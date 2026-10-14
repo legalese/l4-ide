@@ -12,6 +12,7 @@ module TestData (
   maybeParamJL4,
   synonymParamJL4,
   synonymKindsJL4,
+  synonymWrapperJL4,
   saleContractJL4,
   deonticExportJL4,
   deonticRecordPartyJL4,
@@ -302,6 +303,97 @@ GIVETH A NUMBER
   CONSIDER ys
     WHEN EMPTY THEN 0
     WHEN y FOLLOWED BY rest THEN y
+|]
+
+-- | Inputs declared through a synonym for a record, an enum, a DATE, a LIST, a
+-- BOOLEAN, a TIME and a DATETIME, each with a spare MAYBE input, pad, that the
+-- rule never reads: sending pad as @null@ or @{}@ sends the request through the
+-- generated wrapper. The wrapper decides from the head of an input's type how to
+-- read it, and does not expand a synonym. A synonym for a record, an enum or a
+-- DATE was therefore not read as one, and is expanded now. A synonym that takes
+-- no type, for a LIST, a BOOLEAN, a TIME or a DATETIME, is read by the wrapper
+-- as an opaque name and answers, and is left unexpanded, because the wrapper
+-- fails those types written out. The two @plain@ functions take a record and a
+-- DATE written out, and are the control for the first group.
+synonymWrapperJL4 :: Text
+synonymWrapperJL4 =
+  [i|
+DECLARE Pt HAS x IS A NUMBER
+
+DECLARE Point IS A Pt
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Hue IS A Colour
+
+DECLARE Deadline IS A DATE
+
+DECLARE Year IS A NUMBER
+
+DECLARE Years IS A LIST OF Year
+
+DECLARE Flag IS A BOOLEAN
+
+DECLARE Clock IS A TIME
+
+DECLARE Stamp IS A DATETIME
+
+@export the x of a record, through a synonym
+GIVEN p IS A Point
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`point x` p pad MEANS p's x
+
+@export a code for an enum, through a synonym
+GIVEN h IS A Hue
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`hue code` h pad MEANS IF h EQUALS Red THEN 1 ELSE 2
+
+@export the year of a DATE, through a synonym
+GIVEN d IS A Deadline
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`deadline year` d pad MEANS DATE_YEAR d
+
+@export the x of a record written out, the control
+GIVEN p IS A Pt
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`plain point x` p pad MEANS p's x
+
+@export the year of a DATE written out, the control
+GIVEN d IS A DATE
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`plain deadline year` d pad MEANS DATE_YEAR d
+
+@export the first of a list, through a synonym
+GIVEN ys IS A Years
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`first year` ys pad MEANS
+  CONSIDER ys
+    WHEN EMPTY THEN 0
+    WHEN y FOLLOWED BY rest THEN y
+
+@export a code for a BOOLEAN, through a synonym
+GIVEN b IS A Flag
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`flag code` b pad MEANS IF b THEN 1 ELSE 0
+
+@export an answer that does not read a TIME, through a synonym
+GIVEN t IS A Clock
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`clock code` t pad MEANS 5
+
+@export an answer that does not read a DATETIME, through a synonym
+GIVEN dt IS A Stamp
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`stamp code` dt pad MEANS 6
 |]
 
 -- | L4 source with an exported boolean function and a regulative (sale contract) rule.

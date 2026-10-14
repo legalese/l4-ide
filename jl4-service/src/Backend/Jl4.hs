@@ -429,21 +429,42 @@ expandSyn mi = go (16 :: Int)
       TyApp ann r ts -> TyApp ann r (map (subst sub) ts)
       other -> other
 
--- | The types of a function's inputs, with a synonym for MAYBE read as the
--- MAYBE it stands for. The generated wrapper decides from the head of an
--- input's type whether the input may be left out or sent as @null@
--- ('Backend.CodeGen'), and it does not expand a synonym, so an input declared
--- through a synonym for MAYBE was a required one: a @null@ for it, in a batch
--- case or an MCP call, or a @{}@ value anywhere, was refused as a missing
--- parameter. Only a head that comes to a MAYBE is replaced; any other type is
--- left as written.
-maybeSynonymHeads :: [Declare Resolved] -> [(Text, Type' Resolved)] -> [(Text, Type' Resolved)]
-maybeSynonymHeads decls tys = [ (name, headOf ty) | (name, ty) <- tys ]
+-- | The types of a function's inputs, with a synonym at the head of each type
+-- replaced by the type it stands for when that is a MAYBE, a record, an enum
+-- or a DATE. Any other type is left as written.
+--
+-- The generated wrapper decides from the head of an input's type how to read
+-- the input ('Backend.CodeGen'), and it does not expand a synonym. So an input
+-- declared through a synonym for a MAYBE or a DATE was read as a required
+-- input of some other type (a @null@ for a MAYBE synonym, in a batch case or an
+-- MCP call, or a @{}@ value anywhere, was refused as a missing parameter, and
+-- a DATE synonym was passed on as the text it was sent as), and a synonym for a
+-- record or an enum was looked for by its own name. Expanding the head fixes
+-- those four.
+--
+-- A synonym for a LIST, a BOOLEAN, a TIME or a DATETIME is left as written on
+-- purpose. The wrapper reads such a synonym that takes no type as an opaque
+-- name, and the request is answered. Expanded, it would take the wrapper's
+-- limits for those types: the wrapper fails a required LIST, TIME or DATETIME
+-- input with a type error, and reads a BOOLEAN with prelude's @fromMaybe@,
+-- whose import is not found when the host has no copy of the library where the
+-- service looks for one (among them @JL4_LIBRARY_PATH@, the working directory
+-- and @~/.local/share/jl4/libraries@). Only the head of the type is looked at: a
+-- synonym below it (@MAYBE Hue@) is not expanded. A synonym that takes a type
+-- (@Many OF NUMBER@) fails on the wrapper path as it is.
+expandSynonymHeads :: [Declare Resolved] -> [(Text, Type' Resolved)] -> [(Text, Type' Resolved)]
+expandSynonymHeads decls tys = [ (name, headOf ty) | (name, ty) <- tys ]
   where
     mi = buildModuleInfo decls
-    headOf ty = case expandSyn mi ty of
-      expanded | isJust (stripMaybe expanded) -> expanded
-      _                                        -> ty
+    headOf ty
+      | wrapperReads expanded = expanded
+      | otherwise             = ty
+      where expanded = expandSyn mi ty
+    wrapperReads ty =
+         isJust (stripMaybe ty)
+      || isJust (lookupRecord mi ty)
+      || isJust (lookupEnum mi ty)
+      || isTypeUnique TypeCheck.dateUnique ty
 
 -- | Look up an enum or record type by unique.
 lookupEnum :: ModuleInfo -> Type' Resolved -> Maybe [(Text, Resolved)]
@@ -621,8 +642,8 @@ evaluateWithCompiledDeontic
   -> Bool
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz = do
-  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
-      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+  let givenParamTypes = expandSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = expandSynonymHeads compiled.compiledAllDeclares
         (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
@@ -776,8 +797,8 @@ evaluateWithWrapper
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
   -- Extract parameter types from the compiled function definition
-  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
-      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+  let givenParamTypes = expandSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = expandSynonymHeads compiled.compiledAllDeclares
         (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
@@ -1037,8 +1058,8 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 -- to an empty environment instead). Both are repeated here with the
                 -- same arguments, so a request stops before it reaches the wrapper.
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
-                let givenParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module') (extractParamTypes funDecide)
-                    assumeParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module')
+                let givenParamTypes = expandSynonymHeads (moduleDeclaresOnly tcRes.module') (extractParamTypes funDecide)
+                    assumeParamTypes = expandSynonymHeads (moduleDeclaresOnly tcRes.module')
                       (extractAssumeParamTypes tcRes.module' funDecide)
 
                 -- 3. Filter IDE directives from the original source text

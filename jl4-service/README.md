@@ -179,20 +179,25 @@ The function's published `returnSchema` does not describe two of these shapes ye
 
 An input left out of `arguments`, or sent as `null`, is missing.
 Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
-An input declared through a synonym for `MAYBE` is a `MAYBE`, on the wrapper path too, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
+A synonym at the head of an input's type is read as the type it stands for.
+An input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused with the direct path's message.
+On that path a synonym at the head of an input's type is read as the type it stands for when that type is a `MAYBE`, a record, an enum or a `DATE`.
+A synonym for a `LIST`, `BOOLEAN`, `TIME` or `DATETIME` is left as written there.
+A synonym that takes no type (`DECLARE Years IS A LIST OF Year`) answers where the type written out fails (see the limits below); a synonym that takes a type (`DECLARE Many OF a IS A LIST OF a`, used as `Many OF NUMBER`) fails with a parser error.
 A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
 A batch case refused this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
 
 Limits, measured 2026-10-07:
 
-- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`), so every function in a module that uses one fails the request with `I could not find a definition`.
+- On the wrapper path, when the host has no copy of a library where the service looks for one (among them `JL4_LIBRARY_PATH`, its working directory and `~/.local/share/jl4/libraries`), a name the module gets by `IMPORT` is not found (measured with `prelude`), so every function in a module that uses one fails the request with `I could not find a definition`.
   A function with a `BOOLEAN` input fails the same way, because the wrapper reads it with `prelude`'s `fromMaybe`.
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
+- On the wrapper path, only the head of an input's type is read through a synonym: with `DECLARE Hue IS A Colour`, an input `h IS A MAYBE Hue`, given last, fails the request with `The value "Green" reached a CONSIDER that has no branch for it`, where the direct path answers (measured 2026-10-14).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
 - A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
   A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).

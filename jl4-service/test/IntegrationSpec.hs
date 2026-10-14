@@ -19,8 +19,9 @@ import Types
 import Control.Monad (forM_, guard)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
-import Control.Exception (try)
+import Control.Exception (bracket, try)
 import Data.Foldable (toList)
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
@@ -36,9 +37,11 @@ import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, getTemporaryDirectory, removeDirectoryRecursive, withCurrentDirectory)
+import System.Environment (lookupEnv, setEnv, unsetEnv)
+import System.FilePath ((</>))
 import System.IO.Error (isPermissionError)
-import TestData (synonymKindsJL4, synonymParamJL4)
+import TestData (synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4)
 
@@ -301,6 +304,91 @@ spec = describe "integration" do
                     Just (isErr, text) -> Just (isErr, ("\"value\":" <> expected) `Text.isInfixOf` text)
                     Nothing -> Nothing
               (what, statusCode' resp, answered) `shouldBe` (what, 200, Just (False, True))
+
+    -- The wrapper reads the head of an input's type for more than a MAYBE, so a
+    -- synonym for a record, an enum or a DATE failed there too: the wrapper did
+    -- not find a record or an enum by the synonym's name, and passed a DATE on
+    -- as the text it was sent as. Those three are expanded now. A synonym that
+    -- takes no type, for a LIST, a TIME or a DATETIME, answers because the
+    -- wrapper reads it as an opaque name, and the wrapper fails each written
+    -- out, so those are left unexpanded: the examples for them fail if a later
+    -- change expands them.
+    -- Each request below has a spare MAYBE input, pad, that is @null@ or @{}@,
+    -- which sends it through the wrapper. `plain point x` and `plain deadline
+    -- year` write a record and a DATE out: the control.
+    describe "a synonym at the head of an input's type, on the wrapper path" do
+      let deployId = "wrapper-synonym"
+          withSynonyms = withServiceFromSources deployId [("synonym.l4", synonymWrapperJL4)]
+          pathOf fn = Text.unpack (Text.replace " " "%20" fn)
+          recordInput = ("p" :: Aeson.Key.Key, Aeson.object [ "x" Aeson..= (7 :: Int) ])
+          enumInput = ("h" :: Aeson.Key.Key, Aeson.String "Green")
+          dateInput = ("d" :: Aeson.Key.Key, Aeson.String "2020-06-15")
+          listInput = ("ys" :: Aeson.Key.Key, Aeson.toJSON [7, 8 :: Int])
+          timeInput = ("t" :: Aeson.Key.Key, Aeson.String "12:30:00")
+          datetimeInput = ("dt" :: Aeson.Key.Key, Aeson.String "2020-06-15T12:30:00Z")
+      forM_ ([ ("point x", recordInput, 7), ("plain point x", recordInput, 7)
+             , ("hue code", enumInput, 2)
+             , ("deadline year", dateInput, 2020), ("plain deadline year", dateInput, 2020)
+             , ("first year", listInput, 7)
+             , ("clock code", timeInput, 5)
+             , ("stamp code", datetimeInput, 6) ]
+              :: [(Text, (Aeson.Key.Key, Aeson.Value), Int)]) \(fn, (name, input), expected) -> describe (Text.unpack fn) do
+        it "answers a {} for the spare input" do
+          withSynonyms \baseUrl mgr -> do
+            resp <- evalFunction baseUrl mgr deployId fn
+              (Aeson.object [ "arguments" Aeson..= Aeson.object [ name Aeson..= input, "pad" Aeson..= Aeson.object [] ] ])
+            let value = case Aeson.decode (responseBody resp) of
+                  Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                  _ -> Nothing
+            (statusCode' resp, value) `shouldBe` (200, Just (FnLitInt (fromIntegral expected)))
+        it "answers a batch case with a null for the spare input" do
+          withSynonyms \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> pathOf fn <> "/evaluation/batch")
+              (Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object [ "@id" Aeson..= (1 :: Int), name Aeson..= input, "pad" Aeson..= Aeson.Null ]
+                    , Aeson.object [ "@id" Aeson..= (2 :: Int), name Aeson..= input, "pad" Aeson..= (1 :: Int) ]
+                    ]
+                ])
+            resp <- httpLbs req mgr
+            statusCode' resp `shouldBe` 200
+            fmap (map (\c -> (c.outcome, Map.lookup "value" c.attributes)) . (.cases))
+                (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+              `shouldBe` Just (replicate 2 (CaseAnswered, Just (FnLitInt (fromIntegral expected))))
+        it "answers an MCP tool call with a null for the spare input" do
+          withSynonyms \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+              [ "jsonrpc" Aeson..= ("2.0" :: Text)
+              , "id" Aeson..= (1 :: Int)
+              , "method" Aeson..= ("tools/call" :: Text)
+              , "params" Aeson..= Aeson.object
+                  [ "name" Aeson..= Text.replace " " "-" fn
+                  , "arguments" Aeson..= Aeson.object [ name Aeson..= input, "pad" Aeson..= Aeson.Null ]
+                  ]
+              ]
+            resp <- httpLbs req mgr
+            let answered = case mcpToolText (responseBody resp) of
+                  Just (isErr, text) -> Just (isErr, ("\"value\":" <> Text.pack (show expected)) `Text.isInfixOf` text)
+                  Nothing -> Nothing
+            (statusCode' resp, answered) `shouldBe` (200, Just (False, True))
+
+    -- A synonym for a BOOLEAN is left unexpanded too, and the reason only shows
+    -- when the host has no copy of the library where the service looks for one:
+    -- expanded, the wrapper would read the input with prelude's @fromMaybe@, and
+    -- its @IMPORT prelude@ is not found. CI exports JL4_LIBRARY_PATH for the
+    -- whole run, and a developer's host can hold a library under
+    -- ~/.local/share/jl4/libraries, which hides that, so this example removes
+    -- every place the service looks in around its call.
+    it "answers a synonym for a BOOLEAN when the host has no library to import" do
+      withNoLibraryOnTheHost $
+        withServiceFromSources "wrapper-synonym-bool" [("synonym.l4", synonymWrapperJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "wrapper-synonym-bool" "flag code"
+            (Aeson.object [ "arguments" Aeson..= Aeson.object [ "b" Aeson..= True, "pad" Aeson..= Aeson.object [] ] ])
+          let value = case Aeson.decode (responseBody resp) of
+                Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                _ -> Nothing
+          (statusCode' resp, value) `shouldBe` (200, Just (FnLitInt 1))
 
     -- The same fault showed on a synonym for a record, an enum and a list: the
     -- service looked for each by the synonym's own name, and answered
@@ -1801,6 +1889,32 @@ spec = describe "integration" do
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------
+
+-- | Run an action as on a host that has no copy of the standard library where
+-- the service looks for one, and put everything back afterwards: JL4_LIBRARY_PATH
+-- is dropped, XDG_DATA_HOME points at an empty directory (the service looks in
+-- its jl4/libraries), and the working directory is that empty directory too.
+-- CI exports JL4_LIBRARY_PATH for the whole run, and a developer's host can hold
+-- a library under ~/.local/share/jl4/libraries, so either hides a wrapper whose
+-- @IMPORT prelude@ is not found.
+withNoLibraryOnTheHost :: IO a -> IO a
+withNoLibraryOnTheHost act = bracket acquire release (\(_, _, empty) -> withCurrentDirectory empty act)
+  where
+    acquire = do
+      savedLibrary <- lookupEnv "JL4_LIBRARY_PATH"
+      savedXdg <- lookupEnv "XDG_DATA_HOME"
+      tmp <- getTemporaryDirectory
+      stamp <- (floor . (* 1000000)) <$> getPOSIXTime :: IO Integer
+      let empty = tmp </> ("jl4-service-no-library-" <> show stamp)
+      createDirectoryIfMissing True empty
+      unsetEnv "JL4_LIBRARY_PATH"
+      setEnv "XDG_DATA_HOME" empty
+      pure (savedLibrary, savedXdg, empty)
+    release (savedLibrary, savedXdg, empty) = do
+      restore "JL4_LIBRARY_PATH" savedLibrary
+      restore "XDG_DATA_HOME" savedXdg
+      removeDirectoryRecursive empty
+    restore name = maybe (unsetEnv name) (setEnv name)
 
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
