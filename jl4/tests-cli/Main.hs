@@ -43,6 +43,7 @@ import Test.Hspec
 
 import CliTest.Common
 import qualified CliTest.Blawx as Blawx
+import qualified CliTest.BuildIdentity as BuildIdentity
 import qualified CliTest.BuildVersion as BuildVersion
 import qualified CliTest.Catala as Catala
 import qualified CliTest.DmnBpmn as DmnBpmn
@@ -484,6 +485,7 @@ main = do
          , Blawx.fixtures
          , Docassemble.fixtures
          , Catala.fixtures
+         , BuildIdentity.fixtures
          ]) \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
@@ -3389,6 +3391,7 @@ spec bin = do
   Docassemble.spec bin
   Catala.spec bin
   BuildVersion.spec bin
+  BuildIdentity.spec
   where
     for_ xs f = mapM_ f xs
 

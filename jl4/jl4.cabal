@@ -155,6 +155,7 @@ test-suite l4-cli-test
   main-is: Main.hs
   other-modules:
     CliTest.Blawx
+    CliTest.BuildIdentity
     CliTest.BuildVersion
     CliTest.Catala
     CliTest.Common
