@@ -19,6 +19,8 @@ import L4.FindDefinition (findDefinition)
 import L4.FunctionSchema (Parameters(..), Parameter(..), parametersFromDecide)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
+import L4.Syntax
+import Data.Maybe (isJust)
 
 plot :: Text
 plot = Text.unlines
@@ -43,6 +45,12 @@ exportSchema source =
     Right r -> case getExportedFunctions r.tcdModule of
       [ef] -> Right (parametersFromDecide r.tcdModule ef.exportDecide)
       efs  -> Left ["expected exactly one export, got " <> Text.pack (show (length efs))]
+
+-- | Every top-level declaration of a checked module, through its sections.
+topDecls :: Module Resolved -> [TopDecl Resolved]
+topDecls (MkModule _ _ section) = go section
+ where
+  go (MkSection _ _ _ _ ds) = concatMap (\ d -> d : case d of Section _ s -> go s; _ -> []) ds
 
 -- | The start of the definition found from a 1-based line and column.
 definitionAt :: Text -> Int -> Int -> Either [Text] (Maybe (Int, Int))
@@ -81,6 +89,44 @@ spec = do
         Right ps -> do
           fmap (.parameterL4Type) (Map.lookup "t" ps.parameterMap) `shouldBe` Just Nothing
           fmap (.parameterEnum) (Map.lookup "t" ps.parameterMap) `shouldBe` Just ["Owner", "Tenant"]
+
+  -- Review round 1, finding 1: a TYPICALLY on its own line after a list
+  -- whose last option has a field went to that inner field.
+  describe "a default after a list on several lines" $ do
+    let account = Text.unlines
+          [ "DECLARE Status IS ONE OF Open, Closed"
+          , "DECLARE Account HAS"
+          , "  name IS A STRING"
+          , "  state IS ONE OF"
+          , "      Open"
+          , "      Suspended HAS previous IS A Status"
+          , "    TYPICALLY Open"
+          , ""
+          , "@export"
+          , "GIVEN a IS AN Account"
+          , "GIVETH A STRING"
+          , "f a MEANS a's name"
+          ]
+        accountField ps f = Map.lookup "a" ps.parameterMap >>= (.parameterProperties) >>= Map.lookup f
+    it "is the default of the field whose options they are" $
+      case exportSchema account of
+        Left errs -> expectationFailure (show errs)
+        Right ps -> do
+          fmap (.parameterDefault) (accountField ps "state") `shouldBe` Just (Just "Open")
+          fmap (elem "state") (Map.lookup "a" ps.parameterMap >>= (.parameterRequired)) `shouldBe` Just False
+
+    it "is not the default of the last option's field" $
+      case checkWithImports emptyVFS account of
+        Left errs -> expectationFailure (show errs)
+        Right r ->
+          -- the lifted `Account's state`, its option `Suspended`, its field `previous`
+          [ isJust mTypically
+          | Declare _ (MkDeclare _ _ (MkAppForm _ ty _ _) (EnumDecl _ cds)) <- topDecls r.tcdModule
+          , nameToText (getActual ty) == "Account's state"
+          , MkConDecl _ con fields <- cds
+          , nameToText (getActual con) == "Suspended"
+          , MkTypedName _ _ _ _ mTypically _ <- fields
+          ] `shouldBe` [False]
 
   describe "going to a definition" $ do
     it "lands on the field's ONE OF from a rule that names the generated type" $

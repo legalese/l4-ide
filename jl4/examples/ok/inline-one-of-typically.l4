@@ -1,0 +1,39 @@
+-- A TYPICALLY on its own line after a list of options on several lines is the
+-- default of the field whose options they are, even when the last option has
+-- a field of its own (review round 1, finding 1;
+-- specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §9.1).
+--
+-- A field of an option takes a TYPICALLY on a later line only when it is
+-- written to the right of that field's own name.
+
+DECLARE Status IS ONE OF Open, Closed
+DECLARE Reason IS ONE OF Fraud, Arrears
+
+DECLARE Account HAS
+  name IS A STRING
+  -- `Status` also has an `Open`, so the default used to go to `previous`
+  -- with no error at all.
+  state IS ONE OF
+      Open
+      Suspended HAS previous IS A Status
+    TYPICALLY Open
+  -- `Reason` has no `Good`, so the same layout used to be an error that
+  -- named `reason`.
+  standing IS ONE OF
+      Good
+      Flagged HAS reason IS A Reason
+    TYPICALLY Good
+  -- To the right of the inner field's name, the default is the inner field's.
+  review IS ONE OF
+      Pending
+      Escalated HAS
+          level IS A NUMBER
+            TYPICALLY 1
+
+@export Whether an account is open.
+GIVEN a IS AN Account
+GIVETH A BOOLEAN
+`is open` a MEANS a's state EQUALS Open
+
+#ASSERT `is open` (Account WITH name IS "Alex", state IS Open, standing IS Good, review IS Pending)
+#ASSERT NOT `is open` (Account WITH name IS "Alex", state IS (Suspended OF Closed), standing IS (Flagged OF Arrears), review IS (Escalated OF 2))

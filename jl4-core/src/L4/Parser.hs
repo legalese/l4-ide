@@ -1961,6 +1961,7 @@ lsepBy1 pp sep =
 reqParamWith :: Bool -> Parser (TypedName Name)
 reqParamWith inline = do
   current <- Lexer.indentLevel
+  startLine <- currentLine
   attachAnno $
     (\ n (ty, mOptions) mTypically mMeans -> MkTypedName emptyAnno n ty mOptions mTypically mMeans)
       <$> annoHole name
@@ -1969,13 +1970,36 @@ reqParamWith inline = do
       <*> (if inline
              then inlineOptions <|> fieldType FieldTypeSite
              else fieldType NestedFieldTypeSite)
-      <*> optionalHole (annoLexeme (spacedKeyword_ TKTypically) *> annoHole atomicExpr')
-      <*> optionalHole (annoLexeme (spacedKeyword_ TKMeans) *> annoHole (indentedExpr current))
+      <*> optionalHole (ownClause startLine current *> annoLexeme (spacedKeyword_ TKTypically) *> annoHole atomicExpr')
+      <*> optionalHole (ownClause startLine current *> annoLexeme (spacedKeyword_ TKMeans) *> annoHole (indentedExpr current))
   where
     fieldType site =
       (\ ty -> (ty, Nothing))
         <$> annoHole (typeAt site)
         <*  wrapAnnoParser (pure (WithAnno [mkHoleWithSrcRangeHint Nothing] ()))
+    -- A field of one of a field's inline options takes a @TYPICALLY@ or
+    -- @MEANS@ on a later line only when it is written to the right of the
+    -- field's own name. One at or left of it belongs to the field whose
+    -- options these are, which is how the reference page teaches a default
+    -- after a list on several lines:
+    --
+    -- @
+    --   state IS ONE OF
+    --       Open
+    --       Suspended HAS previous IS A Status
+    --     TYPICALLY Open         -- state's default, not previous's
+    -- @
+    --
+    -- Without this the default went to @previous@: silently when @Status@
+    -- also has an @Open@, and otherwise with an error that named the wrong
+    -- field (review round 1, finding 1). Every other field keeps the old
+    -- rule, which checks no column. Consumes nothing and records no hole.
+    ownClause startLine column
+      | inline    = pure ()
+      | otherwise = wrapAnnoParser $ WithAnno [] <$> do
+          line <- currentLine
+          col <- Lexer.indentLevel
+          guard (line == startLine || col > column)
 
 -- | @ONE OF@ and a field's options, parsed by the same 'conDecl' a
 -- @DECLARE … IS ONE OF@ uses, one level deep. One line or several, exactly
