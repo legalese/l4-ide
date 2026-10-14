@@ -1777,11 +1777,11 @@ spec = describe "integration" do
                 case lookupKey "determined" plan of
                   Just (Aeson.Bool b) -> do
                     (bs, reasons) `shouldBe` (bs, [])
-                    (bs, verdict `elem` map (Just . Aeson.String) ["Undetermined", "Undetermined"]) `shouldBe` (bs, False)
+                    (bs, verdict `elem` map (Just . Aeson.String) ["Undetermined", "Refused"]) `shouldBe` (bs, False)
                     (bs, outs) `shouldBe` (bs, map (const (Right b)) outs)
                   Just Aeson.Null
                     | not (null reasons) -> do
-                        (bs, verdict) `shouldBe` (bs, Just (Aeson.String "Undetermined"))
+                        (bs, verdict) `shouldBe` (bs, Just (Aeson.String "Refused"))
                         (bs, length reasons, List.nub (List.sort [r | Left r <- outs]), length [() | Left _ <- outs])
                           `shouldBe` (bs, length (List.nub reasons), List.sort reasons, length outs)
                     | otherwise -> do
@@ -1819,7 +1819,7 @@ spec = describe "integration" do
       withServiceFromSources "refuse-both" [("rule.l4", refusingBothArmsJL4)] \baseUrl mgr -> do
         qp <- queryPlan' baseUrl mgr "refuse-both" "eligible" (args [])
         let plan = decodeObject (responseBody qp)
-        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Undetermined")
+        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Refused")
         askedLabels plan `shouldBe` []
         List.sort (refusalReasons plan)
           `shouldBe` ["the rules for non-residents are not modelled", "the rules for residents are not modelled"]
@@ -1829,7 +1829,7 @@ spec = describe "integration" do
         qp <- queryPlan' baseUrl mgr "refuse-bound" "eligible"
           (args [("adult", True), ("the other conditions are not modelled", True)])
         let plan = decodeObject (responseBody qp)
-        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Undetermined")
+        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Refused")
         refusalReasons plan `shouldBe` ["the other conditions are not modelled"]
 
     -- The guards: a rule of no inputs that cannot refuse, or refuses on only one

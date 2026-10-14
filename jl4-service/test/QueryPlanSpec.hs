@@ -726,7 +726,7 @@ lspTests = do
           refused = lspQP "eligible" params info state [("adult", True)]
           fails = lspQP "eligible" params info state [("adult", False)]
       map (.label) ask.stillNeeded `shouldBe` ["adult"]
-      refused.verdict `shouldBe` QP.Undetermined
+      refused.verdict `shouldBe` QP.Refused
       refused.determined `shouldBe` Nothing
       fmap (.reasons) refused.refusal `shouldBe` Just ["the other conditions are not modelled"]
       fails.verdict `shouldBe` QP.Fails

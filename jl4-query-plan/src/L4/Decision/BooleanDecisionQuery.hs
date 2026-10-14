@@ -230,6 +230,10 @@ data Verdict
     -- so ("yes, you're fine") is not the same as saying you complied: you were never
     -- asked to. Vacuity is a STATE, not a way of passing.
     NotApplicable
+  | -- | Evaluation reaches a refusal (R7): the model declines to answer this case,
+    -- and no answer to anything left would change that. Not a truth value, so
+    -- 'determined' is 'Nothing' with it.
+    Refused
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -622,13 +626,12 @@ lazyDetermined l
 lazyRefused :: Lazy v -> Bool
 lazyRefused l = l.onTrue == 0 && l.onFalse == 0
 
--- | 'verdictOf', read lazily. Where evaluation is sure to refuse there is no
--- truth value to report, so the verdict is 'Undetermined', with nothing left to
--- ask, and 'refusedAt' says where. The function is asked first, since a seam can
--- refuse whichever way a scope still open comes out (@(x OR r) IMPLIES r@).
+-- | 'verdictOf', read lazily: a refusal is a verdict of its own. The function
+-- is asked first, since a seam can refuse whichever way a scope still open
+-- comes out (@(x OR r) IMPLIES r@).
 lazyVerdictOf :: LazyRoots v -> Verdict
 lazyVerdictOf lr
-  | lazyRefused lr.fnLazy = Undetermined
+  | lazyRefused lr.fnLazy = Refused
   | otherwise = case lr.seamLazy of
       Nothing -> case lazyDetermined lr.fnLazy of
         Just True -> Holds

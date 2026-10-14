@@ -146,7 +146,7 @@ spec = do
       let e = BAnd [BVar x, BRefuse r]
       (plan e [(x, False)]).verdict `shouldBe` Fails
       (plan e [(x, False)]).determined `shouldBe` Just False
-      (plan e [(x, True)]).verdict `shouldBe` Undetermined
+      (plan e [(x, True)]).verdict `shouldBe` Refused
       (plan e [(x, True)]).determined `shouldBe` Nothing
       (plan e [(x, True)]).refusedAt `shouldBe` Set.fromList [r]
       (plan e [(x, True)]).support `shouldBe` Set.empty
@@ -159,45 +159,45 @@ spec = do
 
     it "r AND x: refused before x is read, whatever x is" do
       let e = BAnd [BRefuse r, BVar x]
-      (plan e []).verdict `shouldBe` Undetermined
-      (plan e [(x, False)]).verdict `shouldBe` Undetermined
+      (plan e []).verdict `shouldBe` Refused
+      (plan e [(x, False)]).verdict `shouldBe` Refused
       (plan e []).support `shouldBe` Set.empty
 
     it "x OR r: TRUE where x is, refused where x is FALSE" do
       let e = BOr [BVar x, BRefuse r]
       (plan e [(x, True)]).verdict `shouldBe` Holds
-      (plan e [(x, False)]).verdict `shouldBe` Undetermined
+      (plan e [(x, False)]).verdict `shouldBe` Refused
 
     it "NOT r refuses" do
-      (plan (BNot (BRefuse r)) []).verdict `shouldBe` Undetermined
+      (plan (BNot (BRefuse r)) []).verdict `shouldBe` Refused
 
     it "an answer for a refusing leaf changes nothing: evaluation takes none" do
       let e = BAnd [BVar x, BRefuse r]
-      (plan e [(x, True), (r, True)]).verdict `shouldBe` Undetermined
-      (plan e [(x, True), (r, False)]).verdict `shouldBe` Undetermined
+      (plan e [(x, True), (r, True)]).verdict `shouldBe` Refused
+      (plan e [(x, True), (r, False)]).verdict `shouldBe` Refused
 
     it "the impact of answering x says which answer leads to the refusal" do
       let res = plan (BAnd [BVar x, BRefuse r]) []
-      fmap (.ifTrue.verdict) (Map.lookup x res.impact) `shouldBe` Just Undetermined
+      fmap (.ifTrue.verdict) (Map.lookup x res.impact) `shouldBe` Just Refused
       fmap (.ifFalse.verdict) (Map.lookup x res.impact) `shouldBe` Just Fails
 
     it "a seam: a scope that refuses is a refusal; one that is FALSE is not applicable" do
       let e = BImplies (BAnd [BVar x, BRefuse r]) (BVar y)
       (plan e [(x, False)]).verdict `shouldBe` NotApplicable
-      (plan e [(x, True)]).verdict `shouldBe` Undetermined
-      (plan e [(x, True), (y, True)]).verdict `shouldBe` Undetermined
+      (plan e [(x, True)]).verdict `shouldBe` Refused
+      (plan e [(x, True), (y, True)]).verdict `shouldBe` Refused
 
     it "a seam: a requirement that refuses is a refusal once the scope holds" do
       let e = BImplies (BVar x) (BOr [BVar y, BRefuse r])
       (plan e [(x, False)]).verdict `shouldBe` NotApplicable
       (plan e [(x, True), (y, True)]).verdict `shouldBe` Complies
-      (plan e [(x, True), (y, False)]).verdict `shouldBe` Undetermined
+      (plan e [(x, True), (y, False)]).verdict `shouldBe` Refused
 
     it "a seam whose scope is still open can be sure to refuse: nothing is asked" do
       let r2 = "r2"
           e = BImplies (BOr [BVar x, BRefuse r]) (BRefuse r2)
           res = queryDecision (compileDecisionQuery [x, r, r2] e) Map.empty Map.empty
-      res.verdict `shouldBe` Undetermined
+      res.verdict `shouldBe` Refused
       res.support `shouldBe` Set.empty
       res.refusedAt `shouldBe` Set.fromList [r, r2]
 
@@ -205,7 +205,7 @@ spec = do
       let r2 = "r2"
           e = BOr [BAnd [BVar x, BRefuse r], BAnd [BNot (BVar x), BRefuse r2]]
           res bs = queryDecision (compileDecisionQuery [x, r, r2] e) Map.empty (Map.fromList bs)
-      (res []).verdict `shouldBe` Undetermined
+      (res []).verdict `shouldBe` Refused
       (res []).refusedAt `shouldBe` Set.fromList [r, r2]
       (res [(x, True)]).refusedAt `shouldBe` Set.fromList [r]
       (res [(x, False)]).refusedAt `shouldBe` Set.fromList [r2]
@@ -277,7 +277,7 @@ outcomeOfEval :: Outcome -> (Verdict, Maybe Bool, Set.Set String)
 outcomeOfEval = \case
   OTrue -> (Holds, Just True, Set.empty)
   OFalse -> (Fails, Just False, Set.empty)
-  ORefused v -> (Undetermined, Nothing, Set.singleton v)
+  ORefused v -> (Refused, Nothing, Set.singleton v)
 
 -- | Expressions over three variables and two refusing leaves, with at least one
 -- refusing leaf (so that they are planned lazily), and no top-level seam (whose

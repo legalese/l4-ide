@@ -628,7 +628,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
         <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
         <> " Report `verdict`, not `determined`: when the rule is stated as a seam (`scope IMPLIES requirement`), `Complies` and `NotApplicable` are BOTH `determined = true`, and telling a user they complied with a rule that never reached them is a category error, not a rounding error."
-        <> " Where `refusal` is set, evaluation of this case refuses to answer, for the reasons it lists; a `REFUSE`, or a rule of no inputs that always refuses, is never asked."
+        <> " `Refused` means evaluation of this case refuses to answer, for the reasons in `refusal`; a `REFUSE`, or a rule of no inputs that always refuses, is never asked."
    in
     QueryPlanResponse
       { determined = res.determined

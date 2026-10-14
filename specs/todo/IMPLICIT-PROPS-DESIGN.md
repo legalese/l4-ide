@@ -1662,11 +1662,11 @@ Built on unstable (branch `fix/query-plan-refusal`):
   left to right and stopping as soon as the answer is known (`connectiveLeft`): as three diagrams
   over the askable atoms, TRUE, FALSE, and one per refusing leaf for "reaches this one first". So
   the plan and `/evaluation` agree case by case, order-dependence included: `adult AND r` is
-  `Fails` where `adult` is FALSE, `r AND adult` refuses either way. The order-dependence this
+  `Fails` where `adult` is FALSE, `r AND adult` is `Refused` either way. The order-dependence this
   section writes down is honoured, not removed. An expression with no refusing leaf is planned as
   it always was, by the same code.
 - **The answer.** A `refusal` field carrying the reasons evaluation can reach first, set wherever
-  evaluation is sure to refuse, with `determined: null` and nothing left to ask. In the
+  evaluation is sure to refuse, and `verdict` gains `Refused`, with `determined: null`. In the
   service and the browser editor, a ladder with a refusing leaf is drawn again unsimplified, since
   distributing `OR` over `AND` can change which refusal evaluation reaches; every other ladder is
   drawn as before. jl4-lsp plans from the ladder the reader is shown, which is unsimplified unless

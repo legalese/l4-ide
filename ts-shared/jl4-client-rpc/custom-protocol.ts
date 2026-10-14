@@ -107,6 +107,8 @@ export type Verdict =
   | 'Complies'
   | 'InBreach'
   | 'NotApplicable'
+  /** Evaluation of this case refuses to answer (REFUSE, R7); `refusal` says why. */
+  | 'Refused'
 
 export type QueryOutcome = {
   /** The FUNCTION's truth value. Correct, and not a verdict. */
