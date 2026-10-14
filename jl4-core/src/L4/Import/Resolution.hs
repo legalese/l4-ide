@@ -371,6 +371,9 @@ combineResolvedImports uri imports =
         , TypeCheck.constBodies = finalState.constBodies
         , TypeCheck.sectionPaths = finalState.sectionPaths
         , TypeCheck.deferredChoices = 0
+        , TypeCheck.plural = False
+        , TypeCheck.bindLog = []
+        , TypeCheck.bindLogLen = 0
         }
     , finalEnv
     )
@@ -405,6 +408,9 @@ combineResolvedImports uri imports =
                -- imported 'Unique' is still never ranked (spec §5.5, FIX C).
              , TypeCheck.sectionPaths = Map.union accState.sectionPaths r.sectionPaths
              , TypeCheck.deferredChoices = 0
+             , TypeCheck.plural = False
+             , TypeCheck.bindLog = []
+             , TypeCheck.bindLogLen = 0
              }
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
          )

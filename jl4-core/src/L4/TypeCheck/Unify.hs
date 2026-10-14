@@ -293,5 +293,5 @@ infVars (InfVar _ _ i)  = [i]
 --
 bind :: Int -> Type' Resolved -> Check Bool
 bind i t = do
-  modifying' #substitution (Map.insert i t)
+  bindInfVar i t
   pure True

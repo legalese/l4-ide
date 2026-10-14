@@ -15,8 +15,16 @@ module L4.TypeCheck
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext
+  -- what the merge of 'checkExpr' tells values apart by; exported to be tested
+  , headKey
   -- 'severity' is re-exported via @module X@ (it lives in
   -- L4.TypeCheck.Types now, next to candidate viability)
+  --
+  -- The combinators that put a whole 'CheckState' back, which a plural outcome
+  -- ('CheckState.plural') has to survive; exported to be tested.
+  , quietly
+  , settleOneClause
+  , speculatively
   )
   where
 
@@ -138,6 +146,9 @@ mkInitialCheckState substitution =
     , constBodies  = Map.empty
     , sectionPaths = Map.empty
     , deferredChoices = 0
+    , plural       = False
+    , bindLog      = []
+    , bindLogLen   = 0
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -1541,7 +1552,7 @@ checkClausesLet ec ann ds e t
 -- mention prints as what was inferred, not as a bare inference variable.
 speculatively :: Check a -> Check ()
 speculatively m = MkCheck \ e s ->
-  [ (foldr With (Plain ()) diags', s { supply = s''.supply })
+  [ (foldr With (Plain ()) diags', s { supply = s''.supply, plural = s'.plural })
   | (w, s') <- runCheck m e s
   , let (diags, _) = runWith w
   , (w', s'') <- take 1 (runCheck (traverse applySubst diags) e s')
@@ -2279,7 +2290,7 @@ typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emp
 -- but nothing consumes it at runtime.
 checkTypically :: Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
 checkTypically n ty = traverse $ \ e -> do
-  re <- checkExpr (ExpectTypicallyValueContext n) e ty
+  re <- checkExprExact (ExpectTypicallyValueContext n) e ty
   literal <- isTypicallyLiteral re
   unless literal $ addError (TypicallyValueNotALiteral n)
   pure re
@@ -2532,17 +2543,84 @@ ensureDistinct ndc ns = do
   unless (null dups) $
     addError (NonDistinctError ndc dups)
 
+-- | 'softprune' for the check of an expression against a type: the outcomes
+-- that nothing after it can tell apart are merged ('softpruneAlike').
+--
+-- What the callers of 'checkExpr' do with the expression it returns is, with
+-- two exceptions, to embed it in a larger one, and that is all the merge
+-- allows for: it compares only what 'headKey' reads off it.
+--
+-- * A caller that reads the head of it ('checkTypically', the party of
+--   'checkDeonton', 'inferEvent') calls 'checkExprExact', whose outcomes are
+--   never merged.
+--
+-- * 'inferDecide' records the body of a nullary definition in
+--   'CheckState.constBodies', and 'subjectOfActionExpr' reads it back by name.
+--   A @WHERE@ or @LET@ local is checked while the rest of the enclosing
+--   definition, which reads it, is still part of the search. That reader reads
+--   a body only through 'bodyRead', and 'headKey' is made of what 'bodyRead'
+--   reads, so two outcomes with the same key are read back the same.
+softpruneExpr :: Check (Expr Resolved) -> Check (Expr Resolved)
+softpruneExpr = softpruneAlike headKey
+
+-- | How 'subjectOfActionExpr' reads the body of a nullary definition, and the
+-- only way it does: the arguments of an application, whose heads it looks at,
+-- or a bare name, whose own body it then reads in turn. Anything else it does
+-- not look into.
+data BodyRead
+  = ReadsArgs [Expr Resolved]
+  | ReadsName Resolved
+  | ReadsNothing
+
+bodyRead :: Expr Resolved -> BodyRead
+bodyRead = \ case
+  App _ _ args@(_ : _) -> ReadsArgs args                           -- applied / positional record
+  AppNamed _ _ nes _   -> ReadsArgs [ a | MkNamedExpr _ _ a <- nes ]
+  App _ f []           -> ReadsName f                              -- a bare name: resolve its body
+  _                    -> ReadsNothing
+
+-- | What anything that reads the value a 'checkExpr' returns can tell it
+-- apart by, other than by embedding it in a larger expression: the key of
+-- 'softpruneAlike'. It is what 'bodyRead' reads, down to the 'Unique' of the
+-- name, or of the head of each argument ('exprHeadConstructor', which is what
+-- 'subjectField' looks at); and whether the value is a literal.
+headKey :: Expr Resolved -> ExprHead
+headKey e = case bodyRead e of
+  ReadsName f    -> HeadName (getUnique f)
+  ReadsArgs args -> HeadApplied (map (fmap getUnique . exprHeadConstructor) args)
+  ReadsNothing   -> case e of
+    Lit {} -> HeadLiteral
+    _      -> HeadOther
+
+-- | What 'headKey' tells expressions apart by.
+data ExprHead
+  = HeadLiteral
+  | HeadName Unique
+  | HeadApplied [Maybe Unique]
+  | HeadOther
+  deriving stock (Eq, Ord, Show)
+
 checkExpr :: ExpectationContext -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
-checkExpr ec (IfThenElse ann e1 e2 e3) t = softprune $ do
+checkExpr = checkExprWith softpruneExpr
+
+-- | 'checkExpr' for a caller that reads the expression it returns: where two
+-- meanings of a name both check, both outcomes are kept, as 'softprune' keeps them.
+checkExprExact :: ExpectationContext -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
+checkExprExact = checkExprWith softprune
+
+checkExprWith
+  :: (Check (Expr Resolved) -> Check (Expr Resolved))
+  -> ExpectationContext -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
+checkExprWith pr ec (IfThenElse ann e1 e2 e3) t = pr $ do
   re <- checkIfThenElse ec ann e1 e2 e3 t
   setAnnResolvedType t Nothing re
-checkExpr ec c@(Consider ann e branches) t = softprune $ errorContext (WhileCheckingExpression c) $ do
+checkExprWith pr ec c@(Consider ann e branches) t = pr $ errorContext (WhileCheckingExpression c) $ do
   re <- checkConsider ec ann e branches t
   setAnnResolvedType t Nothing re
 -- checkExpr (ParenExpr ann e) t = do
 --   re <- checkExpr e t
 --   pure (ParenExpr ann re)
-checkExpr ec (Where ann e ds) t = softprune $ do
+checkExprWith pr ec (Where ann e ds) t = pr $ do
   let
     preScanDecl = mapMaybeM scanTyDeclLocalDecl
     scanDecl = mapMaybeM inferTyDeclLocalDecl
@@ -2560,9 +2638,9 @@ checkExpr ec (Where ann e ds) t = softprune $ do
       nlgExpr re
     pure re
   setAnnResolvedType t Nothing (Where ann re rds)
-checkExpr ec (LetIn ann ds e) t
-  | any isClausesBinding ds = softprune $ checkClausesLet ec ann ds e t
-checkExpr ec (LetIn ann ds e) t = softprune $ do
+checkExprWith pr ec (LetIn ann ds e) t
+  | any isClausesBinding ds = pr $ checkClausesLet ec ann ds e t
+checkExprWith pr ec (LetIn ann ds e) t = pr $ do
   let
     preScanDecl = mapMaybeM scanTyDeclLocalDecl
     scanDecl = mapMaybeM inferTyDeclLocalDecl
@@ -2583,7 +2661,7 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
 -- was known. A LEST/HENCE, the operand of a RAND/ROR under a GIVETH (via the
 -- two clauses below), and a top-level @x MEANS BREACH BY …@ under a GIVETH
 -- all arrive here.
-checkExpr ec e@(Breach ann mParty mReason) t = softprune $ errorContext (WhileCheckingExpression e) do
+checkExprWith pr ec e@(Breach ann mParty mReason) t = pr $ errorContext (WhileCheckingExpression e) do
   partyT <- fresh (NormalName "party")
   actionT <- fresh (NormalName "action")
   expect ec t (contract partyT actionT)
@@ -2600,13 +2678,13 @@ checkExpr ec e@(Breach ann mParty mReason) t = softprune $ errorContext (WhileCh
 -- @GIVETH A DEONTIC …@ never reached the operands, and the refusal's advice
 -- ("give the definition a signature") was false for a rule that had one
 -- (adversarial pass of 2026-09-15, round 2, R2-TC-1).
-checkExpr ec e@(RAnd ann e1 e2) t = softprune $ errorContext (WhileCheckingExpression e) do
+checkExprWith pr ec e@(RAnd ann e1 e2) t = pr $ errorContext (WhileCheckingExpression e) do
   re <- checkRegulativeBinOp ec "AND" RAnd InertCtxAnd ann e1 e2 t
   setAnnResolvedType t Nothing re
-checkExpr ec e@(ROr ann e1 e2) t = softprune $ errorContext (WhileCheckingExpression e) do
+checkExprWith pr ec e@(ROr ann e1 e2) t = pr $ errorContext (WhileCheckingExpression e) do
   re <- checkRegulativeBinOp ec "OR" ROr InertCtxOr ann e1 e2 t
   setAnnResolvedType t Nothing re
-checkExpr ec e t = softprune $ errorContext (WhileCheckingExpression e) do
+checkExprWith pr ec e t = pr $ errorContext (WhileCheckingExpression e) do
   (re, rt) <- inferExpr e
   expect ec t rt
   -- Store the expected type in the annotation so it's available during evaluation
@@ -2718,7 +2796,7 @@ checkDeonton
 checkDeonton ann subject action opens due mjoin hence lest partyT actionT =
   case subject of
     Party sann party -> do
-      partyR <- checkExpr ExpectRegulativePartyContext party partyT
+      partyR <- checkExprExact ExpectRegulativePartyContext party partyT
       -- A join says when a cast's continuation fires; one PARTY is not a cast.
       forM_ mjoin (addError . JoinWithoutEvery)
       joinR <- traverse checkJoin mjoin
@@ -3264,13 +3342,12 @@ subjectOfActionExpr partyT = go (0 :: Int)
   where
     go depth e
       | depth > 8 = pure Nothing            -- guard against pathological alias chains
-      | otherwise = case e of
-          App _ _ args@(_ : _) -> subjectField partyT args     -- applied / positional record
-          AppNamed _ _ nes _   -> subjectField partyT [ a | MkNamedExpr _ _ a <- nes ]
-          App _ f []           ->                              -- a bare name: resolve its body
+      | otherwise = case bodyRead e of
+          ReadsArgs args -> subjectField partyT args
+          ReadsName f    ->
             use #constBodies >>= \ bodies ->
               maybe (pure Nothing) (go (depth + 1)) (Map.lookup (getUnique f) bodies)
-          _                    -> pure Nothing
+          ReadsNothing   -> pure Nothing
 
 -- | Recover an action /expression/ from a regulative action pattern: a bare
 -- pinned action name (already turned into a value reference by the pattern
@@ -4951,8 +5028,8 @@ inferEvent :: Event Name -> Check (Event Resolved, Type' Resolved)
 inferEvent (MkEvent ann party action timestamp atFirst) = do
   partyT <- fresh (NormalName "party")
   actionT <- fresh (NormalName "action")
-  party' <- checkExpr ExpectRegulativePartyContext party partyT
-  action' <- checkExpr ExpectRegulativeActionContext action actionT
+  party' <- checkExprExact ExpectRegulativePartyContext party partyT
+  action' <- checkExprExact ExpectRegulativeActionContext action actionT
   -- Rung 3: an event's acting party must own the action it performs, so a
   -- @PARTY Drinker DOES eat@ event is rejected even though the union contract
   -- type accepts it. This is what makes cross-actor /driving/ actor-correct.
@@ -5825,7 +5902,7 @@ matchFunTy  isProjection r t0 args =
                 argts <- traverse (const (fresh (NormalName "arg"))) args
                 rt <- fresh (NormalName "res")
                 let tf = fun_ argts rt
-                assign #substitution (Map.insert i tf subst)
+                bindInfVar i tf
 
                 rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
                 pure (rargs, rt)
@@ -5878,7 +5955,7 @@ matchPatFunTy  r t args =
           argts <- traverse (const (fresh (NormalName "arg"))) args
           rt <- fresh (NormalName "res")
           let tf = fun_ argts rt
-          assign #substitution (Map.insert i tf subst)
+          bindInfVar i tf
 
           (rargs, extends) <- unzip <$> traverse (\ (j, e, t') -> descendActionPattern (checkPattern (ExpectAppArgContext False r j) e t')) (zip3 [1 ..] args argts)
           pure (rargs, rt, concat extends)

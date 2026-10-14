@@ -95,6 +95,19 @@ data CheckState =
     -- 'prune', which all start from the same state, so the absolute value is
     -- meaningless and is never reset: 'prune' prefers the viable outcome with
     -- the fewest such choices when exactly one has the fewest.
+    , plural :: !Bool
+    -- ^ This outcome stands for TWO OR MORE viable outcomes of the search that
+    -- nothing after it can tell apart ('mergeAlike'), kept as one so that the
+    -- rest of the check runs once instead of once per outcome. Everything
+    -- that counts viable outcomes counts it as two ('outcomeWeight'): 'prune',
+    -- 'softprune' and 'forkWithLazyFallback'. It is never cleared, so an
+    -- outcome derived from a plural one is plural too.
+    , bindLog :: ![Int]
+    -- ^ The inference variables bound so far, latest first ('bindInfVar'), and
+    -- how many ('bindLogLen'). The bindings an outcome made since an earlier
+    -- state are a prefix of the log, which is how 'alikeStates' finds them
+    -- without comparing two substitutions in full.
+    , bindLogLen :: !Int
     }
   deriving stock (Generic)
 
@@ -803,6 +816,30 @@ viableCandidate :: With CheckErrorWithContext a -> Bool
 viableCandidate = \ case
   Plain _  -> True
   With e w -> severity e /= SError && viableCandidate w
+
+-- | How many viable outcomes of the search an outcome stands for: none if it
+-- is not viable, two if it is plural ('CheckState.plural'), else one. Every
+-- place that decides by how many viable outcomes there are (none, one, or
+-- several) counts with this.
+outcomeWeight :: (With CheckErrorWithContext a, CheckState) -> Int
+outcomeWeight (w, st)
+  | not (viableCandidate w) = 0
+  | st.plural               = 2
+  | otherwise               = 1
+
+-- | The outcomes with each plural viable one written as the two it stands
+-- for, side by side: what a list of outcomes that were never merged would
+-- read as, to code that was written for such a list.
+expandPlural :: [(With CheckErrorWithContext a, CheckState)] -> [(With CheckErrorWithContext a, CheckState)]
+expandPlural = concatMap (\ o -> if outcomeWeight o >= 2 then [o, o] else [o])
+
+-- | Bind an unbound inference variable, and record that it was bound
+-- ('CheckState.bindLog'). The only way to bind one.
+bindInfVar :: Int -> Type' Resolved -> Check ()
+bindInfVar i t =
+  modifying' #substitution (Map.insert i t)
+    >> modifying' #bindLog (i :)
+    >> modifying' #bindLogLen (+ 1)
 
 instance HasSrcRange CheckErrorWithContext where
   rangeOf (MkCheckErrorWithContext e ctx) = rangeOf e <|> rangeOf ctx
@@ -2049,9 +2086,9 @@ forkWithLazyFallback preambleErr cands fallback kont =
     let
       ks = runCheck (choose cands >>= kont) e s
     in
-      case filter (viableCandidate . fst) ks of
-        [_] | not preambleErr -> ks
-        _                     -> ks ++ runCheck (fallback >>= kont) e s
+      case sum (map outcomeWeight ks) of
+        1 | not preambleErr -> ks
+        _                   -> ks ++ runCheck (fallback >>= kont) e s
 
 -- | Whether a 'TermKind' names a value in the ordinary term namespace (as
 -- opposed to a record selector or data constructor, which are reached through
@@ -2358,8 +2395,9 @@ prune m = do
   ctx <- asks (.errorContext)
   MkCheck $ \ s env ->
     let
+      -- A plural outcome ('mergeAlike') is read as the two it stands for.
       candidates :: [(With CheckErrorWithContext a, CheckState)]
-      candidates = runCheck m s env
+      candidates = expandPlural (runCheck m s env)
 
       -- Lexical scoping across a forward reference (spec §12, FIX D). A
       -- branch that resolved a name to a not-yet-inferred binding OFF its
@@ -2404,40 +2442,204 @@ prune m = do
         | otherwise               = procFailed c cs
 
     in
-      case leastDeferred of
-        Just c  -> [c]
-        Nothing -> proc candidates
+      -- What comes out of a prune is one outcome, and it is never plural: a
+      -- plural viable outcome is read as the two it stands for, so it is never
+      -- the single viable answer. It can still be the outcome that carries the
+      -- ambiguity (when every outcome after the second is viable), and that
+      -- state goes on to the next declaration, where the flag would make every
+      -- viable outcome count as two.
+      map (\ (w, st) -> (w, st { plural = False })) $
+        case leastDeferred of
+          Just c  -> [c]
+          Nothing -> proc candidates
 
 -- | Prune to one result if there's a clearly best one at this point,
 -- but don't force it.
 --
 softprune :: forall a. Check a -> Check a
-softprune m = do
-  MkCheck $ \ s env ->
+softprune = softpruneWith (\ _ os -> os)
+
+-- | 'softprune' that also runs as one the outcomes that nothing after it can
+-- tell apart ('mergeAlike'), given the key of a VALUE: two values with the same
+-- key cannot be told apart by anything that reads it. For the check of an
+-- expression whose result the caller embeds in a larger one, which is all
+-- 'L4.TypeCheck.checkExpr' does with it, the key is 'L4.TypeCheck.headKey'.
+--
+-- The viable outcomes of a name with two meanings that both check are all kept
+-- by 'softprune', so that something later can decide between them, and each
+-- of them runs the rest of the enclosing expression. So do the failures that
+-- come with them (the name's fallback, and the candidates that did not fit),
+-- since a check cannot see that the path it is on has already failed. A chain
+-- of n such names cost the number of outcomes of one use, to the power n; and
+-- all but one of those paths is thrown away at the end, where 'prune' reads
+-- two or more viable outcomes as an ambiguity and shows the LAST outcome,
+-- which none of them is.
+softpruneAlike :: forall a k. Ord k => (a -> k) -> Check a -> Check a
+softpruneAlike key = softpruneWith (mergeAlike key)
+
+softpruneWith
+  :: forall a. (CheckState -> [(With CheckErrorWithContext a, CheckState)] -> [(With CheckErrorWithContext a, CheckState)])
+  -> Check a -> Check a
+softpruneWith merge m =
+  MkCheck $ \ env st ->
     let
       candidates :: [(With CheckErrorWithContext a, CheckState)]
-      candidates = runCheck m s env
-
-      proc []       = [] -- should never occur
-      proc [a]      = [a]
-      proc (a : cs)
-        | viableCandidate (fst a) = procViable a cs
-        | otherwise               = procFailed a cs
-
-      -- We have a success, we don't want a second one
-      procViable a []       = [a]
-      procViable a (c : cs)
-        | viableCandidate (fst c) = candidates
-        | otherwise               = procViable a cs
-
-      -- We have a failure, we're still looking for a success, and prefer the last failure
-      procFailed a []       = [a]
-      procFailed _ (c : cs)
-        | viableCandidate (fst c) = procViable c cs
-        | otherwise               = procFailed c cs
-
+      candidates = runCheck m env st
     in
-      proc candidates
+      -- The failures before the first viable outcome are dropped, as is every
+      -- failure when exactly one viable outcome (counting a plural one as
+      -- two) follows; with none, the last failure is kept.
+      case dropWhile ((== 0) . outcomeWeight) candidates of
+        [] -> case candidates of
+                [] -> []
+                _  -> [last candidates]
+        a : rest
+          | outcomeWeight a >= 2 || any ((> 0) . outcomeWeight) rest -> merge st candidates
+          | otherwise -> [a]
+
+-- | Run each group of outcomes that nothing after the 'softprune' can tell
+-- apart as one.
+--
+-- What a check passes on to what follows it is the substitution on the
+-- inference variables that already existed when it began, a few counters, and
+-- the value it returns. Two outcomes alike in those are not told apart by
+-- anything after them: what follows runs the same on both. That holds only
+-- as far as what follows reads these and nothing else, and it has been found
+-- wrong once, so the places that read more are listed here:
+--
+-- * The editor's maps ('infoMap' and the like) differ, and are not read by the
+--   checker. The keys of 'sectionPaths' and the unique supply differ, and are
+--   only ever looked up for names in scope, which the two outcomes share.
+--
+-- * The value is not only embedded in a larger expression. The body of a
+--   nullary @DECIDE@ is recorded in 'CheckState.constBodies', and
+--   'L4.TypeCheck.subjectOfActionExpr' reads it back, by name, to find the
+--   actor of an action. A @WHERE@ local is checked while the rest of its
+--   definition, which reads it, is still part of the search, so two readings
+--   of an overloaded name that look alike must not be merged if that reader
+--   would tell them apart. It reads the body through 'L4.TypeCheck.bodyRead'
+--   and nothing else, and the key of a value ('L4.TypeCheck.headKey') is made
+--   of what 'L4.TypeCheck.bodyRead' reads, down to the 'Unique's of a bare
+--   name and of the arguments of an application. An outcome that recorded a
+--   body since the check began is never merged ('stateKey'), whatever the
+--   body is.
+--
+-- * The callers that read the head of the value call 'L4.TypeCheck.checkExprExact',
+--   which never merges.
+--
+-- * Viable outcomes alike are replaced by the first of them, marked plural
+--   ('CheckState.plural'), which every count of viable outcomes reads as two.
+--   Both go on to succeed or both go on to fail, and a name with two meanings
+--   that both check is ambiguous, in one way, however many of its uses follow.
+--
+-- * Failures alike are replaced by the last of them. A failure is counted by
+--   nothing; the one outcome of a search 'prune' shows when it finds nothing
+--   to choose is the last, and nothing that follows a failure can make it
+--   succeed. A check does not see the failure that came before it, so each
+--   failure of an early use of a name was running the later uses all over
+--   again.
+--
+-- Classes are made by what the outcomes DO, never by what they say: an
+-- outcome that carries a warning and one that carries none are alike if they
+-- leave the same substitution, and a viable outcome is never alike a failure.
+--
+-- Nothing is merged unless the LAST outcome is a failure, and it is then the
+-- last of its class. A fork with two or more viable outcomes always ends with
+-- its fallback, a failure, and then what 'prune' shows for an ambiguity is the
+-- last outcome of the whole search, which merging leaves where it was. A list
+-- that ends in a viable outcome ('orElse' and 'quietly' make such lists) would
+-- show a different outcome if the viable ones were merged, so it is left as it
+-- is.
+--
+-- The classes are found by sorting the outcomes by key, not by comparing each
+-- outcome with the leader of every class: where nothing can be merged, this is
+-- called on a list that is exponentially long, and comparing in pairs costs
+-- more than the search itself.
+mergeAlike
+  :: forall a k. Ord k
+  => (a -> k)
+  -> CheckState
+  -> [(With CheckErrorWithContext a, CheckState)]
+  -> [(With CheckErrorWithContext a, CheckState)]
+mergeAlike valueKey s0 outcomes
+  | null outcomes || viableCandidate (fst (last outcomes)) = outcomes
+  | all ((== 1) . length) classes = outcomes
+  | otherwise =
+      [ (w, if plural' then st { plural = True } else st)
+      | (i, (w, st)) <- indexed
+      , Just plural' <- [Map.lookup i kept]
+      ]
+  where
+    indexed = zip [0 :: Int ..] outcomes
+
+    valueOf = snd . runWith
+
+    -- The members of each class, the latest first. An outcome with no state
+    -- key is in a class of its own.
+    classes :: Map (Either Int (Bool, k, StateKey)) [Int]
+    classes = foldl' classify Map.empty indexed
+
+    classify acc (i, (w, st)) =
+      let key = case stateKey s0 st of
+            Nothing -> Left i
+            Just sk -> Right (viableCandidate w, valueKey (valueOf w), sk)
+      in Map.insertWith (<>) key [i] acc
+
+    -- The outcome that stands for each class, and whether it is plural: the
+    -- first of a class of viable outcomes, the last of a class of failures.
+    kept :: Map Int Bool
+    kept = Map.fromList
+      [ if viableAt earliest then (earliest, length members > 1) else (latest, False)
+      | members@(latest : _) <- Map.elems classes
+      , let earliest = last members
+      ]
+
+    viableAt i = maybe False (viableCandidate . fst) (Map.lookup i byIndex)
+    byIndex = Map.fromList indexed
+
+-- | What the check passes on to what follows it, as a key: two outcomes of one
+-- search that started from the state @s0@ and have the same key, both viable or
+-- both failures, leave it alike in everything the check passes on
+-- ('mergeAlike'): the counters, and the substitution on the inference
+-- variables that existed in @s0@. The latter is the types the substitution
+-- makes of the variables the outcome bound, and an outcome that bound one to a
+-- type that holds a variable made since has no key, because there is no telling
+-- whether two outcomes made the same one. Nor has an outcome that recorded a
+-- body in 'CheckState.constBodies' since @s0@: the bodies are what a later
+-- reader follows, and the sizes of the maps cannot say they are the same ones.
+-- Nor has one that added a name to 'CheckState.sectionPaths', for the same
+-- reason, although no reader that could tell two outcomes apart has been
+-- found. In doubt there is no key, and the outcome is kept as it was.
+data StateKey = MkStateKey
+  { choices :: !Int
+  , bound   :: [(Int, TypeKey)]
+  }
+  deriving stock (Eq, Ord)
+
+stateKey :: CheckState -> CheckState -> Maybe StateKey
+stateKey s0 s
+  | s.bindLogLen < s0.bindLogLen                         = Nothing
+  | Map.size s.constBodies /= Map.size s0.constBodies    = Nothing
+  | Map.size s.sectionPaths /= Map.size s0.sectionPaths  = Nothing
+  | any (mentionsFrom s0.supply . snd) bound             = Nothing
+  | otherwise = Just (MkStateKey s.deferredChoices bound)
+  where
+    -- The variables that existed in @s0@ and were bound since, by index.
+    -- Variables made since cannot be seen by what follows except through these.
+    bound :: [(Int, TypeKey)]
+    bound =
+      [ (i, resolved i)
+      | i <- Set.toAscList (Set.fromList (filter (< s0.supply) (take (s.bindLogLen - s0.bindLogLen) s.bindLog)))
+      ]
+
+    resolved i = typeKey (substituteInfVars s.substitution (InfVar emptyAnno (NormalName "alike") i))
+
+    mentionsFrom n = \ case
+      TyKType       -> False
+      TyKApp _ ks   -> any (mentionsFrom n) ks
+      TyKFun ks k   -> any (mentionsFrom n) ks || mentionsFrom n k
+      TyKForall _ k -> mentionsFrom n k
+      TyKInfVar i   -> i >= n
 
 -- | Set the 'CheckErrorContext' for the given scope.
 errorContext :: (CheckErrorContext -> CheckErrorContext) -> Check a -> Check a
