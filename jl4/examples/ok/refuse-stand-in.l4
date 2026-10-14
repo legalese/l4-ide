@@ -1,0 +1,29 @@
+IMPORT prelude
+
+-- REFUSE "reason" marks a case the encoding deliberately does not cover.
+-- On main it is a prelude function that type-checks at any type.
+-- Only the branches that do not refuse are evaluated here: evaluation that
+-- reaches a REFUSE stops with an assumed-term error.
+
+-- A refusal at NUMBER
+@export default The fee in a given year
+GIVEN year IS A NUMBER
+GIVETH A NUMBER
+`the fee in year` year MEANS
+    IF year AT LEAST 2000
+    THEN 100
+    ELSE REFUSE "this schedule is not encoded for years before 2000"
+
+-- A refusal at BOOLEAN
+GIVEN year IS A NUMBER
+GIVETH A BOOLEAN
+`the fee is waived in year` year MEANS
+    IF year AT LEAST 2000
+    THEN FALSE
+    ELSE REFUSE "this rule has not been written yet"
+
+#EVAL `the fee in year` 2024
+#EVAL `the fee is waived in year` 2024
+
+#ASSERT `the fee in year` 2024 EQUALS 100
+#ASSERT NOT `the fee is waived in year` 2024

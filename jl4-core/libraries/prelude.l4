@@ -757,6 +757,20 @@ GIVEN
 GIVETH AN a
 ASSUME TBD
 
+-- REFUSE "reason" stands in, on main, for the REFUSE keyword that
+-- unstable has. It type-checks at any type, so a rule written with REFUSE
+-- checks here as it does there.
+-- It is an assumed term: evaluation that reaches it stops with "I could not
+-- continue evaluating ... it is an assumed term", and the reason is not shown.
+-- Delete this when the REFUSE keyword lands on main: the change that adds the
+-- keyword must remove this declaration in the same commit, because a reserved
+-- word cannot also be a prelude name. Do not merge it into unstable, which
+-- has the keyword.
+GIVEN
+  a IS A TYPE
+GIVETH FUNCTION FROM STRING TO a
+ASSUME `REFUSE`
+
 §§ `Comparison Operators`
 
 -- Comparison of nullable numbers

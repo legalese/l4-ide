@@ -134,6 +134,7 @@ The prelude can be imported into every L4 program with `IMPORT prelude` and prov
 - `even` / `odd` - Number parity
 - `max` / `min` - Maximum/minimum of two values. The `MAYBE NUMBER` overloads treat `NOTHING` as absent: the other value wins, and only `max NOTHING NOTHING` / `min NOTHING NOTHING` give `NOTHING`
 - `TBD` - Polymorphic placeholder
+- `REFUSE` - Mark a case the encoding deliberately does not cover, with a reason: see [REFUSE](REFUSE.md)
 
 ### Example: Using Prelude Functions
 

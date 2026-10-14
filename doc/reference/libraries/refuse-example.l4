@@ -1,0 +1,21 @@
+-- REFUSE example: a case the encoding does not cover
+IMPORT prelude
+
+-- Write REFUSE where the rule stops. It type-checks at any type.
+GIVEN year IS A NUMBER
+GIVETH A NUMBER
+`the fee in year` year MEANS
+    IF year AT LEAST 2000
+    THEN 100
+    ELSE REFUSE "this schedule is not encoded for years before 2000"
+
+GIVEN year IS A NUMBER
+GIVETH A BOOLEAN
+`the fee is waived in year` year MEANS
+    IF year AT LEAST 2000
+    THEN FALSE
+    ELSE REFUSE "this rule has not been written yet"
+
+-- The branches that do not refuse answer as usual.
+#EVAL `the fee in year` 2024         -- 100
+#EVAL `the fee is waived in year` 2024  -- FALSE
