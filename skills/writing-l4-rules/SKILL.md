@@ -78,6 +78,13 @@ DECLARE Driver HAS
 
 Records can declare **computed fields** (derived attributes) with `MEANS`; see [references/gotchas.md](references/gotchas.md) and <https://legalese.com/l4/reference/types/DECLARE.md>.
 
+**Inline options on a field** (on the local branch `feat/inline-one-of` only, not on `unstable`; C over the status quo is not ruled).
+A field may list its options in place of its type, `` `tenure` IS ONE OF Owner, Tenant, Lodger ``, one line or several, with `TYPICALLY` after the list.
+L4 names the type after the place: `` `Plot's tenure` `` (record, `'s`, field), or `` `Holding's Lease's term` `` for a field of a constructor.
+Use it only for a list that its one field uses.
+When a rule needs the type, or the name will be read, `DECLARE` the enum under a name of your own and write `IS A` that name: the generated name appears in error messages and in the DMN, Catala and Blawx output.
+It is refused in a `GIVEN`, `GIVETH` or `ASSUME`, under `LIST OF` or `MAYBE`, inside another inline list, and in a record with a type parameter.
+
 **`DECLARE` is only for types** — sum types (`IS ONE OF`) and product types (`HAS`). For constants and functions, use plain `name MEANS value` or `DECIDE name IS …`. Never write `DECLARE name IS A TYPE MEANS value`.
 
 ### 3. Write decisions
