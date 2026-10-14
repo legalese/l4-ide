@@ -115,6 +115,12 @@ vizExprToBoolExpr expr =
     VizExpr.Not _ x ->
       let (ex, m, o) = go x
        in (BDQ.BNot ex, m, o)
+    -- As 'LSP.L4.Viz.QueryPlan.vizExprToBoolExpr': a seam is handed over intact,
+    -- so the verdict can tell a vacuous TRUE from compliance (DESIGN §25.3).
+    VizExpr.Implies _ scope requirement _seam ->
+      let (ep, mp, op) = go scope
+          (eq, mq, oq) = go requirement
+       in (BDQ.BImplies ep eq, mp <> mq, op <> oq)
     VizExpr.And _ xs ->
       let (es, ms, os) = unzip3 (map go xs)
        in (BDQ.BAnd es, mconcat ms, mconcat os)
