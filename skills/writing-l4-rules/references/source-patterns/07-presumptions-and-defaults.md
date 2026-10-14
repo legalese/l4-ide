@@ -204,7 +204,8 @@ the form, and for a call that leaves the input out.
 **It is doing** three things. A **section `GIVEN`** that carries one is used by every rule that reads
 it and is given no value. A **rule's own `GIVEN`** that carries one may be left out of a `WITH` call
 that names the rule's inputs, and a **record field** that carries one may be left out of a `WITH`
-construction: the call or the construction takes the default. A record built from every one of its defaults is written `T WITHAL`. And at the boundary (`l4 batch`, the
+construction: the call or the construction takes the default. So may a field of an `ONE OF`
+alternative that carries data (`Rect HAS width IS A NUMBER TYPICALLY 2, height IS A NUMBER`: `Rect WITH height IS 5`). A record built from every one of its defaults is written `T WITHAL`. And at the boundary (`l4 batch`, the
 service) a case that leaves the fact out takes it and says so under `presumed`; an exported schema
 lists such an input as optional, with its default.
 
@@ -231,7 +232,8 @@ construction or call by position gives every input. A field with **no** `TYPICAL
 required at a `WITH` construction, and a misspelt name is still an error.
 
 **Not** a `TYPICALLY` on a field with a `MEANS` clause. A computed field's value always comes from
-its `MEANS`, so a default could never be used, and the checker says so.
+its `MEANS`, so a default could never be used, and the checker says so. Only a record's fields can be
+computed: a `MEANS` on a field of a `ONE OF` alternative is a check error too.
 
 **Not** a default that is itself a calculation. A `TYPICALLY` value must be a fixed value written
 out (`28`, `"yes"`, `TRUE`, `NOTHING`, a constructor of your own `ONE OF` type); it cannot name another

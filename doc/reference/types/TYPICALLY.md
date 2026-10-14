@@ -226,15 +226,40 @@ be declared after the rule that builds it, and in a file you `IMPORT`.
 A construction that leaves out _every_ field is written `Paint WITHAL`, which takes each field's default and writes none; see [`WITHAL`](WITHAL.md).
 It is an error when any field has no default, and the error names each one.
 
-Two things are not offered, and each is an error or unchanged rather than a
-quiet choice:
+A computed field, one with a `MEANS` clause, cannot carry a `TYPICALLY` at all: its value always comes from the `MEANS`, so a default could never be used.
+That is a check error.
 
-- **A field of an enum constructor that carries data**, an alternative under
-  `ONE OF` such as `Circle HAS radius IS A NUMBER`, still has to be given, even
-  when it carries a `TYPICALLY`.
-- **A computed field**, one with a `MEANS` clause, cannot carry a `TYPICALLY`
-  at all: its value always comes from the `MEANS`, so a default could never be
-  used. That is a check error.
+## On a field of an alternative that carries data
+
+An alternative declared with `ONE OF` can carry data, as `Circle HAS radius IS A NUMBER` does.
+It is built like a record, so its fields take a `TYPICALLY` in the same way:
+
+```l4
+DECLARE Shape IS ONE OF
+  Circle HAS radius IS A NUMBER TYPICALLY 1
+  Rect HAS width  IS A NUMBER TYPICALLY 2
+           height IS A NUMBER
+  Dot
+
+GIVETH A Shape
+`a tall rect` MEANS Rect WITH height IS 5
+
+#EVAL `a tall rect`        -- Rect OF 2, 5
+#EVAL Circle WITHAL        -- Circle OF 1
+```
+
+The same limits apply as for a record: a field with no default must still be given, and `Rect OF 2` (by position) must give every field.
+`Circle WITHAL` takes the default of every field, and is an error naming each field that has none.
+An alternative that carries nothing, such as `Dot`, has no fields to take a default for.
+
+Two limits are particular to alternatives:
+
+- **A field of an alternative cannot be computed.**
+  A `MEANS` clause on one is a check error, because the fields of an alternative are given when it is built and the clause would never be used.
+  Only the fields of a record can be computed.
+- **`l4 batch` cannot be given an alternative that carries data.**
+  A case that writes `{"tag": "Circle"}` or `{"tag": "Circle", "radius": 2}` is not read as a `Circle`; the answer reports that no branch matched.
+  The default applies where the alternative is built in the rules, with `WITH`.
 
 ## In rendered text: `l4 nlg` and `l4 render`
 

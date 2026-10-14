@@ -89,8 +89,7 @@ So there is exactly one way to write each construction: `WITH` names the fields 
 - **The name is not a record.**
   `WITHAL` builds records.
   A rule, a field, and an input of a rule are each refused, with one message: the name is not a record.
-  An alternative declared with `ONE OF` gets a message of its own, one for an alternative that carries data and one for an alternative that carries nothing.
-  An alternative that carries data, such as `Circle HAS radius IS A NUMBER`, still has to be given its fields, even a field that has a `TYPICALLY`.
+  An alternative declared with `ONE OF` that carries nothing gets a message of its own, which says to write just its name.
   To call a rule and leave some of its inputs to their usual values, name the other inputs with `WITH`.
 
 - **More than one definition has the name.**
@@ -133,7 +132,9 @@ Inside your rules, `WITHAL` is how you say "a record with every usual value".
 - **`WITHAL` is now a reserved word.**
   A name spelled exactly `WITHAL` has to be written in backticks.
   `withal` in lower case is still an ordinary name, because keywords are matched by their capitals.
-- **Records only.**
+- **Records, and alternatives that carry data.**
+  `Circle WITHAL` works for `Circle HAS radius IS A NUMBER TYPICALLY 1`, and is `Circle OF 1`; see [`TYPICALLY`](TYPICALLY.md#on-a-field-of-an-alternative-that-carries-data).
+  An alternative that carries nothing, a rule, and a field are refused.
   A rule that has a usual value for every input still has no keyword for calling it with all of them.
   Name an input with `WITH`.
 - **A record with no fields** is accepted, and `WITHAL` on it is that record.

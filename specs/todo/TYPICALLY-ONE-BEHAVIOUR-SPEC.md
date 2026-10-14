@@ -1,6 +1,6 @@
 # `TYPICALLY`: one behaviour
 
-**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539, merged 2026-10-06), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); `T WITHAL`, the spelling T1 left open for a construction in which every field is defaulted, ruled 2026-10-09 and built in `feat/withal` on top of `feat/typically-w4w5` (local commits, not pushed, not reviewed: §4.3); W7, expression defaults, withdrawn by Meng's ruling HAIRCUT, 2026-10-12 (§4); the rest not built.
+**Status:** proposed; W1 built 2026-10-01 in legalese/l4-ide#530; W2 and W3 built 2026-10-02 in `feat/typically-w2w3` (legalese/l4-ide#539, merged 2026-10-06), with the minimum of W8 they need and the checking half of W5 (§4.1); W4 and W5 built 2026-10-03 in this branch (`feat/typically-w4w5`, on top of #539), with the `MEANS` check of T1 and W8's event at their fill sites (§4.2); W6 deferred by Meng's word (§4); the findings of two rounds of adversarial review of W4 and W5 fixed or recorded on 2026-10-03 (§4.2, "Review fixes"); `T WITHAL`, the spelling T1 left open for a construction in which every field is defaulted, ruled 2026-10-09 and built in `feat/withal` on top of `feat/typically-w4w5` (local commits, not pushed, not reviewed: §4.3); W7, expression defaults, withdrawn by Meng's ruling HAIRCUT, 2026-10-12 (§4); the payload fields of an enum constructor (Lane C L7, ruled by Meng 2026-10-12, option B) built 2026-10-14 in `feat/typically-l7-payload`, on top of `feat/typically-w4w5` (local commits, not pushed, not reviewed: §4.2, "Payload fields"); the rest not built.
 This spec is an implementation plan, not a new design.
 The design was ruled on 2026-09-04 as **R8** (`IMPLICIT-PROPS-DESIGN.md` §11.5) and extended on 2026-09-06 by **D7.3** (`SURFACE-SUGAR-CLUSTER-2026-09.md`).
 R8 is the owning ruling, and anything this spec settles is recorded back there (repo `CLAUDE.md` §4).
@@ -310,13 +310,13 @@ Only a named site reaches that function, so R8 rule 1 holds without being checke
   A misspelling that matches nothing the callee reads is still caught, and so is a supplied binder the callee does not read ("This call supplies `ratee` but `scaled` does not read it", measured).
   It holds for a rule in the same file, one declared in a `WHERE`, a recursive call, and one in an imported file; and together with a section `GIVEN` the rule reads, in any order of the written arguments (`ok/typically-named-site.l4`, last section: `130`, `31`, `51`).
 - **T1, T1b and D7.3 / W5.** `Paint WITH coats IS 2` takes every other field's declared default (p4: `c's timeout` is `30`), a number, a string, a boolean, an enum constructor (p10) and `NOTHING` for `MAYBE … TYPICALLY NOTHING` alike; the order of the written fields is free; a field with no default is still required, and a positional construction still gives every field.
-  Only a record's fields: an enum constructor that carries data keeps requiring its fields, and a `TYPICALLY` on one of those fields is accepted and does nothing (a bench card is owed; see "Not built here").
+  A record's fields, and the payload fields of an enum constructor that carries data (Lane C L7, RULED 2026-10-12, §4.2 "Payload fields"): `Rect WITH height IS 5` takes `width`'s default as `Paint WITH coats IS 2` takes `colour`'s.
   A construction in which EVERY field is defaulted is `Paint WITHAL` (T1, ANSWERED 2026-10-09, §4.3).
 - **T1's check error.** A `TYPICALLY` on a field with a `MEANS` clause is now a check error, `TypicallyOnComputedField`, at the field (`not-ok/tc/typically-computed-field.l4`).
   Read off the parsed module (`detectTypicallyOnComputedFields`), because `desugarComputedFields` moves the field out of its record, and its `TYPICALLY` with it.
   One file in this repository did it, `ok/typically-basic.l4` (`taxed`), under a comment calling the `TYPICALLY` "inert metadata"; the field and the comments are changed without moving a line, because `QueryPlanSpec` pins that file's ladder atom ids (unmoved: `jl4-service-test` below).
-  It reaches a record's fields only: on an enum constructor that carries data a `MEANS` is not desugared and is ignored outright (measured on the W2+W3 binary and on `unstable`: `area IS A NUMBER TYPICALLY 4 MEANS w TIMES w` is a stored field, and `Rect 2 5` gives `area` 5, with no diagnostic), so a `TYPICALLY` beside it raises nothing.
-  That is settled with the payload-field card below, which has to say what a `MEANS` there means first.
+  It reaches a record's fields only: on an enum constructor that carries data a `MEANS` was not desugared and was ignored outright (measured on the W2+W3 binary and on `unstable`: `area IS A NUMBER TYPICALLY 4 MEANS w TIMES w` was a stored field, and `Rect 2 5` gave `area` 5, with no diagnostic), so a `TYPICALLY` beside it raised nothing.
+  Lane C L7 (RULED 2026-10-12, §4.2 "Payload fields") makes any `MEANS` on such a field its own check error, `MeansOnAlternativeField`.
   None in `doc/`, `jl4-core/libraries` or `skills/`; none in `legalese/canon` (searched 2026-10-03 at `6b6476d`, its own checkout; `l4 check` of its three files that carry a `TYPICALLY` gives no diagnostic on this branch, as on the W2+W3 binary).
 - **p10's message (L4).** A default naming something that is not in scope is reported once, as that: `checkTypically` no longer raises "must be a literal" for an `OutOfScope` reference, on a field or on a rule's input (`not-ok/tc/typically-unresolved.l4`).
 - **T4 and T4b.** A default taken at a named site or a construction is inside the rules, where no request can supply the value, so presumption does not withdraw it: `--presumption hard` and `"presumption": "hard"` take it as soft does, and in either mode the answer says it rests on it (below).
@@ -449,10 +449,8 @@ Six of the decisions below were put to Meng as cards O1 to O6 on a bench ("Overn
 
 - W6 (`ASSUME … TYPICALLY`): deferred, by Meng's word (§4).
 - A construction that leaves out every field: not built in this section. T1's spelling for it, `T WITHAL`, is ANSWERED 2026-10-09 and built on top of this branch (§4.3).
-- An enum constructor's payload fields: a field of `Rect HAS width IS A NUMBER, height IS A NUMBER TYPICALLY 1` still has to be given at `Rect WITH width IS 2`, and its `TYPICALLY` does nothing.
-  T1 as printed ("any field declared `TYPICALLY` may be omitted at construction") does not say records only, so this is a ruling for Meng and not an assumption.
-  Recommended: open them, with the same table keyed by the constructor (`recordInputDefaults`); additive, since no `DECLARE … IS ONE OF` block in `jl4/examples`, `doc/`, `skills/`, `jl4-core/libraries` or `legalese/canon` (at `6b6476d`) has a `TYPICALLY` (scanned 2026-10-03, by block, not by grep for the keyword), and every such omission is an error today.
-  If declined, make a `TYPICALLY` on such a field a check error, so that the annotation is never inert; that would also settle a `MEANS` there (above).
+- ~~An enum constructor's payload fields.~~ **Built 2026-10-14 (Lane C L7, RULED 2026-10-12): see "Payload fields" below.**
+  Until then a field of `Rect HAS width IS A NUMBER, height IS A NUMBER TYPICALLY 1` had to be given at `Rect WITH width IS 2`, and its `TYPICALLY` did nothing; T1 as printed ("any field declared `TYPICALLY` may be omitted at construction") does not say records only, so it was a ruling for Meng and not an assumption.
 - **T4b's check-time warning on a construction that restates a field's `TYPICALLY` literally.**
   Not built, so S3 is made avoidable and not closed (§3).
   The warning would fire in two files of the vendored canon mirror, `canon/sg/succession/sg-succession-domain.l4` (`the orthodox reading`, `the per capita reading`) and `canon/sg/child-support/sg-child-support-domain.l4` (`the live reading`), and add diagnostics to their goldens, which this repository may not edit; and the two all-defaults constants could not stop restating until T1's spelling for "every field defaulted" was ruled, so there was nothing to change them to; it is ruled now (`T WITHAL`, §4.3), and the change to them is canon's.
@@ -548,7 +546,7 @@ The parser reads it as the node a `WITH` already parses to, `AppNamed`, with an 
 `inferWithal` (`L4/TypeCheck.hs`) fills it through `fillDefaults`, which `supplyAppNamed` now shares, so the checked tree is a `WITH` that omitted every field, each argument carrying its `DefaultFill`.
 Every consumer therefore sees what it already sees for a `WITH` that omitted fields, and both modes list each default as `WITH T: field` by the path it already had.
 `L4.Print` prints a named application with nothing written as `T WITHAL`; before this it printed bare `T`, a different expression (by reading; the old arm was `[] -> printWithLayout n`).
-A record is told from an enum alternative and from a rule by its declaration: this module's own records are read from `declareDeclarations` (a `RecordDecl` whose constructor it is), and a record from an `IMPORT` from the table `recordInputDefaults` builds from the same declaration, which now has an entry for every record constructor, empty when no field has a default.
+A constructor with fields is told from a nullary alternative and from a rule by its declaration: this module's own are read from `declareDeclarations` (a `RecordDecl` whose constructor it is, or an `EnumDecl` constructor that carries fields, since Lane C L7), and one from an `IMPORT` from the table `recordInputDefaults` builds from the same declaration, which now has an entry for every record constructor and every enum constructor that carries data, empty when no field has a default.
 Presence in that table alone was not enough, and was the first version: the module's own entries are installed after the field defaults and the rule `GIVEN` defaults are checked, so `Inner WITHAL` written as a `TYPICALLY` was reported as an alternative of a `ONE OF`.
 That early state, a record of this module whose defaults are not installed yet, now says nothing and gives the record's type, because `checkTypically` rejects any named application there as no literal and the author is told that, once (`not-ok/tc/withal-in-a-default.l4`).
 The consumers were run, not only read: `l4 export` of `Paint WITHAL` and of `Paint WITH colour IS Red` gives the same dmn, dmn-md and catala output, and the same refusal, loud, from openfisca, blawx, docassemble and yscript; `jl4-mlir` compiles both to wasm and the four answers under node agree.
@@ -563,8 +561,8 @@ That is a count of tracked files at one commit each, not of untracked files or o
 - Records only.
   `rule WITHAL` is refused ("is not a record"), because what is not ruled stays loud.
   A rule whose every input has a default still has no spelling for being called with all of them.
-- An enum alternative that carries data is refused, as its payload fields stay required on this branch (§4.2, "Not built here").
-  One that carries nothing is refused too, with a message that says to write its name.
+- ~~An enum alternative that carries data is refused.~~ It takes `WITHAL` since Lane C L7 (§4.2, "Payload fields").
+  One that carries nothing is refused, with a message that says to write its name.
 - A record with no fields takes `WITHAL` and is that record.
 - It is not accepted in a pattern (`CONSIDER … WHEN T WITHAL`), which is a parse error.
 - The parse error for `T WITHAL a IS TRUE` is the parser's general "unexpected IS", positioned at the `IS`, because `T WITHAL a` has already parsed as a function applied to the record; no message says "WITHAL takes no fields".
@@ -581,6 +579,27 @@ That is a count of tracked files at one commit each, not of untracked files or o
 `ok/withal.l4` (14 `#ASSERT`s, 20 `Result:` blocks), `ok/withal-decode.l4` (the decode of `{}`, with and without a bare `MAYBE` field), `ok/withal-import-def.l4` and `ok/withal-import-use.l4` (a record across an `IMPORT`), and `not-ok/tc/withal-missing-default.l4`, `withal-not-a-record.l4`, `withal-overloaded.l4`, `withal-in-a-default.l4`, `withal-maybe-field.l4`, `withal-then-override.l4` (the parse error), each with its four goldens, read and free of absolute paths; `lsp/semantic-tokens/withal.l4`; `l4-cli-test` (batch under soft and hard, a record from an `IMPORT`, the name of a type); `jl4-service-test` (the same on the service).
 `prettyLayout round-trip`, `exactprint identity` and the parser memo check run over every `ok/` file, so over these.
 The evaluation differential of `CLAUDE.md` §3.2.1 was run by hand (`L4/Print.hs` is in the diff): see the commit message of the docs commit for its numbers.
+
+**Payload fields (Lane C L7).**
+**RULED 2026-10-12, in chat, accept B (card L7, bench "Lane C Rulings", written into its store by Claude from chat).**
+Meng, verbatim: _"Ah. B makes sense: we have sums-of-products and therefore our treatment of plain records (products) should carry across to records-in-enums. Right?"_ and then _"L7 accept B, ruled."_
+A `TYPICALLY` on a payload field of an enum constructor works as on a record field.
+Built 2026-10-14 in `feat/typically-l7-payload`, on top of `feat/typically-w4w5` at `1747606b1`, under B's six printed conditions:
+
+1. **Any `MEANS` on a payload field is a check error with its own message** (`MeansOnAlternativeField`, `detectMeansOnAlternativeFields`; `not-ok/tc/means-on-alternative-field.l4`).
+   Before it, `Rect OF 2, 5` kept the 5 whatever a `MEANS` said, and `TypicallyOnComputedField`'s message ("the value always comes from the `MEANS` expression") would have been false for a payload field.
+2. **The schema stops listing a defaulted payload field as required** (`JsonSchema.addConField`, now `isRequired = not MAYBE && no TYPICALLY`, the record branch's test).
+   At `1747606b1`, by reading, `addConField` wrote `required` from the field's type alone (`not (isMaybeOrOptionalType fieldTy)`, `JsonSchema.hs:338`) and still wrote the `default`, so a defaulted payload field was listed as required with its default beside it.
+3. **The page and this spec say it**: `doc/reference/types/TYPICALLY.md` ("On a field of an alternative that carries data"), `doc/reference/types/WITHAL.md`, and this section.
+   `l4 batch` cannot be given an alternative that carries data: `{"tag": "Circle", "radius": 2}` is not read as a `Circle` and the answer reports that no branch matched (measured on this branch's binary, 2026-10-14), so the default applies where the alternative is built in the rules.
+4. **docassemble pre-fills.** A payload field's follow-up question carries the field's `default:`, and the `DA-TYPICALLY` note lists it (`tests-cli/fixtures/docassemble-payload-default.l4`; `doc/exports/docassemble.md`).
+5. **`T WITHAL` reaches alternatives that carry data.** `recordInputDefaults` gains an `EnumDecl` case, so an alternative that carries data has an entry, empty when no field has a default, and a nullary alternative has none; `inferWithal` reads a constructor with fields from the table or from its own module's declaration.
+   `WithalOnAlternative` is gone, with its message; `Rect WITHAL` takes every default or names the fields that have none (`not-ok/tc/withal-alternative-missing-default.l4`), and `withal-not-a-record.l4` keeps the nullary, rule, field and built-in refusals.
+6. **Recorded here** and in `IMPLICIT-PROPS-DESIGN.md` (R8's T1 copy); the skill's entry 7.4 is corrected.
+   The skill bundle in `legalese/l4-plugin` is regenerated by the generator, not by hand (`CLAUDE.md` §1.0): not done here.
+
+Assumed, not ruled: a payload field's default is checked in the same phase as a record field's (`checkFieldDefaults` already did), so `HAIRCUT`'s literal-only rule applies to it unchanged.
+No real file reaches this: 0 of 1,269 l4-ide `.l4` files and 0 of 1,383 commons `.l4` files put a `TYPICALLY` on a payload field (counted for the card at its drafting, 2026-10-11).
 
 **What review changed.**
 An independent review on 2026-10-11 found no silent wrong answer caused by this branch, and these things to correct:

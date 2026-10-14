@@ -526,6 +526,8 @@ The following tests would improve coverage but have not yet been written:
 | Equality in computed fields             | `ok/`              | **Bug found** | `=` operator causes name ambiguity with sibling LET bindings |
 | Computed field in enum constructor      | `ok/` or `not-ok/` | Not done      | Does MEANS work inside `IS ONE OF` constructors?             |
 
+The last row is answered (2026-10-14, Lane C L7, `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2, "Payload fields"): a `MEANS` inside an `IS ONE OF` constructor is a check error, `not-ok/tc/means-on-alternative-field.l4`.
+
 ### Known Bugs Found During Testing
 
 **~~Parameterized types:~~** **Fixed.** The DECLARE's GIVEN type parameters are now propagated to the synthetic DECIDE's type signature. For `GIVEN a IS A TYPE DECLARE Box a HAS f IS A BOOLEAN MEANS ...`, the synthetic function is generated as `GIVEN a IS A TYPE GIVEN _self IS A (Box a) GIVETH A BOOLEAN`.

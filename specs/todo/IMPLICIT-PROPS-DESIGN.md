@@ -1128,6 +1128,7 @@ gate it.
 
 **EXTENDED 2026-10-01 by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (PR #525), ruled on bench "Unknowns and Defaults".**
 T1: any field declared `TYPICALLY`, not only a `MAYBE … TYPICALLY NOTHING` field, may be omitted at construction and may be absent in JSON, taking its default.
+Lane C L7 (RULED 2026-10-12, built 2026-10-14 in `feat/typically-l7-payload`, local commits, not pushed): "any field" includes the payload fields of an enum constructor that carries data, and a `MEANS` on one is a check error (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2, "Payload fields").
 T2: a module-level `ASSUME … TYPICALLY` takes its default at the root.
 T3: on the wire, absent means not asked and takes the default, `null` means "don't know" and never does, and `fromMaybe FALSE` leaves the service.
 T4: one switch turns presumption off for every evaluation.
