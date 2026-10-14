@@ -559,11 +559,11 @@ spec bin = do
     it "reads clauses indented with tabs" $
       results [batchClausesTabs, "--inputs", batchClausesColours]
         >>= (`shouldBe` map ok [Number 1, Number 3, Number 3])
-    -- The printer adds its indentation to the later lines of any string
-    -- that spans lines, in a rule written as clauses or not. `l4 run` gives
-    -- "a\n      b".
+    -- A string that spans lines keeps the later lines as the source wrote
+    -- them: printed back as source, its line break is written as an escape
+    -- (#595), so the printer's indentation cannot enter the string. `l4 run`
+    -- gives "a\n      b".
     it "keeps a string that spans lines in a clause body" $ do
-      pendingWith "the printer indents the later lines of a multi-line string, in every rule"
       results [batchClausesString, "--inputs", batchClausesColours]
         >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
 
