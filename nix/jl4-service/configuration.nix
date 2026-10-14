@@ -35,7 +35,7 @@
       description = ''
         Bundles to pre-seed into the store on startup.
         Keys are deployment IDs, values are directories containing .l4 files.
-        Pre-seeded bundles are compiled on first boot; subsequent restarts use CBOR cache.
+        Pre-seeded bundles are compiled on first boot; every restart compiles them again from the stored sources.
       '';
     };
   };
