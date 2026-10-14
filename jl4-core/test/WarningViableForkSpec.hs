@@ -72,7 +72,7 @@ spec = describe "A success that carries only a warning" $ do
     -- CPU time, so that time spent waiting for a busy machine is not counted.
     -- Twice the operands take about as long again when the cost is linear, and
     -- a thousand times as long when it doubles with each operand; the guard
-    -- fails above 'growthLimit'. A check that has not finished in 30 s fails
+    -- fails above 'growthLimit'. A check that has not finished in 120 s fails
     -- the test, rather than the suite waiting for it.
     it "checks an OR of 20 operands ending in a partial CONSIDER in time linear in the operands" $
       chainGrowsLinearly "OR" partialArms
@@ -178,9 +178,11 @@ warnings source = do
       PatternMatchRedundant {}  -> "redundant"
       _                         -> "other"
 
--- | The watchdog on one check, in microseconds.
+-- | The watchdog on one check, in microseconds. It is wall-clock time
+-- ('System.Timeout.timeout' has no other), so it has to leave room for a busy
+-- machine: at a load of 55 a check that took 0.1 s of CPU time stalled for 61 s.
 checkSeconds :: Int
-checkSeconds = 30 * 1000000
+checkSeconds = 120 * 1000000
 
 -- | The check of a chain of 20 operands takes less than 'growthLimit' times
 -- the check of 10, and both are accepted. The test is pending if the clock
@@ -197,7 +199,7 @@ chainGrowsLinearly op arms = do
         Left errs -> fail ("unexpected pipeline failure: " <> show errs)
         Right r -> evaluate r.tcdSuccess
       case mb of
-        Nothing -> expectationFailure ("the check of " <> show n <> " operands did not finish within 30 s")
+        Nothing -> expectationFailure ("the check of " <> show n <> " operands did not finish within 120 s")
         Just ok -> ok `shouldBe` True
 
 -- | How many times longer the larger program may take. Linear growth is about
