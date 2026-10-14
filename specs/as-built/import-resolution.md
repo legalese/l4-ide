@@ -3,7 +3,7 @@
 As built on `main` by this PR.
 Source spec: `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md`, which is on `unstable` and not on `main`; this page stands in for it here.
 The work came from `unstable`; this page describes only what `main` has.
-Line numbers hold at the head of this PR, which is `main` at `00298eb60` plus this PR's commits.
+Line numbers hold at the head of this PR, which is `main` at `096e7dbdd` plus this PR's commits.
 
 Differences from the source spec: its §2 and §2.1 describe the code before #134 (embedded copy last, a `resolveLibraryFromFilesystem`, two resolvers); it covers #134 only, not #64, #148, #167, #87, #102, #93, #630 or #627; its §8 acceptance 1 (the winning copy is visible) is not met on the CLI; its §7 calls the in-memory layer "orthogonal and correct", but the API/WASM resolver ranks the embedded copy above it.
 
@@ -110,7 +110,7 @@ Core resolver (API/WASM): `resolved` maps each module name to its type-checked r
 Merging imported environments keeps the first `entityInfo` entry on a key collision; a collision is the same entity reached by two paths, so the values agree.
 Build: if the TH splice finds no `prelude.l4` in the Cabal datadir, `./libraries` or `./jl4-core/libraries`, compilation fails (`jl4-core/src/L4/API/EmbeddedLibraries/TH.hs:41-51`).
 The embed is read when GHC compiles `L4.API.EmbeddedLibraries`; editing a library alone leaves nothing for Cabal to rebuild, so `cabal build` prints `Up to date` and the binary keeps the old stdlib (measured, `doc/reference/libraries/resolution.md`, "The embed-staleness gotcha").
-CI step "The sdist must carry the standard library" (`.github/workflows/pr-checks.yml:171-187`, job `haskell`) fails on a `cabal check` parser warning or an sdist without `libraries/prelude.l4`.
+CI step "The sdist must carry the standard library" (`.github/workflows/pr-checks.yml:174-190`, job `haskell`) fails on a `cabal check` parser warning or an sdist without `libraries/prelude.l4`.
 
 ## Diagnostics
 
