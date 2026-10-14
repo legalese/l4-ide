@@ -116,22 +116,22 @@ JL4_FIXED_NOW=2025-01-01T00:00:00Z l4 run my-rules.l4
 
 All libraries require `IMPORT` **except prelude**, which is loaded automatically.
 
-| Library         | Purpose                                                 | Reference                                                      |
-| --------------- | ------------------------------------------------------- | -------------------------------------------------------------- |
-| `prelude`       | Lists, Maybe, Pair, booleans, numbers (always imported) | <https://legalese.com/l4/reference/libraries/prelude.md>       |
-| `daydate`       | Date calculations and temporal logic                    | <https://legalese.com/l4/reference/libraries/daydate.md>       |
-| `time`          | Wall-clock time-of-day operations                       | <https://legalese.com/l4/reference/libraries/time.md>          |
-| `datetime`      | Absolute points in time with timezones                  | <https://legalese.com/l4/reference/libraries/datetime.md>      |
-| `timezone`      | IANA timezone constants                                 | <https://legalese.com/l4/reference/libraries/timezone.md>      |
-| `excel-date`    | Excel serial-date compatibility                         | <https://legalese.com/l4/reference/libraries/excel-date.md>    |
-| `math`          | Mathematical functions                                  | <https://legalese.com/l4/reference/libraries/math.md>          |
-| `currency`      | Currency handling (ISO 4217)                            | <https://legalese.com/l4/reference/libraries/currency.md>      |
-| `legal-persons` | Legal entity types and capacity                         | <https://legalese.com/l4/reference/libraries/legal-persons.md> |
-| `jurisdiction`  | Jurisdiction definitions                                | <https://legalese.com/l4/reference/libraries/jurisdiction.md>  |
-| `holdings`      | Ownership and holdings                                  | <https://legalese.com/l4/reference/libraries/holdings.md>      |
-| `actus`         | ACTUS financial-contract standards                      | <https://legalese.com/l4/reference/libraries/actus.md>         |
-| `llm`           | LLM API integration (from within L4)                    | <https://legalese.com/l4/reference/libraries/llm.md>           |
-| `date-compat`   | Legacy DATE syntax compatibility                        | <https://legalese.com/l4/reference/libraries/date-compat.md>   |
+| Library         | Purpose                                                  | Reference                                                      |
+| --------------- | -------------------------------------------------------- | -------------------------------------------------------------- |
+| `prelude`       | Lists, Maybe, Pair, booleans, numbers (`IMPORT prelude`) | <https://legalese.com/l4/reference/libraries/prelude.md>       |
+| `daydate`       | Date calculations and temporal logic                     | <https://legalese.com/l4/reference/libraries/daydate.md>       |
+| `time`          | Wall-clock time-of-day operations                        | <https://legalese.com/l4/reference/libraries/time.md>          |
+| `datetime`      | Absolute points in time with timezones                   | <https://legalese.com/l4/reference/libraries/datetime.md>      |
+| `timezone`      | IANA timezone constants                                  | <https://legalese.com/l4/reference/libraries/timezone.md>      |
+| `excel-date`    | Excel serial-date compatibility                          | <https://legalese.com/l4/reference/libraries/excel-date.md>    |
+| `math`          | Mathematical functions                                   | <https://legalese.com/l4/reference/libraries/math.md>          |
+| `currency`      | Currency handling (ISO 4217)                             | <https://legalese.com/l4/reference/libraries/currency.md>      |
+| `legal-persons` | Legal entity types and capacity                          | <https://legalese.com/l4/reference/libraries/legal-persons.md> |
+| `jurisdiction`  | Jurisdiction definitions                                 | <https://legalese.com/l4/reference/libraries/jurisdiction.md>  |
+| `holdings`      | Ownership and holdings                                   | <https://legalese.com/l4/reference/libraries/holdings.md>      |
+| `actus`         | ACTUS financial-contract standards                       | <https://legalese.com/l4/reference/libraries/actus.md>         |
+| `llm`           | LLM API integration (from within L4)                     | <https://legalese.com/l4/reference/libraries/llm.md>           |
+| `date-compat`   | Legacy DATE syntax compatibility                         | <https://legalese.com/l4/reference/libraries/date-compat.md>   |
 
 Import syntax:
 
@@ -147,7 +147,7 @@ Reference: <https://legalese.com/l4/reference/libraries.md>
 
 ## Prelude — most-used functions
 
-The prelude is always imported. These are the functions you will reach for constantly. The full reference is at <https://legalese.com/l4/reference/libraries/prelude.md>.
+Write `IMPORT prelude` to use these; they are the functions you will reach for constantly. The full reference is at <https://legalese.com/l4/reference/libraries/prelude.md>.
 
 ### Lists
 
