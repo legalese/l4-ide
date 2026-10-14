@@ -344,7 +344,7 @@ Deployed 'late-fee' (version 1.0.0) with 1 function:
 API: https://api.legalese.cloud/acme/late-fee
 ```
 
-The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with everything it imports, standard libraries included.
+The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
 
 | Command            | What it does                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
