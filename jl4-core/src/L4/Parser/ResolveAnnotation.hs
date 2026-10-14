@@ -2038,7 +2038,12 @@ instance (HasSrcRange n, HasRef n) => HasRef (Declare n) where
 
 instance (HasSrcRange n, HasRef n) => HasRef (Decide n) where
   addRef d@(MkDecide ann tySig appForm expr) = do
-    ann' <- attachRef d ann
+    -- The local definition a group of clauses is lowered to holds the clauses
+    -- after the first ('L4.Parser.bindFallthrough'). It is generated and
+    -- marked, and its range, the next clause's body, is there to key the
+    -- checker. It claims no ref: a ref above that clause is the first node
+    -- written in it, which the descent below reaches.
+    ann' <- if isJust (view annPmSynthetic ann) then pure ann else attachRef d ann
     tySig' <- addRef tySig
     appForm' <- addRef appForm
     expr' <- addRef expr
@@ -2245,10 +2250,20 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       e' <- addRef e
       lcl' <- traverse addRef lcl
       pure $ Where ann' e' lcl'
-    LetIn ann lcl e -> attachRef expr ann >>= \ann' -> do
-      lcl' <- traverse addRef lcl
-      e' <- addRef e
-      pure $ LetIn ann' lcl' e'
+    -- The LET a group of clauses is lowered to binds the clauses after the
+    -- first, which are written after its body: source order is the body's
+    -- ('bindsLaterClauses'). Taken in the other order, the later clauses claim
+    -- the refs written inside the first.
+    LetIn ann lcl e -> attachRef expr ann >>= \ann' ->
+      if bindsLaterClauses lcl
+        then do
+          e' <- addRef e
+          lcl' <- traverse addRef lcl
+          pure $ LetIn ann' lcl' e'
+        else do
+          lcl' <- traverse addRef lcl
+          e' <- addRef e
+          pure $ LetIn ann' lcl' e'
     Event ann e -> attachRef expr ann >>= \ann' -> Event ann' <$> addRef e
     Fetch ann e -> attachRef expr ann >>= \ann' -> Fetch ann' <$> addRef e
     Env ann e -> attachRef expr ann >>= \ann' -> Env ann' <$> addRef e
