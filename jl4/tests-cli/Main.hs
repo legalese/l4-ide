@@ -29,7 +29,7 @@ import System.Directory
   )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeFileName)
 import System.IO (hClose, hSetBinaryMode)
 import System.Process
   ( CreateProcess(..)
@@ -460,6 +460,29 @@ spec bin = do
       -- Formatter output should contain the DECIDE (exact spelling may
       -- differ from input, so we only look for the identifier).
       sout `shouldSatisfy` ("xor" `isInfixOf`)
+
+    -- A postfix call used to lose its argument, and a call written between its
+    -- arguments used to be printed head first, with exit code 0 and output that
+    -- no longer checked (smucclaw/l4-ide#918). Each fixture covers one of the two.
+    -- Carriage returns are dropped before comparing, as the file may be checked
+    -- out with CRLF line endings (Windows).
+    let formatsAsWritten fixture = do
+          src <- readFile fixture
+          Output code sout _ <- runL4 bin ["format", fixture]
+          code `shouldBe` ExitSuccess
+          filter (/= '\r') sout `shouldBe` filter (/= '\r') src
+          tmp <- getTemporaryDirectory
+          let formatted = tmp </> ("l4-cli-test-" ++ takeFileName fixture)
+          writeFile formatted sout
+          Output checkCode _ _ <- runL4 bin ["check", formatted]
+          removePathForcibly formatted
+          checkCode `shouldBe` ExitSuccess
+
+    it "prints a postfix mixfix call back with its argument, and the output checks" $
+      formatsAsWritten (fixtureDir </> "format-mixfix-postfix.l4")
+
+    it "prints a binary and a chained mixfix call back in source order, and the output checks" $
+      formatsAsWritten (fixtureDir </> "format-mixfix-infix.l4")
 
     it "writes nothing to stdout and exits non-zero on a broken file" $ do
       Output code _ _ <- runL4 bin ["format", garbageFixture]
