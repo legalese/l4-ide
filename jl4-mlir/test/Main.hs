@@ -16,7 +16,11 @@ import L4.MLIR.Dialect.Arith
 import L4.MLIR.Dialect.SCF
 import L4.MLIR.Runtime.Builtins (builtinDeclarations)
 import L4.MLIR.Lower (lowerProgramWithInfo, lowerProgramWithDiagnostics)
-import L4.MLIR.Schema (bundleExports, applyDiagnostics, encodeBundle)
+import L4.MLIR.Schema (bundleExports, applyDiagnostics, encodeBundle, FunctionExport)
+
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text.Encoding as TE
@@ -85,6 +89,97 @@ testDeonticNamesPlain = do
           putStrLn $ "\n    failing checks: " <> show failures
           putStrLn $ "    json: " <> T.unpack (T.take 600 json)
           pure False
+
+-- | The party of an explicit @BREACH BY@ is baked as its PLAIN name, as
+-- jl4-service answers it, not as rule source with backticks: @lest.by@ is
+-- @the borrower@, and the BECAUSE text stays the rule source it is.
+testDeonticBreachByPlain :: IO Bool
+testDeonticBreachByPlain = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the borrower`"
+        , "DECLARE Action IS ONE OF `repay loan`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `the borrower`"
+        , "    MUST `repay loan`"
+        , "    WITHIN 30"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH BY `the borrower` BECAUSE \"not repaid\""
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("by is a plain name",    T.isInfixOf "\"by\":\"the borrower\"" json)
+            , ("by is tagged a name",   T.isInfixOf "\"byKind\":\"name\"" json)
+            , ("because is rule source", T.isInfixOf "\"because\":\"\\\"not repaid\\\"\"" json)
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
+-- | The tag of a @BREACH BY@ party survives a read and a write of the bundle,
+-- and a bundle without it (compiled before the key existed) reads as it always
+-- did: the party is source, and is written back without the key.
+testDeonticBreachByRoundTrip :: IO Bool
+testDeonticBreachByRoundTrip = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the borrower`"
+        , "DECLARE Action IS ONE OF `repay loan`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `the borrower`"
+        , "    MUST `repay loan`"
+        , "    WITHIN 30"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH BY `the borrower` BECAUSE \"not repaid\""
+        ]
+      stripKey k v = case v of
+        Aeson.Object o -> Aeson.Object (Aeson.KeyMap.map (stripKey k) (Aeson.KeyMap.delete (Aeson.Key.fromText k) o))
+        Aeson.Array a  -> Aeson.Array (fmap (stripKey k) a)
+        other          -> other
+      rewrite :: Aeson.Value -> Either String T.Text
+      rewrite v = do
+        fe <- case v of
+          Aeson.Object o | Just (Aeson.Object fns) <- Aeson.KeyMap.lookup "functions" o
+                         , Just f <- Aeson.KeyMap.lookup "demo" fns -> Right f
+          _ -> Left "no function demo in the bundle"
+        fx <- either (Left . ("decode: " <>)) Right (decodeExport (Aeson.encode fe))
+        pure (TE.decodeUtf8 (LBS.toStrict (Aeson.encode fx)))
+      decodeExport :: LBS.ByteString -> Either String FunctionExport
+      decodeExport = Aeson.eitherDecode
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json ->
+      case Aeson.eitherDecode (LBS.fromStrict (TE.encodeUtf8 json)) of
+        Left err -> putStrLn ("\n    bundle is not JSON: " <> err) >> pure False
+        Right v -> case (rewrite v, rewrite (stripKey "byKind" v)) of
+          (Right kept, Right older) -> do
+            let checks :: [(String, Bool)]
+                checks =
+                  [ ("the tag survives a round trip",      T.isInfixOf "\"byKind\":\"name\"" kept)
+                  , ("the party is still the plain name",  T.isInfixOf "\"by\":\"the borrower\"" kept)
+                  , ("an older bundle reads without it",   T.isInfixOf "\"by\":\"the borrower\"" older)
+                  , ("and is written back without it",     not (T.isInfixOf "byKind" older))
+                  ]
+                failures = [name | (name, ok) <- checks, not ok]
+            if null failures then pure True else do
+              putStrLn $ "\n    failing checks: " <> show failures
+              pure False
+          (a, b) -> putStrLn ("\n    " <> show (either id (const "ok") a, either id (const "ok") b)) >> pure False
 
 -- | An action that carries a value is not a name: it is baked as the rule
 -- source it is, as @Backend.Jl4.actionText@ prints it, with no @actionKind@;
@@ -166,6 +261,8 @@ main = do
     , test "deontic party/action names are plain, tagged" testDeonticNamesPlain
     , test "deontic value-carrying action stays source" testDeonticValueActionIsSource
     , test "WASM trace reserved words match the lexer" testReservedWordsInSync
+    , test "deontic BREACH BY party is plain" testDeonticBreachByPlain
+    , test "deontic BREACH BY tag round-trips" testDeonticBreachByRoundTrip
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn

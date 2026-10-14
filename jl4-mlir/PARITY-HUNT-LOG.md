@@ -550,7 +550,10 @@ apart from rule source with a sibling key of the obligation (`partyKind` /
 `actionKind` = `"name"`, `DEName`); `party` and `action` stay plain strings, so a
 runtime that predates the key reads the bundle correctly. The trace's source text
 backticks a tagged spaced name and leaves `pay 100` alone; a bundle compiled
-before the key holds none, and the runtime prints its literals as given.
+before the key holds none, and the runtime prints its literals as given. The
+party of an explicit `BREACH BY` is told the same way, by a `byKind` key on the
+breach node: the answer's `party` stays plain, and the trace's source text
+backticks the tagged name as it does an obligation's.
 Measured on the CI Tier-2 corpus
 (`pr-checks.yml`, `jl4-mlir-parity-full`, 9 files): unstable service and unstable
 backend, **120 comparisons, 0 differs**; fixed service and unstable backend, **109

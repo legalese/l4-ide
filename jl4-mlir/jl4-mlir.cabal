@@ -107,6 +107,7 @@ test-suite jl4-mlir-test
   hs-source-dirs: test
   main-is: Main.hs
   build-depends:
+    aeson,
     bytestring,
     containers,
     jl4-core,

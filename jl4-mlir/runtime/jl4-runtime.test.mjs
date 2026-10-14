@@ -713,7 +713,9 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     // models that reader: no answer may depend on them, only the trace text.
     const withoutKinds = JSON.parse(
       JSON.stringify(sale, (k, v) =>
-        k === "partyKind" || k === "actionKind" ? undefined : v,
+        k === "partyKind" || k === "actionKind" || k === "byKind"
+          ? undefined
+          : v,
       ),
     );
     eq(
@@ -846,6 +848,134 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       },
     },
   );
+
+  // The party of an explicit BREACH BY. The answer prints it plain, as
+  // jl4-service does, and the trace's source text prints it as L4: a name is
+  // backticked, and the BREACH node's byKind says it is one. Both trace nodes
+  // that print the clause read the kind from the contract, not from the answer.
+  {
+    const rtB = createRuntime();
+    rtB.attachMemory(new WebAssembly.Memory({ initial: 1 }));
+    const metaOf = (contract) => ({
+      name: "the-loan-contract",
+      isDeontic: true,
+      parameters: { properties: {} },
+      paramOrder: [],
+      deonticContract: contract,
+      traceMeta: { fnName: "`the loan contract`" },
+    });
+    const lapsing = (by, byKind) => ({
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: "the borrower",
+      partyKind: "name",
+      action: "repay loan",
+      actionKind: "name",
+      deadline: 30,
+      hence: { kind: "FULFILLED" },
+      lest: {
+        kind: "BREACH",
+        by,
+        ...(byKind ? { byKind } : {}),
+        because: '"not repaid"',
+      },
+    });
+    const late = [{ party: "the borrower", action: "repay loan", at: 40 }];
+    const answer = (contract) =>
+      JSON.stringify(runDeontic(contract, 0, late, {}, null));
+    const breachTrace = (contract, meta = metaOf(contract), args = {}) =>
+      rtB.invokeFunctionWithReasoning({ exports: {} }, meta, {
+        startTime: 0,
+        events: late,
+        ...args,
+      }).reasoning;
+    // The clause is the second child of the call node, the third child of the
+    // root.
+    const clause = (tree) => tree.children[2].children[1].exampleCode[0];
+    const breached = lapsing("the borrower", "name");
+
+    const wire = runDeontic(breached, 0, late, {}, null).BREACH;
+    eq(
+      "deontic: a BREACH BY party is answered plain",
+      JSON.stringify([wire.party, wire.parties, wire.failures[0].party]),
+      JSON.stringify(["the borrower", ["the borrower"], "the borrower"]),
+    );
+    const tree = breachTrace(breached);
+    eq(
+      "deontic trace: the Result text backticks a BREACH BY name",
+      tree.explanation[0],
+      'Result: DEONTIC BREACHED:\n  BREACH\n  BY `the borrower`\n  BECAUSE "not repaid"',
+    );
+    eq(
+      "deontic trace: the BREACH clause node backticks a BREACH BY name",
+      clause(tree),
+      'BREACH BY `the borrower` BECAUSE "not repaid"',
+    );
+    [
+      ["Alice", false],
+      ["seller_1", false],
+      ["ship-it", true],
+      ["2nd buyer", true],
+    ].forEach(([name, quoted]) => {
+      const shown = quoted ? "`" + name + "`" : name;
+      const t = breachTrace(lapsing(name, "name"));
+      eq(
+        "deontic trace: BREACH BY " +
+          name +
+          (quoted ? " is" : " is not") +
+          " backticked, in the Result text and in the clause",
+        t.explanation[0].includes("  BY " + shown + "\n") &&
+          clause(t) === "BREACH BY " + shown + ' BECAUSE "not repaid"',
+        true,
+      );
+    });
+    // Rule source (a party that is not a bare name) carries no byKind and is
+    // printed as given, and so is a bundle compiled before the key existed.
+    const sourceParty = breachTrace(lapsing("Person OF `the borrower`"));
+    eq(
+      "deontic trace: a BREACH BY with no byKind is printed as given (Result)",
+      sourceParty.explanation[0],
+      'Result: DEONTIC BREACHED:\n  BREACH\n  BY Person OF `the borrower`\n  BECAUSE "not repaid"',
+    );
+    eq(
+      "deontic trace: a BREACH BY with no byKind is printed as given (clause)",
+      clause(sourceParty),
+      'BREACH BY Person OF `the borrower` BECAUSE "not repaid"',
+    );
+    eq(
+      "deontic trace: an older bundle's BREACH BY name is printed as given",
+      clause(breachTrace(lapsing("the borrower"))),
+      'BREACH BY the borrower BECAUSE "not repaid"',
+    );
+    eq(
+      "deontic: the byKind key never changes the answer",
+      answer(lapsing("the borrower")),
+      answer(breached),
+    );
+
+    // The parameterised synthesizer prints the clause too.
+    const paramMeta = {
+      ...metaOf(breached),
+      paramOrder: ["flag"],
+      parameters: { properties: { flag: { type: "boolean" } } },
+    };
+    const paramTree = JSON.stringify(
+      breachTrace(breached, paramMeta, {
+        arguments: { flag: true },
+        flag: true,
+      }),
+    );
+    eq(
+      "deontic trace (parameterised): a BREACH BY name is backticked",
+      paramTree.includes("BY `the borrower`"),
+      true,
+    );
+    eq(
+      "deontic trace (parameterised): and never printed bare",
+      paramTree.includes("BY the borrower"),
+      false,
+    );
+  }
 
   // Blocker 2b — a MUST with NO LEST that lapses → deadline_missed breach that
   // names the lapsing event's party/action/time and the obligation's deadline.
