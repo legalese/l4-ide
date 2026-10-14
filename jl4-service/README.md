@@ -202,8 +202,6 @@ A batch case refused this way comes back in `cases` with the same message as its
 
 Limits, measured 2026-10-07:
 
-- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`), so every function in a module that uses one fails the request with `I could not find a definition`.
-  A function with a `BOOLEAN` input fails the same way, because the wrapper reads it with `prelude`'s `fromMaybe`.
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
