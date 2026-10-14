@@ -81,7 +81,8 @@ Import with `IMPORT actus` to get all modules, or import individual modules sele
 
 ### Schedule Generation (`actus-schedule`)
 
-- `` `add months` ``, `` `add days` `` — date arithmetic with month-end clamping
+- `` `add days` `` — date arithmetic on a number of days
+- `` `add months` `` — month arithmetic with month-end clamping; it is defined in [`daydate`](daydate.md), which `actus-schedule` imports, so it is available to anything that imports `actus-schedule`
 - `` `monthly schedule` `` — generate a list of monthly dates from a start date
 - `` `schedule length` `` — count dates in a schedule
 

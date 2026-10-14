@@ -16,23 +16,13 @@ IMPORT `actus-daycount`
 §§ `Add Period to Date`
 -- =============================================================================
 
-GIVEN date IS A DATE
-      months IS A NUMBER
-GIVETH A DATE
-`add months` MEANS
-    DATE_FROM_DMY clampedDay newMonth newYear
-    WHERE
-        originalDay MEANS DATE_DAY date
-        oldMonth MEANS DATE_MONTH date
-        oldYear MEANS DATE_YEAR date
-        totalMonths MEANS oldMonth PLUS months
-        newYear MEANS oldYear PLUS (FLOOR ((totalMonths MINUS 1) DIVIDED BY 12))
-        newMonth MEANS ((totalMonths MINUS 1) MODULO 12) PLUS 1
-        -- Clamp the day to the last valid day of the target month
-        maxDayInTargetMonth MEANS `Days in month` newMonth newYear
-        clampedDay MEANS IF originalDay GREATER THAN maxDayInTargetMonth
-                         THEN maxDayInTargetMonth
-                         ELSE originalDay
+-- `add months` used to be defined here, with the day-clamping body now in
+-- `daydate`'s Calendar Arithmetic section. It moved because it is not an ACTUS
+-- idea: the same clamp is Excel's EDATE, and -- measured 2026-08-05 -- FEEL's
+-- `date + duration("P1M")` on both DMN engines. Schedule generation was simply
+-- the first caller. This module IMPORTs daydate, so `add months` still resolves;
+-- the definition was deleted rather than left in place because two identical
+-- DATE x NUMBER -> DATE definitions would be a genuine overload ambiguity.
 
 GIVEN date IS A DATE
       days IS A NUMBER
