@@ -8,6 +8,7 @@ module QueryPlanSpec (spec) where
 import Test.Hspec
 
 import Data.Either (isLeft, isRight)
+import Data.Foldable (for_)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -142,6 +143,17 @@ GIVEN a IS A BOOLEAN
       c IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `app leaf` IF (`both of` a b) OR c
+|]
+
+-- | A rule that reaches a refusal through a rule of no inputs (R7).
+refusingL4 :: Text
+refusingL4 = [i|
+GIVETH A BOOLEAN
+`not modelled` MEANS REFUSE "the other conditions are not modelled"
+
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE eligible IF adult AND `not modelled`
 |]
 
 -- A rule with the shape of a real one: a scope, a requirement, and a seam between
@@ -593,6 +605,26 @@ serviceTests = do
           rPartial = svcQP c [("walks", True)]
       length rPartial.asks `shouldSatisfy` (<= length rNone.asks)
 
+  -- The guard for a corpus that refuses on one path only: Reg CF's money rules
+  -- refuse for a rule date before 2022-09-20 (`the aggregate offering cap`, a
+  -- NUMBER that refuses on one arm of a BRANCH). None of its boolean decisions has
+  -- a leaf the plan treats as a refusal, so every one is planned exactly as before.
+  describe "regcf-denovo: no boolean decision has a refusing leaf" do
+    let exports =
+          [ "the exemption is available"
+          , "the ongoing reporting obligation continues"
+          , "the resale is permitted"
+          , "the person is a disqualifying covered person"
+          , "the offering may be closed early"
+          , "the person may act as an intermediary"
+          , "the funding portal activity is within the safe harbour"
+          ]
+    for_ exports \fn ->
+      it (Text.unpack fn) do
+        src <- Text.pack <$> readFile "../jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4"
+        c <- serviceCache fn src
+        c.core.refusalsByUnique `shouldBe` mempty
+
   -- The VERDICT, end to end from L4 source (DESIGN §25.7). `determined` is the
   -- function's truth value and stays correct throughout; what these pin is that it is
   -- NOT the thing to show a user, and that the planner now knows the difference.
@@ -683,6 +715,22 @@ lspTests = do
       let r = lspQP "simple and" params info state [("a", True), ("b", True)]
       r.determined `shouldBe` Just True
       r.stillNeeded `shouldBe` []
+
+  -- The editor's wizard plans from the same ladder state the service does, so it
+  -- reaches a refusal where evaluation does too, and never asks the rule that
+  -- refuses.
+  describe "a refusal" do
+    it "is reached where evaluation reaches it, and the refusing rule is never asked" do
+      (info, state, params) <- lspCache "eligible" refusingL4
+      let ask = lspQP "eligible" params info state []
+          refused = lspQP "eligible" params info state [("adult", True)]
+          fails = lspQP "eligible" params info state [("adult", False)]
+      map (.label) ask.stillNeeded `shouldBe` ["adult"]
+      refused.verdict `shouldBe` QP.Undetermined
+      refused.determined `shouldBe` Nothing
+      fmap (.reasons) refused.refusal `shouldBe` Just ["the other conditions are not modelled"]
+      fails.verdict `shouldBe` QP.Fails
+      fails.refusal `shouldBe` Nothing
 
   describe "OR" do
     it "determined True on short-circuit" do

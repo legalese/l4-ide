@@ -135,7 +135,9 @@ buildQueryPlanCache :: VizExpr.RenderAsLadderInfo -> LadderViz.VizState -> QP.Ca
 buildQueryPlanCache ladderInfo vizState =
   let
     (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
-    compiled = BDQ.compileDecisionQuery order boolExpr
+    -- A leaf evaluation can only refuse at is not a question (R7).
+    refusals = LadderViz.getRefusingAtoms vizState
+    compiled = BDQ.compileDecisionQuery order (BDQ.refusing (Set.fromList (IntMap.keys refusals)) boolExpr)
     deps :: IntMap IntSet
     deps = LadderViz.getAtomDeps vizState
     inputRefs = LadderViz.getAtomInputRefs vizState
@@ -149,6 +151,7 @@ buildQueryPlanCache ladderInfo vizState =
             inputRefs
       , compiled
       , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+      , refusalsByUnique = refusals
       , leafKeyByUnique = LadderViz.getLeafKeys vizState
       }
 

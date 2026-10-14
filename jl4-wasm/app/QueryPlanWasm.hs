@@ -11,6 +11,7 @@ module QueryPlanWasm (l4QueryPlan) where
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
+import qualified Data.IntMap.Lazy as IntMap
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -46,13 +47,22 @@ l4QueryPlan source uriText functionName bindingsJson =
       if any ((== SError) . severity) result.tcdErrors
         then encodeJson $ Aeson.object ["error" Aeson..= ("Type check error" :: Text.Text)]
         else
-          case Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution True functionName of
+          -- A ladder with a leaf evaluation can only refuse at is drawn again as
+          -- written, as 'Backend.DecisionQueryPlan' does: simplifying can change
+          -- which refusal evaluation reaches first (R7).
+          let draw simplify = Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution simplify functionName
+              drawn = case draw True of
+                Right (_, st) | not (IntMap.null (Ladder.getRefusingAtoms st)) -> draw False
+                other -> other
+          in case drawn of
             Left _ ->
               encodeJson $ Aeson.object ["error" Aeson..= ("Function not found or not visualizable" :: Text.Text)]
             Right (ladderInfo, vizState) ->
               let -- Build CachedDecisionQuery from viz results
                   (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
-                  compiled = BDQ.compileDecisionQuery order boolExpr
+                  -- A leaf evaluation can only refuse at is not a question (R7).
+                  refusals = Ladder.getRefusingAtoms vizState
+                  compiled = BDQ.compileDecisionQuery order (BDQ.refusing (Set.fromList (IntMap.keys refusals)) boolExpr)
                   deps = Ladder.getAtomDeps vizState
                   inputRefs = Ladder.getAtomInputRefs vizState
                   cache = QP.CachedDecisionQuery
@@ -62,6 +72,7 @@ l4QueryPlan source uriText functionName bindingsJson =
                         fmap (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path)) inputRefs
                     , compiled = compiled
                     , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+                    , refusalsByUnique = refusals
                     , leafKeyByUnique = Ladder.getLeafKeys vizState
                     }
 

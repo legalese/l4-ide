@@ -650,6 +650,7 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
       BDQ.BTrue -> []
       BDQ.BFalse -> []
       BDQ.BVar k -> [k]
+      BDQ.BRefuse k -> [k]  -- never built here: the query plan's, not verify's
       BDQ.BNot x -> varsOfT x
       BDQ.BAnd xs -> concatMap varsOfT xs
       BDQ.BOr xs -> concatMap varsOfT xs
@@ -660,6 +661,7 @@ mapVarsTo f = \case
   BDQ.BTrue -> BDQ.BTrue
   BDQ.BFalse -> BDQ.BFalse
   BDQ.BVar v -> BDQ.BVar (f v)
+  BDQ.BRefuse v -> BDQ.BRefuse (f v)
   BDQ.BNot x -> BDQ.BNot (mapVarsTo f x)
   BDQ.BAnd xs -> BDQ.BAnd (map (mapVarsTo f) xs)
   BDQ.BOr xs -> BDQ.BOr (map (mapVarsTo f) xs)
@@ -821,6 +823,7 @@ mapVars f = \case
   BDQ.BTrue -> BDQ.BTrue
   BDQ.BFalse -> BDQ.BFalse
   BDQ.BVar v -> BDQ.BVar (f v)
+  BDQ.BRefuse v -> BDQ.BRefuse (f v)
   BDQ.BNot e -> BDQ.BNot (mapVars f e)
   BDQ.BAnd es -> BDQ.BAnd (fmap (mapVars f) es)
   BDQ.BOr es -> BDQ.BOr (fmap (mapVars f) es)
@@ -860,6 +863,7 @@ varsOf = \case
   BDQ.BTrue -> []
   BDQ.BFalse -> []
   BDQ.BVar v -> [v]
+  BDQ.BRefuse v -> [v]
   BDQ.BNot e -> varsOf e
   BDQ.BAnd es -> concatMap varsOf es
   BDQ.BOr es -> concatMap varsOf es
@@ -1013,6 +1017,7 @@ analyseBody labels order defs body
       -- same word would be worse than not reporting it.
       BDQ.BNot _ -> []
       BDQ.BVar _ -> []
+      BDQ.BRefuse _ -> []
       BDQ.BTrue -> []
       BDQ.BFalse -> []
 

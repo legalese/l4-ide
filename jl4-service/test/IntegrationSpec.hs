@@ -21,7 +21,7 @@ import Types
 import L4.FunctionSchema (Parameters (..))
 
 import Control.Concurrent.Async (concurrently, forConcurrently)
-import Control.Monad (forM, forM_, guard, unless, when)
+import Control.Monad (forM, forM_, guard, replicateM, unless, when)
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Exception (bracket, try)
@@ -54,7 +54,7 @@ import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import System.IO.Error (isPermissionError)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1723,6 +1723,132 @@ spec = describe "integration" do
           (createZipBundle [("qualifies.l4", qualifiesJL4 <> "\n-- v2\n")])
         _ <- httpLbs reReq mgr
         awaitVersion (major <> ".0.1") 50
+
+  -- REFUSE (R7) is a throw at force, never a value. The plan must reach it where
+  -- evaluation does: a rule of no inputs that always refuses is not a question
+  -- (no answer to it is ever used), and a case that reaches a refusal is reported
+  -- as one, with evaluation's reason. /evaluation is the oracle.
+  describe "query-plan and evaluation agree on refusals" do
+    let args :: [(Text, Bool)] -> Aeson.Value
+        args bs = Aeson.object ["arguments" Aeson..= Aeson.object [Aeson.Key.fromText k Aeson..= v | (k, v) <- bs]]
+
+        refusalReasons :: Maybe Aeson.Object -> [Text]
+        refusalReasons plan = case lookupKey "refusal" plan of
+          Just (Aeson.Object r) | Just (Aeson.Array rs) <- Aeson.KeyMap.lookup "reasons" r -> [t | Aeson.String t <- toList rs]
+          _ -> []
+
+        -- The questions a plan asks, by label.
+        askedLabels :: Maybe Aeson.Object -> [Text]
+        askedLabels plan = case lookupKey "stillNeeded" plan of
+          Just (Aeson.Array xs) -> [l | Aeson.Object a <- toList xs, Just (Aeson.String l) <- [Aeson.KeyMap.lookup "label" a]]
+          _ -> []
+
+        -- Every complete set of answers to the inputs is evaluated, and the plan
+        -- for it must say the same: the same truth value, or a refusal whose one
+        -- reason is the reason /evaluation gives. Every partial set is planned too,
+        -- and where the plan settles the case early, every way of answering the
+        -- rest must agree with it: the same truth value, or a refusal, with the
+        -- plan's reasons exactly the ones those completions reach. No plan asks
+        -- anything but an input.
+        oracle :: Text -> Text -> [Text] -> SpecWith ()
+        oracle dep src inputs =
+          it (Text.unpack dep <> ": the plan agrees with /evaluation on every set of answers") do
+            withServiceFromSources dep [("rule.l4", src)] \baseUrl mgr -> do
+              let completions bs =
+                    [ List.sort (bs <> zip rest vals)
+                    | let rest = [n | n <- inputs, n `notElem` map fst bs]
+                    , vals <- replicateM (length rest) [False, True]
+                    ]
+                  partials = [[a | Just a <- answers] | answers <- traverse (\n -> [Nothing, Just (n, False), Just (n, True)]) inputs]
+              evaluated <- fmap Map.fromList $ forM (completions []) \bs -> do
+                ev <- evalFunction baseUrl mgr dep "eligible" (args bs)
+                case Aeson.decode (responseBody ev) :: Maybe SimpleResponse of
+                  Just (SimpleError (EvaluatorRefused reason _)) -> pure (bs, Left reason)
+                  Just (SimpleResponse r) | Just (FnLitBool b) <- Map.lookup "value" r.fnResult -> pure (bs, Right b)
+                  other -> fail ("unexpected evaluation of " <> show bs <> ": " <> show other)
+              for_ partials \bs -> do
+                qp <- queryPlan' baseUrl mgr dep "eligible" (args bs)
+                statusCode' qp `shouldBe` 200
+                let plan = decodeObject (responseBody qp)
+                    outs = [evaluated Map.! c | c <- completions bs]
+                    reasons = refusalReasons plan
+                    verdict = lookupKey "verdict" plan
+                (bs, filter (`notElem` inputs) (askedLabels plan)) `shouldBe` (bs, [])
+                case lookupKey "determined" plan of
+                  Just (Aeson.Bool b) -> do
+                    (bs, reasons) `shouldBe` (bs, [])
+                    (bs, verdict `elem` map (Just . Aeson.String) ["Undetermined", "Undetermined"]) `shouldBe` (bs, False)
+                    (bs, outs) `shouldBe` (bs, map (const (Right b)) outs)
+                  Just Aeson.Null
+                    | not (null reasons) -> do
+                        (bs, verdict) `shouldBe` (bs, Just (Aeson.String "Undetermined"))
+                        (bs, length reasons, List.nub (List.sort [r | Left r <- outs]), length [() | Left _ <- outs])
+                          `shouldBe` (bs, length (List.nub reasons), List.sort reasons, length outs)
+                    | otherwise -> do
+                        (bs, verdict) `shouldBe` (bs, Just (Aeson.String "Undetermined"))
+                        (bs, length bs < length inputs) `shouldBe` (bs, True)
+                  other -> expectationFailure (show bs <> ": determined is " <> show other)
+
+    -- The measured rule: `adult AND` a rule of no inputs that refuses.
+    oracle "refuse-and" refusingConditionJL4 ["adult"]
+    -- OR, the same way round: TRUE where adult is.
+    oracle "refuse-or" refusingOrJL4 ["adult"]
+    -- The refusing rule read first refuses whatever adult is.
+    oracle "refuse-first" refusingFirstJL4 ["adult"]
+    oracle "refuse-not" refusingNotJL4 ["adult", "resident"]
+    oracle "refuse-implies" refusingImpliesJL4 ["adult", "resident"]
+    oracle "refuse-implies-nested" refusingImpliesNestedJL4 ["adult", "resident"]
+    oracle "refuse-seam-open" refusingSeamOpenJL4 ["adult"]
+    -- Three rules of no inputs deep, one under a WHERE.
+    oracle "refuse-deep" refusingDeepJL4 ["adult"]
+    -- Inside a disjunction of conjunctions: planned as written, not simplified.
+    oracle "refuse-dist" refusingDistributedJL4 ["adult", "resident"]
+    -- A REFUSE written on an arm of the rule.
+    oracle "refuse-arm" refusingArmJL4 ["resident", "adult"]
+    oracle "refuse-both-arms" refusingBothArmsJL4 ["resident"]
+
+    it "asks only adult, never the rule that refuses" do
+      withServiceFromSources "refuse-asks" [("rule.l4", refusingConditionJL4)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "refuse-asks" "eligible" (args [])
+        statusCode' qp `shouldBe` 200
+        let plan = decodeObject (responseBody qp)
+        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Undetermined")
+        askedLabels plan `shouldBe` ["adult"]
+
+    it "both arms of an IF refuse: refused before the condition is answered, with both reasons" do
+      withServiceFromSources "refuse-both" [("rule.l4", refusingBothArmsJL4)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "refuse-both" "eligible" (args [])
+        let plan = decodeObject (responseBody qp)
+        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Undetermined")
+        askedLabels plan `shouldBe` []
+        List.sort (refusalReasons plan)
+          `shouldBe` ["the rules for non-residents are not modelled", "the rules for residents are not modelled"]
+
+    it "an answer for the rule that refuses changes nothing: evaluation takes none" do
+      withServiceFromSources "refuse-bound" [("rule.l4", refusingConditionJL4)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "refuse-bound" "eligible"
+          (args [("adult", True), ("the other conditions are not modelled", True)])
+        let plan = decodeObject (responseBody qp)
+        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Undetermined")
+        refusalReasons plan `shouldBe` ["the other conditions are not modelled"]
+
+    -- The guards: a rule of no inputs that cannot refuse, or refuses on only one
+    -- path, is still a question, exactly as before.
+    it "still asks a rule of no inputs that cannot refuse" do
+      withServiceFromSources "answered-cond" [("rule.l4", answeredConditionJL4)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "answered-cond" "eligible" (args [("adult", True)])
+        let plan = decodeObject (responseBody qp)
+        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Undetermined")
+        askedLabels plan `shouldBe` ["the fee is paid"]
+        lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
+
+    it "still asks a rule of no inputs that refuses on only one path" do
+      withServiceFromSources "conditional-refuser" [("rule.l4", conditionalRefuserJL4)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "conditional-refuser" "eligible" (args [("adult", True)])
+        let plan = decodeObject (responseBody qp)
+        lookupKey "verdict" plan `shouldBe` Just (Aeson.String "Undetermined")
+        askedLabels plan `shouldBe` ["the cap applies"]
+        lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
 
   describe "query-plan" do
     it "returns a query plan with no bindings" do
