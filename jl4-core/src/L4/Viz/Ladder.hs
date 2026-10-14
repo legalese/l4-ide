@@ -21,6 +21,7 @@ module L4.Viz.Ladder
   , getAtomDeps
   , getAtomInputRefs
   , getLeafKeys
+  , getRefusingAtoms
     -- * Utilities (shared with LSP)
   , collectTypicallyDefaults
   , seamLabel
@@ -48,6 +49,7 @@ import L4.Print (prettyLayout)
 import qualified L4.Transform as Transform (simplify, positionalCall, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget)
 import L4.Desugar
 import qualified L4.Export as Export
+import qualified L4.Refusal as Refusal
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
 import L4.Viz.GuardedRows (guardedToLadder, hasEffectfulNode, normaliseGuarded, GuardedRows (..))
@@ -115,6 +117,13 @@ data VizState = MkVizState
     -- these, so the diagram and the plan cannot disagree (smucclaw/l4-ide#935).
   , freshLeaves :: !Int
     -- ^ How many leaves keyed apart per occurrence ('keyLeaf') so far.
+  , refusingDefs :: Refusal.AlwaysRefusing
+    -- ^ The module's definitions that always refuse ("L4.Refusal"). Lazy: a
+    -- pass that names no definition never computes it.
+  , refusingAtoms :: IntMap Text
+    -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only
+    -- ever refuse at: a @REFUSE@, or a bare reference to a definition that
+    -- always refuses. The query plan never asks one (R7).
   }
   deriving stock (Generic)
 
@@ -139,6 +148,8 @@ mkInitialState uri mod' subst simp = MkVizState
   , keyEnv = withTypeExpander (TC.applyFinalSubstitution subst uri) (mkKeyEnv mod')
   , leafKeys = Map.empty
   , freshLeaves = 0
+  , refusingDefs = Refusal.alwaysRefusing mod'
+  , refusingAtoms = Map.empty
   }
 
 ------------------------------------------------------
@@ -256,6 +267,11 @@ getAtomInputRefs = (.atomInputRefs)
 -- | The C1 key of every leaf's term, by leaf id ('L4.Viz.AtomKey').
 getLeafKeys :: VizState -> IntMap Text
 getLeafKeys = (.leafKeys)
+
+-- | The leaves evaluation can only refuse at, by leaf id, with the reason each
+-- refuses with (see 'refusingAtoms').
+getRefusingAtoms :: VizState -> IntMap Text
+getRefusingAtoms = (.refusingAtoms)
 
 -- | Find all DECIDE rules that can be visualized.
 -- Rather than just checking types, we try to visualize each DECIDE
@@ -467,7 +483,7 @@ translateExpr shouldSimplify = top
       -- (@REFUSE "…"@) so the picture says what it is. Explicit above the
       -- wildcard because the wildcard would first try 'normaliseGuarded' on
       -- it, and a refusal is not ladder STRUCTURE — it is a terminal.
-      Refuse{} -> leafFromExpr e
+      Refuse _ msg -> leafFromExpr e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
 
       App _ resolved [] -> do
         vid <- getFresh
@@ -577,7 +593,21 @@ varLeaf vid vname resolved = do
   atomId <- keyLeaf vname.unique (App emptyAnno resolved [])
   defaults <- use #typicallyDefaults
   let mTypically = Map.lookup (getUnique resolved).unique defaults
-  pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically Nothing
+  -- A rule of no inputs that always refuses is not a question: evaluation takes
+  -- no answer for it, it forces the rule (R7). One that refuses on only some
+  -- paths stays a question. Mirrors 'LSP.L4.Viz.Ladder.varLeaf'.
+  refusing <- use #refusingDefs
+  refusingLeaf (DMap.lookup (getUnique resolved) refusing) $
+    VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically Nothing
+
+-- | Record a leaf as one evaluation can only refuse at, with the reason, if it
+-- has one.
+refusingLeaf :: Maybe Text -> IRExpr -> Viz IRExpr
+refusingLeaf reason leaf = do
+  case (reason, leaf) of
+    (Just r, VizExpr.UBoolVar _ nm _ _ _ _ _) -> #refusingAtoms %= Map.insert nm.unique r
+    _ -> pure ()
+  pure leaf
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
