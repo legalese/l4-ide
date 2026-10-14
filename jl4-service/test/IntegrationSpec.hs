@@ -3,7 +3,7 @@
 
 -- | The helpers are exported for "StdlibResolutionSpec", which needs the same
 -- in-process service but must control the environment around it.
-module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess) where
+module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions) where
 
 import Test.Hspec
 
