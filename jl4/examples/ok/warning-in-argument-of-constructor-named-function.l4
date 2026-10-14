@@ -1,0 +1,34 @@
+-- A function may share its name with the constructor of a record that has
+-- exactly one LIST field, and a warning raised inside an argument of a call
+-- to it must not change which of the two the call means. The constructor
+-- takes its elements as a list, so a call with two arguments is checked
+-- twice, as the function and as the constructor; the call to the function
+-- succeeds, with only a warning. It was once set aside for the other reading
+-- and the name reported as ambiguous, when nothing said what type the call
+-- has: the rules below have no GIVETH.
+--
+-- Each of the three rules below calls `Bag` with a CONSIDER as its first
+-- argument: one misses Blue, one has a repeated arm, one is complete. The
+-- first two are warned about, once each.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECLARE Bag HAS items IS A LIST OF NUMBER
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+DECIDE Bag a b IS a PLUS b
+
+GIVEN c IS A Colour
+DECIDE `missing case` c IS Bag (CONSIDER c WHEN Red THEN 1, WHEN Green THEN 2) 3
+
+GIVEN c IS A Colour
+DECIDE `repeated case` c IS Bag (CONSIDER c WHEN Red THEN 1, WHEN Green THEN 2, WHEN Blue THEN 2, WHEN Red THEN 2) 3
+
+GIVEN c IS A Colour
+DECIDE `complete` c IS Bag (CONSIDER c WHEN Red THEN 1, WHEN Green THEN 2, WHEN Blue THEN 2) 3
+
+#EVAL `missing case` Red
+#EVAL `repeated case` Green
+#EVAL `complete` Blue
