@@ -631,7 +631,16 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     case "FULFILLED":
       return { value: "FULFILLED", residual: null, ctx };
     case "BREACH":
-      return { value: deonticBreachToWire(current), residual: null, ctx };
+      // The wire answer prints the party as the plain name, as jl4-service
+      // does; how the trace's source text must spell it (a name is
+      // backticked, rule source is not) is the contract node's @byKind@, and
+      // travels beside the answer, not in it.
+      return {
+        value: deonticBreachToWire(current),
+        residual: null,
+        ctx,
+        breachByKind: current.byKind,
+      };
     default:
       throw new Error(
         "deontic interpreter: unexpected node kind: " + current.kind,
@@ -852,6 +861,7 @@ function synthesizeDeonticReasoning(
   residualContract,
   residualDeadline,
   args,
+  breachByKind,
 ) {
   const givenParams = (meta.paramOrder || []).filter(
     (p) => p !== "startTime" && p !== "events",
@@ -869,6 +879,7 @@ function synthesizeDeonticReasoning(
       residualDeadline,
       args,
       givenParams,
+      breachByKind,
     );
   }
 
@@ -891,7 +902,7 @@ function synthesizeDeonticReasoning(
       : value === "BREACH"
         ? "BREACH"
         : explicitBreach
-          ? deonticBreachResultText(value.BREACH)
+          ? deonticBreachResultText(value.BREACH, breachByKind)
           : residualContract
             ? renderContractAsSource(residualContract, residualDeadline)
             : contractBodyText;
@@ -939,7 +950,7 @@ function synthesizeDeonticReasoning(
   ];
   if (explicitBreach) {
     callChildren.push({
-      exampleCode: [renderExplicitBreachClause(value.BREACH)],
+      exampleCode: [renderExplicitBreachClause(value.BREACH, breachByKind)],
       explanation: ["Result: " + resultText],
       children: [],
     });
@@ -975,19 +986,26 @@ function synthesizeDeonticReasoning(
 // 'BREACH BY <party> BECAUSE "<detail>"' — source form for the extra
 // child node svc inserts under 'a OF b, c' on an explicit-BREACH
 // outcome. 'detail' is the un-quoted L4 string literal; re-quote it
-// so the rendered clause matches the original source.
-function renderExplicitBreachClause(br) {
+// so the rendered clause matches the original source. 'byKind' is the
+// contract's @byKind@ for the party (`breachByKind` of the interpreter's
+// result): a name is backticked as L4's printer does, anything else is printed
+// as given.
+function renderExplicitBreachClause(br, byKind) {
   const parts = ["BREACH"];
-  if (br.party != null) parts.push("BY " + br.party);
+  if (br.party != null) {
+    parts.push("BY " + deonticLiteralAsSource(br.party, byKind));
+  }
   if (br.detail != null) parts.push('BECAUSE "' + br.detail + '"');
   return parts.join(" ");
 }
 
 // 'DEONTIC BREACHED:\n  BREACH\n  BY p\n  BECAUSE "r"' — the
 // "Result:" line text on every node that ends in an explicit BREACH.
-function deonticBreachResultText(br) {
+function deonticBreachResultText(br, byKind) {
   const lines = ["DEONTIC BREACHED:", "  BREACH"];
-  if (br.party != null) lines.push("  BY " + br.party);
+  if (br.party != null) {
+    lines.push("  BY " + deonticLiteralAsSource(br.party, byKind));
+  }
   if (br.detail != null) lines.push('  BECAUSE "' + br.detail + '"');
   return lines.join("\n");
 }
@@ -1024,6 +1042,7 @@ function synthesizeParameterizedDeonticReasoning(
   residualDeadline,
   args,
   givenParams,
+  breachByKind,
 ) {
   const fnNameRendered =
     (meta.traceMeta && meta.traceMeta.fnName) || meta.name || "";
@@ -1038,7 +1057,7 @@ function synthesizeParameterizedDeonticReasoning(
       : value === "BREACH"
         ? "BREACH"
         : explicitBreach
-          ? deonticBreachResultText(value.BREACH)
+          ? deonticBreachResultText(value.BREACH, breachByKind)
           : residualContract
             ? renderResidualForParamCtx(
                 residualContract,
@@ -3150,6 +3169,7 @@ export function createRuntime(opts) {
         result.residual,
         result.residualDeadline,
         args,
+        result.breachByKind,
       );
       return { value: result.value, reasoning };
     }
