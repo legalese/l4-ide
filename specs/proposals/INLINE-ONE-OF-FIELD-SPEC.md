@@ -641,3 +641,6 @@ Where the build departed from or added to the note, it is listed here, each labe
    `l4 render` differs, as intended: the twin prints "Plot's tenure means one of Owner, Tenant, or Lodger." and "tenure — Plot's tenure", the inline form only "tenure — one of Owner, Tenant, or Lodger".
    The ladder was not run.
 10. **Not built:** inline options in a record with a type parameter (refused, as §7 scopes it), in `GIVEN`, and inline records (option E).
+11. **An inline `ONE OF` with no options** checks, as an empty `DECLARE … IS ONE OF` does, and is warned about at its `ONE OF`, because no record that has the field can be made (added in review round 1; `jl4/examples/ok/inline-one-of-empty.l4`).
+    An empty `DECLARE … IS ONE OF` is left as it was.
+    Assumed, not ruled.

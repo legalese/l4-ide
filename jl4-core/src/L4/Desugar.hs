@@ -7,6 +7,7 @@ module L4.Desugar (
   --
   desugarInlineOptions,
   detectInlineOptionsInParameterisedTypes,
+  detectEmptyInlineOptions,
   inlineOptionsKey,
   -- * Computed Fields
   --
@@ -402,6 +403,28 @@ detectInlineOptionsInParameterisedTypes (MkModule _ _ section) = goSection secti
           [ (dn, fn, inlineOptionsKeywordRange tn)
           | tn@(MkTypedName _ fn _ (Just _) _ _) <- fieldsOf td
           ]
+    _ -> []
+  fieldsOf = \ case
+    RecordDecl _ _ tns -> tns
+    EnumDecl _ cds     -> concat [ tns | MkConDecl _ _ tns <- cds ]
+    _                  -> []
+
+-- | Fields written @IS ONE OF@ with no options after it, with the range of the
+-- field's @ONE OF@. An empty list parses, as it does after @DECLARE … IS ONE
+-- OF@, and lifts to an enum with no constructors, so the field can never be
+-- given a value; 'L4.TypeCheck' warns (review round 1, F6). Assumed, not
+-- ruled: a warning rather than an error, and an empty @DECLARE … IS ONE OF@
+-- keeps saying nothing.
+detectEmptyInlineOptions :: Module Name -> [(Name, Maybe SrcRange)]
+detectEmptyInlineOptions (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ _ decls) = concatMap goTopDecl decls
+  goTopDecl = \ case
+    Section _ s -> goSection s
+    Declare _ (MkDeclare _ _ _ td) ->
+      [ (fn, inlineOptionsKeywordRange tn)
+      | tn@(MkTypedName _ fn _ (Just []) _ _) <- fieldsOf td
+      ]
     _ -> []
   fieldsOf = \ case
     RecordDecl _ _ tns -> tns

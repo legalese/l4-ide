@@ -1,0 +1,10 @@
+-- A field written IS ONE OF with no options after it checks, as an empty
+-- DECLARE ... IS ONE OF does, but no record that has it can ever be made, so
+-- L4 warns at the ONE OF (review round 1, F6; assumed, not ruled).
+DECLARE Plot HAS
+  tenure IS ONE OF
+  area IS A NUMBER
+
+GIVEN p IS A Plot
+GIVETH A NUMBER
+`area of` p MEANS p's area

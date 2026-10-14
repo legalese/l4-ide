@@ -123,7 +123,7 @@ import Data.Function (on)
 import Control.Exception (assert)
 import Data.Char (isPrint)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarInlineOptions, desugarSectionGivens, detectComputedFieldCycles, detectInlineOptionsInParameterisedTypes, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, inlineOptionsKey, openFields, recordFieldTable, shadowCandidates)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarInlineOptions, desugarSectionGivens, detectComputedFieldCycles, detectEmptyInlineOptions, detectInlineOptionsInParameterisedTypes, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, inlineOptionsKey, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -195,6 +195,11 @@ doCheckProgramWithDependencies checkState checkEnv program =
         -- the field.
         [ MkCheckErrorWithContext (InlineOptionsInParameterisedType r declName fieldName) None
         | (declName, fieldName, r) <- detectInlineOptionsInParameterisedTypes program
+        ]
+        ++
+        -- An inline ONE OF with nothing after it, followed by the next field.
+        [ MkCheckErrorWithContext (CheckWarning (EmptyInlineOptions r fieldName)) None
+        | (fieldName, r) <- detectEmptyInlineOptions program
         ]
         ++
         -- The dedent hazard of R4: a section binder pushed back to column 1
@@ -8327,6 +8332,13 @@ prettyCheckWarning = \ case
     , "  a OP b MEANS ..."
     , ""
     , "where a and b are the GIVEN inputs."
+    ]
+  EmptyInlineOptions _ field ->
+    [ "The field " <> quotedName field <> " is written IS ONE OF, but no options follow,"
+    , "so no value can ever be given for it, and no record that has it can be made."
+    , ""
+    , "List the options after ONE OF, on the same line or each on a line of its own,"
+    , "or give the field a type."
     ]
   DeprecatedExactly info -> case info.advice of
     DropTheKeyword line ->
