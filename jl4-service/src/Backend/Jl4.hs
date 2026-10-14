@@ -27,7 +27,9 @@ import qualified LSP.Core.Shake as Shake
 import Control.Exception (throwIO)
 import EvalLimits (currentAllocationLimit)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
-import LSP.Core.Types.Diagnostics (FileDiagnostic (..), prettyDiagnostic)
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..), messageOfL, prettyDiagnostic)
+import qualified L4.IgnoredAnnotation as IA
+import Data.Functor.Const (Const (..))
 import LSP.L4.Oneshot (oneshotL4ActionAndDiagnosticsIn, oneshotL4ActionAndErrorsIn)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
@@ -161,11 +163,14 @@ bundleScope = Rules.EmbeddedStdlibOnly
 -- (parse, import resolution, typecheck) and shares them across all files.
 --
 -- Returns per-file typecheck results and per-file evaluator environments
--- (for files that have exports and need import environments), and the IMPORTs
+-- (for files that have exports and need import environments), the IMPORTs
 -- of the bundle's @.l4@ files that resolved to nothing, as (importing file,
--- module name). The caller says so in its log: the diagnostic for one is in the
+-- module name), and the annotation lines this version of L4 ignored. The caller
+-- says so of an unresolved IMPORT in its log: the diagnostic for one is in the
 -- session's store, which this function does not hand back, and a bundle with an
--- unresolvable IMPORT still compiles.
+-- unresolvable IMPORT still compiles. Whether an ignored annotation refuses a
+-- deployment is "Compiler".compileBundle's rule; 'L4.IgnoredAnnotation' says why
+-- the lexer lets one through.
 typecheckAndEvalBundle
   :: ModuleContext
   -- ^ All source files in the bundle (filepath -> content)
@@ -182,6 +187,10 @@ typecheckAndEvalBundle
         -- ^ Evaluator import environments for requested files
         , [(FilePath, Text)]
         -- ^ IMPORTs that resolved to nothing: (importing file, module name)
+        , [(FilePath, IA.IgnoredAnnotation)]
+        -- ^ Annotation lines this version of L4 ignored (an unknown name, or
+        -- a known one without the form it needs), with the bundle file each
+        -- is in. Which of them refuse a deployment is the caller's rule.
         )
 typecheckAndEvalBundle moduleContext evalFiles = do
   fixedNow <- Eval.readFixedNowEnv
@@ -216,7 +225,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   -- Use the first file's directory as the session root (arbitrary but required)
   let allFiles = StrictMap.toList moduleContext
   case allFiles of
-    [] -> pure ([], StrictMap.empty, StrictMap.empty, [])
+    [] -> pure ([], StrictMap.empty, StrictMap.empty, [], [])
     ((firstPath, _) : _) -> do
       (_log, diags, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndDiagnosticsIn bundleScope evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
@@ -275,7 +284,13 @@ typecheckAndEvalBundle moduleContext evalFiles = do
             | d@FileDiagnostic{fdFilePath = uri, fdLspDiagnostic = Diagnostic{_severity = Just DiagnosticSeverity_Error}} <- diags
             , Just path <- [StrictMap.lookup uri uriToPath]
             ]
-      pure (errs, tcMap, evalMap, unresolved)
+          ignored =
+            [ (path, a)
+            | d@FileDiagnostic{fdFilePath = uri} <- diags
+            , Just a <- [getConst (messageOfL @IA.IgnoredAnnotation Const d)]
+            , Just path <- [StrictMap.lookup uri uriToPath]
+            ]
+      pure (errs, tcMap, evalMap, unresolved, ignored)
 
 buildFunDecide :: Text -> FunctionDeclaration -> ExceptT EvaluatorError IO (Decide Resolved)
 buildFunDecide fnImpl fnDecl = do
