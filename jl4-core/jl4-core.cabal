@@ -10,7 +10,7 @@ flag safe-mode
   manual: True
 
 flag serialise-support
-  description: Enable Serialise instances for AST types (for jl4-service CBOR caching). Disable for WASM builds where cborg doesn't compile.
+  description: Enable Serialise instances for AST types. jl4-service used them to cache checked modules and no longer does, so nothing in this repository uses them. Disable for WASM builds where cborg doesn't compile.
   default: True
   manual: True
 
@@ -162,20 +162,29 @@ test-suite jl4-core-test
     Paths_jl4_core
     ImportResolutionSpec
     TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
+    PatternMatchParserSpec
+    PatternClausesMissingSpec
     UUID5Spec
     ExportValidationSpec
     NumberLiteralSpec
     DirectiveRenameSpec
+    MultiClausePrintSpec
+    ConsiderScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
+    RefAnnotationSpec
+    DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
+    optics,
     text,
     time

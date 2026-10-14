@@ -9,12 +9,15 @@ module L4.Syntax where
 import Base
 import L4.Annotation
 import L4.Lexer (PosToken)
+import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
 import L4.Instances.Serialise ()
-import Codec.Serialise (Serialise)
+import L4.Parser.SrcSpan (SrcPos)
+import Codec.Serialise (Serialise (..))
 #endif
 import Data.Default
+import Data.TreeDiff.Class (ToExpr (..))
 import qualified GHC.Generics as GHC
 import qualified Generics.SOP as SOP
 import Optics
@@ -32,6 +35,8 @@ data RawName =
   -- ^ contains the actual name and a list of qualifiers, e.g.
   -- foo.bar becomes @'QualifiedName' bar [foo]@
   | PreDef Text
+  -- ^ a name the compiler made up, which no source can write: the parser
+  -- never produces it ('L4.Parser.generatedName', 'isGeneratedName')
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -87,6 +92,39 @@ rawNameToText (QualifiedName qs n) = Text.intercalate "." (NE.toList qs <> [n])
 
 nameToText :: Name -> Text
 nameToText = rawNameToText . rawName
+
+-- | Is this pattern /distinguishable/, i.e. clearly a pattern rather than a
+-- plain parameter name? True for literals, applied constructors (@JUST x@),
+-- cons (@x FOLLOWED BY xs@) and EXACTLY expressions. False for a bare
+-- @PatApp n []@, which at parse time (before scope-checking) is ambiguous
+-- between a variable binder and a nullary constructor such as @EMPTY@ / @TRUE@.
+-- Grouping into a pattern match is only triggered when a clause carries at
+-- least one distinguishable pattern ('L4.Parser.decidePatternMatch').
+isDistinguishablePat :: Pattern Name -> Bool
+isDistinguishablePat = \ case
+  PatLit {}     -> True
+  PatCons {}    -> True
+  PatExpr {}    -> True
+  PatApp _ _ ps -> not (null ps)
+  PatVar {}     -> False
+
+-- | Does this pattern of a multi-clause group always match its scrutinee
+-- /without introducing a new binding/? True for the anonymous wildcard @_@ and
+-- for a variable pattern that reuses the scrutinee's own name (so the binding
+-- is already in scope). Named wildcards (@_foo@) and differently-named
+-- variables still bind, via a WHEN ('L4.Parser.matchClauses').
+patAlwaysMatchesAs :: Name -> Pattern Name -> Bool
+patAlwaysMatchesAs s (PatApp _ n []) =
+  nameToText n == "_" || rawName n == rawName s
+patAlwaysMatchesAs _ _ = False
+
+-- | Is this a name the compiler made up ('PreDef')? Such a name has no
+-- source of its own, so nothing that offers names to a drafter (completion,
+-- the outline) or prints source should show it.
+isGeneratedName :: RawName -> Bool
+isGeneratedName = \ case
+  PreDef _ -> True
+  _        -> False
 
 data Type' n =
     Type   Anno -- ^ the type of types
@@ -420,20 +458,161 @@ moduleTopDecls = lens
 -- Source Annotations
 -- ----------------------------------------------------------------------------
 
-data Extension = Extension
-  { resolvedInfo :: Maybe Info
-  , nlg          :: Maybe Nlg
-  , desc         :: Maybe Desc
+-- | One clause of a multi-clause pattern-matching group, as parsed: the
+-- clause head name's source range (the warning anchor), the argument
+-- patterns, one per column, and what belongs to this clause alone: its head
+-- name as written, its @AKA@, and the @\@desc@ (or @\@export@) written
+-- above it. A run that the checker turns back into separate definitions
+-- ('L4.TypeCheck.separateOverloads') gives each definition its own clause's
+-- head, @AKA@ and annotations; a group keeps those of its first clause, and
+-- warns about any above a later one ('L4.TypeCheck.checkClauseMatrix').
+--
+-- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
+-- generic traversals): the stored patterns transitively contain @Expr Name@
+-- (via 'PatExpr'), so a Generic instance here would splice a Name-pass AST
+-- fragment into the generic-representation closure of EVERY annotated node —
+-- making polymorphic @gplate \@(Decide n)@ traversals ambiguous (overlapping
+-- instances) and monomorphic ones silently descend into annotation extras.
+-- Without 'GHC.Generic', optics' @GPlateInner@ treats the field as a leaf.
+-- 'NFData', 'ToExpr' and 'Serialise' are therefore written by hand below.
+data PmMatrixClause = MkPmMatrixClause
+  { headRange :: Maybe SrcRange
+  , patterns  :: [Pattern Name]
+  , clauseHead :: Name
+    -- ^ the clause's head name, as parsed; an @\@nlg@ written above a later
+    -- clause is attached to it ('L4.Parser.ResolveAnnotation')
+  , clauseAka :: Maybe (Aka Name)
+  , clauseDescs :: [Desc]
+    -- ^ every @\@desc@ and @\@export@ written between the clause above and a
+    -- later clause, in source order ('L4.Parser.ResolveAnnotation'); a
+    -- separated overload keeps one of them, as a definition does
+    -- ('L4.Parser.ResolveAnnotation.pickDesc'). The first clause's are the
+    -- group's own, as a plain definition's are.
+  , clauseNlgs :: [Nlg]
+    -- ^ every @\@nlg@ written between the clause above and a later clause, in
+    -- source order; the one a separated overload uses is on @clauseHead@
+  , bodyRange :: Maybe SrcRange
+    -- ^ the range of the clause's body, with a @WHERE@'s definitions and
+    -- anything written inside them; an annotation after it and before the next
+    -- clause's head is written between the two clauses
+    -- ('L4.Parser.ResolveAnnotation')
+  }
+  deriving stock (Eq, Ord, Show)
+
+instance NFData PmMatrixClause where
+  rnf (MkPmMatrixClause r ps h a d n b) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d `seq` rnf n `seq` rnf b
+
+instance ToExpr PmMatrixClause where
+  toExpr (MkPmMatrixClause r ps h a d n b) = toExpr (r, ps, h, a, (d, n, b))
+
+-- | The source clause matrix of a multi-clause pattern-matching group,
+-- attached by the parser to the fused Decide's annotation BEFORE
+-- 'L4.Parser.matchClauses' lowers the group to nested CONSIDERs (which have
+-- no per-clause structure and no source ranges). Consumed once, by the
+-- type checker's clause-matrix exhaustiveness analysis
+-- ('L4.TypeCheck.checkClauseMatrix'). Stored in the Name pass; the AST
+-- Functor does not map into annotation extras, so the Resolved tree still
+-- carries the Name-pass patterns — the checker re-resolves them itself
+-- (quietly) against the GIVEN column types. Not 'GHC.Generic' — see
+-- 'PmMatrixClause'.
+data PmMatrix = MkPmMatrix
+  { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @input i@)
+  , synthesizedScrutinees :: Bool
+    -- ^ the group has no GIVEN naming one input per pattern, so 'scrutinees'
+    -- are names the desugarer made up ('L4.Parser.generatedName'), which no
+    -- source can write, so no suggested clause may use them
+  , clauses    :: [PmMatrixClause]
+  , catchAll   :: Maybe Int
+    -- ^ index of the first clause every one of whose patterns matches
+    -- anything ('L4.Syntax.patAlwaysMatchesAs'); the clauses after it are
+    -- never tried
+  }
+  deriving stock (Eq, Ord, Show)
+
+instance NFData PmMatrix where
+  rnf (MkPmMatrix s syn cs ca) = rnf s `seq` rnf syn `seq` rnf cs `seq` rnf ca
+
+instance ToExpr PmMatrix where
+  toExpr (MkPmMatrix s syn cs ca) = toExpr (s, syn, cs, ca)
+
+-- | The multi-clause group a generated node belongs to, as the drafter
+-- wrote it: the name its clauses define, and how many clauses there are.
+data PmGroup = MkPmGroup
+  { groupHead   :: RawName
+  , clauseCount :: Int
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | Marks a node that 'L4.Parser.matchClauses' generated while lowering a
+-- multi-clause group, as opposed to one the drafter wrote. The checker and
+-- the evaluator read it so that what they report is about the clauses the
+-- drafter wrote, not about the CONSIDERs and local definitions they were
+-- compiled to. The mark is on the node itself, never inferred from a name: a
+-- drafter can spell any name, and a CONSIDER the drafter wrote inside a
+-- clause's body sits in the same generated definition as the ones around it.
+data PmSynthetic
+  = PmConsider PmGroup Int Bool
+    -- ^ a CONSIDER testing one input of the group: its 1-based position, and
+    -- whether the group's GIVEN declares that input's type
+  | PmFallthrough PmGroup
+    -- ^ the local definition holding the clauses not yet tried
+  | PmUnreachable PmGroup
+    -- ^ the same, after a clause that matches every input, so never used.
+    -- Bound only so that its clauses are type-checked; the checker drops it
+    -- from what it returns, so nothing downstream ever sees it.
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- NOTE on serialisation: jl4-service's AST cache (@bundle.cbor@) writes an
+-- annotation through 'Serialise Anno' at the bottom of this module, which
+-- keeps 'pmSynthetic' and none of the other fields below, so 'pmMatrix'
+-- never reaches the cache. A change to 'PmSynthetic' or 'PmGroup' changes the
+-- shape of every cached bundle: one written before the change fails to decode
+-- and is recompiled from source, which is the cache's normal versioning
+-- behaviour. 'Extension' still derives 'Serialise', so every field's type
+-- needs an instance (see the CPP block at the bottom of this module).
+data Extension = Extension
+  { resolvedInfo :: Maybe Info
+  , nlg          :: Maybe Nlg
+  , desc         :: Maybe Desc
+  , ref          :: Refs
+    -- ^ Every @\@ref@ written before this node and after the node before it,
+    -- in source order. See 'annRefs'.
+  , pmMatrix     :: Maybe PmMatrix
+  , pmSynthetic  :: Maybe PmSynthetic
+    -- ^ Set on the nodes a multi-clause group is compiled to. See 'PmSynthetic'.
+  }
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The refs a node holds; 'annRefs' reads them as a list.
+--
+-- A newtype only so that 'show' of an EMPTY one is @Nothing@ and not @[]@, the
+-- spelling this change was carried over with from @unstable@. The text is
+-- visible only where an 'Extension' is shown raw: @l4 run --json@ on
+-- @ok/assumes.l4@, @ok/elem.l4@ and @ok/lazytrace-exception.l4@ prints
+-- @ref = Nothing@ in the value of the error. No atomId on @main@ depends on
+-- it: 'L4.Viz.Ladder.generateAtomId' hashes the function, the printed label
+-- and the input refs, and not an 'Anno'. Ruling R6 (2026-10-12) removes the
+-- newtype; that has not landed (specs/done/REF-ANNOTATION-SPEC.md).
+newtype Refs = MkRefs [Ref]
+  deriving stock (GHC.Generic, Eq, Ord)
+  deriving newtype (Semigroup, Monoid, NFData)
+
+instance Show Refs where
+  showsPrec _ (MkRefs []) = showString "Nothing"
+  showsPrec d (MkRefs rs) = showsPrec d rs
+
+instance ToExpr Refs where
+  toExpr (MkRefs rs) = toExpr rs
+
 instance Semigroup Extension where
-  Extension i1 nlg1 desc <> Extension i2 nlg2 desc' =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc')
+  Extension i1 nlg1 desc ref1 pm1 syn1 <> Extension i2 nlg2 desc' ref2 pm2 syn2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <> ref2) (pm1 <|> pm2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing Nothing (MkRefs []) Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -443,7 +622,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing
+  def = Extension Nothing Nothing Nothing (MkRefs []) Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -459,11 +638,42 @@ annNlg = #extra % #nlg
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
 
+-- | The @\@ref@ citations held by a node: every one written after the node
+-- before it and before this one, in source order.
+--
+-- See 'L4.Parser.ResolveAnnotation.addRefCommentsToAst' for which node holds a
+-- ref. Not kept in a bundle: 'Serialise Anno' writes only the unit.
+annRefs :: Lens' Anno [Ref]
+annRefs = #extra % #ref % iso (\(MkRefs rs) -> rs) MkRefs
+
+-- | The ref nearest the node: the last of those it holds, the one written
+-- closest above it. What every reader that shows ONE citation per node reads,
+-- so a stack of refs shows its bottom one (ruled 2026-10-12: in a stack the
+-- exporters show the nearest).
+annRef :: Getter Anno (Maybe Ref)
+annRef = annRefs % to (listToMaybe . reverse)
+
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
 
 setDesc :: Desc -> Anno -> Anno
 setDesc d a = a & annDesc ?~ d
+
+-- | Hold further refs on a node, after any it already has.
+addRefs :: [Ref] -> Anno -> Anno
+addRefs rs a = a & annRefs %~ (<> rs)
+
+annPmMatrix :: Lens' Anno (Maybe PmMatrix)
+annPmMatrix = #extra % #pmMatrix
+
+setPmMatrix :: PmMatrix -> Anno -> Anno
+setPmMatrix m a = a & annPmMatrix ?~ m
+
+annPmSynthetic :: Lens' Anno (Maybe PmSynthetic)
+annPmSynthetic = #extra % #pmSynthetic
+
+setPmSynthetic :: PmSynthetic -> Anno -> Anno
+setPmSynthetic m a = a & annPmSynthetic ?~ m
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)
@@ -685,6 +895,20 @@ data Ref = MkRef Anno Text
 getRef :: Ref -> Text
 getRef (MkRef _ t) = t
 
+-- | The citation itself, without the herald or the angle brackets it was
+-- written with and without the spaces and carriage return the lexer keeps.
+--
+-- For a message that quotes the citation. 'getRef' is not that: it hands back
+-- the token as written, @\"\@ref X  \"@ or @\"\<\<X\>\>\"@, because the exact
+-- printer reprints it byte for byte.
+refCitation :: Ref -> Text
+refCitation r =
+  let stripped = Text.strip (getRef r)
+      afterHerald = Text.strip (fromMaybe stripped (Text.stripPrefix "@ref" stripped))
+  in case Text.stripPrefix "<<" afterHerald of
+       Just inner -> Text.strip (fromMaybe inner (Text.stripSuffix ">>" inner))
+       Nothing    -> afterHerald
+
 data Desc = MkDesc Anno Text
   deriving stock (Show, Eq, Ord, GHC.Generic)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
@@ -820,7 +1044,8 @@ app :: n -> [Type' n] -> Type' n
 app = TyApp emptyAnno
 
 -- ----------------------------------------------------------------------------
--- Serialise instances (CBOR) for AST caching in jl4-service
+-- Serialise instances (CBOR) for the AST. jl4-service used them for its cache,
+-- @bundle.cbor@, and no longer does.
 -- ----------------------------------------------------------------------------
 
 #if defined(SERIALISE_ENABLED)
@@ -860,6 +1085,31 @@ deriving anyclass instance Serialise n => Serialise (Module n)
 deriving anyclass instance Serialise n => Serialise (Section n)
 deriving anyclass instance Serialise n => Serialise (TopDecl n)
 deriving anyclass instance Serialise n => Serialise (LocalDecl n)
+deriving anyclass instance Serialise SrcPos
+deriving anyclass instance Serialise SrcRange
+-- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
+-- definitions), so their instances are written by hand, via tuples.
+instance Serialise PmMatrixClause where
+  encode (MkPmMatrixClause r ps h a d n b) = encode (r, ps, h, a, (d, n, b))
+  decode = (\ (r, ps, h, a, (d, n, b)) -> MkPmMatrixClause r ps h a d n b) <$> decode
+instance Serialise PmMatrix where
+  encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
+  decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode
+deriving anyclass instance Serialise PmGroup
+deriving anyclass instance Serialise PmSynthetic
+-- | An annotation holds the concrete tokens, the source range and what the
+-- checker found, which the IDE needs and an evaluator does not, so a bundle
+-- keeps only 'pmSynthetic', the mark on the nodes a multi-clause group is
+-- compiled to. The evaluator reads that mark to say which rule has no clause
+-- for an input ("No clause of `price` matches these inputs";
+-- 'L4.EvaluateLazy.Machine.consideredClauses'). A module read back from
+-- jl4-service's @bundle.cbor@ without the mark reports a CONSIDER that the
+-- drafter never wrote. An unmarked node still costs one byte, as the @()@ that
+-- used to stand for every annotation did. A bundle written before the mark
+-- was kept does not decode, and the service then recompiles from source.
+instance Serialise Anno where
+  encode = encode . view annPmSynthetic
+  decode = (\ m -> emptyAnno & annPmSynthetic .~ m) <$> decode
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
@@ -867,6 +1117,7 @@ deriving anyclass instance Serialise Nlg
 deriving anyclass instance Serialise n => Serialise (NlgFragment n)
 deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
+deriving anyclass instance Serialise Refs
 deriving anyclass instance Serialise Desc
 #endif
 

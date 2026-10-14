@@ -94,6 +94,10 @@ After deploying, the status progresses through:
 
 When you deploy to a name that already exists, the extension checks for **breaking changes** — such as removed parameters, changed return types, or renamed rules. If breaking changes are detected, you will see a warning before confirming the update.
 
+### From the command line
+
+The `l4` CLI deploys the same way: `l4 deploy insurance-premium.l4` creates the deployment, and `l4 redeploy insurance-premium.l4` updates it, refusing breaking changes unless you add `--force`. See [Deploy as an API](../getting-started/l4-cli.md#step-7-deploy-as-an-api).
+
 ---
 
 ## Step 4: Manage Deployments
@@ -355,7 +359,7 @@ DECIDE `calculate premium` IS ...
 
 ## Self-hosted jl4-service
 
-If you run your own `jl4-service` instead of Legalese Cloud, the same API surface is served from your own host (e.g. `http://localhost:8080`), with the deployment id in the path instead of the org/deployment pair:
+If you run your own `jl4-service` instead of Legalese Cloud, deploy to it with `l4 deploy insurance-premium.l4 --server http://localhost:8080`. The same API surface is served from your own host, with the deployment id in the path instead of the org/deployment pair:
 
 - `GET /deployments/{deploymentId}/functions` — list exported rules
 - `POST /deployments/{deploymentId}/functions/{name}/evaluation` — evaluate a rule

@@ -1,0 +1,10 @@
+-- The mixfix rule for mixfix-input-named-like-word-import.l4, in a file of its own.
+-- The calls are written head first: main's exact-printer reorders an infix
+-- mixfix call (smucclaw/l4-ide#918, fixed on unstable), which the .ep.golden
+-- would then record.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+a `plus` b MEANS a + b
+
+#EVAL `plus` 3 4    -- 7

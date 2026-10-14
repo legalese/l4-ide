@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-mixfix-input-word.l4:20:1-20:
+  5
+pattern-matching-mixfix-input-word.l4:21:1-16:
+  0
+pattern-matching-mixfix-input-word.l4:22:1-16:
+  7

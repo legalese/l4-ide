@@ -1,0 +1,14 @@
+-- The mixfix rule comes from another file; the rule below has an input named
+-- like its word, and is left alone there too.
+-- The calls are written head first: main's exact-printer reorders an infix
+-- mixfix call (smucclaw/l4-ide#918, fixed on unstable), which the .ep.golden
+-- would then record.
+IMPORT `mixfix-input-named-like-word-def`
+
+GIVEN plus IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+total plus y MEANS plus * y
+
+#EVAL `plus` 3 4    -- 7
+#EVAL total 3 4     -- 12
