@@ -612,6 +612,9 @@ Where the build departed from or added to the note, it is listed here, each labe
    The note said only that the type slot is filled by the desugarer.
    After checking, the field's options slot holds the lifted declaration's checked constructors, carrying the source annotations, and the lifted `DECLARE` is token-free, so semantic tokens and hover meet the options where the author wrote them (`jl4/examples/lsp/semantic-tokens/inline-one-of.l4`, `jl4/examples/lsp/hover/inline-one-of-hover.l4`).
    The type the field refers to has an empty annotation: a range-carrying hole on it emptied the whole checked phase's semantic tokens, because the token walk reached a `Name` with a hole and no child to fill it.
+   **Narrowed in review round 1:** the checked-phase tokens hold only for a module with no computed field.
+   On origin/unstable `8c45e2a0a` already, a record with a computed field (`MEANS`) leaves its whole module with no checked-phase semantic tokens ("No Tokens for this phase"), with or without inline options, so `jl4/examples/ok/inline-one-of-payload.l4`, which has one, has none either.
+   That defect predates this branch and is not fixed here.
    Assumed, not ruled.
 5. **Where going to the definition lands.**
    The lifted `DECLARE` carries the field's range, as §5.8 asked, which is also how the checker finds it again; the generated name carries the range of the field's `ONE OF`, so going to the definition of `` `Plot's tenure` `` from a rule lands on the `ONE OF` (`jl4-core/test/InlineOptionsSpec.hs`).
