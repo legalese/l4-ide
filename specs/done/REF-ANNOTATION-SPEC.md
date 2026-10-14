@@ -12,9 +12,9 @@ This document specifies how `@ref` annotations should be attached to AST nodes. 
 | Component               | Status | Location                                                                  |
 | ----------------------- | ------ | ------------------------------------------------------------------------- |
 | Lexer recognizes `@ref` | ✅     | `jl4-core/src/L4/Lexer.hs:77` — `TRef !Text !AnnoType`                    |
-| Parser collects `@ref`  | ✅     | `jl4-core/src/L4/Parser.hs:73` — `PState.refs`                            |
-| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs:725`                                           |
-| Attachment to AST       | ✅     | `jl4-core/src/L4/Parser/ResolveAnnotation.hs:857` — `addRefCommentsToAst` |
+| Parser collects `@ref`  | ✅     | `jl4-core/src/L4/Parser.hs:80` — `PState.refs`                            |
+| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs:891`                                           |
+| Attachment to AST       | ✅     | `jl4-core/src/L4/Parser/ResolveAnnotation.hs:996` — `addRefCommentsToAst` |
 
 ### Parser TODO (as it stood before @ref annotations were attached)
 
