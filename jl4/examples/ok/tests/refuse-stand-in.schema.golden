@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The fee in a given year",
+    "properties": {
+        "year": {
+            "$ref": "#/$defs/NUMBER"
+        }
+    },
+    "required": [
+        "year"
+    ],
+    "title": "the fee in year",
+    "type": "object"
+}
