@@ -1,12 +1,11 @@
 module Compiler (
   compileBundle,
-  buildFromCborBundle,
   computeVersion,
   toDecl,
 ) where
 
 import qualified Backend.Jl4 as Jl4
-import Backend.Jl4 (ModuleContext, CompiledModule(..), getFunctionDefinition, buildCompiledFromShared, typecheckAndEvalBundle)
+import Backend.Jl4 (ModuleContext, buildCompiledFromShared, typecheckAndEvalBundle)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
@@ -14,10 +13,8 @@ import Backend.CodeGen (isDeonticType)
 import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
-import BundleStore (SerializedBundle (..), StoredMetadata (..))
 import Types
 import Control.Monad (forM, forM_, unless)
-import Control.Monad.Trans.Except (runExceptT)
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
@@ -89,13 +86,14 @@ logUnresolvedImports logger deployId unresolved =
 -- results across the import graph. This avoids creating N independent IDE
 -- sessions that redundantly re-process overlapping imports.
 --
--- Returns a list of 'SerializedBundle's (one per compiled file that had exports)
--- so callers can persist CBOR caches for fast restart.
+-- A deploy and a restart both come through here: the service keeps no cache
+-- of a compiled deployment, so what it serves after a restart is what a deploy
+-- of the same sources would serve, and is refused for the same reasons.
 compileBundle
   :: Logger
   -> Text  -- ^ deployment ID for logging
   -> Map FilePath Text
-  -> IO (Either Text (Map Text ValidatedFunction, DeploymentMetadata, [SerializedBundle]))
+  -> IO (Either Text (Map Text ValidatedFunction, DeploymentMetadata))
 compileBundle logger deployId sources = do
   let l4Files = Map.toList $ Map.filterWithKey (\k _ -> takeExtension k == ".l4") sources
   if null l4Files
@@ -110,7 +108,7 @@ compileBundle logger deployId sources = do
       -- Pass all paths as needing eval environments — we'll discover which have
       -- exports from the typecheck results, then only the eval envs for those
       -- files will actually be used.
-      (_errs, tcMap, evalMap, unresolved) <- typecheckAndEvalBundle moduleContext allPaths
+      (errs, tcMap, evalMap, unresolved) <- typecheckAndEvalBundle moduleContext allPaths
       logUnresolvedImports logger deployId unresolved
 
       -- Phase 2: Process typecheck results per file
@@ -119,15 +117,18 @@ compileBundle logger deployId sources = do
           Just (Just tcResult) ->
             processTypecheckedFile logger deployId filepath content moduleContext tcResult evalMap
           _ -> do
+            -- No result at all: the file did not parse, or did not get as far
+            -- as being checked. The reason is in what the session reported.
+            let why = [msg | (path, msg) <- errs, path == filepath]
             logWarn logger "Typecheck failed"
               [ ("deploymentId", toJSON deployId)
               , ("file", toJSON filepath)
+              , ("errors", toJSON why)
               ]
-            pure (filepath, Left "Typecheck failed")
+            pure (filepath, Left (Text.intercalate "\n" (("Typecheck failed: " <> Text.pack filepath) : why)))
 
-      let allFunctionsWithFile = [ (fp, fn) | (fp, Right (fns, _)) <- results, fn <- fns ]
+      let allFunctionsWithFile = [ (fp, fn) | (fp, Right fns) <- results, fn <- fns ]
           allFunctions = map snd allFunctionsWithFile
-          allBundles = concatMap (either (const []) snd . snd) results
           errors = [err | (_, Left err) <- results]
 
       -- Any file that failed to compile (typecheck errors, unsupported
@@ -165,7 +166,7 @@ compileBundle logger deployId sources = do
               , ("functionCount", toJSON (length allFunctions))
               ]
 
-          pure $ Right (fnMap, meta, allBundles)
+          pure $ Right (fnMap, meta)
 
 -- | Process a single typechecked file: discover exports, build CompiledModules.
 -- The typecheck result and evaluator import environment come from the shared
@@ -178,7 +179,7 @@ processTypecheckedFile
   -> ModuleContext
   -> Rules.TypeCheckResult
   -> Map FilePath EvalEnv.Environment  -- ^ Import environments from shared session
-  -> IO (FilePath, Either Text ([ValidatedFunction], [SerializedBundle]))
+  -> IO (FilePath, Either Text [ValidatedFunction])
 processTypecheckedFile logger deployId filepath content moduleContext
   tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
   evalMap = do
@@ -221,7 +222,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
           ]
         pure (filepath, Left (Text.intercalate "\n" blockingErrs))
       else if null exports
-      then pure (filepath, Right ([], []))
+      then pure (filepath, Right [])
       else do
         let implicitParams = extractImplicitAssumeParams tcErrors
             allDeclares = collectAllDeclares tcResult
@@ -287,138 +288,12 @@ processTypecheckedFile logger deployId filepath content moduleContext
                 , fnDecisionQueryCache = Nothing
                 }
 
-        -- Build SerializedBundle from typecheck result for CBOR caching
-        let bundle = SerializedBundle
-              { sbModule = resolvedModule
-              , sbEnvironment = env
-              , sbEntityInfo = ei
-              , sbExports = exports
-              , sbDeclares = allDeclares
-              , sbFilePath = filepath
-              }
-
         logInfo logger "Found exports"
           [ ("deploymentId", toJSON deployId)
           , ("file", toJSON filepath)
           , ("exportCount", toJSON (length fns))
           ]
-        pure (filepath, Right (fns, [bundle]))
-
--- | Rebuild ValidatedFunctions from deserialized CBOR bundles,
--- skipping the expensive typecheck step.
---
--- This is the fast restart path: the Module Resolved, Environment, and
--- EntityInfo are loaded from CBOR, and only the evaluator import environment
--- needs to be rebuilt (which requires the sources).
---
--- Uses a single Shake session for all import environment evaluations,
--- sharing work across the import graph.
-buildFromCborBundle
-  :: Logger
-  -> Text  -- ^ deployment ID for logging
-  -> [SerializedBundle]
-  -> Map FilePath Text       -- ^ source files (for import resolution and eval)
-  -> StoredMetadata          -- ^ persisted metadata
-  -> IO (Either Text (Map Text ValidatedFunction, DeploymentMetadata))
-buildFromCborBundle logger deployId bundles sources storedMeta = do
-  let moduleContext = sources
-      -- Collect filepaths that need import environments (bundle files with sources)
-      bundleFiles = [bundle.sbFilePath | bundle <- bundles, Map.member bundle.sbFilePath sources]
-
-  -- Build all import environments in a single Shake session
-  (_errs, _tcMap, evalMap, unresolved) <- typecheckAndEvalBundle moduleContext bundleFiles
-  logUnresolvedImports logger deployId unresolved
-
-  -- Process each bundle using the shared eval environments
-  allFnsWithFile <- fmap concat $ forM bundles $ \bundle -> do
-    let resolvedModule = bundle.sbModule
-        env = bundle.sbEnvironment
-        ei = bundle.sbEntityInfo
-        exports = bundle.sbExports
-        filepath = bundle.sbFilePath
-
-    case Map.lookup filepath sources of
-      Nothing -> pure []
-      Just content -> do
-        let importEnv = Map.findWithDefault Jl4.emptyEvalEnvironment filepath evalMap
-
-        fns <- forM exports $ \export -> do
-          let fnDecl = exportToFunction bundle.sbDeclares [] export
-              apiDecl = toDecl fnDecl
-              funRawName = NormalName apiDecl.name
-
-          -- Validate that sanitized property names don't collide
-          let collisions = validateNoSanitizationCollisions fnDecl.name fnDecl.parameters
-          unless (null collisions) $ do
-            let collisionMsg = Text.intercalate "\n  " collisions
-            logWarn logger "Property name sanitization collision"
-              [ ("deploymentId", toJSON deployId)
-              , ("function", toJSON fnDecl.name)
-              , ("collisions", toJSON collisions)
-              ]
-            error $ Text.unpack $ "Compilation failed for function '" <> fnDecl.name
-              <> "': field name collision after sanitization (spaces and hyphens "
-              <> "become indistinguishable in API/MCP schemas):\n  " <> collisionMsg
-
-          -- Find the function definition in the deserialized AST
-          mDecide <- runExceptT $ getFunctionDefinition funRawName resolvedModule
-          case mDecide of
-            Left _err -> pure Nothing
-            Right decide -> do
-              let compiled = CompiledModule
-                    { compiledModule = resolvedModule
-                    , compiledEnvironment = env
-                    , compiledEntityInfo = ei
-                    , compiledDecide = decide
-                    , compiledImportEnv = importEnv
-                    -- `sbDeclares` is the bundle's cached map of every
-                    -- DECLARE across the entry module and its
-                    -- transitive imports — exactly what the direct-AST
-                    -- evaluator needs to resolve cross-file record
-                    -- types (see Backend.Jl4.buildModuleInfo).
-                    , compiledAllDeclares = Map.elems bundle.sbDeclares
-                    }
-
-              let runFn = Jl4.createRunFunctionFromCompiled filepath apiDecl compiled content moduleContext
-
-              pure $ Just ValidatedFunction
-                { fnImpl = fnDecl
-                , fnEvaluator = Map.fromList [(JL4, runFn)]
-                , fnCompiled = Just compiled
-                , fnSourceText = content
-                , fnModuleContext = moduleContext
-                , fnDecisionQueryCache = Nothing
-                }
-
-        pure [(filepath, fn) | Just fn <- fns]
-
-  let allFns = map snd allFnsWithFile
-  if null allFns
-    then pure $ Left "No functions rebuilt from CBOR bundles"
-    else do
-      let fnMap = Map.fromList [(fn.fnImpl.name, fn) | fn <- allFns]
-
-      now <- getCurrentTime
-      let summaries = [FunctionSummary { fsName = fn.fnImpl.name, fsDescription = fn.fnImpl.description, fsParameters = fn.fnImpl.parameters, fsReturnType = fn.fnImpl.returnType, fsReturnSchema = fn.fnImpl.returnSchema, fsSection = Nothing, fsIsDeontic = fn.fnImpl.isDeontic, fsSourceFile = Just (Text.pack fp) } | (fp, fn) <- allFnsWithFile]
-          version = storedMeta.smVersion
-          fileEntries = buildFileEntries deployId sources summaries
-          meta = DeploymentMetadata
-            { metaFunctions = summaries
-            , metaFiles = fileEntries
-            , metaVersion = version
-            , metaCreatedAt = now
-            , metaDescription = storedMeta.smDescription
-            -- Version strings are restored from StoredMetadata by the
-            -- caller (DeploymentLoader); default to "" here.
-            , metaServiceVersion = ""
-            , metaDeploymentVersion = ""
-            }
-
-      logInfo logger "Rebuilt functions from CBOR cache"
-        [ ("deploymentId", toJSON deployId)
-        , ("functionCount", toJSON (length allFns))
-        ]
-      pure $ Right (fnMap, meta)
+        pure (filepath, Right fns)
 
 -- | Convert an ExportedFunction to our Function type.
 exportToFunction :: Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function

@@ -92,8 +92,6 @@ library
     -- Concurrency / state
     async,
     stm,
-    -- Serialization (CBOR)
-    serialise,
     -- Crypto / archiving
     cryptohash-sha256,
     zip-archive,
@@ -136,7 +134,6 @@ test-suite jl4-service-test
     QueryPlanSpec
     SchemaSpec
     SanitizationSpec
-    SerialisationSpec
     StdlibResolutionSpec
     TestData
     UnresolvedImportSpec
@@ -163,7 +160,6 @@ test-suite jl4-service-test
     lsp-types,
     QuickCheck,
     quickcheck-instances,
-    serialise,
     servant >=0.20.2 && <0.21,
     stm,
     string-interpolate,

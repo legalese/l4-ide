@@ -470,7 +470,8 @@ The service enforces several resource limits to protect against abuse:
 - **Concurrency**: Returns `503 Service at capacity` when `--max-concurrent-requests` is exceeded. The `/health` endpoint is exempt.
 - **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`. Returns `500` on limit exceeded.
 - **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout.
-- **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds.
+- **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds, whether it is a deploy or a deployment being loaded from the store at startup. The limit is on wall-clock time.
+- **Compilation memory**: `--max-compile-memory-mb` sets a GHC allocation counter on the thread that compiles. Measured with 8 MB and with 2048 MB, at deploy (a large example file) and at restart (a store of 110 deployments), it stopped no compile: every deployment still compiled. Do not rely on it to stop a large compile.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
 - **File count**: Upload rejected with `400` if zip contains more than `--max-file-count` entries.
 - **Deployment count**: New deployment rejected with `400` if `--max-deployments` is reached.
@@ -486,13 +487,17 @@ Deployments are stored on disk at `{store-path}/{deployment-id}/`:
       main.l4
       helper.l4
     metadata.json
+    metadata-cache.json
   other-deploy/
     sources/
       rules.l4
     metadata.json
+    metadata-cache.json
 ```
 
-On startup, the service scans the store directory and recompiles all deployments. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
+`metadata-cache.json` is a cache, written after a successful compile; the sources and `metadata.json` are what a deployment is.
+
+On startup, the service scans the store directory and compiles every deployment from its stored sources, the way a deploy compiles them and under the same limits (see Resource Limits), as many at once as it has capabilities, which on this build is one: it runs GHC's non-threaded runtime. A timeout counts wall-clock time, and a compile starts only when one of those places is free, so a deployment is not failed for waiting its turn. The service opens its port only after every deployment has loaded, so a store of k deployments that each time out delays the port by about k times `--compile-timeout`. A deployment that does not finish in `--compile-timeout` stays `failed` until it is redeployed or the service restarts (a PUT to a failed deployment is not checked for compatibility, as before). Nothing is kept from the compile that made the deployment, so a restart serves exactly what a deploy of those sources would serve. A deployment whose stored sources no longer parse or type-check (a file was edited on disk, or the service's checks changed) is `failed`, with the errors a deploy of them would be rejected with; the log has a warning that names the file and prints the errors, and the other deployments load as usual. A `bundle.cbor` that an earlier version of the service left beside the sources is not read and not touched; it is safe to delete. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
 
 ## Testing
 
@@ -511,9 +516,8 @@ Test coverage:
 - **BundleStoreSpec** -- Filesystem persistence round-trips
 - **CodeGenSpec** -- Input field name collision avoidance
 - **DecisionQueryCacheKeySpec** -- Cache key determinism
-- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping
+- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping, answers after a restart
 - **SanitizationSpec** -- Property name sanitization, reverse mapping, collision detection
-- **SerialisationSpec** -- CBOR serialisation round-trips and cache rebuild
 - **SchemaSpec** -- QuickCheck property tests for API type serialization
 
 ## Architecture

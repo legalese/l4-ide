@@ -24,11 +24,12 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo, Environment)
 import L4.Utils.Ratio
 import qualified LSP.Core.Shake as Shake
-import LSP.L4.Oneshot (oneshotL4ActionAndErrorsIn)
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..), prettyDiagnostic)
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnosticsIn, oneshotL4ActionAndErrorsIn)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
 
-import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
+import Language.LSP.Protocol.Types (Diagnostic (..), DiagnosticSeverity (..), normalizedFilePathToUri, toNormalizedFilePath)
 import System.FilePath ((<.>), takeExtension, takeFileName)
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
@@ -168,8 +169,10 @@ typecheckAndEvalBundle
   -> [FilePath]
   -- ^ Files that need evaluator import environments (i.e., files with exports).
   -- Pass empty list to skip evaluation entirely (typecheck only).
-  -> IO ( [Text]
-        -- ^ Diagnostic/error messages from the session
+  -> IO ( [(FilePath, Text)]
+        -- ^ The errors the session reported, rendered, with the bundle file
+        -- each belongs to. This is where the reason a file did not parse is
+        -- to be found: its 'Rules.TypeCheckResult' is just 'Nothing'.
         , Map FilePath (Maybe Rules.TypeCheckResult)
         -- ^ Typecheck results per file (Nothing if typecheck failed)
         , Map FilePath EvalEnv.Environment
@@ -212,7 +215,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   case allFiles of
     [] -> pure ([], StrictMap.empty, StrictMap.empty, [])
     ((firstPath, _) : _) -> do
-      (errs, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndErrorsIn bundleScope evalConfig firstPath $ \_nfp -> do
+      (_log, diags, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndDiagnosticsIn bundleScope evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
         -- Use the full path from the bundle (not just the basename) to avoid
         -- collisions when multiple files share the same filename in different dirs.
@@ -257,6 +260,16 @@ typecheckAndEvalBundle moduleContext evalFiles = do
 
         pure (tcMap, evalMap, unresolved)
 
+      -- The errors of the bundle's own files; a library's are its own business.
+      let uriToPath = StrictMap.fromList
+            [ (normalizedFilePathToUri (toNormalizedFilePath ("./" <> path)), path)
+            | (path, _) <- allFiles
+            ]
+          errs =
+            [ (path, Text.pack (show (prettyDiagnostic d)))
+            | d@FileDiagnostic{fdFilePath = uri, fdLspDiagnostic = Diagnostic{_severity = Just DiagnosticSeverity_Error}} <- diags
+            , Just path <- [StrictMap.lookup uri uriToPath]
+            ]
       pure (errs, tcMap, evalMap, unresolved)
 
 buildFunDecide :: Text -> FunctionDeclaration -> ExceptT EvaluatorError IO (Decide Resolved)
