@@ -52,6 +52,7 @@ library
     safe-exceptions,
     stm,
     stm-containers,
+    template-haskell,
     text,
     text-rope,
     time,
@@ -98,6 +99,7 @@ library
     LSP.Core.Types.Shake
 
     LSP.L4.Actions
+    LSP.L4.BuildInfo
     LSP.L4.EmbeddedLibrary
     LSP.L4.Inspector
     LSP.L4.SemanticTokens
@@ -161,6 +163,7 @@ test-suite jl4-lsp-test
   other-modules:
     AtomKeySizeSpec
     AtomKeySweepSpec
+    BuildInfoSpec
     CheckSource
     ClauseGeneratedNamesSpec
     CorpusSweep

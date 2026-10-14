@@ -52,6 +52,15 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build exe:jl4-lsp exe:l4 test:l4-cli-test --only-dependencies
@@ -120,6 +129,16 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
+
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        shell: bash
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
 
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
@@ -196,6 +215,15 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
+
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
 
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
@@ -310,6 +338,15 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
+
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
 
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
