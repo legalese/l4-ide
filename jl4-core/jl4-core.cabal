@@ -246,6 +246,7 @@ test-suite jl4-core-test
     BulletParserSpec
     UUID5Spec
     ExportReadSetSpec
+    InlineOptionsSpec
     ExportValidationSpec
     NonassertableSpec
     CatalaLowerSpec

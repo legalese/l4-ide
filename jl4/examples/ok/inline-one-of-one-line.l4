@@ -1,0 +1,27 @@
+-- On one line, whatever has fields takes the rest of the line
+-- (doc/reference/types/inline-one-of.md, Limits; review round 1, finding 3).
+-- These are the readings the reference page documents. Neither is refused.
+
+-- An option with fields: `area` is a second field of `Leasehold`, not the
+-- next field of `Title`.
+DECLARE Title HAS estate IS ONE OF Absolute, Leasehold HAS years IS A NUMBER, area IS A NUMBER
+
+-- The mirror case: the inline options of a constructor's field take the rest
+-- of the line, so `Bar` is a third option of `t`, and `E` has one constructor.
+DECLARE E IS ONE OF Foo HAS t IS ONE OF X, Y, Bar
+
+GIVEN title IS A Title
+GIVETH A NUMBER
+`area of` title MEANS
+  CONSIDER title's estate
+  WHEN Leasehold y a THEN a
+  OTHERWISE 0
+
+GIVEN e IS AN E
+GIVETH A BOOLEAN
+`is bar` e MEANS
+  CONSIDER e
+  WHEN Foo z THEN z EQUALS Bar
+
+#ASSERT `area of` (Title OF (Leasehold OF 5, 6)) EQUALS 6
+#ASSERT `is bar` (Foo OF Bar)

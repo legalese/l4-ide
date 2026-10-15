@@ -1,0 +1,67 @@
+-- The options a field lists inline may carry fields of their own, and a
+-- field of a constructor may list its options inline too
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.5).
+--
+-- A field of a constructor is named by the enum, the constructor and the
+-- field, `Holding's Lease's term`, because two enums may share a
+-- constructor: `Interest` below also has a `Lease` with a `term`, and its
+-- options are `Interest's Lease's term`, a different type.
+
+DECLARE Holding IS ONE OF
+    Freehold
+    Lease HAS
+        `years` IS A NUMBER
+        `term`  IS ONE OF Short, Long
+
+DECLARE Interest IS ONE OF
+    Licence
+    Lease HAS
+        `term` IS ONE OF Fixed, Periodic
+
+-- Options with fields, one level deep. Under the options' fields a field may
+-- not list options of its own.
+DECLARE Title HAS
+    `holder`  IS A STRING
+    `estate`  IS ONE OF
+        Absolute
+        Leasehold HAS
+            `remaining years` IS A NUMBER TYPICALLY 99
+        Possessory
+    -- A computed field whose type is listed inline.
+    `status`  IS ONE OF Secure, Precarious
+        MEANS IF estate EQUALS Possessory THEN Precarious ELSE Secure
+
+GIVEN h IS A Holding
+GIVETH A BOOLEAN
+`short lease` h MEANS
+  CONSIDER h
+  WHEN Lease y t THEN t EQUALS Short
+  WHEN Freehold THEN FALSE
+
+GIVEN t IS A `Interest's Lease's term`
+GIVETH A BOOLEAN
+`fixed` t MEANS t EQUALS Fixed
+
+@export The years left on a title, if it is leasehold.
+GIVEN title IS A Title
+GIVETH A NUMBER
+`years remaining` title MEANS
+  CONSIDER title's estate
+  WHEN Leasehold n THEN n
+  OTHERWISE 0
+
+-- The exhaustiveness check sees an ordinary enum: this CONSIDER misses
+-- Possessory, and the warning names the missing option.
+GIVEN title IS A Title
+GIVETH A BOOLEAN
+`registered absolutely` title MEANS
+  CONSIDER title's estate
+  WHEN Absolute THEN TRUE
+  WHEN Leasehold n THEN FALSE
+
+#ASSERT `short lease` (Lease OF 5, Short)
+#ASSERT NOT `short lease` Freehold
+#ASSERT `fixed` Fixed
+#ASSERT `years remaining` (Title WITH holder IS "Alex", estate IS Leasehold OF 40) EQUALS 40
+#ASSERT (Title WITH holder IS "Alex", estate IS Possessory)'s status EQUALS Precarious
+#ASSERT (Title WITH holder IS "Alex", estate IS Absolute)'s status EQUALS Secure

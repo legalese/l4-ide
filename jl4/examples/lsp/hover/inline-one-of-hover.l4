@@ -1,0 +1,9 @@
+-- Hover over a field that lists its options inline.
+DECLARE Plot HAS
+    @desc How the occupier holds the plot.
+    `tenure` IS ONE OF Owner, Tenant
+    `area`   IS A NUMBER
+
+GIVEN t IS A `Plot's tenure`
+GIVETH A BOOLEAN
+`owned` t MEANS t EQUALS Owner

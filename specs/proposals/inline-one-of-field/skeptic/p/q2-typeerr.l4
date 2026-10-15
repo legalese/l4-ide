@@ -1,0 +1,6 @@
+DECLARE `Plot's tenure` IS ONE OF Owner, Tenant, Lodger
+DECLARE Role IS ONE OF Manager, Clerk
+DECLARE Plot HAS
+    tenure IS A `Plot's tenure`
+
+#EVAL Plot WITH tenure IS Manager

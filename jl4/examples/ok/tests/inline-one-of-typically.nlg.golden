@@ -1,0 +1,2 @@
+`is open` with `Account` where `name` is Alex, `state` is `Open`, `standing` is `Good` and `review` is `Pending`
+not `is open` with `Account` where `name` is Alex, `state` is `Suspended` with `Closed`, `standing` is `Flagged` with `Arrears` and `review` is `Escalated` with 2

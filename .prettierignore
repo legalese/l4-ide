@@ -31,3 +31,6 @@ jl4-mlir/parity-report/
 
 # Generated evidence for the P2a token-simulation baseline (specs/todo/lexipedia-superset/P2A-TOKEN-SIM-BASELINE.md)
 etc/bpmn-token-sim/out/
+
+# Evidence copied beside specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md, kept as the note cites it (the spec's header says what was changed)
+specs/proposals/inline-one-of-field/

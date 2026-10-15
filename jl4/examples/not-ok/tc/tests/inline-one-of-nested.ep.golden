@@ -1,0 +1,12 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: inline-one-of-nested.l4
+  Hidden: no
+  Range: 8:23-8:26
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+      |
+    8 |             `kind` IS ONE OF Short, Long
+      |                       ^
+    A field's options listed with ONE OF go one level deep, so a field of one of those options cannot list options of its own. Declare the inner options with DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant, and give the field that type.

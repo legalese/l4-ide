@@ -1,0 +1,50 @@
+-- A constructor with fields need not come last on its line
+-- (smucclaw/l4-ide#1045).
+--
+-- A comma separates two fields only when a field name and IS follow it,
+-- because a field name is always followed by IS and a constructor never is.
+-- Any other comma belongs to the list of constructors around the fields.
+
+-- `Circle` is the third constructor, not a third field of `Rect`.
+DECLARE Shape IS ONE OF Dot, Rect HAS width IS A NUMBER, height IS A NUMBER, Circle
+
+-- Two constructors with fields, one after the other, then a bare one.
+DECLARE Figure IS ONE OF Square HAS side IS A NUMBER, Disc HAS radius IS A NUMBER, Point
+
+-- The other direction: a comma followed by a field name and IS is still a
+-- field separator, so `depth` is the second field of `Crate`.
+DECLARE Box IS ONE OF Empty, Crate HAS length IS A NUMBER, depth IS A NUMBER
+
+-- A record's fields on one line are unchanged.
+DECLARE Size HAS rows IS A NUMBER, columns IS A NUMBER
+
+GIVEN s IS A Shape
+GIVETH A NUMBER
+`area of` s MEANS
+  CONSIDER s
+  WHEN Dot THEN 0
+  WHEN Rect w h THEN w TIMES h
+  WHEN Circle THEN 1
+
+GIVEN f IS A Figure
+GIVETH A NUMBER
+`size of` f MEANS
+  CONSIDER f
+  WHEN Square x THEN x
+  WHEN Disc r THEN r
+  WHEN Point THEN 0
+
+GIVEN b IS A Box
+GIVETH A NUMBER
+`volume of` b MEANS
+  CONSIDER b
+  WHEN Empty THEN 0
+  WHEN Crate l d THEN l TIMES d
+
+#ASSERT `area of` (Rect OF 2, 3) EQUALS 6
+#ASSERT `area of` Circle EQUALS 1
+#ASSERT `area of` Dot EQUALS 0
+#ASSERT `size of` (Disc OF 4) EQUALS 4
+#ASSERT `size of` Point EQUALS 0
+#ASSERT `volume of` (Crate OF 2, 5) EQUALS 10
+#ASSERT (Size OF 3, 4)'s columns EQUALS 4

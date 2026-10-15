@@ -1,0 +1,9 @@
+DECLARE Shape IS ONE OF
+    Dot
+    Rect HAS
+        width  IS A NUMBER
+        height IS A NUMBER
+    Circle
+
+#EVAL Rect OF 1, 2
+#EVAL Circle

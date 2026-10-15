@@ -253,7 +253,7 @@ mapUnitBody f u = case u.uDecl of
 -- declaring type name do not share a 'Unique'.
 recordCtorFields :: [Module Resolved] -> Map.Map Text [Resolved]
 recordCtorFields mods = Map.fromList
-  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ _ <- fields ])
+  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ _ _ <- fields ])
   | m <- mods
   , Declare _ (MkDeclare _ _ (MkAppForm _ ctorName _ _) (RecordDecl _ _ fields)) <- topDeclsRec m
   ]
@@ -474,7 +474,25 @@ buildDocument cfg mainModule0 deps0 =
     && isInstanceValueUnit u
     && not (isExportUnit u)
 
+  -- An enum whose options a record's stored field listed inline is not a
+  -- term the author defined: its options are listed under the field
+  -- ('declareClause'), and its generated name would otherwise sit beside the
+  -- field as a defined term of its own (INLINE-ONE-OF-FIELD-SPEC §5.11).
+  --
+  -- ONLY a record's stored fields. Render shows no constructor's fields and no
+  -- computed field, so the options of a field of a constructor, or of a
+  -- computed field, would otherwise appear nowhere at all; those lifted types
+  -- stay ordinary defined terms, under their generated names, until render
+  -- shows those fields (review round 1, finding 2).
+  inlineTypes = Set.fromList
+    [ getUnique r
+    | md <- mainModule : deps
+    , Declare _ (MkDeclare _ _ _ (RecordDecl _ _ fields)) <- topDeclsRec md
+    , MkTypedName _ _ (TyApp _ r []) (Just _) _ _ <- fields
+    ]
+
   renderUnit i u
+    | Set.member u.uPrimary inlineTypes = Nothing
     | isMain i =
         if isFixture i u || isComputedSelector u
           then Nothing
@@ -958,8 +976,12 @@ declareClause = \case
   SynonymDecl _ ty      -> CLeaf (typeText ty)
   OpaqueDecl _          -> CLeaf "a kind of thing"
  where
-  recordField (MkTypedName _ n ty _mTypically Nothing)     = (resolvedText n, typeText ty)
-  recordField (MkTypedName _ n ty _mTypically (Just expr)) =
+  -- A field whose options are listed inline shows them, as a one-line enum
+  -- reads ("one of …"); its lifted type is not rendered as a term of its own.
+  recordField (MkTypedName _ n _ (Just cons) _mTypically Nothing) =
+    (resolvedText n, "one of " <> oxford "or" (map conName cons))
+  recordField (MkTypedName _ n ty _ _mTypically Nothing)     = (resolvedText n, typeText ty)
+  recordField (MkTypedName _ n ty _ _mTypically (Just expr)) =
     (resolvedText n, typeText ty <> ", computed as " <> leafText expr)
   conName (MkConDecl _ n _) = resolvedText n
 

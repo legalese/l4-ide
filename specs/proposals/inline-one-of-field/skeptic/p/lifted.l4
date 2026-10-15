@@ -1,0 +1,11 @@
+DECLARE `Plot's tenure` IS ONE OF Owner, Tenant, Lodger
+DECLARE Plot HAS
+    `the owner` IS A STRING
+    tenure      IS A `Plot's tenure`
+
+@export default Whether the plot is let
+GIVEN p IS A Plot
+GIVETH A BOOLEAN
+DECIDE `is let` p IF p's tenure EQUALS Tenant OR p's tenure EQUALS Lodger
+
+#EVAL `is let` (Plot WITH `the owner` IS "x", tenure IS Lodger)

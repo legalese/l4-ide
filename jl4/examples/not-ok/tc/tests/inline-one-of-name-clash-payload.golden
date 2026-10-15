@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: inline-one-of-name-clash-payload.l4
+  Hidden: no
+  Range: 10:9-10:37
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The options of the field `term` are given the type name
+
+      `Holding's Lease's term`
+
+    and that name is already used here:
+
+      `Holding's Lease's term` (defined at inline-one-of-name-clash-payload.l4:5:9-33)
+
+    Rename one of them. If a rule needs the options by name, you can also
+    declare them yourself with DECLARE ... IS ONE OF ..., under a name you
+    choose, and give the field that type.

@@ -167,11 +167,83 @@ data Type' n =
 type Kind = Int
 
 data TypedName n =
-  MkTypedName Anno n (Type' n) (Maybe (Expr n)) (Maybe (Expr n))
-  -- ^ 4th field: TYPICALLY default value (Nothing = no default);
-  --   5th field: Nothing = stored field, Just expr = computed field (MEANS clause)
+  MkTypedName Anno n (Type' n) (Maybe [ConDecl n]) (Maybe (Expr n)) (Maybe (Expr n))
+  -- ^ 3rd field: the field's type. For a field written @IS ONE OF …@ it is
+  --   'inlineOptionsPlaceholder' in the parsed tree and the lifted type
+  --   once 'L4.Desugar.desugarInlineOptions' has run;
+  --   4th field: the options of a field written @IS ONE OF …@, Nothing for
+  --   any other field (see Note [Inline ONE OF on a field]);
+  --   5th field: TYPICALLY default value (Nothing = no default);
+  --   6th field: Nothing = stored field, Just expr = computed field (MEANS clause)
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+{- Note [Inline ONE OF on a field]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A record field, or a field of a constructor, may list its options in place of
+its type (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md, option C):
+
+  DECLARE Plot HAS
+      `the owner` IS A STRING
+      `tenure`    IS ONE OF Owner, Tenant, Lodger
+
+'L4.Desugar.desugarInlineOptions' lifts the list, before type checking, into an
+ordinary @DECLARE `Plot's tenure` IS ONE OF Owner, Tenant, Lodger@ placed
+immediately before the record, and points the field's type at it. So the
+checker, the evaluator and every exporter see an ordinary declaration.
+
+The options live in the 4th field of 'MkTypedName', in source order between
+the type and @TYPICALLY@, because exact printing and semantic tokens walk a
+node's holes in field order. It is a field of 'TypedName' rather than a new
+'Type'' constructor so that @ONE OF@ cannot parse in any other type position.
+
+What the 4th field holds, by phase:
+
+  * Parsed: the constructors as written, and the type slot holds
+    'inlineOptionsPlaceholder', whose empty annotation prints as nothing.
+  * Desugared: unchanged, and the type slot names the lifted type, still
+    with an empty annotation, so that the token walk does not enter it.
+  * Checked: the lifted declaration's own checked constructors (so they carry
+    the source annotations, a constructor's type, and its @\@nlg@), put there
+    by 'L4.TypeCheck.checkFieldDefaults'. That is what the checked-phase
+    semantic tokens and hover walk; the lifted DECLARE itself is token-free.
+
+The 4th field is also the provenance mark: a field whose 4th field is 'Just'
+has a type that the author never named ('inlineOptionsTypes'). The function
+schema reads it to publish no @x-l4-type@, the module schema to write the
+@enum@ in the property, and @l4 render@ to list the options under the field
+and print no defined term for the lifted type.
+
+The mark is deliberately NOT a field of 'Extension'. An atomId is a hash of
+'show' of a term whose annotations are all 'emptyAnno' ("L4.Viz.AtomKey"), and
+'show' of an 'Extension' lists every field, so a new one would move every
+atomId a deployed service has handed out (the reason 'Refs' is a newtype).
+It would not have needed to survive 'Serialise Anno' (which keeps only
+'pmSynthetic') either, being ordinary data of the node rather than part of an
+annotation. And nothing serialises a checked module any more: checked
+2026-10-14 on @jl4-service/@, which imports no @Codec.Serialise@, and whose
+deployment loader compiles stored sources afresh and does not read a
+@bundle.cbor@ (@DeploymentLoader.hs@, 'loadAndRegister'). The instances
+are still built, behind the @serialise-support@ flag of @jl4-core.cabal@.
+-}
+
+-- | The type a parsed field written @IS ONE OF …@ carries until
+-- 'L4.Desugar.desugarInlineOptions' names the lifted type. Its annotation is
+-- empty, so both printers render it as nothing, and its name cannot be
+-- written, so a module that reached the checker without the desugaring would
+-- fail loudly rather than check.
+inlineOptionsPlaceholder :: Type' Name
+inlineOptionsPlaceholder = TyApp emptyAnno (MkName emptyAnno (NormalName "")) []
+
+-- | The types lifted out of the fields of one checked declaration, each with
+-- the field it was lifted from (Note [Inline ONE OF on a field]).
+inlineOptionsTypes :: Declare Resolved -> [(Resolved, TypedName Resolved)]
+inlineOptionsTypes (MkDeclare _ _ _ td) = case td of
+  RecordDecl _ _ tns -> fromFields tns
+  EnumDecl _ cds     -> concat [ fromFields tns | MkConDecl _ _ tns <- cds ]
+  _                  -> []
+ where
+  fromFields tns = [ (r, tn) | tn@(MkTypedName _ _ (TyApp _ r []) (Just _) _ _) <- tns ]
 
 data OptionallyTypedName n =
   MkOptionallyTypedName Anno n (Maybe (Type' n)) (Maybe (Expr n))

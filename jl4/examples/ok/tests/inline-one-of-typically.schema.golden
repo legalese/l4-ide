@@ -1,0 +1,135 @@
+{
+    "$defs": {
+        "Account": {
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "review": {
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "tag": {
+                                    "const": "Pending"
+                                }
+                            },
+                            "required": [
+                                "tag"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "properties": {
+                                "level": {
+                                    "default": 1,
+                                    "type": "number"
+                                },
+                                "tag": {
+                                    "const": "Escalated"
+                                }
+                            },
+                            "required": [
+                                "tag",
+                                "level"
+                            ],
+                            "type": "object"
+                        }
+                    ]
+                },
+                "standing": {
+                    "default": "Good",
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "tag": {
+                                    "const": "Good"
+                                }
+                            },
+                            "required": [
+                                "tag"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "properties": {
+                                "reason": {
+                                    "$ref": "#/$defs/Reason"
+                                },
+                                "tag": {
+                                    "const": "Flagged"
+                                }
+                            },
+                            "required": [
+                                "tag",
+                                "reason"
+                            ],
+                            "type": "object"
+                        }
+                    ]
+                },
+                "state": {
+                    "default": "Open",
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "tag": {
+                                    "const": "Open"
+                                }
+                            },
+                            "required": [
+                                "tag"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "properties": {
+                                "previous": {
+                                    "$ref": "#/$defs/Status"
+                                },
+                                "tag": {
+                                    "const": "Suspended"
+                                }
+                            },
+                            "required": [
+                                "tag",
+                                "previous"
+                            ],
+                            "type": "object"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "name",
+                "review"
+            ],
+            "type": "object"
+        },
+        "Reason": {
+            "enum": [
+                "Fraud",
+                "Arrears"
+            ],
+            "type": "string"
+        },
+        "Status": {
+            "enum": [
+                "Open",
+                "Closed"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether an account is open.",
+    "properties": {
+        "a": {
+            "$ref": "#/$defs/Account"
+        }
+    },
+    "required": [
+        "a"
+    ],
+    "title": "is open",
+    "type": "object"
+}

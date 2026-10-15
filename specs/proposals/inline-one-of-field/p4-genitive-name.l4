@@ -1,0 +1,10 @@
+DECLARE `Plot's tenure` IS ONE OF Owner, Tenant, Lodger
+DECLARE Plot HAS
+    `the owner` IS A STRING
+    tenure      IS A `Plot's tenure`
+
+GIVEN t IS A `Plot's tenure`
+GIVETH A BOOLEAN
+`is let` t MEANS t EQUALS Tenant OR t EQUALS Lodger
+
+#EVAL `is let` ((Plot WITH `the owner` IS "x", tenure IS Lodger)'s tenure)

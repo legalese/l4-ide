@@ -1,0 +1,14 @@
+-- The options a field lists inline are highlighted where they are written:
+-- ONE and OF as keywords, each option as a constructor, in both the parse
+-- and the check phase (the lifted DECLARE emits no tokens of its own).
+DECLARE Plot HAS
+    `tenure` IS ONE OF Owner, Tenant TYPICALLY Owner
+    `estate` IS ONE OF
+        Freehold
+        Lease HAS
+            `years` IS A NUMBER
+    `area`   IS A NUMBER
+
+GIVEN t IS A `Plot's tenure`
+GIVETH A BOOLEAN
+`owned` t MEANS t EQUALS Owner

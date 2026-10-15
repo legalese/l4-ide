@@ -660,7 +660,7 @@ type RecordShapes = Map.Map Unique [(Text, Type' Resolved, Bool)]
 
 recordShapes :: [Declare Resolved] -> RecordShapes
 recordShapes decls = Map.fromList
-  [ (getUnique tyName, [ (rawNameToText (rawName (getActual fn)), fty, isJust d) | MkTypedName _ fn fty d _ <- fields ])
+  [ (getUnique tyName, [ (rawNameToText (rawName (getActual fn)), fty, isJust d) | MkTypedName _ fn fty _ d _ <- fields ])
   | MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ _ fields) <- decls ]
 
 -- | A module's imports, transitively, each once.

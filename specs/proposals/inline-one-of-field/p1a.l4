@@ -1,0 +1,3 @@
+DECLARE Plot HAS
+    `the owner` IS A STRING
+    `tenure`    IS ONE OF Owner, Tenant, Lodger

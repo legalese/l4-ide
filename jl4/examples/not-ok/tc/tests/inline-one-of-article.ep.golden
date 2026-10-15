@@ -1,0 +1,12 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: inline-one-of-article.l4
+  Hidden: no
+  Range: 5:25-5:28
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+      |
+    5 |     `tenure`       IS A ONE OF Owner, Tenant, Lodger
+      |                         ^
+    ONE OF follows IS directly, with no A, AN or THE between them: write `tenure` IS ONE OF Owner, Tenant.

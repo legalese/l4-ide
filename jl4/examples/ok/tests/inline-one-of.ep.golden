@@ -1,0 +1,65 @@
+-- A record field may list its options in place of its type
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md, option C).
+--
+-- `tenure IS ONE OF Owner, Tenant, Lodger` reads as the three words a
+-- DECLARE ... IS ONE OF uses, written where the field's type goes. L4 lifts
+-- the list into an ordinary declaration named after the place it was written,
+-- `Plot's tenure`, so every rule, check and export sees an ordinary type.
+
+@desc A plot of land on the register.
+DECLARE Plot HAS
+    `the occupier` IS A STRING
+    -- One line, with a default the schema publishes.
+    @desc How the occupier holds the plot.
+    `tenure`       IS ONE OF Owner, Tenant, Lodger TYPICALLY Owner
+    -- One line, and a field after it: a comma followed by a name and IS
+    -- starts the next field rather than adding an option.
+    `use`          IS ONE OF Residential, Commercial, `area in square metres` IS A NUMBER
+    -- Several lines, each option on its own, with its own wording for
+    -- the natural-language output, and the default on a line of its own.
+    `boundary`     IS ONE OF
+        Fenced    @nlg a fenced boundary
+        Hedged    @nlg a hedged boundary
+        Open      @nlg an open boundary
+      TYPICALLY Fenced
+
+-- A rule can name the generated type. Advice on the reference page: once a
+-- second place needs the type, give it a name of your own with DECLARE.
+GIVEN t IS A `Plot's tenure`
+GIVETH A STRING
+`tenure label` t MEANS
+  CONSIDER t
+  WHEN Owner THEN "owner-occupied"
+  WHEN Tenant THEN "let"
+  WHEN Lodger THEN "lodging"
+
+-- Field opening (R5): `tenure` and `use` read the fields of `p` bare, and
+-- `Owner` is resolved by the field's type, as for any enum.
+@export Whether a plot is lived in by its owner.
+GIVEN p IS A Plot
+GIVETH A BOOLEAN
+`owner occupied` p MEANS
+      tenure EQUALS Owner
+  AND use EQUALS Residential
+
+GIVEN p IS A Plot
+GIVETH A STRING
+`describe` p MEANS `tenure label` (p's tenure)
+
+`Alex's plot` MEANS Plot WITH
+  `the occupier`         IS "Alex"
+  tenure                 IS Owner
+  use                    IS Residential
+  `area in square metres` IS 420
+  boundary               IS Hedged
+
+#EVAL `describe` `Alex's plot`
+#ASSERT `owner occupied` `Alex's plot`
+#ASSERT NOT `owner occupied` (Plot WITH
+  `the occupier`          IS "Alex"
+  tenure                  IS Tenant
+  use                     IS Residential
+  `area in square metres` IS 420
+  boundary                IS Open)
+#ASSERT `Alex's plot`'s boundary EQUALS Hedged
+#ASSERT `tenure label` Lodger EQUALS "lodging"

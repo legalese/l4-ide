@@ -819,7 +819,7 @@ buildCtx ei exps m = ctx
   -- @MEANS@ field out of the RecordDecl before type checking and synthesises a
   -- top-level selector, so a projection onto a computed field is an ordinary
   -- call and a "record has no such field" branch for one is dead code.
-  storedFields fields = [ (fAnn, fRes, fTy) | MkTypedName fAnn fRes fTy _ Nothing <- fields ]
+  storedFields fields = [ (fAnn, fRes, fTy) | MkTypedName fAnn fRes fTy _ _ Nothing <- fields ]
 
   assumeDecls = [ (ann, a) | Assume ann a <- decls ]
 

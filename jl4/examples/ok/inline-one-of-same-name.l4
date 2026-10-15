@@ -1,0 +1,24 @@
+-- A DECLAREd enum in another section may share its name with a type L4 lifted
+-- out of a field. It is an ordinary declared type, so the schemas publish it as
+-- one: under its name in the module schema's $defs, and with its x-l4-type in
+-- the function schema (review round 1; the schema writers once recognised a
+-- lifted type by its name, and treated this one as lifted too).
+
+§ `Plots`
+
+DECLARE Plot HAS
+    `tenure` IS ONE OF Owner, Tenant
+
+§ `Lots`
+
+DECLARE `Plot's tenure` IS ONE OF Freehold, Leasehold
+
+DECLARE Lot HAS
+    `kind` IS A `Plot's tenure`
+
+@export Whether a lot is freehold.
+GIVEN l IS A Lot
+GIVETH A BOOLEAN
+`freehold` l MEANS l's kind EQUALS Freehold
+
+#ASSERT `freehold` (Lot WITH kind IS Freehold)

@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: inline-one-of-name-clash.l4
+  Hidden: no
+  Range: 10:5-10:51
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The options of the field `tenure` are given the type name
+
+      `Plot's tenure`
+
+    and that name is already used here:
+
+      `Plot's tenure` (defined at inline-one-of-name-clash.l4:6:9-24)
+
+    Rename one of them. If a rule needs the options by name, you can also
+    declare them yourself with DECLARE ... IS ONE OF ..., under a name you
+    choose, and give the field that type.

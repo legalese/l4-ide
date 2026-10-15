@@ -1,0 +1,32 @@
+-- Example: a field that lists its options in place of its type.
+-- See inline-one-of.md.
+
+DECLARE Plot HAS
+    `the occupier` IS A STRING
+    `tenure`       IS ONE OF Owner, Tenant, Lodger TYPICALLY Owner
+    `boundary`     IS ONE OF
+        Fenced
+        Hedged
+        Open
+
+-- Alex owns a plot with a hedge round it.
+`Alex's plot` MEANS Plot WITH
+    `the occupier` IS "Alex"
+    tenure         IS Owner
+    boundary       IS Hedged
+
+GIVEN p IS A Plot
+GIVETH A BOOLEAN
+`lived in by its owner` p MEANS p's tenure EQUALS Owner
+
+-- A rule that takes the options themselves names the type L4 made for them.
+GIVEN t IS A `Plot's tenure`
+GIVETH A STRING
+`description of` t MEANS
+  CONSIDER t
+  WHEN Owner  THEN "the owner lives there"
+  WHEN Tenant THEN "it is let to a tenant"
+  WHEN Lodger THEN "a lodger lives there"
+
+#EVAL `lived in by its owner` `Alex's plot`
+#EVAL `description of` (`Alex's plot`'s tenure)

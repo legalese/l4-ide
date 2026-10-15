@@ -1,0 +1,67 @@
+
+OCaml - Language extensions
+☰
+☰The OCaml languageThe OCaml language
+Language extensions
+Chapter 12 Language extensions
+Version 5.3
+< The OCaml Manual
+Language extensions
+1 Recursive definitions of values
+2 Recursive modules
+3 Private types
+4 Locally abstract types
+5 First-class modules
+6 Recovering the type of a module
+7 Substituting inside a signature
+8 Type-level module aliases
+9 Overriding in open statements
+10 Generalized algebraic datatypes
+11 Syntax for Bigarray access
+12 Attributes
+13 Extension nodes
+14 Extensible variant types
+15 Generative functors
+16 Extension-only syntax
+17 Inline records
+18 Documentation comments
+19 Extended indexing operators 
+20 Empty variant types
+21 Alerts
+22 Generalized open statements
+23 Binding operators
+24 Effect handlers
+17 Inline records
+(Introduced in OCaml 4.03)
+  constr-args::=
+...
+ ∣ record-decl
+The arguments of sum-type constructors can now be defined using the
+same syntax as records. Mutable and polymorphic fields are allowed.
+GADT syntax is supported. Attributes can be specified on individual
+fields.
+Syntactically, building or matching constructors with such an inline
+record argument is similar to working with a unary constructor whose
+unique argument is a declared record type. A pattern can bind
+the inline record as a pseudo-value, but the record cannot escape the
+scope of the binding and can only be used with the dot-notation to
+extract or modify fields or to build new constructor values.
+type t =
+ | Point of {width: int; mutable x: float; mutable y: float}
+ | Other
+let v = Point {width = 10; x = 0.; y = 0.}
+let scale l = function
+ | Point p -> Point {p with x = l *. p.x; y = l *. p.y}
+ | Other -> Other
+let print = function
+ | Point {x; y; _} -> Printf.printf "%f/%f" x y
+ | Other -> ()
+let reset = function
+ | Point p -> p.x <- 0.; p.y <- 0.
+ | Other -> ()
+let invalid = function
+ | Point p -> p
+Error: This form is not allowed as the type of the inlined record could escape.
+« Extension-only syntaxDocumentation comments »
+Copyright © 2025 Institut National de
+Recherche en Informatique et en Automatique

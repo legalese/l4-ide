@@ -980,7 +980,7 @@ recordFieldDefaults decls = Map.fromList
   | MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ _ fields) <- decls
   , let ds = Map.fromList
                [ (rawNameToText (rawName (getActual fn)), d)
-               | MkTypedName _ fn _ (Just d) _ <- fields ]
+               | MkTypedName _ fn _ _ (Just d) _ <- fields ]
   , not (Map.null ds)
   ]
 

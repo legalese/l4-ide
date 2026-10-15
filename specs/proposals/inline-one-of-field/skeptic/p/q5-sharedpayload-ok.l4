@@ -1,0 +1,27 @@
+DECLARE HoldingTerm  IS ONE OF Fixed, Periodic
+DECLARE InterestTerm IS ONE OF Weekly, Monthly
+DECLARE Holding IS ONE OF
+    Freehold
+    Lease HAS
+        term IS A HoldingTerm
+DECLARE Interest IS ONE OF
+    Licence
+    Lease HAS
+        term IS A InterestTerm
+
+GIVEN h IS A Holding
+GIVETH A BOOLEAN
+`fixed` h MEANS
+  CONSIDER h
+    WHEN Lease t THEN t EQUALS Fixed
+    WHEN Freehold THEN FALSE
+
+GIVEN i IS A Interest
+GIVETH A BOOLEAN
+`weekly` i MEANS
+  CONSIDER i
+    WHEN Lease t THEN t EQUALS Weekly
+    WHEN Licence THEN FALSE
+
+#EVAL `fixed` (Lease Fixed)
+#EVAL `weekly` (Lease Weekly)

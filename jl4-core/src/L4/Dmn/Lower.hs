@@ -3780,7 +3780,7 @@ lowerModule opts modul@(MkModule _ uri _) =
         , A.siEnumFields     =
             Map.fromList
               [ ( getUnique tn
-                , [ (nameOf cn, Set.fromList [nameOf fn | MkTypedName _ fn _ _ _ <- fs])
+                , [ (nameOf cn, Set.fromList [nameOf fn | MkTypedName _ fn _ _ _ _ <- fs])
                   | MkConDecl _ cn fs <- cds
                   ]
                 )
@@ -3798,8 +3798,8 @@ lowerModule opts modul@(MkModule _ uri _) =
       callGraph allDecides
    where
     componentTysOf = \case
-      RecordDecl _ _ fs -> [ty | MkTypedName _ _ ty _ _ <- fs]
-      EnumDecl _ cds    -> [ty | MkConDecl _ _ fs <- cds, MkTypedName _ _ ty _ _ <- fs]
+      RecordDecl _ _ fs -> [ty | MkTypedName _ _ ty _ _ _ <- fs]
+      EnumDecl _ cds    -> [ty | MkConDecl _ _ fs <- cds, MkTypedName _ _ ty _ _ _ <- fs]
       SynonymDecl _ ty  -> [ty]
       OpaqueDecl _      -> []
 
@@ -3985,8 +3985,8 @@ lowerModule opts modul@(MkModule _ uri _) =
       <> map (getUnique . decideResolved) computedSelectorDecides
 
   selectorNames = \case
-    EnumDecl _ cds    -> [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ <- fs]
-    RecordDecl _ _ fs -> [n | MkTypedName _ n _ _ _ <- fs]
+    EnumDecl _ cds    -> [n | MkConDecl _ _ fs <- cds, MkTypedName _ n _ _ _ _ <- fs]
+    RecordDecl _ _ fs -> [n | MkTypedName _ n _ _ _ _ <- fs]
     SynonymDecl _ _   -> []
     OpaqueDecl _      -> []
 
@@ -4128,7 +4128,7 @@ lowerModule opts modul@(MkModule _ uri _) =
         -- also the exact string the cells already carry, so the domain and the
         -- cells cannot disagree.
         , itdCtors    = ctors
-        -- STORED fields only. The 5th field of 'MkTypedName' is `Just expr` for
+        -- STORED fields only. The 6th field of 'MkTypedName' is `Just expr` for
         -- a COMPUTED field (a `MEANS` clause), which is derived rather than
         -- supplied; emitting it as an itemComponent would misstate the model's
         -- input contract, so it is skipped and reported D-ITEMDEF.
@@ -4155,8 +4155,8 @@ lowerModule opts modul@(MkModule _ uri _) =
         -- true simultaneously, and the base definition staying stored-only is
         -- deliberate: it is the model's input contract, and a caller never
         -- supplies a derived component.
-        , itdFields   = [(fn, fty) | MkTypedName _ fn fty _ Nothing <- flds]
-        , itdComputed = [nameOf fn | MkTypedName _ fn _ _ (Just _) <- flds]
+        , itdFields   = [(fn, fty) | MkTypedName _ fn fty _ _ Nothing <- flds]
+        , itdComputed = [nameOf fn | MkTypedName _ fn _ _ _ (Just _) <- flds]
         , itdPayload  = payload
         }
     | Declare _ (MkDeclare _ _ (MkAppForm _ tn _ _) td) <- decls
@@ -4639,7 +4639,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , length cds > 1
     , MkConDecl _ cn cfs <- cds
     , not (null cfs)
-    , u <- getUnique cn : [getUnique fn | MkTypedName _ fn _ _ _ <- cfs]
+    , u <- getUnique cn : [getUnique fn | MkTypedName _ fn _ _ _ _ <- cfs]
     ]
 
   -- Aligned with 'decides'. Emitted BKMs take a "bkm_" id prefix (the probes'
@@ -4994,7 +4994,7 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- (payload-carrying or not) are deliberately absent.
   recordCtorFields :: Map Unique [Unique]
   recordCtorFields = Map.fromList
-    [ (getUnique cn, [getUnique n | MkTypedName _ n _ _ _ <- fs])
+    [ (getUnique cn, [getUnique n | MkTypedName _ n _ _ _ _ <- fs])
     | Declare _ (MkDeclare _ _ _ (RecordDecl _ mn fs)) <- decls
     , cn <- maybeToList mn
     ]

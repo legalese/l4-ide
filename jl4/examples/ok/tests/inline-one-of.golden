@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+inline-one-of.l4:56:1-31:
+  "owner-occupied"
+inline-one-of.l4:57:1-39:
+  assertion satisfied
+inline-one-of.l4:58:1-63:35:
+  assertion satisfied
+inline-one-of.l4:64:1-47:
+  assertion satisfied
+inline-one-of.l4:65:1-47:
+  assertion satisfied

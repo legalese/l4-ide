@@ -1,0 +1,5 @@
+-- ONE OF can be the whole type of a field, but not part of one: not after
+-- LIST OF (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.1, second row).
+DECLARE Plot HAS
+    `the occupier` IS A STRING
+    `tenures`      IS A LIST OF ONE OF Owner, Tenant, Lodger

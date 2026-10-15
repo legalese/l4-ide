@@ -1,0 +1,38 @@
+-- A field's options are lifted into the section the record is declared in,
+-- so they are section-local exactly as the record is
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.8). Two sections may each
+-- declare a `Plot` with a `tenure`: the lifted types are
+-- `Plots`.`Plot's tenure` and `Leases`.`Plot's tenure`.
+
+§ `Plots`
+
+DECLARE Plot HAS
+    `tenure` IS ONE OF Owner, Tenant, Lodger
+
+GIVEN p IS A Plot
+GIVETH A BOOLEAN
+`owned` p MEANS p's tenure EQUALS Owner
+
+§ `Leases`
+
+DECLARE Plot HAS
+    `tenure` IS ONE OF Owner, Manager
+
+GIVEN t IS A `Plot's tenure`
+GIVETH A BOOLEAN
+`managed` t MEANS t EQUALS Manager
+
+§ `Use`
+
+-- From a third section, the section names which `Plot's tenure` is meant.
+GIVEN t IS A `Plots`.`Plot's tenure`
+GIVETH A STRING
+`label` t MEANS
+  CONSIDER t
+  WHEN Owner THEN "owner"
+  WHEN Tenant THEN "tenant"
+  WHEN Lodger THEN "lodger"
+
+#ASSERT `Plots`.`owned` (`Plots`.Plot WITH tenure IS Owner)
+#ASSERT `managed` Manager
+#ASSERT `label` Lodger EQUALS "lodger"

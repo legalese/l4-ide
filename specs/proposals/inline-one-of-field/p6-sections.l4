@@ -1,0 +1,18 @@
+§ `Plots`
+DECLARE Tenure IS ONE OF Owner, Tenant, Lodger
+DECLARE Plot HAS tenure IS A Tenure
+
+§ `Roles`
+DECLARE Tenure IS ONE OF Owner, Manager
+DECLARE Post HAS tenure IS A Tenure
+
+§ `Use`
+GIVEN p IS A Plot
+GIVETH A BOOLEAN
+`owned` p MEANS p's tenure EQUALS Owner
+
+GIVEN t IS A Tenure
+GIVETH A BOOLEAN
+`bare` t MEANS t EQUALS Owner
+
+#EVAL `owned` (Plot WITH tenure IS Owner)

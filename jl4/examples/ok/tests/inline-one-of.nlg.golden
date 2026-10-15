@@ -1,0 +1,5 @@
+`describe` with `Alex's plot`
+`owner occupied` with `Alex's plot`
+not `owner occupied` with `Plot` where `the occupier` is Alex, `tenure` is `Tenant`, `use` is `Residential`, `area in square metres` is 420 and `boundary` is an open boundary
+`Alex's plot` 's `boundary` is equal to a hedged boundary
+`tenure label` with `Lodger` is equal to lodging

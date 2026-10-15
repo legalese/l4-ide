@@ -1,0 +1,13 @@
+-- A record that takes a type parameter cannot list a field's options inline:
+-- the type L4 makes for them would need the parameter too
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.1, fifth row). This is a
+-- check error, at the ONE OF, so the rest of the module is still checked.
+DECLARE Box a HAS
+    `contents` IS A a
+    `state`    IS ONE OF Open, Shut
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`double` n MEANS n TIMES 2
+
+#EVAL `double` 21

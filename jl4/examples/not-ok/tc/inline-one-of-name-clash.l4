@@ -1,0 +1,10 @@
+-- A field's options are named after the place they are written,
+-- `Plot's tenure`. A type of that name declared as near to the field is a
+-- clash, reported once, at the field, with the generated name and the other
+-- declaration's location (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §6
+-- item 8).
+DECLARE `Plot's tenure` IS ONE OF Freehold, Leasehold
+
+DECLARE Plot HAS
+    `the occupier` IS A STRING
+    `tenure`       IS ONE OF Owner, Tenant, Lodger

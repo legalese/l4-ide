@@ -1,0 +1,6 @@
+DECLARE Person HAS
+    name  IS A STRING
+    age   IS A NUMBER
+    adult IS A BOOLEAN MEANS age >= 18
+
+#EVAL (Person WITH name IS "a", age IS 20)'s adult

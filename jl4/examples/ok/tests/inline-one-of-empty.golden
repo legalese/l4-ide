@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+inline-one-of-empty.l4:5:13-19:
+  The field `tenure` is written IS ONE OF, but no options follow,
+  so no value can ever be given for it, and no record that has it can be made.
+  
+  List the options after ONE OF, on the same line or each on a line of its own,
+  or give the field a type.

@@ -130,7 +130,25 @@ typeToParameter ::
   Set.Set Text ->
   Type' Resolved ->
   Parameter
-typeToParameter declares visited ty =
+typeToParameter declares = typeToParameterWith declares (inlineOptionsTypeUniques declares)
+
+-- | The enums 'L4.Desugar.desugarInlineOptions' lifted out of a field, among
+-- 'declares', by 'Unique' (Note [Inline ONE OF on a field]). By 'Unique' and
+-- not by name, because a DECLAREd enum in another section may share a lifted
+-- type's name, and it must keep its @x-l4-type@ (review round 1).
+inlineOptionsTypeUniques :: Map Text (Declare Resolved) -> Set.Set Unique
+inlineOptionsTypeUniques declares =
+  Set.fromList [ getUnique r | d <- Map.elems declares, (r, _) <- inlineOptionsTypes d ]
+
+-- | 'typeToParameter', given the lifted enums, which are worked out once per
+-- call of 'typeToParameter' rather than at every type it descends into.
+typeToParameterWith ::
+  Map Text (Declare Resolved) ->
+  Set.Set Unique ->
+  Set.Set Text ->
+  Type' Resolved ->
+  Parameter
+typeToParameterWith declares inlineTypes visited ty =
   case ty of
     Type _ -> emptyParam "object"
     TyApp _ name [] ->
@@ -141,16 +159,16 @@ typeToParameter declares visited ty =
         if lowered `elem` ["list", "listof"]
           then
             (emptyParam "array")
-              { parameterItems = Just (typeToParameter declares visited inner)
+              { parameterItems = Just (typeToParameterWith declares inlineTypes visited inner)
               }
           else
             if lowered `elem` ["maybe", "optional"]
-              then typeToParameter declares visited inner
+              then typeToParameterWith declares inlineTypes visited inner
               else typeNameToParameter name
     TyApp _ name _ ->
       typeNameToParameter name
     Fun{} -> emptyParam "object"
-    Forall _ _ inner -> typeToParameter declares visited inner
+    Forall _ _ inner -> typeToParameterWith declares inlineTypes visited inner
     InfVar{} -> emptyParam "object"
  where
   emptyParam :: Text -> Parameter
@@ -197,7 +215,7 @@ typeToParameter declares visited ty =
       _ -> Nothing
 
   declareToParameter :: Text -> Declare Resolved -> Parameter
-  declareToParameter typeName (MkDeclare declAnn _ _ typeDecl)
+  declareToParameter typeName (MkDeclare declAnn _ (MkAppForm _ declHead _ _) typeDecl)
     | typeName `Set.member` visited =
         -- Recursive type (e.g. a record whose field is a LIST OF itself):
         -- we must stop expanding to keep the schema finite, but we still
@@ -209,18 +227,18 @@ typeToParameter declares visited ty =
           RecordDecl _ _ fields ->
             let
               visited' = Set.insert typeName visited
-              fieldOrder = [resolvedNameText fieldName | MkTypedName _ fieldName _ _ _ <- fields]
+              fieldOrder = [resolvedNameText fieldName | MkTypedName _ fieldName _ _ _ _ <- fields]
               props =
                 Map.fromList
-                  [ (resolvedNameText fieldName, addDefault mTypically (addDesc fieldDesc (typeToParameter declares visited' fieldTy)))
-                  | MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans <- fields
+                  [ (resolvedNameText fieldName, addDefault mTypically (addDesc fieldDesc (typeToParameterWith declares inlineTypes visited' fieldTy)))
+                  | MkTypedName fieldAnn fieldName fieldTy _ mTypically _mMeans <- fields
                   , let fieldDesc = fmap getDesc (fieldAnn Optics.^. annDesc)
                   ]
               -- A field with a TYPICALLY may be left out: the JSON decoders
               -- fill it from this DECLARE (T1b of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
               requiredFields =
                 [ resolvedNameText fieldName
-                | MkTypedName _ fieldName fieldTy mTypically _ <- fields
+                | MkTypedName _ fieldName fieldTy _ mTypically _ <- fields
                 , not (isMaybeFieldType fieldTy)
                 , Maybe.isNothing mTypically
                 ]
@@ -236,10 +254,18 @@ typeToParameter declares visited ty =
             (emptyParam "string")
               { parameterDescription = Maybe.fromMaybe "" (fmap getDesc (declAnn Optics.^. annDesc))
               , parameterEnum = [resolvedNameText c | MkConDecl _ c _ <- constructors]
-              , parameterL4Type = Just typeName
+              -- An enum whose options a field listed inline has no name the
+              -- author wrote, so it publishes none: @x-l4-type@ is "the L4
+              -- user-declared type name … when this node came from a
+              -- DECLARE", and this one did not. Keeping the generated name
+              -- out of every deployed schema also makes a later promotion to
+              -- a DECLARE additive rather than a rename
+              -- (INLINE-ONE-OF-FIELD-SPEC §5.10).
+              , parameterL4Type =
+                  if getUnique declHead `Set.member` inlineTypes then Nothing else Just typeName
               }
           SynonymDecl _ inner ->
-            typeToParameter declares (Set.insert typeName visited) inner
+            typeToParameterWith declares inlineTypes (Set.insert typeName visited) inner
           -- An opaque type has no JSON shape: no fields, no constructors, no
           -- primitive image. This is the same 'emptyParam "object"' that an
           -- @ASSUME T IS A TYPE@ name reaches by not being in @declares@ at
