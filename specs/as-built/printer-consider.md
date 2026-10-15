@@ -67,4 +67,4 @@ None; this is a printer change.
 - `nest 2` is not on `unstable`, and `unstable` does not need it for a `WHERE`: its `Where` printer is `align $ vcatHard [...]` (from the same commit, `07a95495b`), which aligns the `WHERE` and its bindings to the column where the `Where` expression itself starts.
   Read in code at `5c4ed4e2d`, and measured with a prebuilt `l4` from `unstable` dated 2026-09-28 (its provenance is the file date; it passes the nested-CONSIDER fixtures, so it has that commit): all three `WHERE` fixtures give the answers `l4 run` gives.
   A later merge of `unstable`'s `Print.hs` into `main` will conflict on the `Consider` line.
-- Nothing in the test suites checks that every corpus file re-prints to source with the same answers; §3.2.1 of `CLAUDE.md` describes the evaluation differential, which is run by hand and is deliberately not a test.
+- Nothing in the test suites checks that every corpus file re-prints to source with the same answers; §3.2.1 of `unstable`'s `CLAUDE.md` (`main` has none) describes the evaluation differential, which is run by hand and is deliberately not a test.
