@@ -425,6 +425,14 @@ data TSpaces
   = TSpace        !Text
   | TLineComment  !Text
   | TBlockComment !Text
+  | TIgnoredAnnotation !Text !Text
+    -- ^ @\@name rest@: an annotation line this version of L4 cannot use. Either
+    -- the name is not one of 'knownAnnotationHeralds', or it is one and the line
+    -- does not have the form it needs (a bare @\@lang@). The first field is the
+    -- name WITHOUT the @\@@; the second is the rest of the line, verbatim, which
+    -- an annotation always takes ('lineAnno'). It is trivia, as a comment is, so
+    -- no parser position can reject it and exactprint reproduces it byte for
+    -- byte; a warning ("L4.IgnoredAnnotation") is the only trace it leaves.
   | EOF
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
@@ -454,8 +462,78 @@ data TokenType
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
+-- | The annotation names the editor offers as completions ("LSP.L4.Actions").
+-- Four of them: this is NOT the list of annotations the lexer knows, which is
+-- 'knownAnnotationHeralds'.
 annotations :: [Text]
 annotations = ["nlg", "ref", "ref-map", "ref-src"]
+
+-- | The name (without the @\@@) of every annotation this version of L4 knows.
+--
+-- Two things read this and must agree with the lexers below: 'ignoredAnnotation'
+-- lexes any @\@name@ the lexers above it refused as trivia, and the warning for
+-- an unknown one suggests the nearest of these (a known name is warned about as
+-- malformed instead). "UnknownAnnotationSpec" reads a name off a token of every
+-- kind, by a function that must cover every constructor, and checks that the
+-- set of names is this list: an annotation added to the lexer and not here, or
+-- here and not to the lexer, fails that test.
+knownAnnotationHeralds :: [Text]
+knownAnnotationHeralds =
+  [ "desc", "export", "infix", "infixl", "infixr", "lang", "nlg"
+  , "nonassertable", "nonexhaustive", "ref", "ref-map", "ref-src"
+  ]
+
+-- | The name after the @\@@ of an annotation: a letter, then letters, digits
+-- and underscores, with hyphens allowed BETWEEN those, the way @ref-src@ is
+-- spelled. A hyphen not followed by one of them ends the name, so @\@desc-- note@
+-- is @\@desc@ and a comment.
+annotationName :: Lexer Text
+annotationName =
+  Text.cons <$> satisfy isAlpha <*> (Text.concat <$> many (nameWord <|> try hyphenatedWord))
+  where
+    nameWord = takeWhile1P (Just "annotation name character") isAnnotationNameChar
+    hyphenatedWord = Text.cons <$> char '-' <*> nameWord
+
+-- | A character that can continue an annotation's name (after a letter).
+isAnnotationNameChar :: Char -> Bool
+isAnnotationNameChar c = isAlphaNum c || c == '_'
+
+-- | An annotation line no annotation lexer above accepted: @\@name@, then the
+-- rest of the line. Lexed as trivia and warned about, as GHC treats an unknown
+-- @{-# FOO #-}@ pragma ('-Wunrecognised-pragmas'), so that a module written for
+-- a newer L4 still loads, checks and highlights in an older one.
+--
+-- That covers two cases, told apart only by the warning ("L4.IgnoredAnnotation"
+-- looks the name up in 'knownAnnotationHeralds'):
+--
+--   * a name L4 has no annotation for (@\@exprot@, or one from a newer L4);
+--   * a name it does know whose own lexer refused the line. Only @\@lang@ can
+--     be refused: the rest accept a bare herald, a trailing space, a tab and a
+--     non-ASCII letter after them. A bare @\@lang@,
+--     @\@lang<TAB>en@ and a non-ASCII code are plausible typos, and a lexer
+--     error on any of them leaves the file with no semantic tokens at all.
+--
+-- Nothing is stricter than "an @\@, then a letter". An @\@ followed by anything
+-- else is not the shape of an annotation, so no annotation of any version can
+-- take that form, and it stays a lexer error.
+--
+-- Order matters: this is a 'spacesPayload' alternative, and 'tokenPayload' tries
+-- 'annotationsPayload' first, so a well-formed known annotation never reaches it.
+--
+-- The annotation shape (an @\@, then a letter) is decided by looking ahead, and a
+-- line that does not have it fails here at the @\@ having said nothing. That
+-- matters for the one error that remains: megaparsec keeps the failure that got
+-- furthest, so a 'try' that consumed the @\@ before failing left its own
+-- failure behind and the message read "expecting end of input or whitespace",
+-- where it used to list every token that could have stood there. Once the shape
+-- is confirmed nothing below can fail.
+ignoredAnnotation :: Lexer TSpaces
+ignoredAnnotation = do
+  isAnnotation <- lookAhead ((True <$ try (char '@' *> satisfy isAlpha)) <|> pure False)
+  unless isAnnotation empty
+  _ <- char '@'
+  name <- annotationName
+  TIgnoredAnnotation name <$> takeWhileP (Just "character") (/= '\n')
 
 nlgAnnotation :: Lexer (Maybe LangTag, Text, AnnoType)
 nlgAnnotation =
@@ -543,8 +621,13 @@ nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
 -- on the same line is still parsed (and the mark is then reported as not on a
 -- line of its own), and prose after it is a parse error; a line annotation
 -- would swallow both silently.
+--
+-- 'try', because the herald has been consumed when the next character is
+-- refused, and an alternative that fails after consuming ends the whole lexer
+-- instead of letting 'ignoredAnnotation' read @\@nonassertablex@ as an
+-- annotation this version does not know.
 nonassertableAnnotation :: Lexer ()
-nonassertableAnnotation = () <$ (string "@nonassertable" <* notFollowedBy (satisfy (\ c -> isAlphaNum c || c == '_')))
+nonassertableAnnotation = () <$ try (string "@nonassertable" <* notFollowedBy (satisfy (\ c -> isAlphaNum c || c == '_')))
 
 -- | A run of literal text inside an NLG annotation.
 --
@@ -854,6 +937,7 @@ spacesPayload = asum
   [ TSpace        <$> whitespace
   , TLineComment  <$> lineComment
   , TBlockComment <$> blockComment
+  , ignoredAnnotation
   ]
 
 symbolsPayload :: Lexer TSymbols
@@ -1503,6 +1587,7 @@ displayTokenType = \case
     TSpace t          -> t
     TLineComment t    -> t
     TBlockComment t   -> t
+    TIgnoredAnnotation name rest -> "@" <> name <> rest
     EOF               -> ""
   TLiterals lit -> case lit of
     TIntLit t _i      -> t
@@ -1568,6 +1653,9 @@ posTokenCategory = \ case
   TSpaces EOF -> CEOF
   TSpaces TLineComment {} -> CComment
   TSpaces TBlockComment {} -> CComment
+  -- Ignored, as a comment is: an editor that greys it out says what the
+  -- warning says.
+  TSpaces TIgnoredAnnotation {} -> CComment
   TSpaces TSpace {} -> CWhitespace
   TLiterals TStringLit {} -> CStringLit
   TLiterals TIntLit {} -> CNumberLit

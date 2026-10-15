@@ -35,6 +35,8 @@ If you already know what error you are looking at, use the table of contents bel
   - [Redundant pattern match branch](#redundant-pattern-match-branch)
   - [Clause that is never used](#clause-that-is-never-used)
   - [Annotation above a later clause](#annotation-above-a-later-clause)
+  - [Unknown annotation](#unknown-annotation)
+  - [Malformed annotation](#malformed-annotation)
   - [A definition after clauses that is not another clause](#a-definition-after-clauses-that-is-not-another-clause)
   - [ASSUME is being retired](#assume-is-being-retired)
 - [Runtime Errors](#runtime-errors)
@@ -905,6 +907,67 @@ Definitions that share a name but are told apart by their types, such as `DECIDE
 **How to fix it:** Move the annotation to where the rule's own annotations go, or remove it.
 An `@desc` or `@export` goes above the rule's `GIVEN`, or above its first clause if it has no `GIVEN`.
 An `@nlg` goes on the line above the first clause.
+
+---
+
+### Unknown annotation
+
+**Warning message:**
+
+```
+Unknown annotation `@exprot`: this version of L4 does not know it, so it is ignored, along with the rest of its line. Did you mean `@export`?
+```
+
+When the name is not close to a known one, the last sentence lists the annotations this version knows instead.
+
+**What you wrote:**
+
+```l4
+@exprot what the rule works out
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `add one` n IS n + 1
+```
+
+**What went wrong:** An `@` and a name that L4 has no annotation for is read as a comment: it and the rest of its line are ignored, and the rest of the file is checked as usual.
+It is a warning, not an error, for two reasons.
+A file written for a newer version of L4 can use an annotation this version lacks and still be opened, checked and highlighted.
+And a misspelt annotation is better flagged than silently dropped, since here the rule is not published and nothing else says so.
+
+A newer annotation that changes what a rule means is not applied by a version that does not know it, so the warning is the only sign that it was left out.
+A known annotation that lacks the form it needs is not this warning; it has [its own](#malformed-annotation).
+An `@` that is not followed by a letter is still an error.
+
+**Where you see it.** `l4 check` and `l4 run` print it, and so does the editor, as a warning on the line. The browser editor shows such a line like a comment and does not show the message, so `l4 check` is where to see it. `l4 batch` prints it on its standard error, as `file:line:column: message`, for the file you name (not for the modules it imports). `jl4-service` is the exception, on purpose: a deployment is what the service publishes, and a misspelt `@export` is a rule that is silently not published, so **a deployment that holds such a line is refused**, with the same message and its line and column in the file, and a service that is older than the file it is given refuses it for the same reason: it cannot honour the annotation, and the message names it. This is what the service always did with such a line, as a lexer error, so nothing already stored can hold one, and a restart refuses nothing it accepted before.
+
+**A name that begins with a known annotation's is not this warning.** `@exports` is `@export` followed by the text `s`, and `@descr` is `@desc` followed by `r`, as they always were, so neither is unknown and neither is warned about. An `@exports` does not publish a function.
+
+**How to fix it:** Correct the spelling, as the message suggests, or update L4 if the annotation is a newer one, or remove the line.
+
+---
+
+### Malformed annotation
+
+**Warning message:**
+
+```
+Malformed annotation `@lang`: it needs a language code after a space, such as `@lang en` (letters, digits and hyphens), so this line is ignored.
+```
+
+**What you wrote:**
+
+```l4
+@lang
+```
+
+or `@lang` followed by a tab, or by a language code with a non-ASCII letter.
+
+**What went wrong:** `@lang` names the module's language, and it needs a language code after a space.
+Without one, L4 cannot use the line, so it ignores it, as it ignores an [unknown annotation](#unknown-annotation), and the module's language is what it would be with no `@lang` at all.
+It is a warning, not an error, so the rest of the file is still checked and highlighted.
+`@lang` is the only annotation that can be malformed; every other accepts a bare herald, a trailing space, a tab and a non-ASCII letter after it.
+
+**How to fix it:** Write the language code after one or more spaces, in letters, digits and hyphens: `@lang en`, `@lang he`.
 
 ---
 

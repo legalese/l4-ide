@@ -1,0 +1,6 @@
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@future-annotation between the GIVETH and the DECIDE
+DECIDE `add one` n IS n + 1
+
+#ASSERT (`add one` 1) EQUALS 2

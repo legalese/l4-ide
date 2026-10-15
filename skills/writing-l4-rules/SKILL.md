@@ -432,6 +432,8 @@ Only functions marked `@export` are visible to the service. Place it directly ab
 | `@export default <description>` | Export as the bundle's **default** function            |
 | `@desc <description>`           | Internal description only — does **not** export        |
 
+A misspelt annotation (`@exprot`) is not an error to `l4 check`, `l4 run` or the editor, which warn `Unknown annotation` and ignore the line, so the rule is **not** published: read the warnings, not only the exit status. `jl4-service` refuses a deployment that holds one, with the same message, `l4 batch` prints it on stderr, and the browser editor shows the line like a comment. A name that merely begins with a known annotation's, such as `@exports` or `@descr`, is that annotation followed by stray text, with no warning anywhere, and `@exports` publishes nothing: spell `@export` exactly. Run `l4 check` before you deploy.
+
 The description is the single highest-value sentence in the whole file: it is what an LLM agent sees in its tool list when deciding whether to call this rule. Write it as if the agent has no other context.
 
 ```l4

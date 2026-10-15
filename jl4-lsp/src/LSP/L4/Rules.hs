@@ -16,6 +16,7 @@ import L4.Nlg (promoteHeadInputNlg)
 import Optics (gplate, toListOf, (%), (^.))
 import qualified L4.Lexer as Lexer
 import qualified L4.SmartPunctuation as SP
+import qualified L4.IgnoredAnnotation as IA
 import qualified L4.Parser as Parser
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
@@ -1005,13 +1006,19 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
                   , range <- SP.nbspHitsInToken uri pt.range.start txt
                   ]
                 mk range = mkFileDiagnosticWithSource uri (mkNbspLintDiagnostic range) (MkNbspLint range)
+                -- An annotation line this version of L4 cannot use (an unknown
+                -- name, or a known one without the form it needs) is trivia to
+                -- the parser (see 'Lexer.TIgnoredAnnotation'); this is the
+                -- only place it is mentioned. A warning, so the rest of the
+                -- file is still checked and highlighted.
+                ignoredAnnotation a = mkFileDiagnosticWithSource uri (mkIgnoredAnnotationDiagnostic a) a
                 -- The redundant-@lang hint: a module that declares nothing is
                 -- English (R-M2), so `@lang en` can go. A hint, below the NBSP
                 -- lint's warning: it exists so that a stale skill or generator
                 -- cannot quietly put the line back, and it changes nothing
                 -- about exit codes or evaluation.
                 langHints = map (mkSimpleFileDiagnostic uri . mkRedundantLangEnHint) (Parser.redundantLangEnRanges ts)
-            pure (map mk nbspRanges <> langHints, Just (ts, contents))
+            pure (map mk nbspRanges <> map ignoredAnnotation (IA.ignoredAnnotations ts) <> langHints, Just (ts, contents))
 
   -- | GetMixfixRegistry collects mixfix hints from the current module AND all imports.
   -- This enables cross-module mixfix resolution.
@@ -1426,6 +1433,20 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , _codeDescription = Nothing
         , _source = Just "linter"
         , _message = "non-breaking space (U+00A0) used where a normal space was expected — this usually comes from pasted text; replace it with an ordinary space."
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
+    mkIgnoredAnnotationDiagnostic :: IA.IgnoredAnnotation -> Diagnostic
+    mkIgnoredAnnotationDiagnostic a =
+      Diagnostic
+        { _range = srcRangeToLspRange (Just a.range)
+        , _severity = Just LSP.DiagnosticSeverity_Warning
+        , _code = Nothing
+        , _codeDescription = Nothing
+        , _source = Just "lexer"
+        , _message = IA.ignoredAnnotationMessage a
         , _tags = Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing

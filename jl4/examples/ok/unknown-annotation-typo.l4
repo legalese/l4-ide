@@ -1,0 +1,7 @@
+-- A misspelt annotation is an unknown one: a warning, and the line is ignored.
+@exprot what the rule works out
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `add one` n IS n + 1
+
+#ASSERT (`add one` 1) EQUALS 2

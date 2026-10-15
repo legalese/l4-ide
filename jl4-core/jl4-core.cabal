@@ -200,6 +200,7 @@ library
     L4.TypeCheck.Types
     L4.TypeCheck.Unify
     L4.TypeCheck.With
+    L4.IgnoredAnnotation
     L4.Yscript.IR
     L4.Yscript.Lower
     L4.Yscript.Emit
@@ -260,6 +261,7 @@ test-suite jl4-core-test
     NlgRenderSpec
     TracePostprocessSpec
     UnknownInputsSpec
+    UnknownAnnotationSpec
     GraphVizStubSpec
     EdgeCrashSpec
     PrintRoundtripSpec

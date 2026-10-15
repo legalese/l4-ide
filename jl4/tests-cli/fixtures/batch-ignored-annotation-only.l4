@@ -1,0 +1,4 @@
+@exprot This function is meant to be published
+GIVEN code IS A STRING
+GIVETH A STRING
+echoCode code MEANS code

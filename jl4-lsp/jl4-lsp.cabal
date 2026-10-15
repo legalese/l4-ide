@@ -179,6 +179,7 @@ test-suite jl4-lsp-test
     OutOfScopeGivenFixSpec
     SmartPunctuationActionsSpec
     StateGraphLensSpec
+    UnknownAnnotationLspSpec
     VisualiseExpansionOptInSpec
   build-tool-depends:
     hspec-discover:hspec-discover

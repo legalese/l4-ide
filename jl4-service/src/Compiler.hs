@@ -5,6 +5,7 @@ module Compiler (
 ) where
 
 import qualified Backend.Jl4 as Jl4
+import qualified L4.IgnoredAnnotation as IA
 import Backend.Jl4 (ModuleContext, buildCompiledFromShared, typecheckAndEvalBundle)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
@@ -108,7 +109,7 @@ compileBundle logger deployId sources = do
       -- Pass all paths as needing eval environments — we'll discover which have
       -- exports from the typecheck results, then only the eval envs for those
       -- files will actually be used.
-      (errs, tcMap, evalMap, unresolved) <- typecheckAndEvalBundle moduleContext allPaths
+      (errs, tcMap, evalMap, unresolved, ignored) <- typecheckAndEvalBundle moduleContext allPaths
       logUnresolvedImports logger deployId unresolved
 
       -- Phase 2: Process typecheck results per file
@@ -127,9 +128,30 @@ compileBundle logger deployId sources = do
               ]
             pure (filepath, Left (Text.intercalate "\n" (("Typecheck failed: " <> Text.pack filepath) : why)))
 
+      -- An annotation line this version ignores is a warning in the editor and
+      -- in `l4 check`, and here a REFUSAL. The lexer lets one through so that a
+      -- file written for a newer L4 still opens in an older one; but a
+      -- deployment is what the service PUBLISHES, and a misspelt `@export` is a
+      -- rule that silently is not (the deploy was "applied" with no functions).
+      -- The service refused every such line as a lexer error until then, and
+      -- refuses the same ones still, now saying which annotation and what was
+      -- probably meant. Nothing already stored can hold one, for that reason, so
+      -- a restart, which comes through here too, refuses nothing it accepted.
+      -- Every one is logged as well.
+      forM_ ignored $ \(path, a) ->
+        logWarn logger "Ignored annotation"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON path)
+          , ("message", toJSON (IA.renderIgnoredAnnotation a))
+          ]
+      let ignoredErrors =
+            [ Text.pack path <> ":" <> IA.renderIgnoredAnnotation a
+            | (path, a) <- ignored
+            ]
+
       let allFunctionsWithFile = [ (fp, fn) | (fp, Right fns) <- results, fn <- fns ]
           allFunctions = map snd allFunctionsWithFile
-          errors = [err | (_, Left err) <- results]
+          errors = [err | (_, Left err) <- results] <> ignoredErrors
 
       -- Any file that failed to compile (typecheck errors, unsupported
       -- @export inputs, …) fails the whole deploy. Previously this only

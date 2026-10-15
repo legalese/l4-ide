@@ -925,6 +925,7 @@ tokenToSemanticType tok = case tok.payload of
   -- Comments (type index 7)
   TSpaces (TLineComment _) -> Just 7
   TSpaces (TBlockComment _) -> Just 7
+  TSpaces (TIgnoredAnnotation _ _) -> Just 7
   
   -- Annotations/decorators (type index 8)
   TAnnotations _ -> Just 8

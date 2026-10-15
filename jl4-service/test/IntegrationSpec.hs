@@ -2470,6 +2470,32 @@ spec = describe "integration" do
         (<> "\nDECIDE ( IS\n")
         "unexpected ("
 
+    describe "when the stored sources hold a name that begins with a known annotation" do
+      -- `@descr x` is `@desc` with the text "r x", and `@nlgg x` is `@nlg` with
+      -- "g x": the lexer has always read a name that begins with a known one as
+      -- that annotation, and still does, so a deployment stored with one comes
+      -- up after a restart as it did, and nothing is logged as ignored. (A line
+      -- the lexer IGNORES, which it used to refuse, cannot be in a store: see
+      -- "an annotation this version ignores".)
+      let deployments =
+            [ ("kept", [("qualifies.l4", qualifiesJL4)])
+            , ("edited", [("qualifies.l4", qualifiesJL4)])
+            , ("twice", [("qualifies.l4", qualifiesJL4)])
+            ]
+          edits dir = do
+            editSource "edited" "qualifies.l4" ("@descr a longer description\n" <>) dir
+            editSource "twice" "qualifies.l4" (Text.replace "drinks IS A BOOLEAN" "drinks IS A BOOLEAN @nlgg whether they drink") dir
+      it "loads the deployments and serves their functions" do
+        withServicesRestarted deployments edits
+          \logLines baseUrl mgr -> do
+            forM_ ["edited", "twice"] \deployId -> do
+              status <- deploymentStatus baseUrl mgr deployId
+              fmap (.dsStatus) status `shouldBe` Just "ready"
+              resp <- evalFunction baseUrl mgr deployId "compute_qualifies" allTrueArgs
+              assertSuccess resp \r ->
+                Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+              ignoredLoggedFor deployId "qualifies.l4" logLines `shouldBe` []
+
     it "answers a record input as before when an edit shifts the numbering of the types" do
       -- The stored sources are re-checked, and the record's type is found by
       -- its Unique, which is the position of its DECLARE in the file. Add a
@@ -3750,6 +3776,75 @@ spec = describe "integration" do
         Right _ -> expectationFailure "A source that does not parse was compiled"
       errorsLoggedFor "test" "broken.l4" logLines `shouldSatisfy` any ("unexpected (" `Text.isInfixOf`)
 
+    -- An annotation line this version of L4 ignores is a warning in the editor
+    -- and in `l4 check`, because the lexer lets it through so that a file
+    -- written for a newer L4 still opens in an older one. A deployment is what
+    -- the service publishes, so here it is a REFUSAL: a misspelt `@export` was
+    -- "applied" with no functions at all, silently. Before the lexer let these
+    -- through, the service refused them as lexer errors; it still does.
+    describe "an annotation this version ignores" do
+      let rule = ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "DECIDE `add one` n IS n + 1"]
+          refusedWith needles line = do
+            logger <- newLogger False
+            result <- compileBundle logger "test" (Map.singleton "typo.l4" (Text.unlines (line : rule)))
+            case result of
+              Left err -> forM_ needles \needle -> err `shouldSatisfy` Text.isInfixOf needle
+              Right (_fns, meta) ->
+                expectationFailure $
+                  "Expected a refusal, but compiled and published "
+                    <> show (map (.fsName) meta.metaFunctions)
+
+      it "refuses a deployment whose misspelt @export would publish nothing" $
+        refusedWith ["typo.l4:1:1:", "`@exprot`", "Did you mean `@export`?"]
+          "@exprot default adds one to a number"
+
+      it "refuses a deployment that uses an annotation from a newer L4" $
+        refusedWith ["typo.l4:1:1:", "`@future-annotation`", "ignored"]
+          "@future-annotation this version has never heard of it"
+
+      it "refuses a malformed @lang, which the editor ignores with a warning" $
+        refusedWith ["typo.l4:1:1:", "Malformed annotation `@lang`", "@lang en"]
+          "@lang"
+
+      it "names the line of an annotation that is not on the first" do
+        logger <- newLogger False
+        result <- compileBundle logger "test" (Map.singleton "typo.l4" (Text.unlines (rule <> ["", "@exprot adds two"])))
+        case result of
+          Left err -> err `shouldSatisfy` Text.isInfixOf "typo.l4:5:1:"
+          Right _ -> expectationFailure "Expected a refusal"
+
+      -- A name that merely BEGINS with a known annotation's (`@descr`, `@exports`,
+      -- `@nlgg`) is not an ignored annotation: the lexer reads it as that
+      -- annotation with stray text, as it always did, and the service accepts it
+      -- as it did. `@langx` and `@nonassertablex` were lexer errors, and are
+      -- ignored lines now, so they are refused.
+      let compiledWith line = do
+            (logPath, h) <- openTempFile' "jl4-service-ignored"
+            logger <- newLoggerTo h False
+            result <- compileBundle logger "test" (Map.singleton "old.l4" (Text.unlines (line <> rule)))
+            hClose h
+            logLines <- Maybe.mapMaybe Aeson.decodeStrict . BS8.lines <$> BS.readFile logPath
+            removePathForcibly (takeDirectory logPath)
+            pure (result, ignoredLoggedFor "test" "old.l4" logLines)
+
+      it "accepts a name that begins with a known annotation, as it always did, and ignores nothing" do
+        (result, logged) <- compiledWith ["@export default adds one", "@descr a longer description"]
+        case result of
+          Left err -> expectationFailure ("Expected the deployment, but it was refused: " <> Text.unpack err)
+          Right (fns, _meta) -> Map.keys fns `shouldBe` ["add one"]
+        logged `shouldBe` []
+
+      it "still refuses a name that begins with an annotation whose lexer checked what follows" $
+        forM_ ["@langx en", "@nonassertablex"] \line ->
+          refusedWith ["typo.l4:1:1:"] line
+
+      it "accepts a module with @lang en, which only earns the editor a hint" do
+        (result, logged) <- compiledWith ["@lang en"]
+        case result of
+          Left err -> expectationFailure ("Expected the deployment, but it was refused: " <> Text.unpack err)
+          Right _ -> pure ()
+        logged `shouldBe` []
+
     it "rejects empty bundles" do
       logger <- newLogger False
       let sources = Map.empty :: Map FilePath Text
@@ -4405,6 +4500,20 @@ errorsLoggedFor deployId file logLines =
   , Aeson.KeyMap.lookup "file" o == Just (Aeson.String (Text.pack file))
   , Just (Aeson.Array errs) <- [Aeson.KeyMap.lookup "errors" o]
   , Aeson.String err <- toList errs
+  ]
+
+-- | The annotation lines a warning says one deployment's file holds that the
+-- lexer ignores: the @message@ of the "Ignored annotation" warnings that name
+-- the file.
+ignoredLoggedFor :: Text -> FilePath -> [Aeson.Value] -> [Text]
+ignoredLoggedFor deployId file logLines =
+  [ m
+  | Aeson.Object o <- logLines
+  , Aeson.KeyMap.lookup "level" o == Just (Aeson.String "warn")
+  , Aeson.KeyMap.lookup "msg" o == Just (Aeson.String "Ignored annotation")
+  , Aeson.KeyMap.lookup "deploymentId" o == Just (Aeson.String deployId)
+  , Aeson.KeyMap.lookup "file" o == Just (Aeson.String (Text.pack file))
+  , Just (Aeson.String m) <- [Aeson.KeyMap.lookup "message" o]
   ]
 
 -- | The names in a deployment's list of functions, sorted.

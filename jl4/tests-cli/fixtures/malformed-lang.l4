@@ -1,0 +1,6 @@
+@lang
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `add one` n IS n + 1
+
+#EVAL `add one` 1
