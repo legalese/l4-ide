@@ -313,7 +313,18 @@ The decision graph and the query plan refuse them with this message (the service
 These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules.
 ```
 
-In VS Code, a rule refused as too long keeps the lens above it, which then reads `No decision graph: these clauses are too long to draw`.
+**At most 300 boxes.**
+A rule written as clauses is also refused when its picture would come to more than 300 boxes.
+Clauses that read as one `CONSIDER` are one box, however many rows they have, so this is reached by clauses that read as something else.
+One way is a first clause that gives an input a new name, such as `DECIDE rule m a b IS …` for a rule whose `GIVEN` calls its first input `n`: L4 reads that as a test of the input, with the clauses after it as the other answer, and draws its result, which can be long.
+The query plan reaches the limit sooner than the picture does, because the service simplifies the picture first, and an `OR` of `AND`s, rewritten as an `AND` of `OR`s, can grow far past its own size.
+An `OR` of six `AND`s of two inputs each, as the result of such a first clause, is drawn in VS Code, and its query plan is refused with this message:
+
+```
+These clauses would draw a ladder of more than 300 boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules.
+```
+
+In VS Code, a rule that is refused keeps the lens above it, which then reads `No decision graph: these clauses are too long to draw`, or `No decision graph: these clauses would draw more than 300 boxes` when the picture as drawn comes to that many.
 Clicking it shows the whole message.
 Only the picture and the plan are refused: `#EVAL`, `l4 run` and the service's evaluation answer the rule as usual.
 
@@ -321,8 +332,9 @@ To bring such a rule back into the picture, give part of it a name of its own: m
 A rule that uses another shows the use as one box, not the clauses behind it.
 Or split one long list into smaller lists, each deciding one part of the question, and combine their answers with `AND` or `OR`.
 
-The limit applies only to a rule written as clauses that L4 reads through.
-A rule whose first clause matches every input is not read through, because the clauses after that one are never reached, so it is drawn and planned as a rule written without clauses is, however long it is.
+The limits apply only to a rule written as clauses that L4 reads through.
+A rule whose first clause names each input as its `GIVEN` does, or is `_`, is not read through, because the clauses after that one are never reached, so it is drawn and planned as a rule written without clauses is, however long it is.
+A first clause that gives an input a new name is read through, and both limits apply to it.
 A `CONSIDER` you write yourself is drawn as you wrote it.
 A rule that answers something other than yes or no, such as a number, is not drawn at all, however it is written, and L4 says that first.
 
