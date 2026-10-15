@@ -192,8 +192,9 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
       (_, tcTable) <- check "premise-table" colourTable
       (_, tcByHand) <- check "premise-by-hand" colourByHand
       (_, tcNewName) <- check "premise-new-name" (newNameDnf 3)
-      map (Transform.holdsGeneratedNodes . bodyOf) [tcCatchAll, tcGroup, tcTable, tcByHand, tcNewName]
-        `shouldBe` [False, True, True, False, True]
+      (_, tcExactly) <- check "premise-exactly" (T.replace "DECIDE rule n " "DECIDE rule (EXACTLY n) " (catchAllDnf 3 True))
+      map (Transform.holdsGeneratedNodes . bodyOf) [tcCatchAll, tcGroup, tcTable, tcByHand, tcNewName, tcExactly]
+        `shouldBe` [False, True, True, False, True, True]
     it "is drawn in both ladders when its simplified ladder is more than 300 boxes" $ do
       (ver, tc) <- check "catchall-dnf" (catchAllDnf 6 True)
       (verH, tcH) <- check "catchall-dnf-by-hand" (catchAllDnf 6 False)

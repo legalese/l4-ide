@@ -49,7 +49,7 @@ import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -861,6 +861,19 @@ spec = describe "integration" do
           resp <- queryPlan' baseUrl mgr "newname-dnf-6" "rule" noArguments
           statusCode' resp `shouldBe` 400
           LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
+      -- `(EXACTLY n)` for the input's own name is not exempt either: only the bare
+      -- name and `_` are, so the desugarer tests it and the group is read through.
+      -- It reads through to one CONSIDER, which is one box, so the 300-box limit is
+      -- not reached at six pairs; the 20,000-part one is.
+      it "EXACTLY its own name: plans a group of six pairs, which reads through to one CONSIDER" do
+        withServiceFromSources "exactly-dnf-6" [("rule.l4", exactlyNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "EXACTLY its own name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "exactly-huge" [("rule.l4", exactlyHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
       it "new name: answers such a group when its simplified ladder is less than 300 boxes" do
         withServiceFromSources "newname-dnf-5" [("rule.l4", newNameDnfJL4 5)] \baseUrl mgr -> do
           resp <- queryPlan' baseUrl mgr "newname-dnf-5" "rule" noArguments

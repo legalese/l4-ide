@@ -46,6 +46,8 @@ module TestData (
   handCatchAllHugeJL4,
   newNameHugeJL4,
   newNameDnfJL4,
+  exactlyNameDnfJL4,
+  exactlyHugeJL4,
   dnfClauseJL4,
   handDnfJL4,
   jsonDecodePersonJL4,
@@ -878,29 +880,43 @@ dnfClauseJL4 k = dnfRule k True
 -- 22,000 parts or so: more than the 20,000 that clauses are limited to when
 -- they are read through. The clause after it is never reached.
 catchAllHugeJL4 :: Text
-catchAllHugeJL4 = hugeRule "n" True
+catchAllHugeJL4 = hugeRule "n" "n" True
 
 -- | 'catchAllHugeJL4' without the clause after the first: a rule written without
 -- clauses, which is what the group is answered as.
 handCatchAllHugeJL4 :: Text
-handCatchAllHugeJL4 = hugeRule "n" False
+handCatchAllHugeJL4 = hugeRule "n" "n" False
 
 -- | 'catchAllHugeJL4' with the first clause's input given a new name, @m@. That
 -- clause matches every input, but not as the @GIVEN@ names it, so it is a test
 -- the desugarer generates, and the group is read through and limited.
 newNameHugeJL4 :: Text
-newNameHugeJL4 = hugeRule "m" True
+newNameHugeJL4 = hugeRule "m" "m" True
 
-hugeRule :: Text -> Bool -> Text
-hugeRule input clauses =
+-- | 'catchAllHugeJL4' with the first clause's input written @(EXACTLY n)@.
+exactlyHugeJL4 :: Text
+exactlyHugeJL4 = hugeRule "(EXACTLY n)" "n" True
+
+-- | The first clause's pattern for the @GIVEN@'s @n@, the name its result uses
+-- for it, and whether the clause after it is written.
+hugeRule :: Text -> Text -> Bool -> Text
+hugeRule pat var clauses =
   "@export Huge\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
-    <> "DECIDE rule " <> input <> " IS " <> input <> Text.concat (replicate 11000 " + 1") <> " GREATER THAN 0\n"
+    <> "DECIDE rule " <> pat <> " IS " <> var <> Text.concat (replicate 11000 " + 1") <> " GREATER THAN 0\n"
     <> (if clauses then "DECIDE rule 0 IS FALSE\n" else "")
 
 -- | 'dnfClauseJL4' with the first clause's @n@ given a new name, @m@: read
 -- through and limited, where 'dnfClauseJL4' is not.
 newNameDnfJL4 :: Int -> Text
 newNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule m " (dnfClauseJL4 k)
+
+-- | 'dnfClauseJL4' with the first clause's @n@ written @(EXACTLY n)@. The
+-- missing-case check counts that as the input's own name, but the desugarer
+-- tests it (only the bare name and @_@ are exempt), so the group is read
+-- through. It reads through to one CONSIDER, which is one box, so six pairs
+-- are planned; 'exactlyHugeJL4' is refused as too long.
+exactlyNameDnfJL4 :: Int -> Text
+exactlyNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule (EXACTLY n) " (dnfClauseJL4 k)
 
 -- | 'dnfClauseJL4' without clauses.
 handDnfJL4 :: Int -> Text
