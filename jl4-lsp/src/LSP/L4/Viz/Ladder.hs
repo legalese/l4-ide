@@ -24,6 +24,7 @@ module LSP.L4.Viz.Ladder (
   getAtomInputRefs,
   getLeafExpr,
   getLeafKeys,
+  getRefusingAtoms,
   getFreshLeaves,
   getVizConfig,
   getKeyEnv,
@@ -68,6 +69,7 @@ import qualified LSP.L4.Viz.VizExpr as V
 import qualified LSP.L4.Viz.CustomProtocol as V (EvalAppRequestParams (..))
 import LSP.L4.Viz.VizExpr (InertContext(..))
 import L4.Desugar
+import qualified L4.Refusal as Refusal
 
 ------------------------------------------------------
 -- Monad
@@ -262,6 +264,13 @@ data VizState = MkVizState
   -- ^ This pass refused an expansion because 'expansionNodeBudget' was spent.
   , expansionCutByDepth :: !Bool
   -- ^ This pass refused an expansion only because of 'expansionDepthLimit'.
+  , refusingDefs :: Refusal.AlwaysRefusing
+  -- ^ The module's definitions that always refuse ("L4.Refusal"). Lazy: a pass
+  -- that names no definition never computes it.
+  , refusingAtoms :: IntMap Text
+  -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only ever
+  -- refuse at: a @REFUSE@, or a bare reference to a definition that always
+  -- refuses. The query plan never asks one (R7).
   }
   deriving stock (Generic)
 
@@ -297,6 +306,8 @@ mkInitialVizState cfg =
     , freshLeaves = 0
     , freshLeafIds = IntSet.empty
     , expansionNodes = 0
+    , refusingDefs = Refusal.alwaysRefusing cfg.module'
+    , refusingAtoms = Map.empty
     , expansionOverBudget = False
     , expansionCutByDepth = False
     }
@@ -407,6 +418,11 @@ getLeafExpr vs leaf = Map.lookup leaf vs.leafExprs
 -- expansion that is the term AFTER the call's arguments were put in (R3).
 getLeafKeys :: VizState -> IntMap Text
 getLeafKeys vs = vs.leafKeys
+
+-- | The leaves evaluation can only refuse at, by leaf id, with the reason each
+-- refuses with (see 'refusingAtoms').
+getRefusingAtoms :: VizState -> IntMap Text
+getRefusingAtoms vs = vs.refusingAtoms
 
 -- | The leaves keyed apart per occurrence, because their value depends on when
 -- they are evaluated ('L4.Viz.AtomKey.isEffectful'). Their keys are numbered in
@@ -732,7 +748,7 @@ translateGo = go
         -- (@REFUSE "…"@). Explicit above the wildcard because the wildcard
         -- would first try 'normaliseGuarded' on it, and a refusal is not
         -- ladder STRUCTURE — it is a terminal. (Mirrors "L4.Viz.Ladder".)
-        Refuse{} -> leafFromExpr e
+        Refuse _ msg -> leafFromExpr e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
 
         -- 'var'
         App _ resolved [] -> do
@@ -853,7 +869,21 @@ varLeaf vid vname resolved = do
     if canInline
       then expandCall (getUnique resolved) (App emptyAnno resolved [])
       else pure Nothing
-  pure $ V.UBoolVar vid vname defaultUBoolVarValue canInline atomId mTypically expansion
+  -- A rule of no inputs that always refuses is not a question: evaluation takes
+  -- no answer for it, it forces the rule (R7). One that refuses on only some
+  -- paths stays a question.
+  refusing <- use #refusingDefs
+  refusingLeaf (DataMap.lookup (getUnique resolved) refusing) $
+    V.UBoolVar vid vname defaultUBoolVarValue canInline atomId mTypically expansion
+
+-- | Record a leaf as one evaluation can only refuse at, with the reason, if it
+-- has one.
+refusingLeaf :: Maybe Text -> IRExpr -> Viz IRExpr
+refusingLeaf reason leaf = do
+  case (reason, leaf) of
+    (Just r, V.UBoolVar _ nm _ _ _ _ _) -> #refusingAtoms %= Map.insert nm.unique r
+    _ -> pure ()
+  pure leaf
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do

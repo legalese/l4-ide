@@ -1635,6 +1635,48 @@ Those are the `REFUSE` row of R7's taxonomy, not the gate row, even though both 
 date — and canon's is guarded on the **child's date of birth**, not on `RULES EFFECTIVE DATE`, so no
 rule-version axis can answer it at all.
 
+### 11.9.4 The query plan's image of a refusal. Built 2026-10-14; assumed, not ruled.
+
+R7's list of per-surface images had none for the decision service's query plan, which a wizard
+uses to choose its next question. It treated every bare reference to a rule of no inputs as a
+yes/no question, so for `` eligible adult MEANS adult AND `not modelled` ``, with `` `not modelled` ``
+a `REFUSE`, answering both questions gave `determined: true`, where `/evaluation` of the same case
+answers 422 `EvaluatorRefused`. A `REFUSE` written in the rule was a question too: it reads no
+input, so it was in no `asks` entry, but it was in `stillNeeded` and `ranked`, and an answer bound
+by its label was used. Measured on main with the REFUSE carve and on unstable `3823e590d`, and for
+the `REFUSE` leaf on unstable `8aeab916a` (`ok/refuse-uncatchable.l4`).
+
+Built on unstable (branch `fix/query-plan-refusal`):
+
+- **What counts as refusing.** `L4.Refusal.alwaysRefusing`: the module's own definitions, local
+  ones included, whose body is a `REFUSE`, or a bare reference to a definition already counted,
+  under any `WHERE` or `LET`; the least fixed point. Narrower than §2.8's `Ref(f)`, which is "can
+  reach". A definition that refuses on only some paths is not counted (the Reg CF cleanroom's
+  `` `the aggregate offering cap` ``, a NUMBER that refuses for a rule date before 2022-09-20, is
+  one); a BOOLEAN one stays a question, as before, since whether it refuses can turn on what the
+  plan does not see, such as the rule date. Names from other
+  modules are not followed, so the prelude's `TBD`, which this section already sets apart, is not
+  seen. A `REFUSE` leaf, and a bare reference to a counted rule of no inputs, are refusing leaves.
+  They are never asked.
+- **In evaluation's order.** An expression with a refusing leaf is planned as evaluation reads it,
+  left to right and stopping as soon as the answer is known (`connectiveLeft`): as three diagrams
+  over the askable atoms, TRUE, FALSE, and one per refusing leaf for "reaches this one first". So
+  the plan and `/evaluation` agree case by case, order-dependence included: `adult AND r` is
+  `Fails` where `adult` is FALSE, `r AND adult` is `Refused` either way. The order-dependence this
+  section writes down is honoured, not removed. An expression with no refusing leaf is planned as
+  it always was, by the same code.
+- **The answer.** A `refusal` field carrying the reasons evaluation can reach first, set wherever
+  evaluation is sure to refuse, and `verdict` gains `Refused`, with `determined: null`. In the
+  service and the browser editor, a ladder with a refusing leaf is drawn again unsimplified, since
+  distributing `OR` over `AND` can change which refusal evaluation reaches; every other ladder is
+  drawn as before. jl4-lsp plans from the ladder the reader is shown, which is unsimplified unless
+  they switch simplification on.
+
+Not covered, and stated on `doc/reference/control-flow/REFUSE.md`: a definition that refuses on
+only some paths; a refusal behind a leaf the plan holds as one question (a comparison reading a
+refusing rule, a call with inputs to one); a refusal reached only through an import; and, in the
+editor with simplification on, the simplified order.
+
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 
 The transitive read-set pass lands first; the schema is keyed by (name, tier) with `x-l4-tier`;
