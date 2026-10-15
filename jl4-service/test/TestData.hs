@@ -43,6 +43,9 @@ module TestData (
   longNumberClausesJL4,
   longClausesJL4,
   catchAllHugeJL4,
+  handCatchAllHugeJL4,
+  newNameHugeJL4,
+  newNameDnfJL4,
   dnfClauseJL4,
   handDnfJL4,
   jsonDecodePersonJL4,
@@ -862,8 +865,8 @@ longNumberClausesJL4 k width =
     <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS n" <> Text.concat (replicate width " + 1") | row <- [0 .. k - 1] ]
     <> "DECIDE rule n IS 0\n"
 
--- | A group whose first clause names every input, so it matches every input
--- and the group reads through to that clause's body: a disjunction of @k@
+-- | A group whose first clause names every input as the @GIVEN@ does, so it
+-- matches every input and the group is that clause's body: a disjunction of @k@
 -- conjunctions of two inputs. (The second clause is never used, and the
 -- checker says so.) The service simplifies the ladder into conjunctive normal
 -- form, which has @2^k@ disjunctions of @k@ inputs: 193 boxes for 5, and 449
@@ -871,14 +874,33 @@ longNumberClausesJL4 k width =
 dnfClauseJL4 :: Int -> Text
 dnfClauseJL4 k = dnfRule k True
 
--- | A first clause that names its input and whose result is 22,000 parts or so:
--- more than the 20,000 that clauses are limited to when they are read through.
--- The clause after it is never reached.
+-- | A first clause that names its input as the @GIVEN@ does and whose result is
+-- 22,000 parts or so: more than the 20,000 that clauses are limited to when
+-- they are read through. The clause after it is never reached.
 catchAllHugeJL4 :: Text
-catchAllHugeJL4 =
+catchAllHugeJL4 = hugeRule "n" True
+
+-- | 'catchAllHugeJL4' without the clause after the first: a rule written without
+-- clauses, which is what the group is answered as.
+handCatchAllHugeJL4 :: Text
+handCatchAllHugeJL4 = hugeRule "n" False
+
+-- | 'catchAllHugeJL4' with the first clause's input given a new name, @m@. That
+-- clause matches every input, but not as the @GIVEN@ names it, so it is a test
+-- the desugarer generates, and the group is read through and limited.
+newNameHugeJL4 :: Text
+newNameHugeJL4 = hugeRule "m" True
+
+hugeRule :: Text -> Bool -> Text
+hugeRule input clauses =
   "@export Huge\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
-    <> "DECIDE rule n IS n" <> Text.concat (replicate 11000 " + 1") <> " GREATER THAN 0\n"
-    <> "DECIDE rule 0 IS FALSE\n"
+    <> "DECIDE rule " <> input <> " IS " <> input <> Text.concat (replicate 11000 " + 1") <> " GREATER THAN 0\n"
+    <> (if clauses then "DECIDE rule 0 IS FALSE\n" else "")
+
+-- | 'dnfClauseJL4' with the first clause's @n@ given a new name, @m@: read
+-- through and limited, where 'dnfClauseJL4' is not.
+newNameDnfJL4 :: Int -> Text
+newNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule m " (dnfClauseJL4 k)
 
 -- | 'dnfClauseJL4' without clauses.
 handDnfJL4 :: Int -> Text

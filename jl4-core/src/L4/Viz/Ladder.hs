@@ -308,9 +308,11 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   -- clauses on it), not off its body.
   let isClauseGroup = Transform.writtenAsClauses asWritten
       -- The limits below guard the reading through, so they apply to a group
-      -- that has something to read through. One whose first clause matches
-      -- every input has nothing: its body is that clause's result, and it is
-      -- drawn as a rule written without clauses is, whatever its size.
+      -- that has something to read through. One whose first clause names each
+      -- input as the GIVEN does (or is @_@) has nothing: its body is that
+      -- clause's result, and it is drawn as a rule written without clauses is,
+      -- whatever its size. A first clause that gives an input a new name is a
+      -- test the desugarer generates, so that group is read through.
       readsThrough = isClauseGroup && Transform.holdsGeneratedNodes body0
   body <- case Transform.inlineLetsForViz body0 of
     Right inlined -> pure inlined
@@ -328,7 +330,8 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   vizBody <- translateExpr shouldSimplify (carameliseExpr body)
   -- The same limit on what is drawn as where a CONSIDER is drawn as rows (see
   -- 'Transform.clauseGroupLadderBudget'). A rule that was not written as
-  -- clauses, or whose first clause matches every input, is drawn as it always was.
+  -- clauses, or whose first clause names each input as the GIVEN does (or is
+  -- @_@), is drawn as it always was.
   when (readsThrough && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
     throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
   pure $ MkFunDecl vid funName (paramNamesFromGivens givenSig appArgs) vizBody

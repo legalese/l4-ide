@@ -49,7 +49,7 @@ import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -817,14 +817,14 @@ spec = describe "integration" do
           statusCode' resp `shouldBe` 400
           LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "returns a boolean"
 
-      -- A group whose first clause matches every input has nothing to read
-      -- through: the clauses after it are never reached, and its body is that
-      -- clause's result, as a rule written without clauses has it. `main` plans
-      -- such a rule however long or large its result, and so does the service. The
-      -- service simplifies the ladder, and a disjunction of conjunctions
-      -- rewritten into conjunctive normal form grows past 300 boxes at six
-      -- pairs of inputs (449 boxes).
-      it "catch-all: answers a group whose first clause matches every input, simplified to 193 boxes" do
+      -- A group whose first clause names each of its inputs as the GIVEN does has
+      -- nothing to read through: the clauses after it are never reached, and its
+      -- body is that clause's result, as a rule written without clauses has it.
+      -- `main` plans such a rule however long or large its result, and so does the
+      -- service. The service simplifies the ladder, and a disjunction of
+      -- conjunctions rewritten into conjunctive normal form grows past 300 boxes
+      -- at six pairs of inputs (449 boxes).
+      it "catch-all: answers a group whose first clause names each input as the GIVEN does, simplified to 193 boxes" do
         withServiceFromSources "dnf-5" [("rule.l4", dnfClauseJL4 5)] \baseUrl mgr -> do
           resp <- queryPlan' baseUrl mgr "dnf-5" "rule" noArguments
           statusCode' resp `shouldBe` 200
@@ -838,10 +838,39 @@ spec = describe "integration" do
             let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
             planOf qpC `shouldBe` planOf qpH
             lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
-      it "catch-all: answers such a group whose result is more than 20000 parts long" do
+      it "catch-all: answers such a group whose result is more than 20000 parts long, as it answers the rule written without clauses" do
         withServiceFromSources "catchall-huge" [("rule.l4", catchAllHugeJL4)] \baseUrl mgr -> do
-          resp <- queryPlan' baseUrl mgr "catchall-huge" "rule" noArguments
+          withServiceFromSources "hand-catchall-huge" [("rule.l4", handCatchAllHugeJL4)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "catchall-huge" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-catchall-huge" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldSatisfy` Maybe.isJust
+            planOf qpC `shouldBe` planOf qpH
+
+      -- A first clause that matches every input through a NEW name is not that: it
+      -- is a test the desugarer generates, with the clauses after it as the other
+      -- answer, so the group is read through and limited like any other. `main`
+      -- answers such a group with 400 "Can only visualize, as a ladder diagram, a
+      -- DECIDE that returns a boolean" (it cannot plan a clause group at all), so
+      -- these say what this branch answers; they pass with and without the guard
+      -- that exempts the own-name first clause.
+      it "new name: refuses a group whose first clause gives an input a new name when its simplified ladder is more than 300 boxes" do
+        withServiceFromSources "newname-dnf-6" [("rule.l4", newNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
+      it "new name: answers such a group when its simplified ladder is less than 300 boxes" do
+        withServiceFromSources "newname-dnf-5" [("rule.l4", newNameDnfJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-5" "rule" noArguments
           statusCode' resp `shouldBe` 200
+      it "new name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "newname-huge" [("rule.l4", newNameHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
 
   -- A deployment outlives the process that compiled it. On restart the service
   -- compiles the stored sources again, as a deploy does. Everything below asks

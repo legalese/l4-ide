@@ -174,12 +174,14 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
     either id (const "drawn") (ideLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
     either id (const "drawn") (coreLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
 
-  -- A group whose first clause matches every input has nothing to read through:
-  -- the clauses after it are never reached, and the body is that clause's result,
-  -- as a rule written without clauses has it. `main` draws such a rule however
-  -- long its result is, so both ladders do. The limits on clauses guard the
-  -- reading through, which such a group does not do.
-  describe "catch-all: a group whose first clause matches every input" $ do
+  -- A group whose first clause names each of its inputs as the GIVEN does (or is
+  -- `_`) has nothing to read through: the clauses after it are never reached,
+  -- and the body is that clause's result, as a rule written without clauses has
+  -- it. `main` draws such a rule however long its result is, so both ladders
+  -- do. The limits on clauses guard the reading through, which such a group
+  -- does not do. A first clause that matches every input through a new name
+  -- does not qualify (see the next block).
+  describe "catch-all: a group whose first clause names each input as the GIVEN does" $ do
     -- The premise of the rest: the desugarer generates nothing for such a group
     -- (the clauses after the first are checked and dropped), where a group that
     -- tests its input generates CONSIDERs and LETs, and what a drafter wrote is
@@ -189,8 +191,9 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
       (_, tcGroup) <- check "premise-group" colourGroup
       (_, tcTable) <- check "premise-table" colourTable
       (_, tcByHand) <- check "premise-by-hand" colourByHand
-      map (Transform.holdsGeneratedNodes . bodyOf) [tcCatchAll, tcGroup, tcTable, tcByHand]
-        `shouldBe` [False, True, True, False]
+      (_, tcNewName) <- check "premise-new-name" (newNameDnf 3)
+      map (Transform.holdsGeneratedNodes . bodyOf) [tcCatchAll, tcGroup, tcTable, tcByHand, tcNewName]
+        `shouldBe` [False, True, True, False, True]
     it "is drawn in both ladders when its simplified ladder is more than 300 boxes" $ do
       (ver, tc) <- check "catchall-dnf" (catchAllDnf 6 True)
       (verH, tcH) <- check "catchall-dnf-by-hand" (catchAllDnf 6 False)
@@ -206,6 +209,42 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
       either id (const "drawn") (coreLadder ver tc) `shouldBe` "drawn"
     it "keeps its lens, titled as an ordinary rule's is" $ do
       (ver, tc) <- check "lens-catchall-huge" (catchAllHuge <> smallRule)
+      lensTitles ver tc `shouldBe` ["Show decision graph", "Show decision graph"]
+
+  -- A first clause that matches every input through a NEW name is a test the
+  -- desugarer generates, with the clauses after it as the other answer, so it is
+  -- read through and limited like any group. `main` answers such a group with
+  -- "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean",
+  -- so neither side draws it; these pin what this branch says.
+  describe "a group whose first clause gives an input a new name" $ do
+    it "is refused as too long, in both ladders, when its result is more than 20000 parts long" $ do
+      (ver, tc) <- check "newname-huge" newNameHuge
+      either id (const "drawn") (ideLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
+      either id (const "drawn") (coreLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
+    it "keeps its lens, titled with why, when its result is more than 20000 parts long" $ do
+      (ver, tc) <- check "lens-newname-huge" (newNameHuge <> smallRule)
+      lensTitles ver tc `shouldBe` ["No decision graph: these clauses are too long to draw", "Show decision graph"]
+    it "is drawn as written, but refused once simplified, when its simplified ladder is more than 300 boxes" $ do
+      (ver, tc) <- check "newname-dnf-6" (newNameDnf 6 <> smallRule)
+      either id (const "drawn") (ideLadderWith False ver tc) `shouldBe` "drawn"
+      either id (const "drawn") (coreLadderWith False ver tc) `shouldBe` "drawn"
+      either id (const "drawn") (ideLadderWith True ver tc) `shouldSatisfy` ("more than 300 boxes" `T.isInfixOf`)
+      either id (const "drawn") (coreLadderWith True ver tc) `shouldSatisfy` ("more than 300 boxes" `T.isInfixOf`)
+      -- the editor does not simplify, so it draws the group and keeps the ordinary lens
+      lensTitles ver tc `shouldBe` ["Show decision graph", "Show decision graph"]
+    it "is drawn, simplified too, when its simplified ladder is less than 300 boxes" $ do
+      (ver, tc) <- check "newname-dnf-5" (newNameDnf 5)
+      either id (const "drawn") (ideLadderWith True ver tc) `shouldBe` "drawn"
+      either id (const "drawn") (coreLadderWith True ver tc) `shouldBe` "drawn"
+    it "is refused in the editor too, with its lens saying so, when it is drawn as written with more than 300 boxes" $ do
+      (ver, tc) <- check "newname-wide" (newNameWide 301 <> smallRule)
+      either id (const "drawn") (ideLadder ver tc) `shouldSatisfy` ("more than 300 boxes" `T.isInfixOf`)
+      either id (const "drawn") (coreLadder ver tc) `shouldSatisfy` ("more than 300 boxes" `T.isInfixOf`)
+      lensTitles ver tc `shouldBe` ["No decision graph: these clauses would draw more than 300 boxes", "Show decision graph"]
+    it "is not refused when it names each input as the GIVEN does, however many boxes it draws" $ do
+      (ver, tc) <- check "ownname-wide" (newNameWide' "n" 301 <> smallRule)
+      either id (const "drawn") (ideLadder ver tc) `shouldBe` "drawn"
+      either id (const "drawn") (coreLadder ver tc) `shouldBe` "drawn"
       lensTitles ver tc `shouldBe` ["Show decision graph", "Show decision graph"]
 
   -- A rule written as clauses that is refused keeps its lens, titled with
@@ -253,6 +292,14 @@ catchAllDnf k withClauses =
     js = [ T.pack (show i) | i <- [1 .. k] ]
     inputs = T.unwords (concat [ ["a" <> j, "b" <> j] | j <- js ])
 
+-- | 'catchAllDnf' with the first clause's first input given a new name, @m@
+-- for the @n@ of the @GIVEN@. A clause that does not name each of its inputs as
+-- the @GIVEN@ does is not one that always matches: the desugarer reads it as a
+-- test of @n@ with the clause after it as the other answer, so there is
+-- something to read through.
+newNameDnf :: Int -> T.Text
+newNameDnf k = T.replace "DECIDE rule n " "DECIDE rule m " (catchAllDnf k True)
+
 -- | A first clause that names its input and whose result is 22,000 parts or so:
 -- more than the 20,000 that clauses are limited to when they are read through.
 catchAllHuge :: T.Text
@@ -261,6 +308,30 @@ catchAllHuge =
     [ "GIVEN n IS A NUMBER", "GIVETH A BOOLEAN"
     , "DECIDE rule n IS n" <> T.concat (replicate 11000 " + 1") <> " GREATER THAN 0"
     , "DECIDE rule 0 IS FALSE" ]
+
+-- | 'catchAllHuge' with the first clause's input given a new name.
+newNameHuge :: T.Text
+newNameHuge = T.replace "DECIDE rule n IS n" "DECIDE rule m IS m" catchAllHuge
+
+-- | A first clause that gives @n@ a new name, @m@, over @k@ BOOLEAN inputs
+-- ANDed together: drawn as written it is @k@ atoms and an AND, so more than 300
+-- boxes at @k@ = 301, and its conjunctive normal form is no larger.
+newNameWide :: Int -> T.Text
+newNameWide = newNameWide' "m"
+
+-- | The same, with the name the first clause gives the @GIVEN@'s @n@: @n@ itself
+-- names it as the @GIVEN@ does.
+newNameWide' :: T.Text -> Int -> T.Text
+newNameWide' first k =
+  T.unlines $
+    ["GIVEN n IS A NUMBER"]
+      <> [ "      a" <> j <> " IS A BOOLEAN" | j <- js ]
+      <> ["GIVETH A BOOLEAN"]
+      <> ["DECIDE rule " <> first <> " " <> inputs <> " IS " <> T.intercalate " AND " [ "a" <> j | j <- js ]]
+      <> ["DECIDE rule 0 " <> inputs <> " IS FALSE"]
+  where
+    js = [ T.pack (show i) | i <- [1 .. k] ]
+    inputs = T.unwords [ "a" <> j | j <- js ]
 
 
 -- | The body of @rule@, as checked.

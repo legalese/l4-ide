@@ -303,10 +303,12 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 Returns which inputs are still needed, ranked by impact on the outcome.
 
 A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
-There are two such answers.
+There are three such answers.
 A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
 A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
-A rule whose first clause matches every input is not read through, and is planned however long it is.
+A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
+A rule whose first clause names each input as its `GIVEN` does, or is `_`, is not read through, and is planned however long it is.
+A first clause that gives an input a new name is read through, and is limited like any other.
 
 An atom's `label` is rule source too, so a string literal in it is escaped in the same way, and the atom's `atomId` is computed from the label.
 

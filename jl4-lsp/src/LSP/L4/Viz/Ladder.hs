@@ -325,8 +325,8 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
     -- Mirrors 'L4.Viz.Ladder.translateDecide'.
     let isClauseGroup = Transform.writtenAsClauses asWritten
         -- The limits apply to a group that has something to read through; one
-        -- whose first clause matches every input has nothing, and is drawn as a
-        -- rule written without clauses is.
+        -- whose first clause names each input as the GIVEN does (or is @_@) has
+        -- nothing, and is drawn as a rule written without clauses is.
         readsThrough = isClauseGroup && Transform.holdsGeneratedNodes body0
     body <- case Transform.inlineLetsForViz body0 of
       Right inlined -> pure inlined

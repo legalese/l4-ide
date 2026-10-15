@@ -150,14 +150,19 @@ letInliningNodeBudget = 20000
 -- | The most boxes a ladder may have when the rule was written as DECIDE
 -- clauses and the desugarer generated something to read through
 -- ('holdsGeneratedNodes'). Here a CONSIDER is drawn as one box, so a group that
--- reads through to a CONSIDER is one box, however many rows it has: nothing
--- reaches this limit today. It is kept as @unstable@ has it, for when a
+-- reads through to a CONSIDER is one box, however many rows it has. A group
+-- whose first clause gives an input a new name reads through to that clause's
+-- result instead, and is drawn as that, so it is refused when that comes to
+-- more than this many boxes: in the editor when the ladder as drawn does, and
+-- in the service's query plan when the simplified ladder does (the editor's
+-- does not simplify). The limit is also kept as @unstable@ has it, for when a
 -- CONSIDER is drawn as rows (legalese/l4-ide#137), which is where a group of
 -- many rows can draw more boxes than anyone can read.
 --
--- A group whose first clause matches every input is not limited. It has nothing
--- to read through, so its ladder is that of a rule written without clauses,
--- which is not limited either, however far simplifying grows it.
+-- A group whose first clause names each of its inputs as the @GIVEN@ does, or
+-- is @_@, is not limited. It has nothing to read through, so its ladder is
+-- that of a rule written without clauses, which is not limited either, however
+-- far simplifying grows it.
 clauseGroupLadderBudget :: Int
 clauseGroupLadderBudget = 300
 
@@ -172,10 +177,13 @@ writtenAsClauses (MkDecide ann _ _ _) = isJust (view annPmMatrix ann)
 -- yet tried? Only then is there anything to read through, and only then do the
 -- limits on reading clauses through apply.
 --
--- A group whose first clause matches every input has no such node. The
--- desugarer binds the clauses after that one only so that they are checked, and
--- the checker drops them from the tree ('PmUnreachable'), so the body is that
--- clause's result, as a rule written without clauses would have it.
+-- A group whose first clause names each of its inputs as the @GIVEN@ does, or is
+-- @_@, has no such node. The desugarer binds the clauses after that one only so
+-- that they are checked, and the checker drops them from the tree
+-- ('PmUnreachable'), so the body is that clause's result, as a rule written
+-- without clauses would have it. A first clause that matches every input
+-- through a new name is not that: it is a test of the input, generated, with
+-- the clauses after it as the other answer, so it holds a node.
 holdsGeneratedNodes :: Expr Resolved -> Bool
 holdsGeneratedNodes e = here || any holdsGeneratedNodes (toListOf (gplate @(Expr Resolved)) e)
   where
