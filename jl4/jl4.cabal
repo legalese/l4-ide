@@ -31,6 +31,7 @@ executable l4
     jl4-core,
     jl4-lsp,
     aeson,
+    attoparsec,
     bytestring,
     cassava,
     containers,

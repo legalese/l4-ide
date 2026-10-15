@@ -47,7 +47,7 @@ import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1120,6 +1120,29 @@ spec = describe "integration" do
           -- trace=full should produce a non-trivial reasoning tree
           let ResponseWithReason{reasoning = tree} = r
           isEmptyReasoning tree `shouldBe` False
+
+    -- `exampleCode` is source: it prints a string literal as the source
+    -- spells it, a line break as \n and a tab as \t. #595 changed that from a
+    -- raw line break, and with it `l4 trace`. `explanation` prints a VALUE, and
+    -- keeps the line break. Ruled 2026-10-12: printed string literals stay
+    -- escaped on every surface, as the valid spelling of the source.
+    it "spells a string literal in exampleCode as source, and keeps the line break in explanation" do
+      withServiceFromSources "trace-line-break" [("line-break.l4", lineBreakJL4)] \baseUrl mgr -> do
+        req <- buildJsonPost
+          (baseUrl <> "/deployments/trace-line-break/functions/s/evaluation?trace=full")
+          (Aeson.object [ "arguments" Aeson..= Aeson.object [ "x" Aeson..= (1 :: Int) ] ])
+        resp <- httpLbs req mgr
+        assertSuccess resp \r -> do
+          let ResponseWithReason{reasoning = tree} = r
+              nodes t = t : concatMap nodes t.children
+              code = concatMap (.exampleCode) (nodes tree)
+              explained = concatMap (.explanation) (nodes tree)
+          -- the literal is in the tree at all, spelled with a backslash and an n
+          code `shouldSatisfy` any (Text.isInfixOf "\"line\\nnext\"")
+          -- and no step of the code holds a raw line break
+          code `shouldSatisfy` all (not . Text.isInfixOf "\n")
+          -- the value's own print keeps the break
+          explained `shouldSatisfy` any (Text.isInfixOf "\"line\nnext\"")
 
     it "includes graphviz DOT when trace=full and graphviz=true" do
       withServiceFromSources "trace-gv" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do

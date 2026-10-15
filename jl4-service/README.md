@@ -205,6 +205,12 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
 
+Each node of the response's `reasoning` tree has `exampleCode`, `explanation` and `children`.
+`exampleCode` is the step as L4 source, and `explanation` is its result.
+Wherever the answer prints rule source, a string literal in it is escaped the way the source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`.
+So `"line\nnext"` in `exampleCode` stays on one line, and so does the literal in the `explanation` of a `DEONTIC` contract (`MUST say "pay\nnow"`), which prints the contract's rule.
+A string that is itself the result, such as the answer of an ordinary function, keeps its line breaks in `explanation`.
+
 #### Deontic (Contract) Evaluation
 
 Functions returning `DEONTIC` model contract obligations and require additional parameters for simulation:
@@ -282,6 +288,8 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+
+An atom's `label` is rule source too, so a string literal in it is escaped in the same way, and the atom's `atomId` is computed from the label.
 
 ### MCP (Model Context Protocol)
 
