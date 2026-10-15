@@ -9,7 +9,7 @@ Can be imported into L4 files with `IMPORT daydate`. Automatically imports `date
 
 ### Features
 
-- Date construction from day/month/year, serial numbers, strings, or DATETIME extraction
+- Date construction from year/month/day (`YMD`, bounds-checked) or day/month/year (`Date`), serial numbers, strings, or DATETIME extraction
 - Date arithmetic (add/subtract days, weeks, months, years)
 - Weekday and weekend detection
 - Week-of-year calculations
@@ -28,6 +28,9 @@ Can be imported into L4 files with `IMPORT daydate`. Automatically imports `date
 
 **Date Construction:**
 
+- `YMD year month day` - **Recommended for new code.** Create date from components in ISO 8601 order, **bounds-checked**: `YMD` builds the candidate through `Date` and then requires its year, month and day to equal the arguments, so a rolled component (`YMD 2026 28 7`, a transposition; `YMD 2023 2 29`, no such leap day; month 0; day 32) stops evaluation with an assumed-term error naming `YMD refusal`, instead of computing a wrong date.
+  `Date d m y` remains the lenient, rolling constructor, and stays supported. A transposed `Date 7 28 2026` is not rejected: month 28 silently overflows into 2028-04-07.
+  If you give an out-of-range `YMD` a name, as in `` `bad day` MEANS YMD 2023 2 29 ``, the first `#EVAL` of that name prints the assumed-term error and every later one in the same run prints `Infinite loop detected while trying to evaluate:` instead.
 - `Date day month year` - Create date from components
 - `Date serialNumber` - Create date from serial number
 - `Date str` - Parse date string (ISO format, ignores time/timezone if present), returns MAYBE DATE
