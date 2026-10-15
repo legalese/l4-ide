@@ -43,9 +43,9 @@ None; this is a printer change.
   Each puts one kind of operand inside an `AND`: an `OR`, a `NOT`, an `IMPLIES`, an `IF … THEN … ELSE`, and a function call.
   With the printer as it was before this change, `l4 batch` answered `true` to all five, with `"status":"success"` and no diagnostic; `l4 run` and the fixed printer answer `false`.
 - Three trace goldens show the brackets and would move if they were dropped:
-  - `jl4/examples/ok/tests/lazytrace-exception.golden:33`, which prints `x AND (and OF xs)`;
+  - `jl4/examples/ok/tests/lazytrace-exception.golden:34`, which prints `x AND (and OF xs)`;
   - `jl4/examples/legal/tests/ceo-performance-award.golden:59`, where the `PROVIDED` guard's `OR` of two `OF` applications is bracketed inside the `AND`, and each application is bracketed too;
-  - `jl4/examples/legal/tests/ny-environmental-7.3.golden:8` and `:15`, where a `CONSIDER` conjunct is bracketed.
+  - `jl4/examples/legal/tests/ny-environmental-7.3.golden:8` and `:17`, where a `CONSIDER` conjunct is bracketed.
 - Before this change, `l4 batch` on `main` re-printed `(a OR b) AND c` as `a OR b AND c` and `(NOT x) AND y` as `NOT x AND y`.
   The parser, which this change does not touch, reads those as `a OR (b AND c)` and `NOT (x AND y)`: measured with `#EVAL`, `TRUE OR FALSE AND FALSE` is TRUE where `(TRUE OR FALSE) AND FALSE` is FALSE, and `NOT TRUE AND FALSE` is TRUE where `(NOT TRUE) AND FALSE` is FALSE.
 
