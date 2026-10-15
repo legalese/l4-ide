@@ -44,7 +44,11 @@ import LSP.SemanticTokens
 import Language.LSP.Protocol.Types
 import qualified Language.LSP.Protocol.Types as LSP
 
+import qualified Data.ByteString as BS
 import qualified Data.List as List
+import UnliftIO
+import qualified Data.Set as Set
+import qualified Data.Text.Encoding as TextEncoding
 import System.Directory
 import System.Environment (getExecutablePath, lookupEnv)
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -231,64 +235,451 @@ instance Pretty Log where
             <+> pretty s.category
     LogImportResolution msg -> "[Import Resolution]" <+> pretty msg
 
--- | Result of filesystem library resolution.
+-- | Which tiers of the library ladder an import may fall through to once the
+-- in-memory (VFS) tier has missed. See 'resolveLibrary'.
+data LibraryScope
+  = AmbientLibraries
+    -- ^ The whole ladder: @$JL4_LIBRARY_PATH@, the project root, the importing
+    -- file's directory, the embedded stdlib, the per-user XDG store and the
+    -- editor extension's bundle. The CLI, the REPL and the language server run
+    -- on a person's own machine, where the project directory, the environment
+    -- and their own stores are theirs to use.
+  | EmbeddedStdlibOnly
+    -- ^ The stdlib built into this binary, and nothing else: no environment
+    -- variable, no working directory, no per-user store, no extension bundle.
+    -- For a host that serves bundles somebody else uploaded. The bundle's own
+    -- files sit in the VFS tier, which is consulted first, so what is left for
+    -- the ladder to find is the stdlib; and a file that happens to sit in the
+    -- host's working directory, or a library directory an operator exported,
+    -- must not be able to replace it for every deployment (jl4-service).
+    -- Ruled 2026-10-12: a deployment resolves its own files and the built-in
+    -- stdlib, nothing from the host; an IMPORT that resolves to nothing is logged
+    -- at WARN when a bundle is compiled or rebuilt after a restart, and refused
+    -- only if a later ruling says so.
+  deriving stock (Eq, Show)
+
+-- | One candidate source for a bare-module-name import.
+data LibraryCandidate
+  = FileCandidate !Text !FilePath
+    -- ^ label (for logs) and filesystem path to probe
+  | EmbeddedCandidate
+    -- ^ the stdlib copy compiled into this binary ('L4.API.EmbeddedLibraries').
+    -- NOTE: the embed is read when GHC compiles "L4.API.EmbeddedLibraries".
+    -- Editing a checkout's @jl4-core/libraries/*.l4@ alone does NOT refresh it
+    -- on a plain @cabal build@, which prints @Up to date@ and never calls GHC
+    -- (a real change to any jl4-core source file does; measured 2026-10-13, see
+    -- @L4.API.EmbeddedLibraries.TH@). When developing the stdlib itself, pin
+    -- @JL4_LIBRARY_PATH@ at your worktree's @jl4-core/libraries@ (see
+    -- @jl4-core/libraries/README.md@).
+  deriving stock (Eq, Show)
+
+candidateDisplay :: LibraryCandidate -> Text
+candidateDisplay = \case
+  FileCandidate lbl p -> lbl <> ": " <> Text.pack p
+  EmbeddedCandidate   -> "embedded stdlib (compiled into this binary)"
+
+-- | Result of library resolution over the filesystem + embedded tiers.
 data LibraryResolution = LibraryResolution
-  { resolvedPath    :: !(Maybe FilePath)  -- ^ Path found, if any
-  , searchedPaths   :: ![FilePath]        -- ^ All paths that were checked
-  , hasExplicitPath :: !Bool              -- ^ True if JL4_LIBRARY_PATH is set (skip embedded libs)
+  { winner          :: !(Maybe (Int, LibraryCandidate))
+    -- ^ first existing candidate (1-based index into 'candidates'), if any
+  , existing        :: ![(Int, LibraryCandidate)]
+    -- ^ /every/ candidate that exists, in precedence order — kept so callers
+    -- can detect when a lower-priority copy is being shadowed (spec Option E)
+  , candidates      :: ![LibraryCandidate]  -- ^ full ordered list probed
+  , searchedPaths   :: ![FilePath]          -- ^ filesystem paths probed (for the not-found diagnostic)
+  , hasExplicitPath :: !Bool
+    -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted). Always
+    -- False under 'EmbeddedStdlibOnly', which does not read the variable.
   }
 
--- | Resolve a library module from the filesystem.
--- Checks paths in order of priority:
+-- | Resolve a library module across the filesystem and the embedded stdlib.
+-- Candidates are probed in order of priority (first existing wins):
+--
 --   1. JL4_LIBRARY_PATH environment variable (user/operator override)
 --   2. Root directory (project-local)
 --   3. Relative to importing file
---   4. XDG data directory (~/.local/share/jl4/libraries/)
---   5. Bundled with VSCode extension (../../libraries from executable)
+--   4. Embedded stdlib compiled into this binary
+--   5. XDG data directory (~/.local/share/jl4/libraries/)
+--   6. Bundled with VSCode extension (../../libraries from executable)
 --
--- When JL4_LIBRARY_PATH is set, callers should NOT fall back to embedded
--- libraries — the operator has taken explicit control of the library store.
-resolveLibraryFromFilesystem :: FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
-resolveLibraryFromFilesystem rootDirectory mImportingFile modName = do
-  let relPath = do
-        nfp <- mImportingFile
-        let dir = takeDirectory (fromNormalizedFilePath nfp)
-        pure $ dir </> modName <.> "l4"
-      rootPath = rootDirectory </> modName <.> "l4"
-
+-- The project-scoped tiers (1–3) rank above the embedded copy so intentional
+-- overrides keep working; the ambient machine-global tiers (5–6) rank /below/
+-- it so a stray XDG symlink or stale bundle can no longer silently shadow the
+-- stdlib the binary was built with (Option B′, specs/as-built/import-resolution.md).
+-- The ambient tiers still matter for modules the embed does not carry — e.g. a
+-- bundle shipping extra libraries.
+--
+-- When JL4_LIBRARY_PATH is set, the embedded copy is not consulted at all —
+-- the operator has taken explicit control of the library store.
+--
+-- Under 'EmbeddedStdlibOnly' the ladder is the embedded copy alone, whatever the
+-- environment and the working directory hold.
+resolveLibrary :: LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
+resolveLibrary EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
+  pure LibraryResolution
+    { winner = Maybe.listToMaybe present
+    , existing = present
+    , candidates = [EmbeddedCandidate]
+    , searchedPaths = []
+    , hasExplicitPath = False
+    }
+  where
+    present = [ (1, EmbeddedCandidate)
+              | Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName)) ]
+resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
   mEnvPath <- lookupEnv "JL4_LIBRARY_PATH"
+  xdgDataDir <- getXdgDirectory XdgData "jl4"
+  exePath <- getExecutablePath
+
   let hasExplicit = Maybe.isJust mEnvPath
-      envPaths = case mEnvPath of
-        Just p  -> [p </> modName <.> "l4"]
-        Nothing -> []
+      libFile dir = dir </> modName <.> "l4"
+      exeDir = takeDirectory exePath
+      extensionRoot = exeDir </> ".." </> ".."
 
-  discoverPaths <- do
-    xdgDataDir <- getXdgDirectory XdgData "jl4"
-    let xdgPath = xdgDataDir </> "libraries" </> modName <.> "l4"
+      envCands     = [ FileCandidate "$JL4_LIBRARY_PATH" (libFile p) | Just p <- [mEnvPath] ]
+      rootCand     = FileCandidate "project root" (libFile rootDirectory)
+      siblingCands = [ FileCandidate "importer-relative" (libFile (takeDirectory (fromNormalizedFilePath nfp)))
+                     | Just nfp <- [mImportingFile] ]
+      xdgCand      = FileCandidate "XDG data dir" (xdgDataDir </> "libraries" </> modName <.> "l4")
+      bundledCand  = FileCandidate "VSCode bundle" (extensionRoot </> "libraries" </> modName <.> "l4")
 
-    exePath <- getExecutablePath
-    let exeDir = takeDirectory exePath
-        extensionRoot = exeDir </> ".." </> ".."
-        bundledPath = extensionRoot </> "libraries" </> modName <.> "l4"
+      cands = envCands <> [rootCand] <> siblingCands
+           <> [ EmbeddedCandidate | not hasExplicit ]
+           <> [xdgCand, bundledCand]
 
-    pure [xdgPath, bundledPath]
+      probe (i, c) = case c of
+        FileCandidate _ p -> do
+          ok <- doesFileExist p
+          pure $ if ok then Just (i, c) else Nothing
+        EmbeddedCandidate ->
+          pure $ if Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName))
+                   then Just (i, c) else Nothing
 
-  let allPaths = envPaths <> catMaybes [Just rootPath, relPath] <> discoverPaths
-
-  result <- runMaybeT $ asum $
-    flip map allPaths $ \pth -> do
-      exists <- liftIO (doesFileExist pth)
-      guard exists
-      pure pth
+  present <- catMaybes <$> traverse probe (zip [1 :: Int ..] cands)
 
   pure LibraryResolution
-    { resolvedPath = result
-    , searchedPaths = allPaths
+    { winner = Maybe.listToMaybe present
+    , existing = present
+    , candidates = cands
+    , searchedPaths = [ p | FileCandidate _ p <- cands ]
     , hasExplicitPath = hasExplicit
     }
 
+-- | Fetch a candidate's content for the shadow check ('warnOnLibraryShadow').
+-- File reads are byte-level so the comparison is not locale-sensitive.
+candidateContent :: String -> LibraryCandidate -> IO (Maybe BS.ByteString)
+candidateContent modName = \case
+  FileCandidate _ p -> either (\(_ :: SomeException) -> Nothing) Just <$> tryAny (BS.readFile p)
+  EmbeddedCandidate -> pure $ TextEncoding.encodeUtf8 <$> EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName)
+
+-- | Canonicalized display of a candidate: when the probed path is a symlink
+-- (or otherwise not canonical), append its real target, so a log reader can
+-- see /which checkout/ a machine-global entry actually points at.
+candidateDisplayCanonical :: LibraryCandidate -> IO Text
+candidateDisplayCanonical c = case c of
+  EmbeddedCandidate -> pure (candidateDisplay c)
+  FileCandidate _ p -> do
+    real <- either (\(_ :: SomeException) -> p) id <$> tryAny (canonicalizePath p)
+    pure $ candidateDisplay c <> if real == p then "" else " -> " <> Text.pack real
+
+-- | The existing candidates with each FILE kept once, at the rank of its first
+-- appearance.
+--
+-- Two tiers can name one file: the CLI sets the project root to the importing
+-- file's own directory, so the root tier and the importer-relative tier probe
+-- the same path, and an XDG symlink can point at a copy another tier also
+-- reaches. Left in, the shadow warning listed that file twice, once as
+-- [chosen] and once as [shadowed], which reads as a copy shadowing itself.
+-- Files are compared by canonical path, so a symlink and its target are one
+-- file; the embedded stdlib is not a file and is never merged with anything.
+distinctCopies :: [(Int, LibraryCandidate)] -> IO [(Int, LibraryCandidate)]
+distinctCopies existing = do
+  keyed <- traverse (\ic -> (,ic) <$> fileKey (snd ic)) existing
+  pure (map snd (List.nubBy sameFile keyed))
+  where
+    fileKey = \case
+      EmbeddedCandidate -> pure Nothing
+      FileCandidate _ p ->
+        Just . either (\ (_ :: SomeException) -> normalise p) id <$> tryAny (canonicalizePath p)
+    sameFile (Just a, _) (Just b, _) = a == b
+    sameFile _ _ = False
+
+-- | What one import resolved to, plus everything that was tried (for the
+-- not-found diagnostic).
+data ImportOutcome = ImportOutcome
+  { importUri  :: !(Maybe NormalizedUri)
+  , vfsTried   :: ![NormalizedUri]
+  , pathsTried :: ![FilePath]
+  , embedTried :: !EmbedStatus
+    -- ^ What happened at the embedded tier. Kept SEPARATE from 'pathsTried'
+    -- because the embed has no path, and the not-found diagnostic listed only
+    -- paths — so the one tier that can silently be empty was the one tier the
+    -- error could not mention. See 'renderEmbedStatus'.
+  }
+
+-- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
+data EmbedStatus
+  = EmbedSkipped
+    -- ^ @JL4_LIBRARY_PATH@ is set, so the embed was deliberately not consulted.
+  | EmbedEmpty
+    -- ^ Consulted, and this binary carries NO embedded libraries at all.
+    --
+    -- __Unreachable in a binary built from this tree__, because the @fail@ in
+    -- "L4.API.EmbeddedLibraries" now stops such a binary from being produced.
+    -- Kept anyway: it costs three lines, it explains the failure for the many
+    -- already-installed binaries that predate that @fail@, and if the guard is
+    -- ever weakened this is the message that says what went wrong.
+  | EmbedMissing !Int
+    -- ^ Consulted, carries @n@ modules, and this one is not among them.
+  deriving stock (Eq, Show)
+
+-- | One entry for the not-found diagnostic's list of tried locations.
+renderEmbedStatus :: EmbedStatus -> Text
+renderEmbedStatus = \ case
+  EmbedSkipped   -> "the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)"
+  EmbedMissing n -> "the stdlib embedded in this binary (" <> Text.pack (show n) <> " modules, not among them)"
+  EmbedEmpty     -> Text.unlines
+    [ "the stdlib embedded in this binary -- WHICH IS EMPTY."
+    , "  That is a BUILD DEFECT, not a problem with your file: this binary carries no"
+    , "  standard libraries at all, so no IMPORT of one can ever succeed. If it came"
+    , "  from `cabal install`, check that jl4-core.cabal's `data-files` field still"
+    , "  precedes every section (`cabal check` reports it if not) and rebuild."
+    ]
+
+-- | Resolve one bare-module-name import. This is the /single/ resolution code
+-- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
+-- (typecheck-dependency resolution), so the two rules can never load different
+-- sources for the same import (specs/as-built/import-resolution.md §3.3): a module
+-- must not parse against source A while typechecking against source B.
+--
+-- VFS candidates (web/editor in-memory overlays) are checked first, then the
+-- filesystem + embedded tiers via 'resolveLibrary'. An embedded winner is
+-- /not/ registered anywhere: it is handed back as its 'Shake.embeddedLibraryUri',
+-- which 'Shake.getVirtualFile' serves from a pure map.
+--
+-- An import that resolves to nothing is announced at Warning, once per
+-- importing module and module name until it resolves. Both rules above ask
+-- about every IMPORT, so announcing on each ask printed one mistake twice, and
+-- both copies reached @--json@ diagnostics. The key is cleared when the import
+-- resolves, so breaking it again later warns again.
+resolveImportShared
+  :: Recorder (WithPriority Log)
+  -> IORef (Set.Set (String, [Text]))
+     -- ^ shadow configurations already warned about this session (warn-once)
+  -> IORef (Set.Set (Text, String))
+     -- ^ (importing module, module name) pairs already announced as not found
+  -> LibraryScope
+  -> FilePath          -- ^ root directory
+  -> NormalizedUri     -- ^ importing module
+  -> String            -- ^ bare module name
+  -> Action ImportOutcome
+resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory importerUri modName = do
+  outcome <- resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName
+  let key = ((fromNormalizedUri importerUri).getUri, modName)
+  case outcome.importUri of
+    Just _ ->
+      UnliftIO.atomicModifyIORef' notFoundWarnedRef \s -> (Set.delete key s, ())
+    Nothing -> do
+      fresh <- UnliftIO.atomicModifyIORef' notFoundWarnedRef \s ->
+        if Set.member key s then (s, False) else (Set.insert key s, True)
+      when fresh $ logWith recorder Warning $ LogImportResolution $
+        case outcome.embedTried of
+          EmbedSkipped -> "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): " <> Text.pack modName
+          _            -> "Module not found: " <> Text.pack modName
+  pure outcome
+
+-- | 'resolveImportShared' without the not-found announcement.
+resolveImportQuietly
+  :: Recorder (WithPriority Log)
+  -> IORef (Set.Set (String, [Text]))
+  -> LibraryScope
+  -> FilePath
+  -> NormalizedUri
+  -> String
+  -> Action ImportOutcome
+resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName = do
+  logWith recorder Info $ LogImportResolution $
+    "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri importerUri).getUri
+
+  -- VFS tier: project:/ scheme (Monaco), importer-relative, root-relative.
+  --
+  -- These candidates are /speculative/: they are probed before anything is
+  -- known to exist there. So the URIs they can name are exactly the URIs a
+  -- module can be hijacked at, and nothing that must rank below the filesystem
+  -- tier may be reachable from here. That is why the embedded stdlib lives
+  -- outside the @file:@ scheme ('Shake.embeddedLibraryUri') rather than at
+  -- @./<name>.l4@, which both @rootDirectory == "."@ and a bare embedded
+  -- importer URI used to forge.
+  let projectUri = toNormalizedUri $ Uri $ Text.pack $ "project:/" <> modName <.> "l4"
+      -- 'Nothing' for a non-file importer — notably an embedded library, which
+      -- has no directory and so contributes no sibling candidate. Its imports
+      -- are then ranked by 'resolveLibrary' alone (project root above embedded,
+      -- per Option B′), the same ranking every other importer gets: one module
+      -- name stays bound to one source across the whole build.
+      relativeUri = do
+        nfp <- uriToNormalizedFilePath importerUri
+        let dir = takeDirectory $ fromNormalizedFilePath nfp
+        pure $ toNormalizedUri $ filePathToUri $ dir </> modName <.> "l4"
+      rootUri = toNormalizedUri $ filePathToUri $ rootDirectory </> modName <.> "l4"
+      vfsUris = [projectUri] <> Maybe.maybeToList relativeUri <> [rootUri]
+
+  logWith recorder Debug $ LogImportResolution $
+    "Checking VFS URIs: " <> Text.intercalate ", " (map ((.getUri) . fromNormalizedUri) vfsUris)
+
+  let checkVfsUri candidateUri = do
+        mContent <- use GetFileContents candidateUri
+        case mContent of
+          Just (_, Just _rope) -> do
+            logWith recorder Info $ LogImportResolution $
+              "VFS HIT: " <> (fromNormalizedUri candidateUri).getUri
+            pure $ Just candidateUri
+          _ -> do
+            logWith recorder Debug $ LogImportResolution $
+              "VFS MISS: " <> (fromNormalizedUri candidateUri).getUri
+            pure Nothing
+
+  vfsResult <- runMaybeT $ asum $ map (MaybeT . checkVfsUri) vfsUris
+
+  case vfsResult of
+    Just vfsUri -> do
+      logWith recorder Info $ LogImportResolution $
+        "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
+      -- Resolved above the library tiers entirely, so the embed was never reached.
+      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, pathsTried = []
+                         , embedTried = EmbedSkipped }
+    Nothing -> do
+      let mImportingNfp = uriToNormalizedFilePath importerUri
+      res <- liftIO $ resolveLibrary scope rootDirectory mImportingNfp modName
+
+      -- Detailed candidate accounting + the shadow warning run only when
+      -- JL4_LIBRARY_PATH is unset: with the env var set the operator has
+      -- already taken explicit control (and the golden suites pin it — their
+      -- captured logs must stay machine-independent, while the ambient XDG /
+      -- bundle state that this reporting exists to expose is exactly the
+      -- machine-dependent part).
+      unless res.hasExplicitPath $ do
+        statuses <- traverse
+          (\(i, c) -> do
+            shown <- liftIO $ candidateDisplayCanonical c
+            let hit = i `elem` map fst res.existing
+            pure $ "[" <> Text.pack (show i) <> "] " <> shown <> (if hit then " (hit)" else " (miss)"))
+          (zip [1 :: Int ..] res.candidates)
+        logWith recorder Debug $ LogImportResolution $
+          "Candidate order for " <> Text.pack modName <> ": " <> Text.intercalate "; " statuses
+        warnOnLibraryShadow res
+
+      let embedStatus
+            | res.hasExplicitPath = EmbedSkipped
+            | n == 0              = EmbedEmpty
+            | otherwise           = EmbedMissing n
+            where n = Map.size EmbeddedLibraries.embeddedLibraries
+          outcome mUri = ImportOutcome
+            { importUri = mUri, vfsTried = vfsUris, pathsTried = res.searchedPaths
+            , embedTried = embedStatus }
+
+      case res.winner of
+        Just (ix, FileCandidate _ fp) -> do
+          msg <-
+            if res.hasExplicitPath
+              then -- Historical wording, captured verbatim by the golden suite
+                   -- (which always pins JL4_LIBRARY_PATH); keep it stable.
+                   pure $ "Found on filesystem: " <> Text.pack fp
+              else do
+                real <- liftIO $ either (\(_ :: SomeException) -> fp) id <$> tryAny (canonicalizePath fp)
+                pure $ "Found on filesystem (candidate " <> Text.pack (show ix) <> " of "
+                     <> Text.pack (show (length res.candidates)) <> "): " <> Text.pack fp
+                     <> (if real == fp then "" else " -> " <> Text.pack real)
+          logWith recorder Info $ LogImportResolution msg
+          pure $ outcome $ Just $ toNormalizedUri $ filePathToUri fp
+        Just (ix, EmbeddedCandidate) -> do
+          logWith recorder Info $ LogImportResolution $
+            "Found in embedded libraries (candidate " <> Text.pack (show ix) <> " of "
+            <> Text.pack (show (length res.candidates)) <> "): " <> Text.pack modName
+          case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName) of
+            Just _ ->
+              -- No VFS write: the embedded copy is already readable at its
+              -- canonical URI via 'Shake.embeddedLibraryVfs'. Registering it
+              -- here would only re-introduce the mid-rule VFS mutation whose
+              -- ordering-dependence caused smucclaw/l4-ide#906 in the first place.
+              pure $ outcome $ Just $ Shake.embeddedLibraryUri (Text.pack modName)
+            Nothing ->
+              -- Cannot happen: 'resolveLibrary' only lists 'EmbeddedCandidate'
+              -- as existing when the lookup succeeds. Fail soft regardless.
+              pure $ outcome Nothing
+        -- Not announced here: 'resolveImportShared' does that, once.
+        Nothing -> pure $ outcome Nothing
+  where
+    -- Option E (specs/as-built/import-resolution.md): when several copies of the
+    -- same module are visible AND their contents differ, name them all (with
+    -- symlinks dereferenced) and say which one wins. Identical copies (e.g. an
+    -- XDG symlink pointing at the very sources the embed was built from) stay
+    -- silent. Warned once per distinct configuration per session.
+    warnOnLibraryShadow res = do
+      -- Each file once: see 'distinctCopies'. Counting copies, and listing
+      -- them, both go by the deduplicated list.
+      copies <- liftIO $ distinctCopies res.existing
+      when (length copies >= 2) $ do
+        contents <- liftIO $ traverse (\(_, c) -> candidateContent modName c) copies
+        let distinct = List.nub (catMaybes contents)
+        when (length distinct >= 2) $ do
+          shownAll <- liftIO $ traverse (candidateDisplayCanonical . snd) copies
+          let key = (modName, shownAll)
+          fresh <- UnliftIO.atomicModifyIORef' shadowWarnedRef $ \s ->
+            if Set.member key s then (s, False) else (Set.insert key s, True)
+          when fresh $ do
+            let mark i = if Just i == fmap fst res.winner then "[chosen]   " else "[shadowed] "
+                rows = zipWith (\(i, _) shown -> "  " <> mark i <> shown) copies shownAll
+            logWith recorder Warning $ LogImportResolution $ Text.unlines $
+              [ "Multiple differing copies of module `" <> Text.pack modName <> "` are visible:" ]
+              <> rows
+              <> [ "The [chosen] copy is used wherever this module is imported. To use a"
+                 , "different copy, set JL4_LIBRARY_PATH or place " <> Text.pack modName
+                   <> ".l4 in the project root or beside the importing file."
+                 ]
+
+-- | The modules a file imports that resolved to nothing, by bare name, in the
+-- order they are written, each once.
+--
+-- 'GetImports' reports an unresolvable IMPORT as a diagnostic and gives it the
+-- importing file's own URI as its module, a placeholder that stands for nothing
+-- (see @mkImportUri@ there), whereas an IMPORT that resolved names another
+-- file. So the unresolved ones are the results whose module is the importer.
+-- The names are the ones 'GetImports' computed, so the two cannot disagree
+-- about which module an IMPORT names. A file that does not parse has no
+-- imports and yields @[]@: its own error is the one to read.
+--
+-- For a host that must say so when an uploaded bundle imports something it
+-- does not carry (jl4-service), where the diagnostic itself is not in reach.
+unresolvedImports :: NormalizedUri -> Action [Text]
+unresolvedImports uri = do
+  mResolved <- use GetImports uri
+  pure $ case mResolved of
+    Just resolved ->
+      List.nub
+        [ moduleBaseName r.importName
+        | r <- resolved
+        , r.moduleUri == uri
+        ]
+    Nothing -> []
+  where
+    moduleBaseName :: Name -> Text
+    moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+
+-- | The rules of a session that may use every tier of the library ladder: the
+-- CLI, the REPL and the language server. See 'LibraryScope'.
 jl4Rules :: EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
-jl4Rules evalConfig rootDirectory recorder = do
+jl4Rules = jl4RulesIn AmbientLibraries
+
+jl4RulesIn :: LibraryScope -> EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
+jl4RulesIn scope evalConfig rootDirectory recorder = do
+  -- Session-scoped memory for 'resolveImportShared''s shadow warning, so a
+  -- given shadow configuration is reported once, not on every re-resolution.
+  shadowWarnedRef <- UnliftIO.newIORef Set.empty
+  -- ...and for its not-found warning, which two rules would otherwise each print.
+  notFoundWarnedRef <- UnliftIO.newIORef Set.empty
+  let resolveImport :: NormalizedUri -> String -> Action ImportOutcome
+      resolveImport = resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory
+
   define shakeRecorder $ \GetLexTokens uri -> do
     mRope <- runMaybeT $
       MaybeT (snd <$> use_ GetFileContents uri)
@@ -331,46 +722,14 @@ jl4Rules evalConfig rootDirectory recorder = do
               _ -> []
             importNames = foldTopDecls extractImport firstProg
 
-        -- Resolve import URIs using the same logic as GetImports
+        -- Resolve import URIs via the exact code path GetImports uses
+        -- ('resolveImportShared'), so parser-hint resolution can never pick a
+        -- different source than typecheck resolution (specs/as-built/import-resolution.md §3.3).
         let resolveImportUri :: Name -> Action (Maybe NormalizedUri)
             resolveImportUri n = do
               let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
-
-              -- Generate candidate VFS URIs
-              let projectUri = toNormalizedUri $ Uri $ Text.pack $ "project:/" <> modName <.> "l4"
-                  relativeUri = do
-                    nfp <- uriToNormalizedFilePath uri
-                    let dir = takeDirectory $ fromNormalizedFilePath nfp
-                    pure $ toNormalizedUri $ filePathToUri $ dir </> modName <.> "l4"
-                  rootUri = toNormalizedUri $ filePathToUri $ rootDirectory </> modName <.> "l4"
-                  vfsUris = [projectUri] <> Maybe.maybeToList relativeUri <> [rootUri]
-
-              -- Check VFS first
-              let checkVfs candidateUri = do
-                    mContent <- use GetFileContents candidateUri
-                    pure $ case mContent of
-                      Just (_, Just _rope) -> Just candidateUri
-                      _ -> Nothing
-
-              vfsResult <- runMaybeT $ asum $ map (MaybeT . checkVfs) vfsUris
-
-              case vfsResult of
-                Just vfsUri -> pure $ Just vfsUri
-                Nothing -> do
-                  let mImportingNfp = uriToNormalizedFilePath uri
-                  res <- liftIO $ resolveLibraryFromFilesystem rootDirectory mImportingNfp modName
-                  case res.resolvedPath of
-                    Just fp -> pure $ Just (toNormalizedUri $ filePathToUri fp)
-                    Nothing
-                      -- Skip embedded libs when operator has set an explicit library path
-                      | res.hasExplicitPath -> pure Nothing
-                      | otherwise ->
-                          case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName) of
-                            Just libContent -> do
-                              let libPath = toNormalizedFilePath ("./" <> modName <.> "l4")
-                              _ <- Shake.addVirtualFile libPath libContent
-                              pure $ Just (normalizedFilePathToUri libPath)
-                            Nothing -> pure Nothing
+              outcome <- resolveImport uri modName
+              pure outcome.importUri
 
         -- Resolve all import URIs
         resolvedUris <- catMaybes <$> traverse resolveImportUri importNames
@@ -399,93 +758,23 @@ jl4Rules evalConfig rootDirectory recorder = do
 
   define shakeRecorder $ \GetImports uri -> do
     let -- NOTE: we curently don't allow any relative or absolute file paths, just bare module names
-        -- Generate candidate URIs to check in VFS
-        mkCandidateVfsUris :: String -> [NormalizedUri]
-        mkCandidateVfsUris modName =
-          let -- Standard project:/ URI scheme used by Monaco
-              projectUri = toNormalizedUri $ Uri $ Text.pack $ "project:/" <> modName <.> "l4"
-              -- file:/// URI relative to current file's directory (if applicable)
-              relativeUri = do
-                nfp <- uriToNormalizedFilePath uri
-                let dir = takeDirectory $ fromNormalizedFilePath nfp
-                pure $ toNormalizedUri $ filePathToUri $ dir </> modName <.> "l4"
-              -- file:/// URI in root directory
-              rootUri = toNormalizedUri $ filePathToUri $ rootDirectory </> modName <.> "l4"
-          in [projectUri] <> Maybe.maybeToList relativeUri <> [rootUri]
-
-        -- Check if a URI exists in VFS
-        checkVfsUri :: NormalizedUri -> Action (Maybe NormalizedUri)
-        checkVfsUri candidateUri = do
-          mContent <- use GetFileContents candidateUri
-          case mContent of
-            Just (_, Just _rope) -> do
-              logWith recorder Info $ LogImportResolution $
-                "VFS HIT: " <> (fromNormalizedUri candidateUri).getUri
-              pure $ Just candidateUri
-            _ -> do
-              logWith recorder Debug $ LogImportResolution $
-                "VFS MISS: " <> (fromNormalizedUri candidateUri).getUri
-              pure Nothing
-
-        mkImportPath :: Import Name -> Action (Maybe SrcRange, String, [FilePath], [NormalizedUri], Maybe (Either NormalizedUri FilePath))
+        mkImportPath :: Import Name -> Action (Maybe SrcRange, String, ImportOutcome)
         mkImportPath (MkImport a n _mr) = do
-
           let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+          outcome <- resolveImport uri modName
+          pure (rangeOf a, modName, outcome)
 
-          logWith recorder Info $ LogImportResolution $
-            "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri uri).getUri
-
-          -- First, try VFS (for web-based usage)
-          let vfsUris = mkCandidateVfsUris modName
-          logWith recorder Debug $ LogImportResolution $
-            "Checking VFS URIs: " <> Text.intercalate ", " (map ((.getUri) . fromNormalizedUri) vfsUris)
-
-          vfsResult <- runMaybeT $ asum $ map (MaybeT . checkVfsUri) vfsUris
-
-          case vfsResult of
-            Just vfsUri -> do
-              logWith recorder Info $ LogImportResolution $
-                "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
-              pure (rangeOf a, modName, [], vfsUris, Just (Left vfsUri))
-            Nothing -> do
-              let mImportingNfp = uriToNormalizedFilePath uri
-              res <- liftIO $ resolveLibraryFromFilesystem rootDirectory mImportingNfp modName
-
-              case res.resolvedPath of
-                Just fp -> do
-                  logWith recorder Info $ LogImportResolution $
-                    "Found on filesystem: " <> Text.pack fp
-                  pure (rangeOf a, modName, res.searchedPaths, vfsUris, Just (Right fp))
-                Nothing
-                  -- Skip embedded libs when operator has set an explicit library path
-                  | res.hasExplicitPath -> do
-                      logWith recorder Warning $ LogImportResolution $
-                        "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): " <> Text.pack modName
-                      pure (rangeOf a, modName, res.searchedPaths, vfsUris, Nothing)
-                  | otherwise ->
-                      case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName) of
-                        Just libContent -> do
-                          logWith recorder Info $ LogImportResolution $
-                            "Found in embedded libraries: " <> Text.pack modName
-                          let libPath = toNormalizedFilePath ("./" <> modName <.> "l4")
-                          _ <- Shake.addVirtualFile libPath libContent
-                          let libUri = normalizedFilePathToUri libPath
-                          pure (rangeOf a, modName, res.searchedPaths, vfsUris, Just (Left libUri))
-                        Nothing -> do
-                          logWith recorder Warning $ LogImportResolution $
-                            "Module not found: " <> Text.pack modName
-                          pure (rangeOf a, modName, res.searchedPaths, vfsUris, Nothing)
-
-        mkImportUri (range, modName, fsPaths, vfsUris, mResult) = case mResult of
-          Just (Left vfsUri) -> do
-            -- Found in VFS
-            pure ([], range, vfsUri)
-          Just (Right fp) -> do
-            -- Found on filesystem
-            let u = toNormalizedUri $ filePathToUri fp
+        mkImportUri (range, modName, outcome) = case outcome.importUri of
+          Just u ->
             pure ([], range, u)
           Nothing ->
-            let allPaths = map ((.getUri) . fromNormalizedUri) vfsUris <> map Text.pack fsPaths
+            -- nub: the CLI sets the project root to the importing file's own
+            -- directory, so the root and importer-relative tiers coincide and
+            -- the list used to repeat every path twice.
+            let allPaths = List.nub
+                  ( map ((.getUri) . fromNormalizedUri) outcome.vfsTried
+                 <> map Text.pack outcome.pathsTried )
+                 <> [renderEmbedStatus outcome.embedTried]
                 diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri
@@ -840,6 +1129,12 @@ prettyNlgResolveWarning = \ case
     , "The following annotations would be attached:"
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
+  Resolve.RefUnattached r ->
+    Resolve.refUnattachedMessage r.payload
+  Resolve.RefTrailing r code ->
+    Resolve.refTrailingMessage r.payload code
+  Resolve.RefNoLocation ref ->
+    Resolve.refNoLocationMessage ref
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -855,6 +1150,12 @@ rangeOfResolveWarning = \ case
     srcSpanToLspRange Nothing
   Resolve.Ambiguous name _ ->
     srcRangeToLspRange $ rangeOf name
+  Resolve.RefUnattached r ->
+    srcSpanToLspRange $ Just r.range
+  Resolve.RefTrailing r _ ->
+    srcSpanToLspRange $ Just r.range
+  Resolve.RefNoLocation _ ->
+    srcSpanToLspRange Nothing
 
 -- ----------------------------------------------------------------------------
 -- Helpers for implementing syntax highlighting

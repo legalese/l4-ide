@@ -1928,7 +1928,7 @@ mixfixPostfixOp exprLineInfo = hidden $ try $ do
   notFollowedBy (sameLineExpr exprLineInfo.exprEndLine)
   let funcName = eN.payload
       op = mkSimpleEpaAnno eN
-  pure $ \l -> App (fixAnnoSrcRange $ mkHoleAnnoFor l <> op) funcName [l]
+  pure $ \l -> App (fixAnnoSrcRange $ mkAnno [AnnoHole Nothing] <> mkHoleAnnoFor l <> op) funcName [l]
   where
     -- A parser that only succeeds if there's a base expression on the same line
     sameLineExpr line = do
@@ -2015,17 +2015,22 @@ mixfixChainExpr = do
       -- Build: App firstKeyword [firstExpr, firstArg, kw2, arg2, kw3, arg3, ...]
       -- For binary: a `plus` b -> App plus [a, b]
       -- For ternary+: a `f1` b `f2` c -> App f1 [a, b, Var f2, c]
-      let allArgs = firstExpr : firstArg : concatMap pairToArgs moreKwArgs
-          -- IMPORTANT: genericToNodes for App expects exactly 2 holes:
-          -- 1. One for the function name
-          -- 2. One for the args list
-          -- We combine all keyword tokens as CSNs and create just 2 holes
-          funcHole = mkAnno [AnnoHole Nothing]  -- Hole for function name
-          argsHole = mkAnno [AnnoHole Nothing]  -- Hole for args list (all args together)
-          -- Collect all CSN tokens for keywords (they don't need holes)
-          kwTokens = mkSimpleEpaAnno firstKeyword : concatMap pairToCsn moreKwArgs
-          combinedAnno = funcHole <> foldl' (<>) emptyAnno kwTokens <> argsHole
-      in pure $ App (fixAnnoSrcRange combinedAnno) firstKeyword.payload allArgs
+      --
+      -- IMPORTANT: genericToNodes for App expects exactly 2 holes:
+      -- 1. One for the function name (whose Name carries no tokens here)
+      -- 2. One for the args list (all args together)
+      -- The exactprinter emits them in exactly that order, so keyword
+      -- tokens stored in this outer anno would print *before* the args,
+      -- rewriting the infix call `1 UNION 2` to prefix `UNION 1 2`
+      -- (issue #918). Instead, every keyword's tokens live inside the args
+      -- list, in source position: the first keyword as a leading hidden
+      -- cluster on the argument that follows it (hidden clusters are
+      -- exact-printed in place but ignored by 'rangeOf', keeping that
+      -- argument's own range precise), and each later keyword in its
+      -- marker node ('pairToArgs').
+      let allArgs = firstExpr : prependHiddenEpa firstKeyword firstArg : concatMap pairToArgs moreKwArgs
+          combinedAnno = mkAnno [AnnoHole Nothing, mkHoleWithSrcRange allArgs]
+      in pure $ App combinedAnno firstKeyword.payload allArgs
   where
     -- Parse: `keyword` expr (`keyword` expr)*
     -- Returns: (firstKeyword, firstArg, [(kw2, arg2), (kw3, arg3), ...])
@@ -2068,15 +2073,21 @@ mixfixChainExpr = do
       pure kw
 
     -- Convert (keyword, expr) pair to [Var keyword, expr]
-    -- These are the "additional" keywords beyond the first one
+    -- These are the "additional" keywords beyond the first one.
+    -- The marker node carries the keyword's own tokens, so it exact-prints
+    -- in source position within the args list.
     pairToArgs :: (Epa Name, Expr Name) -> [Expr Name]
     pairToArgs (kw, e) =
       let kwVar = App (mkSimpleEpaAnno kw) kw.payload []  -- Var keyword
       in [kwVar, e]
 
-    -- Get CSN annotation from keyword (just the keyword tokens, no holes)
-    pairToCsn :: (Epa Name, Expr Name) -> [Anno]
-    pairToCsn (kw, _) = [mkSimpleEpaAnno kw]
+    -- Attach a keyword's tokens to the front of an expression's anno as a
+    -- hidden cluster (plus any structured hidden clusters it carries, e.g.
+    -- comments): exact-printed in source position, but invisible to
+    -- 'rangeOf', so the expression's own source range is unchanged.
+    prependHiddenEpa :: Epa Name -> Expr Name -> Expr Name
+    prependHiddenEpa kw =
+      overAnno (over #payload (fmap mkCluster (epaToHiddenCluster kw : kw.hiddenClusters) <>))
 
     -- Extract range from name inside App/Var expressions
     -- Used as fallback when rangeOf on the App itself returns Nothing
@@ -2787,28 +2798,30 @@ execNlgParserForTokens p uri input ts =
 -- JL4 parsers
 -- ----------------------------------------------------------------------------
 
-execParser :: (Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParser = execParserWithHints mempty
 
-execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserWithHints hints p uri input =
   case execLexer uri input of
     Left errs -> Left errs
     Right ts -> execParserForTokensWithHints hints p uri input ts
 
-execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokens = execParserForTokensWithHints mempty
 
-execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWithHints hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
     Right (a, pstate)  ->
       let
         (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
-        (annotatedA, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
+        (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
+        (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withDesc
+        refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
-        Right (annotatedA, nlgS.warnings, pstate)
+        Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)
   where
     env = Env
       { moduleUri = file
@@ -2874,7 +2887,7 @@ execProgramParserWithHintPass uri input = do
 -- ----------------------------------------------------------------------------
 
 -- | Parse a source file and pretty-print the resulting syntax tree.
-parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a) => Parser a -> NormalizedUri -> Text -> IO ()
+parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => Parser a -> NormalizedUri -> Text -> IO ()
 parseFile p uri input =
   case execParser p uri input of
     Left errs -> Text.putStr $ Text.unlines $ fmap (.message) (toList errs)

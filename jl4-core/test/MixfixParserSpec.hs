@@ -5,6 +5,7 @@ module MixfixParserSpec (spec) where
 import Base hiding (listToMaybe)
 import Data.Maybe (listToMaybe)
 import qualified Data.Text as T
+import L4.ExactPrint (exactprint)
 import L4.Parser (buildMixfixHintRegistry, execProgramParserWithHintPass)
 import L4.Syntax (AppForm (..), Decide (..), Expr (..), Module (..), Name, Section (..), TopDecl (..), pattern Var, rawName, rawNameToText)
 import Test.Hspec
@@ -36,6 +37,63 @@ spec =
           assertPostfix postfixBody
           assertBinary mixfixBody
           assertChain chainBody
+
+    describe "exact-print round-trip (issue #918)" $ do
+      -- `l4 format` is exactprint of the parsed AST, so exactprint must be
+      -- the identity on source text. Before the fix, infix mixfix call
+      -- sites were rewritten to prefix form (`1 UNION 2` -> `UNION 1 2`)
+      -- and chained keywords were printed twice.
+      it "round-trips the mixfix fixture (bare + backticked, binary + ternary)" $
+        roundTrips mixfixFixture
+
+      it "round-trips the multiline fixture (aligned mixfix + postfix)" $
+        roundTrips multilineFixture
+
+      it "round-trips the issue-918 repro (UNION call sites stay infix)" $
+        roundTrips issue918Fixture
+
+      it "round-trips an unparenthesized chain without reordering tokens" $
+        -- `1 UNION 2 UNION 3` does not typecheck (arity), but formatting
+        -- happens before typechecking and must not reorder tokens.
+        roundTrips (unionPrologue <> "chain MEANS 1 UNION 2 UNION 3\n")
+
+      it "round-trips infix call sites with trailing comments" $
+        roundTrips (unionPrologue <> "commented MEANS 1 UNION 2 -- trailing note\n")
+
+roundTrips :: T.Text -> Expectation
+roundTrips src =
+  case execProgramParserWithHintPass uri src of
+    Left errs ->
+      expectationFailure $ "Parser failed with: " <> show errs
+    Right (moduleAst, _hints, _warnings) ->
+      case exactprint moduleAst of
+        Left err -> expectationFailure $ "exactprint failed: " <> show err
+        Right printed -> printed `shouldBe` src
+  where
+    uri = toNormalizedUri (Uri "file:///mixfix-roundtrip-spec")
+
+unionPrologue :: T.Text
+unionPrologue =
+  T.unlines
+    [ "IMPORT prelude"
+    , ""
+    , "GIVEN p IS A NUMBER"
+    , "      q IS A NUMBER"
+    , "GIVETH A NUMBER"
+    , "p UNION q MEANS p + q"
+    , ""
+    ]
+
+issue918Fixture :: T.Text
+issue918Fixture =
+  unionPrologue
+    <> T.unlines
+      [ "single MEANS 1 UNION 2"
+      , ""
+      , "nested MEANS (1 UNION 2) UNION 3"
+      , ""
+      , "backtick MEANS 1 `UNION` 2"
+      ]
 
 assertPostfix :: Expr Name -> Expectation
 assertPostfix expr =

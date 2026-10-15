@@ -70,6 +70,21 @@ GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 ```
 
+## Libraries and `IMPORT`
+
+A deployment resolves an `IMPORT` against the files of its own bundle and the standard library built into the service, and against nothing else.
+The service does not read `JL4_LIBRARY_PATH`, its working directory or the per-user library folder.
+A library that is not part of the standard library has to be in the bundle, beside the file that imports it.
+A bundle file named like a standard library module, such as `prelude.l4`, is used for the bundle's own imports in place of the built-in one.
+
+The service logs three `WARN` lines about this:
+
+- `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
+- `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
+- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422.
+
+[Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
+
 ## API Reference
 
 ### Health
@@ -187,8 +202,6 @@ A batch case refused this way comes back in `cases` with the same message as its
 
 Limits, measured 2026-10-07:
 
-- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`), so every function in a module that uses one fails the request with `I could not find a definition`.
-  A function with a `BOOLEAN` input fails the same way, because the wrapper reads it with `prelude`'s `fromMaybe`.
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
@@ -204,6 +217,12 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
   -H "Content-Type: application/json" \
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
+
+Each node of the response's `reasoning` tree has `exampleCode`, `explanation` and `children`.
+`exampleCode` is the step as L4 source, and `explanation` is its result.
+Wherever the answer prints rule source, a string literal in it is escaped the way the source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`.
+So `"line\nnext"` in `exampleCode` stays on one line, and so does the literal in the `explanation` of a `DEONTIC` contract (`MUST say "pay\nnow"`), which prints the contract's rule.
+A string that is itself the result, such as the answer of an ordinary function, keeps its line breaks in `explanation`.
 
 #### Deontic (Contract) Evaluation
 
@@ -282,6 +301,8 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+
+An atom's `label` is rule source too, so a string literal in it is escaped in the same way, and the atom's `atomId` is computed from the label.
 
 ### MCP (Model Context Protocol)
 
@@ -455,7 +476,8 @@ The service enforces several resource limits to protect against abuse:
 - **Concurrency**: Returns `503 Service at capacity` when `--max-concurrent-requests` is exceeded. The `/health` endpoint is exempt.
 - **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`. Returns `500` on limit exceeded.
 - **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout.
-- **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds.
+- **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds, whether it is a deploy or a deployment being loaded from the store at startup. The limit is on wall-clock time.
+- **Compilation memory**: `--max-compile-memory-mb` sets a GHC allocation counter on the thread that compiles. Measured with 8 MB and with 2048 MB, at deploy (a large example file) and at restart (a store of 110 deployments), it stopped no compile: every deployment still compiled. Do not rely on it to stop a large compile.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
 - **File count**: Upload rejected with `400` if zip contains more than `--max-file-count` entries.
 - **Deployment count**: New deployment rejected with `400` if `--max-deployments` is reached.
@@ -471,13 +493,17 @@ Deployments are stored on disk at `{store-path}/{deployment-id}/`:
       main.l4
       helper.l4
     metadata.json
+    metadata-cache.json
   other-deploy/
     sources/
       rules.l4
     metadata.json
+    metadata-cache.json
 ```
 
-On startup, the service scans the store directory and recompiles all deployments. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
+`metadata-cache.json` is a cache, written after a successful compile; the sources and `metadata.json` are what a deployment is.
+
+On startup, the service scans the store directory and compiles every deployment from its stored sources, the way a deploy compiles them and under the same limits (see Resource Limits), as many at once as it has capabilities, which on this build is one: it runs GHC's non-threaded runtime. A timeout counts wall-clock time, and a compile starts only when one of those places is free, so a deployment is not failed for waiting its turn. The service opens its port only after every deployment has loaded, so a store of k deployments that each time out delays the port by about k times `--compile-timeout`. A deployment that does not finish in `--compile-timeout` stays `failed` until it is redeployed or the service restarts (a PUT to a failed deployment is not checked for compatibility, as before). Nothing is kept from the compile that made the deployment, so a restart serves exactly what a deploy of those sources would serve. A deployment whose stored sources no longer parse or type-check (a file was edited on disk, or the service's checks changed) is `failed`, with the errors a deploy of them would be rejected with; the log has a warning that names the file and prints the errors, and the other deployments load as usual. A `bundle.cbor` that an earlier version of the service left beside the sources is not read and not touched; it is safe to delete. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
 
 ## Testing
 
@@ -496,9 +522,8 @@ Test coverage:
 - **BundleStoreSpec** -- Filesystem persistence round-trips
 - **CodeGenSpec** -- Input field name collision avoidance
 - **DecisionQueryCacheKeySpec** -- Cache key determinism
-- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping
+- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping, answers after a restart
 - **SanitizationSpec** -- Property name sanitization, reverse mapping, collision detection
-- **SerialisationSpec** -- CBOR serialisation round-trips and cache rebuild
 - **SchemaSpec** -- QuickCheck property tests for API type serialization
 
 ## Architecture

@@ -1384,7 +1384,9 @@ decodeJsonToValueTyped jsonStr ty = do
 -- | Convert Aeson Value to L4 WHNF using type information
 -- This function recursively handles nested structures: lists of records, records containing records, etc.
 jsonValueToWHNFTyped :: Aeson.Value -> Type' Resolved -> Machine WHNF
-jsonValueToWHNFTyped jsonValue ty = do
+jsonValueToWHNFTyped jsonValue ty0 = do
+  -- a synonym decodes as what it stands for (a synonym for MAYBE X as MAYBE X)
+  ty <- expandTypeSynonyms ty0
   case ty of
     -- Handle LIST OF α
     TyApp _anno listRef [elementType]
@@ -1517,7 +1519,9 @@ jsonValueToWHNFTyped jsonValue ty = do
                     Aeson.Object obj -> do
                       -- Decode each field from the JSON object WITH TYPE INFORMATION
                       -- Note: We ignore extra fields in the JSON (Postel's Law)
-                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType) -> do
+                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
+                        -- a synonym for MAYBE is a MAYBE: expand before deciding
+                        fieldType <- expandTypeSynonyms fieldType0
                         case KeyMap.lookup (Key.fromText fieldName) obj of
                           Nothing
                             | isMaybeFieldTy fieldType ->
@@ -1540,6 +1544,37 @@ jsonValueToWHNFTyped jsonValue ty = do
 
     -- For other types, fall back to generic decoding
     _ -> jsonValueToWHNF jsonValue
+
+-- | A type with its synonyms expanded at the head, as far as they go. The
+-- checker records a synonym's body on its 'TypeCheck.KnownType'; a
+-- parameterised synonym has its arguments substituted for its parameters.
+-- Without this, @DECLARE Year IS A NUMBER@ is not a primitive here, and a JSON
+-- string for a @Year@ is accepted as it stands instead of refused as it is for
+-- a @NUMBER@.
+expandTypeSynonyms :: Type' Resolved -> Machine (Type' Resolved)
+expandTypeSynonyms = go (16 :: Int)
+  where
+    go 0 ty = pure ty
+    go n ty@(TyApp _ tyRef args) = do
+      entityInfo <- getEntityInfo
+      case Map.lookup (getUnique tyRef) entityInfo of
+        Just (_, TypeCheck.KnownType _ params (Just body))
+          | length params == length args ->
+              go (n - 1) (substituteTypeParams (Map.fromList (zip (map getUnique params) args)) body)
+        _ -> pure ty
+    go _ ty = pure ty
+
+substituteTypeParams :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
+substituteTypeParams sub = \ case
+  TyApp ann r []
+    | Just t <- Map.lookup (getUnique r) sub -> t
+    | otherwise -> TyApp ann r []
+  TyApp ann r ts -> TyApp ann r (map (substituteTypeParams sub) ts)
+  Fun ann args res ->
+    Fun ann [ MkOptionallyNamedType a n (substituteTypeParams sub t) | MkOptionallyNamedType a n t <- args ]
+      (substituteTypeParams sub res)
+  Forall ann vs t -> Forall ann vs (substituteTypeParams sub t)
+  other -> other
 
 -- | Check if a type is MAYBE α (used for optional record field handling)
 isMaybeFieldTy :: Type' Resolved -> Bool

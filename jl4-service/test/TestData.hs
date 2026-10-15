@@ -21,6 +21,11 @@ module TestData (
   wireProbeJL4,
   declineLabelsJL4,
   twoDatesJL4,
+  lineBreakJL4,
+  jsonDecodePersonJL4,
+  taxpayerJL4,
+  implicitFlagJL4,
+  nameClashJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -34,6 +39,7 @@ import Control.Monad.Trans.Except
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 rodentAndVerminFunctionSpec :: IO ValidatedFunction
 rodentAndVerminFunctionSpec = either (error . show) id <$> runExceptT rodentAndVerminFunction
@@ -166,6 +172,25 @@ constantJL4 =
 GIVETH A NUMBER
 DECIDE the_answer IS 42
 |]
+
+-- | A function whose answer is a string holding a line break or a tab.
+--
+-- The reasoning tree prints each step as source code, so the literal reaches
+-- @exampleCode@ spelled the way the source spells it (@"line\nnext"@, a
+-- backslash and an n), while @explanation@ prints the VALUE and keeps the
+-- break. Written as plain lines, not through the interpolating quasi-quoter,
+-- which would turn the backslash pairs into the characters they spell.
+lineBreakJL4 :: Text
+lineBreakJL4 =
+  Text.unlines
+    [ "@export default the text"
+    , "GIVEN x IS A NUMBER"
+    , "GIVETH A STRING"
+    , "DECIDE s x IS"
+    , "    IF x > 0"
+    , "    THEN \"line\\nnext\""
+    , "    ELSE \"tab\\there\""
+    ]
 
 -- | L4 source for the "compute_qualifies" function used in integration tests.
 qualifiesJL4 :: Text
@@ -503,4 +528,84 @@ GIVEN `d one` IS A DATE
       pad     IS A MAYBE NUMBER
 GIVETH A NUMBER
 DECIDE `later` IS 1
+|]
+
+-- | A record read from a JSON string by JSONDECODE, as written in
+-- smucclaw/l4-ide#1040. What the decoder builds depends on the type the type
+-- checker recorded on the call, so a service that serves a program without
+-- that type answers differently: JSON that is not a Person is accepted as one,
+-- and a Person comes back as NOTHING.
+jsonDecodePersonJL4 :: Text
+jsonDecodePersonJL4 =
+  [i|
+DECLARE Person HAS
+    name IS A STRING
+    age  IS A NUMBER
+
+GIVEN json IS A STRING
+GIVETH AN EITHER STRING Person
+`decode person` json MEANS JSONDECODE json
+
+@export default The age next year of the person in a JSON string, or -1 if it does not decode
+GIVEN json IS A STRING
+GIVETH A NUMBER
+`age next year` json MEANS
+  CONSIDER `decode person` json
+    WHEN RIGHT p THEN p's age + 1
+    WHEN LEFT msg THEN -1
+
+@export default Whether a JSON string decodes as a person
+GIVEN json IS A STRING
+GIVETH A BOOLEAN
+`is a person` json MEANS
+  CONSIDER `decode person` json
+    WHEN RIGHT p THEN TRUE
+    WHEN LEFT msg THEN FALSE
+|]
+
+-- | A record input whose fields carry @desc text. The text is on the
+-- annotations of the DECLARE, which a cache of the checked module did not
+-- keep, so a schema built from the cached DECLAREs had no field descriptions;
+-- and the record input has to be found by its type, whose numbering shifts
+-- when a DECLARE is added above it.
+taxpayerJL4 :: Text
+taxpayerJL4 =
+  [i|
+DECLARE Taxpayer HAS
+    name   IS A STRING @desc The taxpayer's full name
+    income IS A MAYBE NUMBER @desc Income earned abroad, if any
+
+@export Whether the taxpayer must file a foreign income disclosure
+GIVEN tp IS A Taxpayer @desc The taxpayer's full profile
+GIVETH A BOOLEAN
+DECIDE disclosure IS
+    CONSIDER tp's income
+    WHEN NOTHING THEN FALSE
+    WHEN JUST amt THEN amt > 10000
+|]
+
+-- | An @export that reads a name nothing declares. The type checker reports it
+-- as out of scope, and the deploy turns it into an input, `flag`, of the type
+-- the use implies. Only the listing is of interest: calling `above` answers
+-- "flag is not in scope" on a fresh deploy too.
+implicitFlagJL4 :: Text
+implicitFlagJL4 =
+  [i|
+@export Whether a threshold is passed while a standing flag holds
+GIVEN threshold IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE above IF threshold > 1 AND flag
+|]
+
+-- | Two inputs whose names are different in L4 and the same once the service
+-- turns spaces and hyphens into one character for its schemas (@a b@, @a-b@).
+-- The compiler does not refuse this module, it raises an error.
+nameClashJL4 :: Text
+nameClashJL4 =
+  [i|
+@export Two inputs that sanitise to one name
+GIVEN `a b` IS A NUMBER
+      `a-b` IS A NUMBER
+GIVETH A NUMBER
+DECIDE clash IS `a b` PLUS `a-b`
 |]

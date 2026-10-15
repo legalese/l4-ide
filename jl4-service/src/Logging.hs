@@ -2,6 +2,7 @@ module Logging (
   Logger,
   LogLevel (..),
   newLogger,
+  newLoggerTo,
   logDebug,
   logInfo,
   logWarn,
@@ -14,7 +15,7 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.IORef (IORef, newIORef, atomicModifyIORef')
 import Data.Text (Text)
 import Data.Time (getCurrentTime)
-import System.IO (hFlush, stdout)
+import System.IO (Handle, hFlush, stdout)
 
 -- | Log severity levels.
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError
@@ -25,15 +26,21 @@ data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError
 data Logger = Logger
   { logMinLevel :: !LogLevel
   , logLock     :: !(IORef ())
+  , logHandle   :: !Handle
   }
 
--- | Create a logger. Debug mode enables DEBUG level; otherwise INFO and above.
+-- | Create a logger on stdout. Debug mode enables DEBUG level; otherwise INFO and above.
 newLogger :: Bool -> IO Logger
-newLogger debugMode = do
+newLogger = newLoggerTo stdout
+
+-- | Create a logger writing to the given handle.
+newLoggerTo :: Handle -> Bool -> IO Logger
+newLoggerTo h debugMode = do
   lock <- newIORef ()
   pure Logger
     { logMinLevel = if debugMode then LevelDebug else LevelInfo
     , logLock = lock
+    , logHandle = h
     }
 
 -- | Log at DEBUG level.
@@ -52,7 +59,7 @@ logWarn = logMsg LevelWarn
 logError :: Logger -> Text -> [(Text, Value)] -> IO ()
 logError = logMsg LevelError
 
--- | Core logging function. Writes a single JSON line to stdout.
+-- | Core logging function. Writes a single JSON line to the logger's handle.
 logMsg :: LogLevel -> Logger -> Text -> [(Text, Value)] -> IO ()
 logMsg level logger msg fields
   | level < logger.logMinLevel = pure ()
@@ -67,8 +74,8 @@ logMsg level logger msg fields
       -- Serialize writes to prevent interleaved output
       atomicModifyIORef' logger.logLock $ \() ->
         let !_ = () in ((), ())
-      LBS.hPut stdout line
-      hFlush stdout
+      LBS.hPut logger.logHandle line
+      hFlush logger.logHandle
 
 -- | Convert log level to text label.
 levelText :: LogLevel -> Text
