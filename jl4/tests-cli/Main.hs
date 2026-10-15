@@ -14,7 +14,6 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (IOException, finally, throwIO, try)
 import Control.Monad (forM_, unless, void, when)
-import Data.Char (isDigit)
 import qualified Data.Char as Char
 import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
 import Data.Maybe (fromMaybe)
@@ -60,6 +59,10 @@ import System.Process
   )
 import System.Timeout (timeout)
 import Test.Hspec
+import Data.Aeson (toJSON)
+import Data.Char (isDigit)
+import System.IO (hPutStr)
+import System.IO.Temp (withSystemTempDirectory)
 
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
@@ -740,6 +743,152 @@ spec bin = do
       code `shouldBe` ExitSuccess
       -- The dumper uses pretty-simple; any module will start with "MkModule".
       sout `shouldSatisfy` ("MkModule" `isInfixOf`)
+
+  -- `l4 batch` and the REPL re-print the module and run the printed text. A
+  -- CONSIDER's arms were printed comma-separated on one hanging indent, so in a
+  -- CONSIDER inside an arm of another, the outer's later arms were read as more
+  -- arms of the inner one, and an arm that ended in a comma list took the comma
+  -- after it for another element. The expected answers are what `l4 run` gives
+  -- on the fixture's own #EVALs, which the first test of each group pins.
+  --
+  -- Everything this needs is local to the block, so that it shares no line with
+  -- the rest of the file: the fixtures are named here, and an answer is a
+  -- `Value`, with a string standing for an exception or for text that is none
+  -- of TRUE, FALSE, a number or a LIST of numbers.
+  describe "a CONSIDER whose arms are printed back" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let noBranch = String "<a CONSIDER with no branch for its value>"
+        one n    = Number n
+        -- the answer a block of output spells
+        answerOf :: T.Text -> Value
+        answerOf t
+          | Just rest <- T.stripPrefix "LIST " t
+          , let elems = T.splitOn ", " rest
+          , all (\e -> not (T.null e) && T.all isDigit e) elems
+          = toJSON (map (read . T.unpack) elems :: [Integer])
+          | t == "TRUE"  = Bool True
+          | t == "FALSE" = Bool False
+          | not (T.null t), T.all isDigit t = Number (fromInteger (read (T.unpack t)))
+          | "has no branch" `T.isInfixOf` t = noBranch
+          | otherwise = String ("<" <> t <> ">")
+        -- what `l4 run` gives for each #EVAL of a file, in order
+        runAnswers file = do
+          Output _ sout _ <- runL4 bin ["run", file]
+          let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
+              result b = T.strip (fst (T.breakOn "Trace:" (T.drop (T.length "Result:") (snd (T.breakOn "Result:" b)))))
+          pure (map (answerOf . result) blocks)
+        -- what each row of `l4 batch` gives. A row that raises is `"status":"error"`
+        -- with its message in the result, and it stops the batch unless `-c` says to
+        -- go on; so a file with a raising row is run with `-c`, and every row is read.
+        batchAnswers file inputs entry = do
+          Output _ sout _ <- runL4 bin ["batch", "-c", file, "-i", inputs, "-e", entry]
+          let result row = case objField row "output" of
+                Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+                _ -> Nothing
+              rowAnswer row = case (objField row "status", result row) of
+                (_, Just (Object o))
+                  | Just (String e) <- KeyMap.lookup (Key.fromString "error") o -> answerOf e
+                (Just (String "success"), Just v) -> v
+                _ -> String ("<" <> T.pack (take 300 (show (objField row "diagnostics"))) <> ">")
+          pure [ rowAnswer row | l <- map (filter (/= '\r')) (lines sout)
+                               , Right row <- [eitherDecode (BSL8.pack l)] ]
+        -- what the REPL gives to each query, loading the file first. It runs in a
+        -- directory of its own, because it keeps a history file in the one it is in.
+        replAnswers repl file queries = withSystemTempDirectory "l4-repl-consider-arms" \work -> do
+          absFile <- makeAbsolute file
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          hPutStr hin (unlines (queries <> [":quit"]))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          -- the banner, then one reply after each prompt, then the last prompt's goodbye
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map (answerOf . T.strip) (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        inRepl file queries expected = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> replAnswers repl file queries `shouldReturn` expected
+
+        types    = fixtureDir </> "batch-nested-consider-types.l4"
+        silent   = fixtureDir </> "batch-nested-consider-silent.l4"
+        listArms = fixtureDir </> "batch-consider-list-arms.l4"
+        rows f   = fixtureDir </> ("batch-" ++ f ++ ".json")
+
+        typesWant  = [one 1, one 2, one 3, one 4]
+        -- Red Red, Red Blue (no arm for Blue in the inner one), Green, Blue
+        silentWant = [Bool True, noBranch, Bool False, Bool True]
+        listsWant  = [toJSON [1, 2 :: Integer], toJSON [3 :: Integer], toJSON [4, 5 :: Integer]]
+
+        -- a WHERE under an arm; the three files differ in which arm holds it
+        whereFile n = fixtureDir </> ("batch-consider-where-" ++ n ++ ".l4")
+        whereRows n = rows ("consider-where-" ++ n)
+        whereWant   = [one 0, one 20, one 50]
+        whereQueries = [ "`late fee` 1000 0", "`late fee` 1000 10", "`late fee` 1000 45" ]
+        whereArms   = ["first", "middle", "last"]
+
+    -- the inner CONSIDER is on another type, so the outer's later arms did not
+    -- type-check as its arms and every row was an error
+    it "is read by l4 run as the rule says" $ do
+      runAnswers types  `shouldReturn` typesWant
+      runAnswers silent `shouldReturn` (silentWant <> [one 4])
+      runAnswers listArms `shouldReturn` listsWant
+
+    it "is read as written by l4 batch, when the inner one is on another type" $
+      batchAnswers types (rows "nested-consider-types") "inner on another type" `shouldReturn` typesWant
+
+    -- the inner CONSIDER is on the same type, so they did type-check, and the
+    -- printed rule answered differently with no diagnostic
+    it "is read as written by l4 batch, when the inner one is on the same type" $
+      batchAnswers silent (rows "nested-consider-silent") "inner on the same type" `shouldReturn` silentWant
+
+    -- the control: an inner CONSIDER that is the last arm was always printed right
+    it "is read as written by l4 batch, when it is the last arm" $
+      batchAnswers silent (rows "nested-consider-last") "inner last" `shouldReturn` [one 4]
+
+    -- no nesting at all: the comma after an arm was read as the next element of
+    -- the LIST the arm ended in
+    it "is read as written by l4 batch, when an arm ends in a comma list" $
+      batchAnswers listArms (rows "consider-list-arms") "list arms" `shouldReturn` listsWant
+
+    it "is read as written by the REPL, when the inner one is on another type" $
+      inRepl types
+        [ "`inner on another type` 0 1", "`inner on another type` 0 9"
+        , "`inner on another type` 1 1", "`inner on another type` 2 9" ]
+        typesWant
+
+    it "is read as written by the REPL, when the inner one is on the same type" $
+      inRepl silent
+        [ "`inner on the same type` 0 0", "`inner on the same type` 0 2"
+        , "`inner on the same type` 1 0", "`inner on the same type` 2 0" ]
+        silentWant
+
+    it "is read as written by the REPL, when an arm ends in a comma list" $
+      inRepl listArms [ "`list arms` 0", "`list arms` 1", "`list arms` 2" ] listsWant
+
+    -- a WHERE under an arm: its line stood at the column of the arm's WHEN, which
+    -- ends the definition, so any arm after it did not parse and every row failed.
+    -- The last arm has none after it, and was always printed right.
+    it "is read by l4 run as the rule says, with a WHERE under an arm" $
+      forM_ whereArms \n -> runAnswers (whereFile n) `shouldReturn` whereWant
+
+    forM_ whereArms \n -> do
+      it ("is read as written by l4 batch, with a WHERE under the " ++ n ++ " arm") $
+        batchAnswers (whereFile n) (whereRows n) "late fee" `shouldReturn` whereWant
+
+      it ("is read as written by the REPL, with a WHERE under the " ++ n ++ " arm") $
+        inRepl (whereFile n) whereQueries whereWant
 
   describe "l4 trace" $ do
     it "refuses --format png without --output-dir" $ do
