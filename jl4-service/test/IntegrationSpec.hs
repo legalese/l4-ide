@@ -760,6 +760,23 @@ spec = describe "integration" do
       sameAtomIds "table2" clauseTable2JL4 handTable2JL4
       sameAtomIds "newname" clauseNewNameJL4 handNewNameJL4
 
+      -- A restart compiles the stored sources again, as a deploy does (#666), so
+      -- a clause group is planned after one as it was when deployed. Before #666
+      -- a restart read a cache that kept no type for the generated nodes, and
+      -- /query-plan answered 400 for every boolean rule, written as clauses or by
+      -- hand. The fresh side must answer 200 with a body, so that two empty
+      -- answers cannot pass for equal.
+      for_ [ ("enum", clauseGroupEnumJL4), ("mixed", clauseGroupMixedJL4), ("single", clauseGroupSingleJL4)
+           , ("nogiveth", clauseGroupNoGivethJL4), ("call", clauseGroupCallJL4), ("table", clauseTableJL4)
+           , ("table2", clauseTable2JL4), ("newname", clauseNewNameJL4) ] \(name, src) ->
+        it ("restarted: is planned as it was before the restart: " <> name) do
+          let probe baseUrl mgr deployId =
+                answerOf baseUrl deployId <$> queryPlan' baseUrl mgr deployId "rule" noArguments
+          (fresh, restarted) <- beforeAndAfterRestart ("cg-restart-" <> Text.pack name) [("rule.l4", src)] probe
+          fst fresh `shouldBe` 200
+          snd fresh `shouldSatisfy` Maybe.isJust
+          restarted `shouldBe` fresh
+
       -- A clause whose result is a LET the drafter wrote: the group around it is
       -- read through, and the LET inside the clause stays as written.
       it "answers a clause group whose clause result is a LET" do
