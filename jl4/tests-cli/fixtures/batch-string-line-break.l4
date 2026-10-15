@@ -1,0 +1,15 @@
+-- `l4 batch` re-prints the module and runs the printed text. A newline inside a
+-- string used to be printed raw, so it became a layout line break that took the
+-- body's indentation, and batch answered "line\n  next" where `l4 run` answers
+-- "line\nnext", with status success (smucclaw/l4-ide#1028).
+
+@export default the text
+GIVEN x IS A NUMBER
+GIVETH A STRING
+DECIDE s x IS
+    IF x > 0
+    THEN "line\nnext"
+    ELSE "tab\there"
+
+#EVAL s 1
+#EVAL s 0

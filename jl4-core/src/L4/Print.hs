@@ -698,7 +698,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (LocalDecl a) where
 instance LayoutPrinter Lit where
   printWithLayout = \ case
     NumericLit _ t -> pretty (prettyRatio t)
-    StringLit _ t -> surround (pretty $ escapeStringLiteral t) "\"" "\""
+    StringLit _ t -> surround (pretty $ escapeSourceStringLiteral t) "\"" "\""
 
 instance LayoutPrinterWithName a => LayoutPrinter (BranchLhs a) where
   printWithLayout = \ case
@@ -999,6 +999,27 @@ escapeStringLiteral = Text.concatMap (\ case
   '\"' -> "\\\""
   '\\' -> "\\\\"
   c -> Text.singleton c
+  )
+
+-- | 'escapeStringLiteral' for a string literal printed as SOURCE, which also
+-- writes a line break, tab or carriage return as its escape.
+--
+-- A raw newline handed to 'pretty' becomes a layout line break, and a layout
+-- line break takes the current nesting: @"line\nnext"@ printed inside an
+-- indented body came out as @"line@, then a new line @  next"@, which reads
+-- back as a different string. @l4 batch@ re-prints the module and runs the
+-- printed text, so it answered @"line\n  next"@ with status success
+-- (smucclaw/l4-ide#1028). The lexer reads these escapes back
+-- (@Lexer.charLiteral@), so the printed source means what the tree does.
+--
+-- A value being displayed ('Lazy.ValString') still goes through
+-- 'escapeStringLiteral', so @l4 run@ shows a multi-line string as before.
+escapeSourceStringLiteral :: Text -> Text
+escapeSourceStringLiteral = Text.concatMap (\ case
+  '\n' -> "\\n"
+  '\t' -> "\\t"
+  '\r' -> "\\r"
+  c -> escapeStringLiteral (Text.singleton c)
   )
 
 -- | Format a UTCTime with timezone offset as ISO-8601

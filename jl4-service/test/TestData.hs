@@ -21,6 +21,7 @@ module TestData (
   wireProbeJL4,
   declineLabelsJL4,
   twoDatesJL4,
+  lineBreakJL4,
   jsonDecodePersonJL4,
   taxpayerJL4,
   implicitFlagJL4,
@@ -38,6 +39,7 @@ import Control.Monad.Trans.Except
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 rodentAndVerminFunctionSpec :: IO ValidatedFunction
 rodentAndVerminFunctionSpec = either (error . show) id <$> runExceptT rodentAndVerminFunction
@@ -170,6 +172,25 @@ constantJL4 =
 GIVETH A NUMBER
 DECIDE the_answer IS 42
 |]
+
+-- | A function whose answer is a string holding a line break or a tab.
+--
+-- The reasoning tree prints each step as source code, so the literal reaches
+-- @exampleCode@ spelled the way the source spells it (@"line\nnext"@, a
+-- backslash and an n), while @explanation@ prints the VALUE and keeps the
+-- break. Written as plain lines, not through the interpolating quasi-quoter,
+-- which would turn the backslash pairs into the characters they spell.
+lineBreakJL4 :: Text
+lineBreakJL4 =
+  Text.unlines
+    [ "@export default the text"
+    , "GIVEN x IS A NUMBER"
+    , "GIVETH A STRING"
+    , "DECIDE s x IS"
+    , "    IF x > 0"
+    , "    THEN \"line\\nnext\""
+    , "    ELSE \"tab\\there\""
+    ]
 
 -- | L4 source for the "compute_qualifies" function used in integration tests.
 qualifiesJL4 :: Text
