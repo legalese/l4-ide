@@ -183,6 +183,24 @@ jobs:
         with:
           submodules: true
 
+      # Bake the build version (<major>.<minor> of the VS Code extension, then
+      # the run number, matching the l4-ide-build-<run_number> tag) into the
+      # jl4-service binary via the JL4_SERVICE_VERSION env var, which the
+      # Version module captures with a Template Haskell splice at compile time.
+      # It must be set before any step compiles jl4-service, and "Install
+      # dependencies" does: for exe:jl4-service it builds the package's own
+      # library, Version.hs included. Neither cabal nor GHC rebuilds a module
+      # whose source is unchanged when only an environment variable changed
+      # (touching the file does not help, as both compare contents), so a
+      # library compiled before this step keeps 0.0.0-dev. Build 95 shipped
+      # that way. "Check the baked jl4-service version" below catches it.
+      - name: Compute jl4-service version
+        run: |
+          CURRENT=$(grep -m1 '"version"' ts-apps/vscode/package.json | sed -E 's/.*"version" *: *"([^"]+)".*/\1/')
+          MAJOR_MINOR=$(echo "$CURRENT" | sed 's/\.[^.]*$//')
+          echo "JL4_SERVICE_VERSION=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "jl4-service version: ${MAJOR_MINOR}.${{ github.run_number }}"
+
       - name: Install system dependencies
         run: |
           for i in 1 2 3; do
@@ -236,25 +254,6 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      # Bake the build version (1.5.<run_number>, matching the VS Code
-      # extension version + the l4-ide-build-<run_number> tag) into the
-      # jl4-service binary via the JL4_SERVICE_VERSION env var, which the
-      # Version module captures with a Template Haskell splice at compile time.
-      # The project is built fresh each run (only the cabal store is cached),
-      # so the splice never goes stale.
-      - name: Compute jl4-service version
-        run: |
-          CURRENT=$(grep -m1 '"version"' ts-apps/vscode/package.json | sed -E 's/.*"version" *: *"([^"]+)".*/\1/')
-          MAJOR_MINOR=$(echo "$CURRENT" | sed 's/\.[^.]*$//')
-          echo "JL4_SERVICE_VERSION=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_ENV"
-          echo "jl4-service version: ${MAJOR_MINOR}.${{ github.run_number }}"
-          # The version is baked into Version.hs via a Template Haskell splice
-          # that reads JL4_SERVICE_VERSION at *compile* time. GHC won't re-run
-          # the splice if Version.o is up to date, so force a recompile by
-          # touching the source — this keeps the bake correct even if the build
-          # dir is ever cached (today it isn't).
-          touch jl4-service/src/Version.hs
-
       - name: Build jl4-lsp, l4, and jl4-service
         run: cabal build exe:jl4-lsp exe:l4 exe:jl4-service
 
@@ -279,6 +278,34 @@ jobs:
           echo "jl4-service SHA256: $(cat bin/linux-x64/jl4-service.sha256)"
 
           ls -lh bin/linux-x64/
+
+      # The binary that is released must say the version it is released as:
+      # production reads it from /health, and new deployments take their major
+      # version from it.
+      - name: Check the baked jl4-service version
+        run: |
+          store=$(mktemp -d)
+          bin/linux-x64/jl4-service --port 18080 --store-path "$store" > "$RUNNER_TEMP/jl4-service-check.log" 2>&1 &
+          pid=$!
+          reported=""
+          for _ in $(seq 1 30); do
+            if body=$(curl -sf http://127.0.0.1:18080/health); then
+              reported=$(jq -r '.version // empty' <<<"$body")
+              break
+            fi
+            sleep 1
+          done
+          kill "$pid" 2>/dev/null || true
+          if [ -z "$reported" ]; then
+            echo "::error::jl4-service gave no version on /health within 30 s"
+            cat "$RUNNER_TEMP/jl4-service-check.log"
+            exit 1
+          fi
+          echo "jl4-service reports version: $reported"
+          if [ "$reported" != "$JL4_SERVICE_VERSION" ]; then
+            echo "::error::jl4-service reports version $reported, expected $JL4_SERVICE_VERSION"
+            exit 1
+          fi
 
       - name: Upload LSP + CLI binary artifact
         uses: actions/upload-artifact@v6
