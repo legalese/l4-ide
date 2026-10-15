@@ -913,8 +913,9 @@ newNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule m " (dnfClauseJL4 k
 -- | 'dnfClauseJL4' with the first clause's @n@ written @(EXACTLY n)@. The
 -- missing-case check counts that as the input's own name, but the desugarer
 -- tests it (only the bare name and @_@ are exempt), so the group is read
--- through. It reads through to one CONSIDER, which is one box, so six pairs
--- are planned; 'exactlyHugeJL4' is refused as too long.
+-- through. Six pairs are planned (probably because it reads through to one
+-- CONSIDER, which is one box; not drawn); 'exactlyHugeJL4' is refused as too
+-- long.
 exactlyNameDnfJL4 :: Int -> Text
 exactlyNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule (EXACTLY n) " (dnfClauseJL4 k)
 

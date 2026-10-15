@@ -711,8 +711,9 @@ So a new-name first clause is where `unstable` is, and ahead of `main` at five p
 Exempting new names too, so that those groups were planned as the own-name ones are, would be a gain over `main` and not parity; it is not done, and whether to do it is for the maintainers.
 
 `(EXACTLY n)` for the input's own name is not exempt either: `patAlwaysMatchesAs` is true only of the bare name and `_`, so the desugarer tests it, and `holdsGeneratedNodes` is true for such a first clause (the premise test in `ClauseGroupLadderSpec`).
-It reads through to one CONSIDER, which is one box, so the 300-box limit is not reached by it at six pairs, which the service plans (200), where a first clause of 22,000 parts is refused as too long (400); `IntegrationSpec` pins both.
-The user page says under "Limits" that `EXACTLY` of the input's own name "matches every input, like the bare name"; that is true of the missing-case check, and the page does not say that the drawing reads such a clause through. I left the page.
+The service plans six pairs of it (200) and refuses a first clause of 22,000 parts as too long (400); `IntegrationSpec` pins both.
+I infer that it reads through to one CONSIDER, which is one box, and that this is why the 300-box limit is not reached at six pairs; I did not draw it.
+The user page says under "Limits" that `EXACTLY` of the input's own name "matches every input, like the bare name"; that is true of the missing-case check, and the page now adds, next to it, that drawn or planned such a clause is read as a test, so the 20,000-part limit applies to it.
 
 These are `unstable`'s bounds, applied to a group that reads through, and the only ones here.
 They were checked on 111 generated tables, each run through `/query-plan` here and `/ladder` on `unstable` at `01557e40a`, on 2026-10-13: one NUMBER input of 50 to 1,200 rows; an enumeration by one BOOLEAN (24 to 200 values) and by as many BOOLEANs as values (10 to 150); two enumerations with every pair of values a row (5 by 5 to 30 by 30); rows over an enumeration whose results AND 3 or 6 number comparisons, or 10 or 20 BOOLEAN inputs; and random tables of 2 to 6 inputs, BOOLEAN or NUMBER, with results TRUE, FALSE or an input, some with a name in an earlier column before a test of a later one.

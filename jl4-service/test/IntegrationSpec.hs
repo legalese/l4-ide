@@ -863,8 +863,9 @@ spec = describe "integration" do
           LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
       -- `(EXACTLY n)` for the input's own name is not exempt either: only the bare
       -- name and `_` are, so the desugarer tests it and the group is read through.
-      -- It reads through to one CONSIDER, which is one box, so the 300-box limit is
-      -- not reached at six pairs; the 20,000-part one is.
+      -- Six pairs of it are planned; a first clause of 22,000 parts is refused. (I
+      -- infer it reads through to one CONSIDER, which is one box, so that the
+      -- 300-box limit is not reached; that is not drawn.)
       it "EXACTLY its own name: plans a group of six pairs, which reads through to one CONSIDER" do
         withServiceFromSources "exactly-dnf-6" [("rule.l4", exactlyNameDnfJL4 6)] \baseUrl mgr -> do
           resp <- queryPlan' baseUrl mgr "exactly-dnf-6" "rule" noArguments
