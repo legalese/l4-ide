@@ -13,6 +13,7 @@ module TestData (
   synonymParamJL4,
   synonymKindsJL4,
   synonymWrapperJL4,
+  inputThenInputJL4,
   saleContractJL4,
   deonticExportJL4,
   deonticRecordPartyJL4,
@@ -423,6 +424,95 @@ GIVETH A NUMBER
 `stamp code` dt pad MEANS 6
 |]
 
+-- | A MAYBE input followed by another input, on the wrapper path: a synonym for a
+-- MAYBE and a MAYBE NUMBER written out, each first, with a NUMBER after it, and
+-- the synonym last as the control; and three DEONTIC functions of the same
+-- shapes. The generated wrapper once wrote the input record with a leading comma
+-- on every field after the first, which does not parse after a field whose type
+-- is an application (@MAYBE OF NUMBER@), so each of these failed with a parser
+-- error. Every function takes @y@ and @z@, so one request fits them all.
+inputThenInputJL4 :: Text
+inputThenInputJL4 =
+  [i|
+DECLARE MaybeYear IS A MAYBE NUMBER
+
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
+
+@export a synonym for a MAYBE, then a NUMBER
+GIVEN y IS A MaybeYear
+      z IS A NUMBER
+GIVETH A NUMBER
+`syn then number` y z MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a synonym for a MAYBE, then a MAYBE NUMBER
+GIVEN y IS A MaybeYear
+      z IS A MAYBE NUMBER
+GIVETH A NUMBER
+`syn then maybe` y z MEANS
+  (CONSIDER y
+     WHEN JUST n THEN n
+     WHEN NOTHING THEN 0)
+  PLUS (CONSIDER z
+          WHEN JUST m THEN m
+          WHEN NOTHING THEN 0)
+
+@export a MAYBE NUMBER written out, then a NUMBER
+GIVEN y IS A MAYBE NUMBER
+      z IS A NUMBER
+GIVETH A NUMBER
+`plain maybe then number` y z MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a NUMBER, then a synonym for a MAYBE: the control
+GIVEN z IS A NUMBER
+      y IS A MaybeYear
+GIVETH A NUMBER
+`number then syn` z y MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a contract with a synonym for a MAYBE first
+GIVEN y IS A MaybeYear
+      z IS A NUMBER
+GIVETH A DEONTIC Party `Contract Action`
+`syn contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+@export a contract with a MAYBE NUMBER written out first
+GIVEN y IS A MAYBE NUMBER
+      z IS A NUMBER
+GIVETH A DEONTIC Party `Contract Action`
+`plain contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+@export a contract with the synonym last: the control
+GIVEN z IS A NUMBER
+      y IS A MaybeYear
+GIVETH A DEONTIC Party `Contract Action`
+`control contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+|]
+
 -- | L4 source with an exported boolean function and a regulative (sale contract) rule.
 -- Used for testing state graph extraction and DOT output.
 saleContractJL4 :: Text
@@ -663,10 +753,9 @@ DECIDE `verdict` IS IF n > 10 THEN Unjust ELSE Just "lawful"
 
 -- | Inputs the wrapper must unwrap, so a missing one makes it answer NOTHING
 -- and the service names the input: an ASSUME, and a DATE, which the wrapper
--- reads from a string. The optional input comes last: the wrapper's generated
--- input record does not parse when an optional input is followed by another
--- (`GIVEN pad IS A MAYBE NUMBER, n IS A NUMBER` answers 422 with a parser
--- error on that path).
+-- reads from a string. The optional input comes last, as it had to when the
+-- wrapper's generated input record did not parse an optional input followed by
+-- another; it parses now ('inputThenInputJL4').
 declineLabelsJL4 :: Text
 declineLabelsJL4 =
   [i|

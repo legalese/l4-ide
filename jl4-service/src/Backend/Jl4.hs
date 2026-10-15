@@ -498,9 +498,7 @@ expandSyn mi = go (16 :: Int)
 -- LIST, a TIME, a DATETIME or a BOOLEAN declared through one because it leaves
 -- the synonym's name alone; expanding those here would break a LIST, a TIME and
 -- a DATETIME, which the wrapper fails when they are written out. Only the head of
--- the type is looked at. A consequence: a synonym for a MAYBE that is followed by
--- another input meets the wrapper's limit for a MAYBE followed by another input,
--- as a MAYBE written out does.
+-- the type is looked at.
 maybeSynonymHeads :: [Declare Resolved] -> [(Text, Type' Resolved)] -> [(Text, Type' Resolved)]
 maybeSynonymHeads decls tys = [ (name, headOf ty) | (name, ty) <- tys ]
   where
