@@ -20,6 +20,7 @@ import Language.LSP.Protocol.Types (CodeLens (..), Command (..), VersionedTextDo
 import L4.Syntax
   ( AppForm (..)
   , Decide (..)
+  , Expr
   , Module (..)
   , Resolved
   , Section (..)
@@ -30,6 +31,7 @@ import L4.Syntax
   )
 import qualified L4.Viz.Ladder as Core
 import qualified L4.Viz.VizExpr as V
+import qualified L4.Transform as Transform (holdsGeneratedNodes)
 import LSP.L4.Actions (decisionGraphCodeLenses)
 import qualified LSP.L4.Viz.Ladder as Ladder
 import LSP.L4.Rules (TypeCheckResult (..))
@@ -65,16 +67,24 @@ ruleOf tc = case [ d | d@(MkDecide _ _ (MkAppForm _ n _ _) _) <- go section, tex
 -- | The editor's ladder of @rule@, as the editor asks for it (not simplified),
 -- or the message it refuses with.
 ideLadder :: VersionedTextDocumentIdentifier -> TypeCheckResult -> Either T.Text V.FunDecl
-ideLadder verId tc =
+ideLadder = ideLadderWith False
+
+-- | The same, simplified or not. @jl4-service@ simplifies the ladder it plans from.
+ideLadderWith :: Bool -> VersionedTextDocumentIdentifier -> TypeCheckResult -> Either T.Text V.FunDecl
+ideLadderWith simplify verId tc =
   either (Left . Ladder.prettyPrintVizError) (Right . (.funDecl) . fst)
-    (Ladder.doVisualize (ruleOf tc) (Ladder.mkVizConfig verId tc.module' tc.substitution False))
+    (Ladder.doVisualize (ruleOf tc) (Ladder.mkVizConfig verId tc.module' tc.substitution simplify))
 
 -- | The core ladder of @rule@ (the REPL's and the browser's), or the message
 -- it refuses with.
 coreLadder :: VersionedTextDocumentIdentifier -> TypeCheckResult -> Either T.Text V.FunDecl
-coreLadder verId tc =
+coreLadder = coreLadderWith False
+
+-- | The same, simplified or not.
+coreLadderWith :: Bool -> VersionedTextDocumentIdentifier -> TypeCheckResult -> Either T.Text V.FunDecl
+coreLadderWith simplify verId tc =
   either (Left . Core.prettyPrintVizError) (Right . (.funDecl))
-    (Core.visualizeByName (toNormalizedUri verId._uri) "" 0 tc.module' tc.substitution False "rule")
+    (Core.visualizeByName (toNormalizedUri verId._uri) "" 0 tc.module' tc.substitution simplify "rule")
 
 -- | Check a source, under its own stem, so that two sources are two documents.
 check :: String -> T.Text -> IO (VersionedTextDocumentIdentifier, TypeCheckResult)
@@ -164,6 +174,40 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
     either id (const "drawn") (ideLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
     either id (const "drawn") (coreLadder ver tc) `shouldSatisfy` ("too long to draw" `T.isInfixOf`)
 
+  -- A group whose first clause matches every input has nothing to read through:
+  -- the clauses after it are never reached, and the body is that clause's result,
+  -- as a rule written without clauses has it. `main` draws such a rule however
+  -- long its result is, so both ladders do. The limits on clauses guard the
+  -- reading through, which such a group does not do.
+  describe "catch-all: a group whose first clause matches every input" $ do
+    -- The premise of the rest: the desugarer generates nothing for such a group
+    -- (the clauses after the first are checked and dropped), where a group that
+    -- tests its input generates CONSIDERs and LETs, and what a drafter wrote is
+    -- never taken for generated.
+    it "holds no node the desugarer generated, where a group that tests its input does" $ do
+      (_, tcCatchAll) <- check "premise-catchall" (catchAllDnf 3 True)
+      (_, tcGroup) <- check "premise-group" colourGroup
+      (_, tcTable) <- check "premise-table" colourTable
+      (_, tcByHand) <- check "premise-by-hand" colourByHand
+      map (Transform.holdsGeneratedNodes . bodyOf) [tcCatchAll, tcGroup, tcTable, tcByHand]
+        `shouldBe` [False, True, True, False]
+    it "is drawn in both ladders when its simplified ladder is more than 300 boxes" $ do
+      (ver, tc) <- check "catchall-dnf" (catchAllDnf 6 True)
+      (verH, tcH) <- check "catchall-dnf-by-hand" (catchAllDnf 6 False)
+      -- the premise: the rule, drawn as it is written, is more than 300 boxes
+      either T.unpack (\ f -> show (V.irExceeds 300 f.body)) (ideLadderWith True verH tcH) `shouldBe` "True"
+      either T.unpack (\ f -> show (V.irExceeds 300 f.body)) (coreLadderWith True verH tcH) `shouldBe` "True"
+      -- and the group draws as it does
+      fmap (leaves . (.body)) (ideLadderWith True ver tc) `shouldBe` fmap (leaves . (.body)) (ideLadderWith True verH tcH)
+      fmap (leaves . (.body)) (coreLadderWith True ver tc) `shouldBe` fmap (leaves . (.body)) (coreLadderWith True verH tcH)
+    it "is drawn in both ladders when its result is more than 20000 parts long" $ do
+      (ver, tc) <- check "catchall-huge" catchAllHuge
+      either id (const "drawn") (ideLadder ver tc) `shouldBe` "drawn"
+      either id (const "drawn") (coreLadder ver tc) `shouldBe` "drawn"
+    it "keeps its lens, titled as an ordinary rule's is" $ do
+      (ver, tc) <- check "lens-catchall-huge" (catchAllHuge <> smallRule)
+      lensTitles ver tc `shouldBe` ["Show decision graph", "Show decision graph"]
+
   -- A rule written as clauses that is refused keeps its lens, titled with
   -- why: a lens that silently went missing would not tell its drafter anything.
   -- Clicking it answers with the whole message ('LSP.L4.Actions.visualise').
@@ -191,3 +235,53 @@ tooLong =
     ["GIVEN n IS A NUMBER", "GIVETH A BOOLEAN"]
       <> [ "DECIDE rule " <> T.pack (show i) <> " IS n" <> T.concat (replicate 200 " + 1") <> " GREATER THAN 0" | i <- [0 .. 59 :: Int] ]
       <> ["DECIDE rule n IS FALSE"]
+
+
+-- | @k@ pairs of BOOLEAN inputs. The first clause names every input, so it
+-- matches all of them, and the clause after it is never reached; its result is
+-- a disjunction of conjunctions, whose conjunctive normal form is 449 boxes at
+-- @k@ = 6. Without the second clause it is a rule written without clauses.
+catchAllDnf :: Int -> Bool -> T.Text
+catchAllDnf k withClauses =
+  T.unlines $
+    ["GIVEN n IS A NUMBER"]
+      <> concat [ ["      a" <> j <> " IS A BOOLEAN", "      b" <> j <> " IS A BOOLEAN"] | j <- js ]
+      <> ["GIVETH A BOOLEAN"]
+      <> ["DECIDE rule n " <> inputs <> " IS " <> T.intercalate " OR " [ "(a" <> j <> " AND b" <> j <> ")" | j <- js ]]
+      <> [ "DECIDE rule 0 " <> inputs <> " IS FALSE" | withClauses ]
+  where
+    js = [ T.pack (show i) | i <- [1 .. k] ]
+    inputs = T.unwords (concat [ ["a" <> j, "b" <> j] | j <- js ])
+
+-- | A first clause that names its input and whose result is 22,000 parts or so:
+-- more than the 20,000 that clauses are limited to when they are read through.
+catchAllHuge :: T.Text
+catchAllHuge =
+  T.unlines
+    [ "GIVEN n IS A NUMBER", "GIVETH A BOOLEAN"
+    , "DECIDE rule n IS n" <> T.concat (replicate 11000 " + 1") <> " GREATER THAN 0"
+    , "DECIDE rule 0 IS FALSE" ]
+
+
+-- | The body of @rule@, as checked.
+bodyOf :: TypeCheckResult -> Expr Resolved
+bodyOf tc = case ruleOf tc of MkDecide _ _ _ body -> body
+
+colourGroup, colourTable, colourByHand :: T.Text
+colourGroup = T.unlines
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue", ""
+  , "GIVEN c IS A Colour", "GIVETH A BOOLEAN"
+  , "DECIDE rule Red IS TRUE", "DECIDE rule Green IS FALSE", "DECIDE rule Blue IS FALSE" ]
+colourTable = T.unlines
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue", ""
+  , "GIVEN c IS A Colour", "      b IS A BOOLEAN", "GIVETH A BOOLEAN"
+  , "DECIDE rule Red TRUE IS TRUE", "DECIDE rule Red FALSE IS FALSE"
+  , "DECIDE rule Green b IS b", "DECIDE rule Blue b IS NOT b" ]
+-- | A CONSIDER and a LET that the drafter wrote.
+colourByHand = T.unlines
+  [ "DECLARE Colour IS ONE OF Red, Green, Blue", ""
+  , "GIVEN c IS A Colour", "GIVETH A BOOLEAN"
+  , "DECIDE rule c IS"
+  , "  LET warm BE TRUE"
+  , "  IN CONSIDER c"
+  , "       WHEN Red THEN warm", "       WHEN Green THEN FALSE", "       WHEN Blue THEN FALSE" ]

@@ -46,7 +46,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, writtenAsClauses)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import L4.Desugar
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
@@ -307,13 +307,18 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   -- Whether it was is read off the rule as written (the parser records its
   -- clauses on it), not off its body.
   let isClauseGroup = Transform.writtenAsClauses asWritten
+      -- The limits below guard the reading through, so they apply to a group
+      -- that has something to read through. One whose first clause matches
+      -- every input has nothing: its body is that clause's result, and it is
+      -- drawn as a rule written without clauses is, whatever its size.
+      readsThrough = isClauseGroup && Transform.holdsGeneratedNodes body0
   body <- case Transform.inlineLetsForViz body0 of
     Right inlined -> pure inlined
     -- Too big to read through. Clauses are refused: drawn as they stand they
     -- would be one leaf that asks nothing. Anything else is drawn as written:
     -- a LET the drafter wrote is never read through.
-    Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
-           | otherwise     -> pure body0
+    Left _ | readsThrough -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+           | otherwise    -> pure body0
 
   let funName = mkPrettyVizName funResolved
   assign #functionName funName.label
@@ -323,8 +328,8 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   vizBody <- translateExpr shouldSimplify (carameliseExpr body)
   -- The same limit on what is drawn as where a CONSIDER is drawn as rows (see
   -- 'Transform.clauseGroupLadderBudget'). A rule that was not written as
-  -- clauses is drawn as it always was.
-  when (isClauseGroup && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+  -- clauses, or whose first clause matches every input, is drawn as it always was.
+  when (readsThrough && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
     throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
   pure $ MkFunDecl vid funName (paramNamesFromGivens givenSig appArgs) vizBody
   where

@@ -49,7 +49,7 @@ import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -817,21 +817,30 @@ spec = describe "integration" do
           statusCode' resp `shouldBe` 400
           LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "returns a boolean"
 
-      -- A rule written as clauses may draw 300 boxes and no more. Here a CONSIDER
-      -- is one box, but the service simplifies the ladder, and a disjunction of
-      -- conjunctions rewritten into conjunctive normal form grows past 300.
-      it "answers clauses whose simplified ladder draws 193 boxes" do
+      -- A group whose first clause matches every input has nothing to read
+      -- through: the clauses after it are never reached, and its body is that
+      -- clause's result, as a rule written without clauses has it. `main` plans
+      -- such a rule however long or large its result, and so does the service. The
+      -- service simplifies the ladder, and a disjunction of conjunctions
+      -- rewritten into conjunctive normal form grows past 300 boxes at six
+      -- pairs of inputs (449 boxes).
+      it "catch-all: answers a group whose first clause matches every input, simplified to 193 boxes" do
         withServiceFromSources "dnf-5" [("rule.l4", dnfClauseJL4 5)] \baseUrl mgr -> do
           resp <- queryPlan' baseUrl mgr "dnf-5" "rule" noArguments
           statusCode' resp `shouldBe` 200
-      it "refuses clauses whose simplified ladder would draw 449 boxes, naming why" do
+      it "catch-all: answers such a group whose simplified ladder is 449 boxes, as it answers the rule written without clauses" do
         withServiceFromSources "dnf-6" [("rule.l4", dnfClauseJL4 6)] \baseUrl mgr -> do
-          resp <- queryPlan' baseUrl mgr "dnf-6" "rule" noArguments
-          statusCode' resp `shouldBe` 400
-          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
-      it "draws the same rule written without clauses, whatever its size" do
-        withServiceFromSources "hand-dnf-6" [("rule.l4", handDnfJL4 6)] \baseUrl mgr -> do
-          resp <- queryPlan' baseUrl mgr "hand-dnf-6" "rule" noArguments
+          withServiceFromSources "hand-dnf-6" [("rule.l4", handDnfJL4 6)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "dnf-6" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-dnf-6" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldBe` planOf qpH
+            lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+      it "catch-all: answers such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "catchall-huge" [("rule.l4", catchAllHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "catchall-huge" "rule" noArguments
           statusCode' resp `shouldBe` 200
 
   -- A deployment outlives the process that compiled it. On restart the service

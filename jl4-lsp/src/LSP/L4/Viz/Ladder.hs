@@ -45,7 +45,7 @@ import L4.Viz.Ladder (InputRef(..), generateAtomId)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, writtenAsClauses)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import LSP.L4.Viz.VizExpr
   ( ID (..), IRExpr,
     RenderAsLadderInfo (..),
@@ -324,10 +324,14 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
     -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
     -- Mirrors 'L4.Viz.Ladder.translateDecide'.
     let isClauseGroup = Transform.writtenAsClauses asWritten
+        -- The limits apply to a group that has something to read through; one
+        -- whose first clause matches every input has nothing, and is drawn as a
+        -- rule written without clauses is.
+        readsThrough = isClauseGroup && Transform.holdsGeneratedNodes body0
     body <- case Transform.inlineLetsForViz body0 of
       Right inlined -> pure inlined
-      Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
-             | otherwise     -> pure body0
+      Left _ | readsThrough -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+             | otherwise    -> pure body0
 
     let funName = mkPrettyVizName funResolved
     assign #functionName funName.label
@@ -335,7 +339,7 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
     shouldSimplify <- getShouldSimplify
     vid            <- getFresh
     vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
-    when (isClauseGroup && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+    when (readsThrough && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
       throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
     pure $ V.MkFunDecl
       vid

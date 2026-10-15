@@ -42,6 +42,7 @@ module TestData (
   letChainJL4,
   longNumberClausesJL4,
   longClausesJL4,
+  catchAllHugeJL4,
   dnfClauseJL4,
   handDnfJL4,
   jsonDecodePersonJL4,
@@ -869,6 +870,15 @@ longNumberClausesJL4 k width =
 -- for 6.
 dnfClauseJL4 :: Int -> Text
 dnfClauseJL4 k = dnfRule k True
+
+-- | A first clause that names its input and whose result is 22,000 parts or so:
+-- more than the 20,000 that clauses are limited to when they are read through.
+-- The clause after it is never reached.
+catchAllHugeJL4 :: Text
+catchAllHugeJL4 =
+  "@export Huge\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> "DECIDE rule n IS n" <> Text.concat (replicate 11000 " + 1") <> " GREATER THAN 0\n"
+    <> "DECIDE rule 0 IS FALSE\n"
 
 -- | 'dnfClauseJL4' without clauses.
 handDnfJL4 :: Int -> Text

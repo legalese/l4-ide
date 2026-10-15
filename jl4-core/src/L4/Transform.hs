@@ -148,12 +148,16 @@ letInliningNodeBudget :: Int
 letInliningNodeBudget = 20000
 
 -- | The most boxes a ladder may have when the rule was written as DECIDE
--- clauses. Here a CONSIDER is drawn as one box, so a group that reads through
--- to a CONSIDER is one box, however many rows it has. The limit is reached by a
--- group that reads through to something else (one whose first clause matches
--- every input, say, and whose result is a long disjunction), or when the
--- ladder is simplified, as jl4-service simplifies it: a disjunction of
--- conjunctions rewritten into conjunctive normal form can grow far past it.
+-- clauses and the desugarer generated something to read through
+-- ('holdsGeneratedNodes'). Here a CONSIDER is drawn as one box, so a group that
+-- reads through to a CONSIDER is one box, however many rows it has: nothing
+-- reaches this limit today. It is kept as @unstable@ has it, for when a
+-- CONSIDER is drawn as rows (legalese/l4-ide#137), which is where a group of
+-- many rows can draw more boxes than anyone can read.
+--
+-- A group whose first clause matches every input is not limited. It has nothing
+-- to read through, so its ladder is that of a rule written without clauses,
+-- which is not limited either, however far simplifying grows it.
 clauseGroupLadderBudget :: Int
 clauseGroupLadderBudget = 300
 
@@ -162,6 +166,28 @@ clauseGroupLadderBudget = 300
 -- stays on the decision whatever is later put into its body.
 writtenAsClauses :: Decide Resolved -> Bool
 writtenAsClauses (MkDecide ann _ _ _) = isJust (view annPmMatrix ann)
+
+-- | Does this expression hold a node the clause desugarer generated: a CONSIDER
+-- it compiled clauses to ('PmConsider'), or a LET that binds the clauses not
+-- yet tried? Only then is there anything to read through, and only then do the
+-- limits on reading clauses through apply.
+--
+-- A group whose first clause matches every input has no such node. The
+-- desugarer binds the clauses after that one only so that they are checked, and
+-- the checker drops them from the tree ('PmUnreachable'), so the body is that
+-- clause's result, as a rule written without clauses would have it.
+holdsGeneratedNodes :: Expr Resolved -> Bool
+holdsGeneratedNodes e = here || any holdsGeneratedNodes (toListOf (gplate @(Expr Resolved)) e)
+  where
+    here = case e of
+      Consider ann _ _ -> case view annPmSynthetic ann of
+        Just PmConsider{} -> True
+        _                 -> False
+      LetIn _ ds _ -> any generatedDecl ds
+      _            -> False
+    generatedDecl = \ case
+      LocalDecide _ (MkDecide a _ _ _) -> isJust (view annPmSynthetic a)
+      _                                -> False
 
 -- | Join a generated CONSIDER whose last branch is an OTHERWISE holding another
 -- generated CONSIDER on the same input. Bottom-up, so a run of three joins.
