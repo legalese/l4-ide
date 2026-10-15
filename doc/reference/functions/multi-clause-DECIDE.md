@@ -333,7 +333,7 @@ A rule that uses another shows the use as one box, not the clauses behind it.
 Or split one long list into smaller lists, each deciding one part of the question, and combine their answers with `AND` or `OR`.
 
 The limits apply only to a rule written as clauses that L4 reads through.
-A rule whose first clause names each input as its `GIVEN` does, or is `_`, is not read through, because the clauses after that one are never reached, so it is drawn and planned as a rule written without clauses is, however long it is.
+A rule whose first clause names each input as its `GIVEN` does, or is `` `_` ``, is not read through, because the clauses after that one are never reached, so it is drawn and planned as a rule written without clauses is, however long it is.
 A first clause that gives an input a new name is read through, and both limits apply to it.
 A `CONSIDER` you write yourself is drawn as you wrote it.
 A rule that answers something other than yes or no, such as a number, is not drawn at all, however it is written, and L4 says that first.
