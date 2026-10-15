@@ -5,6 +5,7 @@ module Types (
   DeploymentState (..),
   UpdateJob (..),
   UpdateJobStatus (..),
+  DeployWarning (..),
   DeploymentMetadata (..),
   FunctionSummary (..),
   FileEntry (..),
@@ -94,10 +95,58 @@ data UpdateJob = UpdateJob
 data UpdateJobStatus
   = JobCompiling
   -- ^ Bundle is compiling / being compatibility-checked.
-  | JobApplied
-  -- ^ The new bundle is compiled, compatible, and now the live version.
+  | JobApplied ![DeployWarning]
+  -- ^ The new bundle is compiled, compatible, and now the live version. The
+  -- warnings are things the deploy let through that a caller will meet later.
   | JobRejected !Text
   -- ^ Rejected: breaking change, compile failure, or timeout (reason).
+
+-- | Something a deploy let through, that its operator would want to know
+-- before a caller finds out. A warning never changes what is served and never
+-- rejects a deploy.
+--
+-- The one kind today is @uncallable-input@: an exported function's input needs
+-- a value of a type with a constructor that carries data, and the service has no
+-- JSON form for that constructor, so no call can supply it (see
+-- "UncallableInputs").
+data DeployWarning = DeployWarning
+  { dwKind         :: !Text
+  -- ^ Always @uncallable-input@ for now.
+  , dwFunction     :: !Text
+  -- ^ The exported function, as the deployment names it.
+  , dwParameter    :: ![Text]
+  -- ^ Where the input sits: the function's @GIVEN@, then each field below it,
+  -- spelled as the L4 source spells them.
+  , dwType         :: !Text
+  -- ^ The type that is needed at that position.
+  , dwConstructors :: ![Text]
+  -- ^ The constructors of that type that carry data and so cannot be supplied.
+  , dwCanSupply    :: ![Text]
+  -- ^ The constructors of that type that carry no data and can still be sent.
+  , dwMessage      :: !Text
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance ToJSON DeployWarning where
+  toJSON w = Aeson.object $
+    [ "kind"         .= w.dwKind
+    , "function"     .= w.dwFunction
+    , "parameter"    .= w.dwParameter
+    , "type"         .= w.dwType
+    , "constructors" .= w.dwConstructors
+    ] <> (if null w.dwCanSupply then [] else ["canSupply" .= w.dwCanSupply])
+      <> ["message" .= w.dwMessage]
+
+instance FromJSON DeployWarning where
+  parseJSON = Aeson.withObject "DeployWarning" $ \o ->
+    DeployWarning
+      <$> o .: "kind"
+      <*> o .: "function"
+      <*> o .: "parameter"
+      <*> o .: "type"
+      <*> o .: "constructors"
+      <*> o .:? "canSupply" .!= []
+      <*> o .: "message"
 
 -- | Metadata persisted alongside a deployment bundle.
 data DeploymentMetadata = DeploymentMetadata
@@ -123,6 +172,10 @@ data DeploymentMetadata = DeploymentMetadata
   -- single string — the BREAKING/RUNNING counters are parsed back out of it at
   -- the next deploy and bumped (string-edited), so there are no separate
   -- counter fields to keep in sync. Empty when unknown.
+  , metaWarnings :: ![DeployWarning]
+  -- ^ What this deployment's compile let through that a caller will meet later.
+  -- Recomputed from the sources at every compile, so it is current for the
+  -- live version; empty when there is nothing to say.
   }
   deriving stock (Show, Generic)
 
@@ -137,6 +190,7 @@ instance ToJSON DeploymentMetadata where
             else ["serviceVersion" .= dm.metaServiceVersion])
       <> (if Text.null dm.metaDeploymentVersion then []
             else ["deploymentVersion" .= dm.metaDeploymentVersion])
+      <> (if null dm.metaWarnings then [] else ["warnings" .= dm.metaWarnings])
 
 instance FromJSON DeploymentMetadata where
   parseJSON = Aeson.withObject "DeploymentMetadata" $ \o ->
@@ -148,6 +202,7 @@ instance FromJSON DeploymentMetadata where
       <*> (o .:? "description" <|> o .:? "metaDescription")
       <*> o .:? "serviceVersion" .!= ""
       <*> o .:? "deploymentVersion" .!= ""
+      <*> o .:? "warnings" .!= []
 
 -- | Summary of a single exported function within a deployment.
 data FunctionSummary = FunctionSummary

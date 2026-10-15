@@ -100,6 +100,9 @@ data UpdateStatusResponse = UpdateStatusResponse
   , usDeploymentId :: !Text
   , usStatus       :: !Text   -- "compiling" | "applied" | "rejected"
   , usError        :: !(Maybe Text)
+  , usWarnings     :: ![DeployWarning]
+  -- ^ Set only on an applied job: what the deploy let through that a caller
+  -- will meet later (inputs no call can fill). Absent when there is none.
   }
   deriving stock (Show, Generic)
 
@@ -109,6 +112,7 @@ instance ToJSON UpdateStatusResponse where
     , "deploymentId" .= u.usDeploymentId
     , "status"       .= u.usStatus
     ] <> maybe [] (\e -> ["error" .= e]) u.usError
+      <> (if null u.usWarnings then [] else ["warnings" .= u.usWarnings])
 
 instance FromJSON UpdateStatusResponse where
   parseJSON = Aeson.withObject "UpdateStatusResponse" $ \o ->
@@ -117,6 +121,7 @@ instance FromJSON UpdateStatusResponse where
       <*> o Aeson..: "deploymentId"
       <*> o Aeson..: "status"
       <*> o Aeson..:? "error"
+      <*> o Aeson..:? "warnings" Aeson..!= []
 
 -- | The control plane API for managing deployments.
 type ControlPlaneApi =
@@ -298,11 +303,14 @@ getUpdateStatusHandler deployIdText jobId = do
         , usDeploymentId = j.ujDeploymentId
         , usStatus = case j.ujStatus of
             JobCompiling  -> "compiling"
-            JobApplied    -> "applied"
+            JobApplied _  -> "applied"
             JobRejected _ -> "rejected"
         , usError = case j.ujStatus of
             JobRejected m -> Just m
             _             -> Nothing
+        , usWarnings = case j.ujStatus of
+            JobApplied ws -> ws
+            _             -> []
         }
     _ -> throwError err404
 
@@ -504,7 +512,7 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
                 ]
           atomically $ modifyTVar' env.deploymentRegistry $
             Map.insert deployId (DeploymentReady fns meta)
-          setJob env jobId JobApplied
+          setJob env jobId (JobApplied meta.metaWarnings)
           logInfo env.logger "Deploy job applied"
             [ ("deploymentId", toJSON deployId.unDeploymentId)
             , ("jobId", toJSON jobId)

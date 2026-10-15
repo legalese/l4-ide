@@ -14,6 +14,7 @@ import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, decl
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import Types
+import UncallableInputs (uncallableInputWarnings)
 import Control.Monad (forM, forM_, unless)
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
@@ -29,7 +30,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
-import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams, honouredDefault, isRequiredInput)
+import L4.Export (ExportedFunction (..), ExportedParam (..), ParamSource (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams, honouredDefault, isRequiredInput)
 import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
 import Logging (Logger, logInfo, logWarn)
@@ -127,8 +128,9 @@ compileBundle logger deployId sources = do
               ]
             pure (filepath, Left (Text.intercalate "\n" (("Typecheck failed: " <> Text.pack filepath) : why)))
 
-      let allFunctionsWithFile = [ (fp, fn) | (fp, Right fns) <- results, fn <- fns ]
+      let allFunctionsWithFile = [ (fp, fn) | (fp, Right (fns, _)) <- results, fn <- fns ]
           allFunctions = map snd allFunctionsWithFile
+          warnings = [ w | (_, Right (_, ws)) <- results, w <- ws ]
           errors = [err | (_, Left err) <- results]
 
       -- Any file that failed to compile (typecheck errors, unsupported
@@ -158,6 +160,7 @@ compileBundle logger deployId sources = do
                 , metaDescription = Nothing
                 , metaServiceVersion = ""
                 , metaDeploymentVersion = ""
+                , metaWarnings = warnings
                 }
 
           unless (null allFunctions) $
@@ -179,7 +182,7 @@ processTypecheckedFile
   -> ModuleContext
   -> Rules.TypeCheckResult
   -> Map FilePath EvalEnv.Environment  -- ^ Import environments from shared session
-  -> IO (FilePath, Either Text [ValidatedFunction])
+  -> IO (FilePath, Either Text ([ValidatedFunction], [DeployWarning]))
 processTypecheckedFile logger deployId filepath content moduleContext
   tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
   evalMap = do
@@ -236,7 +239,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
           ]
         pure (filepath, Left (Text.intercalate "\n" blockingErrs))
       else if null exports
-      then pure (filepath, Right [])
+      then pure (filepath, Right ([], []))
       else do
         let implicitParams = extractImplicitAssumeParams tcErrors
             allDeclares = collectAllDeclares tcResult
@@ -307,7 +310,26 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("file", toJSON filepath)
           , ("exportCount", toJSON (length fns))
           ]
-        pure (filepath, Right fns)
+        -- Inputs no call can fill (UncallableInputs). A warning, not a refusal:
+        -- the function still deploys, and every call that does not need that
+        -- input is unaffected.
+        let warnings = concat
+              [ uncallableInputWarnings allDeclares fn.fnImpl.name (export.exportParams <> implicitAssumes export)
+              | (export, fn) <- zip exports fns
+              ]
+            implicitAssumes export =
+              [ ExportedParam { paramName = pname, paramType = Just ty, paramDescription = Nothing
+                              , paramRequired = True, paramDefault = Nothing, paramSource = AssumeInput }
+              | (pname, ty) <- implicitParams
+              , pname `notElem` map (.paramName) export.exportParams
+              ]
+        unless (null warnings) $
+          logWarn logger "Exported inputs that no call can fill"
+            [ ("deploymentId", toJSON deployId)
+            , ("file", toJSON filepath)
+            , ("warnings", toJSON (map (.dwMessage) warnings))
+            ]
+        pure (filepath, Right (fns, warnings))
 
 -- | Convert an ExportedFunction to our Function type.
 exportToFunction :: Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function

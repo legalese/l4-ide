@@ -293,6 +293,10 @@ instance Arbitrary DeploymentMetadata where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
+    <*> arbitrary
+
+instance Arbitrary DeployWarning where
+  arbitrary = DeployWarning <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary FunctionSummary where
   arbitrary = FunctionSummary <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
