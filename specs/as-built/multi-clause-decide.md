@@ -1,7 +1,9 @@
 # Multi-clause pattern-matching DECIDE (as built on main)
 
-This describes branch `carve/multi-clause-decide` (PR #545, into `main`), re-measured on 2026-10-13 (the goldens and the test counts, after the carry of #631 described under "Review round 5"); a measurement dated earlier in the text keeps its date. The `file:line` citations were last re-derived on 2026-10-15, after the merges of `main` into the branch that carries the ladder section (#656).
-Every `file:line` below is at the commit that last changed this file. The probes, test counts and timings below were run on binaries built from earlier commits, the one the text names beside each where it names one; a commit that changes only this file does not re-run them.
+This describes branch `carve/multi-clause-decide` (PR #545, into `main`), re-measured on 2026-10-13 (the goldens and the test counts, after the carry of #631 described under "Review round 5"); a measurement dated earlier in the text keeps its date.
+The `file:line` citations were last re-derived on 2026-10-15, after the merges of `main` into the branch that carries the ladder section (#656).
+Every `file:line` below is at the commit that last changed this file.
+The probes, test counts and timings below were run on binaries built from earlier commits, the one the text names beside each where it names one; a commit that changes only this file does not re-run them.
 The branch carries work first merged into unstable, one PR at a time, and each section below names its unstable source.
 The unstable commits named here are on unstable only: none of them is on this branch or on main.
 
@@ -542,7 +544,7 @@ Test: `ok/pattern-matching-clause-arity-change.l4`, with its goldens.
 
 Tests for the editor.
 The outline and completion leave out the names a clause group is compiled with (see "Generated names, printing, editor and render"), and nothing tested it: the outline's filters were in the document-symbol handler in `jl4-lsp/app`, out of any test's reach.
-They are now `outlineGivenParams` and `outlineLocals` in `jl4-lsp/src/LSP/L4/Actions.hs` (`:283`, `:290`), which the handler calls (`jl4-lsp/app/LSP/L4/Handlers.hs:506`, `:507` and `:622`); completion's filter was already there (`:350`).
+They are now `outlineGivenParams` and `outlineLocals` in `jl4-lsp/src/LSP/L4/Actions.hs` (`:283`, `:290`), which the handler calls (`jl4-lsp/app/LSP/L4/Handlers.hs:506`, `:507` and `:622`); completion's filter was already there (`jl4-lsp/src/LSP/L4/Actions.hs:352`).
 Main had no `jl4-lsp` test suite, so this adds the stanza (`test-suite jl4-lsp-test`, `jl4-lsp/jl4-lsp.cabal:156`), modelled on unstable's with `main-is: Spec.hs` under `hs-source-dirs: test`, and only the two modules the spec needs, `CheckSource` and `ClauseGeneratedNamesSpec`, with the packages they import (`-Wunused-packages` is an error).
 `ClauseGeneratedNamesSpec` has ten examples: one that the module type-checks, four for the outline and four for completion over the three shapes that make the machinery name something (a group with a `GIVEN` whose input is named after a constructor, a group with no `GIVEN`, a one-clause group with a literal), and a control that a rule written without clauses keeps what was written.
 Each case first finds a generated name in the unfiltered list, so that taking a filter out turns it red.
@@ -670,7 +672,7 @@ Until legalese/l4-ide#666 a restart read `bundle.cbor`, which kept no part of an
 #666 removed the cache, so a restart compiles the stored sources as a deploy does.
 `IntegrationSpec` pins it ("restarted: is planned as it was before the restart", one case for each of the eight clause groups of the pairs below): each group is deployed, the service is restarted from its store, and `/query-plan` is asked before and after; the answer before must be a 200 with a body, and the answer after must equal it.
 All eight pass at `e393b2e4c`.
-With a mutation, not kept, that makes the restart compile the sources with `IS FALSE` turned into `IS TRUE`, the five groups whose source contains `IS FALSE` fail on that comparison and the other three pass.
-The test shows that a restart gives the plan a deploy gives; it cannot reproduce the old `bundle.cbor` failure, whose code is gone.
+With a mutation, not kept, that passes each restarted function's compiled module and DECIDE through the CBOR encoding the old cache used (`Serialise Anno`, still behind the flag), all eight fail, each with the old 400 "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." against the fresh 200.
+With a mutation, not kept, that compiles `IS FALSE` as `IS TRUE`, the five groups whose source has `IS FALSE` fail on that comparison and the other three pass.
 
 Pinned by `jl4-service/test/IntegrationSpec.hs` ("a BOOLEAN rule written as DECIDE clauses": eight pairs compared with their hand-written CONSIDER, whole plan and atomIds; the 20,000-part refusal; the 193 and 449-box simplified ladders; the boolean check first; a drafter's LET kept as written; the eight groups planned as before after a restart) and `jl4-lsp/test/ClauseGroupLadderSpec.hs` (four pairs in both ladders, `EXACTLY` among them; the refusal in both; the lens).
