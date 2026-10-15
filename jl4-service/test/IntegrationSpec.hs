@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module IntegrationSpec (spec) where
+-- | The helpers are exported for "StdlibResolutionSpec", which needs the same
+-- in-process service but must control the environment around it.
+module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions) where
 
 import Test.Hspec
 
@@ -42,7 +44,7 @@ import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (removeDirectoryRecursive, removePathForcibly, doesDirectoryExist)
+import System.Directory (removeDirectoryRecursive, removePathForcibly, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
@@ -868,6 +870,33 @@ spec = describe "integration" do
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
         dir <- readIORef storeDir
         Text.IO.readFile (dir </> "old" </> "bundle.cbor") `shouldReturn` oldCache
+
+    it "serves a function that calls sum from a store whose cache holds the standard library at its old address" do
+      -- bundle.cbor in the fixture directory was written by a service built from
+      -- main before library resolution changed (00298eb60): it holds the
+      -- prelude at `file://prelude.l4`, 1,084 times, and never at
+      -- `jl4-embedded:`. A build that read it paired it with a library
+      -- environment at the new address, and every library function, `sum`
+      -- among them, was "not in scope" at call time. This build compiles the
+      -- sources and reads no cache, so the function answers, and the file is
+      -- left as it was.
+      let fixtureDir = "test/fixtures/old-prelude-cache"
+      here <- doesFileExist (fixtureDir </> "bundle.cbor")
+      let dirOfFixture = if here then fixtureDir else "jl4-service" </> fixtureDir
+      oldCache <- BS.readFile (dirOfFixture </> "bundle.cbor")
+      total <- Text.IO.readFile (dirOfFixture </> "total.l4")
+      storeDir <- newIORef ""
+      let plant dir = do
+            writeIORef storeDir dir
+            BS.writeFile (dir </> "oldsum" </> "bundle.cbor") oldCache
+      withServicesRestarted [("oldsum", [("total.l4", total)])] plant \logLines baseUrl mgr -> do
+        assertRecompiled "oldsum" logLines
+        resp <- evalFunction baseUrl mgr "oldsum" "total"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["xs" Aeson..= ([1, 2, 3] :: [Int])]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 6)
+        dir <- readIORef storeDir
+        BS.readFile (dir </> "oldsum" </> "bundle.cbor") `shouldReturn` oldCache
 
     it "compiles a restarted deployment under --compile-timeout, as a deploy does" do
       -- A timeout of zero is over before the compile starts. A restart that

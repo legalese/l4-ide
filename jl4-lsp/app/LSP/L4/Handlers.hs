@@ -63,6 +63,7 @@ import Language.LSP.Server hiding (notificationHandler, requestHandler)
 import qualified Language.LSP.Server as LSP
 import Language.LSP.VFS (VFS)
 import LSP.L4.Actions
+import LSP.L4.EmbeddedLibrary
 import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
@@ -816,6 +817,20 @@ handlers evalConfig recorder =
                     , _xdata = Nothing
                     }
 
+    , requestHandler (SMethod_CustomMethod (Proxy @EmbeddedLibraryMethodName)) $ \_ide params ->
+        pure case Aeson.fromJSON params of
+          Aeson.Error err -> Left $ TResponseError
+            { _code = InR ErrorCodes_InvalidParams
+            , _message = "Failed to parse l4/embeddedLibrary params: " <> Text.pack err
+            , _xdata = Nothing
+            }
+          Aeson.Success reqParams -> case embeddedLibraryResponse reqParams of
+            Nothing -> Left $ TResponseError
+              { _code = InR ErrorCodes_InvalidParams
+              , _message = "Not an embedded library: " <> reqParams.uri
+              , _xdata = Nothing
+              }
+            Just response -> Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.GetExportedFunctionsMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.GetExportedFunctionsParams
             parseParams v = case Aeson.fromJSON v of

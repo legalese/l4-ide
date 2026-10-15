@@ -1,5 +1,7 @@
 -- Prelude Example: Demonstrating core list and Maybe patterns
--- The prelude is automatically imported and provides foundational types
+-- Everything below is core syntax and built-ins, so this file needs no IMPORT.
+-- The prelude itself is NOT automatic: reach for one of its functions and you
+-- must write `IMPORT prelude` first, exactly as for any other library.
 
 -- List construction using FOLLOWED BY (cons) and EMPTY
 DECIDE `first few numbers` IS 1 FOLLOWED BY 2 FOLLOWED BY 3 FOLLOWED BY EMPTY

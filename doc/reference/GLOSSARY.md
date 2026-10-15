@@ -266,7 +266,7 @@ For complete documentation, see **[Libraries Reference](libraries/README.md)**.
 
 | Library           | Purpose                              |
 | ----------------- | ------------------------------------ |
-| **prelude**       | Standard functions (always imported) |
+| **prelude**       | Standard functions (IMPORT prelude)  |
 | **daydate**       | Date calculations and temporal logic |
 | **time**          | Wall-clock time-of-day operations    |
 | **datetime**      | Absolute points in time (with tz)    |

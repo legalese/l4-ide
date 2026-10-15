@@ -15,6 +15,58 @@ This directory contains the standard libraries for L4, providing common function
 - **holdings.l4** - Financial holdings and ownership structures
 - **math.l4** - Mathematical functions (trigonometry, logarithms, etc.)
 
+## How `IMPORT` finds these files (resolution order)
+
+The libraries reach a running binary by two routes: an **embedded copy**
+(a Template Haskell splice in `L4.API.EmbeddedLibraries` compiles this whole
+directory into the binary at build time, so an installed `jl4`/`l4` works with
+no checkout on disk) and a **filesystem search**. A bare `IMPORT prelude`
+resolves in this priority order (first hit wins):
+
+1. `$JL4_LIBRARY_PATH/<mod>.l4` — explicit operator override
+2. `<project root>/<mod>.l4`
+3. `<directory of the importing file>/<mod>.l4`
+4. the **embedded copy** (skipped entirely when `JL4_LIBRARY_PATH` is set)
+5. `~/.local/share/jl4/libraries/<mod>.l4` (XDG data dir)
+6. `<exeDir>/../../libraries/<mod>.l4` (VSCode extension bundle)
+
+Project-scoped locations (1–3) outrank the embedded copy so intentional
+overrides work; machine-global locations (5–6) rank _below_ it so a stray
+symlink can't silently shadow the stdlib the binary was built with. When
+several _differing_ copies of a module are visible at once, the resolver emits
+a warning naming all of them (symlinks dereferenced) and the one chosen. See
+`doc/reference/libraries/resolution.md` for the full dev-vs-prod guide
+(including the history that forced this design), and
+`specs/as-built/import-resolution.md` for an as-built description of the code.
+
+## Editing these files? Read this first (the staleness gotcha)
+
+The embedded copy is captured at **build** time, when GHC compiles
+`L4.API.EmbeddedLibraries`. For a checkout it reads the checkout's own
+`jl4-core/libraries/`, and GHC re-embeds a library whose content changed — but
+only if Cabal calls GHC at all. Measured 2026-10-13 (GHC 9.10.3, Cabal 3.16):
+
+- Editing `jl4-core/libraries/*.l4` and nothing else does **not** re-embed on a
+  plain `cabal build`: it prints `Up to date`, rebuilds nothing, and the binary
+  keeps serving the old stdlib, so your edit "mysteriously" doesn't take
+  effect. `touch`-ing a source file does not help (Cabal compares content).
+- A real change to any `jl4-core/src` file makes Cabal call GHC, and GHC then
+  notices the edited library and re-embeds it.
+- The reliable way to develop stdlib changes is to pin the resolver at your
+  worktree:
+
+  ```sh
+  export JL4_LIBRARY_PATH="$PWD/jl4-core/libraries"
+  ```
+
+  which outranks every other source, including the (possibly stale) embed.
+
+- To actually refresh the embed without the pin, make a real content change to
+  a `jl4-core` source file, or clean-rebuild `jl4-core`.
+
+Note: the local test suites want `JL4_LIBRARY_PATH` set anyway (CI exports
+it), so the pin above is the normal dev configuration.
+
 ## Important: Understanding DATE vs Date
 
 **TL;DR:** `DATE` is the type, `Date` is the constructor function. They're different things with confusingly similar names.
