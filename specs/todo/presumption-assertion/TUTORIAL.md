@@ -1,6 +1,6 @@
 # Telling a rule what you know, and letting it presume the rest
 
-**Status:** a draft of a future page under `doc/tutorials/`, written 2026-10-09 and revised the same day after two adversarial reviews, against a design that is not yet built.
+**Status:** a draft of a future page under `doc/tutorials/`, written 2026-10-09 and revised the same day after two adversarial reviews, and revised again on 2026-10-11 to name the age fallback `is adult` for the fact and not `presumed adult` for its default, against a design that is not yet built.
 It sits under `specs/todo/` until the behaviour it teaches lands; each section below says what runs today and what does not.
 The design it teaches is `CONTRACT.md`, beside this file, and the measurements behind both are `../PRESUMPTION-SCENARIOS.md`.
 Nothing on this page describes shipped behaviour unless the section says so.
@@ -183,6 +183,7 @@ A request that asserts `offence made out` would then be refused by name, before 
 The rule's own final answer can never be asserted in L4's own evaluators, with or without the annotation.
 
 **Not built yet.** Nothing today refuses an assertion, because nothing today accepts one.
+The `@nonassertable` annotation itself parses and is checked today, and nothing reads it.
 Open by default, with this annotation as the opt-out, is what Meng ruled in chat on 2026-10-09 (`../PRESUMPTION-SCENARIOS.md` §7); it is recorded in the specification that owns it (`UNKNOWN-EVALUATION-SPEC.md` §5), so by this repository's rules it is decided.
 
 Why open by default?
@@ -209,18 +210,28 @@ DECLARE Person HAS
 @export
 GIVEN alex IS A Person
       asat IS A DATE
-      `presumed adult` IS A BOOLEAN TYPICALLY TRUE
+      `is adult` IS A BOOLEAN TYPICALLY TRUE
 GIVETH A BOOLEAN
 `adult` MEANS
   CONSIDER alex's birthdate
     WHEN JUST b  THEN DATE_YEAR asat MINUS DATE_YEAR b AT LEAST 21
-    WHEN NOTHING THEN `presumed adult`
+    WHEN NOTHING THEN `is adult`
 ```
 
+`is adult` here belongs to this rule, and is not the one at the top of the page.
+There it decides the answer; here it is read only when the birthdate leaves the question open.
+This rule works adulthood out from the birthdate when it can, and falls back on `is adult` only when it cannot.
+The input is named for the fact, not for its default, so a value sent for it counts as supplied, and only the default, when it is used, is listed under `presumed`.
+
 With a known birthdate the presumption is never read and never listed.
-With the birthdate sent as no date, the answer is `true` and `presumed` names `presumed adult`.
-With the birthdate left out altogether, `presumed` names both `alex.birthdate`, because treating a left-out date as no date is itself a presumption, and `presumed adult`.
-`../PRESUMPTION-SCENARIOS.md` §2.2 shows the same rows on a longer version of this rule.
+With the birthdate sent as no date, the answer is `true` and `presumed` names `is adult`.
+With the birthdate left out altogether, `presumed` names both `alex.birthdate`, because treating a left-out date as no date is itself a presumption, and `is adult`.
+A value sent for `is adult` is read only where the rule falls back on it, which is when the birthdate leaves the question open.
+Sent beside a known birthdate it is ignored: Alex born in 1990 with `is adult` false still comes out `true`, with nothing listed and no warning.
+So this input lets someone answer for a missing birthdate, and does not let anyone overrule one.
+Overruling a birthdate is what an assertion is for, once that is built, as in "Door number two" above.
+It needs a named step on the birthdate side to land on, which this rule does not have, because the rule's own final answer, `adult`, can never be asserted.
+`../PRESUMPTION-SCENARIOS.md` §2.2 shows the same rows on a longer version of this rule, and the rows with a value sent beside a known birthdate.
 
 One trap is worth knowing.
 If you write `WHEN NOTHING THEN TRUE` instead, you have made the same presumption, but the answer will not say so: `TRUE` written in a rule is a value, and nothing marks it as a presumption (§2.7 there measures it).
@@ -246,8 +257,8 @@ Sending it as no value at all, which JSON spells [**`null`**](https://en.wikiped
 L4 treats the two differently.
 A fact left out is a gap: under soft it may be filled by a presumption, and under hard it is refused.
 A fact sent as `null` is a statement.
-On a fact that is allowed to have no value, a `MAYBE` like Alex's birthdate, the rule goes on with "no date": the date itself is not presumed, and whatever the rule presumes next, such as `presumed adult`, is listed as usual.
-On any other fact, in `l4 batch` and in a single request to the service, `null` is refused by name, because the rule needs a value and you have said you do not have one; `l4 batch` prints `Field 'is adult' is null, which means the value is not known: supply a value`.
+On a fact that is allowed to have no value, a `MAYBE` like Alex's birthdate, the rule goes on with "no date": the date itself is not presumed, and whatever the rule presumes next, such as Alex's fallback `is adult`, is listed as usual.
+On any other fact, in `l4 batch` and in a single request to the service, `null` is refused by name, because the rule needs a value and you have said you do not have one; for the `is adult` at the top of the page, `l4 batch` prints `Field 'is adult' is null, which means the value is not known: supply a value`.
 (Two other ways of asking the service do not refuse it yet, and that difference is a known defect, smucclaw/l4-ide#1021.)
 
 **This runs today**, and the rows in `../PRESUMPTION-SCENARIOS.md` §2.2 and §2.6 show the columns side by side.
@@ -264,6 +275,6 @@ Spreadsheet users take note: in a comma-separated values (CSV) file an empty cel
 | pick door two in a picture                                                                     | click the named step's box                     | built                                                                                                 |
 | pick door two in a request                                                                     | `assertions` beside `arguments`                | ruled 2026-10-09; the key's spelling and the limits on which steps qualify are assumed; not built     |
 | see what was asserted                                                                          | `asserted` in the answer                       | ruled 2026-10-09; not built                                                                           |
-| keep a conclusion from being asserted                                                          | `@nonassertable` on the step                   | ruled 2026-10-09; not built                                                                           |
+| keep a conclusion from being asserted                                                          | `@nonassertable` on the step                   | ruled 2026-10-09; the annotation parses and is checked, nothing reads it yet                          |
 | presume a named step                                                                           | `TYPICALLY` on a `MEANS`                       | proposed, not ruled                                                                                   |
 | say "the value is not known"                                                                   | send `null`                                    | built in `l4 batch` and single service requests, except from CSV                                      |
