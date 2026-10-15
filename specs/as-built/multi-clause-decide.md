@@ -289,9 +289,11 @@ This keeps ruling M1's condition: main warns only about clauses after one that m
 Measured: Red / Gren / Blue checked clean at `6d0146f27` (`colour Blue` gives 2) and now warns; so does a group over numbers with `other`.
 
 Item 5, the clause wording after a reload.
-The evaluator words a value no clause matches from `pmSynthetic`, a mark on the annotations of the generated CONSIDERs, and jl4-service's `bundle.cbor` wrote every annotation as `()`.
-`Serialise Anno` (`Syntax.hs:1052`) now keeps `pmSynthetic` and nothing else; main serves the CBOR module after every restart, so this is the whole fix here.
-`SerialisationSpec` checks the module read back from the bundle and the service before and after a reload; both fail without the change.
+The evaluator words a value no clause matches from `pmSynthetic`, a mark on the annotations of the generated CONSIDERs.
+jl4-service's `bundle.cbor` used to write every annotation as `()`, so a restarted service had lost the mark; this item made `Serialise Anno` keep it and nothing else (`Syntax.hs:1110`).
+Since legalese/l4-ide#666 a restart compiles the stored sources again, as a deploy does, and reads no cache, so the desugarer sets the mark again; the instance stays behind `jl4-core`'s `serialise-support` flag (`jl4-core.cabal:28`), whose description says nothing in this repository uses it now.
+`IntegrationSpec` ("after a restart", "words a rule written as clauses as it did before the restart") asks a rule written as clauses for an input no clause matches, on a fresh deployment and on a restarted one, and wants the same words.
+`SerialisationSpec` went with the cache.
 
 Item 6: the `l4 render` test in `jl4/tests-cli` drops carriage returns before matching two lines, for Windows.
 
@@ -661,8 +663,10 @@ The lens never simplifies the ladder.
 - Term-keyed atomIds (R3): atomIds here hash the printed label.
 - Drawing a CONSIDER as rows of boxes (`L4.Viz.GuardedRows`, legalese/l4-ide#137, `unstable` only), and with it the plan cost of twin atoms that `unstable` records. On this branch a CONSIDER written by hand is one box too, so a clause group drawn as the same one box is drawn alike.
 
-After a `jl4-service` restart that rehydrates from `bundle.cbor`, `/query-plan` answers "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." for every boolean rule, a clause group or one written by hand, and `/evaluation` still answers.
-`Serialise Anno` (`jl4-core/src/L4/Syntax.hs:1052`) writes only the desugarer's mark, so the rehydrated DECIDE has no resolved type.
-That is older than this work, and it is not fixed here.
+After a `jl4-service` restart, a clause group is planned as it was at deploy.
+Until legalese/l4-ide#666 a restart read `bundle.cbor`, which kept no part of an annotation but the desugarer's mark, so the rehydrated DECIDE had no resolved type and `/query-plan` answered "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." for every boolean rule, a clause group or one written by hand; `/evaluation` still answered.
+#666 removed the cache, so a restart compiles the stored sources as a deploy does.
+No test on this branch asks `/query-plan` of a clause group across a restart; the one restart test for clauses checks the words of a no-clause error.
+In a one-off check, on this branch merged with main at `53337e2d3`, each of the eight clause groups of the pairs below gave the same `/query-plan` before and after a restart; a control in the same run showed the comparison tells two different rules apart.
 
 Pinned by `jl4-service/test/IntegrationSpec.hs` ("a BOOLEAN rule written as DECIDE clauses": eight pairs compared with their hand-written CONSIDER, whole plan and atomIds; the 20,000-part refusal; the 193 and 449-box simplified ladders; the boolean check first; a drafter's LET kept as written) and `jl4-lsp/test/ClauseGroupLadderSpec.hs` (four pairs in both ladders, `EXACTLY` among them; the refusal in both; the lens).
