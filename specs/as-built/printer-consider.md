@@ -15,6 +15,7 @@ Its sibling page is `printer-bracket.md`, which owns the bracketing of `AND`/`OR
 `l4 batch` and the REPL re-emit a module through it and then parse and run the printed text, so a printer whose output reads differently from its input changes answers, sometimes with no diagnostic.
 Before this change a CONSIDER's arms were printed comma-separated on one hanging indent (`CONSIDER c WHEN Red THEN 1,` with the arms after it under the first).
 `L4.Parser.consider` reads the arm list by column, and a comma at the end of a line is eaten by whatever comma list the arm ended in, so three things went wrong:
+
 - A CONSIDER inside an arm of another one swallowed the outer's later arms as its own.
   On another type that is a type error on every row; on the same type it type-checks and answers wrongly, in both directions, with `"status":"success"`.
 - An arm that ends in a comma list (`WHEN Red THEN LIST 1, 2`) had its separating comma read as the next element of the list.
