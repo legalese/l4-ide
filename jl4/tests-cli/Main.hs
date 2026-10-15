@@ -461,7 +461,8 @@ main = do
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
-       , multiClauseRenderFixture ] \fp -> do
+       , multiClauseRenderFixture
+       , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
