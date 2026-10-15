@@ -1,0 +1,61 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+daydate-add-months.l4:15:1-80:
+  assertion satisfied
+daydate-add-months.l4:17:1-80:
+  assertion satisfied
+daydate-add-months.l4:19:1-80:
+  assertion satisfied
+daydate-add-months.l4:21:1-80:
+  assertion satisfied
+daydate-add-months.l4:23:1-80:
+  assertion satisfied
+daydate-add-months.l4:25:1-80:
+  assertion satisfied
+daydate-add-months.l4:27:1-81:
+  assertion satisfied
+daydate-add-months.l4:29:1-81:
+  assertion satisfied
+daydate-add-months.l4:31:1-81:
+  assertion satisfied
+daydate-add-months.l4:33:1-79:
+  assertion satisfied
+daydate-add-months.l4:35:1-83:
+  assertion satisfied
+daydate-add-months.l4:37:1-81:
+  assertion satisfied
+daydate-add-months.l4:39:1-82:
+  assertion satisfied
+daydate-add-months.l4:41:1-90:
+  assertion satisfied
+daydate-add-months.l4:43:1-91:
+  assertion satisfied
+daydate-add-months.l4:45:1-91:
+  assertion satisfied
+daydate-add-months.l4:47:1-90:
+  assertion satisfied
+daydate-add-months.l4:49:1-92:
+  assertion satisfied
+daydate-add-months.l4:51:1-91:
+  assertion satisfied
+daydate-add-months.l4:54:1-79:
+  assertion satisfied
+daydate-add-months.l4:56:1-79:
+  assertion satisfied
+daydate-add-months.l4:58:1-79:
+  assertion satisfied
+daydate-add-months.l4:60:1-79:
+  assertion satisfied
+daydate-add-months.l4:62:1-81:
+  assertion satisfied
+daydate-add-months.l4:64:1-78:
+  assertion satisfied
+daydate-add-months.l4:66:1-79:
+  assertion satisfied
+daydate-add-months.l4:68:1-81:
+  assertion satisfied
+daydate-add-months.l4:70:1-89:
+  assertion satisfied
+daydate-add-months.l4:72:1-89:
+  assertion satisfied

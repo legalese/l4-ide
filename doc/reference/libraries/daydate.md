@@ -40,6 +40,9 @@ Can be imported into L4 files with `IMPORT daydate`. Automatically imports `date
 
 - `date PLUS days` - Add days to date
 - `date MINUS days` - Subtract days from date
+- `` `add months` `` date months, `` `add years` `` date years - Add whole months or years to a date, counting backwards for a negative number and rounding a fractional one down.
+  When the day does not exist in the month it lands in, the date is clamped to that month's last day, as Excel's `EDATE` does: 31 January plus one month is 29 February in 2024 and 28 February in 2023, and 29 February 2024 plus one year is 28 February 2025.
+  `Date d m y` does the opposite and rolls forward, so `Date 29 2 2025` is 1 March 2025: use `` `add years` `` for an anniversary.
 - `the day after`, `the week before`, etc.
 
 **Queries:**

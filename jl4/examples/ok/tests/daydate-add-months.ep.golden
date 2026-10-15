@@ -1,0 +1,72 @@
+IMPORT prelude
+IMPORT daydate
+
+-- `add months` and `add years` (daydate, Calendar Arithmetic) add a whole number
+-- of months or years to a date and CLAMP the day to the last day of the target
+-- month when the original day does not exist there: 31 January plus one month
+-- is 29 February in a leap year and 28 February otherwise, and the first
+-- anniversary of 29 February 2024 is 28 February 2025. This is Excel's EDATE.
+-- A fractional count is floored, and a negative one counts backwards.
+--
+-- The expected dates are written with the DATE_FROM_DMY builtin, not with
+-- anything in daydate, and were worked out independently of the library.
+
+-- 31 January plus one month is the last day of February
+#ASSERT `add months` (DATE_FROM_DMY 31 1 2023) 1 EQUALS DATE_FROM_DMY 28 2 2023
+-- ... in a leap year
+#ASSERT `add months` (DATE_FROM_DMY 31 1 2024) 1 EQUALS DATE_FROM_DMY 29 2 2024
+-- 30 January plus one month
+#ASSERT `add months` (DATE_FROM_DMY 30 1 2023) 1 EQUALS DATE_FROM_DMY 28 2 2023
+-- 31 March plus one month is 30 April
+#ASSERT `add months` (DATE_FROM_DMY 31 3 2024) 1 EQUALS DATE_FROM_DMY 30 4 2024
+-- a day every month has is not clamped
+#ASSERT `add months` (DATE_FROM_DMY 15 1 2024) 1 EQUALS DATE_FROM_DMY 15 2 2024
+-- zero months
+#ASSERT `add months` (DATE_FROM_DMY 15 1 2024) 0 EQUALS DATE_FROM_DMY 15 1 2024
+-- 29 February plus twelve months
+#ASSERT `add months` (DATE_FROM_DMY 29 2 2024) 12 EQUALS DATE_FROM_DMY 28 2 2025
+-- year rollover with a clamp: 31 October plus four months
+#ASSERT `add months` (DATE_FROM_DMY 31 10 2024) 4 EQUALS DATE_FROM_DMY 28 2 2025
+-- year rollover: 15 November plus three months
+#ASSERT `add months` (DATE_FROM_DMY 15 11 2024) 3 EQUALS DATE_FROM_DMY 15 2 2025
+-- 1 December plus one month
+#ASSERT `add months` (DATE_FROM_DMY 1 12 2024) 1 EQUALS DATE_FROM_DMY 1 1 2025
+-- twelve months is a year
+#ASSERT `add months` (DATE_FROM_DMY 31 12 2024) 12 EQUALS DATE_FROM_DMY 31 12 2025
+-- twenty-four months
+#ASSERT `add months` (DATE_FROM_DMY 15 1 2024) 24 EQUALS DATE_FROM_DMY 15 1 2026
+-- a fractional count is floored: 1.5 months
+#ASSERT `add months` (DATE_FROM_DMY 15 1 2024) 1.5 EQUALS DATE_FROM_DMY 15 2 2024
+-- negative: 31 March minus one month is 29 February
+#ASSERT `add months` (DATE_FROM_DMY 31 3 2024) (0 MINUS 1) EQUALS DATE_FROM_DMY 29 2 2024
+-- negative, into the previous year
+#ASSERT `add months` (DATE_FROM_DMY 15 1 2024) (0 MINUS 1) EQUALS DATE_FROM_DMY 15 12 2023
+-- negative, clamped, into the previous year
+#ASSERT `add months` (DATE_FROM_DMY 31 1 2024) (0 MINUS 2) EQUALS DATE_FROM_DMY 30 11 2023
+-- negative, clamped, in a non-leap year
+#ASSERT `add months` (DATE_FROM_DMY 31 3 2025) (0 MINUS 1) EQUALS DATE_FROM_DMY 28 2 2025
+-- negative, more than a year back
+#ASSERT `add months` (DATE_FROM_DMY 15 1 2024) (0 MINUS 13) EQUALS DATE_FROM_DMY 15 12 2022
+-- negative: 29 February minus twelve months
+#ASSERT `add months` (DATE_FROM_DMY 29 2 2024) (0 MINUS 12) EQUALS DATE_FROM_DMY 28 2 2023
+
+-- 29 February plus one year is 28 February
+#ASSERT `add years` (DATE_FROM_DMY 29 2 2024) 1 EQUALS DATE_FROM_DMY 28 2 2025
+-- 29 February plus four years is 29 February
+#ASSERT `add years` (DATE_FROM_DMY 29 2 2024) 4 EQUALS DATE_FROM_DMY 29 2 2028
+-- 28 February into a leap year stays the 28th
+#ASSERT `add years` (DATE_FROM_DMY 28 2 2023) 1 EQUALS DATE_FROM_DMY 28 2 2024
+-- 28 February out of a leap year
+#ASSERT `add years` (DATE_FROM_DMY 28 2 2024) 1 EQUALS DATE_FROM_DMY 28 2 2025
+-- 31 December plus one year
+#ASSERT `add years` (DATE_FROM_DMY 31 12 2024) 1 EQUALS DATE_FROM_DMY 31 12 2025
+-- twenty-five years
+#ASSERT `add years` (DATE_FROM_DMY 1 1 2000) 25 EQUALS DATE_FROM_DMY 1 1 2025
+-- zero years
+#ASSERT `add years` (DATE_FROM_DMY 15 6 2024) 0 EQUALS DATE_FROM_DMY 15 6 2024
+-- a fractional count is floored: 1.9 years
+#ASSERT `add years` (DATE_FROM_DMY 15 6 2024) 1.9 EQUALS DATE_FROM_DMY 15 6 2025
+-- negative: 29 February minus one year
+#ASSERT `add years` (DATE_FROM_DMY 29 2 2024) (0 MINUS 1) EQUALS DATE_FROM_DMY 28 2 2023
+-- negative: 29 February minus four years
+#ASSERT `add years` (DATE_FROM_DMY 29 2 2024) (0 MINUS 4) EQUALS DATE_FROM_DMY 29 2 2020
