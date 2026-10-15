@@ -304,11 +304,9 @@ The decision graph draws a `CONSIDER` as one box, labelled with the `CONSIDER`, 
 A `CONSIDER` that means the same but is written another way, such as `WHEN Red THEN b` in place of the nested `CONSIDER` on `b`, is a box with another label.
 
 **Clauses too long to read.**
-Written out as the `CONSIDER` they stand for, clauses can come to more than their own length.
-A clause that names an input, instead of giving its value, and then tests a later input, has the clauses after it written out again under each answer to that later test, because L4 cannot tell from that clause which value the named input has.
-L4 refuses clauses that come to too much once they are written out.
-A table of a few thousand rows does, even when every row is short, and so does a table of a few dozen rows whose entries are long expressions; a table of several hundred rows of ordinary length does not.
-Clauses that come to more than 20000 parts written out are not drawn or planned.
+Clauses that come to more than 20,000 parts when written out as their CONSIDER are not drawn or planned.
+This is reached most easily by a table over optional inputs whose clauses take values apart with JUST: each such clause is written out again under every answer to the inputs after it.
+A table of eleven clauses over five MAYBE BOOLEAN inputs can reach it.
 The decision graph and the query plan refuse them with this message (the service answers with a 400 error):
 
 ```

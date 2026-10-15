@@ -638,13 +638,34 @@ That is older than this work and is not changed here.
 ### Bounds
 
 `letInliningNodeBudget` (`jl4-core/src/L4/Transform.hs:147`) is 20,000 nodes, counted on the pruned CONSIDERs before joining, as on `unstable`.
-It bounds the work of reading the clauses through, since pruning cannot settle every copy (behind a pattern that binds a name, say).
+It bounds the size of what is read through, since pruning cannot settle every copy (behind a pattern that binds a name, say); it does not bound the time that takes, which is measured below.
 Past it the ladder refuses a rule written as clauses that holds generated nodes with `ClauseGroupTooLong`: "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 Sixty rows on one NUMBER input, each comparing a sum of two hundred ones with zero, come to 24,301 nodes.
 Deployed over HTTP to the test service at `e393b2e4c`, that group was ready after 3.6 s, and `/query-plan` refused it, with the message above, after 2.6 s.
 Where the line falls is the total length, not the number of rows.
 Measured at `6cb5225f9` through `/query-plan`, with rows that each compare a sum of some number of ones with zero (`longClausesJL4`): of a sum of 200 terms, 49 rows are planned and 50 are refused; of 100 terms, 97 are planned and 99 refused; of 20 terms, 440 planned and 450 refused; of one term, 2,000 planned and 3,000 refused.
-The page for users says only that a few thousand short rows, or a few dozen rows of long entries, are too much, and that several hundred ordinary rows are not.
+The page for users gives the other way to reach it, in the words of the review of #656 and unchanged: a table over optional inputs whose clauses take values apart with JUST, each such clause written out again under every answer to the inputs after it, and it says that a table of eleven clauses over five MAYBE BOOLEAN inputs can reach it.
+It gives no row counts; they were replaced by that text on 2026-10-15.
+
+That example holds, but eleven is not where the line falls.
+Measured on 2026-10-15 at `6b3af806c` through `/query-plan` on the test service, on a Linux host, with tables over MAYBE BOOLEAN inputs built like this: clause _i_ takes _j_ of the inputs apart with `(JUST x)`, starting at input _i_ and going round, names the others, and returns the AND of the values it took apart; the last clause names every input and is `IS FALSE`.
+Clauses that each take two inputs apart: twelve clauses over five inputs are planned and thirteen refused (the same over four).
+Taking three apart: eight clauses over five inputs are planned and nine refused (the same over three; over four, nine to twelve are refused, and eight was not run).
+Taking four apart: six clauses over five inputs are planned and seven refused (the same over four).
+Taking all five apart: six are planned and seven refused.
+So the line falls at a number of clauses that depends on how many inputs each takes apart, and the number of inputs matters only as the most a clause can take apart: eleven clauses over five inputs are refused when the first ten take three apart each, and planned when they take two.
+The same eleven can fall either side by one clause: six clauses that take two apart, then three that take three, then the last, ten clauses in all, are planned; one more that takes three apart, eleven clauses, is refused.
+
+The budget bounds the size, not the time, and these tables show it.
+`inlineLetsForViz` called alone on the checked rule of the tables whose clauses each take three inputs apart took, in CPU seconds of the test process: 0.5 for five clauses, 18.3 for eight (planned), 22.3 for nine (refused) and 30.2 for twelve (refused); the eleven-clause table whose first four clauses take three apart and next six take two took 32.7 (refused).
+The whole simplified core ladder took within a second of that in each case, so nothing after it costs anything beside it.
+A second run on the same host (its times differ from the first by up to a factor of two) separated the steps only as far as laziness allows.
+Counting the first 20,001 nodes of the rule with the generated LETs substituted (`inlineGeneratedLets`) took 0.03 s for six to nine clauses.
+Counting the first 20,001 nodes after `pruneGeneratedConsiders` had read that rule took 0.3, 1.0, 3.2, 10.6 and 16.5 s for five to nine clauses, and the trees it gave were 521, 1,574, 4,733, 14,210 and (stopped at the budget) 20,001 nodes: about three times the time and the nodes of the clause before.
+The substitution is lazy, so these figures do not say how much of the pruning time is the substitution that pruning forces.
+Through `/query-plan` the same tables took 0.01, 0.03, 0.12, 0.45, 1.5 and 4.6 CPU seconds for two to seven clauses, 35.6 for twelve (refused) and 55.2 for sixteen (refused).
+Thirteen clauses that each take two inputs apart, over five, ran past the test client's 30 s response timeout, and took 37 CPU seconds when it was lengthened (refused).
+The comment on `letInliningNodeBudget` says the budget bounds the work of reading the clauses through (`jl4-core/src/L4/Transform.hs:143`); it bounds the size of the pruned result, not the time that takes, as these measurements show, and the comment is not changed here.
 
 `ClauseGroupTooLarge` and its message ("These clauses would draw a ladder of more than 300 boxes, too many to show. ...") are kept as on `unstable` (`clauseGroupLadderBudget`, `:161`).
 A CONSIDER is one box here, so a group that reads through is one box, however many rows it has, and nothing reaches this limit today.
