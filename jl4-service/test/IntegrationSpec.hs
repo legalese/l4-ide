@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module IntegrationSpec (spec) where
+-- | The helpers are exported for "StdlibResolutionSpec", which needs the same
+-- in-process service but must control the environment around it.
+module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions) where
 
 import Test.Hspec
 
@@ -43,14 +45,14 @@ import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (createDirectoryIfMissing, doesDirectoryExist, getTemporaryDirectory, removeDirectoryRecursive, removePathForcibly, withCurrentDirectory)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getTemporaryDirectory, removeDirectoryRecursive, removePathForcibly, withCurrentDirectory)
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
 import TestData (synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1054,6 +1056,33 @@ spec = describe "integration" do
         dir <- readIORef storeDir
         Text.IO.readFile (dir </> "old" </> "bundle.cbor") `shouldReturn` oldCache
 
+    it "serves a function that calls sum from a store whose cache holds the standard library at its old address" do
+      -- bundle.cbor in the fixture directory was written by a service built from
+      -- main before library resolution changed (00298eb60): it holds the
+      -- prelude at `file://prelude.l4`, 1,084 times, and never at
+      -- `jl4-embedded:`. A build that read it paired it with a library
+      -- environment at the new address, and every library function, `sum`
+      -- among them, was "not in scope" at call time. This build compiles the
+      -- sources and reads no cache, so the function answers, and the file is
+      -- left as it was.
+      let fixtureDir = "test/fixtures/old-prelude-cache"
+      here <- doesFileExist (fixtureDir </> "bundle.cbor")
+      let dirOfFixture = if here then fixtureDir else "jl4-service" </> fixtureDir
+      oldCache <- BS.readFile (dirOfFixture </> "bundle.cbor")
+      total <- Text.IO.readFile (dirOfFixture </> "total.l4")
+      storeDir <- newIORef ""
+      let plant dir = do
+            writeIORef storeDir dir
+            BS.writeFile (dir </> "oldsum" </> "bundle.cbor") oldCache
+      withServicesRestarted [("oldsum", [("total.l4", total)])] plant \logLines baseUrl mgr -> do
+        assertRecompiled "oldsum" logLines
+        resp <- evalFunction baseUrl mgr "oldsum" "total"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["xs" Aeson..= ([1, 2, 3] :: [Int])]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 6)
+        dir <- readIORef storeDir
+        BS.readFile (dir </> "oldsum" </> "bundle.cbor") `shouldReturn` oldCache
+
     it "compiles a restarted deployment under --compile-timeout, as a deploy does" do
       -- A timeout of zero is over before the compile starts. A restart that
       -- read a cache instead did not compile, and so was not subject to it.
@@ -1168,6 +1197,29 @@ spec = describe "integration" do
           -- trace=full should produce a non-trivial reasoning tree
           let ResponseWithReason{reasoning = tree} = r
           isEmptyReasoning tree `shouldBe` False
+
+    -- `exampleCode` is source: it prints a string literal as the source
+    -- spells it, a line break as \n and a tab as \t. #595 changed that from a
+    -- raw line break, and with it `l4 trace`. `explanation` prints a VALUE, and
+    -- keeps the line break. Ruled 2026-10-12: printed string literals stay
+    -- escaped on every surface, as the valid spelling of the source.
+    it "spells a string literal in exampleCode as source, and keeps the line break in explanation" do
+      withServiceFromSources "trace-line-break" [("line-break.l4", lineBreakJL4)] \baseUrl mgr -> do
+        req <- buildJsonPost
+          (baseUrl <> "/deployments/trace-line-break/functions/s/evaluation?trace=full")
+          (Aeson.object [ "arguments" Aeson..= Aeson.object [ "x" Aeson..= (1 :: Int) ] ])
+        resp <- httpLbs req mgr
+        assertSuccess resp \r -> do
+          let ResponseWithReason{reasoning = tree} = r
+              nodes t = t : concatMap nodes t.children
+              code = concatMap (.exampleCode) (nodes tree)
+              explained = concatMap (.explanation) (nodes tree)
+          -- the literal is in the tree at all, spelled with a backslash and an n
+          code `shouldSatisfy` any (Text.isInfixOf "\"line\\nnext\"")
+          -- and no step of the code holds a raw line break
+          code `shouldSatisfy` all (not . Text.isInfixOf "\n")
+          -- the value's own print keeps the break
+          explained `shouldSatisfy` any (Text.isInfixOf "\"line\nnext\"")
 
     it "includes graphviz DOT when trace=full and graphviz=true" do
       withServiceFromSources "trace-gv" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do

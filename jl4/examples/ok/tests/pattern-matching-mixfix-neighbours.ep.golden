@@ -26,7 +26,7 @@ GIVETH A NUMBER
 DECIDE Green 0 IS 7
 DECIDE Green n IS n
 
-#EVAL `costs` Red 0
-#EVAL `costs` Red "x"
+#EVAL Red `costs` 0
+#EVAL Red `costs` "x"
 #EVAL price Red 0
 #EVAL price Blue 4

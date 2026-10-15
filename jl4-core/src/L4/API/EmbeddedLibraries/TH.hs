@@ -35,8 +35,22 @@ embedOneLibrary :: FilePath -> FilePath -> Q Exp
 embedOneLibrary libDir fileName = do
   let name = takeBaseName fileName
       path = libDir </> fileName
-  
-  -- Register dependency so rebuilds happen when files change
+
+  -- Register dependency so that GHC re-embeds a library that changed.
+  --
+  -- STALENESS GOTCHA, measured 2026-10-13 (GHC 9.10.3, Cabal 3.16, a checkout
+  -- built with @cabal build@): @path@ is the checkout's own
+  -- @jl4-core/libraries/<name>.l4@, and GHC records it in
+  -- "L4.API.EmbeddedLibraries"'s interface with a content hash, so when GHC
+  -- runs it does notice an edited library and re-embeds it. But editing only
+  -- @libraries/*.l4@ leaves nothing for Cabal to rebuild: @cabal build@ prints
+  -- @Up to date@, never calls GHC, and the binary keeps the old stdlib.
+  -- @touch@ does not help either (Cabal compares content). Any real change to
+  -- a jl4-core source file makes Cabal call GHC, which then re-embeds. While
+  -- developing the stdlib the reliable way is to set @JL4_LIBRARY_PATH@ to your
+  -- worktree's @jl4-core/libraries@, which outranks the embed in import
+  -- resolution. See jl4-core/libraries/README.md and
+  -- specs/as-built/import-resolution.md (§3.4).
   addDependentFile path
   
   -- Read file contents at compile time

@@ -1,0 +1,23 @@
+§ `Project-local daydate override`
+
+-- A deliberately INCOMPATIBLE project-root override of the embedded `daydate`
+-- library: it offers `Days in month` at one arity only, where the embedded copy
+-- also offers a two-argument (month, year) form.
+--
+-- The embedded `actus-schedule` library applies `Days in month` to two
+-- arguments. So this file is a probe: if the embedded importer is type-checked
+-- against THIS copy — as the Option B′ ordering (specs/as-built/import-resolution.md)
+-- says it must be, project root outranking the embedded stdlib for every
+-- importer alike — the arity mismatch is reported. If the embedded importer
+-- quietly kept using the embedded `daydate` instead, nothing would be reported
+-- and one module name would be bound to two different sources in a single
+-- build.
+--
+-- No case in ../../../Main.hs runs this fixture yet. `l4 check main.l4`, run
+-- from this directory, reports the arity mismatch as a diagnostic on
+-- `jl4-embedded:/actus-schedule.l4` but still prints "Check succeeded." and
+-- exits 0, because an error inside an imported module does not fail the check.
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`Days in month` MEANS n PLUS 1000

@@ -134,7 +134,9 @@ test-suite jl4-service-test
     QueryPlanSpec
     SchemaSpec
     SanitizationSpec
+    StdlibResolutionSpec
     TestData
+    UnresolvedImportSpec
 
   hs-source-dirs:
     test
@@ -161,6 +163,7 @@ test-suite jl4-service-test
     servant >=0.20.2 && <0.21,
     stm,
     string-interpolate,
+    temporary,
     text,
     time,
     transformers,
