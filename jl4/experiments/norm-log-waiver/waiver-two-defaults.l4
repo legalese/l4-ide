@@ -1,0 +1,63 @@
+-- Trap 4 of the userspace waiver (NORM-LOG-SPEC N9): the timed idiom of waiver-userspace.l4 with TWO loans.
+-- Its `waived at` cell names no default, so one waiver clears every default. Written by the N9 skeptic, 2026-10-09.
+-- First trace should block and ALLOWS; the control (no waiver) blocks. Not goldened; run with `l4 run`.
+IMPORT prelude
+
+DECLARE Person IS ONE OF patron, librarian
+DECLARE Action IS ONE OF
+  `return` HAS book IS A NUMBER
+  payFine HAS at IS A NUMBER
+  borrow HAS book IS A NUMBER
+             at IS A NUMBER
+  waive HAS at IS A NUMBER
+
+GIVEN b IS A NUMBER
+      d IS A NUMBER
+GIVETH DEONTIC Person Action
+loanOf MEANS
+  PARTY patron MUST `return` b WITHIN d
+  HENCE FULFILLED
+  LEST  RECORD `overdue since` IS d
+        HENCE PARTY patron MUST payFine t WITHIN 100
+              HENCE RECORD `cured at` IS t
+              HENCE FULFILLED
+
+GIVETH DEONTIC Person Action
+waiverPower MEANS
+  PARTY librarian MAY waive t WITHIN 200
+  HENCE COMMIT `waived at` IS t
+  HENCE FULFILLED
+
+GIVEN now IS A NUMBER
+      cell IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+`happened by` MEANS
+  CONSIDER cell
+  WHEN NOTHING THEN FALSE
+  WHEN JUST x THEN x AT MOST now
+
+GIVEN now IS A NUMBER
+GIVETH A BOOLEAN
+`default continuing at` MEANS
+      `happened by` now (RECALL patron's `overdue since`)
+  AND NOT `happened by` now (RECALL patron's `cured at`)
+  AND NOT `happened by` now (RECALL OFFICIAL's `waived at`)
+
+GIVETH DEONTIC Person Action
+borrowing MEANS
+  PARTY patron MAY borrow 2 t PROVIDED NOT `default continuing at` t WITHIN 200
+
+GIVETH DEONTIC Person Action
+two MEANS loanOf 1 14 RAND loanOf 3 50 RAND waiverPower RAND borrowing
+
+-- E2: default A (book 1 due 14) waived at 25; default B (book 3 due 50) late at 60, never waived; borrow at 70. Should be blocked.
+#TRACE two AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY librarian DOES waive 25 AT 25
+  PARTY patron DOES `return` 3 AT 60
+  PARTY patron DOES borrow 2 70 AT 70
+-- control: same without the waiver; should be blocked
+#TRACE two AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES `return` 3 AT 60
+  PARTY patron DOES borrow 2 70 AT 70
