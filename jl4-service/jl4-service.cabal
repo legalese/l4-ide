@@ -67,6 +67,7 @@ library
     Schema
     Shared
     Types
+    UncallableInputs
     Version
     WebMCPPage
 
@@ -146,6 +147,7 @@ test-suite jl4-service-test
     StdlibResolutionSpec
     TestData
     TestStoreDir
+    UncallableInputsSpec
     UnresolvedImportSpec
 
   hs-source-dirs:

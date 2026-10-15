@@ -107,6 +107,50 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 | `applied`   | The new bundle is compiled, compatible, and now the live version   |
 | `rejected`  | Breaking change, compile failure, or timeout — `error` has details |
 
+#### Warnings on an applied deploy
+
+A deploy can apply and still hand its callers something they cannot use.
+The service says so when it knows: an `applied` job carries `warnings`, and `GET /deployments/{id}` carries the same list under `metadata.warnings`.
+Neither key is present when there is nothing to say.
+A warning never rejects a deploy, never changes what is served, and never changes a schema.
+
+The one warning today is `uncallable-input`.
+It names an exported function whose input needs a value of a type with a constructor that carries data, such as `Circle HAS radius IS A NUMBER`, or `EITHER`, whose `LEFT` and `RIGHT` both carry data.
+The service has no JSON form it accepts for such a constructor, yet `tools/list` still lists its name, so a call that supplies it fails.
+
+```json
+{
+  "updateId": "<job>",
+  "deploymentId": "my-rules",
+  "status": "applied",
+  "warnings": [
+    {
+      "kind": "uncallable-input",
+      "function": "area",
+      "parameter": ["p", "shape"],
+      "type": "Shape",
+      "constructors": ["Circle"],
+      "canSupply": ["Unspecified"],
+      "message": "Input `p` > `shape` of area has type Shape. Its constructor Circle carries data, …"
+    }
+  ]
+}
+```
+
+`parameter` is the path from the function's input down to the position, spelled as the source spells it.
+`constructors` are the ones that carry data and cannot be sent; `canSupply` are the ones that carry none and can still be sent, as their name.
+To make the input callable, make it a `MAYBE`, give it a `TYPICALLY` default, or take the data as separate inputs.
+
+What it does not flag:
+
+- A `MAYBE`, a `LIST`, an input with a `TYPICALLY` default, and a record field that is one of those.
+  A call can be made without a value there, though it still cannot carry one of these constructors.
+- A type that carries data only in what a function returns: an answer can hold such a constructor, and the service writes it out.
+- A function that is not exported.
+
+This check says nothing about what the JSON form of such a constructor should be.
+It describes the service as measured on 2026-10-15 (see "Limits" under Evaluation), and should stop flagging a type when the service accepts a form for it.
+
 `POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. Terminal jobs are retained for 10 minutes, then pruned.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
@@ -243,6 +287,7 @@ Limits, measured 2026-10-02:
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Before UNKNOWN-EVALUATION-SPEC §8 step 1, a rule that read such an input through `CONSIDER` with an `OTHERWISE` answered `200` with the `OTHERWISE` value instead, which the direct path does not give. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
+- **An input of a type with a constructor that carries data cannot be supplied.** Measured 2026-10-15 on `unstable` at `5c63add10`, for a type `Shape` with `Circle HAS radius IS A NUMBER` and `Unspecified`: the constructor's name alone (`"Circle"`) is read as `Circle` with nothing in it and fails with `The value Circle reached a CONSIDER that has no branch for it`; an object, whether `{"Circle":{"radius":2}}`, `{"tag":"Circle","radius":2}` or `{"radius":2}`, fails with `Parameter 's': FnObject but expected type is not a known record`; the nullary `"Unspecified"` is accepted. The schema lists all three names. `EITHER` as an input fails the same way, and its schema is `{"type":"object"}`. The same holds for a type whose only constructor carries data. Answers can carry such a constructor: `Circle OF 2` comes back as `{"Circle":{"radius":2}}` and `RIGHT 5` as `{"RIGHT":[5]}`, though the returned schema lists only the constructors' names. A deploy warns about the inputs ("Warnings on an applied deploy" above).
 
 Measured 2026-10-06:
 
