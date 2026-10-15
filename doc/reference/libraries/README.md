@@ -6,7 +6,7 @@ L4 ships with a set of core libraries that provide essential functions for commo
 
 Core libraries are located in the [jl4-core/libraries/](https://github.com/legalese/l4-ide/tree/main/jl4-core/libraries) directory:
 
-- **[prelude](prelude.md)** - Standard functions (automatically imported)
+- **[prelude](prelude.md)** - Standard functions (`IMPORT prelude`, like every other library)
 - **[daydate](daydate.md)** - Date calculations and temporal logic
 - **[time](time.md)** - Wall-clock time-of-day operations
 - **[datetime](datetime.md)** - Absolute points in time with timezones
@@ -22,6 +22,9 @@ Core libraries are located in the [jl4-core/libraries/](https://github.com/legal
 - **[llm](llm.md)** - LLM API integration
 
 ---
+
+How `IMPORT` locates a library on disk — and how to work with dev vs prod
+preludes — is covered in [Library Resolution](resolution.md).
 
 ## Using Libraries
 
@@ -50,7 +53,7 @@ Condensed function tables for each core library. See individual library pages fo
 
 ### prelude
 
-Automatically imported. Provides foundational functions for lists, numbers, and data types.
+`IMPORT prelude`. Provides foundational functions for lists, numbers, and data types.
 
 **List Functions:**
 

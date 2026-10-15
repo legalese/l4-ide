@@ -98,6 +98,7 @@ library
     LSP.Core.Types.Shake
 
     LSP.L4.Actions
+    LSP.L4.EmbeddedLibrary
     LSP.L4.Inspector
     LSP.L4.SemanticTokens
     LSP.L4.Rules
@@ -161,9 +162,14 @@ test-suite jl4-lsp-test
     CheckSource
     ClauseGeneratedNamesSpec
     ClauseGroupLadderSpec
+    EmbeddedLibrarySpec
+    HoverDisplaySpec
+    LibraryResolutionSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
+    containers,
     directory,
     filepath,
     hspec,

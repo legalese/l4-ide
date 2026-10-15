@@ -9,8 +9,10 @@
 -- it (@POST@), as the extension does once you confirm the breaking change.
 --
 -- The upload is the file plus its transitive imports, flat by file name,
--- typechecked locally first. Like the extension's, it includes the
--- standard libraries the file imports (prelude, daydate, …).
+-- typechecked locally first. It does not include the standard libraries the
+-- file imports (prelude, daydate, …): a deployment resolves its IMPORTs
+-- against its own files and the standard library built into the service, as
+-- the extension's upload does.
 module L4.Cli.Deploy
   ( DeployOptions(..)
   , deployOptionsParser
@@ -60,7 +62,6 @@ import Language.LSP.Protocol.Types
   , normalizedFilePathToUri
   , uriToNormalizedFilePath
   )
-import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import L4.Syntax (Module(..))
 
 import L4.Cli.Cloud
@@ -289,14 +290,13 @@ bundle fp = do
       die (Text.pack fp <> " doesn't typecheck; fix it before deploying (see `l4 check`).")
 
   let paths = absFp : mapMaybe moduleFile (drop 1 (flatten tc))
+  -- A standard library the typechecker took from the copies built into l4 has
+  -- no file on disk and a URI that is not a file's ('moduleFile' is Nothing),
+  -- so it is not in 'paths' and is not uploaded.
   files <- fmap concat $ forM (dedupe paths) \p ->
     if isAbsolute p
       then pure . (p,) <$> BSL.readFile p
-      -- A standard library the typechecker took from the copies built
-      -- into l4 (nothing on disk); the extension uploads its bundled copy.
-      else case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack (dropExtension (takeFileName p))) of
-        Just src -> pure [(p, BSL.fromStrict (TE.encodeUtf8 src))]
-        Nothing -> [] <$ note ("Skipping " <> Text.pack p <> ": not found")
+      else [] <$ note ("Skipping " <> Text.pack p <> ": not found")
 
   let byName = Map.fromListWith (flip (<>)) [ (takeFileName p, [p]) | (p, _) <- files ]
   case [ (n, ps) | (n, ps@(_ : _ : _)) <- Map.toList byName ] of

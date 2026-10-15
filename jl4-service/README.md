@@ -70,6 +70,21 @@ GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 ```
 
+## Libraries and `IMPORT`
+
+A deployment resolves an `IMPORT` against the files of its own bundle and the standard library built into the service, and against nothing else.
+The service does not read `JL4_LIBRARY_PATH`, its working directory or the per-user library folder.
+A library that is not part of the standard library has to be in the bundle, beside the file that imports it.
+A bundle file named like a standard library module, such as `prelude.l4`, is used for the bundle's own imports in place of the built-in one.
+
+The service logs three `WARN` lines about this:
+
+- `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
+- `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
+- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422.
+
+[Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
+
 ## API Reference
 
 ### Health
@@ -187,8 +202,6 @@ A batch case refused this way comes back in `cases` with the same message as its
 
 Limits, measured 2026-10-07:
 
-- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`), so every function in a module that uses one fails the request with `I could not find a definition`.
-  A function with a `BOOLEAN` input fails the same way, because the wrapper reads it with `prelude`'s `fromMaybe`.
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
