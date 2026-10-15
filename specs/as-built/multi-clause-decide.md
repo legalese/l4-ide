@@ -609,8 +609,8 @@ A node with a `PmSynthetic` mark now has its type recorded on the node itself, w
 
 The shape.
 With the type recorded, the ladder drew the generated LET as one leaf, and the plan asked nothing.
-`translateDecide` in both ladders (`jl4-core/src/L4/Viz/Ladder.hs:300`, `jl4-lsp/src/LSP/L4/Viz/Ladder.hs:317`) now runs `L4.Transform.inlineLetsForViz` (`jl4-core/src/L4/Transform.hs:131`) first.
-It substitutes the generated LETs into the CONSIDERs that use them, in linear time (`inlineGeneratedLets`, `:68`); prunes each generated CONSIDER by what the branches around it settled, so a later clause does not ask again about an input an earlier one decided (`pruneGeneratedConsiders`, `:253`, which knows nullary constructors, literals and `EXACTLY` of a constructor the checker stamped, and reads a clause whose pattern is a new name as the `OTHERWISE`); and joins the generated CONSIDERs on one input (`joinGeneratedConsiders`, `:202`).
+`translateDecide` in both ladders (`jl4-core/src/L4/Viz/Ladder.hs:300`, `jl4-lsp/src/LSP/L4/Viz/Ladder.hs:317`) now runs `L4.Transform.inlineLetsForViz` (`jl4-core/src/L4/Transform.hs:130`) first.
+It substitutes the generated LETs into the CONSIDERs that use them (`inlineGeneratedLets`, `:67`); prunes each generated CONSIDER by what the branches around it settled, so a later clause does not ask again about an input an earlier one decided (`pruneGeneratedConsiders`, `:254`, which knows nullary constructors, literals and `EXACTLY` of a constructor the checker stamped, and reads a clause whose pattern is a new name as the `OTHERWISE`); and joins the generated CONSIDERs on one input (`joinGeneratedConsiders`, `:203`).
 A LET the drafter wrote is never read through.
 
 Pruning is what keeps the read-through small.
@@ -626,8 +626,8 @@ Measured on two tables of two enumerations, every pair of values a row, with `ru
 
 With the type fixed and nothing read through, the box's label was the first row, the generated LETs, and the plan asked nothing.
 
-Whether a rule was written as clauses is read off its `PmMatrix` mark (`writtenAsClauses`, `jl4-core/src/L4/Transform.hs:172`), and a rule that was not is drawn as it always was.
-So is a group whose first clause names each of its inputs as the `GIVEN` does, or is `_`: the desugarer drops the clauses after that one (`PmUnreachable`), so the body holds no node it generated (`holdsGeneratedNodes`, `jl4-core/src/L4/Transform.hs:187`).
+Whether a rule was written as clauses is read off its `PmMatrix` mark (`writtenAsClauses`, `jl4-core/src/L4/Transform.hs:173`), and a rule that was not is drawn as it always was.
+So is a group whose first clause names each of its inputs as the `GIVEN` does, or is `_`: the desugarer drops the clauses after that one (`PmUnreachable`), so the body holds no node it generated (`holdsGeneratedNodes`, `jl4-core/src/L4/Transform.hs:188`).
 A first clause that matches every input through a new name is not that group: the desugarer generates a test of the input for it, with the clauses after it as the other answer, so the body holds a node and the group is read through (see "Bounds").
 The limits under "Bounds" apply only where the body holds one (`readsThrough`, `jl4-core/src/L4/Viz/Ladder.hs:316`).
 
@@ -638,7 +638,7 @@ That is older than this work and is not changed here.
 
 ### Bounds
 
-`letInliningNodeBudget` (`jl4-core/src/L4/Transform.hs:147`) is 20,000 nodes, counted on the pruned CONSIDERs before joining, as on `unstable`.
+`letInliningNodeBudget` (`jl4-core/src/L4/Transform.hs:148`) is 20,000 nodes, counted on the pruned CONSIDERs before joining, as on `unstable`.
 It bounds the size of what is read through, since pruning cannot settle every copy (behind a pattern that binds a name, say); it does not bound the time that takes, which is measured below.
 Past it the ladder refuses a rule written as clauses that holds generated nodes with `ClauseGroupTooLong`: "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 Sixty rows on one NUMBER input, each comparing a sum of two hundred ones with zero, come to 24,301 nodes.
@@ -649,15 +649,16 @@ The page for users gives the other way to reach it, in the words of the review o
 It gives no row counts; they were replaced by that text on 2026-10-15.
 
 That example holds, but eleven is not where the line falls.
-Measured on 2026-10-15 at `6b3af806c` through `/query-plan` on the test service, on a Linux host, with tables over MAYBE BOOLEAN inputs built like this: clause _i_ takes _j_ of the inputs apart with `(JUST x)`, starting at input _i_ and going round, names the others, and returns the AND of the values it took apart; the last clause names every input and is `IS FALSE`.
+Measured on 2026-10-15 at `6b3af806c` through `/query-plan` on the test service, on a Linux host, with tables over MAYBE BOOLEAN inputs built like this: clause _i_ takes _j_ of the inputs apart with `(JUST x)`, starting at input _i_ and going round, gives the others new names, and returns the AND of the values it took apart; the last clause gives every input a new name and is `IS FALSE`.
 Clauses that each take two inputs apart: twelve clauses over five inputs are planned and thirteen refused (the same over four).
 Taking three apart: eight clauses over five inputs are planned and nine refused (the same over three; over four, nine to twelve are refused, and eight was not run).
 Taking four apart: six clauses over five inputs are planned and seven refused (the same over four).
 Taking all five apart: six are planned and seven refused.
 So the line falls at a number of clauses that depends on how many inputs each takes apart, and the number of inputs matters only as the most a clause can take apart: eleven clauses over five inputs are refused when the first ten take three apart each, and planned when they take two.
 The same eleven can fall either side by one clause: six clauses that take two apart, then three that take three, then the last, ten clauses in all, are planned; one more that takes three apart, eleven clauses, is refused.
+Written with the others named as the `GIVEN` names them (and the last clause naming every input so), the tables I ran both ways are planned and refused at the same clause counts: two apart, twelve planned and thirteen refused over five inputs and over four; three apart, eight and nine over five; four apart, six and seven; all five apart, six and seven; and the ten-clause table planned and the eleven-clause one refused.
 
-The budget bounds the size, not the time, and these tables show it.
+The budget bounds the size, not the time, and the tables written with new names show it.
 `inlineLetsForViz` called alone on the checked rule of the tables whose clauses each take three inputs apart took, in CPU seconds of the test process: 0.5 for five clauses, 18.3 for eight (planned), 22.3 for nine (refused) and 30.2 for twelve (refused); the eleven-clause table whose first four clauses take three apart and next six take two took 32.7 (refused).
 The whole simplified core ladder took within a second of that in each case, so nothing after it costs anything beside it.
 A second run on the same host (its times differ from the first by up to a factor of two) separated the steps only as far as laziness allows.
@@ -666,9 +667,18 @@ Counting the first 20,001 nodes after `pruneGeneratedConsiders` had read that ru
 The substitution is lazy, so these figures do not say how much of the pruning time is the substitution that pruning forces.
 Through `/query-plan` the same tables took 0.01, 0.03, 0.12, 0.45, 1.5 and 4.6 CPU seconds for two to seven clauses, 35.6 for twelve (refused) and 55.2 for sixteen (refused).
 Thirteen clauses that each take two inputs apart, over five, ran past the test client's 30 s response timeout, and took 37 CPU seconds when it was lengthened (refused).
-The comment on `letInliningNodeBudget` says the budget bounds the work of reading the clauses through (`jl4-core/src/L4/Transform.hs:143`); it bounds the size of the pruned result, not the time that takes, as these measurements show, and the comment is not changed here.
+It is the new-name way of writing these tables that takes tens of seconds.
+Written with the others named as the `GIVEN` names them, the 32 tables I ran through `/query-plan` (two to five apart, over four and five inputs, planned and refused) took 0.06 to 1.44 CPU seconds each, the refused ones 1.07 to 1.20, where the new-name tables of eight and nine clauses took 11.9 and 19.5 s in the same run.
+The same four tables (eight and nine clauses, three apart, new names and the `GIVEN`'s) on `main` at `12d6773ad` are answered at once, with 400 "Can only visualize ...", in 0.001 s of CPU.
+On `unstable` at `bd887270e`, whose `inlineLetsForViz`, `pruneGeneratedConsiders`, `inlineGeneratedLets` and `joinGeneratedConsiders` are the same text as here, the new-name tables took 30.8 s (eight clauses, planned) and 22.1 s (nine, refused), and the `GIVEN`-name ones 19.6 s (eight, planned) and 1.3 s (nine, refused).
+I did not time the editor's lens on any of these.
+The comment on `letInliningNodeBudget` said the budget bounds the work of reading the clauses through; it bounds the size of the pruned result, not the time that takes, and the comment now says so.
 
-`ClauseGroupTooLarge` and its message ("These clauses would draw a ladder of more than 300 boxes, too many to show. ...") are kept as on `unstable` (`clauseGroupLadderBudget`, `:166`).
+Nothing in the service caps that time for `/query-plan`, and a refusal is not remembered.
+`queryPlanHandler'` builds the plan on the first request for a function and stores it only when the build succeeded (`jl4-service/src/DataPlane.hs:362-369`); a refusal is thrown from `buildDecisionQueryCacheFromCompiled` before anything is stored (`jl4-service/src/Backend/DecisionQueryPlan.hs:182`), so every request for a refused rule pays the whole cost again.
+The deployment timeouts guard compiling (`tryCompileWithTimeout`) and evaluation (`timeoutAction`), not the plan.
+
+`ClauseGroupTooLarge` and its message ("These clauses would draw a ladder of more than 300 boxes, too many to show. ...") are kept as on `unstable` (`clauseGroupLadderBudget`, `:167`).
 A CONSIDER is one box here, so a group that reads through to a CONSIDER is one box, however many rows it has.
 A group that reads through to something else is drawn as that, and can reach the limit: a first clause that gives an input a new name reads through to its result.
 Measured with the ladder tests on this branch: 301 BOOLEAN inputs ANDed under a new name are refused in both ladders, simplified or not, and the lens reads "No decision graph: these clauses would draw more than 300 boxes", where the same rule under the `GIVEN`'s own name is drawn; six pairs ANDed and ORed under a new name are drawn as written, with the ordinary lens, and refused once simplified, which is what the service's plan does (449 boxes for six pairs with the first clause's own names; five pairs are drawn simplified too).
