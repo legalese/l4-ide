@@ -334,13 +334,14 @@ GIVETH A NUMBER
 -- | Inputs declared through a synonym for a record, an enum, a DATE, a LIST, a
 -- BOOLEAN, a TIME and a DATETIME, each with a spare MAYBE input, pad, that the
 -- rule never reads: sending pad as @null@ or @{}@ sends the request through the
--- generated wrapper. The wrapper decides from the head of an input's type how to
--- read it, and does not expand a synonym. A synonym for a record, an enum or a
--- DATE was therefore not read as one, and is expanded now. A synonym that takes
--- no type, for a LIST, a BOOLEAN, a TIME or a DATETIME, is read by the wrapper
--- as an opaque name and answers, and is left unexpanded, because the wrapper
--- fails those types written out. The two @plain@ functions take a record and a
--- DATE written out, and are the control for the first group.
+-- generated wrapper. The JSON decoder expands a synonym for a record, an enum or
+-- a DATE, which is why those are answered; a LIST, a TIME, a DATETIME or a
+-- BOOLEAN synonym is answered because the wrapper leaves its name alone. A
+-- synonym for a MAYBE is the one the wrapper expands itself
+-- ('Backend.Jl4.maybeSynonymHeads'; 'synonymParamJL4' pins it). These pin the
+-- rest, so that expanding every head, which breaks a LIST, a TIME and a DATETIME,
+-- is caught. The two @plain@ functions take a record and a DATE written out, and
+-- are the control for the first group.
 synonymWrapperJL4 :: Text
 synonymWrapperJL4 =
   [i|

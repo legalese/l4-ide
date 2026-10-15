@@ -314,14 +314,14 @@ spec = describe "integration" do
                     Nothing -> Nothing
               (what, statusCode' resp, answered) `shouldBe` (what, 200, Just (False, True))
 
-    -- The wrapper reads the head of an input's type for more than a MAYBE, so a
-    -- synonym for a record, an enum or a DATE failed there too: the wrapper did
-    -- not find a record or an enum by the synonym's name, and passed a DATE on
-    -- as the text it was sent as. Those three are expanded now. A synonym that
-    -- takes no type, for a LIST, a TIME or a DATETIME, answers because the
-    -- wrapper reads it as an opaque name, and the wrapper fails each written
-    -- out, so those are left unexpanded: the examples for them fail if a later
-    -- change expands them.
+    -- Every kind these examples cover is answered on the wrapper path. The JSON
+    -- decoder expands a synonym for a record, an enum or a DATE, which is why
+    -- those answer (stop it expanding and only those examples fail); a synonym for
+    -- a LIST, a TIME, a DATETIME or a BOOLEAN answers because the wrapper leaves
+    -- its name alone. Only a synonym for a MAYBE is expanded in the wrapper
+    -- ('Backend.Jl4.maybeSynonymHeads', pinned above). Expanding every head would
+    -- break the LIST, TIME and DATETIME ones, because the wrapper fails each
+    -- written out, so these examples fail if a later change does that.
     -- Each request below has a spare MAYBE input, pad, that is @null@ or @{}@,
     -- which sends it through the wrapper. `plain point x` and `plain deadline
     -- year` write a record and a DATE out: the control.
@@ -382,13 +382,15 @@ spec = describe "integration" do
                   Nothing -> Nothing
             (statusCode' resp, answered) `shouldBe` (200, Just (False, True))
 
-    -- A synonym for a BOOLEAN is left unexpanded too, and the reason only shows
-    -- when the host has no copy of the library where the service looks for one:
-    -- expanded, the wrapper would read the input with prelude's @fromMaybe@, and
-    -- its @IMPORT prelude@ is not found. CI exports JL4_LIBRARY_PATH for the
-    -- whole run, and a developer's host can hold a library under
-    -- ~/.local/share/jl4/libraries, which hides that, so this example removes
-    -- every place the service looks in around its call.
+    -- A synonym for a BOOLEAN answers when the host has no copy of the standard
+    -- library in the places this example controls: a bundle's import of the
+    -- standard library is served from the one built into the service
+    -- (StdlibResolutionSpec). So this passes whatever the host holds, and with
+    -- every head expanded too: it pins the answer, and does not tell the rules
+    -- apart, and it fails in no state of `Backend/Jl4.hs`. Around its call it drops
+    -- JL4_LIBRARY_PATH and puts XDG_DATA_HOME and the working directory in an empty
+    -- directory; the path beside the executable, which the service also searches,
+    -- it does not touch.
     it "answers a synonym for a BOOLEAN when the host has no library to import" do
       withNoLibraryOnTheHost $
         withServiceFromSources "wrapper-synonym-bool" [("synonym.l4", synonymWrapperJL4)] \baseUrl mgr -> do
@@ -2308,13 +2310,14 @@ assertNoClauseForBlue resp = case Aeson.decode (responseBody resp) :: Maybe Simp
   Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf noClauseForBlue
   other -> expectationFailure ("Expected " <> show noClauseForBlue <> ", got: " <> show other)
 
--- | Run an action as on a host that has no copy of the standard library where
--- the service looks for one, and put everything back afterwards: JL4_LIBRARY_PATH
--- is dropped, XDG_DATA_HOME points at an empty directory (the service looks in
--- its jl4/libraries), and the working directory is that empty directory too.
--- CI exports JL4_LIBRARY_PATH for the whole run, and a developer's host can hold
--- a library under ~/.local/share/jl4/libraries, so either hides a wrapper whose
--- @IMPORT prelude@ is not found.
+-- | Run an action with no copy of the standard library in the places a test can
+-- control, and put everything back afterwards: JL4_LIBRARY_PATH is dropped,
+-- XDG_DATA_HOME points at an empty directory (the service looks in its
+-- jl4/libraries), and the working directory is that empty directory too. The
+-- path beside the executable is not touched. CI exports JL4_LIBRARY_PATH for the
+-- whole run, and a developer's host can hold a library under
+-- ~/.local/share/jl4/libraries, so either would hide a wrapper that reached for
+-- the host's library.
 withNoLibraryOnTheHost :: IO a -> IO a
 withNoLibraryOnTheHost act = bracket acquire release (\(_, _, empty) -> withCurrentDirectory empty act)
   where
