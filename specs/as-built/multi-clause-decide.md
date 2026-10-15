@@ -642,6 +642,9 @@ It bounds the work of reading the clauses through, since pruning cannot settle e
 Past it the ladder refuses a rule written as clauses that holds generated nodes with `ClauseGroupTooLong`: "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 Sixty rows on one NUMBER input, each comparing a sum of two hundred ones with zero, come to 24,301 nodes.
 Deployed over HTTP to the test service at `e393b2e4c`, that group was ready after 3.6 s, and `/query-plan` refused it, with the message above, after 2.6 s.
+Where the line falls is the total length, not the number of rows.
+Measured at `6cb5225f9` through `/query-plan`, with rows that each compare a sum of some number of ones with zero (`longClausesJL4`): of a sum of 200 terms, 49 rows are planned and 50 are refused; of 100 terms, 97 are planned and 99 refused; of 20 terms, 440 planned and 450 refused; of one term, 2,000 planned and 3,000 refused.
+The page for users says only that a few thousand short rows, or a few dozen rows of long entries, are too much, and that several hundred ordinary rows are not.
 
 `ClauseGroupTooLarge` and its message ("These clauses would draw a ladder of more than 300 boxes, too many to show. ...") are kept as on `unstable` (`clauseGroupLadderBudget`, `:161`).
 A CONSIDER is one box here, so a group that reads through is one box, however many rows it has, and nothing reaches this limit today.
