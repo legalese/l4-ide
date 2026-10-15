@@ -62,9 +62,8 @@ equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)
 -- tried, 'PmFallthrough') into the CONSIDERs that refer to them.
 --
 -- These bindings are all of one shape (no parameters, used from the CONSIDERs
--- of their own body), and a group of @n@ clauses is @n@ nested @LET@s, so a
--- plain substitution, which takes time linear in the size of the body it goes
--- into, reads a long group in linear time.
+-- of their own body), and a group of @n@ clauses is @n@ nested @LET@s, which a
+-- plain substitution reads.
 inlineGeneratedLets :: Expr Resolved -> Expr Resolved
 inlineGeneratedLets = transformOf (gplate @(Expr Resolved)) \ case
   LetIn _ ds body
@@ -140,10 +139,12 @@ inlineLetsForViz e
 
 -- | The size, in expression nodes, past which the generated @LET@s of a clause
 -- group are not read through for drawing, counted on the pruned CONSIDERs
--- before those on one input are joined. It bounds the work of reading the
--- clauses through, for pruning cannot settle every copy (behind a pattern that
--- binds a name, say), and a long group of many inputs could still copy those
--- exponentially.
+-- before those on one input are joined. It bounds the size of the pruned
+-- result, which pruning cannot always keep small: it cannot settle every copy
+-- (behind a pattern that binds a name, say), and a long group of many inputs
+-- could still copy those exponentially. It does not bound the time the
+-- pruning takes before the count stops it; the as-built spec measures that, in
+-- its "Bounds".
 letInliningNodeBudget :: Int
 letInliningNodeBudget = 20000
 
