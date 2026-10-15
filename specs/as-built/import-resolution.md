@@ -3,7 +3,7 @@
 As built on `main` by this PR.
 Source spec: `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md`, which is on `unstable` and not on `main`; this page stands in for it here.
 The work came from `unstable`; this page describes only what `main` has.
-Line numbers hold at the head of this PR, which is `main` at `a80bc4d86` plus this PR's commits.
+Line numbers hold at the head of this PR, which is `main` at `2541e4366` plus this PR's commits.
 
 Differences from the source spec: its §2 and §2.1 describe the code before #134 (embedded copy last, a `resolveLibraryFromFilesystem`, two resolvers); it covers #134 only, not #64, #148, #167, #87, #102, #93, #630 or #627; its §8 acceptance 1 (the winning copy is visible) is not met on the CLI; its §7 calls the in-memory layer "orthogonal and correct", but the API/WASM resolver ranks the embedded copy above it.
 
@@ -140,9 +140,9 @@ Two rulings of 2026-10-12 cover this feature; the source spec records them as it
 - `jl4-service/test/UnresolvedImportSpec.hs` (#642): a bundle that imports a module nobody supplies compiles, and the log has exactly one `WARN` naming the deployment, the importing file and the module; with several `IMPORT`s, the missing ones are named and `prelude`, `daydate` and a bundle file are not; loading the deployment from a store through `loadAndRegister`, as a restart does, says it again on its own log; and a bundle whose `IMPORT`s all resolve logs nothing on either path (the positive control). With the call to `logUnresolvedImports` in `compileBundle`, the only one left since #666 deleted the cache rebuild that had the other, made to log nothing, the first three fail and the control passes.
 - Black-box, on the built `jl4-service` (2026-10-13): a bundle that imports `zznope` deploys "applied", answers 200 with 42, and logs one `WARN` at the deploy and one after a restart (measured before #666, when a restart read `bundle.cbor`; since, the restart case of `UnresolvedImportSpec` pins it through `loadAndRegister`), each naming `d1`, `main.l4` and `zznope`.
 - `jl4-service/test/StdlibResolutionSpec.hs`: with a stray `prelude.l4` in the service's working directory, and with `JL4_LIBRARY_PATH` naming a directory that holds one, a deployment answers 200 from the real stdlib; a bundle's own `prelude.l4` wins and is warned about; a byte-for-byte copy of the stdlib's is not (#630). The first two fail on this PR's first commit with 422, and the warning case with no log line.
-- `jl4/tests-cli/Main.hs:750-765`: embedded-only diamond (#87), with fixture `jl4/tests-cli/fixtures/embedded-diamond/main.l4`.
-- `jl4/tests-cli/Main.hs:772-863`: black-box cases for the shadow order and warning, with fixtures `jl4/tests-cli/fixtures/library-shadow/{embedded-wins,sibling-wins,xdg-extra}/` (#134). The poisoned-XDG case asserts the two rows whole, `[chosen]   embedded stdlib` and `[shadowed] XDG data dir`.
-- `jl4/tests-cli/Main.hs:872-1008`: entry-path spelling and embedded importers: a bare entry path (#148) for the project override and for the embedded stdlib; the stdlib's names in scope under a bare entry path (measured failing on `main`); the two embedded-importer cases of #148, adapted (below); one row per copy in the shadow warning; one `Module not found` warning per mistake in stderr, `check --json`, `run --json` and `ast` (#630).
+- `jl4/tests-cli/Main.hs:1436-1451`: embedded-only diamond (#87), with fixture `jl4/tests-cli/fixtures/embedded-diamond/main.l4`.
+- `jl4/tests-cli/Main.hs:1458-1549`: black-box cases for the shadow order and warning, with fixtures `jl4/tests-cli/fixtures/library-shadow/{embedded-wins,sibling-wins,xdg-extra}/` (#134). The poisoned-XDG case asserts the two rows whole, `[chosen]   embedded stdlib` and `[shadowed] XDG data dir`.
+- `jl4/tests-cli/Main.hs:1558-1694`: entry-path spelling and embedded importers: a bare entry path (#148) for the project override and for the embedded stdlib; the stdlib's names in scope under a bare entry path (measured failing on `main`); the two embedded-importer cases of #148, adapted (below); one row per copy in the shadow warning; one `Module not found` warning per mistake in stderr, `check --json`, `run --json` and `ast` (#630).
 - `jl4-core/test/ImportResolutionSpec.hs:88`: both diamond siblings type-check clean (#102).
 - `jl4-lsp/test/HoverDisplaySpec.hs:63-64`: hover shows `a`, never `x10` (#93).
 - `ts-apps/vscode/src/unit-tests/embedded-library.test.ts`: the document selector forwards `jl4-embedded:` documents, and the content provider asks for exactly the URI it is given, waits for the client, passes the text through untouched, and names the document when the server errors (#627).
@@ -155,7 +155,7 @@ Run against the `l4` built from plain `main`, eight of the CLI cases fail: the e
 The two "an embedded library sees the project-local override" cases of #148 assert that `l4 check` exits non-zero on an error inside an imported module, which needs `hasBlockingError` from unstable's #52, not on `main`.
 On `main` that error is printed and `l4 check` still exits 0, so here the cases keep their three stderr assertions (the arity error names `actus-schedule`; the shadow warning names `daydate`; `[chosen]   project root`) and drop the exit code.
 Measured: they fail against `main`'s `l4`, where the embedded `actus-schedule` keeps the embedded `daydate` and `l4 check` prints no diagnostic, and pass against this PR's.
-The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:334-345`) is not extended for the new fixtures.
+The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:447-459`) is not extended for the new fixtures.
 
 ## Limits and known defects (verified by reading the code)
 
@@ -170,4 +170,4 @@ The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:33
 ## Later changes
 
 - #451, a separate change on unstable that is not on `main`, adds `tiersInOrder` and `roundTrippingFileUri` (smucclaw/l4-ide#971), lists the not-found locations in ladder order deduplicated by file, adds the line "Nothing it defines is in scope here; ...", stops an unresolved import from producing the importer's own URI (the source of "Your module depends on itself"), and adds `ImportDiagnosticSpec` and `ImportUriSpec` to `jl4-lsp-test`.
-- On unstable the CLI runner `runL4EmbeddedOnly` (added by #87) later moved to a `CliTest/Common.hs`; `main` has no such file, and the runner is in `jl4/tests-cli/Main.hs:207-208`.
+- On unstable the CLI runner `runL4EmbeddedOnly` (added by #87) later moved to a `CliTest/Common.hs`; `main` has no such file, and the runner is in `jl4/tests-cli/Main.hs:208-209`.
