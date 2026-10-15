@@ -42,7 +42,8 @@ l4 --help
 ```
 l4 — the L4 computational-law CLI
 
-Usage: l4 (COMMAND | FILE [--json] [-t|--trace MODE] [--fixed-now ISO8601])
+Usage: l4 [--version]
+          (COMMAND | FILE [--json] [-t|--trace MODE] [--fixed-now ISO8601])
 
 Available commands:
   run                      Typecheck and evaluate an L4 file (prints diagnostics
@@ -69,6 +70,24 @@ Available commands:
 ```
 
 Run `l4 <command> --help` for the options of any subcommand.
+
+### Which build is this?
+
+```bash
+l4 --version
+```
+
+This prints one line that names the build you are running, so you can say which one you have when you report a problem, or check that an upgrade took:
+
+```
+1.6.91 (main, a1b2c3d, 2026-10-14)
+```
+
+The line is the release, then in brackets the branch it was built from, the commit, and the day it was built. A prerelease from the `unstable` shelf names itself by its tag: `unstable-20261014-8b2f1a0 (unstable, 8b2f1a0, 2026-10-14)`.
+
+A build that someone made from a working copy of the source is not a release, and says just `dev`.
+
+`jl4-lsp --version`, the language server that the editor runs, prints the same line. The server also sends it to the editor as its `serverInfo` when the editor connects, and writes it to its log when it starts.
 
 ---
 
