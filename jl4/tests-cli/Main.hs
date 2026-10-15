@@ -53,6 +53,7 @@ import Test.Hspec
 import Data.Aeson (toJSON)
 import Data.Char (isDigit)
 import System.IO (hPutStr)
+import System.IO.Temp (withSystemTempDirectory)
 
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
@@ -775,10 +776,11 @@ spec bin = do
           let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
               result b = T.strip (fst (T.breakOn "Trace:" (T.drop (T.length "Result:") (snd (T.breakOn "Result:" b)))))
           pure (map (answerOf . result) blocks)
-        -- what each row of `l4 batch` gives. A row that raises is a success with
-        -- an `error` result on main, so that reads as the exception too.
+        -- what each row of `l4 batch` gives. A row that raises is `"status":"error"`
+        -- with its message in the result, and it stops the batch unless `-c` says to
+        -- go on; so a file with a raising row is run with `-c`, and every row is read.
         batchAnswers file inputs entry = do
-          Output _ sout _ <- runL4 bin ["batch", file, "-i", inputs, "-e", entry]
+          Output _ sout _ <- runL4 bin ["batch", "-c", file, "-i", inputs, "-e", entry]
           let result row = case objField row "output" of
                 Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
                 _ -> Nothing
@@ -791,11 +793,7 @@ spec bin = do
                                , Right row <- [eitherDecode (BSL8.pack l)] ]
         -- what the REPL gives to each query, loading the file first. It runs in a
         -- directory of its own, because it keeps a history file in the one it is in.
-        replAnswers repl file queries = do
-          tmp <- getTemporaryDirectory
-          let work = tmp </> "l4-repl-consider-arms"
-          removePathForcibly work
-          createDirectoryIfMissing True work
+        replAnswers repl file queries = withSystemTempDirectory "l4-repl-consider-arms" \work -> do
           absFile <- makeAbsolute file
           (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
             { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
@@ -806,7 +804,6 @@ spec bin = do
           soutBytes <- BS.hGetContents hout
           _ <- BS.hGetContents herr
           _ <- waitForProcess ph
-          removePathForcibly work
           -- the banner, then one reply after each prompt, then the last prompt's goodbye
           let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
           pure (map (answerOf . T.strip) (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
@@ -823,6 +820,13 @@ spec bin = do
         -- Red Red, Red Blue (no arm for Blue in the inner one), Green, Blue
         silentWant = [Bool True, noBranch, Bool False, Bool True]
         listsWant  = [toJSON [1, 2 :: Integer], toJSON [3 :: Integer], toJSON [4, 5 :: Integer]]
+
+        -- a WHERE under an arm; the three files differ in which arm holds it
+        whereFile n = fixtureDir </> ("batch-consider-where-" ++ n ++ ".l4")
+        whereRows n = rows ("consider-where-" ++ n)
+        whereWant   = [one 0, one 20, one 50]
+        whereQueries = [ "`late fee` 1000 0", "`late fee` 1000 10", "`late fee` 1000 45" ]
+        whereArms   = ["first", "middle", "last"]
 
     -- the inner CONSIDER is on another type, so the outer's later arms did not
     -- type-check as its arms and every row was an error
@@ -862,6 +866,19 @@ spec bin = do
 
     it "is read as written by the REPL, when an arm ends in a comma list" $
       inRepl listArms [ "`list arms` 0", "`list arms` 1", "`list arms` 2" ] listsWant
+
+    -- a WHERE under an arm: its line stood at the column of the arm's WHEN, which
+    -- ends the definition, so any arm after it did not parse and every row failed.
+    -- The last arm has none after it, and was always printed right.
+    it "is read by l4 run as the rule says, with a WHERE under an arm" $
+      forM_ whereArms \n -> runAnswers (whereFile n) `shouldReturn` whereWant
+
+    forM_ whereArms \n -> do
+      it ("is read as written by l4 batch, with a WHERE under the " ++ n ++ " arm") $
+        batchAnswers (whereFile n) (whereRows n) "late fee" `shouldReturn` whereWant
+
+      it ("is read as written by the REPL, with a WHERE under the " ++ n ++ " arm") $
+        inRepl (whereFile n) whereQueries whereWant
 
   describe "l4 trace" $ do
     it "refuses --format png without --output-dir" $ do

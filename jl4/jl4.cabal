@@ -133,4 +133,5 @@ test-suite l4-cli-test
     filepath,
     hspec,
     process,
+    temporary,
     text,

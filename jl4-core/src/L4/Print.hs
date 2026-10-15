@@ -529,9 +529,15 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     -- outer's, is not one of them. Written as a comma-separated list on one
     -- hanging indent, as this was, the outer's later arms were read as more arms
     -- of the inner CONSIDER.
+    -- Each arm is nested two more columns, which moves every line of the arm
+    -- after its first and not the first itself: an arm's later lines must sit
+    -- PAST its WHEN, or they read as the next arm's neighbours. The case that
+    -- needs it is a WHERE under an arm: the `Where` printer breaks its lines at
+    -- the current nesting, so unnested its `WHERE` stood at the WHEN's column,
+    -- which ends the definition, and the arms after it did not parse.
     Consider   _ expr branches ->
       hang 2 $ vcatHard $
-        ("CONSIDER" <+> printWithLayout expr) : fmap printWithLayout branches
+        ("CONSIDER" <+> printWithLayout expr) : fmap (nest 2 . printWithLayout) branches
 
     Lit        _ lit -> printWithLayout lit
     Percent    _ expr -> parensIfNeeded expr <+> "%"
