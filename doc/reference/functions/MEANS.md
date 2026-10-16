@@ -1,6 +1,6 @@
 # MEANS
 
-`MEANS` introduces the body of a definition written without `DECIDE`.
+`MEANS` gives the body of a function or a value, written without `DECIDE`.
 
 ## Syntax
 
@@ -38,7 +38,7 @@ buyer `buys from` seller MEANS CONCAT buyer, " buys from ", seller
 #EVAL "Alice" `buys from` "Bob"
 ```
 
-See [Definitions: Mixfix definitions](README.md#mixfix-definitions).
+See [Mixfix functions](README.md#mixfix-functions).
 
 ## Other places MEANS appears
 
