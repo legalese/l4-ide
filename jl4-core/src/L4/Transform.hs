@@ -142,9 +142,10 @@ inlineLetsForViz e
 -- before those on one input are joined. It bounds the size of the pruned
 -- result, which pruning cannot always keep small: it cannot settle every copy
 -- (behind a pattern that binds a name, say), and a long group of many inputs
--- could still copy those exponentially. It does not bound the time the
--- pruning takes before the count stops it; the as-built spec measures that, in
--- its "Bounds".
+-- could still copy those exponentially. The time pruning takes follows the size
+-- it reaches before the count stops it, so refusing takes about as long as
+-- drawing a group of this size: the as-built spec measures that, in its
+-- "Bounds".
 letInliningNodeBudget :: Int
 letInliningNodeBudget = 20000
 
