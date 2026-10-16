@@ -83,7 +83,7 @@ This prints one line that names the build you are running, so you can say which 
 1.6.91 (main, a1b2c3d, 2026-10-14)
 ```
 
-The line is the release, then in brackets the branch it was built from, the commit, and the day it was built. A prerelease from the `unstable` shelf names itself by its tag: `unstable-20261014-8b2f1a0 (unstable, 8b2f1a0, 2026-10-14)`.
+The line is the release, then in brackets the branch it was built from, the commit, and the day it was built.
 
 A build that someone made from a working copy of the source is not a release, and says just `dev`.
 
