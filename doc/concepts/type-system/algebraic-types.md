@@ -1,4 +1,4 @@
-# Algebraic Types in L4
+# Types as legal categories
 
 Why L4 builds its data model from algebraic data types — and why those types are a natural fit for legal structure.
 
@@ -11,7 +11,7 @@ Why L4 builds its data model from algebraic data types — and why those types a
 1. **Product types**: Combine multiple values (AND)
 2. **Sum types**: Choose between alternatives (OR)
 
-L4 uses ADTs extensively because they naturally map to legal structures. This article explains the mapping; for the full syntax of declaring and using types, see the [Types Reference](../../reference/types/README.md) and [DECLARE](../../reference/types/DECLARE.md).
+L4 uses ADTs extensively because they naturally map to legal structures. This article explains the mapping; for the full syntax of declaring and using types, see [Types](../../reference/types/README.md) and [DECLARE](../../reference/types/DECLARE.md).
 
 ---
 
@@ -42,7 +42,7 @@ DECLARE Contract
         obligations IS A LIST OF Obligation
 ```
 
-For record construction and field access syntax (`Person "Alice Smith" 30 "alice@example.com"`, `alice's name`), see the [Types Reference](../../reference/types/README.md).
+For record construction and field access syntax (`Person "Alice Smith" 30 "alice@example.com"`, `alice's name`), see [Types](../../reference/types/README.md).
 
 ---
 
@@ -94,35 +94,7 @@ GIVETH A STRING
     WHEN Rejected r THEN r
 ```
 
-### Exhaustiveness
-
-L4 checks that a `CONSIDER` over an algebraic type covers all of its constructors. If a case is missing, the compiler emits a **warning**:
-
-```l4
--- ⚠️ Warning: "The following branches still need to be considered: WHEN Rejected `_` THEN"
-CONSIDER status
-WHEN Pending THEN "..."
-WHEN Paid d a THEN "..."
-```
-
-The checker also warns about **redundant** branches that can never be reached. Two caveats:
-
-- The check enumerates constructors, so it can list the missing ones only for algebraic types with a known, finite set of them. Over a `NUMBER`, a `STRING` or a `DATE`, whose values cannot be enumerated, it can only ask for an `OTHERWISE`.
-- A missing case is a warning, not a hard error — the program still compiles and runs.
-
-See [Exhaustiveness](exhaustiveness.md) for why this check matters legally, and why it is a warning rather than an error.
-
-### Otherwise
-
-`OTHERWISE` is a catch-all branch:
-
-```l4
-CONSIDER status
-WHEN Pending THEN "Not yet processed"
-OTHERWISE "Already processed"
-```
-
-Note the trade-off: `OTHERWISE` silences the exhaustiveness check. If a new variant is added to the type later, the catch-all will absorb it silently instead of prompting you to decide how it should be handled.
+Because a sum type lists all of its alternatives, L4 can check that a `CONSIDER` handles every one of them, and it warns when one is missing. That is the code form of a legal demand: a determination over a closed category must say what happens in every case. When an amendment adds a category and the new variant is added to the declaration, every determination that has not yet decided how to handle it is flagged. A catch-all `OTHERWISE` switches this check off, and would absorb the new variant without comment. [Exhaustiveness](exhaustiveness.md) explains the check, its limits, and why it warns rather than fails.
 
 ---
 
@@ -157,8 +129,8 @@ A legal status is usually **mutually exclusive**: a contract is draft _or_ execu
 Compare the flattened alternative — a record of booleans:
 
 ```l4
--- ❌ Admits impossible states
-DECLARE ContractFlags
+-- Admits impossible states
+DECLARE `contract flags`
     HAS `is draft` IS A BOOLEAN
         `is executed` IS A BOOLEAN
         `is terminated` IS A BOOLEAN
@@ -188,20 +160,6 @@ A value of this type cannot be constructed with a particular missing — the typ
 ### Variants with data mirror case-specific particulars
 
 Legal consequences often depend on _which_ alternative applies, and each alternative comes with its own relevant facts: a rejected application has grounds for rejection; a granted one has a grant date. Attaching data to variants keeps each case's facts with that case, instead of a wide record where most fields are meaningless most of the time.
-
-### Exhaustiveness is complete case analysis
-
-A legal determination over a closed category must say what happens in **every** case — a tax rule that classifies entities must have an answer for each entity type:
-
-```l4
-CONSIDER entity
-WHEN `natural person` p THEN `personal tax rules` p
-WHEN `body corporate` c THEN `corporate tax rules` c
-WHEN partnership p THEN `partnership tax rules` p
--- The compiler warns if a case is missing
-```
-
-When the legislature adds a fourth category, adding the variant to the declaration makes the checker flag every determination that has not yet decided how to handle it. The type system turns "we forgot about partnerships" from a silent gap into a visible diagnostic. This property is developed fully in [Exhaustiveness](exhaustiveness.md).
 
 ---
 
@@ -251,7 +209,7 @@ DECLARE `legal document` IS ONE OF
                    meaning IS A STRING
 ```
 
-A section contains subsections, which contain paragraphs and definitions — arbitrarily deep, out of one three-variant declaration.
+A section contains subsections, which contain paragraphs and definitions — arbitrarily deep, out of one three-variant declaration. [Type theory](type-theory.md#fixed-points-and-recursion) gives the formal reading of such a type as a fixed point.
 
 ---
 
@@ -271,7 +229,7 @@ DECLARE Person
 MAYBE a  =  NOTHING  |  JUST a
 ```
 
-Optionality is explicit in the type, and `CONSIDER ... WHEN NOTHING ... WHEN JUST x ...` forces both possibilities to be handled. There is no null. See the [maybe example](../../reference/types/maybe-example.l4).
+Optionality is explicit in the type, so there is no null: to use the value, a `CONSIDER` takes it apart with `WHEN NOTHING` and `WHEN JUST x`. Write both branches; the [exhaustiveness check](exhaustiveness.md) looks inside a `MAYBE` but does not report a missing `WHEN NOTHING`. See the [maybe example](../../reference/types/maybe-example.l4).
 
 ### Lists
 
@@ -303,6 +261,6 @@ See the [list example](../../reference/types/list-example.l4).
 ## Further Reading
 
 - [Exhaustiveness](exhaustiveness.md) - Totality of determinations as a legal-safety property
-- [Types Reference](../../reference/types/README.md) - Detailed type reference
-- [Type Theory](../../reference/types/type-theory.md) - Formal foundations of the type system
-- [Foundation Course Module 2](../../courses/foundation/module-2-entities.md) - Hands-on with types
+- [Types](../../reference/types/README.md) - Detailed type reference
+- [Type theory](type-theory.md) - Formal foundations of the type system
+- [Module 2: Legal entities and relationships](../../courses/foundation/module-2-entities.md) - Hands-on with types

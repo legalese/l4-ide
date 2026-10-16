@@ -10,6 +10,10 @@ module TestData (
   qualifiesJL4,
   recordJL4,
   maybeParamJL4,
+  synonymParamJL4,
+  synonymKindsJL4,
+  synonymWrapperJL4,
+  inputThenInputJL4,
   saleContractJL4,
   deonticExportJL4,
   deonticRecordPartyJL4,
@@ -283,6 +287,260 @@ DECIDE with_maybe IS Result WITH
             WHEN NOTHING THEN FALSE
 |]
 
+-- | Inputs declared through a type synonym for a MAYBE: one without a type
+-- parameter, and one that takes a type (@Optional OF NUMBER@). Each must be a
+-- MAYBE to the service, so a value is a JUST and a null or a missing one is a
+-- NOTHING, as for @MAYBE NUMBER@ itself, which is the control.
+synonymParamJL4 :: Text
+synonymParamJL4 =
+  [i|
+DECLARE MaybeYear IS A MAYBE NUMBER
+
+DECLARE Optional OF a IS A MAYBE a
+
+@export a year that may be left out, through a synonym
+GIVEN y IS A MaybeYear
+GIVETH A NUMBER
+`year maybe` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export a number that may be left out, through a synonym that takes a type
+GIVEN y IS AN Optional OF NUMBER
+GIVETH A NUMBER
+`optional number` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export a plain MAYBE, the control
+GIVEN y IS A MAYBE NUMBER
+GIVETH A NUMBER
+`plain maybe` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+|]
+
+-- | Inputs declared through a synonym for a record, an enum and a list. The
+-- service looked for a record, an enum or a LIST by the synonym's own name, so
+-- each was refused, and each now reads as the type the synonym stands for.
+synonymKindsJL4 :: Text
+synonymKindsJL4 =
+  [i|
+DECLARE Year IS A NUMBER
+
+DECLARE Pt HAS x IS A NUMBER
+
+DECLARE Point IS A Pt
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Hue IS A Colour
+
+DECLARE Years IS A LIST OF Year
+
+@export the x of a record, through a synonym
+GIVEN p IS A Point
+GIVETH A NUMBER
+`point x` p MEANS p's x
+
+@export a code for an enum, through a synonym
+GIVEN h IS A Hue
+GIVETH A NUMBER
+`hue code` h MEANS IF h EQUALS Red THEN 1 ELSE 2
+
+@export the first of a list, through a synonym
+GIVEN ys IS A Years
+GIVETH A NUMBER
+`first year` ys MEANS
+  CONSIDER ys
+    WHEN EMPTY THEN 0
+    WHEN y FOLLOWED BY rest THEN y
+|]
+
+-- | Inputs declared through a synonym for a record, an enum, a DATE, a LIST, a
+-- BOOLEAN, a TIME and a DATETIME, each with a spare MAYBE input, pad, that the
+-- rule never reads: sending pad as @null@ or @{}@ sends the request through the
+-- generated wrapper. The JSON decoder expands a synonym for a record, an enum or
+-- a DATE, which is why those are answered; a LIST, a TIME, a DATETIME or a
+-- BOOLEAN synonym is answered because the wrapper leaves its name alone. A
+-- synonym for a MAYBE is the one the wrapper expands itself
+-- ('Backend.Jl4.maybeSynonymHeads'; 'synonymParamJL4' pins it). These pin the
+-- rest, so that expanding every head, which breaks a LIST, a TIME and a DATETIME,
+-- is caught. The two @plain@ functions take a record and a DATE written out, and
+-- are the control for the first group.
+synonymWrapperJL4 :: Text
+synonymWrapperJL4 =
+  [i|
+DECLARE Pt HAS x IS A NUMBER
+
+DECLARE Point IS A Pt
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Hue IS A Colour
+
+DECLARE Deadline IS A DATE
+
+DECLARE Year IS A NUMBER
+
+DECLARE Years IS A LIST OF Year
+
+DECLARE Flag IS A BOOLEAN
+
+DECLARE Clock IS A TIME
+
+DECLARE Stamp IS A DATETIME
+
+@export the x of a record, through a synonym
+GIVEN p IS A Point
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`point x` p pad MEANS p's x
+
+@export a code for an enum, through a synonym
+GIVEN h IS A Hue
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`hue code` h pad MEANS IF h EQUALS Red THEN 1 ELSE 2
+
+@export the year of a DATE, through a synonym
+GIVEN d IS A Deadline
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`deadline year` d pad MEANS DATE_YEAR d
+
+@export the x of a record written out, the control
+GIVEN p IS A Pt
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`plain point x` p pad MEANS p's x
+
+@export the year of a DATE written out, the control
+GIVEN d IS A DATE
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`plain deadline year` d pad MEANS DATE_YEAR d
+
+@export the first of a list, through a synonym
+GIVEN ys IS A Years
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`first year` ys pad MEANS
+  CONSIDER ys
+    WHEN EMPTY THEN 0
+    WHEN y FOLLOWED BY rest THEN y
+
+@export a code for a BOOLEAN, through a synonym
+GIVEN b IS A Flag
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`flag code` b pad MEANS IF b THEN 1 ELSE 0
+
+@export an answer that does not read a TIME, through a synonym
+GIVEN t IS A Clock
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`clock code` t pad MEANS 5
+
+@export an answer that does not read a DATETIME, through a synonym
+GIVEN dt IS A Stamp
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`stamp code` dt pad MEANS 6
+|]
+
+-- | A MAYBE input followed by another input, on the wrapper path: a synonym for a
+-- MAYBE and a MAYBE NUMBER written out, each first, with a NUMBER after it, and
+-- the synonym last as the control; and three DEONTIC functions of the same
+-- shapes. The generated wrapper once wrote the input record with a leading comma
+-- on every field after the first, which does not parse after a field whose type
+-- is an application (@MAYBE OF NUMBER@), so each of these failed with a parser
+-- error. Every function takes @y@ and @z@, so one request fits them all.
+inputThenInputJL4 :: Text
+inputThenInputJL4 =
+  [i|
+DECLARE MaybeYear IS A MAYBE NUMBER
+
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
+
+@export a synonym for a MAYBE, then a NUMBER
+GIVEN y IS A MaybeYear
+      z IS A NUMBER
+GIVETH A NUMBER
+`syn then number` y z MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a synonym for a MAYBE, then a MAYBE NUMBER
+GIVEN y IS A MaybeYear
+      z IS A MAYBE NUMBER
+GIVETH A NUMBER
+`syn then maybe` y z MEANS
+  (CONSIDER y
+     WHEN JUST n THEN n
+     WHEN NOTHING THEN 0)
+  PLUS (CONSIDER z
+          WHEN JUST m THEN m
+          WHEN NOTHING THEN 0)
+
+@export a MAYBE NUMBER written out, then a NUMBER
+GIVEN y IS A MAYBE NUMBER
+      z IS A NUMBER
+GIVETH A NUMBER
+`plain maybe then number` y z MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a NUMBER, then a synonym for a MAYBE: the control
+GIVEN z IS A NUMBER
+      y IS A MaybeYear
+GIVETH A NUMBER
+`number then syn` z y MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a contract with a synonym for a MAYBE first
+GIVEN y IS A MaybeYear
+      z IS A NUMBER
+GIVETH A DEONTIC Party `Contract Action`
+`syn contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+@export a contract with a MAYBE NUMBER written out first
+GIVEN y IS A MAYBE NUMBER
+      z IS A NUMBER
+GIVETH A DEONTIC Party `Contract Action`
+`plain contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+@export a contract with the synonym last: the control
+GIVEN z IS A NUMBER
+      y IS A MaybeYear
+GIVETH A DEONTIC Party `Contract Action`
+`control contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+|]
+
 -- | L4 source with an exported boolean function and a regulative (sale contract) rule.
 -- Used for testing state graph extraction and DOT output.
 saleContractJL4 :: Text
@@ -523,10 +781,9 @@ DECIDE `verdict` IS IF n > 10 THEN Unjust ELSE Just "lawful"
 
 -- | Inputs the wrapper must unwrap, so a missing one makes it answer NOTHING
 -- and the service names the input: an ASSUME, and a DATE, which the wrapper
--- reads from a string. The optional input comes last: the wrapper's generated
--- input record does not parse when an optional input is followed by another
--- (`GIVEN pad IS A MAYBE NUMBER, n IS A NUMBER` answers 422 with a parser
--- error on that path).
+-- reads from a string. The optional input comes last, as it had to when the
+-- wrapper's generated input record did not parse an optional input followed by
+-- another; it parses now ('inputThenInputJL4').
 declineLabelsJL4 :: Text
 declineLabelsJL4 =
   [i|
