@@ -107,7 +107,7 @@ The calls return `TRUE` and `150`. There is no limit on the number of inputs.
 - **Use parentheses** when an argument is itself an expression: ``(1 + 2) `plus` (3 + 4)``.
 - **Define local helpers in `WHERE`.** A `WHERE` block can hold a full `GIVEN ... MEANS` definition, mixfix ones included; the complete example shows one.
 
-For the exact rules of how L4 matches mixfix calls, see [Mixfix definitions](../../reference/functions/README.md#mixfix-definitions).
+For the exact rules of how L4 matches mixfix calls, see [Mixfix functions](../../reference/functions/README.md#mixfix-functions).
 
 ---
 
