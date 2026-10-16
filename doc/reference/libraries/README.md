@@ -36,7 +36,7 @@ Functions built into the language, such as `TOSTRING`, `CONCAT` or `FETCH`, need
 
 ## IMPORT
 
-`IMPORT` makes the definitions of another L4 file available in the current file. Put the `IMPORT` lines at the top of the file, one module per line.
+`IMPORT` makes the definitions of another L4 file available in the current file. Put the `IMPORT` lines at the top of the file, before the first `§` section, one module per line. An `IMPORT` below a section heading is ignored without a warning: the names it should bring in are then reported as [not defined](../errors/README.md#i-could-not-find-a-definition-for-the-identifier).
 
 **Example:** [import-example.l4](import-example.l4)
 
@@ -56,7 +56,7 @@ IMPORT `legal-persons`
 
 - Every top-level definition of the imported file: its types, constructors, functions and constants.
 - Nothing is imported for you. A file that uses `map`, `sum` or `fromMaybe` needs `IMPORT prelude` like any other library.
-- Do not rely on getting the libraries that a library imports. Some are passed on and some are not (`IMPORT datetime` does not make `Date` from `daydate` available), so import each library you use by name.
+- Import each library you use by name. The definitions a library imports for itself also reach your file, but do not count on it: `IMPORT datetime`, for example, does not give you `Date`; that needs `IMPORT daydate`.
 
 ### Where modules are found
 

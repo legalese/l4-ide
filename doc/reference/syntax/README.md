@@ -42,7 +42,7 @@ There is no date literal; see [Types and data](../types/README.md#built-in-types
 
 ## IMPORT
 
-`IMPORT name` at the top of a file makes the definitions of a library or another L4 file available. See [Standard libraries: IMPORT](../libraries/README.md#import).
+`IMPORT name` at the top of a file, before the first `§` section, makes the definitions of a library or another L4 file available. An `IMPORT` below a section heading is ignored. See [Standard libraries: IMPORT](../libraries/README.md#import).
 
 ## Annotations
 

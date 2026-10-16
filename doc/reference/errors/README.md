@@ -379,6 +379,7 @@ L4 met a name that nothing in scope defines. The usual causes:
 - **A library is not imported.** `map`, `filter`, `all`, `any`, `sum`, `fromMaybe` and `APPEND` come from the prelude, which is never loaded automatically. Add `IMPORT prelude`. The same goes for `Date` (`IMPORT daydate`) and the other [standard libraries](../libraries/README.md).
 - **A typo or a different spelling**, in a function name or a field name: `person's fullname` where the record declares `full name`. The type L4 shows helps: for a field it is `FUNCTION FROM Person TO ...`.
 - **The wrong case.** Keywords and built-in values are upper case: `TRUE` and `FALSE`, not `True` or `true`; `NOTHING`, `JUST`, `LEFT`, `RIGHT`.
+- **An `IMPORT` below a section heading.** `IMPORT` lines count only before the first `§`; one placed after it is ignored, so the names it should bring in are not defined. Move it to the top of the file.
 - **A name defined somewhere it cannot be seen.** A name defined in the `WHERE` or `LET` of one definition exists only inside that definition.
 
 **How to fix it:** Correct the spelling, or add the `IMPORT`:
