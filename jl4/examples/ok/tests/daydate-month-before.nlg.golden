@@ -1,0 +1,7 @@
+`the month before` with `Date` with 15, 1 and 2026 is equal to `Date` with 1, 12 and 2025
+`the month before` with `Date` with 1, 1 and 2026 is equal to `Date` with 1, 12 and 2025
+`the month before` with `Date` with 31, 3 and 2026 is equal to `Date` with 1, 2 and 2026
+`the month before` with `Date` with 15, 12 and 2026 is equal to `Date` with 1, 11 and 2026
+`the month after` with `Date` with 15, 12 and 2026 is equal to `Date` with 1, 1 and 2027
+`the month after` with `Date` with 31, 1 and 2026 is equal to `Date` with 1, 2 and 2026
+`the month before` with `Date` with 15, 1 and 2026
