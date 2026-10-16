@@ -52,6 +52,15 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build exe:jl4-lsp exe:l4 test:l4-cli-test --only-dependencies
@@ -67,7 +76,9 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -121,6 +132,16 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        shell: bash
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
@@ -139,7 +160,9 @@ jobs:
 
       - name: Run l4 CLI test suite
         shell: bash
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy binaries
         shell: bash
@@ -181,6 +204,17 @@ jobs:
           MAJOR_MINOR=$(echo "$CURRENT" | sed 's/\.[^.]*$//')
           echo "JL4_SERVICE_VERSION=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_ENV"
           echo "jl4-service version: ${MAJOR_MINOR}.${{ github.run_number }}"
+
+      # What `l4 --version` and `jl4-lsp --version` report (LSP.L4.BuildInfo bakes it
+      # in at compile time). The same constraint as the version above: it must be
+      # set before any step compiles the local libraries, which "Install
+      # dependencies" does. A library compiled without these variables says `dev`,
+      # and the build step after it finds it up to date; the l4 CLI test suite
+      # checks the binaries against these variables.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
 
       - name: Install system dependencies
         run: |
@@ -230,7 +264,9 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4 exe:jl4-service
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -338,6 +374,15 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build exe:jl4-lsp exe:l4 test:l4-cli-test --only-dependencies
@@ -353,7 +398,9 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
