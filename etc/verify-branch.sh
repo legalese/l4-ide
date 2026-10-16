@@ -171,6 +171,7 @@ suite_start() { # suite_start <cabal test target>
   local target="$1" log="$LOGDIR/$1.log"
   ( cd "$WT" && cabal test "$target" > "$log" 2>&1 ) &
   LAST_SUITE_PID=$!
+  SUITE_PIDS="$SUITE_PIDS $!"
 }
 suite_report() { # suite_report <label> <cabal test target> <summary lines to show>
   local label="$1" target="$2" lines="$3" log="$LOGDIR/$2.log"
@@ -193,6 +194,7 @@ suite_report() { # suite_report <label> <cabal test target> <summary lines to sh
   return 1
 }
 LAST_SUITE_PID=
+SUITE_PIDS=""
 # The suites, in report order: <label>|<cabal test target>|<summary lines to show>.
 # jl4-service-test renders a state graph over the HTTP surface and asserts its captions
 # (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
@@ -201,11 +203,67 @@ SUITES=()
 [ "$QUICK" = 1 ] || SUITES+=("jl4-test (corpus goldens + round-trip)|jl4-test|3")
 SUITES+=("l4-cli-test|l4-cli-test|2" "jl4-core-test|jl4-core-test|2" "jl4-service-test|jl4-service-test|2")
 
+# The checks below read files and run node or git; none of them touches cabal or the
+# built binaries, so they can run while the test suites do (see the gate section).
+static_checks() {
+  step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.mjs"
+
+  # Citations INTO legalese/canon. Selftest first -- a checker's green means
+  # nothing until something has shown it can go red. The sweep itself needs no
+  # canon checkout for the file:line and assertion-count classes, which resolve
+  # against the vendored mirror; NOTES.md section citations print as explicitly
+  # unchecked when canon is absent, and CANON_DIR=... makes them checkable. This
+  # gate does not pass --require, because a laptop without canon beside l4-ide is
+  # a normal state and not a branch defect.
+  step "check-canon-citations --selftest" bash -c "cd '$WT' && node etc/check-canon-citations.mjs --selftest"
+  step "check-canon-citations" bash -c "cd '$WT' && node etc/check-canon-citations.mjs"
+
+  # The vendored mirror under jl4/examples/canon/ must equal legalese/canon at the
+  # pin (CLAUDE.md §3.1). Nothing above looks at that: jl4-test compares the
+  # mirror's files with the mirror's own goldens, so a mirror file edited together
+  # with its golden stays green here and goes red only in CI's Canon Mirror job.
+  # A merge makes exactly that edit, with no conflict, when one side moves a file
+  # into the mirror and the other side edits it at its old path (measured
+  # 2026-09-24 on #489). --check fetches canon at the pin; its exit 3 means canon
+  # was unreachable, which offline is a normal state and not a branch defect, so
+  # it is noted rather than failed.
+  step "sync-canon --selftest" bash -c "cd '$WT' && node etc/sync-canon.mjs --selftest | tail -1; exit \${PIPESTATUS[0]}"
+  printf '\n=== sync-canon --check (mirror = canon at the pin) ===\n'
+  (cd "$WT" && node etc/sync-canon.mjs --check)
+  case $? in
+    0) RESULTS+=("PASS  sync-canon --check (mirror = canon at the pin)") ;;
+    3) note "sync-canon --check SKIPPED: canon unreachable at the pin; CI's Canon Mirror job still runs it" ;;
+    *) RESULTS+=("FAIL  sync-canon --check (mirror = canon at the pin)"); FAILED=1 ;;
+  esac
+
+  step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6; exit \${PIPESTATUS[0]}"
+
+  # Prettier over the WHOLE repo trips on a missing workspace package in a fresh
+  # worktree (`@repo/prettier-config` under ts-apps), which is an install gap and
+  # not a formatting defect. Check the files this branch actually changed, and
+  # only those that still exist: `--diff-filter=d` leaves out deletions, which
+  # prettier would otherwise report as "No files matching the pattern".
+  CHANGED=$(git -C "$WT" diff --name-only --diff-filter=d "$BASE"...HEAD 2>/dev/null | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
+  if [ -n "$CHANGED" ]; then
+    # shellcheck disable=SC2086
+    step "prettier 3.4.2 (changed files)" bash -c "cd '$WT' && npx -y prettier@3.4.2 --check $(echo $CHANGED | tr '\n' ' ')"
+  else
+    note "prettier SKIPPED (no changed files it handles)"
+  fi
+}
+
 # ---------------------------------------------------------------- the gate
 step "cabal build all" bash -c "cd '$WT' && cabal build all 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"
 
 if [ "$QUICK" = 1 ]; then
   note "jl4-test SKIPPED (--quick)"
+fi
+
+if [ "$SERIAL" != 1 ]; then
+  # Their results come back through files: a background subshell cannot append to RESULTS.
+  ( RESULTS=(); FAILED=0; static_checks
+    printf '%s\n' "${RESULTS[@]}" > "$LOGDIR/static.results"; echo "$FAILED" > "$LOGDIR/static.failed" ) > "$LOGDIR/static.out" 2>&1 &
+  STATIC_PID=$!
 fi
 
 if [ "$SERIAL" = 1 ]; then
@@ -221,7 +279,8 @@ else
   if step "cabal build the test suites" bash -c "cd '$WT' && cabal build ${targets[*]} 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"; then
     note "test suites ran at the same time (use --serial to run them one at a time)"
     for spec in "${SUITES[@]}"; do IFS='|' read -r _ target _ <<< "$spec"; suite_start "$target"; done
-    wait
+    # shellcheck disable=SC2086
+    wait $SUITE_PIDS
     for spec in "${SUITES[@]}"; do IFS='|' read -r label target lines <<< "$spec"; suite_report "$label" "$target" "$lines"; done
   else
     note "test suites NOT run: they did not build"
@@ -268,49 +327,13 @@ else NOT_PROBED+=("(c) CLI \\r"); fi
 [ "${#NOT_PROBED[@]}" -eq 0 ] ||
   note "probes not run, the diff does not touch what they guard: $(printf '%s, ' "${NOT_PROBED[@]}" | sed 's/, $//')"
 
-step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.mjs"
-
-# Citations INTO legalese/canon. Selftest first -- a checker's green means
-# nothing until something has shown it can go red. The sweep itself needs no
-# canon checkout for the file:line and assertion-count classes, which resolve
-# against the vendored mirror; NOTES.md section citations print as explicitly
-# unchecked when canon is absent, and CANON_DIR=... makes them checkable. This
-# gate does not pass --require, because a laptop without canon beside l4-ide is
-# a normal state and not a branch defect.
-step "check-canon-citations --selftest" bash -c "cd '$WT' && node etc/check-canon-citations.mjs --selftest"
-step "check-canon-citations" bash -c "cd '$WT' && node etc/check-canon-citations.mjs"
-
-# The vendored mirror under jl4/examples/canon/ must equal legalese/canon at the
-# pin (CLAUDE.md §3.1). Nothing above looks at that: jl4-test compares the
-# mirror's files with the mirror's own goldens, so a mirror file edited together
-# with its golden stays green here and goes red only in CI's Canon Mirror job.
-# A merge makes exactly that edit, with no conflict, when one side moves a file
-# into the mirror and the other side edits it at its old path (measured
-# 2026-09-24 on #489). --check fetches canon at the pin; its exit 3 means canon
-# was unreachable, which offline is a normal state and not a branch defect, so
-# it is noted rather than failed.
-step "sync-canon --selftest" bash -c "cd '$WT' && node etc/sync-canon.mjs --selftest | tail -1; exit \${PIPESTATUS[0]}"
-printf '\n=== sync-canon --check (mirror = canon at the pin) ===\n'
-(cd "$WT" && node etc/sync-canon.mjs --check)
-case $? in
-  0) RESULTS+=("PASS  sync-canon --check (mirror = canon at the pin)") ;;
-  3) note "sync-canon --check SKIPPED: canon unreachable at the pin; CI's Canon Mirror job still runs it" ;;
-  *) RESULTS+=("FAIL  sync-canon --check (mirror = canon at the pin)"); FAILED=1 ;;
-esac
-
-step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6; exit \${PIPESTATUS[0]}"
-
-# Prettier over the WHOLE repo trips on a missing workspace package in a fresh
-# worktree (`@repo/prettier-config` under ts-apps), which is an install gap and
-# not a formatting defect. Check the files this branch actually changed, and
-# only those that still exist: `--diff-filter=d` leaves out deletions, which
-# prettier would otherwise report as "No files matching the pattern".
-CHANGED=$(git -C "$WT" diff --name-only --diff-filter=d "$BASE"...HEAD 2>/dev/null | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
-if [ -n "$CHANGED" ]; then
-  # shellcheck disable=SC2086
-  step "prettier 3.4.2 (changed files)" bash -c "cd '$WT' && npx -y prettier@3.4.2 --check $(echo $CHANGED | tr '\n' ' ')"
+if [ "$SERIAL" = 1 ]; then
+  static_checks
 else
-  note "prettier SKIPPED (no changed files it handles)"
+  wait "$STATIC_PID"
+  cat "$LOGDIR/static.out"
+  while IFS= read -r r; do RESULTS+=("$r"); done < "$LOGDIR/static.results"
+  [ "$(cat "$LOGDIR/static.failed")" = 1 ] && FAILED=1
 fi
 
 # ---------------------------------------------------------------- hygiene
