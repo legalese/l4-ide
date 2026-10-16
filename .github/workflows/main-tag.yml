@@ -696,6 +696,71 @@ jobs:
   # Create Git Tag with Artifacts
   # ============================================
 
+  # ============================================
+  # Package the Claude Code plugin and the skill
+  # ============================================
+
+  package-plugin:
+    name: Package L4 plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The plugin keeps its own <major>.<minor> (from .claude-plugin/plugin.json)
+      # and takes this build's run number as the patch, matching the
+      # l4-ide-build-<run_number> tag it is released under.
+      - name: Set the plugin version
+        run: |
+          CURRENT=$(jq -r '.version' .claude-plugin/plugin.json)
+          VERSION="${CURRENT%.*}.${{ github.run_number }}"
+          echo "Plugin version: $VERSION"
+          # Both manifests: Claude Code's .claude-plugin/ and the portable
+          # Agent Plugins 1.0 one at the plugin root.
+          for m in .claude-plugin/plugin.json plugin.json; do
+            jq --arg ver "$VERSION" '.version = $ver' "$m" > "$m.tmp"
+            mv "$m.tmp" "$m"
+          done
+          # The marketplace catalog, published at .claude-plugin/ (Claude Code)
+          # and .github/plugin/ (Copilot CLI, VS Code); keep them byte-identical.
+          jq --arg ver "$VERSION" '.metadata.version = $ver | .plugins[0].version = $ver' \
+            .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
+          mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
+          cp .claude-plugin/marketplace.json .github/plugin/marketplace.json
+
+      - name: Create plugin packages
+        run: |
+          # Skill only: SKILL.md and its references
+          (
+            cd skills/writing-l4-rules
+            zip -r "$GITHUB_WORKSPACE/writing-l4-rules.skill" \
+              assets/ \
+              references/ \
+              scripts/ \
+              SKILL.md \
+              -x "*.DS_Store" \
+              -x "*/__pycache__/*" \
+              -x "*/node_modules/.cache/*"
+          )
+          # Full plugin: both manifests, the skill and PLUGIN.md
+          zip -r l4-plugin.zip \
+            .claude-plugin/ \
+            plugin.json \
+            skills/writing-l4-rules/ \
+            PLUGIN.md \
+            -x "*.DS_Store" \
+            -x "*/__pycache__/*" \
+            -x "*/node_modules/.cache/*"
+          ls -lh writing-l4-rules.skill l4-plugin.zip
+          unzip -l l4-plugin.zip | head -30
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: l4-plugin
+          path: |
+            l4-plugin.zip
+            writing-l4-rules.skill
+
   create-tag:
     name: Create Git Tag
     runs-on: ubuntu-latest
@@ -704,6 +769,7 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - package-plugin
     steps:
       - uses: actions/checkout@v5
         with:
@@ -728,6 +794,10 @@ jobs:
           find artifacts -name "jl4-core.wasm" -exec cp {} release-artifacts/ \;
           find artifacts -name "jl4-core.mjs" -exec cp {} release-artifacts/ \;
           find artifacts -name "version.txt" -exec cp {} release-artifacts/wasm-version.txt \; 2>/dev/null || true
+
+          # Collect the Claude Code plugin and the skill
+          find artifacts -name "l4-plugin.zip" -exec cp {} release-artifacts/ \;
+          find artifacts -name "writing-l4-rules.skill" -exec cp {} release-artifacts/ \;
 
           # Collect jl4-service binary and SHA256
           if [ -d artifacts/jl4-service-linux-x64 ]; then
@@ -769,14 +839,15 @@ jobs:
           Artifacts included:
           - VSCode extensions (platform-specific, cross-platform, universal)
           - WASM binaries (jl4-core.wasm, jl4-core.mjs)
-          - jl4-service binary (linux-x64) with SHA256"
+          - jl4-service binary (linux-x64) with SHA256
+          - Claude Code plugin (l4-plugin.zip) and skill (writing-l4-rules.skill)"
           git push origin "${{ steps.tag-name.outputs.tag }}"
 
       - name: Upload artifacts to tag
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag-name.outputs.tag }}
-          name: L4 VSCode Extension & WASM (Build ${{ github.run_number }})
+          name: L4 VSCode Extension & Tools (Build ${{ github.run_number }})
           body: |
             ## Build Artifacts
 
@@ -807,6 +878,15 @@ jobs:
             |------|-------------|
             | `jl4-core.wasm` | L4 core WASM module |
             | `jl4-core.mjs` | JavaScript FFI glue code |
+
+            ### Claude Code Plugin
+
+            | File | Description |
+            |------|-------------|
+            | `l4-plugin.zip` | The L4 plugin: the `writing-l4-rules` skill and the plugin manifests |
+            | `writing-l4-rules.skill` | The skill alone (SKILL.md and its references) |
+
+            Install from the marketplace with `/plugin marketplace add legalese/l4-ide`, then `/plugin install l4-computational-law@legalese`; or extract `writing-l4-rules.skill` into `~/.claude/skills/writing-l4-rules/`.
 
             ### Installation
 
@@ -839,6 +919,7 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - package-plugin
       - create-tag
     if: always()
     steps:
@@ -857,4 +938,5 @@ jobs:
           echo "| Cross Platform | ${{ needs.package-vscode-cross-platform.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Universal | ${{ needs.package-vscode-universal.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.build-wasm.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Claude Code Plugin | ${{ needs.package-plugin.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Git Tag | ${{ needs.create-tag.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
