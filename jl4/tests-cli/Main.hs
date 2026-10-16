@@ -840,6 +840,52 @@ spec bin = do
       sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
       sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
 
+  describe "l4 run on REFUSE" $ do
+    -- A refusal is a determinate non-answer: neither a value, nor an
+    -- evaluation error, nor an unknown fact. It is the model declining to
+    -- answer, with a reason. Each of these pins one way that distinction could
+    -- quietly be lost.
+    let refuseRunFixture = fixtureDir </> "refuse-run.l4"
+
+    -- (1) A refusal must not be treated as a crash. `l4 run` exits 0.
+    it "exits 0 when a directive REFUSES — a refusal is an answer, not a crash" $
+      expectOk bin ["run", refuseRunFixture] "The model refuses to answer"
+
+    -- (2) --json gives a refusing #EVAL its own kind, and a plain #ASSERT whose
+    -- expression refuses its reason under "refused" rather than "error". A
+    -- consumer that reads every non-boolean assertion out of "error" would
+    -- otherwise report a designed outcome as a defect.
+    it "emits kind \"refused\" for a refusing #EVAL and a refused field for a refused #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> case foldr (:) [] v of
+          [ev, assertPlain] -> do
+            objField ev "kind"   `shouldBe` Just (String "refused")
+            objField ev "value"  `shouldBe` Just Null
+            objField ev "reason" `shouldBe` Just (String "this case is not modelled")
+            -- A plain #ASSERT whose expression refuses is neither true nor
+            -- false, and its reason is NOT under "error".
+            objField assertPlain "kind"  `shouldBe` Just (String "assertion")
+            objField assertPlain "value" `shouldBe` Just Null
+            objField assertPlain "error" `shouldBe` Nothing
+            case objField assertPlain "refused" of
+              Just r  -> objField r "reason" `shouldBe` Just (String "this case is not modelled")
+              other   -> expectationFailure ("Expected a refused object, got " ++ show other)
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- (3) A refusing batch row reports the refusal under its result, as an
+    -- erroring row reports its error, and does NOT stop the batch: the row
+    -- after it is still processed.
+    it "reports a refusing batch row's reason under its result and still processes the next row" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", fixtureDir </> "refuse-batch.l4", "--inputs", fixtureDir </> "refuse-batch.json"]
+      code `shouldBe` ExitSuccess
+      length (filter (not . null) (lines sout)) `shouldBe` 2
+      sout `shouldSatisfy`
+        ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
+      sout `shouldSatisfy` ("\"result\":100" `isInfixOf`)
   describe "l4 format" $ do
     it "prints the reformatted source of a clean file to stdout" $ do
       Output code sout _ <- runL4 bin ["format", cleanFixture]

@@ -1398,6 +1398,8 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Env{}                  -> (a, r, n)
       Post{}                 -> (a, r, n)
       Breach{}               -> (a, r, n)
+      -- A refusal has no trace children: it stops evaluation.
+      Refuse{}               -> (a, r, n)
       Inert{}                -> (a, r, n)
 
     -- M5 — force-trace a CONSIDER branch body when it's a 'Lit' or

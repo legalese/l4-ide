@@ -147,7 +147,37 @@ This is a crash, not a verdict: `l4 run` exits non-zero, and in `--json` the res
 
 The same holds when you assert an `ASSUME`d `BOOLEAN` directly: `#ASSERT b` and `#ASSERT NOT b` both report `assertion could not be evaluated`, because `b` has no value to check.
 
-`l4 run` exits with a non-zero code for type errors and for directives that fail while evaluating, but **not** for a failed assertion: the file is still valid L4, so the exit code is `0`. In CI, look for failures explicitly: grep the output for `assertion failed`, or run `l4 run --json` and check each result whose `"kind"` is `"assertion"` for `"value": false`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
+### What a refusal looks like
+
+A fourth outcome is neither a verdict nor a breakdown. A rule can be written to _decline_ a case with `REFUSE "..."`: this case is outside what the encoding covers, and here is the sentence saying so. Regulation Crowdfunding took effect in 2016, so an encoding of its funding limit has nothing to say about 2015:
+
+```l4
+GIVEN year IS A NUMBER
+GIVETH A NUMBER
+DECIDE `funding limit for` IS
+    IF year AT LEAST 2016
+    THEN 5000000
+    ELSE REFUSE "no Regulation Crowdfunding figure exists before commencement in 2016"
+```
+
+Asked about 2015, a plain `#ASSERT` over it reports the refusal, which is neither `assertion satisfied` nor `assertion failed`:
+
+```l4
+#ASSERT `funding limit for` 2015 EQUALS 5000000
+```
+
+```
+Evaluation[1] @ funding.l4:8:1-48
+
+Result:
+  assertion refused:
+  The model refuses to answer:
+    no Regulation Crowdfunding figure exists before commencement in 2016
+```
+
+`#ASSERT NOT` over the same expression reports the refusal too: `NOT` has to know the value, and there is none. A refusal is an answer of its own kind and not a crash, so `l4 run` exits `0`; in `--json` the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"refused"`, not under `"error"`. [REFUSE](../../reference/control-flow/REFUSE.md) has the rest.
+
+`l4 run` exits with a non-zero code for type errors and for directives that fail while evaluating, but **not** for a failed assertion or a refusal: the file is still valid L4, so the exit code is `0`. In CI, look for failures explicitly: grep the output for `assertion failed`, or run `l4 run --json` and check each result whose `"kind"` is `"assertion"` for `"value": false`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
 
 ---
 

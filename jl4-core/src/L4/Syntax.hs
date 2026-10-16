@@ -277,6 +277,16 @@ data Expr n =
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]
+  | Refuse     Anno (Expr n)
+    -- ^ @REFUSE "message"@ — the model declines to answer. Evaluating a
+    -- 'Refuse' raises a refusal: a determinate outcome that is neither a value,
+    -- nor an evaluation error, nor an unknown fact the boundary can supply, and
+    -- that no rule in the language can observe or convert into an answer.
+    --
+    -- The message is parsed as a literal (see 'L4.Parser.refuse') and checked
+    -- against STRING, so a refusal's reason is statically known. That keeps the
+    -- payload out of the machine's frame stack, so a refusal needs no 'Frame',
+    -- and keeps a per-reason static analysis possible.
   | Inert      Anno Text InertContext  -- ... "inert text" - grammatical scaffolding with context-aware evaluation
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)

@@ -146,6 +146,18 @@ data LowerState = LowerState
     -- set is potentially mutually recursive — eager evaluation would
     -- loop, so 'lowerLocalDecl' lambda-lifts it instead.
   , pendingDecide :: !(Set.Set Text)
+    -- | Static call graph over L4-level functions: caller's WASM symbol ⟶
+    -- the symbols it calls directly. Recorded by 'callL4' / 'callL4Direct'
+    -- (the two choke points for an L4→L4 @func.call@; runtime intrinsics
+    -- are excluded — they can't carry diagnostics). Used by
+    -- 'propagateDiagnostics' to lift a helper's unsupported-construct
+    -- diagnostic up to every exported function that transitively calls it:
+    -- 'markUnsupported' keys a diagnostic on the *enclosing* function, but
+    -- 'Schema.applyDiagnostics' only downgrades entries in @bundleExports@,
+    -- so an unsupported HELPER would be silently invoked by a still-
+    -- @supported: true@ export. Fail loud instead: the export inherits the
+    -- diagnostic and routes to the fallback evaluator.
+  , callGraph :: !(Map Text (Set.Set Text))
   }
 
 type LowerM a = State LowerState a
@@ -176,6 +188,7 @@ initState info = LowerState
   , openTraceNode = Nothing
   , funcParams = Map.empty
   , pendingDecide = Set.empty
+  , callGraph = Map.empty
   }
 
 -- | Look up the ground-truth type for an expression using the typechecker's
@@ -255,8 +268,21 @@ callPreludeL4 funcN args = do
     pure (v, ty)
   callL4 funcN argPairs retTy
 
+-- | Record a @caller ⟶ callee@ edge in the static 'callGraph', so
+-- 'propagateDiagnostics' can lift an unsupported helper's diagnostic up to
+-- the exports that reach it. No-op outside a function body (no caller to
+-- attribute the edge to). The *untraced* symbol is recorded: @fn@ and
+-- @fn$trace@ are the same L4 function and share its diagnostics.
+recordCallEdge :: Text -> LowerM ()
+recordCallEdge callee = do
+  mfn <- gets (.currentFunction)
+  forM_ mfn $ \caller ->
+    modify' $ \s ->
+      s { callGraph = Map.insertWith Set.union caller (Set.singleton callee) s.callGraph }
+
 callL4 :: Text -> [(Value, MLIRType)] -> MLIRType -> LowerM Value
 callL4 callee args retTy = do
+  recordCallEdge callee
   -- Internal callers of @export functions don't supply the ASSUME-derived
   -- args themselves; synthesise each by calling the ASSUME's own extern,
   -- preserving the pre-@export behaviour (the wasm host satisfies the
@@ -287,6 +313,7 @@ callL4 callee args retTy = do
 -- calling the regular function inside).
 callL4Direct :: Text -> [(Value, MLIRType)] -> MLIRType -> LowerM Value
 callL4Direct callee args retTy = do
+  recordCallEdge callee
   fullArgs <- appendAssumeExternArgs callee args
   boxed <- forM fullArgs $ \(v, t) -> boxABI t v
   let nArgs = length fullArgs
@@ -466,7 +493,72 @@ lowerProgramWithDiagnostics info mainMod deps =
         lowerModuleDecls mainMod
         ) initial
       rawOps = reverse finalState.globals ++ reverse finalState.functions
-  in (MLIRModule { moduleOps = rawOps }, finalState.diagnostics)
+      diags = propagateDiagnostics finalState.callGraph finalState.diagnostics
+  in (MLIRModule { moduleOps = rawOps }, diags)
+
+-- | Lift each unsupported-construct diagnostic to every function that
+-- transitively calls the function it was raised in.
+--
+-- 'markUnsupported' attributes a diagnostic to the *enclosing* function, but
+-- 'Schema.applyDiagnostics' only downgrades entries in @bundleExports@. A
+-- helper is not an export, so without this pass an exported function whose
+-- helper contains an unsupported construct stays @supported: true@ and the
+-- proxy happily runs a WASM module that cannot evaluate it — the helper's
+-- fail-closed 0.0/FALSE surfaces as a silently wrong ANSWER rather than a
+-- refusal. (For @REFUSE@ this is the house style, one named definition per
+-- refusal, reached from the exported rules.)
+--
+-- Fail loud instead: an export that reaches an unsupported helper is itself
+-- unsupported, and routes to the fallback evaluator. The reason names the
+-- helper so the refusal is diagnosable.
+--
+-- Cycles (self- and mutual recursion) are fine — reachability is computed
+-- with a visited set. A function that is its own ancestor doesn't get a
+-- propagated copy of its own reason; its direct one already says it.
+propagateDiagnostics :: Map Text (Set.Set Text) -> Map Text [Text] -> Map Text [Text]
+propagateDiagnostics cg direct = Map.unionWith (++) direct propagated
+  where
+    -- Reverse the call graph: callee ⟶ its direct callers.
+    callers :: Map Text (Set.Set Text)
+    callers = Map.fromListWith Set.union
+      [ (callee, Set.singleton caller)
+      | (caller, callees) <- Map.toList cg
+      , callee <- Set.toList callees
+      ]
+
+    -- Every function that transitively calls @fn@ (BFS over the reverse
+    -- edges; @seen@ terminates on recursion).
+    ancestorsOf :: Text -> Set.Set Text
+    ancestorsOf fn = go Set.empty [fn]
+      where
+        go seen [] = seen
+        go seen (f : rest)
+          | f `Set.member` seen = go seen rest
+          | otherwise =
+              let ups = Map.findWithDefault Set.empty f callers
+              in go (Set.insert f seen) (Set.toList ups ++ rest)
+
+    propagated :: Map Text [Text]
+    propagated = Map.fromListWith (++)
+      [ (caller, [reasonFor helper reasons])
+      | (helper, reasons) <- Map.toList direct
+      , caller <- Set.toList (ancestorsOf helper)
+      , caller /= helper
+      ]
+
+    -- A helper is lowered twice (its own body and the @$trace@ clone), so its
+    -- raw reasons list each one twice; say each once, in first-seen order.
+    reasonFor helper reasons =
+      "depends on '" <> helper <> "', which the WASM backend cannot compile: "
+        <> Text.intercalate "; " (uniq reasons)
+
+    uniq :: [Text] -> [Text]
+    uniq = go Set.empty
+      where
+        go _ [] = []
+        go seen (r : rs)
+          | r `Set.member` seen = go seen rs
+          | otherwise           = r : go (Set.insert r seen) rs
 
 -- | For every @\@export@-decorated DECIDE in the main module, collect the
 -- ASSUME declarations it references. These get promoted to function-level
@@ -1840,6 +1932,11 @@ lowerExprCases expr expectedTy = case expr of
   Breach{}     -> emitVal $ \vid -> arithConstantFloat vid 0.0
   -- Event / IO constructs still aren't supported — they don't have a
   -- runtime interpretation in the schema yet.
+  -- REFUSE has no WASM image: the compiled module has no way to stop with a
+  -- reason. 'markUnsupported' marks the export @supported:false@, which routes
+  -- the request to the fallback evaluator — and that one raises the refusal
+  -- properly. Never lowered to a value.
+  Refuse{}     -> markUnsupported "REFUSE is not supported by the WASM backend"
   Event{}      -> markUnsupported "EVENT construct not supported by the WASM backend"
   Fetch{}      -> markUnsupported "FETCH (IO) not supported by the WASM backend"
   Post{}       -> markUnsupported "POST (IO) not supported by the WASM backend"
@@ -2529,6 +2626,8 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
         in Set.unions (self : map (go bound) args)
       AppNamed _ _ named _ ->
         Set.unions [go bound e | MkNamedExpr _ _ e <- named]
+      -- The REFUSE message is a literal; it binds and mentions nothing.
+      Refuse{} -> Set.empty
       And _ a b        -> Set.union (go bound a) (go bound b)
       Or _ a b         -> Set.union (go bound a) (go bound b)
       RAnd _ a b       -> Set.union (go bound a) (go bound b)

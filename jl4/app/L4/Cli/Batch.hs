@@ -74,6 +74,7 @@ import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
+  , ReductionOutcome(..)
   , prettyEvalException
   )
 import L4.Lexer (showStringLit)
@@ -356,7 +357,7 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
             Just evalResults ->
               -- The wrapper evaluated; a row still "fails" if evaluation raised
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
-              -- declared type). Those surface as `Reduction (Left …)`.
+              -- declared type). Those surface as `Reduction (ReducedErrored …)`.
               let excMsgs = concatMap resultExceptionMsgs evalResults
               in if null excMsgs
                    then ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
@@ -377,8 +378,8 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
 resultExceptionMsgs :: EvalDirectiveResult -> [Text]
 resultExceptionMsgs (MkEvalDirectiveResult _ res _) = case res of
-  Reduction (Left exc) -> prettyEvalException exc
-  _                    -> []
+  Reduction (ReducedErrored exc) -> prettyEvalException exc
+  _                              -> []
 
 ----------------------------------------------------------------------------
 -- Row validation (for --validate-only)
