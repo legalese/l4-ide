@@ -143,7 +143,7 @@ mom and dad `have a baby named` kid MEANS
     CONCAT "mother: ", mom, ", father: ", dad, ", child: ", kid
 ```
 
-Here, the backtick identifier `` `have a baby named` `` is a function name with parameters appearing on both sides, reading as a natural English sentence. This is a direct borrowing from how legal rules are phrased: "the buyer shall pay the seller" has the verb phrase embedded between the parties. [Definitions](../../reference/functions/README.md) in the reference gives the rules for these mixfix names, and [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md) shows how to use them, and `@nlg` annotations, to make a rulebase read as prose.
+Here, the backtick identifier `` `have a baby named` `` is a function name with parameters appearing on both sides, reading as a natural English sentence. This is a direct borrowing from how legal rules are phrased: "the buyer shall pay the seller" has the verb phrase embedded between the parties. [Functions](../../reference/functions/README.md) in the reference gives the rules for these mixfix names, and [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md) shows how to use them, and `@nlg` annotations, to make a rulebase read as prose.
 
 ---
 

@@ -148,19 +148,19 @@ GIVETH NUMBER
 
 Wherever a type is expected (after `IS A`, `GIVETH`, in a field):
 
-| Type expression                          | Meaning                                       |
-| ---------------------------------------- | --------------------------------------------- |
-| `NUMBER`, `STRING`, `BOOLEAN`, `DATE`    | a built-in type ([Types and data](README.md)) |
-| `LIST OF Type`                           | a list                                        |
-| `MAYBE Type`                             | a value that may be missing                   |
-| `EITHER Type1 Type2`                     | one of two types                              |
-| `Name OF Type1, Type2`                   | a parameterised type, given its parameters    |
-| `FUNCTION FROM Type1 AND Type2 TO Type3` | a function                                    |
-| `TYPE`                                   | a type parameter                              |
+| Type expression                          | Meaning                                    |
+| ---------------------------------------- | ------------------------------------------ |
+| `NUMBER`, `STRING`, `BOOLEAN`, `DATE`    | a built-in type ([Types](README.md))       |
+| `LIST OF Type`                           | a list                                     |
+| `MAYBE Type`                             | a value that may be missing                |
+| `EITHER Type1 Type2`                     | one of two types                           |
+| `Name OF Type1, Type2`                   | a parameterised type, given its parameters |
+| `FUNCTION FROM Type1 AND Type2 TO Type3` | a function                                 |
+| `TYPE`                                   | a type parameter                           |
 
 ## Related pages
 
-- [Types and data](README.md): built-in types
+- [Types](README.md): built-in types
 - [ASSUME](ASSUME.md): a name with a type and no definition
 - [FOR ALL](for-all.md): polymorphic types for `ASSUME`
 - [AKA](../functions/AKA.md): other names for a type

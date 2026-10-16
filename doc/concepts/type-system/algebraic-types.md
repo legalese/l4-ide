@@ -11,7 +11,7 @@ Why L4 builds its data model from algebraic data types — and why those types a
 1. **Product types**: Combine multiple values (AND)
 2. **Sum types**: Choose between alternatives (OR)
 
-L4 uses ADTs extensively because they naturally map to legal structures. This article explains the mapping; for the full syntax of declaring and using types, see [Types and data](../../reference/types/README.md) and [DECLARE](../../reference/types/DECLARE.md).
+L4 uses ADTs extensively because they naturally map to legal structures. This article explains the mapping; for the full syntax of declaring and using types, see [Types](../../reference/types/README.md) and [DECLARE](../../reference/types/DECLARE.md).
 
 ---
 
@@ -42,7 +42,7 @@ DECLARE Contract
         obligations IS A LIST OF Obligation
 ```
 
-For record construction and field access syntax (`Person "Alice Smith" 30 "alice@example.com"`, `alice's name`), see [Types and data](../../reference/types/README.md).
+For record construction and field access syntax (`Person "Alice Smith" 30 "alice@example.com"`, `alice's name`), see [Types](../../reference/types/README.md).
 
 ---
 
@@ -261,6 +261,6 @@ See the [list example](../../reference/types/list-example.l4).
 ## Further Reading
 
 - [Exhaustiveness](exhaustiveness.md) - Totality of determinations as a legal-safety property
-- [Types and data](../../reference/types/README.md) - Detailed type reference
+- [Types](../../reference/types/README.md) - Detailed type reference
 - [Type theory](type-theory.md) - Formal foundations of the type system
 - [Module 2: Legal entities and relationships](../../courses/foundation/module-2-entities.md) - Hands-on with types

@@ -156,6 +156,6 @@ All coercion functions give the same result on every system: they do not depend 
 
 ## Related pages
 
-- [Types and data](README.md)
+- [Types](README.md)
 - [Built-in functions](../builtins/README.md)
 - [daydate](../libraries/daydate.md), [time](../libraries/time.md), [datetime](../libraries/datetime.md): more on dates and times
