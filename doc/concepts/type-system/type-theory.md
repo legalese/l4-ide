@@ -2,7 +2,7 @@
 
 The formal foundations of L4's type system. This page is for readers who know some type theory or functional programming and want the precise mechanics behind L4's type checking, inference and evaluation.
 
-For practical use of L4 types, see [Types and data](../../reference/types/README.md). For the intuitive account of records and enumerations, see [Types as legal categories](algebraic-types.md).
+For practical use of L4 types, see [Types](../../reference/types/README.md). For the intuitive account of records and enumerations, see [Types as legal categories](algebraic-types.md).
 
 ---
 
@@ -273,7 +273,7 @@ and a function that recurses over it with CONSIDER, one branch per constructor, 
 
 ## See Also
 
-- **[Types and data](../../reference/types/README.md)** -- Practical guide to all L4 types
+- **[Types](../../reference/types/README.md)** -- Practical guide to all L4 types
 - **[Types as legal categories](algebraic-types.md)** -- Conceptual explanation of product and sum types
 - **[Exhaustiveness](exhaustiveness.md)** -- Why CONSIDER checks that every constructor is covered
 - **[Regulative rules](../../reference/regulative/README.md)** -- MUST, MAY, SHANT and regulative rule structure

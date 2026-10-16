@@ -2,7 +2,7 @@
 
 Every keyword, operator, type, directive and annotation in L4, with a one-line meaning and a link to the page that describes it. Functions are listed under [Built-in functions](builtins/README.md) and [Standard libraries](libraries/README.md).
 
-## Definitions
+## Functions
 
 | Keyword                | Meaning                                                                  | Reference                                     |
 | ---------------------- | ------------------------------------------------------------------------ | --------------------------------------------- |
@@ -19,36 +19,36 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 | **AKA**                | Another name for the same definition                                     | [AKA](functions/AKA.md)                       |
 | Several clauses        | A rule written as one line per case: `DECIDE price Red IS 1`             | [DECIDE](functions/DECIDE.md#several-clauses) |
 
-## Types and data
+## Types
 
-| Keyword                      | Meaning                                                                            | Reference                         |
-| ---------------------------- | ---------------------------------------------------------------------------------- | --------------------------------- |
-| **DECLARE**                  | Defines a new type                                                                 | [DECLARE](types/DECLARE.md)       |
-| **HAS**                      | Lists the fields of a record, including computed fields with MEANS                 | [DECLARE](types/DECLARE.md)       |
-| **ONE OF**                   | Lists the alternatives of an enumeration                                           | [DECLARE](types/DECLARE.md)       |
-| **IS A** / **IS AN**         | States a type: `age IS A NUMBER`                                                   | [DECLARE](types/DECLARE.md)       |
-| **A** / **AN** / **THE**     | Articles before a type name; they do not change the meaning                        | [DECLARE](types/DECLARE.md)       |
-| **OF**                       | Applies a type or a constructor to its arguments: `LIST OF NUMBER`, `PAIR OF x, y` | [DECLARE](types/DECLARE.md)       |
-| **WITH**                     | Builds a record by field name: `Person WITH name IS "Ann"`                         | [DECLARE](types/DECLARE.md)       |
-| **ASSUME**                   | Declares a name with a type but no definition                                      | [ASSUME](types/ASSUME.md)         |
-| **TYPE**                     | The type of types, for type inputs: `GIVEN a IS A TYPE`                            | [FOR ALL](types/for-all.md)       |
-| **FOR ALL**                  | Introduces type variables in a type                                                | [FOR ALL](types/for-all.md)       |
-| **FUNCTION FROM** ... **TO** | A function type: `FUNCTION FROM NUMBER TO BOOLEAN`                                 | [Types and data](types/README.md) |
-| **AS**                       | `x AS STRING` turns a value into text                                              | [Coercions](types/coercions.md)   |
+| Keyword                      | Meaning                                                                            | Reference                       |
+| ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------- |
+| **DECLARE**                  | Defines a new type                                                                 | [DECLARE](types/DECLARE.md)     |
+| **HAS**                      | Lists the fields of a record, including computed fields with MEANS                 | [DECLARE](types/DECLARE.md)     |
+| **ONE OF**                   | Lists the alternatives of an enumeration                                           | [DECLARE](types/DECLARE.md)     |
+| **IS A** / **IS AN**         | States a type: `age IS A NUMBER`                                                   | [DECLARE](types/DECLARE.md)     |
+| **A** / **AN** / **THE**     | Articles before a type name; they do not change the meaning                        | [DECLARE](types/DECLARE.md)     |
+| **OF**                       | Applies a type or a constructor to its arguments: `LIST OF NUMBER`, `PAIR OF x, y` | [DECLARE](types/DECLARE.md)     |
+| **WITH**                     | Builds a record by field name: `Person WITH name IS "Ann"`                         | [DECLARE](types/DECLARE.md)     |
+| **ASSUME**                   | Declares a name with a type but no definition                                      | [ASSUME](types/ASSUME.md)       |
+| **TYPE**                     | The type of types, for type inputs: `GIVEN a IS A TYPE`                            | [FOR ALL](types/for-all.md)     |
+| **FOR ALL**                  | Introduces type variables in a type                                                | [FOR ALL](types/for-all.md)     |
+| **FUNCTION FROM** ... **TO** | A function type: `FUNCTION FROM NUMBER TO BOOLEAN`                                 | [Types](types/README.md)        |
+| **AS**                       | `x AS STRING` turns a value into text                                              | [Coercions](types/coercions.md) |
 
 ## Built-in types
 
 | Type           | Meaning                                                           | Reference                                    |
 | -------------- | ----------------------------------------------------------------- | -------------------------------------------- |
-| **NUMBER**     | Whole numbers and exact fractions                                 | [Types and data](types/README.md)            |
-| **STRING**     | Text                                                              | [Types and data](types/README.md)            |
-| **BOOLEAN**    | `TRUE` or `FALSE`                                                 | [Types and data](types/README.md)            |
-| **DATE**       | A calendar date                                                   | [Types and data](types/README.md)            |
-| **TIME**       | A time of day, with no date or time zone                          | [Types and data](types/README.md)            |
-| **DATETIME**   | A moment in time, with a time zone                                | [Types and data](types/README.md)            |
-| **LIST**       | A list of values of one type; also writes a list: `LIST 1, 2, 3`  | [Types and data](types/README.md)            |
-| **MAYBE**      | A value that may be missing: `JUST x` or `NOTHING`                | [Types and data](types/README.md)            |
-| **EITHER**     | One of two values: `LEFT x` or `RIGHT y`                          | [Types and data](types/README.md)            |
+| **NUMBER**     | Whole numbers and exact fractions                                 | [Types](types/README.md)                     |
+| **STRING**     | Text                                                              | [Types](types/README.md)                     |
+| **BOOLEAN**    | `TRUE` or `FALSE`                                                 | [Types](types/README.md)                     |
+| **DATE**       | A calendar date                                                   | [Types](types/README.md)                     |
+| **TIME**       | A time of day, with no date or time zone                          | [Types](types/README.md)                     |
+| **DATETIME**   | A moment in time, with a time zone                                | [Types](types/README.md)                     |
+| **LIST**       | A list of values of one type; also writes a list: `LIST 1, 2, 3`  | [Types](types/README.md)                     |
+| **MAYBE**      | A value that may be missing: `JUST x` or `NOTHING`                | [Types](types/README.md)                     |
+| **EITHER**     | One of two values: `LEFT x` or `RIGHT y`                          | [Types](types/README.md)                     |
 | **PAIR**       | Two values together, from the prelude                             | [prelude](libraries/prelude.md#pairs)        |
 | **Dictionary** | Keys mapped to values, from the prelude                           | [prelude](libraries/prelude.md#dictionaries) |
 | **DEONTIC**    | The type of a regulative rule: `DEONTIC party action`             | [DEONTIC](regulative/DEONTIC.md)             |
@@ -59,10 +59,10 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 
 | Name                                              | Meaning                                                                | Reference                                |
 | ------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------- |
-| **TRUE** / **FALSE**                              | The two BOOLEAN values                                                 | [Types and data](types/README.md)        |
-| **JUST** / **NOTHING**                            | A present or a missing MAYBE value                                     | [Types and data](types/README.md)        |
-| **LEFT** / **RIGHT**                              | The two sides of an EITHER                                             | [Types and data](types/README.md)        |
-| **EMPTY**                                         | The empty list                                                         | [Types and data](types/README.md)        |
+| **TRUE** / **FALSE**                              | The two BOOLEAN values                                                 | [Types](types/README.md)                 |
+| **JUST** / **NOTHING**                            | A present or a missing MAYBE value                                     | [Types](types/README.md)                 |
+| **LEFT** / **RIGHT**                              | The two sides of an EITHER                                             | [Types](types/README.md)                 |
+| **EMPTY**                                         | The empty list                                                         | [Types](types/README.md)                 |
 | **TODAY**, **NOW**, **CURRENTTIME**, **TIMEZONE** | The current date, moment and time of day, and the document's time zone | [Built-in functions](builtins/README.md) |
 
 ## Control flow
@@ -170,10 +170,10 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 | Term                    | Meaning                                                                                                        | Reference                                                |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | **Regulative rule**     | A rule about behaviour: who MUST, MAY or SHANT do what, by when, and what follows                              | [Regulative rules](regulative/README.md)                 |
-| **Constitutive rule**   | A rule that defines, classifies or calculates, written with DECIDE or MEANS                                    | [Definitions](functions/README.md)                       |
+| **Constitutive rule**   | A rule that defines, classifies or calculates, written with DECIDE or MEANS                                    | [Functions](functions/README.md)                         |
 | **Deontic modality**    | Obligation (MUST), permission (MAY) or prohibition (SHANT/MUST NOT)                                            | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)           |
 | **Defeasibility**       | A general rule giving way to an exception ("unless", "notwithstanding"), written with UNLESS or branches       | [UNLESS](operators/UNLESS.md)                            |
-| **Mixfix**              | A name with inputs between its words, such as ``borrower `pays` lender``, so a call reads like a sentence      | [Definitions](functions/README.md)                       |
+| **Mixfix**              | A name with inputs between its words, such as ``borrower `pays` lender``, so a call reads like a sentence      | [Functions](functions/README.md)                         |
 | **Isomorphism**         | Code that follows the structure of the legal text, clause for clause                                           | [Concepts](../concepts/README.md)                        |
 | **Residual obligation** | What is still owed after some events: the DEONTIC value a `#TRACE` gives                                       | [DEONTIC](regulative/DEONTIC.md)                         |
 | **Reparation**          | A further obligation that follows a breach, written in a LEST                                                  | [Deadlines and consequences](regulative/consequences.md) |

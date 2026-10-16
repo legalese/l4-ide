@@ -6,12 +6,12 @@
 
 ## Language
 
-- [Types and data](types/README.md)
+- [Types](types/README.md)
   - [DECLARE](types/DECLARE.md)
   - [ASSUME](types/ASSUME.md)
   - [FOR ALL](types/for-all.md)
   - [Coercions](types/coercions.md)
-- [Definitions](functions/README.md)
+- [Functions](functions/README.md)
   - [DECIDE](functions/DECIDE.md)
   - [GIVEN and GIVETH](functions/GIVEN.md)
   - [MEANS](functions/MEANS.md)
