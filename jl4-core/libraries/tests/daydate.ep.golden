@@ -556,7 +556,9 @@ GIVETH A DATE
 GIVEN date   IS A DATE
 GIVETH A DATE
 `the month before` MEANS
-    Date 1 (DATE_MONTH date MINUS 1) (DATE_YEAR date)
+    IF    DATE_MONTH date EQUALS 1
+    THEN  Date 1 12 (DATE_YEAR date MINUS 1)
+    ELSE  Date 1 (DATE_MONTH date MINUS 1) (DATE_YEAR date)
 
 GIVEN date   IS A DATE
 GIVETH A DATE
