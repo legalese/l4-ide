@@ -1,0 +1,41 @@
+{
+  "name": "cloud-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Headless Legalese AI harness for cloud sessions: runs @repo/legalese-agent against a session folder on S3 Files, with jl4-lsp over stdio, the file relay, the lease and the agent key chain (cloud-sessions spec §5.4, §6.2, §8, §11)",
+  "type": "module",
+  "bin": {
+    "cloud-agent": "./dist/cloud-agent.cjs"
+  },
+  "scripts": {
+    "clean": "git clean -fdx dist out || echo 'git not available'",
+    "build": "npm run clean && tsc --noEmit && node scripts/bundle.mjs",
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "tsc -p tsconfig.test.json && node --test 'out/test/**/*.test.js'",
+    "lint": "eslint --max-warnings=0 .",
+    "lint-fix": "eslint . --fix",
+    "dev": "node dist/cloud-agent.cjs --dev"
+  },
+  "packageManager": "npm@11.0.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "prettier": "@repo/prettier-config",
+  "dependencies": {
+    "@repo/legalese-agent": "*",
+    "vscode-jsonrpc": "^8.2.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/prettier-config": "*",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "jl4-client-rpc": "*",
+    "prettier": "3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.16.0"
+  }
+}

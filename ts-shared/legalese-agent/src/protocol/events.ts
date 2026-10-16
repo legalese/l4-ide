@@ -52,6 +52,10 @@ type ToPayload<E> = E extends { kind: infer K }
 /** A {@link ChatServiceEvent} as an event payload: `kind` → `type`. */
 export type ChatEventPayload = ToPayload<ChatServiceEvent>
 
+/** Longest `git-committed.summary` accepted (the harness caps commit
+ *  subjects at 72 characters; this leaves room). */
+export const GIT_SUMMARY_MAX = 200
+
 /** Git commit ids (SHA-1 or SHA-256). */
 export const GIT_SHA_RE = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
 
@@ -82,7 +86,17 @@ export type CloudOnlyEventPayload =
       /** Raw X25519 public key, base64url (see `sealed.ts`). */
       publicKey?: string
     }
-  | { type: 'git-committed'; turnId: string; sha: string; parent: string }
+  /** The turn's changes were committed. `summary` is the commit's
+   *  subject line (a one-line summary of the turn, or the prompt's first
+   *  line when no summary could be generated), for labelling the commit
+   *  and the rollback confirmation. */
+  | {
+      type: 'git-committed'
+      turnId: string
+      sha: string
+      parent: string
+      summary?: string
+    }
   | { type: 'rolled-back'; turnId: string; sha: string }
   | { type: 'local-merged'; sha: string }
   | { type: 'local-merge-conflict'; files: string[] }
@@ -204,6 +218,7 @@ const payloads: { [T in CloudEventType]: Check<Payload<T>> } = {
     turnId: opaqueId,
     sha,
     parent: sha,
+    summary: optional(str({ min: 1, max: GIT_SUMMARY_MAX })),
   }),
   'rolled-back': obj({ type: literal('rolled-back'), turnId: opaqueId, sha }),
   'local-merged': obj({ type: literal('local-merged'), sha }),
