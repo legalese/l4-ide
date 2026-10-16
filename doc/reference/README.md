@@ -2,12 +2,12 @@
 
 The reference describes exactly what each part of L4 is and does. To learn the language step by step, take a [course](../courses/README.md); to get a particular job done, see the [tutorials](../tutorials/README.md).
 
-| If you want to…                           | Go to                              |
-| ----------------------------------------- | ---------------------------------- |
-| Look up a single keyword or symbol        | [Glossary](GLOSSARY.md)            |
-| Find the L4 version of code you know      | [Cheat sheet](cheat-sheet.md)      |
-| Understand an error or warning            | [Error messages](errors/README.md) |
-| Find a function for dates, money or lists | [Library](#library), further down  |
+| Go to                              | If you want to…                                                   |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| [Glossary](GLOSSARY.md)            | Look up a single keyword or symbol                                |
+| [Cheat sheet](cheat-sheet.md)      | Find the L4 version of code you know                              |
+| [Error messages](errors/README.md) | Understand an error or warning                                    |
+| [Library](#library)                | Find a function for dates, money or lists (further down the page) |
 
 ## Language
 

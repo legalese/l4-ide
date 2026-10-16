@@ -2,12 +2,12 @@
 
 A deployed rule set can be used in four ways, all served from the same deployment and always computing the same answers. This page compares them and collects what they share: addresses, API keys and permissions, and self-hosting. To create a deployment first, see [Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md).
 
-| You want                                                                                  | Use                                         | Page                                             |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------ |
-| An AI agent (Claude, Cursor, VS Code with Copilot, …) to find and run your rules as tools | MCP, optionally with an agent skill         | [Connect an AI agent](ai-agents.md)              |
-| A chat assistant that answers from your rules, called with an OpenAI or Anthropic client  | Chat API with the `legalese-comply-4` model | [Chat with your rules](openai-compatible-api.md) |
-| Your own application to call rules directly, with no model involved                       | REST, described by an OpenAPI document      | [Call rules over REST](openapi-spec.md)          |
-| AI agents in your visitors' browsers to use your rules on your website                    | The WebMCP embed script                     | [Embed rules in a website](webmcp-embed.md)      |
+| You want                                                                                         | Use                                         | Page                                             |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------- | ------------------------------------------------ |
+| An AI agent (Claude, Codex, Cursor, VS Code with Copilot, …) to find and run your rules as tools | MCP, optionally with an agent skill         | [Connect an AI agent](ai-agents.md)              |
+| A chat assistant that answers from your rules, called with an OpenAI or Anthropic client         | Chat API with the `legalese-comply-4` model | [Chat with your rules](openai-compatible-api.md) |
+| Your own application to call rules directly, with no model involved                              | REST, described by an OpenAPI document      | [Call rules over REST](openapi-spec.md)          |
+| AI agents in your visitors' browsers to use your rules on your website                           | The WebMCP embed script                     | [Embed rules in a website](webmcp-embed.md)      |
 
 REST is deterministic: the same inputs always give the same result, which suits back-end workflows, batch jobs and audited systems. MCP, chat and WebMCP put a model in front of the rules: the model chooses the rule and gathers the inputs, and the rule computes the answer.
 

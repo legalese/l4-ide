@@ -22,7 +22,7 @@ Step-by-step guides for getting a task done with L4: from installing it and writ
 ## Use deployed rules
 
 - [Choose an integration](legalese-cloud/README.md): compare the ways to use a deployment; addresses, API keys and permissions.
-- [Connect an AI agent](legalese-cloud/ai-agents.md): Claude, Cursor, VS Code and other MCP clients, with skills and plugins.
+- [Connect an AI agent](legalese-cloud/ai-agents.md): Claude, Codex, Cursor, VS Code and other MCP clients, with skills and plugins.
 - [Chat with your rules](legalese-cloud/openai-compatible-api.md): ask a deployment questions from an OpenAI or Anthropic client.
 - [Call rules over REST](legalese-cloud/openapi-spec.md): run rules from your own application, and generate a client from OpenAPI.
 - [Embed rules in a website](legalese-cloud/webmcp-embed.md): one script tag lets visitors' browser agents use your rules.

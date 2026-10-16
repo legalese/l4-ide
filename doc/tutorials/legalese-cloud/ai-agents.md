@@ -1,6 +1,6 @@
-# Connect an AI agent: Claude, Cursor and VS Code
+# Connect an AI agent: Claude, Codex, Cursor and VS Code
 
-Let an AI agent answer questions by running your deployed rules instead of guessing. This page covers Claude (Claude Code, Claude Desktop and claude.ai), Cursor, and VS Code with GitHub Copilot, as well as the GitHub Copilot CLI, Windsurf, Cline and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io) (MCP).
+Let an AI agent answer questions by running your deployed rules instead of guessing. This page covers Claude (Claude Code, Claude Desktop and claude.ai), OpenAI Codex (the CLI, the Codex app and the IDE extension), Cursor, and VS Code with GitHub Copilot, as well as the GitHub Copilot CLI, Windsurf, Cline and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io) (MCP).
 
 **Before you start:** a deployment on Legalese Cloud ([Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md)). For permissions and self-hosted addresses, see [Choose an integration](README.md).
 
@@ -61,6 +61,24 @@ claude mcp add --transport http {orgSlug}-{deploymentId} \
 
 Without a header, Claude Code signs you in on first use. To use an API key instead, add `--header "Authorization: Bearer sk_..."`. The single-deployment server is named after the deployment, as the plugin install below names it, so the two kinds of server can sit side by side.
 
+In Codex (the CLI, the Codex app and the IDE extension share one configuration):
+
+```bash
+# All deployments
+codex mcp add legalese-rules --url https://mcp.legalese.cloud
+codex mcp login legalese-rules
+```
+
+`codex mcp login` signs you in through the browser. To use an API key instead, keep it in an environment variable and name that variable in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.legalese-rules]
+url = "https://mcp.legalese.cloud"
+bearer_token_env_var = "LEGALESE_TOKEN"
+```
+
+For one deployment, use the address `https://mcp.legalese.cloud/{orgSlug}/{deploymentId}` and the server name `{orgSlug}-{deploymentId}`. In the Codex app or IDE extension, you can also add the server under **Settings → MCP servers** as a Streamable HTTP server; type `/mcp` to check that it is connected.
+
 In any other MCP client, add an HTTP server with one of the addresses above, and an `Authorization` header if you use a key. The client then lists the tools, and the model calls them with structured arguments.
 
 Adding a server by hand gives the agent the tools, but not the skill that tells it when to use them. The installs below add both.
@@ -109,7 +127,8 @@ These clients read the plugin's portable `mcp.json`, which has no credential in 
 | VS Code (Copilot)            | Yes        | Yes               | Yes: `@agentPlugins`          |
 | GitHub Copilot CLI           | Yes        | Yes               | Yes: `copilot plugin install` |
 | Cursor, Windsurf, Cline      | Yes        | Yes               | Varies                        |
-| OpenAI Codex CLI, Gemini CLI | Yes        | No                | Yes                           |
+| OpenAI Codex (CLI, app, IDE) | Yes        | No                | Yes                           |
+| Gemini CLI                   | Yes        | No                | Yes                           |
 
 MCP is what they all share; the skill is an addition on top. Support changes quickly, so check your agent's own documentation.
 
