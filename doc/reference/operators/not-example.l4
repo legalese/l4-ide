@@ -1,73 +1,55 @@
--- NOT keyword examples
+-- NOT examples
 
--- Basic NOT Operations
+-- Basic NOT
 
 #EVAL NOT TRUE
 #EVAL NOT FALSE
-
--- Double Negation
-
 #EVAL NOT NOT TRUE
-#EVAL NOT NOT FALSE
 
--- In Conditional Logic
+-- With AND, on separate lines: NOT applies to its own line only
 
-ASSUME hasCriminalRecord IS A BOOLEAN
+GIVEN age IS A NUMBER
+      `is blocked` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may access` age `is blocked` MEANS
+      age >= 18
+  AND NOT `is blocked`
 
-DECIDE isClean IS NOT hasCriminalRecord
+#EVAL `may access` 30 FALSE
+#EVAL `may access` 30 TRUE
 
-#CHECK isClean
+-- On one line, NOT applies to everything after it
 
--- With AND
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+`not both` a b MEANS NOT a AND b
+-- means NOT (a AND b)
 
-ASSUME personAge IS A NUMBER
-ASSUME isBlocked IS A BOOLEAN
+GIVETH A BOOLEAN
+`not a, and b` a b MEANS (NOT a) AND b
+-- parentheses limit NOT to a
 
-DECIDE canAccess IS personAge >= 18 AND NOT isBlocked
+#EVAL `not both` TRUE FALSE
+#EVAL `not a, and b` TRUE FALSE
 
-#CHECK canAccess
-
--- With OR
-
-GIVEN isAdmin IS A BOOLEAN, isRestricted IS A BOOLEAN
-hasAccess isAdmin isRestricted MEANS isAdmin OR NOT isRestricted
-
-#EVAL hasAccess FALSE FALSE
-#EVAL hasAccess FALSE TRUE
-
--- Negating Compound Expressions
-
-GIVEN a IS A BOOLEAN, b IS A BOOLEAN
-
--- NOT binds tighter than AND
-notAThenB a b MEANS NOT a AND b
-
--- Use parentheses to negate compound expression
-notBoth a b MEANS NOT (a AND b)
-
-#EVAL notAThenB TRUE TRUE
-#EVAL notAThenB FALSE TRUE
-#EVAL notBoth TRUE TRUE
-#EVAL notBoth FALSE TRUE
-
--- NOT with Comparisons
+-- With comparisons: no parentheses needed
 
 GIVEN n IS A NUMBER
-isNotZero n MEANS NOT (n EQUALS 0)
-isNotPositive n MEANS NOT (n > 0)
+GIVETH A BOOLEAN
+`is not zero` n MEANS NOT n EQUALS 0
 
-#EVAL isNotZero 5
-#EVAL isNotZero 0
-#EVAL isNotPositive 5
-#EVAL isNotPositive (-3)
+#EVAL `is not zero` 5
+#EVAL `is not zero` 0
 
--- In IF Expressions
+-- In IF expressions
 
 GIVEN flag IS A BOOLEAN
-invertedMessage flag MEANS
+GIVETH A STRING
+`flag message` flag MEANS
   IF NOT flag
   THEN "flag is off"
   ELSE "flag is on"
 
-#EVAL invertedMessage TRUE
-#EVAL invertedMessage FALSE
+#EVAL `flag message` TRUE
+#EVAL `flag message` FALSE

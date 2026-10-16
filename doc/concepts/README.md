@@ -1,75 +1,20 @@
-# L4 Concepts
+# Concepts
 
-Understanding-oriented explanations of the principles, theories, and design decisions behind L4.
+These pages explain why L4 works the way it does: the choices behind its syntax, how it models legal rules, and what its type system guarantees. Read them after you have tried a feature. For what a keyword does, see the [Reference](../reference/README.md); for step-by-step guides, see the [Tutorials](../tutorials/README.md).
 
-## Purpose
+## Language design
 
-Concepts documentation helps you understand:
+- [Design principles](language-design/principles.md): the five principles behind L4, and the style of writing that follows from them.
+- [Reading like the law](language-design/linguistic-syntax.md): how L4 borrows from English grammar so that code can be checked against its source text.
 
-- **Why** L4 works the way it does
-- **How** different features relate to each other
-- **When** to use particular patterns or approaches
-- **What** theoretical foundations support L4's design
+## Legal modeling
 
-Unlike reference docs (which tell you **what** things are) or tutorials (which show you **how** to do things), concepts explain the **why** and provide deeper understanding.
+- [Definitions and duties](legal-modeling/constitutive-vs-regulative.md): why L4 keeps rules that define things apart from rules that impose duties.
+- [Exceptions and defaults](legal-modeling/default-reasoning.md): how to encode a general rule followed by its exceptions.
+- [How obligations unfold](legal-modeling/regulative-rules.md): a contract as something that waits for events and moves through time.
 
----
+## Types
 
-## Topics
-
-### 🎨 Language Design
-
-The philosophy and principles behind L4's design
-
-- **[Principles](language-design/principles.md)** - Core design principles of L4
-- **[Linguistic Syntax](language-design/linguistic-syntax.md)** - How L4 borrows from natural language linguistics
-
-**Key Ideas:** Human-readable code, legal text fidelity, accessibility for non-programmers
-
-_More topics planned: Layout Sensitivity, Scope_
-
----
-
-### ⚖️ Legal Modeling
-
-Representing legal concepts in code
-
-- **[Regulative Rules](legal-modeling/regulative-rules.md)** - Obligations, permissions, prohibitions
-- **[Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)** - Definitions vs duties, and why L4 separates them at the type level
-- **[Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)** - Defeasibility, UNLESS, and encoding general-rule-plus-exception structure
-
-**Key Ideas:** Deontic modalities, legal rules as code, contract patterns, defeasibility
-
-_More topics planned: Deontic Logic, Contract Composition_
-
----
-
-### 🏗️ Type System
-
-How L4's type system works
-
-- **[Algebraic Types](type-system/algebraic-types.md)** - Sum types and product types
-- **[Exhaustiveness](type-system/exhaustiveness.md)** - Totality as a legal-safety property: every case of a determination handled
-
-**Key Ideas:** Type safety, algebraic data types, functional programming influence
-
-_More topics planned: Maybe and Nothing, Type Inference_
-
----
-
-## How to Use Concepts
-
-### During Learning
-
-- Read concept docs **after** you've tried the feature in practice
-- Concepts build on knowledge from [courses](../courses/README.md) and [tutorials](../tutorials/README.md)
-
-### For Deeper Understanding
-
-- Concepts explain the "why" behind language features
-- Use concepts to inform design decisions in your L4 programs
-
-### For Discussion
-
-- Concepts provide vocabulary for discussing L4 design
-- Reference concepts when proposing changes or new features
+- [Types as legal categories](type-system/algebraic-types.md): records and enumerations as the shapes of legal definitions.
+- [Exhaustiveness](type-system/exhaustiveness.md): why L4 checks that a determination handles every case.
+- [Type theory](type-system/type-theory.md): the formal foundations, for readers who know type theory.

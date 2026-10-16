@@ -1,38 +1,34 @@
 # FOR ALL
 
-Universal quantifier for introducing type variables in polymorphic type signatures. Used to declare that a value or function works for _any_ type.
+`FOR ALL` introduces type variables in a type, so that an `ASSUME` can declare a value or function that works for any type.
 
 ## Syntax
 
-```l4
-FOR ALL typeVar
-FOR ALL typeVar1 AND typeVar2
-FOR ALL typeVar1 AND typeVar2 AND typeVar3 ...
+```text
+FOR ALL a
+FOR ALL a AND b
+FOR ALL a AND b AND c
 ```
 
-## Purpose
-
-`FOR ALL` introduces type variables (type parameters) in type signatures, enabling polymorphism. A polymorphic function can operate on values of any type without knowing the specific type in advance.
-
-## Examples
+`FOR ALL` comes first in the type, followed by the type that uses the variables.
 
 **Example file:** [for-all-example.l4](for-all-example.l4)
 
-### Single Type Variable
+## Examples
+
+### One type variable
 
 ```l4
--- A function that works for any type 'a'
 ASSUME identity IS
   FOR ALL a
   A FUNCTION FROM a TO a
 ```
 
-This declares `identity` as a function that takes a value of any type and returns a value of the same type.
+`identity` takes a value of any type and returns a value of the same type.
 
-### Multiple Type Variables
+### Several type variables
 
 ```l4
--- The classic 'map' function for lists
 ASSUME map IS
   FOR ALL a AND b
   A FUNCTION
@@ -41,14 +37,9 @@ ASSUME map IS
     TO    LIST OF b
 ```
 
-This says: "For all types `a` and `b`, `map` is a function that takes:
+For all types `a` and `b`, `map` takes a function from `a` to `b` and a list of `a`, and returns a list of `b`.
 
-- a function from `a` to `b`
-- a list of `a` values
-
-and returns a list of `b` values."
-
-### With Custom Types
+### With a parameterised type
 
 ```l4
 DECLARE Choice OF a, b
@@ -56,7 +47,6 @@ DECLARE Choice OF a, b
     Left  HAS payload IS AN a
     Right HAS payload IS A  b
 
--- A function that handles either alternative
 ASSUME choose IS
   FOR ALL a AND b AND c
   A FUNCTION
@@ -66,25 +56,10 @@ ASSUME choose IS
     TO    c
 ```
 
-## Usage Context
+## FOR ALL and GIVEN
 
-`FOR ALL` is used with `ASSUME` to declare the type of external or primitive functions. It's the declaration-style way to express polymorphism.
-
-### ASSUME vs GIVEN
-
-There are two ways to write polymorphic functions:
-
-**Declaration style (FOR ALL):** Declares a type signature without implementation
-
-```l4
-ASSUME map IS
-  FOR ALL a AND b
-  A FUNCTION
-    FROM FUNCTION FROM a TO b AND LIST OF a
-    TO LIST OF b
-```
-
-**Definition style (GIVEN ... IS A TYPE):** Defines a function with implementation
+`FOR ALL` declares a polymorphic type with no definition, in an `ASSUME`.
+A function that is defined gets its type variables from `GIVEN … IS A TYPE` instead:
 
 ```l4
 GIVEN a IS A TYPE
@@ -92,111 +67,42 @@ GIVEN a IS A TYPE
       f IS A FUNCTION FROM a TO b
       list IS A LIST OF a
 GIVETH A LIST OF b
-map f list MEANS
+`apply to each` f list MEANS
   CONSIDER list
   WHEN EMPTY THEN EMPTY
-  WHEN x FOLLOWED BY xs THEN f x FOLLOWED BY map f xs
+  WHEN x FOLLOWED BY xs THEN f x FOLLOWED BY `apply to each` f xs
 ```
 
-Both express the same polymorphic type, but:
+Both give the function the same type.
 
-- `FOR ALL` is for **type declarations** (no implementation)
-- `GIVEN ... IS A TYPE` is for **function definitions** (with implementation)
+## Type variables
 
-## Type Variables
+- They are usually single lowercase letters (`a`, `b`, `c`), but any identifier works.
+- They are in scope only in the type that follows.
+- The names in one `FOR ALL` must be distinct: `FOR ALL a AND a` is an error.
 
-Type variables introduced by `FOR ALL`:
+## Not a quantifier over lists
 
-- Are conventionally single lowercase letters: `a`, `b`, `c`
-- Can be any valid identifier
-- Are scoped to the type signature
-- Must be distinct within the same `FOR ALL`
+`FOR ALL` works on types, not on values. To test every element of a list, or some element, use `all` or `any` from the [prelude](../libraries/prelude.md) with a [YIELD](../functions/YIELD.md) function:
 
 ```l4
--- Valid:
-FOR ALL a AND b AND c
+IMPORT prelude
 
--- Invalid (duplicate):
--- FOR ALL a AND a  -- Error: duplicate type variable
+GIVEN amounts IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+`every amount is positive` amounts MEANS all (GIVEN x YIELD x > 0) amounts
 ```
 
-## Common Patterns
-
-### Identity Function
-
-```l4
-ASSUME identity IS
-  FOR ALL a
-  A FUNCTION FROM a TO a
-```
-
-### Constant Function
-
-```l4
-ASSUME const IS
-  FOR ALL a AND b
-  A FUNCTION FROM a AND b TO a
-```
-
-### Function Composition
-
-```l4
-ASSUME compose IS
-  FOR ALL a AND b AND c
-  A FUNCTION
-    FROM      FUNCTION FROM b TO c
-          AND FUNCTION FROM a TO b
-    TO    FUNCTION FROM a TO c
-```
-
-### List Operations
-
-```l4
-ASSUME head IS
-  FOR ALL a
-  A FUNCTION FROM LIST OF a TO MAYBE a
-
-ASSUME tail IS
-  FOR ALL a
-  A FUNCTION FROM LIST OF a TO LIST OF a
-
-ASSUME filter IS
-  FOR ALL a
-  A FUNCTION
-    FROM      FUNCTION FROM a TO BOOLEAN
-          AND LIST OF a
-    TO    LIST OF a
-```
-
-## NOT a Runtime Quantifier
-
-**Important:** `FOR ALL` is a _type-level_ construct, not a runtime quantifier over lists or collections.
-
-```l4
--- WRONG - FOR ALL is not for iterating over lists:
--- FOR ALL x IN myList CHECK x > 0  -- NOT VALID L4!
-
--- CORRECT - use prelude functions for list quantification:
-all (GIVEN x YIELD x > 0) myList    -- Check all elements
-any (GIVEN x YIELD x > 0) myList    -- Check if any element
-```
-
-## Comparison with Other Languages
+## In other languages
 
 | L4                | Haskell       | TypeScript | Java     |
 | ----------------- | ------------- | ---------- | -------- |
 | `FOR ALL a`       | `forall a.`   | `<T>`      | `<T>`    |
 | `FOR ALL a AND b` | `forall a b.` | `<T, U>`   | `<T, U>` |
 
-## Related Keywords
+## Related pages
 
-- **[GIVEN](../functions/GIVEN.md)** - Function parameters (including type parameters)
-- **[TYPE](keywords.md)** - The kind of types
-- **[ASSUME](ASSUME.md)** - Declare types without implementation
-- **[FUNCTION](keywords.md)** - Function type constructor
-
-## See Also
-
-- **[Types Reference](README.md)** - Type system overview
-- **[Polymorphic Types](README.md#polymorphic-types)** - LIST, MAYBE, EITHER
-- **[Prelude Library](../libraries/prelude.md)** - Polymorphic standard functions
+- [GIVEN and GIVETH](../functions/GIVEN.md#type-parameters): type parameters of a defined function
+- [ASSUME](ASSUME.md): declare a name without a definition
+- [DECLARE: Type expressions](DECLARE.md#type-expressions): `FUNCTION FROM … TO …` and `TYPE`
+- [prelude](../libraries/prelude.md): polymorphic standard functions

@@ -1,12 +1,12 @@
-# Version Control for Rules
+# Manage rules in git and CI
 
-Manage L4 rules in git: repository layout, commit discipline, review, CI, and safe redeployment.
+Keep L4 rules in git: repository layout, commits, review, automatic checks, and safe redeployment.
 
-**Prerequisites:** [Your First L4 File](first-l4-file.md), [Testing Your Rules](testing-your-rules.md), basic git
+**Before you start:** [Test your rules](testing-your-rules.md), and basic git.
 
 ---
 
-## Why Legal Rules Belong in Git
+## Why legal rules belong in git
 
 An `.l4` file is a legal text that happens to be executable. That makes version control more than an engineering habit:
 
@@ -19,7 +19,7 @@ None of this works if rules live in a wiki, a shared drive, or someone's editor.
 
 ---
 
-## A Sensible Repository Layout
+## A repository layout
 
 Keep it simple. A rules project needs little more than:
 
@@ -28,22 +28,22 @@ loan-rules/
 ├── README.md              # what these rules encode, which instrument, which version
 ├── rules/
 │   ├── eligibility.l4     # one file per part/instrument, named after the source text
-│   ├── repayment.l4       # rules + their §§ Tests sections (see Testing Your Rules)
+│   ├── repayment.l4       # rules + their §§ Tests sections
 │   └── shared-types.l4    # DECLAREs shared across files (IMPORTed by the others)
 └── .github/
     └── workflows/
-        └── check.yml      # CI: l4 check + assertions on every PR
+        └── check.yml      # CI: l4 check and the tests on every pull request
 ```
 
 Guidelines:
 
 - **Mirror the source text.** One file per statute part or contract, with `§` sections matching the source's numbering, keeps every diff traceable to a clause.
-- **Tests live with the rules.** `#ASSERT` and `#TRACE` directives are ignored by deployment, so keep each rule's tests in the same file, in a `§§ Tests` section.
+- **Tests live with the rules.** Deployment publishes only the rules marked `@export`, so keep each rule's tests in the same file, in a `§§ Tests` section.
 - **Shared vocabulary in one place.** If several files need the same `DECLARE`s, put them in one file and `IMPORT` it (a same-directory file can be imported by name).
 
 ---
 
-## Commit Discipline: One Legal Change per Commit
+## One legal change per commit
 
 Because the diff is the amendment, cut commits along legal lines, not editing sessions:
 
@@ -77,7 +77,7 @@ Anyone — including a reviewer who has never seen L4 — can see exactly what c
 
 ---
 
-## Reviewing Rule Changes
+## Review rule changes
 
 Treat a pull request on a rules repo as an amendment bill:
 
@@ -85,9 +85,9 @@ Treat a pull request on a rules repo as an amendment bill:
 2. **Check the assertions moved.** New boundary values need new `#ASSERT`s on both sides of the boundary; changed obligations need updated `#TRACE` timelines.
 3. **Let CI do the mechanical part.** Reviewers should never spend attention on "does it compile".
 
-### CI with `l4 check` and `l4 run`
+## Check every change in CI
 
-A minimal GitHub Actions workflow that typechecks every rule file and fails on failed assertions:
+This GitHub Actions workflow type-checks every rule file and fails when an assertion fails. It takes the `l4` binary from the Linux build of the VS Code extension, which is attached to each `l4-ide-build-…` release of [legalese/l4-ide](https://github.com/legalese/l4-ide/releases):
 
 ```yaml
 name: check-rules
@@ -99,11 +99,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Provide the l4 binary. Build it once from the l4-ide repo
-      # (cabal build jl4:l4) and cache it, or fetch a binary your team
-      # publishes — whatever gets `l4` onto the PATH.
       - name: Install l4
-        run: ./scripts/install-l4.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release list --repo legalese/l4-ide --limit 50 --json tagName \
+                  --jq '[.[] | select(.tagName | startswith("l4-ide-build-"))][0].tagName')
+          gh release download "$tag" --repo legalese/l4-ide \
+            --pattern 'l4-vscode-linux-x64-*.vsix' --output l4.vsix
+          mkdir -p "$HOME/.local/bin"
+          unzip -j l4.vsix 'extension/bin/linux-x64/l4' -d "$HOME/.local/bin"
+          chmod +x "$HOME/.local/bin/l4"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Typecheck all rule files
         run: |
@@ -111,12 +118,15 @@ jobs:
             l4 check "$f"
           done
 
-      - name: Run tests (fail on failed assertions)
+      - name: Run tests (fail on failed assertions and on assertions that cannot be evaluated)
         run: |
           status=0
           for f in $(git ls-files '*.l4'); do
-            out=$(l4 run "$f" 2>&1) || status=1
-            if echo "$out" | grep -q "assertion failed"; then
+            if ! out=$(l4 run "$f" 2>&1); then
+              echo "::error file=$f::l4 run failed for $f (a type error, or a directive that could not be evaluated)"
+              echo "$out"
+              status=1
+            elif echo "$out" | grep -q "assertion failed"; then
               echo "::error file=$f::assertion failed in $f"
               echo "$out"
               status=1
@@ -125,18 +135,20 @@ jobs:
           exit $status
 ```
 
+To pin a version, replace the `tag=$(...)` line with a fixed tag, such as `tag=l4-ide-build-95`. To build `l4` from source instead, see [Using the l4 CLI](l4-cli.md).
+
 Two details worth knowing:
 
 - `l4 check` exits non-zero on any parse or type error, so the typecheck step needs no extra logic.
-- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step greps for it (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
+- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step checks two things: the exit code, which catches the type errors and the assertions that could not be evaluated, and a grep for `assertion failed`, which catches the verdicts (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
 
 If rules use `NOW` or `TODAY`, add `--fixed-now <ISO8601>` to the `l4 run` calls so CI results do not depend on the day the job runs.
 
 ---
 
-## Redeployment: When a Merge Changes a Live API
+## Redeploy when a merge changes a live API
 
-If your rules are deployed ([Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md)), merging to main is not the end of the story — the deployment has consumers, and its exported interface is a contract with them.
+If your rules are deployed ([Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md)), merging to main is not the end of the story — the deployment has consumers, and its exported interface is a contract with them.
 
 When you redeploy to an existing deployment name, the interface of the new bundle is diffed against the currently deployed one. **Backwards-compatible** changes go through silently:
 
@@ -152,7 +164,7 @@ When you redeploy to an existing deployment name, the interface of the new bundl
 - narrowing the accepted values of an input enum
 - changing a rule's return type, removing a result field, or widening an output enum with values consumers may not handle
 
-Both surfaces enforce this. The VS Code Deploy tab runs the check client-side and warns you before you confirm ([see the deployment tutorial](../deploying-rules/exporting-rules-for-deployment.md#updating-an-existing-deployment)); the service runs the same diff server-side on a guarded update and rejects it outright with a message listing every incompatibility:
+Both surfaces enforce this. The VS Code Deploy tab runs the check client-side and warns you before you confirm ([Update a deployment](../deploying-rules/exporting-rules-for-deployment.md#update-a-deployment)); the service runs the same diff server-side on a guarded update and rejects it outright with a message listing every incompatibility:
 
 ```
 Update rejected — it would break existing integrations:
@@ -160,7 +172,7 @@ Update rejected — it would break existing integrations:
   qualifies for discount return type changed from BOOLEAN to NUMBER
 ```
 
-If the break is intentional, the deliberate path is to overwrite explicitly (confirming the warning in VS Code); the deployment's version number records it — the breaking component of the version is bumped, so consumers can see at a glance that the interface changed incompatibly.
+If the break is intentional, overwrite explicitly: confirm the warning in VS Code, or run `l4 redeploy --force`. The deployment's version number records it — the breaking component of the version is bumped, so consumers can see at a glance that the interface changed incompatibly.
 
 Practical workflow:
 
@@ -170,18 +182,8 @@ Practical workflow:
 
 ---
 
-## What You Learned
+## Next steps
 
-- Rule repositories make amendments reviewable, history auditable, and rollbacks trivial
-- Lay out files to mirror the legal source; keep tests in the same file as the rules
-- Cut commits along legal lines; update assertions in the same commit; cite the instrument
-- CI: `l4 check` for validity, `l4 run` plus a grep for `assertion failed` for outcomes
-- Redeployments are interface-checked: compatible changes flow through, breaking changes are rejected unless you overwrite deliberately
-
----
-
-## Next Steps
-
-- [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) — the deployment pipeline this page protects
-- [Testing Your Rules](testing-your-rules.md) — the assertions your CI runs
-- [Using the l4 CLI](l4-cli.md) — the commands behind the workflow
+- [Test your rules](testing-your-rules.md): the assertions your CI runs.
+- [Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md): the deployment this page protects.
+- [Using the l4 CLI](l4-cli.md): every command used in the workflow.

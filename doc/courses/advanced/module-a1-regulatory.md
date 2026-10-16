@@ -1,4 +1,4 @@
-# Module A1: Real Regulatory Schemes
+# Module A1: Real regulatory schemes
 
 In this module, you'll learn how to model complete legislative frameworks using a systematic three-layer approach. Find a working example at the end.
 
@@ -398,6 +398,4 @@ Key practices:
 
 ---
 
-## What's Next?
-
-In [Module A2: Cross-Cutting Concerns](module-a2-cross-cutting.md), you'll learn patterns for timing, notices, appeals, and other concerns that span multiple rules.
+Next, [Module A2: Cross-cutting concerns](module-a2-cross-cutting.md) covers timing, notices, appeals and other concerns that span many rules.

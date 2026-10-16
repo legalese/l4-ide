@@ -39,9 +39,9 @@ Only `PARTY` + modal + action are required. `WITHIN`, `HENCE`, and `LEST` all ha
 
 | Keyword | Meaning                   | Reference                                               |
 | ------- | ------------------------- | ------------------------------------------------------- |
-| `MUST`  | Obligation (required)     | <https://legalese.com/l4/reference/regulative/MUST.md>  |
-| `MAY`   | Permission (allowed)      | <https://legalese.com/l4/reference/regulative/MAY.md>   |
-| `SHANT` | Prohibition (forbidden)   | <https://legalese.com/l4/reference/regulative/SHANT.md> |
+| `MUST`  | Obligation (required)     | <https://legalese.com/l4/reference/regulative/PARTY.md> |
+| `MAY`   | Permission (allowed)      | <https://legalese.com/l4/reference/regulative/PARTY.md> |
+| `SHANT` | Prohibition (forbidden)   | <https://legalese.com/l4/reference/regulative/PARTY.md> |
 | `DO`    | Optionality / possibility |                                                         |
 
 ```l4
@@ -267,11 +267,9 @@ saleContract MEANS
 ## See also
 
 - <https://legalese.com/l4/reference/regulative.md> — full keyword reference
-- <https://legalese.com/l4/reference/regulative/MUST.md>
-- <https://legalese.com/l4/reference/regulative/MAY.md>
-- <https://legalese.com/l4/reference/regulative/SHANT.md>
-- <https://legalese.com/l4/reference/regulative/PARTY.md>
+- <https://legalese.com/l4/reference/regulative/PARTY.md> — PARTY, MUST, MAY, SHANT
+- <https://legalese.com/l4/reference/regulative/consequences.md> — WITHIN, HENCE, LEST, RAND, ROR
 - <https://legalese.com/l4/reference/regulative/BECAUSE.md>
 - <https://legalese.com/l4/reference/regulative/DEONTIC.md>
 - <https://legalese.com/l4/concepts/legal-modeling/regulative-rules.md> — conceptual overview
-- <https://legalese.com/l4/courses/foundation/module-5-regulative.md> — foundation course module
+- <https://legalese.com/l4/courses/foundation/module-6-regulative.md> — foundation course module
