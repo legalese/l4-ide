@@ -17,9 +17,15 @@
 #   says which one it was.
 #
 # USAGE
-#   etc/verify-branch.sh [--quick] [--base <ref>] <absolute-worktree-path>
+#   etc/verify-branch.sh [--quick] [--serial] [--base <ref>] <absolute-worktree-path>
 #
 #     --quick        skip jl4-test (~12 min). Everything else still runs.
+#     --serial       run the test suites one after another. The default runs them at
+#                    the same time, after one serial build of all of them, because
+#                    two cabal processes that BUILD in one worktree corrupt each
+#                    other (CLAUDE.md §2.1) while processes that only run built
+#                    test binaries do not. Use --serial to tell a failure caused by
+#                    the suites running together from one that is not.
 #     --base <ref>   what to diff against for changed-file checks and commit
 #                    trailers. Default origin/unstable.
 #
@@ -50,20 +56,22 @@
 set -uo pipefail
 
 QUICK=0
+SERIAL=0
 BASE=origin/unstable
 WT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --quick) QUICK=1; shift ;;
+    --serial) SERIAL=1; shift ;;
     --base)  BASE="${2:-}"; [ -n "$BASE" ] || { echo "--base needs a ref" >&2; exit 2; }; shift 2 ;;
-    -h|--help) sed -n '3,48p' "$0"; exit 0 ;;
+    -h|--help) sed -n '3,54p' "$0"; exit 0 ;;
     -*) echo "unknown flag: $1" >&2; exit 2 ;;
     *)  [ -z "$WT" ] || { echo "give exactly one worktree path" >&2; exit 2; }; WT="$1"; shift ;;
   esac
 done
 
-[ -n "$WT" ] || { echo "usage: $0 [--quick] [--base <ref>] <absolute-worktree-path>" >&2; exit 2; }
+[ -n "$WT" ] || { echo "usage: $0 [--quick] [--serial] [--base <ref>] <absolute-worktree-path>" >&2; exit 2; }
 
 # An absolute path is the whole point: a relative one would be resolved against
 # whatever directory the caller happens to be in, which is the bug this script
@@ -156,12 +164,23 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-suite() { # suite <label> <cabal test target> <summary lines to show>
+# A suite is started (its `cabal test` writes the log), then reported (the
+# summary lines, the verdict, the failing examples). Splitting the two lets the
+# suites run at the same time and still be reported in a fixed order.
+suite_start() { # suite_start <cabal test target>
+  local target="$1" log="$LOGDIR/$1.log"
+  ( cd "$WT" && cabal test "$target" > "$log" 2>&1 ) &
+  LAST_SUITE_PID=$!
+}
+suite_report() { # suite_report <label> <cabal test target> <summary lines to show>
   local label="$1" target="$2" lines="$3" log="$LOGDIR/$2.log"
-  if step "$label" bash -c "cd '$WT' && cabal test $target 2>&1 | tee '$log' | grep -E 'examples,|PASS|FAIL' | tail -$lines; grep -q '$target: PASS' '$log'"; then
-    rm -f "$log"
+  printf '\n=== %s ===\n' "$label"
+  grep -E 'examples,|PASS|FAIL' "$log" | tail -"$lines"
+  if grep -q "$target: PASS" "$log"; then
+    RESULTS+=("PASS  $label"); rm -f "$log"
     return 0
   fi
+  RESULTS+=("FAIL  $label"); FAILED=1
   KEPT+=("$log")
   echo "  full log: $log"
   # hspec numbers each failure "  1) <the example's path>". A suite that did not
@@ -173,22 +192,41 @@ suite() { # suite <label> <cabal test target> <summary lines to show>
   fi
   return 1
 }
+LAST_SUITE_PID=
+# The suites, in report order: <label>|<cabal test target>|<summary lines to show>.
+# jl4-service-test renders a state graph over the HTTP surface and asserts its captions
+# (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
+# lts/draw-what-it-means turned it red while this script stayed green, because it was not here.
+SUITES=()
+[ "$QUICK" = 1 ] || SUITES+=("jl4-test (corpus goldens + round-trip)|jl4-test|3")
+SUITES+=("l4-cli-test|l4-cli-test|2" "jl4-core-test|jl4-core-test|2" "jl4-service-test|jl4-service-test|2")
 
 # ---------------------------------------------------------------- the gate
 step "cabal build all" bash -c "cd '$WT' && cabal build all 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"
 
 if [ "$QUICK" = 1 ]; then
   note "jl4-test SKIPPED (--quick)"
-else
-  suite "jl4-test (corpus goldens + round-trip)" jl4-test 3
 fi
 
-suite "l4-cli-test"   l4-cli-test 2
-suite "jl4-core-test" jl4-core-test 2
-# jl4-service-test renders a state graph over the HTTP surface and asserts its captions
-# (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
-# lts/draw-what-it-means turned it red while this script stayed green, because it was not here.
-suite "jl4-service-test" jl4-service-test 2
+if [ "$SERIAL" = 1 ]; then
+  note "test suites ran one after another (--serial)"
+  for spec in "${SUITES[@]}"; do
+    IFS='|' read -r label target lines <<< "$spec"
+    suite_start "$target"; wait "$LAST_SUITE_PID"
+    suite_report "$label" "$target" "$lines"
+  done
+else
+  # Build every suite once, here, so that no `cabal test` below has anything to compile.
+  targets=(); for spec in "${SUITES[@]}"; do IFS='|' read -r _ target _ <<< "$spec"; targets+=("$target"); done
+  if step "cabal build the test suites" bash -c "cd '$WT' && cabal build ${targets[*]} 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"; then
+    note "test suites ran at the same time (use --serial to run them one at a time)"
+    for spec in "${SUITES[@]}"; do IFS='|' read -r _ target _ <<< "$spec"; suite_start "$target"; done
+    wait
+    for spec in "${SUITES[@]}"; do IFS='|' read -r label target lines <<< "$spec"; suite_report "$label" "$target" "$lines"; done
+  else
+    note "test suites NOT run: they did not build"
+  fi
+fi
 
 # ---------------------------------------------------------------- probes
 # Each probe guards a defect that a review of a main-bound PR found after every
