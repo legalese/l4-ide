@@ -167,11 +167,32 @@ trap 'exit 143' TERM
 # A suite is started (its `cabal test` writes the log), then reported (the
 # summary lines, the verdict, the failing examples). Splitting the two lets the
 # suites run at the same time and still be reported in a fixed order.
-suite_start() { # suite_start <cabal test target>
+suite_start() { # suite_start <cabal test target | jl4-test:<slice>>
   local target="$1" log="$LOGDIR/$1.log"
-  ( cd "$WT" && cabal test "$target" > "$log" 2>&1 ) &
+  case "$target" in
+    jl4-test:*)
+      # One slice of the jl4-test examples, run from the built binary, because four `cabal test`
+      # processes would write one test log. This is what `cabal test jl4-test` sets up for it:
+      # the package directory as cwd, and the two data directories.
+      shard_opts "${target#jl4-test:}"
+      ( cd "$WT/jl4" && env jl4_datadir="$WT/jl4" jl4_core_datadir="$WT/jl4-core" \
+          "$JL4_TEST_BIN" "${SHARD_OPTS[@]}" > "$log" 2>&1 \
+        && echo "Test suite $target: PASS" >> "$log" ) & ;;
+    *) ( cd "$WT" && cabal test "$target" > "$log" 2>&1 ) & ;;
+  esac
   LAST_SUITE_PID=$!
   SUITE_PIDS="$SUITE_PIDS $!"
+}
+# jl4-test as four processes, chosen by hspec example path. Whatever the three named slices do not select
+# lands in "rest", so no example is missed; the example counts are checked against hspec's own count below.
+# Measured on nye (10 cores): 299 s against 663-679 s for one process; the slowest slice is prettyLayout.
+shard_opts() { # shard_opts <slice> sets SHARD_OPTS
+  case "$1" in
+    canon)        SHARD_OPTS=(--match "ok files/canon/") ;;
+    oknotcanon)   SHARD_OPTS=(--match "ok files/" --skip "ok files/canon/") ;;
+    prettylayout) SHARD_OPTS=(--match "prettyLayout round-trip") ;;
+    rest)         SHARD_OPTS=(--skip "ok files/" --skip "prettyLayout round-trip") ;;
+  esac
 }
 suite_report() { # suite_report <label> <cabal test target> <summary lines to show>
   local label="$1" target="$2" lines="$3" log="$LOGDIR/$2.log"
@@ -200,7 +221,13 @@ SUITE_PIDS=""
 # (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
 # lts/draw-what-it-means turned it red while this script stayed green, because it was not here.
 SUITES=()
-[ "$QUICK" = 1 ] || SUITES+=("jl4-test (corpus goldens + round-trip)|jl4-test|3")
+if [ "$QUICK" != 1 ]; then
+  if [ "$SERIAL" = 1 ]; then SUITES+=("jl4-test (corpus goldens + round-trip)|jl4-test|3")
+  else
+    SUITES+=("jl4-test, slice canon|jl4-test:canon|3" "jl4-test, slice ok files outside canon|jl4-test:oknotcanon|3")
+    SUITES+=("jl4-test, slice prettyLayout round-trip|jl4-test:prettylayout|3" "jl4-test, slice everything else|jl4-test:rest|3")
+  fi
+fi
 SUITES+=("l4-cli-test|l4-cli-test|2" "jl4-core-test|jl4-core-test|2" "jl4-service-test|jl4-service-test|2")
 
 # The checks below read files and run node or git; none of them touches cabal or the
@@ -275,13 +302,45 @@ if [ "$SERIAL" = 1 ]; then
   done
 else
   # Build every suite once, here, so that no `cabal test` below has anything to compile.
-  targets=(); for spec in "${SUITES[@]}"; do IFS='|' read -r _ target _ <<< "$spec"; targets+=("$target"); done
+  targets=(); for spec in "${SUITES[@]}"; do IFS='|' read -r _ target _ <<< "$spec"; t="${target%%:*}"
+    case " ${targets[*]-} " in *" $t "*) ;; *) targets+=("$t") ;; esac; done
   if step "cabal build the test suites" bash -c "cd '$WT' && cabal build ${targets[*]} 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"; then
     note "test suites ran at the same time (use --serial to run them one at a time)"
-    for spec in "${SUITES[@]}"; do IFS='|' read -r _ target _ <<< "$spec"; suite_start "$target"; done
-    # shellcheck disable=SC2086
-    wait $SUITE_PIDS
-    for spec in "${SUITES[@]}"; do IFS='|' read -r label target lines <<< "$spec"; suite_report "$label" "$target" "$lines"; done
+    JL4_TEST_BIN=""; JL4_TEST_COUNT=""
+    case " ${targets[*]-} " in *" jl4-test "*)
+      JL4_TEST_BIN=$(cd "$WT" && cabal list-bin jl4-test 2>/dev/null)
+      # hspec's own count of the examples, to hold the four slices against.
+      JL4_TEST_COUNT=$( [ -x "$JL4_TEST_BIN" ] && cd "$WT/jl4" && env jl4_datadir="$WT/jl4" jl4_core_datadir="$WT/jl4-core" "$JL4_TEST_BIN" --dry-run 2>&1 | grep -E '^[0-9]+ examples' | tail -1 | cut -d' ' -f1)
+      ;; esac
+    if case " ${targets[*]-} " in *" jl4-test "*) [ -z "$JL4_TEST_COUNT" ] ;; *) false ;; esac; then
+      RESULTS+=("FAIL  jl4-test: no built binary or no example count from --dry-run ($JL4_TEST_BIN)"); FAILED=1
+    else
+      # On a host with fewer than 8 cores the jl4-test slices run AFTER the other suites, not beside them:
+      # on lhs (4 cores, Intel N150) four slices beside jl4-service-test starved its batch examples, which
+      # run 40 half-second cases through one capability against a 30-second HTTP timeout, and three of them
+      # failed in all four full-gate runs. nice -n 10 on the slices did not help (the load average stayed
+      # near 3.5 of 4), so the cause is not CPU share alone. On 8 or more cores everything starts together.
+      CORES=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+      for phase in 1 2; do
+        SUITE_PIDS=""
+        for spec in "${SUITES[@]}"; do IFS='|' read -r _ target _ <<< "$spec"
+          late=0; case "$target" in jl4-test:*) [ "$CORES" -lt 8 ] && late=1 ;; esac
+          [ "$late" = $((phase - 1)) ] && suite_start "$target"
+        done
+        # shellcheck disable=SC2086
+        [ -z "$SUITE_PIDS" ] || wait $SUITE_PIDS
+      done
+      [ "$CORES" -lt 8 ] && note "jl4-test slices ran after the other suites ($CORES cores; they run beside them from 8)"
+      if [ -n "$JL4_TEST_COUNT" ]; then
+        SLICED=0
+        for sl in canon oknotcanon prettylayout rest; do
+          n=$(grep -E '^[0-9]+ examples' "$LOGDIR/jl4-test:$sl.log" 2>/dev/null | tail -1 | cut -d' ' -f1); SLICED=$((SLICED + ${n:-0}))
+        done
+        if [ "$SLICED" = "$JL4_TEST_COUNT" ]; then RESULTS+=("PASS  jl4-test slices cover all $JL4_TEST_COUNT examples (hspec --dry-run)")
+        else RESULTS+=("FAIL  jl4-test slices ran $SLICED examples; hspec counts $JL4_TEST_COUNT"); FAILED=1; fi
+      fi
+      for spec in "${SUITES[@]}"; do IFS='|' read -r label target lines <<< "$spec"; suite_report "$label" "$target" "$lines"; done
+    fi
   else
     note "test suites NOT run: they did not build"
   fi
