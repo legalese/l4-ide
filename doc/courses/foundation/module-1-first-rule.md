@@ -1,6 +1,4 @@
-# Module 1: Your First Legal Rule
-
-**Prerequisites:** Module 0
+# Module 1: Your first legal rule
 
 In this module, you'll write your first legal rule in L4—a simple legal obligation with conditions, deadlines, and consequences.
 
@@ -125,7 +123,7 @@ MUST `file the annual return`
 WITHIN 60
 ```
 
-`WITHIN 60` means "within 60 days." L4 uses days as the default time unit.
+`WITHIN 60` means "within 60 units of time". L4 does not fix the unit; these examples count in days.
 
 ---
 
@@ -229,10 +227,10 @@ The result shows whether the obligation was `FULFILLED` or `BREACH`.
 ### 1. Missing Type Declaration
 
 ```l4
--- ❌ Wrong: Type not declared
+-- Wrong: Type not declared
 GIVEN charity IS A `Registered Charity`
 
--- ✅ Right: Declare the type first
+-- Right: Declare the type first
 DECLARE `Registered Charity`
     HAS `the name` IS A STRING
 ```
@@ -240,20 +238,20 @@ DECLARE `Registered Charity`
 ### 2. Wrong Field Access
 
 ```l4
--- ❌ Wrong: Missing 's
+-- Wrong: Missing 's
 IF charity `the status` EQUALS Active
 
--- ✅ Right: Use 's for field access
+-- Right: Use 's for field access
 IF charity's `the status` EQUALS Active
 ```
 
 ### 3. Missing Backticks for Multi-Word Names
 
 ```l4
--- ❌ Wrong: Spaces without backticks
+-- Wrong: Spaces without backticks
 MUST file the annual return
 
--- ✅ Right: Use backticks
+-- Right: Use backticks
 MUST `file the annual return`
 ```
 
@@ -375,6 +373,4 @@ In this module, you learned:
 
 ---
 
-## What's Next?
-
-In [Module 2: Legal Entities and Relationships](module-2-entities.md), you'll learn how to model complex legal entities with proper types, including records, enums, and relationships between entities.
+Next, [Module 2: Legal entities and relationships](module-2-entities.md) models legal entities with proper types: records, enumerations, and the relationships between them.

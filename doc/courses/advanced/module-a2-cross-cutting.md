@@ -1,4 +1,4 @@
-# Module A2: Cross-Cutting Concerns
+# Module A2: Cross-cutting concerns
 
 In this module, you'll learn patterns for concerns that span multiple rules: timing, notices, appeals, and escalation. Find a full working example at the end.
 
@@ -232,29 +232,40 @@ GIVETH A DEONTIC Actor Action
 
 ### Real Example: Charity Decision Appeals
 
-```l4
--- Article 33: Appeal Commissioner decision to Royal Court
+Article 33 lets a charity appeal a decision of the Commissioner to the Royal Court within 21 days. What happens next depends on what the court decides, so the court's action carries its outcome (`` `decide the appeal` HAS `the outcome` IS A `Court Decision` ``), and the rule names that outcome and passes it on:
 
+```l4
+-- What the Royal Court's decision leads to
+GIVEN outcome IS A `Court Decision`
+GIVETH A DEONTIC Actor Action
+`the effect of the court's decision` MEANS
+    CONSIDER outcome
+    WHEN Upheld THEN FULFILLED
+    WHEN Quashed THEN
+        PARTY  `the Commissioner`
+        MUST   `withdraw the decision`
+        WITHIN 7
+    WHEN Varied `the new decision` THEN
+        PARTY  `the Commissioner`
+        MUST   `make the varied decision` (EXACTLY `the new decision`)
+        WITHIN 7
+
+-- Article 33: Appeal Commissioner decision to Royal Court
 GIVEN charity IS A `Registered Charity`
       decision IS A `Commissioner Decision`
 GIVETH A DEONTIC Actor Action
 `appeal commissioner decision` MEANS
-    PARTY `the charity` charity
-    MAY `hear appeal` decision
+    PARTY  `the charity` charity
+    MAY    `appeal to the Royal Court` (EXACTLY decision)
     WITHIN 21  -- 21 days from notification
     HENCE
+        -- No statutory deadline for the hearing, so no WITHIN
         PARTY `the Royal Court`
-        MUST `hear appeal` decision
-        -- No statutory deadline for hearing in original law
-        HENCE CONSIDER `court decision`
-                WHEN Upheld THEN
-                    `original decision takes effect`
-                WHEN Quashed THEN
-                    `decision has no effect`
-                WHEN Varied `the new decision` THEN
-                    `varied decision takes effect` `the new decision`
-        LEST BREACH BY `the Royal Court` BECAUSE "failed to hear appeal"
+        MUST  `decide the appeal` outcome
+        HENCE `the effect of the court's decision` outcome
 ```
+
+In ``MUST `decide the appeal` outcome``, `outcome` is a new name: it matches whatever outcome the court's event carries, and `HENCE` can use it. `EXACTLY` does the opposite: `(EXACTLY decision)` only matches an appeal against this decision. The tests at the end of the [example file](module-a2-cross-cutting-examples.l4) run an appeal that is quashed and one that is varied.
 
 ---
 
@@ -358,15 +369,14 @@ GIVETH A DEONTIC Actor Action
         -- Grace period with late fee
         PARTY debtor
         MUST `pay with late fee` `the late amount`
-        WITHIN `the grace deadline`
+        WITHIN `the grace period`
         HENCE FULFILLED
         LEST BREACH BY debtor BECAUSE "failed to pay within grace period"
     WHERE
         `the late amount` MEANS amount * (1 + `the late fee rate`)
-        `the grace deadline` MEANS `the due date` + `the grace period`
 ```
 
----
+The grace period's `WITHIN` counts from the moment the first deadline is found to have passed, so it is `` `the grace period` `` itself, not the due date plus the grace period.
 
 ---
 
@@ -409,12 +419,14 @@ GIVETH A DEONTIC `Licence Party` `Licence Action`
         -- Grace period with late fee
         PARTY holder
         MUST `apply with late fee`
-        WITHIN (`the expiry date` - 30 + 14)  -- 14 day grace period
+        WITHIN 14  -- 14 day grace period, from when the first deadline is missed
         HENCE FULFILLED
         LEST
             -- Reinstatement period after suspension
+            -- DO: an option. Doing it leads to HENCE, letting the time pass to LEST.
+            -- (A MAY would never reach its LEST.)
             PARTY holder
-            MAY `apply for reinstatement`
+            DO `apply for reinstatement`
             WITHIN 60
             HENCE FULFILLED
             LEST
@@ -450,6 +462,4 @@ Key principle: **Abstract common patterns** into reusable functions rather than 
 
 ---
 
-## What's Next?
-
-In [Module A3: Contracts in Depth](module-a3-contracts.md), you'll learn advanced contract modeling including complex payment terms, recursive obligations, and penalty structures.
+Next, [Module A3: Contracts in depth](module-a3-contracts.md) covers complex payment terms, recursive obligations and penalty structures.

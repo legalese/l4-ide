@@ -2,7 +2,7 @@
 
 Run, check, format, render, and deploy L4 files from the command line.
 
-**Prerequisites:** [Your First L4 File](first-l4-file.md)
+**Prerequisites:** [Install L4 and write your first rule](first-l4-file.md)
 
 ---
 

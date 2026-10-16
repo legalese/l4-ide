@@ -1,16 +1,10 @@
-# OpenAI- and Anthropic-Compatible AI APIs
+# Chat with your rules through the OpenAI or Anthropic API
 
-Talk to a deployed set of L4 rules using either an OpenAI-compatible or an Anthropic-compatible client. Legalese Cloud serves each deployment behind both wire formats, backed by the same `legalese-comply-4` pipeline — a model pipeline tuned for fast, reliable rule evaluation. Use whichever SDK your stack already speaks.
+Ask a deployment questions in plain language from any OpenAI or Anthropic client. Legalese Cloud serves each deployment in both formats, backed by the same `legalese-comply-4` model pipeline: the model decides which exported rules to run, gathers their inputs and explains the result. It is the same service the **Use in chat** button in the VS Code Deployments tab connects to.
 
-**Prerequisites:** A deployment on [Legalese Cloud](https://legalese.cloud) ([Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md))
+**Before you start:** a deployment on Legalese Cloud ([Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md)). To compare this with the other integrations, see [Choose an integration](README.md).
 
 ---
-
-## When to Use This
-
-Use the AI chat APIs when you want **conversational** rule evaluation — the caller asks a question in natural language and the model decides which exported rules to run, gathers the inputs, and explains the outcome. It is the same surface the **"Use in chat"** button in the VS Code Deployment tab connects to.
-
-Reach for the [MCP server](./mcp-server.md) instead when you want a tool-calling client to drive the rules, or the [OpenAPI spec](./openapi-spec.md) when you want to call individual rules deterministically as plain REST.
 
 ## Endpoint
 
@@ -25,33 +19,18 @@ https://ai.legalese.cloud/{orgSlug}/{deploymentId}/v1
 | OpenAI             | `/chat/completions` |
 | Anthropic Messages | `/messages`         |
 
-Both paths front the same pipeline and the same conversation store — pick whichever SDK is more convenient. The two surfaces share auth, daily token quota, and tool-loop behaviour; only the request/response shape on the wire differs.
+Both paths lead to the same pipeline, with the same authentication and daily token quota; only the shape of requests and responses differs. Use whichever SDK your stack already has.
 
 ## Authentication
 
-Either of these headers carries your credential — the value (sealed Legalese Cloud session or `sk_*` API key) is the same; only the header name differs so each SDK works out of the box:
+Send your credential, a Legalese Cloud session or an `sk_...` API key, in either header:
 
-- `Authorization: Bearer {token}` — the OpenAI-SDK default, and what the VS Code extension uses with your Legalese Cloud session.
-- `x-api-key: {token}` — the Anthropic-SDK default.
+- `Authorization: Bearer {token}`: the OpenAI SDK's default, and what the VS Code extension sends with your session;
+- `x-api-key: {token}`: the Anthropic SDK's default.
 
-For credentials:
+An API key needs the `ai:chat`, `l4:rules` and `l4:evaluate` permissions. With `ai:chat` but not `l4:evaluate`, the model can hold a conversation but cannot run any rule, and says it cannot compute the answer. See [API keys and permissions](README.md#api-keys-and-permissions).
 
-- **Legalese Cloud session** — sign in from the VS Code sidebar; the extension uses your session automatically.
-- **API key** (for API use only) — create a key in the [Legalese Cloud console](https://legalese.cloud) with the `ai:chat`, `l4:rules` and `l4:evaluate` permissions to use this feature.
-
-### Legalese Cloud Permissions
-
-A key (or session) used against this endpoint needs three scopes — each gates a different step of a chat turn:
-
-| Permission    | Enables                                                                                                                                                                          |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ai:chat`     | Open a conversation against the deployment's `legalese-comply-4` pipeline — the hosted chat-completions surface itself. Without it the request is rejected before any rule runs. |
-| `l4:rules`    | Let the model **discover** the deployment's exported rules: their names, descriptions and input shapes, so it can pick the right one for the question.                           |
-| `l4:evaluate` | Let the model **run** a chosen rule with the inputs it gathered and read back the typed decision it then explains to the user.                                                   |
-
-Grant only what the integration needs. A key with `ai:chat` but missing `l4:evaluate`, for example, can hold a conversation but every rule call will fail — the model will say it cannot compute the answer.
-
-## Use It
+## Use it
 
 ### OpenAI clients
 
@@ -161,10 +140,10 @@ const resp = await client.messages.create({
 console.log(resp.content[0].type === "text" ? resp.content[0].text : "");
 ```
 
-Streaming (`stream: true`), extended thinking, and multi-turn conversations work exactly as they do against `api.anthropic.com`. Reasoning surfaces as native `thinking` content blocks (no proxy-specific event extension needed on this surface).
+Streaming (`stream: true`), extended thinking, and multi-turn conversations work exactly as they do against `api.anthropic.com`. The model's reasoning arrives as ordinary `thinking` content blocks.
 
 ## Notes
 
-- The deployment endpoint only knows the rules you exported in that deployment — it does not have access to your editor, workspace, or other deployments.
-- The model name is always `legalese-comply-4` on this scoped endpoint; both surfaces reject raw upstream ids (e.g. `claude-opus-4-7`) with `400 model_not_found` — pipelines, not upstream models, are the product of record.
-- Self-hosted `jl4-service` does **not** expose these AI endpoints. Use the [OpenAPI spec](./openapi-spec.md) or [MCP server](./mcp-server.md) there instead.
+- The endpoint knows only the rules exported in that deployment. It has no access to your editor, your workspace or your other deployments.
+- The model name is always `legalese-comply-4`. Both formats reject other model names, such as `claude-opus-4-7`, with `400 model_not_found`.
+- A self-hosted jl4-service does not offer this API; use [MCP](ai-agents.md) or [REST](openapi-spec.md) there.

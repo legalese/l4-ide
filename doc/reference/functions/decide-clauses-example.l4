@@ -1,4 +1,4 @@
--- Multi-clause DECIDE examples
+-- DECIDE written as several clauses, one per case
 
 -- Numbers: the first clause matches only 0, the second any number
 
@@ -24,7 +24,7 @@ DECIDE `factorial with CONSIDER` n IS
 
 DECLARE Peril IS ONE OF Water, Fire, Cosmetic
 
-GIVEN p IS A Peril
+GIVEN peril IS A Peril
 GIVETH A BOOLEAN
 DECIDE covered Water    IS TRUE
 DECIDE covered Fire     IS TRUE

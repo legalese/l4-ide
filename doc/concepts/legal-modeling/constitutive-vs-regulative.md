@@ -1,4 +1,4 @@
-# Constitutive vs Regulative Rules
+# Definitions and duties
 
 The most important structural distinction in legal drafting — and how L4 makes it a distinction in the type system.
 
@@ -76,7 +76,7 @@ GIVETH A DEONTIC Actor Act
     LEST  BREACH BY `The Company`
 ```
 
-A `DEONTIC` value does not evaluate to true or false. It lies dormant until fed a start time and a stream of events, and then advances to one of three outcomes: `FULFILLED`, `BREACH`, or a residual obligation still awaiting events. That machinery — timelines, event matching, reparation chains — is the subject of [Regulative Rules](regulative-rules.md).
+A `DEONTIC` value does not evaluate to true or false. It lies dormant until fed a start time and a stream of events, and then advances to one of three outcomes: `FULFILLED`, `BREACH`, or a residual obligation still awaiting events. That machinery — timelines, event matching, reparation chains — is the subject of [How obligations unfold](regulative-rules.md).
 
 ---
 
@@ -123,7 +123,7 @@ When encoding a provision, ask: **can this be breached, by someone, over time?**
 
 ## Further Reading
 
-- [Regulative Rules](regulative-rules.md) — The full regulative system: events, timelines, verdicts
-- [Default Reasoning and Exceptions](default-reasoning.md) — Structuring the constitutive layer's general rules and exceptions
+- [How obligations unfold](regulative-rules.md) — Events, timelines and verdicts
+- [Exceptions and defaults](default-reasoning.md) — Structuring the constitutive layer's general rules and exceptions
 - [Regulative Keywords Reference](../../reference/regulative/README.md) — `PARTY`, `MUST`, `MAY`, `SHANT` and friends
 - [Functions Reference](../../reference/functions/README.md) — `DECIDE`, `MEANS`, `GIVEN`, `GIVETH`

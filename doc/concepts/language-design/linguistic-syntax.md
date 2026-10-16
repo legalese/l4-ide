@@ -1,4 +1,4 @@
-# Linguistic Syntax in L4
+# Reading like the law
 
 How L4 borrows from natural language linguistics to make legal code readable.
 
@@ -31,15 +31,17 @@ The Saxon genitive, by contrast, is immediately legible to anyone who reads Engl
 
 **Technical detail:** The `'s` operator chains naturally, just as it does in English. `company's ceo's name` accesses the `name` field of the `ceo` field of the `company` record. When used as an argument to a function, wrap in parentheses: `f (record's field)`.
 
-For the full syntax specification, see the [Genitive reference](../../reference/syntax/README.md).
+For the full syntax specification, see [Genitive](../../reference/syntax/README.md#genitive) in the syntax reference.
 
 ---
 
-## The Caret Operator (^) and Gapping
+## Ditto (^) and Gapping
 
 Consider a decision table that maps scores to grades:
 
 ```l4
+GIVEN score IS A NUMBER
+GIVETH A STRING
 grade MEANS
     BRANCH
         IF score >= 90 THEN "A"
@@ -54,11 +56,11 @@ Each `^` stands for the token that appeared in the same position on the line abo
 
 This is a computational implementation of **gapping** -- a well-studied phenomenon in linguistics where repeated words are omitted in parallel structures. In the sentence "Alice ordered coffee, and Bob tea," the verb "ordered" is gapped in the second clause because it would be redundant. The listener fills it in automatically.
 
-L4's caret operator makes gapping explicit. Rather than leaving gaps unmarked (which would be ambiguous in a programming language), the `^` character serves as a visible placeholder that says "same as above."
+L4's ditto mark, `^`, makes gapping explicit. Rather than leaving gaps unmarked (which would be ambiguous in a programming language), the `^` character serves as a visible placeholder that says "same as above."
 
 The effect is that decision tables become visually clean. The eye can scan down the columns to see what varies (the threshold and the grade) without being distracted by what stays the same (the keywords IF, THEN, and the variable `score`). In Edward Tufte's terms, this improves the **data-ink ratio** -- the proportion of visual elements that carry information versus those that are merely structural repetition.
 
-For more examples, see the [Ditto reference](../../reference/syntax/README.md).
+For more examples, see [Ditto](../../reference/syntax/README.md#ditto) in the syntax reference.
 
 ---
 
@@ -66,11 +68,7 @@ For more examples, see the [Ditto reference](../../reference/syntax/README.md).
 
 In linguistics, **syndetic coordination** joins clauses with an explicit conjunction: "A _and_ B _and_ C." **Asyndetic coordination** joins them without one: "A, B, C" -- the conjunction is implied by context.
 
-L4 supports both styles. The keywords `AND` and `OR` provide syndetic coordination:
-
-```l4
-IF age >= 18 AND hasValidID
-```
+L4 supports both styles. The keywords `AND` and `OR` provide syndetic coordination, as in `` `is an adult` AND `has valid identification` ``.
 
 The operators `...` (three dots) and `..` (two dots) provide asyndetic coordination -- implicit AND and implicit OR, respectively:
 
@@ -145,7 +143,7 @@ mom and dad `have a baby named` kid MEANS
     CONCAT "mother: ", mom, ", father: ", dad, ", child: ", kid
 ```
 
-Here, the backtick identifier `` `have a baby named` `` is a function name with parameters appearing on both sides, reading as a natural English sentence. This is a direct borrowing from how legal rules are phrased: "the buyer shall pay the seller" has the verb phrase embedded between the parties.
+Here, the backtick identifier `` `have a baby named` `` is a function name with parameters appearing on both sides, reading as a natural English sentence. This is a direct borrowing from how legal rules are phrased: "the buyer shall pay the seller" has the verb phrase embedded between the parties. [Definitions](../../reference/functions/README.md) in the reference gives the rules for these mixfix names, and [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md) shows how to use them, and `@nlg` annotations, to make a rulebase read as prose.
 
 ---
 
@@ -210,7 +208,7 @@ This is what legal isomorphism means in practice. It is not about making code "l
 | Feature               | Linguistic Concept          | Programming Equivalent        | Why L4 Chose the Linguistic Form                     |
 | --------------------- | --------------------------- | ----------------------------- | ---------------------------------------------------- |
 | `'s`                  | Saxon genitive              | Dot notation (`record.field`) | Reads like natural English possessives               |
-| `^`                   | Gapping / ellipsis          | No equivalent                 | Improves data-ink ratio in parallel structures       |
+| `^` (ditto)           | Gapping / ellipsis          | No equivalent                 | Improves data-ink ratio in parallel structures       |
 | `...`                 | Asyndetic conjunction       | `&&` or `AND`                 | Mirrors implicit conjunction in statutes             |
 | `..`                  | Asyndetic disjunction       | `\|\|` or `OR`                | Mirrors implicit disjunction in statutes             |
 | `"string"` in boolean | Inert element / scaffolding | No equivalent                 | Preserves statutory language without affecting logic |
@@ -220,7 +218,8 @@ This is what legal isomorphism means in practice. It is not about making code "l
 
 ## Further Reading
 
-- [Design Principles](principles.md) -- The five core principles guiding L4
-- [Syntax Reference](../../reference/syntax/README.md) -- Full syntax specification
-- [GLOSSARY](../../reference/GLOSSARY.md) -- Complete feature index
-- [Foundation Course](../../courses/foundation/README.md) -- Learn L4 from scratch
+- [Design principles](principles.md) -- The five core principles guiding L4
+- [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md) -- Writing rules that read as prose
+- [Syntax and directives](../../reference/syntax/README.md) -- Full syntax specification
+- [Glossary](../../reference/GLOSSARY.md) -- Complete feature index
+- [Foundation course](../../courses/foundation/README.md) -- Learn L4 from scratch

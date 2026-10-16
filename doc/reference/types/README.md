@@ -1,352 +1,74 @@
-# L4 Types Reference
+# Types and data
 
-L4's type system provides strong static typing with type inference, algebraic data types, and polymorphism. This reference documents all types available in L4.
+Every value in L4 has a type, and the type checker makes sure each rule is given and returns values of the right types.
+L4 has a few built-in types, and `DECLARE` makes new ones: records, enumerations and synonyms.
+Types are usually inferred, but writing them in `GIVEN` and `GIVETH` makes rules easier to read.
 
-L4 uses a Hindley-Milner-style type system with bidirectional type checking, algebraic data types, and lazy (call-by-need) evaluation. The core is pure functional, with DEONTIC as an effect type for regulative rules.
+## Pages
 
-## Overview
+- [DECLARE](DECLARE.md): records, enumerations, type synonyms, parameterised types, `A`/`AN` and type expressions
+- [ASSUME](ASSUME.md): a name with a type and no definition
+- [FOR ALL](for-all.md): type variables in the type of an `ASSUME`
+- [Coercions](coercions.md): converting between types (`TOSTRING`, `TONUMBER`, `TODATE`, `AS STRING` and others)
 
-L4's type system is inspired by functional programming languages like Haskell and includes:
+## Built-in types
 
-- **Primitive types** - Basic data types (NUMBER, STRING, BOOLEAN, DATE, TIME, DATETIME)
-- **Algebraic types** - Records (products) and enums (sums)
-- **Polymorphic types** - Generic types parameterized by other types
-- **Function types** - First-class functions
-- **Type constructors** - Building complex types from simpler ones
+| Type       | Values                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `NUMBER`   | exact numbers, whole or fractional: `42`, `-17`, `3.14`, `5.4%` (= `0.054`), `100_000`                       |
+| `STRING`   | text in double quotes: `"Hello"`; `\"`, `\\` and `\n` are escapes                                            |
+| `BOOLEAN`  | `TRUE` and `FALSE`                                                                                           |
+| `DATE`     | a calendar date, made with `Date 15 1 2025` from [daydate](../libraries/daydate.md), or parsed with `TODATE` |
+| `TIME`     | a time of day, without a date or time zone; see [time](../libraries/time.md)                                 |
+| `DATETIME` | a point in time with a time zone; see [datetime](../libraries/datetime.md)                                   |
 
----
+- Arithmetic on `NUMBER` is exact: `10 / 4` is `2.5`, not a rounded value.
+- In a number, underscores between digits are ignored: `100_000` is `100000`. A number must start with a digit and must not end with an underscore.
+- `TRUE` and `FALSE` are written in capitals.
 
-## Primitive Types
+## Lists, optional values and choices
 
-### NUMBER
+These built-in types take another type as a parameter.
 
-Numeric values including integers and rationals.
+| Type         | Values                                                        | Example file                           |
+| ------------ | ------------------------------------------------------------- | -------------------------------------- |
+| `LIST OF a`  | `LIST 1, 2, 3`, `EMPTY`, `1 FOLLOWED BY EMPTY`                | [list-example.l4](list-example.l4)     |
+| `MAYBE a`    | `JUST 42` when there is a value, `NOTHING` when there is none | [maybe-example.l4](maybe-example.l4)   |
+| `EITHER a b` | `LEFT "error"` or `RIGHT 42`                                  | [either-example.l4](either-example.l4) |
 
-- Integers: `42`, `-17`, `0`
-- Rationals: `3.14`, `-0.5`, `2.718`, `5.4%`
-- Underscores between digits are accepted as thousand separators and stripped from the value: `100_000` is `100000`, `1_000_000.50_5` is `1000000.505`. A literal must start with a digit and must not end with an underscore.
-- Arbitrary precision arithmetic
-- **Examples:** Age calculations, financial amounts, quantities, percentages
+L4 has no null: a value that may be missing has a `MAYBE` type, and [CONSIDER](../control-flow/CONSIDER.md) handles both cases.
+Functions on these types, and the `PAIR` and `Dictionary` types, are in the [prelude](../libraries/prelude.md).
 
-### STRING
+## Records and enumerations
 
-Text strings enclosed in double quotes.
+A record has named fields; an enumeration has a fixed list of values, each of which can carry fields. Both are made with [DECLARE](DECLARE.md).
+Examples: [record-example.l4](record-example.l4), [enum-example.l4](enum-example.l4).
 
-- Unicode support
-- Escape sequences: `\"`, `\\`, `\n`, etc.
-- String concatenation with CONCAT or APPEND
-- **Examples:** Names, descriptions, legal text
+## Functions
 
-### BOOLEAN
+A function is a value too. Its type is written `FUNCTION FROM Type1 AND Type2 TO Result`, so a function can be an input of another function.
+Example: [function-type-example.l4](function-type-example.l4).
 
-Truth values for logical operations.
+## Type parameters and inference
 
-- Values: `TRUE`, `FALSE`
-- Three-valued logic support (with UNKNOWN for partial evaluation)
-- Logical operators: AND, OR, NOT, IMPLIES
-- **Examples:** Eligibility checks, conditions, yes/no answers
+A function or a type can work for any type, with a type parameter (`GIVEN a IS A TYPE`; see [GIVEN and GIVETH](../functions/GIVEN.md#type-parameters)).
+Example: [polymorphic-example.l4](polymorphic-example.l4).
 
-### DATE
+When `GIVETH` or an input's type is left out, L4 infers it.
+Example: [type-inference-example.l4](type-inference-example.l4).
 
-Calendar dates for temporal reasoning.
+## Comparison with other languages
 
-- ISO 8601 format: `YYYY-MM-DD`
-- Date arithmetic and comparison
-- Integration with daydate library
-- **Examples:** Deadlines, effective dates, time periods
+| L4                    | Haskell              | Other languages           |
+| --------------------- | -------------------- | ------------------------- |
+| `DECLARE T HAS ...`   | `data T = T { ... }` | struct, class, record     |
+| `DECLARE T IS ONE OF` | `data T = A \| B`    | enum, union, sealed class |
+| `GIVEN … GIVETH`      | `a -> b`             | function signature        |
+| `MAYBE T`             | `Maybe T`            | Optional, nullable        |
+| `LIST OF T`           | `[T]`                | array, list               |
+| `CONSIDER`            | `case … of`          | switch, match             |
+| `BRANCH`              | guards               | if-else-if chain          |
+| `WHERE`, `LET … IN`   | `where`, `let … in`  | local variables           |
+| `'s`                  | record field         | `.field`                  |
 
-### TIME
-
-Wall-clock time-of-day (no date or timezone component).
-
-- 24-hour format internally: `HH:MM:SS`
-- Time arithmetic with midnight wrapping
-- Integration with time library
-- **Examples:** Business hours, curfew checks, scheduling constraints
-
-### DATETIME
-
-Absolute points in time combining date, time, and timezone.
-
-- Stored internally as UTC
-- Extractors return local values in the stored timezone
-- Cross-timezone comparison
-- Integration with datetime library
-- **Examples:** Legal deadlines, transaction timestamps, cross-timezone events
-
----
-
-## Algebraic Types
-
-### Records
-
-Product types with named fields.
-
-**Example:** [record-example.l4](record-example.l4)
-
-- Named fields with types
-- Field access with `'s`
-- Construction with `WITH` keyword
-- **Examples:** Structured data, entities, configurations
-
-### Enums
-
-Sum types with named constructors.
-
-**Example:** [enum-example.l4](enum-example.l4)
-
-- Pattern matching with CONSIDER/WHEN
-- Constructors with optional fields
-- Discriminated unions
-- **Examples:** Status values, categories, variants
-
-### PAIR
-
-Two-element product type from prelude.
-
-**Note:** PAIR is defined in the prelude library. See [prelude.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/prelude.l4) for implementation.
-
-- Generic over both element types
-- Used in key-value data structures
-- Tuple-like functionality
-- **Examples:** Coordinates, key-value pairs, associations
-
----
-
-## Type Correspondence
-
-How L4 types map to concepts in other languages and type theory:
-
-| L4 Construct      | Type Theory | Haskell             | Other Languages                 | Category Theory   |
-| ----------------- | ----------- | ------------------- | ------------------------------- | ----------------- |
-| DECLARE T HAS ... | Product     | data T = T { ... }  | struct/class/interface          | Product (x)       |
-| IS ONE OF         | Sum         | data T = A \| B     | enum/union/variant/sealed class | Coproduct (+)     |
-| GIVEN...GIVETH    | Arrow       | a -> b              | function signature/def/fn       | Exponential (B^A) |
-| MAYBE T           | Option      | Maybe T             | Optional/null/nil/None/?        | T + 1             |
-| LIST OF T         | List        | [T]                 | Array/List/Vec/Sequence         | Free monoid       |
-| CONSIDER          | Match       | case...of           | switch/case/match/when          | Catamorphism      |
-| BRANCH            | Guards      | \| cond = ...       | if-elseif chain/cond            | -                 |
-| WHERE / LET...IN  | Binding     | where / let...in    | let/const/var/local             | Substitution      |
-| DEONTIC           | Effect      | Custom monad        | - (domain-specific)             | Kleisli category  |
-| 's genitive       | Accessor    | Record field / lens | dot notation / .field           | Projection        |
-
----
-
-## Polymorphic Types
-
-### LIST
-
-Ordered collection of elements of the same type.
-
-**Example:** [list-example.l4](list-example.l4)
-
-- Homogeneous (all elements same type)
-- Recursive structure
-- Rich prelude functions: map, filter, fold, etc.
-- **Examples:** Collections, sequences, ordered data
-
-### MAYBE
-
-Optional values that may be present or absent.
-
-**Example:** [maybe-example.l4](maybe-example.l4)
-
-- Handles nullability explicitly
-- No null pointer errors
-- Pattern matching for safety
-- **Examples:** Optional fields, lookup results, partial functions
-
-### EITHER
-
-Choice between two alternative values.
-
-**Example:** [either-example.l4](either-example.l4)
-
-- Discriminated union of two types
-- Often used for error handling
-- Pattern matching to handle both cases
-- **Examples:** Success/failure, validation, branching logic
-
-### Dictionary
-
-Associative map from keys to values (from prelude).
-
-**Note:** Dictionary is defined in the prelude library. See [prelude.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/prelude.l4) for implementation.
-
-- Generic key-value store
-- Lookup by key
-- Rich API: insert, delete, update, union, etc.
-- **Examples:** Configuration, mappings, indexes
-
----
-
-## Type Constructors
-
-### TYPE
-
-The kind of types (a type of types).
-
-- Used in type signatures
-- `IS A TYPE` declares a type parameter
-- Enables polymorphism
-- **Examples:** Generic functions, type parameters
-
-### FUNCTION
-
-Function types.
-
-**Example:** [function-type-example.l4](function-type-example.l4)
-
-- First-class functions
-- Multi-parameter with AND
-- Higher-order functions supported
-- **Examples:** Callbacks, operators, combinators
-
----
-
-## Type System Features
-
-### Type Inference
-
-L4 can often infer types automatically.
-
-**Example:** [type-inference-example.l4](type-inference-example.l4)
-
-### Type Annotations
-
-Explicit types improve clarity and catch errors. See examples throughout the type reference pages.
-
-### Polymorphism
-
-Generic types work with any type.
-
-**Example:** [polymorphic-example.l4](polymorphic-example.l4)
-
-### Algebraic Data Types
-
-Combine product (AND) and sum (OR) types:
-
-- Products: Multiple fields together (records)
-- Sums: One of several alternatives (enums)
-- Composable and nestable
-
----
-
-## Type Compatibility
-
-### Coercion
-
-Built-in conversion functions:
-
-- **TOSTRING** - Convert to STRING
-- **TONUMBER** - Convert to NUMBER
-- **TODATE** - Convert to DATE
-- **TOTIME** - Convert to TIME
-- **TODATETIME** - Convert to DATETIME
-- **TRUNC** - Truncate to integer
-
-See [Built-ins](../builtins/README.md) and [coercions](coercions.md) for details.
-
-### Comparison
-
-- Equality (`EQUALS`, `=`) works for most types
-- Ordering (`<`, `>`, `<=`, `>=`) for NUMBER, STRING, DATE, TIME, DATETIME
-- Custom comparison via functions
-
-### Maybe and Nullability
-
-L4 uses MAYBE for optional values, not null.
-
-[maybe-example.l4](maybe-example.l4) for usage patterns.
-
----
-
-## Common Patterns
-
-### Option Type Pattern
-
-Use MAYBE for nullable values. See prelude's `lookup` function
-
-[maybe-example.l4](maybe-example.l4)
-
-### Either for Errors
-
-Use EITHER for success/failure.
-
-[either-example.l4](either-example.l4)
-
-### Lists for Collections
-
-Use LIST for ordered data. See prelude's `sum` function
-
-[list-example.l4](list-example.l4)
-
-### Records for Structured Data
-
-Use records for entities.
-
-[record-example.l4](record-example.l4)
-
----
-
-## Type Hierarchy
-
-```
-TYPE
-  ├─ Primitive Types
-  │   ├─ NUMBER
-  │   ├─ STRING
-  │   ├─ BOOLEAN
-  │   ├─ DATE
-  │   ├─ TIME
-  │   └─ DATETIME
-  │
-  ├─ Algebraic Types
-  │   ├─ Records (product types)
-  │   └─ Enums (sum types)
-  │
-  ├─ Polymorphic Types
-  │   ├─ LIST OF a
-  │   ├─ MAYBE a
-  │   ├─ EITHER a b
-  │   ├─ PAIR OF a, b
-  │   └─ Dictionary k v
-  │
-  ├─ Function Types
-  │   └─ FUNCTION FROM args TO result
-  │
-  └─ Effect Types
-      └─ DEONTIC (MUST / MAY / SHANT)
-```
-
----
-
-## Learning Path
-
-### Beginners
-
-1. Start with primitive types: NUMBER, STRING, BOOLEAN
-2. Learn records for structured data
-3. Understand LIST for collections
-
-### Intermediate
-
-1. Master MAYBE for optional values
-2. Use enums for variants
-3. Explore EITHER for error handling
-
-### Advanced
-
-1. Write polymorphic functions with type parameters
-2. Use Dictionary for complex data structures
-3. Master higher-order functions
-
----
-
-## See Also
-
-- **[GLOSSARY](../GLOSSARY.md)** - Complete language index
-- **[Functions](../functions/README.md)** - Function keywords
-- **[Operators](../operators/README.md)** - Operations on types
-- **[Type Theory](type-theory.md)** - Formal type inference rules, bidirectional checking, and advanced type system details
-- **[Specifications](https://github.com/legalese/l4-ide/tree/main/specs)** - Technical specifications
+How the type system works, formally: [Type theory](../../concepts/type-system/type-theory.md). Why types matter for legal rules: [Types as legal categories](../../concepts/type-system/algebraic-types.md).

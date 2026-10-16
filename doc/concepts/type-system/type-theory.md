@@ -1,8 +1,8 @@
-# Type Theory
+# Type theory
 
-Formal type theory foundations of L4's type system. This page is for advanced users -- language implementors, functional programming developers, and type theory enthusiasts -- who want to understand the precise mechanics behind L4's type checking, inference, and evaluation.
+The formal foundations of L4's type system. This page is for readers who know some type theory or functional programming and want the precise mechanics behind L4's type checking, inference and evaluation.
 
-For practical usage of L4 types, see the [Types Reference](README.md).
+For practical use of L4 types, see [Types and data](../../reference/types/README.md). For the intuitive account of records and enumerations, see [Types as legal categories](algebraic-types.md).
 
 ---
 
@@ -17,6 +17,25 @@ L4's type system draws from well-established foundations in programming language
 - **Evaluation:** Lazy (call-by-need), following Haskell semantics
 
 The combination of Hindley-Milner inference with bidirectional checking means that most expressions do not require explicit type annotations, while top-level function signatures (via GIVEN/GIVETH) provide checking anchors that improve error messages and serve as documentation.
+
+---
+
+## Type Correspondence
+
+How L4 constructs map to type theory, Haskell, other languages and category theory:
+
+| L4 construct      | Type theory | Haskell             | Other languages                 | Category theory   |
+| ----------------- | ----------- | ------------------- | ------------------------------- | ----------------- |
+| DECLARE T HAS ... | Product     | data T = T { ... }  | struct/class/interface          | Product (×)       |
+| IS ONE OF         | Sum         | data T = A \| B     | enum/union/variant/sealed class | Coproduct (+)     |
+| GIVEN...GIVETH    | Arrow       | a -> b              | function signature/def/fn       | Exponential (B^A) |
+| MAYBE T           | Option      | Maybe T             | Optional/null/nil/None/?        | T + 1             |
+| LIST OF T         | List        | [T]                 | Array/List/Vec/Sequence         | Free monoid       |
+| CONSIDER          | Match       | case...of           | switch/case/match/when          | Catamorphism      |
+| BRANCH            | Guards      | \| cond = ...       | if-elseif chain/cond            | -                 |
+| WHERE / LET...IN  | Binding     | where / let...in    | let/const/var/local             | Substitution      |
+| DEONTIC           | Effect      | Custom monad        | - (domain-specific)             | Kleisli category  |
+| 's genitive       | Accessor    | Record field / lens | dot notation / .field           | Projection        |
 
 ---
 
@@ -117,7 +136,10 @@ filter : (a -> BOOLEAN) -> LIST OF a -> LIST OF a
 In L4 usage, the type variables are instantiated by inference:
 
 ```l4
-map (GIVEN x YIELD x * 2) numbers
+IMPORT prelude
+
+numbers MEANS LIST 1, 2, 3
+doubled MEANS map (GIVEN x YIELD x * 2) numbers
 ```
 
 Here `a` and `b` are both inferred as NUMBER from the multiplication operator and the type of `numbers`.
@@ -126,10 +148,15 @@ User-defined polymorphism is available through type parameters declared with `IS
 
 ```l4
 GIVEN T IS A TYPE
-GIVEN xs IS A LIST OF T
-GIVETH A LIST OF T
-`reverse` MEANS ...
+      xs IS A LIST OF T
+GIVETH A MAYBE T
+`the first item of` MEANS
+    CONSIDER xs
+    WHEN EMPTY THEN NOTHING
+    WHEN x FOLLOWED BY rest THEN JUST x
 ```
+
+`` `the first item of` (LIST 1, 2, 3) `` gives `JUST 1`, and `` `the first item of` (LIST "a", "b") `` gives `JUST "a"`: `T` is instantiated afresh at each call.
 
 ---
 
@@ -139,17 +166,17 @@ The DEONTIC type is L4's effect type for regulative rules. It has a modal logic 
 
 ### Modal Operators
 
-| L4 Keyword | Deontic Meaning | Modal Logic       | Symbol  |
-| ---------- | --------------- | ----------------- | ------- |
-| MUST       | Obligation      | Necessity         | Box     |
-| MAY        | Permission      | Possibility       | Diamond |
-| SHANT      | Prohibition     | Negated necessity | Not-Box |
+| L4 Keyword | Deontic Meaning | Modal Logic      | Symbol  |
+| ---------- | --------------- | ---------------- | ------- |
+| MUST       | Obligation      | Necessity        | Box     |
+| MAY        | Permission      | Possibility      | Diamond |
+| SHANT      | Prohibition     | Necessity of not | Box-Not |
 
 In modal logic terms:
 
 - **MUST p** asserts that p is obligatory -- in all compliant futures, p holds. This corresponds to the necessity operator.
 - **MAY p** asserts that p is permitted -- there exists a compliant future where p holds. This corresponds to the possibility operator.
-- **SHANT p** asserts that p is forbidden -- in no compliant future does p hold. This corresponds to the negation of the necessity operator applied to p.
+- **SHANT p** asserts that p is forbidden -- in no compliant future does p hold. This corresponds to the necessity operator applied to not-p, or equivalently to the negation of the possibility operator.
 
 ### Composition
 
@@ -158,18 +185,15 @@ DEONTIC expressions compose through:
 - **HENCE** -- Sequential composition. After one obligation is fulfilled, the next obligation follows.
 - **LEST** -- Alternative composition. If an obligation is breached, the LEST branch specifies consequences.
 - **IF** -- Conditional guard. The deontic obligation only activates when the condition holds.
+- **RAND / ROR** -- Parallel composition. Both obligations, or either one, must be fulfilled.
 
 ### Trace Semantics
 
-When evaluated with `#TRACE`, a DEONTIC expression produces an obligation graph -- a structured trace showing the sequence of obligations, permissions, and prohibitions, along with their conditions and consequences. This trace is the basis for L4's explainable AI capabilities: it provides an audit-grade record of how the system arrived at its conclusions.
+A DEONTIC value is run against a start time and a list of events, with `#TRACE` or the `EVALTRACE` function. The result is again a DEONTIC value: `FULFILLED`, a breach, or the residual obligation still waiting for events. `l4 state-graph` draws the possible paths through a rule's `HENCE` and `LEST` branches as a graph. [How obligations unfold](../legal-modeling/regulative-rules.md) explains this behaviour without the formalism.
 
 ### Type Signature
 
-A regulative rule declares its effect type as:
-
-```l4
-GIVETH A DEONTIC
-```
+A regulative rule has type `DEONTIC party action`, parameterised over the type of its parties and the type of its actions; a rule declares it with `` GIVETH A DEONTIC `Party` `Action` ``.
 
 Within the type system, DEONTIC acts as a custom monad (in Haskell terms) or, in category-theoretic terms, lives in a Kleisli category.
 
@@ -177,11 +201,11 @@ Within the type system, DEONTIC acts as a custom monad (in Haskell terms) or, in
 
 ## Subtyping
 
-L4 has **limited, mostly nominal** subtyping:
+L4 has **no subtyping**, and its types are **nominal**:
 
 - Types are distinguished by name, not by structure. Two record types with identical fields but different names are different types.
-- **Numeric literal flexibility:** Numeric literals have a flexible type that can be used where NUMBER is expected, without explicit coercion. This is the primary exception to strict nominal typing.
 - There is no structural subtyping or row polymorphism.
+- There is one numeric type, NUMBER, for whole and fractional numbers alike, so there is no numeric tower to coerce along. Conversions between types, such as `TOSTRING`, are explicit function calls ([Coercions](../../reference/types/coercions.md)).
 
 ---
 
@@ -192,7 +216,7 @@ The unit type (written `()` in Haskell) is **implicit** in L4 -- it is not direc
 Its primary manifestation is through nullary constructors in sum types:
 
 ```l4
-DECLARE Status IS ONE OF Active | Closed
+DECLARE Status IS ONE OF Active, Closed
 ```
 
 Here, `Active` and `Closed` are nullary constructors. Internally, they can be understood as functions from unit to Status (`() -> Status`), though this is not visible to the L4 programmer.
@@ -211,7 +235,7 @@ L4 uses **call-by-need** evaluation semantics, following Haskell:
 - **Infinite data structures** are possible in principle (e.g., infinite lists), though this is rarely needed in legal domain code.
 - **Short-circuit evaluation:** AND and OR do not evaluate their second operand if the first operand determines the result. This is a natural consequence of laziness, not a special case.
 - **WHERE bindings are lazy:** Definitions in a WHERE clause are only evaluated if referenced. This allows defining multiple helper values without paying for unused ones.
-- **Evaluation traces:** The `#TRACE` directive records which expressions were actually evaluated and in what order, providing visibility into the lazy evaluation process for debugging.
+- **Evaluation traces:** The `#EVALTRACE` directive records which expressions were actually evaluated and in what order, providing visibility into the lazy evaluation process for debugging.
 
 ---
 
@@ -237,11 +261,20 @@ Where `fix` is the fixed-point combinator satisfying `fix f = f (fix f)`. The ty
 
 Mutual recursion (multiple functions referencing each other in the same WHERE block) follows the same letrec semantics.
 
+Recursive types are fixed points at the type level. The `` `legal document` `` type in [Types as legal categories](algebraic-types.md#recursive-types), whose sections contain lists of further documents, is the least fixed point
+
+```
+LegalDocument = μX. Section(STRING × STRING × List X) + Paragraph(STRING) + Definition(STRING × STRING)
+```
+
+and a function that recurses over it with CONSIDER, one branch per constructor, is a catamorphism (a fold) over that fixed point.
+
 ---
 
 ## See Also
 
-- **[Types Reference](README.md)** -- Practical guide to all L4 types
-- **[Algebraic Types](../../concepts/type-system/algebraic-types.md)** -- Conceptual explanation of product and sum types
-- **[Regulative Rules](../regulative/README.md)** -- MUST, MAY, SHANT and regulative rule structure
-- **[GLOSSARY](../GLOSSARY.md)** -- Complete language feature index
+- **[Types and data](../../reference/types/README.md)** -- Practical guide to all L4 types
+- **[Types as legal categories](algebraic-types.md)** -- Conceptual explanation of product and sum types
+- **[Exhaustiveness](exhaustiveness.md)** -- Why CONSIDER checks that every constructor is covered
+- **[Regulative rules](../../reference/regulative/README.md)** -- MUST, MAY, SHANT and regulative rule structure
+- **[Glossary](../../reference/GLOSSARY.md)** -- Complete language feature index
