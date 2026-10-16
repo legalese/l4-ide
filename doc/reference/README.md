@@ -11,7 +11,7 @@ The reference describes exactly what each part of L4 is and does. To learn the l
 
 ## Language
 
-### [Types and data](types/README.md)
+### [Types](types/README.md)
 
 Describe the things your rules talk about: people, contracts, amounts, dates. The overview lists the built-in types (BOOLEAN, NUMBER, STRING, DATE) and the ready-made ones (LIST, MAYBE, EITHER).
 
@@ -22,7 +22,7 @@ Describe the things your rules talk about: people, contracts, amounts, dates. Th
 | [FOR ALL](types/for-all.md)     | Functions that work for values of any type                                                                |
 | [Coercions](types/coercions.md) | Converting between NUMBER, STRING, DATE and other types                                                   |
 
-### [Definitions](functions/README.md)
+### [Functions](functions/README.md)
 
 Write values, rules and functions, and give them inputs.
 

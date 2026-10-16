@@ -38,7 +38,7 @@ In a long expression, indentation also groups the operators; see [AND, OR, NOT, 
 | List    | `LIST 1, 2, 3`, `EMPTY`, `1 FOLLOWED BY 2 FOLLOWED BY EMPTY` |
 
 Underscores between the digits of a number are ignored. A number must start with a digit and must not end with an underscore.
-There is no date literal; see [Types and data](../types/README.md#built-in-types).
+There is no date literal; see [Types](../types/README.md#built-in-types).
 
 ## IMPORT
 
@@ -233,5 +233,5 @@ It also appears in types (`LIST OF NUMBER`, `Box OF NUMBER`), in enumerations (`
 ## Related pages
 
 - [Glossary](../GLOSSARY.md): every keyword, with links
-- [Definitions](../functions/README.md)
+- [Functions](../functions/README.md)
 - [Operators](../operators/README.md)

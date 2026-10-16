@@ -39,4 +39,4 @@ Rounding (`ROUND`, `FLOOR`, `CEILING`, `TRUNC`) and functions such as `SQRT` are
 ## Related pages
 
 - [Comparisons](../comparisons/README.md)
-- [Types and data](../../types/README.md): `NUMBER`
+- [Types](../../types/README.md): `NUMBER`

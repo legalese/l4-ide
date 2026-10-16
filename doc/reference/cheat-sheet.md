@@ -57,8 +57,8 @@ These omissions are by design. Legal rules must be deterministic, traceable, and
 ## See Also
 
 - [Glossary](GLOSSARY.md) -- index of all language features
-- [Types and data](types/README.md) -- L4's type system (DECLARE, MAYBE, LIST, etc.)
-- [Definitions](functions/README.md) -- defining computations (MEANS, DECIDE, GIVEN, GIVETH)
+- [Types](types/README.md) -- L4's type system (DECLARE, MAYBE, LIST, etc.)
+- [Functions](functions/README.md) -- defining computations (MEANS, DECIDE, GIVEN, GIVETH)
 - [Control flow](control-flow/README.md) -- conditionals and pattern matching ([IF](control-flow/IF.md), [BRANCH](control-flow/BRANCH.md), [CONSIDER](control-flow/CONSIDER.md))
 - [Operators](operators/README.md) -- arithmetic, comparison, logical, and string operators
 - [Syntax and directives](syntax/README.md) -- layout rules, comments, backtick identifiers, annotations

@@ -2,7 +2,9 @@
 
 # L4 with IDE
 
-**L4** is a domain-specific programming language for law, maintained by [Legalese](https://legalese.com). It formalizes legal rules and contracts as executable specifications, bringing software engineering rigor to legal drafting and analysis.
+**L4** is a domain-specific programming language for law by [Legalese](https://legalese.com). It formalizes legal rules and contracts as executable specifications, bringing software engineering rigor to legal drafting and analysis.
+
+This repository contains the L4 compiler, IDE tooling (VS Code extension, LSP, REPL, web editor), and a decision service that exposes L4 rules as REST APIs and MCP tools.
 
 - [Design principles](https://legalese.com/l4/concepts/language-design/principles) — the principles behind L4's design and the style of writing that follows from them
 - [Reading like the law](https://legalese.com/l4/concepts/language-design/linguistic-syntax) — how L4 borrows from natural language so that rules read like legal text
@@ -12,8 +14,6 @@
 - [Types as legal categories](https://legalese.com/l4/concepts/type-system/algebraic-types) — why algebraic data types fit legal structure
 - [Exhaustiveness](https://legalese.com/l4/concepts/type-system/exhaustiveness) — every case of a determination handled
 - [Type theory](https://legalese.com/l4/concepts/type-system/type-theory) — the formal foundations of L4's type system
-
-This repository contains the L4 compiler, IDE tooling (VS Code extension, LSP, REPL, web editor), and a decision service that exposes L4 rules as REST APIs and MCP tools.
 
 ## What You Get From a Single L4 File
 

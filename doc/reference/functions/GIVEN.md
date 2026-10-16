@@ -105,5 +105,5 @@ A rule that returns obligations has the result type `DEONTIC Party Action`; see 
 ## Related pages
 
 - [DECIDE](DECIDE.md): the definition that follows `GIVEN` and `GIVETH`
-- [Types and data](../types/README.md): the types an input or result can have
+- [Types](../types/README.md): the types an input or result can have
 - [ASSUME](../types/ASSUME.md): a name with a type and no definition

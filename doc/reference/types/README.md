@@ -1,4 +1,4 @@
-# Types and data
+# Types
 
 Every value in L4 has a type, and the type checker makes sure each rule is given and returns values of the right types.
 L4 has a few built-in types, and `DECLARE` makes new ones: records, enumerations and synonyms.

@@ -1,4 +1,4 @@
-# Definitions
+# Functions
 
 A definition gives a name to a value or a function. In L4 each rule is a definition: its inputs, the type of its result, and the expression that computes it.
 
@@ -43,6 +43,6 @@ When to use mixfix, with worked examples: [Make rules read like law](../../tutor
 
 ## Related pages
 
-- [Types and data](../types/README.md): types of inputs and results
+- [Types](../types/README.md): types of inputs and results
 - [Operators](../operators/README.md): operators inside expressions
 - [Control flow](../control-flow/README.md): `IF`, `BRANCH` and `CONSIDER`
