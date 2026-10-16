@@ -1,13 +1,13 @@
--- Example: Comments in L4
--- This demonstrates line and block comments
+-- Comments
 
--- This is a line comment
-ASSUME age IS A NUMBER  -- inline comment
+-- A line comment starts with two dashes
+// or with two slashes
+`the age limit` MEANS 18  -- and can follow code on a line
 
-{- This is a
-   multi-line
-   block comment -}
+{- A block comment
+   can span several lines -}
 
-ASSUME name IS A STRING
+/* So can this
+   one */
 
-#EVAL age
+#EVAL `the age limit`

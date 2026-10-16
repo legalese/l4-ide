@@ -23,6 +23,8 @@ L4_ERRORS=0
 L4_OK=0
 ORPHAN_ERRORS=0
 ORPHAN_OK=0
+REDIRECT_ERRORS=0
+REDIRECT_OK=0
 
 # Options
 VERBOSE=false
@@ -112,6 +114,10 @@ CHECKS:
     3. Orphan file detection
        - Finds .md and .l4 files not linked from any other file
        - README.md and SUMMARY.md files are exempt (they are index files)
+
+    4. Redirects (redirects.json)
+       - Each old slug must no longer be a page
+       - Each new slug (and #anchor, if given) must exist
 
 EXAMPLES:
     ./doc/test-docs.sh              # Run all checks
@@ -461,6 +467,72 @@ else
 fi
 
 # =============================================================================
+# PART 4: Check Redirects
+# =============================================================================
+# redirects.json maps the slug of a page that moved or was merged away to its
+# new slug, optionally with #anchor. The website publishes a redirect at each
+# old URL, so the old page must be gone and the new one must exist.
+
+echo ""
+log_info "Checking redirects..."
+echo ""
+
+REDIRECTS_FILE="$SCRIPT_DIR/redirects.json"
+
+# The page file for a slug: <slug>.md, or <slug>/README.md for a folder
+slug_to_file() {
+    local slug="$1"
+    if [[ -z "$slug" ]]; then
+        echo "$SCRIPT_DIR/README.md"
+    elif [[ -f "$SCRIPT_DIR/$slug.md" ]]; then
+        echo "$SCRIPT_DIR/$slug.md"
+    elif [[ -f "$SCRIPT_DIR/$slug/README.md" ]]; then
+        echo "$SCRIPT_DIR/$slug/README.md"
+    fi
+}
+
+if [[ -f "$REDIRECTS_FILE" ]]; then
+    if ! redirect_lines=$(python3 -c 'import json, sys
+for old, new in json.load(open(sys.argv[1])).items():
+    print(old + "\t" + new)' "$REDIRECTS_FILE"); then
+        log_error "redirects.json is not a valid JSON object"
+        ((REDIRECT_ERRORS+=1))
+        redirect_lines=""
+    fi
+
+    while IFS=$'\t' read -r old new; do
+        [[ -z "$old" ]] && continue
+        new_slug="${new%%#*}"
+        anchor=""
+        [[ "$new" == *"#"* ]] && anchor="${new#*#}"
+
+        if [[ -n "$(slug_to_file "$old")" ]]; then
+            log_error "Redirect from a page that still exists: $old"
+            ((REDIRECT_ERRORS+=1))
+            continue
+        fi
+
+        target="$(slug_to_file "$new_slug")"
+        if [[ -z "$target" ]]; then
+            log_error "Redirect to a missing page: $old -> $new"
+            ((REDIRECT_ERRORS+=1))
+        elif [[ -n "$anchor" ]] && ! anchor_exists "$target" "$anchor"; then
+            log_error "Redirect to a missing anchor: $old -> $new"
+            ((REDIRECT_ERRORS+=1))
+        else
+            log_verbose "  [OK] $old -> $new"
+            ((REDIRECT_OK+=1))
+        fi
+    done <<< "$redirect_lines"
+fi
+
+if [[ $REDIRECT_ERRORS -eq 0 ]]; then
+    log_success "All $REDIRECT_OK redirects point at existing pages"
+else
+    log_error "$REDIRECT_ERRORS broken redirects found ($REDIRECT_OK valid)"
+fi
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 
@@ -472,9 +544,10 @@ echo ""
 echo "  Markdown links:  $LINK_OK valid, $LINK_ERRORS errors"
 echo "  L4 files:        $L4_OK valid, $L4_ERRORS errors"
 echo "  Orphan check:    $ORPHAN_OK linked, $ORPHAN_ERRORS orphaned"
+echo "  Redirects:       $REDIRECT_OK valid, $REDIRECT_ERRORS errors"
 echo ""
 
-TOTAL_ERRORS=$((LINK_ERRORS + L4_ERRORS + ORPHAN_ERRORS))
+TOTAL_ERRORS=$((LINK_ERRORS + L4_ERRORS + ORPHAN_ERRORS + REDIRECT_ERRORS))
 
 if [[ $TOTAL_ERRORS -eq 0 ]]; then
     log_success "All documentation checks passed!"

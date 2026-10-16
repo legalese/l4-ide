@@ -1,252 +1,112 @@
-# Your First L4 File
+# Install L4 and write your first rule
 
-Create, run, and test a simple L4 program.
-
-**Prerequisites:** L4 tools installed (VS Code extension or CLI)
+Set up L4, write a short eligibility rule, and run it.
 
 ---
 
-## What You'll Build
+## Install L4
 
-A simple eligibility rule: "A person is eligible if they are at least 18 years old and have valid ID."
+### VS Code extension
 
-**Complete example:** [eligibility-example.l4](eligibility-example.l4)
+This is the main way to work with L4.
+
+1. Install [VS Code](https://code.visualstudio.com/).
+2. Install the [L4 extension](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode) from the Marketplace.
+3. Open or create a file ending in `.l4`. The extension checks it as you type, shows errors and results, draws decision diagrams, and adds the L4 sidebar (Legalese AI, Render, Deploy).
+
+The extension also ships the `l4` command-line tool. The first time it starts, it asks "Install the L4 CLI?". Accept, or run **L4: Install L4 CLI** from the Command Palette later. On macOS and Linux it links `l4` into `~/.local/bin`; on Windows it copies `l4.exe` to `%LOCALAPPDATA%\Programs\l4`. Both are added to your PATH. Open a new terminal and check:
+
+```bash
+l4 --help
+```
+
+### Web editor
+
+To try L4 without installing anything, open the web editor at [jl4.legalese.com](https://jl4.legalese.com/).
+
+Developers can also build `l4` from source; see [Using the l4 CLI](l4-cli.md).
 
 ---
 
-## Step 1: Create the File
+## Write the rule
 
-Create a new file called `eligibility.l4`:
+The rule: _a person is eligible if they are at least 18 years old and have valid ID._
 
-```l4
--- eligibility.l4
--- A simple eligibility check
+Create a file called `eligibility.l4` with this content:
 
-§ `Eligibility Rule`
+[eligibility-example.l4](eligibility-example.l4)
 
--- Define the Person type
-DECLARE Person
-    HAS name IS A STRING
-        age IS A NUMBER
-        hasValidID IS A BOOLEAN
+What each part does:
 
--- Define the eligibility rule
-GIVEN person IS A Person
-GIVETH A BOOLEAN
-DECIDE `is eligible` IF
-    person's age >= 18
-    AND person's hasValidID
+| Part                                  | Meaning                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `-- ...`                              | A comment. L4 ignores it.                                                                                                 |
+| `` § `Eligibility` ``                 | A section heading. `§§` starts a subsection.                                                                              |
+| `DECLARE Person HAS ...`              | A record type with three fields: a name (text), an age (number) and whether the person has valid ID (`TRUE` or `FALSE`).  |
+| ``GIVEN `the applicant` IS A Person`` | The rule's input.                                                                                                         |
+| `GIVETH A BOOLEAN`                    | The rule's answer is `TRUE` or `FALSE`.                                                                                   |
+| ``DECIDE `is eligible` IF ...``       | The rule itself: the answer is `TRUE` when the conditions hold. `` `the applicant`'s `age` `` reads a field of the input. |
+| `` `Alice` MEANS Person WITH ... ``   | Example data: a person to test the rule on.                                                                               |
+| `` #EVAL `is eligible` `Alice` ``     | Evaluate the rule for Alice and show the result.                                                                          |
 
--- Test data
-alice MEANS Person "Alice" 25 TRUE
-bob MEANS Person "Bob" 16 TRUE
-charlie MEANS Person "Charlie" 30 FALSE
-
--- Tests
-#EVAL `is eligible` alice    -- Should be TRUE
-#EVAL `is eligible` bob      -- Should be FALSE (under 18)
-#EVAL `is eligible` charlie  -- Should be FALSE (no valid ID)
-```
+Names in backticks, such as `` `is eligible` ``, can contain spaces, so rules read like the text they encode. Indentation matters: the lines under `HAS` and `IF` are indented to show they belong there.
 
 ---
 
-## Step 2: Understand the Code
+## Run it
 
-Let's break down each part:
+**In VS Code or the web editor**, results appear as you type. Hover over an `#EVAL` line to see its result; errors are underlined in red with an explanation.
 
-### Comments
-
-```l4
--- This is a comment
-```
-
-Comments start with `--` and are ignored by L4.
-
-### Sections
-
-```l4
-§ `Eligibility Rule`
-```
-
-Sections organize your code. The `§` symbol starts a section with a title.
-
-### Type Declaration
-
-```l4
-DECLARE Person
-    HAS name IS A STRING
-        age IS A NUMBER
-        hasValidID IS A BOOLEAN
-```
-
-This defines a `Person` type with three fields: name (text), age (number), and hasValidID (true/false).
-
-### Function Definition
-
-```l4
-GIVEN person IS A Person
-GIVETH A BOOLEAN
-DECIDE `is eligible` IF
-    person's age >= 18
-    AND person's hasValidID
-```
-
-- `GIVEN` declares the input parameter
-- `GIVETH A BOOLEAN` says it returns true or false
-- `DECIDE ... IF` defines when the result is true
-
-### Test Data
-
-```l4
-alice MEANS Person "Alice" 25 TRUE
-```
-
-This creates a Person named "Alice" who is 25 years old with valid ID.
-
-### Tests
-
-```l4
-#EVAL `is eligible` alice
-```
-
-`#EVAL` evaluates an expression and shows the result.
-
----
-
-## Step 3: Run the File
-
-### Option A: VS Code
-
-1. Open the file in VS Code (with L4 extension installed)
-2. Hover over any `#EVAL` line to see the result
-3. Errors appear as red underlines with explanations
-
-### Option B: Command Line
+**On the command line:**
 
 ```bash
 l4 run eligibility.l4
-
-# Or from a Haskell checkout
-cabal run l4 -- run eligibility.l4
 ```
 
-This validates the file and reports any errors.
+```
+Evaluation[1] @ eligibility.l4:34:1-28
 
-> **Getting the `l4` CLI:** it is built from this repository with `cabal build jl4:l4` (see the repo [README](../../../README.md) for toolchain setup). For installation details and the full command set, see [Using the l4 CLI](l4-cli.md).
-
-### Option C: REPL
-
-```bash
-cabal run jl4-repl -- eligibility.l4
+Result:
+  TRUE
+...
 ```
 
-Then type expressions interactively:
+There is one `Evaluation` block per `#EVAL`, in file order:
 
-```
-> `is eligible` alice
-TRUE
+| Expression                    | Result  | Why                       |
+| ----------------------------- | ------- | ------------------------- |
+| `` `is eligible` `Alice` ``   | `TRUE`  | 25 is at least 18; has ID |
+| `` `is eligible` `Bob` ``     | `FALSE` | 16 is under 18            |
+| `` `is eligible` `Charlie` `` | `FALSE` | No valid ID               |
 
-> `is eligible` bob
-FALSE
-```
+`l4 check eligibility.l4` only type-checks the file, without evaluating anything. It prints `Check succeeded.` when the file is valid.
+
+Try a change: add a field `` `is banned` IS A BOOLEAN `` to `Person`, add `` AND NOT `the applicant`'s `is banned` `` to the rule, and give each example person a value for it.
 
 ---
 
-## Step 4: Verify the Results
+## Common mistakes
 
-Your tests should show:
-
-| Expression            | Result | Why                       |
-| --------------------- | ------ | ------------------------- |
-| `is eligible` alice   | TRUE   | Age 25 ≥ 18, has valid ID |
-| `is eligible` bob     | FALSE  | Age 16 < 18               |
-| `is eligible` charlie | FALSE  | No valid ID               |
-
----
-
-## Step 5: Extend the Rule
-
-Let's add another condition: the person must not be banned.
+**Missing indentation.** Fields and conditions must be indented under the line that introduces them.
 
 ```l4
--- Extended Person type
+-- Wrong: the fields start in column 1
+-- DECLARE Person
+-- HAS `name` IS A STRING
+
+-- Right
 DECLARE Person
-    HAS name IS A STRING
-        age IS A NUMBER
-        hasValidID IS A BOOLEAN
-        isBanned IS A BOOLEAN
-
--- Extended rule
-GIVEN person IS A Person
-GIVETH A BOOLEAN
-DECIDE `is eligible` IF
-    person's age >= 18
-    AND person's hasValidID
-    AND NOT person's isBanned
-
--- Updated test data
-alice MEANS Person "Alice" 25 TRUE FALSE
-bob MEANS Person "Bob" 16 TRUE FALSE
-charlie MEANS Person "Charlie" 30 FALSE FALSE
-dave MEANS Person "Dave" 40 TRUE TRUE  -- Banned
-
--- Tests
-#EVAL `is eligible` alice    -- TRUE
-#EVAL `is eligible` bob      -- FALSE (under 18)
-#EVAL `is eligible` charlie  -- FALSE (no valid ID)
-#EVAL `is eligible` dave     -- FALSE (banned)
+    HAS `name` IS A STRING
 ```
+
+**Missing `'s` in field access.** Write `` `the applicant`'s `age` ``, not `` `the applicant` `age` ``.
+
+**Missing backticks around a name with spaces.** Write ``DECIDE `is eligible` IF``. Without backticks, `is eligible` is two separate words.
 
 ---
 
-## Common Mistakes
+## Next steps
 
-### Missing Indentation
-
-```l4
--- ❌ Wrong
-DECLARE Person
-HAS name IS A STRING
-
--- ✅ Right
-DECLARE Person
-    HAS name IS A STRING
-```
-
-### Missing Apostrophe in Field Access
-
-```l4
--- ❌ Wrong
-person age >= 18
-
--- ✅ Right
-person's age >= 18
-```
-
-### Missing Backticks in Multi-Word Names
-
-```l4
--- ❌ Wrong
-DECIDE is eligible IF ...
-
--- ✅ Right
-DECIDE `is eligible` IF ...
-```
-
----
-
-## What You Learned
-
-- How to create an L4 file
-- How to define types with `DECLARE`
-- How to define rules with `GIVEN`, `GIVETH`, and `DECIDE`
-- How to create test data
-- How to test with `#EVAL`
-
----
-
-## Next Steps
-
-- [Encoding Legislation](encoding-legislation.md) - Turn legal text into L4
-- [Common Patterns](../../reference/patterns/common-patterns.md) - Frequently used L4 patterns
-- [Foundation Course Module 1](../../courses/foundation/module-1-first-rule.md) - Learn more about legal rules
+- [Foundation course](../../courses/foundation/README.md): learn the language step by step.
+- [Test your rules](testing-your-rules.md): check that rules give the answers you expect.
+- [Using the l4 CLI](l4-cli.md): check, run, batch-evaluate and deploy rules from the command line.

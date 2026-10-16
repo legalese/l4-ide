@@ -1,12 +1,16 @@
--- Example: Identifiers in L4
--- Demonstrates regular and quoted identifiers
+-- Identifiers: plain and quoted
 
--- Regular identifiers
+-- A plain identifier: letters, digits and underscores, starting with a letter
 ASSUME age IS A NUMBER
-ASSUME taxRate IS A NUMBER
+ASSUME income_band IS A STRING
 
--- Quoted identifiers with spaces
+-- A quoted identifier, in backquotes, can contain spaces and punctuation
 ASSUME `total tax` IS A NUMBER
 ASSUME `Section 2(a)` IS A STRING
 
-#EVAL age
+-- Identifiers are case-sensitive: these are two different names
+`the rate` MEANS 1
+`The rate` MEANS 2
+
+#EVAL `the rate`
+#EVAL `The rate`

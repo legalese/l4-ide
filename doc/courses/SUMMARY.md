@@ -1,23 +1,23 @@
 # Courses - Summary
 
-- [Courses Home](README.md)
+- [Overview](README.md)
 
-## Foundation
+## Foundation course
 
-- [Foundation Course](foundation/README.md)
-- [M0: Introduction to L4](foundation/module-0-introduction.md)
-- [M1: Your First Legal Rule](foundation/module-1-first-rule.md)
-- [M2: Legal Entities and Relationships](foundation/module-2-entities.md)
-- [M3: Control Flow](foundation/module-3-control-flow.md)
-- [M4: Decision Logic](foundation/module-4-decision-logic.md)
-- [M5: Functions](foundation/module-5-functions.md)
-- [M6: Regulative Rules](foundation/module-6-regulative.md)
-- [M7: Putting It Together](foundation/module-7-capstone.md)
+- [Overview](foundation/README.md)
+- [0. Introduction to L4](foundation/module-0-introduction.md)
+- [1. Your first legal rule](foundation/module-1-first-rule.md)
+- [2. Legal entities and relationships](foundation/module-2-entities.md)
+- [3. Control flow](foundation/module-3-control-flow.md)
+- [4. Decision logic](foundation/module-4-decision-logic.md)
+- [5. Functions](foundation/module-5-functions.md)
+- [6. Regulative rules](foundation/module-6-regulative.md)
+- [7. Putting it together](foundation/module-7-capstone.md)
 
-## Advanced
+## Advanced course
 
-- [Advanced Course](advanced/README.md)
-- [MA1: Real Regulatory Schemes](advanced/module-a1-regulatory.md)
-- [MA2: Cross-Cutting Concerns](advanced/module-a2-cross-cutting.md)
-- [MA3: Contracts in Depth](advanced/module-a3-contracts.md)
-- [MA4: Production Patterns](advanced/module-a4-production.md)
+- [Overview](advanced/README.md)
+- [A1. Real regulatory schemes](advanced/module-a1-regulatory.md)
+- [A2. Cross-cutting concerns](advanced/module-a2-cross-cutting.md)
+- [A3. Contracts in depth](advanced/module-a3-contracts.md)
+- [A4. Production patterns](advanced/module-a4-production.md)
