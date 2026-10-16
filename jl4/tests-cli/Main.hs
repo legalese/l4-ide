@@ -10,13 +10,19 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
+import Control.Concurrent (forkIO)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (IOException, finally, throwIO, try)
-import Control.Monad (forM_, unless, when)
-import Data.List (isInfixOf, isPrefixOf, isSuffixOf, tails)
+import Control.Monad (forM_, unless, void, when)
+import qualified Data.Char as Char
+import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
+import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.Aeson as Aeson
 import Data.Aeson (Value(..), eitherDecode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
@@ -39,7 +45,8 @@ import System.Directory
 import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>), takeFileName)
-import System.IO (hClose, hSetBinaryMode)
+import qualified System.Info as Info
+import System.IO (Handle, hClose, hFlush, hSetBinaryMode)
 import System.IO.Error (isPermissionError)
 import System.Process
   ( CreateProcess(..)
@@ -47,9 +54,15 @@ import System.Process
   , createProcess
   , proc
   , readCreateProcessWithExitCode
+  , terminateProcess
   , waitForProcess
   )
+import System.Timeout (timeout)
 import Test.Hspec
+import Data.Aeson (toJSON)
+import Data.Char (isDigit)
+import System.IO (hPutStr)
+import System.IO.Temp (withSystemTempDirectory)
 
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
@@ -451,7 +464,8 @@ main = do
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
-       , multiClauseRenderFixture ] \fp -> do
+       , multiClauseRenderFixture
+       , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -877,6 +891,152 @@ spec bin = do
       code `shouldBe` ExitSuccess
       -- The dumper uses pretty-simple; any module will start with "MkModule".
       sout `shouldSatisfy` ("MkModule" `isInfixOf`)
+
+  -- `l4 batch` and the REPL re-print the module and run the printed text. A
+  -- CONSIDER's arms were printed comma-separated on one hanging indent, so in a
+  -- CONSIDER inside an arm of another, the outer's later arms were read as more
+  -- arms of the inner one, and an arm that ended in a comma list took the comma
+  -- after it for another element. The expected answers are what `l4 run` gives
+  -- on the fixture's own #EVALs, which the first test of each group pins.
+  --
+  -- Everything this needs is local to the block, so that it shares no line with
+  -- the rest of the file: the fixtures are named here, and an answer is a
+  -- `Value`, with a string standing for an exception or for text that is none
+  -- of TRUE, FALSE, a number or a LIST of numbers.
+  describe "a CONSIDER whose arms are printed back" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let noBranch = String "<a CONSIDER with no branch for its value>"
+        one n    = Number n
+        -- the answer a block of output spells
+        answerOf :: T.Text -> Value
+        answerOf t
+          | Just rest <- T.stripPrefix "LIST " t
+          , let elems = T.splitOn ", " rest
+          , all (\e -> not (T.null e) && T.all isDigit e) elems
+          = toJSON (map (read . T.unpack) elems :: [Integer])
+          | t == "TRUE"  = Bool True
+          | t == "FALSE" = Bool False
+          | not (T.null t), T.all isDigit t = Number (fromInteger (read (T.unpack t)))
+          | "has no branch" `T.isInfixOf` t = noBranch
+          | otherwise = String ("<" <> t <> ">")
+        -- what `l4 run` gives for each #EVAL of a file, in order
+        runAnswers file = do
+          Output _ sout _ <- runL4 bin ["run", file]
+          let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
+              result b = T.strip (fst (T.breakOn "Trace:" (T.drop (T.length "Result:") (snd (T.breakOn "Result:" b)))))
+          pure (map (answerOf . result) blocks)
+        -- what each row of `l4 batch` gives. A row that raises is `"status":"error"`
+        -- with its message in the result, and it stops the batch unless `-c` says to
+        -- go on; so a file with a raising row is run with `-c`, and every row is read.
+        batchAnswers file inputs entry = do
+          Output _ sout _ <- runL4 bin ["batch", "-c", file, "-i", inputs, "-e", entry]
+          let result row = case objField row "output" of
+                Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+                _ -> Nothing
+              rowAnswer row = case (objField row "status", result row) of
+                (_, Just (Object o))
+                  | Just (String e) <- KeyMap.lookup (Key.fromString "error") o -> answerOf e
+                (Just (String "success"), Just v) -> v
+                _ -> String ("<" <> T.pack (take 300 (show (objField row "diagnostics"))) <> ">")
+          pure [ rowAnswer row | l <- map (filter (/= '\r')) (lines sout)
+                               , Right row <- [eitherDecode (BSL8.pack l)] ]
+        -- what the REPL gives to each query, loading the file first. It runs in a
+        -- directory of its own, because it keeps a history file in the one it is in.
+        replAnswers repl file queries = withSystemTempDirectory "l4-repl-consider-arms" \work -> do
+          absFile <- makeAbsolute file
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          hPutStr hin (unlines (queries <> [":quit"]))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          -- the banner, then one reply after each prompt, then the last prompt's goodbye
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map (answerOf . T.strip) (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        inRepl file queries expected = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> replAnswers repl file queries `shouldReturn` expected
+
+        types    = fixtureDir </> "batch-nested-consider-types.l4"
+        silent   = fixtureDir </> "batch-nested-consider-silent.l4"
+        listArms = fixtureDir </> "batch-consider-list-arms.l4"
+        rows f   = fixtureDir </> ("batch-" ++ f ++ ".json")
+
+        typesWant  = [one 1, one 2, one 3, one 4]
+        -- Red Red, Red Blue (no arm for Blue in the inner one), Green, Blue
+        silentWant = [Bool True, noBranch, Bool False, Bool True]
+        listsWant  = [toJSON [1, 2 :: Integer], toJSON [3 :: Integer], toJSON [4, 5 :: Integer]]
+
+        -- a WHERE under an arm; the three files differ in which arm holds it
+        whereFile n = fixtureDir </> ("batch-consider-where-" ++ n ++ ".l4")
+        whereRows n = rows ("consider-where-" ++ n)
+        whereWant   = [one 0, one 20, one 50]
+        whereQueries = [ "`late fee` 1000 0", "`late fee` 1000 10", "`late fee` 1000 45" ]
+        whereArms   = ["first", "middle", "last"]
+
+    -- the inner CONSIDER is on another type, so the outer's later arms did not
+    -- type-check as its arms and every row was an error
+    it "is read by l4 run as the rule says" $ do
+      runAnswers types  `shouldReturn` typesWant
+      runAnswers silent `shouldReturn` (silentWant <> [one 4])
+      runAnswers listArms `shouldReturn` listsWant
+
+    it "is read as written by l4 batch, when the inner one is on another type" $
+      batchAnswers types (rows "nested-consider-types") "inner on another type" `shouldReturn` typesWant
+
+    -- the inner CONSIDER is on the same type, so they did type-check, and the
+    -- printed rule answered differently with no diagnostic
+    it "is read as written by l4 batch, when the inner one is on the same type" $
+      batchAnswers silent (rows "nested-consider-silent") "inner on the same type" `shouldReturn` silentWant
+
+    -- the control: an inner CONSIDER that is the last arm was always printed right
+    it "is read as written by l4 batch, when it is the last arm" $
+      batchAnswers silent (rows "nested-consider-last") "inner last" `shouldReturn` [one 4]
+
+    -- no nesting at all: the comma after an arm was read as the next element of
+    -- the LIST the arm ended in
+    it "is read as written by l4 batch, when an arm ends in a comma list" $
+      batchAnswers listArms (rows "consider-list-arms") "list arms" `shouldReturn` listsWant
+
+    it "is read as written by the REPL, when the inner one is on another type" $
+      inRepl types
+        [ "`inner on another type` 0 1", "`inner on another type` 0 9"
+        , "`inner on another type` 1 1", "`inner on another type` 2 9" ]
+        typesWant
+
+    it "is read as written by the REPL, when the inner one is on the same type" $
+      inRepl silent
+        [ "`inner on the same type` 0 0", "`inner on the same type` 0 2"
+        , "`inner on the same type` 1 0", "`inner on the same type` 2 0" ]
+        silentWant
+
+    it "is read as written by the REPL, when an arm ends in a comma list" $
+      inRepl listArms [ "`list arms` 0", "`list arms` 1", "`list arms` 2" ] listsWant
+
+    -- a WHERE under an arm: its line stood at the column of the arm's WHEN, which
+    -- ends the definition, so any arm after it did not parse and every row failed.
+    -- The last arm has none after it, and was always printed right.
+    it "is read by l4 run as the rule says, with a WHERE under an arm" $
+      forM_ whereArms \n -> runAnswers (whereFile n) `shouldReturn` whereWant
+
+    forM_ whereArms \n -> do
+      it ("is read as written by l4 batch, with a WHERE under the " ++ n ++ " arm") $
+        batchAnswers (whereFile n) (whereRows n) "late fee" `shouldReturn` whereWant
+
+      it ("is read as written by the REPL, with a WHERE under the " ++ n ++ " arm") $
+        inRepl (whereFile n) whereQueries whereWant
 
   describe "l4 trace" $ do
     it "refuses --format png without --output-dir" $ do
@@ -1841,6 +2001,9 @@ spec bin = do
       occurrences warning astErr `shouldBe` 1
       removePathForcibly work
 
+  buildVersionSpec bin
+  buildIdentitySpec
+
 -- | Run one row through @l4 batch@ and return its result, failing the test
 -- unless the row's status is @success@.
 batchAnswer :: FilePath -> FilePath -> FilePath -> String -> IO Value
@@ -1856,3 +2019,210 @@ batchAnswer bin file inputs entry = do
   case objField row "output" of
     Just (Array outs) | (o : _) <- foldr (:) [] outs, Just r <- objField o "result" -> pure r
     other -> expectationFailure ("no result in batch output: " ++ show other) >> error "unreachable"
+
+----------------------------------------------------------------------------
+-- The line that names a build
+----------------------------------------------------------------------------
+
+-- | Files the build-identity tests need, relative to @jl4/@.
+buildIdentityScript, buildIdentityPackageJson :: FilePath
+buildIdentityScript      = "../etc/build-identity.sh"
+buildIdentityPackageJson = "../ts-apps/vscode/package.json"
+
+-- | No white space at either end, and any run of it inside a single space: how
+-- the renderer treats each part, so a value with a line break in it still gives
+-- one line.
+buildOneLine :: String -> String
+buildOneLine = unwords . words
+
+-- | The line this build should print, when the variables it was built with are
+-- in the environment of the test run: the release, then the branch (@unknown@
+-- if none), the first seven characters of the commit and the date in brackets,
+-- with the commit and the date left out when empty. 'Nothing' when there is no
+-- release, and the build is a @dev@ build.
+--
+-- This restates the format of @LSP.L4.BuildInfo.renderBuildInfo@ on purpose, so
+-- that the test does not use the code it checks.
+buildExpectedFromEnvironment :: IO (Maybe String)
+buildExpectedFromEnvironment = do
+  release <- buildOneLine . fromMaybe "" <$> lookupEnv "L4_BUILD_RELEASE"
+  branch <- buildOneLine . fromMaybe "" <$> lookupEnv "L4_BUILD_BRANCH"
+  commit <- buildOneLine . fromMaybe "" <$> lookupEnv "L4_BUILD_COMMIT"
+  date <- buildOneLine . fromMaybe "" <$> lookupEnv "L4_BUILD_DATE"
+  let details = (if null branch then "unknown" else branch) : filter (not . null) [take 7 commit, date]
+  pure $
+    if null release
+      then Nothing
+      else Just (release ++ " (" ++ intercalate ", " details ++ ")")
+
+-- | Find the @jl4-lsp@ binary: @JL4_LSP_BIN@, else the one Cabal built for this
+-- test suite (@build-tool-depends@ makes sure it is built).
+locateLspBinary :: IO (Maybe FilePath)
+locateLspBinary = do
+  fromEnv <- lookupEnv "JL4_LSP_BIN"
+  case fromEnv of
+    Just p -> do
+      ok <- doesFileExist p
+      if ok then Just <$> makeAbsolute p else pure Nothing
+    Nothing -> do
+      (code, out, _err) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-lsp"]) ""
+      let path = reverse (dropWhile Char.isSpace (reverse (dropWhile Char.isSpace out)))
+      ok <- if code == ExitSuccess then doesFileExist path else pure False
+      if ok then Just <$> makeAbsolute path else pure Nothing
+
+-- | One @Content-Length@-framed LSP message from a handle, or 'Nothing' at end
+-- of input.
+readLspMessage :: Handle -> IO (Maybe BS.ByteString)
+readLspMessage h = go BS.empty
+  where
+    go acc
+      | "\r\n\r\n" `BS.isSuffixOf` acc = body acc
+      | otherwise = do
+          c <- BS.hGet h 1
+          if BS.null c then pure Nothing else go (acc <> c)
+    body header =
+      case [ BS8.readInt (BS8.dropWhile Char.isSpace (BS.drop 1 (BS8.dropWhile (/= ':') l)))
+           | l <- BS8.lines header, "content-length" `BS.isPrefixOf` BS8.map toLowerAscii l ] of
+        Just (n, _) : _ -> Just <$> BS.hGet h n
+        _ -> pure Nothing
+    toLowerAscii c = if c >= 'A' && c <= 'Z' then toEnum (fromEnum c + 32) else c
+
+-- | Start @jl4-lsp@, send it @initialize@, and give back its answer and
+-- everything it wrote to stderr up to being stopped. 'Nothing' for the answer if
+-- none came within a minute.
+initializeLspServer :: FilePath -> IO (Maybe Value, String)
+initializeLspServer lsp = do
+  (Just hin, Just hout, Just herr, ph) <-
+    createProcess (proc lsp []) {std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
+  mapM_ (`hSetBinaryMode` True) [hin, hout, herr]
+  errVar <- newEmptyMVar
+  _ <- forkIO (BS.hGetContents herr >>= putMVar errVar)
+  let request = BS8.pack "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"processId\":null,\"rootUri\":null,\"capabilities\":{}}}"
+  BS.hPut hin (BS8.pack ("Content-Length: " ++ show (BS.length request) ++ "\r\n\r\n") <> request)
+  hFlush hin
+  answered <- timeout 60000000 (readLspMessage hout)
+  terminateProcess ph
+  void (waitForProcess ph)
+  _ <- try (hClose hin) :: IO (Either IOException ())
+  errBytes <- takeMVar errVar
+  pure
+    ( case answered of
+        Just (Just msg) -> Aeson.decode (BSL8.fromStrict msg)
+        _ -> Nothing
+    , T.unpack (TE.decodeUtf8Lenient errBytes)
+    )
+
+-- | The line a binary must print for @--version@: exactly what
+-- 'buildExpectedFromEnvironment' says, or @dev@ when the environment names no
+-- release. Windows ends a line with carriage return and line feed, so the
+-- carriage returns are dropped first.
+checkVersionLine :: Maybe String -> String -> Expectation
+checkVersionLine expected sout =
+  filter (/= '\r') sout `shouldBe` fromMaybe "dev" expected ++ "\n"
+
+-- | Black-box tests for the line that names a build (@LSP.L4.BuildInfo@):
+-- @l4 --version@, @jl4-lsp --version@, the language server's @serverInfo@ and
+-- its start-up log line.
+--
+-- What a binary prints is fixed when it is compiled, so these tests cannot set
+-- it. They compare it with the variables that are in the environment of the
+-- test run. The release workflow (@main-tag.yml@) writes the variables for the
+-- build step and the test step alike, so there the test fails if the bake did
+-- not take: a release binary that says @dev@, or says the wrong release. Without
+-- the variables the binary must say @dev@.
+buildVersionSpec :: FilePath -> Spec
+buildVersionSpec bin = describe "the line that names a build" $ do
+  mLsp <- runIO locateLspBinary
+  let withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
+
+  describe "l4 --version" $ do
+    it "prints one line naming the build, and nothing else, and succeeds" $ do
+      expected <- buildExpectedFromEnvironment
+      Output code sout serr <- runL4 bin ["--version"]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') serr `shouldBe` ""
+      checkVersionLine expected sout
+
+    it "is listed in l4 --help" $ do
+      Output _ sout _ <- runL4 bin ["--help"]
+      sout `shouldSatisfy` ("--version" `isInfixOf`)
+
+  describe "jl4-lsp --version" $ do
+    it "prints the line l4 --version prints" $ withLsp \lsp -> do
+      expected <- buildExpectedFromEnvironment
+      Output code sout serr <- runL4 lsp ["--version"]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') serr `shouldBe` ""
+      checkVersionLine expected sout
+      Output _ l4Out _ <- runL4 bin ["--version"]
+      sout `shouldBe` l4Out
+
+  describe "the language server" $ do
+    it "reports the line as serverInfo, and logs it when it starts" $ withLsp \lsp -> do
+      expected <- buildExpectedFromEnvironment
+      (answer, stderrText) <- initializeLspServer lsp
+      let line = fromMaybe "dev" expected
+          serverInfo = answer >>= (`objField` "result") >>= (`objField` "serverInfo")
+      fmap (`objField` "name") serverInfo `shouldBe` Just (Just (String "jl4-lsp"))
+      fmap (`objField` "version") serverInfo `shouldBe` Just (Just (String (T.pack line)))
+      stderrText `shouldSatisfy` (("| Info | jl4-lsp " ++ line) `isInfixOf`)
+
+-- | Tests for @etc/build-identity.sh@, which the release workflow
+-- (@main-tag.yml@) runs to write the variables that @LSP.L4.BuildInfo@ bakes
+-- into @l4@ and @jl4-lsp@. What the binaries print is tested in
+-- 'buildVersionSpec'.
+buildIdentitySpec :: Spec
+buildIdentitySpec = describe "etc/build-identity.sh" $ do
+  let posixOnly act
+        | Info.os == "mingw32" = pendingWith "needs a POSIX shell; the release workflow runs it on Windows under Git Bash"
+        | otherwise = act
+      -- The parent's environment, less the three variables a workflow run sets
+      -- (CI has them), plus the ones the case gives.
+      runScript set = do
+        parent <- getEnvironment
+        let inherited = [kv | kv@(k, _) <- parent, k `notElem` ["GITHUB_RUN_NUMBER", "GITHUB_SHA", "GITHUB_REF_NAME"]]
+        readCreateProcessWithExitCode (proc "bash" [buildIdentityScript]) {env = Just (inherited ++ set)} ""
+      sha = "0123456789abcdef0123456789abcdef01234567"
+      datePrefix = "L4_BUILD_DATE=" :: String
+      isDate d = length d == 10 && all isDigit (take 4 d) && d !! 4 == '-' && all isDigit (take 2 (drop 5 d))
+                   && d !! 7 == '-' && all isDigit (drop 8 d)
+
+  it "prints the release, the first seven characters of the commit, and today, one VAR=value per line" $ posixOnly $ do
+    (code, out, _) <- runScript [("GITHUB_RUN_NUMBER", "91"), ("GITHUB_SHA", sha), ("GITHUB_REF_NAME", "main")]
+    code `shouldBe` ExitSuccess
+    package <- BS.readFile buildIdentityPackageJson
+    let version = case Aeson.decodeStrict package >>= (`objField` "version") of
+          Just (String v) -> T.unpack v
+          _ -> ""
+        majorMinor = reverse (drop 1 (dropWhile (/= '.') (reverse version)))
+    version `shouldSatisfy` (not . null)
+    case lines out of
+      [r, b, c, d] -> do
+        r `shouldBe` "L4_BUILD_RELEASE=" ++ majorMinor ++ ".91"
+        b `shouldBe` "L4_BUILD_BRANCH=main"
+        c `shouldBe` "L4_BUILD_COMMIT=0123456"
+        d `shouldSatisfy` isPrefixOf datePrefix
+        drop (length datePrefix) d `shouldSatisfy` isDate
+      other -> expectationFailure ("expected four lines, got " ++ show other)
+
+  it "names the branch the workflow ran on, whatever it is called" $ posixOnly $ do
+    (code, out, _) <- runScript [("GITHUB_RUN_NUMBER", "91"), ("GITHUB_SHA", sha), ("GITHUB_REF_NAME", "feature/x")]
+    code `shouldBe` ExitSuccess
+    lines out `shouldSatisfy` ("L4_BUILD_BRANCH=feature/x" `elem`)
+
+  it "says unknown when the workflow gave no branch, and does not ask Git" $ posixOnly $ do
+    (code, out, _) <- runScript [("GITHUB_RUN_NUMBER", "91"), ("GITHUB_SHA", sha)]
+    code `shouldBe` ExitSuccess
+    lines out `shouldSatisfy` ("L4_BUILD_BRANCH=unknown" `elem`)
+
+  it "refuses to print anything without a run number, so a local run cannot pass for a release" $ posixOnly $ do
+    (code, out, err) <- runScript [("GITHUB_SHA", sha)]
+    code `shouldSatisfy` (/= ExitSuccess)
+    out `shouldBe` ""
+    err `shouldSatisfy` ("GITHUB_RUN_NUMBER" `isInfixOf`)
+
+  it "refuses to print anything without a commit" $ posixOnly $ do
+    (code, out, err) <- runScript [("GITHUB_RUN_NUMBER", "91")]
+    code `shouldSatisfy` (/= ExitSuccess)
+    out `shouldBe` ""
+    err `shouldSatisfy` ("GITHUB_SHA" `isInfixOf`)

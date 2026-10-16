@@ -521,8 +521,8 @@ All documentation for the currently-published L4 release lives under `https://le
 - **Libraries:** <https://legalese.com/l4/reference/libraries.md>
 - **Tutorials — first L4 file:** <https://legalese.com/l4/tutorials/getting-started/first-l4-file.md>
 - **Tutorials — common patterns:** <https://legalese.com/l4/tutorials/getting-started/common-patterns.md>
-- **Tutorials — deploying functions:** <https://legalese.com/l4/tutorials/deploying-functions/exporting-functions-for-deployment.md>
+- **Tutorials — deploying rules:** <https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment.md>
 - **Concepts — regulative rules:** <https://legalese.com/l4/concepts/legal-modeling/regulative-rules.md>
-- **Foundation course (Module 5 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-5-regulative.md>
+- **Foundation course (Module 6 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-6-regulative.md>
 
 The website tracks the currently-published L4 version; treat it as ground truth over any snippet in this skill.

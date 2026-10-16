@@ -1,116 +1,65 @@
 # ASSUME
 
-Declares a variable or function with a specified type, without providing a definition. Used for external values or assumptions about inputs.
+`ASSUME` declares a name and its type without giving it a value or a definition.
+Use it for facts that are supplied from outside, and for functions whose definition lives elsewhere.
 
 ## Syntax
 
-```l4
+```text
 ASSUME name IS A Type
-ASSUME name IS A FUNCTION FROM Type1 TO Type2
+ASSUME name IS A FUNCTION FROM Type1 AND Type2 TO Type3
 ```
-
-## Purpose
-
-ASSUME is used to:
-
-1. Declare input variables for decision logic
-2. Declare external functions whose implementation is provided elsewhere
-3. State assumptions about values that will be provided at runtime
-
-## Examples
 
 **Example file:** [assume-example.l4](assume-example.l4)
 
-### Basic Variable Assumptions
+## Examples
 
 ```l4
--- Assume a boolean input
-ASSUME isEmployed IS A BOOLEAN
+ASSUME `the applicant's age` IS A NUMBER
+ASSUME `the applicant is employed` IS A BOOLEAN
+ASSUME `the tax on` IS A FUNCTION FROM NUMBER TO NUMBER
 
--- Assume a numeric value
-ASSUME income IS A NUMBER
-
--- Assume a string
-ASSUME applicantName IS A STRING
+DECIDE `the applicant qualifies` IF
+      `the applicant's age` >= 18
+  AND `the applicant is employed`
 ```
 
-### Function Assumptions
+An assumed name can be used anywhere its type fits, and the file type-checks.
+Evaluating an expression that needs its value stops with "I could not continue evaluating, because I needed to know the value of … but it is an assumed term."
+To try such a rule with values, give the facts as `GIVEN` inputs instead, or publish it with `@export` as below.
 
-```l4
--- Assume an external function
-ASSUME calculateTax IS A FUNCTION FROM NUMBER TO NUMBER
-
--- Multi-parameter function (using AND)
-ASSUME addNumbers IS A FUNCTION FROM NUMBER AND NUMBER TO NUMBER
-```
-
-### Using Assumed Values
-
-```l4
-ASSUME age IS A NUMBER
-ASSUME income IS A NUMBER
-
-DECIDE isEligible IS
-  age >= 18 AND income > 50000
-```
-
-## Behavior
-
-- Assumed values can be used in expressions but have no defined value
-- When evaluated directly, assumed values remain symbolic
-- Assumed values are typically bound via `#CHECK ... WITH` or `#TRACE ... WITH`
+For a polymorphic assumed function, see [FOR ALL](for-all.md).
 
 ## ASSUME and `@export`
 
-When a module-level ASSUME is referenced by an `@export`-decorated DECIDE, it
-is promoted to a parameter of the exported function and must be supplied by
-the caller at request time (alongside the function's `GIVEN` parameters).
-ASSUMEs not referenced by any exported function remain module-level
-assumptions and are unaffected.
+When a function marked `@export` uses a top-level `ASSUME`, the assumed name becomes an input of the exported function, and the caller supplies it with the `GIVEN` inputs.
+An `ASSUME` that no exported function uses stays as it is.
 
 ```l4
-ASSUME age IS A NUMBER         -- promoted to a parameter of `isAdult`
-ASSUME unused IS A BOOLEAN     -- stays assumed (no @export uses it)
+ASSUME `the applicant's age` IS A NUMBER
+ASSUME `an unused fact` IS A BOOLEAN
 
-@export Check if the subject is an adult
-DECIDE isAdult IS age >= 18
+@export Check whether the applicant is an adult
+DECIDE `the applicant is an adult` IF `the applicant's age` >= 18
 ```
+
+Here `` `the applicant's age` `` is an input of `` `the applicant is an adult` ``; `` `an unused fact` `` is not.
 
 ### Function-typed inputs are not supported for `@export`
 
-An `@export` function cannot accept a function-typed input, whether declared
-as a `GIVEN` parameter or as a referenced ASSUME:
+An exported function cannot take an input of function type, whether it is a `GIVEN` input or an `ASSUME` it uses:
 
-```l4
--- ✘ Rejected at typecheck / deploy time
-ASSUME predicate IS A FUNCTION FROM NUMBER TO BOOLEAN
-@export Apply the predicate
-DECIDE `applies` IF predicate OF 42
+```text
+ASSUME `the test` IS A FUNCTION FROM NUMBER TO BOOLEAN
+@export Apply the test
+DECIDE `passes` IF `the test` 42
 ```
 
-Functions can't be passed over JSON (REST/MCP), and function-typed ASSUMEs
-stay uninterpreted at runtime — so any call would fail with an "assumed
-term" error rather than return a value. The typechecker emits
-`Function type inputs are not supported for @export` and the service
-refuses to deploy such bundles.
+`l4 check` reports "Function type inputs are not supported for @export", and the service refuses to deploy such a file.
+A function cannot be sent as JSON over REST or MCP, and an assumed function has no definition to run.
 
-## Binding Assumed Values
+## Related pages
 
-```l4
-ASSUME age IS A NUMBER
-
-DECIDE isAdult IS age >= 18
-
--- Bind the assumed value for checking
-#CHECK isAdult WITH age IS 25
-```
-
-## Related Keywords
-
-- **[DECIDE](../functions/DECIDE.md)** - Define a value or function with a body
-- **[GIVEN](../functions/GIVEN.md)** - Introduce function parameters
-- **[TYPE-KEYWORDS](keywords.md)** - Type syntax (IS, FUNCTION, etc.)
-
-## See Also
-
-- **[Types Reference](../types/README.md)** - Type syntax
+- [GIVEN and GIVETH](../functions/GIVEN.md): inputs of a function
+- [DECLARE](DECLARE.md): types and type expressions
+- [Deploy your rules](../../tutorials/deploying-rules/exporting-rules-for-deployment.md): `@export` in practice
