@@ -111,12 +111,15 @@ jobs:
             l4 check "$f"
           done
 
-      - name: Run tests (fail on failed assertions)
+      - name: Run tests (fail on failed assertions and on assertions that cannot be evaluated)
         run: |
           status=0
           for f in $(git ls-files '*.l4'); do
-            out=$(l4 run "$f" 2>&1) || status=1
-            if echo "$out" | grep -q "assertion failed"; then
+            if ! out=$(l4 run "$f" 2>&1); then
+              echo "::error file=$f::l4 run failed for $f (a type error, or a directive that could not be evaluated)"
+              echo "$out"
+              status=1
+            elif echo "$out" | grep -q "assertion failed"; then
               echo "::error file=$f::assertion failed in $f"
               echo "$out"
               status=1
@@ -128,7 +131,7 @@ jobs:
 Two details worth knowing:
 
 - `l4 check` exits non-zero on any parse or type error, so the typecheck step needs no extra logic.
-- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step greps for it (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
+- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step checks two things: the exit code, which catches the type errors and the assertions that could not be evaluated, and a grep for `assertion failed`, which catches the verdicts (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
 
 If rules use `NOW` or `TODAY`, add `--fixed-now <ISO8601>` to the `l4 run` calls so CI results do not depend on the day the job runs.
 
@@ -175,7 +178,7 @@ Practical workflow:
 - Rule repositories make amendments reviewable, history auditable, and rollbacks trivial
 - Lay out files to mirror the legal source; keep tests in the same file as the rules
 - Cut commits along legal lines; update assertions in the same commit; cite the instrument
-- CI: `l4 check` for validity, `l4 run` plus a grep for `assertion failed` for outcomes
+- CI: `l4 check` for validity; for outcomes, `l4 run`'s exit code and a grep for `assertion failed`
 - Redeployments are interface-checked: compatible changes flow through, breaking changes are rejected unless you overwrite deliberately
 
 ---
