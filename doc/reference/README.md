@@ -24,17 +24,17 @@ Describe the things your rules talk about: people, contracts, amounts, dates. Th
 
 ### [Functions](functions/README.md)
 
-Write values, rules and functions, and give them inputs.
+Rules in L4 are functions: they take inputs and compute a result.
 
-| Page                                                         | What it covers                                                                   |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [DECIDE](functions/DECIDE.md)                                | Define a value, a function or a rule; DECIDE … IF; several clauses, one per case |
-| [GIVEN and GIVETH](functions/GIVEN.md)                       | Name and type the inputs; state the type of the result                           |
-| [MEANS](functions/MEANS.md)                                  | The body of a definition, and computed fields in records                         |
-| [LET and WHERE](functions/LET.md)                            | Local definitions, before or after an expression                                 |
-| [YIELD](functions/YIELD.md)                                  | Functions without a name                                                         |
-| [AKA](functions/AKA.md)                                      | Other names for a definition, a type or a section                                |
-| [Mixfix definitions](functions/README.md#mixfix-definitions) | Names with words between the inputs, so a call reads like a sentence             |
+| Page                                                     | What it covers                                                                   |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [DECIDE](functions/DECIDE.md)                            | Define a value, a function or a rule; DECIDE … IF; several clauses, one per case |
+| [GIVEN and GIVETH](functions/GIVEN.md)                   | Name and type the inputs; state the type of the result                           |
+| [MEANS](functions/MEANS.md)                              | The body of a definition, and computed fields in records                         |
+| [LET and WHERE](functions/LET.md)                        | Local definitions, before or after an expression                                 |
+| [YIELD](functions/YIELD.md)                              | Functions without a name                                                         |
+| [AKA](functions/AKA.md)                                  | Other names for a definition, a type or a section                                |
+| [Mixfix functions](functions/README.md#mixfix-functions) | Names with words between the inputs, so a call reads like a sentence             |
 
 ### [Control flow](control-flow/README.md)
 

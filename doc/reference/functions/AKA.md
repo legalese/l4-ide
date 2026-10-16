@@ -1,6 +1,6 @@
 # AKA
 
-`AKA` ("also known as") gives a definition, a type or a section more than one name. Every name refers to the same thing.
+`AKA` ("also known as") gives a function, a value, a type or a section more than one name. Every name refers to the same thing.
 
 ## Syntax
 

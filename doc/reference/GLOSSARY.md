@@ -7,16 +7,16 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 | Keyword                | Meaning                                                                  | Reference                                     |
 | ---------------------- | ------------------------------------------------------------------------ | --------------------------------------------- |
 | **DECIDE**             | Defines a value, a function or a rule; one definition or several clauses | [DECIDE](functions/DECIDE.md)                 |
-| **MEANS**              | Gives the body of a definition or a computed field                       | [MEANS](functions/MEANS.md)                   |
+| **MEANS**              | Gives the body of a function, a value or a computed field                | [MEANS](functions/MEANS.md)                   |
 | **IS**                 | Gives the body after `DECIDE name`; also states a type (`IS A NUMBER`)   | [DECIDE](functions/DECIDE.md)                 |
 | **IF** (after DECIDE)  | `DECIDE x IF condition` defines a BOOLEAN                                | [DECIDE](functions/DECIDE.md)                 |
-| **GIVEN**              | Names and types the inputs of a definition                               | [GIVEN and GIVETH](functions/GIVEN.md)        |
+| **GIVEN**              | Names and types the inputs of a function                                 | [GIVEN and GIVETH](functions/GIVEN.md)        |
 | **GIVETH** / **GIVES** | States the type of the result                                            | [GIVEN and GIVETH](functions/GIVEN.md#giveth) |
 | **LET** ... **IN**     | Local definitions before an expression                                   | [LET and WHERE](functions/LET.md)             |
 | **BE** / **MEAN**      | Alternatives to IS and MEANS in a LET binding                            | [LET and WHERE](functions/LET.md)             |
 | **WHERE**              | Local definitions after an expression                                    | [LET and WHERE](functions/LET.md#where)       |
 | **YIELD**              | A function without a name: `GIVEN n YIELD n + 1`                         | [YIELD](functions/YIELD.md)                   |
-| **AKA**                | Another name for the same definition                                     | [AKA](functions/AKA.md)                       |
+| **AKA**                | Another name for the same function, value, type or section               | [AKA](functions/AKA.md)                       |
 | Several clauses        | A rule written as one line per case: `DECIDE price Red IS 1`             | [DECIDE](functions/DECIDE.md#several-clauses) |
 
 ## Types

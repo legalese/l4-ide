@@ -1,6 +1,6 @@
 # Functions
 
-A definition gives a name to a value or a function. In L4 each rule is a definition: its inputs, the type of its result, and the expression that computes it.
+A function takes inputs and computes a result from them. In L4 each rule is a function: `GIVEN` names and types its inputs, `GIVETH` states the type of its result, and `DECIDE` or `MEANS` gives the expression that computes it. A function without inputs is a named value.
 
 ```l4
 GIVEN age IS A NUMBER
@@ -15,11 +15,11 @@ DECIDE `is an adult` age IF age >= 18
 - [MEANS](MEANS.md): define without `DECIDE`
 - [LET and WHERE](LET.md): local definitions before or after an expression
 - [YIELD](YIELD.md): functions without a name
-- [AKA](AKA.md): more than one name for the same definition
+- [AKA](AKA.md): more than one name for the same function, value, type or section
 
-## Mixfix definitions
+## Mixfix functions
 
-A function's name does not have to come first. In a **mixfix** definition, the `GIVEN` inputs are placed between the words of the name, so a call reads like a sentence:
+A function's name does not have to come first. In a **mixfix** function, the `GIVEN` inputs are placed between the words of the name, so a call reads like a sentence:
 
 ```l4
 GIVEN mom IS A STRING
