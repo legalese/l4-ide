@@ -116,6 +116,87 @@ The clauses mean the same as one `DECIDE` whose body is a [CONSIDER](../control-
 
 What the missing-case check can and cannot see is explained in [Exhaustiveness](../../concepts/type-system/exhaustiveness.md).
 
+### The decision graph and the query plan
+
+A rule written as clauses that answers yes or no has a decision graph in the editor, as the `CONSIDER` it stands for has.
+It also has a query plan from the service that publishes rules: the `/query-plan` route of `jl4-service`, which a wizard asks for the next question to put.
+L4 reads the clauses as that `CONSIDER`.
+These two rules are the same rule, and are drawn and planned alike:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE warm Red   IS TRUE
+DECIDE warm Green IS FALSE
+DECIDE warm Blue  IS FALSE
+
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE `warm, by hand` c IS
+  CONSIDER c
+    WHEN Red   THEN TRUE
+    WHEN Green THEN FALSE
+    WHEN Blue  THEN FALSE
+```
+
+Clauses may share an earlier input and differ in a later one, as the rows of a decision table do:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `colour rule` Red   TRUE  IS TRUE
+DECIDE `colour rule` Red   FALSE IS FALSE
+DECIDE `colour rule` Green b     IS b
+DECIDE `colour rule` Blue  b     IS NOT b
+```
+
+L4 reads each clause knowing what the clauses above it have already settled, so this is read as the nested `CONSIDER` a drafter would write: one question about the colour, and for `Red` one question about `b`.
+A clause whose pattern is a new name, such as `DECIDE warm other IS FALSE`, matches anything that reaches it, and is read as `OTHERWISE`.
+
+The decision graph draws a `CONSIDER` as one box, labelled with the `CONSIDER`, and a rule written as clauses is that same box, with the same label.
+A `CONSIDER` that means the same but is written another way, such as `WHEN Red THEN b` in place of the nested `CONSIDER` on `b`, is a box with another label.
+
+**Clauses too long to read.**
+Clauses that come to more than 20,000 parts when written out as their CONSIDER are not drawn or planned.
+This is reached most easily by a table over optional inputs whose clauses take values apart with JUST: each such clause is written out again under every answer to the inputs after it.
+A table of eleven clauses over five MAYBE BOOLEAN inputs can reach it.
+The decision graph and the query plan refuse them with this message (the service answers with a 400 error):
+
+```
+These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules.
+```
+
+**At most 300 boxes.**
+A rule written as clauses is also refused when its picture would come to more than 300 boxes.
+Clauses that read as one `CONSIDER` are one box, however many rows they have, so this is reached by clauses that read as something else.
+One way is a first clause that gives an input a new name, such as `DECIDE rule m a b IS …` for a rule whose `GIVEN` calls its first input `n`: L4 reads that as a test of the input, with the clauses after it as the other answer, and draws its result, which can be long.
+The query plan reaches the limit sooner than the picture does, because the service simplifies the picture first, and an `OR` of `AND`s, rewritten as an `AND` of `OR`s, can grow far past its own size.
+An `OR` of six `AND`s of two inputs each, as the result of such a first clause, is drawn in VS Code, and its query plan is refused with this message:
+
+```
+These clauses would draw a ladder of more than 300 boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules.
+```
+
+In VS Code, a rule that is refused keeps the lens above it, which then reads `No decision graph: these clauses are too long to draw`, or `No decision graph: these clauses would draw more than 300 boxes` when the picture as drawn comes to that many.
+Clicking it shows the whole message.
+Only the picture and the plan are refused: `#EVAL`, `l4 run` and the service's evaluation answer the rule as usual.
+
+To bring such a rule back into the picture, give part of it a name of its own: move a group of clauses into a separate rule, named for what it decides, and use that rule in the clauses that remain.
+A rule that uses another shows the use as one box, not the clauses behind it.
+Or split one long list into smaller lists, each deciding one part of the question, and combine their answers with `AND` or `OR`.
+
+The limits apply only to a rule written as clauses that L4 reads through.
+A rule whose first clause names each input as its `GIVEN` does, or is `` `_` ``, is not read through, because the clauses after that one are never reached, so it is drawn and planned as a rule written without clauses is, however long it is.
+A first clause that gives an input a new name is read through, and both limits apply to it.
+`EXACTLY` of the input's own name, as in `DECIDE f (EXACTLY n) IS 1`, is not the bare name: drawn or planned, such a clause is read as a test, so the 20,000-part limit applies to it.
+A `CONSIDER` you write yourself is drawn as you wrote it.
+A rule that answers something other than yes or no, such as a number, is not drawn at all, however it is written, and L4 says that first.
+
 ## Related pages
 
 - [GIVEN and GIVETH](GIVEN.md): inputs and result type
