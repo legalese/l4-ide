@@ -50,6 +50,7 @@ module TestData (
   handCatchAllHugeJL4,
   newNameHugeJL4,
   newNameDnfJL4,
+  maybeTableJL4,
   exactlyNameDnfJL4,
   exactlyHugeJL4,
   dnfClauseJL4,
@@ -1166,6 +1167,26 @@ hugeRule pat var clauses =
 -- through and limited, where 'dnfClauseJL4' is not.
 newNameDnfJL4 :: Int -> Text
 newNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule m " (dnfClauseJL4 k)
+
+-- | A table of @k@ clauses over five @MAYBE BOOLEAN@ inputs, each clause taking
+-- three of them apart with @(JUST x)@ (inputs @i@, @i+1@, @i+2@, going round) and
+-- returning the @AND@ of what it took apart. The other two inputs are given new
+-- names, or, when @own@, are written as the @GIVEN@ names them. The last clause
+-- names every input and is @IS FALSE@.
+maybeTableJL4 :: Bool -> Int -> Text
+maybeTableJL4 own k =
+  Text.unlines $
+    ["@export Maybes"]
+      <> [ (if c == 1 then "GIVEN " else "      ") <> "a" <> Text.pack (show c) <> " IS A MAYBE BOOLEAN" | c <- [1 .. inputsN] ]
+      <> ["GIVETH A BOOLEAN"]
+      <> [ "DECIDE rule " <> Text.unwords [ patOf row c | c <- [1 .. inputsN] ] <> " IS " <> Text.intercalate " AND " [ boundName row c | c <- takenApart row ] | row <- [1 .. k - 1] ]
+      <> [ "DECIDE rule " <> Text.unwords [ otherOf k c | c <- [1 .. inputsN] ] <> " IS FALSE" ]
+  where
+    inputsN = 5 :: Int
+    takenApart row = [ ((row + d - 1) `mod` inputsN) + 1 | d <- [0 .. 2] ]
+    boundName row c = "p" <> Text.pack (show row) <> "c" <> Text.pack (show c)
+    otherOf row c = if own then "a" <> Text.pack (show c) else boundName row c
+    patOf row c = if c `elem` takenApart row then "(JUST " <> boundName row c <> ")" else otherOf row c
 
 -- | 'dnfClauseJL4' with the first clause's @n@ written @(EXACTLY n)@. The
 -- missing-case check counts that as the input's own name, but the desugarer

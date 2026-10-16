@@ -12,7 +12,9 @@
 -- alike.
 module ClauseGroupLadderSpec (spec) where
 
+import Control.Exception (evaluate)
 import Data.Foldable (for_)
+import System.Timeout (timeout)
 import qualified Data.Text as T
 
 import Language.LSP.Protocol.Types (CodeLens (..), Command (..), VersionedTextDocumentIdentifier (..), toNormalizedUri)
@@ -248,6 +250,32 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
       either id (const "drawn") (coreLadder ver tc) `shouldBe` "drawn"
       lensTitles ver tc `shouldBe` ["Show decision graph", "Show decision graph"]
 
+  -- A table of optional inputs taken apart with `JUST`, with new names for the
+  -- others, was refused only after a minute (24 clauses) or two (48): reading the
+  -- clauses through rebuilt the clauses below a clause once for every name it
+  -- bound. A renaming applied where a name is read does not, so such a table is
+  -- refused as fast as one written with the GIVEN's names, and one that is drawn
+  -- is drawn in about a second. The limit on the wait is far above that and far
+  -- below the minute.
+  describe "a table of optional inputs taken apart, with new names for the others" $ do
+    it "is refused in both ladders, and its lens says so, within seconds, at 24 and at 48 clauses" $
+      for_ [24, 48 :: Int] \ k -> do
+        (ver, tc) <- check ("maybe-new-" <> show k) (maybeTable False k <> smallRule)
+        answers <- within 8
+          ([ refusalOrDrawn (ideLadder ver tc), refusalOrDrawn (coreLadder ver tc)
+           , refusalOrDrawn (ideLadderWith True ver tc), refusalOrDrawn (coreLadderWith True ver tc)
+           , T.intercalate " | " (lensTitles ver tc) ])
+        case answers of
+          Nothing -> expectationFailure (show k <> " clauses: no answer within 8 seconds")
+          Just xs -> do
+            take 4 xs `shouldSatisfy` all ("too long to draw" `T.isInfixOf`)
+            drop 4 xs `shouldBe` ["No decision graph: these clauses are too long to draw | Show decision graph"]
+    it "is still drawn at 8 clauses, with new names or with the GIVEN's, within seconds" $
+      for_ [False, True] \ own -> do
+        (ver, tc) <- check ("maybe-8-" <> show own) (maybeTable own 8 <> smallRule)
+        answers <- within 8 [refusalOrDrawn (ideLadder ver tc), refusalOrDrawn (coreLadderWith True ver tc), T.intercalate " | " (lensTitles ver tc)]
+        answers `shouldBe` Just ["drawn", "drawn", "Show decision graph | Show decision graph"]
+
   -- A rule written as clauses that is refused keeps its lens, titled with
   -- why: a lens that silently went missing would not tell its drafter anything.
   -- Clicking it answers with the whole message ('LSP.L4.Actions.visualise').
@@ -258,6 +286,36 @@ spec = describe "a BOOLEAN rule written as DECIDE clauses" $ do
     it "gives a rule that does not return a boolean no lens, however it is written" $ do
       (ver, tc) <- check "lens-number" (T.unlines ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "DECIDE f 0 IS 1", "DECIDE f n IS n"] <> smallRule)
       lensTitles ver tc `shouldBe` ["Show decision graph"]
+
+-- | The answers, if each comes within @secs@ seconds (a minute's wait is far
+-- longer, and is what this guards against). Each is waited for on its own: a
+-- ladder takes about a second, and the lens is another ladder.
+within :: Int -> [T.Text] -> IO (Maybe [T.Text])
+within secs xs = sequence <$> mapM (\ x -> timeout (secs * 1000000) (evaluate (T.length x) >> pure x)) xs
+
+-- | A ladder's refusal, or that it is drawn.
+refusalOrDrawn :: Either T.Text a -> T.Text
+refusalOrDrawn = either id (const "drawn")
+
+-- | A table of @k@ clauses over five @MAYBE BOOLEAN@ inputs, each clause taking
+-- three of them apart with @(JUST x)@ (inputs @i@, @i+1@, @i+2@, going round)
+-- and returning the @AND@ of what it took apart. The other two inputs are given
+-- new names, or, when @own@, are written as the @GIVEN@ names them. The last
+-- clause names every input and is @IS FALSE@.
+maybeTable :: Bool -> Int -> T.Text
+maybeTable own k =
+  T.unlines $
+    ["@export Maybes"]
+      <> [ (if c == 1 then "GIVEN " else "      ") <> "a" <> T.pack (show c) <> " IS A MAYBE BOOLEAN" | c <- [1 .. m] ]
+      <> ["GIVETH A BOOLEAN"]
+      <> [ "DECIDE rule " <> T.unwords [ pat i c | c <- [1 .. m] ] <> " IS " <> T.intercalate " AND " [ name i c | c <- taken i ] | i <- [1 .. k - 1] ]
+      <> [ "DECIDE rule " <> T.unwords [ other k c | c <- [1 .. m] ] <> " IS FALSE" ]
+  where
+    m = 5 :: Int
+    taken i = [ ((i + d - 1) `mod` m) + 1 | d <- [0 .. 2] ]
+    name i c = "p" <> T.pack (show i) <> "c" <> T.pack (show c)
+    other i c = if own then "a" <> T.pack (show c) else name i c
+    pat i c = if c `elem` taken i then "(JUST " <> name i c <> ")" else other i c
 
 -- | The titles of the decision-graph lenses of a module, top to bottom.
 lensTitles :: VersionedTextDocumentIdentifier -> TypeCheckResult -> [T.Text]

@@ -24,6 +24,7 @@ import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
 import Control.Exception (bracket, try)
+import System.Timeout (timeout)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
@@ -52,7 +53,7 @@ import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1129,6 +1130,25 @@ spec = describe "integration" do
           resp <- queryPlan' baseUrl mgr "exactly-huge" "rule" noArguments
           statusCode' resp `shouldBe` 400
           LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      -- A table of optional inputs taken apart with `JUST`, with new names for the
+      -- others, was refused only after a minute (24 clauses): see the same-named
+      -- block in ClauseGroupLadderSpec. The wait is far above what it takes now
+      -- (about a second) and far below the minute.
+      it "new names: refuses a table of 24 clauses of optional inputs taken apart with JUST within seconds" do
+        withServiceFromSources "maybe-new-24" [("rule.l4", maybeTableJL4 False 24)] \baseUrl mgr -> do
+          answer <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-24" "rule" noArguments)
+          case answer of
+            Nothing -> expectationFailure "no answer within 8 seconds"
+            Just resp -> do
+              statusCode' resp `shouldBe` 400
+              LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      it "new names: still plans the same table at 8 clauses, as it plans it with the GIVEN's names" do
+        withServiceFromSources "maybe-new-8" [("rule.l4", maybeTableJL4 False 8)] \baseUrl mgr -> do
+          withServiceFromSources "maybe-own-8" [("rule.l4", maybeTableJL4 True 8)] \baseUrl' mgr' -> do
+            qpN <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-8" "rule" noArguments)
+            qpO <- timeout 8_000_000 (queryPlan' baseUrl' mgr' "maybe-own-8" "rule" noArguments)
+            fmap statusCode' qpN `shouldBe` Just 200
+            fmap statusCode' qpO `shouldBe` Just 200
       it "new name: answers such a group when its simplified ladder is less than 300 boxes" do
         withServiceFromSources "newname-dnf-5" [("rule.l4", newNameDnfJL4 5)] \baseUrl mgr -> do
           resp <- queryPlan' baseUrl mgr "newname-dnf-5" "rule" noArguments
