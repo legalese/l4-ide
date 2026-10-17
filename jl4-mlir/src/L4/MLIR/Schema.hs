@@ -145,7 +145,9 @@ data DeonticContract
       }
   | DCFulfilled
   | DCBreach
-      { dcBreachBy      :: !(Maybe Text)
+      { dcBreachBy      :: !(Maybe DeonticExpr)
+        -- ^ the party of @BREACH BY@: a bare name ('DEName') or rule source
+        -- ('DELiteral'), told apart as an obligation's party is
       , dcBreachBecause :: !(Maybe Text)
       }
   | DCIfThenElse
@@ -155,13 +157,25 @@ data DeonticContract
       }
   deriving stock (Eq, Show)
 
--- | Either a pre-rendered literal expression ('DELiteral' \"`the seller`\")
--- or a reference to a GIVEN parameter ('DEParam' \"driver\"). The JS
--- runtime resolves DEParam against the request's @arguments@ bag at
--- evaluation time, giving record-typed parties their actual value
--- (which the wire envelope then tags with the record type name).
+-- | A party or an action in the contract tree: a bare name ('DEName' \"the
+-- seller\"), pre-rendered rule source ('DELiteral' \"say \\\"pay\\\"\"), or a
+-- reference to a GIVEN parameter ('DEParam' \"driver\"). The JS runtime
+-- resolves DEParam against the request's @arguments@ bag at evaluation time,
+-- giving record-typed parties their actual value (which the wire envelope then
+-- tags with the record type name).
+--
+-- The name and the source are told apart so that the runtime can print the
+-- trace's source text as L4: a name with a space is backticked there, source
+-- text is printed as given. On the wire both are the same bare string, so a
+-- runtime that does not know the difference reads a bundle correctly; the
+-- difference travels in a sibling key of the obligation, @partyKind@ \/
+-- @actionKind@ = @"name"@, which such a runtime ignores. A bundle compiled
+-- before the key existed has none, and the runtime prints its literals as
+-- given. The party of an explicit @BREACH BY@ is told the same way, in the
+-- breach's @byKind@.
 data DeonticExpr
-  = DELiteral !Text
+  = DEName    !Text
+  | DELiteral !Text
   | DEParam   !Text
   deriving stock (Eq, Show)
 
@@ -784,7 +798,7 @@ exprToContract :: Expr Resolved -> Maybe DeonticContract
 exprToContract = \case
   Regulative _ deonton -> Just (deontonToContract deonton)
   Breach _ mBy mBec ->
-    Just (DCBreach (Print.prettyLayout <$> mBy) (Print.prettyLayout <$> mBec))
+    Just (DCBreach (partyDeonticExpr <$> mBy) (Print.prettyLayout <$> mBec))
   App _ headRes []
     | rawNameToText (rawName (getActual headRes)) `elem` ["Fulfilled", "FULFILLED"] ->
         Just DCFulfilled
@@ -808,26 +822,44 @@ deontonToContract deonton =
     , dcLest     = deonton.lest >>= exprToContract
     }
 
--- | Classify the party/action expression as either a parameter
--- reference (so the runtime can resolve it against the request's
--- @arguments@ bag) or a literal text (party / action names that
--- pre-render via 'L4.Print.prettyLayout' to a stable string).
+-- | Classify the party/action expression as a parameter reference (so
+-- the runtime can resolve it against the request's @arguments@ bag), a
+-- bare name, or rule source (pre-rendered via 'L4.Print.prettyLayout').
+--
+-- A bare name is baked with its PLAIN name, not 'Print.prettyLayout':
+-- prettyLayout emits L4 /source/, so a name with a space comes back
+-- backtick-quoted, and jl4-service answers a party as the plain
+-- constructor name (@Backend.Jl4.partyText@, the README's rule for an
+-- enum answer). The runtime backticks it again in the trace's source text.
 exprToDeonticExpr :: Expr Resolved -> DeonticExpr
 exprToDeonticExpr e = case e of
   -- Bare Var: pretty-print as the param name without backticks so
   -- 'DEParam' lookups land in the request's @arguments@ bag.
   App _ headRes [] ->
     let nm = rawNameToText (rawName (getActual headRes))
-    in if isLikelyParam nm then DEParam nm else DELiteral (Print.prettyLayout e)
+    in if isLikelyParam nm then DEParam nm else DEName nm
   _ -> DELiteral (Print.prettyLayout e)
 
--- | Pattern variant: 'PatVar' is the param-ref shape; everything
--- else collapses to its pretty-printed form.
+-- | The party of an explicit @BREACH BY@: jl4-service answers it as the
+-- constructor name (@Backend.Jl4.constructorText@), without backticks, not as
+-- the rule source 'Print.prettyLayout' emits, so a bare name is baked plain
+-- ('DEName') and the runtime backticks it again where it prints source text.
+-- An expression that is more than a name stays rule source ('DELiteral').
+partyDeonticExpr :: Expr Resolved -> DeonticExpr
+partyDeonticExpr e = case e of
+  App _ headRes [] -> DEName (rawNameToText (rawName (getActual headRes)))
+  _                -> DELiteral (Print.prettyLayout e)
+
+-- | Pattern variant: 'PatVar' is the param-ref shape; a bare action name is
+-- its PLAIN name, as @Backend.Jl4.actionText@ spells it; everything else (an
+-- action that carries a value, @say "pay"@) collapses to its pretty-printed
+-- rule source.
 patternToDeonticExpr :: Pattern Resolved -> DeonticExpr
 patternToDeonticExpr p = case p of
   PatVar _ n ->
     let nm = rawNameToText (rawName (getActual n))
-    in if isLikelyParam nm then DEParam nm else DELiteral nm
+    in if isLikelyParam nm then DEParam nm else DEName nm
+  PatApp _ n [] -> DEName (rawNameToText (rawName (getActual n)))
   _ -> DELiteral (Print.prettyLayout p)
 
 -- | Heuristic: a bare lowercase identifier without surrounding
@@ -1829,16 +1861,19 @@ instance Aeson.FromJSON FunctionExport where
 --     "hence": <DeonticContract|null>, "lest": <DeonticContract|null> }
 --   { "kind": "FULFILLED" }
 --   { "kind": "BREACH", "by": <string|null>, "because": <string|null> }
+--   (plus "byKind": "name" beside a "by" that is a bare name, as an obligation's
+--   "partyKind" does)
 --   { "kind": "IF", "cond": <DeonticGuard>,
 --     "then": <DeonticContract>, "else": <DeonticContract> }
 instance Aeson.ToJSON DeonticContract where
   toJSON DCFulfilled = Aeson.object ["kind" .= ("FULFILLED" :: Text)]
-  toJSON (DCBreach mBy mBec) = Aeson.object
+  toJSON (DCBreach mBy mBec) = Aeson.object $
     [ "kind"    .= ("BREACH" :: Text)
     , "by"      .= mBy
     , "because" .= mBec
     ]
-  toJSON o@DCObligation{} = Aeson.object
+    <> [ "byKind" .= ("name" :: Text) | Just DEName{} <- [mBy] ]
+  toJSON o@DCObligation{} = Aeson.object $
     [ "kind"     .= ("OBLIGATION" :: Text)
     , "party"    .= o.dcParty
     , "action"   .= o.dcAction
@@ -1847,6 +1882,8 @@ instance Aeson.ToJSON DeonticContract where
     , "hence"    .= o.dcHence
     , "lest"     .= o.dcLest
     ]
+    <> [ "partyKind"  .= ("name" :: Text) | DEName{} <- [o.dcParty] ]
+    <> [ "actionKind" .= ("name" :: Text) | DEName{} <- [o.dcAction] ]
   toJSON o@DCIfThenElse{} = Aeson.object
     [ "kind" .= ("IF" :: Text)
     , "cond" .= o.dcCond
@@ -1859,10 +1896,12 @@ instance Aeson.FromJSON DeonticContract where
     kind <- o .: "kind"
     case (kind :: Text) of
       "FULFILLED" -> pure DCFulfilled
-      "BREACH"    -> DCBreach <$> o .:? "by" <*> o .:? "because"
+      "BREACH"    -> DCBreach
+        <$> (fmap . tagName <$> o .:? "byKind" <*> o .:? "by")
+        <*> o .:? "because"
       "OBLIGATION" -> DCObligation
-        <$> o .: "party"
-        <*> o .: "action"
+        <$> (tagName <$> o .:? "partyKind" <*> o .: "party")
+        <*> (tagName <$> o .:? "actionKind" <*> o .: "action")
         <*> o .: "modal"
         <*> o .:? "deadline"
         <*> o .:? "hence"
@@ -1873,9 +1912,11 @@ instance Aeson.FromJSON DeonticContract where
         <*> o .: "else"
       _ -> fail ("unknown DeonticContract kind: " ++ Text.unpack kind)
 
--- | DeonticExpr ⇄ JSON: literal as a bare string, param ref as
--- '{"param": "<name>"}'. The runtime branches on @typeof@.
+-- | DeonticExpr ⇄ JSON: a name or source as a bare string, a param ref as
+-- '{"param": "<name>"}'. The runtime branches on @typeof@. A name is the same
+-- string as source; 'DeonticContract' says which in a sibling key.
 instance Aeson.ToJSON DeonticExpr where
+  toJSON (DEName    t) = Aeson.toJSON t
   toJSON (DELiteral t) = Aeson.toJSON t
   toJSON (DEParam   t) = Aeson.object ["param" .= t]
 
@@ -1884,6 +1925,12 @@ instance Aeson.FromJSON DeonticExpr where
     Aeson.String t -> pure (DELiteral t)
     Aeson.Object o -> DEParam <$> o .: "param"
     _ -> fail "DeonticExpr: expected string (literal) or {param: name}"
+
+-- | Apply a sibling @partyKind@ \/ @actionKind@ key to the expression it
+-- describes: @"name"@ makes a literal a bare name.
+tagName :: Maybe Text -> DeonticExpr -> DeonticExpr
+tagName (Just "name") (DELiteral t) = DEName t
+tagName _             e             = e
 
 -- | DeonticGuard ⇄ JSON: tagged-record form, mirroring DeonticContract.
 instance Aeson.ToJSON DeonticGuard where
