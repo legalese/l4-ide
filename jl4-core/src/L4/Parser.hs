@@ -1959,10 +1959,13 @@ infix2' f op l r =
 infixUnless :: Lexeme PosToken -> Expr Name -> Expr Name -> Expr Name
 infixUnless op l r =
   let opAnno = mkSimpleEpaAnno (lexToEpa op)
-      -- Construct NOT r with annotation derived from UNLESS and r
-      notAnno = fixAnnoSrcRange $ opAnno <> mkHoleAnnoFor r
+      -- The synthesized NOT has no keyword in the source, so its anno is just
+      -- the operand hole: exactprint emits @r@ alone. (Putting the UNLESS
+      -- token here too would print it twice — @l UNLESS UNLESS r@.)
+      notAnno = fixAnnoSrcRange $ mkHoleAnnoFor r
       notR = Not notAnno r
-      -- Construct l AND (NOT r) with annotation spanning the whole expression
+      -- The single UNLESS token lives on the outer AND, between l and (NOT r),
+      -- so exactprint reproduces the source @l UNLESS r@.
       andAnno = fixAnnoSrcRange $ mkHoleAnnoFor l <> opAnno <> mkHoleAnnoFor r
   in And andAnno l notR
 
@@ -2244,7 +2247,7 @@ stringLit :: Parser Lit
 stringLit =
   attachAnno $
     StringLit emptyAnno
-      <$> annoEpa (spacedToken (#_TLiterals % #_TStringLit) "String Literal")
+      <$> annoEpa (spacedToken (#_TLiterals % #_TStringLit % _2) "String Literal")
 
 -- Note: The `...` syntax is now handled by `implicitAndCont` as syntactic sugar for AND.
 -- String literals in boolean context are converted to Inert nodes during type checking.

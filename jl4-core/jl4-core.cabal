@@ -180,6 +180,8 @@ test-suite jl4-core-test
     MixfixParserSpec
     PatternMatchParserSpec
     PatternClausesMissingSpec
+    EventExactPrintSpec
+    FormatFidelitySpec
     UUID5Spec
     ExportValidationSpec
     DisambiguationWarningsSpec

@@ -4717,16 +4717,21 @@ prettyMissingPattern = go
 -- token (one the parser did not make) prints through the generic printer.
 --
 -- A piece of text prints as L4 writes it: every printable character as it
--- is, @"@ and @\\@ escaped ('L4.Print.escapeStringLiteral'). The lexer
--- keeps only the decoded text, not its spelling, so there is no token to
--- read, and the token's own display ('L4.Lexer.showStringLit') would write
--- @"São Paulo"@ as @"S\227o Paulo"@. A text with a character that does
--- not print (a tab, a newline) is written that way instead, with
--- Haskell-style escapes, which L4 reads back.
+-- is, @"@ and @\\@ escaped ('L4.Print.escapeStringLiteral'). It is not read
+-- off the token: the token's text is the source slice, quotes and escapes
+-- as written, which for a text spelled across lines, or with a tab or a
+-- zero-width space typed in, holds that character raw and would break the
+-- suggested clause over two lines or hide the character. (Before the
+-- token kept the slice its display was 'L4.Lexer.showStringLit' of the
+-- decoded text, which would write @"São Paulo"@ as @"S\227o Paulo"@.) A text
+-- with a character that does not print is written with Haskell-style
+-- escapes instead ('L4.Lexer.showStringLit'), which L4 reads back.
 literalAsWritten :: Lit -> Text
 literalAsWritten lit =
   case lit of
-    StringLit _ t | Text.all isPrint t -> prettyLayout lit
+    StringLit _ t
+      | Text.all isPrint t -> prettyLayout lit
+      | otherwise -> Lexer.showStringLit t
     _ -> case runExcept (ExactPrint.concreteNodesToTokens lit) of
       Right toks
         | (tok : _) <- [ t | t@(Lexer.MkPosToken _ (Lexer.TLiterals _)) <- toks ]
