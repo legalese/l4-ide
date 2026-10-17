@@ -40,6 +40,7 @@ import System.Environment (getExecutablePath, lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
+import GHC.Clock (getMonotonicTimeNSec)
 import Test.Hspec
 import Text.Read (readMaybe)
 import Test.Hspec.Golden
@@ -303,7 +304,7 @@ mkPathScrubber examplesRoot = do
 
 jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
 jl4ExactPrintGolden evalConfig dir inputFile = do
-  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+  (errs, moutput) <- logSession "exactprint-golden" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.ExactPrint uri
@@ -330,7 +331,7 @@ jl4ExactPrintGolden evalConfig dir inputFile = do
 -- stay legible instead of dumping the whole file.
 jl4ExactPrintIdentity :: JL4Lazy.EvalConfig -> FilePath -> IO ()
 jl4ExactPrintIdentity evalConfig inputFile = do
-  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+  (errs, moutput) <- logSession "exactprint-identity" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.ExactPrint uri
@@ -398,7 +399,7 @@ jl4ParserMemoChangesNothing inputFile = do
 -- unrelated name-resolution questions.
 jl4PrettyLayoutRoundTrip :: JL4Lazy.EvalConfig -> FilePath -> IO ()
 jl4PrettyLayoutRoundTrip evalConfig inputFile = do
-  (errs, mtc) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+  (errs, mtc) <- logSession "prettylayout-tc" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.SuccessfulTypeCheck uri
@@ -459,7 +460,7 @@ jl4PrettyLayoutRoundTrip evalConfig inputFile = do
         -- places its `<file>.batchN.l4`.
         Right _ -> do
           let virtualPath = inputFile <> ".prettylayout.l4"
-          (errs2, mtc2) <- oneshotL4ActionAndErrors evalConfig virtualPath \_nfp -> do
+          (errs2, mtc2) <- logSession "prettylayout-retc" inputFile $ oneshotL4ActionAndErrors evalConfig virtualPath \_nfp -> do
             let uri2 = normalizedFilePathToUri (toNormalizedFilePath virtualPath)
             _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) printed
             Shake.use Rules.SuccessfulTypeCheck uri2
@@ -508,7 +509,7 @@ leakedInfVars m printed =
 
 jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
-  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+  (errs, moutput) <- logSession "nlg-golden" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.SuccessfulTypeCheck uri
@@ -540,7 +541,7 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
 
 jl4JsonSchemaGolden :: JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden String)
 jl4JsonSchemaGolden evalConfig dir inputFile = do
-  (_, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+  (_, moutput) <- logSession "schema-golden" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.SuccessfulTypeCheck uri
@@ -679,7 +680,7 @@ normalizeWhitespaceString = unlines . map normalizeLine . lines
 
 checkFile :: JL4Lazy.EvalConfig -> Bool -> FilePath -> IO ()
 checkFile evalConfig isOk file = do
-  (errs, diags, isJust -> typechecked) <- oneshotL4ActionAndDiagnostics evalConfig file \nfp -> runMaybeT do
+  (errs, diags, isJust -> typechecked) <- logSession "check-golden" file $ oneshotL4ActionAndDiagnostics evalConfig file \nfp -> runMaybeT do
       let uri = normalizedFilePathToUri nfp
       _        <- lift   $ Shake.addVirtualFileFromFS nfp
       _        <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
@@ -724,3 +725,17 @@ cliErrorMessage mrange msg =
     ( JL4.prettySrcRangeM  mrange <> ":"
         : map ("  " <>) msg
     )
+
+-- | Test-support instrumentation: with @JL4_TEST_SESSION_LOG=<file>@ set, append
+-- one line per Shake session the suite starts: @site<TAB>file<TAB>seconds@.
+logSession :: String -> FilePath -> IO a -> IO a
+logSession site file act = do
+  mLog <- lookupEnv "JL4_TEST_SESSION_LOG"
+  case mLog of
+    Nothing -> act
+    Just logFile -> do
+      t0 <- getMonotonicTimeNSec
+      r <- act
+      t1 <- getMonotonicTimeNSec
+      appendFile logFile (site <> "\t" <> file <> "\t" <> show (fromIntegral (t1 - t0) / 1e9 :: Double) <> "\n")
+      pure r
