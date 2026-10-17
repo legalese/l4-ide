@@ -184,6 +184,7 @@ test-suite jl4-core-test
     ExportValidationSpec
     DisambiguationWarningsSpec
     NumberLiteralSpec
+    AssertRaisesSpec
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec

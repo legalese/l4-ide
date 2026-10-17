@@ -123,6 +123,30 @@ Result:
   assertion failed
 ```
 
+### What an error looks like
+
+An assertion whose expression _raises_ — a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d — is neither satisfied nor failed: the evaluator could not decide it. `#ASSERT P` and `#ASSERT NOT P` then both report the same thing, with the reason:
+
+```l4
+ASSUME x IS A NUMBER
+
+#ASSERT x EQUALS 1
+```
+
+```
+Evaluation[1] @ stuck-assert.l4:3:1-19
+
+Result:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+```
+
+This is a crash, not a verdict: `l4 run` exits non-zero, and in `--json` the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"error"`.
+
+The same holds when you assert an `ASSUME`d `BOOLEAN` directly: `#ASSERT b` and `#ASSERT NOT b` both report `assertion could not be evaluated`, because `b` has no value to check.
+
 `l4 run` exits with a non-zero code for type errors and for directives that fail while evaluating, but **not** for a failed assertion: the file is still valid L4, so the exit code is `0`. In CI, look for failures explicitly: grep the output for `assertion failed`, or run `l4 run --json` and check each result whose `"kind"` is `"assertion"` for `"value": false`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
 
 ---

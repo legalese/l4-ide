@@ -1,0 +1,7 @@
+-- A genuine loop, asserted twice. It is not an assertion that failed: each use
+-- could not be evaluated, and the reason is the loop.
+GIVETH A NUMBER
+`self loop` MEANS `self loop` PLUS 1
+
+#ASSERT `self loop` EQUALS 1
+#ASSERT `self loop` EQUALS 1

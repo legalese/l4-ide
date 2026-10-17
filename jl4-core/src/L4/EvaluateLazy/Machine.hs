@@ -237,7 +237,31 @@ raiseException e = do
   traceEval (Exit (Left e))
   withPoppedFrame \ case
     Nothing -> liftIO (Control.Exception.throwIO e)
-    Just _f -> raiseException e
+    Just f -> do
+      unwindThunk f
+      raiseException e
+
+-- | An exception aborted the force that this frame belongs to. If it is an
+-- 'UpdateThunk' frame, take the thunk's blackhole mark back, so that a later
+-- force of the thunk evaluates it again, and raises again.
+--
+-- Without this the aborted force leaves the mark behind, and every later force
+-- of the same thunk, in the same file or on the same deployment, is reported as
+-- an infinite loop: a definition that raised, used by a second directive, said
+-- @Infinite loop detected@ instead of what it raised.
+--
+-- A genuine loop is still found: the mark is only given back as the exception
+-- unwinds, and a loop forces the thunk again while its mark is still there.
+--
+-- Only 'UpdateThunk' has state to give back on this branch, so the other frames
+-- are matched by a wildcard here; unstable's @unwindFrame@ also restores the
+-- temporal context and the acting party, and lists every frame (unstable only).
+unwindThunk :: Frame -> Eval ()
+unwindThunk = \ case
+  UpdateThunk rf -> pokeThunk rf \tid -> \ case
+    Unevaluated tids e env -> (Unevaluated (Set.delete tid tids) e env, ())
+    thunk                  -> (thunk, ())
+  _ -> pure ()
 
 internalException :: InternalEvalException -> Eval a
 internalException = raiseException . InternalEvalException
