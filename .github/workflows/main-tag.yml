@@ -36,6 +36,20 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
+      # GHC's rts package hard-codes the Command Line Tools SDK, so every link
+      # gets -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib, but
+      # ld comes from the selected Xcode. When the image's CLT is newer than its
+      # Xcode (CLT 27 beside Xcode 26.6 since image 20261013), that ld cannot read
+      # the newer SDK's .tbd files ("unknown architecture arm64e.x1-macos").
+      # Point the rts at the selected Xcode's own SDK, so ld and SDK match.
+      - name: Point GHC at the selected Xcode's SDK
+        run: |
+          sdk=$(xcrun --sdk macosx --show-sdk-path)
+          db=$(ghc --print-libdir)/package.conf.d
+          sed -i '' "s|/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk|$sdk|g" "$db"/*.conf
+          ghc-pkg recache --global
+          ghc-pkg field rts library-dirs,include-dirs --global
+
       - name: Configure and generate build plan
         run: |
           cabal update
