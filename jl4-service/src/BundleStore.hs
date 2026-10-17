@@ -14,7 +14,7 @@ module BundleStore (
   listSourceFiles,
 ) where
 
-import Control.Exception (IOException, catch)
+import Control.Exception (IOException, catch, onException)
 import Data.Aeson (FromJSON, ToJSON, eitherDecodeFileStrict', encodeFile, toJSON)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -23,6 +23,8 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
+import qualified Data.UUID as UUID
+import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
 import Data.List (isSuffixOf)
 import Logging (Logger, logInfo, logWarn)
@@ -144,9 +146,7 @@ saveStoredMetadata :: BundleStore -> Text -> StoredMetadata -> IO ()
 saveStoredMetadata (BundleStore root) deployId meta = do
   let targetDir = root </> Text.unpack deployId
       metaFile = targetDir </> "metadata.json"
-      tmpFile = targetDir </> "metadata.json.tmp"
-  encodeFile tmpFile meta
-  renameFile tmpFile metaFile
+  atomicWriteFile metaFile (\tmpFile -> encodeFile tmpFile meta)
 
 -- | Load sources and metadata from a stored deployment.
 loadBundle
@@ -225,15 +225,24 @@ deleteBundle (BundleStore root) deployId = do
 saveMetadataCache :: BundleStore -> Text -> LBS.ByteString -> IO ()
 saveMetadataCache (BundleStore root) deployId metaJson = do
   let cacheFile = root </> Text.unpack deployId </> "metadata-cache.json"
-      tmpFile = cacheFile <> ".tmp"
-  LBS.writeFile tmpFile metaJson
-  exists <- doesFileExist cacheFile
-  if exists
-    then do
-      removeFile cacheFile
-      renameFile tmpFile cacheFile
-    else
-      renameFile tmpFile cacheFile
+  atomicWriteFile cacheFile (\tmpFile -> LBS.writeFile tmpFile metaJson)
+
+-- | Replace @target@ with a file written by @write@, in one step.
+--
+-- @write@ is given the path of a temp file in the same directory as @target@
+-- (so the rename stays on one filesystem) with a name no other call shares, so
+-- two saves for one deployment that overlap each write their own file instead
+-- of one file. The temp file is then renamed over @target@, which on POSIX
+-- replaces it atomically: a reader sees the old file or the new one, never a
+-- partial one, and nothing is removed before the rename. If @write@ or the
+-- rename throws, the temp file is removed and the original exception is
+-- rethrown.
+atomicWriteFile :: FilePath -> (FilePath -> IO ()) -> IO ()
+atomicWriteFile target write = do
+  suffix <- UUID.toString <$> nextRandom
+  let tmpFile = target <> "." <> suffix <> ".tmp"
+  (write tmpFile >> renameFile tmpFile target)
+    `onException` (removeFile tmpFile `catch` \(_ :: IOException) -> pure ())
 
 -- | Try to load the cached DeploymentMetadata for a deployment.
 -- Returns the raw JSON ByteString (caller decodes as DeploymentMetadata).
