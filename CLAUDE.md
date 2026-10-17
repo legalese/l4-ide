@@ -262,6 +262,10 @@ Three probes run only when the diff touches what they guard: parse time at 1,000
 **A green run is not a green CI** — the script says so at the end, and lists what it did not run.
 See §3.3.
 
+CI's Haskell job builds with `cabal build all --semaphore` (`pr-checks.yml`, the Build step), so cabal and GHC share one job budget and GHC compiles several modules of a package at once; without the flag a package is compiled one module at a time.
+Measured 2026-10-17 on the local packages with the dependencies prebuilt: lhs (4 cores) 920 s without the flag and 701 s with it, nye (10 cores) 515 s and 334 s.
+GitHub's own runner was not measured, so read the Build step's time on a run to see what it gives there.
+
 > **Why.** On 2026-09-08 one session hand-assembled this gate four times and omitted the `cd` in
 > two of them, so the build ran in whichever worktree the shell happened to be in. Both runs went
 > green, and both were green about the wrong tree. One was caught only because the two candidate
