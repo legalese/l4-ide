@@ -518,8 +518,26 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
     Regulative _ (MkDeonton _ p a t f l) -> prettyObligation p a t f l
+    -- One branch per line, aligned, and WITHOUT the comma separator.
+    -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
+    -- `manyLines` over comma-separated groups: continuation lines must start at
+    -- EXACTLY the first branch's column, and a comma at the end of a line is
+    -- instead eaten by whatever comma-list the branch body ended in (`… THEN
+    -- LIST x,` continues the LIST). The same layout is what keeps a CONSIDER
+    -- inside a branch apart from the branches after it: the arms of an inner
+    -- CONSIDER sit at the inner one's column, so the outer's next WHEN, at the
+    -- outer's, is not one of them. Written as a comma-separated list on one
+    -- hanging indent, as this was, the outer's later arms were read as more arms
+    -- of the inner CONSIDER.
+    -- Each arm is nested two more columns, which moves every line of the arm
+    -- after its first and not the first itself: an arm's later lines must sit
+    -- PAST its WHEN, or they read as the next arm's neighbours. The case that
+    -- needs it is a WHERE under an arm: the `Where` printer breaks its lines at
+    -- the current nesting, so unnested its `WHERE` stood at the WHEN's column,
+    -- which ends the definition, and the arms after it did not parse.
     Consider   _ expr branches ->
-      "CONSIDER" <+> printWithLayout expr <+> hang 2 (vsep $ punctuate comma (fmap printWithLayout branches))
+      hang 2 $ vcatHard $
+        ("CONSIDER" <+> printWithLayout expr) : fmap (nest 2 . printWithLayout) branches
 
     Lit        _ lit -> printWithLayout lit
     Percent    _ expr -> parensIfNeeded expr <+> "%"
@@ -698,7 +716,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (LocalDecl a) where
 instance LayoutPrinter Lit where
   printWithLayout = \ case
     NumericLit _ t -> pretty (prettyRatio t)
-    StringLit _ t -> surround (pretty $ escapeStringLiteral t) "\"" "\""
+    StringLit _ t -> surround (pretty $ escapeSourceStringLiteral t) "\"" "\""
 
 instance LayoutPrinterWithName a => LayoutPrinter (BranchLhs a) where
   printWithLayout = \ case
@@ -993,12 +1011,44 @@ prettyConj cnj (d:ds) =
   -- This avoids layout issues when the output is re-parsed
   Prettyprinter.group $ d <> mconcat [softline <> pretty cnj <+> x | x <- ds]
 
+-- | 'vcat' whose line breaks cannot be flattened away.
+--
+-- Prettyprinter's 'vcat'/'vsep' separators are @FlatAlt Line _@: inside a
+-- 'group' (which 'prettyConj' introduces, and which
+-- @layoutPretty (LayoutOptions Unbounded)@ always resolves in favour of the
+-- flattened branch) they collapse to nothing or to a space, jamming the lines
+-- together. A break the layout parser needs is a 'hardline', which 'flatten'
+-- turns into a failure, so 'group' keeps the vertical rendering.
+vcatHard :: [Doc ann] -> Doc ann
+vcatHard = concatWith (\ x y -> x <> hardline <> y)
+
 
 escapeStringLiteral :: Text -> Text
 escapeStringLiteral = Text.concatMap (\ case
   '\"' -> "\\\""
   '\\' -> "\\\\"
   c -> Text.singleton c
+  )
+
+-- | 'escapeStringLiteral' for a string literal printed as SOURCE, which also
+-- writes a line break, tab or carriage return as its escape.
+--
+-- A raw newline handed to 'pretty' becomes a layout line break, and a layout
+-- line break takes the current nesting: @"line\nnext"@ printed inside an
+-- indented body came out as @"line@, then a new line @  next"@, which reads
+-- back as a different string. @l4 batch@ re-prints the module and runs the
+-- printed text, so it answered @"line\n  next"@ with status success
+-- (smucclaw/l4-ide#1028). The lexer reads these escapes back
+-- (@Lexer.charLiteral@), so the printed source means what the tree does.
+--
+-- A value being displayed ('Lazy.ValString') still goes through
+-- 'escapeStringLiteral', so @l4 run@ shows a multi-line string as before.
+escapeSourceStringLiteral :: Text -> Text
+escapeSourceStringLiteral = Text.concatMap (\ case
+  '\n' -> "\\n"
+  '\t' -> "\\t"
+  '\r' -> "\\r"
+  c -> escapeStringLiteral (Text.singleton c)
   )
 
 -- | Format a UTCTime with timezone offset as ISO-8601

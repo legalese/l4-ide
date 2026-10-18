@@ -1,0 +1,7 @@
+-- Entry point for the Option E content-gate tests: imports a module that the
+-- embedded stdlib does not carry, so the only candidate sources are the
+-- project-scoped copy beside this file and whatever the test plants in the
+-- fabricated XDG store.
+IMPORT `shadow-extra`
+
+check MEANS `extra marker`

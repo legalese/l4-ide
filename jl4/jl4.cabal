@@ -31,6 +31,7 @@ executable l4
     jl4-core,
     jl4-lsp,
     aeson,
+    attoparsec,
     bytestring,
     cassava,
     containers,
@@ -123,7 +124,9 @@ test-suite l4-cli-test
   autogen-modules:
     Paths_jl4
   build-tool-depends:
-    jl4:l4
+    jl4:l4,
+    jl4-lsp:jl4-lsp,
+    jl4-repl:jl4-repl
   build-depends:
     aeson,
     bytestring,
@@ -131,4 +134,5 @@ test-suite l4-cli-test
     filepath,
     hspec,
     process,
+    temporary,
     text,

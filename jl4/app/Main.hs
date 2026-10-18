@@ -23,8 +23,11 @@ import Options.Applicative
   , showHelpOnEmpty
   , subparser
   )
+import qualified Data.Text as Text
 import qualified Options.Applicative as Options
 import System.IO (hSetEncoding, stdin, stdout, stderr)
+
+import LSP.L4.BuildInfo (buildInfoLine)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
@@ -90,7 +93,11 @@ commandParser =
              (progDesc "Dump the parsed AST of an L4 file"))
       <> command "batch"
            (info (helper <*> (CmdBatch <$> batchOptionsParser))
-             (progDesc "Evaluate an @export function against many input rows (NDJSON streaming)"))
+             -- "NDJSON" here is the OUTPUT default (--format); the input side
+             -- reads json|yaml|csv and has no ndjson reader. The summary used to
+             -- say just "NDJSON streaming", which read as if
+             -- `--input-format ndjson` were available.
+             (progDesc "Evaluate an @export function against many input rows (json|yaml|csv in, NDJSON streaming out)"))
       <> command "trace"
            (info (helper <*> (CmdTrace <$> traceOptionsParser))
              (progDesc "Render #EVALTRACE evaluation traces as GraphViz (dot|png|svg)"))
@@ -117,12 +124,21 @@ commandParser =
              (progDesc "Install a companion tool: `l4 install legalese` (the Legalese Cloud CLI)"))
 
 commandInfo :: ParserInfo Command
-commandInfo = info (helper <*> commandParser)
+commandInfo = info (helper <*> versionOption <*> commandParser)
   ( fullDesc
   <> header "l4 — the L4 computational-law CLI"
   <> progDesc "Typecheck, evaluate, format, visualize, and deploy .l4 files. Run `l4 <command> --help` for per-command options."
   <> footer "Part of the L4 tool family from Legalese.com"
   )
+
+-- | @l4 --version@: one line naming the build, @dev@ for a local build
+-- ("LSP.L4.BuildInfo"). It is an option of @l4@ itself and not a subcommand,
+-- because @l4 version@ already means the file called @version@ (the
+-- fall-through to @l4 run@ above).
+versionOption :: Parser (a -> a)
+versionOption =
+  Options.infoOption (Text.unpack buildInfoLine)
+    (Options.long "version" <> Options.help "Print the version of this build and exit")
 
 main :: IO ()
 main = do

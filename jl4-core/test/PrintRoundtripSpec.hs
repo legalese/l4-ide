@@ -24,6 +24,7 @@ spec =
     roundtrips "TIMEZONE IS declaration" ["TIMEZONE IS"] timezoneSrc
     roundtrips "GIVEN-parametrised DECLARE" [] declareSrc
     roundtrips "GIVEN-parametrised ASSUME" [] assumeSrc
+    roundtrips "a string literal with a line break and a tab" ["\"line\\nnext\\tend\""] lineBreakSrc
 
 -- | Assert that @src@ parses, its 'prettyLayout' contains every @mustContain@
 -- fragment, and that printed output parses again. A pure re-parse check catches
@@ -82,4 +83,17 @@ assumeSrc :: T.Text
 assumeSrc = T.unlines
   [ "GIVEN a IS A TYPE"
   , "ASSUME emptyThing IS LIST OF a"
+  ]
+
+-- | A raw newline inside a printed string became a layout line break and took
+-- the body's indentation, so the re-printed module held a different string
+-- (smucclaw/l4-ide#1028). The escape must survive into the printed text.
+lineBreakSrc :: T.Text
+lineBreakSrc = T.unlines
+  [ "GIVEN x IS A NUMBER"
+  , "GIVETH A STRING"
+  , "DECIDE s x IS"
+  , "    IF x > 0"
+  , "    THEN \"line\\nnext\\tend\""
+  , "    ELSE \"no\""
   ]

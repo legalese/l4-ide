@@ -212,7 +212,10 @@ iterate until the check passes.
 - `l4 ast FILE` — dump the parsed AST (debugging L4 itself or tooling).
 - `l4 batch FILE --inputs rows.{json,yaml,csv}` — evaluate an `@export`
   function against many rows, streaming NDJSON output (one object per
-  row).
+  row). `--format json|csv|yaml` and `--output FILE` change the output.
+  The run stops at the first failing row and exits 1, unless
+  `--continue-on-error`; `--validate-only` checks the rows against the
+  function's inputs without evaluating.
 - `l4 trace FILE [--format dot|png|svg] [-o DIR]` — render
   `#EVALTRACE` evaluation traces as GraphViz (PNG/SVG needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
@@ -466,7 +469,7 @@ IMPORT prelude
 IMPORT `excel-date`
 ```
 
-The prelude is always available. For the full library list (`prelude`, `daydate`, `time`, `datetime`, `timezone`, `math`, `currency`, `legal-persons`, `jurisdiction`, `actus`, `llm`, `excel-date`, `holdings`, `date-compat`), see [references/builtins.md](references/builtins.md) or <https://legalese.com/l4/reference/libraries.md>.
+The prelude is a library like the others: write `IMPORT prelude` before using its functions. For the full library list (`prelude`, `daydate`, `time`, `datetime`, `timezone`, `math`, `currency`, `legal-persons`, `jurisdiction`, `actus`, `llm`, `excel-date`, `holdings`, `date-compat`), see [references/builtins.md](references/builtins.md) or <https://legalese.com/l4/reference/libraries.md>.
 
 **Filenames with hyphens, spaces, or other non-identifier characters must be backtick-quoted.**
 
@@ -518,8 +521,8 @@ All documentation for the currently-published L4 release lives under `https://le
 - **Libraries:** <https://legalese.com/l4/reference/libraries.md>
 - **Tutorials — first L4 file:** <https://legalese.com/l4/tutorials/getting-started/first-l4-file.md>
 - **Tutorials — common patterns:** <https://legalese.com/l4/tutorials/getting-started/common-patterns.md>
-- **Tutorials — deploying functions:** <https://legalese.com/l4/tutorials/deploying-functions/exporting-functions-for-deployment.md>
+- **Tutorials — deploying rules:** <https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment.md>
 - **Concepts — regulative rules:** <https://legalese.com/l4/concepts/legal-modeling/regulative-rules.md>
-- **Foundation course (Module 5 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-5-regulative.md>
+- **Foundation course (Module 6 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-6-regulative.md>
 
 The website tracks the currently-published L4 version; treat it as ground truth over any snippet in this skill.
