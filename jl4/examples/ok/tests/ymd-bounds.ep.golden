@@ -55,3 +55,37 @@ IMPORT daydate
 -- YMD stops on the same inputs.
 -- expected: an assumed-term error naming `YMD refusal`
 #EVAL YMD 2023 2 29
+
+
+§ `YMD stops on every kind of out-of-range part`
+
+-- expected: an assumed-term error, a transposition: month 28, day 7
+#EVAL YMD 2026 28 7
+
+-- expected: an assumed-term error, month 0
+#EVAL YMD 2026 0 7
+
+-- expected: an assumed-term error, day 32
+#EVAL YMD 2026 7 32
+
+-- expected: an assumed-term error, day 0
+#EVAL YMD 2026 7 0
+
+-- expected: an assumed-term error, 2100 is not a leap year
+#EVAL YMD 2100 2 29
+
+-- expected: an assumed-term error, a fractional month is not a month
+#EVAL YMD 2026 7.5 28
+
+-- `Date` reads a fractional month as its whole part.
+-- expected: DATE OF 28, 7, 2026
+#EVAL Date 28 7.5 2026
+
+
+§ `YMD does not check the year`
+
+-- expected: DATE OF 1, 1, 0
+#EVAL YMD 0 1 1
+
+-- expected: DATE OF 1, 3, -5
+#EVAL YMD -5 3 1
