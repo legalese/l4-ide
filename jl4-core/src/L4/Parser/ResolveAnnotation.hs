@@ -1255,12 +1255,11 @@ instance HasDesc (Decide n) where
 
 -- | A group of clauses claims no @\@desc@ or @\@export@ written inside its
 -- own range that is not its own, a clause's ('claimLaterClauseDescs') or an
--- input's: in a @WHERE@ of a clause, say, or between the @GIVETH@ and the first
--- clause. This pass does not read the clauses' bodies (the descent into an
--- expression is 'pure'), so what is left would be the next top-level rule's,
--- which takes every @\@desc@ written before it ('descPrecedesNode'), and a
--- group published the rule after it under a description of its own. They are
--- dropped.
+-- input's: between the @GIVETH@ and the first clause, say. It runs after the
+-- descent into the clauses' bodies, which has already given a @WHERE@ local its
+-- own, so what is left would be the next top-level rule's, which takes every
+-- @\@desc@ written before it ('descPrecedesNode'), and a group published the
+-- rule after it under a description of its own. They are dropped.
 dropUnclaimedWithinGroup :: (HasSrcRange a) => a -> Anno -> State DescS ()
 dropUnclaimedWithinGroup node ann =
   case (view annPmMatrix ann, nodeSpan node) of
