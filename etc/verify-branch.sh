@@ -17,9 +17,15 @@
 #   says which one it was.
 #
 # USAGE
-#   etc/verify-branch.sh [--quick] [--serial] [--base <ref>] <absolute-worktree-path>
+#   etc/verify-branch.sh [--quick] [--serial] [--fast] [--base <ref>] <absolute-worktree-path>
 #
 #     --quick        skip jl4-test (~12 min). Everything else still runs.
+#     --fast         PARTIAL GATE, never the default. If EVERY path changed since --base (committed, staged,
+#                    unstaged or untracked) is a markdown file that no test source of the four gate suites names
+#                    (etc/gate-fast-select.mjs decides), run only the file checks: no build and no suite.
+#                    Anything else runs the full gate, and the run says why. Either way it says which, at the
+#                    top and the bottom. A reduced run is NOT a substitute for the full gate or for CI.
+#                    Cannot be combined with --quick.
 #     --serial       run the test suites one after another. The default runs them at
 #                    the same time, after one serial build of all of them, because
 #                    two cabal processes that BUILD in one worktree corrupt each
@@ -57,6 +63,7 @@ set -uo pipefail
 
 QUICK=0
 SERIAL=0
+FAST=0
 BASE=origin/unstable
 WT=""
 
@@ -64,14 +71,16 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --quick) QUICK=1; shift ;;
     --serial) SERIAL=1; shift ;;
+    --fast) FAST=1; shift ;;
     --base)  BASE="${2:-}"; [ -n "$BASE" ] || { echo "--base needs a ref" >&2; exit 2; }; shift 2 ;;
-    -h|--help) sed -n '3,54p' "$0"; exit 0 ;;
+    -h|--help) sed -n '3,/^set -uo pipefail/p' "$0" | sed '$d'; exit 0 ;;
     -*) echo "unknown flag: $1" >&2; exit 2 ;;
     *)  [ -z "$WT" ] || { echo "give exactly one worktree path" >&2; exit 2; }; WT="$1"; shift ;;
   esac
 done
 
-[ -n "$WT" ] || { echo "usage: $0 [--quick] [--serial] [--base <ref>] <absolute-worktree-path>" >&2; exit 2; }
+[ -n "$WT" ] || { echo "usage: $0 [--quick] [--serial] [--fast] [--base <ref>] <absolute-worktree-path>" >&2; exit 2; }
+[ "$FAST" = 1 ] && [ "$QUICK" = 1 ] && { echo "--fast and --quick contradict each other: --fast chooses which gate runs" >&2; exit 2; }
 
 # An absolute path is the whole point: a relative one would be resolved against
 # whatever directory the caller happens to be in, which is the bug this script
@@ -87,6 +96,46 @@ HEAD_SHA=$(git -C "$WT" rev-parse --short HEAD)
 BRANCH=$(git -C "$WT" branch --show-current)
 LIBS="$WT/jl4-core/libraries"
 export JL4_LIBRARY_PATH="$LIBS"
+
+# ---------------------------------------------------------------- --fast: may this diff take the reduced gate?
+# Decided before the banner so that the first thing printed says which gate this is. The selector is the
+# one in the tree under test; a branch that predates it cannot take the reduced gate. Any doubt is `full`.
+FAST_MODE=""
+FAST_WHY=""
+FAST_NOTES=()
+PARTIAL_LINE="PARTIAL GATE (--fast): CI and the full gate run more"
+if [ "$FAST" = 1 ]; then
+  if [ ! -f "$WT/etc/gate-fast-select.mjs" ]; then FAST_WHY="this tree has no etc/gate-fast-select.mjs"
+  elif ! command -v node >/dev/null 2>&1; then FAST_WHY="node is not installed"
+  elif ! FAST_SEL=$(cd "$WT" && node etc/gate-fast-select.mjs --base "$BASE" "$WT" 2>&1); then FAST_WHY="the selector failed: $(echo "$FAST_SEL" | grep -m1 -E 'Error|fatal' | head -c 300)"
+  else
+    FAST_VERDICT=""
+    while IFS=$'\t' read -r k v; do
+      case "$k" in
+        VERDICT) FAST_VERDICT=$v ;;
+        REASON)  FAST_WHY="${FAST_WHY:+$FAST_WHY; }$v" ;;
+        NOTE)    FAST_NOTES+=("$v") ;;
+      esac
+    done <<< "$FAST_SEL"
+    case "$FAST_VERDICT" in
+      docs) FAST_MODE=docs ;;
+      corpus) FAST_WHY="${FAST_WHY:+$FAST_WHY; }the diff changes corpus files, and --fast reduces documentation-only diffs" ;;
+      full) ;;
+      *) FAST_WHY="the selector gave no verdict" ;;
+    esac
+  fi
+fi
+partial_banner() {
+  if [ -n "$FAST_MODE" ]; then
+    echo "################################################################"
+    echo "  $PARTIAL_LINE"
+    echo "  reduced gate: $FAST_MODE"
+    echo "################################################################"
+  elif [ "$FAST" = 1 ]; then
+    echo "  FULL GATE: --fast was asked for and fell through, because: $FAST_WHY"
+  fi
+}
+partial_banner
 
 banner() {
   echo "────────────────────────────────────────────────────────────────────"
@@ -270,7 +319,11 @@ static_checks() {
   # not a formatting defect. Check the files this branch actually changed, and
   # only those that still exist: `--diff-filter=d` leaves out deletions, which
   # prettier would otherwise report as "No files matching the pattern".
-  CHANGED=$(git -C "$WT" diff --name-only --diff-filter=d "$BASE"...HEAD 2>/dev/null | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
+  # --fast classifies the working tree, uncommitted and untracked files included, so it checks those too:
+  # for a docs-only diff, prettier is the one check that reads the edited text.
+  CHANGED=$( { git -C "$WT" diff --name-only --diff-filter=d "$BASE"...HEAD 2>/dev/null
+               if [ -n "$FAST_MODE" ]; then git -C "$WT" diff --name-only --diff-filter=d HEAD 2>/dev/null; git -C "$WT" ls-files -o --exclude-standard 2>/dev/null; fi
+             } | sort -u | grep -E '\.(md|mjs|yml|yaml|json|ts|js|svelte)$' || true)
   if [ -n "$CHANGED" ]; then
     # shellcheck disable=SC2086
     step "prettier 3.4.2 (changed files)" bash -c "cd '$WT' && npx -y prettier@3.4.2 --check $(echo $CHANGED | tr '\n' ' ')"
@@ -280,18 +333,31 @@ static_checks() {
 }
 
 # ---------------------------------------------------------------- the gate
+start_static() {
+  # Their results come back through files: a background subshell cannot append to RESULTS.
+  ( RESULTS=(); FAILED=0; static_checks
+    printf '%s\n' "${RESULTS[@]}" > "$LOGDIR/static.results"; echo "$FAILED" > "$LOGDIR/static.failed" ) > "$LOGDIR/static.out" 2>&1 &
+  STATIC_PID=$!
+}
+
+fast_gate() {
+  start_static   # the file checks overlap whatever else runs; --serial does not apply to them here
+  local x
+  for x in ${FAST_NOTES[@]+"${FAST_NOTES[@]}"}; do note "$x"; done
+  note "cabal build, jl4-test, l4-cli-test, jl4-core-test and jl4-service-test NOT RUN (--fast, docs only)"
+}
+
+# The full gate below is deliberately not indented under this `else`: indenting it would turn every line into diff noise.
+if [ -n "$FAST_MODE" ]; then
+fast_gate
+else
 step "cabal build all" bash -c "cd '$WT' && cabal build all 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"
 
 if [ "$QUICK" = 1 ]; then
   note "jl4-test SKIPPED (--quick)"
 fi
 
-if [ "$SERIAL" != 1 ]; then
-  # Their results come back through files: a background subshell cannot append to RESULTS.
-  ( RESULTS=(); FAILED=0; static_checks
-    printf '%s\n' "${RESULTS[@]}" > "$LOGDIR/static.results"; echo "$FAILED" > "$LOGDIR/static.failed" ) > "$LOGDIR/static.out" 2>&1 &
-  STATIC_PID=$!
-fi
+[ "$SERIAL" != 1 ] && start_static
 
 if [ "$SERIAL" = 1 ]; then
   note "test suites ran one after another (--serial)"
@@ -346,6 +412,8 @@ else
   fi
 fi
 
+fi   # end of the full gate
+
 # ---------------------------------------------------------------- probes
 # Each probe guards a defect that a review of a main-bound PR found after every
 # suite above had passed, and runs only when the diff touches what it guards
@@ -386,7 +454,7 @@ else NOT_PROBED+=("(c) CLI \\r"); fi
 [ "${#NOT_PROBED[@]}" -eq 0 ] ||
   note "probes not run, the diff does not touch what they guard: $(printf '%s, ' "${NOT_PROBED[@]}" | sed 's/, $//')"
 
-if [ "$SERIAL" = 1 ]; then
+if [ "$SERIAL" = 1 ] && [ -z "$FAST_MODE" ]; then
   static_checks
 else
   wait "$STATIC_PID"
@@ -426,6 +494,7 @@ fi
 
 # ---------------------------------------------------------------- summary
 echo
+partial_banner
 banner
 echo "  RESULTS"
 for r in "${RESULTS[@]}"; do echo "    $r"; done
@@ -440,5 +509,11 @@ echo "               jl4-mlir-test, jl4-websessions-test, jl4-proleg-burden,"
 echo "               jl4-proleg-roundtrip."
 echo "  NOT CHECKED — also: DMN engine harnesses, go selftest, WASM, Nix,"
 echo "               TypeScript. A green run here is not a green CI."
+if [ -n "$FAST_MODE" ]; then
+  echo
+  echo "  $PARTIAL_LINE"
+  echo "  This was the reduced gate for a '$FAST_MODE' diff. It did not run the full gate's other suites, and nothing"
+  echo "  here shows that the unchanged parts of the tree are still green."
+fi
 echo "────────────────────────────────────────────────────────────────────"
 exit "$FAILED"
