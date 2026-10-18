@@ -176,7 +176,7 @@ data ImportResolutionError
 -- @A -> {B, C} -> D@, once B has resolved D, C must still receive D's exported
 -- environment. Returning @[]@ here (the old, name-set behaviour) type-checked C
 -- against an empty dependency environment, silently degrading the types and
--- entities of the second sibling that A then consumed. See issue #904.
+-- entities of the second sibling that A then consumed. See smucclaw/l4-ide#904.
 resolveImports
   :: forall m. Monad m
   => ModuleLookup m                      -- ^ How to find module sources

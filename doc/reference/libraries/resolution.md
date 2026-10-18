@@ -1,4 +1,6 @@
-# Library Resolution: How `IMPORT` Finds Files, and How to Work with Dev vs Prod Preludes
+# How IMPORT finds libraries
+
+This page is for people who run L4 tooling or develop the standard library. For how to write an `IMPORT`, see [IMPORT](README.md#import).
 
 When an L4 file says `IMPORT prelude`, the toolchain has to find _a_ file
 called `prelude` — but on a developer's machine there may be **several**: one
@@ -16,8 +18,9 @@ store, one shipped inside the VSCode extension. This page explains, in order:
    forced this design, preserved so future devs understand _why_ the rules are
    what they are
 
-The design analysis behind all of this lives in
-`specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` in the repository.
+An as-built description of the code behind all of this lives in
+`specs/as-built/import-resolution.md` in the repository, and the design
+analysis in `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md`.
 
 ---
 
@@ -34,6 +37,11 @@ For a bare module name `<mod>`, resolution tries, **first match wins**:
 | 4   | **embedded**          | compiled into the binary at build time                         | everyone else — this is the default stdlib               |
 | 5   | XDG store             | `~/.local/share/jl4/libraries/<mod>.l4`                        | machine-global _extra_ libraries the embed doesn't carry |
 | 6   | VSCode bundle         | `<exeDir>/../../libraries/<mod>.l4`                            | the packaged extension, for non-embedded extras          |
+
+The XDG store is the `jl4/libraries` folder of the user's data directory.
+It is `$XDG_DATA_HOME/jl4/libraries/` when that variable is set to an absolute path.
+Otherwise it is `~/.local/share/jl4/libraries/` on macOS and Linux, and `%APPDATA%\jl4\libraries\` on Windows, which is usually `C:\Users\<you>\AppData\Roaming\jl4\libraries\`.
+Every other mention of `~/.local/share/jl4/libraries/` on this page means this folder.
 
 Three rules of thumb fall out of the table:
 
@@ -55,10 +63,10 @@ nothing else. **The service reads neither `JL4_LIBRARY_PATH`, nor its working
 directory, nor the XDG store (`~/.local/share/jl4/libraries/`)**, and not the
 extension bundle either: tiers 1, 2, 3, 5 and 6 are not consulted. A
 `prelude.l4` in the service's working directory, or a library directory exported
-into its environment, has no effect on any deployment. (Before this rule it did:
-the deploy reported "applied" and every call then answered 422 `sum is not in
-scope`.) If you set `JL4_LIBRARY_PATH` for the service anyway, it logs one
-`WARN` at startup saying the variable is ignored.
+into its environment, has no effect on any deployment. (Without this rule it
+would: the deploy reports "applied" and every call then answers 422 `sum is not
+in scope`.) The service says at start-up, at `WARN`, when `JL4_LIBRARY_PATH` is
+set and therefore ignored.
 
 A consequence for anyone moving a deployment onto the service: a library you
 used to supply from the host's filesystem has to be a file in the bundle, in the
@@ -79,8 +87,8 @@ library — does not stop the deploy, which still reports "applied": the file
 typechecks, and only a call that reaches something the missing module should have
 defined fails. The service logs a `WARN` for each one, naming the deployment, the
 importing file and the module (`Bundle IMPORT resolves to nothing`), when the
-bundle is compiled and again when the deployment is compiled afresh after a
-restart. A refusal at deploy time is not made; it would need a ruling of its own.
+bundle is compiled, which a restart does again from the stored sources. A refusal at
+deploy time is not made; it would need a ruling of its own.
 
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
 (unit, table-driven), the `l4 library resolution shadow (B′)` group in
@@ -128,10 +136,11 @@ freshly-edited prelude loses to the stale embed on every bare `IMPORT`.
 
 Do **not** try to accomplish this with symlinks in
 `~/.local/share/jl4/libraries/` pointing into a checkout. That was the old
-convenience and it is exactly what caused the incidents below: with several
+convenience and it is exactly what caused the
+[incidents below](#the-shadow-saga-how-we-got-here): with several
 worktrees, a machine-global symlink points at _one_ of them and silently lies
-to all the others. Since the B′ reordering it also no longer works for stdlib
-modules (the embed outranks it) — the env var is both safer and the only
+to all the others. It also no longer works for stdlib modules, because the
+embedded copy outranks the XDG store; the env var is both safer and the only
 supported mechanism.
 
 ### I'm running the test suites
@@ -141,8 +150,10 @@ supported mechanism.
   jl4-core datadir), so a bare `cabal test jl4-test` works. Locally you still
   want the worktree pin from the previous section so the goldens run against
   the sources you're editing.
-- **`l4-cli-test`** manufactures its own hermetic environments per test
-  (fabricated `XDG_DATA_HOME`, env var dropped) — nothing to set.
+- **`l4-cli-test`**: the library-resolution cases manufacture their own
+  environment per case (a fabricated `XDG_DATA_HOME`, the variable dropped), so
+  they need nothing set. The rest of the suite runs in the environment it is
+  given.
 
 ### I'm packaging / deploying
 
@@ -150,7 +161,8 @@ The embedded copy is the source of truth for a deployed binary. The VSCode
 extension additionally ships `libraries/*.l4` next to the bundled binary
 (tier 6); since the embed already carries the full stdlib, that directory only
 matters for libraries _not_ in the embed. (Whether it can be dropped entirely
-is an open question — see §6 of the spec.) `jl4-service` consults neither: see
+is an open question — see §6 in `specs/as-built/import-resolution.md`.)
+`jl4-service` consults neither: see
 [the shorter ladder above](#the-resolution-order).
 
 ### I want machine-global extra libraries
@@ -173,8 +185,11 @@ historical one-line form).
 
 ```
 Info | [Import Resolution] Found in embedded libraries (candidate 3 of 5): prelude
-Info | [Import Resolution] Found on filesystem (candidate 2 of 5): ./prelude.l4
+Info | [Import Resolution] Found on filesystem (candidate 1 of 5): /work/prelude.l4
 ```
+
+(The first when nothing in the project shadows the stdlib, the second when the
+project root holds its own `prelude.l4`.)
 
 **The full candidate table**, at Debug priority:
 
@@ -197,16 +212,24 @@ different copy, set JL4_LIBRARY_PATH or place prelude.l4 in the project root or 
 ```
 
 The CLI (`l4 check`, `l4 run`, …) prints Warning-level resolution lines to
-stderr; Info/Debug lines are visible in the LSP log channel and in verbose
-runs. `l4 check --json` and `l4 run --json` carry the same Warning lines in the
+stderr; Info/Debug lines are visible in the LSP log channel only.
+`l4 check --json` and `l4 run --json` carry the same Warning lines in the
 `diagnostics` array of their output, so a program that reads that array sees a
 shadow warning there too.
+
+An `IMPORT` that resolves to nothing is an error, not a shadow warning: see [When nothing resolves](#when-nothing-resolves).
+
+When two tiers name the same file — the CLI sets the project root to the
+importing file's own directory, so the root tier and the importer-relative tier
+probe one path — the shadow warning lists that file once, not as both
+`[chosen]` and `[shadowed]`.
 
 **Debugging "my edit didn't take effect":**
 
 1. Run `l4 check` on the importing file and read stderr. A shadow warning
    tells you immediately that two differing copies exist and which one won.
-2. No warning? Then only one copy is visible — check the winner line to see
+2. No warning? Then only one copy is visible — check the winner line in the
+   language server's log to see
    _which_ one, and remember the embed-staleness gotcha: the embedded copy may
    be older than your checkout.
 3. When in doubt, `export JL4_LIBRARY_PATH="$PWD/jl4-core/libraries"` and
@@ -228,6 +251,8 @@ the stdlib embedded in this binary (22 modules, not among them),
 /home/dev/.local/share/jl4/libraries/myhelpers.l4,
 /opt/l4/bin/../../libraries/myhelpers.l4
 ```
+
+The error is also listed with the other messages under [Module not found](../errors/README.md#module-not-found).
 
 The list is every candidate from [the table above](#the-resolution-order), in that same tier order, so a typo shows up as a name you do not recognise and a mis-set store shows up as a path you do not recognise.
 Each location is listed **once**, however many tiers name it — the in-memory tier keys a file by URI and the filesystem tiers key it by path, so for a project whose root is the importing file's own directory (which is what the CLI uses) the same file arrives twice — and it is printed as the plain path, at the rank of the tier that spells it that way.

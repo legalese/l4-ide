@@ -1,7 +1,7 @@
 -- | Table-driven unit tests for 'LSP.L4.Rules.resolveLibrary' — the ordered
 -- candidate walk behind bare-module-name @IMPORT@ resolution.
 --
--- These pin the LIBRARY-RESOLUTION-SHADOW-SPEC Option B′ ordering:
+-- These pin the Option B′ ordering (specs/as-built/import-resolution.md):
 --
 --   $JL4_LIBRARY_PATH > project root > importer-relative > EMBEDDED > XDG > bundle
 --
@@ -129,7 +129,7 @@ winnerIsEmbedded res = case res.winner of
 
 spec :: Spec
 spec = around withSandbox $
-  describe "resolveLibrary (LIBRARY-RESOLUTION-SHADOW-SPEC, Option B′)" $ do
+  describe "resolveLibrary (Option B′, specs/as-built/import-resolution.md)" $ do
 
     it "candidate order is env? > root > sibling > embedded > XDG > bundle" $ \sb -> do
       res <- resolveIn sb embeddedMod

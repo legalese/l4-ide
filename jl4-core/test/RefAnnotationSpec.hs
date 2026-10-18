@@ -48,6 +48,26 @@ moduleAndFirstDeclRefs src = do
           error "unreachable"
       pure (moduleRef, firstDeclRef)
 
+-- | Where each ref lands: the line and column at which the node that holds it
+-- starts, with the citation's last path segment, in the order the traversal
+-- meets them. A ref that lands where the author put the node after it starts
+-- at the position of that node's first token.
+refPlacements :: Text -> IO [((Int, Int), Text)]
+refPlacements src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-placements")
+      segment = Text.takeWhileEnd (/= '/') . Text.strip . getRef
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m, _, _) ->
+      pure
+        [ ((r.start.line, r.start.column), segment ref)
+        | a <- toListOf (gplate @Anno) m
+        , ref <- view annRefs a
+        , Just r <- [rangeOf a]
+        ]
+
 -- | For every @\@ref@ and the node that holds it: the line of that node (0 if
 -- it has no range), whether the parser generated the node while compiling a
 -- group of clauses ('annPmSynthetic'), and the last segment of the citation.
@@ -56,6 +76,7 @@ moduleAndFirstDeclRefs src = do
 refHolderMarks :: Text -> IO [(Int, Bool, Text)]
 refHolderMarks src = do
   let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-marks")
+      -- 'refCitation', not 'getRef': an inline @\<\<…\>\>@ keeps its delimiters in the latter.
       segment = Text.takeWhileEnd (/= '/') . refCitation
   case execProgramParserWithHintPass uri src of
     Left errs -> do
@@ -67,6 +88,27 @@ refHolderMarks src = do
         | a <- toListOf (gplate @Anno) m
         , ref <- view annRefs a
         ]
+
+-- | The source range of every node that holds a ref, and the source range of
+-- the body of the last top-level @DECIDE@: whether a ref is held by that
+-- body's own node.
+refHoldersAndBody :: Text -> IO ([Maybe SrcRange], Maybe SrcRange)
+refHoldersAndBody src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-holders")
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m@(MkModule _ _ (MkSection _ _ _ _ decls)), _, _) ->
+      case reverse [ body | Decide _ (MkDecide _ _ _ body) <- decls ] of
+        (body : _) ->
+          pure
+            ( [ rangeOf a | a <- toListOf (gplate @Anno) m, not (null (view annRefs a)) ]
+            , rangeOf (getAnno body)
+            )
+        [] -> do
+          expectationFailure "Expected a DECIDE"
+          error "unreachable"
 
 -- | Parse a source snippet and return the bodies of every top-level @DECIDE@,
 -- paired with the raw text of any @\@ref@ annotation attached to that body
@@ -290,6 +332,67 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
             ]
       attached `shouldBe` [["act", "part"]]
       messages `shouldBe` []
+
+  -- The node a ref lands on is the one that starts at the first token after
+  -- it, whatever kind of node that is. Each case puts a ref on the line above
+  -- a different kind of construct and reads where the node that holds it starts.
+  describe "the node a @ref lands on" $ do
+    it "is the operand after it, when the ref sits inside an expression" $ do
+      refPlacements "DECIDE r IS 1 +\n  @ref https://example.com/operand\n  2\n"
+        `shouldReturn` [((3, 3), "operand")]
+
+    it "is the operand after it, inside the LEFT operand of an infix call" $ do
+      -- The range of an infix call is its keyword and no more, so the call
+      -- starts after its left operand, and used to claim the ref in it.
+      refPlacements
+        (Text.unlines
+          [ "GIVEN a IS A NUMBER, b IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "a `plus` b MEANS a + b"
+          , ""
+          , "DECIDE r IS (1 +"
+          , "  @ref https://example.com/two"
+          , "  2) `plus` 3"
+          ])
+        `shouldReturn` [((7, 3), "two")]
+
+    it "is the whole infix call, when the ref sits above the call" $ do
+      -- The call's own range is its keyword, but the call starts where its
+      -- left operand does, so a ref above the whole call is the call's, and
+      -- not its left operand's.
+      (holders, bodyRange) <-
+        refHoldersAndBody
+          (Text.unlines
+            [ "GIVEN a IS A NUMBER, b IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "a `plus` b MEANS a + b"
+            , ""
+            , "DECIDE s IS"
+            , "  @ref https://example.com/whole"
+            , "  (1 + 2) `plus` 3"
+            ])
+      holders `shouldBe` [bodyRange]
+
+    it "is the type after it" $ do
+      refPlacements "GIVEN x IS A\n  @ref https://example.com/type\n  NUMBER\nDECIDE r IS x\n"
+        `shouldReturn` [((3, 3), "type")]
+
+    it "is the field after it" $ do
+      refPlacements "DECLARE Person HAS\n  @ref https://example.com/field\n  name IS A STRING\n"
+        `shouldReturn` [((3, 3), "field")]
+
+    it "is the branch after it, in a CONSIDER" $ do
+      refPlacements
+        (Text.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE f n IS"
+          , "  CONSIDER n"
+          , "  @ref https://example.com/branch"
+          , "  WHEN 0 THEN 1"
+          , "  OTHERWISE 2"
+          ])
+        `shouldReturn` [((6, 3), "branch")]
 
   -- A group of clauses is compiled to one definition: a CONSIDER on the first
   -- clause, and a local definition, with a range of its own, that holds the

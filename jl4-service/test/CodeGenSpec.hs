@@ -8,7 +8,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import Backend.Api (TraceLevel (..))
-import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String, generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode (..), AnswerShape (..))
+import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String, generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode (..), AnswerShape (..), RequiredInput (..))
+import L4.TypeCheck.Environment (boolean, date, maybeType, number)
 
 spec :: SpecWith ()
 spec = describe "CodeGen" $ do
@@ -22,6 +23,23 @@ spec = describe "CodeGen" $ do
     it "is Bare for a deontic function" $
       fmap (.answerShape) (generateDeonticEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) 0 [] Nothing Nothing TraceNone)
         `shouldBe` Right Bare
+
+  -- The wrapper unwraps every input that is neither a BOOLEAN nor a MAYBE,
+  -- GIVENs before ASSUMEs, and reads a DATE from a string.
+  describe "requiredInputs" $
+    it "lists the inputs the wrapper cannot go on without, in its order" $
+      fmap (.requiredInputs)
+        (generateEvalWrapper "f"
+          [("a", number), ("b", boolean), ("c", maybeType number), ("d", date)]
+          []
+          [("e", number), ("f", date), ("g", maybeType date)]
+          Map.empty (Aeson.object []) TraceNone)
+        `shouldBe` Right
+          [ RequiredInput "a" False Nothing
+          , RequiredInput "d" False (Just "DATE")
+          , RequiredInput "e" True Nothing
+          , RequiredInput "f" True (Just "DATE")
+          ]
 
   describe "inputFieldName" $ do
     it "adds (input) suffix to simple names" $ do

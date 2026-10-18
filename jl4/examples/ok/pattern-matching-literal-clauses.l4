@@ -163,7 +163,7 @@ DECIDE `list head` EMPTY               IS 0
 DECIDE `list head` (0 FOLLOWED BY rest) IS 1
 
 -- Test 23: 1 and 1.0 are the same number, and so are 0.10 and 0.1: the second
--- and fourth clauses are never used. Test 30: `l4 run` agrees.
+-- and fourth clauses are never used; the #EVALs below show `l4 run` agrees.
 GIVEN n IS A NUMBER
 GIVETH A STRING
 DECIDE h 1    IS "one"

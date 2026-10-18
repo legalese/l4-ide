@@ -47,14 +47,15 @@ import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRe
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.FilePath (takeDirectory, (</>))
-import System.Directory (createDirectoryIfMissing, removePathForcibly, withCurrentDirectory)
+import System.Directory (createDirectoryIfMissing, doesFileExist, removePathForcibly, withCurrentDirectory)
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import System.IO.Error (isPermissionError)
+import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -507,6 +508,73 @@ spec = describe "integration" do
                 reqList `shouldNotContain` ["extra"]
               [] -> expectationFailure "Could not find with_maybe function in deployment response"
           other -> expectationFailure ("Expected JSON array of deployments, got: " <> show other)
+
+    -- A MAYBE input followed by another input, on the wrapper path. The wrapper
+    -- wrote its input record with a leading comma on each field after the first,
+    -- which does not parse after a field whose type is an application
+    -- (`MAYBE OF NUMBER`), so a function with such an input before another input
+    -- failed with a parser error on every request that takes the wrapper: a `{}`
+    -- value, a batch case or an MCP call with a `null`, and every request to a
+    -- DEONTIC function. `syn then number` and `syn then maybe` take a synonym for
+    -- a MAYBE first, `plain maybe then number` a MAYBE NUMBER written out first,
+    -- and `number then syn` takes the synonym last: the control.
+    describe "a MAYBE input followed by another input, on the wrapper path" do
+      let deployId = "wrapper-then-input"
+          withFns = withServiceFromSources deployId [("then-input.l4", inputThenInputJL4)]
+          valueOf resp = case Aeson.decode (responseBody resp) of
+            Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+            _ -> Nothing
+      forM_ ["syn then number", "syn then maybe", "plain maybe then number", "number then syn" :: Text] \fn -> describe (Text.unpack fn) do
+        it "answers a {} for the MAYBE input" do
+          withFns \baseUrl mgr -> do
+            resp <- evalFunction baseUrl mgr deployId fn
+              (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= Aeson.object [], "z" Aeson..= (3 :: Int) ] ])
+            (statusCode' resp, valueOf resp) `shouldBe` (200, Just (FnLitInt 3))
+        it "answers a batch case with a null for the MAYBE input" do
+          withFns \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack (Text.replace " " "%20" fn) <> "/evaluation/batch")
+              (Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object [ "@id" Aeson..= (1 :: Int), "y" Aeson..= Aeson.Null, "z" Aeson..= (3 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (2 :: Int), "y" Aeson..= (2020 :: Int), "z" Aeson..= (3 :: Int) ]
+                    ]
+                ])
+            resp <- httpLbs req mgr
+            statusCode' resp `shouldBe` 200
+            fmap (map (\c -> (c.outcome, Map.lookup "value" c.attributes)) . (.cases))
+                (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+              `shouldBe` Just [ (CaseAnswered, Just (FnLitInt 3)), (CaseAnswered, Just (FnLitInt 2023)) ]
+        it "answers an MCP tool call with a null for the MAYBE input" do
+          withFns \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+              [ "jsonrpc" Aeson..= ("2.0" :: Text)
+              , "id" Aeson..= (1 :: Int)
+              , "method" Aeson..= ("tools/call" :: Text)
+              , "params" Aeson..= Aeson.object
+                  [ "name" Aeson..= Text.replace " " "-" fn
+                  , "arguments" Aeson..= Aeson.object [ "y" Aeson..= Aeson.Null, "z" Aeson..= (3 :: Int) ]
+                  ]
+              ]
+            resp <- httpLbs req mgr
+            let answered = case mcpToolText (responseBody resp) of
+                  Just (isErr, text) -> Just (isErr, "\"value\":3" `Text.isInfixOf` text)
+                  Nothing -> Nothing
+            (statusCode' resp, answered) `shouldBe` (200, Just (False, True))
+      forM_ ["syn contract", "plain contract", "control contract" :: Text] \fn -> describe (Text.unpack fn) do
+        forM_ [("a value", Aeson.Number 2020), ("a null", Aeson.Null)] \(what, y) ->
+          it ("answers " <> what <> " for the MAYBE input of a DEONTIC function") do
+            withFns \baseUrl mgr -> do
+              resp <- evalFunction baseUrl mgr deployId fn
+                (Aeson.object
+                  [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= y, "z" Aeson..= (3 :: Int) ]
+                  , "startTime" Aeson..= (0 :: Int)
+                  , "events" Aeson..= ([] :: [Aeson.Value])
+                  ])
+              assertSuccess resp \r -> case Map.lookup "value" r.fnResult of
+                Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+                  Map.lookup "modal" (Map.fromList fields) `shouldBe` Just (FnLitString "MUST")
+                other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
 
   describe "missing BOOLEAN on the wrapper path (smucclaw/l4-ide#992)" do
     -- A {} anywhere in a request sends it through the generated wrapper,
@@ -2172,6 +2240,125 @@ spec = describe "integration" do
       sameAtomIds "table2" clauseTable2JL4 handTable2JL4
       sameAtomIds "newname" clauseNewNameJL4 handNewNameJL4
 
+      let noArguments = Aeson.object ["arguments" Aeson..= Aeson.object []]
+
+      -- A restart compiles the stored sources again, as a deploy does (#666), so
+      -- a clause group is planned after one as it was when deployed. Before #666
+      -- a restart read a cache that kept no type for the generated nodes, and
+      -- /query-plan answered 400 for every boolean rule, written as clauses or by
+      -- hand. The fresh side must answer 200 with a body, so that two empty
+      -- answers cannot pass for equal.
+      for_ [ ("enum", clauseGroupEnumJL4), ("mixed", clauseGroupMixedJL4), ("single", clauseGroupSingleJL4)
+           , ("nogiveth", clauseGroupNoGivethJL4), ("call", clauseGroupCallJL4), ("table", clauseTableJL4)
+           , ("table2", clauseTable2JL4), ("newname", clauseNewNameJL4) ] \(name, src) ->
+        it ("restarted: is planned as it was before the restart: " <> name) do
+          let probe baseUrl mgr deployId =
+                answerOf baseUrl deployId <$> queryPlan' baseUrl mgr deployId "rule" noArguments
+          (fresh, restarted) <- beforeAndAfterRestart ("cg-restart-" <> Text.pack name) [("rule.l4", src)] probe
+          fst fresh `shouldBe` 200
+          snd fresh `shouldSatisfy` Maybe.isJust
+          restarted `shouldBe` fresh
+
+      -- Clauses whose CONSIDER, written out, would be more than 20,000 parts are
+      -- not read through, and not drawn as the generated LETs either (one leaf
+      -- that asks nothing): the answer says why.
+      it "refuses clauses that come to more than 20000 parts, naming why" do
+        withServiceFromSources "long-rows" [("rule.l4", longClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-rows" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
+      it "says long clauses that return a number are not boolean, not that they are too long" do
+        withServiceFromSources "long-num" [("rule.l4", longNumberClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-num" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "returns a boolean"
+
+      -- A group whose first clause names each of its inputs as the GIVEN does has
+      -- nothing to read through: the clauses after it are never reached, and its
+      -- body is that clause's result, as a rule written without clauses has it.
+      -- A rule written without clauses is planned however long or large its result,
+      -- and so is such a group. The service simplifies the ladder, and a disjunction of
+      -- conjunctions rewritten into conjunctive normal form grows past 300 boxes
+      -- at six pairs of inputs (449 boxes).
+      it "catch-all: answers a group whose first clause names each input as the GIVEN does, simplified to 193 boxes" do
+        withServiceFromSources "dnf-5" [("rule.l4", dnfClauseJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "dnf-5" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "catch-all: answers such a group whose simplified ladder is 449 boxes, as it answers the rule written without clauses" do
+        withServiceFromSources "dnf-6" [("rule.l4", dnfClauseJL4 6)] \baseUrl mgr -> do
+          withServiceFromSources "hand-dnf-6" [("rule.l4", handDnfJL4 6)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "dnf-6" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-dnf-6" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldBe` planOf qpH
+            lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+      it "catch-all: answers such a group whose result is more than 20000 parts long, as it answers the rule written without clauses" do
+        withServiceFromSources "catchall-huge" [("rule.l4", catchAllHugeJL4)] \baseUrl mgr -> do
+          withServiceFromSources "hand-catchall-huge" [("rule.l4", handCatchAllHugeJL4)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "catchall-huge" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-catchall-huge" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldSatisfy` Maybe.isJust
+            planOf qpC `shouldBe` planOf qpH
+
+      -- A first clause that matches every input through a NEW name is not that: it
+      -- is a test the desugarer generates, with the clauses after it as the other
+      -- answer, so the group is read through and limited like any other. These
+      -- pass with and without the guard that exempts the own-name first clause.
+      it "new name: refuses a group whose first clause gives an input a new name when its simplified ladder is more than 300 boxes" do
+        withServiceFromSources "newname-dnf-6" [("rule.l4", newNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
+      -- `(EXACTLY n)` for the input's own name is not exempt either: only the bare
+      -- name and `_` are, so the desugarer tests it and the group is read through.
+      -- Six pairs of it are planned; a first clause of 22,000 parts is refused. (I
+      -- infer it reads through to one CONSIDER, which is one box, so that the
+      -- 300-box limit is not reached; that is not drawn.)
+      it "EXACTLY its own name: plans a group of six pairs, which reads through to one CONSIDER" do
+        withServiceFromSources "exactly-dnf-6" [("rule.l4", exactlyNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "EXACTLY its own name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "exactly-huge" [("rule.l4", exactlyHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      -- A table of optional inputs taken apart with `JUST`, with new names for the
+      -- others, was refused only after a minute (24 clauses): see the same-named
+      -- block in ClauseGroupLadderSpec. The wait is far above what it takes now
+      -- (about a second) and far below the minute.
+      it "new names: refuses a table of 24 clauses of optional inputs taken apart with JUST within seconds" do
+        withServiceFromSources "maybe-new-24" [("rule.l4", maybeTableJL4 False 24)] \baseUrl mgr -> do
+          answer <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-24" "rule" noArguments)
+          case answer of
+            Nothing -> expectationFailure "no answer within 8 seconds"
+            Just resp -> do
+              statusCode' resp `shouldBe` 400
+              LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      it "new names: still plans the same table at 8 clauses, as it plans it with the GIVEN's names" do
+        withServiceFromSources "maybe-new-8" [("rule.l4", maybeTableJL4 False 8)] \baseUrl mgr -> do
+          withServiceFromSources "maybe-own-8" [("rule.l4", maybeTableJL4 True 8)] \baseUrl' mgr' -> do
+            qpN <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-8" "rule" noArguments)
+            qpO <- timeout 8_000_000 (queryPlan' baseUrl' mgr' "maybe-own-8" "rule" noArguments)
+            fmap statusCode' qpN `shouldBe` Just 200
+            fmap statusCode' qpO `shouldBe` Just 200
+      it "new name: answers such a group when its simplified ladder is less than 300 boxes" do
+        withServiceFromSources "newname-dnf-5" [("rule.l4", newNameDnfJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-5" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "new name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "newname-huge" [("rule.l4", newNameHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
+
     it "and evaluation still works across that restart" do
       -- The control. /evaluation needs no type annotations, so it kept working
       -- throughout; if this ever goes red the restart harness itself is broken,
@@ -2522,6 +2709,33 @@ spec = describe "integration" do
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
         dir <- readIORef storeDir
         Text.IO.readFile (dir </> "old" </> "bundle.cbor") `shouldReturn` oldCache
+
+    it "serves a function that calls sum from a store whose cache holds the standard library at its old address" do
+      -- bundle.cbor in the fixture directory was written by a service built from
+      -- main before library resolution changed (00298eb60): it holds the
+      -- prelude at `file://prelude.l4`, 1,084 times, and never at
+      -- `jl4-embedded:`. A build that read it paired it with a library
+      -- environment at the new address, and every library function, `sum`
+      -- among them, was "not in scope" at call time. This build compiles the
+      -- sources and reads no cache, so the function answers, and the file is
+      -- left as it was.
+      let fixtureDir = "test/fixtures/old-prelude-cache"
+      here <- doesFileExist (fixtureDir </> "bundle.cbor")
+      let dirOfFixture = if here then fixtureDir else "jl4-service" </> fixtureDir
+      oldCache <- BS.readFile (dirOfFixture </> "bundle.cbor")
+      total <- Text.IO.readFile (dirOfFixture </> "total.l4")
+      storeDir <- newIORef ""
+      let plant dir = do
+            writeIORef storeDir dir
+            BS.writeFile (dir </> "oldsum" </> "bundle.cbor") oldCache
+      withServicesRestarted [("oldsum", [("total.l4", total)])] plant \logLines baseUrl mgr -> do
+        assertRecompiled "oldsum" logLines
+        resp <- evalFunction baseUrl mgr "oldsum" "total"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["xs" Aeson..= ([1, 2, 3] :: [Int])]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 6)
+        dir <- readIORef storeDir
+        BS.readFile (dir </> "oldsum" </> "bundle.cbor") `shouldReturn` oldCache
 
     it "compiles a restarted deployment under --compile-timeout, as a deploy does" do
       -- A timeout of zero is over before the compile starts. A restart that

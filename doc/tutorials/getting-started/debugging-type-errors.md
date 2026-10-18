@@ -1,48 +1,12 @@
-# Debugging Type Errors
+# Fix errors
 
-Read, understand, and fix the errors the L4 compiler reports most often to beginners.
-
-**Prerequisites:** [Your First L4 File](first-l4-file.md), [Using the l4 CLI](l4-cli.md)
+Read an L4 error message, find the cause, and fix it. The [error message reference](../../reference/errors/README.md) lists the errors one by one; this page shows how to work through them.
 
 ---
 
-## How Errors Are Reported
+## Read a diagnostic
 
-Run `l4 check myfile.l4` (or open the file in VS Code — same compiler, same messages as red underlines). Each problem is printed as a diagnostic block:
-
-```
-File:     myfile.l4
-  Range:    4:1-4:1
-  Source:   parser
-  Severity: DiagnosticSeverity_Error
-  Message:  ...
-```
-
-Three things to read, in order:
-
-1. **Range** — `line:column-line:column` of the offending code. Go there first.
-2. **Source** — `parser` means the file could not even be read as L4 (usually layout/indentation); `check` means it parsed but the types do not line up.
-3. **Message** — the explanation. L4's messages are written in prose; read them fully before guessing.
-
-When there are several errors, **fix the first one and re-check**: later errors are often knock-on effects of the first.
-
-The exit code is `0` when the file is valid and `1` otherwise, so `l4 check` slots straight into scripts and CI.
-
-This page walks through the errors beginners hit most. For the systematic catalog of error messages and fixes, see the [error troubleshooting reference](../../reference/errors/README.md).
-
----
-
-## 1. Incorrect Indentation (Parse Error)
-
-L4 is layout-sensitive: the body of a definition must be indented further than the line that introduces it.
-
-```l4
--- ❌ Wrong: the body starts at column 1
-GIVEN x IS A NUMBER
-GIVETH A NUMBER
-DECIDE `twice` IS
-x TIMES 2
-```
+Run `l4 check myfile.l4`, or open the file in VS Code, which shows the same messages as red underlines. Each problem is printed as a block:
 
 ```
 File:     err-layout.l4
@@ -56,133 +20,89 @@ File:     err-layout.l4
     incorrect indentation (got 1, should be greater than 1)
 ```
 
-The message tells you exactly what the layout rule wanted: the continuation had to be indented more than column 1. Fix by indenting the body (or keeping it on the same line):
+Read three things, in this order:
 
-```l4
--- ✅ Right
-GIVEN x IS A NUMBER
-GIVETH A NUMBER
-DECIDE `twice` IS
-    x TIMES 2
-```
+1. **Range**: `line:column-line:column` of the code at fault. Go there first.
+2. **Source**: `parser` means the file could not be read as L4 at all, usually because of layout or a misplaced keyword. `check` means it was read but the types do not fit together.
+3. **Message**: the explanation, in plain words. Read all of it before guessing.
 
-Any `Source: parser` error with "incorrect indentation" or "unexpected <token>" is a layout problem. Check that continuation lines are indented deeper than the construct they belong to, and that `THEN`/`ELSE` chains stair-step consistently.
+When there are several errors, fix the first one and check again: later errors are often caused by the first. `l4 check` exits with `0` when the file is valid and `1` otherwise.
 
 ---
 
-## 2. Type Mismatch Against the Signature
+## A debugging routine
 
-The declared `GIVETH` type is a promise; the body has to keep it.
+1. Run `l4 check file.l4` after every few edits. It is fast because it evaluates nothing.
+2. Read the **first** diagnostic only. Note its source (`parser` or `check`) and go to its range.
+3. For a `parser` error, look at the line above as well: a layout problem is often caused by the construct before it.
+4. For a `check` error, find the pair "expected X … but is here of type Y" and decide which side is wrong.
+5. Still can't see it? Comment out half of the file (`--` per line, or `{- ... -}` around a block), check again, and narrow it down.
+6. Search the [error message reference](../../reference/errors/README.md) for a phrase from the message.
+
+---
+
+## Common errors
+
+### Indentation
+
+L4 is layout-sensitive: the body of a definition must be indented further than the line that introduces it. The diagnostic above comes from this file:
 
 ```l4
--- ❌ Wrong: the signature promises a BOOLEAN, the body computes a NUMBER
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `twice` IS
+x TIMES 2
+```
+
+Indent the body (`    x TIMES 2`) or keep it on the same line. Any `parser` error that says "incorrect indentation" or "unexpected …" is usually a layout problem. See [Incorrect indentation](../../reference/errors/README.md#incorrect-indentation).
+
+### Type mismatch
+
+The `GIVETH` type is a promise that the body has to keep:
+
+```l4
 GIVEN x IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE `is large` IS x PLUS 1
 ```
 
 ```
-File:     err-mismatch.l4
-  Range:    3:22-3:30
-  Source:   check
-  Severity: DiagnosticSeverity_Error
-  Message:
-    The type of this definition must match its type signature at err-mismatch.l4:2:8-17, namely
+The type of this definition must match its type signature at err-mismatch.l4:2:8-17, namely
 
-      BOOLEAN
+  BOOLEAN
 
-    but is here of type
+but is here of type
 
-      NUMBER
+  NUMBER
 ```
 
-The message names both sides: what the signature (at the quoted location) requires, and what the body actually produced. Decide which one is wrong — here, presumably the body:
+Decide which side is wrong. Here it is the body: ``DECIDE `is large` IF x GREATER THAN 1000``. L4 never converts types for you; when you need a conversion, write it (see [Coercions](../../reference/types/coercions.md)). See [Types](../../reference/errors/README.md#types).
+
+### Unknown name
+
+A file defines `` `is an adult` `` for a `Person`, and a test misspells it as `` #EVAL `is an adutl` `Alice` ``:
+
+```
+I could not find a definition for the identifier
+
+  `is an adutl`
+
+which I have inferred to be of type:
+
+  FUNCTION FROM Person TO res11
+```
+
+The second half shows how the unknown name is used: here, as a function from `Person` to something not yet known (`res11`). Use that to find the definition you meant. In order of likelihood:
+
+- **Spelling**, including spaces inside backticks: `` `is an adult` `` and `` `is an adult ` `` are different names.
+- **Missing backticks**: `is an adult` without backticks is three separate words.
+- **The definition does not exist**: order does not matter for top-level definitions, but the name must be defined in the file or in an imported module.
+
+### Missing IMPORT
+
+A library name such as `Date` only exists after you import the library that defines it. Without `IMPORT daydate`, the line `` `the closing date` MEANS Date 15 1 2025 `` gives "I could not find a definition for the identifier `Date`", the same message as a typo. Add the import:
 
 ```l4
--- ✅ Right
-GIVEN x IS A NUMBER
-GIVETH A BOOLEAN
-DECIDE `is large` IF x GREATER THAN 1000
-```
-
-L4 never coerces types implicitly. If you genuinely need to convert, do it explicitly (`TOSTRING`, `TONUMBER`, ...).
-
----
-
-## 3. Unknown Identifier (Usually a Typo)
-
-```l4
-DECLARE Person
-    HAS `name` IS A STRING
-        `age`  IS A NUMBER
-
-GIVEN person IS A Person
-GIVETH A BOOLEAN
-DECIDE `is an adult` IF
-    person's `age` AT LEAST 18
-
-`Alice` MEANS Person WITH
-    `name` IS "Alice"
-    `age`  IS 30
-
-#EVAL `is an adutl` `Alice`     -- ❌ typo: adutl
-```
-
-```
-File:     err-typo.l4
-  Range:    14:7-14:20
-  Source:   check
-  Severity: DiagnosticSeverity_Error
-  Message:
-    I could not find a definition for the identifier
-
-      `is an adutl`
-
-    which I have inferred to be of type:
-
-      FUNCTION FROM Person TO res11
-```
-
-Note the second half: even though the name is unknown, the compiler inferred _how it is being used_ — as a function from `Person` to something. That inferred type is your clue for finding the definition you meant. (`res11` is a placeholder for "a type I could not determine".)
-
-Fixes, in order of likelihood:
-
-- **Spelling** — including spaces and punctuation inside backticks: `` `is an adult` `` and `` `is an adult ` `` (trailing space) are different names.
-- **Definition order in expressions is not the issue** — top-level definitions can be used before they appear — but the definition must exist _somewhere_ in the file or an imported module.
-- **Missing backticks** — `is an adult` without backticks is three separate tokens, not one name.
-
----
-
-## 4. Missing IMPORT
-
-Library names like `Date` only exist after you import the library that defines them:
-
-```l4
--- ❌ Wrong: Date needs the daydate library
-`the closing date` MEANS Date 15 1 2025
-
-#EVAL `the closing date`
-```
-
-```
-File:     err-import.l4
-  Range:    1:26-1:30
-  Source:   check
-  Severity: DiagnosticSeverity_Error
-  Message:
-    I could not find a definition for the identifier
-
-      Date
-
-    which I have inferred to be of type:
-
-      FUNCTION FROM NUMBER AND NUMBER AND NUMBER TO res7
-```
-
-It looks like a typo error, but the name is spelled correctly — it is simply not in scope. The fix is an import at the top of the file:
-
-```l4
--- ✅ Right
 IMPORT daydate
 
 `the closing date` MEANS Date 15 1 2025
@@ -190,16 +110,13 @@ IMPORT daydate
 #EVAL `the closing date`
 ```
 
-If an unknown identifier is a name you did not define yourself, check the [library reference](../../reference/libraries/README.md) for which `IMPORT` provides it. Imports must be the first declarations in the file.
+If an unknown name is one you did not define yourself, check the [library reference](../../reference/libraries/README.md) for the library that provides it. See [I could not find a definition for the identifier](../../reference/errors/README.md#i-could-not-find-a-definition-for-the-identifier) and [Module not found](../../reference/errors/README.md#module-not-found).
 
----
+### Ambiguous operator: mixed types in a comparison
 
-## 5. Ambiguous Operator (Mixed Types in a Comparison)
-
-Comparison operators like `AT LEAST` are overloaded — they work on numbers, strings, and booleans, as long as _both sides agree_. Compare a number to a string and the compiler cannot pick an overload:
+Comparison operators such as `AT LEAST` work on numbers, strings and booleans, as long as both sides have the same type. Compare a number with a string and L4 cannot choose:
 
 ```l4
--- ❌ Wrong: comparing a NUMBER field to the STRING "18"
 DECLARE Person
     HAS `name` IS A STRING
         `age`  IS A NUMBER
@@ -211,105 +128,39 @@ DECIDE `is an adult` IF
 ```
 
 ```
-File:     err-type.l4
-  Range:    8:5-8:33
-  Source:   check
-  Severity: DiagnosticSeverity_Error
-  Message:
-    There are multiple definitions for the identifier
+There are multiple definitions for the identifier
 
-      `__GEQ__`
+  `__GEQ__`
 
-    and I do not have sufficient information to make a choice between them.
-    The options are:
+and I do not have sufficient information to make a choice between them.
+The options are:
 
-      `__GEQ__` (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO BOOLEAN
-      `__GEQ__` (predefined) of type FUNCTION FROM STRING AND STRING TO BOOLEAN
-      `__GEQ__` (predefined) of type FUNCTION FROM BOOLEAN AND BOOLEAN TO BOOLEAN
+  `__GEQ__` (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO BOOLEAN
+  `__GEQ__` (predefined) of type FUNCTION FROM STRING AND STRING TO BOOLEAN
+  `__GEQ__` (predefined) of type FUNCTION FROM BOOLEAN AND BOOLEAN TO BOOLEAN
 ```
 
-`__GEQ__` is the internal name for `AT LEAST`/`>=`. The listed options are the available overloads — none of them accepts a `NUMBER` on the left and a `STRING` on the right, which is exactly the problem. Make both sides the same type:
+`__GEQ__` is the internal name of `AT LEAST` (`>=`). None of the listed versions takes a `NUMBER` and a `STRING`, which is the problem. Make both sides the same type: ``person's `age` AT LEAST 18``.
 
-```l4
--- ✅ Right
-    person's `age` AT LEAST 18
+The same "multiple definitions" message appears with `__PLUS__` and other operators when an imported library adds versions of them (`daydate` adds `PLUS` for dates) and the operands do not show which one you mean. Fix a mistyped literal, or give one operand a known type.
+
+### `@export` with a function-typed input
+
+A rule marked `@export` cannot take a function as an input, because a function cannot be sent as JSON. The error is "Function type inputs are not supported for @export". See [ASSUME and `@export`](../../reference/types/ASSUME.md#function-typed-inputs-are-not-supported-for-export).
+
+The same mistake can be spelled another way. An `ASSUME` that takes inputs of its own is a rule too, even though its declared type is `BOOLEAN`, so an exported rule that reads one is refused for the same reason:
+
+```
+The @export rule `may apply` reads `is eligible`, which is assumed and takes 1 input of its own.
+A published rule's inputs travel as JSON, which can carry a value but not a rule, so an assumed rule with inputs of its own can never be supplied — every request would stop on it.
+Give `is eligible` a definition (DECIDE or MEANS), or take what it is asked about as an ordinary input of `may apply`, or remove the @export.
 ```
 
-You will see the same "multiple definitions ... `__PLUS__`" shape when an imported library adds overloads (for instance, `daydate` overloads `PLUS` for dates) and the operands do not pin down which one you mean. Adding a type annotation to one operand, or fixing a mistyped literal, resolves it.
+Hiding the assumed rule behind a helper does not help, because the check follows every rule the exported one reaches. An assumed name that takes **no** inputs is a value, and stays publishable: `ASSUME age IS A NUMBER` is an input the request supplies. Before 2026-09-08 this spelling passed `l4 check` and then failed on every request; both spellings are refused now, at check time. See [ASSUME](../../reference/types/ASSUME.md#function-typed-inputs).
 
 ---
 
-## 6. Annotation Misuse: `@export` with a Function-Typed Input
+## Next steps
 
-`@export` publishes a rule as an API endpoint, so every input has to be representable as JSON. A parameter of `FUNCTION FROM ... TO ...` type cannot be, and the typechecker rejects it:
-
-```l4
--- ❌ Wrong: exported rule takes a function as input
-@export Check a predicate against a number
-GIVEN p IS A FUNCTION FROM A NUMBER TO A BOOLEAN, x IS A NUMBER
-GIVETH A BOOLEAN
-DECIDE `check with` IS p x
-```
-
-```
-File:     err-export.l4
-  Range:    4:8-4:20
-  Source:   check
-  Severity: DiagnosticSeverity_Error
-  Message:
-    Function type inputs are not supported for @export.
-    The input `p` has a function type.
-```
-
-Fix by removing the `@export` (keep the higher-order function internal) or by restructuring the exported rule to take plain data — for example, an enum value selecting among known predicates.
-
-### The same mistake, spelled another way
-
-The rule being refused is "an input must be a value, not a rule", and it does not care whether the rule was written as a function type. An `ASSUME` that takes inputs of its own is a rule too, even though its declared type is `BOOLEAN`:
-
-```l4
--- ❌ Wrong: the exported rule reads an assumed rule of one input
-ASSUME Person IS A TYPE
-
-GIVEN p IS A Person
-ASSUME `is eligible` p IS A BOOLEAN
-
-@export Whether the person may apply
-GIVEN who IS A Person
-GIVETH A BOOLEAN
-DECIDE `may apply` IF `is eligible` who
-```
-
-```
-File:     err-export-assume.l4
-  Range:    7:8-7:17
-  Source:   check
-  Severity: DiagnosticSeverity_Error
-  Message:
-    The @export rule `may apply` reads `is eligible`, which is assumed and takes 1 input of its own.
-    A published rule's inputs travel as JSON, which can carry a value but not a rule, so an assumed rule with inputs of its own can never be supplied — every request would stop on it.
-    Give `is eligible` a definition (DECIDE or MEANS), or take what it is asked about as an ordinary input of `may apply`, or remove the @export.
-```
-
-Hiding the assumed rule behind a helper does not help — the check follows every rule the exported one reaches, which is exactly the set a request would have to fill in. An assumed name that takes **no** inputs is a value, and stays perfectly publishable: `ASSUME age IS A NUMBER` is an input the request supplies.
-
-Before 2026-09-08 this spelling passed `l4 check` and then failed on every request, so a file could look publishable and not be. Both spellings are refused now, at check time. See [ASSUME (deprecated)](../../reference/types/ASSUME.md#function-typed-inputs).
-
----
-
-## A Debugging Routine
-
-1. `l4 check file.l4` — cheap and fast; run it after every few edits.
-2. Read the **first** diagnostic only. Note its `Source` (parser vs check) and go to its range.
-3. Parser errors → look one line _up_ as well: layout problems are often caused by the previous construct.
-4. Check errors → read the "expected X but got Y" pair and decide which side is wrong.
-5. Can't see it? Isolate: comment out half the file (`--` or `{- ... -}` blocks) and re-check, then bisect.
-6. Still stuck? Search the [error troubleshooting reference](../../reference/errors/README.md) for a phrase from the message.
-
----
-
-## Next Steps
-
-- [Error troubleshooting reference](../../reference/errors/README.md) — the systematic catalog this page samples from
-- [Testing Your Rules](testing-your-rules.md) — catch semantic regressions once the types are clean
-- [Common Patterns](../../reference/patterns/common-patterns.md) — idiomatic shapes that avoid these errors in the first place
+- [Error message reference](../../reference/errors/README.md): every error message, with fixes.
+- [Test your rules](testing-your-rules.md): once the file type-checks, check that it gives the right answers.

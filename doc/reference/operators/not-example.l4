@@ -1,105 +1,95 @@
--- NOT keyword examples
+-- NOT examples
 
-§ `NOT keyword examples`
-    GIVEN hasCriminalRecord IS A BOOLEAN
-          personAge IS A NUMBER
-          isBlocked IS A BOOLEAN
-
--- Basic NOT Operations
+-- Basic NOT
 
 #EVAL NOT TRUE
 #EVAL NOT FALSE
-
--- Double Negation
-
 #EVAL NOT NOT TRUE
-#EVAL NOT NOT FALSE
 
--- In Conditional Logic
+-- With AND, on separate lines: NOT applies to its own line only
 
-DECIDE isClean IS NOT hasCriminalRecord
+GIVEN age IS A NUMBER
+      `is blocked` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may access` age `is blocked` MEANS
+      age >= 18
+  AND NOT `is blocked`
 
-#CHECK isClean
+#EVAL `may access` 30 FALSE
+#EVAL `may access` 30 TRUE
 
--- With AND
-
-DECIDE canAccess IS personAge >= 18 AND NOT isBlocked
-
-#CHECK canAccess
-
--- With OR
-
-GIVEN isAdmin IS A BOOLEAN, isRestricted IS A BOOLEAN
-hasAccess isAdmin isRestricted MEANS isAdmin OR NOT isRestricted
-
-#EVAL hasAccess FALSE FALSE
-#EVAL hasAccess FALSE TRUE
-
--- How Far NOT Reaches
+-- How far NOT reaches
 
 -- On one line, NOT reaches forward over everything after it, so
 -- `NOT a AND b` would mean NOT (a AND b) even though it reads like
 -- "not-a, and b". L4 refuses that spelling: the file does not check until
 -- you say which reading you meant. Both of these are refused --
 --
---     wideByDefault a b MEANS NOT a AND b
---     looksCareful  a b MEANS NOT (a) AND b   -- the bracket closes around a,
---                                             -- not around the NOT
+--     wide a b MEANS NOT a AND b
+--     looksCareful a b MEANS NOT (a) AND b   -- the bracket closes around a,
+--                                            -- not around the NOT
 --
 -- and these are the spellings that are accepted.
 
 -- Brackets around the whole group: the WIDE reading, NOT (a AND b).
-GIVEN a IS A BOOLEAN, b IS A BOOLEAN
-notBoth a b MEANS NOT (a AND b)
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+`not both` a b MEANS NOT (a AND b)
 
 -- Brackets around the NOT itself: the NARROW reading, (NOT a) AND b.
-GIVEN a IS A BOOLEAN, b IS A BOOLEAN
-narrowedProperly a b MEANS (NOT a) AND b
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+`not a, and b` a b MEANS (NOT a) AND b
 
 -- Over several lines nothing is refused, and the columns decide. An AND
 -- that starts further right than the NOT is reached over: the wide reading.
-GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
 swallowed a b MEANS
     NOT a
         AND b
 
 -- An AND that starts in the NOT's column, or further left, stops it: the
 -- narrow reading.
-GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
 stopped a b MEANS
     NOT a
     AND b
 
 -- With a = FALSE and b = FALSE the wide reading gives TRUE and the narrow
 -- reading gives FALSE; with a = TRUE and b = TRUE all four agree on FALSE.
-#EVAL notBoth FALSE FALSE
+#EVAL `not both` FALSE FALSE
 #EVAL swallowed FALSE FALSE
-#EVAL narrowedProperly FALSE FALSE
+#EVAL `not a, and b` FALSE FALSE
 #EVAL stopped FALSE FALSE
 
-#EVAL notBoth TRUE TRUE
+#EVAL `not both` TRUE TRUE
 #EVAL swallowed TRUE TRUE
-#EVAL narrowedProperly TRUE TRUE
+#EVAL `not a, and b` TRUE TRUE
 #EVAL stopped TRUE TRUE
 
--- NOT with Comparisons
+-- With comparisons: no parentheses needed
 
 GIVEN n IS A NUMBER
-isNotZero n MEANS NOT (n EQUALS 0)
-isNotPositive n MEANS NOT (n > 0)
+GIVETH A BOOLEAN
+`is not zero` n MEANS NOT n EQUALS 0
 
-#EVAL isNotZero 5
-#EVAL isNotZero 0
-#EVAL isNotPositive 5
-#EVAL isNotPositive (-3)
+#EVAL `is not zero` 5
+#EVAL `is not zero` 0
 
--- In IF Expressions
+-- In IF expressions
 
 GIVEN flag IS A BOOLEAN
-invertedMessage flag MEANS
+GIVETH A STRING
+`flag message` flag MEANS
   IF NOT flag
   THEN "flag is off"
   ELSE "flag is on"
 
-#EVAL invertedMessage TRUE
-#EVAL invertedMessage FALSE
+#EVAL `flag message` TRUE
+#EVAL `flag message` FALSE

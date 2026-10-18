@@ -142,7 +142,17 @@ For authoring actual L4 rules, prefer the `writing-l4-rules` skill — it covers
 | `doc/tutorials/` | Task-oriented guides ("How do I do X?")              |
 | `doc/concepts/`  | Explanations of ideas and design decisions           |
 
-Keep these index files accurate: `doc/README.md`, `doc/reference/GLOSSARY.md`, and each section's `README.md` / `SUMMARY.md` (the latter drives mdBook rendering).
+Keep these index files accurate: `doc/README.md`, `doc/reference/GLOSSARY.md`, and each section's `README.md` / `SUMMARY.md`.
+
+`doc/` is published at <https://legalese.com/l4>. Each section's `SUMMARY.md` becomes that tab's sidebar, which only shows the sub-pages of the branch the reader is in. The sidebar is for finding your way, not a full index:
+
+- Keep a section's sidebar to a handful of entries.
+- Fold variants and short pages into a parent page instead of adding entries; for example, multi-clause DECIDE is a section of DECIDE, not its own page.
+- Let each section's `README.md` list the pages under it.
+- Give each topic one home and link to it from elsewhere.
+- Keep a page's H1 the same as its sidebar title.
+
+When a page moves or is merged away, add its old slug to `doc/redirects.json` (`"reference/functions/WHERE": "reference/functions/LET#where"`), so released tools and search results that link to it keep working.
 
 ### L4 in docs
 
@@ -162,4 +172,4 @@ Write identifiers that read like natural language for legal audiences: `` `the a
 ./doc/test-docs.sh
 ```
 
-This checks markdown links, compiles every `.l4` file in `doc/`, and flags orphaned files (README.md and SUMMARY.md are exempt from the orphan check). Fix all errors before committing. Use relative paths (`../concepts/README.md`) when cross-linking.
+This checks markdown links, compiles every `.l4` file in `doc/`, flags orphaned files (README.md and SUMMARY.md are exempt from the orphan check), and checks that every redirect in `doc/redirects.json` leaves a removed page and lands on an existing page and anchor. Fix all errors before committing. Use relative paths (`../concepts/README.md`) when cross-linking.

@@ -1,0 +1,4 @@
+age,income,hasViolations
+25,,false
+30,"  ",false
+40,90000,false

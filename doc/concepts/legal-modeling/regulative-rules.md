@@ -1,394 +1,110 @@
-# Regulative Rules
+# How obligations unfold
 
-How L4 models obligations, permissions, and prohibitions — and how those rules play out against a stream of events.
+A regulative rule says who must, may or must not do what, by when, and what follows. This page explains how such a rule behaves over time: what it waits for, how it moves forward, and what it can end in. For the keywords themselves, see the reference: [Regulative rules](../../reference/regulative/README.md), [PARTY, MUST, MAY, SHANT](../../reference/regulative/PARTY.md) and [Deadlines and consequences](../../reference/regulative/consequences.md).
 
-> **Reading order.** This page is the reference-style account. If you would rather start from one lease and one screen at a time, the tutorial series [One Obligation](../../tutorials/obligations/one-obligation.md) → [What Follows](../../tutorials/obligations/what-follows.md) → [Several Parties](../../tutorials/obligations/several-parties.md) builds the same material up in that order, and [The Regulative Layer, Whole](regulative-layer-whole.md) lays out how the five separate ideas on this page fit together and which are still proposed.
+> **Reading order.** If you would rather start from one lease and one screen at a time, the tutorial series [One Obligation](../../tutorials/obligations/one-obligation.md) → [What Follows](../../tutorials/obligations/what-follows.md) → [Several Parties](../../tutorials/obligations/several-parties.md) builds the same material up in that order, and [The Regulative Layer, Whole](regulative-layer-whole.md) lays out how the separate ideas behind regulative rules fit together and which are still proposed.
 
----
-
-## What Are Regulative Rules?
-
-**Regulative rules** govern behaviour. They tell parties what they must, may, or must not do. They are the foundation of contracts, regulations, and laws.
-
-Compare to **constitutive rules**, which define what things _are_ (DECLARE and DECIDE statements). A constitutive rule answers "is the borrower a small business?". A regulative rule answers "what is the borrower obligated to do now, given everything that has happened so far?". The distinction — and why L4 keeps the two kinds of rule apart at the type level — is explored in [Constitutive vs Regulative Rules](constitutive-vs-regulative.md).
-
-### Examples
-
-| Rule Type   | Legal Text                                              | L4 Concept |
-| ----------- | ------------------------------------------------------- | ---------- |
-| Obligation  | "The seller shall deliver the goods"                    | MUST       |
-| Permission  | "The buyer may inspect the goods"                       | MAY        |
-| Prohibition | "Employees shall not disclose confidential information" | SHANT      |
+Regulative rules sit beside constitutive rules, which define what things are. A constitutive rule answers "is the borrower a small business?". A regulative rule answers "what does the borrower have to do now, given everything that has happened so far?". [Definitions and duties](constitutive-vs-regulative.md) explains why L4 keeps the two apart.
 
 ---
 
-## The Five Slots of a Regulative Rule
+## A contract awaiting events
 
-L4 represents a regulative rule as a single atomic unit — a _deontic particle_. Every such particle has the same five slots:
+This is the most important idea in the regulative part of L4, and the one most often missed:
 
-1. **Who** has the duty (`PARTY`)
-2. **What** they must, may, or must not do (`MUST` / `MAY` / `SHANT`)
-3. **When** the duty applies (`WITHIN`)
-4. **What follows on success** (`HENCE`)
-5. **What follows on failure** (`LEST`)
+> **A regulative rule decides nothing by itself. It is a contract that waits until it is given a start time and a sequence of events.**
 
-```l4
-GIVETH A DEONTIC Actor Action
-`delivery obligation` MEANS
-    PARTY  Seller
-    MUST   `deliver goods`
-    WITHIN 14
-    HENCE  `payment due`
-    LEST   BREACH BY Seller
-```
-
-`PARTY`, the modal, and the action are required. `WITHIN`, `HENCE`, and `LEST` all have sensible defaults (covered below). Larger contracts are built by composition — every `HENCE` or `LEST` branch can itself be another five-slot particle.
-
-The `DEONTIC` type parameterises over the actor type and the action type, so different contracts can use different domain-specific parties and actions while sharing the same machinery.
-
-> **Who may perform which action?** When actors are modelled as values and actions carry their actor(s), L4 enforces that a `PARTY p MUST a` obligation (and a `PARTY p DOES a` event) has `p` as the action's _performer_ — so a Drinker cannot be obligated to eat. This covers duplex actions, parameterised (overloaded) actions, and higher-order procurement. See **[Actors, Actions, and Agreement](actors-and-actions.md)** for the full syntax and copious worked examples of what is and isn't allowed.
-
----
-
-## The Mental Model: A Contract Awaiting Events
-
-This is the single most important idea in the regulative system, and the one most often missed.
-
-> **A regulative rule by itself does not decide anything. It is a contract that lies dormant until you feed it a starting time and a sequence of events.**
-
-In other words, a `DEONTIC` value behaves like a function with two inputs:
+A `DEONTIC` value behaves like a function of two inputs:
 
 ```
-contract  ⨯  (start time, events)  →  verdict
+contract  ×  (start time, events)  →  verdict
 ```
 
-- **Start time** — a number that locates "now" on a shared timeline. All deadlines and event timestamps are measured against the same timeline.
-- **Events** — an ordered list of things that actually happened. Each event records _who acted_, _what they did_, and _when_.
-- **Verdict** — one of `FULFILLED`, `BREACH`, or a _residual obligation_ (a contract that is still alive but partially advanced). See [The Three Possible Outcomes](#the-three-possible-outcomes) below.
+- The **start time** places "now" on a timeline. Deadlines and event times are measured on the same timeline.
+- The **events** are what actually happened, in order. Each records who acted, what they did, and when.
+- The **verdict** is `FULFILLED`, a breach, or a _residual obligation_: the contract, partly advanced and still waiting.
 
-This is why a regulative rule is more than just a boolean check. It is a stateful object that watches a timeline, advances as events arrive, and decides on success, failure, or "still waiting" — all while preserving enough information to be resumed later.
+So a regulative rule is more than a yes-or-no check. It watches a timeline, moves forward as events arrive, and keeps enough state to be resumed later.
+
+**Example:** [delivery-obligation.l4](delivery-obligation.l4)
+
+The four `#TRACE` runs in the example give four different results from one rule:
+
+| Events                         | Result                                                  |
+| ------------------------------ | ------------------------------------------------------- |
+| The seller delivers on day 10  | `FULFILLED`                                             |
+| The next event is on day 20    | `BREACH BY` the seller, with the reason given in `LEST` |
+| The buyer "delivers" on day 10 | A residual obligation: the seller must deliver within 4 |
+| No events                      | A residual obligation: the rule itself, still waiting   |
+
+The last two rows surprise most people. A missing event is not a breach. Nothing has happened yet that shows the deadline passed, so the contract is still open.
 
 ---
 
-## Events and the Timeline
+## Events and the timeline
 
 An event is a triple:
 
 ```
-(party, action, timestamp)
+(party, action, time)
 ```
-
-- **party** — who did it (must match a value of the contract's actor type)
-- **action** — what they did (matched against the contract's action shape — see [Conditional obligations with PROVIDED](#conditional-obligations-with-provided))
-- **timestamp** — a number on the same timeline as the start time and `WITHIN` deadlines
 
 > **The party must be the action's performer.** When actors are modelled as values and actions carry their actor(s), a `PARTY p DOES a` event — and a `PARTY p MUST a` obligation — is rejected at type-check time unless `p` is the action `a`'s _performer_. So `PARTY Drinker DOES eat` does not type-check if `eat`'s performer is the Eater. See [Actors, Actions, and Agreement](actors-and-actions.md) for the full rule (the subject-first canon, duplex actions, parameterised actions, and higher-order procurement).
 
-Events are consumed **in order**. As each event is examined, two pieces of internal state move:
+The contract reads events in order. With each event, two things move: the contract's clock advances to the event's time, and the remaining window of the current `WITHIN` shrinks by the time that has passed. Then:
 
-- the contract's **current time** advances to the event's timestamp
-- the **remaining window** under `WITHIN` shrinks by however much time has passed
-
-If an event sits beyond the deadline, the contract takes its failure branch (or, for `SHANT`, its success branch — see below) without even examining what the event was. If the event is within time, the contract checks whether _this_ event matches _this_ obligation (right party, right action shape, guard satisfied). If it matches, the contract advances along `HENCE` (or `LEST` for a violated prohibition). If it doesn't match, the event is skipped and the next one is tried — with the clock now further along and the remaining window smaller.
+- If the event comes **after the deadline**, the contract takes the branch for a missed deadline, without looking at what the event was.
+- If the event is **in time and matches** the duty (right party, right action, any `PROVIDED` condition true), the contract takes the branch for the action being done.
+- If the event is **in time but does not match**, it is skipped. The next event is tried, with the clock further on.
 
 If the event's action holds a fact the case has not supplied, at a place where the action written in the `MUST`, `MAY` or `SHANT` line names one particular kind of thing — a delivery of goods of a kind nobody has stated, against `MUST Deliver Retail` — the contract cannot tell whether it matches, so the run stops and names the missing fact rather than skipping the event. An event that plainly cannot match, whatever that fact turns out to be, is still skipped: a different action, or a quantity written out as a number that differs from the number the obligation writes, as long as everything between the missing fact and that number is written out too. Where the run would have to work something out first to see the mismatch, it stops instead.
 
 The same holds when the missing fact is checked by a rule that uses `CONSIDER`, whether in the action or in a `PROVIDED` condition: an `OTHERWISE` line is not taken just because the fact is missing, so where a line before it could still match, the run stops and names it.
 
-The timeline is purely numeric. It can stand for days, seconds, business hours, or any other unit — L4 doesn't care, as long as deadlines and event timestamps use the same units.
+For `MUST`, doing the action leads to `HENCE` and a missed deadline to `LEST`. For `MAY`, both lead to `HENCE`, because not using a permission is no breach. A prohibition, `SHANT`, turns `MUST` around: doing the forbidden act leads to `LEST`, and reaching the deadline without it leads to `HENCE`. In every case, `HENCE` names the outcome the law wants, and `LEST` the one it does not. `DO` is the bare form, with no modal word; on the current release it behaves exactly as `MUST` does — the same defaults, and the same outcomes when the action is taken and when the deadline passes.
 
----
+The timeline is just numbers. It can stand for days, hours or business days, as long as deadlines and event times use the same unit.
 
-## Obligations: MUST
-
-An **obligation** requires a party to perform an action by a deadline.
-
-```l4
-PARTY  Seller
-MUST   `deliver goods`
-WITHIN 14
-HENCE  FULFILLED          -- if delivered in time, the duty is discharged
-LEST   BREACH BY Seller   -- if not delivered in time, the seller breaches
-```
-
-A matching event before the deadline takes the `HENCE` branch. The deadline passing without a matching event takes the `LEST` branch.
-
-### Conditional obligations with PROVIDED
-
-`PROVIDED` adds a boolean guard to the action. After an event matches the action's shape, the guard is evaluated; if false, the match is rejected and the next event is tried.
-
-```l4
-PARTY  Buyer
-MUST   `pay amount` PROVIDED amount AT LEAST `Payment Due`
-WITHIN 30
-HENCE  FULFILLED
-LEST   BREACH
-```
-
-Use `PROVIDED` to express "the action only counts if …".
-
----
-
-## Permissions: MAY
-
-A **permission** allows a party to perform an action without requiring it.
-
-```l4
-PARTY Buyer
-MAY   `inspect goods`
-HENCE FULFILLED
-```
-
-The crucial difference from `MUST`: **not exercising a permission is not a breach.**
-
-| What happened              | MUST               | MAY              |
-| -------------------------- | ------------------ | ---------------- |
-| Action performed in time   | HENCE (compliance) | HENCE (used)     |
-| Deadline passed, no action | LEST (breach)      | HENCE (declined) |
-
-Permissions are used for optional rights ("buyer may return within 30 days"), discretionary powers ("the commissioner may issue a notice"), and conditional entitlements ("may claim a refund if defective").
-
----
-
-## Prohibitions: SHANT — and the Polarity Flip
-
-A **prohibition** forbids a party from performing an action during a window.
-
-```l4
-PARTY Employee
-SHANT `disclose confidential information`
-HENCE FULFILLED
-LEST  BREACH BY Employee
-```
-
-`MUST NOT` is accepted as a synonym of `SHANT` — write whichever reads closer to the source text.
-
-For prohibitions, **the meaning of "success" and "failure" is inverted compared to `MUST`**:
-
-|                            | MUST       | SHANT          |
-| -------------------------- | ---------- | -------------- |
-| Action performed           | Compliance | **Breach**     |
-| Deadline passed, no action | Breach     | **Compliance** |
-
-This is the _polarity flip_ of `SHANT`: for a prohibition, **the deadline passing quietly is the good outcome**, and a matching event is the violation. That's why `SHANT … HENCE` fires when the timer runs out without anything happening, while `MUST … HENCE` fires when something _does_ happen.
-
-A useful way to remember it: `HENCE` always names the legally desirable outcome, and `LEST` always names the legally undesirable one. Whether that corresponds to "event happened" or "deadline passed" depends on the modal.
-
----
-
-## Deadlines: WITHIN
-
-`WITHIN` sets a relative time window — how long the duty remains live.
-
-```l4
-PARTY  Seller
-MUST   `deliver goods`
-WITHIN 14
-```
-
-The deadline is `start_time + 14`. As the contract advances through events, the remaining window shrinks: after consuming an event at time 12, what was originally `WITHIN 14` is effectively `WITHIN 2` of any subsequent event.
-
-The timeline is purely numeric, and a plain `WITHIN` window starts when its obligation becomes active. To express "deliver within 5 days of order confirmation", chain the obligations: under `HENCE`, the inner window starts from the act that completed the outer obligation; under `LEST`, it starts from the outer obligation's failure — the deadline that was missed for a `MUST`, `DO` or `MAY`, the forbidden act itself for a `SHANT` — and not from whatever later event brought the miss to light. A deadline can also be anchored outright, with `WITHIN d OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING` or `OF` an instant; the [regulative reference](../../reference/regulative/README.md#within-temporal-deadline) has the table.
-
-```l4
-PARTY Buyer
-MUST  `confirm order`
-WITHIN 30
-HENCE
-    PARTY  Seller
-    MUST   deliver
-    WITHIN 5
-    HENCE  FULFILLED
-    LEST   BREACH BY Seller
-```
-
-If the buyer confirms at time 10, the seller's deadline is time 15 — the 5-unit window is measured from the confirmation event, not from the start of the contract.
-
-Without a `WITHIN`, the obligation is _ongoing_ and only fires (or breaches) when an explicit fulfilment or breach is reached:
-
-```l4
-PARTY Employee
-MUST  `maintain confidentiality`
--- no WITHIN: open-ended duty
-HENCE FULFILLED
-LEST  BREACH
-```
+A plain `WITHIN` window starts when its obligation becomes active. In a chain, under `HENCE` the next duty's window starts at the act that completed the one before: if the buyer confirms an order on day 10 and the seller then has `WITHIN 5`, the seller's deadline is day 15. Under `LEST`, the window starts from the outer obligation's failure — the deadline that was missed for a `MUST`, `DO` or `MAY`, the forbidden act itself for a `SHANT` — and not from whatever later event brought the miss to light. A deadline can also be anchored outright, with `WITHIN d OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING` or `OF` an instant; [Deadlines and consequences](../../reference/regulative/consequences.md#anchoring-a-deadline-with-of) has the table.
 
 A window can also have an _opening_ edge — _after a three-day cooling-off period, within 30 days_ is `AFTER 3 WITHIN 30`, and an act before the window opens does not count (the run says so) — and either edge has an absolute form: `AFTER (YMD 2026 6 1)`, `BEFORE (YMD 2026 12 31)`. `WITHIN` takes a duration and `BEFORE` a date, as in English. A date lands on the contract's clock only when the trace is stamped in date serials; on a trace that starts at 0 it is refused by name rather than silently misread. The [AFTER](../../reference/regulative/AFTER.md) page has the two readings of a two-edged window and the limit in full.
 
 ---
 
-## Consequences: HENCE and LEST
+## Three possible outcomes
 
-Every regulative rule names two outgoing branches.
+After a contract has read its events, it is in one of three states.
 
-### HENCE — the desirable path
+**`FULFILLED`.** Every duty was discharged. Nobody has anything left to do under this contract.
 
-```l4
-HENCE FULFILLED                       -- contract complete
-HENCE `next obligation`               -- chain to another rule
-HENCE obligation1 RAND obligation2    -- chain to several at once
-```
+**Breach.** A party failed a duty, or did something forbidden, and no fallback took over. The breach records who breached and, if `BECAUSE` was used, why. That reason is what a reviewer or a downstream system reads, so it is worth writing.
 
-### LEST — the undesirable path
+**A residual obligation.** The events ran out before the contract was fulfilled or breached. The result is a new `DEONTIC` value: the contract in its current state, with the clock where the events stopped, any `WITHIN` window shortened, and any chain ready to resume from its current step. It is a first-class value, so you can:
 
-```l4
-LEST BREACH                                    -- terminal breach
-LEST BREACH BY Seller                          -- breach by a specific party
-LEST BREACH BY Seller BECAUSE "late delivery"  -- breach with a reason
-LEST `penalty clause`                          -- alternative obligation (reparation)
-```
+- inspect it: what is still owed, by whom, and how much time is left?
+- store it, to keep a long-running contract between sessions;
+- give it more events later, to resume where it left off.
 
-`BECAUSE` attaches a human-readable reason to a breach. Use it. Breach reasons are the thing a legal reviewer or downstream system actually reads.
-
-### What "HENCE" and "LEST" trigger on, per modal
-
-| Modal   | HENCE fires when                        | LEST fires when                        | HENCE default | LEST default |
-| ------- | --------------------------------------- | -------------------------------------- | ------------- | ------------ |
-| `DO`    | action is taken                         | deadline passes                        | `FULFILLED`   | `BREACH`     |
-| `MUST`  | action is taken                         | deadline passes without action         | `FULFILLED`   | `BREACH`     |
-| `MAY`   | action is taken                         | deadline passes (permission unused)    | `FULFILLED`   | `FULFILLED`  |
-| `SHANT` | deadline passes (prohibition respected) | action is taken (prohibition violated) | `FULFILLED`   | `BREACH`     |
-
-If you omit `HENCE` or `LEST`, the default above is supplied. `DO` is the bare form, with no modal word; on the current release it behaves exactly as `MUST` does — the same defaults, and the same outcomes when the action is taken and when the deadline passes.
-
----
-
-## The Three Possible Outcomes
-
-Once a contract has consumed an event stream, it returns one of three things.
-
-### 1. `FULFILLED`
-
-Every obligation was discharged. There is nothing left for any party to do under this contract.
-
-### 2. `BREACH`
-
-Some party failed an obligation (or violated a prohibition) and there was no reparation clause to absorb the failure. A `BREACH` records _who_ breached and, if `BECAUSE` was used, _why_.
-
-### 3. A **residual obligation**
-
-This is the most powerful outcome. If the event stream runs out _before_ the contract has fulfilled or breached, the result is a new `DEONTIC` value — the contract in its current state, with:
-
-- the current time advanced to where the event stream stopped
-- any `WITHIN` window shrunk by however much time was consumed
-- any partially-completed `HENCE` chain ready to resume from its current step
-
-The residual obligation is the contract, frozen mid-flight, as a first-class value. You can:
-
-- inspect it (what's still owed by whom, with how much time left?)
-- store it (persist a long-running contract between sessions)
-- feed it more events later (resume execution where you left off)
-
-This is why L4 is a _contract_ language rather than just a _checking_ language: contracts can survive partial execution and be resumed indefinitely.
+This is what makes L4 a contract language rather than only a checking language. A contract can be partly performed and picked up again at any time.
 
 > **Sidebar:** the word _residual_ leads parallel lives in economics (residual control rights, the incomplete-contracts work behind the 2016 Nobel Prize) and in public law (residual discretionary powers — who decides when the statute runs out). The three senses illuminate each other: see [Residual: One Word, Three Disciplines](residual.md).
 
 ---
 
-## Reparation Clauses: LEST as Another Obligation
+## Chains, fallbacks and repeating duties
 
-`LEST` does not have to mean "the contract dies here". It can name _another_ obligation — a fallback duty that fires when the primary one fails. This is how reparation, penalties, and grace periods are expressed.
+Larger contracts are built by putting rules inside rules.
 
-```l4
--- Pay on time, or pay more later
-PARTY  `The Borrower`
-MUST   pay `outstanding amount`
-WITHIN `due date`
-HENCE  FULFILLED
-LEST (
-    PARTY  `The Borrower`
-    MUST   pay `outstanding amount with 5% penalty`
-    WITHIN `default deadline`
-    -- no LEST here: missing this deadline is a terminal breach
-)
-```
+- **Chains.** `HENCE` can name another obligation: once the seller delivers, the buyer must pay. One stream of events runs through the whole chain, and each step starts reading where the last one stopped.
+- **Fallbacks.** `LEST` can name another obligation instead of a breach: pay on time, or pay more within a further period. This is how reparation, penalties and grace periods are written. The contract walks down the fallbacks until something is fulfilled, or a step with no fallback is missed and breaches.
+- **Repeating duties.** A function can return the next period's obligation and call itself in `HENCE`, so instalments or periodic reports need no fixed-length list of steps.
+- **Parallel duties.** `RAND` runs two obligations side by side and needs both; `ROR` needs either.
 
-The inner obligation has no `LEST`, so missing _that_ deadline is the true breach. The outer `LEST` is a softening — the law gives the borrower another chance at a higher price.
-
-You can stack reparation clauses several deep. The contract walks down the chain until something fulfills, or until a leaf with no `LEST` is reached and breaches.
+[Deadlines and consequences](../../reference/regulative/consequences.md) gives the syntax and the exact rules for each.
 
 ---
 
-## Chaining Obligations with HENCE
-
-Real contracts have sequences of duties. `HENCE` strings them together:
-
-```l4
-PARTY  Seller
-MUST   `deliver goods`
-WITHIN 14
-HENCE
-    PARTY  Buyer
-    MUST   `pay invoice`
-    WITHIN 30
-    HENCE  FULFILLED
-    LEST   BREACH BY Buyer
-LEST BREACH BY Seller
-```
-
-The behaviour:
-
-1. Seller has 14 time units to deliver.
-2. _If they deliver_, the buyer is now obliged to pay within 30 of that delivery.
-3. _If the seller does not deliver_, the contract terminates in breach.
-4. If the buyer then pays in time, the contract is `FULFILLED`. If not, the buyer breaches.
-
-The same event stream is threaded through the whole chain — once the seller's delivery event is consumed, the contract advances to the buyer's payment obligation and continues reading from the next event.
-
----
-
-## Recursive Obligations
-
-For recurring duties — instalments, subscriptions, periodic reporting — define a function that emits the _next_ period's obligation:
-
-```l4
-GIVEN remainingBalance IS A NUMBER
-`monthly payments` remainingBalance MEANS
-    IF remainingBalance GREATER THAN 0
-    THEN PARTY  `The Borrower`
-         MUST   pay `monthly installment`
-         WITHIN `next due date`
-         HENCE  `monthly payments` (remainingBalance MINUS `monthly installment`)
-         LEST   `monthly payments` (remainingBalance PLUS `late penalty`)
-    ELSE FULFILLED
-```
-
-`HENCE` reduces the balance and re-issues the same obligation for the following period. `LEST` adds a penalty and tries again. The recursion bottoms out at `FULFILLED` when the balance is paid down.
-
-Recursive obligations let a single rule represent open-ended duties without exploding into a fixed-length sequence.
-
----
-
-## Parallel Composition: RAND and ROR
-
-Two obligations can be active at the same time.
-
-### RAND — both must be fulfilled
-
-```l4
-(PARTY Seller MUST `deliver goods`    WITHIN 14 HENCE FULFILLED LEST BREACH)
-RAND
-(PARTY Seller MUST `provide warranty` WITHIN 14 HENCE FULFILLED LEST BREACH)
-```
-
-Both sides run on the same event stream. The compound `FULFILLS` only if both sides fulfil. If _either_ side breaches, the compound breaches.
-
-### ROR — either one is enough
-
-```l4
-(PARTY Seller MUST `ship goods`     WITHIN 14 HENCE FULFILLED LEST BREACH)
-ROR
-(PARTY Seller MUST `arrange pickup` WITHIN 7  HENCE FULFILLED LEST BREACH)
-```
-
-The first side to fulfil determines the outcome — a race. Only if _both_ sides breach does the compound breach.
-
-**Precedence:** `RAND` binds tighter than `ROR`, so `A ROR B RAND C` means `A ROR (B RAND C)`.
-
----
-
-## The Regulative Rule Lifecycle
+## The lifecycle
 
 ```
                   ┌──────────────────────────┐
@@ -427,145 +143,31 @@ The first side to fulfil determines the outcome — a race. Only if _both_ sides
    └────────────────────────────────────┘
 ```
 
-If the event stream is exhausted before this loop terminates, the entire in-progress contract is returned as a residual obligation.
+If the events run out before the loop ends, the contract in progress is returned as a residual obligation.
 
 ---
 
-## Testing with #TRACE
+## Running a contract
 
-`#TRACE` is the primary way to exercise a regulative rule. It runs the contract against a fixed start time and event sequence and reports the verdict.
-
-```l4
--- Happy path: delivery happens in time
-#TRACE `delivery obligation` AT 0 WITH
-    PARTY Seller DOES `deliver goods` AT 10
--- Result: FULFILLED
-
--- Breach: no event in the deadline window
-#TRACE `delivery obligation` AT 0 WITH
-    -- (no events)
--- Result: BREACH (after day 14)
-
--- Wrong party: the obligated party did not act
-#TRACE `delivery obligation` AT 0 WITH
-    PARTY Buyer DOES `deliver goods` AT 10
--- Result: BREACH — Buyer is not the obligated party, so the event is skipped,
---                  and the deadline passes with no matching event.
-
--- Residual: events run out before the deadline
-#TRACE `delivery obligation` AT 0 WITH
-    -- (no events, and the contract was never advanced past WITHIN 14)
--- Result: a residual obligation, with the same duty but clock partly used up
-```
-
-The starting number after `AT` and the event timestamps after `AT` (inside the `WITH` block) sit on the same numeric timeline as any `WITHIN` durations in the contract.
-
-You can also drive a contract programmatically with the underlying evaluation function, which has the same shape as the mental model:
+`#TRACE` runs a contract from a start time against a fixed list of events and reports the verdict, as in the example above. The same thing is available as a function, `EVALTRACE`, whose type states the mental model directly:
 
 ```
 EVALTRACE  :  DEONTIC party action          -- the contract
            →  NUMBER                        -- start time
-           →  LIST (EVENT party action)     -- events
-           →  DEONTIC party action          -- result (terminal or residual)
+           →  LIST OF EVENT party action    -- events
+           →  DEONTIC party action          -- the result: finished or residual
 ```
 
-This signature is the formal version of "a contract is a function of (start time, events)". Calling `EVALTRACE` repeatedly with the residual from a previous call is how a long-running contract is advanced piece by piece.
+To advance a long-running contract step by step, call `EVALTRACE` again on the residual from the previous call, starting at the time where the previous events stopped. [EVENT](../../reference/regulative/EVENT.md) shows how to build the event list.
+
+To see every path a rule can take rather than one run of it, `l4 state-graph` draws the rule as a graph of states, deadline transitions and the terminal `FULFILLED` and `BREACH` nodes. In the editor, **Show state graph** above a regulative rule opens the same graph in a pane; the [state graph reference page](../../reference/regulative/STATE-GRAPH.md) says how to read it and what it does not show.
 
 ---
 
-## State Graphs
+## Further reading
 
-L4 can visualise regulative rules as state machines, showing the possible paths through `HENCE` and `LEST`:
-
-```bash
-l4 state-graph mycontract.l4
-# Or, from a Haskell checkout:
-cabal run l4 -- state-graph mycontract.l4
-```
-
-The graph shows the initial state, intermediate obligations, deadline transitions, and terminal `FULFILLED` / `BREACH` nodes. In the editor, **Show state graph** above a regulative rule opens the same graph in a pane; the [state graph reference page](../../reference/regulative/STATE-GRAPH.md) says how to read it and what it does not show.
-
----
-
-## Best Practices
-
-### 1. Always name both paths
-
-```l4
--- ✅ Both paths specified
-MUST  action
-HENCE FULFILLED
-LEST  BREACH
-
--- ❌ Missing LEST — relies on defaults; intent is less clear to readers
-MUST  action
-HENCE FULFILLED
-```
-
-The defaults are sensible, but writing both branches explicitly makes legal review easier.
-
-### 2. Attach blame and reasons
-
-```l4
--- ✅ Clear who breached, and why
-LEST BREACH BY Seller BECAUSE "failed to deliver within 14 days"
-
--- Less useful in downstream reports
-LEST BREACH
-```
-
-### 3. Name actions like the legal text
-
-```l4
--- ✅ Reads like the contract it formalises
-MUST `deliver goods in accordance with specification`
-
--- ❌ Loses the legal nuance
-MUST deliver
-```
-
-### 4. Prefer reparation chains to silent defaults
-
-When a deadline failure has a remedy ("pay within 30 or pay extra within 60"), express the remedy as a nested obligation in `LEST` rather than letting the contract terminate in an unrecoverable breach.
-
----
-
-## Summary
-
-| Concept     | Purpose                                                                                     | Syntax                                              |
-| ----------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| MUST        | Obligation                                                                                  | `PARTY x MUST action`                               |
-| MAY         | Permission                                                                                  | `PARTY x MAY action`                                |
-| SHANT       | Prohibition (polarity flips!)                                                               | `PARTY x SHANT action`                              |
-| DO          | Bare form; behaves as MUST                                                                  | `PARTY x DO action`                                 |
-| WITHIN      | Relative deadline                                                                           | `WITHIN duration`                                   |
-| HENCE       | Desirable-outcome branch                                                                    | `HENCE nextRule`                                    |
-| LEST        | Undesirable-outcome branch                                                                  | `LEST consequence` (terminal or another obligation) |
-| PROVIDED    | Guard on action matching                                                                    | `MUST action PROVIDED condition`                    |
-| _(default)_ | A name in an action requires the value it names; a name that names nothing is a placeholder | `MUST action name`                                  |
-| BREACH      | Terminal failure state                                                                      | `LEST BREACH BY party BECAUSE reason`               |
-| FULFILLED   | Terminal success state                                                                      | `HENCE FULFILLED`                                   |
-| RAND        | Parallel: all must fulfil                                                                   | `rule1 RAND rule2`                                  |
-| ROR         | Parallel: any one suffices                                                                  | `rule1 ROR rule2`                                   |
-| #TRACE      | Simulate against a timeline                                                                 | `#TRACE rule AT t WITH events…`                     |
-
-Key conceptual takeaways:
-
-- A regulative rule is a _deontic particle_ with five slots: party, modal-and-action, deadline, hence, lest.
-- A regulative rule is _dormant_ until it is given a start time and an event stream.
-- Events are `(party, action, timestamp)` triples on a shared numeric timeline.
-- The contract advances through events in order; the clock moves forward and any `WITHIN` window shrinks.
-- The result is one of three things: `FULFILLED`, `BREACH`, or a _residual obligation_ that can be resumed later.
-- `SHANT` flips the polarity: for a prohibition, the deadline passing quietly is the success path.
-- `LEST` can name another obligation rather than a terminal breach — that is how reparation clauses, penalties, and grace periods are expressed.
-
----
-
-## Further Reading
-
-- [One Obligation](../../tutorials/obligations/one-obligation.md), [What Follows](../../tutorials/obligations/what-follows.md), [Several Parties](../../tutorials/obligations/several-parties.md), [What Is Coming](../../tutorials/obligations/what-is-coming.md) — The tutorial series: one tenancy, one screen at a time
-- [The Regulative Layer, Whole](regulative-layer-whole.md) — How the five separate ideas on this page fit together, and which are proposed rather than built
-- [Foundation Course Module 6](../../courses/foundation/module-6-regulative.md) — Hands-on tutorial
-- [Regulative Rule Keywords](../../reference/regulative/README.md) — Full keyword reference
-- [DEONTIC](../../reference/regulative/DEONTIC.md) — The regulative type, in detail
-- [PARTY](../../reference/regulative/PARTY.md), [MUST](../../reference/regulative/MUST.md), [MAY](../../reference/regulative/MAY.md), [SHANT](../../reference/regulative/SHANT.md), [BECAUSE](../../reference/regulative/BECAUSE.md) — Individual keyword pages
+- [One Obligation](../../tutorials/obligations/one-obligation.md), [What Follows](../../tutorials/obligations/what-follows.md), [Several Parties](../../tutorials/obligations/several-parties.md) and [What Is Coming](../../tutorials/obligations/what-is-coming.md): the tutorial series, one tenancy and one screen at a time.
+- [The Regulative Layer, Whole](regulative-layer-whole.md): how the separate ideas fit together, and which are proposed rather than built.
+- [Module 6: Regulative rules](../../courses/foundation/module-6-regulative.md): writing and testing regulative rules step by step.
+- [Regulative rules](../../reference/regulative/README.md), [PARTY, MUST, MAY, SHANT](../../reference/regulative/PARTY.md) and [Deadlines and consequences](../../reference/regulative/consequences.md): the keyword reference.
+- [DEONTIC](../../reference/regulative/DEONTIC.md): the type of a regulative rule.

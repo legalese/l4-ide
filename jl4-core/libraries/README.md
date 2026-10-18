@@ -6,15 +6,21 @@ This directory contains the standard libraries for L4, providing common function
 
 - **prelude.l4** - Core functions and types (lists, maybe, either, basic operations)
 - **negation-as-failure.l4** - Negation-as-failure combinators (`holds` / `naf` / `presumed`) over `MAYBE BOOLEAN`
+- **math.l4** - Mathematical functions (trigonometry, logarithms, etc.)
 - **daydate.l4** - Date arithmetic and calendar functions
 - **date-compat.l4** - Backwards compatibility layer for legacy DATE syntax
+- **time.l4** - Times of day
+- **datetime.l4** - Points in time with a time zone
+- **timezone.l4** - IANA time zone constants
 - **excel-date.l4** - Excel-compatible date functions
-- **temporal-prelude.l4** - Temporal logic and time-based reasoning
 - **currency.l4** - Currency types and operations
+- **holdings.l4** - Financial holdings and ownership structures
+- **actus.l4** - ACTUS financial contract types (with its `actus-*.l4` modules)
 - **legal-persons.l4** - Legal entity types (persons, corporations, etc.)
 - **jurisdiction.l4** - Jurisdiction and legal domain modeling
-- **holdings.l4** - Financial holdings and ownership structures
-- **math.l4** - Mathematical functions (trigonometry, logarithms, etc.)
+- **llm.l4** - Calling language models from L4
+
+User documentation for each library: `doc/reference/libraries/` (published at <https://legalese.com/l4/reference/libraries>).
 
 ## How `IMPORT` finds these files (resolution order)
 
@@ -37,7 +43,8 @@ symlink can't silently shadow the stdlib the binary was built with. When
 several _differing_ copies of a module are visible at once, the resolver emits
 a warning naming all of them (symlinks dereferenced) and the one chosen. See
 `doc/reference/libraries/resolution.md` for the full dev-vs-prod guide
-(including the history that forced this design), and
+(including the history that forced this design),
+`specs/as-built/import-resolution.md` for an as-built description of the code, and
 `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` for the design analysis.
 
 ## Editing these files? Read this first (the staleness gotcha)

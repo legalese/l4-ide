@@ -46,7 +46,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, positionalCall, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget)
+import qualified L4.Transform as Transform (simplify, positionalCall, inlineLetsForViz, writtenAsClauses, holdsGeneratedNodes, clauseGroupLadderBudget, letInliningNodeBudget)
 import L4.Desugar
 import qualified L4.Export as Export
 import qualified L4.Refusal as Refusal
@@ -348,13 +348,20 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   -- written by hand that has a call to a clause group unfolded into it (the
   -- IDE's l4/inlineExprs) is still a rule written by hand.
   let isClauseGroup = Transform.writtenAsClauses asWritten
+      -- The limits below guard the reading through, so they apply to a group
+      -- that has something to read through. One whose first clause names each
+      -- input as the GIVEN does (or is @_@) has nothing: its body is that
+      -- clause's result, and it is drawn as a rule written without clauses is,
+      -- whatever its size. A first clause that gives an input a new name is a
+      -- test the desugarer generates, so that group is read through.
+      readsThrough = isClauseGroup && Transform.holdsGeneratedNodes body0
   body <- case Transform.inlineLetsForViz body0 of
     Right inlined -> pure inlined
     -- Too big to read through. Clauses are refused, for a plan of any size
     -- they would be drawn as one leaf that asks nothing. Anything else is
     -- drawn as written: a LET the drafter wrote is never read through.
-    Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
-           | otherwise     -> pure body0
+    Left _ | readsThrough -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+           | otherwise    -> pure body0
 
   let funName = mkPrettyVizName funResolved
   assign #functionName funName.label
@@ -372,8 +379,9 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   vizBody <- translateExpr shouldSimplify (carameliseExpr body)
   -- The ladder of a rule written as clauses can be far larger than the clauses
   -- (see 'Transform.clauseGroupLadderBudget'), and the plan far larger still.
-  -- A rule that was not written as clauses is drawn as it always was.
-  when (isClauseGroup && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+  -- A rule that was not written as clauses, or whose first clause names each
+  -- input as the GIVEN does (or is @_@), is drawn as it always was.
+  when (readsThrough && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
     throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
   pure $ MkFunDecl vid funName (paramNamesFromGivens givenSig appArgs) vizBody
   where

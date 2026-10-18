@@ -149,8 +149,7 @@ hasGeneratedLets = anyOf (cosmosOf (gplate @(Expr Resolved))) isGeneratedLet
 -- proportion to everything under it, and a group of @n@ clauses is @n@ nested
 -- @LET@s, so it takes time quadratic in @n@: 30 s for 300 clauses. These
 -- bindings are all of one shape (no parameters, used from the CONSIDERs of
--- their own body) and a plain substitution takes time linear in the size of
--- the body it goes into.
+-- their own body), which a plain substitution reads.
 inlineGeneratedLets :: Expr Resolved -> Expr Resolved
 inlineGeneratedLets = transformOf (gplate @(Expr Resolved)) \ case
   LetIn _ ds body
@@ -257,13 +256,26 @@ inlineLetsForViz e
     nodes x = x : concatMap nodes (toListOf (gplate @(Expr Resolved)) x)
 
 -- | The size, in expression nodes, past which the generated @LET@s of a clause
--- group are not inlined for drawing. It bounds the work of drawing;
--- 'clauseGroupLadderBudget' is the limit on what is drawn.
+-- group are not read through for drawing, counted on the pruned CONSIDERs
+-- before those on one input are joined. It bounds the size of the pruned
+-- result, which pruning cannot always keep small: it cannot settle every copy
+-- (behind a pattern that binds a name, say), and a long group of many inputs
+-- could still copy those exponentially. The time pruning takes follows the size
+-- it reaches before the count stops it, so refusing takes about as long as
+-- drawing a group of this size: the as-built spec measures that, in its
+-- "Bounds". 'clauseGroupLadderBudget' is the limit on what is drawn.
 letInliningNodeBudget :: Int
 letInliningNodeBudget = 20000
 
 -- | The most nodes a ladder may have when the rule was written as DECIDE
--- clauses. It bounds the drawing, not the work of planning what is drawn.
+-- clauses and the desugarer generated something to read through
+-- ('holdsGeneratedNodes'). It bounds the drawing, not the work of planning what
+-- is drawn.
+--
+-- A group whose first clause names each of its inputs as the @GIVEN@ does, or
+-- is @_@, is not limited. It has nothing to read through, so its ladder is
+-- that of a rule written without clauses, which is not limited either, however
+-- far simplifying grows it.
 --
 -- It was chosen from plans measured through jl4-service on 539cad5fd, before
 -- 'pruneGeneratedConsiders', on randomly generated groups over three to six
@@ -294,6 +306,31 @@ clauseGroupLadderBudget = 300
 -- @l4/inlineExprs@) is still a rule written by hand.
 writtenAsClauses :: Decide Resolved -> Bool
 writtenAsClauses (MkDecide ann _ _ _) = isJust (view annPmMatrix ann)
+
+-- | Does this expression hold a node the clause desugarer generated: a CONSIDER
+-- it compiled clauses to ('PmConsider'), or a LET that binds the clauses not
+-- yet tried? Only then is there anything to read through, and only then do the
+-- limits on reading clauses through apply.
+--
+-- A group whose first clause names each of its inputs as the @GIVEN@ does, or is
+-- @_@, has no such node. The desugarer binds the clauses after that one only so
+-- that they are checked, and the checker drops them from the tree
+-- ('PmUnreachable'), so the body is that clause's result, as a rule written
+-- without clauses would have it. A first clause that matches every input
+-- through a new name is not that: it is a test of the input, generated, with
+-- the clauses after it as the other answer, so it holds a node.
+holdsGeneratedNodes :: Expr Resolved -> Bool
+holdsGeneratedNodes e = here || any holdsGeneratedNodes (toListOf (gplate @(Expr Resolved)) e)
+  where
+    here = case e of
+      Consider ann _ _ -> case view annPmSynthetic ann of
+        Just PmConsider{} -> True
+        _                 -> False
+      LetIn _ ds _ -> any generatedDecl ds
+      _            -> False
+    generatedDecl = \ case
+      LocalDecide _ (MkDecide a _ _ _) -> isJust (view annPmSynthetic a)
+      _                                -> False
 
 -- | Join a generated CONSIDER whose last branch is an OTHERWISE holding another
 -- generated CONSIDER on the same input. Bottom-up, so a run of three joins.
@@ -348,67 +385,97 @@ joinGeneratedConsiders = transformOf (gplate @(Expr Resolved)) \ case
 -- Only CONSIDERs the desugarer generated are read this way. What is known is
 -- forgotten inside anything that binds a name (a lambda, a LET, a WHERE), and is
 -- only ever about an input written as a bare name.
+--
+-- A clause whose pattern is a new name stands for the input in everything after
+-- it. That is a renaming carried down and applied where a name is read, and not
+-- a rewrite of the clauses after it: those are the same later clauses reached by
+-- more than one way, and a rewrite for each name a clause bound rebuilt them
+-- once per name, which took a minute for a table of 24 clauses of optional
+-- inputs taken apart with @JUST@ and given new names for the others.
 pruneGeneratedConsiders :: Expr Resolved -> Expr Resolved
-pruneGeneratedConsiders = total Map.empty
+pruneGeneratedConsiders = total [] Map.empty
   where
     -- Never stuck: where pruning finds no arm can be taken, read the expression
     -- with nothing known instead, which keeps every arm.
-    total :: Map.Map Unique Known -> Expr Resolved -> Expr Resolved
-    total known e = case go known e of
+    total :: Rename -> Map.Map Unique Known -> Expr Resolved -> Expr Resolved
+    total rn known e = case go rn known e of
       Just e' -> e'
-      Nothing -> case go Map.empty e of
+      Nothing -> case go rn Map.empty e of
         Just e' -> e'
+        -- Not reached: with nothing known, the first arm of a generated CONSIDER
+        -- is always kept (a literal or constructor arm stays, an arm that binds
+        -- is the OTHERWISE), and 'matchOne' and 'matchLast' always write one. The
+        -- old code's @e@ was already renamed; this one is not.
         Nothing -> e
 
-    -- 'Nothing': no arm of this generated CONSIDER can be taken.
-    go :: Map.Map Unique Known -> Expr Resolved -> Maybe (Expr Resolved)
-    go known e = case e of
+    -- 'Nothing': no arm of this generated CONSIDER can be taken. @rn@ puts the
+    -- input in for each name a clause bound to it; it is applied where a name
+    -- is read, so that an expression is not rebuilt once for every name the
+    -- clauses above it bound.
+    go :: Rename -> Map.Map Unique Known -> Expr Resolved -> Maybe (Expr Resolved)
+    go rn known e = case e of
       Consider ann s brs
         | Just PmConsider{} <- view annPmSynthetic ann
         , App _ r [] <- s ->
-            arms ann s (getUnique r) (Map.lookup (getUnique r) known) [] known brs
-      Lam{}   -> Just (over (gplate @(Expr Resolved)) (total Map.empty) e)
-      Where{} -> Just (over (gplate @(Expr Resolved)) (total Map.empty) e)
-      LetIn{} -> Just (over (gplate @(Expr Resolved)) (total Map.empty) e)
-      _       -> Just (over (gplate @(Expr Resolved)) (total known) e)
+            arms rn ann s (getUnique r) (Map.lookup (getUnique r) known) [] known brs
+      App _ r [] | Just a <- lookup (getUnique r) rn -> Just a
+      Lam{}   -> Just (over (gplate @(Expr Resolved)) (total rn Map.empty) e)
+      Where{} -> Just (over (gplate @(Expr Resolved)) (total rn Map.empty) e)
+      LetIn{} -> Just (over (gplate @(Expr Resolved)) (total rn Map.empty) e)
+      _       -> Just (over (gplate @(Expr Resolved)) (total rn known) e)
 
     -- Walk the arms of a generated CONSIDER on input @u@, about which @fact@ is
     -- known; @kept@ are the arms kept so far, in reverse.
-    arms ann s u fact kept known = \ case
+    arms rn ann s u fact kept known = \ case
       [] -> finish ann s u fact kept known Nothing
       br@(MkBranch ba (When wa p) body) : rest -> case classify p of
         Ground k -> case fact of
           Just (Is k')
-            | k /= k'    -> arms ann s u fact kept known rest
-            | null kept  -> go known body
-            | otherwise  -> Just (Consider ann s (reverse (MkBranch ba (When wa p) (total known body) : kept)))
+            | k /= k'    -> arms rn ann s u fact kept known rest
+            | null kept  -> go rn known body
+            | otherwise  -> Just (Consider ann s (reverse (MkBranch ba (When wa p) (total rn known body) : kept)))
           _
-            | excluded k -> arms ann s u fact kept known rest
+            | excluded k -> arms rn ann s u fact kept known rest
             | otherwise  ->
-                arms ann s u (Just (IsNot (k : excludedKeys))) (MkBranch ba (When wa p) (total (Map.insert u (Is k) known) body) : kept) known rest
-        Binds v -> finish ann s u fact kept known (Just (substParams [(getUnique v, s)] body))
+                arms rn ann s u (Just (IsNot (k : excludedKeys))) (MkBranch ba (When wa p) (total rn (Map.insert u (Is k) known) body) : kept) known rest
+        Binds v -> finish ann s u fact kept known (Just ((getUnique v, s) : rn, body))
         Uncertain mk -> case (fact, mk) of
-          (Just (Is k'), Just k) | k /= k' -> arms ann s u fact kept known rest
-          _ -> arms ann s u fact (over branchBody (total (withFact u fact known)) br : kept) known rest
-      MkBranch _ (Otherwise _) body : _ -> finish ann s u fact kept known (Just body)
+          (Just (Is k'), Just k) | k /= k' -> arms rn ann s u fact kept known rest
+          _ -> arms rn ann s u fact (over branchBody (total rn (withFact u fact known)) (renamePattern rn br) : kept) known rest
+      MkBranch _ (Otherwise _) body : _ -> finish ann s u fact kept known (Just (rn, body))
       where
         excludedKeys = case fact of
           Just (IsNot ks) -> ks
           _               -> []
         excluded k = k `elem` excludedKeys
 
-    -- The arms are done. @other@ is what is left when none of them is taken.
+    -- The arms are done. @other@ is what is left when none of them is taken,
+    -- with the renaming that holds in it.
     finish ann s u fact kept known other =
       let known' = withFact u fact known
+          read' (rn', o) = go rn' known' o
        in case (kept, other) of
             ([], Nothing) -> Nothing
-            ([], Just o)  -> go known' o
+            ([], Just ro) -> read' ro
             (_, Nothing)  -> Just (Consider ann s (reverse kept))
-            (_, Just o)   -> case go known' o of
+            (_, Just ro)  -> case read' ro of
               Nothing -> Just (Consider ann s (reverse kept))
               Just o' -> Just (Consider ann s (reverse (MkBranch emptyAnno (Otherwise emptyAnno) o' : kept)))
 
     withFact u fact known = maybe known (\ f -> Map.insert u f known) fact
+
+    -- A pattern can name an input in an expression (@EXACTLY x@), which a name
+    -- bound above it stands for.
+    renamePattern :: Rename -> Branch Resolved -> Branch Resolved
+    renamePattern [] br = br
+    renamePattern rn (MkBranch ba (When wa p) b) =
+      MkBranch ba (When wa (over (gplate @(Expr Resolved)) (transformOf (gplate @(Expr Resolved)) (renameName rn)) p)) b
+    renamePattern _ br = br
+
+    renameName :: Rename -> Expr Resolved -> Expr Resolved
+    renameName rn = \ case
+      App _ r [] | Just a <- lookup (getUnique r) rn -> a
+      e -> e
 
     branchBody :: Lens' (Branch Resolved) (Expr Resolved)
     branchBody = lens (\ (MkBranch _ _ b) -> b) (\ (MkBranch a l _) b -> MkBranch a l b)
@@ -438,6 +505,9 @@ pruneGeneratedConsiders = total Map.empty
 
 -- | What is known about an input inside a generated branch.
 data Known = Is GroundKey | IsNot [GroundKey]
+
+-- | The input put in for each name that a clause above bound to it.
+type Rename = [(Unique, Expr Resolved)]
 
 -- | A value a pattern can name exactly: a constructor with no arguments, or a
 -- literal.

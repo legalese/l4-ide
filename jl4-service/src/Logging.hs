@@ -61,7 +61,7 @@ logWarn = logMsg LevelWarn
 logError :: Logger -> Text -> [(Text, Value)] -> IO ()
 logError = logMsg LevelError
 
--- | Core logging function. Writes a single JSON line to stdout.
+-- | Core logging function. Writes a single JSON line to the logger's handle.
 logMsg :: LogLevel -> Logger -> Text -> [(Text, Value)] -> IO ()
 logMsg level logger msg fields
   | level < logger.logMinLevel = pure ()

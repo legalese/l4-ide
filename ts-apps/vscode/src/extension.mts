@@ -29,6 +29,7 @@ import {
   SyncInspectorResults,
   ToggleSimplify,
   EvalDirectiveResultRequestType,
+  EmbeddedLibraryRequestType,
   makeLspRelayRequestType,
   makeL4RpcRequestType,
   isStateGraphResponse,
@@ -46,6 +47,11 @@ import {
   l4DocumentSelector,
 } from './embedded-library.js'
 import { StateGraphPanel } from './state-graph-panel.js'
+import {
+  EMBEDDED_LIBRARY_SCHEME,
+  embeddedLibraryProvider,
+  l4DocumentSelector,
+} from './embedded-library.js'
 import {
   SidebarProvider,
   SIDEBAR_WEBVIEW_TYPE,
@@ -849,6 +855,7 @@ export async function activate(context: ExtensionContext) {
       mcp: aiMcpClient,
       vsMcp: vsMcpTools,
       serviceClient,
+      extensionPath: context.extensionPath,
     })
   )
 

@@ -1,6 +1,4 @@
-# Module 7: Putting It Together
-
-**Prerequisites:** Modules 1–6
+# Module 7: Putting it together
 
 In this capstone module, you'll build a complete legal model combining everything you've learned.
 
@@ -12,7 +10,6 @@ By the end of this module, you will be able to:
 - Organize code with sections
 - Apply best practices
 - Debug common issues
-- Know where to go next
 
 ---
 
@@ -351,7 +348,7 @@ Sections create a hierarchy:
 ### 1. Start with Types
 
 ```l4
--- ✅ Good: Clear domain model
+-- Good: Clear domain model
 DECLARE Application
     HAS `the applicant` IS A `Legal Entity`
         `the purposes` IS A LIST OF Purpose
@@ -361,7 +358,7 @@ DECLARE Application
 ### 2. Small, Focused Functions
 
 ```l4
--- ✅ Good: Single responsibility
+-- Good: Single responsibility
 DECIDE `the governor is an adult` IF governor's `the governor's age` >= 18
 DECIDE `the governor is not bankrupt` IF NOT governor's `the governor is bankrupt`
 
@@ -385,10 +382,10 @@ DECIDE `the person can be a governor` IF
 ### 4. Use Descriptive Names
 
 ```l4
--- ✅ Good: Clear, readable names
+-- Good: Clear, readable names
 DECIDE `the charity meets filing requirements` IF ...
 
--- ❌ Bad: Cryptic names
+-- Bad: Cryptic names
 DECIDE check1 IF ...
 ```
 
@@ -404,110 +401,10 @@ DECIDE `meets charity test` IF ...
 
 ---
 
-## Debugging Checklist
+## Debugging
 
-When something doesn't work:
-
-| Error                  | Likely Cause            | Fix                                       |
-| ---------------------- | ----------------------- | ----------------------------------------- |
-| "Type not in scope"    | Type not declared       | Add DECLARE before use                    |
-| "Unexpected 's"        | Missing parentheses     | `count (x's field)` not `count x's field` |
-| "Expected BOOLEAN"     | Wrong type in condition | Check IF conditions return BOOLEAN        |
-| "Not enough arguments" | Missing function args   | Count parameters in GIVEN                 |
-| "Indentation error"    | Inconsistent spacing    | Align all fields under HAS                |
+When something doesn't work, read the first error, fix it, and check again: one error often causes several more. Common causes are a misspelled name or a type with no `DECLARE`, a field access passed to a function without parentheses (`count (x's field)`, not `count x's field`), an `IF` condition that is not a `BOOLEAN`, a call with too few arguments for its `GIVEN`, and fields not aligned under `HAS`. [Fix errors](../../tutorials/getting-started/debugging-type-errors.md) goes through each kind of error message and how to fix it.
 
 ---
 
-## Where to Go Next
-
-### Immediate Next Steps
-
-1. **[Advanced Course](../advanced/README.md)** - Complex patterns, real legislation, multi-instrument integration
-
-2. **[Tutorials](../../tutorials/README.md)** - Task-focused guides:
-
-   - Building web forms
-   - LLM integration
-   - Contract automation
-
-3. **Practice** - Try encoding a real document:
-   - Your employment contract
-   - Your lease agreement
-   - A regulation you work with
-
-### Reference Materials
-
-- **[Reference Guide](../../reference/README.md)** - Complete keyword and syntax reference
-- **[Concepts](../../concepts/README.md)** - Deep dives into design principles
-
-### Example Code
-
-Explore the examples in the repository:
-
-- `jl4/examples/legal/` - Real legal documents
-- `jl4/examples/ok/` - Working syntax examples
-- `jl4/experiments/` - Experimental features
-
----
-
-## Summary: What You've Learned
-
-### Module 1: Your First Legal Rule
-
-- GIVEN, PARTY, MUST
-- IF conditions
-- WITHIN deadlines
-- HENCE and LEST consequences
-
-### Module 2: Legal Entities and Relationships
-
-- DECLARE with HAS for records
-- IS ONE OF for enumerations
-- Field access with 's
-
-### Module 3: Control Flow
-
-- IF/THEN/ELSE and BRANCH
-- CONSIDER pattern matching
-- AND, OR, NOT operators
-- List operations
-
-### Module 4: Decision Logic
-
-- Constitutive rules with DECIDE and MEANS
-- WHERE for transparent calculations
-- Optional values with MAYBE (NOTHING/JUST)
-- Working with dates
-
-### Module 5: Functions
-
-- GIVEN and GIVETH signatures
-- Recursion
-- Higher-order functions: map, filter, foldl
-
-### Module 6: Regulative Rules
-
-- MUST, MAY, SHANT
-- HENCE, LEST
-- PROVIDED conditions
-- RAND and ROR combinators
-- #TRACE testing
-
-### Module 7: Putting It Together
-
-- Project structure
-- Best practices
-- Debugging
-
----
-
-## Congratulations! 🎉
-
-You've completed the L4 Foundation Course. You now have the skills to:
-
-- Model legal entities and relationships
-- Write legal rules and eligibility criteria
-- Create contracts with obligations and consequences
-- Test your models with simulations
-
-**Next recommended step:** Try the [Advanced Course](../advanced/README.md) to learn about real regulatory schemes, cross-cutting concerns, and production patterns.
+You have completed the Foundation course. The [Advanced course](../advanced/README.md) continues with real regulatory schemes, patterns that cut across rules, contracts in depth, and production patterns.

@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | T4 regression guard: ambiguous-but-well-typed expressions under #ASSERT
--- and TIMEZONE IS must surface as 'AmbiguousTermError' diagnostics, exactly
--- like #EVAL, instead of escaping into 'runCheckUnique' and killing the
--- process with @error "internal error: expected unique result, got several"@.
+-- | Regression guard (specs/as-built/tc-soundness.md): ambiguous-but-well-typed
+-- expressions under #ASSERT and TIMEZONE IS must surface as
+-- 'AmbiguousTermError' diagnostics, exactly like #EVAL, instead of escaping
+-- into 'runCheckUnique' and killing the process with
+-- @error "internal error: expected unique result, got several"@.
 --
 -- This spec drives 'checkWithImports' directly (no CLI catch-all), so a
 -- regression shows up as an 'ErrorCall' failing the test — the same failure
@@ -20,7 +21,7 @@ import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
 
 -- | Run typecheck on a source snippet and return the 'AmbiguousTermError'
--- diagnostics that fired (or 'Left' on fatal failure). Pre-T4-fix, the
+-- diagnostics that fired (or 'Left' on fatal failure). Before the fix, the
 -- ambiguous cases never get this far: 'checkWithImports' throws 'ErrorCall'.
 ambiguousTermErrors :: Text -> Either [Text] [CheckErrorWithContext]
 ambiguousTermErrors source =
@@ -54,7 +55,7 @@ overloadedFooDefs =
 
 spec :: Spec
 spec = do
-  describe "directive ambiguity is a diagnostic, not a crash (T4)" $ do
+  describe "directive ambiguity is a diagnostic, not a crash" $ do
     it "#ASSERT on an ambiguous term reports AmbiguousTermError" $ do
       let src = Text.unlines $ ambiguousFooDefs ++ ["", "#ASSERT foo TRUE"]
       case ambiguousTermErrors src of

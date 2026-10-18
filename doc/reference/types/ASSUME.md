@@ -191,7 +191,9 @@ form, a `GIVEN a IS A TYPE` and a `GIVETH` heading an `ASSUME f` with no type
 of its own; `jl4/examples/ok/tbd.l4` keeps it for that reason. Write the rule
 out instead of assuming it wherever you can.
 
-**The limit is at the export boundary.** A published rule cannot accept an
+### Function-typed inputs are not supported for `@export`
+
+A published rule cannot accept an
 input that is itself a rule, because a rule cannot be sent as JavaScript Object
 Notation (JSON), which is what a request carries. A request carries **values** —
 a number, a date, a yes or no, a record of those — and a rule is not a value.
@@ -281,7 +283,8 @@ for comparison.
 - **[DECLARE](DECLARE.md)** — records, enumerations and, with no body, opaque
   types
 - **[REFUSE](../control-flow/REFUSE.md)** — a case the encoding declines
-- **[TYPE-KEYWORDS](keywords.md)** — type syntax (IS, FUNCTION, and the rest)
+- **[DECLARE: Type expressions](DECLARE.md#type-expressions)** — type syntax (IS, FUNCTION, and the rest)
+- **[FOR ALL](for-all.md)** — type variables in the type of an assumed or given function
 
 ## See Also
 

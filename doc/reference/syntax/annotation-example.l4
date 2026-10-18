@@ -1,5 +1,27 @@
--- Example: Annotations in L4
--- Demonstrates @desc, @nlg, and @ref annotations
+-- Annotations: @desc, @nlg, @ref, @export
+
+@desc The applicant's age in years
+ASSUME `the applicant's age` IS A NUMBER
+
+-- @nlg at the end of a definition's line gives its wording, with %name% slots
+GIVEN x IS A NUMBER, y IS A NUMBER
+GIVETH A NUMBER
+`the greater of` x y @nlg the greater of %x% and %y%
+  MEANS IF x >= y THEN x ELSE y
+
+-- A @ref cites what comes after it
+@ref Section 4(1)(a) of the Act
+@export Check whether a person is old enough to apply
+GIVEN age IS A NUMBER @desc The person's age in years
+GIVETH A BOOLEAN
+DECIDE `is old enough` IF age >= 18
+
+#EVAL `the greater of` 3 7
+#EVAL `is old enough` 20
+
+-- ---------------------------------------------------------------------------
+-- More forms: a section input, escapes, a language subtag
+-- ---------------------------------------------------------------------------
 
 § `Example: Annotations in L4`
     GIVEN age IS A NUMBER @desc "Person's age in years"

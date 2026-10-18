@@ -607,6 +607,6 @@ $ l4 batch charges.l4 --inputs case.json
 
 ## See also
 
-- [Section markers (§)](README.md#section-markers-) — the short summary in the keyword reference for this chapter
+- [Section markers (§)](README.md#sections) — the short summary in the keyword reference for this chapter
 - [What a Section Needs to Know](../../tutorials/section-given/what-a-section-needs-to-know.md) — the tutorial that builds a two-section file from scratch
 - [sections-example.l4](sections-example.l4) — the checked companion to this page

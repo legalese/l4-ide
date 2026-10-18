@@ -60,7 +60,7 @@ hoverMarkdown (Hover contents _range) = case contents of
 
 spec :: Spec
 spec =
-  describe "LSP hover normalises inference variables (#313)" $
+  describe "LSP hover normalises inference variables (smucclaw/l4-ide#313)" $
     it "renders an un-annotated lambda type as 'a', never 'x10'" $ do
       let hov =
             infoToHover

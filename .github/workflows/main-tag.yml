@@ -36,6 +36,20 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
+      # GHC's rts package hard-codes the Command Line Tools SDK, so every link
+      # gets -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib, but
+      # ld comes from the selected Xcode. When the image's CLT is newer than its
+      # Xcode (CLT 27 beside Xcode 26.6 since image 20261013), that ld cannot read
+      # the newer SDK's .tbd files ("unknown architecture arm64e.x1-macos").
+      # Point the rts at the selected Xcode's own SDK, so ld and SDK match.
+      - name: Point GHC at the selected Xcode's SDK
+        run: |
+          sdk=$(xcrun --sdk macosx --show-sdk-path)
+          db=$(ghc --print-libdir)/package.conf.d
+          sed -i '' "s|/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk|$sdk|g" "$db"/*.conf
+          ghc-pkg recache --global
+          ghc-pkg field rts library-dirs,include-dirs --global
+
       - name: Configure and generate build plan
         run: |
           cabal update
@@ -76,7 +90,9 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -158,7 +174,9 @@ jobs:
 
       - name: Run l4 CLI test suite
         shell: bash
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy binaries
         shell: bash
@@ -201,6 +219,17 @@ jobs:
           echo "JL4_SERVICE_VERSION=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_ENV"
           echo "jl4-service version: ${MAJOR_MINOR}.${{ github.run_number }}"
 
+      # What `l4 --version` and `jl4-lsp --version` report (LSP.L4.BuildInfo bakes it
+      # in at compile time). The same constraint as the version above: it must be
+      # set before any step compiles the local libraries, which "Install
+      # dependencies" does. A library compiled without these variables says `dev`,
+      # and the build step after it finds it up to date; the l4 CLI test suite
+      # checks the binaries against these variables.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install system dependencies
         run: |
           for i in 1 2 3; do
@@ -234,15 +263,6 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
-      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
-      # This is before "Install dependencies", which compiles the local libraries
-      # too: one compiled without these variables says `dev`, and the build step
-      # after it finds it up to date.
-      - name: Name the build
-        run: |
-          bash etc/build-identity.sh >> "$GITHUB_ENV"
-          tail -n 4 "$GITHUB_ENV"
-
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build exe:jl4-lsp exe:l4 exe:jl4-service test:l4-cli-test --only-dependencies
@@ -258,7 +278,9 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4 exe:jl4-service
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -390,7 +412,9 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -686,6 +710,81 @@ jobs:
   # Create Git Tag with Artifacts
   # ============================================
 
+  # ============================================
+  # Package the Claude Code plugin and the skill
+  # ============================================
+
+  package-plugin:
+    name: Package L4 plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The plugin keeps its own <major>.<minor> (from .claude-plugin/plugin.json)
+      # and takes this build's run number as the patch, matching the
+      # l4-ide-build-<run_number> tag it is released under.
+      - name: Set the plugin version
+        run: |
+          CURRENT=$(jq -r '.version' .claude-plugin/plugin.json)
+          VERSION="${CURRENT%.*}.${{ github.run_number }}"
+          echo "Plugin version: $VERSION"
+          # Both manifests: Claude Code's .claude-plugin/ and the portable
+          # Agent Plugins 1.0 one at the plugin root.
+          for m in .claude-plugin/plugin.json plugin.json; do
+            jq --arg ver "$VERSION" '.version = $ver' "$m" > "$m.tmp"
+            mv "$m.tmp" "$m"
+          done
+          # The marketplace catalog, published at .claude-plugin/ (Claude Code)
+          # and .github/plugin/ (Copilot CLI, VS Code); keep them byte-identical.
+          jq --arg ver "$VERSION" '.metadata.version = $ver | .plugins[0].version = $ver' \
+            .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
+          mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
+          cp .claude-plugin/marketplace.json .github/plugin/marketplace.json
+
+      - name: Create plugin packages
+        run: |
+          # Skill only: SKILL.md and its references
+          (
+            cd skills/writing-l4-rules
+            zip -r "$GITHUB_WORKSPACE/writing-l4-rules.skill" \
+              assets/ \
+              references/ \
+              scripts/ \
+              SKILL.md \
+              -x "*.DS_Store" \
+              -x "*/__pycache__/*" \
+              -x "*/node_modules/.cache/*"
+          )
+          # Skill only: the whole-Act encoding workflow
+          (
+            cd skills/encoding-a-subject
+            zip -r "$GITHUB_WORKSPACE/encoding-a-subject.skill" \
+              assets/ \
+              references/ \
+              SKILL.md \
+              -x "*.DS_Store"
+          )
+          # Full plugin: both manifests, every skill and PLUGIN.md
+          zip -r l4-plugin.zip \
+            .claude-plugin/ \
+            plugin.json \
+            skills/ \
+            PLUGIN.md \
+            -x "*.DS_Store" \
+            -x "*/__pycache__/*" \
+            -x "*/node_modules/.cache/*"
+          ls -lh writing-l4-rules.skill encoding-a-subject.skill l4-plugin.zip
+          unzip -l l4-plugin.zip | head -30
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: l4-plugin
+          path: |
+            l4-plugin.zip
+            writing-l4-rules.skill
+            encoding-a-subject.skill
+
   create-tag:
     name: Create Git Tag
     runs-on: ubuntu-latest
@@ -694,6 +793,7 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - package-plugin
     steps:
       - uses: actions/checkout@v5
         with:
@@ -718,6 +818,11 @@ jobs:
           find artifacts -name "jl4-core.wasm" -exec cp {} release-artifacts/ \;
           find artifacts -name "jl4-core.mjs" -exec cp {} release-artifacts/ \;
           find artifacts -name "version.txt" -exec cp {} release-artifacts/wasm-version.txt \; 2>/dev/null || true
+
+          # Collect the Claude Code plugin and the skill
+          find artifacts -name "l4-plugin.zip" -exec cp {} release-artifacts/ \;
+          find artifacts -name "writing-l4-rules.skill" -exec cp {} release-artifacts/ \;
+          find artifacts -name "encoding-a-subject.skill" -exec cp {} release-artifacts/ \;
 
           # Collect jl4-service binary and SHA256
           if [ -d artifacts/jl4-service-linux-x64 ]; then
@@ -759,14 +864,15 @@ jobs:
           Artifacts included:
           - VSCode extensions (platform-specific, cross-platform, universal)
           - WASM binaries (jl4-core.wasm, jl4-core.mjs)
-          - jl4-service binary (linux-x64) with SHA256"
+          - jl4-service binary (linux-x64) with SHA256
+          - Claude Code plugin (l4-plugin.zip) and skills (writing-l4-rules.skill, encoding-a-subject.skill)"
           git push origin "${{ steps.tag-name.outputs.tag }}"
 
       - name: Upload artifacts to tag
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag-name.outputs.tag }}
-          name: L4 VSCode Extension & WASM (Build ${{ github.run_number }})
+          name: L4 VSCode Extension & Tools (Build ${{ github.run_number }})
           body: |
             ## Build Artifacts
 
@@ -797,6 +903,16 @@ jobs:
             |------|-------------|
             | `jl4-core.wasm` | L4 core WASM module |
             | `jl4-core.mjs` | JavaScript FFI glue code |
+
+            ### Claude Code Plugin
+
+            | File | Description |
+            |------|-------------|
+            | `l4-plugin.zip` | The L4 plugin: the `writing-l4-rules` and `encoding-a-subject` skills and the plugin manifests |
+            | `writing-l4-rules.skill` | The L4 authoring skill alone (SKILL.md and its references) |
+            | `encoding-a-subject.skill` | The whole-Act encoding workflow skill alone: brief, coverage table, source-derived tests, the legalese/canon layout |
+
+            Install from the marketplace with `/plugin marketplace add legalese/l4-ide`, then `/plugin install l4-computational-law@legalese`; or extract each `.skill` into `~/.claude/skills/<skill-name>/`.
 
             ### Installation
 
@@ -829,6 +945,7 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - package-plugin
       - create-tag
     if: always()
     steps:
@@ -847,4 +964,5 @@ jobs:
           echo "| Cross Platform | ${{ needs.package-vscode-cross-platform.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Universal | ${{ needs.package-vscode-universal.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.build-wasm.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Claude Code Plugin | ${{ needs.package-plugin.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Git Tag | ${{ needs.create-tag.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY

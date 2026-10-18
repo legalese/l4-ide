@@ -70,6 +70,18 @@ module TestData (
   clauseGroupLetResultJL4,
   rowsClauseGroupJL4,
   letChainJL4,
+  inputThenInputJL4,
+  longClausesJL4,
+  longNumberClausesJL4,
+  catchAllHugeJL4,
+  handCatchAllHugeJL4,
+  newNameHugeJL4,
+  newNameDnfJL4,
+  maybeTableJL4,
+  exactlyNameDnfJL4,
+  exactlyHugeJL4,
+  dnfClauseJL4,
+  handDnfJL4,
   ruleDefaultJL4,
   recordDefaultJL4,
   maybeHardJL4,
@@ -2005,3 +2017,197 @@ GIVEN adult IS A BOOLEAN
 GIVETH A BOOLEAN
 eligible adult MEANS adult AND `the cap applies`
 |]
+
+-- | A MAYBE input followed by another input, on the wrapper path: a synonym for a
+-- MAYBE and a MAYBE NUMBER written out, each first, with a NUMBER after it, and
+-- the synonym last as the control; and three DEONTIC functions of the same
+-- shapes. The generated wrapper once wrote the input record with a leading comma
+-- on every field after the first, which does not parse after a field whose type
+-- is an application (@MAYBE OF NUMBER@), so each of these failed with a parser
+-- error. Every function takes @y@ and @z@, so one request fits them all.
+inputThenInputJL4 :: Text
+inputThenInputJL4 =
+  [i|
+DECLARE MaybeYear IS A MAYBE NUMBER
+
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
+
+@export a synonym for a MAYBE, then a NUMBER
+GIVEN y IS A MaybeYear
+      z IS A NUMBER
+GIVETH A NUMBER
+`syn then number` y z MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a synonym for a MAYBE, then a MAYBE NUMBER
+GIVEN y IS A MaybeYear
+      z IS A MAYBE NUMBER
+GIVETH A NUMBER
+`syn then maybe` y z MEANS
+  (CONSIDER y
+     WHEN JUST n THEN n
+     WHEN NOTHING THEN 0)
+  PLUS (CONSIDER z
+          WHEN JUST m THEN m
+          WHEN NOTHING THEN 0)
+
+@export a MAYBE NUMBER written out, then a NUMBER
+GIVEN y IS A MAYBE NUMBER
+      z IS A NUMBER
+GIVETH A NUMBER
+`plain maybe then number` y z MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a NUMBER, then a synonym for a MAYBE: the control
+GIVEN z IS A NUMBER
+      y IS A MaybeYear
+GIVETH A NUMBER
+`number then syn` z y MEANS
+  z PLUS (CONSIDER y
+            WHEN JUST n THEN n
+            WHEN NOTHING THEN 0)
+
+@export a contract with a synonym for a MAYBE first
+GIVEN y IS A MaybeYear
+      z IS A NUMBER
+GIVETH A DEONTIC Party `Contract Action`
+`syn contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+@export a contract with a MAYBE NUMBER written out first
+GIVEN y IS A MAYBE NUMBER
+      z IS A NUMBER
+GIVETH A DEONTIC Party `Contract Action`
+`plain contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+@export a contract with the synonym last: the control
+GIVEN z IS A NUMBER
+      y IS A MaybeYear
+GIVETH A DEONTIC Party `Contract Action`
+`control contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+|]
+
+-- | A BOOLEAN group of @k@ rows on one NUMBER input, each row's result a sum of
+-- @width@ ones compared with zero, then a fall-through. It is long, not
+-- branching: 60 rows of width 200 come to 24,301 parts written out.
+longClausesJL4 :: Int -> Int -> Text
+longClausesJL4 k width =
+  "@export Long rows\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS n" <> Text.concat (replicate width " + 1") <> " GREATER THAN 0" | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS FALSE\n"
+
+-- | A group of @k@ rows on one NUMBER input, each row's result a sum of
+-- @width@ ones, then a fall-through. It returns a NUMBER, so it is not a
+-- ladder at all, which is what the answer must say, not that it is too long
+-- (60 rows of width 200 come to more than 20,000 parts written out).
+longNumberClausesJL4 :: Int -> Int -> Text
+longNumberClausesJL4 k width =
+  "@export Long numeric rows\nGIVEN n IS A NUMBER\nGIVETH A NUMBER\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS n" <> Text.concat (replicate width " + 1") | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS 0\n"
+
+-- | A group whose first clause names every input as the @GIVEN@ does, so it
+-- matches every input and the group is that clause's body: a disjunction of @k@
+-- conjunctions of two inputs. (The second clause is never used, and the
+-- checker says so.) The service simplifies the ladder into conjunctive normal
+-- form, which has @2^k@ disjunctions of @k@ inputs: 193 boxes for 5, and 449
+-- for 6.
+dnfClauseJL4 :: Int -> Text
+dnfClauseJL4 k = dnfRule k True
+
+-- | A first clause that names its input as the @GIVEN@ does and whose result is
+-- 22,000 parts or so: more than the 20,000 that clauses are limited to when
+-- they are read through. The clause after it is never reached.
+catchAllHugeJL4 :: Text
+catchAllHugeJL4 = hugeRule "n" "n" True
+
+-- | 'catchAllHugeJL4' without the clause after the first: a rule written without
+-- clauses, which is what the group is answered as.
+handCatchAllHugeJL4 :: Text
+handCatchAllHugeJL4 = hugeRule "n" "n" False
+
+-- | 'catchAllHugeJL4' with the first clause's input given a new name, @m@. That
+-- clause matches every input, but not as the @GIVEN@ names it, so it is a test
+-- the desugarer generates, and the group is read through and limited.
+newNameHugeJL4 :: Text
+newNameHugeJL4 = hugeRule "m" "m" True
+
+-- | 'catchAllHugeJL4' with the first clause's input written @(EXACTLY n)@.
+exactlyHugeJL4 :: Text
+exactlyHugeJL4 = hugeRule "(EXACTLY n)" "n" True
+
+-- | The first clause's pattern for the @GIVEN@'s @n@, the name its result uses
+-- for it, and whether the clause after it is written.
+hugeRule :: Text -> Text -> Bool -> Text
+hugeRule pat var clauses =
+  "@export Huge\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> "DECIDE rule " <> pat <> " IS " <> var <> Text.concat (replicate 11000 " + 1") <> " GREATER THAN 0\n"
+    <> (if clauses then "DECIDE rule 0 IS FALSE\n" else "")
+
+-- | 'dnfClauseJL4' with the first clause's @n@ given a new name, @m@: read
+-- through and limited, where 'dnfClauseJL4' is not.
+newNameDnfJL4 :: Int -> Text
+newNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule m " (dnfClauseJL4 k)
+
+-- | A table of @k@ clauses over five @MAYBE BOOLEAN@ inputs, each clause taking
+-- three of them apart with @(JUST x)@ (inputs @i@, @i+1@, @i+2@, going round) and
+-- returning the @AND@ of what it took apart. The other two inputs are given new
+-- names, or, when @own@, are written as the @GIVEN@ names them. The last clause
+-- names every input and is @IS FALSE@.
+maybeTableJL4 :: Bool -> Int -> Text
+maybeTableJL4 own k =
+  Text.unlines $
+    ["@export Maybes"]
+      <> [ (if c == 1 then "GIVEN " else "      ") <> "a" <> Text.pack (show c) <> " IS A MAYBE BOOLEAN" | c <- [1 .. inputsN] ]
+      <> ["GIVETH A BOOLEAN"]
+      <> [ "DECIDE rule " <> Text.unwords [ patOf row c | c <- [1 .. inputsN] ] <> " IS " <> Text.intercalate " AND " [ boundName row c | c <- takenApart row ] | row <- [1 .. k - 1] ]
+      <> [ "DECIDE rule " <> Text.unwords [ otherOf k c | c <- [1 .. inputsN] ] <> " IS FALSE" ]
+  where
+    inputsN = 5 :: Int
+    takenApart row = [ ((row + d - 1) `mod` inputsN) + 1 | d <- [0 .. 2] ]
+    boundName row c = "p" <> Text.pack (show row) <> "c" <> Text.pack (show c)
+    otherOf row c = if own then "a" <> Text.pack (show c) else boundName row c
+    patOf row c = if c `elem` takenApart row then "(JUST " <> boundName row c <> ")" else otherOf row c
+
+-- | 'dnfClauseJL4' with the first clause's @n@ written @(EXACTLY n)@. The
+-- missing-case check counts that as the input's own name, but the desugarer
+-- tests it (only the bare name and @_@ are exempt), so the group is read
+-- through. Six pairs are planned (probably because it reads through to one
+-- CONSIDER, which is one box; not drawn); 'exactlyHugeJL4' is refused as too
+-- long.
+exactlyNameDnfJL4 :: Int -> Text
+exactlyNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule (EXACTLY n) " (dnfClauseJL4 k)
+
+-- | 'dnfClauseJL4' without clauses.
+handDnfJL4 :: Int -> Text
+handDnfJL4 k = dnfRule k False
+
+dnfRule :: Int -> Bool -> Text
+dnfRule k clauses =
+  "@export Dnf\nGIVEN n IS A NUMBER\n"
+    <> Text.concat [ "      a" <> Text.pack (show j) <> " IS A BOOLEAN\n      b" <> Text.pack (show j) <> " IS A BOOLEAN\n" | j <- [1 .. k] ]
+    <> "GIVETH A BOOLEAN\n"
+    <> "DECIDE rule n " <> inputs <> " IS " <> Text.intercalate " OR " [ "(a" <> Text.pack (show j) <> " AND b" <> Text.pack (show j) <> ")" | j <- [1 .. k] ] <> "\n"
+    <> (if clauses then "DECIDE rule 0 " <> inputs <> " IS FALSE\n" else "")
+  where
+    inputs = Text.unwords (concat [ ["a" <> Text.pack (show j), "b" <> Text.pack (show j)] | j <- [1 .. k] ])

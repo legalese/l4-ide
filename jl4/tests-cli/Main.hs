@@ -12,13 +12,13 @@ module Main where
 
 import Control.Exception (finally)
 import Control.Monad (forM_, unless, when)
-import Data.Char (isSpace)
+import Data.Char (isDigit, isSpace)
 import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, tails)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Data.Aeson (Value(..), eitherDecode)
+import Data.Aeson (Value(..), eitherDecode, toJSON)
 import Data.Foldable (toList)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
@@ -37,8 +37,19 @@ import System.Directory
   , setOwnerWritable
   , setPermissions
   )
+import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>), isAbsolute, normalise, takeFileName)
+import System.IO (hClose, hPutStr, hSetBinaryMode)
+import System.IO.Temp (withSystemTempDirectory)
+import System.Process
+  ( CreateProcess(cwd, std_err, std_in, std_out)
+  , StdStream(..)
+  , createProcess
+  , proc
+  , readCreateProcessWithExitCode
+  , waitForProcess
+  )
 import Test.Hspec
 
 import CliTest.Common
@@ -497,6 +508,42 @@ shadowImporterDir = fixtureDir </> "library-shadow" </> "embedded-importer"
 shadowImporterEntry :: FilePath
 shadowImporterEntry = shadowImporterDir </> "main.l4"
 
+-- | A @\@ref@ that trails its code (line 4) and one with nothing after it
+-- (line 8): two warnings, no error.
+refTrailingFixture :: FilePath
+refTrailingFixture = fixtureDir </> "ref-trailing.l4"
+
+-- | A cases file that holds one object, not an array.
+batchSingleObjectJson :: FilePath
+batchSingleObjectJson = fixtureDir </> "batch-single-object.json"
+
+-- | Blank CSV cells (T3c): one STRING input that has to be given and one MAYBE
+-- STRING input that need not be, and an income column left blank.
+batchBlankFixture, batchBlankCsv, batchBlankIncomeCsv :: FilePath
+batchBlankFixture   = fixtureDir </> "batch-blank.l4"
+batchBlankCsv       = fixtureDir </> "batch-blank.csv"
+batchBlankIncomeCsv = fixtureDir </> "batch-blank-income.csv"
+
+-- | CSV cells that carry a quote, a backslash, a tab or a line break.
+batchEscapeCellsCsv :: FilePath
+batchEscapeCellsCsv = fixtureDir </> "batch-escape-cells.csv"
+
+-- | Run one row through @l4 batch@ and return its result, failing the test
+-- unless the row's status is @success@.
+batchAnswer :: FilePath -> FilePath -> FilePath -> String -> IO Value
+batchAnswer bin file inputs entry = do
+  Output code sout serr <- runL4 bin ["batch", file, "-i", inputs, "-e", entry]
+  unless (code == ExitSuccess) $
+    expectationFailure ("l4 batch exited " ++ show code ++ "\nstdout:\n" ++ sout ++ "\nstderr:\n" ++ serr)
+  row <- case lines sout of
+    (l : _) -> either (\err -> expectationFailure ("NDJSON parse failed: " ++ err ++ "\n" ++ l) >> error "unreachable")
+                      pure (eitherDecode (BSL8.pack l))
+    []      -> expectationFailure "l4 batch printed no rows" >> error "unreachable"
+  objField row "status" `shouldBe` Just (String "success")
+  case objField row "output" of
+    Just (Array outs) | (o : _) <- foldr (:) [] outs, Just r <- objField o "result" -> pure r
+    other -> expectationFailure ("no result in batch output: " ++ show other) >> error "unreachable"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -574,6 +621,8 @@ coreFixtures =
   , batchClausesString, batchClausesB, batchClausesCatchAll
   , evalUndeterminedFixture
   , evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture
+  , refTrailingFixture, batchSingleObjectJson
+  , batchBlankFixture, batchBlankCsv, batchBlankIncomeCsv, batchEscapeCellsCsv
   ]
 
 spec :: FilePath -> Spec
@@ -617,6 +666,43 @@ spec bin = do
     it "no longer has a top-level verb per backend" $
       for_ ["openfisca", "blawx", "catala", "docassemble", "yscript"] \verb ->
         expectFail bin [verb, "x.l4"]
+
+  describe "l4 deploy / redeploy / undeploy / deployments (no network)" $ do
+    let expectStderr args mEnv needle = do
+          Output code _ serr <- runL4In Nothing mEnv bin args
+          code `shouldNotBe` ExitSuccess
+          unless (needle `isInfixOf` serr) $
+            expectationFailure ("Expected stderr to contain " ++ show needle ++ "\n--- stderr ---\n" ++ serr)
+        -- Nothing listens on the discard port; every case below must stop
+        -- before connecting.
+        noServer = ["--server", "http://127.0.0.1:9"]
+
+    it "are listed in --help, and each takes --help" $ do
+      Output _ sout _ <- runL4 bin ["--help"]
+      mapM_ (\c -> sout `shouldSatisfy` (c `isInfixOf`)) ["deploy", "redeploy", "undeploy", "deployments", "install"]
+      expectOk bin ["deploy", "--help"] "--name"
+      expectOk bin ["install", "legalese", "--help"] "--dir"
+
+    it "refuses a deployment name the service would reject" $
+      expectStderr (["deploy", cleanFixture, "--name", "bad name!"] ++ noServer) Nothing "may only contain"
+
+    it "refuses to deploy a file that doesn't typecheck" $
+      expectStderr (["deploy", errorFixture] ++ noServer) Nothing "doesn't typecheck"
+
+    it "only takes --api-key-file with --server" $
+      expectStderr ["deployments", "--api-key-file", cleanFixture] Nothing "--api-key-file only applies with --server"
+
+    it "won't send an API key over plain http to another host" $
+      expectStderr ["deployments", "--server", "http://example.com"] (Just [("L4_API_KEY", "k")]) "over plain http"
+
+    it "needs the legalese CLI for Legalese Cloud" $ do
+      tmp <- getTemporaryDirectory
+      let emptyPath = tmp </> "l4-cli-test-empty-path"
+      createDirectoryIfMissing True emptyPath
+      expectStderr ["deployments"] (Just [("PATH", emptyPath)]) "l4 install legalese"
+
+    it "won't undeploy without a terminal unless --yes" $
+      expectStderr (["undeploy", "anything"] ++ noServer) Nothing "Pass --yes"
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -876,6 +962,17 @@ spec bin = do
     it "still typechecks the failing fixture — l4 check succeeds on it" $
       expectOk bin ["check", assertFailsFixture] "Check succeeded."
 
+    it "reports an evaluation error in JSON in the drafter's terms, not as Haskell" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "multi-clause-no-match.l4", "--json"]
+      case objField env "results" of
+        Just (Array v) | [Object r] <- foldr (:) [] v -> case KeyMap.lookup (Key.fromString "value") r of
+          Just (String msg) -> do
+            T.unpack msg `shouldSatisfy` ("No clause of `price` matches" `isInfixOf`)
+            T.unpack msg `shouldSatisfy` (not . ("MkPmGroup" `isInfixOf`))
+            T.unpack msg `shouldSatisfy` (not . ("NonExhaustivePatterns" `isInfixOf`))
+          other -> expectationFailure ("Expected an error string, got " ++ show other)
+        other -> expectationFailure ("Expected one result, got " ++ show other)
+
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
 
@@ -993,8 +1090,10 @@ spec bin = do
         mentionsOldName out = any (`isInfixOf` out) generatedSpellings
 
     it "reads the clauses as one list of cases in l4 render" $ do
-      Output code sout _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
+      Output code sout0 _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
       code `shouldBe` ExitSuccess
+      -- Windows ends lines with a carriage return, as in the l4 format test.
+      let sout = filter (/= '\r') sout0
       -- the third clause, which an earlier build left out altogether
       sout `shouldSatisfy` ("- if it is Green: 2\n    - otherwise: 3" `isInfixOf`)
       sout `shouldSatisfy` ("depending on input 1:" `isInfixOf`)
@@ -1032,6 +1131,30 @@ spec bin = do
     it "fails on unparseable garbage input" $ do
       Output code _ _ <- runL4 bin ["check", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
+
+    -- The two warnings of the @ref pass, as the LSP renders them (their text is
+    -- quoted in doc/reference/syntax/README.md, which is the page to change
+    -- with it). They are warnings, so the check still succeeds.
+    it "warns about a @ref after code and a @ref with nothing after it, and still succeeds" $ do
+      Output code sout serr <- runL4 bin ["check", refTrailingFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      let err = filter (/= '\r') serr
+      err `shouldSatisfy` isInfixOf "Range:    4:18-4:49"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 4(1)(a) of the Act`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `GIVETH A BOOLEAN`."
+      err `shouldSatisfy` isInfixOf "Range:    8:1-8:15"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 9`) is at the end of the file, so there is nothing after it to attach to."
+      length (filter (isInfixOf "Severity: DiagnosticSeverity_Warning") (lines err)) `shouldBe` 2
+
+    it "warns that a multi-clause DECIDE misses a case, and still succeeds" $ do
+      let fixture = fixtureDir </> "multi-clause-missing.l4"
+      Output code sout serr <- runL4 bin ["check", fixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      serr `shouldSatisfy` ("does not cover all cases" `isInfixOf`)
+      serr `shouldSatisfy` ("DECIDE `price` Blue IS" `isInfixOf`)
 
     -- An annotation this version of L4 does not know is a warning, not a lexer
     -- error: the file still checks and runs, and the one diagnostic names it.
@@ -1152,6 +1275,16 @@ spec bin = do
     it "writes nothing to stdout and exits non-zero on a broken file" $ do
       Output code _ _ <- runL4 bin ["format", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
+
+    it "reproduces multi-clause DECIDE and MEANS groups byte-for-byte" $ do
+      -- The parser fuses a clause group into one definition; formatting must
+      -- still print every clause as written. Carriage returns are dropped on
+      -- both sides so a CRLF checkout on Windows compares equal.
+      let fixture = fixtureDir </> "multi-clause-format.l4"
+      src <- readFile fixture
+      Output code sout _ <- runL4 bin ["format", fixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldBe` filter (/= '\r') src
 
   ----------------------------------------------------------------------------
   -- One encoding, several languages.
@@ -1387,6 +1520,152 @@ spec bin = do
       code `shouldBe` ExitSuccess
       -- The dumper uses pretty-simple; any module will start with "MkModule".
       sout `shouldSatisfy` ("MkModule" `isInfixOf`)
+
+  -- `l4 batch` and the REPL re-print the module and run the printed text. A
+  -- CONSIDER's arms were printed comma-separated on one hanging indent, so in a
+  -- CONSIDER inside an arm of another, the outer's later arms were read as more
+  -- arms of the inner one, and an arm that ended in a comma list took the comma
+  -- after it for another element. The expected answers are what `l4 run` gives
+  -- on the fixture's own #EVALs, which the first test of each group pins.
+  --
+  -- Everything this needs is local to the block, so that it shares no line with
+  -- the rest of the file: the fixtures are named here, and an answer is a
+  -- `Value`, with a string standing for an exception or for text that is none
+  -- of TRUE, FALSE, a number or a LIST of numbers.
+  describe "a CONSIDER whose arms are printed back" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let noBranch = String "<a CONSIDER with no branch for its value>"
+        one n    = Number n
+        -- the answer a block of output spells
+        answerOf :: T.Text -> Value
+        answerOf t
+          | Just rest <- T.stripPrefix "LIST " t
+          , let elems = T.splitOn ", " rest
+          , all (\e -> not (T.null e) && T.all isDigit e) elems
+          = toJSON (map (read . T.unpack) elems :: [Integer])
+          | t == "TRUE"  = Bool True
+          | t == "FALSE" = Bool False
+          | not (T.null t), T.all isDigit t = Number (fromInteger (read (T.unpack t)))
+          | "has no branch" `T.isInfixOf` t = noBranch
+          | otherwise = String ("<" <> t <> ">")
+        -- what `l4 run` gives for each #EVAL of a file, in order
+        runAnswers file = do
+          Output _ sout _ <- runL4 bin ["run", file]
+          let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
+              result b = T.strip (fst (T.breakOn "Trace:" (T.drop (T.length "Result:") (snd (T.breakOn "Result:" b)))))
+          pure (map (answerOf . result) blocks)
+        -- what each row of `l4 batch` gives. A row that raises is `"status":"error"`
+        -- with its message in the result, and it stops the batch unless `-c` says to
+        -- go on; so a file with a raising row is run with `-c`, and every row is read.
+        batchAnswers file inputs entry = do
+          Output _ sout _ <- runL4 bin ["batch", "-c", file, "-i", inputs, "-e", entry]
+          let result row = case objField row "output" of
+                Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+                _ -> Nothing
+              rowAnswer row = case (objField row "status", result row) of
+                (_, Just (Object o))
+                  | Just (String e) <- KeyMap.lookup (Key.fromString "error") o -> answerOf e
+                (Just (String "success"), Just v) -> v
+                _ -> String ("<" <> T.pack (take 300 (show (objField row "diagnostics"))) <> ">")
+          pure [ rowAnswer row | l <- map (filter (/= '\r')) (lines sout)
+                               , Right row <- [eitherDecode (BSL8.pack l)] ]
+        -- what the REPL gives to each query, loading the file first. It runs in a
+        -- directory of its own, because it keeps a history file in the one it is in.
+        replAnswers repl file queries = withSystemTempDirectory "l4-repl-consider-arms" \work -> do
+          absFile <- makeAbsolute file
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          hPutStr hin (unlines (queries <> [":quit"]))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          -- the banner, then one reply after each prompt, then the last prompt's goodbye
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map (answerOf . T.strip) (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        inRepl file queries expected = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> replAnswers repl file queries `shouldReturn` expected
+
+        types    = fixtureDir </> "batch-nested-consider-types.l4"
+        silent   = fixtureDir </> "batch-nested-consider-silent.l4"
+        listArms = fixtureDir </> "batch-consider-list-arms.l4"
+        rows f   = fixtureDir </> ("batch-" ++ f ++ ".json")
+
+        typesWant  = [one 1, one 2, one 3, one 4]
+        -- Red Red, Red Blue (no arm for Blue in the inner one), Green, Blue
+        silentWant = [Bool True, noBranch, Bool False, Bool True]
+        listsWant  = [toJSON [1, 2 :: Integer], toJSON [3 :: Integer], toJSON [4, 5 :: Integer]]
+
+        -- a WHERE under an arm; the three files differ in which arm holds it
+        whereFile n = fixtureDir </> ("batch-consider-where-" ++ n ++ ".l4")
+        whereRows n = rows ("consider-where-" ++ n)
+        whereWant   = [one 0, one 20, one 50]
+        whereQueries = [ "`late fee` 1000 0", "`late fee` 1000 10", "`late fee` 1000 45" ]
+        whereArms   = ["first", "middle", "last"]
+
+    -- the inner CONSIDER is on another type, so the outer's later arms did not
+    -- type-check as its arms and every row was an error
+    it "is read by l4 run as the rule says" $ do
+      runAnswers types  `shouldReturn` typesWant
+      runAnswers silent `shouldReturn` (silentWant <> [one 4])
+      runAnswers listArms `shouldReturn` listsWant
+
+    it "is read as written by l4 batch, when the inner one is on another type" $
+      batchAnswers types (rows "nested-consider-types") "inner on another type" `shouldReturn` typesWant
+
+    -- the inner CONSIDER is on the same type, so they did type-check, and the
+    -- printed rule answered differently with no diagnostic
+    it "is read as written by l4 batch, when the inner one is on the same type" $
+      batchAnswers silent (rows "nested-consider-silent") "inner on the same type" `shouldReturn` silentWant
+
+    -- the control: an inner CONSIDER that is the last arm was always printed right
+    it "is read as written by l4 batch, when it is the last arm" $
+      batchAnswers silent (rows "nested-consider-last") "inner last" `shouldReturn` [one 4]
+
+    -- no nesting at all: the comma after an arm was read as the next element of
+    -- the LIST the arm ended in
+    it "is read as written by l4 batch, when an arm ends in a comma list" $
+      batchAnswers listArms (rows "consider-list-arms") "list arms" `shouldReturn` listsWant
+
+    it "is read as written by the REPL, when the inner one is on another type" $
+      inRepl types
+        [ "`inner on another type` 0 1", "`inner on another type` 0 9"
+        , "`inner on another type` 1 1", "`inner on another type` 2 9" ]
+        typesWant
+
+    it "is read as written by the REPL, when the inner one is on the same type" $
+      inRepl silent
+        [ "`inner on the same type` 0 0", "`inner on the same type` 0 2"
+        , "`inner on the same type` 1 0", "`inner on the same type` 2 0" ]
+        silentWant
+
+    it "is read as written by the REPL, when an arm ends in a comma list" $
+      inRepl listArms [ "`list arms` 0", "`list arms` 1", "`list arms` 2" ] listsWant
+
+    -- a WHERE under an arm: its line stood at the column of the arm's WHEN, which
+    -- ends the definition, so any arm after it did not parse and every row failed.
+    -- The last arm has none after it, and was always printed right.
+    it "is read by l4 run as the rule says, with a WHERE under an arm" $
+      forM_ whereArms \n -> runAnswers (whereFile n) `shouldReturn` whereWant
+
+    forM_ whereArms \n -> do
+      it ("is read as written by l4 batch, with a WHERE under the " ++ n ++ " arm") $
+        batchAnswers (whereFile n) (whereRows n) "late fee" `shouldReturn` whereWant
+
+      it ("is read as written by the REPL, with a WHERE under the " ++ n ++ " arm") $
+        inRepl (whereFile n) whereQueries whereWant
 
   ----------------------------------------------------------------------------
   -- @desc attachment (L4.Parser.ResolveAnnotation)
@@ -1715,11 +1994,11 @@ spec bin = do
       it "reads clauses indented with tabs" $
         results [batchClausesTabs, "--inputs", batchClausesColours]
           >>= (`shouldBe` map ok [Number 1, Number 3, Number 3])
-      -- The printer adds its indentation to the second line of any string
-      -- that spans lines, in a rule written as clauses or not; routed
-      -- separately. `l4 run` gives "a\n      b".
+      -- A string that spans lines keeps the later lines as the source wrote
+      -- them: printed back as source, its line break is written as an escape
+      -- (#1028), so the printer's indentation cannot enter the string. `l4 run`
+      -- gives "a\n      b".
       it "keeps a string that spans lines in a clause body" $ do
-        pendingWith "the printer indents the later lines of a multi-line string, in every rule"
         results [batchClausesString, "--inputs", batchClausesColours]
           >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
 
@@ -1795,6 +2074,14 @@ spec bin = do
       let statuses = [ s | Object o <- rows
                          , Just (String s) <- [KeyMap.lookup (Key.fromString "status") o] ]
       statuses `shouldBe` ["success", "success"]
+
+    it "reads a cases file that holds one object as one case" $ do
+      -- Plain main answered a JSON object where it expected an array with
+      -- "failed to parse inputs: ... expected Array, but encountered Object".
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchSingleObjectJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 1
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
 
     it "emits a single JSON array with --format json" $ do
       Output code sout _ <-
@@ -1872,6 +2159,51 @@ spec bin = do
       map (cell "flag")   rows `shouldBe` [Just (Bool True), Just (Bool False)]
       -- 007 is not a JSON number, and a date is text
       map (cell "serial") rows `shouldBe` [Just (String "007"), Just (String "2026-10-13")]
+
+    -- T3c (ruled, specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md on unstable): a
+    -- blank CSV cell is ABSENT, exactly like a column missing from the file, for
+    -- every kind of input. Plain main answered an empty STRING cell with "" and
+    -- a blank MAYBE STRING cell with JUST "", and an empty NUMBER cell with a
+    -- decode error under status "success".
+    describe "a blank CSV cell is absent, not null and not an empty string" $ do
+      let blankRows args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          diagnosticsOf row = show (objField row "diagnostics")
+          resultOfRow row = case objField row "output" of
+            Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+            _ -> Nothing
+
+      it "makes a required STRING input missing, and a MAYBE STRING input NOTHING" $ do
+        (code, rows) <- blankRows [batchBlankFixture, "--inputs", batchBlankCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows
+          `shouldBe` map (Just . String) ["error", "error", "success", "success", "success"]
+        case rows of
+          [empty, spaces, noNote, blankNote, note] -> do
+            diagnosticsOf empty  `shouldSatisfy` ("Missing required field 'code'" `isInfixOf`)
+            diagnosticsOf spaces `shouldSatisfy` ("Missing required field 'code'" `isInfixOf`)
+            resultOfRow noNote    `shouldBe` Just (String "nothing")
+            resultOfRow blankNote `shouldBe` Just (String "nothing")
+            resultOfRow note      `shouldBe` Just (String "hello")
+            -- the case as read leaves the blank cell out
+            (objField noNote "input" >>= (`objField` "note")) `shouldBe` Nothing
+            (objField empty "input" >>= (`objField` "code")) `shouldBe` Nothing
+          other -> expectationFailure ("expected 5 rows, got " ++ show (length other))
+
+      it "makes a required NUMBER input missing too" $ do
+        (code, rows) <- blankRows [batchEligFixture, "--inputs", batchBlankIncomeCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["error", "error", "success"]
+        map diagnosticsOf (take 2 rows) `shouldSatisfy` all ("Missing required field 'income'" `isInfixOf`)
+
+      it "is reported by --validate-only as a missing field" $ do
+        Output code sout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchBlankIncomeCsv, "--validate-only", "--continue-on-error"]
+        code `shouldSatisfy` (/= ExitSuccess)
+        length (filter ("Missing required field: 'income'" `isInfixOf`) (lines sout)) `shouldBe` 2
 
     -- A value is read by the type its input declares. The merge of main into
     -- unstable (d543d8531) dropped main's `coerceInputTypes` as "superseded by
@@ -2187,6 +2519,41 @@ spec bin = do
         [ "C:\\Users\\x", "back\\slash", "tab\there", "line\nbreak", "\\u0041", "\\\\n" ]
       map (fst . resultAndPresumed) rows `shouldBe` sent
 
+    -- The same, for a CSV file, where the values arrive as cells. Each cell is
+    -- `echoCode`'s input and so must be its answer, and each is its own example,
+    -- so a failure names the cell. On the hand-rolled escaper the double quote
+    -- fails to lex, and the backslash, the trailing backslash, the tab, the line
+    -- break and the carriage return come back as null, and the escape-looking
+    -- text as a different string, every one under status success; the plain
+    -- text, the non-ASCII letter and the apostrophe case are the controls that
+    -- pass there.
+    describe "hands a CSV cell to the rule and back unchanged" $ do
+      let cells :: [(String, String)]
+          cells = [ ("plain text", "plain"), ("a double quote", "say \"hi\""), ("a backslash", "C:\\Users\\x")
+                  , ("a trailing backslash", "trailing\\"), ("a tab", "tab\there")
+                  , ("a line break", "line one\nline two"), ("a carriage return", "cr\rhere")
+                  , ("a non-ASCII letter", "caf\233"), ("text that looks like an escape", "\\u0041")
+                  , ("two backslashes and an n", "\\\\n"), ("an apostrophe, braces and a percent sign", "it's {braced} 100%") ]
+          resultOf row = case objField row "output" of
+            Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+            _ -> Nothing
+      beforeAll
+        (do Output code sout _ <-
+              runL4 bin ["batch", batchCodeFixture, "--inputs", batchEscapeCellsCsv, "--continue-on-error"]
+            pure ( code
+                 , [ row | l <- lines sout
+                         , Right row <- [eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack (filter (/= '\r') l)))) :: Either String Value] ] )) do
+        it "reads one row per cell, and exits 0" \(code, rows) -> do
+          length rows `shouldBe` length cells
+          code `shouldBe` ExitSuccess
+        forM_ (zip [0 ..] cells) \(i, (name, expected)) ->
+          it ("keeps " <> name) \(_, rows) ->
+            case drop i rows of
+              row : _ ->
+                (objField row "status", resultOf row)
+                  `shouldBe` (Just (String "success"), Just (String (T.pack expected)))
+              [] -> expectationFailure "no row for this cell"
+
   describe "l4 batch: TYPICALLY defaults (W3)" $ do
     -- Before W3 every one of these rows came back "Missing required field",
     -- although #EVAL honours the section default (R1: batch must agree).
@@ -2282,8 +2649,9 @@ spec bin = do
     -- own decoder drops it as if it were a blank line (two rows in, one out,
     -- exit 0). A quoted "   " is a row too, its cell of spaces empty. A blank
     -- line is not a row, and neither is an unquoted line of spaces, in a
-    -- one-column file too (review M4, decided overnight 2026-10-02, pending
-    -- Meng's review): the fixture's `   ` line is skipped.
+    -- one-column file too (review M4; ruled by Meng on 2026-10-13,
+    -- legalese/l4-ide#653): the fixture's `   ` line is skipped, and to give an
+    -- empty value in a one-column file, write `""`.
     it "evaluates a one-column CSV row whose only cell is \"\"" $ do
       Output code sout _ <- runL4 bin ["batch", batchTyOneCol, "--inputs", batchTyOneColCsv, "--format", "json"]
       code `shouldBe` ExitSuccess
@@ -2294,7 +2662,7 @@ spec bin = do
         , (Just (Bool True), presumedOf ["has capacity"])
         ]
 
-    -- Review M4 (decided overnight 2026-10-02, pending Meng's review): a short
+    -- Review M4 (ruled by Meng on 2026-10-13, legalese/l4-ide#653): a short
     -- row used to take the defaults of its missing cells, and a long one lost
     -- its extra cells, both with status success. A line of a tab and a space
     -- is blank, so it is skipped and still counted.
@@ -2488,6 +2856,27 @@ spec bin = do
       removePathForcibly outDir
       wrote `shouldBe` True
 
+    it "runs no shell for --output-dir, and renders or fails with a diagnostic" $ do
+      -- `;` ends a shell command, so this name, handed to a shell, runs
+      -- `touch PWNED` in the working directory. The marker is relative, so
+      -- unlike the case above the name has no drive colon and no separator,
+      -- and is a legal directory on Windows as well.
+      tmp <- getTemporaryDirectory
+      let work    = tmp </> "l4-trace-metachar"
+          evilDir = "o;touch PWNED;x"
+      removePathForcibly work
+      createDirectoryIfMissing True work
+      fixture <- makeAbsolute evalTraceFixture
+      Output code _ serr <- runL4In (Just work) Nothing bin
+        ["trace", fixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist (work </> "PWNED")
+      rendered <- doesFileExist (work </> evilDir </> "evaltrace-eval1.png")
+      removePathForcibly work
+      ranShell `shouldBe` False
+      case code of
+        ExitSuccess   -> rendered `shouldBe` True
+        ExitFailure _ -> serr `shouldSatisfy` ("Error: " `isInfixOf`)
+
     it "hands dot an output dir beginning with '-' as a path, not an option" $ do
       -- dot reads any argument starting with `-` as an option, and has no
       -- `--` to stop that. Given `-out/evaltrace-eval1.dot` it reads
@@ -2513,6 +2902,43 @@ spec bin = do
           removePathForcibly work
           code `shouldBe` ExitSuccess
           svg `shouldSatisfy` ("<svg" `isInfixOf`)
+
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer's brackets as much as batch. Each operand nests inside an
+  -- AND, and each expected answer is the fixture's own #EVAL under `l4 run`.
+  -- With the printer as it was, batch answered `true` to every one of them,
+  -- with "status":"success" and no diagnostic.
+  describe "l4 batch keeps the grouping the rule wrote" $ do
+    let bracket = fixtureDir </> "batch-bracket.l4"
+        rows f  = fixtureDir </> ("batch-bracket-" ++ f ++ ".json")
+    it "brackets an OR inside an AND" $
+      batchAnswer bin bracket (rows "tff") "or under and" `shouldReturn` Bool False
+    it "brackets a NOT inside an AND" $
+      batchAnswer bin bracket (rows "tff") "not under and" `shouldReturn` Bool False
+    it "brackets an IMPLIES inside an AND" $
+      batchAnswer bin bracket (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "brackets an IF inside an AND" $
+      batchAnswer bin bracket (rows "ttf") "if under and" `shouldReturn` Bool False
+    it "brackets a function call inside an AND" $
+      batchAnswer bin bracket (rows "fff") "call under and" `shouldReturn` Bool False
+
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer as much as batch. Each expected value is what `l4 run`
+  -- gives on the fixture's own #EVAL. On build 90 the first three returned the
+  -- opposite answer with "status":"success", and the division failed to
+  -- re-parse (`a DIVIDED b`).
+  describe "l4 batch agrees with l4 run" $ do
+    let grouping = fixtureDir </> "batch-grouping.l4"
+        rows f   = fixtureDir </> ("batch-grouping-" ++ f ++ ".json")
+    it "keeps the brackets on an OR inside an AND" $
+      batchAnswer bin grouping (rows "tff") "or under and" `shouldReturn` Bool False
+    it "keeps the brackets on a NOT inside an OR" $
+      batchAnswer bin grouping (rows "ttf") "not under or" `shouldReturn` Bool True
+    it "keeps the brackets on an IMPLIES inside an AND" $
+      batchAnswer bin grouping (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "evaluates an exported division" $
+      batchAnswer bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
+        `shouldReturn` Number 2
 
   -- Regression tests for the import-cycle false-success bug: `l4 check`/`run`
   -- previously exited 0 on a 2-/3-module import ring because the engine's cycle
@@ -2603,11 +3029,14 @@ spec bin = do
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
       -- Option E: two differing copies were visible; the warning names them
-      -- and the chosen one, at a priority the CLI actually prints.
+      -- and the chosen one, at a priority the CLI actually prints. The two rows
+      -- are asserted whole, with their markers: that the words "embedded
+      -- stdlib" and "XDG data dir" appear somewhere in the output proves
+      -- nothing, because the unresolved-import error and the parse error in
+      -- the poisoned file name them too.
       serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
-      serr `shouldSatisfy` ("[chosen]" `isInfixOf`)
-      serr `shouldSatisfy` ("embedded stdlib" `isInfixOf`)
-      serr `shouldSatisfy` ("XDG data dir" `isInfixOf`)
+      serr `shouldSatisfy` ("[chosen]   embedded stdlib" `isInfixOf`)
+      serr `shouldSatisfy` ("[shadowed] XDG data dir" `isInfixOf`)
 
     -- The example below makes a symbolic link, and is marked pending where the
     -- account may not make one (Windows without the symlink privilege). This
@@ -2712,6 +3141,25 @@ spec bin = do
           "Expected the embedded prelude to serve a bare entry path, but l4 exited "
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
+
+    -- The names, not just the import. embedded-wins/main.l4 above only writes
+    -- the `IMPORT`, so it cannot tell a prelude that is in scope from one that
+    -- is not. With the entry file named bare and nothing on disk to find, plain
+    -- main binds none of the prelude's names: `cd project && l4 run total.l4`
+    -- answers "I could not find a definition for the identifier `sum`" and
+    -- exits 1, while `l4 run project/total.l4` works.
+    it "a bare entry path still brings the stdlib's names into scope" $ do
+      tmp <- getTemporaryDirectory
+      let work = tmp </> "l4-bare-entry-stdlib-names"
+      removePathForcibly work
+      createDirectoryIfMissing True work
+      writeFile (work </> "total.l4") (unlines ["IMPORT prelude", "", "#EVAL sum (LIST 1, 2, 3)"])
+      Output code sout serr <- runL4EmbeddedOnlyIn (Just work) bin ["run", "total.l4"]
+      removePathForcibly work
+      let combined = sout ++ "\n" ++ serr
+      when ("could not find a definition" `isInfixOf` combined) $
+        expectationFailure ("`sum` was not in scope after IMPORT prelude:\n" ++ combined)
+      code `shouldBe` ExitSuccess
 
     -- One module name, one source — including for importers that are themselves
     -- embedded libraries. embedded-importer/daydate.l4 is a deliberately

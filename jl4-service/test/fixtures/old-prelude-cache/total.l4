@@ -1,0 +1,6 @@
+IMPORT prelude
+
+@export the total of a list of numbers
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`total` xs MEANS sum xs

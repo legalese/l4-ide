@@ -1,28 +1,30 @@
 # Concepts - Summary
 
-- [Concepts Home](README.md)
+- [Concepts home](README.md)
 
-## Language Design
+## Language design
 
-- [Design Principles](language-design/principles.md)
-- [Linguistic Syntax](language-design/linguistic-syntax.md)
+- [Design principles](language-design/principles.md)
+- [Reading like the law](language-design/linguistic-syntax.md)
 - [Flowcharts, Decision Tables, and Real Logic](language-design/logic-not-flowcharts.md)
 - [Related Work: Tables, Trees, Diagrams, and Order](language-design/related-work.md)
 
-## Legal Modeling
+## Legal modeling
 
-- [Regulative Rules](legal-modeling/regulative-rules.md)
+- [Definitions and duties](legal-modeling/constitutive-vs-regulative.md)
+- [Exceptions and defaults](legal-modeling/default-reasoning.md)
+- [How obligations unfold](legal-modeling/regulative-rules.md)
 - [The Regulative Layer, Whole](legal-modeling/regulative-layer-whole.md)
-- [Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)
-- [Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)
 - [Five Kinds of No Answer](legal-modeling/non-answers.md)
+- [Residual: One Word, Three Disciplines](legal-modeling/residual.md)
 
-## Type System
+## Types
 
-- [Algebraic Types](type-system/algebraic-types.md)
+- [Types as legal categories](type-system/algebraic-types.md)
 - [Exhaustiveness](type-system/exhaustiveness.md)
+- [Type theory](type-system/type-theory.md)
 
-## Neighbours
+## Neighbouring systems
 
 - [Blawx and s(CASP)](neighbours/blawx-and-scasp.md)
 

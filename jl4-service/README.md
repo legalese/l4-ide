@@ -70,6 +70,21 @@ GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 ```
 
+## Libraries and `IMPORT`
+
+A deployment resolves an `IMPORT` against the files of its own bundle and the standard library built into the service, and against nothing else.
+The service does not read `JL4_LIBRARY_PATH`, its working directory or the per-user library folder.
+A library that is not part of the standard library has to be in the bundle, beside the file that imports it.
+A bundle file named like a standard library module, such as `prelude.l4`, is used for the bundle's own imports in place of the built-in one.
+
+The service logs three `WARN` lines about this:
+
+- `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
+- `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
+- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422.
+
+[Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
+
 ## API Reference
 
 ### Health
@@ -195,7 +210,8 @@ A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer to
 Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
 **A misspelled name is refused where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is refused, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored, as before.
-`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation` refuses it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`); MCP and batch take it to the wrapper path instead (below). A type that is a synonym for a `MAYBE` is a `MAYBE`.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation` refuses it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`); MCP and batch take it to the wrapper path instead (below). A type that is a synonym for a `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
+The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 For this rule:
 
 ```l4
@@ -218,7 +234,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 **`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
 
 **Absent with no default, or `null`.**
-Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
+Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every `/evaluation` request to a `DEONTIC` function; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
 On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
@@ -235,7 +251,7 @@ It stops however the rule reads the input, including through a `CONSIDER` with a
 
 Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
 
-A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`.
+A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`; when more than one does, the message names them all, without quoting.
 
 A synonym for a record, an enum or a `LIST` is read as the type it stands for on this path, and so is a synonym below the head of a type, as in `MAYBE Hue`: the decoder expands it.
 
@@ -351,6 +367,7 @@ An answered case carries the function's result under `value`.
 `outcomes` is required, but the service does not use it yet: every answered case carries the whole result.
 Every case carries its own `@presumed`, the inputs it left out whose defaults its answer or refusal used (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 Neither has a `value`.
 The three `processor…` fields of `summary` are not measured, and are always `0`.
 The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describes this response key by key.
@@ -410,6 +427,12 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+
+A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
+There are three such answers.
+A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
+A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
 
 ### Ladder Diagrams
 
@@ -679,7 +702,7 @@ The service enforces several resource limits to protect against abuse:
 - **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`, on the thread that evaluates: the calling thread on the direct path, and on the wrapper path the thread the evaluator runs on for the module and for each module it imports (see [What the limits do not cover yet](#what-the-limits-do-not-cover-yet)). The limit covers finishing the answer as well as evaluating it, so a trace counts: a traced single evaluation allocates the trace as well, and a call that fits without `?trace=full` can pass the limit with it (a 1,000-step recursion allocated 6.7 MB untraced and 79 MB traced, measured on 2026-10-07). A batch does not write the reasoning tree, so its cases are not charged for building it; but a traced batch case still pays for recording the trace, and without `graphviz=true` the batch writes nothing from it (measured on 2026-10-07: a 1,000-step case was answered at 40 MB and stopped at 38 MB with `?trace=full`, and needs about 7 MB without it). That waste was there before the limits forced the response. Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
 - **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout; in a batch, the case that times out carries `@error` and `"@limit": "time"` instead. The limit is on wall-clock time, so it counts any other work sharing the evaluation's core. Batch cases, counting every batch in flight, never run more at once than there are cores, so batch cases do not slow each other down by sharing a core. A batch case's clock still counts the garbage collector's pauses, which every running evaluation shares, and any of the work that takes no slot (single evaluations, MCP calls, compiles, query plans, ladder and state-graph rendering, response encoding) that is sharing its core at the time.
 - **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds, whether it is a deploy or a deployment being loaded from the store at startup. The limit is on wall-clock time.
-- **Compilation memory**: `--max-compile-memory-mb` sets a GHC allocation counter on the thread that compiles. Measured on a store of 105 deployments, with values from 8 MB to 2 GB, at deploy and at restart, it stopped no compile: every deployment still compiled. Do not rely on it to stop a large compile.
+- **Compilation memory**: `--max-compile-memory-mb` sets a GHC allocation counter on the thread that compiles. Measured with 8 MB and with 2048 MB, at deploy (a large example file) and at restart (a store of 110 deployments), and again on a store of 105 deployments with values from 8 MB to 2 GB, at deploy and at restart, it stopped no compile: every deployment still compiled. Do not rely on it to stop a large compile.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
 - **File count**: Upload rejected with `400` if zip contains more than `--max-file-count` entries.
 - **Deployment count**: New deployment rejected with `400` if `--max-deployments` is reached.
@@ -716,7 +739,7 @@ Deployments are stored on disk at `{store-path}/{deployment-id}/`:
 
 `metadata-cache.json` is a cache, written after a successful compile; the sources and `metadata.json` are what a deployment is.
 
-On startup, the service scans the store directory and compiles every deployment from its stored sources, the way a deploy compiles them and under the same limits (see Resource Limits), as many at once as it has capabilities (one per core unless `+RTS -N` says otherwise). A timeout counts wall-clock time, and a compile starts only when one of those places is free, so a deployment is not failed for waiting its turn. A deployment that does not finish in `--compile-timeout` stays `failed` until it is redeployed or the service restarts (a PUT to a failed deployment is not checked for compatibility, as before). Nothing is kept from the compile that made the deployment, so a restart serves exactly what a deploy of those sources would serve. A deployment whose stored sources no longer parse or type-check (a file was edited on disk, or the service's checks changed) is `failed`, with the errors a deploy of them would be rejected with; the log has a warning that names the file and prints the errors, and the other deployments load as usual. A `bundle.cbor` that an earlier version of the service left beside the sources is not read and not touched; it is safe to delete. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
+On startup, the service scans the store directory and compiles every deployment from its stored sources, the way a deploy compiles them and under the same limits (see Resource Limits), as many at once as it has capabilities (one per core unless `+RTS -N` says otherwise). A timeout counts wall-clock time, and a compile starts only when one of those places is free, so a deployment is not failed for waiting its turn. Unless `--lazy-load` is set, the service opens its port only after every deployment has loaded, so a store of k deployments that each time out delays the port by about k times `--compile-timeout`, divided by the number that compile at once. A deployment that does not finish in `--compile-timeout` stays `failed` until it is redeployed or the service restarts (a PUT to a failed deployment is not checked for compatibility, as before). Nothing is kept from the compile that made the deployment, so a restart serves exactly what a deploy of those sources would serve. A deployment whose stored sources no longer parse or type-check (a file was edited on disk, or the service's checks changed) is `failed`, with the errors a deploy of them would be rejected with; the log has a warning that names the file and prints the errors, and the other deployments load as usual. A `bundle.cbor` that an earlier version of the service left beside the sources is not read and not touched; it is safe to delete. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
 
 ## Testing
 
@@ -735,7 +758,7 @@ Test coverage:
 - **BundleStoreSpec** -- Filesystem persistence round-trips
 - **CodeGenSpec** -- Input field name collision avoidance
 - **DecisionQueryCacheKeySpec** -- Cache key determinism
-- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping
+- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping, answers after a restart
 - **LoggingSpec** -- Log lines stay whole when many threads log at once
 - **SanitizationSpec** -- Property name sanitization, reverse mapping, collision detection
 - **SchemaSpec** -- QuickCheck property tests for API type serialization

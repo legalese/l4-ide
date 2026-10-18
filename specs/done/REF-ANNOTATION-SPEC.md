@@ -1,5 +1,5 @@
 > Status: DONE — @ref annotations are attached to AST nodes as of PR #48 (merged 2026-07-06). The parallel Citations.hs interval-map hyperlink mechanism is intentionally left separate.
-> Amended 2026-10-13, ruled 2026-10-12 (card R1, option A): a node keeps EVERY ref that precedes it, a ref after code on its line is attached to nothing, and two new warnings replace the old one. See "Amendment 2026-10-13" at the end; the code listings below are as PR #48 built them.
+> Amended 2026-10-13, ruled 2026-10-12 (card R1, option A): a node keeps EVERY ref that precedes it, a ref after code on its line is attached to nothing, and two new warnings replace the old one. See "Amendment 2026-10-13" at the end; the code listings below are as PR #48 built them. The as-built record is `specs/as-built/ref-annotation.md`.
 
 # Specification: @ref Annotation Attachment
 
@@ -9,14 +9,14 @@ This document specifies how `@ref` annotations should be attached to AST nodes. 
 
 ## Current Implementation Status
 
-| Component               | Status | Location                                               |
-| ----------------------- | ------ | ------------------------------------------------------ |
-| Lexer recognizes `@ref` | ✅     | `jl4-core/src/L4/Lexer.hs:77` — `TRef !Text !AnnoType` |
-| Parser collects `@ref`  | ✅     | `jl4-core/src/L4/Parser.hs:62` — `PState.refs`         |
-| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs:639`                        |
-| Attachment to AST       | ❌     | TODO in `Parser.hs:216-218`                            |
+| Component               | Status | Location                                                              |
+| ----------------------- | ------ | --------------------------------------------------------------------- |
+| Lexer recognizes `@ref` | ✅     | `jl4-core/src/L4/Lexer.hs` — `TRef !Text !AnnoType`                   |
+| Parser collects `@ref`  | ✅     | `jl4-core/src/L4/Parser.hs` — `PState.refs`                           |
+| `Ref` type in AST       | ✅     | `jl4-core/src/L4/Syntax.hs` — `data Ref`                              |
+| Attachment to AST       | ✅     | `jl4-core/src/L4/Parser/ResolveAnnotation.hs` — `addRefCommentsToAst` |
 
-### Parser TODO (existing)
+### Parser TODO (as it stood before @ref annotations were attached)
 
 ```haskell
 -- jl4-core/src/L4/Parser.hs:216-218
@@ -27,11 +27,11 @@ This document specifies how `@ref` annotations should be attached to AST nodes. 
 
 ## Related Specifications
 
-| Annotation | Spec                                       | Attachment Rule                                    |
-| ---------- | ------------------------------------------ | -------------------------------------------------- |
-| `@nlg`     | (implemented)                              | Attaches to `Name` nodes based on source position  |
-| `@desc`    | `doc/dev/specs/todo/EXPORT-SYNTAX-SPEC.md` | Attaches to immediately following `TopDecl`        |
-| `@ref`     | this document                              | Attaches to **any** immediately following AST node |
+| Annotation | Spec                               | Attachment Rule                                    |
+| ---------- | ---------------------------------- | -------------------------------------------------- |
+| `@nlg`     | (implemented)                      | Attaches to `Name` nodes based on source position  |
+| `@desc`    | `specs/done/EXPORT-SYNTAX-SPEC.md` | Attaches to immediately following `TopDecl`        |
+| `@ref`     | this document                      | Attaches to **any** immediately following AST node |
 
 ## Design
 
@@ -226,8 +226,7 @@ Add test files:
 ## References
 
 - `jl4-core/src/L4/Parser/ResolveAnnotation.hs` — existing `@nlg` attachment pattern
-- `doc/dev/specs/todo/EXPORT-SYNTAX-SPEC.md` — `@desc` attachment specification
-- `doc/dev/specs/todo/WASM-LSP-SPEC.md` — WASM compatibility (reason for `@ref-src` removal: No file-io)
+- `@ref-src` was removed because the WASM build has no file I/O. The specs for `@desc` attachment and for WASM compatibility are `specs/done/EXPORT-SYNTAX-SPEC.md` and `specs/done/WASM-LSP-SPEC.md`.
 - Issue #635 — decision service improvements (related)
 
 ## Amendment 2026-10-13: a node keeps every ref before it; a ref after code is attached to nothing
@@ -252,5 +251,7 @@ What changed:
 
 Measured on this repo's tracked `.l4` files outside `jl4/examples/canon`, 2026-10-13: 190 refs, 179 on a line of their own and 11 at the end of a code line.
 The refs in `ok/ref.l4`, `lsp/semantic-tokens/annotations.l4`, `ok/nlg_ref_parse.l4`, `doc/reference/syntax/annotation-example.l4`, the two `ny-environmental` copies and the `britishcitizen` experiments were moved to the line above what they cite.
+
+Assumed, not ruled: the timing guard in `RefAnnotationSpec` forces the warning count as well as the definitions, so that the whole attachment pass has run when the clock stops.
 
 Not chosen: a same-line rule, under which a ref at the end of a line binds to that line's code and a ref under a `§` heading binds to the section; and a rule under which a ref attaches to the node BEFORE it, which moves every own-line ref in the corpus to the wrong node.

@@ -37,10 +37,15 @@ executable l4
     bytestring,
     cassava,
     containers,
+    crypton,
     directory,
     filepath,
     hls-graph,
+    http-client,
+    http-client-tls,
+    http-types,
     lsp-types,
+    network-uri,
     process,
     text,
     time,
@@ -49,6 +54,9 @@ executable l4
     unordered-containers,
     vector,
     yaml,
+    zip-archive,
+  if !os(windows)
+    build-depends: unix
   main-is: Main.hs
   other-modules:
     L4.Cli.Ast
@@ -56,10 +64,13 @@ executable l4
     L4.Cli.Blawx
     L4.Cli.Catala
     L4.Cli.Check
+    L4.Cli.Cloud
     L4.Cli.Common
+    L4.Cli.Deploy
     L4.Cli.Docassemble
     L4.Cli.Export
     L4.Cli.Format
+    L4.Cli.Install
     L4.Cli.Lts
     L4.Cli.Nlg
     L4.Cli.OpenFisca
@@ -168,7 +179,8 @@ test-suite l4-cli-test
     Paths_jl4
   build-tool-depends:
     jl4:l4,
-    jl4-lsp:jl4-lsp
+    jl4-lsp:jl4-lsp,
+    jl4-repl:jl4-repl
   build-depends:
     aeson,
     bytestring,
@@ -177,4 +189,5 @@ test-suite l4-cli-test
     hspec,
     jl4-core,
     process,
+    temporary,
     text,

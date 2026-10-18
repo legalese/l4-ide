@@ -98,7 +98,7 @@ emits no timer and records that instead. Neither silently invents a unit.
 
 The other deadline the export declines is the anchored one — `WITHIN 5 OF THE JOIN`,
 `OF THE DEADLINE`, `OF THE ARMING`, `OF closingDate` (see
-[WITHIN](../reference/regulative/README.md#within-temporal-deadline)). A BPMN timer runs from the
+[WITHIN](../reference/regulative/consequences.md#within)). A BPMN timer runs from the
 moment its activity starts, and the exporter does not work out whether the anchor is that moment,
 so it draws no timer: the boundary event is a _conditional_ event carrying the text verbatim, and
 the report says so with a blocking `P-DEADLINE` that names the anchor. An anchored `WITHIN` beside

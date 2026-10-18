@@ -405,10 +405,12 @@ suppressResolutionCascade errs
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
 checkProgram written = do
-  -- 'withScanTypeAndSigEnvironment', with one step between scanning the
-  -- types and scanning the definitions: once the module's constructors are
-  -- known, a run of clauses that the parser grouped on bare names alone is
-  -- told apart from a run of overloads ('separateOverloads').
+  -- 'withScanTypeAndSigEnvironment', with two steps between scanning the
+  -- types and scanning the definitions: once every synonym body is
+  -- resolved, a cycle among them is found and its members are given no body
+  -- ('quarantineResolvedSynonymCycles'); and once the module's constructors
+  -- are known, a run of clauses that the parser grouped on bare names alone
+  -- is told apart from a run of overloads ('separateOverloads').
   rdeclares <- scanDeclares scanTyDeclModule inferTyDeclModule written
     >>= quarantineResolvedSynonymCycles
   withDeclares rdeclares do
@@ -682,9 +684,10 @@ applyFinalSubstitution subst moduleUri t =
 -- If you add a directive or top-level declaration case that runs
 -- 'checkExpr'/'inferExpr', wrap it in 'prune', or the 'error' below becomes
 -- reachable from ordinary user input (this happened for #ASSERT and
--- TIMEZONE IS; see T4). We deliberately keep these arms as 'error' rather
--- than auto-recovering: post-T4, reaching them requires a compiler bug (a
--- missing 'prune'), and failing loudly in CI/golden runs beats silently
+-- TIMEZONE IS; see specs/as-built/tc-soundness.md). We deliberately keep these arms as 'error'
+-- rather than auto-recovering: now that those are pruned, reaching them
+-- requires a compiler bug (a missing 'prune'), and failing loudly in
+-- CI/golden runs beats silently
 -- committing to an arbitrary typing. The CLI/LSP drivers have catch-alls
 -- that keep interactive sessions alive.
 runCheckUnique :: Check a -> CheckEnv -> CheckState  -> (With CheckErrorWithContext a, CheckState)
@@ -1087,7 +1090,7 @@ inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
   -- The 'prune' is load-bearing: like the sibling directive cases above, we must
   -- collapse candidate results here, so that an ambiguous-but-well-typed expression
   -- surfaces as an 'AmbiguousTermError' diagnostic instead of leaking multiple
-  -- results into 'runCheckUnique' (which calls 'error'). See T4.
+  -- results into 'runCheckUnique' (which calls 'error'). See specs/as-built/tc-soundness.md.
   e' <- prune $ checkExpr ExpectAssertContext e boolean
   pure (Assert ann e')
 
@@ -1238,7 +1241,7 @@ inferTopDecl _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzE
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
-  -- source range for that diagnostic. See T4.
+  -- source range for that diagnostic. See specs/as-built/tc-soundness.md.
   (rtzExpr, _ty) <- prune $ inferExpr tzExpr
   pure (Timezone ann rtzExpr, [])
 
@@ -4792,7 +4795,8 @@ inferExpr' g =
               -- every 'matchFunTy' branch returns exactly one resolved expr per
               -- argument (zip3 traversals; error branches 'traverse inferExpr args';
               -- Check nondeterminism forks whole computations, never concatenates
-              -- result lists), so the singleton match always succeeds (T4).
+              -- result lists), so the singleton match always succeeds (see
+              -- specs/as-built/tc-soundness.md).
               -- Fail strictly at the site rather than 'pure $ error ...', which
               -- would plant a lazy bottom inside the returned 'Proj' node that
               -- detonates arbitrarily far away (eval/nlg/serialization).

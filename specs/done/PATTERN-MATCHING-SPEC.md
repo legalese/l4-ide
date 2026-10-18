@@ -8,6 +8,8 @@
 
 # Specification: Pattern Matching in Function Definitions
 
+**Status:** done (core). Phase 1, clauses with patterns desugared to CONSIDER/WHEN, is built; what was built, and where it differs from this spec, is in `specs/as-built/multi-clause-decide.md`. Not built: guard patterns, the tabular `|...|...|` sugar, and the Approach 2 decision-tree optimisation.
+
 ## Executive Summary
 
 Haskell's pattern matching in function definitions elegantly expresses what would otherwise require decision tables or nested conditionals. L4 already allows parameters to be omitted from `DECIDE`/`MEANS` lines (inferred from `GIVEN`). We propose extending this: when parameters ARE specified, they can be **literal patterns** that get matched directly, enabling multiple function clauses.

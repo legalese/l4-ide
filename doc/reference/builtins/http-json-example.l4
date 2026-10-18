@@ -48,31 +48,19 @@ DECIDE nothingValue IS JSONENCODE NOTHING
 -- JSONDECODE Examples
 --------------------------------------------------------------------------------
 
-
-
-
-
 -- Decode JSON primitives - returns EITHER STRING value
 DECIDE decodeString IS JSONDECODE "\"hello\""
 DECIDE decodeNumber IS JSONDECODE "42"
 DECIDE decodeArray IS JSONDECODE "[1, 2, 3]"
 
-
-
-
-
-
 #EVAL decodeString   -- RIGHT "hello"
 #EVAL decodeNumber   -- RIGHT 42
 #EVAL decodeArray    -- RIGHT (LIST 1, 2, 3)
 
-
--- Decode a JSON object (returns generic object)
-DECIDE decodeObject IS JSONDECODE "{\"name\":\"Charlie\",\"age\":28}"
-#EVAL decodeObject
-
-
-
+-- Decode a JSON object into a record: say which type you expect
+GIVETH AN EITHER STRING Person
+decodeObject MEANS JSONDECODE "{\"name\":\"Charlie\",\"age\":28}"
+#EVAL decodeObject   -- RIGHT (Person OF "Charlie", 28)
 
 -- Pattern match to extract values from EITHER
 DECIDE extractedValue IS
@@ -80,51 +68,43 @@ DECIDE extractedValue IS
   WHEN RIGHT n THEN n
   WHEN LEFT err THEN 0
 
-
 #EVAL extractedValue  -- 42
 
 -- Handle decode errors gracefully
-
 
 DECIDE badDecodeResult IS JSONDECODE "not valid json"
 
 DECIDE handleError IS
   CONSIDER badDecodeResult
-
   WHEN RIGHT val THEN "Success"
   WHEN LEFT err THEN CONCAT "Error: ", err
 
 #EVAL handleError  -- "Error: ..."
 
 --------------------------------------------------------------------------------
--- ENV Examples (conceptual - requires environment variables to be set)
+-- ENV: read an environment variable (gives a MAYBE STRING)
 --------------------------------------------------------------------------------
 
--- Read an environment variable
--- DECIDE apiKey IS ENV "API_KEY"
-
--- Use in conditional logic
--- DECIDE hasApiKey IS NOT (apiKey EQUALS "")
+DECIDE `the API key is set` IS
+  CONSIDER ENV "API_KEY"
+  WHEN JUST key THEN TRUE
+  WHEN NOTHING THEN FALSE
 
 --------------------------------------------------------------------------------
--- FETCH Examples (conceptual - requires network access)
+-- FETCH and POST (need network access, so these lines are commented out)
 --------------------------------------------------------------------------------
 
 -- Simple GET request
 -- DECIDE uuid IS FETCH "https://www.uuidtools.com/api/generate/v4"
 
 -- Fetch and decode JSON
--- ASSUME userData IS A EITHER STRING Person
--- DECIDE userData IS JSONDECODE (FETCH "https://api.example.com/user/1")
+-- GIVETH AN EITHER STRING Person
+-- `user data` MEANS JSONDECODE (FETCH "https://api.example.com/user/1")
 
---------------------------------------------------------------------------------
--- POST Examples (conceptual - requires network access)
---------------------------------------------------------------------------------
-
--- POST with JSON body
+-- POST with JSON body; headers are "Name: value" lines
 -- DECIDE response IS POST
 --   "https://api.example.com/users"
---   "{\"Content-Type\": \"application/json\"}"
+--   "content-type: application/json"
 --   (JSONENCODE (Person WITH name IS "New User", age IS 21))
 
 --------------------------------------------------------------------------------

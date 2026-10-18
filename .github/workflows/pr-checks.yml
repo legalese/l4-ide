@@ -972,6 +972,9 @@ jobs:
       # Also gated off merge_group, same reason as above. On pull_request and
       # push it works as it always has; the warm-start artifact, not a cache
       # key, is what makes queue entries warm.
+      # On a PR's first run this finds the cache haskell-dependencies.yml
+      # builds on main, under this same key. Keep the two jobs' environments
+      # identical, or the key will not match.
       - name: Restore cached dependencies
         uses: actions/cache/restore@v5
         id: deps-cache
@@ -1036,6 +1039,30 @@ jobs:
 
       - name: Run documentation tests
         run: ./doc/test-docs.sh
+
+      # The linux-x64 jl4-service this PR's checks built and tested, under the
+      # name a release publishes it by. Nothing is triggered by it. The binary
+      # verifier in legalese/jl4-auth-proxy fetches it, and only once every
+      # check on the commit has passed, to compile every stored production
+      # deployment with it (scripts/verify-binary.sh --pr <number>).
+      - name: Package jl4-service
+        if: needs.changes.outputs.haskell == 'true'
+        run: |
+          mkdir -p bin/linux-x64
+          cp "$(cabal list-bin exe:jl4-service)" bin/linux-x64/jl4-service
+          strip bin/linux-x64/jl4-service || true
+          sha256sum bin/linux-x64/jl4-service | awk '{print $1}' > bin/linux-x64/jl4-service.sha256
+          ls -lh bin/linux-x64/
+
+      - name: Upload jl4-service artifact
+        if: needs.changes.outputs.haskell == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: jl4-service-linux-x64
+          path: |
+            bin/linux-x64/jl4-service
+            bin/linux-x64/jl4-service.sha256
+          retention-days: 14
 
       # ---- Cache maintenance (base-branch push only) --------------------------
       # PR and merge_group runs are pure cache CONSUMERS: they RESTORE the base

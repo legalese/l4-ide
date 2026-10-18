@@ -385,7 +385,11 @@ data LibraryScope
     -- host's working directory, or a library directory an operator exported,
     -- must not be able to replace it for every deployment (jl4-service).
     -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R5, option A), with
-    -- conditions; see specs\/todo\/LIBRARY-RESOLUTION-SHADOW-SPEC.md §10.
+    -- conditions; see specs\/todo\/LIBRARY-RESOLUTION-SHADOW-SPEC.md §10: a
+    -- deployment resolves its own files and the built-in stdlib, nothing from the
+    -- host; an IMPORT that resolves to nothing is logged at WARN when a bundle is
+    -- compiled or rebuilt after a restart, and refused only if a later ruling
+    -- says so.
   deriving stock (Eq, Show)
 
 -- | One candidate source for a bare-module-name import.
@@ -444,7 +448,7 @@ data LibraryResolution = LibraryResolution
 -- The project-scoped tiers (1–3) rank above the embedded copy so intentional
 -- overrides keep working; the ambient machine-global tiers (5–6) rank /below/
 -- it so a stray XDG symlink or stale bundle can no longer silently shadow the
--- stdlib the binary was built with (LIBRARY-RESOLUTION-SHADOW-SPEC, Option B′).
+-- stdlib the binary was built with (Option B′, specs/as-built/import-resolution.md).
 -- The ambient tiers still matter for modules the embed does not carry — e.g. a
 -- bundle shipping extra libraries.
 --
@@ -883,7 +887,7 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
               -- No VFS write: the embedded copy is already readable at its
               -- canonical URI via 'Shake.embeddedLibraryVfs'. Registering it
               -- here would only re-introduce the mid-rule VFS mutation whose
-              -- ordering-dependence caused #906 in the first place.
+              -- ordering-dependence caused smucclaw/l4-ide#906 in the first place.
               pure $ outcome $ Just $ Shake.embeddedLibraryUri (Text.pack modName)
             Nothing ->
               -- Cannot happen: 'resolveLibrary' only lists 'EmbeddedCandidate'
@@ -892,7 +896,7 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
         -- Not announced here: 'resolveImportShared' does that, once.
         Nothing -> pure $ outcome Nothing
   where
-    -- Option E of LIBRARY-RESOLUTION-SHADOW-SPEC: when several copies of the
+    -- Option E (specs/as-built/import-resolution.md): when several copies of the
     -- same module are visible AND their contents differ, name them all (with
     -- symlinks dereferenced) and say which one wins. Identical copies (e.g. an
     -- XDG symlink pointing at the very sources the embed was built from) stay
@@ -1041,7 +1045,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
 
         -- Resolve import URIs via the exact code path GetImports uses
         -- ('resolveImportShared'), so parser-hint resolution can never pick a
-        -- different source than typecheck resolution (spec §3.3).
+        -- different source than typecheck resolution (specs/as-built/import-resolution.md §3.3).
         let resolveImportUri :: Name -> Action (Maybe NormalizedUri)
             resolveImportUri n = do
               let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
@@ -1176,7 +1180,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- NOTE: only 'SError' diagnostics count against 'success'; 'SInfo' and
         -- 'SWarn' (e.g. exhaustiveness/redundancy warnings) are non-fatal.
         -- All diagnostics are still published to the editor below regardless
-        -- of this partition — it only decides what blocks 'SuccessfulTypeCheck'.
+        -- of this partition — it decides which go to 'infos' and which to 'errors'.
         (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
     pure
       ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
