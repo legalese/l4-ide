@@ -250,13 +250,13 @@ On a host with fewer than 8 cores the four `jl4-test` processes start after the 
 `--serial` runs everything one after another, in the old order, which is the way to tell a failure caused by running together from one that is not.
 Measured on 2026-10-16 for the full gate: nye 964 s with `--serial` and 380 to 421 s by default; lhs 2080 s with `--serial` and 1129 to 1145 s by default.
 
-**`--fast` is a partial gate, and it is opt-in. Proposed, not landed: it exists on `perf/gate-fastpath` (local) and would be true on `unstable` once that branch merges.**
-When every path changed since `--base` (committed, staged, unstaged or untracked) is a markdown file, or a corpus `.l4` or golden under `jl4/examples/{ok,legal,canon,not-ok,lsp}/`, and no test source of the four gate suites names it, `--fast` runs a reduced gate; otherwise it runs the full gate and prints why.
-For a docs-only diff the reduced gate is the file checks and nothing else; for corpus files it also builds `jl4-test` and runs only the examples for the changed files and for every file that `IMPORT`s them (`etc/gate-fast-select.mjs` chooses, and the run fails unless hspec's `--dry-run` counts a non-empty selection that every affected file contributes to).
+**`--fast` is a partial gate, and it is opt-in.**
+When every path changed since `--base` (committed, staged, unstaged or untracked) is a markdown file that no test source of the four gate suites names, `--fast` runs only the file checks, with no build and no suite; otherwise it runs the full gate and prints why.
+`etc/gate-fast-select.mjs` decides, and any doubt is the full gate: an unclassifiable path, a markdown file a test reads (`doc/reference/syntax/README.md` is one), or a directory that a probe keys on.
 It prints `PARTIAL GATE (--fast): CI and the full gate run more` at the top and the bottom, because a green reduced run says nothing about the unchanged parts of the tree.
-Measured on nye on 2026-10-18 with a warm tree: the full gate took 257 to 297 s on clean runs and the reduced gate 51 to 64 s, and 47 s of that floor is `doc/test-docs.sh --no-l4`.
-Its reach is narrow, replayed over `unstable` as of `c05e15ca0`: of the 150 PRs merged from 2026-09-23 to 2026-10-15, 36 would take the docs path and none the corpus path; of the last 300 commits, 9 would take the corpus path.
-With `L4_GATE_BIN_CACHE=<dir>`, a corpus run in a fresh worktree reuses a `jl4-test` binary built from identical build inputs (`etc/gate-bin-cache.mjs`) instead of building one: 52 s against 432 to 441 s.
+Measured on nye on 2026-10-18 with a warm tree: the full gate took 257 to 297 s on clean runs and the reduced gate 47 to 64 s, and 47 s of that floor is `doc/test-docs.sh --no-l4`.
+Its reach, replayed over `unstable` as of `c05e15ca0`: of the 150 PRs merged from 2026-09-23 to 2026-10-15, 36 would take it; of the 400 merged from 2026-07-27, 102.
+The selector also names the `jl4-test` examples that read a changed corpus file, but no gate uses that yet: a corpus diff runs the full gate.
 
 **The worktree is an argument, not a `cd`, and it must be absolute.** That is the point of the
 script rather than an inconvenience: the working directory of a shell command is not stable between
