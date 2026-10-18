@@ -22,26 +22,25 @@ The month names also build dates: `January 15 2024` is 15 January 2024.
 
 ## Building a date
 
-| Function                               | Gives      | What it does                                                                             |
-| -------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
-| `YMD` year month day                   | DATE       | The date from its parts in ISO order, stopping on an out-of-range part: `YMD 2024 12 25` |
-| `Date` day month year                  | DATE       | The date from its parts: `Date 25 12 2024`                                               |
-| `Date` days                            | DATE       | The date with this day number                                                            |
-| `Date` text                            | MAYBE DATE | Reads an ISO date such as `"2025-06-15"`; any time and time zone are ignored             |
-| `Date` datetime                        | DATE       | The date part of a DATETIME, ignoring time and time zone                                 |
-| `Week` week year                       | DATE       | The Monday of that ISO week                                                              |
-| `Month` month year                     | DATE       | The first day of that month                                                              |
-| `Year` year                            | DATE       | 1 January of that year                                                                   |
-| `Month` date, `Week` date, `Year` date | DATE       | The first day of the month, ISO week or year that contains `date`                        |
-| `January` day year, ...                | DATE       | The date in that month: `March 1 2025`                                                   |
+| Function                               | Gives      | What it does                                                                 |
+| -------------------------------------- | ---------- | ---------------------------------------------------------------------------- |
+| `YMD` year month day                   | DATE       | The date from its parts in ISO order: `YMD 2024 12 25`                       |
+| `Date` day month year                  | DATE       | The date from its parts: `Date 25 12 2024`                                   |
+| `Date` days                            | DATE       | The date with this day number                                                |
+| `Date` text                            | MAYBE DATE | Reads an ISO date such as `"2025-06-15"`; any time and time zone are ignored |
+| `Date` datetime                        | DATE       | The date part of a DATETIME, ignoring time and time zone                     |
+| `Week` week year                       | DATE       | The Monday of that ISO week                                                  |
+| `Month` month year                     | DATE       | The first day of that month                                                  |
+| `Year` year                            | DATE       | 1 January of that year                                                       |
+| `Month` date, `Week` date, `Year` date | DATE       | The first day of the month, ISO week or year that contains `date`            |
+| `January` day year, ...                | DATE       | The date in that month: `March 1 2025`                                       |
 
 `Date` rolls a day that does not exist in the month forward: `Date 29 2 2025` is 1 March 2025. `Days to date` is another name for `Date`.
 
-`YMD` is recommended for new code.
-It builds the candidate through `Date` and then requires the year, month and day of the result to equal its arguments.
-A part that rolled (`YMD 2026 28 7`, a transposition; `YMD 2023 2 29`, no such leap day; month 0; day 32) stops evaluation with an assumed-term error naming `YMD refusal`, instead of computing a wrong date.
-`Date` remains the lenient, rolling constructor and stays supported: a transposed `Date 7 28 2026` is not rejected, and month 28 silently overflows into 2028-04-07.
-If you give an out-of-range `YMD` a name, as in `` `bad day` MEANS YMD 2023 2 29 ``, the first `#EVAL` of that name prints the assumed-term error and every later one in the same run prints `Infinite loop detected while trying to evaluate:` instead.
+`YMD` is the constructor to use for a date written out in full.
+It stops evaluation when the month or day does not exist in that year: `YMD 2023 2 29` (there is no 29 February in 2023), `YMD 2026 28 7` (month 28), a month of 0 and a day of 32 are all refused.
+It does not check the year: `YMD 0 1 1` is 1 January of year 0, and `YMD -5 3 1` is 1 March of year -5.
+`Date` takes the day first, and rolls a part that does not exist forward: `Date 7 28 2026` is 7 April 2028.
 
 ## Reading a date
 
