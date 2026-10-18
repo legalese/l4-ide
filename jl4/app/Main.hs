@@ -28,7 +28,6 @@ import Options.Applicative
   )
 import qualified Data.Text as Text
 import qualified Options.Applicative as Options
-import qualified Data.Text as Text
 import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
 
