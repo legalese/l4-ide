@@ -35,7 +35,6 @@ import {
   isStateGraphResponse,
   stateGraphTargetGone,
   trackSrcPos,
-  EmbeddedLibraryRequestType,
   type DirectiveResult,
   type SrcPos,
   type StateGraphResponse,
@@ -47,11 +46,6 @@ import {
   l4DocumentSelector,
 } from './embedded-library.js'
 import { StateGraphPanel } from './state-graph-panel.js'
-import {
-  EMBEDDED_LIBRARY_SCHEME,
-  embeddedLibraryProvider,
-  l4DocumentSelector,
-} from './embedded-library.js'
 import {
   SidebarProvider,
   SIDEBAR_WEBVIEW_TYPE,
