@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Base
+import Control.Exception (SomeException, evaluate, throwIO, try)
 import Control.Monad.Trans.Maybe
 import Data.Char (isAlphaNum)
 import qualified Data.Aeson.Encode.Pretty as AP
@@ -9,6 +10,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text.Encoding as TE
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified L4.Annotation as JL4
 import qualified L4.EvaluateLazy as JL4Lazy
 import qualified L4.ExactPrint as ExactPrint
@@ -115,8 +117,21 @@ main = do
   -- library must stay out of every glob. These two import a module that exists
   -- nowhere, so they need no neighbour at all.
   importUnresolvedFiles <- sort <$> globDir1 (compile "not-ok/import/unresolved-*.l4") examplesRoot
+  -- ONE name for the corpus these three blocks share. It was written out
+  -- three times, and adding canon/** would have made that four places to keep
+  -- in step -- the exact shape of drift CLAUDE.md warns about, and invisible
+  -- when it happens because a block that silently covers fewer files still
+  -- passes.
+  let goldenCorpus = okFiles <> legalFiles <> librariesFiles <> canonFiles
   -- What the goldens of one file share. See 'CheckMemo'.
-  checkMemo <- newCheckMemo
+  --
+  -- The prettyLayout block starts from something its file's "parses and checks"
+  -- golden derives (see 'checkFile'), for the files of the corpus both read.
+  -- @JL4_EVALDIFF@ needs the module itself, which is not what is held, so that
+  -- mode takes the unshared path.
+  evalDiff <- lookupEnv "JL4_EVALDIFF"
+  let keep = if isJust evalDiff then Set.empty else Set.fromList goldenCorpus
+  checkMemo <- newCheckMemo keep
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -131,12 +146,6 @@ main = do
       corpusNonEmpty "export-placement" exportPlacementFiles
       corpusNonEmpty "import-refusal"   importRefusalFiles
       corpusNonEmpty "import-unresolved" importUnresolvedFiles
-    -- ONE name for the corpus these three blocks share. It was written out
-    -- three times, and adding canon/** would have made that four places to keep
-    -- in step -- the exact shape of drift CLAUDE.md warns about, and invisible
-    -- when it happens because a block that silently covers fewer files still
-    -- passes.
-    let goldenCorpus = okFiles <> legalFiles <> librariesFiles <> canonFiles
     describe "ok files" $ tests checkMemo evalConfig (True, True) goldenCorpus examplesRoot
     -- The built-in connectives used to be closures over two parameters named
     -- @a@ and @b@, whose @IF a THEN b ELSE FALSE@ bodies showed in every trace
@@ -414,20 +423,27 @@ jl4ParserMemoChangesNothing inputFile = do
 -- unrelated name-resolution questions.
 jl4PrettyLayoutRoundTrip :: CheckMemo -> JL4Lazy.EvalConfig -> FilePath -> IO ()
 jl4PrettyLayoutRoundTrip memo evalConfig inputFile = do
-  -- The log is read only when the file did not type-check, so a memoised
-  -- module is fine and a memoised failure is not (see 'LogNeed').
-  (errs, mtc) <- typeCheckedShared memo "prettylayout-tc" evalConfig inputFile LogNeededOnFailure Forget
-  case mtc of
-    Nothing ->
+  -- Either what the "parses and checks" golden already derived from this file's
+  -- module (or the exception deriving it raised: it is raised again here, in
+  -- the test it belongs to), or a module of our own, which may still come from
+  -- the slot ('LogNeededOnFailure': the log is read only when there is no
+  -- module, so a memoised module is fine and a memoised failure is not).
+  kept <- atomicModifyIORef' memo.kept \m -> (Map.delete inputFile m, Map.lookup inputFile m)
+  derived <- case kept of
+    Just (Left e) -> throwIO e
+    Just (Right p) -> logEvent "prettylayout-tc-kept" inputFile >> pure (Right (Nothing, p))
+    Nothing -> do
+      (errs, mtc) <- typeCheckedShared memo "prettylayout-tc" evalConfig inputFile LogNeededOnFailure Forget
+      pure case mtc of
+        Nothing -> Left errs
+        Just tc -> Right (Just tc, printedOf tc)
+  case derived of
+    Left errs ->
       expectationFailure $
         "typecheck produced no module for " <> inputFile <> ":\n"
           <> Text.unpack (Text.unlines errs)
-    Just tc -> do
-      -- restoreMixfixPatterns first: without it the printer emits only a
-      -- mixfix name's head keyword and two operators sharing one collapse
-      -- together (smucclaw/l4-ide#967).
-      let printed = prettyLayout (filterIdeDirectives (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
-          printUri = toNormalizedUri (Uri "file:///pretty-layout-roundtrip")
+    Right (mtc, MkPrinted printed leaked) -> do
+      let printUri = toNormalizedUri (Uri "file:///pretty-layout-roundtrip")
       -- Debugging affordance: prettyLayout output for a corpus module runs to
       -- thousands of columns, so the inline excerpt below is rarely enough to
       -- diagnose a layout failure. Point JL4_PRETTY_DUMP_DIR at a scratch
@@ -444,15 +460,10 @@ jl4PrettyLayoutRoundTrip memo evalConfig inputFile = do
       -- `l4 run` both and compare the `Result:` blocks; see CLAUDE.md §3.2 for
       -- the loop and the cleanup, which you MUST run — these files are inside
       -- the corpus globs and a later run would try to golden them.
+      -- (This mode keeps no module for later, so @mtc@ is always there.)
       mEvalDiff <- lookupEnv "JL4_EVALDIFF"
-      for_ mEvalDiff $ \_ ->
+      for_ (mEvalDiff *> mtc) $ \tc ->
         Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
-      -- No gensym may reach the output. Every inference variable in the
-      -- type-checked module is rendered exactly as `seed <> uniq` by the
-      -- 'Type'' printer, so we can name the forbidden strings precisely rather
-      -- than pattern-matching on "looks like an identifier ending in digits" —
-      -- which would false-positive on `identity1`, `const1a`, `s24`.
-      let leaked = leakedInfVars tc.module' printed
       unless (null leaked) $
         expectationFailure $
           "prettyLayout leaked an inference variable (gensym) for " <> inputFile
@@ -520,6 +531,25 @@ leakedInfVars m printed =
       ]
     tokens = Text.split (not . isTokenChar) printed
     isTokenChar c = isAlphaNum c || c == '_'
+
+-- | What the prettyLayout round-trip derives from a type-checked module before it
+-- re-parses the result: the printed module, and the inference variables that
+-- leaked into it.
+data Printed = MkPrinted !Text ![Text]
+
+printedOf :: TypeCheckResult -> Printed
+printedOf tc = MkPrinted printed leaked
+  where
+    -- No gensym may reach the output. Every inference variable in the
+    -- type-checked module is rendered exactly as `seed <> uniq` by the
+    -- 'Type'' printer, so we can name the forbidden strings precisely rather
+    -- than pattern-matching on "looks like an identifier ending in digits" —
+    -- which would false-positive on `identity1`, `const1a`, `s24`.
+    leaked = leakedInfVars tc.module' printed
+    -- restoreMixfixPatterns first: without it the printer emits only a mixfix
+    -- name's head keyword and two operators sharing one collapse together
+    -- (smucclaw/l4-ide#967).
+    printed = prettyLayout (filterIdeDirectives (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
 
 jl4NlgAnnotationsGolden :: CheckMemo -> JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden memo evalConfig isOk dir inputFile = do
@@ -716,6 +746,20 @@ checkFile memo evalConfig isOk file = do
       liftIO $ Text.putStr formatted
     (,) done <$> liftIO ((,) <$> readIORef parsedRef <*> readIORef checkedRef)
   writeIORef memo.slot (Just (file, mchecked))
+  -- The prettyLayout round-trip comes much later in the tree and starts from
+  -- the same module. Holding the MODULE of every corpus file until then also
+  -- works and is as fast (measured on nye, 2026-10-18: 298 s and 345 s against
+  -- 302-307 s for what is done here), but takes the run from 0.6 GB to 1.4-1.5
+  -- GB resident and the collector's maximum residency from 0.17 GB to 0.43-0.49
+  -- GB. So derive what that test needs now and hold only that, the printed text
+  -- and the leaked-gensym list. An exception the derivation raises is held too,
+  -- and raised again in the test that owns it, so a failure still lands on the
+  -- prettyLayout example.
+  when (file `Set.member` memo.keepFor) $
+    for_ mchecked \tc -> do
+      derived <- try @SomeException $ evaluate case printedOf tc of
+        p@(MkPrinted printed leaked) -> rnf (printed, leaked) `seq` p
+      modifyIORef' memo.kept (Map.insert file derived)
   writeIORef memo.exactPrint
     (Just (file, mparsed >>= either (const Nothing) Just . ExactPrint.exactprint))
   -- NOTE: if we're okay, we don't expect any errors, if we are not, we do expect them
@@ -746,40 +790,53 @@ checkFile memo evalConfig isOk file = do
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt
 
--- | The last file whose type-checked module a golden has asked for, and what
--- @SuccessfulTypeCheck@ answered for it.
+-- | What the goldens of one corpus file share, so that the file is not parsed and
+-- type-checked once per golden.
 --
--- A corpus file's goldens ("parses and checks", "natural language
--- annotations", "json schema") each used to start a Shake session of their own
--- and type-check the file again. This slot lets the later ones read the answer
--- the first one already has. It is NOT a cache of sessions: only the module
--- crosses, because that is a pure value (the rule's result is forced to normal
--- form and carries no handle on the session that produced it).
+-- A file's goldens ("parses and checks", "exactprints", "natural language
+-- annotations", "json schema") each used to start a Shake session of their own,
+-- and so did the exactprint-identity and prettyLayout blocks much later. The
+-- "parses and checks" golden's session now leaves what the others need. It is
+-- NOT a cache of sessions: only pure values cross (a rule's result is forced to
+-- normal form and carries no handle on the session that produced it).
 --
--- The rule for what may be read from it is about the /log/. Every session has
--- its own recorder, and what it holds depends on the rules that ran in the
--- session: the check golden's session also runs @EvaluateLazy@, and its log
--- carries every #EVAL result as a diagnostic that a session which only
--- type-checks never publishes (measured 2026-10-18: 322 of the 598 files have
--- a different log in the two sessions). Some goldens print that log. A golden
--- may take the module from the slot only if it does not print the log, or
--- prints it only on a path that falls back to a session of its own ('LogNeed').
+-- The rule for what may be read from here is about the session's /log/. Every
+-- session has its own recorder, and what it holds depends on the rules that ran
+-- in the session: the check golden's session also runs @EvaluateLazy@, and its
+-- log carries every #EVAL result as a diagnostic that a session which only
+-- type-checks never publishes (measured 2026-10-18: 322 of the 598 files have a
+-- different log in the two sessions). Some goldens print that log. A golden may
+-- take a value from here only if it does not print the log, or prints it only on
+-- a path that falls back to a session of its own ('LogNeed'; the exactprint
+-- golden, and the nlg golden of a file expected NOT to linearize, do the same).
 --
--- ONE slot, and keyed by path: the goldens of a file are adjacent in the tree,
--- so the slot never holds more than one file's closure, and under @--match@,
--- @--skip@ or @--randomize@ a golden whose neighbours did not run simply finds
--- another file there and starts its own session, as it always did. Nothing
--- here needs another example to have run first.
+-- The per-file slots hold ONE file, keyed by path: the goldens of a file are
+-- adjacent in the tree, so a slot never holds more than one file's closure, and
+-- under @--match@, @--skip@ or @--randomize@ a golden whose neighbours did not
+-- run simply finds another file there and starts its own session, as it always
+-- did. Nothing here needs another example to have run first.
 data CheckMemo = CheckMemo
   { slot :: IORef (Maybe (FilePath, Maybe TypeCheckResult))
-    -- ^ what @SuccessfulTypeCheck@ answered for the last file
+    -- ^ what @SuccessfulTypeCheck@ answered for the last file; read by the nlg
+    -- and schema goldens
   , exactPrint :: IORef (Maybe (FilePath, Maybe Text))
-    -- ^ the exact-printer's output for the last file the check golden parsed
-    -- (lazy: computed by the first golden that asks)
+    -- ^ the exact-printer's output for the last file the check golden parsed,
+    -- 'Nothing' when there was no parse or the printer failed (lazy: computed
+    -- by the first golden that asks); read by the exactprints golden
+  , kept :: IORef (Map FilePath (Either SomeException Printed))
+    -- ^ for the prettyLayout round-trip, which runs long after the file's other
+    -- goldens: one entry per file, taken (and so dropped) by the test that
+    -- reads it. See 'checkFile'.
+  , keepFor :: Set.Set FilePath
+    -- ^ the files whose entry is made: none when the run is filtered
   }
 
-newCheckMemo :: IO CheckMemo
-newCheckMemo = CheckMemo <$> newIORef Nothing <*> newIORef Nothing
+newCheckMemo :: Set.Set FilePath -> IO CheckMemo
+newCheckMemo keepFor = do
+  slot <- newIORef Nothing
+  exactPrint <- newIORef Nothing
+  kept <- newIORef Map.empty
+  pure CheckMemo{slot, exactPrint, kept, keepFor}
 
 -- | Does the caller read the session's log?
 data LogNeed
