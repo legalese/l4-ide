@@ -11,6 +11,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified L4.Annotation as JL4
 import qualified L4.EvaluateLazy as JL4Lazy
+import qualified L4.ExactPrint as ExactPrint
 import L4.TracePolicy (lspDefaultPolicy)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Export (ExportedFunction (..))
@@ -114,9 +115,8 @@ main = do
   -- library must stay out of every glob. These two import a module that exists
   -- nowhere, so they need no neighbour at all.
   importUnresolvedFiles <- sort <$> globDir1 (compile "not-ok/import/unresolved-*.l4") examplesRoot
-  -- One slot, shared by every golden that reads a file's type-checked module.
-  -- See 'CheckMemo'.
-  checkMemo <- newIORef Nothing
+  -- What the goldens of one file share. See 'CheckMemo'.
+  checkMemo <- newCheckMemo
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -216,7 +216,7 @@ main = do
           it "parses and checks" $
             l4Golden memo evalConfig tcOk root goldenDir inputFile
           it "exactprints" $
-            jl4ExactPrintGolden evalConfig goldenDir inputFile
+            jl4ExactPrintGolden memo evalConfig goldenDir inputFile
           it "natural language annotations" $
             jl4NlgAnnotationsGolden memo evalConfig nlgOk goldenDir inputFile
           it "json schema" $
@@ -305,12 +305,24 @@ mkPathScrubber examplesRoot = do
         ]
   pure $ \ txt -> foldl' (\ acc (prefix, token) -> sub prefix token acc) txt subs
 
-jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
-jl4ExactPrintGolden evalConfig dir inputFile = do
-  (errs, moutput) <- logSession "exactprint-golden" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
-    let uri = normalizedFilePathToUri nfp
-    _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.ExactPrint uri
+jl4ExactPrintGolden :: CheckMemo -> JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
+jl4ExactPrintGolden memo evalConfig dir inputFile = do
+  -- The golden is the exact-printer's output, which is a pure function of the
+  -- parse the "parses and checks" golden's session already has. When that
+  -- session ran for this file and the printer succeeded, read it from there.
+  -- Otherwise (the printer failed, or no parse, or that golden did not run)
+  -- start the session of its own, because then the session's log is the
+  -- golden. The identity test below still goes through 'Rules.ExactPrint' for
+  -- every file, so the rule itself stays covered.
+  shared <- readIORef memo.exactPrint
+  (errs, moutput) <- case shared of
+    Just (f, Just printed) | f == inputFile -> do
+      logEvent "exactprint-golden-memo" inputFile
+      pure ([], Just printed)
+    _ -> logSession "exactprint-golden" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+      let uri = normalizedFilePathToUri nfp
+      _ <- Shake.addVirtualFileFromFS nfp
+      Shake.use Rules.ExactPrint uri
 
   -- NOTE: we sort the output, because the traces are concurrent and might not be in order
   -- Strip ANSI codes and normalize whitespace for cross-platform consistency
@@ -683,15 +695,17 @@ normalizeWhitespaceString = unlines . map normalizeLine . lines
 
 checkFile :: CheckMemo -> JL4Lazy.EvalConfig -> Bool -> FilePath -> IO ()
 checkFile memo evalConfig isOk file = do
-  (errs, diags, (isJust -> typechecked, mchecked)) <- logSession "check-golden" file $ oneshotL4ActionAndDiagnostics evalConfig file \nfp -> do
+  (errs, diags, (isJust -> typechecked, (mparsed, mchecked))) <- logSession "check-golden" file $ oneshotL4ActionAndDiagnostics evalConfig file \nfp -> do
     -- What @SuccessfulTypeCheck@ answered, whether or not the evaluation after
     -- it did: this is the value the goldens that only read the type-checked
     -- module can be handed instead of starting a session of their own.
     checkedRef <- liftIO (newIORef Nothing)
+    parsedRef <- liftIO (newIORef Nothing)
     done <- runMaybeT do
       let uri = normalizedFilePathToUri nfp
       _        <- lift   $ Shake.addVirtualFileFromFS nfp
-      _        <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
+      parsed   <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
+      liftIO $ writeIORef parsedRef (Just parsed)
       checked  <- MaybeT $ Shake.use SuccessfulTypeCheck uri <* liftIO (Text.putStrLn "Typechecking successful")
       liftIO $ writeIORef checkedRef (Just checked)
       results' <- MaybeT $ Shake.use EvaluateLazy uri
@@ -700,8 +714,10 @@ checkFile memo evalConfig isOk file = do
                   <> map evalLazyDirectiveResultToMessage results'
           formatted = foldMap (sanitizeFilePaths . renderMessage) $ sortOn fst msgs
       liftIO $ Text.putStr formatted
-    (,) done <$> liftIO (readIORef checkedRef)
-  writeIORef memo (Just (file, mchecked))
+    (,) done <$> liftIO ((,) <$> readIORef parsedRef <*> readIORef checkedRef)
+  writeIORef memo.slot (Just (file, mchecked))
+  writeIORef memo.exactPrint
+    (Just (file, mparsed >>= either (const Nothing) Just . ExactPrint.exactprint))
   -- NOTE: if we're okay, we don't expect any errors, if we are not, we do expect them
   --
   -- 'typechecked' alone is not the whole verdict: a rule OTHER than the
@@ -754,7 +770,16 @@ checkFile memo evalConfig isOk file = do
 -- @--skip@ or @--randomize@ a golden whose neighbours did not run simply finds
 -- another file there and starts its own session, as it always did. Nothing
 -- here needs another example to have run first.
-type CheckMemo = IORef (Maybe (FilePath, Maybe TypeCheckResult))
+data CheckMemo = CheckMemo
+  { slot :: IORef (Maybe (FilePath, Maybe TypeCheckResult))
+    -- ^ what @SuccessfulTypeCheck@ answered for the last file
+  , exactPrint :: IORef (Maybe (FilePath, Maybe Text))
+    -- ^ the exact-printer's output for the last file the check golden parsed
+    -- (lazy: computed by the first golden that asks)
+  }
+
+newCheckMemo :: IO CheckMemo
+newCheckMemo = CheckMemo <$> newIORef Nothing <*> newIORef Nothing
 
 -- | Does the caller read the session's log?
 data LogNeed
@@ -776,7 +801,7 @@ data Remembers
 -- and the caller can do without the log; otherwise from a session of its own.
 typeCheckedShared :: CheckMemo -> String -> JL4Lazy.EvalConfig -> FilePath -> LogNeed -> Remembers -> IO ([Text], Maybe TypeCheckResult)
 typeCheckedShared memo site evalConfig inputFile logNeed remembers = do
-  slot <- readIORef memo
+  slot <- readIORef memo.slot
   case slot of
     Just (f, r)
       | f == inputFile, usable r -> do
@@ -785,7 +810,7 @@ typeCheckedShared memo site evalConfig inputFile logNeed remembers = do
     _ -> do
       (errs, r) <- typeCheckedFresh site evalConfig inputFile
       case remembers of
-        Remember -> writeIORef memo (Just (inputFile, r))
+        Remember -> writeIORef memo.slot (Just (inputFile, r))
         Forget -> pure ()
       pure (errs, r)
   where
