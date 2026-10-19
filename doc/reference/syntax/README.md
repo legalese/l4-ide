@@ -158,6 +158,27 @@ A `@ref` after the last construct of the file has nothing to attach to:
 
 > This @ref (`Section 4(1)(a) of the Act`) is at the end of the file, so there is nothing after it to attach to.
 
+#### Writing a literal `>>`
+
+The inline form ends at `>>`, so a citation that contains those two characters would otherwise stop halfway.
+Put a backslash before the angle bracket:
+
+| you write                | you get             |
+| ------------------------ | ------------------- |
+| `<<see s.5 \>> onward>>` | `see s.5 >> onward` |
+| `<<\\>>`                 | `\`                 |
+
+**A single `>` needs nothing.**
+`<<s.5 > s.3>>` has always worked and still does: only the doubled `>>` closes a citation, so a lone one is ordinary text.
+
+**What this costs.**
+A citation can no longer end with a backslash, because `\>` now means a literal `>`; write `\\` instead.
+Any other character after a backslash is left alone, so `\q` is still a backslash followed by a `q`.
+
+This is the same idea as the `\%` and `\]` escapes in `@nlg`, but the set of characters is deliberately different.
+`%` and `]` are ordinary text in a citation, and `>` is ordinary text in an `@nlg` annotation.
+Each annotation escapes only what would otherwise be read as punctuation in that annotation.
+
 ### @export
 
 `@export` marks a function to be published as an endpoint when the file is deployed. The rest of the line is the function's description. Functions without `@export` stay internal.

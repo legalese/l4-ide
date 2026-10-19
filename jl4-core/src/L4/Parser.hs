@@ -112,7 +112,10 @@ spaceOrAnnotations = do
 refP :: Parser (Epa Ref)
 refP = do
   refExpr <- refAnnotationP
-  pure $ fmap (MkRef (mkSimpleEpaAnno refExpr)) refExpr
+  -- The Anno keeps the tokens verbatim, so exactprint re-emits the citation
+  -- byte for byte; the stored Text is the READER's copy and is decoded here,
+  -- so this field is off the print path. See 'L4.Lexer.unescapeRefText'.
+  pure $ fmap (MkRef (mkSimpleEpaAnno refExpr)) (fmap unescapeRefText refExpr)
 
 descP :: Parser (Epa Desc)
 descP = do
