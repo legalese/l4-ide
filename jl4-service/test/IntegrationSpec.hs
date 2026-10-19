@@ -929,6 +929,20 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp2)
         lookupKey "determined" body `shouldBe` Just (Aeson.Bool True)
 
+    it "is held to --eval-timeout, and says so when it runs out" do
+      -- A timeout of zero is over before the plan is computed. A plan left to
+      -- be computed while the response was sent was under no limit of ours,
+      -- and one that took too long lost its connection without a reason.
+      withServicesRestartedOpts testOptions {evalTimeout = 0}
+        [("qp-timeout", [("qualifies.l4", qualifiesJL4)])] (const (pure ())) \_ baseUrl mgr -> do
+          status <- deploymentStatus baseUrl mgr "qp-timeout"
+          fmap (.dsStatus) status `shouldBe` Just "ready"
+          resp <- queryPlan' baseUrl mgr "qp-timeout" "compute_qualifies"
+            (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldBe` 500
+          lookupKey "error" (decodeObject (responseBody resp))
+            `shouldBe` Just (Aeson.String "Query plan timed out")
+
     it "returns 404 for unknown function" do
       withServiceFromSources "qp-404" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         resp <- queryPlan' baseUrl mgr "qp-404" "no_such_fn"
