@@ -48,7 +48,7 @@ Guidelines:
 Because the diff is the amendment, cut commits along legal lines, not editing sessions:
 
 - **One substantive change per commit.** Raising an age threshold and adding a new exemption are two amendments — two commits.
-- **Separate substance from form.** Run `l4 format` in its own commit so reformatting noise never obscures a change of meaning.
+- **Separate substance from form.** Make layout changes, such as re-indenting or realigning a rule, in a commit of their own, so they never obscure a change of meaning.
 - **Update the assertions in the same commit.** A rule change without its test change is an unreviewable claim.
 - **Say why, cite the source.** The message should name the instrument and reason, not describe the syntax.
 

@@ -87,7 +87,7 @@ commandParser =
              (progDesc "Typecheck an L4 file only (fast path; no evaluation)"))
       <> command "format"
            (info (helper <*> (CmdFormat <$> formatOptionsParser))
-             (progDesc "Reformat an L4 file and print to stdout"))
+             (progDesc "Print an L4 file to stdout exactly as written"))
       <> command "ast"
            (info (helper <*> (CmdAst <$> astOptionsParser))
              (progDesc "Dump the parsed AST of an L4 file"))
