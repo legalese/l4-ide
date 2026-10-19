@@ -32,7 +32,7 @@ A brief that says the target is `main` means this build or a later one, and this
   Of the 108 `.l4` files under `doc/` at `b932724d3`, `main` rejects 42 and the shelf build rejects none.
   The shelf build is six commits older than that tree and still rejects none, so none of the 42 is the shelf being too old: the zero is the control.
 - **The probes.**
-  `references/dialect-probes/` holds 99 small files, each the whole of one test, named by what they show:
+  `references/dialect-probes/` holds 105 small files, each the whole of one test, named by what they show:
 
   - a number, `01` to `58`: `unstable` accepts it and `main` rejects it;
   - `alt-`: the spelling to write on `main` instead, which passes on both;
@@ -43,7 +43,7 @@ A brief that says the target is `main` means this build or a later one, and this
   - `unstable-`: `unstable` rejects it and `main` accepts it.
 
   `main` rejects exactly the 58 numbered files.
-  The shelf build rejects exactly seven: the two `main-*` files, the four `unstable-refuses-*` files and `unstable-reads-field-for-constructor`.
+  The shelf build rejects exactly nine: the three `main-*` files, the five `unstable-refuses-*` files and `unstable-reads-field-for-constructor`.
   The probes are deliberately odd `.l4`, so a repo-wide checker can object to one: `etc/check-not-precedence.mjs` does to `unstable-refuses-not-and`, which therefore carries the `NOT-REACH-OK` marker that checker honours.
 
 To refresh this page, run both binaries over both sets from the root of an l4-ide checkout, and compare with the numbers above:
@@ -67,7 +67,7 @@ One pull request separates them (legalese/l4-ide#719).
 It renamed `` `IS INTEGER` `` to `ISINTEGER` and `` `WAIT UNTIL` `` to `WAITUNTIL`, keeping no alias, and removed the temporal built-ins: `` `EVAL AS OF SYSTEM TIME` ``, `` `EVAL UNDER VALID TIME` ``, `` `EVAL UNDER RULES EFFECTIVE AT` ``, `` `EVAL UNDER RULES ENCODED AT` ``, `` `EVER BETWEEN` ``, `` `ALWAYS BETWEEN` ``, `` `WHEN LAST` ``, `` `WHEN NEXT` `` and `` `VALUE AT` ``.
 It also made `DO` a modal of its own, so `MUST DO` no longer parses.
 On build 97 the three `EVAL` forms exist and take a `NUMBER` date serial, not a `DATE`.
-The shelf build has none of the new spellings, so for these constructs the two compilers now accept different text.
+The shelf build has none of the new spellings, so for these constructs the two compilers now accept different text; the table gives a portable idiom for `IS INTEGER` and for `WAIT UNTIL`.
 That is the only difference between the builds that the probes found: probes 01 to 53 fail on build 97 with the same first error (but for 38 to 40), probes 54 to 58 pass on it, and `main-isinteger` and `main-waituntil` fail on it.
 
 ## Status on `main`
@@ -93,7 +93,7 @@ Each row gives one of three words for what `main` does with the construct.
    Only an error, or an `#ASSERT` that comes out differently, moves a count.
    Three rows differ in what they do, and the check passes all three: an input named in an action, a `MAY` with a `LEST`, and a language tag on `@nlg`.
    Use the spelling the table gives, and compare the two builds' output for every trace yourself: run each file with both builds and read the outcomes.
-4. Some constructs have no spelling both compilers read (`WAITUNTIL`, `ISINTEGER`, and anything the table says to leave out).
+4. A few constructs have no spelling both compilers read: anything the table says to leave out, and `WAITUNTIL` or `ISINTEGER` where no portable idiom fits (the table gives one for each common use).
    A module that needs one cannot be written with the shelf build.
    Run it with a main build as your `l4` (`L4=$(fetch-main-l4.sh)`); `check.sh` then compares `main` with itself, which proves nothing about `unstable`, so say in `NOTES.md` that the module is main-only.
 5. Do not get past a **rejects** row with an `ASSUME` stand-in.
@@ -103,17 +103,18 @@ Each row gives one of three words for what `main` does with the construct.
 ## Silent: `main` raises no error
 
 These rows matter most, because nothing tells you.
-In the first, fourth and sixth, `main` answers differently; in the second, third and fifth, `unstable` refuses what `main` accepts.
+In the first, fourth and sixth, `main` answers differently; in the second, third, fifth and seventh, `unstable` refuses what `main` accepts.
 
 <!-- prettier-ignore -->
 | Spelling | `unstable` | `main` build 98 | On `main`, write instead |
 | --- | --- | --- | --- |
-| An input named in an action: `GIVEN creditor …` then `MUST Pay Borrower creditor 10` (`run-must-names-an-input`) | Compares the payload with the input: paying the wrong party leaves the obligation open. | **degrades**: `creditor` is a fresh name that matches any payload: paying a stranger **fulfils** the obligation. | `MUST Pay Borrower payee 10 PROVIDED payee EQUALS creditor` (`run-must-guard-instead`). Same traces, same answers on both. `main`'s own spelling is `EXACTLY`, which `unstable` warns is being retired, and which failed on `main` for a multi-field action (`run-exactly-with-an-input`, `Internal error: creditor is not in scope`). |
-| `NOT a AND b` on one line, with no brackets (`unstable-refuses-not-and`) | An error: it reads as `NOT (a AND b)` and asks you to write the brackets. | **reads**: accepted, and read as `NOT (a AND b)`: `NOT TRUE AND FALSE` is `TRUE`. | Bracket it: `(NOT a) AND b`, or `NOT (a AND b)` (`alt-not-and-bracketed`). Here `unstable` is the stricter compiler. |
+| An input named in an action: `GIVEN creditor …` then `MUST Pay Borrower creditor 10` (`run-must-names-an-input`) | Compares the payload with the input: paying the wrong party leaves the obligation open. | **degrades**: `creditor` is a fresh name that matches any payload: paying a stranger **fulfils** the obligation. | `MUST Pay Borrower payee 10 PROVIDED payee EQUALS creditor` (`run-must-guard-instead`). Same traces, same verdicts for `MUST`, `MAY` and `SHANT`; only the layout of the residual obligation differs. `main`'s own spelling is `EXACTLY`, which `unstable` warns is being retired, and which failed on `main` for a multi-field action (`run-exactly-with-an-input`, `Internal error: creditor is not in scope`). |
+| `NOT a AND b` or `NOT a OR b` on one line, with no brackets (`unstable-refuses-not-and`, `unstable-refuses-not-or`) | An error: it reads as `NOT (a AND b)` and asks you to write the brackets. | **reads**: accepted, and read as `NOT (a AND b)`, or `NOT (a OR b)`: `NOT TRUE AND FALSE` is `TRUE`. | Bracket it: `(NOT a) AND b`, or `NOT (a AND b)` (`alt-not-and-bracketed`). Or put `NOT a` and the connective on separate lines at the same indent, which both read the same (`same-not-on-two-lines`). Here `unstable` is the stricter compiler. |
 | A party that is not the action's performer, which is the action's first actor-typed field. An obligation: `PARTY Drinker MUST eat` where `eat` is `Action OF Eater, "eat"`, a record (`unstable-refuses-wrong-performer`). An event in a `#TRACE`: `PARTY Drinker DOES eat` (`unstable-refuses-wrong-performer-event`), or `PARTY Lender DOES Pay Borrower Lender 10` for a constructor `Pay HAS payer, to, amount` (`unstable-refuses-wrong-performer-event-ctor`) | An error: `An actor may only perform its own actions.` For a constructor action it checks events only: the obligation `PARTY Lender MUST Pay Borrower Lender 10` is clean on both (`same-constructor-obligation-unchecked`). | **reads**: accepted, with no warning. In a trace the stranger's event is passed over and the obligation stays open. | Name the performer in the action and make the `PARTY` match it: `PARTY Eater MUST eat`. `main` will not catch a mismatch, so check it by eye. Here too `unstable` is the stricter compiler, for records and for the events of constructors, and not for the obligation of a constructor. |
 | A language tag on an `@nlg` herald: `@nlg:pt o valor %amount% excede o limite` (`degrades-nlg-language-tag`) | The herald is tagged `pt`, so a rule can carry renderings in several languages. | **degrades**: read as an untagged `@nlg` whose text begins `:pt` (`l4 ast` shows `TNlgString ":pt"`). | Write the herald without a tag; `main` has no per-language heralds. |
 | A constructor named like a field of a record input: `b's kind EQUALS Alpha`, where `b` has a field `Alpha` too (`unstable-reads-field-for-constructor`) | The field wins, because the fields of an input are in scope by name (field opening): a warning says so, and the comparison then fails to type-check. | **reads**: the constructor, as written. | Give the constructor and the field different names. `check.sh` goes red on this, and it is `unstable` that misreads it. |
 | A `MAY` with an explicit `LEST`: `MAY Pay Borrower Lender 10 WITHIN 5 HENCE FULFILLED LEST BREACH`, when nothing is done in time (`run-may-lest-lapse`) | The permission lapses into the `LEST`: `DEONTIC BREACHED`. | **degrades**: `main` ignores a `LEST` after `MAY`, as its own skill says, and the lapse is `FULFILLED`. | If inaction should be a breach, make it a `MUST`: a lapsed `MUST` is a breach on both. If it should have no consequence, leave the `LEST` off: a lapsed `MAY` without one is `FULFILLED` on both. |
+| An infix `EXPONENT` in a module that imports the prelude: `IMPORT prelude` then `#EVAL 2 EXPONENT 10` (`main-infix-exponent`) | An error: `unexpected EXPONENT`. The same line without `IMPORT prelude` is accepted. | **reads**: `1024`. | The prefix form, `EXPONENT 2 10`, which both read the same (`alt-exponent-prefix`). |
 
 The first row has a loud half: read `creditor` again in `HENCE` and `main` stops with `There are multiple definitions for the identifier creditor` (probe 43), which names the wrong thing, since the fault is in the action.
 The `PROVIDED` spelling removes both (`alt-must-guard-then-hence`).
@@ -177,8 +178,8 @@ What `main` says depends on what follows the `GIVEN`:
 | The same name defined in two nested `§` sections (35) | Accepted: a use reads the nearest. | **rejects**: ``There are multiple definitions for the identifier `prescribed rate` `` | Give them different names. |
 | `RULES EFFECTIVE DATE` on its own (37) | Accepted: the version date of the rules. | **rejects**: ``I could not find a definition for the identifier `RULES EFFECTIVE DATE` `` | Take the date as a `GIVEN` input of the rule (`alt-rule-date-as-input`). |
 | The temporal built-ins: `` `EVAL UNDER VALID TIME` ``, `` `EVAL AS OF SYSTEM TIME` ``, `` `EVAL UNDER RULES EFFECTIVE AT` `` with a date (38 to 40), `` `VALUE AT` `` (57), `` `EVER BETWEEN` `` (58) | Present; the `EVAL` forms take a `DATE`. | **rejects**: ``I could not find a definition for the identifier `EVAL UNDER VALID TIME` ``: removed in build 98. | Nothing on `main` from build 98: you cannot evaluate a rule at a date there. Take the rule-version date as a `GIVEN` input and give each vintage its own tests (`alt-rule-date-as-input`). |
-| `` `IS INTEGER` `` (54) | Accepted. | **rejects**: ``I could not find a definition for the identifier `IS INTEGER` ``: build 98 spells it `ISINTEGER`, with no alias. | `ISINTEGER` (`main-isinteger`). `unstable` rejects that spelling, so the module reads on one compiler only. |
-| ``(`WAIT UNTIL` 8)`` in a `#TRACE` (55) | Accepted: the house form in the skills. | **rejects**: ``I could not find a definition for the identifier `WAIT UNTIL` ``: build 98 spells it `WAITUNTIL`, with no alias. | `WAITUNTIL 8` (`main-waituntil`). `unstable` rejects that spelling, so the module reads on one compiler only. |
+| `` `IS INTEGER` `` (54) | Accepted. | **rejects**: ``I could not find a definition for the identifier `IS INTEGER` ``: build 98 spells it `ISINTEGER`, with no alias. | `FLOOR x EQUALS x`, which agrees on both for whole numbers, fractions, negatives and zero (`alt-is-integer-by-floor`). `ISINTEGER` is main's spelling (`main-isinteger`), and `unstable` rejects it. |
+| ``(`WAIT UNTIL` 8)`` in a `#TRACE` (55) | Accepted: the house form in the skills. | **rejects**: ``I could not find a definition for the identifier `WAIT UNTIL` ``: build 98 spells it `WAITUNTIL`, with no alias. | An event at that time by a party the rule does not constrain, such as `PARTY Seller DOES pay AT 8`: the clock moves the same way on both (`alt-wait-by-an-event-of-another-party`). It needs an action that party can perform; where there is none, `WAITUNTIL 8` is main's spelling (`main-waituntil`), and `unstable` rejects it. |
 | `MUST DO pay` (56) | Accepted. | **rejects**: `unexpected DO`: from build 98 `DO` is a modal of its own. | Drop the `DO`: `MUST pay`. |
 | A `\[` or `\]` inside an inline `[…]` annotation (44) | Accepted: a literal bracket. | **rejects**: `unexpected %`, because the annotation ended at the first `]` | Put no bracket inside an inline annotation (`alt-inline-bracket`). |
 | A field read in an action's argument: `MAY Take Official (c's measure)` (51) | Accepted. | **rejects**: `unexpected 's` | `MAY Take Official m PROVIDED m EQUALS c's measure` (`run-field-in-guard`). |

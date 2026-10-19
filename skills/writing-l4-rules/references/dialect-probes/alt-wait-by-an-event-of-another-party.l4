@@ -1,0 +1,12 @@
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay
+
+GIVETH A DEONTIC Person Action
+rent MEANS PARTY Buyer MUST pay WITHIN 7 HENCE FULFILLED LEST BREACH
+
+-- the clock is advanced to 8 by an event of a party the rule does not constrain
+#TRACE rent AT 0 WITH
+    PARTY Seller DOES pay AT 8
+
+#TRACE rent AT 0 WITH
+    PARTY Seller DOES pay AT 3
