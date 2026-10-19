@@ -282,6 +282,34 @@ Provisions
 
 Options: `--format html|text|json|plan`, `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, and `--include-unused`.
 
+### `l4 nlg` — the directives, as sentences
+
+Writes each `#EVAL`, `#ASSERT` and other directive of a file as one line of prose.
+It is the quick way to read what a set of test cases says without running them.
+Where a definition has an `@nlg` wording, `l4 nlg` uses it in place of the name.
+
+```l4
+GIVEN days_overdue IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is late` @nlg the invoice is late
+  IF days_overdue GREATER THAN 30
+
+#EVAL `is late` 45
+#EVAL NOT `is late` 5
+```
+
+```bash
+l4 nlg is-late.l4
+```
+
+```
+the invoice is late with 45
+not the invoice is late with 5
+```
+
+`l4 nlg` prints nothing and exits non-zero if the file does not typecheck, rather than writing prose about a module that does not hold together.
+Options: `-o/--output FILE` writes to a file instead of standard output.
+
 ### `l4 batch` — many cases at once
 
 Evaluates one `@export` function against many input rows, streaming one NDJSON result line per row. Given this exported rule:

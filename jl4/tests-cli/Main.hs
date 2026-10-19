@@ -255,6 +255,20 @@ expectFail bin args = do
     ExitFailure _ -> pure ()
     ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
 
+-- | Assert @l4 nlg SOURCE@ exits 0 and prints exactly the committed golden,
+-- line endings aside: on Windows the output, or a golden checked out there, can
+-- end its lines with a carriage return.
+expectNlgGolden :: FilePath -> FilePath -> FilePath -> IO ()
+expectNlgGolden bin source golden = do
+  Output code sout serr <- runL4 bin ["nlg", source]
+  expected <- T.unpack . TE.decodeUtf8Lenient <$> BS.readFile golden
+  code `shouldBe` ExitSuccess
+  unless (filter (/= '\r') sout == filter (/= '\r') expected) $
+    expectationFailure $
+      "l4 nlg " ++ source ++ " differs from " ++ golden
+      ++ "\n--- stdout ---\n" ++ sout
+      ++ "\n--- stderr ---\n" ++ serr
+
 -- | Parse the stdout of a --json run as a JSON envelope.
 jsonEnvelope :: FilePath -> [String] -> IO Value
 jsonEnvelope bin args = do
@@ -275,6 +289,14 @@ objField _ _ = Nothing
 
 fixtureDir :: FilePath
 fixtureDir = "tests-cli/fixtures"
+
+-- The `l4 nlg` differential pairs: a corpus module and the golden jl4-test
+-- wrote for it.
+nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden :: FilePath
+nlgPromissorySource = "examples/legal/promissory-note.l4"
+nlgPromissoryGolden = "examples/legal/tests/promissory-note.nlg.golden"
+nlgShowcaseSource   = "examples/legal/directive-showcase.l4"
+nlgShowcaseGolden   = "examples/legal/tests/directive-showcase.nlg.golden"
 
 cleanFixture, evalFixture, errorFixture, garbageFixture :: FilePath
 cleanFixture   = fixtureDir </> "clean.l4"
@@ -465,6 +487,7 @@ main = do
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
        , multiClauseRenderFixture
+       , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
@@ -488,6 +511,7 @@ spec bin = do
       sout `shouldSatisfy` ("batch" `isInfixOf`)
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
+      sout `shouldSatisfy` ("nlg" `isInfixOf`)
 
   describe "l4 deploy / redeploy / undeploy / deployments (no network)" $ do
     let expectStderr args mEnv needle = do
@@ -930,6 +954,26 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  -- `l4 nlg` must reproduce what jl4-test writes into a committed
+  -- `.nlg.golden`, byte for byte: that equality is what lets anyone regenerate
+  -- a golden without running the whole golden suite.
+  describe "l4 nlg" $ do
+    it "linearizes a clean module and exits 0" $ do
+      Output code sout _ <- runL4 bin ["nlg", cleanFixture]
+      code `shouldBe` ExitSuccess
+      -- clean.l4 has no directives, so the payload is empty. That is the
+      -- correct answer and not a failure: `nlg` linearizes DIRECTIVES.
+      sout `shouldBe` ""
+
+    it "refuses to emit prose for a module that does not typecheck" $
+      expectFail bin ["nlg", errorFixture]
+
+    it "reproduces the committed promissory-note NLG golden byte for byte" $
+      expectNlgGolden bin nlgPromissorySource nlgPromissoryGolden
+
+    it "reproduces the committed directive-showcase NLG golden byte for byte" $
+      expectNlgGolden bin nlgShowcaseSource nlgShowcaseGolden
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do

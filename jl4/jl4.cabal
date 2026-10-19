@@ -44,6 +44,7 @@ executable l4
     http-types,
     lsp-types,
     network-uri,
+    optics,
     process,
     text,
     time,
@@ -65,6 +66,7 @@ executable l4
     L4.Cli.Deploy
     L4.Cli.Format
     L4.Cli.Install
+    L4.Cli.Nlg
     L4.Cli.Render
     L4.Cli.Run
     L4.Cli.StateGraph
