@@ -1,0 +1,4 @@
+DECLARE Tenure IS ONE OF Owner, Tenant, Lodger
+DECLARE Role   IS ONE OF Owner, Manager
+
+#EVAL Owner

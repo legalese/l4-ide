@@ -1,0 +1,5 @@
+-- ONE OF follows IS directly: no article before it
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.1, first row).
+DECLARE Plot HAS
+    `the occupier` IS A STRING
+    `tenure`       IS A ONE OF Owner, Tenant, Lodger

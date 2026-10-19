@@ -153,6 +153,16 @@ data CheckError =
     -- ^ Error in mixfix pattern matching (function name, error details)
   | CyclicComputedFields Name [Name]
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
+  | InlineOptionsNameClash (Maybe SrcRange) Name RawName [Resolved]
+    -- ^ A field written @IS ONE OF …@ (the range is the field's, the 'Name'
+    -- the field's name) whose lifted type's name, the 'RawName', is also
+    -- the name of each 'Resolved': other types as near to the field as the
+    -- lifted one, so that the field's type would be ambiguous. Note [Inline
+    -- ONE OF on a field] in "L4.Syntax".
+  | InlineOptionsInParameterisedType (Maybe SrcRange) Name Name
+    -- ^ A field written @IS ONE OF …@ (the range is its @ONE OF@; the names
+    -- are the declaration's and the field's) in a declaration that takes a
+    -- type parameter. The lifted type would need the parameter too.
   | CyclicTypeSynonyms [Name]
     -- ^ Circular dependency between type synonym declarations (cycle members)
   | SynonymExpansionLimit Int Resolved
@@ -467,6 +477,11 @@ data CheckWarning
     -- Only fires inside a deontic action. R6 was decided DEONTIC-ONLY, so
     -- @EXACTLY@ remains the /only/ way to pin a value in a
     -- @CONSIDER … WHEN@ and is not deprecated there.
+  | EmptyInlineOptions (Maybe SrcRange) Name
+    -- ^ A field written @IS ONE OF@ with no options after it (the range is
+    -- the field's @ONE OF@). It checks, as an empty @DECLARE … IS ONE OF@
+    -- does, but no value of the record can then be made. A warning, so
+    -- nothing that checked before stops checking (review round 1, F6).
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -858,6 +873,8 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
+  rangeOf (InlineOptionsNameClash r _ _ _)  = r
+  rangeOf (InlineOptionsInParameterisedType r _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
@@ -888,6 +905,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
+  rangeOf (CheckWarning (EmptyInlineOptions r _)) = r
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (SuspiciousClausePattern _ _ b _) = rangeOf b

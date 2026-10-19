@@ -922,9 +922,30 @@ recordDecl =
       <*> recordDecl'
 
 recordDecl' :: AnnoParser [TypedName Name]
-recordDecl' =
+recordDecl' = recordDeclWith True
+
+-- | A @HAS@ field list. The flag says whether a field may list its options
+-- inline (@`tenure` IS ONE OF Owner, Tenant@): it may in a record and in a
+-- constructor of a @DECLARE@, and not in a constructor that is itself one of
+-- a field's inline options (Note [Inline ONE OF on a field], "L4.Syntax").
+recordDeclWith :: Bool -> AnnoParser [TypedName Name]
+recordDeclWith inline =
      annoLexeme (spacedKeyword_ TKHas)
-  *> annoHole (lsepBy (const reqParam) (spacedSymbol_ TComma))
+  *> annoHole (lsepBy (const (reqParamWith inline)) fieldComma)
+
+-- | The comma between two fields of one line, @HAS w IS A NUMBER, h IS A NUMBER@.
+--
+-- A field name is always followed by @IS@ (or @:@), and a constructor never
+-- is, so a comma counts as a field separator only when the next two tokens
+-- are a name and @IS@. Any other comma is left where it is, for the list the
+-- fields sit in: in @DECLARE Shape IS ONE OF Dot, Rect HAS w IS A NUMBER,
+-- Circle@ it separates @Rect@ from @Circle@. Consuming it made @Circle@ a
+-- field name and failed at the next token with "expecting IS", so a
+-- constructor with fields could only come last on its line
+-- (smucclaw/l4-ide#1045). The look-ahead is retried, not committed: 'try'
+-- puts the comma back when no field follows it.
+fieldComma :: Parser (Lexeme PosToken)
+fieldComma = try (spacedSymbol_ TComma <* lookAhead (name *> separator))
 
 enumOrSynonymDecl :: Parser (TypeDecl Name)
 enumOrSynonymDecl =
@@ -945,14 +966,19 @@ enumDecl =
 synonymDecl :: AnnoParser (TypeDecl Name)
 synonymDecl =
   SynonymDecl emptyAnno
-    <$> annoHole type'
+    <$> annoHole (typeAt DeclareTypeSite)
 
 conDecl :: Parser (ConDecl Name)
-conDecl =
+conDecl = conDeclWith True
+
+-- | A constructor, with its fields if it has any. See 'recordDeclWith' for
+-- the flag.
+conDeclWith :: Bool -> Parser (ConDecl Name)
+conDeclWith inline =
   attachAnno $
     MkConDecl emptyAnno
       <$> annoHole name
-      <*> option [] recordDecl'
+      <*> option [] (recordDeclWith inline)
 
 decide :: TypeSig Name -> Parser (Decide Name)
 decide sig = do
@@ -1635,27 +1661,102 @@ expr =
   indentedExpr (mkPos 1)
 
 type' :: Parser (Type' Name)
-type' =
+type' = typeAt RuleTypeSite
+
+-- | Where a type is being read. It changes nothing about what parses; it only
+-- decides what a misplaced @ONE OF@ is told ('oneOfGuard').
+--
+-- @ONE OF@ can be the whole type of a record field or of a constructor's
+-- field, and nowhere else (Note [Inline ONE OF on a field], "L4.Syntax").
+-- Without the guard every other @ONE@ was a bare "unexpected ONE", which
+-- names the token and not the rule.
+data TypeSite
+  = FieldTypeSite
+    -- ^ The whole type of a field, after its @IS@. @ONE OF@ itself is read by
+    -- 'inlineOptions' before this is tried, so the guard here fires only
+    -- after an article: @`tenure` IS A ONE OF …@.
+  | NestedFieldTypeSite
+    -- ^ The whole type of a field of a constructor that is itself one of a
+    -- field's inline options: inline lists go one level deep.
+  | DeclareTypeSite
+    -- ^ The body of @DECLARE T IS …@. @DECLARE T IS ONE OF …@ is an
+    -- 'enumDecl', so here too the guard fires only after an article.
+  | InnerTypeSite
+    -- ^ Part of the type of a field or of a @DECLARE@: after @LIST OF@, a
+    -- type's arguments, @FUNCTION FROM@, @FOR ALL@, or inside parentheses.
+  | RuleTypeSite
+    -- ^ A rule's input or result, or an @ASSUME@, at any depth.
+  deriving stock (Eq, Show)
+
+-- | The site of a type nested inside one read at the given site.
+innerSite :: TypeSite -> TypeSite
+innerSite RuleTypeSite = RuleTypeSite
+innerSite _            = InnerTypeSite
+
+typeAt :: TypeSite -> Parser (Type' Name)
+typeAt site =
       withOptionalArticle
       (   typeKind
-      <|> tyApp
-      <|> fun
+      <|> tyApp (innerSite site)
+      <|> fun (innerSite site)
+      <|> oneOfGuard site
       )
-  <|> forall'
-  <|> paren type'
+  <|> forall' (innerSite site)
+  <|> paren (typeAt (innerSite site))
+
+-- | Fail at a @ONE@ where a type was expected, with the rule for that site
+-- spelled out. Consumes nothing and is 'hidden', the shape of
+-- 'edgeOrderGuard', so @ONE@ joins no list of expected tokens: it is not
+-- accepted at any site this guards.
+oneOfGuard :: TypeSite -> Parser a
+oneOfGuard site = do
+  _ <- lookAhead (hidden (spacedKeyword_ TKOne))
+  fancyFailure (Set.singleton (ErrorFail (oneOfMessage site)))
+
+-- | The same guard after a whole type: @MAYBE ONE OF …@ reads @MAYBE@ as a
+-- type with no arguments, because a type's arguments are optional, so the
+-- @ONE@ is met only once the type is over. No type is ever followed by @ONE@.
+oneOfAfterType :: TypeSite -> AnnoParser ()
+oneOfAfterType site = wrapAnnoParser $ WithAnno [] <$> do
+  next <- optional (lookAhead (hidden (spacedKeyword_ TKOne)))
+  for_ next \ _ -> fancyFailure (Set.singleton (ErrorFail (oneOfMessage site)))
+
+oneOfMessage :: TypeSite -> String
+oneOfMessage = \ case
+  FieldTypeSite ->
+    "ONE OF follows IS directly, with no A, AN or THE between them: \
+    \write `tenure` IS ONE OF Owner, Tenant."
+  DeclareTypeSite ->
+    "ONE OF follows IS directly, with no A, AN or THE between them: \
+    \write DECLARE Tenure IS ONE OF Owner, Tenant."
+  NestedFieldTypeSite ->
+    "A field's options listed with ONE OF go one level deep, so a field of \
+    \one of those options cannot list options of its own. Declare the inner \
+    \options with DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant, \
+    \and give the field that type."
+  InnerTypeSite ->
+    "ONE OF can be the whole type of a field, but not part of one: not after \
+    \LIST OF or MAYBE, and not inside another type. Declare the options with \
+    \DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant, and then write \
+    \LIST OF Tenure or MAYBE Tenure."
+  RuleTypeSite ->
+    "ONE OF can list a field's options inside DECLARE ... HAS, but it cannot \
+    \be the type of a rule's input or result. Declare the options with \
+    \DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant, and then write \
+    \IS A Tenure."
 
 typeKind :: Parser (Type' Name)
 typeKind =
   attachAnno $
   Type emptyAnno <$ annoLexeme (spacedKeyword_ TKType)
 
-atomicType :: Parser (Type' Name)
-atomicType =
+atomicType :: TypeSite -> Parser (Type' Name)
+atomicType site =
       withOptionalArticle
       (   typeKind
       <|> nameAsApp TyApp
       )
-  <|> paren type'
+  <|> paren (typeAt site)
 
 paren :: (AnnoToken a ~ PosToken, HasAnno a, HasSrcRange a) => Parser a -> Parser a
 paren p =
@@ -1790,36 +1891,37 @@ memoGroupAt extra table p =
         (Megaparsec.NotConsumed, Megaparsec.Error err) -> eerr err s''
 
 -- We don't actually currently allow parsing an optional name
-optionallyNamedType :: Parser (OptionallyNamedType Name)
-optionallyNamedType = do
+optionallyNamedType :: TypeSite -> Parser (OptionallyNamedType Name)
+optionallyNamedType site = do
   attachAnno $
     MkOptionallyNamedType emptyAnno
     <$> annoHole (pure Nothing)
-    <*> annoHole type'
+    <*> annoHole (typeAt site)
 
-tyApp :: Parser (Type' Name)
-tyApp = do
+tyApp :: TypeSite -> Parser (Type' Name)
+tyApp site = do
   current <- Lexer.indentLevel
   attachAnno $
     TyApp emptyAnno
     <$> annoHole (tokenAsName (TKeywords TKList) <|> name)
-    <*> (   annoLexeme (spacedKeyword_ TKOf) *> annoHole (lsepBy1 (const (indented type' current)) (spacedSymbol_ TComma))
-        <|> annoHole (lmany (const (indented atomicType current)))
+    <*> (   annoLexeme (spacedKeyword_ TKOf) *> annoHole (lsepBy1 (const (indented (typeAt site) current)) (spacedSymbol_ TComma))
+        <|> annoHole (lmany (const (indented (atomicType site) current)))
         )
+    <*  oneOfAfterType site
 
-fun :: Parser (Type' Name)
-fun = do
+fun :: TypeSite -> Parser (Type' Name)
+fun site = do
   current <- Lexer.indentLevel
   attachAnno $
     Fun emptyAnno
     <$  annoLexeme (spacedKeyword_ TKFunction)
     <*  annoLexeme (spacedKeyword_ TKFrom)
-    <*> annoHole (lsepBy1 (const (indented optionallyNamedType current)) (spacedKeyword_ TKAnd))
+    <*> annoHole (lsepBy1 (const (indented (optionallyNamedType site) current)) (spacedKeyword_ TKAnd))
     <*  annoLexeme (spacedKeyword_ TKTo)
-    <*> annoHole (indented type' current)
+    <*> annoHole (indented (typeAt site) current)
 
-forall' :: Parser (Type' Name)
-forall' = do
+forall' :: TypeSite -> Parser (Type' Name)
+forall' site = do
   -- current <- Lexer.indentLevel
   attachAnno $
     Forall emptyAnno
@@ -1827,7 +1929,7 @@ forall' = do
     <*  annoLexeme (spacedKeyword_ TKAll)
     <*> annoHole (lsepBy1 (const name) (spacedKeyword_ TKAnd))
 --    <*  optional article
-    <*> annoHole type' -- (indented type' current)
+    <*> annoHole (typeAt site) -- (indented type' current)
 
 article :: AnnoParser PosToken
 article =
@@ -1871,17 +1973,81 @@ lsepBy1 pp sep =
     zipAnno :: a -> Lexeme_ (AnnoToken a) (AnnoToken a) -> a
     zipAnno p s = setAnno (fixAnnoSrcRange $ getAnno p <> mkSimpleEpaAnno (lexToEpa s)) p
 
-reqParam :: Parser (TypedName Name)
-reqParam = do
+-- | A field, @name IS type [TYPICALLY literal] [MEANS expr]@, or, when the
+-- flag allows it, @name IS ONE OF options …@ (Note [Inline ONE OF on a
+-- field], "L4.Syntax").
+--
+-- The annotation's holes follow 'MkTypedName''s fields in order: the name,
+-- the type, the options, the default and the body. A field with options has
+-- an empty hole for its type (the placeholder prints as nothing) and its
+-- @ONE OF@ keywords before the options' hole; any other field has an empty
+-- hole for its options.
+reqParamWith :: Bool -> Parser (TypedName Name)
+reqParamWith inline = do
   current <- Lexer.indentLevel
+  startLine <- currentLine
   attachAnno $
-    MkTypedName emptyAnno
+    (\ n (ty, mOptions) mTypically mMeans -> MkTypedName emptyAnno n ty mOptions mTypically mMeans)
       <$> annoHole name
       <*  annoLexeme separator
 --      <*  optional article
-      <*> annoHole type'
-      <*> optionalHole (annoLexeme (spacedKeyword_ TKTypically) *> annoHole atomicExpr')
-      <*> optionalHole (annoLexeme (spacedKeyword_ TKMeans) *> annoHole (indentedExpr current))
+      <*> (if inline
+             then inlineOptions <|> fieldType FieldTypeSite
+             else fieldType NestedFieldTypeSite)
+      <*> optionalHole (ownClause startLine current *> annoLexeme (spacedKeyword_ TKTypically) *> annoHole atomicExpr')
+      <*> optionalHole (ownClause startLine current *> annoLexeme (spacedKeyword_ TKMeans) *> annoHole (indentedExpr current))
+  where
+    fieldType site =
+      (\ ty -> (ty, Nothing))
+        <$> annoHole (typeAt site)
+        <*  wrapAnnoParser (pure (WithAnno [mkHoleWithSrcRangeHint Nothing] ()))
+    -- A field of one of a field's inline options takes a @TYPICALLY@ or
+    -- @MEANS@ on a later line only when it is written to the right of the
+    -- field's own name. One at or left of it belongs to the field whose
+    -- options these are, which is how the reference page teaches a default
+    -- after a list on several lines:
+    --
+    -- @
+    --   state IS ONE OF
+    --       Open
+    --       Suspended HAS previous IS A Status
+    --     TYPICALLY Open         -- state's default, not previous's
+    -- @
+    --
+    -- Without this the default went to @previous@: silently when @Status@
+    -- also has an @Open@, and otherwise with an error that named the wrong
+    -- field (review round 1, finding 1). Every other field keeps the old
+    -- rule, which checks no column. Consumes nothing and records no hole.
+    ownClause startLine column
+      | inline    = pure ()
+      | otherwise = wrapAnnoParser $ WithAnno [] <$> do
+          line <- currentLine
+          col <- Lexer.indentLevel
+          guard (line == startLine || col > column)
+
+-- | @ONE OF@ and a field's options, parsed by the same 'conDecl' a
+-- @DECLARE … IS ONE OF@ uses, one level deep. One line or several, exactly
+-- as there.
+--
+-- A constructor is never followed by @IS@ and a field name always is, so on
+-- one line a comma followed by a name and @IS@ ends the options and is left
+-- for the field list: in @HAS tenure IS ONE OF Owner, Tenant, area IS A
+-- NUMBER@ it separates @tenure@ from @area@ ('optionComma'). On several
+-- lines the same test ends the options at a line that is a field.
+inlineOptions :: AnnoParser (Type' Name, Maybe [ConDecl Name])
+inlineOptions =
+  (\ cds -> (inlineOptionsPlaceholder, Just cds))
+    <$  annoHole (pure inlineOptionsPlaceholder)
+    <*  annoLexeme (spacedKeyword_ TKOne)
+    <*  annoLexeme (spacedKeyword_ TKOf)
+    <*> annoHole (lsepBy (const inlineOption) optionComma)
+  where
+    inlineOption = notFollowedBy (name *> separator) *> conDeclWith False
+
+-- | The comma between two of a field's inline options: any comma that is not
+-- followed by a field (see 'inlineOptions' and 'fieldComma', its mirror).
+optionComma :: Parser (Lexeme PosToken)
+optionComma = try (spacedSymbol_ TComma <* notFollowedBy (name *> separator))
 
 param :: Parser (OptionallyTypedName Name)
 param =

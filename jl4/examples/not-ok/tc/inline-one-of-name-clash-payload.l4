@@ -1,0 +1,10 @@
+-- The same clash for a field of a constructor, whose options are named by the
+-- enum, the constructor and the field (`Holding's Lease's term`). Two enums
+-- that share a constructor are not a clash (see
+-- ok/inline-one-of-payload.l4); a hand-written type of the generated name is.
+DECLARE `Holding's Lease's term` IS ONE OF Fixed, Periodic
+
+DECLARE Holding IS ONE OF
+    Freehold
+    Lease HAS
+        `term` IS ONE OF Short, Long

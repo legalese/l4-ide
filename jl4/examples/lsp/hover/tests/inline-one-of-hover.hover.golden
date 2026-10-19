@@ -1,0 +1,5 @@
+field: ``` | FUNCTION FROM Plot TO `Plot's tenure` | ``` |  | --- |  | How the occupier holds the plot.
+one-of: ``` | TYPE | ``` | 
+option: ``` | `Plot's tenure` | ``` | 
+generated-type-in-given: ``` | TYPE | ``` | 
+option-in-rule: ``` | `Plot's tenure` | ``` | 

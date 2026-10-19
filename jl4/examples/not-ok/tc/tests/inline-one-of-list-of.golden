@@ -1,0 +1,13 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: inline-one-of-list-of.l4
+  Hidden: no
+  Range: 5:33-5:36
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+      |
+    5 |     `tenures`      IS A LIST OF ONE OF Owner, Tenant, Lodger
+      |                                 ^
+    ONE OF can be the whole type of a field, but not part of one: not after LIST OF or MAYBE, and not inside another type. Declare the options with DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant, and then write LIST OF Tenure or MAYBE Tenure.

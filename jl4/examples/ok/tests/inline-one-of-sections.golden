@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+inline-one-of-sections.l4:36:1-60:
+  assertion satisfied
+inline-one-of-sections.l4:37:1-26:
+  assertion satisfied
+inline-one-of-sections.l4:38:1-39:
+  assertion satisfied

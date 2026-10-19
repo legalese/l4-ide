@@ -1,0 +1,3 @@
+DECLARE Shape IS ONE OF Dot, Circle, Rect HAS w IS A NUMBER
+
+#EVAL Circle

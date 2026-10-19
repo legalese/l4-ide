@@ -1,0 +1,113 @@
+ 
+ Nested Types - C# | Microsoft Learn
+ Skip to main content
+ Skip to Ask Learn chat experience
+ This browser is no longer supported.
+ Upgrade to Microsoft Edge to take advantage of the latest features, security updates, and technical support.
+ Download Microsoft Edge
+ More info about Internet Explorer and Microsoft Edge
+ Table of contents 
+ Exit editor mode
+ Ask Learn
+ Ask Learn
+ Reading mode
+ Table of contents
+ Read in English
+ Add
+ Add to Plans
+ Edit
+ Copy Markdown
+ Print
+ Note
+ Access to this page requires authorization. You can try signing in or changing directories.
+ Access to this page requires authorization. You can try changing directories.
+ Nested types (C# programming guide)
+ Feedback
+ Summarize this article for me
+ In this article
+ A nested type is a type that you define within a class, struct, or interface. For example:
+public class Container
+{
+ class Nested
+ {
+ Nested() { }
+ }
+}
+Regardless of whether the outer type is a class, interface, or struct, nested types default to private. You can access them only from their containing type. In the preceding example, external types can't access the Nested class.
+You can also specify an access modifier to define the accessibility of a nested type, as follows:
+Nested types of a class can be public, protected, internal, protected internal, private, or private protected.
+However, defining a protected, protected internal, or private protected nested class inside a sealed class generates compiler warning CS0628, "new protected member declared in sealed class."
+Also be aware that making a nested type externally visible violates the code quality rule CA1034 "Nested types should not be visible".
+Nested types of a struct can be public, internal, or private.
+The following example makes the Nested class public:
+public class Container
+{
+ public class Nested
+ {
+ Nested() { }
+ }
+}
+The nested, or inner, type can access the containing, or outer, type. To access the containing type, pass it as an argument to the constructor of the nested type. For example:
+public class Container
+{
+ public class Nested
+ {
+ private Container? parent;
+ public Nested()
+ {
+ }
+ public Nested(Container parent)
+ {
+ this.parent = parent;
+ }
+ }
+}
+A nested type has access to all of the members that are accessible to its containing type. It can access private and protected members of the containing type, including any inherited protected members.
+In the previous declaration, the full name of class Nested is Container.Nested. This is the name used to create a new instance of the nested class, as follows:
+Container.Nested nest = new Container.Nested();
+See also
+The C# type system
+Access Modifiers
+Constructors
+CA1034 rule
+ Collaborate with us on GitHub
+ The source for this content can be found on GitHub, where you can also create and review issues and pull requests. For more information, see our contributor guide.
+ .NET
+ Open a documentation issue
+ Provide product feedback
+ Feedback
+ Was this page helpful?
+ Yes
+ No
+ No
+ Need help with this topic?
+ Want to try using Ask Learn to clarify or guide you through this topic?
+ Ask Learn
+ Ask Learn
+ Suggest a fix? 
+ Additional resources
+ Last updated on 
+ 2025-12-17
+ In this article
+ Was this page helpful?
+ Need help with this topic?
+ Want to try using Ask Learn to clarify or guide you through this topic?
+ Ask Learn
+ Ask Learn
+ Suggest a fix? 
+ en-us
+ Your Privacy Choices
+ Theme
+ Light 
+ Dark 
+ High contrast 
+ AI Disclaimer
+ Previous Versions
+ Blog
+ Contribute
+ Privacy
+ Consumer Health Privacy
+ Terms of Use
+ Trademarks
+ © Microsoft 2026
+ 

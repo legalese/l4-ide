@@ -1,0 +1,7 @@
+-- ONE OF can be the whole type of a field, but not part of one: not after
+-- MAYBE either (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.1, second row).
+-- MAYBE takes its argument optionally, so the ONE is met after the type;
+-- the message is the same.
+DECLARE Plot HAS
+    `the occupier` IS A STRING
+    `tenure`       IS A MAYBE ONE OF Owner, Tenant, Lodger

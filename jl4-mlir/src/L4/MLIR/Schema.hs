@@ -1338,7 +1338,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       case td of
         RecordDecl _ _ fields ->
           let fname = rawNameToText (rawName (getActual fieldRes))
-          in case [ ty | MkTypedName _ fn ty _ _ <- fields
+          in case [ ty | MkTypedName _ fn ty _ _ _ <- fields
                        , rawNameToText (rawName (getActual fn)) == fname
                        ] of
                (ty:_) -> Just (kindFromL4Type ty)
@@ -1481,13 +1481,13 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
     recordFieldNames typeName =
       case Map.lookup typeName declares of
         Just (MkDeclare _ _ _ (RecordDecl _ _ fields)) ->
-          [ Print.prettyLayout n | MkTypedName _ n _ _ _ <- fields ]
+          [ Print.prettyLayout n | MkTypedName _ n _ _ _ _ <- fields ]
         Just (MkDeclare _ _ _ (EnumDecl _ cons)) ->
           case [ fields
                | MkConDecl _ conName fields <- cons
                , rawNameToText (rawName (getActual conName)) == typeName
                ] of
-            (fields:_) -> [ Print.prettyLayout n | MkTypedName _ n _ _ _ <- fields ]
+            (fields:_) -> [ Print.prettyLayout n | MkTypedName _ n _ _ _ _ <- fields ]
             []         -> []
         _ -> []
 
@@ -1753,7 +1753,7 @@ typeToRetSchema declares visited ty = case ty of
               Just (MkDeclare _ _ _ (RecordDecl _ _ fields)) ->
                 buildRecord nameText
                   [ (rawNameToText (rawName (getActual fieldName)), fieldTy)
-                  | MkTypedName _ fieldName fieldTy _ _ <- fields
+                  | MkTypedName _ fieldName fieldTy _ _ _ <- fields
                   ]
               Just (MkDeclare _ _ _ (EnumDecl _ cons)) ->
                 let conNames = [ rawNameToText (rawName (getActual conName))

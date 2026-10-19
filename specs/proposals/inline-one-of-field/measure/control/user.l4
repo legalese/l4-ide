@@ -1,0 +1,4 @@
+IMPORT ctl
+GIVEN e IS A Exported
+GIVETH A BOOLEAN
+`h` e MEANS e EQUALS EA

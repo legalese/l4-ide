@@ -1,0 +1,11 @@
+DECLARE Tenure IS ONE OF Owner, Tenant, Lodger
+DECLARE Holding IS ONE OF
+    Freehold
+    Lease HAS
+        years IS A NUMBER TYPICALLY 99
+DECLARE Plot HAS
+    area   IS A NUMBER
+    tenure IS A Tenure TYPICALLY Owner
+    holding IS A Holding
+
+#EVAL (Plot WITH area IS 3, holding IS Freehold)'s tenure

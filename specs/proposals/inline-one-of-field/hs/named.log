@@ -1,0 +1,9 @@
+[1 of 2] Compiling Main             ( Named.hs, Named.o )
+Named.hs:3:55: error: [GHC-48959]
+    • Can't make a derived instance of ‘Show Plot’:
+        Don't know how to derive ‘Show’ for type ‘(# () | () #)’
+    • In the data declaration for ‘Plot’
+  |
+3 | data Plot = Plot { tenure :: (# () | () #) } deriving Show
+  |                                                       ^^^^
+

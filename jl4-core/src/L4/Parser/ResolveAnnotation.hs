@@ -596,7 +596,37 @@ addNlgTypedName claimsBelow a = extendNlgA a $ case a of
     -- column of things rather than a sequence of declarations, and all three
     -- independently generated Hebrew encodings measured in 2026-09 annotate
     -- fields this way — 100 heralds, every one below its field.
-    MkTypedName ann n ty mTypically mExpr -> do
+    -- A field whose options are listed inline, @`tenure` IS ONE OF Owner,
+    -- Tenant@: each option takes what is written on it, exactly as the
+    -- constructors of a @DECLARE … IS ONE OF@ do (an EnumDecl, above), so
+    -- @Owner [an owner]@, or an @\@nlg@ trailing an option's own line, is
+    -- that option's (Note [Inline ONE OF on a field], "L4.Syntax").
+    --
+    -- On one line the options are a type in all but name, and are treated as
+    -- the type is below: they claim what is left on the line and advertise no
+    -- span, so the field's NAME still takes an annotation written underneath.
+    -- On several lines the lines underneath are the options', so the name
+    -- takes only what is written before the first of them.
+    MkTypedName ann n ty (Just cds) mTypically mExpr
+      | onOneLine -> do
+          n' <- addNlgFieldName claimsBelow (fromSrcRange <$> rangeOf cds) n
+          cds' <- unspanned (maybe id (hoistNlgA . inLocRange . upToEndOfLineOf) (rangeOf cds) (traverse addNlg cds))
+          pure $ MkTypedName ann n' ty (Just cds') mTypically mExpr
+      | otherwise -> do
+          n' <- addNlgFieldName (const False) (fromSrcRange <$> rangeOf cds) n
+          cds' <- addNlgOptions cds
+          pure $ MkTypedName ann n' ty (Just cds') mTypically mExpr
+     where
+      onOneLine = case (fromSrcRange <$> rangeOf n, fromSrcRange <$> rangeOf cds) of
+        (Just nameSpan, Just optionsSpan) -> nameSpan.start.line == optionsSpan.end.line
+        _                                 -> True
+      addNlgOptions options = case List.unsnoc options of
+        Just (cons, lastCon) -> do
+          cons' <- traverse addNlg cons
+          lastCon' <- addNlgConDecl claimsBelow lastCon
+          pure (cons' <> [lastCon'])
+        Nothing -> pure []
+    MkTypedName ann n ty Nothing mTypically mExpr -> do
       n' <- addNlgFieldName claimsBelow (fromSrcRange <$> rangeOf ty) n
       -- The type claims what is left on the field's own line, and no further:
       -- it runs second, so with nothing after it, a type that reached down
@@ -607,7 +637,7 @@ addNlgTypedName claimsBelow a = extendNlgA a $ case a of
       -- traversing it made it a sibling whose span cut the name off from the
       -- line below, so an own-line herald under a field with a default went to
       -- the NEXT field, or to nothing (smucclaw/l4-ide#997).
-      pure $ MkTypedName ann n' ty' mTypically mExpr
+      pure $ MkTypedName ann n' ty' Nothing mTypically mExpr
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (ConDecl n) where
   addNlg = addNlgConDecl (const True)
@@ -1328,11 +1358,12 @@ instance HasDesc (ConDecl n) where
     MkConDecl ann name <$> traverse addDesc names
 
 instance HasDesc (TypedName n) where
-  addDesc name@(MkTypedName ann n ty mTypically mExpr) = do
+  addDesc name@(MkTypedName ann n ty mOptions mTypically mExpr) = do
     ty' <- addDesc ty
+    mOptions' <- traverse (traverse addDesc) mOptions
     mTypically' <- traverse addDesc mTypically
     ann' <- attachLeadingOrInlineDesc name ann
-    pure $ MkTypedName ann' n ty' mTypically' mExpr
+    pure $ MkTypedName ann' n ty' mOptions' mTypically' mExpr
 
 instance HasDesc (Type' n) where
   addDesc = pure
@@ -2094,13 +2125,14 @@ instance (HasSrcRange n, HasRef n) => HasRef (TypeDecl n) where
     OpaqueDecl ann -> OpaqueDecl <$> attachRef a ann
 
 instance (HasSrcRange n, HasRef n) => HasRef (TypedName n) where
-  addRef a@(MkTypedName ann n ty mExpr typically) = do
+  addRef a@(MkTypedName ann n ty mOptions mExpr typically) = do
     ann' <- attachRef a ann
     n' <- addRef n
     ty' <- addRef ty
+    mOptions' <- traverse (traverse addRef) mOptions
     mExpr' <- traverse addRef mExpr
     typically' <- traverse addRef typically
-    pure $ MkTypedName ann' n' ty' mExpr' typically'
+    pure $ MkTypedName ann' n' ty' mOptions' mExpr' typically'
 
 instance (HasSrcRange n, HasRef n) => HasRef (ConDecl n) where
   addRef a@(MkConDecl ann n typedNames) = do

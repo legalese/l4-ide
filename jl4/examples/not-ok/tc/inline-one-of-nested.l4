@@ -1,0 +1,8 @@
+-- Inline options go one level deep: a field of one of a field's inline
+-- options cannot list options of its own
+-- (specs/proposals/INLINE-ONE-OF-FIELD-SPEC.md §5.1, fourth row).
+DECLARE Title HAS
+    `estate` IS ONE OF
+        Absolute
+        Leasehold HAS
+            `kind` IS ONE OF Short, Long

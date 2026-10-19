@@ -370,9 +370,13 @@ nlgConDecl (MkConDecl ann n typedName) =
     <*> traverse nlgTypedName typedName
 
 nlgTypedName :: TypedName Resolved -> Check (TypedName Resolved)
-nlgTypedName (MkTypedName ann n ty mTypically mExpr) =
+nlgTypedName (MkTypedName ann n ty mOptions mTypically mExpr) =
   MkTypedName ann
     <$> resolveNlgAnnotationInResolved n
     <*> nlgType ty
+    -- A field's inline options are filled in after this runs, from the
+    -- lifted declaration, which has had its own pass (Note [Inline ONE OF on
+    -- a field], "L4.Syntax").
+    <*> pure mOptions
     <*> traverse nlgExpr mTypically
     <*> pure mExpr

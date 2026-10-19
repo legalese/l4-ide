@@ -40,6 +40,8 @@ DECLARE Shape IS ONE OF
   Rectangle HAS width IS A NUMBER, height IS A NUMBER
 ```
 
+A list of options that only one field uses can also be written on the field itself, `` `tenure` IS ONE OF Owner, Tenant, Lodger ``: see [A field's options, listed inline](inline-one-of.md).
+
 ### Computed Fields (Methods)
 
 Record fields can have a `MEANS` clause that defines a derived value — computed automatically from the record's other fields. These are analogous to **methods**, **calculated properties**, or **derived attributes** in other languages.

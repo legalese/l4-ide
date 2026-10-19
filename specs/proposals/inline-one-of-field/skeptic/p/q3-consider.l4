@@ -1,0 +1,11 @@
+DECLARE `Plot's tenure` IS ONE OF Owner, Tenant, Lodger
+DECLARE Plot HAS
+    tenure IS A `Plot's tenure`
+
+GIVEN p IS A Plot
+GIVETH A STRING
+`describe` p MEANS CONSIDER p's tenure
+                     WHEN Owner  THEN "owner"
+                     WHEN Tenant THEN "tenant"
+
+#EVAL `describe` (Plot WITH tenure IS Owner)

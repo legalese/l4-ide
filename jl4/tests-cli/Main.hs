@@ -115,6 +115,11 @@ earlyActFixture = fixtureDir </> "early-act.l4"
 multiClauseRenderFixture :: FilePath
 multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
 
+-- | A record whose fields list their options inline, and the rows to run it on.
+inlineOneOfFixture, inlineOneOfJson :: FilePath
+inlineOneOfFixture = fixtureDir </> "inline-one-of.l4"
+inlineOneOfJson    = fixtureDir </> "inline-one-of.json"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -1013,6 +1018,41 @@ spec bin = do
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("OTHERWISE `the result of clauses 2 to 3`" `isInfixOf`)
       sout `shouldNotSatisfy` mentionsOldName
+
+  -- A field that lists its options inline (INLINE-ONE-OF-FIELD-SPEC §5.11).
+  -- L4 lifts the options into a type named after the field, `Plot's tenure`;
+  -- a reader of the rendered document should meet a stored field's options
+  -- under the field, and not that generated name as a term of its own.
+  describe "a field that lists its options inline" $ do
+    it "l4 render lists a stored field's options under it and defines no generated term" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", inlineOneOfFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("- tenure — one of Owner, Tenant, or Lodger" `isInfixOf`)
+      sout `shouldSatisfy` ("- boundary — one of Fenced, Hedged, or Open" `isInfixOf`)
+      sout `shouldNotSatisfy` ("Plot's tenure" `isInfixOf`)
+      sout `shouldNotSatisfy` ("Plot's boundary" `isInfixOf`)
+
+    -- Render shows neither a constructor's fields nor a computed field, so
+    -- the options of such a field keep their defined term: hiding it too left
+    -- the options nowhere in the document (review round 1, finding 2).
+    it "l4 render keeps the options of a constructor's field and of a computed field" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", inlineOneOfFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Holding's Lease's term means one of Short or Long." `isInfixOf`)
+      sout `shouldSatisfy` ("Plot's status means one of Settled or Disputed." `isInfixOf`)
+
+    -- `batch` re-prints the checked module, which holds the lifted DECLAREs,
+    -- and re-runs it per row: the printed field must name the lifted type
+    -- rather than list the options again, or the re-run declares them twice.
+    it "l4 batch re-prints the lifted form and runs it, default included" $ do
+      Output code sout _ <- runL4 bin ["batch", inlineOneOfFixture, "--inputs", inlineOneOfJson]
+      code `shouldBe` ExitSuccess
+      let rows = lines sout
+      length rows `shouldBe` 3
+      rows `shouldSatisfy` all ("\"status\":\"success\"" `isInfixOf`)
+      map ("\"result\":true" `isInfixOf`) rows `shouldBe` [True, False, True]
+      -- the third row leaves `tenure` out, and its TYPICALLY fills it
+      (rows !! 2) `shouldSatisfy` ("\"presumed\":[\"p.tenure\"]" `isInfixOf`)
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $

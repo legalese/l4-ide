@@ -132,7 +132,7 @@ data RecordSpec = MkRecordSpec
 -- payload — the two are the same syntax and lower to the same artifacts (a
 -- question apiece), which is why they share a spec.
 fieldSpecOf :: TypedName Resolved -> FieldSpec
-fieldSpecOf (MkTypedName fAnn fRes fTy mDflt _) = MkFieldSpec
+fieldSpecOf (MkTypedName fAnn fRes fTy _ mDflt _) = MkFieldSpec
   { fsU       = getUnique fRes
   , fsL4      = resolvedToText fRes
   , fsSan     = attrIdent (resolvedToText fRes)
@@ -221,7 +221,7 @@ collectRecords (MkModule _ _ section) = Map.fromList (goSection section)
       [ ( getUnique recRes
         , MkRecordSpec
             { rsName   = resolvedToText recRes
-            -- the 5th MkTypedName field (computed/MEANS) is always Nothing
+            -- the 6th MkTypedName field (computed/MEANS) is always Nothing
             -- post-desugar; see the FieldSpec haddock
             , rsFields = map fieldSpecOf fields
             }

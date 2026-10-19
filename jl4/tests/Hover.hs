@@ -110,6 +110,16 @@ hoverGolden evalConfig dir inputFile = do
       , (Position 8 13, "input-pattern")
       , (Position 22 11, "later-input-pattern")
       ]
+    -- A field that lists its options inline (INLINE-ONE-OF-FIELD-SPEC):
+    -- the field, its ONE OF (where the generated type is defined), an
+    -- option where it is listed, and both used from a rule.
+    "inline-one-of-hover.l4" ->
+      [ (Position 3 5, "field")
+      , (Position 3 16, "one-of")
+      , (Position 3 23, "option")
+      , (Position 6 16, "generated-type-in-given")
+      , (Position 8 26, "option-in-rule")
+      ]
     other -> error ("Hover.positionsFor: no positions pinned for " <> other)
 
   getHoverAt tcRes nuri (pos, label) =

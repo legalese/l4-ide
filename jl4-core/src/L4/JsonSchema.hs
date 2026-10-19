@@ -14,6 +14,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import L4.Export (ExportedFunction (..), ExportedParam (..), honouredDefault, isRequiredInput)
 import L4.FunctionSchema (typicallyToJson)
@@ -48,6 +49,12 @@ data SchemaType
 data SchemaContext = SchemaContext
   { ctxDeclares :: !(Map Text (Declare Resolved))
   , ctxCollectedDefs :: !(Map Text SchemaType)
+  , ctxInlineTypes :: !(Set.Set Unique)
+    -- ^ The enums among 'ctxDeclares' that 'L4.Desugar.desugarInlineOptions'
+    -- lifted out of a field ('inlineOptionsTypeUniques'). 'generateJsonSchema'
+    -- works it out from 'ctxDeclares' once, so a caller need not set it; a
+    -- direct caller of 'typeToJsonSchema' that leaves it empty gets such an
+    -- enum under @$defs@, as any other.
   }
   deriving stock (Show)
 
@@ -56,6 +63,7 @@ emptyContext =
   SchemaContext
     { ctxDeclares = Map.empty
     , ctxCollectedDefs = Map.empty
+    , ctxInlineTypes = Set.empty
     }
 
 instance ToJSON JsonSchema where
@@ -133,8 +141,9 @@ schemaTypeToFields = \case
   descField = maybe [] (\d -> ["description" .= d])
 
 generateJsonSchema :: SchemaContext -> ExportedFunction -> JsonSchema
-generateJsonSchema ctx export =
-  let (paramSchema, finalDefs) = buildParamsSchema ctx export.exportParams
+generateJsonSchema ctx0 export =
+  let ctx = ctx0{ctxInlineTypes = inlineOptionsTypeUniques ctx0.ctxDeclares}
+      (paramSchema, finalDefs) = buildParamsSchema ctx export.exportParams
    in JsonSchema
         { schemaVersion = "https://json-schema.org/draft/2020-12/schema"
         , schemaTitle = export.exportName
@@ -220,6 +229,16 @@ typeToJsonSchema ctx = \case
              in (SAnyOf [innerSchema, SNull] Nothing, defs)
           _ ->
             case Map.lookup typeName ctx.ctxDeclares of
+              -- An enum whose options a field listed inline is written in the
+              -- property itself, which is JSON Schema's native form for a
+              -- field's allowed values ("enum", Validation 2020-12 §6.1.2),
+              -- rather than under a name the author never wrote in @$defs@
+              -- (INLINE-ONE-OF-FIELD-SPEC §5.10; Note [Inline ONE OF on a
+              -- field] in "L4.Syntax"). It cannot recurse: its options'
+              -- fields cannot list options of their own.
+              Just decl@(MkDeclare _ _ (MkAppForm _ declHead _ _) _)
+                | getUnique declHead `Set.member` ctx.ctxInlineTypes ->
+                    declareToJsonSchema ctx decl
               Just decl ->
                 if Map.member typeName ctx.ctxCollectedDefs
                   then (SRef typeName Nothing, ctx.ctxCollectedDefs)
@@ -237,6 +256,15 @@ typeToJsonSchema ctx = \case
     typeToJsonSchema ctx inner
   InfVar _ _ _ ->
     (SString Nothing, ctx.ctxCollectedDefs)
+
+-- | The enums 'L4.Desugar.desugarInlineOptions' lifted out of a field, among
+-- the given declarations, by 'Unique' (Note [Inline ONE OF on a field]). By
+-- 'Unique' and not by name, because a DECLAREd enum in another section may
+-- share a lifted type's name and must keep its own @$defs@ entry (review
+-- round 1).
+inlineOptionsTypeUniques :: Map Text (Declare Resolved) -> Set.Set Unique
+inlineOptionsTypeUniques declares =
+  Set.fromList [ getUnique r | d <- Map.elems declares, (r, _) <- inlineOptionsTypes d ]
 
 declareToJsonSchema :: SchemaContext -> Declare Resolved -> (SchemaType, Map Text SchemaType)
 declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
@@ -259,7 +287,7 @@ declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
           (SObject [] desc, ctx.ctxCollectedDefs)
  where
   addField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
-  addField ctx' (MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans) (acc, defs) =
+  addField ctx' (MkTypedName fieldAnn fieldName fieldTy _ mTypically _mMeans) (acc, defs) =
     let fieldNameText = resolvedToText fieldName
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx'{ctxCollectedDefs = defs} fieldTy
@@ -315,7 +343,7 @@ enumWithPayloads ctx' desc constructors =
      in (objSchema : acc, newDefs)
 
   addConField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
-  addConField ctx'' (MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans) (acc, defs) =
+  addConField ctx'' (MkTypedName fieldAnn fieldName fieldTy _ mTypically _mMeans) (acc, defs) =
     let fieldNameText = resolvedToText fieldName
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx''{ctxCollectedDefs = defs} fieldTy

@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+inline-one-of-one-line.l4:26:1-58:
+  assertion satisfied
+inline-one-of-one-line.l4:27:1-30:
+  assertion satisfied

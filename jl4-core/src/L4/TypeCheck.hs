@@ -131,7 +131,7 @@ import Data.Function (on)
 import Control.Exception (assert)
 import Data.Char (isPrint)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarInlineOptions, desugarSectionGivens, detectComputedFieldCycles, detectEmptyInlineOptions, detectInlineOptionsInParameterisedTypes, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, inlineOptionsKey, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -200,6 +200,19 @@ doCheckProgramWithDependencies checkState checkEnv program =
         | (recName, cycleFlds) <- detectComputedFieldCycles program
         ]
         ++
+        -- A field's inline ONE OF in a declaration with a type parameter: the
+        -- lifted type would need the parameter. Reported here, at the ONE OF,
+        -- because the parser cannot see the declaration's parameters from
+        -- the field.
+        [ MkCheckErrorWithContext (InlineOptionsInParameterisedType r declName fieldName) None
+        | (declName, fieldName, r) <- detectInlineOptionsInParameterisedTypes program
+        ]
+        ++
+        -- An inline ONE OF with nothing after it, followed by the next field.
+        [ MkCheckErrorWithContext (CheckWarning (EmptyInlineOptions r fieldName)) None
+        | (fieldName, r) <- detectEmptyInlineOptions program
+        ]
+        ++
         -- The dedent hazard of R4: a section binder pushed back to column 1
         -- silently becomes the next declaration's parameter. Reported only
         -- where the declaration makes no use of the name at all, which is the
@@ -261,10 +274,19 @@ doCheckProgramWithDependencies checkState checkEnv program =
       -- which the elaboration leaves in place. Its record table is read off
       -- the ORIGINAL module and the import environment, so computed fields —
       -- which the first pass strips from their DECLARE — are still in it.
+      --
+      -- A field's inline ONE OF is lifted FIRST, before the computed fields, so
+      -- that a computed field whose type is listed inline gets a synthetic
+      -- DECIDE whose GIVETH already names the lifted type. The lifted DECLAREs
+      -- only ever go before the declaration they came from, so this pass does
+      -- not interfere with the other two either. The candidates an opened
+      -- field may shadow are read off the lifted module, because a lifted
+      -- list's 0-ary constructors are constructors like any other.
+      inlinedProgram = desugarInlineOptions program
       (desugaredProgram, fieldCollisions, fieldShadows) =
         openFields (recordFieldTable checkEnv.entityInfo program)
-          (shadowCandidates checkEnv.entityInfo program)
-          (desugarSectionGivens (desugarComputedFields program))
+          (shadowCandidates checkEnv.entityInfo inlinedProgram)
+          (desugarSectionGivens (desugarComputedFields inlinedProgram))
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
         , sectionBinderNames = collectSectionBinderNames program
@@ -820,9 +842,23 @@ checkFieldDefaults t (MkDeclare dann dsig daf rt) =
     _ -> pure rt
  where
   conFields (MkConDecl _ _ tns) (MkConDecl cann cn rtns) = MkConDecl cann cn <$> fields tns rtns
-  fields = zipWithM \ (MkTypedName _ n _ mTypically _) (MkTypedName fann fn fty _ fmeans) -> do
+  fields = zipWithM \ tn@(MkTypedName _ n _ mOptions mTypically _) (MkTypedName fann fn fty _ _ fmeans) -> do
     rTypically <- checkTypically n fty mTypically
-    pure (MkTypedName fann fn fty rTypically fmeans)
+    rOptions <- maybe (pure Nothing) (const (liftedOptions tn)) mOptions
+    pure (MkTypedName fann fn fty rOptions rTypically fmeans)
+  -- A field written @IS ONE OF …@ gets the checked constructors of the
+  -- declaration 'desugarInlineOptions' lifted out of it, so that the checked
+  -- field still holds its options where the author wrote them (Note [Inline
+  -- ONE OF on a field], "L4.Syntax"). They are the lifted declaration's own
+  -- nodes, with its uniques, types and @\@nlg@, and with the field's source
+  -- annotations, which the lifted declaration was made with. If that
+  -- declaration did not check, the field keeps no options and the reason is
+  -- reported there.
+  liftedOptions tn = do
+    lifted <- asks (.declareDeclarations)
+    pure case rangeOf (inlineOptionsKey tn) >>= flip Map.lookup lifted of
+      Just MkDeclChecked { payload = MkDeclare _ _ _ (EnumDecl _ rcds) } -> Just rcds
+      _ -> Nothing
 
 -- | Where an 'Assume' node came from. Only an author-written @ASSUME@ is the
 -- deprecated spelling; the 0-ary @ASSUME@ that 'desugarSectionGivens' prepends
@@ -2283,7 +2319,7 @@ inferConDecl rappForm (MkConDecl ann n tns) = do
   pure (condecl, conCheckInfo : concat extends)
 
 typedNameOptionallyNamedType :: TypedName n -> OptionallyNamedType n
-typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emptyAnno (Just n) t
+typedNameOptionallyNamedType (MkTypedName _ n t _ _ _) = MkOptionallyNamedType emptyAnno (Just n) t
 
 -- | Type-check a TYPICALLY default value against the declared type of its binder.
 -- TYPICALLY is metadata only: we resolve and type-check the stored default,
@@ -2330,8 +2366,10 @@ rejectTypicallyOnType _ Nothing  = pure Nothing
 rejectTypicallyOnType n (Just _) = Nothing <$ addError (TypicallyOnTypeVariable n)
 
 inferSelector :: AppForm Resolved -> TypedName Name -> Check (TypedName Resolved, [CheckInfo])
-inferSelector rappForm (MkTypedName ann n t _mTypically _mMeans) = do
-  rt <- inferType t
+inferSelector rappForm (MkTypedName ann n t mOptions _mTypically _mMeans) = do
+  rt <- case (mOptions, t) of
+    (Just _, TyApp tann tn []) -> inferInlineOptionsType ann n tann tn
+    _                          -> inferType t
   -- The field's TYPICALLY is checked in phase 4, by 'checkFieldDefaults':
   -- here no constructor is in scope yet, so an enum default cannot resolve.
   let rTypically = Nothing
@@ -2348,7 +2386,33 @@ inferSelector rappForm (MkTypedName ann n t _mTypically _mMeans) = do
   -- are (#921): @`Section`.w@ must name the field wherever @w@ would. Aliases
   -- only, as for constructors (see 'addQualifiedAliases').
   selCheckInfo <- addQualifiedAliases (makeKnown dn selectorInfo)
-  pure (MkTypedName ann dn rt rTypically Nothing, [selCheckInfo])
+  pure (MkTypedName ann dn rt Nothing rTypically Nothing, [selCheckInfo])
+
+-- | The type of a field written @IS ONE OF …@: the enum 'desugarInlineOptions'
+-- lifted out of it, named @`Plot's tenure`@ or @`Holding's Lease's term`@ and
+-- declared in the field's own section.
+--
+-- Resolved here rather than by 'inferType' so that a second type of the same
+-- name, as near to the field as the lifted one, is reported once, at the
+-- field, with the generated name and where the other is declared, instead of
+-- as an ambiguity at a name the author never wrote (INLINE-ONE-OF-FIELD-SPEC
+-- §6 item 8). The field's type is then the lifted one regardless, so nothing
+-- else about the field is reported twice. A type of the same name in another
+-- section is not a clash: the lifted one is nearer, which is what
+-- 'resolveType' would have chosen too. One in an imported module IS reported,
+-- as for any same-named type: an import is as near as the module's own
+-- declarations (review round 1, finding 4).
+inferInlineOptionsType :: Anno -> Name -> Anno -> Name -> Check (Type' Resolved)
+inferInlineOptionsType fieldAnn field tann tn = do
+  candidates <- sequenceA =<< resolveTypeCandidates tn
+  let isLifted (r, _) = rangeOf (getOriginal r) == rangeOf tn
+  case List.partition isLifted candidates of
+    ((r, _) : _, others) -> do
+      unless (null others) do
+        others' <- traverse (sectionQualified . fst) others
+        addError (InlineOptionsNameClash (rangeOf fieldAnn) field (rawName tn) others')
+      pure (TyApp tann r [])
+    ([], _) -> inferType (TyApp tann tn [])
 
 -- | Infers / checks a type to be of kind TYPE.
 inferType :: Type' Name -> Check (Type' Resolved)
@@ -2391,6 +2455,27 @@ checkKind kind xs
 
 resolveType :: Name -> Check (Resolved, Kind)
 resolveType n = do
+  cands <- resolveTypeCandidates n
+  case cands of
+    [] -> do
+      let kind = 0
+      n' <- setAnnResolvedKind kind n
+      rn <- outOfScope n' (Type emptyAnno)
+      pure (rn, kind)
+    [x] -> x
+    xs -> choose xs <|> do
+      let kind = 0
+      n' <- setAnnResolvedKind kind n
+      xs' <- sequenceA xs
+      rn <- ambiguousType n' xs'
+      pure (rn, kind)
+
+-- | The type bindings a type name could resolve to from here, nearest first
+-- and after the section-proximity choice 'resolveType' makes: one means the
+-- name is resolved, none that it is out of scope, more than one that it is
+-- ambiguous.
+resolveTypeCandidates :: Name -> Check [Check (Resolved, Kind)]
+resolveTypeCandidates n = do
   options <- lookupRawNameInEnvironment (rawName n)
   -- Lexical scoping for type names: same nearest-enclosing-section preference
   -- as 'resolveTerm''. Types and terms scope identically.
@@ -2405,19 +2490,7 @@ resolveType n = do
         case [ c | c@(_, u, _) <- viable, u `Set.member` locals ] of
           []            -> viable
           localsInScope -> localsInScope
-  case selectByProximityPerType curUri current paths candidates of
-    [] -> do
-      let kind = 0
-      n' <- setAnnResolvedKind kind n
-      rn <- outOfScope n' (Type emptyAnno)
-      pure (rn, kind)
-    [x] -> x
-    xs -> choose xs <|> do
-      let kind = 0
-      n' <- setAnnResolvedKind kind n
-      xs' <- sequenceA xs
-      rn <- ambiguousType n' xs'
-      pure (rn, kind)
+  pure (selectByProximityPerType curUri current paths candidates)
   where
     -- Group by kind so that same-kinded type bindings shadow lexically while
     -- differently-kinded ones remain available for resolution.
@@ -7944,6 +8017,27 @@ prettyCheckError (CyclicComputedFields _recName cycleFlds) =
   , "Break the cycle by making one of these a stored field"
   , "or restructuring the dependencies."
   ]
+prettyCheckError (InlineOptionsNameClash _ field generated others) =
+  [ "The options of the field " <> quotedName field <> " are given the type name"
+  , ""
+  , "  " <> prettyLayout (MkName emptyAnno generated)
+  , ""
+  , "and that name is already used here:"
+  , ""
+  ] ++ map (\ r -> "  " <> prettyResolvedWithRange r) others ++
+  [ ""
+  , "Rename one of them. If a rule needs the options by name, you can also"
+  , "declare them yourself with DECLARE ... IS ONE OF ..., under a name you"
+  , "choose, and give the field that type."
+  ]
+prettyCheckError (InlineOptionsInParameterisedType _ decl field) =
+  [ "The options of the field " <> quotedName field <> " cannot be listed with ONE OF here,"
+  , "because " <> quotedName decl <> " takes a type as an input, and the type that L4"
+  , "makes for the options would need that input too."
+  , ""
+  , "Declare the options with DECLARE, as in DECLARE Tenure IS ONE OF Owner, Tenant,"
+  , "and give the field that type."
+  ]
 prettyCheckError (SuppliedComputedField fieldName) =
   [ "The field " <> quotedName fieldName <> " is a computed field"
   , "and cannot be supplied in a record constructor."
@@ -8315,6 +8409,13 @@ prettyCheckWarning = \ case
     , "  a OP b MEANS ..."
     , ""
     , "where a and b are the GIVEN inputs."
+    ]
+  EmptyInlineOptions _ field ->
+    [ "The field " <> quotedName field <> " is written IS ONE OF, but no options follow,"
+    , "so no value can ever be given for it, and no record that has it can be made."
+    , ""
+    , "List the options after ONE OF, on the same line or each on a line of its own,"
+    , "or give the field a type."
     ]
   DeprecatedExactly info -> case info.advice of
     DropTheKeyword line ->

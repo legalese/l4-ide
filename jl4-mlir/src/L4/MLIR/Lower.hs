@@ -1221,10 +1221,10 @@ lowerDeclare (MkDeclare _ _ appForm typeDecl) = do
                                 -- of an ASSUMEd type did (no Declare to read).
   where
     fieldName :: TypedName Resolved -> Text
-    fieldName (MkTypedName _ n _ _ _) = resolvedName n
+    fieldName (MkTypedName _ n _ _ _ _) = resolvedName n
 
     fieldType :: TypedName Resolved -> Type' Resolved
-    fieldType (MkTypedName _ _ ty _ _) = ty
+    fieldType (MkTypedName _ _ ty _ _ _) = ty
 
 -- ---------------------------------------------------------------------------
 -- Function/decision lowering
