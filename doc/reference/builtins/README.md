@@ -2,13 +2,15 @@
 
 Built-in functions are part of the language, so they work in every file without an `IMPORT`. Functions that come from a library, such as `map`, `sum` or `Date`, are listed under [Standard libraries](../libraries/README.md).
 
+A built-in whose name has several words is written in backquotes, like any other name with spaces: `` `IS INTEGER` 3 ``, `` `EVER BETWEEN` start end predicate ``. Without them, `IS INTEGER 3` is a parse error.
+
 Operators (`+`, `AND`, `EQUALS`, `UNLESS`, `FOLLOWED BY` and the rest) are described under [Operators](../operators/README.md). The conversions `TOSTRING`, `TONUMBER`, `TODATE`, `TOTIME`, `TODATETIME` and `AS STRING` are described under [Coercions](../types/coercions.md).
 
 ## Numbers
 
 | Function            | Inputs         | Gives   | What it does                                                                                                                                                   |
 | ------------------- | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IS INTEGER`        | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
+| `` `IS INTEGER` ``  | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
 | `FLOOR`             | NUMBER         | NUMBER  | Rounds down to a whole number                                                                                                                                  |
 | `CEILING`           | NUMBER         | NUMBER  | Rounds up to a whole number                                                                                                                                    |
 | `ROUND`             | NUMBER         | NUMBER  | Rounds to the nearest whole number; a half goes to the even number, so 2.5 gives 2 and 3.5 gives 4                                                             |
@@ -93,22 +95,22 @@ These functions change the date at which an expression is evaluated. While a pre
 
 **Example:** [temporal-example.l4](temporal-example.l4)
 
-| Function         | Inputs                                    | Gives      | What it does                                                                                              |
-| ---------------- | ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
-| `EVER BETWEEN`   | DATE, DATE, FUNCTION FROM DATE TO BOOLEAN | BOOLEAN    | TRUE if the predicate holds on any day from the start to the end; FALSE if the start is after the end     |
-| `ALWAYS BETWEEN` | DATE, DATE, FUNCTION FROM DATE TO BOOLEAN | BOOLEAN    | TRUE if the predicate holds on every day from the start to the end; TRUE if the start is after the end    |
-| `WHEN LAST`      | DATE, FUNCTION FROM DATE TO BOOLEAN       | MAYBE DATE | The latest day on or before the date on which the predicate holds, or `NOTHING`                           |
-| `WHEN NEXT`      | DATE, FUNCTION FROM DATE TO BOOLEAN       | MAYBE DATE | The earliest day on or after the date on which the predicate holds (up to 31 December 9999), or `NOTHING` |
-| `VALUE AT`       | DATE, FUNCTION FROM DATE TO a             | a          | The function evaluated at the date, with the valid time and rules date set to it                          |
+| Function               | Inputs                                    | Gives      | What it does                                                                                              |
+| ---------------------- | ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
+| `` `EVER BETWEEN` ``   | DATE, DATE, FUNCTION FROM DATE TO BOOLEAN | BOOLEAN    | TRUE if the predicate holds on any day from the start to the end; FALSE if the start is after the end     |
+| `` `ALWAYS BETWEEN` `` | DATE, DATE, FUNCTION FROM DATE TO BOOLEAN | BOOLEAN    | TRUE if the predicate holds on every day from the start to the end; TRUE if the start is after the end    |
+| `` `WHEN LAST` ``      | DATE, FUNCTION FROM DATE TO BOOLEAN       | MAYBE DATE | The latest day on or before the date on which the predicate holds, or `NOTHING`                           |
+| `` `WHEN NEXT` ``      | DATE, FUNCTION FROM DATE TO BOOLEAN       | MAYBE DATE | The earliest day on or after the date on which the predicate holds (up to 31 December 9999), or `NOTHING` |
+| `` `VALUE AT` ``       | DATE, FUNCTION FROM DATE TO a             | a          | The function evaluated at the date, with the valid time and rules date set to it                          |
 
 The `EVAL ...` functions evaluate an expression in a different temporal setting and then restore the original one. The first input is a serial number (see `DATE_SERIAL` and `DATETIME_SERIAL`); the second is the expression.
 
-| Function                        | Inputs    | Gives | What it does                                                         |
-| ------------------------------- | --------- | ----- | -------------------------------------------------------------------- |
-| `EVAL AS OF SYSTEM TIME`        | NUMBER, a | a     | Evaluates as if the system time were the given moment                |
-| `EVAL UNDER VALID TIME`         | NUMBER, a | a     | Evaluates with the valid time set to the given date                  |
-| `EVAL UNDER RULES EFFECTIVE AT` | NUMBER, a | a     | Evaluates under the version of the rules in effect on the given date |
-| `EVAL UNDER RULES ENCODED AT`   | NUMBER, a | a     | Evaluates under the rules as they were written at the given moment   |
+| Function                              | Inputs    | Gives | What it does                                                         |
+| ------------------------------------- | --------- | ----- | -------------------------------------------------------------------- |
+| `` `EVAL AS OF SYSTEM TIME` ``        | NUMBER, a | a     | Evaluates as if the system time were the given moment                |
+| `` `EVAL UNDER VALID TIME` ``         | NUMBER, a | a     | Evaluates with the valid time set to the given date                  |
+| `` `EVAL UNDER RULES EFFECTIVE AT` `` | NUMBER, a | a     | Evaluates under the version of the rules in effect on the given date |
+| `` `EVAL UNDER RULES ENCODED AT` ``   | NUMBER, a | a     | Evaluates under the rules as they were written at the given moment   |
 
 ## Regulative traces
 
