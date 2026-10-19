@@ -281,6 +281,17 @@ Each slot is filled with the input's name in the definition itself, and with the
 • The deadline means whichever is larger of start date and end date.
 ```
 
+A slot is **tight**: `%amount%`, with no spaces inside the delimiters.
+That is what keeps a written-out percentage from being mistaken for one.
+In
+
+```l4
+@nlg a 5% levy on %amount%
+```
+
+the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot; `%amount%` still is one.
+Where a percent sign would end up flush against a word, as in `5%levy`, wrap it in backticks (`` `5%` ``) or spell it out ("5 percent"), either of which puts it beyond doubt.
+
 **It replaces the body.** A function with `@nlg` renders as its sentence, not as its implementation. That is what makes recursive library functions readable; the prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so a call reads as a sentence instead of exposing the recursion.
 
 | Situation                                            | Why `@nlg` helps                                   |
