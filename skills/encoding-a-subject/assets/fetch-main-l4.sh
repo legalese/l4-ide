@@ -24,6 +24,10 @@
 # With a cold cache and no network it exits 4. To pin a build, give BUILD (check.sh passes
 # L4_MAIN_BUILD through).
 #
+# A build older than 98, the build references/dialects.md is measured at, is still fetched (give
+# BUILD, or fall back to an old cached build) but with a warning on stderr: the page's rows may
+# not describe it.
+#
 # Platforms with a main binary: darwin-arm64, linux-x64, linux-arm64. On any other platform
 # (Intel macOS, Windows, anything else) this exits 3 and fetches nothing: there is no main build
 # to run, so there is no main check to make, and the caller must say so rather than skip it.
@@ -32,9 +36,11 @@
 # jl4-service-linux-x64.sha256, which is for another file). And this script RUNS the downloaded
 # binary, `l4 --version`, before it reports the path, to see that it is a main build. So the
 # download is trusted to the extent GitHub's release page for legalese/l4-ide is. What it does to
-# limit the damage from a bad package: it takes only the one named zip member, refuses it unless
-# it is a regular file (not a symlink or a directory), checks the path it extracted to, and does
-# not cache a binary whose `--version` is not a main build's.
+# limit the damage from a bad package: it takes only the one named zip member, refuses it if the
+# package marks it as anything but a regular file (a symlink, a directory; an entry with no Unix
+# type bits at all is accepted, because that is not a link), checks that what it extracted is a
+# regular file reached through real directories, and does not cache a binary whose `--version` is
+# not a main build's. A package unzip cannot read is reported as truncated or corrupt.
 #
 # Uses `gh` when it is installed and works; otherwise `curl` against the public release API.
 # The only network calls are GitHub's release endpoints: the list of releases, one release, one
@@ -50,9 +56,12 @@ LOOKBACK=5
 # The first main build that answers `l4 --version` (the flag landed on 2026-10-15). A build older
 # than this may print nothing for it; a newer one that does is not a real main build.
 FIRST_VERSIONED=97
+# The build references/dialects.md is measured at. Keep it in step with that page's header.
+MINIMUM=98
 
 die() { echo "fetch-main-l4: $1" >&2; exit "${2:-4}"; }
 warn() { echo "fetch-main-l4: warning: $1" >&2; }
+old_note() { warn "build $1 is older than $MINIMUM, the minimum references/dialects.md is measured at; its rows may not describe it."; }
 
 case "${1:-}" in
   -h|--help) sed -n '2,/^set -u/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//' >&2; exit 0 ;;
@@ -89,6 +98,8 @@ want="${want#"$TAG_PREFIX"}"
 if [ $# -eq 1 ]; then
   case "$want" in ""|*[!0-9]*) die "BUILD must be a number such as 97 or a tag such as ${TAG_PREFIX}97, not '$1'." 2 ;; esac
 fi
+
+[ -z "$want" ] || [ "$want" -ge "$MINIMUM" ] || old_note "$want"
 
 work=""
 trap '[ -n "$work" ] && rm -rf -- "$work"' EXIT
@@ -142,10 +153,19 @@ fetch_build() {
 
   # --- take out the one binary, and only if it is a regular file ------------------------------
   member="extension/bin/${platform}/l4"
+  if ! listing="$(unzip -Z -1 "$vsix" 2>/dev/null)"; then
+    echo "fetch-main-l4: $tag's package is truncated or corrupt: unzip cannot read it." >&2
+    return 8
+  fi
+  if ! printf '%s\n' "$listing" | grep -qxF "$member"; then
+    echo "fetch-main-l4: $tag's package has no $member." >&2
+    return 8
+  fi
   entry="$(unzip -Z "$vsix" "$member" 2>/dev/null | head -n 1)"
   case "$entry" in
     -*) ;;
-    "") echo "fetch-main-l4: $tag's package has no $member." >&2; return 8 ;;
+    # No Unix type bits (a package made on another system): not a link, so go on to the checks of what is on disk.
+    \?*) ;;
     *)  echo "fetch-main-l4: $tag's $member is not a regular file in the package (its entry reads '$(printf '%s' "$entry" | cut -c1-60)'). Refusing it." >&2; return 8 ;;
   esac
   mkdir "$work/x" || die "cannot make a directory under $work" 4
@@ -209,6 +229,7 @@ if [ -z "$numbers" ]; then
   cached="$(ls "$root" 2>/dev/null | grep -E '^[0-9]+$' | sort -n | tail -n 1)"
   if [ -n "$cached" ] && [ -x "$root/$cached/l4" ]; then
     warn "could not look up the newest release (network failure?); using the newest build already cached, ${TAG_PREFIX}${cached}. It may not be the newest main build."
+    [ "$cached" -ge "$MINIMUM" ] || old_note "$cached"
     printf '%s\n' "$root/$cached/l4"
     exit 0
   fi
@@ -220,6 +241,7 @@ for n in $numbers; do
   fetch_build "$n"; rc=$?
   if [ "$rc" = 0 ]; then
     [ "$n" = "$newest" ] || warn "${TAG_PREFIX}${newest} has no package for $platform; used the next older release that has one, ${TAG_PREFIX}${n}."
+    [ "$n" -ge "$MINIMUM" ] || old_note "$n"
     exit 0
   fi
   [ "$rc" = 5 ] || fail_with "${TAG_PREFIX}${n}" "$rc"
