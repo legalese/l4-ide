@@ -32,6 +32,13 @@
 # a MAY with a LEST lapses to BREACH on unstable and to FULFILLED on main). A trace is compared by
 # running it with both builds and reading the two outcomes; this script will not tell you.
 #
+# TWO RUNS, THE SAME ENVIRONMENT. With the target main every module is run twice with `l4 run`,
+# once with your l4 and once with the main build (in the module's directory), and both get your
+# environment except that the main run has JL4_LIBRARY_PATH unset. A module that FETCHes or POSTs
+# over the network, or reads ENV, does that twice, once with main. For such a module use
+# L4_TARGET=unstable and compare by hand, or keep it out of the directory you check against main.
+# The comparison is of COUNTS: equal counts can hide a different assertion failing on each side.
+#
 # Usage:  check.sh [DIR]          (DIR defaults to the directory this script is in)
 # Env:    L4         the l4 binary you write with        (default: `l4` on PATH)
 #         L4_TARGET  main | unstable                    (default: main)
@@ -40,6 +47,7 @@
 #         L4_MAIN    the path of a main-build l4         (default: whatever fetch-main-l4.sh,
 #                    next to this script, prints: the newest main build, cached)
 #         L4_FETCH   a fetch-main-l4.sh somewhere else   (default: next to this script)
+#         L4_MAIN_BUILD  a main build number for fetch-main-l4.sh to fetch instead of the newest
 #         L4_MAIN_TIMEOUT  seconds each module may take on the main build (default: 300; 0 = no limit).
 #                    A module that main cannot finish in that time is red: main is the compiler
 #                    that has to read it. Your own l4 is never timed.
@@ -71,11 +79,32 @@ first_error() {
       if (line ~ /^ *$/) next
       sub(/^ +/, "", line); sub(/ +$/, "", line)
       text = text (taken ? " " : "") line; taken++
-      if (taken >= ((src == "parser" || src == "lexer") ? 1 : 3)) exit
+      if (taken >= ((src == "parser" || src == "lexer" || src ~ /^file:/) ? 1 : 3)) exit
     }
-    END { if (found) printf "%s %s: %s\n", (src == "parser" || src == "lexer") ? "parse" : ((src == "check") ? "type" : src), rng, substr(text, 1, 150) }
+    END { if (found) printf "%s %s: %s\n", (src == "parser" || src == "lexer") ? "parse" : ((src == "check") ? "type" : ((src ~ /^file:/) ? "import" : src)), rng, substr(text, 1, 150) }
   '
 }
+
+# The main run is a child (and, for a wrapper-style binary, a tree of them) plus a watchdog that
+# sleeps for L4_MAIN_TIMEOUT. However this script ends, including by SIGINT, SIGTERM or SIGHUP,
+# what it started is killed and its temporary file removed.
+kill_tree() { # kill_tree PID: PID and everything it started, children first, quietly
+  local c
+  if command -v pgrep >/dev/null 2>&1; then
+    for c in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$c"; done
+  fi
+  kill -9 "$1" 2>/dev/null
+}
+mpid="" wd="" mtmp=""
+cleanup() {
+  if [ -n "$wd" ]; then kill_tree "$wd"; wd=""; fi
+  if [ -n "$mpid" ]; then kill_tree "$mpid"; mpid=""; fi
+  if [ -n "$mtmp" ]; then rm -f -- "$mtmp" "$mtmp.timeout"; mtmp=""; fi
+}
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+trap 'cleanup; exit 129' HUP
 
 # A module that is MEANT to fail (a draft's test cases run against the text as made,
 # say) is listed here with its exact count, and named in encoding.json `expected_red`.
@@ -103,6 +132,9 @@ MAIN="" MAIN_VERSION=""
 case "$TARGET" in
   unstable) echo "check.sh: the target is unstable, so the main check was skipped." >&2 ;;
   main)
+    case "$MAIN_TIMEOUT" in
+      ""|*[!0-9]*) echo "check.sh: L4_MAIN_TIMEOUT must be a number of seconds, not '$MAIN_TIMEOUT'." >&2; exit 2 ;;
+    esac
     MAIN="${L4_MAIN:-}"
     if [ -z "$MAIN" ]; then
       fetch="${L4_FETCH:-$HERE/fetch-main-l4.sh}"
@@ -113,7 +145,7 @@ case "$TARGET" in
         echo "          A run with this step missing is not a full check; if the brief says the target is unstable, set L4_TARGET=unstable." >&2
         exit 2
       fi
-      MAIN="$("$fetch")" || {
+      MAIN="$("$fetch" ${L4_MAIN_BUILD:+"$L4_MAIN_BUILD"})" || {
         echo "check.sh: the target is main, and fetch-main-l4.sh could not get a main-build l4 (its message is above)." >&2
         echo "          A run with this step missing is not a full check. Set L4_MAIN=/path/to/a/main/l4 to supply one;" >&2
         echo "          if the brief says the target is unstable, set L4_TARGET=unstable." >&2
@@ -142,9 +174,6 @@ case "$TARGET" in
   *)
     echo "check.sh: L4_TARGET must be main or unstable, not '$TARGET'." >&2
     exit 2 ;;
-esac
-case "$MAIN_TIMEOUT" in
-  ""|*[!0-9]*) echo "check.sh: L4_MAIN_TIMEOUT must be a number of seconds, not '$MAIN_TIMEOUT'." >&2; exit 2 ;;
 esac
 
 status=0 total_err=0 total_ok=0 total_bad=0 total_ref=0 n=0
@@ -181,14 +210,15 @@ for f in "$DIR"/*.l4; do
     mpid=$!
     wd=""
     if [ "$MAIN_TIMEOUT" -gt 0 ]; then
-      ( sleep "$MAIN_TIMEOUT"; kill -9 "$mpid" 2>/dev/null && touch "$mtmp.timeout" ) >/dev/null 2>&1 &
+      ( sleep "$MAIN_TIMEOUT"; kill_tree "$mpid" && touch "$mtmp.timeout" ) >/dev/null 2>&1 &
       wd=$!
     fi
     wait "$mpid" 2>/dev/null; mrc=$?
-    if [ -n "$wd" ]; then pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null; fi
+    mpid=""
+    if [ -n "$wd" ]; then kill_tree "$wd"; wait "$wd" 2>/dev/null; wd=""; fi
     timedout=0; [ -e "$mtmp.timeout" ] && timedout=1
     mout="$(tr -d '\000' <"$mtmp")"
-    rm -f -- "${mtmp:?}" "${mtmp:?}.timeout"
+    rm -f -- "$mtmp" "$mtmp.timeout"; mtmp=""
     if [ "$timedout" = 0 ] && ! produced_output "$mout"; then
       echo "check.sh: the main build ('$MAIN') printed nothing it recognises for $m (it exited $mrc), so the main step could not run. A run with this step missing is not a full check." >&2
       exit 2

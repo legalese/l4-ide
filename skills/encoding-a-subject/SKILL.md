@@ -124,6 +124,7 @@ Run it after every unit you land. Report the numbers it prints, never "it's gree
 Unless you set `L4_TARGET=unstable`, `check.sh` runs every module with a main build as well as with your `l4`, and compares the four counts.
 Copy [`assets/fetch-main-l4.sh`](assets/fetch-main-l4.sh) beside it: `check.sh` calls that to get the newest main build, and caches it.
 A line that ends `reads differently on main` is a module `main` cannot read as it stands; `writing-l4-rules/references/dialects.md` says what to write instead.
+Every module is run twice, once with each build, with your environment (a module that fetches over the network or reads `ENV` does that twice), and the comparison is of counts, not of which assertion fails; the header of `check.sh` says what to do about both.
 Exit status 2 means the main step did not run (no main build for your platform, no network, no `fetch-main-l4.sh`), and that is not a pass.
 A module `main` does not finish within `L4_MAIN_TIMEOUT` seconds (300 unless you set it) is red as well: `main` is the compiler that has to read it, and some modules that run in a second on `unstable` take minutes on `main`.
 The check counts error diagnostics and assertion lines and nothing else.

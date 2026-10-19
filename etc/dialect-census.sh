@@ -21,7 +21,7 @@
 #
 #       <path relative to dir>  <kind>  <line:col>  <first error, on one line>
 #
-#   kind is `parse` (the parser rejected the text), `type` (the type checker did), or `crash` (non-zero exit, no error block).
+#   kind is `parse` (the parser rejected the text), `type` (the type checker did), `import` (a module could not be found), or `crash` (non-zero exit, no error block).
 #   The last line is a summary: `census: <n> files, <m> fail (<binary version line>)`.
 #   It exits 0 whatever it finds; it reports, it does not gate.
 #
@@ -96,11 +96,12 @@ while IFS= read -r -d '' f; do
   case "$src" in
     parser|lexer) kind=parse ;;
     check) kind=type ;;
+    file:*) kind=import ;;
     *) kind="${src:-other}" ;;
   esac
   # The message text on one line. A parse error: the line under the caret row ("unexpected X"; the "expecting ..." list is dropped).
   # A type error: the first three non-blank lines, which usually carry the quoted name, cut to 150 characters.
-  limit=3; [ "$kind" = parse ] && limit=1
+  limit=3; [ "$kind" = parse ] || [ "$kind" = import ] && limit=1
   msg="$(printf '%s\n' "$block" | awk -F'\t' -v limit="$limit" '
     $1 == "MSG" {
       line = substr($0, 5)
