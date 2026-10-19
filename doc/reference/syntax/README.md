@@ -87,7 +87,7 @@ DECIDE `is large` IF amount GREATER THAN 100
 
 **Trailing a line, it describes what is on that line.**
 **Starting a line of its own, it describes what follows.**
-That holds whether the thing is a rule, an input, a field or a type declaration.
+That holds whether the thing is a rule, an input, a field or a type declaration, with one exception, for a list of fields, below.
 
 **Put a rule's sentence trailing its head, or on its own line between its `GIVEN` block and the `DECIDE`, never above the `GIVEN`.**
 An annotation on its own line above a `GIVEN` is not the rule's, because the `GIVEN` comes between them.
@@ -103,6 +103,19 @@ L4 drops it and warns instead.
 
 **A record field can carry two.**
 `head [the first item] IS AN a [an element]` glosses the field and its type separately, because each annotation sits with the token it follows.
+
+**A field list is an exception to "own line describes what follows".**
+Underneath a field, an annotation describes _that_ field, the one above it, not the next one:
+
+```l4
+DECLARE Employee
+  HAS `full name`  IS A STRING
+      -- describes `full name`
+      @nlg the employee's full name
+      `start date` IS A DATE
+```
+
+A field list is a column of things rather than a sequence of declarations, and writing the gloss under the field it belongs to is what authors do.
 
 #### Writing a literal `%` or `]`
 
