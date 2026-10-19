@@ -77,8 +77,8 @@ nlgProse src =
       pure (map proseOf (reverse pstate.nlgs))
  where
   proseOf = \ case
-    MkParsedNlg _ frags   -> Text.concat [t | MkNlgText _ t <- frags]
-    MkResolvedNlg _ frags -> Text.concat [t | MkNlgText _ t <- frags]
+    MkParsedNlg _ _ frags   -> Text.concat [t | MkNlgText _ t <- frags]
+    MkResolvedNlg _ _ frags -> Text.concat [t | MkNlgText _ t <- frags]
     MkInvalidNlg{}        -> "<invalid>"
 
 decide :: Text -> Text

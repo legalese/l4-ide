@@ -44,7 +44,7 @@ nlgRefs src = do
   -- arrives later, from the type checker.
   refsOf :: Nlg -> [Text]
   refsOf = \ case
-    MkParsedNlg _ frags -> [nameToText n | MkNlgRef _ n <- frags]
+    MkParsedNlg _ _ frags -> [nameToText n | MkNlgRef _ n <- frags]
     MkResolvedNlg{}     -> []
     MkInvalidNlg{}      -> []
 
@@ -70,7 +70,7 @@ nlgFrags src = do
  where
   fragsOf :: Nlg -> [Text]
   fragsOf = \ case
-    MkParsedNlg _ frags -> [ f | Just f <- map render frags ]
+    MkParsedNlg _ _ frags -> [ f | Just f <- map render frags ]
     MkResolvedNlg{}     -> []
     MkInvalidNlg{}      -> []
 
