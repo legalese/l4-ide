@@ -15,6 +15,7 @@ module L4.Parser (
   mkPError,
   PState (..),
   langTagOfToken,
+  declaredModuleLang,
   redundantLangEnRanges,
   MixfixHintRegistry,
   buildMixfixHintRegistry,
@@ -133,6 +134,23 @@ langTagOfToken :: TokenType -> Maybe LangTag
 langTagOfToken = \ case
   TAnnotations (TLang tag _) -> Just tag
   _ -> Nothing
+
+-- | A module's declared @\@lang@, read straight off its token stream, or
+-- 'Nothing' when it declares none.
+--
+-- The LAST declaration in source order wins, which is the same rule
+-- 'execParserForTokensWithHints' applies below: it takes @listToMaybe
+-- pstate.langs@, and 'addLang' accumulates by prepending, so that head IS the
+-- last one written. Stated in both places because the two have different
+-- inputs (a token list here, the parser state there).
+--
+-- This exists because a consumer downstream of the parse — @l4 render@, which
+-- labels its HTML @<html lang="…">@ — needs the declaration itself, not its
+-- effect on annotations. The effect ('withDefaultLang') is unrecoverable for a
+-- module that declares a language and carries no @\@nlg@ at all.
+declaredModuleLang :: [PosToken] -> Maybe LangTag
+declaredModuleLang ts =
+  listToMaybe [ tag | t <- reverse ts, Just tag <- [langTagOfToken t.payload] ]
 
 -- | The ranges of the @\@lang en@ lines that say nothing the module does not
 -- already say, read off the token stream.

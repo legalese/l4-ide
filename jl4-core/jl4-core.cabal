@@ -186,6 +186,7 @@ test-suite jl4-core-test
     DisambiguationWarningsSpec
     NumberLiteralSpec
     NlgLangTagSpec
+    RenderLangDirSpec
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec
