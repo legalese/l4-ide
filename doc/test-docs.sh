@@ -480,6 +480,8 @@ for old, new in json.load(open(sys.argv[1])).items():
 
     while IFS=$'\t' read -r old new; do
         [[ -z "$old" ]] && continue
+        # Python on Windows ends its lines with CRLF
+        new="${new%$'\r'}"
         new_slug="${new%%#*}"
         anchor=""
         [[ "$new" == *"#"* ]] && anchor="${new#*#}"
