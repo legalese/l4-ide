@@ -459,7 +459,7 @@ dmnDrgFor opts tcRes = do
             -- extracts them identically, so the two cannot drift).
             , dloMissingMatchRanges =
                 [ r
-                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _)) _) <- tcRes.infos
+                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <- tcRes.infos
                 , Just r <- [rangeOf e]
                 ]
             -- L1's Decide-level channel: the clause-matrix warnings for

@@ -4314,7 +4314,7 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                 , dloIncludeTests = False
                 , dloMissingMatchRanges =
                     [ r
-                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _)) _) <-
+                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <-
                         tc.tcdErrors
                     , Just r <- [rangeOf e]
                     ]

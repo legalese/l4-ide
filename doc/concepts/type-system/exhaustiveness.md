@@ -129,7 +129,12 @@ A `CONSIDER` over an enumeration declared in another file and brought in with `I
 
 ### Very large tables
 
-For a rule written as clauses, the check gives up without a warning when it would have to list more than 64 clauses, or when the analysis grows past its size limit. When the clauses match numbers or text, it does not fall silent at that limit, but gives a shorter, coarser list. A large `CONSIDER` still warns, but may list only some of the missing branches.
+For a rule written as clauses, the check gives up without a warning when it would have to list more than 64 clauses, or when the analysis grows past its size limit.
+When the clauses match numbers or text, it does not fall silent at that limit, but gives a shorter, coarser list.
+A `CONSIDER` written by hand with no number or piece of text in its branches, written out or as the value of an `EXACTLY`, does not fall silent either: it lists its first 128 missing branches, and says when there are more.
+Adding the listed branches may not be enough: the check follows at most 128 cases still uncovered and gives up without a warning past that, so it can go silent while cases are still missing.
+A `CONSIDER` with a number or text in a branch is told only what its branches without one leave open, and gets no warning when that list is too long as well.
+Both give up without a warning when the analysis grows past its size limit.
 
 ### Where the check applies
 
@@ -152,6 +157,8 @@ Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
 The typechecker's exhaustiveness warning lists all missing branches.
 ```
 
+The last line is quoted as the program prints it.
+For a `CONSIDER` with more than 128 missing branches the warning lists only the first 128, and says so.
 A rule written as clauses fails the same way, with "No clause of `describe` matches these inputs." and the value it could not match. `l4 run` exits non-zero when any directive fails this way. The warning exists so you find the hole before an applicant does.
 
 ---

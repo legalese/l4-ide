@@ -1156,7 +1156,11 @@ What the check covers:
 - A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests it. A WHEN with a number or a piece of text, and an `EXACTLY` of one or of a value of an enumeration, matches that value, as in a [rule written as clauses](#multi-clause-decide-does-not-cover-all-cases). A CONSIDER written by hand reads numbers, pieces of text and `EXACTLY` exactly as the clauses do, so the two spellings of one rule warn alike. A keyed gap inside a pattern is suggested as a WHEN, with the key as the branches spell it, and a number repeated in another spelling is a redundant branch.
 - The builtin container types MAYBE, EITHER and LIST are checked, constructors and contents alike: a CONSIDER over a `MAYBE` with no `WHEN NOTHING` branch is warned about, and so is one over a `LIST` with no `WHEN EMPTY`. `WHEN JUST Red` over a `MAYBE Colour` asks for `WHEN JUST Green` and `WHEN JUST Blue`. A number or a piece of text nested in a pattern (`WHEN JUST 1`, `WHEN "a" FOLLOWED BY rest`) is read the same way.
 - A CONSIDER over an enumeration declared in an imported file gives no missing-case warning at all.
-- Past 64 missing branches to list, a CONSIDER is told only what the branches without a number or a piece of text leave open, as clauses are, and gets no warning when that list is too long as well.
+- Past 64 missing branches to list, a CONSIDER with a number or a piece of text in a branch, written out or as the value of an `EXACTLY`, is told only what the branches without one leave open, as clauses are, and gets no warning when that list is too long as well.
+  A CONSIDER with no such branch lists its first 128 missing branches instead, each a case that really is missing, where the check can read all its branches.
+  The warning says when it lists only the first of more, and that adding them may not be enough: the check follows at most 128 cases still uncovered and gives up without a warning past that, which many added branches, or a CONSIDER of branches that each test several fields, can reach.
+  It also says nothing where it cannot read a branch: an `EXACTLY` of anything but a number, a piece of text or a value of an enumeration stops the check for that match.
+  A rule written as clauses is not given the longer list.
 - Warnings never block evaluation: a file with warnings still runs its `#EVAL` directives.
 
 A rule written as a list of clauses is checked the same way; its warning is [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases).
@@ -1200,6 +1204,7 @@ The typechecker's exhaustiveness warning lists all missing branches.
 ```
 
 **What went wrong:** Evaluation reached a CONSIDER whose branches do not cover the actual value of the scrutinee (shown in the message). Either the [warning](#non-exhaustive-pattern-match) was ignored, or the check could not see the gap: a missing value of an enumeration declared in another file gets no warning. A directive that stops this way makes `l4 run` exit with an error.
+The last line of the message is quoted as the program prints it; for a CONSIDER with more than 128 missing branches the warning lists only the first 128, and says so.
 
 **How to fix it:** Add branches for the missing cases, or an OTHERWISE branch for everything else. A CONSIDER over a NUMBER, a STRING or a DATE always needs an OTHERWISE.
 

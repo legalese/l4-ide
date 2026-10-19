@@ -1366,7 +1366,7 @@ settleOneClause m = do
     -- 'checkConsider' runs under the 'WhileCheckingExpression' context of its
     -- own CONSIDER, so the mark is on the node at the head of the context.
     isOneClauseMissing = \ case
-      MkCheckErrorWithContext (CheckWarning (PatternMatchesMissing _)) (WhileCheckingExpression (Consider a _ _) _)
+      MkCheckErrorWithContext (CheckWarning (PatternMatchesMissing _ _)) (WhileCheckingExpression (Consider a _ _) _)
         | Just (PmConsider g _ _) <- view annPmSynthetic a -> g.clauseCount == 1
       _ -> False
 
@@ -1773,7 +1773,7 @@ checkClauseMatrix dec dHead =
                      | scrutR <- colScruts
                      ])
                 uncovered
-          (verdict, redundantAnyway) = literalTiers ctorSets leftOut render concatMap rows
+          (verdict, redundantAnyway) = literalTiers ctorSets leftOut Nothing render concatMap rows
           -- A redundant leaf is identified by its anno, which is its
           -- clause's head range ('rowLeaf').
           redundantIndices redundant =
@@ -1784,7 +1784,7 @@ checkClauseMatrix dec dHead =
             ]
       case verdict of
         Nothing -> pure (False, redundantIndices redundantAnyway)
-        Just (missingRows, redundant) -> do
+        Just (missingRows, _, redundant) -> do
           unless (null missingRows || not warnMissing) do
             case hullRange matrix of
               -- R2: the warning must anchor at a real source range; if none
@@ -3776,17 +3776,20 @@ checkConsider ec ann e branches t = do
       analysis = do
         guard (BailGroup `notElem` verdicts)
         rows <- flattenPatTree pt
-        pure (literalTiers cl (ClauseCoversNothing `elem` verdicts) render rankArm rows)
-      (missing, redundant) = case analysis of
-        Just (Just (missingArms, redundantArms), _) -> (missingArms, redundantArms)
-        Just (Nothing, redundantArms) -> ([], redundantArms)
-        Nothing -> ([], [])
+        -- A CONSIDER written by hand lists its first branches past the cap; one
+        -- a group of clauses compiled to leaves a missing case to the group.
+        let overflow = maxOverflowSuggestions <$ guard (isNothing generated)
+        pure (literalTiers cl (ClauseCoversNothing `elem` verdicts) overflow render rankArm rows)
+      (missing, onlyFirst, redundant) = case analysis of
+        Just (Just (missingArms, more, redundantArms), _) -> (missingArms, more, redundantArms)
+        Just (Nothing, redundantArms) -> ([], False, redundantArms)
+        Nothing -> ([], False, [])
 
   inNonexhaustive <- asks (.inNonexhaustiveDecide)
   -- Inside an @nonexhaustive-decorated definition only the MISSING-branch warning
   -- is silenced; redundancy is a bug regardless of intended partiality.
   unless (inNonexhaustive || leftToClauseMatrix || null missing) do
-    addWarning $ PatternMatchesMissing missing
+    addWarning $ PatternMatchesMissing missing onlyFirst
   -- A CONSIDER the clauses compiled to is @WHEN p@ and an OTHERWISE for the
   -- clauses after it, which nobody wrote, and which nothing reaches when @p@
   -- is a new name. That finding is about the clauses, and
@@ -4522,18 +4525,33 @@ columnVerdict ei ctorSets colTy mScrutR mentionsInput = \ case
 -- fits. The redundant branches come from the exact analysis when it ran,
 -- which sees every row; a branch the coarse analysis finds redundant is
 -- covered by a subset of the rows above it, so that verdict holds too.
+--
+-- Rows with no number or text in them, and none left out, have no second
+-- tier to fall back to, and a list over the cap would leave them silent. (An
+-- @EXACTLY@ of a number or a piece of text is a row left out: it counts for
+-- nothing there.) The caller may allow them a longer list instead
+-- ('maxOverflowSuggestions'): the first rows of the exact list, each a gap
+-- that is really there, so that the warning is partial and not absent; the
+-- verdict's 'Bool' says that more rows were missing than are listed. The rows
+-- are taken from the lazy list the first tier renders, so the cost is that of
+-- the rows listed and not of the rows missing: a gap of millions of rows costs
+-- the same as one of 129. A clause group allows none, and stays silent past the
+-- cap.
 literalTiers
   :: Map Unique [Resolved]
   -- ^ the constructor sets ('constructorsInScopeFromEntityInfo')
   -> Bool
   -- ^ whether a row was left out
+  -> Maybe Int
+  -- ^ how many rows to list, at most, when the first tier's list is over the
+  -- cap and there is no second tier ('Nothing': none, and no warning)
   -> ([Nabla Resolved] -> [r])
   -- ^ the missing rows one tier's uncovered values render as
   -> ((Pattern Resolved -> [Int]) -> r -> [Int])
   -- ^ a missing row's rank, from its patterns' ranks
   -> [([Guard Info Resolved], Branch Resolved)]
-  -> (Maybe ([r], [Branch Resolved]), [Branch Resolved])
-literalTiers ctorSets leftOut render rankRow rows = (verdict, redundantAnyway)
+  -> (Maybe ([r], Bool, [Branch Resolved]), [Branch Resolved])
+literalTiers ctorSets leftOut overflow render rankRow rows = (verdict, redundantAnyway)
   where
     -- 'Nothing' when the 'maxUncoveredNablas' cap trips.
     analyse = \ case
@@ -4547,19 +4565,29 @@ literalTiers ctorSets leftOut render rankRow rows = (verdict, redundantAnyway)
     -- Only rows with a number or a piece of text in them, or with a row
     -- left out, have a second tier: for any other, it would re-run the same
     -- rows.
+    hasSecondTier = leftOut || any (any isLitGuard . fst) rows
     coarse = do
-      guard (leftOut || any (any isLitGuard . fst) rows)
+      guard hasSecondTier
       analyse (filter (not . any isLitGuard . fst) rows)
+    ranked = List.sortOn (rankRow (missingPatternRanks ctorSets keyOrder))
     fit (uncovered, redundant) =
       let missingRows = render uncovered
           overCap = length (take (maxMissingSuggestions + 1) missingRows) > maxMissingSuggestions
-      in if overCap then Nothing else Just (List.sortOn (rankRow (missingPatternRanks ctorSets keyOrder)) missingRows, redundant)
+      in if overCap then Nothing else Just (ranked missingRows, False, redundant)
     keyOrder = nubOrd [ k | (gs, _) <- rows, LitGuard _ k <- gs ]
     verdict = case guard (not leftOut) *> exact >>= fit of
       Just v -> Just v
-      Nothing -> do
-        (missingRows, redundant2) <- coarse >>= fit
-        pure (missingRows, maybe redundant2 snd exact)
+      Nothing
+        | hasSecondTier -> do
+            (missingRows, more, redundant2) <- coarse >>= fit
+            pure (missingRows, more, maybe redundant2 snd exact)
+        -- The first tier's list is all there is. Past the cap it is cut, not
+        -- withheld; if the nablas outgrew theirs there is no list at all.
+        | otherwise -> do
+            limit <- overflow
+            (uncovered, redundant) <- exact
+            let found = take (limit + 1) (render uncovered)
+            pure (ranked (take limit found), length found > limit, redundant)
     -- When neither tier's list fits, the missing warning is withheld, and
     -- the branches never used are still reported, from whichever analysis
     -- ran (the exact one when it did).
@@ -5672,6 +5700,16 @@ maxUncoveredNablas = 128
 -- than print pages of arms.
 maxMissingSuggestions :: Int
 maxMissingSuggestions = 64
+
+-- | How many missing branches a CONSIDER written by hand lists when it has
+-- more than 'maxMissingSuggestions' to list and no second tier to fall back
+-- to (no branch with a number or a piece of text, written out or as the
+-- value of an @EXACTLY@): the first of them, and no more, so that the warning
+-- is partial where it would otherwise be absent, and says so, and a gap of any
+-- size is listed at the cost of this many rows. A rule written as clauses lists
+-- none past 'maxMissingSuggestions' (see 'literalTiers').
+maxOverflowSuggestions :: Int
+maxOverflowSuggestions = 128
 
 -- | Sequential coverage analysis, one branch at a time — the classic
 -- residual-set ("Lower Your Guards") shape:
@@ -8245,12 +8283,17 @@ prettyCheckWarning = \ case
     map (("  " <>) . prettyBranchAsWritten) b
     <> [ ""
     ]
-  PatternMatchesMissing b ->
+  PatternMatchesMissing b onlyFirst ->
     [ "The following branches still need to be considered:"
     , "" ]
     <>
     map (("  " <>) . prettyMissingBranchLhs) b
     <> [ "" ]
+    <> concat
+         [ [ "These are the first " <> Text.pack (show (length b)) <> " of the missing branches."
+           , "Adding them may not be enough: the check can go silent while cases are still missing."
+           , "" ]
+         | onlyFirst ]
   PatternClausesMissing _ headName clauseCount rows ->
     [ (if clauseCount == 1 then "This clause does not cover all cases." else "This multi-clause definition does not cover all cases.")
         <> " The following clauses are still needed:"

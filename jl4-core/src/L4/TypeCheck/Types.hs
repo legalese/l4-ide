@@ -411,7 +411,11 @@ data UnreachableClause
 
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
-  | PatternMatchesMissing [BranchLhs Resolved]
+  | PatternMatchesMissing [BranchLhs Resolved] Bool
+    -- ^ A CONSIDER does not cover all cases: the branches still needed. The
+    -- 'Bool' says the list is only the first of more ('L4.TypeCheck.maxOverflowSuggestions'),
+    -- and the warning then says so, and that adding them may not be enough: the
+    -- check can go silent ('L4.TypeCheck.maxUncoveredNablas') with cases still missing.
   | PatternClausesMissing SrcRange Name Int [[Pattern Resolved]]
     -- ^ A multi-clause DECIDE\/MEANS pattern-matching group does not cover
     -- all cases ('L4.TypeCheck.checkClauseMatrix'). Carries the hull of the

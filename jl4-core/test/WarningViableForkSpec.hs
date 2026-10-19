@@ -149,7 +149,7 @@ spec = describe "A success that carries only a warning" $ do
     -- The search itself, without the language: outcomes that nothing after
     -- them can tell apart are merged into one that counts as two.
     let valueKey a = (a :: Int)
-        warned = addWarning (PatternMatchesMissing [])
+        warned = addWarning (PatternMatchesMissing [] False)
         failed = addError InternalAmbiguityError >> pure (0 :: Int)
         -- Two outcomes with the same value, one with a warning, and a failure
         -- after them: what a fork with two viable outcomes ends with.
@@ -301,7 +301,7 @@ spec = describe "A success that carries only a warning" $ do
     -- a count of two would read as one, and the module would silently take
     -- one meaning of a name that has two. Each of them keeps it.
     let valueKey a = (a :: Int)
-        warned = addWarning (PatternMatchesMissing [])
+        warned = addWarning (PatternMatchesMissing [] False)
         failed = addError InternalAmbiguityError >> pure (0 :: Int)
         twoAlike = choose [pure (1 :: Int), warned >> pure 1, failed]
         merged = softpruneAlike valueKey twoAlike
@@ -334,7 +334,7 @@ spec = describe "A success that carries only a warning" $ do
     -- module is ambiguous; without the pair it would be one, and the module
     -- would pick that branch.
     let valueKey a = (a :: Int)
-        warned = addWarning (PatternMatchesMissing [])
+        warned = addWarning (PatternMatchesMissing [] False)
         redundant = addWarning (PatternMatchRedundant [])
         failed = addError InternalAmbiguityError >> pure (0 :: Int)
         errorsOf (w, _) = show (fst (runWith w))

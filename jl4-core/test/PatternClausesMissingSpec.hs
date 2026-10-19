@@ -6,8 +6,10 @@
 -- by severity and rendered text, the way a user meets them.
 module PatternClausesMissingSpec (spec) where
 
+import Data.List (nub)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import System.Timeout (timeout)
 import Test.Hspec
 
 import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
@@ -1571,14 +1573,11 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
       ]
     missingArms ws `shouldBe` ["WHEN Row NOTHING Gold THEN"]
 
-  -- Disabled by the main-into-unstable sync, and unlike the other cases here this one is a GAP in unstable,
-  -- not a difference of wording: past 64 rows main falls back to its own analysis and warns, and unstable's
-  -- engine withholds the warning when neither list fits (doc/reference/errors/README.md states the limit).
-  -- A hand-written CONSIDER like this one passes `l4 check` with no warning on unstable.
-  xit "still warns when its missing branches are more than the clauses' engine lists" $ do
-    -- 208 missing values: past 64 rows the clauses' engine gives up, and
-    -- this CONSIDER fell silent (7236198ad). Main's own analysis reads it
-    -- instead, and warns as it did before M-D sent it to the clauses' engine.
+  it "still warns when its missing branches are more than the clauses' engine lists" $ do
+    -- 208 missing values: past 64 rows the first tier gives up, and this
+    -- CONSIDER fell silent. With no number or text in a branch there is no
+    -- second tier, so it lists its first rows instead
+    -- ('L4.TypeCheck.maxOverflowSuggestions').
     ws <- considerWarnings $ Text.unlines
       [ "DECLARE E IS ONE OF e0, e1, e2, e3, e4, e5"
       , "DECLARE Rec HAS f0 IS AN E, f1 IS AN E, f2 IS AN E"
@@ -1592,6 +1591,131 @@ plainConsiderSpec = describe "CONSIDER with no number, text or EXACTLY" $ do
       , "    WHEN Rec e1 e3 e3 THEN \"a2\""
       ]
     length (missingArms ws) `shouldSatisfy` (> 64)
+
+  it "lists 64 missing branches as before, and 65 where it used to fall silent" $ do
+    -- One arm over an enumeration: the cap is 64 branches to list.
+    let tshow = Text.pack . show
+        big :: Int -> Text
+        big k = Text.unlines
+          [ "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "E" <> tshow i | i <- [0 .. k] ]
+          , ""
+          , "GIVEN e IS A Big"
+          , "GIVETH A NUMBER"
+          , "f e MEANS"
+          , "  CONSIDER e"
+          , "    WHEN E0 THEN 0"
+          ]
+        gaps k = [ "WHEN E" <> tshow i <> " THEN" | i <- [1 .. k] ]
+    sixtyFour <- considerWarnings (big 64)
+    missingArms sixtyFour `shouldBe` gaps 64
+    sixtyFive <- considerWarnings (big 65)
+    missingArms sixtyFive `shouldBe` gaps 65
+
+  it "lists its first 128 missing branches, each a real gap, however many are missing" $ do
+    -- Eight fields of twelve values, one arm for each field's first value
+    -- (d0, the other fields named by a variable): the one uncovered set is
+    -- every field other than d0, 11^8 = 214,358,881 branches. The rows are
+    -- taken from a lazy list, so the rest are never built. Measured with a
+    -- build that ranked the whole list before taking 128: six fields of ten
+    -- values (531,441 rows) took 7.8 s and 1 GB, so that size would not catch
+    -- the regression within the timeout; this size was still running after
+    -- 60 s, at 6.4 GB, where the lazy build takes 0.2 s and 130 MB.
+    let nFields = 8 :: Int
+        field i = "f" <> Text.pack (show i)
+        arm i = "    WHEN Rec " <> Text.unwords [ if j == i then "d0" else "x" <> Text.pack (show j) | j <- [0 .. nFields - 1] ] <> " THEN " <> Text.pack (show i)
+        src = Text.unlines $
+          [ "DECLARE D IS ONE OF " <> Text.intercalate ", " [ "d" <> Text.pack (show v) | v <- [0 .. 11 :: Int] ]
+          , "DECLARE Rec HAS " <> Text.intercalate ", " [ field i <> " IS A D" | i <- [0 .. nFields - 1] ]
+          , ""
+          , "GIVEN q IS A Rec"
+          , "GIVETH A NUMBER"
+          , "f q MEANS"
+          , "  CONSIDER q"
+          ] <> map arm [0 .. nFields - 1]
+        -- the values a listed branch names, one per field
+        values arm' = take nFields (drop 2 (Text.words arm'))
+    mws <- timeout (60 * 1000000) (considerWarnings src)
+    case mws of
+      Nothing -> expectationFailure "the check did not return within 60 s"
+      Just ws -> do
+        let arms = missingArms ws
+            rows = map values arms
+        length arms `shouldBe` 128
+        -- no row twice, and none that leaves a field open
+        length (nub arms) `shouldBe` 128
+        filter (any (`elem` ["_", "`_`"])) rows `shouldBe` []
+        -- a real gap matches none of the written arms, and arm i matches
+        -- exactly the rows with d0 in field i
+        [ (i, row) | row <- rows, i <- [0 .. nFields - 1], row !! i == "d0" ] `shouldBe` []
+        -- the warning says the list is only the first of more
+        any (mentions "first 128 of the missing branches") ws `shouldBe` True
+        -- and that adding them may not be enough: the check can go silent
+        any (mentions "may not be enough") ws `shouldBe` True
+
+  it "does not say a list is partial when it lists every missing branch" $ do
+    let tshow = Text.pack . show
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "E" <> tshow i | i <- [0 .. 100 :: Int] ]
+      , ""
+      , "GIVEN e IS A Big"
+      , "GIVETH A NUMBER"
+      , "f e MEANS"
+      , "  CONSIDER e"
+      , "    WHEN E0 THEN 0"
+      ]
+    -- 100 missing: over the cap of 64, under 128
+    length (missingArms ws) `shouldBe` 100
+    any (mentions "first") ws `shouldBe` False
+
+  it "stays silent for a CONSIDER with all its branches, however many values" $ do
+    let tshow = Text.pack . show
+    ws <- considerWarnings $ Text.unlines $
+      [ "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "E" <> tshow i | i <- [0 .. 64 :: Int] ]
+      , ""
+      , "GIVEN e IS A Big"
+      , "GIVETH A NUMBER"
+      , "f e MEANS"
+      , "  CONSIDER e"
+      ] <> [ "    WHEN E" <> tshow i <> " THEN " <> tshow i | i <- [0 .. 64 :: Int] ]
+    ws `shouldBe` []
+
+  it "keeps the silent cap for a CONSIDER with a number, whose second tier is over the cap too" $ do
+    -- 69 missing rows with the number's branch, and 69 without it: neither
+    -- list fits, and this has a second tier, so it is not listed in part.
+    let tshow = Text.pack . show
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "E" <> tshow i | i <- [0 .. 69 :: Int] ]
+      , "DECLARE Pair HAS a IS A Big"
+      , "                 n IS A NUMBER"
+      , ""
+      , "GIVEN p IS A Pair"
+      , "GIVETH A NUMBER"
+      , "f p MEANS"
+      , "  CONSIDER p"
+      , "    WHEN Pair E0 1 THEN 0"
+      , "    WHEN Pair E1 m THEN 1"
+      ]
+    missingArms ws `shouldBe` []
+
+  it "keeps the silent cap where a branch is an EXACTLY of a number, which counts for nothing in the first tier" $ do
+    -- The EXACTLY leaves a row out, so there is a second tier, and its 69
+    -- rows are over the cap too.
+    let tshow = Text.pack . show
+    ws <- considerWarnings $ Text.unlines
+      [ "DECLARE Big IS ONE OF " <> Text.intercalate ", " [ "E" <> tshow i | i <- [0 .. 69 :: Int] ]
+      , "DECLARE Pair HAS a IS A Big"
+      , "                 n IS A NUMBER"
+      , ""
+      , "zero MEANS 0"
+      , ""
+      , "GIVEN p IS A Pair"
+      , "GIVETH A NUMBER"
+      , "f p MEANS"
+      , "  CONSIDER p"
+      , "    WHEN Pair E0 (EXACTLY zero) THEN 0"
+      , "    WHEN Pair E1 m THEN 1"
+      ]
+    missingArms ws `shouldBe` []
 
 -- | A branch that matches anything, after a branch that already does, is
 -- redundant: an OTHERWISE, a new name, a wildcard, or an EXACTLY of the
