@@ -32,7 +32,7 @@ A brief that says the target is `main` means this build or a later one, and this
   Of the 108 `.l4` files under `doc/` at `b932724d3`, `main` rejects 42 and the shelf build rejects none.
   The shelf build is six commits older than that tree and still rejects none, so none of the 42 is the shelf being too old: the zero is the control.
 - **The probes.**
-  `references/dialect-probes/` holds 95 small files, each the whole of one test, named by what they show:
+  `references/dialect-probes/` holds 96 small files, each the whole of one test, named by what they show:
 
   - a number, `01` to `58`: `unstable` accepts it and `main` rejects it;
   - `alt-`: the spelling to write on `main` instead, which passes on both;
@@ -43,7 +43,7 @@ A brief that says the target is `main` means this build or a later one, and this
   - `unstable-`: `unstable` rejects it and `main` accepts it.
 
   `main` rejects exactly the 58 numbered files.
-  The shelf build rejects exactly five: the two `main-*` files and the three `unstable-refuses-*` files.
+  The shelf build rejects exactly six: the two `main-*` files, the three `unstable-refuses-*` files and `unstable-reads-field-for-constructor`.
 
 To refresh this page, run both binaries over both sets from the root of an l4-ide checkout, and compare with the numbers above:
 
@@ -101,7 +101,7 @@ Each row gives one of three words for what `main` does with the construct.
 ## Silent: `main` raises no error
 
 These rows matter most, because nothing tells you.
-In the first and the last, `main` answers differently; in the second and third, `unstable` refuses what `main` accepts.
+In the first and the fourth, `main` answers differently; in the other three, `unstable` refuses what `main` accepts.
 
 <!-- prettier-ignore -->
 | Spelling | `unstable` | `main` build 98 | On `main`, write instead |
@@ -110,6 +110,7 @@ In the first and the last, `main` answers differently; in the second and third, 
 | `NOT a AND b` on one line, with no brackets (`unstable-refuses-not-and`) | An error: it reads as `NOT (a AND b)` and asks you to write the brackets. | **reads**: accepted, and read as `NOT (a AND b)`: `NOT TRUE AND FALSE` is `TRUE`. | Bracket it: `(NOT a) AND b`, or `NOT (a AND b)` (`alt-not-and-bracketed`). Here `unstable` is the stricter compiler. |
 | A party that is not the action's performer: `PARTY Drinker MUST eat` where `eat` is `Action OF Eater, "eat"` (`unstable-refuses-wrong-performer`), or `PARTY Drinker DOES eat` in a `#TRACE` (`unstable-refuses-wrong-performer-event`) | An error: `An actor may only perform its own actions.` The performer is the action's first actor-typed field. | **reads**: accepted, with no warning. In a trace the stranger's event is passed over and the obligation stays open. | Name the performer in the action and make the `PARTY` match it: `PARTY Eater MUST eat`. `main` will not catch a mismatch, so check it by eye. Here too `unstable` is the stricter compiler. |
 | A language tag on an `@nlg` herald: `@nlg:pt o valor %amount% excede o limite` (`degrades-nlg-language-tag`) | The herald is tagged `pt`, so a rule can carry renderings in several languages. | **degrades**: read as an untagged `@nlg` whose text begins `:pt` (`l4 ast` shows `TNlgString ":pt"`). | Write the herald without a tag; `main` has no per-language heralds. |
+| A constructor named like a field of a record input: `b's kind EQUALS Alpha`, where `b` has a field `Alpha` too (`unstable-reads-field-for-constructor`) | The field wins, because the fields of an input are in scope by name (field opening): a warning says so, and the comparison then fails to type-check. | **reads**: the constructor, as written. | Give the constructor and the field different names. `check.sh` goes red on this, and it is `unstable` that misreads it. |
 
 The first row has a loud half: read `creditor` again in `HENCE` and `main` stops with `There are multiple definitions for the identifier creditor` (probe 43), which names the wrong thing, since the fault is in the action.
 The `PROVIDED` spelling removes both (`alt-must-guard-then-hence`).

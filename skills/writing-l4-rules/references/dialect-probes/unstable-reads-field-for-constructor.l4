@@ -1,0 +1,9 @@
+DECLARE Kind IS ONE OF Alpha, Beta
+
+DECLARE Body HAS
+    kind  IS A Kind
+    Alpha IS A BOOLEAN
+
+GIVEN b IS A Body
+GIVETH A BOOLEAN
+`is alpha` b MEANS b's kind EQUALS Alpha
