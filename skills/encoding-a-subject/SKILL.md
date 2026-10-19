@@ -126,8 +126,9 @@ Copy [`assets/fetch-main-l4.sh`](assets/fetch-main-l4.sh) beside it: `check.sh` 
 A line that ends `reads differently on main` is a module `main` cannot read as it stands; `writing-l4-rules/references/dialects.md` says what to write instead.
 Exit status 2 means the main step did not run (no main build for your platform, no network, no `fetch-main-l4.sh`), and that is not a pass.
 A module `main` does not finish within `L4_MAIN_TIMEOUT` seconds (300 unless you set it) is red as well: `main` is the compiler that has to read it, and some modules that run in a second on `unstable` take minutes on `main`.
-The check sees what an assertion exercises: a module `main` rejects, or reads differently in a way a test tells apart.
-It does not see a difference no assertion exercises, so test the two rows `dialects.md` marks as degrading.
+The check counts error diagnostics and assertion lines and nothing else.
+It sees a module `main` rejects, and a difference that changes an `#ASSERT`'s outcome.
+It does not see a different `#TRACE` outcome, because a trace prints no assertion line: for the rows `dialects.md` marks as degrading, run the file with both builds and compare the traces yourself.
 
 ### 8. The independent test pass (recommended)
 

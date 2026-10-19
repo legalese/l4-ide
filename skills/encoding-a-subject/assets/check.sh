@@ -22,10 +22,15 @@
 # skill), and the only mechanical way to know is to run a main build over the module too. With the
 # target `main` (the default) this script runs every module with BOTH binaries and compares the four
 # counts. A module whose counts differ, or that errors on main, is red, its line says "reads
-# differently on main", and the next line shows the first error main gives. The counts are what it compares, so it catches a module main rejects and a
-# difference that changes an assertion's outcome; it cannot catch one that no assertion exercises
-# (an input named in a MUST action matches any payload on main, and only a test of a WRONG payload
-# shows it). Write that test, or use the spelling dialects.md gives.
+# differently on main", and the next line shows the first error main gives.
+#
+# WHAT IT DOES NOT SEE. It counts error diagnostics and assertion lines, and nothing else. So it
+# catches a module main rejects, and a difference that changes an #ASSERT's outcome. It does NOT
+# see a different #TRACE outcome: a trace prints FULFILLED or BREACH or a residual obligation, never
+# an assertion line, so no count moves. Several differences between main and unstable live there
+# (dialects.md marks them "degrades": an input named in a MUST action matches any payload on main,
+# a MAY with a LEST lapses to BREACH on unstable and to FULFILLED on main). A trace is compared by
+# running it with both builds and reading the two outcomes; this script will not tell you.
 #
 # Usage:  check.sh [DIR]          (DIR defaults to the directory this script is in)
 # Env:    L4         the l4 binary you write with        (default: `l4` on PATH)
@@ -74,6 +79,13 @@ first_error() {
 
 # A module that is MEANT to fail (a draft's test cases run against the text as made,
 # say) is listed here with its exact count, and named in encoding.json `expected_red`.
+# Every real `l4 run` prints "Checking succeeded." or, when it has anything to say, a block that
+# starts with "File:" or "Evaluation[". Output with none of them did not come from an l4 that ran
+# the module (a stub, `true`, a crash), and a count of zero from it is not a reading of the module.
+produced_output() {
+  printf '%s\n' "$1" | grep -a -q -E '^(Checking succeeded|File:|Evaluation\[)'
+}
+
 expected_failed() {
   case "$1" in
     # tests-red.l4) echo 3 ;;
@@ -108,10 +120,16 @@ case "$TARGET" in
         exit 2
       }
     fi
-    if ! command -v "$MAIN" >/dev/null 2>&1; then
+    resolved="$(command -v "$MAIN" 2>/dev/null)" || resolved=""
+    if [ -z "$resolved" ] || [ ! -x "$resolved" ]; then
       echo "check.sh: the target is main, and '$MAIN' is not an executable l4. A run with this step missing is not a full check." >&2
       exit 2
     fi
+    # The main run happens in the module's directory, so a relative path to the binary must be made absolute now.
+    case "$resolved" in
+      /*) MAIN="$resolved" ;;
+      *) MAIN="$(cd "$(dirname "$resolved")" && pwd)/$(basename "$resolved")" ;;
+    esac
     MAIN_VERSION="$(env -u JL4_LIBRARY_PATH "$MAIN" --version 2>/dev/null | tr -d '\000' | head -n 1)"
     case "$MAIN_VERSION" in
       unstable-*)
@@ -148,6 +166,10 @@ for f in "$DIR"/*.l4; do
   bad=$(printf '%s\n' "$msgs" | grep -cE 'assertion failed|assertion could not be evaluated')
   ref=$(printf '%s\n' "$msgs" | grep -cE 'assertion refused')
   exp=$(expected_failed "$m")
+  if [ "$TARGET" = main ] && ! produced_output "$out"; then
+    echo "check.sh: your l4 ('$L4') printed nothing it recognises for $m, so the target check cannot compare anything. A run with this step missing is not a full check." >&2
+    exit 2
+  fi
   [ $((err - bad)) -eq 0 ] && [ "$ref" -eq 0 ] && [ "$bad" -eq "$exp" ] || status=1
   total_err=$((total_err + err)) total_ok=$((total_ok + ok)) total_bad=$((total_bad + bad)) total_ref=$((total_ref + ref)) n=$((n + 1))
   if [ "$TARGET" = main ]; then
@@ -167,6 +189,10 @@ for f in "$DIR"/*.l4; do
     timedout=0; [ -e "$mtmp.timeout" ] && timedout=1
     mout="$(tr -d '\000' <"$mtmp")"
     rm -f -- "${mtmp:?}" "${mtmp:?}.timeout"
+    if [ "$timedout" = 0 ] && ! produced_output "$mout"; then
+      echo "check.sh: the main build ('$MAIN') printed nothing it recognises for $m (it exited $mrc), so the main step could not run. A run with this step missing is not a full check." >&2
+      exit 2
+    fi
     mmsgs="$(printf '%s\n' "$mout" | grep -a -A1 -E '^[[:space:]]*Message:')"
     merr=$(printf '%s\n' "$mout" | grep -a -c 'DiagnosticSeverity_Error')
     mok=$(printf '%s\n' "$mmsgs" | grep -a -cE 'assertion satisfied')
@@ -198,7 +224,7 @@ fi
 echo "(a failed assertion is also an error; any other error, or any refused assertion, makes the run red)"
 if [ "$TARGET" = main ]; then
   if [ "$differ" -eq 0 ]; then
-    echo "(target main: every module has the same four counts on the main build. That rules out a module main rejects, and a difference an assertion exercises; it does not rule out one no assertion exercises)"
+    echo "(target main: every module has the same four counts on the main build. That rules out a module main rejects and a difference an assertion shows; it does not see a different TRACE outcome, or any difference no assertion exercises)"
   else
     echo "(target main: $differ module(s) read differently on main, so this encoding is not readable by main as it stands; see references/dialects.md in the writing-l4-rules skill, or set L4_TARGET=unstable if the brief says the target is unstable)"
   fi
