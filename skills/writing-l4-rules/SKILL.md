@@ -212,7 +212,8 @@ iterate until the check passes.
 
 **Other subcommands** (run `l4 <command> --help` for details):
 
-- `l4 format FILE` — reformat an `.l4` file to stdout (`gofmt`-style).
+- `l4 format FILE` — print an `.l4` file to stdout exactly as written
+  (it does not change the layout; exits 1 if the file does not parse).
 - `l4 ast FILE` — dump the parsed AST (debugging L4 itself or tooling).
 - `l4 batch FILE --inputs rows.{json,yaml,csv}` — evaluate an `@export`
   function against many rows, streaming NDJSON output (one object per

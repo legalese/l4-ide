@@ -188,9 +188,13 @@ instance ToSemTokens Context PosToken (AppForm Name) where
       CType -> genericToSemTokens a
       CValue -> genericToSemTokens a
 
+-- The holes follow the source order of the clauses, which depends on
+-- 'atFirst': @AT ts PARTY p DOES d@ (atFirst) puts the timestamp first,
+-- @PARTY p DOES d AT ts@ puts it last. Same order as the 'Event Resolved'
+-- instance below and the 'ToConcreteNodes' instances in "L4.Syntax".
 instance ToSemTokens Context PosToken (Event Name) where
   toSemTokens (MkEvent ann p a t atFirst) = traverseCsnWithHoles ann $ map toSemTokens
-    if atFirst then [p, a, t] else [t, p, a]
+    if atFirst then [t, p, a] else [p, a, t]
 
 
 

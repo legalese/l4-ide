@@ -1,0 +1,16 @@
+-- An event can be written PARTY p DOES a AT t, or AT t PARTY p DOES a.
+-- Either way its tokens come out in the order they are written.
+DECLARE Person IS ONE OF Tenant, Landlord
+DECLARE Action IS ONE OF
+  `pay rent`
+  `return keys`
+
+GIVETH DEONTIC Person Action
+`rent obligation` MEANS
+  PARTY Tenant
+  MUST `pay rent`
+  WITHIN 30
+
+#TRACE `rent obligation` AT 0 WITH
+  PARTY Tenant DOES `pay rent` AT 20
+  AT 25 PARTY Tenant DOES `return keys`

@@ -693,12 +693,30 @@ spec bin = do
         >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
 
   describe "l4 format" $ do
-    it "prints the reformatted source of a clean file to stdout" $ do
+    it "prints a clean file to stdout as written" $ do
+      src <- readFile cleanFixture
       Output code sout _ <- runL4 bin ["format", cleanFixture]
       code `shouldBe` ExitSuccess
-      -- Formatter output should contain the DECIDE (exact spelling may
-      -- differ from input, so we only look for the identifier).
-      sout `shouldSatisfy` ("xor" `isInfixOf`)
+      -- Carriage returns are dropped on both sides: the checkout may have
+      -- CRLF line endings, which 'readFile' turns into LF on Windows.
+      filter (/= '\r') sout `shouldBe` filter (/= '\r') src
+
+    -- The output has the file's own line endings, compared byte for byte. On
+    -- Windows, reading the file or writing stdout in text mode would turn LF
+    -- into CRLF or the other way round.
+    it "keeps LF and CRLF line endings as they are in the file" $
+      withSystemTempDirectory "l4-format-line-endings" \dir ->
+        forM_ [("lf.l4", "\n"), ("crlf.l4", "\r\n")] \(name, eol) -> do
+          let file = dir </> name
+              bytes = TE.encodeUtf8 $ T.intercalate eol
+                [ "GIVETH A STRING"
+                , "DECIDE `the city` IS \"São Paulo\""
+                , ""
+                ]
+          BS.writeFile file bytes
+          Output code sout _ <- runL4 bin ["format", file]
+          code `shouldBe` ExitSuccess
+          sout `shouldBe` T.unpack (TE.decodeUtf8 bytes)
 
     -- A postfix call used to lose its argument, and a call written between its
     -- arguments used to be printed head first, with exit code 0 and output that
