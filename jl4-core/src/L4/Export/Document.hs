@@ -54,7 +54,7 @@ import L4.Annotation (emptyAnno)
 import L4.Desugar (carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
-import L4.Nlg (simpleLinearizer)
+import L4.Nlg (simpleLinearizer, unescapeNlgText)
 import L4.Syntax
 import L4.TypeCheck.Types (CheckInfo (..), FunTypeSig (..), MixfixRegistry (..))
 import L4.Utils.Ratio (prettyRatio)
@@ -334,7 +334,11 @@ renderNlgWith argMap = \case
   MkResolvedNlg _ frags -> normalizeWs (Text.concat (map frag frags))
   other                 -> simpleLinearizer other
  where
-  frag (MkNlgText _ t) = t
+  -- Escapes decode HERE, not in the lexer: the annotation token carries
+  -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
+  -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
+  -- backslash still in it.
+  frag (MkNlgText _ t) = unescapeNlgText t
   -- An unsubstituted reference (definition view, or a name with no matching
   -- argument) renders as the bare parameter name — NOT via 'simpleLinearizer',
   -- which would re-expand that parameter's own @\@nlg@ and recurse when the

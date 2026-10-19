@@ -1642,6 +1642,38 @@ spec bin = do
       batchAnswer bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
         `shouldReturn` Number 2
 
+  -- `l4 batch` prints the checked module back and checks it again beside a
+  -- generated record with a field for each input. An annotation that names an
+  -- input (`%a%`) would then have two candidates and no expected type to choose
+  -- between them, and `main`'s checker refuses that ("multiple definitions").
+  -- `prettyLayout` writes no annotation back, so the row runs; this pins it.
+  describe "l4 batch runs an export whose annotation names its input" $
+    it "answers instead of refusing the printed module" $
+      batchAnswer bin (fixtureDir </> "batch-nlg-input-slot.l4") (fixtureDir </> "batch-nlg-input-slot.json") "is large"
+        `shouldReturn` Bool True
+
+  -- An `@nlg` annotation is wording for the reader of a rule, not part of what
+  -- the rule evaluates to. `prettyLayout` prints evaluation results, and it
+  -- writes no annotation back; a printer that did would put `[a red colour]`
+  -- inside `Shape OF Red [a red colour], 3`.
+  describe "l4 run prints a value without its annotations" $ do
+    let runOut = do
+          Output code sout0 _ <- runL4 bin ["run", fixtureDir </> "annotated-values.l4"]
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout0)
+    it "leaves an annotation off a constructor inside a value" $ do
+      sout <- runOut
+      sout `shouldSatisfy` ("Shape OF Red, 3" `isInfixOf`)
+      sout `shouldSatisfy` ("JUST OF Green" `isInfixOf`)
+      sout `shouldNotSatisfy` ("a red colour" `isInfixOf`)
+      sout `shouldNotSatisfy` ("a green colour" `isInfixOf`)
+    it "leaves an annotation off the party and the action of an obligation" $ do
+      sout <- runOut
+      sout `shouldSatisfy` ("PARTY Alice" `isInfixOf`)
+      sout `shouldSatisfy` ("MUST `pay the price`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("the payer" `isInfixOf`)
+      sout `shouldNotSatisfy` ("paying" `isInfixOf`)
+
   -- Regression test for smucclaw/l4-ide#906: a diamond import over the
   -- embedded-library fallback used to starve the second sibling of the shared
   -- bottom's environment. `main.l4` imports two embedded siblings

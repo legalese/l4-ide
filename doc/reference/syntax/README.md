@@ -71,6 +71,33 @@ GIVETH A NUMBER
 Text in square brackets after a name, as in ``DECIDE `the limit` [the statutory limit] IS 5``, is a short inline wording for that name.
 How to use `@nlg` well: [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md).
 
+#### Writing a literal `%` or `]`
+
+Inside `@nlg`, `%` marks an input to fill in, and `%age%` is replaced by the value of `age`.
+A `]` ends a bracketed annotation.
+To write either character as itself, put a backslash in front of it.
+
+| you write            | you get           | without the backslash             |
+| -------------------- | ----------------- | --------------------------------- |
+| `10\%and\%20`        | `10%and%20`       | `and` is read as an input name    |
+| `[rate \] per unit]` | `rate ] per unit` | the annotation ends early         |
+| `\\`                 | `\`               | —                                 |
+
+**Most of the time you do not need this.**
+A percent sign with a space after it is already ordinary text, so `a 5% levy on %amount%` works as written and fills in `amount`.
+The backslash is for the case with no space, such as `10%and%20`, where L4 cannot tell a written-out range from an input.
+
+**The two mistakes fail very differently, and the quiet one is the one to watch.**
+A stray `]` ends the annotation early and you get a parse error pointing at the leftover text, which is annoying but tells you.
+A stray `%` pair tells you nothing.
+If the word between the two percent signs happens to name one of your inputs, L4 quietly substitutes that value, and your sentence comes out with a number where you wrote a word.
+Nothing is reported, and the rule still runs.
+
+**What this costs.**
+A backslash immediately before the closing `]` no longer ends the annotation, because `\]` now means a literal `]`.
+Write `\\` if you want the annotation to end with a backslash.
+Any other character after a backslash is left completely alone: `\q` is still a backslash followed by a `q`.
+
 ### @ref
 
 `@ref` cites a legal source: the provision a rule, a type or an input comes from.

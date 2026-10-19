@@ -192,6 +192,7 @@ test-suite jl4-core-test
     PrintRoundtripSpec
     RefAnnotationSpec
     NlgPercentSpec
+    NlgRenderSpec
     DirectiveAmbiguitySpec
   build-tool-depends:
     hspec-discover:hspec-discover
