@@ -11,8 +11,9 @@ L4 is a statically-typed, pure-functional language for computational law. It is 
 
 <https://legalese.com/l4/README.md>
 
-This file is a compact operational guide. For anything syntactic you do not remember, link through to the corresponding page on `legalese.com/l4/...` rather than guessing. Seven deeper references ship in this skill:
+This file is a compact operational guide. For anything syntactic you do not remember, link through to the corresponding page on `legalese.com/l4/...` rather than guessing. Eight deeper references ship in this skill:
 
+- [references/dialects.md](references/dialects.md) — `main` and `unstable` are two compilers: what `main` rejects or reads differently, and what to write instead (read step 0 first)
 - [references/regulative.md](references/regulative.md) — deep dive on obligations, `#TRACE`, and the `MUST`/`MAY`/`SHANT`/`DO` `HENCE` `LEST` `BREACH` machinery
 - [references/builtins.md](references/builtins.md) — coercions, HTTP (Hypertext Transfer Protocol) / JSON (JavaScript Object Notation), temporal globals, and the library index
 - [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM (large language model) will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix, and four errors whose message points away from the fix)
@@ -46,6 +47,25 @@ L4 is the wrong tool for imperative scripting, user-interface code, numerical co
 ---
 
 ## Core workflow
+
+### 0. Which compiler do you run, and which dialect do you write?
+
+This skill describes L4 as it is on `unstable`.
+`main` is a different compiler that rejects much of it, with errors that read like mistakes in your file, and in a few places accepts it and reads it differently.
+Two questions decide what you may write, and they are not the same question.
+
+- **The compiler you run** is the `l4` you test with.
+  `l4 --version` names it.
+  A leading number, as in `1.6.98 (main, 7689b0d, 2026-10-19)`, is a `main` build.
+  `unstable-` and a date, as in `unstable-20261015-8730d3f (unstable, 8730d3f, 2026-10-15)`, is the prerelease shelf.
+  `dev` is a build from a working tree and does not say, and a build older than 2026-10-14 may not answer `--version` at all; for either, run `l4 check` on [references/dialect-probes/02-refuse.l4](references/dialect-probes/02-refuse.l4), which passes on `unstable` and on `main` fails with `I could not find a definition for the identifier REFUSE`.
+- **The dialect you write** is the target, the compiler that has to read the finished file.
+  The brief names it.
+  If the brief is silent, the target is `main`; it is `unstable` only when the brief says so.
+  With no brief at all, assume `main` and say that you did.
+
+Running an `unstable` binary does not license `unstable` syntax.
+For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too, and goes red when `main` reads it differently.
 
 ### 1. Analyse the source
 

@@ -1,0 +1,4 @@
+IMPORT prelude
+IMPORT daydate
+
+#EVAL `EVAL AS OF SYSTEM TIME` (Date 1 1 2024) 5

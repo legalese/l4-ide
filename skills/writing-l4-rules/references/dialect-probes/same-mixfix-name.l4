@@ -1,0 +1,8 @@
+DECLARE Action IS ONE OF Pay HAS payer IS A NUMBER, amount IS A NUMBER
+
+GIVEN who IS A NUMBER
+      amount IS A NUMBER
+GIVETH AN Action
+`payment by` who amount MEANS Pay who amount
+
+#ASSERT (`payment by` 1 2) EQUALS (Pay 1 2)

@@ -27,8 +27,9 @@ Most of the quality comes from the brief.
 
 ### 0. Before you start
 
+- **Know the target, and do not confuse it with the binary.** The brief names the target compiler, `main` or `unstable`: the one that has to read the deposit. The `l4` you run is a different question. Commons wants encodings a `main` build can read, so the target is `main` unless the brief says `unstable`, and running an `unstable` binary does not license `unstable` syntax. Write inside what `writing-l4-rules/references/dialects.md` says `main` reads, and let `check.sh` (step 7) confirm it with a main build.
 - **Get a current `l4`.** Install it with this plugin's `scripts/install-l4.sh`, which fetches the release it was built against and checks its digest, or download an archive from [`legalese/prereleases`](https://github.com/legalese/prereleases/releases) — each carries a `BUILD-INFO.txt` naming the commit it was built from.
-  `l4` has no `--version` flag, so that file is how you know what you are running.
+  `l4 --version` prints the build, as a release line or as `dev` for a build from a working tree; the `BUILD-INFO.txt` of an archive is the record for a binary old enough not to answer it (the flag landed on `unstable` on 2026-10-14 and on `main` the next day).
   The authoring skill documents the language as it is on `unstable`; **a binary older than the skill rejects constructs the skill tells you exist**, and the symptom is a parse error that reads like your mistake.
   Measured: `@lang en`, a spelling of the `@lang` declaration the authoring skill documents, is a parse error at line 1 on the 7 September 2026 prerelease.
   Note that `install-l4.sh` links `~/.local/bin/l4`, replacing whatever was there.
@@ -56,6 +57,8 @@ Copy [`assets/brief-template.md`](assets/brief-template.md) and fill in every �
 The brief pins **scope** (which provisions, by number), **deliverables**, and **the rules that matter**.
 Write it even when you are the encoder: it is what a reviewer reads to learn what you were trying to do, and what the independent test author in step 8 works from.
 If you find yourself wanting to tell the encoder something that is not in the brief, put it in the brief.
+The brief names the **target compiler** (default `main`, from build 98).
+The encoder reads that line, and reads [`writing-l4-rules/references/dialects.md`](../writing-l4-rules/references/dialects.md) before writing when it says `main`.
 
 ### 3. Enumerate before you encode
 
@@ -85,7 +88,7 @@ The rules that decide whether a reviewer can trust the result:
   One source provision → one recognisable place in the L4, with the source's numbering and an `@ref` citation on every rule.
   If you keep the source as a text file, quote it and put source locators on the `@ref`, so that a script can check the quotation and the citation against the file: [`references/source-locators.md`](references/source-locators.md).
 - **Vintages are inputs, never merged.** Where the law exists in two versions, use the rule-version (rule-effective-time) mechanism in `writing-l4-rules` (`references/source-patterns/04-dates-and-periods.md`), or take the vintage as an explicit input. A vintage that is silent on something answers with silence — never with a number borrowed from another vintage.
-- **`REFUSE "…"` where the sources do not answer** — never `FALSE`, `0` or a plausible default. `MAYBE` / `NOTHING` where the source itself names an absent case. See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
+- **`REFUSE "…"` where the sources do not answer** (target `unstable`; `main` has no `REFUSE`, so for target `main` return `NOTHING` from a `MAYBE`, as `dialects.md` says) — never `FALSE`, `0` or a plausible default. `MAYBE` / `NOTHING` where the source itself names an absent case. See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
   Do not invent your own three-valued logic (`Established` / `Rejected` / `Unresolved` enums threaded through every rule): the language already has these, and a home-made version is one more thing a reviewer must learn before they can read a single rule.
 - **Inputs as `GIVEN`**, threading a record where there are many facts. `ASSUME` is deprecated for inputs.
 - **`BRANCH IF … IF … OTHERWISE`, not chains of `ELSE IF`.**
@@ -117,6 +120,17 @@ L4=/path/to/l4 ./check.sh
 
 Run it after every unit you land. Report the numbers it prints, never "it's green".
 
+**It also makes the target check.**
+Unless you set `L4_TARGET=unstable`, `check.sh` runs every module with a main build as well as with your `l4`, and compares the four counts.
+Copy [`assets/fetch-main-l4.sh`](assets/fetch-main-l4.sh) beside it: `check.sh` calls that to get the newest main build, and caches it.
+A line that ends `reads differently on main` is a module `main` cannot read as it stands; `writing-l4-rules/references/dialects.md` says what to write instead.
+Every module is run twice, once with each build, with your environment (a module that fetches over the network or reads `ENV` does that twice), and the comparison is of counts, not of which assertion fails; the header of `check.sh` says what to do about both.
+Exit status 2 means the main step did not run (no main build for your platform, no network, no `fetch-main-l4.sh`), and that is not a pass.
+A module `main` does not finish within `L4_MAIN_TIMEOUT` seconds (300 unless you set it) is red as well: `main` is the compiler that has to read it, and some modules that run in a second on `unstable` take minutes on `main`.
+The check counts error diagnostics and assertion lines and nothing else.
+It sees a module `main` rejects, and a difference that changes an `#ASSERT`'s outcome.
+It does not see a different `#TRACE` outcome, because a trace prints no assertion line: for the rows `dialects.md` marks as degrading, run the file with both builds and compare the traces yourself.
+
 ### 8. The independent test pass (recommended)
 
 Start a **fresh session** — one that has not seen your encoding — give it the brief and the sources, and have it decide what the answers should be **before** it opens the encoding. Only then does it read the encoding for names and write `tests-independent.l4` asserting those answers.
@@ -132,7 +146,8 @@ A reviewer reads this first. It carries:
 3. **The fork register**: every ambiguity you met — the readings you saw, the one you took, and why, with the text that licenses each reading.
    A fork resolved by a court or the regulator says who settled it. "No ambiguities found" is a claim a reviewer will not believe; if you found none, say where you looked.
 4. **An answer table** where the subject has one — the fee for each service in each vintage, the threshold for each grade — with the provision cited per cell.
-5. **What `check.sh` prints**, and which failing assertions are expected, and why.
+5. **What `check.sh` prints**, main columns included, and the main build it compared with, and which failing assertions are expected, and why.
+   Also the **target** the encoding was written for, `main` or `unstable`.
 6. **Open questions** for a domain expert.
 
 ### 10. Deposit it in canon
@@ -149,14 +164,15 @@ The review that turns `draft` into `reviewed` is a human who knows the law readi
 
 Each of these is a way for an encoding to look finished and not be:
 
-| failure                                                      | what prevents it                                         |
-| ------------------------------------------------------------ | -------------------------------------------------------- |
-| a fifth of the Act encoded, every check green                | the coverage table (step 3)                              |
-| the same person declared three ways in three chapters        | nouns first (step 4)                                     |
-| one 2,000-line module nobody can review against the source   | split along the source's structure (step 5)              |
-| a home-made `Unresolved` value instead of `REFUSE` / `MAYBE` | step 5, and `writing-l4-rules`' page 11                  |
-| a number from the amended text answering for the original    | vintages as inputs (step 5)                              |
-| tests that restate the code, so they cannot fail             | tests from the source; the independent pass (steps 6, 8) |
-| an expected value edited until the test passed               | a failing assertion is a finding (step 6)                |
-| "all green" over a run with failed or refused assertions     | `check.sh`, not the exit code (step 7)                   |
-| valid-looking syntax rejected by an old binary               | a current `l4` (step 0)                                  |
+| failure                                                          | what prevents it                                         |
+| ---------------------------------------------------------------- | -------------------------------------------------------- |
+| a fifth of the Act encoded, every check green                    | the coverage table (step 3)                              |
+| the same person declared three ways in three chapters            | nouns first (step 4)                                     |
+| one 2,000-line module nobody can review against the source       | split along the source's structure (step 5)              |
+| a home-made `Unresolved` value instead of `REFUSE` / `MAYBE`     | step 5, and `writing-l4-rules`' page 11                  |
+| a number from the amended text answering for the original        | vintages as inputs (step 5)                              |
+| tests that restate the code, so they cannot fail                 | tests from the source; the independent pass (steps 6, 8) |
+| an expected value edited until the test passed                   | a failing assertion is a finding (step 6)                |
+| "all green" over a run with failed or refused assertions         | `check.sh`, not the exit code (step 7)                   |
+| valid-looking syntax rejected by an old binary                   | a current `l4` (step 0)                                  |
+| an encoding only an `unstable` binary can read, filed for `main` | the target check in `check.sh` (step 7)                  |

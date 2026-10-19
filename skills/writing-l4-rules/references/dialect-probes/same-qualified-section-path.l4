@@ -1,0 +1,5 @@
+§ `Part 1`
+§§ `Division 1`
+`applies` MEANS TRUE
+
+#ASSERT `Part 1`.`Division 1`.`applies`

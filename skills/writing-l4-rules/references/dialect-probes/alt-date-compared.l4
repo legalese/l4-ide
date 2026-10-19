@@ -1,0 +1,5 @@
+IMPORT daydate
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`is recent` d MEANS d AT LEAST (Date 1 7 2025)

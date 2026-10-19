@@ -1,0 +1,10 @@
+DECLARE Actor IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF Pay HAS payer IS AN Actor, amount IS A NUMBER
+
+GIVETH A DEONTIC Actor Action
+rent MEANS
+    PARTY  Alice
+    MUST   Pay Alice 1500
+    WITHIN 7
+    HENCE  FULFILLED
+    LEST   BREACH

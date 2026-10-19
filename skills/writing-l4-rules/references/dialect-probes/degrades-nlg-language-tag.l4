@@ -1,0 +1,4 @@
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:pt o valor %amount% excede o limite
+  IF amount GREATER THAN 100

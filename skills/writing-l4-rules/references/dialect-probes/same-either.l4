@@ -1,0 +1,9 @@
+GIVEN result IS AN EITHER STRING NUMBER
+GIVETH A STRING
+`handle the result` result MEANS
+  CONSIDER result
+  WHEN LEFT OF err THEN err
+  WHEN RIGHT OF val THEN TOSTRING val
+
+#ASSERT `handle the result` (LEFT OF "bad") EQUALS "bad"
+#ASSERT `handle the result` (RIGHT OF 42) EQUALS "42"

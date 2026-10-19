@@ -1,0 +1,7 @@
+§ `Part 5` AKA `the fees Part`
+`prescribed fee` MEANS 250
+
+§ `Part 6`
+`net fee` MEANS `the fees Part`.`prescribed fee`
+
+#ASSERT `Part 6`.`net fee` EQUALS 250

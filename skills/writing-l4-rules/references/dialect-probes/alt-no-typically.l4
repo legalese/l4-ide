@@ -1,0 +1,3 @@
+DECLARE Person HAS
+    name IS A STRING
+    capable IS A BOOLEAN

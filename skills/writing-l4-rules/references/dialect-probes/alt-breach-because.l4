@@ -1,0 +1,8 @@
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF deliver
+
+GIVETH A DEONTIC Person Action
+`reason only` MEANS
+  PARTY Seller MUST deliver WITHIN 14
+  HENCE FULFILLED
+  LEST BREACH BECAUSE "late"

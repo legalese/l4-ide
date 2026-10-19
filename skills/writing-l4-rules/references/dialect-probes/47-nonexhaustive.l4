@@ -1,0 +1,4 @@
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nonexhaustive
+`is large` amount MEANS amount AT LEAST 100

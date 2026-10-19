@@ -1,0 +1,4 @@
+GIVETH A NUMBER
+`not covered` MEANS REFUSE "this case is not encoded"
+
+#ASSERT REFUSED `not covered` BECAUSE "this case is not encoded"
