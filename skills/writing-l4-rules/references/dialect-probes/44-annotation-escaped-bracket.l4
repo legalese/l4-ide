@@ -1,0 +1,4 @@
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+DECIDE `the surcharge on` [see note \[3\] on %amount%] amount
+  IS amount TIMES 0.05

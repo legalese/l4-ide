@@ -1,0 +1,3 @@
+IMPORT prelude
+
+n MEANS setSize (setFromList (LIST "a", "b"))

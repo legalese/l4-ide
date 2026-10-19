@@ -1,0 +1,3 @@
+IMPORT prelude
+
+s MEANS (setFromList (LIST "a")) UNION (setFromList (LIST "b"))

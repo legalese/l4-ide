@@ -1,0 +1,11 @@
+§ `Rates`
+
+GIVEN rate IS A NUMBER
+GIVETH A NUMBER
+doubled rate MEANS rate TIMES 2
+
+GIVEN rate IS A NUMBER
+GIVETH A NUMBER
+tripled rate MEANS rate TIMES 3
+
+#EVAL tripled 5

@@ -1,0 +1,17 @@
+IMPORT prelude
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVEN t IS AN Actor
+GIVETH A DEONTIC Actor Action
+`a tenant signs` t MEANS
+    PARTY t
+        MUST   Sign signer PROVIDED signer EQUALS t
+        WITHIN 14
+        HENCE  FULFILLED
+        LEST   BREACH

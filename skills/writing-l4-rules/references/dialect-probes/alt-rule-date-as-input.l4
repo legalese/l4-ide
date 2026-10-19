@@ -1,0 +1,8 @@
+IMPORT daydate
+
+GIVEN `rules effective on` IS A DATE
+GIVETH A NUMBER
+`GST rate` `rules effective on` MEANS
+  IF (DATE_SERIAL `rules effective on`) AT LEAST (DATE_SERIAL (Date 1 1 2024))
+  THEN 9
+  ELSE 7

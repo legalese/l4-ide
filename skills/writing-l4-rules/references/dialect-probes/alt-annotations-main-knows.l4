@@ -1,0 +1,9 @@
+@ref-map act https://example.com/act
+@ref-src act "An Act"
+
+@export Is the amount large
+GIVEN amount IS A NUMBER @desc The amount under test
+GIVETH A BOOLEAN
+@ref act s. 3(1)(a)
+DECIDE `is large` @nlg %amount% is at least 100
+  IF amount AT LEAST 100

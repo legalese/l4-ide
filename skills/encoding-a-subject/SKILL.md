@@ -28,7 +28,7 @@ Most of the quality comes from the brief.
 ### 0. Before you start
 
 - **Get a current `l4`.** Install it with this plugin's `scripts/install-l4.sh`, which fetches the release it was built against and checks its digest, or download an archive from [`legalese/prereleases`](https://github.com/legalese/prereleases/releases) â€” each carries a `BUILD-INFO.txt` naming the commit it was built from.
-  `l4` has no `--version` flag, so that file is how you know what you are running.
+  `l4 --version` prints the build, as a release line or as `dev` for a build from a working tree; the `BUILD-INFO.txt` of an archive is the record for a binary old enough not to answer it (the flag landed on `unstable` on 2026-10-14 and on `main` the next day).
   The authoring skill documents the language as it is on `unstable`; **a binary older than the skill rejects constructs the skill tells you exist**, and the symptom is a parse error that reads like your mistake.
   Measured: `@lang en`, a spelling of the `@lang` declaration the authoring skill documents, is a parse error at line 1 on the 7 September 2026 prerelease.
   Note that `install-l4.sh` links `~/.local/bin/l4`, replacing whatever was there.
@@ -56,6 +56,8 @@ Copy [`assets/brief-template.md`](assets/brief-template.md) and fill in every âŸ
 The brief pins **scope** (which provisions, by number), **deliverables**, and **the rules that matter**.
 Write it even when you are the encoder: it is what a reviewer reads to learn what you were trying to do, and what the independent test author in step 8 works from.
 If you find yourself wanting to tell the encoder something that is not in the brief, put it in the brief.
+The brief names the **target compiler**, `unstable` or `main`.
+The encoder reads that line, and reads [`writing-l4-rules/references/dialects.md`](../writing-l4-rules/references/dialects.md) before writing when it says `main`.
 
 ### 3. Enumerate before you encode
 

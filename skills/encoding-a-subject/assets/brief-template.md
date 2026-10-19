@@ -62,6 +62,12 @@ Name anything deliberately left out, and why.⟩
 
 ## Toolchain
 
+**Target compiler: ⟨`unstable` or `main`⟩.**
+This is the compiler that will read the deposit, and it decides which L4 you may write: `main` rejects, or reads differently, much of what the authoring skill teaches.
+If it is `main`, read `references/dialects.md` in the `writing-l4-rules` skill first, and use only what it allows.
+Where this brief asks for something that page lists as unavailable on `main`, use its "write instead" column, or leave the provision out, and say which in `NOTES.md`.
+If you cannot tell which compiler you have, run `L4_BIN --version`: a leading version number is `main`, and `unstable-` with a date is `unstable`; `dev` does not say, and step 0 of `writing-l4-rules` has the test for it.
+
 The binary is `L4_BIN`, built from ⟨commit or release tag⟩.
 Leave `JL4_LIBRARY_PATH` unset: the standard library is compiled into the binary and always matches it.
 `L4_BIN check FILE` typechecks; `L4_BIN run FILE` also evaluates every `#EVAL` and `#ASSERT`.

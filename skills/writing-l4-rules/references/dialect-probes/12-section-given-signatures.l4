@@ -1,0 +1,6 @@
+§ `Sigs`
+    GIVEN identity IS FOR ALL a A FUNCTION FROM a TO a
+          const IS FOR ALL a AND b A FUNCTION FROM a AND b TO a
+
+DECLARE Pair OF a, b HAS first IS AN a
+                         second IS A b
