@@ -90,6 +90,16 @@ rawNameToText (NormalName n)       = n
 rawNameToText (PreDef n)           = n
 rawNameToText (QualifiedName qs n) = Text.intercalate "." (NE.toList qs <> [n])
 
+-- | As 'rawNameToText', dropping any section qualification.
+--
+-- 'rawNameToText' joins the section path with @.@, which is right inside L4 and
+-- wrong wherever a name is compared with a library's own spelling: the date
+-- literal check in "L4.Nlg" asks whether a call is daydate's @Date@, and a call
+-- written through a section qualifier is still that function.
+unqualifiedRawNameToText :: RawName -> Text
+unqualifiedRawNameToText (QualifiedName _ n) = n
+unqualifiedRawNameToText rn                  = rawNameToText rn
+
 nameToText :: Name -> Text
 nameToText = rawNameToText . rawName
 
