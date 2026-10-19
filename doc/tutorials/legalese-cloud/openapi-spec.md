@@ -1,82 +1,88 @@
-# RESTful OpenAPI Specification
+# Call rules over REST
 
-Every deployment publishes an OpenAPI (Swagger) JSON document so third-party systems can generate clients and call your rules as a plain REST API.
+Call a deployment's rules from your own application as a plain REST API, and generate a client from its OpenAPI document. No model is involved: the same inputs always give the same result, which is what back-end workflows, batch jobs and audited systems need.
 
-**Prerequisites:** A deployment ([Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md))
+**Before you start:** a deployment ([Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md)). For API keys, permissions and self-hosted addresses, see [Choose an integration](README.md).
+
+The examples use the `insurance-premium` deployment from [Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md). Replace `{orgSlug}` with your organization and `sk_...` with an API key.
 
 ---
 
-## When to Use This
+## Names in the API
 
-Use the OpenAPI spec for **deterministic, server-to-server** integration: each exported rule is a typed REST operation with a documented request and response schema. No model is involved — the same inputs always produce the same decision, which is what you want for backend workflows, batch jobs, and audited systems.
+In addresses and arguments, spaces in names become hyphens: the rule `` `qualifies for discount` `` is called as `qualifies-for-discount`, and the field `` `risk score` `` is passed as `"risk-score"`.
 
-For conversational or agent-driven use, see the [OpenAI- and Anthropic-compatible AI APIs](./openai-compatible-api.md) or [MCP server](./mcp-server.md).
-
-## Endpoint
-
-**Legalese Cloud:**
-
-```
-https://api.legalese.cloud/{orgSlug}/{deploymentId}/openapi.json
-```
-
-**Self-hosted jl4-service:**
-
-```
-http://{serviceUrl}/{deploymentId}/openapi.json
-```
-
-The VS Code **Integrate** dialog pre-fills the correct URL for your connection.
-
-## Authentication
-
-- **Legalese Cloud:** bearer token — your signed-in session or an API key (`Authorization: Bearer sk_...`) from the [console](https://legalese.cloud). Uses the `l4:rules`, `l4:evaluate` and `l4:read` permissions.
-- **Self-hosted:** whatever auth your `jl4-service` is configured with.
-
-### Legalese Cloud Permissions
-
-| Permission    | Enables                                                                                                                      |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `l4:rules`    | Enumerate the deployment's rules — which REST operations (paths) the spec exposes.                                           |
-| `l4:read`     | Fetch `openapi.json` itself: the request/response **schemas** for every operation. Code generators and Swagger UI need this. |
-| `l4:evaluate` | Call an operation — POST inputs to a rule and receive its computed decision.                                                 |
-
-A common split: a build-time key with `l4:rules` + `l4:read` to (re)generate clients from the spec, and a separate runtime key that also has `l4:evaluate` for the service that actually calls the rules.
-
-## Use It
-
-### Inspect the spec
+## List the rules
 
 ```bash
-curl https://api.legalese.cloud/{orgSlug}/{deploymentId}/openapi.json \
+curl https://api.legalese.cloud/{orgSlug}/insurance-premium/functions \
   -H "Authorization: Bearer sk_..."
 ```
 
-The document lists one path per exported rule, with the `GIVEN` parameters as the typed request body and the rule's decision as the response.
+## Run a rule
 
-### Generate a client
-
-Feed the URL to any OpenAPI tool:
+Send the rule's inputs under `arguments` to `/functions/{name}/evaluation`:
 
 ```bash
-# openapi-generator
-openapi-generator-cli generate \
-  -i https://api.legalese.cloud/{orgSlug}/{deploymentId}/openapi.json \
-  -g typescript-fetch -o ./generated
-
-# or import the URL into Postman / Insomnia / Swagger UI
-```
-
-### Call a rule
-
-```bash
-curl https://api.legalese.cloud/{orgSlug}/{deploymentId}/<rule-operation> \
+curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/qualifies-for-discount/evaluation \
   -H "Authorization: Bearer sk_..." \
   -H "Content-Type: application/json" \
-  -d '{ "applicant": { "age": 40, "risk-score": 0.8 } }'
+  -d '{
+    "arguments": {
+      "applicant": {
+        "age": 35,
+        "risk-score": 0.4,
+        "existing-customer": true
+      }
+    }
+  }'
 ```
 
-The exact path and request shape for each rule come straight from the spec.
+```json
+{
+  "contents": { "presumed": [], "result": { "value": true } },
+  "report": "default",
+  "tag": "SimpleResponse"
+}
+```
+
+The answer is in `value`, under `result`. With the same applicant, `calculate-premium` gives `{ "value": 1400 }`.
+
+`presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; here there are none. `report` says which report the answer carries; the default report is the only one so far.
+
+## Read the answer
+
+What `value` holds depends on what the rule gives back:
+
+| The rule gives back                                    | `value` is                                                                                                                  |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `TRUE` or `FALSE`                                      | `true` or `false`                                                                                                           |
+| a number                                               | that number; one that is not whole comes back as a decimal, to about 16 significant digits: a third is `0.3333333333333333` |
+| a string                                               | that string                                                                                                                 |
+| a `DATE`                                               | the date as text, year first: `"2026-01-31"`                                                                                |
+| `NOTHING`, from a `MAYBE`                              | `null`                                                                                                                      |
+| `JUST` a value, from a `MAYBE`                         | the value itself, with nothing around it                                                                                    |
+| a list                                                 | a JSON array, even when the list has only one item                                                                          |
+| one of a list of choices, such as `` `under review` `` | the name as a string, without backticks: `"under review"`                                                                   |
+| a record, such as a `Pair` of `left` and `right side`  | an object with one key, the record's name, holding its fields: `{"Pair": {"left": 5, "right side": 6}}`                     |
+
+Four things to know:
+
+- Field names inside an answer are spelled as the rule spells them, spaces included; they are not turned into hyphens.
+- A rule that gives back a `MAYBE` of a `MAYBE` answers `null` both for `NOTHING` and for `JUST NOTHING`, so the two cannot be told apart.
+- Each rule's description includes a `returnSchema` for its answer. It does not show the record's name around a record's fields, or that a `MAYBE` answer can be `null`; go by the table above for those two.
+- A long list can come back cut short. A list answer of around 200 items or more may end with two `null`s in place of the rest, still with status 200, so two `null`s at the end of a long list mean it was cut, not that items were empty.
+
+## Ask only the questions that matter
+
+The query-plan endpoint takes the inputs you have so far and returns the inputs that are still needed, ranked by how much they can change the result:
+
+```bash
+curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/calculate-premium/query-plan \
+  -H "Authorization: Bearer sk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"arguments": {"applicant": {"existing-customer": true}}}'
+```
 
 ## Evaluating many cases at once
 
@@ -114,8 +120,21 @@ What else a case can carry:
 
 For every detail of the request and the response, see the [decision service's own documentation](../../../jl4-service/README.md#batch-evaluation).
 
-## Notes
+## Generate a client from the OpenAPI document
 
-- The spec regenerates on every redeploy, so generated clients stay in sync — re-run codegen after a schema-changing deploy.
-- Responses are the rule's typed decision, suitable for storing as an auditable record.
-- A self-hosted `jl4-service` serves the spec at `http://{serviceUrl}/{deploymentId}/openapi.json`.
+Every deployment publishes an OpenAPI document, with one operation per exported rule: the `GIVEN` inputs as the request body and the rule's result as the response.
+
+```bash
+curl https://api.legalese.cloud/{orgSlug}/insurance-premium/openapi.json \
+  -H "Authorization: Bearer sk_..."
+```
+
+Give the address to any OpenAPI tool, or import it into Postman, Insomnia or Swagger UI:
+
+```bash
+openapi-generator-cli generate \
+  -i https://api.legalese.cloud/{orgSlug}/insurance-premium/openapi.json \
+  -g typescript-fetch -o ./generated
+```
+
+The document is regenerated on every redeploy. Run the generator again after a deploy that changes a rule's inputs or result.

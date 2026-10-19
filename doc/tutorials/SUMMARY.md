@@ -1,62 +1,46 @@
 # Tutorials - Summary
 
-- [Tutorials Home](README.md)
+- [Overview](README.md)
 
-## Getting Started
+## Start here
 
-- [Your First L4 File](getting-started/first-l4-file.md)
-- [Using the l4 CLI](getting-started/l4-cli.md)
-- [Testing Your Rules](getting-started/testing-your-rules.md)
-- [Debugging Type Errors](getting-started/debugging-type-errors.md)
-- [Version Control for Rules](getting-started/version-control-for-rules.md)
-- [Encoding Legislation](getting-started/encoding-legislation.md)
+- [Install L4 and write your first rule](getting-started/first-l4-file.md)
+- [Draft rules with Legalese AI](llm-integration/composing-l4-with-ai.md)
+
+## Write and check rules
+
+- [Test your rules](getting-started/testing-your-rules.md)
+- [Fix errors](getting-started/debugging-type-errors.md)
+- [Encode legislation](getting-started/encoding-legislation.md)
+- [Make rules read like law](natural-language-functions/optimising-natural-language-generation.md)
+- [Common patterns](getting-started/common-patterns.md)
 - [What a Section Needs to Know](section-given/what-a-section-needs-to-know.md)
-- [Wedding Vows](getting-started/wedding-vows.md)
+- [Grouping and Precedence: What Binds to What](getting-started/grouping-and-precedence.md)
+- [Sets, and the Two Meanings of "And"](set-operators/sets-and-the-two-ands.md)
+- [When a Rule Cannot Answer](refuse/when-a-rule-cannot-answer.md)
 
-## Obligations
+## Model obligations and time
 
 - [One Obligation](obligations/one-obligation.md)
 - [What Follows](obligations/what-follows.md)
 - [Several Parties](obligations/several-parties.md)
 - [What Is Coming](obligations/what-is-coming.md)
-
-## Set Operators
-
-- [Sets, and the Two Meanings of "And"](set-operators/sets-and-the-two-ands.md)
-
-## Multi-Temporal Modeling
-
 - [Multi-Temporal Rule Modeling](multi-temporal-modeling/multi-temporal-rule-modeling.md)
 
-## Deployment
+## Publish rules
 
-- [Exporting Rules for Deployment](deploying-rules/exporting-rules-for-deployment.md)
-
-## Blawx Bridge
-
+- [Deploy your rules](deploying-rules/exporting-rules-for-deployment.md)
 - [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)
 
-## Legalese Cloud
+## Use deployed rules
 
-- [OpenAI- and Anthropic-Compatible AI APIs](legalese-cloud/openai-compatible-api.md)
-- [MCP Server](legalese-cloud/mcp-server.md)
-- [Using Your Rules from Claude](legalese-cloud/using-rules-from-claude.md)
-- [Install as Agent Plugin](legalese-cloud/agent-plugin.md)
-- [Use Deployed Rules from an AI Agent (MCP)](legalese-cloud/agent-marketplace.md)
-- [WebMCP Embed Script](legalese-cloud/webmcp-embed.md)
-- [RESTful OpenAPI Specification](legalese-cloud/openapi-spec.md)
+- [Choose an integration](legalese-cloud/README.md)
+- [Connect an AI agent](legalese-cloud/ai-agents.md)
+- [Chat with your rules](legalese-cloud/openai-compatible-api.md)
+- [Call rules over REST](legalese-cloud/openapi-spec.md)
+- [Embed rules in a website](legalese-cloud/webmcp-embed.md)
 
-## Natural Language
+## Advanced
 
-- [Using Infix, Postfix, and Mixfix Functions](natural-language-functions/natural-language-functions.md)
-- [Optimising for Natural Language Generation with @nlg](natural-language-functions/optimising-natural-language-generation.md)
-
-## LLM Integration
-
-- [Getting Started with LLM](llm-integration/llm-getting-started.md)
-- [Legislative Ingestion](llm-integration/legislative-ingestion.md)
-- [Composing L4 with AI](llm-integration/composing-l4-with-ai.md)
-
-## When a Rule Cannot Answer
-
-- [When a Rule Cannot Answer](refuse/when-a-rule-cannot-answer.md)
+- [Using the l4 CLI](getting-started/l4-cli.md)
+- [Manage rules in git and CI](getting-started/version-control-for-rules.md)

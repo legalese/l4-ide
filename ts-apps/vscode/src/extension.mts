@@ -29,12 +29,12 @@ import {
   SyncInspectorResults,
   ToggleSimplify,
   EvalDirectiveResultRequestType,
+  EmbeddedLibraryRequestType,
   makeLspRelayRequestType,
   makeL4RpcRequestType,
   isStateGraphResponse,
   stateGraphTargetGone,
   trackSrcPos,
-  EmbeddedLibraryRequestType,
   type DirectiveResult,
   type SrcPos,
   type StateGraphResponse,
@@ -849,6 +849,7 @@ export async function activate(context: ExtensionContext) {
       mcp: aiMcpClient,
       vsMcp: vsMcpTools,
       serviceClient,
+      extensionPath: context.extensionPath,
     })
   )
 

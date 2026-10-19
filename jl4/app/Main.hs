@@ -26,8 +26,8 @@ import Options.Applicative
   , showHelpOnEmpty
   , subparser
   )
-import qualified Options.Applicative as Options
 import qualified Data.Text as Text
+import qualified Options.Applicative as Options
 import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
 
@@ -38,9 +38,23 @@ import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
 import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxExportOptionsParser, blawxImportOptionsParser)
 import L4.Cli.Catala (CatalaOptions, catalaCmd, catalaOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
+import L4.Cli.Deploy
+  ( DeployOptions
+  , DeploymentsOptions
+  , UndeployOptions
+  , deployCmd
+  , deployOptionsParser
+  , deploymentsCmd
+  , deploymentsOptionsParser
+  , redeployCmd
+  , redeployOptionsParser
+  , undeployCmd
+  , undeployOptionsParser
+  )
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
+import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
 import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
@@ -73,6 +87,11 @@ data Command
   | CmdLts        LtsOptions
   | CmdVerify     VerifyOptions
   | CmdYscript    YscriptOptions
+  | CmdDeploy     DeployOptions
+  | CmdRedeploy   DeployOptions
+  | CmdUndeploy   UndeployOptions
+  | CmdDeployments DeploymentsOptions
+  | CmdInstall    InstallOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -83,32 +102,32 @@ commandParser =
   where
     subcommandSet =
          command "run"
-           (info (CmdRun <$> runOptionsParser)
+           (info (helper <*> (CmdRun <$> runOptionsParser))
              (progDesc "Typecheck and evaluate an L4 file (prints diagnostics + #EVAL results)"))
       <> command "check"
-           (info (CmdCheck <$> checkOptionsParser)
+           (info (helper <*> (CmdCheck <$> checkOptionsParser))
              (progDesc "Typecheck an L4 file only (fast path; no evaluation)"))
       <> command "format"
-           (info (CmdFormat <$> formatOptionsParser)
+           (info (helper <*> (CmdFormat <$> formatOptionsParser))
              (progDesc "Reformat an L4 file and print to stdout"))
       <> command "ast"
-           (info (CmdAst <$> astOptionsParser)
+           (info (helper <*> (CmdAst <$> astOptionsParser))
              (progDesc "Dump the parsed AST of an L4 file"))
       <> command "batch"
-           (info (CmdBatch <$> batchOptionsParser)
+           (info (helper <*> (CmdBatch <$> batchOptionsParser))
              -- "NDJSON" here is the OUTPUT default (--output-format); the input
              -- side reads json|yaml|csv and has no ndjson reader. The summary
              -- used to say just "NDJSON streaming", which read as if
              -- `--input-format ndjson` were available (smucclaw/l4-ide#932).
              (progDesc "Evaluate an @export function against many input rows (json|yaml|csv in, NDJSON streaming out)"))
       <> command "trace"
-           (info (CmdTrace <$> traceOptionsParser)
+           (info (helper <*> (CmdTrace <$> traceOptionsParser))
              (progDesc "Render #EVALTRACE evaluation traces as GraphViz (dot|png|svg)"))
       <> command "state-graph"
-           (info (CmdStateGraph <$> stateGraphOptionsParser)
+           (info (helper <*> (CmdStateGraph <$> stateGraphOptionsParser))
              (progDesc "Extract regulative-rule state transition graphs as GraphViz DOT"))
       <> command "render"
-           (info (CmdRender <$> renderOptionsParser)
+           (info (helper <*> (CmdRender <$> renderOptionsParser))
              (progDesc "Render an L4 file to a formatted document (html|text|json|plan)"))
       <> command "nlg"
            (info (helper <*> (CmdNlg <$> nlgOptionsParser))
@@ -134,6 +153,21 @@ commandParser =
       <> command "import"
            (info (helper <*> importFormats)
              (progDesc "Read another notation into L4 source. Run `l4 import --help` for the formats"))
+      <> command "deploy"
+           (info (helper <*> (CmdDeploy <$> deployOptionsParser))
+             (progDesc "Deploy an L4 file and its imports as a new deployment (Legalese Cloud, or --server)"))
+      <> command "redeploy"
+           (info (helper <*> (CmdRedeploy <$> redeployOptionsParser))
+             (progDesc "Update an existing deployment; refuses breaking changes unless --force"))
+      <> command "undeploy"
+           (info (helper <*> (CmdUndeploy <$> undeployOptionsParser))
+             (progDesc "Delete a deployment"))
+      <> command "deployments"
+           (info (helper <*> (CmdDeployments <$> deploymentsOptionsParser))
+             (progDesc "List deployments"))
+      <> command "install"
+           (info (helper <*> (CmdInstall <$> installOptionsParser))
+             (progDesc "Install a companion tool: `l4 install legalese` (the Legalese Cloud CLI)"))
 
     -- One subcommand per foreign notation (CLI-SURFACE-SPEC C1). Each was a
     -- top-level verb, or a `--to` value on `l4 export`, until 2026-09-24.
@@ -193,7 +227,7 @@ commandInfo :: ParserInfo Command
 commandInfo = info (helper <*> versionOption <*> commandParser)
   ( fullDesc
   <> header "l4 — the L4 computational-law CLI"
-  <> progDesc "Typecheck, evaluate, format and visualize .l4 files, and export them to (or import them from) other notations. Run `l4 <command> --help` for per-command options."
+  <> progDesc "Typecheck, evaluate, format, visualize and deploy .l4 files, and export them to (or import them from) other notations. Run `l4 <command> --help` for per-command options."
   <> footer "Part of the L4 tool family from Legalese.com"
   )
 
@@ -247,6 +281,11 @@ main = do
     CmdLts        opts -> ltsCmd        opts
     CmdVerify     opts -> verifyCmd     opts
     CmdYscript    opts -> yscriptCmd    opts
+    CmdDeploy     opts -> deployCmd     opts
+    CmdRedeploy   opts -> redeployCmd   opts
+    CmdUndeploy   opts -> undeployCmd   opts
+    CmdDeployments opts -> deploymentsCmd opts
+    CmdInstall    opts -> installCmd    opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.

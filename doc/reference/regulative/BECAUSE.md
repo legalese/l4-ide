@@ -1,127 +1,53 @@
 # BECAUSE
 
-Provides a reason or justification for a breach in regulative rules. Used with BREACH to document why a violation occurred.
+`BECAUSE` gives the reason for a breach. It comes after `BREACH`, optionally with `BY` and the party in breach.
 
 ## Syntax
 
-```l4
+```text
 BREACH BECAUSE reason
 BREACH BY party BECAUSE reason
 BREACH BY LIST party, party BECAUSE reason
 ```
 
-Where:
+| Form                                | Records                |
+| ----------------------------------- | ---------------------- |
+| `BREACH`                            | that a breach happened |
+| `BREACH BY Seller`                  | who is in breach       |
+| `BREACH BECAUSE "reason"`           | why                    |
+| `BREACH BY Seller BECAUSE "reason"` | who and why            |
+| `BREACH BY LIST Seller, Carrier`    | several parties        |
 
-- `party` - The party responsible for the breach (optional). After `BY` you may write one party, or a `LIST` of them when several share the blame — one entry each, in order
-- `reason` - A STRING explaining why the breach occurred
-
-## Purpose
-
-BECAUSE serves two purposes in L4:
-
-1. **Documentation** - Records the legal reason for a breach, useful for generating explanations and audit trails
-2. **Specificity** - Distinguishes between different types of breaches in complex contracts
-
-## Examples
+The reason is a STRING, either text in quotes or an expression that gives text.
 
 **Example file:** [because-example.l4](because-example.l4)
 
-### Basic BECAUSE
+## Example
 
 ```l4
--- Breach with reason only
-PARTY Seller
-MUST `deliver goods`
-WITHIN 14
-LEST BREACH BECAUSE "failed to deliver within deadline"
-```
+DECLARE Party IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF `pay invoice` HAS amount IS A NUMBER
 
-### Full Form: BY and BECAUSE
+`the amount due` MEANS 1000
 
-```l4
--- Breach with party and reason
-PARTY Seller
-MUST `deliver goods`
-WITHIN 14
-LEST BREACH BY Seller BECAUSE "failed to deliver within deadline"
-```
-
-### Multiple Breach Types
-
-BECAUSE allows distinguishing between different breach scenarios:
-
-```l4
--- Different breach reasons for different conditions
-`delivery obligation` MEANS
-  PARTY Seller
-  MUST `deliver goods` qty PROVIDED qty AT LEAST 100
-  WITHIN 14
-  HENCE FULFILLED
-  LEST BREACH BY Seller BECAUSE "insufficient quantity delivered"
-
-`quality obligation` MEANS
-  PARTY Seller
-  MUST `pass inspection`
-  WITHIN 7
-  HENCE FULFILLED
-  LEST BREACH BY Seller BECAUSE "goods failed quality inspection"
-```
-
-## Usage Patterns
-
-### With LEST (Most Common)
-
-BECAUSE typically appears in the LEST clause to explain what went wrong:
-
-```l4
-PARTY Employee
-SHANT `disclose confidential information`
-HENCE FULFILLED
-LEST BREACH BY Employee BECAUSE "violated NDA section 3.2"
-```
-
-### With HENCE (Unusual but Valid)
-
-In rare cases, BECAUSE can appear with HENCE when exercising a permission itself triggers a breach:
-
-```l4
--- Smoking is permitted but still recorded as a policy violation
-PARTY Employee
-MAY smoke
-WITHIN 30
-HENCE BREACH BY Employee BECAUSE "smoking policy violation logged"
-```
-
-### In Chained Obligations
-
-```l4
-`payment chain` MEANS
+GIVETH A DEONTIC Party Action
+`payment` MEANS
   PARTY Buyer
-  MUST `pay deposit` 1000
-  WITHIN 7
-  HENCE (
-    PARTY Buyer
-    MUST `pay balance` 9000
-    WITHIN 30
-    HENCE FULFILLED
-    LEST BREACH BY Buyer BECAUSE "failed to pay balance"
-  )
-  LEST BREACH BY Buyer BECAUSE "failed to pay deposit"
+  MUST `pay invoice` `the amount due`
+  WITHIN 30
+  HENCE FULFILLED
+  LEST BREACH BY Buyer BECAUSE (CONCAT "failed to pay ", TOSTRING `the amount due`)
+
+#TRACE `payment` AT 0 WITH
+  (`WAIT UNTIL` 31)
 ```
 
-## BREACH Forms
+The `#TRACE` result shows the breach with its party and reason: `BREACH BY Buyer BECAUSE "failed to pay 1000"`.
 
-BREACH can be used in several forms:
+`BREACH … BECAUSE` usually follows `LEST`, but it can stand wherever a rule can, for example after `HENCE` or in a branch of an `IF`.
+When a contract has several ways to fail, give each its own reason, and cite the clause or section it comes from, so a reader of the result knows which duty failed and why.
 
-| Form         | Example                             | Description                  |
-| ------------ | ----------------------------------- | ---------------------------- |
-| Simple       | `BREACH`                            | Anonymous breach             |
-| With party   | `BREACH BY Seller`                  | Identifies responsible party |
-| With parties | `BREACH BY LIST Seller, Carrier`    | Several share the blame      |
-| With reason  | `BREACH BECAUSE "reason"`           | Documents why                |
-| Full form    | `BREACH BY Seller BECAUSE "reason"` | Complete breach info         |
-
-### Several parties
+## Several parties
 
 `BY` takes a `LIST` as well as a single party, for a breach that several parties carry together. The list can be written out or computed, and it is read when the breach happens. Every name in it becomes one line of the answer, in the order written, each carrying the `BECAUSE`; the same party named twice is named twice — nothing is collapsed, so a list that says a party is in breach two ways says so.
 
@@ -144,92 +70,8 @@ When the party type is itself a `LIST` (a group as one party, `DEONTIC (LIST OF 
 
 You do not have to write the list yourself when the language already knows who failed. When both sides of a `RAND` are lost, the breach names both sides' failures, each with its own reason or its own missed deadline; when several members of an `EVERY … ONCE ALL HAVE` group fail and the group has no `LEST`, the breach names every one of them, each with their own deadline. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
 
-## Best Practices
+## Related pages
 
-### 1. Be Specific
-
-```l4
--- ✅ Good: Specific reason
-LEST BREACH BY Seller BECAUSE "delivery exceeded 14-day SLA"
-
--- ❌ Vague: Doesn't help with analysis
-LEST BREACH BECAUSE "failed"
-```
-
-### 2. Reference Legal Text
-
-```l4
--- ✅ Good: References contract section
-LEST BREACH BY Tenant BECAUSE "violated lease agreement section 8.3"
-
--- ✅ Also good: References regulation
-LEST BREACH BY Employer BECAUSE "non-compliance with Employment Act s.42"
-```
-
-### 3. Use Meaningful Party Names
-
-```l4
--- ✅ Good: Clear party identification
-LEST BREACH BY `The Borrower` BECAUSE "exceeded debt covenant"
-
--- Less clear
-LEST BREACH BY x BECAUSE "exceeded debt covenant"
-```
-
-### 4. Distinguish Breach Types
-
-When a contract has multiple potential breaches, use BECAUSE to distinguish them:
-
-```l4
--- Payment late vs. payment insufficient
-LEST BREACH BY Buyer BECAUSE "payment received after deadline"
-
--- vs.
-
-LEST BREACH BY Buyer BECAUSE "payment amount below minimum"
-```
-
-## Type Checking
-
-The BECAUSE clause must be a STRING type:
-
-```l4
--- ✅ Valid: String literal
-LEST BREACH BECAUSE "reason text"
-
--- ✅ Valid: String expression
-LEST BREACH BECAUSE (CONCAT "failed to pay ", TOSTRING amount)
-
--- ❌ Invalid: Not a string
--- LEST BREACH BECAUSE 42
-```
-
-## Evaluation and Tracing
-
-When tracing regulative rules, BECAUSE reasons appear in the output:
-
-```l4
-#TRACE obligation AT 0 WITH
-  -- No action taken, deadline passes
--- Output includes: BREACH BY Seller BECAUSE "failed to deliver"
-```
-
-This helps with:
-
-- **Debugging** contracts during development
-- **Explainability** when generating reports
-- **Audit trails** for compliance
-
-## Related Keywords
-
-- **[BREACH](README.md#lest-breach-consequence)** - The violation marker
-- **[BY](README.md)** - Identifies the breaching party
-- **[LEST](README.md#lest-breach-consequence)** - Breach consequence clause
-- **[HENCE](README.md#hence-fulfillment-consequence)** - Fulfillment consequence
-
-## See Also
-
-- **[Regulative Rules Overview](README.md)** - Complete regulative syntax
-- **[SHANT](SHANT.md)** - Prohibitions (often use BECAUSE)
-- **[MUST](MUST.md)** - Obligations
-- **[Regulative Rules Concept](../../concepts/legal-modeling/regulative-rules.md)** - Conceptual overview
+- [Deadlines and consequences: FULFILLED and BREACH](consequences.md#fulfilled-and-breach)
+- [PARTY, MUST, MAY, SHANT](PARTY.md)
+- [DEONTIC](DEONTIC.md)

@@ -636,7 +636,7 @@ infoToHover nuri subst r i mNlg mDesc =
           -- residual inference variables — e.g. an un-annotated lambda parameter,
           -- whose 'InfVar' prints @rawName <> uniq@ like @x10@ — are normalised to
           -- stable names (@a@, @b@, …). This also makes hover consistent with the
-          -- deployed schema's @returnType@, which already uses this renderer. See #313.
+          -- deployed schema's @returnType@, which already uses this renderer. See smucclaw/l4-ide#313.
           mdCodeBlock (prettyTypeForDisplay (applyFinalSubstitution subst nuri t)) <>
             case mNlg of
               Nothing -> mempty

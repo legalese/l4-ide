@@ -1,87 +1,118 @@
 # DECLARE
 
-Declares a new type in L4. Types can be records (product types), enums (sum types), type synonyms, or **opaque types** — a type that is named but not described.
+`DECLARE` introduces a new type: a record, an enumeration, a synonym for another type, or an **opaque type**, a type that is named but not described.
 
 ## Syntax
 
-```l4
-DECLARE TypeName IS ...
-DECLARE TypeName HAS ...
-DECLARE TypeName IS ONE OF ...
-DECLARE TypeName
+```text
+DECLARE Name HAS field1 IS A Type1, field2 IS A Type2
+DECLARE Name IS ONE OF Value1, Value2, Value3
+DECLARE Name IS A Type
+DECLARE Name OF a, b HAS ...
+DECLARE Name
 ```
 
-## Forms
+**Example files:** [declare-example.l4](declare-example.l4), [record-example.l4](record-example.l4), [enum-example.l4](enum-example.l4), [opaque-example.l4](opaque-example.l4)
 
-### Record Types (Product Types)
+## Records
 
-Records are types with named fields:
+A record has named fields. Write them after `HAS`, one per line or separated by commas:
 
 ```l4
 DECLARE Person
   HAS
     name IS A STRING
     age IS A NUMBER
+
+DECLARE Point HAS x IS A NUMBER, y IS A NUMBER
 ```
 
-### Enum Types (Sum Types)
+A field can also be written `name: STRING` or `name: A STRING`.
 
-Enums define a type with multiple alternatives:
+**Making a record.** Give every field by name with `WITH`, or give the values in the order the fields are declared, with `OF` and commas or with spaces:
 
 ```l4
-DECLARE Colour IS ONE OF red, green, blue
+DECLARE Person HAS
+  name IS A STRING
+  age IS A NUMBER
+
+`the buyer` MEANS Person WITH name IS "Kim", age IS 30
+`the seller` MEANS Person OF "Lee", 45
+`the agent` MEANS Person "Jo" 28
+
+#EVAL `the buyer`'s age
 ```
 
-Enum constructors can have fields:
+**Reading a field.** Use the genitive `'s`: `` `the buyer`'s age ``. See [Syntax and directives: Genitive](../syntax/README.md#genitive).
+
+## Computed fields
+
+A field followed by `MEANS` is computed from the record's other fields. It is read with `'s` like any other field, and it is not given when the record is made.
+
+```l4
+DECLARE Employee HAS
+    `name`          IS A STRING
+    `year of birth` IS A NUMBER
+    `current year`  IS A NUMBER
+    `age`           IS A NUMBER
+        MEANS `current year` - `year of birth`
+    `adult`         IS A BOOLEAN
+        MEANS `age` >= 18
+
+`the employee` MEANS Employee WITH
+    `name`          IS "Lim"
+    `year of birth` IS 1990
+    `current year`  IS 2026
+
+#EVAL `the employee`'s `adult`
+```
+
+- The body can use the record's other fields by name, including other computed fields, and call functions defined elsewhere.
+- It can use `WHERE` and `LET … IN`.
+- It takes no inputs of its own: there is no `GIVEN` for a computed field. Its only input is the record.
+- Computed fields that depend on each other in a cycle are an error ("Circular dependency detected between computed fields").
+
+Putting the stored fields first and the computed fields after them makes a declaration easier to read.
+
+**Example file:** [computed-fields-example.l4](computed-fields-example.l4)
+
+## Enumerations
+
+`IS ONE OF` lists the values a type can have:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+```
+
+A value can carry fields of its own:
 
 ```l4
 DECLARE Shape IS ONE OF
   Circle HAS radius IS A NUMBER
   Rectangle HAS width IS A NUMBER, height IS A NUMBER
+  Point
+
+`the plot` MEANS Rectangle WITH width IS 20, height IS 30
+`the pond` MEANS Circle 4
 ```
 
-### Computed Fields (Methods)
+Use [CONSIDER](../control-flow/CONSIDER.md) to tell the values apart.
 
-Record fields can have a `MEANS` clause that defines a derived value — computed automatically from the record's other fields. These are analogous to **methods**, **calculated properties**, or **derived attributes** in other languages.
+## Type synonyms
+
+`DECLARE Name IS Type` gives another name to an existing type. The two names are the same type.
 
 ```l4
-DECLARE Employee HAS
-    -- stored fields (primary attributes)
-    `name`             IS A STRING
-    `date of birth`    IS A NUMBER
-    `current year`     IS A NUMBER
-    -- computed fields (derived attributes)
-    `age`              IS A NUMBER
-        MEANS `current year` - `date of birth`
-    `adult`            IS A BOOLEAN
-        MEANS `age` >= 18
+DECLARE Age IS A NUMBER
+
+GIVEN age IS AN Age
+GIVETH A BOOLEAN
+`is an adult` age MEANS age >= 18
 ```
 
-**Key points:**
-
-- Computed fields are accessed with `'s` just like stored fields: `employee's `age``
-- Computed fields may depend on other computed fields (chaining)
-- Computed fields may call external functions using OF syntax: `MEANS `f`OF`x`, `y``
-- Computed fields may use WHERE and LET/IN for local bindings
-- When constructing a record with WITH, only stored fields are supplied — computed fields are derived automatically
-
-**Referential transparency:** Computed fields are _pure_ — they may only reference sibling fields of the same record. There is no way to add a GIVEN parameter to a MEANS clause inside a DECLARE; the only input is the record itself. This is a deliberate design choice rooted in functional programming: a computed field is a total function from the record's stored state to a derived value, with no hidden dependencies on external state or arguments. In the language of the lambda calculus, each computed field is a closed term over the record's own bindings. This purity guarantee means that computed fields are referentially transparent — evaluating `employee's \`age\`` will always yield the same result for the same record, regardless of when or where it is called. It also makes cycle detection decidable: the compiler builds a dependency graph over a finite set of sibling fields and rejects any strongly connected component, ensuring termination.
-
-**Style guide:** Group stored fields first, then computed fields, so readers see the primary data before the derived logic. Depart from this convention when expository clarity calls for a different ordering — for instance, placing a computed field immediately after the stored fields it depends on.
-
-**Example file:** [computed-fields-example.l4](computed-fields-example.l4)
-
-### Type Synonyms
-
-Create an alias for an existing type:
-
-```l4
-DECLARE Age IS NUMBER
-DECLARE PersonName IS STRING
-```
-
-**A synonym may not refer to itself**, either directly or through other synonyms, because a type like that could never be written out in full.
-L4 reports it as a circular dependency between the synonyms, and sets aside what they stand for rather than following them round and round.
+- A synonym can take type parameters: `DECLARE Optional OF a IS A MAYBE a`.
+- A synonym cannot refer to itself, directly or through other synonyms, because a type like that could never be written out in full. L4 reports it as a circular dependency between the synonyms, and sets aside what they stand for rather than following them round and round.
+- L4 follows a chain of synonyms for at most 1000 steps. For a longer chain, declare the first synonym as the type the chain ends in.
 
 ```l4
 -- Not allowed: each is defined as the other
@@ -114,7 +145,7 @@ as the type it finally stands for, to shorten the chain.
 The message does not say the two types differ, because L4 has not found out whether they do.
 Chains anywhere near that long are rare; the usual remedy is to declare the first synonym in the chain as the type the chain ends in.
 
-### Opaque Types
+## Opaque types
 
 Leave the body off entirely and you get an **opaque type**: a type that has a
 name and nothing else. It has no fields, no alternatives, and no synonym body,
@@ -156,7 +187,7 @@ DECLARE Bag x
 
 **Example file:** [opaque-example.l4](opaque-example.l4)
 
-#### Where the values come from
+### Where the values come from
 
 An opaque type has no constructors, so no expression in your file can produce
 one. Values arrive from outside: a fact declared in a
@@ -169,7 +200,7 @@ looks inside an opaque value still evaluates normally.
     GIVEN `the applicant` IS AN Applicant
 ```
 
-#### Limits
+### Limits of opaque types
 
 - **You cannot write down a value.** There is no literal, no constructor, and
   no `WITH` form for an opaque type. A directive that has to inspect one stops
@@ -186,8 +217,8 @@ looks inside an opaque value still evaluates normally.
 - **`TYPICALLY` does not apply.** A default value would have to be a value of
   the type, and there are none.
 - **A misspelt body keyword becomes a type parameter.** `DECLARE Bag x` and
-  `DECLARE Conduct IZ STRING` are the same shape — a name followed by more
-  names — so nothing in the declaration itself can tell a parameterised opaque
+  `DECLARE Conduct IZ STRING` are the same shape (a name followed by more
+  names), so nothing in the declaration itself can tell a parameterised opaque
   head from a typo for `IS`. The second one declares an opaque `Conduct` of
   arity two. You still find out, but one step later and under a different
   name: `GIVEN c IS A Conduct` then reports "This type is given the wrong
@@ -195,7 +226,7 @@ looks inside an opaque value still evaluates normally.
   at all is a misspelt declaration that nothing uses. If you meant a synonym,
   check that the keyword reads `IS`.
 
-#### In the editor
+### In the editor
 
 When you use a type name that nothing declares, the editor flags it with "I could not find a definition for the identifier".
 Click the lightbulb on that error (or run the "Quick Fix" command) and choose "Declare `Widget` as a type".
@@ -206,7 +237,7 @@ When the name is used in a section's own `GIVEN`, the line goes above the sectio
 If the use gives the type arguments, as in `Box OF NUMBER`, the declaration gets one parameter for each: `DECLARE Box a`.
 The fix declares an opaque type and nothing more; if you meant a record or a list of alternatives, add the `HAS` or `IS ONE OF` part yourself.
 
-#### The older spelling
+### The older spelling
 
 `ASSUME TypeName IS A TYPE` declares the same thing and still works. The two
 produce the same entity in the type checker, so you can migrate a file one
@@ -214,50 +245,76 @@ line at a time. `DECLARE` is the spelling to use: it puts type declarations
 under one keyword, and `ASSUME` is deprecated in every one of its jobs. See
 [ASSUME (deprecated)](ASSUME.md).
 
-## Examples
+## Parameterised types
 
-**Example file:** [declare-example.l4](declare-example.l4)
-
-### Basic Record
-
-```l4
-DECLARE Customer
-  HAS
-    name IS A STRING
-    email IS A STRING
-    balance IS A NUMBER
-```
-
-### Parameterized Types
-
-Types can have type parameters:
+A type can take type parameters, so that the same declaration works for numbers, text or any other type.
+Write the parameters after the name, with `OF` and commas, or declare them with `GIVEN … IS A TYPE` above the `DECLARE`:
 
 ```l4
+DECLARE Box OF a HAS contents IS AN a
+
 GIVEN a IS A TYPE
-DECLARE Box
-  HAS
-    contents IS AN a
+      b IS A TYPE
+DECLARE `Pair of values` HAS first IS AN a, second IS A b
+
+GIVETH A Box OF NUMBER
+`a box of 42` MEANS Box WITH contents IS 42
 ```
 
-### Field Syntax Variations
+The parameter can also follow the name without `OF` (`DECLARE Box a HAS …`).
+A use of the type gives the parameters with `OF`: `Box OF NUMBER`, `` `Pair of values` OF NUMBER, STRING ``.
 
-L4 supports multiple syntaxes for fields:
+## A and AN
+
+`A` and `AN` before a type are for readability only. They are interchangeable and can be left out: `IS A NUMBER`, `IS AN Account` and `IS NUMBER` mean the same.
 
 ```l4
--- Using IS A
-DECLARE Person1 HAS name IS A STRING
+DECLARE Account HAS balance IS A NUMBER
 
--- Using colon
-DECLARE Person2 HAS name: STRING
-
--- Using colon with article
-DECLARE Person3 HAS name: A STRING
+GIVEN account IS AN Account
+GIVETH NUMBER
+`balance of` account MEANS account's balance
 ```
 
-## Related Keywords
+The same articles read the same way on the facts a section takes in:
 
-- **[TYPE-KEYWORDS](keywords.md)** - Type-related keywords (IS, HAS, ONE OF)
+```l4
+§ `Applicant`
+    GIVEN age IS A NUMBER
+          name IS A STRING
+          account IS AN Account
+```
 
-## See Also
+A rule is told some facts about the case in front of it (its **"inputs"**).
+A fact supplied afresh for each case goes in a [`GIVEN` under its section's heading](../syntax/section-given.md), a **"section `GIVEN`"**, where the articles read exactly the same way.
+Older files spell the same declaration `ASSUME name IS A Type`; that keyword is deprecated (ruled 2026-09-04) and still works.
 
-- **[Types Reference](../types/README.md)** - Complete type system documentation
+## Type expressions
+
+Wherever a type is expected (after `IS A`, `GIVETH`, in a field):
+
+| Type expression                          | Meaning                                    |
+| ---------------------------------------- | ------------------------------------------ |
+| `NUMBER`, `STRING`, `BOOLEAN`, `DATE`    | a built-in type ([Types](README.md))       |
+| `LIST OF Type`                           | a list                                     |
+| `MAYBE Type`                             | a value that may be missing                |
+| `EITHER Type1 Type2`                     | one of two types                           |
+| `Name OF Type1, Type2`                   | a parameterised type, given its parameters |
+| `FUNCTION FROM Type1 AND Type2 TO Type3` | a function                                 |
+| `TYPE`                                   | a type parameter                           |
+
+The same spellings declare the inputs of a section:
+
+```l4
+§ `Facts about the case`
+    GIVEN x IS A NUMBER
+          f IS A FUNCTION FROM NUMBER TO NUMBER
+          g IS A FUNCTION FROM NUMBER AND STRING TO BOOLEAN
+```
+
+## Related pages
+
+- [Types](README.md): built-in types
+- [ASSUME (deprecated)](ASSUME.md): the older spelling of an input or an opaque type, and what to write instead
+- [FOR ALL](for-all.md): type variables in the type of a function the section takes in
+- [AKA](../functions/AKA.md): other names for a type

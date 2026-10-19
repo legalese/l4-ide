@@ -105,7 +105,7 @@ a AND b IMPLIES c OR d
 That is not a cosmetic convenience. The whole argument of this page is that the
 statute's shape is `P → Q` over two Boolean trees — so the language had better be
 able to _say_ `→`, rather than make you re-encode it as a branch. See
-[IMPLIES](../../reference/operators/IMPLIES.md).
+[IMPLIES](../../reference/operators/logical.md#implies).
 
 It also gets the boundary of the rule right for free. A ground-floor window makes
 the antecedent false, so the conditional is **vacuously true** — the window

@@ -777,11 +777,12 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
           CsvRagged record reason  -> RefusedRow (rowToJson inferCsvCell record) reason
       | r <- rows ]
       where
-        -- An EMPTY cell is left out of the row, exactly as if its column were
-        -- not there (T3c): the input is absent, so with presumption soft it
-        -- takes its TYPICALLY default (or, for a MAYBE input with none,
-        -- NOTHING), and with presumption hard it is missing. CSV has no
-        -- spelling of null; T3c adds one only when a user needs it.
+        -- A BLANK cell (empty, spaces only, or a quoted @""@) is left out of the
+        -- row, exactly as if its column were not there (T3c): the input is
+        -- absent, so with presumption soft it takes its TYPICALLY default (or,
+        -- for a MAYBE input with none, NOTHING), and with presumption hard it is
+        -- missing. CSV has no spelling of null, and a blank cell is not text;
+        -- T3c adds a spelling of null only when a user needs it.
         --
         -- A case that will be evaluated keeps each non-blank cell as the text
         -- written: only the export's declared input types can say whether
@@ -906,8 +907,11 @@ data CsvRow
 -- spaces or tabs; a quoted @"   "@ is a row whose cell is absent. A record
 -- with fewer or more cells than the header is refused, naming its line: a
 -- short one used to take the defaults of its missing cells, and a long one
--- lost its extra cells, both with status success (review M4; decided
--- overnight 2026-10-02, pending Meng's review, spec §4.1).
+-- lost its extra cells, both with status success (review M4). Both ruled by
+-- Meng on 2026-10-13 (legalese/l4-ide#653): the refusal stands, and in a
+-- one-column file a line of only spaces or tabs is a blank line and not a
+-- case; to give an empty value, write @""@, which is a row whose cell is
+-- absent.
 csvRows :: BSL.ByteString -> Either String [CsvRow]
 csvRows bytes
   | Just opened <- unclosedQuote (dropByteOrderMark bytes) =

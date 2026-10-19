@@ -245,11 +245,13 @@ test-suite jl4-core-test
     FormatFidelitySpec
     PatternMatchParserSpec
     BulletParserSpec
+    PatternClausesMissingSpec
     UUID5Spec
     ExportReadSetSpec
     ExportValidationSpec
     NonassertableSpec
     CatalaLowerSpec
+    DisambiguationWarningsSpec
     NumberLiteralSpec
     NlgLangTagSpec
     RenderLangDirSpec

@@ -51,6 +51,8 @@ oneshotL4ActionAndErrorsIn scope evalConfig fp act = do
 -- @SuccessfulTypeCheck@, so a module importing a module that does not exist and
 -- referencing nothing from it used to pass the suite while @l4 check@ failed it
 -- (smucclaw\/l4-ide#971).
+-- A host that serves bundles somebody else uploaded uses it to say why a file of
+-- one did not parse: that file has no check result, and the reason is only here.
 oneshotL4ActionAndDiagnostics
   :: EvalConfig
   -> FilePath

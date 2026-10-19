@@ -58,7 +58,7 @@ import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander,
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, clausesReadThrough, positionalCall)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, holdsGeneratedNodes, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, clausesReadThrough, positionalCall)
 import qualified L4.Viz.GuardedRows as GR
 import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
@@ -634,13 +634,17 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
     -- written by hand that has a call to a clause group unfolded into it (the
     -- IDE's l4/inlineExprs) is still a rule written by hand.
     let isClauseGroup = Transform.writtenAsClauses asWritten
+        -- The limits apply to a group that has something to read through; one
+        -- whose first clause names each input as the GIVEN does (or is @_@) has
+        -- nothing, and is drawn as a rule written without clauses is.
+        readsThrough = isClauseGroup && Transform.holdsGeneratedNodes body0
     body <- case Transform.inlineLetsForViz body0 of
       Right inlined -> pure inlined
       -- Too big to read through. Clauses are refused, for a plan of any size
       -- they would be drawn as one leaf that asks nothing. Anything else is
       -- drawn as written: a LET the drafter wrote is never read through.
-      Left _ | isClauseGroup -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
-             | otherwise     -> pure body0
+      Left _ | readsThrough -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+             | otherwise    -> pure body0
 
     -- functionName, defsForInlining, maxId and typicallyDefaults are already
     -- set ('preparedState').
@@ -650,8 +654,9 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
     vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
     -- The ladder of a rule written as clauses can be far larger than the clauses
     -- (see 'Transform.clauseGroupLadderBudget'), and the plan far larger still.
-    -- A rule that was not written as clauses is drawn as it always was.
-    when (isClauseGroup && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+    -- A rule that was not written as clauses, or has nothing to read through, is
+    -- drawn as it always was.
+    when (readsThrough && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
       throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
     pure $ V.MkFunDecl
       vid

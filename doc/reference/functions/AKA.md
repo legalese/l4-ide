@@ -1,85 +1,55 @@
 # AKA
 
-Provides alternate names (aliases) for a definition. Allows the same value or type to be referenced by multiple names.
+`AKA` ("also known as") gives a function, a value, a type or a section more than one name. Every name refers to the same thing.
 
 ## Syntax
 
-```l4
-name1 AKA name2, name3 MEANS expression
-DECLARE TypeName AKA AliasName IS ...
+```text
+name AKA alias1, alias2 MEANS expression
+DECLARE TypeName AKA Alias HAS ...
+DECLARE TypeName AKA Alias IS ...
+§ `Section name` AKA alias
 ```
-
-## Purpose
-
-AKA ("also known as") enables:
-
-1. Creating synonyms for legal terminology
-2. Supporting multiple naming conventions
-3. Providing human-readable alternatives
-
-## Examples
 
 **Example file:** [aka-example.l4](aka-example.l4)
 
-### Value Aliases
+## Values
 
 ```l4
-x AKA y, z MEANS TRUE
+`the borrower` AKA `the debtor` MEANS "Acme Ltd"
 
-#EVAL x   -- TRUE
-#EVAL y   -- TRUE
-#EVAL z   -- TRUE
+#EVAL `the debtor`
 ```
 
-### Type Aliases
+## Types
+
+A statute and the people who apply it often use different words for the same thing:
 
 ```l4
-DECLARE B AKA YesNo IS BOOLEAN
-
--- Both names refer to the same type
-GIVETH B
-example1 MEANS TRUE
-
-GIVETH YesNo
-example2 MEANS FALSE
-```
-
-### Complex Type with Aliases
-
-```l4
-DECLARE Pair OF a, b AKA `2-tuple`
-  HAS
-    px IS AN a
-    py IS A b
-
--- Use either name
-GIVETH Pair OF NUMBER, NUMBER
-test1 MEANS Pair WITH px IS 3, py IS 5
-
-GIVETH `2-tuple` OF NUMBER, NUMBER
-test2 MEANS Pair WITH px IS 10, py IS 20
-```
-
-## Use Cases
-
-### Legal Terminology
-
-```l4
--- The regulation uses "Authorized Representative"
--- but practitioners say "Agent"
-DECLARE `Authorized Representative` AKA Agent
+DECLARE `Authorised Representative` AKA Agent
   HAS
     name IS A STRING
-    licenseNumber IS A STRING
+    `licence number` IS A STRING
+
+GIVEN agent IS AN Agent
+GIVETH A STRING
+`licence of` agent MEANS agent's `licence number`
 ```
 
-### Internationalization
+A type synonym can have aliases too: ``DECLARE `Value Added Tax rate` AKA `VAT rate` IS NUMBER``.
+
+## Sections
+
+An alias on a section heading gives a shorter name for qualified references:
 
 ```l4
--- Support English and abbreviated forms
-DECLARE Value Added Tax AKA VAT, `sales tax`
-  IS NUMBER
+§ `Definitions for Part VII` AKA defs
+`taxable income` MEANS 50000
+
+#EVAL defs's `taxable income`
 ```
+
+See [Syntax and directives: Sections](../syntax/README.md#sections).
 
 ## Limits
 
@@ -96,12 +66,7 @@ could not find a definition for `Coupon`. (Measured 2026-09-04; the alias
 resolves the same way whether or not a section heading sits between the
 declaration and the use.)
 
-## Related Keywords
+## Related pages
 
-- **[DECLARE](../types/DECLARE.md)** - Type declarations
-- **[DECIDE](DECIDE.md)** - Value definitions
-- **[MEANS](MEANS.md)** - Definition body
-
-## See Also
-
-- **[Types Reference](../types/README.md)** - Type system
+- [DECLARE](../types/DECLARE.md): type declarations
+- [DECIDE](DECIDE.md) and [MEANS](MEANS.md): value definitions

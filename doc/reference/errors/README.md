@@ -1,85 +1,127 @@
-# Troubleshooting L4 Errors
+# Error messages
 
-When something goes wrong in L4, the compiler tries to tell you what happened. This guide helps you understand those error messages and fix the underlying problems quickly.
+This page lists the messages L4 gives when a file does not parse, does not type-check or stops while it runs, and the warnings it gives about code that probably does not do what you meant. Each entry quotes the message, says what causes it and how to fix it. Search the page for a phrase from your message.
 
-If you already know what error you are looking at, use the table of contents below to jump to it. Otherwise, search this page for a keyword from your error message.
+- An **error** stops the file: it is not checked further, and its `#EVAL` lines do not run.
+- A **warning** does not stop anything. The file still runs, but the code it points at is likely to be wrong.
+- A parse error shows the line and the column where L4 stopped reading, then `unexpected ...` and a list of what it expected. The mistake is often just before that point.
+
+Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 spelling of familiar constructs. The tutorial [Fix errors](../../tutorials/getting-started/debugging-type-errors.md) walks through the errors beginners meet most.
+
+## Entries
+
+**Layout and syntax**
+
+- [Incorrect indentation](#incorrect-indentation)
+- [IF without ELSE](#if-without-else)
+- [Arguments on the lines below a function](#arguments-on-the-lines-below-a-function)
+- [Field access as an argument](#field-access-as-an-argument)
+- [Double equals sign](#double-equals-sign)
+- [Curly quotes and dashes from a word processor](#curly-quotes-and-dashes-from-a-word-processor)
+- [GIVEN at column 1 meant for the section](#given-at-column-1-meant-for-the-section)
+- [NOT followed by AND, OR or IMPLIES on one line](#not-followed-by-and-or-or-implies-on-one-line)
+
+**Types**
+
+- [Pipes in sum types](#pipes-in-sum-types)
+- [Bare positional payload in sum types](#bare-positional-payload-in-sum-types)
+- [Branch type mismatch](#branch-type-mismatch)
+- [Wrong number of inputs](#wrong-number-of-inputs)
+- [Input of the wrong type](#input-of-the-wrong-type)
+- [Several definitions with the same name](#several-definitions-with-the-same-name)
+
+**Names and imports**
+
+- [I could not find a definition for the identifier](#i-could-not-find-a-definition-for-the-identifier)
+- [Module not found](#module-not-found)
+
+**Definitions and clauses**
+
+- [A clause written like a rule with a word between its inputs](#a-clause-written-like-a-rule-with-a-word-between-its-inputs)
+- [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
+- [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases)
+- [Clause that is never used](#clause-that-is-never-used)
+- [Annotation above a later clause](#annotation-above-a-later-clause)
+- [A definition after clauses that is not another clause](#a-definition-after-clauses-that-is-not-another-clause)
+- [Unknown annotation](#unknown-annotation)
+- [Malformed annotation](#malformed-annotation)
+- [Infinite loop detected](#infinite-loop-detected)
+
+**Assumed terms and refusals**
+
+- [ASSUME is being retired](#assume-is-being-retired)
+- [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term)
+- [Refusal reported instead of a result](#refusal-reported-instead-of-a-result)
+
+**Pattern matching**
+
+- [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
+- [Redundant pattern match branch](#redundant-pattern-match-branch)
+- [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
+
+**Regulative rules**
+
+- [#EVAL shows the rule instead of an outcome](#eval-shows-the-rule-instead-of-an-outcome)
+
+**Export**
+
+- [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
+- [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
 
 ---
 
-## Contents
+## Layout and syntax
 
-- [Parse Errors](#parse-errors)
-  - [Unexpected THEN](#unexpected-then)
-  - [Missing ELSE branch](#missing-else-branch)
-  - [Pipes in sum types](#pipes-in-sum-types)
-  - [Bare positional payload in sum types](#bare-positional-payload-in-sum-types)
-  - [Boolean literal case](#boolean-literal-case)
-  - [Parentheses required for field access](#parentheses-required-for-field-access)
-  - [Curly quotes and dashes from a word processor](#curly-quotes-and-dashes-from-a-word-processor)
-  - [A clause written like a rule with a word between its inputs](#a-clause-written-like-a-rule-with-a-word-between-its-inputs)
-- [Indentation Errors](#indentation-errors)
-  - [Body less indented than definition](#body-less-indented-than-definition)
-  - [Multi-line function arguments](#multi-line-function-arguments)
-  - [GIVEN at column 1 meant for the section](#given-at-column-1-meant-for-the-section)
-  - [NOT followed by AND, OR or IMPLIES on one line](#not-followed-by-and-or-or-implies-on-one-line)
-- [Type Errors](#type-errors)
-  - [Branch type mismatch](#branch-type-mismatch)
-  - [Undefined field access](#undefined-field-access)
-  - [Wrong number of inputs](#wrong-number-of-inputs)
-  - [Clauses with more or fewer patterns than the GIVEN names](#clauses-with-more-or-fewer-patterns-than-the-given-names)
-  - [APPEND vs append](#append-vs-append)
-  - [An @export input that is a rule, not a value](#an-export-input-that-is-a-rule-not-a-value)
-  - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
-- [Compiler Warnings](#compiler-warnings)
-  - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
-  - [Redundant pattern match branch](#redundant-pattern-match-branch)
-  - [Clause that is never used](#clause-that-is-never-used)
-  - [Annotation above a later clause](#annotation-above-a-later-clause)
-  - [Unknown annotation](#unknown-annotation)
-  - [Malformed annotation](#malformed-annotation)
-  - [A definition after clauses that is not another clause](#a-definition-after-clauses-that-is-not-another-clause)
-  - [ASSUME is being retired](#assume-is-being-retired)
-- [Runtime Errors](#runtime-errors)
-  - [Circular definition](#circular-definition)
-  - [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)
-  - [DEONTIC rule does not execute](#deontic-rule-does-not-execute)
-  - [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term)
-  - [Refusal reported instead of a result](#refusal-reported-instead-of-a-result)
-- [Common Gotchas](#common-gotchas)
-  - [Equality uses single equals](#equality-uses-single-equals)
-  - [Missing IMPORT prelude](#missing-import-prelude)
-  - [Module not found](#module-not-found)
-  - [WHERE scope issues](#where-scope-issues)
-  - [Missing type annotations](#missing-type-annotations)
-- [Coming from Other Languages?](#coming-from-other-languages)
-- [See Also](#see-also)
+L4 is layout-sensitive, like Python: indentation decides what belongs to what. Use spaces, not tabs, and indent a continuation line further than the line it continues.
 
----
+### Incorrect indentation
 
-## Parse Errors
+**Error:** `incorrect indentation (got 5, should be greater than 9)`
 
-Parse errors happen before your code runs. They mean L4 could not understand the structure of what you wrote.
+The line named is not indented far enough for the place it is in. Two common causes:
 
-### Unexpected THEN
-
-**Error message:** `Parse error: unexpected THEN at line N`
-
-**What you wrote:**
+**The body of a definition starts left of the definition.**
 
 ```l4
-result MEANS
-    IF a THEN 1
-    ELSE IF b THEN 2
-         ELSE IF c THEN 3
-              ELSE 4
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+        result x y MEANS
+    x + y
 ```
 
-**What went wrong:** Nested IF/THEN/ELSE chains are fragile because each level adds more indentation, and L4's layout rules can get confused about which ELSE belongs to which IF.
-
-**How to fix it:** Use `BRANCH` instead. It handles multiple conditions cleanly without nesting:
+Indent the body further than the line that defines the name:
 
 ```l4
-result MEANS
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+result x y MEANS
+    x + y
+```
+
+**A chain of `ELSE IF` lined up under the first `IF`.**
+
+```l4
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A NUMBER
+result a b c MEANS
+    IF a THEN 1
+    ELSE IF b THEN 2
+    ELSE IF c THEN 3
+    ELSE 4
+```
+
+Each `IF` after an `ELSE` starts a new expression that must be indented further than the one before. Use `BRANCH` for a list of conditions instead:
+
+```l4
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A NUMBER
+result a b c MEANS
     BRANCH
         IF a THEN 1
         IF b THEN 2
@@ -87,129 +129,125 @@ result MEANS
         OTHERWISE 4
 ```
 
-BRANCH evaluates conditions top-to-bottom and returns the result for the first one that is TRUE. The OTHERWISE clause catches everything else. See [Control Flow](../control-flow/README.md) for more on BRANCH.
+BRANCH takes the first condition that is TRUE, and OTHERWISE covers the rest. See [BRANCH](../control-flow/BRANCH.md).
 
 ---
 
-### Missing ELSE branch
+### IF without ELSE
 
-**Error message:** `Parse error: expected ELSE after THEN`
-
-**What you wrote:**
+**Error:** `unexpected ...` followed by `expecting %, ELSE, or space token` (at the end of a file, `unexpected end of input`)
 
 ```l4
-result MEANS IF condition THEN value
+GIVEN condition IS A BOOLEAN
+GIVETH A NUMBER
+result condition MEANS IF condition THEN 1
 ```
 
-**What went wrong:** In L4, IF/THEN/ELSE is an expression, not a statement. Every IF must produce a value regardless of whether the condition is TRUE or FALSE, so an ELSE branch is always required.
+IF is an expression: it has to give a value whether the condition is TRUE or FALSE, so the ELSE is required.
 
-**How to fix it:** Provide an ELSE branch:
-
-```l4
-result MEANS IF condition THEN value ELSE default
-```
-
-If you genuinely only care about one case, consider using a guard or a BRANCH with an OTHERWISE in the surrounding context.
-
----
-
-### Pipes in sum types
-
-**Error message:** `Parse error` when defining a sum type with `|`
-
-**What you wrote:**
+**How to fix it:** Add the ELSE:
 
 ```l4
-DECLARE Color IS ONE OF
-    Red | Green | Blue
-```
-
-**What went wrong:** L4 does not use the pipe character `|` to separate sum type constructors. If you are used to Haskell or similar languages, this is an easy mistake to make.
-
-**How to fix it:** Use commas or newlines instead:
-
-```l4
-DECLARE Color IS ONE OF Red, Green, Blue
-```
-
-Or on separate lines:
-
-```l4
-DECLARE Color IS ONE OF
-    Red
-    Green
-    Blue
-```
-
-See [Types](../types/README.md) for more on declaring sum types.
-
----
-
-### Bare positional payload in sum types
-
-**Error message:** `expecting HAS` when putting a bare type after a constructor
-
-**What you wrote:**
-
-```l4
-DECLARE Shape IS ONE OF
-    Circle NUMBER
-```
-
-**What went wrong:** Sum type constructors that carry data must use the `HAS` keyword with named fields. L4 does not support anonymous positional payloads like Haskell or Rust.
-
-**How to fix it:** Name the field explicitly:
-
-```l4
-DECLARE Shape IS ONE OF
-    Circle HAS radius IS A NUMBER
+GIVEN condition IS A BOOLEAN
+GIVETH A NUMBER
+result condition MEANS IF condition THEN 1 ELSE 0
 ```
 
 ---
 
-### Boolean literal case
+### Arguments on the lines below a function
 
-**Error message:** `Parse error: unknown identifier 'True'`
-
-**What you wrote:**
+**Error:** `unexpected 100` (the first argument), followed by a list of what was expected
 
 ```l4
-result MEANS True
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+triple a b c MEANS a + b + c
+
+r MEANS triple
+    100
+    200
+    300
 ```
 
-**What went wrong:** Boolean literals in L4 must be fully uppercase. `True`, `true`, `False`, and `false` are not recognized.
+Arguments written on their own lines below a function name are not read as its arguments.
 
-**How to fix it:** Use `TRUE` and `FALSE`:
+**How to fix it:** Write the arguments on the same line, or use `OF` with commas:
 
 ```l4
-result MEANS TRUE
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+triple a b c MEANS a + b + c
+
+r MEANS triple OF 100, 200, 300
+s MEANS triple 100 200 300
 ```
 
 ---
 
-### Parentheses required for field access
+### Field access as an argument
 
-**Error message:** Parse error when using field access as a function argument
-
-**What you wrote:**
+**Error:** `unexpected 's`
 
 ```l4
-all (GIVEN g YIELD g's age >= 18) charity's governors
+IMPORT prelude
+
+DECLARE Person HAS age IS A NUMBER
+DECLARE Charity HAS governors IS A LIST OF Person
+
+GIVEN charity IS A Charity
+GIVETH A BOOLEAN
+`all governors are adults` charity MEANS
+  all (GIVEN g YIELD g's age >= 18) charity's governors
 ```
 
-**What went wrong:** When a field access expression (using `'s`) appears as an argument to a function, L4's parser cannot tell where the expression boundaries are. The field access needs to be explicitly grouped.
+When a field access such as `charity's governors` is an argument to a function, L4 cannot tell where the argument ends.
 
-**How to fix it:** Wrap the field access in parentheses:
+**How to fix it:** Put the field access in parentheses:
 
 ```l4
-all (GIVEN g YIELD g's age >= 18) (charity's governors)
+IMPORT prelude
+
+DECLARE Person HAS age IS A NUMBER
+DECLARE Charity HAS governors IS A LIST OF Person
+
+GIVEN charity IS A Charity
+GIVETH A BOOLEAN
+`all governors are adults` charity MEANS
+  all (GIVEN g YIELD g's age >= 18) (charity's governors)
+```
+
+---
+
+### Double equals sign
+
+**Error:** `unexpected ==`
+
+```l4
+GIVEN x IS A NUMBER
+GIVETH A BOOLEAN
+result x MEANS x == 5
+```
+
+L4 writes equality with a single `=`, or `EQUALS`. There is no assignment in L4, so `=` is never ambiguous.
+
+**How to fix it:**
+
+```l4
+GIVEN x IS A NUMBER
+GIVETH A BOOLEAN
+result x MEANS x = 5
 ```
 
 ---
 
 ### Curly quotes and dashes from a word processor
 
-**Error message:** ``This is ’ (Right Single Quotation Mark, U+2019). It looks like `'`, but L4 only understands the plain one.`` (or the same for another curly quote, dash or ellipsis)
+**Error:** ``This is ’ (Right Single Quotation Mark, U+2019). It looks like `'`, but L4 only understands the plain one.`` (or the same for another curly quote, dash or ellipsis)
 
 **What you wrote:**
 
@@ -252,9 +290,284 @@ usually comes from pasted text; replace it with an ordinary space.
 
 **How to fix it:** click the lightbulb on the flagged space and choose "Replace with an ordinary space" — or run "Straighten all smart punctuation in this file", which replaces every non-breaking space in the document as well as any curly quotes, dashes and ellipses it finds.
 
+---
+
+### GIVEN at column 1 meant for the section
+
+**Error:**
+
+```
+This GIVEN starts at column 1, so it is the signature of the declaration
+below it -- and that declaration never uses
+
+  `the rate`
+
+If `the rate` was meant as an input for the whole of
+
+  § S
+
+indent the GIVEN so that it starts past the § of the heading:
+
+  § <heading>
+      GIVEN `the rate` IS A <type>
+```
+
+It arrives alongside a pair of "The names in a type signature must match those in the definition" errors, which have the same cause.
+
+**What you wrote:**
+
+```l4
+§ S
+
+GIVEN `the rate` IS A NUMBER
+DECLARE Applicant
+    HAS name IS A STRING
+```
+
+**What went wrong:** A `GIVEN` belongs to the section only when it starts at a column past the heading's `§`. At column 1 it lists the facts the declaration immediately below it is told about the case (its **"inputs"**) — so L4 tried to give `Applicant` an input called `the rate`, which `Applicant` never mentions. A paste, or a re-indent that straightened the file's left margin, is the usual way to arrive here.
+
+**How to fix it:** Indent the `GIVEN` past the `§`, on the line after the heading:
+
+```l4
+§ S
+    GIVEN `the rate` IS A NUMBER
+
+DECLARE Applicant
+    HAS name IS A STRING
+```
+
+**Note:** the check fires for a `DECLARE` or an `ASSUME` below the `GIVEN`, not for a `DECIDE`. A decision that ignores one of its own inputs is an ordinary thing to write, and is indistinguishable from a section `GIVEN` that has been pushed back to column 1. So if a rule that should read a section-wide name is asking whoever calls it for an input instead, check the column of its `GIVEN` yourself. See [The section `GIVEN`](../syntax/section-given.md).
+
+---
+
+### NOT followed by AND, OR or IMPLIES on one line
+
+**Error:**
+
+```
+On one line, NOT reaches to the end of the line, so this reads as
+
+  NOT (`has a permit` AND `paid the fee`)
+
+If that is the meaning, write those brackets in. If only
+
+  `has a permit`
+
+is negated, put the brackets around the NOT and that alone:
+
+  (NOT `has a permit`) AND `paid the fee`
+
+or move the AND to a line of its own, starting in the same
+column as the NOT or further left.
+```
+
+**What you wrote:**
+
+```l4
+GIVEN `has a permit` IS A BOOLEAN
+      `paid the fee` IS A BOOLEAN
+DECIDE `must apply` IF NOT `has a permit` AND `paid the fee`
+```
+
+**What went wrong:** `NOT` has no place in the ranking of the other operators. It reaches forward and takes everything after it on its line, so the rule above would mean "it is not the case that (they have a permit and paid the fee)" — while most people read it as "they have no permit, and they paid the fee". The two disagree whenever the person has no permit. Rather than return the wrong answer silently, L4 stops and asks which you meant. Brackets around the first thing alone, `NOT (`has a permit`) AND …`, do not change this: that bracket closes around `has a permit`, not around the `NOT`, and the spelling is refused too.
+
+**How to fix it:** say which reading you meant.
+
+```l4
+-- the whole of "has a permit and paid the fee" is negated
+DECIDE `must apply` IF NOT (`has a permit` AND `paid the fee`)
+
+-- only "has a permit" is negated
+DECIDE `must apply` IF (NOT `has a permit`) AND `paid the fee`
+```
+
+Or move the `AND` to its own line. Over several lines nothing is refused, and the columns decide: an `AND` that starts in the same column as the `NOT`, or further left, stops the `NOT`; one that starts further right is reached over. `x AND NOT y` on one line is always fine, because the `NOT` is last and there is nothing after it to reach over. Comparisons are not refused either: `NOT n EQUALS 0` has only one sensible reading. See [How Far Does NOT Reach?](../operators/logical.md#how-far-does-not-reach).
+
+---
+
+## Types
+
+### Pipes in sum types
+
+**Error:** `expecting operator char`, pointing at the first `|`
+
+```l4
+DECLARE Colour IS ONE OF
+    Red | Green | Blue
+```
+
+L4 does not separate the alternatives of a type with `|`.
+
+**How to fix it:** Use commas, or one alternative per line:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECLARE Shape IS ONE OF
+    Circle HAS radius IS A NUMBER
+    Square HAS side IS A NUMBER
+```
+
+See [DECLARE](../types/DECLARE.md).
+
+---
+
+### Bare positional payload in sum types
+
+**Error:** `unexpected NUMBER` followed by `expecting ,, ;, HAS, end of input, or space token`
+
+```l4
+DECLARE Shape IS ONE OF
+    Circle NUMBER
+```
+
+An alternative that carries data names each field with `HAS`. L4 has no unnamed fields.
+
+**How to fix it:** Name the field:
+
+```l4
+DECLARE Shape IS ONE OF
+    Circle HAS radius IS A NUMBER
+```
+
+---
+
+### Branch type mismatch
+
+**Error:** `Both the THEN and the ELSE branch of an IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs must have the same type.`, followed by the type expected and the type found
+
+```l4
+GIVEN x IS A NUMBER
+GIVETH A STRING
+result x MEANS
+    BRANCH
+        IF x < 0 THEN "negative"
+        IF x = 0 THEN 0
+        OTHERWISE "positive"
+```
+
+Every branch of an IF, a BRANCH or a CONSIDER must give a value of the same type. Here two give a STRING and one a NUMBER.
+
+**How to fix it:**
+
+```l4
+GIVEN x IS A NUMBER
+GIVETH A STRING
+result x MEANS
+    BRANCH
+        IF x < 0 THEN "negative"
+        IF x = 0 THEN "zero"
+        OTHERWISE "positive"
+```
+
+---
+
+### Wrong number of inputs
+
+**Error:** `The function add (defined at ...) expects 2 inputs, but here it is given 3 inputs.`
+
+A call gives a function more or fewer inputs than its `GIVEN` names.
+
+**How to fix it:** Check the function's `GIVEN` and give one input for each name, in the same order. If you meant to give fewer (partial application), make sure the context supports it:
+
+```l4
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+add a b MEANS a + b
+
+#EVAL add 1 2
+```
+
+---
+
+### Input of the wrong type
+
+**Error:** `The first input of function append (defined at ...) is expected to be of type LIST OF a but is here of type STRING`
+
+A function was given a value of a type it does not take. A common case is mixing up two prelude functions with similar names:
+
+| Function | Written            | Works on | Example                          |
+| -------- | ------------------ | -------- | -------------------------------- |
+| `APPEND` | between its inputs | STRING   | `"hello" APPEND " world"`        |
+| `append` | before its inputs  | LIST     | `append (LIST 1, 2) (LIST 3, 4)` |
+
+**How to fix it:** Use the function for the type you have. `CONCAT` also joins strings, and needs no import:
+
+```l4
+IMPORT prelude
+
+DECIDE greeting IS "hello" APPEND " world"
+DECIDE numbers IS append (LIST 1, 2) (LIST 3, 4)
+DECIDE `the same greeting` IS CONCAT "hello", " world"
+```
+
+---
+
+### Several definitions with the same name
+
+**Error:** `There are multiple definitions for the identifier Date and I do not have sufficient information to make a choice between them.`, followed by the candidates and their types
+
+Some names have several definitions told apart by their types, such as `Date` and `Time` in the date and time libraries. When L4 cannot tell from the context which one is meant, it asks. This often happens when such a call is followed by a word written between two inputs, as in ``Date 10 1 2024 `is before` Date 11 1 2024``.
+
+**How to fix it:** Put each call in parentheses, or say the expected type with `GIVETH`:
+
+```l4
+IMPORT daydate
+
+#EVAL (Date 10 1 2024) `is before` (Date 11 1 2024)
+```
+
+---
+
+## Names and imports
+
+### I could not find a definition for the identifier
+
+**Error:** `I could not find a definition for the identifier`, then the name, then `which I have inferred to be of type:` and the type L4 expected it to have
+
+L4 met a name that nothing in scope defines. The usual causes:
+
+- **A library is not imported.** `map`, `filter`, `all`, `any`, `sum`, `fromMaybe` and `APPEND` come from the prelude, which is never loaded automatically. Add `IMPORT prelude`. The same goes for `Date` (`IMPORT daydate`) and the other [standard libraries](../libraries/README.md).
+- **A typo or a different spelling**, in a function name or a field name: `person's fullname` where the record declares `full name`. The type L4 shows helps: for a field it is `FUNCTION FROM Person TO ...`.
+- **The wrong case.** Keywords and built-in values are upper case: `TRUE` and `FALSE`, not `True` or `true`; `NOTHING`, `JUST`, `LEFT`, `RIGHT`.
+- **An `IMPORT` below a section heading.** `IMPORT` lines count only before the first `§`; one placed after it is ignored, so the names it should bring in are not defined. Move it to the top of the file.
+- **A name defined somewhere it cannot be seen.** A name defined in the `WHERE` or `LET` of one definition exists only inside that definition.
+
+**How to fix it:** Correct the spelling, or add the `IMPORT`:
+
+```l4
+IMPORT prelude
+
+DECIDE total IS sum (LIST 1, 2, 3)
+DECIDE `is ready` IS TRUE
+```
+
+---
+
+### Module not found
+
+**Error:** `I could not find a module with this name: helpers`, then `Nothing it defines is in scope here; names you expected from it are reported as undefined.`, then `I have tried the following locations:` and the places that were tried, once each, in the order L4 looks. The standard library built into `l4` is listed at its own place, for example `the stdlib embedded in this binary (22 modules, not among them)`, or `the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)` when that variable is set. On the command line, `l4` also prints `Warning | [Import Resolution] Module not found: helpers`.
+
+This is an error, not a warning: it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module. Other commands, `l4 render`, `l4 nlg` and the transpilers among them, print the same error and still exit 0; [When nothing resolves](../libraries/resolution.md#which-commands-fail-on-it) has the measured list.
+
+An `IMPORT` names a module that is neither a standard library nor a file `helpers.l4` in your project's root folder or beside the importing file.
+
+**How to fix it:**
+
+- Check the name. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output. A name with a hyphen needs backticks: ``IMPORT `legal-persons` ``. `IMPORT` takes a module name, not a path: a folder in front of the name is ignored.
+- Put your own module in the project's root folder or beside the file that imports it.
+- If `JL4_LIBRARY_PATH` is set, the built-in standard library is not used at all, so that folder must hold every library you import, `prelude.l4` included.
+
+[IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
+
+---
+
+## Definitions and clauses
+
 ### A clause written like a rule with a word between its inputs
 
-**Error message:**
+**Error:**
 
 ```
 This clause is written the way a rule with a word between its inputs is written, like this one:
@@ -308,6 +621,8 @@ and is refused too, for the same reason. Its message begins "This definition is 
 Write the rule once, and tell its cases apart inside it with `CONSIDER`:
 
 ```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
 GIVEN c IS A Colour
       n IS A NUMBER
 GIVETH A NUMBER
@@ -322,6 +637,8 @@ c `costs` n MEANS
 or write the cases as clauses with a name of their own in front, one pattern for each input, in the order of the `GIVEN`:
 
 ```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
 GIVEN c IS A Colour
       n IS A NUMBER
 GIVETH A NUMBER
@@ -346,217 +663,9 @@ Give that input another name, and the body means what it says.
 
 ---
 
-## Indentation Errors
-
-L4 is layout-sensitive, like Python. Indentation determines how code is grouped, replacing the braces and semicolons used in languages like JavaScript or Java. Getting indentation wrong is one of the most common sources of errors.
-
-**General rules:**
-
-- Use spaces, not tabs.
-- Continuation lines must be indented more deeply than the line that introduced them.
-- WHERE bindings should align vertically.
-- The body of MEANS or DECIDE must be indented relative to the definition line.
-
-### Body less indented than definition
-
-**Error message:** Parse error on the line after MEANS
-
-**What you wrote:**
-
-```l4
-        result MEANS
-    x + y
-```
-
-**What went wrong:** The body (`x + y`) is less indented than the keyword `MEANS` that introduces it. L4 expects the body to be indented further in.
-
-**How to fix it:** Make sure the body is indented relative to the definition:
-
-```l4
-result MEANS
-    x + y
-```
-
-**Tip:** If your definition is already deeply indented, consider refactoring to reduce nesting.
-
----
-
-### Multi-line function arguments
-
-**Error message:** Parse error on continuation lines of a function call
-
-**What you wrote:**
-
-```l4
-r MEANS triple
-    100
-    200
-```
-
-**What went wrong:** When function arguments appear on continuation lines without the `OF` keyword, the parser cannot tell whether these lines are arguments to the function or new top-level expressions.
-
-**How to fix it:** Use `OF` with commas for multi-argument calls:
-
-```l4
-r MEANS triple OF 100, 200, 300
-```
-
-**Tip:** The VS Code extension for L4 highlights layout boundaries, which helps catch these issues as you type.
-
----
-
-### GIVEN at column 1 meant for the section
-
-**Error message:**
-
-```
-This GIVEN starts at column 1, so it is the signature of the declaration
-below it -- and that declaration never uses
-
-  `the rate`
-
-If `the rate` was meant as an input for the whole of
-
-  § S
-
-indent the GIVEN so that it starts past the § of the heading:
-
-  § <heading>
-      GIVEN `the rate` IS A <type>
-```
-
-It arrives alongside a pair of "The names in a type signature must match those in the definition" errors, which have the same cause.
-
-**What you wrote:**
-
-```l4
-§ S
-
-GIVEN `the rate` IS A NUMBER
-DECLARE Applicant
-    HAS name IS A STRING
-```
-
-**What went wrong:** A `GIVEN` belongs to the section only when it starts at a column past the heading's `§`. At column 1 it lists the facts the declaration immediately below it is told about the case (its **"inputs"**) — so L4 tried to give `Applicant` an input called `the rate`, which `Applicant` never mentions. A paste, or a re-indent that straightened the file's left margin, is the usual way to arrive here.
-
-**How to fix it:** Indent the `GIVEN` past the `§`, on the line after the heading:
-
-```l4
-§ S
-    GIVEN `the rate` IS A NUMBER
-
-DECLARE Applicant
-    HAS name IS A STRING
-```
-
-**Note:** the check fires for a `DECLARE` or an `ASSUME` below the `GIVEN`, not for a `DECIDE`. A decision that ignores one of its own inputs is an ordinary thing to write, and is indistinguishable from a section `GIVEN` that has been pushed back to column 1. So if a rule that should read a section-wide name is asking whoever calls it for an input instead, check the column of its `GIVEN` yourself. See [The section `GIVEN`](../syntax/section-given.md).
-
----
-
-### NOT followed by AND, OR or IMPLIES on one line
-
-**Error message:**
-
-```
-On one line, NOT reaches to the end of the line, so this reads as
-
-  NOT (`has a permit` AND `paid the fee`)
-
-If that is the meaning, write those brackets in. If only
-
-  `has a permit`
-
-is negated, put the brackets around the NOT and that alone:
-
-  (NOT `has a permit`) AND `paid the fee`
-
-or move the AND to a line of its own, starting in the same
-column as the NOT or further left.
-```
-
-**What you wrote:**
-
-```l4
-GIVEN `has a permit` IS A BOOLEAN
-      `paid the fee` IS A BOOLEAN
-DECIDE `must apply` IF NOT `has a permit` AND `paid the fee`
-```
-
-**What went wrong:** `NOT` has no place in the ranking of the other operators. It reaches forward and takes everything after it on its line, so the rule above would mean "it is not the case that (they have a permit and paid the fee)" — while most people read it as "they have no permit, and they paid the fee". The two disagree whenever the person has no permit. Rather than return the wrong answer silently, L4 stops and asks which you meant. Brackets around the first thing alone, `NOT (`has a permit`) AND …`, do not change this: that bracket closes around `has a permit`, not around the `NOT`, and the spelling is refused too.
-
-**How to fix it:** say which reading you meant.
-
-```l4
--- the whole of "has a permit and paid the fee" is negated
-DECIDE `must apply` IF NOT (`has a permit` AND `paid the fee`)
-
--- only "has a permit" is negated
-DECIDE `must apply` IF (NOT `has a permit`) AND `paid the fee`
-```
-
-Or move the `AND` to its own line. Over several lines nothing is refused, and the columns decide: an `AND` that starts in the same column as the `NOT`, or further left, stops the `NOT`; one that starts further right is reached over. `x AND NOT y` on one line is always fine, because the `NOT` is last and there is nothing after it to reach over. Comparisons are not refused either: `NOT n EQUALS 0` has only one sensible reading. See [How Far Does NOT Reach?](../operators/NOT.md#how-far-does-not-reach).
-
----
-
-## Type Errors
-
-Type errors mean L4 understood the structure of your code but found a logical inconsistency in how values are used.
-
-### Branch type mismatch
-
-**Error message:** `Type error: branch returns T1 but expected T2`
-
-**What you wrote:**
-
-```l4
-result MEANS
-    BRANCH
-        IF x < 0 THEN "negative"
-        IF x = 0 THEN 0
-        OTHERWISE "positive"
-```
-
-**What went wrong:** All branches of a BRANCH (or IF/THEN/ELSE, or CONSIDER) must return the same type. Here, the first and third branches return a STRING, but the second returns a NUMBER.
-
-**How to fix it:** Make all branches return the same type:
-
-```l4
-result MEANS
-    BRANCH
-        IF x < 0 THEN "negative"
-        IF x = 0 THEN "zero"
-        OTHERWISE "positive"
-```
-
----
-
-### Undefined field access
-
-**Error message:** `Error: record type T has no field 'fieldname'`
-
-**What you wrote:** An expression like `person's fullname` where the field `fullname` does not exist on the type.
-
-**What went wrong:** You are accessing a field that is not defined in the type's DECLARE block. This is usually a typo or a misremembering of the field name.
-
-**How to fix it:** Check the DECLARE definition for the type and verify the exact field name. Common mistakes include singular vs. plural (`name` vs. `names`) and different word choices (`fullname` vs. `full name`).
-
----
-
-### Wrong number of inputs
-
-**Error message:** `The function … expects 2 inputs, but here it is given 1 input.`
-
-**What you wrote:** A rule used with too many or too few inputs.
-
-**What went wrong:** The rule was defined with a certain number of `GIVEN` inputs, and a different number was supplied where it was used.
-
-**How to fix it:** Check the rule's definition to see how many inputs it expects, and supply exactly that many. If you meant to supply fewer (partial application), make sure the context supports it.
-
----
-
 ### Clauses with more or fewer patterns than the GIVEN names
 
-**Error message:**
+**Error:**
 
 ```
 Each clause of `g` has 2 patterns, but its GIVEN names 1 input.
@@ -603,182 +712,44 @@ Such clauses cannot be published with `@export`, even a single one; see [An @exp
 
 ---
 
-### APPEND vs append
+### Multi-clause DECIDE does not cover all cases
 
-**Error message:** Unexpected type error involving strings or lists
-
-**What you wrote:**
-
-```l4
-append "hello" "world"
-```
-
-**What went wrong:** L4's prelude defines two different functions that look similar but operate on different types:
-
-| Function | Case      | Style  | Works on | Example                          |
-| -------- | --------- | ------ | -------- | -------------------------------- |
-| `APPEND` | uppercase | infix  | STRING   | `"hello" APPEND " world"`        |
-| `append` | lowercase | prefix | LIST     | `append (LIST 1, 2) (LIST 3, 4)` |
-
-Using the wrong one gives a type error because strings are not lists and vice versa.
-
-**How to fix it:** Use uppercase `APPEND` (infix) for strings and lowercase `append` (prefix) for lists:
-
-```l4
-"hello" APPEND " world"
-append (LIST 1, 2) (LIST 3, 4)
-```
-
-For string concatenation, you can also use `CONCAT`:
-
-```l4
-CONCAT "hello", " world"
-```
-
----
-
-### An @export input that is a rule, not a value
-
-**Error message:** `Function type inputs are not supported for @export.` — or, for the other
-spelling, `The @export rule … reads …, which is assumed and takes 1 input of its own.`
-
-**What you wrote:** A published rule that depends on a rule somebody else is expected to supply.
-
-```l4
-ASSUME Person IS A TYPE
-
-GIVEN p IS A Person
-ASSUME `is eligible` p IS A BOOLEAN
-
-@export Whether the person may apply
-GIVEN who IS A Person
-GIVETH A BOOLEAN
-DECIDE `may apply` IF `is eligible` who
-```
-
-**What went wrong:** `@export` publishes a rule as a web endpoint, and a request reaches it as
-JavaScript Object Notation (**"JSON"**). JSON carries **values** — a number, a date, a yes or no, a
-record of those. It cannot carry a rule. So an input that is itself a rule can never be supplied,
-and every request would stop on it.
-
-Three ways of writing the same mistake, all refused:
-
-| what you wrote                                                      | how many inputs it takes |
-| ------------------------------------------------------------------- | ------------------------ |
-| `GIVEN p IS A Person` above ``ASSUME `is eligible` p IS A BOOLEAN`` | 1                        |
-| ``ASSUME `is eligible` IS A FUNCTION FROM Person TO BOOLEAN``       | 1                        |
-| ``GIVEN `is eligible` IS A FUNCTION FROM Person TO BOOLEAN``        | 1                        |
-
-An assumed name that takes **no** inputs is a value, and stays publishable: `ASSUME age IS A NUMBER`
-is exactly the sort of thing a request supplies.
-
-The check follows every rule the published one reaches, so moving the assumed rule behind a helper
-does not silence it — that set is precisely what a request would have to fill in.
-
-**How to fix it:** any of three moves, and the message names all three.
-
-1. **Give the rule a definition** — `DECIDE` or `MEANS` — so nothing outside has to supply it.
-2. **Take what it is asked about as an ordinary input.** If `` `is eligible` `` is really a fact
-   about the person, make it a field of the person's record and let the request send that.
-3. **Remove the `@export`.** The rule still checks, runs and compiles; it is simply not published.
-
-Compiling to [Blawx](../../exports/blawx.md) is the one place this shape is fine as written, because
-a Blawx interview asks a person for the answer instead of receiving it in a request. `l4 export blawx` will
-still compile such a file even though `l4 check` refuses to publish it.
-
----
-
-### An @export of clauses with no GIVEN
-
-**Error message:**
-
-```
-`size` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
-```
-
-**What you wrote:**
-
-```l4
-DECLARE Colour IS ONE OF Red, Green, Blue
-
-@export
-DECIDE size Red   n IS n
-DECIDE size Green n IS n + 1
-DECIDE size Blue  n IS 0
-```
-
-**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input by name, as a value of that input's type.
-A rule written as clauses with patterns and no `GIVEN`, whether one clause or several, has neither.
-L4 names its inputs itself, `input 1`, `input 2` and so on, and works out their types from the patterns and the clause bodies, so a request could not say which input a value is for, and there is no declared type to check the value against.
-So an `@export` of such a rule is an error, reported at the `@export` line, because that is where the missing `GIVEN` goes.
-The error stops the whole file from checking: `l4 run`, the REPL, `l4 batch` and every exporter refuse the file, the `#EVAL`s of its other rules included, until you add the `GIVEN` or remove the `@export`.
-`@export default` is refused the same way.
-Without `@export`, clauses with no `GIVEN` are fine.
-
-**How to fix it:** Add a `GIVEN` below `@export` that names and types each input, in the order the patterns appear, and say what the rule gives back with `GIVETH`:
-
-```l4
-DECLARE Colour IS ONE OF Red, Green, Blue
-
-@export
-GIVEN c IS A Colour
-      n IS A NUMBER
-GIVETH A NUMBER
-DECIDE size Red   n IS n
-DECIDE size Green n IS n + 1
-DECIDE size Blue  n IS 0
-```
-
-The rule is then published with the inputs `c` and `n`.
-Or remove the `@export`, if the rule is not meant to be published.
-
----
-
-## Compiler Warnings
-
-Warnings do not stop compilation, but they flag code that is likely to fail at runtime or that contains dead branches.
-
-### Non-exhaustive pattern match
-
-**Warning message:** pattern matches are missing (the warning lists the uncovered branches)
-
-**What you wrote:**
-
-```l4
-CONSIDER status
-WHEN Active THEN "running"
-WHEN Closed THEN "stopped"
-```
-
-**What went wrong:** The CONSIDER expression does not cover all possible constructors of the scrutinee's type. If `status` could be `Suspended` (or any other constructor you did not list), there is no branch to handle it. This is a **compile-time warning** (not an error): the program still compiles and runs, but evaluating the match on an uncovered value raises a runtime error (see [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)).
-
-**How to fix it:** Either cover all constructors explicitly or add an OTHERWISE branch:
-
-```l4
-CONSIDER status
-WHEN Active THEN "running"
-WHEN Closed THEN "stopped"
-OTHERWISE "unknown"
-```
-
-A rule written as a list of clauses, one `DECIDE` line per case, is checked the same way:
-
-```l4
-GIVEN status IS A Status
-GIVETH A STRING
-DECIDE label Active IS "running"
-DECIDE label Closed IS "stopped"
-```
-
-Here the warning lists the clauses still needed, ready to paste:
+**Warning:**
 
 ```
 This multi-clause definition does not cover all cases. The following clauses are still needed:
 
-  DECIDE `label` Suspended IS
+  DECIDE `price` Blue IS
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE price Red   IS 1
+DECIDE price Green IS 2
+```
+
+**What went wrong:** The clauses of `price` match `Red` and `Green` but no clause matches `Blue`, so `price Blue` would stop evaluation with an error. This is a **compile-time warning** (not an error); an editor underlines it from the first clause's name to the last's.
+
+**How to fix it:** Add each listed clause and write its result after `IS`:
+
+```l4
+DECIDE price Blue IS 3
+```
+
+Or end the group with a clause that matches anything, written with the `GIVEN` name:
+
+```l4
+DECIDE price c IS 0
 ```
 
 When the rule has only one clause, the first line reads "This clause does not cover all cases." instead.
+
+**What the check reads.** Rules whose clauses match enumeration values or `TRUE`/`FALSE` are checked, and so are rules whose clauses match particular numbers or texts.
 
 A number or a piece of text in a clause matches one value of its input, and there is no end of the other values.
 So a rule whose clauses match particular numbers or texts is complete only with a clause written with the input's name, and the warning suggests that clause:
@@ -811,27 +782,15 @@ When there would be more than 64 clauses to list, a rule whose clauses name numb
 A rule whose clauses name no number or text gets no missing-clause warning past that cap, and neither does one whose shorter list is also longer than 64 clauses; a clause that is never used is reported either way.
 A rule declared partial on purpose, with `@nonexhaustive` before its `GIVEN`, gets no missing-clause warning.
 A rule of one clause whose check gives up gets the warning for a CONSIDER instead, listing the WHEN branches its clause does not cover; that warning stands down where the clause's does, for an `EXACTLY` it cannot read, so `DECIDE f (EXACTLY someColour) IS 1` on its own, with `c IS A Colour`, gets no warning at all.
+A rule whose clauses match enumeration values only also gets no missing-clause warning when finding the clauses would take more than 10000 steps.
 
-**Note:** A CONSIDER written by hand reads numbers, pieces of text and `EXACTLY` exactly as the clauses above do, so the two spellings of one rule warn alike.
-A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests OTHERWISE; a keyed gap inside a pattern is suggested as a WHEN, with the key as the branches spell it; a number repeated in another spelling is a redundant branch.
-BOOLEAN is analysed normally, and so are the builtin container types MAYBE, EITHER, and LIST; the analysis reaches CONSIDER expressions inside WHERE- and LET-bound local definitions.
-Past 64 missing branches to list, a CONSIDER is told only what the branches without a number or a piece of text leave open, as clauses are, and gets no warning when that list is too long as well. Warnings never block evaluation — a file with warnings still runs its `#EVAL` directives.
-
----
-
-### Redundant pattern match branch
-
-**Warning message:** pattern match branches are redundant (the warning lists the unreachable branches)
-
-**What went wrong:** A WHEN branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover every value it could match.
-
-**How to fix it:** Delete the unreachable branch, or reorder branches if a more specific pattern was accidentally placed after a more general one.
+[Several clauses](../functions/DECIDE.md#several-clauses), under DECIDE, gives an example of each.
 
 ---
 
 ### Clause that is never used
 
-**Warning message:**
+**Warning:**
 
 ```
 This clause of `describe` is never used, and neither is the clause after it.
@@ -878,7 +837,7 @@ A clause that is never used is still checked against the rule's `GIVEN` and `GIV
 
 ### Annotation above a later clause
 
-**Warning message:**
+**Warning:**
 
 ```
 This @export is above the second clause of `colour code`, where it is not used.
@@ -910,9 +869,51 @@ An `@nlg` goes on the line above the first clause.
 
 ---
 
+### A definition after clauses that is not another clause
+
+**Warning:**
+
+```
+This definition of `f` is not another clause of the clauses above it.
+Each of those has 1 pattern, and this one has 2 inputs, `Red` and `Blue`, so it is a separate rule, and what follows its name is the names it gives its inputs, not patterns.
+If it is meant as another clause, give it as many patterns as the others have; if it is a rule of its own, give it a GIVEN of its own.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE f Red IS 1
+DECIDE f c IS 2
+DECIDE f Red Blue IS 3
+```
+
+**What went wrong:** Clauses that follow one another are gathered into one rule when they have the same name and the same number of patterns after it.
+The first two clauses have one pattern each, so they are one rule.
+The third has two, so it is not a clause of that rule: it is a rule of its own that takes two inputs and calls them `Red` and `Blue`, whatever else those words mean elsewhere.
+It checks, and `f Green Red` gives 3, where a reader of the three lines might have expected L4 to be looking for the colour Red and the colour Blue.
+The warning appears once, at the name in the definition, and only for a definition that has no `GIVEN` of its own and follows a rule written as clauses directly.
+
+**How to fix it:** If the line was meant as another clause of the rule above, give it as many patterns as the clauses above have (here, one).
+If it is a rule of its own, say so with a `GIVEN` of its own, which also gives its inputs their types:
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      d IS A Colour
+GIVETH A NUMBER
+f c d MEANS 3
+```
+
+---
+
 ### Unknown annotation
 
-**Warning message:**
+**Warning:**
 
 ```
 Unknown annotation `@exprot`: this version of L4 does not know it, so it is ignored, along with the rest of its line. Did you mean `@export`?
@@ -948,7 +949,7 @@ An `@` that is not followed by a letter is still an error.
 
 ### Malformed annotation
 
-**Warning message:**
+**Warning:**
 
 ```
 Malformed annotation `@lang`: it needs a language code after a space, such as `@lang en` (letters, digits and hyphens), so this line is ignored.
@@ -971,49 +972,42 @@ It is a warning, not an error, so the rest of the file is still checked and high
 
 ---
 
-### A definition after clauses that is not another clause
+### Infinite loop detected
 
-**Warning message:**
-
-```
-This definition of `f` is not another clause of the clauses above it.
-Each of those has 1 pattern, and this one has 2 inputs, `Red` and `Blue`, so it is a separate rule, and what follows its name is the names it gives its inputs, not patterns.
-If it is meant as another clause, give it as many patterns as the others have; if it is a rule of its own, give it a GIVEN of its own.
-```
-
-**What you wrote:**
+**Error:** `Infinite loop detected while trying to evaluate: x PLUS 1`
 
 ```l4
-DECLARE Colour IS ONE OF Red, Green, Blue
-
-GIVEN c IS A Colour
-GIVETH A NUMBER
-DECIDE f Red IS 1
-DECIDE f c IS 2
-DECIDE f Red Blue IS 3
+x MEANS x + 1
+#EVAL x
 ```
 
-**What went wrong:** Clauses that follow one another are gathered into one rule when they have the same name and the same number of patterns after it.
-The first two clauses have one pattern each, so they are one rule.
-The third has two, so it is not a clause of that rule: it is a rule of its own that takes two inputs and calls them `Red` and `Blue`, whatever else those words mean elsewhere.
-It checks, and `f Green Red` gives 3, where a reader of the three lines might have expected L4 to be looking for the colour Red and the colour Blue.
-The warning appears once, at the name in the definition, and only for a definition that has no `GIVEN` of its own and follows a rule written as clauses directly.
+To find `x`, L4 needs `x + 1`, which needs `x` again. L4 notices this for a value defined in terms of itself and stops with this error.
 
-**How to fix it:** If the line was meant as another clause of the rule above, give it as many patterns as the clauses above have (here, one).
-If it is a rule of its own, say so with a `GIVEN` of its own, which also gives its inputs their types:
+A function that calls itself with new inputs, and never reaches a case that stops, is not caught: its `#EVAL` keeps running and never answers.
+
+**How to fix it:** If you meant recursion, give it a case that stops:
 
 ```l4
-GIVEN c IS A Colour
-      d IS A Colour
+GIVEN n IS A NUMBER
 GIVETH A NUMBER
-f c d MEANS 3
+factorial n MEANS
+    IF n <= 1 THEN 1
+    ELSE n * factorial (n - 1)
+
+#EVAL factorial 5
 ```
+
+If you did not, you probably meant another name on the right-hand side.
 
 ---
 
+## Assumed terms and refusals
+
+Some names stand for facts that are supplied for each case, and some cases a rule declines to answer.
+
 ### ASSUME is being retired
 
-**Warning message:**
+**Warning:**
 
 ```
 ASSUME is an older way of introducing a name, and it is being retired.
@@ -1064,84 +1058,9 @@ The warning is given once per `ASSUME`, on the declared name (for an infix patte
 
 ---
 
-## Runtime Errors
-
-Runtime errors occur when the code is well-formed and well-typed but does something problematic during evaluation.
-
-### Circular definition
-
-**Symptom:** Evaluation hangs or produces a stack overflow
-
-**What you wrote:**
-
-```l4
-x MEANS x + 1
-```
-
-**What went wrong:** The definition refers to itself without ever reaching a base case. When L4 tries to evaluate `x`, it needs `x + 1`, which needs `x`, which needs `x + 1`, and so on forever.
-
-**How to fix it:** If you intend recursion, make sure there is a base case that stops the cycle:
-
-```l4
-factorial MEANS
-    IF n <= 1 THEN 1
-    ELSE n * (factorial (n - 1))
-```
-
-If you did not intend recursion, you probably meant to reference a different variable. Check your names.
-
----
-
-### Non-exhaustive patterns at runtime
-
-**Error message:**
-
-```
-The value
-  Withdrawn
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
-The typechecker's exhaustiveness warning lists all missing branches.
-```
-
-**What went wrong:** Evaluation reached a CONSIDER whose branches do not cover the actual value of the scrutinee (shown in the message). Either the compile-time warning was ignored, or the value escaped the analysis — in particular matches on NUMBER, STRING, or DATE scrutinees, for which exhaustiveness checking is skipped (see [Non-exhaustive pattern match](#non-exhaustive-pattern-match) under Compiler Warnings). A directive that crashes this way makes `l4 run` exit non-zero.
-
-**How to fix it:** Add branches for the missing cases, or add an OTHERWISE branch as a catch-all. For matches on NUMBER, STRING, or DATE values, always include OTHERWISE.
-
-When the rule was written as a list of clauses rather than with a CONSIDER, the message talks about its clauses instead:
-
-```
-No clause of `label` matches these inputs.
-The value that the last clause could not match is
-  Suspended
-Add a clause for this case, or end the clauses with one that matches every input.
-```
-
-Here `label` has a clause for `Active` and one for `Closed`, and was asked about `Suspended`. Add a clause for the missing case (the warning described under [Non-exhaustive pattern match](#non-exhaustive-pattern-match) lists the clauses still needed), or end the list with a clause whose pattern matches anything. A rule with only one clause says "The only clause of `label` does not match these inputs." instead.
-
-A value that nobody supplied never produces this message: a `CONSIDER` on it stops with [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term) instead, `OTHERWISE` or not.
-
----
-
-### DEONTIC rule does not execute
-
-**Symptom:** You defined a DEONTIC rule (MUST, MAY, SHANT) but nothing happens when you evaluate it.
-
-**What went wrong:** DEONTIC rules produce effects (obligations, permissions, prohibitions) rather than plain values. They need to be evaluated using the `#TRACE` directive, which generates a state graph showing the obligations and their consequences.
-
-**How to fix it:** Use `#TRACE` to evaluate your rule:
-
-```l4
-#TRACE ruleFunction context
-```
-
-See [Regulative Rules](../regulative/README.md) for more on deontic logic in L4.
-
----
-
 ### Needed the value of an assumed term
 
-**Error message:**
+**Error:**
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -1192,138 +1111,234 @@ Result:
 
 ---
 
-## Common Gotchas
+## Pattern matching
 
-These are not always error messages per se, but they trip up many L4 users.
+### Non-exhaustive pattern match
 
-### Equality uses single equals
+**Warning:**
+
+```
+The following branches still need to be considered:
+
+  WHEN Suspended THEN
+```
+
+```l4
+DECLARE Status IS ONE OF Active, Suspended, Closed
+
+GIVEN status IS A Status
+GIVETH A STRING
+describe status MEANS
+    CONSIDER status
+    WHEN Active THEN "running"
+    WHEN Closed THEN "stopped"
+```
+
+The branches of the CONSIDER do not cover every value of its type. The file still runs, but evaluating the CONSIDER on a value with no branch stops with an error (see [Non-exhaustive patterns at runtime](#non-exhaustive-patterns-at-runtime)).
+
+**How to fix it:** Add the branches the warning lists, or an OTHERWISE for everything else:
+
+```l4
+DECLARE Status IS ONE OF Active, Suspended, Closed
+
+GIVEN status IS A Status
+GIVETH A STRING
+describe status MEANS
+    CONSIDER status
+    WHEN Active THEN "running"
+    WHEN Closed THEN "stopped"
+    OTHERWISE "unknown"
+```
+
+What the check covers:
+
+- Enumerations declared in the same file, records and BOOLEAN are checked, including inside `WHERE` and `LET` definitions.
+- A NUMBER, a STRING or a DATE has no end of values, so a CONSIDER over one is complete only with an OTHERWISE, and the warning suggests it. A WHEN with a number or a piece of text, and an `EXACTLY` of one or of a value of an enumeration, matches that value, as in a [rule written as clauses](#multi-clause-decide-does-not-cover-all-cases). A CONSIDER written by hand reads numbers, pieces of text and `EXACTLY` exactly as the clauses do, so the two spellings of one rule warn alike. A keyed gap inside a pattern is suggested as a WHEN, with the key as the branches spell it, and a number repeated in another spelling is a redundant branch.
+- The builtin container types MAYBE, EITHER and LIST are checked, constructors and contents alike: a CONSIDER over a `MAYBE` with no `WHEN NOTHING` branch is warned about, and so is one over a `LIST` with no `WHEN EMPTY`. `WHEN JUST Red` over a `MAYBE Colour` asks for `WHEN JUST Green` and `WHEN JUST Blue`. A number or a piece of text nested in a pattern (`WHEN JUST 1`, `WHEN "a" FOLLOWED BY rest`) is read the same way.
+- A CONSIDER over an enumeration declared in an imported file gives no missing-case warning at all.
+- Past 64 missing branches to list, a CONSIDER is told only what the branches without a number or a piece of text leave open, as clauses are, and gets no warning when that list is too long as well.
+- Warnings never block evaluation: a file with warnings still runs its `#EVAL` directives.
+
+A rule written as a list of clauses is checked the same way; its warning is [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases).
+
+[CONSIDER](../control-flow/CONSIDER.md#missing-and-redundant-branches) gives the full rules, and [Exhaustiveness](../../concepts/type-system/exhaustiveness.md) explains why the check works this way.
+
+---
+
+### Redundant pattern match branch
+
+**Warning:** `The following CONSIDER branch is redundant:`, followed by the branch
+
+```l4
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A STRING
+label c MEANS
+    CONSIDER c
+    WHEN Red THEN "r"
+    OTHERWISE "x"
+    WHEN Blue THEN "b"
+```
+
+A branch can never be reached, because the branches above it, here the OTHERWISE, already cover every value it could match. A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is also redundant.
+
+**How to fix it:** Delete the branch, or move it above the more general one.
+
+---
+
+### Non-exhaustive patterns at runtime
+
+**Error:**
+
+```
+The value
+  Withdrawn
+reached a CONSIDER that has no branch for it.
+Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
+The typechecker's exhaustiveness warning lists all missing branches.
+```
+
+**What went wrong:** Evaluation reached a CONSIDER whose branches do not cover the actual value of the scrutinee (shown in the message). Either the [warning](#non-exhaustive-pattern-match) was ignored, or the check could not see the gap: a missing value of an enumeration declared in another file gets no warning. A directive that stops this way makes `l4 run` exit with an error.
+
+**How to fix it:** Add branches for the missing cases, or an OTHERWISE branch for everything else. A CONSIDER over a NUMBER, a STRING or a DATE always needs an OTHERWISE.
+
+When the rule was written as a list of clauses rather than with a CONSIDER, the message talks about its clauses instead:
+
+```
+No clause of `label` matches these inputs.
+The value that the last clause could not match is
+  Suspended
+Add a clause for this case, or end the clauses with one that matches every input.
+```
+
+Here `label` has a clause for `Active` and one for `Closed`, and was asked about `Suspended`. Add a clause for the missing case (the warning [Multi-clause DECIDE does not cover all cases](#multi-clause-decide-does-not-cover-all-cases) lists the clauses still needed), or end the list with a clause whose pattern matches anything. A rule with only one clause says "The only clause of `label` does not match these inputs." instead.
+
+A value that nobody supplied never produces this message: a `CONSIDER` on it stops with [Needed the value of an assumed term](#needed-the-value-of-an-assumed-term) instead, `OTHERWISE` or not.
+
+---
+
+## Regulative rules
+
+### #EVAL shows the rule instead of an outcome
+
+**Symptom:** `#EVAL` of a regulative rule prints the rule back (`PARTY Seller MUST ...`) instead of saying whether it was complied with.
+
+A regulative rule is a `DEONTIC` value: it says what is owed, not what happened. To see an outcome, run it against events with `#TRACE`, giving a start time and what each party did and when:
+
+```l4
+DECLARE Party IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver the goods`, `pay`
+
+GIVETH A DEONTIC Party Action
+`the delivery duty` MEANS
+    PARTY Seller
+    MUST `deliver the goods`
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `the delivery duty` AT 0 WITH
+    PARTY Seller DOES `deliver the goods` AT 3
+```
+
+This gives `FULFILLED`. See [Regulative rules](../regulative/README.md) and [EVENT](../regulative/EVENT.md).
+
+---
+
+## Export
+
+### An @export input that is a rule, not a value
+
+**Error:** `Function type inputs are not supported for @export.` — or, for the other
+spelling, `The @export rule … reads …, which is assumed and takes 1 input of its own.`
+
+**What you wrote:** A published rule that depends on a rule somebody else is expected to supply.
+
+```l4
+ASSUME Person IS A TYPE
+
+GIVEN p IS A Person
+ASSUME `is eligible` p IS A BOOLEAN
+
+@export Whether the person may apply
+GIVEN who IS A Person
+GIVETH A BOOLEAN
+DECIDE `may apply` IF `is eligible` who
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request reaches it as
+JavaScript Object Notation (**"JSON"**). JSON carries **values** — a number, a date, a yes or no, a
+record of those. It cannot carry a rule. So an input that is itself a rule can never be supplied,
+and every request would stop on it.
+
+Three ways of writing the same mistake, all refused:
+
+| what you wrote                                                      | how many inputs it takes |
+| ------------------------------------------------------------------- | ------------------------ |
+| `GIVEN p IS A Person` above ``ASSUME `is eligible` p IS A BOOLEAN`` | 1                        |
+| ``ASSUME `is eligible` IS A FUNCTION FROM Person TO BOOLEAN``       | 1                        |
+| ``GIVEN `is eligible` IS A FUNCTION FROM Person TO BOOLEAN``        | 1                        |
+
+An assumed name that takes **no** inputs is a value, and stays publishable: `ASSUME age IS A NUMBER`
+is exactly the sort of thing a request supplies.
+
+The check follows every rule the published one reaches, so moving the assumed rule behind a helper
+does not silence it — that set is precisely what a request would have to fill in.
+
+**How to fix it:** any of three moves, and the message names all three.
+
+1. **Give the rule a definition** — `DECIDE` or `MEANS` — so nothing outside has to supply it.
+2. **Take what it is asked about as an ordinary input.** If `` `is eligible` `` is really a fact
+   about the person, make it a field of the person's record and let the request send that.
+3. **Remove the `@export`.** The rule still checks, runs and compiles; it is simply not published.
+
+Compiling to [Blawx](../../exports/blawx.md) is the one place this shape is fine as written, because
+a Blawx interview asks a person for the answer instead of receiving it in a request. `l4 export blawx` will
+still compile such a file even though `l4 check` refuses to publish it.
+
+---
+
+### An @export of clauses with no GIVEN
+
+**Error:**
+
+```
+`size` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
+```
 
 **What you wrote:**
 
 ```l4
-result MEANS x == 5
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
 ```
 
-**What went wrong:** L4 uses a single `=` for equality comparison. The double `==` from Python, JavaScript, Java, and many other languages does not exist in L4.
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input by name, as a value of that input's type.
+A rule written as clauses with patterns and no `GIVEN`, whether one clause or several, has neither.
+L4 names its inputs itself, `input 1`, `input 2` and so on, and works out their types from the patterns and the clause bodies, so a request could not say which input a value is for, and there is no declared type to check the value against.
+So an `@export` of such a rule is an error, reported at the `@export` line, because that is where the missing `GIVEN` goes.
+The error stops the whole file from checking: `l4 run`, the REPL, `l4 batch` and every exporter refuse the file, the `#EVAL`s of its other rules included, and jl4-service will not deploy it, until you add the `GIVEN` or remove the `@export`.
+`@export default` is refused the same way.
+Without `@export`, clauses with no `GIVEN` are fine.
 
-**How to fix it:**
+**How to fix it:** Add a `GIVEN` below `@export` that names and types each input, in the order the patterns appear, and say what the rule gives back with `GIVETH`:
 
 ```l4
-result MEANS x = 5
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
 ```
 
-This is consistent with mathematical notation and feels natural once you are used to it. L4 does not have variable assignment, so there is no ambiguity.
-
----
-
-### Missing IMPORT prelude
-
-**Error message:** `Error: undefined function 'map'` (or `filter`, `all`, `any`, etc.)
-
-**What went wrong:** Standard library functions like `map`, `filter`, `all`, `any`, and `append` are defined in the prelude. If you are getting "undefined" errors for these common functions, the prelude may not be imported.
-
-**How to fix it:** Add this line at the top of your file:
-
-```l4
-IMPORT prelude
-```
-
-See [Libraries](../libraries/README.md) for the full list of available libraries.
-
----
-
-### Module not found
-
-**Error message:**
-
-```
-I could not find a module with this name: modulename
-Nothing it defines is in scope here; names you expected from it are reported as undefined.
-I have tried the following locations:
-...
-```
-
-This is an error, not a warning: it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module. The message lists every place that was searched, once each, in the same tier order as the resolution table. Other commands — `l4 render`, `l4 nlg` and the transpilers among them — print the same error and still exit 0; [When nothing resolves](../libraries/resolution.md#which-commands-fail-on-it) has the measured list.
-
-**What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order (first match wins):
-
-1. Virtual filesystem (VFS) provided by the integrated development environment (IDE) or by the service
-2. `JL4_LIBRARY_PATH` environment variable (if set)
-3. Project root directory
-4. Relative to the importing file
-5. Embedded standard libraries compiled into the binary
-6. The user-wide data directory laid down by the Cross-Desktop Group (XDG) specification (`~/.local/share/jl4/libraries/`)
-7. Bundled with the VSCode extension (`../../libraries/` from executable)
-
-Project-scoped locations (2–4) outrank the embedded stdlib, so intentional overrides work; machine-global locations (6–7) rank below it, so they can only supply modules the embed does not carry. When `JL4_LIBRARY_PATH` is set, the embedded copy (step 5) is skipped entirely — the operator has full control over which libraries are available. See [Library Resolution](../libraries/resolution.md) for the full story, including the shadow warning emitted when several differing copies of a module are visible at once.
-
-**How to fix it:**
-
-- Check the module name for typos. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output.
-- For your own modules, place them in the project directory or set `JL4_LIBRARY_PATH`.
-- For third-party (non-stdlib) libraries, install them to `~/.local/share/jl4/libraries/`
-- If `JL4_LIBRARY_PATH` is set, ensure it contains the standard libraries you need (e.g., `prelude.l4`).
-
----
-
-### WHERE scope issues
-
-**Error message:** `Error: undefined variable in WHERE clause`
-
-**What went wrong:** A variable you referenced in a WHERE binding does not exist. Note that WHERE bindings can see the outer scope and can reference each other, so the issue is usually a typo or a missing definition rather than a scoping limitation.
-
-**How to fix it:** Double-check that the variable you are referencing is defined either in an enclosing scope or in another binding within the same WHERE block.
-
----
-
-### Missing type annotations
-
-**Symptom:** Yellow warning in the IDE, or confusing type error messages
-
-**What went wrong:** L4 can infer types without annotations, but omitting them sometimes leads to ambiguous inference or unhelpful error messages when something goes wrong downstream.
-
-**How to fix it:** Add GIVEN and GIVETH (or GIVES) annotations to top-level definitions:
-
-```l4
-GIVEN person IS A Person
-GIVETH A BOOLEAN
-DECIDE `the person is eligible` IF
-    person's age >= 18
-```
-
-Explicit types serve as documentation, produce better error messages, and prevent inference ambiguity.
-
----
-
-## Coming from Other Languages?
-
-If you have experience with other programming languages, this translation table will help you avoid the most common syntax mistakes.
-
-| What you might write      | What L4 uses                      | Notes                              |
-| ------------------------- | --------------------------------- | ---------------------------------- |
-| `==`                      | `=`                               | Single equals for equality         |
-| `True` / `true`           | `TRUE`                            | Uppercase boolean literals         |
-| `False` / `false`         | `FALSE`                           | Uppercase boolean literals         |
-| `null` / `nil` / `None`   | `NOTHING`                         | Used with the MAYBE type           |
-| `Nothing` / `Just`        | `NOTHING` / `JUST`                | Uppercase constructors             |
-| `%`                       | `MODULO`                          | Keyword, not symbol                |
-| `.` (dot access)          | `'s`                              | Genitive/possessive field access   |
-| `++` / `+` (strings)      | `CONCAT` or `APPEND`              | String concatenation               |
-| `def` / `fn` / `function` | `MEANS` or `DECIDE`               | Definition keywords                |
-| `return`                  | (not needed)                      | L4 is expression-based             |
-| `;`                       | (not needed)                      | Layout-sensitive, uses indentation |
-| `{ }`                     | (not needed)                      | Uses indentation instead of braces |
-| `\|` (sum types)          | `,` or newline                    | Sum type constructor separators    |
-| `Constructor Type`        | `Constructor HAS field IS A Type` | Named fields, not positional       |
-
----
-
-## See Also
-
-- **[Syntax Reference](../syntax/README.md)** -- Layout rules, identifiers, annotations, and other structural syntax
-- **[Types Reference](../types/README.md)** -- Type system, DECLARE, sum types, and polymorphic types
-- **[Control Flow](../control-flow/README.md)** -- IF/THEN/ELSE, BRANCH, CONSIDER
-- **[Operators Reference](../operators/README.md)** -- Arithmetic, comparison, logical, and string operators
-- **[Functions Reference](../functions/README.md)** -- GIVEN, GIVETH, MEANS, DECIDE, WHERE
-- **[Libraries Reference](../libraries/README.md)** -- Prelude and other importable libraries
-- **[GLOSSARY](../GLOSSARY.md)** -- Master index of all language features
+The rule is then published with the inputs `c` and `n`.
+Or remove the `@export`, if the rule is not meant to be published.

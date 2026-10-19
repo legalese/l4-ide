@@ -3,7 +3,7 @@
 The **query planner** turns a Boolean-valued L4 decision into an interactive
 question-and-answer session: given the facts known so far, it decides whether the
 outcome is already settled, and if not, which question to ask next. This is what
-lets the [web-app generator](../../courses/advanced/module-a4-production.md#web-form-generation)
+lets the [web-app generator](../../courses/advanced/module-a4-production.md#getting-ready-to-deploy)
 produce a wizard from a rule instead of a static form.
 
 The planner is built on a [Reduced Ordered Binary Decision Diagram](robdd.md)
@@ -121,7 +121,7 @@ the query planner") for the tracked entry. Not scheduled.
 
 ## How the web-app generator uses it
 
-The [web form generator](../../courses/advanced/module-a4-production.md#web-form-generation)
+The [web form generator](../../courses/advanced/module-a4-production.md#getting-ready-to-deploy)
 walks the planner as the user answers:
 
 1. render the top-ranked unanswered question as a form field;
@@ -246,5 +246,5 @@ Written with the input `b` itself where the clauses have the pattern `TRUE`, it 
 
 - [Binary Decision Diagrams (ROBDD)](robdd.md) — the substrate
 - [TYPICALLY](../types/TYPICALLY.md) — per-atom priors for the ordering policy
-- [Web Form Generation](../../courses/advanced/module-a4-production.md#web-form-generation)
+- [Getting Ready to Deploy](../../courses/advanced/module-a4-production.md#getting-ready-to-deploy)
   — the generator that consumes the planner

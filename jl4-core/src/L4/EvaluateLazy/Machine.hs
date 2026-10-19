@@ -5305,6 +5305,9 @@ suppliedField = \ case
 -- | A type with its synonyms expanded at the head, as far as they go. The
 -- checker records a synonym's body on its 'TypeCheck.KnownType'; a
 -- parameterised synonym has its arguments substituted for its parameters.
+-- Without this, @DECLARE Year IS A NUMBER@ is not a primitive here, and a JSON
+-- string for a @Year@ is accepted as it stands instead of refused as it is for
+-- a @NUMBER@.
 expandTypeSynonyms :: Type' Resolved -> Machine (Type' Resolved)
 expandTypeSynonyms = go (16 :: Int)
   where

@@ -25,6 +25,10 @@ import {
   AiConversationList,
   AiConversationLoad,
   AiConversationNew,
+  AiDictationCancel,
+  AiDictationStart,
+  AiDictationStatus,
+  AiDictationStop,
   AiFileOpen,
   AiFileOpenDiff,
   AiGetActiveFileSelection,
@@ -55,6 +59,7 @@ import * as nodePath from 'path'
 import * as os from 'os'
 import { promises as fsPromises } from 'fs'
 import {
+  AiProxyError,
   MCP_L4_RULES_PREFIX,
   categoryForTool,
   type AiProxyClient,
@@ -71,6 +76,11 @@ import type { AuthManager } from '../auth.js'
 import type { ServiceClient } from '../service-client.js'
 import { isLocalMode } from './ai-endpoint.js'
 import type { AiLogger } from './logger.js'
+import {
+  DICTATION_MAX_SECONDS,
+  DictationError,
+  DictationRecorder,
+} from './dictation.js'
 import type { VsCodeMcpTools } from './vscode-mcp.js'
 import type { WebviewUserInteraction } from './vscode-user-interaction.js'
 
@@ -125,6 +135,9 @@ export function registerAiChatHandlers(deps: {
    *  endpoint (`/deployments/{id}/functions/{fn}`) for chat tool-call
    *  rendering. */
   serviceClient: ServiceClient
+  /** `ExtensionContext.extensionPath` — locates the bundled dictation
+   *  recorder (worker script + native audio module). */
+  extensionPath: string
 }): vscode.Disposable {
   const {
     messenger,
@@ -136,6 +149,7 @@ export function registerAiChatHandlers(deps: {
     logger,
     interaction,
     permissions,
+    extensionPath,
     dispatcher,
     visibility,
     mcp,
@@ -856,6 +870,61 @@ export function registerAiChatHandlers(deps: {
     return { items }
   })
 
+  // ── Voice dictation ────────────────────────────────────────────────
+  // The webview can't open a microphone, so it asks us to record. Only
+  // offered in a local desktop window: in a remote workspace (SSH, WSL,
+  // dev container, Codespaces) this code runs on the remote machine,
+  // which has no microphone to listen to, and the webview then shows no
+  // dictation UI at all.
+  const dictation = new DictationRecorder({
+    extensionPath,
+    log: (m) => logger.info(m),
+  })
+  const dictationAvailable =
+    vscode.env.remoteName === undefined &&
+    vscode.env.uiKind === vscode.UIKind.Desktop &&
+    dictation.isSupported()
+
+  messenger.onRequest(AiDictationStatus, () => ({
+    available: dictationAvailable,
+    maxSeconds: DICTATION_MAX_SECONDS,
+  }))
+
+  messenger.onRequest(AiDictationStart, async () => {
+    if (!dictationAvailable) {
+      return { error: 'Dictation isn’t available.' }
+    }
+    try {
+      // A recording orphaned by a webview reload must not block the
+      // next one.
+      dictation.cancel()
+      await dictation.start()
+      return {}
+    } catch (err) {
+      return { error: dictationErrorMessage(err, logger) }
+    }
+  })
+
+  messenger.onRequest(AiDictationStop, async ({ apiBaseUrl }) => {
+    try {
+      const wav = await dictation.stop()
+      const text = await proxy.transcribe(wav, apiBaseUrl)
+      return { text }
+    } catch (err) {
+      return { error: dictationErrorMessage(err, logger) }
+    }
+  })
+
+  messenger.onNotification(AiDictationCancel, () => {
+    dictation.cancel()
+  })
+
+  // Never keep listening where the user can't see the recording
+  // indicator: switching away from the chat drops an in-progress clip.
+  const dictationVisibilitySub = visibility.onDidChangeVisibility((visible) => {
+    if (!visible) dictation.cancel()
+  })
+
   // Usage polling. Subscribing starts a 30s timer that hits
   // /v1/usage and forwards the result to the webview. The server
   // caches the result for 10s inside TokenQuota, so a 30s cadence
@@ -1027,6 +1096,8 @@ export function registerAiChatHandlers(deps: {
   return {
     dispose(): void {
       if (usageTimer) clearInterval(usageTimer)
+      dictation.cancel()
+      dictationVisibilitySub.dispose()
       authSub.dispose()
       aiKeyConfigSub.dispose()
       activeFileSub.dispose()
@@ -1206,6 +1277,25 @@ function mediaTypeForExtension(ext: string): string | null {
     default:
       return null
   }
+}
+
+/** Turn a dictation failure into the short line the chat input shows
+ *  above the mic. Kept deliberately plain — no addresses, status codes
+ *  or advice the user can't act on; the specifics go to the log. */
+function dictationErrorMessage(err: unknown, logger: AiLogger): string {
+  const message = err instanceof Error ? err.message : String(err)
+  const detail = err instanceof DictationError ? err.detail : undefined
+  logger.warn(`dictation: ${detail ?? message}`)
+  if (err instanceof DictationError) return message
+  if (err instanceof AiProxyError) {
+    if (err.code === 'network_error') return 'Couldn’t reach the AI proxy.'
+    if (err.status === 429) return 'Daily limit reached.'
+    if (err.status === 413) return 'Keep it short.'
+    if (err.status === 401 || err.status === 403) {
+      return 'Sign in to use dictation.'
+    }
+  }
+  return 'Couldn’t transcribe that.'
 }
 
 async function handlePickAttachment(

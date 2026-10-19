@@ -484,7 +484,7 @@ There are three points to count from, all of them positions in the life of the o
 | `OF THE DEADLINE` | the earlier obligation's own deadline                                 |
 | `OF THE ARMING`   | the moment the earlier obligation arose                               |
 
-and `OF` can also take a date, when the lease names one. An anchor has to have something to be the position of, so `OF THE JOIN` at the top of a rule, with no earlier obligation, is refused with a message saying why. The [WITHIN reference](../../reference/regulative/README.md#within-temporal-deadline) has the rest, including the forms that are refused.
+and `OF` can also take a date, when the lease names one. An anchor has to have something to be the position of, so `OF THE JOIN` at the top of a rule, with no earlier obligation, is refused with a message saying why. The [WITHIN reference](../../reference/regulative/consequences.md#within) has the rest, including the forms that are refused.
 
 **A window that opens later.** Some duties may not be performed _too early_ either. When the last month's rent is paid, the deposit comes back — but not in the first fourteen days, which is when the landlord inspects the flat, and within sixteen days after that:
 

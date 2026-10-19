@@ -1250,7 +1250,22 @@ instance HasDesc (Decide n) where
     tySig' <- addDesc tySig
     app' <- addDesc appForm
     expr' <- addDesc expr
+    dropUnclaimedWithinGroup dec ann'
     pure $ MkDecide ann' tySig' app' expr'
+
+-- | A group of clauses claims no @\@desc@ or @\@export@ written inside its
+-- own range that is not its own, a clause's ('claimLaterClauseDescs') or an
+-- input's: between the @GIVETH@ and the first clause, say. It runs after the
+-- descent into the clauses' bodies, which has already given a @WHERE@ local its
+-- own, so what is left would be the next top-level rule's, which takes every
+-- @\@desc@ written before it ('descPrecedesNode'), and a group published the
+-- rule after it under a description of its own. They are dropped.
+dropUnclaimedWithinGroup :: (HasSrcRange a) => a -> Anno -> State DescS ()
+dropUnclaimedWithinGroup node ann =
+  case (view annPmMatrix ann, nodeSpan node) of
+    (Just _, Just span') ->
+      void (takeMatchingDescs \ w -> span'.start <= w.range.start && w.range.end <= span'.end)
+    _ -> pure ()
 
 -- | In a group of clauses, the @\@desc@s and @\@export@s written between the
 -- clause above and a later clause belong to that clause ('PmMatrixClause'
@@ -2207,10 +2222,25 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       sig' <- addRef sig
       body' <- addRef body
       pure $ Lam ann' sig' body'
-    App ann n ns -> attachRef expr ann >>= \ann' -> do
+    App ann n ns -> do
+      -- The range of an infix (mixfix) call is its keyword and no more, so an
+      -- operand to the LEFT of the keyword starts before the call does. The
+      -- call is where its first left operand begins, so it claims the refs
+      -- that precede that operand first. The operands then come before the
+      -- call in the walk, so that a ref inside one is claimed by the node it
+      -- precedes and not by the whole call.
+      let beginsBeforeCall a = case (nodeSpan a, nodeSpan expr) of
+            (Just sa, Just se) -> sa.start < se.start
+            _                  -> False
+          (leftOperands, rest) = span beginsBeforeCall ns
+      annAbove <- case leftOperands of
+        []      -> pure ann
+        l : _   -> attachRef l ann
+      leftOperands' <- traverse addRef leftOperands
+      ann' <- attachRef expr annAbove
       n' <- addRef n
-      ns' <- traverse addRef ns
-      pure $ App ann' n' ns'
+      rest' <- traverse addRef rest
+      pure $ App ann' n' (leftOperands' <> rest')
     AppNamed ann n ns order -> attachRef expr ann >>= \ann' -> do
       n' <- addRef n
       ns' <- traverse addRef ns

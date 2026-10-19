@@ -1,354 +1,67 @@
-# L4 Operators Reference
+# Operators
 
-Operators in L4 perform operations on values. Most operators have both textual (keyword) and symbolic forms to balance readability for legal professionals and conciseness for programmers.
+Operators combine values into expressions: arithmetic, comparisons and logic.
+Most have a word form, which reads well in legal text, and a symbol form; the two mean the same and can be mixed. Words suit rules that lawyers read; symbols are shorter.
 
-## Overview
+## Pages
 
-L4 operators are organized into categories:
+- [AND, OR, NOT, IMPLIES](logical.md): logical operators and their truth table
+- [UNLESS](UNLESS.md): exceptions
+- [Arithmetic](arithmetic/README.md): `PLUS`, `MINUS`, `TIMES`, `DIVIDED BY`, `MODULO`
+- [Comparisons](comparisons/README.md): `EQUALS`, `GREATER THAN`, `AT LEAST` and the others
 
-- **Arithmetic** - Mathematical operations (PLUS, MINUS, TIMES, etc.)
-- **Comparison** - Value comparisons (EQUALS, GREATER THAN, etc.)
-- **Logical** - Boolean operations (AND, OR, NOT, IMPLIES)
-- **String** - Text manipulation (CONCAT, APPEND)
-- **List** - List construction and manipulation (FOLLOWED BY, EMPTY)
-- **Temporal** - Time-based operations (AT, WITHIN)
+## Word and symbol forms
 
----
+| Word         | Symbol | Word                    | Symbol |
+| ------------ | ------ | ----------------------- | ------ |
+| `PLUS`       | `+`    | `EQUALS`                | `=`    |
+| `MINUS`      | `-`    | `GREATER THAN`, `ABOVE` | `>`    |
+| `TIMES`      | `*`    | `LESS THAN`, `BELOW`    | `<`    |
+| `DIVIDED BY` | `/`    | `AT LEAST`              | `>=`   |
+| `MODULO`     |        | `AT MOST`               | `<=`   |
+| `AND`        | `&&`   | `OR`                    | `\|\|` |
+| `IMPLIES`    | `=>`   | `NOT`, `UNLESS`         |        |
 
-## Arithmetic Operators
+**Example file:** [textual-vs-symbolic-example.l4](textual-vs-symbolic-example.l4)
 
-Mathematical operations on numbers.
+## Precedence
 
-[Details and examples on arithmetic operators](arithmetic/README.md)
+From the tightest-binding to the loosest:
 
-### Addition
+| Level | Operators                                                                      | Grouping      |
+| ----- | ------------------------------------------------------------------------------ | ------------- |
+| 1     | function application, `'s`                                                     |               |
+| 2     | `TIMES`, `DIVIDED BY`, `MODULO`                                                | left to right |
+| 3     | `PLUS`, `MINUS`                                                                | left to right |
+| 4     | `FOLLOWED BY`                                                                  | to the right  |
+| 5     | `EQUALS`, `GREATER THAN`, `LESS THAN`, `AT LEAST`, `AT MOST` and their symbols |               |
+| 6     | `AND`, `...`, `RAND`                                                           | to the right  |
+| 7     | `OR`, `..`, `ROR`                                                              | to the right  |
+| 8     | `IMPLIES`, `UNLESS`                                                            | to the right  |
 
-- **Keyword:** PLUS
-- **Symbol:** `+`
-- **Type:** `NUMBER -> NUMBER -> NUMBER`
-- **Example:** `5 PLUS 3` or `5 + 3` → `8`
+- `2 + 3 * 4` is `14`, and `10 - 4 - 3` is `3`.
+- `NOT` is not in the table: it reaches forward over everything after it on its line, so `NOT a AND b` would mean `NOT (a AND b)`, and L4 refuses that spelling. Write `NOT (a AND b)` for the wide reading or `(NOT a) AND b` for the narrow one. See [How far does NOT reach?](logical.md#how-far-does-not-reach).
+- Parentheses override precedence: `(2 + 3) * 4` is `20`.
+- When an expression spans several lines, an operator written further left than the lines above it applies to all of them together. See [Several lines](logical.md#several-lines).
 
-### Subtraction
+**Example files:** [precedence-example.l4](precedence-example.l4), [associativity-example.l4](associativity-example.l4)
 
-- **Keyword:** MINUS
-- **Symbol:** `-`
-- **Type:** `NUMBER -> NUMBER -> NUMBER`
-- **Example:** `10 MINUS 4` or `10 - 4` → `6`
+## Asyndetic AND and OR
 
-### Multiplication
+Legal text often lists conditions with punctuation instead of "and" or "or". L4 has two such forms:
 
-- **Keyword:** TIMES
-- **Symbol:** `*`
-- **Type:** `NUMBER -> NUMBER -> NUMBER`
-- **Example:** `6 TIMES 7` or `6 * 7` → `42`
+- `...` (three dots) means `AND`: `` `is a citizen` ... `is over 18` ... `has ID` ``
+- `..` (two dots) means `OR`: `` approved .. pending .. `under review` ``
 
-### Division
+They have the same precedence as `AND` and `OR`.
 
-- **Keywords:** DIVIDED BY
-- **Symbol:** `/`
-- **Type:** `NUMBER -> NUMBER -> NUMBER`
-- **Example:** `15 DIVIDED BY 3` or `15 / 3` → `5`
-- **Note:** Returns rational numbers for non-integer results
+**Example file:** [asyndetic-example.l4](asyndetic-example.l4)
 
-### Modulo
+## Other operators
 
-- **Keyword:** MODULO
-- **Type:** `NUMBER -> NUMBER -> NUMBER`
-- **Example:** `17 MODULO 5` → `2`
-- **Note:** Remainder after division
-
----
-
-## Comparison Operators
-
-Compare values and return BOOLEAN results.
-
-[Details and examples on comparison operators](comparisons/README.md)
-
-### Equality
-
-- **Keyword:** EQUALS
-- **Symbol:** `=`
-- **Type:** `a -> a -> BOOLEAN`
-- **Example:** `5 EQUALS 5` or `5 = 5` → `TRUE`
-
-### Greater Than
-
-- **Keywords:** GREATER THAN, ABOVE
-- **Symbol:** `>`
-- **Type:** `NUMBER -> NUMBER -> BOOLEAN`
-- **Example:** `10 GREATER THAN 5` or `10 > 5` → `TRUE`
-
-### Less Than
-
-- **Keywords:** LESS THAN, BELOW
-- **Symbol:** `<`
-- **Type:** `NUMBER -> NUMBER -> BOOLEAN`
-- **Example:** `3 LESS THAN 7` or `3 < 7` → `TRUE`
-
-### Greater or Equal
-
-- **Keywords:** AT LEAST
-- **Symbol:** `>=`
-- **Type:** `NUMBER -> NUMBER -> BOOLEAN`
-- **Example:** `5 AT LEAST 5` or `5 >= 5` → `TRUE`
-
-### Less or Equal
-
-- **Keywords:** AT MOST
-- **Symbol:** `<=`
-- **Type:** `NUMBER -> NUMBER -> BOOLEAN`
-- **Example:** `4 AT MOST 10` or `4 <= 10` → `TRUE`
-
-### Inequality
-
-- **Expression:** `NOT (x EQUALS y)`
-- **Example:** `NOT (5 EQUALS 3)` → `TRUE`
-
----
-
-## Logical Operators
-
-Boolean operations for conditions and logic.
-
-### Conjunction
-
-- **Keyword:** [AND](AND.md)
-- **Symbol:** `&&` / `...`
-- **Type:** `BOOLEAN -> BOOLEAN -> BOOLEAN`
-- **Example:** `TRUE AND FALSE` → `FALSE`
-- **Truth table:**
-  - `TRUE AND TRUE` → `TRUE`
-  - `TRUE AND FALSE` → `FALSE`
-  - `FALSE AND TRUE` → `FALSE`
-  - `FALSE AND FALSE` → `FALSE`
-
-### Disjunction
-
-- **Keyword:** [OR](OR.md)
-- **Symbol:** `||` \ `..`
-- **Type:** `BOOLEAN -> BOOLEAN -> BOOLEAN`
-- **Example:** `TRUE OR FALSE` → `TRUE`
-- **Truth table:**
-  - `TRUE OR TRUE` → `TRUE`
-  - `TRUE OR FALSE` → `TRUE`
-  - `FALSE OR TRUE` → `TRUE`
-  - `FALSE OR FALSE` → `FALSE`
-
-### Negation
-
-- **Keyword:** [NOT](NOT.md)
-- **Type:** `BOOLEAN -> BOOLEAN`
-- **Example:** `NOT TRUE` → `FALSE`
-- **Note:** NOT reaches forward over whatever follows it on the line, so `NOT a AND b` would mean `NOT (a AND b)` — and L4 refuses that spelling. Write `NOT (a AND b)` for the wide reading or `(NOT a) AND b` for the narrow one. See [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach)
-
-### Implication
-
-- **Keyword:** [IMPLIES](IMPLIES.md)
-- **Symbol:** `=>`
-- **Type:** `BOOLEAN -> BOOLEAN -> BOOLEAN`
-- **Example:** `FALSE IMPLIES TRUE` → `TRUE`
-- **Note:** `p IMPLIES q` is equivalent to `(NOT p) OR q` — the brackets matter, see [NOT](NOT.md#how-far-does-not-reach)
-
-### Exception
-
-- **Keyword:** [UNLESS](UNLESS.md)
-- **Type:** `BOOLEAN -> BOOLEAN -> BOOLEAN`
-- **Example:** `TRUE UNLESS FALSE` → `TRUE`
-- **Note:** `p UNLESS q` is equivalent to `p AND NOT q`
-- **Precedence:** Binds looser than OR (applies to entire expression)
-- **Truth table:**
-  - `TRUE UNLESS TRUE` → `FALSE`
-  - `TRUE UNLESS FALSE` → `TRUE`
-  - `FALSE UNLESS TRUE` → `FALSE`
-  - `FALSE UNLESS FALSE` → `FALSE`
-
----
-
-## String Operators
-
-Operations on text strings.
-
-### Concatenation
-
-- **Keyword:** CONCAT
-- **Type:** `STRING -> STRING -> STRING`
-- **Example:** `CONCAT "hello", " world"` → `"hello world"`
-
-### Append
-
-- **Keyword:** APPEND
-- **Type:** `STRING -> STRING -> STRING`
-- **Example:** `"hello" APPEND " world"` → `"hello world"`
-- **Note:** Infix wrapper for CONCAT
-
----
-
-## List Operators
-
-Construct and manipulate lists.
-
-### Cons
-
-- **Keywords:** FOLLOWED BY
-- **Type:** `a -> LIST OF a -> LIST OF a`
-- **Example:** `1 FOLLOWED BY LIST 2, 3` → `LIST 1, 2, 3`
-- **Note:** Prepends element to list
-
-### Empty List
-
-- **Keyword:** EMPTY
-- **Type:** `LIST OF a`
-- **Example:** `EMPTY` → Empty list
-- **Note:** Used in pattern matching
-
----
-
-## Temporal Operators
-
-Time-based operations for dates and deadlines.
-
-### At
-
-- **Keyword:** AT
-- **Type:** Used during tracing of regulative statements to track points in time
-- **Example:** `event AT date`
-
-### Within
-
-- **Keyword:** WITHIN
-- **Type:** Time duration constraint in regulative statements
-- **Example:** `PARTY MUST DO action WITHIN 30 DAYS`
-
----
-
-## Operator Precedence
-
-Operators are evaluated in the following order (highest to lowest precedence). Every entry below either joins two things (`AND`, `PLUS`, `EQUALS`) or applies a function to its arguments — see the next heading for the one operator that does neither:
-
-1. **Function application** (highest)
-2. **Multiplicative** (TIMES, DIVIDED BY, MODULO)
-3. **Additive** (PLUS, MINUS)
-4. **Comparison** (EQUALS, GREATER THAN, LESS THAN, etc.)
-5. **Logical AND**
-6. **Logical OR**
-7. **UNLESS** (exception clause)
-8. **IMPLIES** (lowest)
-
-Use parentheses `()` to override precedence.
-
-### NOT is not on this list
-
-[NOT](NOT.md) is deliberately absent, and it is the one operator you cannot look up here. It does not join two things, and it has no place in the ordering above. Instead it **reaches forward** and takes everything after it, until it meets a word that starts at its own column or further left. On one line that is everything, so `NOT a AND b` would mean `NOT (a AND b)` — and because most people read it the other way, L4 refuses the spelling and asks for brackets:
-
-```l4
--- refused: on one line the NOT would reach over the AND
---     wide a b MEANS NOT a AND b
-
--- the wide reading, spelled out: NOT (a AND b)
-GIVEN a IS A BOOLEAN, b IS A BOOLEAN
-wide a b MEANS NOT (a AND b)
-
--- brackets around the NOT itself are what stop it: (NOT a) AND b
-GIVEN a IS A BOOLEAN, b IS A BOOLEAN
-narrow a b MEANS (NOT a) AND b
-```
-
-Bracketing the operand — `NOT (a) AND b` — does **not** narrow it, and is refused too. Read [How Far Does NOT Reach?](NOT.md#how-far-does-not-reach) before writing a rule that puts NOT anywhere but at the end of a line.
-
-### Examples
-
-[precedence-example.l4](precedence-example.l4)
-
----
-
-## Associativity
-
-### Left-Associative Operators
-
-Most binary operators associate left-to-right.
-
-### Right-Associative Operators
-
-List cons (FOLLOWED BY) and IMPLIES associate right-to-left.
-
-[associativity-example.l4](associativity-example.l4)
-
----
-
-## Overloading
-
-Some operators work on multiple types:
-
-### EQUALS
-
-Works on most types:
-
-- `5 EQUALS 5` (NUMBER)
-- `"hello" EQUALS "hello"` (STRING)
-- `TRUE EQUALS TRUE` (BOOLEAN)
-
-### Comparison Operators
-
-Work on ordered types:
-
-- NUMBER: `5 > 3`
-- STRING: `"b" > "a"` (lexicographic)
-- DATE: `date1 > date2` (chronological)
-
-### PLUS
-
-Overloaded for different contexts:
-
-- Arithmetic: `5 + 3`
-- Can be extended via libraries
-
----
-
-## Special Syntax
-
-### Asyndetic Operators
-
-Implicit operators using punctuation:
-
-- **`...`** (ellipsis) - Implicit AND
-- **`..`** (double dot) - Implicit OR
-
-**Example:** [asyndetic-example.l4](asyndetic-example.l4)
-
-### Genitive
-
-Field access using possessive:
-
-- **`'s`** - Record field access
-- Example: `person's age`
-
-See the syntax reference for details.
-
----
-
-## Textual vs. Symbolic Forms
-
-### Why Both?
-
-- **Textual forms** - More readable for legal professionals unfamiliar with programming
-- **Symbolic forms** - More concise for experienced developers
-
-Both are equivalent and can be mixed.
-
-**Example:** [textual-vs-symbolic-example.l4](textual-vs-symbolic-example.l4)
-
-### Recommendations
-
-- **Legal documents:** Prefer textual forms
-- **Technical code:** Use symbolic forms for conciseness
-- **Mixed audiences:** Choose based on primary readers
-
----
-
-## See Also
-
-- **[GLOSSARY](../GLOSSARY.md)** - All operators indexed
-- **[Functions](../functions/README.md)** - Function keywords
-- **[Types](../types/README.md)** - Types used with operators
-- **[Syntax](../syntax/README.md)** - Operator syntax rules
+- `FOLLOWED BY` adds an element to the front of a list: `1 FOLLOWED BY LIST 2, 3` is `LIST 1, 2, 3`.
+- `'s` reads a field of a record: `` `the buyer`'s age ``. See [Syntax and directives: Genitive](../syntax/README.md#genitive).
+- `%` after a number divides it by 100: `5%` is `0.05`.
+- `AS STRING` converts a value to text; see [Coercions](../types/coercions.md).
+- `CONCAT` joins text: `CONCAT "a", "b", "c"`. The [prelude](../libraries/prelude.md) adds `APPEND` (`"a" APPEND "b"`); see [Built-in functions](../builtins/README.md).
+- `RAND` and `ROR` combine obligations; see [Deadlines and consequences](../regulative/consequences.md).

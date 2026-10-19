@@ -461,6 +461,32 @@ spec = describe "Unification" $ do
         Right r -> evaluate r.tcdSuccess
       mb `shouldBe` Just False
 
+    -- From main's carve of this suite (tc-soundness, 2026-10-18 sync): the cycle
+    -- runs through a use at the wrong number of arguments, which names no
+    -- synonym. Not run against unstable's quarantine before this merge.
+    it "terminates when a cycle through a use at the wrong number of arguments comes from an imported module" $ do
+      let vfs = vfsFromList
+            [ ( "wloops"
+              , Text.unlines
+                  [ "IMPORT prelude"
+                  , "DECLARE B1 a IS A PAIR OF B1, B1"
+                  , "DECLARE B2 a IS A PAIR OF B2, B2"
+                  ]
+              )
+            ]
+          source = Text.unlines
+            [ "IMPORT prelude"
+            , "IMPORT wloops"
+            , ""
+            , "GIVEN x IS A B1 OF NUMBER"
+            , "GIVETH A B2 OF NUMBER"
+            , "f x MEANS x"
+            ]
+      mb <- timeout (30 * 1000000) $ case checkWithImports vfs source of
+        Left errs -> fail ("unexpected pipeline failure: " <> show errs)
+        Right r -> evaluate r.tcdSuccess
+      mb `shouldBe` Just False
+
     it "terminates promptly unifying two distinct cyclic doubling synonyms" $ do
       -- Both synonyms are flagged at declaration time, but checking
       -- continues; with their bodies still expandable this unification

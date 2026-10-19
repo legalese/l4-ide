@@ -1277,9 +1277,10 @@ async function collectL4Sources(
     // The stdlib jl4-lsp carries inside its binary. A deployment runs on the
     // service's own built-in stdlib unless the bundle ships a same-named file
     // (`bundleScope` in jl4-service's Backend/Jl4.hs), so zipping this
-    // machine's would pin it over the service's. Ruled 2026-10-12 (bench "Main
-    // Wave Rulings", card R3, option A); see
-    // specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md §10.
+    // machine's would pin it over the service's. Ruled 2026-10-12: deployments
+    // run on the service's built-in stdlib, and this skip stands; a later,
+    // non-blocking change is to warn at deploy time when this machine's stdlib
+    // differs from the service's.
     if (isEmbeddedLibraryUri(importUri)) continue
     await collectFile(importUri)
   }

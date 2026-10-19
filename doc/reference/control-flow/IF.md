@@ -1,89 +1,69 @@
 # IF
 
-Conditional expression that evaluates one of two branches based on a boolean condition.
+`IF … THEN … ELSE` chooses between two values by a BOOLEAN condition.
+It is an expression: it always gives a value, so the `ELSE` is required.
 
 ## Syntax
 
-```l4
-IF condition THEN consequent ELSE alternative
+```text
+IF condition THEN value-if-true ELSE value-if-false
+
+IF condition
+THEN value-if-true
+ELSE value-if-false
 ```
 
-## Purpose
-
-IF expressions select between two values based on a condition. Unlike imperative if-statements, L4's IF is an expression that always returns a value.
-
-## Examples
+Both branches must have the same type ([Branch type mismatch](../errors/README.md#branch-type-mismatch)). An `IF` without `ELSE` is a syntax error ([IF without ELSE](../errors/README.md#if-without-else)).
 
 **Example file:** [if-example.l4](if-example.l4)
 
-### Basic If-Then-Else
+## Examples
 
 ```l4
-IF TRUE THEN "yes" ELSE "no"
-
 GIVEN age IS A NUMBER
-DECIDE status age IS
-  IF age >= 18 THEN "adult" ELSE "minor"
-```
+GIVETH A STRING
+`age group of` age MEANS IF age >= 18 THEN "adult" ELSE "minor"
 
-### Nested Conditions
-
-```l4
-GIVEN score IS A NUMBER
-DECIDE grade score IS
-  IF score >= 90 THEN "A"
-  ELSE IF score >= 80 THEN "B"
-  ELSE IF score >= 70 THEN "C"
-  ELSE IF score >= 60 THEN "D"
-  ELSE "F"
-```
-
-### Multi-line Format
-
-```l4
 GIVEN x IS A NUMBER
-DECIDE absolute x IS
+GIVETH A NUMBER
+`absolute value of` x MEANS
   IF x >= 0
   THEN x
   ELSE 0 MINUS x
 ```
 
-### Boolean Expressions in Condition
+The condition can be any BOOLEAN expression, built with [AND, OR, NOT](../operators/logical.md):
 
 ```l4
 GIVEN age IS A NUMBER
-GIVEN hasLicense IS A BOOLEAN
-DECIDE canDrive IS
-  IF age >= 16 AND hasLicense
-  THEN TRUE
-  ELSE FALSE
+      `has a licence` IS A BOOLEAN
+GIVETH A STRING
+`driving status` age `has a licence` MEANS
+  IF age >= 16 AND `has a licence`
+  THEN "may drive"
+  ELSE "may not drive"
 ```
 
-## DECIDE ... IF Form
+## Several conditions
 
-For boolean-returning functions, use `DECIDE ... IF`:
+An `IF` can go inside the `ELSE` of another. Each inner `IF` must be indented further than the one it belongs to:
 
 ```l4
-GIVEN age IS A NUMBER
-DECIDE isEligible IF age >= 18
+GIVEN score IS A NUMBER
+GIVETH A STRING
+`grade for` score MEANS
+  IF score >= 90 THEN "A"
+  ELSE IF score >= 80 THEN "B"
+       ELSE IF score >= 70 THEN "C"
+            ELSE "F"
 ```
 
-This is shorthand for:
+Lining up every `ELSE IF` in one column is an indentation error from the second one on. For more than two conditions, [BRANCH](BRANCH.md) is flatter.
 
-```l4
-GIVEN age IS A NUMBER
-DECIDE isEligible IS IF age >= 18 THEN TRUE ELSE FALSE
-```
+A rule that is only a condition, such as "a person is eligible if …", is better written `DECIDE … IF`; see [DECIDE IF](../functions/DECIDE.md#decide-if).
 
-## Related Keywords
+## Related pages
 
-- **[AND](../operators/AND.md)** - Logical conjunction in conditions
-- **[OR](../operators/OR.md)** - Logical disjunction in conditions
-- **[CONSIDER](CONSIDER.md)** - Pattern matching alternative
-- **[CONTROL-FLOW](README.md)** - All control flow keywords
-
-> Note: THEN and ELSE are part of the IF syntax, not separate keyword pages.
-
-## See Also
-
-- **[Logical Operators](../operators/README.md#logical-operators)** - Combining conditions
+- [BRANCH](BRANCH.md): several conditions, tried in order
+- [CONSIDER](CONSIDER.md): choose by the shape of a value
+- [Control flow](README.md)

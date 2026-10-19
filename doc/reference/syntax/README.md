@@ -1,61 +1,44 @@
-# L4 Syntax Reference
+# Syntax and directives
 
-L4's syntax is designed to be readable by legal professionals while maintaining the precision needed for computation. This section documents syntax patterns, rules, and special features.
+This page covers how an L4 file is written: layout, comments, names, literals, annotations, directives and the special forms that make rules read like legal text.
+For how to write rules that read well, see [Writing in the L4 style](../../concepts/language-design/principles.md#writing-in-the-l4-style).
 
-## Overview
+## Layout
 
-Key syntax features:
-
-- **Layout-sensitive** - Uses indentation like Python
-- **Natural language style** - Reads like structured English
-- **Annotations** - Metadata for documentation and generation
-- **Directives** - Compiler commands for testing and evaluation
-- **Special symbols** - Backticks, ditto marks, ellipsis, etc.
-
----
-
-## Core Syntax Features
-
-### Layout Rules
-
-Indentation-based grouping instead of braces.
-
-**Key Concepts:**
-
-- Blocks defined by indentation level
-- Consistent indentation required
-- Replaces `{` `}` and `;` separators
-- Pythonic style
+L4 is layout-sensitive: indentation, not braces or semicolons, shows what belongs to what.
+The lines of a block are indented further than the line that opens it, and the items of a block (fields, inputs, branches) start in the same column.
+Spaces only; a tab is not a substitute.
 
 **Example:** [layout-example.l4](layout-example.l4)
 
----
+In a long expression, indentation also groups the operators; see [AND, OR, NOT, IMPLIES: Several lines](../operators/logical.md#several-lines).
 
-### Comments
+## Comments
 
-Documentation and notes in code.
+- `--` or `//` starts a comment that runs to the end of the line.
+- `{- … -}` and `/* … */` enclose a comment that can span several lines.
 
 **Example:** [comment-example.l4](comment-example.l4)
 
-**Note:** Both `{- -}` and `/* */` styles work for block comments.
+## Identifiers
 
----
-
-### Identifiers
-
-Names for variables, functions, and types.
+- A plain identifier starts with a letter and continues with letters, digits and underscores: `age`, `income_band`.
+- A quoted identifier is written in backquotes and can contain spaces and punctuation: `` `the applicant` ``, `` `Section 2(a)` ``. Prefer these: they let a rule read like the legal text.
+- Keywords (`DECIDE`, `GIVEN`, `IF`, …) are written in capitals. Identifiers are case-sensitive: `` `the rate` `` and `` `The rate` `` are different names.
 
 **Example:** [identifier-example.l4](identifier-example.l4)
 
-**Regular:** Start with letter, continue with letters/numbers/underscore  
-**Quoted:** Use backticks for spaces/special characters
+## Literals
 
-**Case Sensitivity:**
+| Kind    | Examples                                                     |
+| ------- | ------------------------------------------------------------ |
+| Number  | `42`, `-17`, `3.14`, `5%` (= `0.05`), `100_000`              |
+| Text    | `"hello"`, with `\"`, `\\` and `\n` as escapes               |
+| Boolean | `TRUE`, `FALSE`                                              |
+| List    | `LIST 1, 2, 3`, `EMPTY`, `1 FOLLOWED BY 2 FOLLOWED BY EMPTY` |
 
-- Keywords: UPPERCASE only
-- Identifiers: Case-sensitive (`age` ≠ `Age`)
-
----
+Underscores between the digits of a number are ignored. A number must start with a digit and must not end with an underscore.
+There is no date literal; see [Types](../types/README.md#built-in-types).
 
 ### Lists
 
@@ -97,17 +80,22 @@ becoming the next sibling item — this only matters for a name that is
 arity-overloaded across a 0-arg and a list-taking definition. Wrap the name in
 parens, e.g. `(reverse)`, to force it back into a standalone list item.
 
----
+## IMPORT
+
+`IMPORT name` at the top of a file, before the first `§` section, makes the definitions of a library or another L4 file available. An `IMPORT` below a section heading is ignored. See [Standard libraries: IMPORT](../libraries/README.md#import).
 
 ## Annotations
 
-Metadata attached to declarations.
+Annotations attach information to the definition that follows them, or to the line they end.
 
 ### @desc
 
-Human-readable descriptions.
+`@desc text` describes a rule, a type or an input. It goes on the line above a definition, or at the end of an input's line. Deployed functions show it to their callers.
 
-**Example:** [annotation-example.l4](annotation-example.l4)
+```l4
+@desc The applicant's age in years
+ASSUME `the applicant's age` IS A NUMBER
+```
 
 ### @nonassertable
 
@@ -135,11 +123,17 @@ Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the reque
 
 ### @nlg
 
-Natural language generation hints.
+`@nlg` gives the natural-language wording of a definition, with `%name%` slots for its inputs. Write it at the end of the definition's line, or on a line of its own above it ([Where to put it](#where-to-put-it)). `l4 render` and the editor use it when they put the rule into words.
 
-**Inline form:** `The applicant [is %age% years old].`
+```l4
+GIVEN x IS A NUMBER, y IS A NUMBER
+GIVETH A NUMBER
+`the greater of` x y @nlg the greater of %x% and %y%
+  MEANS IF x >= y THEN x ELSE y
+```
 
-See [annotation-example.l4](annotation-example.l4)
+Text in square brackets after a name, as in ``DECIDE `the limit` [the statutory limit] IS 5``, is a short inline wording for that name.
+How to use `@nlg` well: [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md).
 
 #### Writing a literal `%` or `]`
 
@@ -453,13 +447,10 @@ wrote before tags existed still means what it meant.
 
 ### @ref
 
-Cross-references to legal sources: the provision a rule, a type or an input comes from.
+`@ref` cites a legal source: the provision a rule, a type or an input comes from.
 
-**Line form:** `@ref` and the citation, on a line of its own.
-
-**Inline form:** the citation between `<<` and `>>`, which can sit in the middle of a line.
-
-See [annotation-example.l4](annotation-example.l4)
+- **Line form:** `@ref` and the citation, on a line of its own.
+- **Inline form:** the citation between `<<` and `>>`, which can sit in the middle of a line.
 
 #### What a `@ref` cites
 
@@ -471,13 +462,14 @@ GIVEN age IS A NUMBER
       resident IS A BOOLEAN
 GIVETH A BOOLEAN
 `is eligible` MEANS
-  age AT LEAST 18
+  age >= 18
   AND <<Section 4(1)(b)>> resident
 ```
 
 The `@ref` cites the rule `is eligible`; the `<<…>>` cites `resident`, the expression that follows it.
 A `@ref` is held by the first construct that starts after it: a rule, a type, a section heading, an input, or an expression inside a rule.
 Blank lines and comments between a `@ref` and that construct make no difference.
+A citation before the first operand of a chain of `AND`, `OR` or arithmetic is held by the whole chain, because the chain is the outermost expression that starts after it; to cite one operand, put the citation just before that operand inside the chain, as with `resident` above.
 
 **Several citations.** Write them one above the other, each on a line of its own.
 The construct below keeps all of them, in the order written.
@@ -488,11 +480,21 @@ The construct below keeps all of them, in the order written.
 § `Dogs Act - 33D.1`
 ```
 
-An export that carries one citation per rule uses the nearest, which is the one written last, just above the construct.
+Where only one citation per construct is wanted, the nearest is used: the one written last, just above the construct.
+In the editor, hovering over a citation shows it as a link.
+
+**`@ref-map name url`** maps a citation to a link: a `@ref` whose text is `name` links to `url`.
+Everything before the last space is the name and the last word is the URL; the name is matched ignoring case.
+See [jl4/README.md](../../../jl4/README.md#how-to-use-annotations-for-citations) for an example.
+
+**`@ref-src`** is accepted and ignored.
+It used to load name-to-URL mappings from a CSV file; that was removed so that the language core needs no file access, and `@ref-map` replaces it.
+A `@ref-src` that names a file which does not exist passes `l4 check`.
 
 #### Two warnings
 
-Both are warnings, so `l4 check` still succeeds, and the IDE marks the `@ref` itself.
+Both are warnings, so `l4 check` still succeeds, and the VS Code extension marks the `@ref` itself.
+The browser-based editor does not show them.
 
 **A `@ref` that follows code on its line.**
 A `@ref` written at the end of a line, after the code it means to cite, cannot cite that code, because it cites what comes after it.
@@ -533,42 +535,22 @@ text in a citation, and `>` is ordinary text in an `@nlg` annotation. Each
 annotation escapes only what would otherwise be read as punctuation in that
 annotation.
 
-### @ref-map
-
-Gives a name a URL: `@ref-map NAME URL`.
-Everything before the last space is the name and the last word is the URL.
-A citation written with `@ref` (or `<<` `>>`) whose text equals the name, ignoring case, is shown in the IDE as a link to the URL.
-See [jl4/README.md](../../../jl4/README.md#how-to-use-annotations-for-citations) for an example.
-
-### @ref-src
-
-Accepted and ignored.
-The annotation used to load name-to-URL mappings from a CSV file; that was removed so that the language core needs no file access, and `@ref-map` replaces it.
-A `@ref-src` that names a file which does not exist passes `l4 check`.
-
 ### @export
 
-Marks a function for export, e.g. as an endpoint when deploying to `jl4-service`. The rest of the annotation line is the exported function's description.
+`@export` marks a function to be published as an endpoint when the file is deployed. The rest of the line is the function's description. Functions without `@export` stay internal.
 
 ```l4
-@export Check whether the applicant qualifies for a discount
-GIVEN applicant IS A Applicant
+@export Check whether a person is old enough to apply
+GIVEN age IS A NUMBER @desc The person's age in years
 GIVETH A BOOLEAN
-DECIDE `qualifies for discount` IF ...
+DECIDE `is old enough` IF age >= 18
 ```
 
-### @export default
+`@export default` marks the file's main entry point among its exports.
+A function written as [several clauses](../functions/DECIDE.md#several-clauses) needs a `GIVEN` to be exported, and a function-typed input cannot be exported ([ASSUME](../types/ASSUME.md#function-typed-inputs-are-not-supported-for-export)).
+How to deploy: [Deploy your rules](../../tutorials/deploying-rules/exporting-rules-for-deployment.md).
 
-Adding the `default` keyword marks the **default exported function** — the primary entry point among a file's exports:
-
-```l4
-@export default Calculate the insurance premium for an applicant
-GIVEN applicant IS A Applicant
-GIVETH A NUMBER
-DECIDE `calculate premium` IS ...
-```
-
-Only functions carrying `@export` are exported; everything else stays internal.
+**Example:** [annotation-example.l4](annotation-example.l4)
 
 ### @infixl / @infixr / @infix
 
@@ -643,31 +625,41 @@ The annotations this version knows are `@desc`, `@export`, `@infix`, `@infixl`, 
 - **An `@` that is not followed by a letter is still an error.** That is not the shape of an annotation, so no annotation of any version can take it, and L4 cannot tell what the line was meant to be.
 - **`l4 format` keeps the line** exactly as written, as it keeps comments.
 
----
-
 ## Directives
 
-Compiler commands for testing and evaluation. Directives begin with `#` and appear at the top level of a file.
+Directives are instructions to the tools, written at the top level of a file. `l4 run` and the editor carry them out; `l4 check` only type-checks them.
 
-### #EVAL
+| Directive    | What it does                                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `#EVAL`      | evaluates an expression and shows the result                                                                     |
+| `#EVALTRACE` | evaluates an expression and also shows the steps that led to the result (`l4 trace` draws them)                  |
+| `#CHECK`     | type-checks an expression and shows its type, without evaluating it                                              |
+| `#ASSERT`    | evaluates an expression and reports "assertion failed" when it is not TRUE (`#ASSERT REFUSED` expects a refusal) |
+| `#TRACE`     | runs a regulative rule against a list of events (see [Regulative rules](../regulative/README.md))                |
 
-Evaluate an expression and display the result. Used for testing functions and inspecting computed values.
-
-**Syntax:**
-
-```l4
+```text
 #EVAL expression
+#EVALTRACE expression
+#CHECK expression
+#ASSERT expression
+#TRACE rule AT start-time WITH
+  PARTY party DOES action AT time
 ```
 
-**Examples:**
+A directive's expression ends with its line. To continue it, start the next line with `#` and a space, followed by an operator:
 
 ```l4
-#EVAL `is adult` 21        -- evaluates to TRUE
-#EVAL `tax owed` 75000     -- evaluates to the computed number
-#EVAL 2 PLUS 2             -- evaluates to 4
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is an adult` IF age >= 18
+
+#EVAL `is an adult` 21
+#   AND `is an adult` 30
+#CHECK `is an adult`
+#ASSERT NOT `is an adult` 12
 ```
 
-**See also:** [directive-example.l4](directive-example.l4)
+**Example:** [directive-example.l4](directive-example.l4)
 
 ### #EVALTRACE
 
@@ -771,57 +763,9 @@ One line in it is one you did not write.
 
 **See also:** [evaltrace-example.l4](evaltrace-example.l4)
 
-### #TRACE
-
-Evaluate a deontic (regulative) expression and display the obligation trace. Shows the sequence of obligations, which parties must act, deadlines, and the resulting state (FULFILLED or BREACH).
-
-**Syntax:**
-
-```l4
-#TRACE deonticExpression AT startTime WITH
-  PARTY partyName DOES action AT eventTime
-  ...
-```
-
-**Examples:**
-
-```l4
-#TRACE paymentObligation AT 0 WITH
-  PARTY Alice DOES pay 100 AT 15
-
-#TRACE saleContract AT 0 WITH
-  PARTY Seller DOES delivery AT 2
-  PARTY Buyer DOES payment 100 AT 5
-```
-
-**See also:** [Regulative Rules](../regulative/README.md) for the deontic keywords used with #TRACE
-
-### #CHECK
-
-Type check an expression without evaluating it.
-
-**Syntax:**
-
-```l4
-#CHECK expression
-```
-
 ### #ASSERT
 
-Assert that an expression evaluates to TRUE. Used for automated testing.
-
-**Syntax:**
-
-```l4
-#ASSERT expression
-#ASSERT NOT expression
-```
-
-**Example:**
-
-```l4
-#ASSERT 2 PLUS 2 EQUALS 4
-```
+`#ASSERT expression` and `#ASSERT NOT expression` check that an expression is TRUE, or not.
 
 **Outcomes.** An assertion reports one of four things: `assertion satisfied`; `assertion failed`;
 `assertion could not be evaluated`, when working the expression out stopped part-way — most often because it
@@ -871,90 +815,9 @@ The first is what a `#ASSERT REFUSED` reports when the expression refused and an
 matched; the second when the expression produced an ordinary value instead; the third when it
 refused, but carrying a different message.
 
----
+## Sections
 
-## Special Syntax
-
-### Ditto
-
-Copy from line above using `^`.
-
-**Example:** [ditto-example.l4](ditto-example.l4)
-
-**Rules:**
-
-- One `^` per token to copy
-- Copies tokens from line directly above
-- Useful for repetitive declarations
-
----
-
-### OF (Positional Argument Syntax)
-
-Multi-purpose structural keyword that introduces comma-separated argument lists. Without OF, arguments must be space-separated on the same line or indented on subsequent lines.
-
-**Contexts where OF appears:**
-
-| Context              | Example                      |
-| -------------------- | ---------------------------- |
-| Function application | `add OF 3, 4`                |
-| Sum type declaration | `IS ONE OF Red, Green, Blue` |
-| Type constructor     | `LIST OF Person`             |
-| Record construction  | `Pair OF 10, 20`             |
-| Pattern matching     | `WHEN Pair OF x, y THEN ...` |
-
-**Examples:**
-
-```l4
--- With OF: comma-separated args on one line
-result1 MEANS add OF 3, 4
-result2 MEANS foldr OF add, 0, numbers
-
--- Without OF: space-separated on same line
-result3 MEANS add 3 4
-```
-
-OF is optional in function application -- `add OF 3, 4` and `add 3 4` are equivalent. But for multi-argument calls, OF with commas is often clearer than relying on whitespace parsing.
-
-**See also:** [Types reference](../types/keywords.md) for OF in type contexts
-
----
-
-### TO (Function Type Syntax)
-
-Used in function type annotations to separate input types from the return type.
-
-**Syntax:**
-
-```l4
-FUNCTION FROM Type1 AND Type2 TO ReturnType
-```
-
-**Note:** `TO` is a reserved keyword used only in function type annotations. In deontic rules, `to` appearing in an action (e.g. `deliver goods to buyer`) is part of the mixfix expression, not the TO keyword.
-
----
-
-### Genitive
-
-Record field access using `'s`.
-
-**Example:** [genitive-example.l4](genitive-example.l4)
-
----
-
-### Section Markers (§)
-
-Organize code into named, nested sections using `§`, the way Parts and Divisions divide a statute. A name is looked for first along the using rule's own ancestry — its own section, then each enclosing section, then the root — and the nearest declaration of it wins; if nothing on that ancestry declares the name, every declaration of it anywhere in the file is a candidate, and one candidate resolves while two of the same kind is an error. L4 also gives every declaration a fully qualified name, so any of them can be named explicitly. [Sections](sections.md) states the whole rule, with the table of cases and the diagnostics.
-
-**Levels:**
-
-- `§` -- Top-level section
-- `§§` -- Subsection
-- `§§§` -- Sub-subsection
-
-**Example:** [section-example.l4](section-example.l4)
-
-**Qualified access:** A bare name resolves whenever exactly one declaration of it is in reach, whatever section that is in. Qualification is _required_ only where two declarations of the same kind are equally far from the rule using them — and is worth writing anyway across Parts, so a reader can see where the name comes from. This parallels how legislation scopes definitions ("for purposes of subsection 2, X means ..."). In the example below, `is adult under sub 2` sits inside `Subsection 3`, which declares its own `age of majority`, so reaching `Subsection 2`'s must be spelled out.
+`§` starts a section, like a part or section of a statute; `§§` starts a subsection, `§§§` a sub-subsection, and so on. The heading is the name after the marks.
 
 ```l4
 § `Part VII`
@@ -965,161 +828,53 @@ Organize code into named, nested sections using `§`, the way Parts and Division
 §§ `Subsection 3`
 `age of majority` MEANS 21
 
--- Consumer must qualify:
-DECIDE `is adult under sub 2` IF
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is an adult under subsection 2` IF
     age >= `Part VII`'s `Subsection 2`'s `age of majority`
 ```
 
-**The section `GIVEN`:** A rule is told some facts about the case in front of it (its **"inputs"**, the names listed after `GIVEN`). A `GIVEN` indented under a section heading declares one of those names once for the whole section — a **"section `GIVEN`"** — instead of every rule in the section repeating it in its own `GIVEN`. See [The section `GIVEN`](section-given.md) and [section-given-example.l4](section-given-example.l4).
+Definitions in different sections can share a name.
+A name is looked for first along the using rule's own ancestry: its own section, then each enclosing section, then the root. The nearest declaration of it wins.
+If nothing on that ancestry declares the name, every declaration of it anywhere in the file is a candidate, and one candidate resolves while two of the same kind is an error.
+L4 also gives every declaration a fully qualified name, so any of them can be named explicitly. [Sections](sections.md) states the whole rule, with the table of cases and the diagnostics.
 
-**Field opening:** inside a rule whose input is a record, the record's fields can be read by their bare names — `bankrupt` for `person's `bankrupt``. See [Field opening](field-opening.md) and [field-opening-example.l4](field-opening-example.l4).
+A bare name resolves whenever exactly one declaration of it is in reach, whatever section that is in.
+Qualification is _required_ only where two declarations of the same kind are equally far from the rule using them, and is worth writing anyway across Parts, so a reader can see where the name comes from.
+In the example above, `is an adult under subsection 2` sits inside `Subsection 3`, which declares its own `age of majority`, so reaching `Subsection 2`'s must be spelled out with `'s`.
 
-**Section aliases:** Use AKA to create shorter names for qualified references:
+**The section `GIVEN`.** A rule is told some facts about the case in front of it (its **"inputs"**, the names listed after `GIVEN`). A `GIVEN` indented under a section heading declares one of those names once for the whole section, instead of every rule in the section repeating it in its own `GIVEN`. See [The section `GIVEN`](section-given.md) and [section-given-example.l4](section-given-example.l4).
 
-```l4
-§ `Definitions for Part VII` AKA defs
-  taxableIncome MEANS 50000
+**Field opening.** Inside a rule whose input is a record, the record's fields can be read by their bare names: `bankrupt` for ``person's `bankrupt` ``. See [Field opening](field-opening.md) and [field-opening-example.l4](field-opening-example.l4).
 
-result MEANS defs.taxableIncome   -- via alias
-```
+A section can have a shorter alias: ``§ `Definitions for Part VII` AKA defs``, then `` defs's `taxable income` `` (or `` defs.`taxable income` ``).
 
----
+**Example:** [section-example.l4](section-example.l4)
 
-## Literals
+## Genitive
 
-### Numbers
+`'s` reads a field of a record, as in English: `` `the applicant`'s age ``. It can be chained: `` `the applicant`'s address's city ``.
+``age OF `the applicant` `` means the same.
 
-**Integers:** `42`, `-17`, `0`  
-**Rationals:** `3.14`, `-0.5`, `2.718`
+**Example:** [genitive-example.l4](genitive-example.l4)
 
-**Thousand separators:** Underscores may appear between digits as a visual grouping aid. They are stripped before the numeric value is computed, so `100_000` is exactly `100000` and `1_000_000.50_5` is exactly `1000000.505`. A literal must start with a digit and must not end with an underscore (so `_100` and `100_` are rejected).
+## OF
 
-### Strings
+`OF` introduces arguments separated by commas: `add OF 3, 4` means the same as `add 3 4`.
+It also appears in types (`LIST OF NUMBER`, `Box OF NUMBER`), in enumerations (`IS ONE OF`), when making a record (`Person OF "Kim", 30`) and in patterns (`WHEN JUST OF x`).
 
-**Basic:** `"hello world"`, `"L4 language"`  
-**Escape Sequences:** `\n` (newline), `\"` (quotes), `\\` (backslash)
+## Ditto
 
-### Booleans
+`^` repeats the word in the same position on the line above, one `^` per word. It keeps repetitive lines short.
 
-`TRUE`, `FALSE`
+**Example:** [ditto-example.l4](ditto-example.l4)
 
-### Lists
+## Asyndetic AND and OR
 
-`LIST 1, 2, 3`, `EMPTY`, `1 FOLLOWED BY 2 FOLLOWED BY EMPTY`
+`...` means `AND` and `..` means `OR`, as in lists of conditions in legal text. See [Operators: Asyndetic AND and OR](../operators/README.md#asyndetic-and-and-or).
 
----
+## Related pages
 
-## Symbols
-
-### Parentheses
-
-`( )` - Grouping and tuples.
-
-Examples: `(age PLUS 5) TIMES 2`, `PAIR OF 1, 2`
-
-### Brackets
-
-`[ ]` - Inline natural language generation (NLG) annotations.
-
-Example: `The applicant [is %age% years old].`
-
-### Angles
-
-`<< >>` - Inline reference annotations.
-
-Example: `The applicant <<must be 18 or over>>.`
-
-### Braces
-
-`{ }` - Block comments (alternative).
-
-Example: `{- Block comment -}`
-
-### Other Symbols
-
-- `,` - Separator
-- `;` - Statement separator (rarely needed with layout)
-- `.` - Decimal point
-- `:` - Type signature separator
-- `%` - Percent numbers, NLG expression delimiter
-- `^` - Ditto (copy above)
-- `...` - Asyndetic AND
-- `..` - Asyndetic OR
-
----
-
-## Syntax Conventions
-
-### Naming Conventions
-
-**Variables and Functions:**
-
-- camelCase: `taxRate`, `calculateTotal`
-- snake_case: `tax_rate`, `calculate_total`
-- Spaces with backticks: `` `tax rate` ``
-
-**Types:**
-
-- PascalCase: `Person`, `TaxBracket`
-- Prefer nouns
-
-**Constants:**
-
-- UPPERCASE: `MAX_AGE`, `DEFAULT_RATE`
-
-### Indentation
-
-- **2 spaces** or **4 spaces** (choose one, be consistent)
-- No tabs
-- Align related items vertically
-
-### Line Length
-
-- Recommended: 80-100 characters
-- Legal text may be longer for readability
-
----
-
-## Style Guide
-
-### Readability
-
-- Use whitespace liberally
-- Add comments for complex logic
-- Prefer textual operators in legal contexts
-
-### Consistency
-
-- Follow project conventions
-- Use linter/formatter when available
-- Be consistent within a file
-
-### Legal Isomorphism
-
-- Structure code to mirror legal text
-- Use legal terminology in identifiers
-- Preserve section/subsection hierarchy
-
----
-
-## Common Patterns
-
-### Type Declarations
-
-**Example:** [record-example.l4](../types/record-example.l4)
-
-### Function Definitions
-
-**Example:** [function-type-example.l4](../types/function-type-example.l4)
-
-### Pattern Matching
-
-**Example:** [enum-example.l4](../types/enum-example.l4)
-
----
-
-## See Also
-
-- **[GLOSSARY](../GLOSSARY.md)** - Complete feature index
-- **[Functions](../functions/README.md)** - Function keywords
-- **[Specifications](https://github.com/legalese/l4-ide/tree/main/specs)** - Technical specifications
+- [Glossary](../GLOSSARY.md): every keyword, with links
+- [Functions](../functions/README.md)
+- [Operators](../operators/README.md)

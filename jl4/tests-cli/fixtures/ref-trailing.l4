@@ -1,0 +1,8 @@
+-- A @ref cites what FOLLOWS it. The first one trails the code it means to
+-- cite, so it is attached to nothing and `l4 check` warns, but still succeeds.
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN @ref Section 4(1)(a) of the Act
+`is adult` MEANS age >= 18
+
+-- This one has nothing after it.
+@ref Section 9

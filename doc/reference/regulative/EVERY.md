@@ -273,7 +273,7 @@ draws the three from `tenants`, then keeps the two the condition allows. Nothing
 ## The action: the member's own name means the member
 
 The action after `MUST` is a **pattern**, exactly as it is after `PARTY` (see
-[Action Patterns: Reference or Wildcard](README.md#action-patterns-reference-or-wildcard)).
+[Action Patterns: Reference or Wildcard](consequences.md#action-patterns-reference-or-wildcard)).
 `t` is the quantifier's own variable, so it is a name already in scope — and a
 name in an action that is already in scope requires that value:
 
@@ -335,7 +335,7 @@ GIVETH A DEONTIC Actor Action
         LEST   BREACH BY t
 ```
 
-The inner obligation is in parentheses, as every nested obligation is: it has no closing token, so its own optional `HENCE`/`LEST` would otherwise swallow the outer `LEST`. This is the same rule as for a `PARTY` rule nested in a `HENCE` (see [HENCE](README.md#hence-fulfillment-consequence)).
+The inner obligation is in parentheses, as every nested obligation is: it has no closing token, so its own optional `HENCE`/`LEST` would otherwise swallow the outer `LEST`. This is the same rule as for a `PARTY` rule nested in a `HENCE` (see [HENCE](consequences.md#hence-and-lest)).
 
 ### Seen as a diagram
 
@@ -381,7 +381,7 @@ GIVETH A DEONTIC Actor Action
 
 ### Anchored deadlines under a join
 
-Either `WITHIN` may be anchored with `OF`, as described under [WITHIN](README.md#within-temporal-deadline): the deadline is then the anchor's instant plus the duration, whatever the clock read when the obligation arose.
+Either `WITHIN` may be anchored with `OF`, as described under [WITHIN](consequences.md#within): the deadline is then the anchor's instant plus the duration, whatever the clock read when the obligation arose.
 
 **On the act's `WITHIN`**, the three lifecycle anchors name positions in the life of the obligation the `EVERY` is nested under — `THE JOIN` its completion, `THE DEADLINE` its deadline, `THE ARMING` when it was entered — exactly as they would on a `PARTY` rule in the same place. An `EVERY` at the top level has no enclosing obligation, so `THE JOIN` and `THE DEADLINE` are refused there and `THE ARMING` is the `EVERY`'s own arming, which is the default.
 
@@ -517,7 +517,7 @@ Verified 2026-09-08 against the compiler at the head of this branch; the blame s
 - Type checking: the variable has the party type; the cast must be a constructor of that type; the condition must be a `BOOLEAN`; both `WITHIN` durations must be `NUMBER`s and an `OF` expression a `NUMBER` or a `DATE`; an `AFTER` takes a `NUMBER` (a duration) or a `DATE` (the instant, which then takes no anchor), and a `BEFORE` a `DATE` — a date after `WITHIN` or a number after `BEFORE` is refused naming the other word; a lifecycle anchor is refused where the position it names does not exist (`THE JOIN`/`THE DEADLINE` on a join line, at the top level, or — for `THE JOIN` — under `LEST`), on either edge; `AFTER d1 WITHIN d2 OF anchor` with literal `d1 > d2` is refused as a window that closes before it opens, where the `AFTER` cannot open before that anchor (a bare `AFTER` against `THE ARMING`, `THE JOIN` under `HENCE`, or `THE DEADLINE` under a `LEST` other than a `SHANT`'s, and the last two only for an obligation written as the continuation itself, not one handed to a function as an argument; an anchored `AFTER` against the same noun — see [AFTER](AFTER.md#the-two-readings-and-why-the-bare-form-re-anchors)); a second closing edge is a parse error naming the rule; a `HENCE` or `LEST` under `EVERY` without a join line is rejected, naming the two spellings; a join line under `PARTY` is rejected. (Until 2026-09-16 an action that spelled the variable again — `MUST Sign t` — was rejected as a rebinding; #407 retired that error the same day, and that spelling is now the reference to the member.)
 - Printing: `l4 format` reproduces the source; the layout printer used by `l4 batch` re-emits a parseable, re-checkable rule, anchors and both edges included.
 - **Running**, as described above: the roll call, the barrier, the fork, the plain distributive form with no join line, all four modals, the deadline on the act and the deadline on the join line, both of them anchored (`OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING`, `OF` an instant) as the section above describes, and nesting one quantified rule inside another's `HENCE`. **The window's opening edge** on the members' act (`AFTER 3 WITHIN 30`: each member's window is `[3, 33]` from the `EVERY`'s arming, under a barrier or a fork), and in a barrier's `HENCE` (from the last member's act). A member who acts before the window opens has not acted — the act is a nullity and the run reports it beside the result (R-X6) — and may act again once it is open. A join line's own `WITHIN` bounds the whole from the arming and is **not** re-anchored by a member's `AFTER`: with `AFTER 3` on the act and `WITHIN 30` on the join line, each member's window is `[3, 30]`; the machine hands the demoted deadline to each member as `WITHIN 30 OF THE ARMING`. A date on either edge is refused by name on a trace that starts `AT 0` — see [the limit](AFTER.md#the-absolute-forms-after-date-before-date).
-- **A failed barrier's breach names everyone who failed.** With no `LEST` on the join, the answer is one breach naming every member who did not act, in roll order, each with the action and deadline they missed. It is anchored at the member whose failure took effect first — the deadline missed first, or, for a member entered after its own deadline, its entry — and several are decisive when they failed at the same instant (see [When a breach happened](README.md#when-a-breach-happened)). It is dated at the event that revealed that miss (the `at` line below is the `WAIT UNTIL 20` that revealed it, not the deadline of 14; a `LEST`'s clock, by contrast, starts at the deadline — see "`LEST`" above). That member prints first, in the same words a single failure uses; the full list follows. Two of three tenants never sign:
+- **A failed barrier's breach names everyone who failed.** With no `LEST` on the join, the answer is one breach naming every member who did not act, in roll order, each with the action and deadline they missed. It is anchored at the member whose failure took effect first — the deadline missed first, or, for a member entered after its own deadline, its entry — and several are decisive when they failed at the same instant (see [When a breach happened](consequences.md#when-a-breach-happened)). It is dated at the event that revealed that miss (the `at` line below is the `WAIT UNTIL 20` that revealed it, not the deadline of 14; a `LEST`'s clock, by contrast, starts at the deadline — see "`LEST`" above). That member prints first, in the same words a single failure uses; the full list follows. Two of three tenants never sign:
 
   ```
   DEONTIC BREACHED:
@@ -599,7 +599,7 @@ Verified 2026-09-08 against the compiler at the head of this branch; the blame s
 ## Related Keywords
 
 - **[PARTY](PARTY.md)** - one named party
-- **[MUST](MUST.md)**, **[MAY](MAY.md)**, **[SHANT](SHANT.md)** - the modals
+- **[PARTY, MUST, MAY, SHANT](PARTY.md)** - the party and the modals
 - **[REGULATIVE](README.md)** - `WITHIN`, `HENCE`, `LEST`, `PROVIDED`, `EXACTLY`, `RAND`, `ROR`
 
 ## See Also

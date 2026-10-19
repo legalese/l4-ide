@@ -1402,6 +1402,45 @@ export const AiUsageUpdate: NotificationType<{
   method: 'aiUsageUpdate',
 }
 
+/**
+ * Voice dictation for the chat input. The microphone lives on the host
+ * side of the messenger: a VSCode webview can't open one, so the
+ * extension records natively; the standalone web chat records in the
+ * page. Either way the clip goes to the ai-proxy's speech-to-text
+ * endpoint (`legalese-listen-4`) and the transcript comes back here for
+ * the input to insert.
+ */
+
+/** Whether this host can record at all (no microphone → no mic button),
+ *  and the longest clip the input should let run before stopping it. */
+export const AiDictationStatus: RequestType<
+  void,
+  { available: boolean; maxSeconds: number }
+> = {
+  method: 'aiDictationStatus',
+}
+
+/** Start recording. `error` is a user-facing reason when it couldn't. */
+export const AiDictationStart: RequestType<void, { error?: string }> = {
+  method: 'aiDictationStart',
+}
+
+/** Stop recording and transcribe. `apiBaseUrl` routes the request to a
+ *  deployment-bound chat's endpoint, like `AiChatStartParams.apiBaseUrl`.
+ *  Exactly one of `text` / `error` is set; `text` may be empty when
+ *  nothing intelligible was said. */
+export const AiDictationStop: RequestType<
+  { apiBaseUrl?: string },
+  { text?: string; error?: string }
+> = {
+  method: 'aiDictationStop',
+}
+
+/** Stop recording and throw the clip away. */
+export const AiDictationCancel: NotificationType<void> = {
+  method: 'aiDictationCancel',
+}
+
 /*******************************************************************************
  Convert between L4 RPC types and vscode-messenger's Request/Notification types
 ********************************************************************************/

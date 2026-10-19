@@ -27,7 +27,7 @@ AFTER  3
 WITHIN 30 OF THE JOIN        -- [delivery+3, delivery+30]
 ```
 
-`OF THE JOIN` is the anchor vocabulary of [WITHIN](README.md#within-temporal-deadline): the instant the enclosing obligation's `HENCE` fired — here, the delivery. Any anchor `WITHIN` accepts works on the closing edge, and on the opening edge too: `AFTER 3 OF THE JOIN WITHIN 30` opens three after the delivery and, with the `WITHIN` bare, still re-anchors ([13, 43]); `AFTER 3 OF THE ARMING WITHIN 30 OF THE JOIN` measures the two edges from two different instants.
+`OF THE JOIN` is the anchor vocabulary of [WITHIN](consequences.md#within): the instant the enclosing obligation's `HENCE` fired — here, the delivery. Any anchor `WITHIN` accepts works on the closing edge, and on the opening edge too: `AFTER 3 OF THE JOIN WITHIN 30` opens three after the delivery and, with the `WITHIN` bare, still re-anchors ([13, 43]); `AFTER 3 OF THE ARMING WITHIN 30 OF THE JOIN` measures the two edges from two different instants.
 
 A two-offset window can close before it opens. `AFTER 30 WITHIN 5 OF THE JOIN` is refused by the type checker when both offsets are literals; when they are computed, the run reports it beside the result and the obligation runs as written — every act is early or late, and an early act's note says the window closes before it opens, since it never will be open.
 
@@ -62,7 +62,7 @@ An act at 1000 is in time. Before the window opens the residual prints `AFTER n`
 
 ## Under LEST, and under a join
 
-Under a `LEST` the clock is the **failure time** (see [LEST](README.md#lest-breach-consequence)): for a `MUST`, `DO` or `MAY` that is the deadline it missed (or its entry, for one entered after its own deadline), so `AFTER 3 WITHIN 30` there opens three after that deadline and closes thirty after that — `[deadline+3, deadline+33]` — and `AFTER 3 OF THE DEADLINE WITHIN 30` names the same instant. For a `SHANT` the failure time is the violating act's own stamp, which comes before the prohibition's window ends: there the bare `AFTER 3 WITHIN 30` counts from the violation, while `OF THE DEADLINE` names the window's end, and the two windows differ. In the `HENCE` of a barrier (`ONCE ALL HAVE`) it counts from the last member's act; on the members' own line it counts from the `EVERY`'s arming, for each member. A join line's own `WITHIN` bounds the whole and is not re-anchored by a member's `AFTER`: with `AFTER 3` on the act and `WITHIN 30` on the join line, each member's window is `[3, 30]` from the arming. The join line takes no `AFTER` of its own. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
+Under a `LEST` the clock is the **failure time** (see [LEST](consequences.md#when-the-next-clock-starts)): for a `MUST`, `DO` or `MAY` that is the deadline it missed (or its entry, for one entered after its own deadline), so `AFTER 3 WITHIN 30` there opens three after that deadline and closes thirty after that — `[deadline+3, deadline+33]` — and `AFTER 3 OF THE DEADLINE WITHIN 30` names the same instant. For a `SHANT` the failure time is the violating act's own stamp, which comes before the prohibition's window ends: there the bare `AFTER 3 WITHIN 30` counts from the violation, while `OF THE DEADLINE` names the window's end, and the two windows differ. In the `HENCE` of a barrier (`ONCE ALL HAVE`) it counts from the last member's act; on the members' own line it counts from the `EVERY`'s arming, for each member. A join line's own `WITHIN` bounds the whole and is not re-anchored by a member's `AFTER`: with `AFTER 3` on the act and `WITHIN 30` on the join line, each member's window is `[3, 30]` from the arming. The join line takes no `AFTER` of its own. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
 
 ## The absolute forms: AFTER date, BEFORE date
 
@@ -95,6 +95,6 @@ The opening edge is written before the closing edge — `AFTER 3 WITHIN 30`, `AF
 
 ## See Also
 
-- **[WITHIN](README.md#within-temporal-deadline)** — the closing edge, and the anchor vocabulary both edges use
-- **[LEST](README.md#lest-breach-consequence)** — when the next clock starts
+- **[WITHIN](consequences.md#within)** — the closing edge, and the anchor vocabulary both edges use
+- **[LEST](consequences.md#when-the-next-clock-starts)** — when the next clock starts
 - **[EVERY](EVERY.md)** — windows under a join

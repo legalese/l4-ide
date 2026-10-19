@@ -1,6 +1,6 @@
 ---
 name: writing-l4-rules
-description: Writes, validates, and deploys L4 — a typed functional language for computational law — encoding contracts, regulations, and policy logic as executable rules with type-checked decisions and formally-modeled obligations. Use when the user asks to formalise legal text, draft rules with deadlines and reparations, mark functions for deployment with `@export`/`@desc`, run the `l4` CLI (`l4 run`, `l4 check`), or deploy to `jl4-service`/Legalese Cloud.
+description: Writes, validates, and deploys L4 — a typed functional language for computational law — encoding contracts, regulations, and policy logic as executable rules with type-checked decisions and formally-modeled obligations. Use when the user asks to formalise legal text, draft rules with deadlines and reparations, mark functions for deployment with `@export`/`@desc`, run the `l4` CLI (`l4 run`, `l4 check`), or deploy to `jl4-service`/Legalese Cloud (`l4 deploy`).
 ---
 
 # Writing L4 Rules
@@ -366,7 +366,10 @@ gap as a dropped directive.
 - `l4 ast FILE` — dump the parsed AST (debugging L4 itself or tooling).
 - `l4 batch FILE --inputs rows.{json,yaml,csv}` — evaluate an `@export`
   function against many rows, streaming NDJSON (newline-delimited JSON) output (one object per
-  row).
+  row). `--format json|csv|yaml` and `--output FILE` change the output.
+  The run stops at the first failing row and exits 1, unless
+  `--continue-on-error`; `--validate-only` checks the rows against the
+  function's inputs without evaluating.
 - `l4 trace FILE [--format dot|png|svg] [-o DIR]` — render
   `#EVALTRACE` evaluation traces as GraphViz (PNG (Portable Network Graphics) and SVG (Scalable Vector Graphics) output needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
@@ -382,6 +385,10 @@ gap as a dropped directive.
   `l4 export FORMAT --help` its options. `l4 import blawx FILE` reads a Blawx
   project back into L4. There is no top-level `l4 openfisca`, `l4 blawx` and
   so on: each notation is a subcommand of `export` (or `import`).
+- `l4 deploy FILE [--name NAME] [--description TEXT]` — typecheck, then
+  deploy the file and everything it imports as a new API (see
+  [8. Deploy](#8-deploy)). `l4 redeploy FILE` updates it, `l4 deployments`
+  lists them, `l4 undeploy NAME` deletes one.
 
 ### 7. Test with `#EVAL`, `#ASSERT`, `#TRACE`
 
@@ -426,6 +433,22 @@ has the worked file.
 
 See the **Deployment** section below. In short: add `@export` above the functions that should become API endpoints, add `@desc` to their parameters. Exported functions should answer the highest utility questions a reader of the rules might have. Often the rule definition is not written as such and a separate file importing the rules needs to decorate those export functions.
 
+From a terminal, deploy with the `l4` CLI:
+
+```bash
+l4 install legalese    # once: the legalese CLI holds the Legalese Cloud sign-in
+legalese login         # once: sign in and pick the organization
+
+l4 deploy path/to/file.l4 --description "Who uses these rules, and for what"
+l4 redeploy path/to/file.l4            # update; refused if it would break callers
+l4 deployments                         # list
+l4 undeploy NAME --yes                 # delete
+
+l4 deploy path/to/file.l4 --server http://localhost:8080   # self-hosted jl4-service
+```
+
+The name defaults to the file name (`--name` overrides). `l4 redeploy` is rejected when it removes or changes an exported function; `--force` applies it anyway. A deployment is a live API other people and agents may call: confirm with the user before deploying under a new name, forcing a breaking redeploy, or undeploying.
+
 ---
 
 ## Deployment with `jl4-service`
@@ -440,7 +463,7 @@ See the **Deployment** section below. In short: add `@export` above the function
 - **WebMCP** — `<script src="/.webmcp/embed.js">` for browser AI agents
 - **Traces** — `?trace=full&graphviz=true` on any evaluation
 
-**Self-hosted or managed.** You can run `jl4-service` yourself (`cabal run jl4-service`), or use the managed [Legalese Cloud](https://legalese.cloud) offering, which gives each org a subdomain (`https://{org-slug}.legalese.cloud`), handled compilation, OAuth protection, and one-click deployment from the VS Code extension's Deploy tab. Both expose the same API shape, so annotations and client code are portable.
+**Self-hosted or managed.** You can run `jl4-service` yourself (`cabal run jl4-service`), or use the managed [Legalese Cloud](https://legalese.cloud) offering, which gives each org a subdomain (`https://{org-slug}.legalese.cloud`), handled compilation, OAuth protection, and one-click deployment from the VS Code extension's Deploy tab or `l4 deploy`. Both expose the same API shape, so annotations and client code are portable.
 
 ### `@export` — publish a function
 
@@ -825,8 +848,8 @@ All documentation for the currently-published L4 release lives under `https://le
 - **Libraries:** <https://legalese.com/l4/reference/libraries.md>
 - **Tutorials — first L4 file:** <https://legalese.com/l4/tutorials/getting-started/first-l4-file.md>
 - **Tutorials — common patterns:** <https://legalese.com/l4/tutorials/getting-started/common-patterns.md>
-- **Tutorials — deploying functions:** <https://legalese.com/l4/tutorials/deploying-functions/exporting-functions-for-deployment.md>
+- **Tutorials — deploying rules:** <https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment.md>
 - **Concepts — regulative rules:** <https://legalese.com/l4/concepts/legal-modeling/regulative-rules.md>
-- **Foundation course (Module 5 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-5-regulative.md>
+- **Foundation course (Module 6 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-6-regulative.md>
 
 The website tracks the currently-published L4 version; treat it as ground truth over any snippet in this skill.

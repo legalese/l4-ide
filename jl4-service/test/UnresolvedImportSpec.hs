@@ -121,10 +121,10 @@ spec = describe "a bundle IMPORT that resolves to nothing is logged at WARN" do
 
   describe "when the deployment is loaded after a restart" do
     it "says it again, on the restart path's own log" do
-      (compiled, compileLog, rebuilt, restartLog) <-
+      (compiled, compileLog, restarted, restartLog) <-
         compileThenRestart (Map.singleton "main.l4" (importing ["zznope"]))
       compiled `shouldBe` Right ()
-      rebuilt `shouldBe` Right ()
+      restarted `shouldBe` Right ()
       length (unresolvedLines compileLog) `shouldBe` 1
       case unresolvedLines restartLog of
         [line] -> do
@@ -140,8 +140,8 @@ spec = describe "a bundle IMPORT that resolves to nothing is logged at WARN" do
             [ ("main.l4", importing ["prelude", "daydate", "helper"])
             , ("helper.l4", Text.unlines ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "`plus one` n MEANS n PLUS 1"])
             ]
-      (compiled, compileLog, rebuilt, restartLog) <- compileThenRestart sources
+      (compiled, compileLog, restarted, restartLog) <- compileThenRestart sources
       compiled `shouldBe` Right ()
-      rebuilt `shouldBe` Right ()
+      restarted `shouldBe` Right ()
       unresolvedLines compileLog `shouldBe` []
       unresolvedLines restartLog `shouldBe` []

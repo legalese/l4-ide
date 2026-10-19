@@ -334,7 +334,7 @@ hasBlockingError = any isBlocking
 --
 -- Import-resolution lines at Warning/Error priority are NOT chatter: they
 -- carry the library-shadow warning (multiple differing copies of a module
--- visible; see LIBRARY-RESOLUTION-SHADOW-SPEC) and module-not-found notices,
+-- visible; see specs/as-built/import-resolution.md) and module-not-found notices,
 -- which a CLI user must see.
 isProgressChatter :: Text -> Bool
 isProgressChatter txt =

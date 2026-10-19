@@ -1028,10 +1028,21 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     -- `manyLines` over comma-separated groups: continuation lines must start at
     -- EXACTLY the first branch's column, and a comma at end of line is instead
     -- eaten by whatever comma-list the branch body ended in (`… THEN LIST x,`
-    -- continues the LIST). That pair of facts is smucclaw/l4-ide#932.
+    -- continues the LIST). That pair of facts is smucclaw/l4-ide#932. The same
+    -- layout is what keeps a CONSIDER inside a branch apart from the branches
+    -- after it: the arms of an inner CONSIDER sit at the inner one's column, so
+    -- the outer's next WHEN, at the outer's, is not one of them. Written as a
+    -- comma-separated list on one hanging indent, as this was, the outer's later
+    -- arms were read as more arms of the inner CONSIDER.
+    -- Each arm is nested two more columns, which moves every line of the arm
+    -- after its first and not the first itself: an arm's later lines must sit
+    -- PAST its WHEN, or they read as the next arm's neighbours. The case that
+    -- needs it is a WHERE under an arm: the `Where` printer breaks its lines at
+    -- the current nesting, so unnested its `WHERE` stood at the WHEN's column,
+    -- which ends the definition, and the arms after it did not parse.
     Consider   _ expr branches ->
       hang 2 $ vcatHard $
-        ("CONSIDER" <+> printWithLayout expr) : fmap printWithLayout branches
+        ("CONSIDER" <+> printWithLayout expr) : fmap (nest 2 . printWithLayout) branches
 
     Lit        _ lit -> printWithLayout lit
     Percent    _ expr -> parensIfNeeded expr <+> "%"
@@ -1126,7 +1137,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
 -- @issuer is eligible OF plan AND rest@ re-parses as
 -- @issuer is eligible OF (plan AND rest)@: it still parses, and then fails type
 -- checking with the arguments transposed. That was the second half of
--- smucclaw/l4-ide#932 — @l4 batch@ on @regcf-wizard.l4@ got past the parser
+-- smucclaw/l4-ide#932 — @l4 batch@ on Reg CF's @regcf-wizard.l4@ (now in
+-- legalese/canon) got past the parser
 -- only to be rejected by the checker. @PARTY … MUST … WITHIN …@ is the same
 -- shape for the regulative connectives: the obligation has no closing token, so
 -- a following @ROR@ reads as another of its own clauses.
@@ -1147,7 +1159,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
 --
 -- That is a SILENT wrong answer rather than a diagnostic: @ok/logic.l4@ went
 -- from @LIST TRUE, TRUE, FALSE, FALSE@ to @LIST TRUE, TRUE, TRUE, TRUE@ and an
--- assertion in @legal/regcf/regcf.l4@ went from satisfied to failed, both
+-- assertion in Reg CF's @regcf.l4@ (now in legalese/canon) went from
+-- satisfied to failed, both
 -- through @l4 batch@, with no error anywhere. Comparisons (@EQUALS@,
 -- @GREATER THAN@, …) were measured SAFE in the same harness and stay bare, so
 -- the corpus's @`mkt cap` GREATER THAN … AND …@ does not grow noise.

@@ -485,7 +485,8 @@ stripList _ = Nothing
 
 -- | A type with its synonyms expanded at the head, so that a synonym for MAYBE
 -- is a MAYBE when deciding what a missing or @null@ value means (T3), and a
--- synonym for a record or an enum is found. The JSON decoder does the same
+-- synonym for a record or an enum is found. A synonym that takes parameters is
+-- expanded when every parameter is given. The JSON decoder does the same
 -- ('L4.EvaluateLazy.Machine.expandTypeSynonyms').
 expandSyn :: ModuleInfo -> Type' Resolved -> Type' Resolved
 expandSyn mi = go (16 :: Int)
@@ -1501,7 +1502,13 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                   Nothing -> throwError $ InterpreterError (mconcat initErrs)
                   Just tcRes -> pure tcRes
 
-                -- 2. Get function definition and extract parameter types
+                -- 2. Get function definition and extract parameter types.
+                -- The entry module's own declarations are all this path has, as in
+                -- precompileModule's single-file fallback. It runs only after
+                -- precompileModule failed, and that fails only where typecheckModule
+                -- or getFunctionDefinition does (buildImportEnvironment falls back
+                -- to an empty environment instead). Both are repeated here with the
+                -- same arguments, so a request stops before it reaches the wrapper.
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
                 let givenParamTypes = extractParamTypes funDecide
                     (binderParamTypes0, assumeParamTypes) = splitAssumeParams tcRes.module' funDecide
