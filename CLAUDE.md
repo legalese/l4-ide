@@ -40,8 +40,9 @@ branch), and on 2026-09-29 it left this repo with the `go` pipeline for the priv
 `legalese/l4-pipeline`. That repo is cloned into `etc/go/`, which `.gitignore` excludes here, and
 ships the skill as its own plugin. **Nothing in this repo's CI runs the pipeline any more**; its
 own CI runs against `unstable` daily.
-This repo is upstream: `.github/workflows/release-l4-skill.yml` packages `skills/` into
-`l4-plugin.zip`. There are two marketplace entries, `/plugin marketplace add legalese/l4-ide` and
+This repo is upstream: the `package-plugin` job of `.github/workflows/main-tag.yml` packages `skills/`
+into `l4-plugin.zip` when that workflow is run by hand to cut a release. There are two marketplace
+entries, `/plugin marketplace add legalese/l4-ide` and
 `/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.
 
 **So a correction to a skill lands here first**, and its other copies are found and corrected in
