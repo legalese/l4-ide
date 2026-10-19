@@ -92,6 +92,12 @@ data TAnnotations
   | TNlgPrefix    !(Maybe LangTag) -- ^ "@nlg", optionally ":he"
   | TDesc         !Text -- ^ "@desc"
   | TExport       !Text -- ^ "@export"
+  | TLang         !LangTag !Text
+    -- ^ @\@lang he@ — the module's default language, the one an untagged
+    -- @\@nlg@ in that module is written in. The 'Text' is the RAW remainder
+    -- after the herald, spacing and any trailing comment included, because
+    -- 'displayTokenType' re-emits it for exactprint; the 'LangTag' is the
+    -- parsed subtag, so no reader has to re-split the line.
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -429,6 +435,24 @@ refSrcAnnotation = fst <$> lineAnno "@ref-src"
 refMapAnnotation :: Lexer Text
 refMapAnnotation = fst <$> lineAnno "@ref-map"
 
+-- | @\@lang he@ — a module's default language.
+--
+-- Deliberately NOT a 'lineAnno': the subtag's SHAPE is checked here, by the
+-- same 'isLangTagChar' as @\@nlg:he@, so the two spellings cannot drift into
+-- disagreeing about what a subtag is. Everything after the subtag is kept
+-- verbatim (a trailing comment is ordinary), so exactprint re-emits the line
+-- byte for byte including the author's spacing.
+--
+-- 'try', so that a herald which merely starts with these characters is not
+-- half-consumed on the way to failing.
+langAnnotation :: Lexer (LangTag, Text)
+langAnnotation = try $ do
+  _    <- string "@lang"
+  sp   <- takeWhile1P (Just "space") (== ' ')
+  tag  <- takeWhile1P (Just "language subtag") isLangTagChar
+  rest <- takeWhileP (Just "character") (/= '\n')
+  pure (MkLangTag tag, sp <> tag <> rest)
+
 descAnnotation :: Lexer Text
 descAnnotation = fst <$> lineAnno "@desc"
 
@@ -731,6 +755,7 @@ annotationsPayload :: Lexer TAnnotations
 annotationsPayload = asum
   [ TRefSrc       <$> refSrcAnnotation
   , TRefMap       <$> refMapAnnotation
+  , uncurry TLang <$> langAnnotation
   , TDesc         <$> descAnnotation
   , TExport       <$> exportAnnotation
   , (\ (mtag, t, ty) -> TNlg mtag t ty) <$> nlgAnnotation
@@ -1232,6 +1257,7 @@ displayTokenType = \case
     TNlgPrefix mtag   -> "@nlg" <> langTagSuffix mtag
     TDesc t           -> "@desc" <> t
     TExport t         -> "@export" <> t
+    TLang _ raw       -> "@lang" <> raw
   TIdentifiers i -> case i of
     TGenitive         -> "'s"
     TIdentifier t     -> t

@@ -79,12 +79,19 @@ data PState = PState
   , nlgs :: [Nlg]
   , refs :: [Ref]
   , descs :: [Desc]
+  , langs :: [LangTag]
+    -- ^ @\@lang@ declarations seen, most recent first. A list rather than a
+    -- 'Maybe' so that a second declaration is a fact we could report on later
+    -- rather than one silently overwriting the other.
   }
   deriving stock (Show, Eq, Generic)
   deriving (Semigroup, Monoid) via Generically PState
 
 addNlg :: Nlg -> PState -> PState
 addNlg n s = over #nlgs (n:) s
+
+addLang :: LangTag -> PState -> PState
+addLang l s = over #langs (l:) s
 
 addRef :: Ref -> PState -> PState
 addRef ref s = over #refs (ref:) s
@@ -99,7 +106,7 @@ spaces =
 spaceOrAnnotations :: Parser (Lexeme ())
 spaceOrAnnotations = do
   ws <- spaces
-  nlgs :: [NS Epa [Ref, Nlg, Desc, ()]] <- many (fmap (S . S . S . Z) refAdditionalP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
+  nlgs :: [NS Epa [Ref, Nlg, Desc, (), LangTag]] <- many (fmap (S . S . S . S . Z) langP <|> fmap (S . S . S . Z) refAdditionalP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
   traverse_ addAnnotation nlgs
   let
     epaNlgs = fmap (collapse_NS . map_NS (K . epaToHiddenCluster)) nlgs
@@ -108,6 +115,14 @@ spaceOrAnnotations = do
     , payload = ()
     , hiddenClusters = epaNlgs
     }
+
+-- | @\@lang he@. Collected like any other annotation, so its tokens ride in
+-- the same hidden cluster and exactprint re-emits the line unchanged.
+langP :: Parser (Epa LangTag)
+langP = hidden $ spacedTokenWs (\ case
+  TAnnotations (TLang tag _) -> Just tag
+  _ -> Nothing)
+  "Language declaration"
 
 refP :: Parser (Epa Ref)
 refP = do
@@ -279,11 +294,12 @@ lexeme p = do
     , hiddenClusters = wsOrAnnotation.hiddenClusters
     }
 
-addAnnotation :: NS Epa (Ref : Nlg : Desc : xs) -> Parser ()
+addAnnotation :: NS Epa (Ref : Nlg : Desc : () : LangTag : xs) -> Parser ()
 addAnnotation = \ case
   S (S (Z desc)) -> modify' (addDesc desc.payload)
   S (Z nlg) -> modify' (addNlg nlg.payload)
   Z ref -> modify' (addRef ref.payload)
+  S (S (S (S (Z lang)))) -> modify' (addLang lang.payload)
   _ -> pure ()
 
 lexemeWs :: Parser a -> Parser (Lexeme a)
@@ -2873,6 +2889,7 @@ execNlgParserForTokens p uri input ts =
       , comments = []
       , refs = []
       , descs = []
+      , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 
@@ -2898,7 +2915,18 @@ execParserForTokensWithHints hints p file input ts =
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
     Right (a, pstate)  ->
       let
-        (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
+        -- The module's declared language, or `en`. Taken as the LAST
+        -- declaration in source order: `langs` accumulates by prepending, so
+        -- the head is the last one written. Two declarations in one module is
+        -- not diagnosed here — the list keeps both, so a check for it has
+        -- something to read.
+        moduleLang = fromMaybe defaultModuleLang (listToMaybe pstate.langs)
+        -- Stamp every untagged annotation with it BEFORE attachment, which is
+        -- what makes `@lang he` mean exactly "tag every herald in this module
+        -- `:he`" rather than a second mechanism with its own precedence — and
+        -- makes it order-independent, since pstate is complete by now.
+        localisedNlgs = fmap (withDefaultLang moduleLang) pstate.nlgs
+        (withNlg, nlgS) = Resolve.addNlgCommentsToAst moduleLang localisedNlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
         (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withDesc
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
@@ -2914,6 +2942,7 @@ execParserForTokensWithHints hints p file input ts =
       , comments = []
       , refs = []
       , descs = []
+      , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 
