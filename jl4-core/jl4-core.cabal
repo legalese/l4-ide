@@ -185,6 +185,7 @@ test-suite jl4-core-test
     ExportValidationSpec
     DisambiguationWarningsSpec
     NumberLiteralSpec
+    NlgLangTagSpec
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec
@@ -203,6 +204,7 @@ test-suite jl4-core-test
     deepseq,
     hspec,
     jl4-core,
+    megaparsec,
     optics,
     text,
     time
