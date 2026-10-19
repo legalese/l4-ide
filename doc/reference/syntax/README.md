@@ -134,6 +134,13 @@ It is the `GIVEN` keyword's column that counts, not the left margin, so a `GIVEN
 The column is all it reads: a rule's sentence indented under the last input, by even one space, becomes that input's gloss, and nothing warns.
 The exceptions are confined to those two lists: between `GIVETH` and `DECIDE`, an annotation on its own line describes the rule below it at any indentation.
 
+**The last field of a record, and an `ASSUME`, are read by the same column.**
+The last field of a record, and the last field of the last constructor of an enum, have no field after them, so the line under them is also the line above whatever is written next.
+An annotation indented further than the `DECLARE` keyword describes that field; at the keyword's column or left of it, it describes what follows.
+An `ASSUME` is read the same way: an annotation trailing it, or indented under it, is its own, and one at the margin is the next declaration's.
+After an enum whose last value has no fields, an annotation at the margin is still read as that value's: nothing is reported unless the value already carries a note, and the rule written below it loses the annotation.
+Write the rule's sentence trailing the rule's head instead, as in ``DECIDE `passes` @nlg the test is passed``.
+
 #### Writing a literal `%` or `]`
 
 Inside `@nlg`, `%` marks an input to fill in, and `%age%` is replaced by the value of `age`.

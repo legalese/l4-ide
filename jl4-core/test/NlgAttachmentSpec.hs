@@ -356,3 +356,77 @@ spec = describe "which node an @nlg attaches to" $ do
         \DECIDE `is large` IF amount GREATER THAN 100\n"
       attachments m `shouldBe` []
       [ () | NotAttached{} <- ws ] `shouldSatisfy` (not . null)
+
+  -- The last field of a field list is bounded only by whatever follows the
+  -- declaration, so it takes from a later line only what is indented past the
+  -- declaration's keyword, the column test the last input of a GIVEN list has.
+  -- A herald at the margin is the NEXT declaration's.
+  describe "the last field of a field list takes only an annotation indented past the declaration" $ do
+    let rule = "@nlg the answer\nDECIDE `answer` IS 42\n"
+
+    it "leaves a herald at the margin to the rule written after the record" $ do
+      (m, ws) <- parsed
+        ("DECLARE Rec HAS\n    base IS A NUMBER\n\n" <> rule)
+      attachments m `shouldBe` [("answer", "the answer")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "leaves a herald at the margin to the DECLARE written after the record" $ do
+      (m, ws) <- parsed
+        "DECLARE Rec HAS\n    base IS A NUMBER\n\n\
+        \@nlg an employee\n\
+        \DECLARE Emp HAS\n    salary IS A NUMBER\n"
+      attachments m `shouldBe` [("Emp", "an employee")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "does the same for the last field of the last constructor of an enum" $ do
+      (m, ws) <- parsed
+        ("DECLARE Shape IS ONE OF\n    Dot\n    Disc HAS\n        base IS A NUMBER\n\n" <> rule)
+      attachments m `shouldBe` [("answer", "the answer")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "still gives the last field an annotation indented under it, beside the rule's" $ do
+      (m, ws) <- parsed
+        ("DECLARE Rec HAS\n    base IS A NUMBER\n    @nlg the base\n\n" <> rule)
+      attachments m `shouldBe` [("base", "the base"), ("answer", "the answer")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "still gives the last field of an enum's constructor an annotation indented under it" $ do
+      (m, _) <- parsed
+        "DECLARE Shape IS ONE OF\n    Dot\n    Disc HAS\n        base IS A NUMBER\n        @nlg the base\n"
+      attachments m `shouldBe` [("base", "the base")]
+
+    it "keeps a field's own trailing gloss and its type's separate" $ do
+      (m, _) <- parsed
+        "DECLARE Rec HAS\n    base [the base] IS A NUMBER @nlg the number\n"
+      attachments m `shouldBe` [("base", "the base"), ("NUMBER", "the number")]
+
+  -- ASSUME is one declaration, so a herald at the margin under it is the NEXT
+  -- declaration's and one indented past it is its own, the column test of the
+  -- other two lists.
+  describe "an ASSUME takes only an annotation indented past it" $ do
+    it "takes a gloss trailing it" $ do
+      (m, _) <- parsed "ASSUME `the input` IS A NUMBER @nlg the assumed input\n"
+      attachments m `shouldBe` [("the input", "the assumed input")]
+
+    it "leaves a herald at the margin under it to the rule after it" $ do
+      (m, ws) <- parsed
+        "ASSUME `the input` IS A NUMBER\n\
+        \@nlg the output rule\n\
+        \DECIDE `out` IS `the input`\n"
+      attachments m `shouldBe` [("out", "the output rule")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
+
+    it "takes a gloss indented under it" $ do
+      (m, _) <- parsed
+        "ASSUME `the input` IS A NUMBER\n\
+        \    @nlg the assumed input\n\
+        \DECIDE `out` IS `the input`\n"
+      attachments m `shouldBe` [("the input", "the assumed input")]
+
+    it "takes both, when one is indented and one is at the margin" $ do
+      (m, _) <- parsed
+        "ASSUME `the input` IS A NUMBER\n\
+        \    @nlg the assumed input\n\
+        \@nlg the output rule\n\
+        \DECIDE `out` IS `the input`\n"
+      attachments m `shouldBe` [("the input", "the assumed input"), ("out", "the output rule")]
