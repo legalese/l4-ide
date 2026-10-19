@@ -125,6 +125,7 @@ Unless you set `L4_TARGET=unstable`, `check.sh` runs every module with a main bu
 Copy [`assets/fetch-main-l4.sh`](assets/fetch-main-l4.sh) beside it: `check.sh` calls that to get the newest main build, and caches it.
 A line that ends `reads differently on main` is a module `main` cannot read as it stands; `writing-l4-rules/references/dialects.md` says what to write instead.
 Exit status 2 means the main step did not run (no main build for your platform, no network, no `fetch-main-l4.sh`), and that is not a pass.
+A module `main` does not finish within `L4_MAIN_TIMEOUT` seconds (300 unless you set it) is red as well: `main` is the compiler that has to read it, and some modules that run in a second on `unstable` take minutes on `main`.
 The check sees what an assertion exercises: a module `main` rejects, or reads differently in a way a test tells apart.
 It does not see a difference no assertion exercises, so test the two rows `dialects.md` marks as degrading.
 

@@ -85,7 +85,7 @@ Each row gives one of three words for what `main` does with the construct.
 2. Before you call a module done, run `check.sh` in the encoding directory.
    The target is `main` unless you set `L4_TARGET=unstable`.
    It fetches the newest main build with `fetch-main-l4.sh` (cached), runs every module with both binaries, and compares the four counts.
-   A line that says `reads differently on main` is a module `main` cannot read as it stands.
+   A line that says `reads differently on main` is a module `main` cannot read as it stands, because its counts differ or because `main` did not finish it in `L4_MAIN_TIMEOUT` seconds (300 unless set).
    Exit status 2 means the main step could not run (no main build for this platform, no network, no `fetch-main-l4.sh` beside `check.sh`), and then the check is not done.
 3. Know what the check cannot see.
    It compares counts, so a **degrades** row passes it unless an assertion exercises the difference.

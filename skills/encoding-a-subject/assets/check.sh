@@ -35,6 +35,9 @@
 #         L4_MAIN    the path of a main-build l4         (default: whatever fetch-main-l4.sh,
 #                    next to this script, prints: the newest main build, cached)
 #         L4_FETCH   a fetch-main-l4.sh somewhere else   (default: next to this script)
+#         L4_MAIN_TIMEOUT  seconds each module may take on the main build (default: 300; 0 = no limit).
+#                    A module that main cannot finish in that time is red: main is the compiler
+#                    that has to read it. Your own l4 is never timed.
 #
 # Exit status: 0 only when no module has an error other than its expected failed
 # assertions, no assertion refused, each module fails exactly as often as
@@ -46,6 +49,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIR="${1:-$HERE}"
 L4="${L4:-l4}"
 TARGET="${L4_TARGET:-main}"
+MAIN_TIMEOUT="${L4_MAIN_TIMEOUT:-300}"
 
 # A module that is MEANT to fail (a draft's test cases run against the text as made,
 # say) is listed here with its exact count, and named in encoding.json `expected_red`.
@@ -100,6 +104,9 @@ case "$TARGET" in
     echo "check.sh: L4_TARGET must be main or unstable, not '$TARGET'." >&2
     exit 2 ;;
 esac
+case "$MAIN_TIMEOUT" in
+  ""|*[!0-9]*) echo "check.sh: L4_MAIN_TIMEOUT must be a number of seconds, not '$MAIN_TIMEOUT'." >&2; exit 2 ;;
+esac
 
 status=0 total_err=0 total_ok=0 total_bad=0 total_ref=0 n=0
 m_err=0 m_ok=0 m_bad=0 m_ref=0 differ=0
@@ -125,16 +132,29 @@ for f in "$DIR"/*.l4; do
   if [ "$TARGET" = main ]; then
     # The same module, the same counting, with the main build. JL4_LIBRARY_PATH is unset for it: a
     # library path newer than the binary breaks it with errors that look like the module's.
-    mout="$(env -u JL4_LIBRARY_PATH "$MAIN" run "$f" 2>&1; echo "check-rc=$?")"
-    mrc="$(printf '%s\n' "$mout" | sed -n 's/^check-rc=//p' | tail -n 1)"
-    mout="$(printf '%s\n' "$mout" | tr -d '\000' | grep -a -v '^check-rc=')"
+    # It is bounded by L4_MAIN_TIMEOUT: a module main cannot finish is not readable by main.
+    mtmp="$(mktemp "${TMPDIR:-/tmp}/check-main.XXXXXX")" || { echo "check.sh: cannot make a temporary file." >&2; exit 2; }
+    ( exec env -u JL4_LIBRARY_PATH "$MAIN" run "$f" >"$mtmp" 2>&1 ) &
+    mpid=$!
+    wd=""
+    if [ "$MAIN_TIMEOUT" -gt 0 ]; then
+      ( sleep "$MAIN_TIMEOUT"; kill -9 "$mpid" 2>/dev/null && touch "$mtmp.timeout" ) >/dev/null 2>&1 &
+      wd=$!
+    fi
+    wait "$mpid" 2>/dev/null; mrc=$?
+    if [ -n "$wd" ]; then pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null; fi
+    timedout=0; [ -e "$mtmp.timeout" ] && timedout=1
+    mout="$(tr -d '\000' <"$mtmp")"
+    rm -f -- "${mtmp:?}" "${mtmp:?}.timeout"
     mmsgs="$(printf '%s\n' "$mout" | grep -a -A1 -E '^[[:space:]]*Message:')"
     merr=$(printf '%s\n' "$mout" | grep -a -c 'DiagnosticSeverity_Error')
     mok=$(printf '%s\n' "$mmsgs" | grep -a -cE 'assertion satisfied')
     mbad=$(printf '%s\n' "$mmsgs" | grep -a -cE 'assertion failed|assertion could not be evaluated')
     mref=$(printf '%s\n' "$mmsgs" | grep -a -cE 'assertion refused')
     verdict="same"
-    if [ "$merr" -ne "$err" ] || [ "$mok" -ne "$ok" ] || [ "$mbad" -ne "$bad" ] || [ "$mref" -ne "$ref" ]; then
+    if [ "$timedout" = 1 ]; then
+      verdict="reads differently on main (it did not finish in $MAIN_TIMEOUT s)"
+    elif [ "$merr" -ne "$err" ] || [ "$mok" -ne "$ok" ] || [ "$mbad" -ne "$bad" ] || [ "$mref" -ne "$ref" ]; then
       verdict="reads differently on main"
     elif [ "$mrc" != 0 ] && [ "$merr" -eq 0 ] && [ "$rc" = 0 ]; then
       verdict="reads differently on main (it exited $mrc and printed no error)"
