@@ -308,7 +308,8 @@ not the invoice is late with 5
 ```
 
 `l4 nlg` prints nothing and exits non-zero if the file does not typecheck, rather than writing prose about a module that does not hold together.
-Options: `-o/--output FILE` writes to a file instead of standard output.
+Options: `-o/--output FILE` writes to a file instead of standard output, and `--lang SUBTAG` uses the `@nlg:SUBTAG` wordings for the rules that have them (and the module's default wording for those that do not).
+See [one encoding, several languages](../natural-language-functions/optimising-natural-language-generation.md#one-encoding-several-languages).
 
 ### `l4 batch` — many cases at once
 

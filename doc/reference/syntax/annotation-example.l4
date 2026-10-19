@@ -38,3 +38,15 @@ GIVETH A BOOLEAN
   claimant
 
 #EVAL `is eligible` TRUE
+
+-- A heralded `@nlg` may carry a language subtag, and one rule may carry a
+-- rendering per language. `l4 nlg --lang he` and `l4 render --lang he` select
+-- the Hebrew one; with no flag, or for a rule that has none in that language,
+-- the default rendering is used.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is a large amount` @nlg:en the amount %amount% is large
+                           @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+
+#EVAL `is a large amount` 150

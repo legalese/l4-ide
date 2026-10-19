@@ -309,6 +309,37 @@ Tips:
 
 ---
 
+## One encoding, several languages
+
+An `@nlg` sentence is in whatever language you wrote it in.
+To keep the same rule readable in two languages, give it one sentence per language and tag each with its language:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
+
+Nothing about the rule is duplicated, only its wording.
+Ask for the language you want:
+
+```bash
+l4 render --lang he --format html contract.l4 > contract.he.html
+l4 nlg --lang he contract.l4
+```
+
+A rule with no sentence in that language keeps its default one, so a half-translated file still produces a whole document.
+When a whole module is in one language, say it once with `@lang he` on a line of its own instead of tagging every sentence; the tag then means "every untagged `@nlg` in this module is Hebrew".
+
+What this does not do is translate.
+L4 prints the words you wrote.
+The little words it adds itself, such as "is equal to" or "with", stay English unless L4 has a phrase table for the language, and today the only table is a draft for Hebrew.
+[The syntax reference](../../reference/syntax/README.md#labelling-the-language-nlghe) has the details and the limits.
+
+---
+
 ## Putting it together
 
 Before, with short names and no annotation:

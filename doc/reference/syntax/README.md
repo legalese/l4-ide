@@ -147,11 +147,12 @@ Inside `@nlg`, `%` marks an input to fill in, and `%age%` is replaced by the val
 A `]` ends a bracketed annotation.
 To write either character as itself, put a backslash in front of it.
 
-| you write            | you get           | without the backslash             |
-| -------------------- | ----------------- | --------------------------------- |
-| `10\%and\%20`        | `10%and%20`       | `and` is read as an input name    |
-| `[rate \] per unit]` | `rate ] per unit` | the annotation ends early         |
-| `\\`                 | `\`               | —                                 |
+| you write               | you get             | without the backslash          |
+| ----------------------- | ------------------- | ------------------------------ |
+| `10\%and\%20`           | `10%and%20`         | `and` is read as an input name |
+| `[rate \] per unit]`    | `rate ] per unit`   | the annotation ends early      |
+| `[see note \[3\] here]` | `see note [3] here` | —                              |
+| `\\`                    | `\`                 | —                              |
 
 **Most of the time you do not need this.**
 A percent sign with a space after it is already ordinary text, so `a 5% levy on %amount%` works as written and fills in `amount`.
@@ -163,10 +164,164 @@ A stray `%` pair tells you nothing.
 If the word between the two percent signs happens to name one of your inputs, L4 quietly substitutes that value, and your sentence comes out with a number where you wrote a word.
 Nothing is reported, and the rule still runs.
 
+**An opening `[` never needs escaping, and you may escape it anyway.**
+Only the closing bracket ends an annotation, so `[see note [3] here]` is already correct as written.
+But nobody writes half a pair: reach for the backslash on the `]` and your hand puts one on the `[` too.
+So `\[` means a literal `[`, exactly as the bare character does, and the two spellings come out the same.
+
 **What this costs.**
 A backslash immediately before the closing `]` no longer ends the annotation, because `\]` now means a literal `]`.
 Write `\\` if you want the annotation to end with a backslash.
 Any other character after a backslash is left completely alone: `\q` is still a backslash followed by a `q`.
+
+#### Labelling the language: `@nlg:he`
+
+A heralded `@nlg` can say which language its prose is in, by putting a language subtag straight after the herald:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+  IF amount GREATER THAN 100
+```
+
+**L4 has no idea what language you are writing in.**
+The renderer prints whatever the annotation says, so an annotation written in Hebrew has always produced Hebrew output, with or without a tag.
+The tag does not translate anything.
+What it does is let you attach _more than one_ rendering to the same rule and say which is which.
+
+**The bare inline form cannot be tagged.**
+`[…]` has nowhere to put a subtag, so `@nlg:he` is available only on the heralded form.
+
+**A word glued to the colon is a tag, and a colon with a space after it is ordinary text.**
+A subtag is letters, digits and hyphens, so `@nlg:he` and `@nlg:zh-Hant` are tags, while `@nlg: see below` has no tag and the colon is simply the first character of the prose.
+This changes what an annotation written `@nlg:word` with no space means: `@nlg:total of the first` now reads `total` as the tag and `of the first` as the prose, and `@nlg:Test` on its own is a tag with no prose.
+If you want the colon as text, leave a space after it.
+No `@nlg:` in `main`'s tree is followed by a letter, a digit or a hyphen, so nothing there changes.
+
+#### Writing the same rule in two languages
+
+Put the second rendering on the continuation line, under the first:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
+
+Then ask for one:
+
+```console
+$ l4 nlg --lang he mymodule.l4
+$ l4 render --format html --lang he mymodule.l4 -o mymodule.he.html
+```
+
+`l4 nlg` gives the linearized prose of the file's directives; `l4 render` gives the formatted document, in any of its formats.
+Both take `--lang`.
+Two runs of the same command over the same source produce the two documents, and nothing about the rule is duplicated, only its wording.
+
+In both, a call to a rule that carries a herald reads as that herald with the call's arguments in its `%slots%`: ``#EVAL `is large` 150`` linearizes as `the amount 150 is large`.
+An argument the herald does not mention is not dropped; it follows the sentence as `with …`, so a herald written without slots still shows every value the call supplied.
+A herald written on the `GIVEN` name is a gloss for that input, not a sentence for the rule, and is never used for the rule.
+
+`l4 nlg` also writes a date given as literals as a date: `Date 16 7 2025` reads `16 July 2025`.
+That covers only daydate's own `Date`, only when all three arguments are whole numbers, and only when they name a real day.
+Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.
+A percentage reads `50%`.
+
+**The words L4 itself puts around your sentences follow `--lang` in `l4 nlg`:** "is equal to", "not", "with", a month's name.
+For ``#EVAL `is large` 150 EQUALS TRUE`` over the rule above, `l4 nlg --lang he` prints ``150 עולה על הסף שווה ל־`TRUE` `` where `l4 nlg` prints ``the amount 150 is large is equal to `TRUE` ``.
+They come from a table of phrases, not a grammar, so the English word order stays: a Hebrew line is Hebrew words in the order English would put them.
+A word the table has no entry for stays English, and `l4 nlg` names it on stderr, so you can see what was not translated.
+**Today the only table is Hebrew, and it is a draft that no Hebrew-speaking lawyer has reviewed.**
+For every other language, `--lang` selects your own wordings and leaves the linearizer's connecting words in English.
+`l4 render` does not use the table.
+Without `--lang`, nothing changes.
+
+In the `html` format the document says which language it is in: `<html lang="he" dir="rtl">`.
+`lang` is the `--lang` you asked for, or the module's `@lang` if you asked for nothing, or `en`.
+`dir="rtl"` is added for a right-to-left language, decided from the script subtag when the tag carries one, so `he-Latn` is left-to-right and `az-Arab` is not, and omitted for every other, left-to-right being HTML's own default.
+Asking for a language **nothing** in the module renders does not relabel the document: it keeps the language it declares, and `render` says so on stderr.
+The `akn` format reports the same choice as the language component of its FRBR URIs (`/akn/doc/main/heb@`).
+The `--lang` value is checked, because it ends up in markup: a trailing space is trimmed, the first subtag is lowercased, and anything that is not a language tag is refused.
+
+**A rule you have not translated yet still appears.**
+`--lang he` falls back to a rule's default rendering when it has no Hebrew one, so a half-finished translation produces a whole document with some of it still in the original language, rather than a document with holes in it.
+
+**Which rendering is the default**, the one you get with no `--lang` at all, is the one in the module's own language (`en` unless the module says otherwise), and otherwise the first in the file.
+So a rule with exactly one annotation behaves exactly as it did before tags existed, tagged or not.
+
+**Two renderings in the SAME language is still an error.**
+Two `@nlg:he` on one rule, or two untagged ones, is a genuine ambiguity: L4 warns and attaches neither, because picking one would silently throw away a sentence you wrote.
+A clash in one language does not affect the others: two `@nlg:he` and one `@nlg:en` leaves the English rendering working.
+
+#### Declaring the module's language: `@lang he`
+
+Tagging every herald gets repetitive the moment a whole module is in one language.
+Say it once instead, on a line of its own:
+
+```l4
+@lang he
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg %amount% עולה על הסף
+                  @nlg:en the claim of %amount% exceeds the threshold
+  IF amount GREATER THAN 100
+```
+
+**`@lang he` means "every untagged `@nlg` in this module is Hebrew".**
+It is not a separate mechanism with its own precedence: it is exactly equivalent to writing `:he` on each of those heralds, and you can mix the two freely.
+A herald that names its own language keeps it, which is how the English rendering above survives in a Hebrew module.
+
+**`@lang` does not translate anything.**
+It labels what you wrote.
+
+**A module that declares nothing is `en`.**
+That is a default, not a detection: L4 cannot tell what language you are writing in, so a Hebrew module with no `@lang` is _labelled_ English while still _rendering_ Hebrew.
+The label has a visible cost: `l4 render --format html` puts it in `<html lang="en">` and emits no `dir`, so the Hebrew renders left-to-right with its punctuation at the wrong end of the line, and `--format akn` identifies the document as an English expression.
+So declare it if your module is not English.
+
+**Do not write `@lang en`: it says what a module that declares nothing already is.**
+`l4 check` and your editor put a hint on the line: "A module that declares nothing is English; this line can go."
+It is only a hint, so a check that passed still passes.
+A module that also declares another language gets no hint, and neither does a tag other than `en`.
+
+**It applies to the whole file, wherever you write it**, including annotations above the declaration.
+Convention is the top; nothing breaks if it is not.
+
+**Two renderings in the module's own language still collide.**
+`@lang he` together with an explicit `@nlg:he` on the same rule is two Hebrew renderings, and is reported as such.
+
+#### A rule that names its inputs in the head
+
+A rule may name its inputs twice, once in the `GIVEN` and again in the head, and an annotation written after an input's name in the head lands on that INPUT rather than on the rule.
+It is read as the rule's sentence anyway:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`is large` amount @nlg the claim of %amount% is large
+  MEANS amount GREATER THAN 100
+```
+
+reads as ``the claim of `amount` is large`` at every call site, in `l4 nlg` and in `l4 render` alike.
+A call written with `WITH` keeps its `where` clause and takes the sentence as its heading.
+A rule whose own name carries an annotation keeps that one, and the one on the input stays the input's gloss.
+
+**An annotation on an `AKA` name is the rule's sentence too**, and a call through the alias reads it.
+
+**An annotation in the `GIVEN` is an input gloss, never the rule's sentence.**
+It labels the input in a `WITH` call's `where` clause.
+Which occurrence BINDS is what decides this, not which line you wrote on: when the head names the input, the head is the binding occurrence and the `GIVEN` is a reference back to it, so a gloss written in the `GIVEN` there reaches nothing at all.
+Put a sentence for the rule on the rule, and a gloss for an input in the `GIVEN` of a head that does not repeat it.
+
+**Two annotations in the same language on one input collide**, neither attaches, and both projections fall back to their own paraphrase.
+L4 reports that separately, as an ambiguity naming the input.
+
+The placements are listed one per row, with the reading each projection gives, in `jl4/examples/ok/nlg-head-placement.l4`; its committed golden pins the `l4 nlg` readings, and a CLI test pins the `l4 render` ones.
 
 ### @ref
 
