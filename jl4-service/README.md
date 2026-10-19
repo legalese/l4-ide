@@ -194,16 +194,26 @@ The function's published `returnSchema` does not describe two of these shapes ye
 
 An input left out of `arguments`, or sent as `null`, is missing.
 Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
+A synonym at the head of an input's type is read as the type it stands for.
+An input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
+The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused with the direct path's message.
+On both paths, an input declared through a synonym for a `MAYBE` is a `MAYBE`: it may be left out, or sent as `null` or `{}`.
+An input declared through any other synonym takes the values of the type the synonym stands for: a record's fields, one of an enum's names, a list, or a date, a time or a date and time as a string. So does a synonym below the head of a type, as in `MAYBE Hue`.
+A synonym that takes no type (`DECLARE Years IS A LIST OF Year`) is answered where the type written out is not: a required `LIST`, `TIME` or `DATETIME` input fails on this path (see the limits below), and a synonym for one does not.
+A synonym that takes a type (`DECLARE Many OF a IS A LIST OF a`, used as `Many OF NUMBER`) fails with a parser error.
+Two kinds of synonym differ from the type written out when the input is left out or the value is wrong; the limits below say how.
 A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
 A batch case refused this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
 
-Limits, measured 2026-10-07:
+Limits:
 
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
-- On the wrapper path, a function with a `MAYBE` input followed by another input fails the request with a parser error (measured with `MAYBE NUMBER` and `MAYBE DATE`).
+- On the wrapper path, a function with a `MAYBE DATE` input fails the request, with an error about the generated code: `incorrect indentation (got 7, should be greater than 7)`, or, when another input is required, a type error about `TODATE`.
+- On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is refused with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out is `FALSE`.
+- On the wrapper path, an input declared through a synonym for a `DATE` whose string does not parse is refused with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD`, where a `DATE` written out is refused with `Parameter 'd': could not read "garbage" as a DATE`; a synonym for a `TIME` or a `DATETIME` is refused with `Could not parse time string …` or `Could not parse datetime string …`, and the type written out fails the wrapper with a type error.
 - On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
 - A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
   A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
@@ -301,6 +311,14 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+
+A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
+There are three such answers.
+A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
+A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
+A rule whose first clause names each input as its `GIVEN` does, or is `` `_` ``, is not read through, and is planned however long it is.
+A first clause that gives an input a new name is read through, and is limited like any other.
 
 An atom's `label` is rule source too, so a string literal in it is escaped in the same way, and the atom's `atomId` is computed from the label.
 

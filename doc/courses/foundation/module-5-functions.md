@@ -1,68 +1,19 @@
 # Module 5: Functions
 
-**Prerequisites:** Modules 1–4
-
-In this module, you'll learn how to define reusable functions in L4.
+[Module 4](module-4-decision-logic.md) showed how to write a rule with a signature (`GIVEN` and `GIVETH`) and break it into parts with `WHERE`. This module goes further: calling functions, functions that work for any type, functions that call themselves, and functions that take other functions.
 
 ## Learning Objectives
 
 By the end of this module, you will be able to:
 
-- Define functions with GIVEN and GIVETH
-- Use DECIDE and MEANS appropriately
-- Create local definitions with WHERE
+- Call functions with several arguments, in the right order
+- Write functions that work for values of any type
 - Write recursive functions
-- Understand function application
+- Use higher-order functions such as `map`, `filter` and `foldl`, with lambdas
 
 ---
 
-## Function Basics
-
-This is the complete working example to work along.
-
-[module-5-examples.l4](module-5-examples.l4)
-
-### The Structure of a Function
-
-Every L4 function has these parts:
-
-```l4
-GIVEN x IS A NUMBER           -- Parameters (inputs)
-      y IS A NUMBER
-GIVETH A NUMBER               -- Return type (output)
-`the sum of x and y` MEANS    -- Name and definition
-    x + y
-```
-
-### DECIDE vs MEANS
-
-Both define the same thing—use whichever reads better:
-
-```l4
--- These are equivalent
-DECIDE `the person is an adult` IF age >= 18
-`the person is an adult` MEANS age >= 18
-DECIDE `the person is an adult` IS age >= 18
-```
-
-| Syntax                | Best for                     |
-| --------------------- | ---------------------------- |
-| `DECIDE name IS expr` | Rules, decisions, conditions |
-| `DECIDE name IF expr` | Boolean predicates           |
-| `name MEANS expr`     | Definitions, computations    |
-
-### Type Signatures
-
-The `GIVETH` clause declares what type the function returns:
-
-- `GIVETH A NUMBER` — Returns a number
-- `GIVETH A STRING` — Returns a string
-- `GIVETH A BOOLEAN` — Returns true/false
-- `GIVETH A Person` — Returns a Person record
-- `GIVETH A LIST OF NUMBER` — Returns a list of numbers
-- `GIVETH A MAYBE NUMBER` — Returns a number or nothing
-
----
+The complete working example to work along: [module-5-examples.l4](module-5-examples.l4)
 
 ## Function Parameters
 
@@ -110,43 +61,18 @@ GIVETH A NUMBER
 
 ### Multi-Argument Calls
 
+Arguments are separated by spaces, in the order of the `GIVEN` lines:
+
 ```l4
--- Arguments separated by spaces
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`the sum of x and y` MEANS x + y
+
 #EVAL `the sum of x and y` 3 5       -- Result: 8
 ```
 
----
-
-## Local Definitions with WHERE
-
-Use `WHERE` to define helper values and functions. (`EXPONENT base power` is L4's built-in exponentiation function.)
-
-```l4
-GIVEN `the principal` IS A NUMBER
-      `the annual rate` IS A NUMBER
-      `the years` IS A NUMBER
-GIVETH A NUMBER
-`the compound interest` MEANS
-    `the principal` * EXPONENT `the growth factor` `the years`
-    WHERE
-        `the growth factor` MEANS 1 + `the annual rate`
-```
-
-### Multiple Local Definitions
-
-```l4
-GIVEN `the loan amount` IS A NUMBER
-      `the annual rate` IS A NUMBER
-      `the term in months` IS A NUMBER
-GIVETH A NUMBER
-`the monthly payment` MEANS
-    `the loan amount` *
-    (`the monthly rate` * `the compound factor`) /
-    (`the compound factor` - 1)
-    WHERE
-        `the monthly rate` MEANS `the annual rate` / 12
-        `the compound factor` MEANS EXPONENT (1 + `the monthly rate`) `the term in months`
-```
+An argument that is itself a function call goes in parentheses: `` `the square of` (`the sum of x and y` 1 2) `` is `9`. Without them, `` `the square of` `the sum of x and y` 1 2 `` would pass three separate arguments to `` `the square of` ``.
 
 ---
 
@@ -195,13 +121,13 @@ Functions that take or return other functions.
 Use `GIVEN ... YIELD`:
 
 ```l4
--- Double each number
-map (GIVEN n YIELD n * 2) (LIST 1, 2, 3)
--- Result: LIST 2, 4, 6
+IMPORT prelude
 
--- Filter positive numbers
-filter (GIVEN n YIELD n > 0) (LIST -1, 2, -3, 4)
--- Result: LIST 2, 4
+-- Double each number: LIST 2, 4, 6
+#EVAL map (GIVEN n YIELD n * 2) (LIST 1, 2, 3)
+
+-- Keep the positive numbers: LIST 2, 4
+#EVAL filter (GIVEN n YIELD n > 0) (LIST -1, 2, -3, 4)
 ```
 
 Multi-parameter lambdas separate their parameters with commas: `GIVEN acc, n YIELD acc + n`.
@@ -211,6 +137,8 @@ Multi-parameter lambdas separate their parameters with commas: `GIVEN acc, n YIE
 `foldl` combines a whole list into a single result, starting from an initial value:
 
 ```l4
+IMPORT prelude
+
 GIVEN numbers IS A LIST OF NUMBER
 GIVETH A NUMBER
 `the total of` MEANS
@@ -244,47 +172,29 @@ GIVETH A NUMBER
 
 </details>
 
-### Exercise 2: Function with WHERE
+### Exercise 2: Recursive Function
 
-Write a function that calculates the area of a circle using π ≈ 3.14159.
-
-<details>
-<summary>Solution</summary>
-
-```l4
-GIVEN `the radius` IS A NUMBER
-GIVETH A NUMBER
-`the area of the circle` MEANS
-    pi * `the radius` * `the radius`
-    WHERE
-        pi MEANS 3.14159
-
-#EVAL `the area of the circle` 10
-```
-
-</details>
-
-### Exercise 3: Recursive Function
-
-Write a recursive function to calculate the sum of a list of numbers.
+Write a recursive function that counts the items in a list of strings.
 
 <details>
 <summary>Solution</summary>
 
 ```l4
-GIVEN numbers IS A LIST OF NUMBER
+GIVEN items IS A LIST OF STRING
 GIVETH A NUMBER
-`the sum of the list` MEANS
-    CONSIDER numbers
+`the number of items in` MEANS
+    CONSIDER items
     WHEN EMPTY THEN 0
-    WHEN x FOLLOWED BY rest THEN x + `the sum of the list` rest
+    WHEN first FOLLOWED BY rest THEN 1 + `the number of items in` rest
 
-#EVAL `the sum of the list` (LIST 1, 2, 3, 4, 5)
+#EVAL `the number of items in` (LIST "deed", "lease", "will")
 ```
+
+An empty list has no items; any other list has one more item than the rest of it.
 
 </details>
 
-### Exercise 4: Higher-Order Function
+### Exercise 3: Higher-Order Function
 
 Use `filter` to get all numbers greater than 10 from a list. (Remember to `IMPORT prelude`.)
 
@@ -308,20 +218,7 @@ GIVETH A LIST OF NUMBER
 
 ## Common Mistakes
 
-### 1. Missing Return Type
-
-```l4
--- ❌ Wrong: No GIVETH
-GIVEN n IS A NUMBER
-`the square of` MEANS n * n
-
--- ✅ Right: Include GIVETH
-GIVEN n IS A NUMBER
-GIVETH A NUMBER
-`the square of` MEANS n * n
-```
-
-### 2. Wrong Argument Order in Calls
+### Wrong Argument Order in Calls
 
 ```l4
 -- Definition
@@ -330,21 +227,11 @@ GIVEN x IS A NUMBER
 GIVETH A NUMBER
 `the difference of` MEANS x - y
 
--- ❌ Wrong: Gets 3 - 10 = -7, not 10 - 3
+-- Wrong: Gets 3 - 10 = -7, not 10 - 3
 #EVAL `the difference of` 3 10
 
--- ✅ Right: Match the order in GIVEN
+-- Right: Match the order in GIVEN
 #EVAL `the difference of` 10 3  -- Gets 10 - 3 = 7
-```
-
-### 3. Missing Parentheses in Function Calls
-
-```l4
--- ❌ Wrong: f applied to g, not to result of g x
-f g x
-
--- ✅ Right: Apply g to x, then f to result
-f (g x)
 ```
 
 ---
@@ -354,8 +241,7 @@ f (g x)
 | Concept              | Syntax                                     |
 | -------------------- | ------------------------------------------ |
 | Function definition  | `GIVEN params GIVETH Type name MEANS expr` |
-| Decision function    | `DECIDE name IF condition`                 |
-| Local definitions    | `expr WHERE helper MEANS value`            |
+| Polymorphic function | `GIVEN a IS A TYPE` before the parameters  |
 | Recursion            | Function calls itself in definition        |
 | Lambda               | `GIVEN x YIELD expression`                 |
 | Multi-param lambda   | `GIVEN acc, x YIELD expression`            |
@@ -364,6 +250,4 @@ f (g x)
 
 ---
 
-## What's Next?
-
-In [Module 6: Regulative Rules](module-6-regulative.md), you'll learn how to model legal obligations, permissions, and prohibitions using L4's deontic constructs.
+Next, [Module 6: Regulative rules](module-6-regulative.md) models obligations, permissions and prohibitions: the part of L4 with no equivalent in other programming languages.

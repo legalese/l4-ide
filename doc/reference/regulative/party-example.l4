@@ -72,7 +72,7 @@ DECLARE `Contract Action` IS ONE OF
   LEST (
     PARTY `The Borrower`
     MUST `make payment` 1100  -- 10% penalty
-    WITHIN 45  -- 15-day grace period
+    WITHIN 15  -- 15-day grace period, counted from when the first deadline is found to have passed
     LEST BREACH
   )
 
@@ -112,18 +112,21 @@ DECLARE `Contract Action` IS ONE OF
 #TRACE `payment obligation` AT 0 WITH
   PARTY `The Borrower` DOES `make payment` 5000 AT 20
 
--- Test 2: Payment obligation breached (no payment)
+-- Test 2: Payment obligation breached (no payment before the deadline)
 #TRACE `payment obligation` AT 0 WITH
+  (WAITUNTIL 31)
 
 -- Test 3: Early termination right exercised
 #TRACE `early termination right` AT 0 WITH
   PARTY `The Tenant` DOES `vacate premises` AT 30
 
--- Test 4: Confidentiality maintained (no breach)
+-- Test 4: Confidentiality maintained until the period ends (no breach)
 #TRACE `confidentiality obligation` AT 0 WITH
+  (WAITUNTIL 731)
 
 -- Test 5: Payment with penalty - paid in grace period
 #TRACE `payment with penalty clause` AT 0 WITH
+  (WAITUNTIL 31)
   PARTY `The Borrower` DOES `make payment` 1100 AT 40
 
 -- Test 6: Purchase and delivery - happy path
@@ -135,4 +138,4 @@ DECLARE `Contract Action` IS ONE OF
 #TRACE `service agreement` AT 0 WITH
   PARTY `The Employee` DOES `sign document` "employment contract" AT 3
   PARTY `The Employee` DOES `provide services` AT 50
-  PARTY `The Employer` DOES `make payment` 3000 AT 100
+  PARTY `The Employer` DOES `make payment` 3000 AT 55

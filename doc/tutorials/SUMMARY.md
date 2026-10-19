@@ -1,38 +1,33 @@
 # Tutorials - Summary
 
-- [Tutorials Home](README.md)
+- [Overview](README.md)
 
-## Getting Started
+## Start here
 
-- [Your First L4 File](getting-started/first-l4-file.md)
+- [Install L4 and write your first rule](getting-started/first-l4-file.md)
+- [Draft rules with Legalese AI](llm-integration/composing-l4-with-ai.md)
+
+## Write and check rules
+
+- [Test your rules](getting-started/testing-your-rules.md)
+- [Fix errors](getting-started/debugging-type-errors.md)
+- [Encode legislation](getting-started/encoding-legislation.md)
+- [Make rules read like law](natural-language-functions/optimising-natural-language-generation.md)
+- [Common patterns](getting-started/common-patterns.md)
+
+## Publish rules
+
+- [Deploy your rules](deploying-rules/exporting-rules-for-deployment.md)
+
+## Use deployed rules
+
+- [Choose an integration](legalese-cloud/README.md)
+- [Connect an AI agent](legalese-cloud/ai-agents.md)
+- [Chat with your rules](legalese-cloud/openai-compatible-api.md)
+- [Call rules over REST](legalese-cloud/openapi-spec.md)
+- [Embed rules in a website](legalese-cloud/webmcp-embed.md)
+
+## Advanced
+
 - [Using the l4 CLI](getting-started/l4-cli.md)
-- [Testing Your Rules](getting-started/testing-your-rules.md)
-- [Debugging Type Errors](getting-started/debugging-type-errors.md)
-- [Version Control for Rules](getting-started/version-control-for-rules.md)
-- [Encoding Legislation](getting-started/encoding-legislation.md)
-- [Wedding Vows](getting-started/wedding-vows.md)
-
-## Deployment
-
-- [Exporting Rules for Deployment](deploying-rules/exporting-rules-for-deployment.md)
-
-## Legalese Cloud
-
-- [OpenAI- and Anthropic-Compatible AI APIs](legalese-cloud/openai-compatible-api.md)
-- [MCP Server](legalese-cloud/mcp-server.md)
-- [Using Your Rules from Claude](legalese-cloud/using-rules-from-claude.md)
-- [Install as Agent Plugin](legalese-cloud/agent-plugin.md)
-- [Use Deployed Rules from an AI Agent (MCP)](legalese-cloud/agent-marketplace.md)
-- [WebMCP Embed Script](legalese-cloud/webmcp-embed.md)
-- [RESTful OpenAPI Specification](legalese-cloud/openapi-spec.md)
-
-## Natural Language
-
-- [Using Infix, Postfix, and Mixfix Functions](natural-language-functions/natural-language-functions.md)
-- [Optimising for Natural Language Generation with @nlg](natural-language-functions/optimising-natural-language-generation.md)
-
-## LLM Integration
-
-- [Getting Started with LLM](llm-integration/llm-getting-started.md)
-- [Legislative Ingestion](llm-integration/legislative-ingestion.md)
-- [Composing L4 with AI](llm-integration/composing-l4-with-ai.md)
+- [Manage rules in git and CI](getting-started/version-control-for-rules.md)

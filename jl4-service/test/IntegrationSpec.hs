@@ -23,10 +23,12 @@ import L4.FunctionSchema (Parameters (..))
 import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
-import Control.Exception (try)
-import Data.Foldable (toList)
+import Control.Exception (bracket, try)
+import System.Timeout (timeout)
+import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import qualified Codec.Archive.Zip as Zip
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
@@ -44,12 +46,14 @@ import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
-import System.Directory (removeDirectoryRecursive, removePathForcibly, doesDirectoryExist, doesFileExist)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getTemporaryDirectory, removeDirectoryRecursive, removePathForcibly, withCurrentDirectory)
+import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
 import System.IO.Error (isPermissionError)
+import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -232,6 +236,257 @@ spec = describe "integration" do
               Map.lookup "extra_provided" fieldMap `shouldBe` Just (FnLitBool False)
             other ->
               expectationFailure ("Expected FnObject with named fields, got: " <> show other)
+
+    -- A synonym for a MAYBE is a MAYBE: the service read only a type written
+    -- as MAYBE itself, so a value given for `MaybeYear` reached the rule as a
+    -- bare number ("reached a CONSIDER that has no branch for it") and a null
+    -- or an omitted one was "missing required parameter", both a 422.
+    it "reads a synonym for a MAYBE as a MAYBE: a value, a null and an omitted one" do
+      withServiceFromSources "maybe-synonym" [("synonym.l4", synonymParamJL4)] \baseUrl mgr ->
+        forM_ ["year maybe", "optional number" :: Text] \fn -> do
+          let answer args = do
+                resp <- evalFunction baseUrl mgr "maybe-synonym" fn
+                  (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+                pure ( statusCode' resp
+                     , case Aeson.decode (responseBody resp) of
+                         Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                         _ -> Nothing )
+          answer [ "y" Aeson..= (2020 :: Int) ] >>= (`shouldBe` (200, Just (FnLitInt 2021)))
+          answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
+          answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
+
+    -- Three kinds of request go through the generated wrapper and not the direct
+    -- path: an input whose value is `{}`, a batch case with a `null`, and an MCP
+    -- call with a `null`. The wrapper read the head of an input's type only, so
+    -- it took a synonym for a MAYBE as a required input and refused the null as
+    -- "missing required parameter" (for `Optional OF NUMBER`, with a parser
+    -- error). `plain maybe` is the control that always answered.
+    describe "a synonym for a MAYBE, on the wrapper path" do
+      let deployId = "maybe-synonym-wrapper"
+          withSynonyms = withServiceFromSources deployId [("synonym.l4", synonymParamJL4)]
+          pathOf fn = Text.unpack (Text.replace " " "%20" fn)
+      forM_ ["year maybe", "optional number", "plain maybe" :: Text] \fn -> describe (Text.unpack fn) do
+        it "answers a {} value as NOTHING" do
+          withSynonyms \baseUrl mgr -> do
+            resp <- evalFunction baseUrl mgr deployId fn
+              (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= Aeson.object [] ] ])
+            let value = case Aeson.decode (responseBody resp) of
+                  Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                  _ -> Nothing
+            (statusCode' resp, value) `shouldBe` (200, Just (FnLitInt 0))
+        it "answers a null, a {} and a left-out input in a batch case as NOTHING" do
+          withSynonyms \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> pathOf fn <> "/evaluation/batch")
+              (Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object [ "@id" Aeson..= (1 :: Int), "y" Aeson..= (2020 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (2 :: Int), "y" Aeson..= Aeson.Null ]
+                    , Aeson.object [ "@id" Aeson..= (3 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (4 :: Int), "y" Aeson..= Aeson.object [] ]
+                    ]
+                ])
+            resp <- httpLbs req mgr
+            statusCode' resp `shouldBe` 200
+            fmap (map (\c -> (c.outcome, Map.lookup "value" c.attributes)) . (.cases))
+                (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+              `shouldBe` Just [ (CaseAnswered, Just (FnLitInt 2021))
+                              , (CaseAnswered, Just (FnLitInt 0))
+                              , (CaseAnswered, Just (FnLitInt 0))
+                              , (CaseAnswered, Just (FnLitInt 0)) ]
+        it "answers a null, a {} and a left-out input in an MCP tool call as NOTHING" do
+          withSynonyms \baseUrl mgr ->
+            forM_ ([ ("2020", Aeson.object [ "y" Aeson..= (2020 :: Int) ], "2021")
+                   , ("null", Aeson.object [ "y" Aeson..= Aeson.Null ], "0")
+                   , ("{}", Aeson.object [ "y" Aeson..= Aeson.object [] ], "0")
+                   , ("left out", Aeson.object [], "0") ] :: [(Text, Aeson.Value, Text)]) \(what, args, expected) -> do
+              req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= Text.replace " " "-" fn
+                    , "arguments" Aeson..= args
+                    ]
+                ]
+              resp <- httpLbs req mgr
+              let answered = case mcpToolText (responseBody resp) of
+                    Just (isErr, text) -> Just (isErr, ("\"value\":" <> expected) `Text.isInfixOf` text)
+                    Nothing -> Nothing
+              (what, statusCode' resp, answered) `shouldBe` (what, 200, Just (False, True))
+
+    -- Every kind these examples cover is answered on the wrapper path. The JSON
+    -- decoder expands a synonym for a record, an enum or a DATE, which is why
+    -- those answer (stop it expanding and only those examples fail); a synonym for
+    -- a LIST, a TIME, a DATETIME or a BOOLEAN answers because the wrapper leaves
+    -- its name alone. Only a synonym for a MAYBE is expanded in the wrapper
+    -- ('Backend.Jl4.maybeSynonymHeads', pinned above). Expanding every head would
+    -- break the LIST, TIME and DATETIME ones, because the wrapper fails each
+    -- written out, so these examples fail if a later change does that.
+    -- Each request below has a spare MAYBE input, pad, that is @null@ or @{}@,
+    -- which sends it through the wrapper. `plain point x` and `plain deadline
+    -- year` write a record and a DATE out: the control.
+    describe "a synonym at the head of an input's type, on the wrapper path" do
+      let deployId = "wrapper-synonym"
+          withSynonyms = withServiceFromSources deployId [("synonym.l4", synonymWrapperJL4)]
+          pathOf fn = Text.unpack (Text.replace " " "%20" fn)
+          recordInput = ("p" :: Aeson.Key.Key, Aeson.object [ "x" Aeson..= (7 :: Int) ])
+          enumInput = ("h" :: Aeson.Key.Key, Aeson.String "Green")
+          dateInput = ("d" :: Aeson.Key.Key, Aeson.String "2020-06-15")
+          listInput = ("ys" :: Aeson.Key.Key, Aeson.toJSON [7, 8 :: Int])
+          timeInput = ("t" :: Aeson.Key.Key, Aeson.String "12:30:00")
+          datetimeInput = ("dt" :: Aeson.Key.Key, Aeson.String "2020-06-15T12:30:00Z")
+      forM_ ([ ("point x", recordInput, 7), ("plain point x", recordInput, 7)
+             , ("hue code", enumInput, 2)
+             , ("deadline year", dateInput, 2020), ("plain deadline year", dateInput, 2020)
+             , ("first year", listInput, 7)
+             , ("clock code", timeInput, 5)
+             , ("stamp code", datetimeInput, 6) ]
+              :: [(Text, (Aeson.Key.Key, Aeson.Value), Int)]) \(fn, (name, input), expected) -> describe (Text.unpack fn) do
+        it "answers a {} for the spare input" do
+          withSynonyms \baseUrl mgr -> do
+            resp <- evalFunction baseUrl mgr deployId fn
+              (Aeson.object [ "arguments" Aeson..= Aeson.object [ name Aeson..= input, "pad" Aeson..= Aeson.object [] ] ])
+            let value = case Aeson.decode (responseBody resp) of
+                  Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                  _ -> Nothing
+            (statusCode' resp, value) `shouldBe` (200, Just (FnLitInt (fromIntegral expected)))
+        it "answers a batch case with a null for the spare input" do
+          withSynonyms \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> pathOf fn <> "/evaluation/batch")
+              (Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object [ "@id" Aeson..= (1 :: Int), name Aeson..= input, "pad" Aeson..= Aeson.Null ]
+                    , Aeson.object [ "@id" Aeson..= (2 :: Int), name Aeson..= input, "pad" Aeson..= (1 :: Int) ]
+                    ]
+                ])
+            resp <- httpLbs req mgr
+            statusCode' resp `shouldBe` 200
+            fmap (map (\c -> (c.outcome, Map.lookup "value" c.attributes)) . (.cases))
+                (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+              `shouldBe` Just (replicate 2 (CaseAnswered, Just (FnLitInt (fromIntegral expected))))
+        it "answers an MCP tool call with a null for the spare input" do
+          withSynonyms \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+              [ "jsonrpc" Aeson..= ("2.0" :: Text)
+              , "id" Aeson..= (1 :: Int)
+              , "method" Aeson..= ("tools/call" :: Text)
+              , "params" Aeson..= Aeson.object
+                  [ "name" Aeson..= Text.replace " " "-" fn
+                  , "arguments" Aeson..= Aeson.object [ name Aeson..= input, "pad" Aeson..= Aeson.Null ]
+                  ]
+              ]
+            resp <- httpLbs req mgr
+            let answered = case mcpToolText (responseBody resp) of
+                  Just (isErr, text) -> Just (isErr, ("\"value\":" <> Text.pack (show expected)) `Text.isInfixOf` text)
+                  Nothing -> Nothing
+            (statusCode' resp, answered) `shouldBe` (200, Just (False, True))
+
+    -- A MAYBE input followed by another input, on the wrapper path. The wrapper
+    -- wrote its input record with a leading comma on each field after the first,
+    -- which does not parse after a field whose type is an application
+    -- (`MAYBE OF NUMBER`), so a function with such an input before another input
+    -- failed with a parser error on every request that takes the wrapper: a `{}`
+    -- value, a batch case or an MCP call with a `null`, and every request to a
+    -- DEONTIC function. `syn then number` and `syn then maybe` take a synonym for
+    -- a MAYBE first, `plain maybe then number` a MAYBE NUMBER written out first,
+    -- and `number then syn` takes the synonym last: the control.
+    describe "a MAYBE input followed by another input, on the wrapper path" do
+      let deployId = "wrapper-then-input"
+          withFns = withServiceFromSources deployId [("then-input.l4", inputThenInputJL4)]
+          valueOf resp = case Aeson.decode (responseBody resp) of
+            Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+            _ -> Nothing
+      forM_ ["syn then number", "syn then maybe", "plain maybe then number", "number then syn" :: Text] \fn -> describe (Text.unpack fn) do
+        it "answers a {} for the MAYBE input" do
+          withFns \baseUrl mgr -> do
+            resp <- evalFunction baseUrl mgr deployId fn
+              (Aeson.object [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= Aeson.object [], "z" Aeson..= (3 :: Int) ] ])
+            (statusCode' resp, valueOf resp) `shouldBe` (200, Just (FnLitInt 3))
+        it "answers a batch case with a null for the MAYBE input" do
+          withFns \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack (Text.replace " " "%20" fn) <> "/evaluation/batch")
+              (Aeson.object
+                [ "outcomes" Aeson..= ([] :: [Text])
+                , "cases" Aeson..=
+                    [ Aeson.object [ "@id" Aeson..= (1 :: Int), "y" Aeson..= Aeson.Null, "z" Aeson..= (3 :: Int) ]
+                    , Aeson.object [ "@id" Aeson..= (2 :: Int), "y" Aeson..= (2020 :: Int), "z" Aeson..= (3 :: Int) ]
+                    ]
+                ])
+            resp <- httpLbs req mgr
+            statusCode' resp `shouldBe` 200
+            fmap (map (\c -> (c.outcome, Map.lookup "value" c.attributes)) . (.cases))
+                (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
+              `shouldBe` Just [ (CaseAnswered, Just (FnLitInt 3)), (CaseAnswered, Just (FnLitInt 2023)) ]
+        it "answers an MCP tool call with a null for the MAYBE input" do
+          withFns \baseUrl mgr -> do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+              [ "jsonrpc" Aeson..= ("2.0" :: Text)
+              , "id" Aeson..= (1 :: Int)
+              , "method" Aeson..= ("tools/call" :: Text)
+              , "params" Aeson..= Aeson.object
+                  [ "name" Aeson..= Text.replace " " "-" fn
+                  , "arguments" Aeson..= Aeson.object [ "y" Aeson..= Aeson.Null, "z" Aeson..= (3 :: Int) ]
+                  ]
+              ]
+            resp <- httpLbs req mgr
+            let answered = case mcpToolText (responseBody resp) of
+                  Just (isErr, text) -> Just (isErr, "\"value\":3" `Text.isInfixOf` text)
+                  Nothing -> Nothing
+            (statusCode' resp, answered) `shouldBe` (200, Just (False, True))
+      forM_ ["syn contract", "plain contract", "control contract" :: Text] \fn -> describe (Text.unpack fn) do
+        forM_ [("a value", Aeson.Number 2020), ("a null", Aeson.Null)] \(what, y) ->
+          it ("answers " <> what <> " for the MAYBE input of a DEONTIC function") do
+            withFns \baseUrl mgr -> do
+              resp <- evalFunction baseUrl mgr deployId fn
+                (Aeson.object
+                  [ "arguments" Aeson..= Aeson.object [ "y" Aeson..= y, "z" Aeson..= (3 :: Int) ]
+                  , "startTime" Aeson..= (0 :: Int)
+                  , "events" Aeson..= ([] :: [Aeson.Value])
+                  ])
+              assertSuccess resp \r -> case Map.lookup "value" r.fnResult of
+                Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+                  Map.lookup "modal" (Map.fromList fields) `shouldBe` Just (FnLitString "MUST")
+                other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    -- A synonym for a BOOLEAN answers when the host has no copy of the standard
+    -- library in the places this example controls: a bundle's import of the
+    -- standard library is served from the one built into the service
+    -- (StdlibResolutionSpec). So this passes whatever the host holds, and with
+    -- every head expanded too: it pins the answer, and does not tell the rules
+    -- apart, and it fails in no state of `Backend/Jl4.hs`. Around its call it drops
+    -- JL4_LIBRARY_PATH and puts XDG_DATA_HOME and the working directory in an empty
+    -- directory; the path beside the executable, which the service also searches,
+    -- it does not touch.
+    it "answers a synonym for a BOOLEAN when the host has no library to import" do
+      withNoLibraryOnTheHost $
+        withServiceFromSources "wrapper-synonym-bool" [("synonym.l4", synonymWrapperJL4)] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "wrapper-synonym-bool" "flag code"
+            (Aeson.object [ "arguments" Aeson..= Aeson.object [ "b" Aeson..= True, "pad" Aeson..= Aeson.object [] ] ])
+          let value = case Aeson.decode (responseBody resp) of
+                Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                _ -> Nothing
+          (statusCode' resp, value) `shouldBe` (200, Just (FnLitInt 1))
+
+    -- The same fault showed on a synonym for a record, an enum and a list: the
+    -- service looked for each by the synonym's own name, and answered
+    -- "FnObject but expected type is not a known record", "check equality on
+    -- types that do not support it" and "FnArray but expected type is not LIST".
+    it "reads a synonym for a record, an enum and a list as the type it stands for" do
+      withServiceFromSources "kinds-synonym" [("kinds.l4", synonymKindsJL4)] \baseUrl mgr -> do
+        let answer fn args = do
+              resp <- evalFunction baseUrl mgr "kinds-synonym" fn
+                (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+              pure ( statusCode' resp
+                   , case Aeson.decode (responseBody resp) of
+                       Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                       _ -> Nothing )
+        answer "point x" [ "p" Aeson..= Aeson.object [ "x" Aeson..= (5 :: Int) ] ]
+          >>= (`shouldBe` (200, Just (FnLitInt 5)))
+        answer "hue code" [ "h" Aeson..= ("Red" :: Text) ] >>= (`shouldBe` (200, Just (FnLitInt 1)))
+        answer "hue code" [ "h" Aeson..= ("Green" :: Text) ] >>= (`shouldBe` (200, Just (FnLitInt 2)))
+        answer "first year" [ "ys" Aeson..= [2020, 2021 :: Int] ] >>= (`shouldBe` (200, Just (FnLitInt 2020)))
 
     it "MAYBE parameter is not in the required list of the schema" do
       withServiceFromSources "maybe-schema" [("maybe.l4", maybeParamJL4)] \baseUrl mgr -> do
@@ -679,6 +934,231 @@ spec = describe "integration" do
         resp <- queryPlan' baseUrl mgr "qp-404" "no_such_fn"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 404
+
+    -- A rule written as DECIDE clauses is the same rule as the CONSIDER it
+    -- stands for, so its plan, with the ladder the plan carries, must be the
+    -- same: the same inputs, the same questions, the same atoms. Compared
+    -- whole, modulo the numbering of nodes ('withoutNodeIds'), so that a clause
+    -- group drawn as one leaf that asks nothing (or one that names a generated
+    -- binding) fails. This ladder draws a CONSIDER as one box, whose atomId
+    -- hashes its printed text, so the hand-written forms below are written as
+    -- the CONSIDER the clauses read through to, nested where a table's rows are.
+    describe "a BOOLEAN rule written as DECIDE clauses" do
+      let noArguments = Aeson.object ["arguments" Aeson..= Aeson.object []]
+          sameAsHandWritten :: Text -> Text -> Text -> SpecWith ()
+          sameAsHandWritten name clauses hand =
+            it (Text.unpack ("has the plan and the ladder of its hand-written CONSIDER: " <> name)) do
+              withServiceFromSources ("cg-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hw-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  qpC <- queryPlan' baseUrl mgr ("cg-" <> name) "rule" noArguments
+                  qpH <- queryPlan' baseUrl' mgr' ("hw-" <> name) "rule" noArguments
+                  statusCode' qpC `shouldBe` 200
+                  statusCode' qpH `shouldBe` 200
+                  let planC = withoutNodeIds <$> (Aeson.decode (responseBody qpC) :: Maybe Aeson.Value)
+                      planH = withoutNodeIds <$> (Aeson.decode (responseBody qpH) :: Maybe Aeson.Value)
+                  planC `shouldBe` planH
+                  -- the plan asks something
+                  lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+                  -- and no name the desugarer made up reaches a label, an ask or an input
+                  let text = Text.pack (show (responseBody qpC))
+                  for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
+                    (g, g `Text.isInfixOf` text) `shouldBe` (g, False)
+
+          -- The plans above are compared whole, atomIds included. This compares
+          -- the atomIds alone, so that a failure names them: the ladder's, and the
+          -- plan's. The two are not compared with each other: here the plan names
+          -- an atom's inputs by their labels and the ladder by their numbers, so
+          -- they differ for every rule with inputs, however it is written.
+          sameAtomIds :: Text -> Text -> Text -> SpecWith ()
+          sameAtomIds name clauses hand =
+            it (Text.unpack ("names every atom as its hand-written CONSIDER does: " <> name)) do
+              withServiceFromSources ("cga-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hwa-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  qpC <- queryPlan' baseUrl mgr ("cga-" <> name) "rule" noArguments
+                  qpH <- queryPlan' baseUrl' mgr' ("hwa-" <> name) "rule" noArguments
+                  for_ [qpC, qpH] \r -> statusCode' r `shouldBe` 200
+                  let ladderIds r = case lookupKey "ladder" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object l) | Just (Aeson.Object fd) <- Aeson.KeyMap.lookup "funDecl" l ->
+                          List.sort (List.nub (ladderLeafField "atomId" fd))
+                        _ -> []
+                      planIds r = case lookupKey "impactByAtomId" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object m) -> List.sort (map Aeson.Key.toText (Aeson.KeyMap.keys m))
+                        _ -> []
+                  -- both are non-empty, so the equalities below mean something
+                  ladderIds qpC `shouldSatisfy` (not . null)
+                  planIds qpC `shouldSatisfy` (not . null)
+                  ladderIds qpC `shouldBe` ladderIds qpH
+                  planIds qpC `shouldBe` planIds qpH
+
+      sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAsHandWritten "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAsHandWritten "single" clauseGroupSingleJL4 handSingleJL4
+      -- The hand-written CONSIDER without a GIVETH is itself refused (its type is an
+      -- inference variable the service never resolves), so the group without one is
+      -- compared with the hand-written rule that has one.
+      sameAsHandWritten "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAsHandWritten "call" clauseGroupCallJL4 handCallJL4
+      -- Rows that share an earlier column: the desugarer tests it again in every
+      -- later clause, and the ladder reads each test with what the branches
+      -- around it already decided.
+      sameAsHandWritten "table" clauseTableJL4 handTableJL4
+      sameAsHandWritten "table2" clauseTable2JL4 handTable2JL4
+      -- A last clause whose pattern is a new name is the OTHERWISE.
+      sameAsHandWritten "newname" clauseNewNameJL4 handNewNameJL4
+
+      sameAtomIds "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAtomIds "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAtomIds "single" clauseGroupSingleJL4 handSingleJL4
+      sameAtomIds "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAtomIds "call" clauseGroupCallJL4 handCallJL4
+      sameAtomIds "table" clauseTableJL4 handTableJL4
+      sameAtomIds "table2" clauseTable2JL4 handTable2JL4
+      sameAtomIds "newname" clauseNewNameJL4 handNewNameJL4
+
+      -- A restart compiles the stored sources again, as a deploy does (#666), so
+      -- a clause group is planned after one as it was when deployed. Before #666
+      -- a restart read a cache that kept no type for the generated nodes, and
+      -- /query-plan answered 400 for every boolean rule, written as clauses or by
+      -- hand. The fresh side must answer 200 with a body, so that two empty
+      -- answers cannot pass for equal.
+      for_ [ ("enum", clauseGroupEnumJL4), ("mixed", clauseGroupMixedJL4), ("single", clauseGroupSingleJL4)
+           , ("nogiveth", clauseGroupNoGivethJL4), ("call", clauseGroupCallJL4), ("table", clauseTableJL4)
+           , ("table2", clauseTable2JL4), ("newname", clauseNewNameJL4) ] \(name, src) ->
+        it ("restarted: is planned as it was before the restart: " <> name) do
+          let probe baseUrl mgr deployId =
+                answerOf baseUrl deployId <$> queryPlan' baseUrl mgr deployId "rule" noArguments
+          (fresh, restarted) <- beforeAndAfterRestart ("cg-restart-" <> Text.pack name) [("rule.l4", src)] probe
+          fst fresh `shouldBe` 200
+          snd fresh `shouldSatisfy` Maybe.isJust
+          restarted `shouldBe` fresh
+
+      -- A clause whose result is a LET the drafter wrote: the group around it is
+      -- read through, and the LET inside the clause stays as written.
+      it "answers a clause group whose clause result is a LET" do
+        withServiceFromSources "cg-let-result" [("rule.l4", clauseGroupLetResultJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "cg-let-result" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+          -- the colour is asked: the group's CONSIDER is read through
+          lookupArrayLength "inputs" (decodeObject (responseBody resp)) `shouldSatisfy` maybe False (> 0)
+
+      -- Only the LETs the desugarer generated are read through. A LET the
+      -- drafter wrote stays as written, so a chain of LETs that each use the one
+      -- before twice (which doubles for each LET when written out) is the one
+      -- atom it always was, however long.
+      it "answers a LET the drafter wrote as written" do
+        withServiceFromSources "let-enum" [("rule.l4", letEnumJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "let-enum" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "LET"
+      for_ [3 :: Int, 7] \n ->
+        it ("answers a chain of " <> show n <> " doubling LETs fast, as written") do
+          withServiceFromSources "chain" [("rule.l4", letChainJL4 n)] \baseUrl mgr -> do
+            resp <- queryPlan' baseUrl mgr "chain" "rule" noArguments
+            statusCode' resp `shouldBe` 200
+            LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "LET"
+
+      -- Clauses whose CONSIDER, written out, would be more than 20,000 parts are
+      -- not read through, and not drawn as the generated LETs either (one leaf
+      -- that asks nothing): the answer says why.
+      it "refuses clauses that come to more than 20000 parts, naming why" do
+        withServiceFromSources "long-rows" [("rule.l4", longClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-rows" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
+      it "says long clauses that return a number are not boolean, not that they are too long" do
+        withServiceFromSources "long-num" [("rule.l4", longNumberClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-num" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "returns a boolean"
+
+      -- A group whose first clause names each of its inputs as the GIVEN does has
+      -- nothing to read through: the clauses after it are never reached, and its
+      -- body is that clause's result, as a rule written without clauses has it.
+      -- `main` plans such a rule however long or large its result, and so does the
+      -- service. The service simplifies the ladder, and a disjunction of
+      -- conjunctions rewritten into conjunctive normal form grows past 300 boxes
+      -- at six pairs of inputs (449 boxes).
+      it "catch-all: answers a group whose first clause names each input as the GIVEN does, simplified to 193 boxes" do
+        withServiceFromSources "dnf-5" [("rule.l4", dnfClauseJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "dnf-5" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "catch-all: answers such a group whose simplified ladder is 449 boxes, as it answers the rule written without clauses" do
+        withServiceFromSources "dnf-6" [("rule.l4", dnfClauseJL4 6)] \baseUrl mgr -> do
+          withServiceFromSources "hand-dnf-6" [("rule.l4", handDnfJL4 6)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "dnf-6" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-dnf-6" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldBe` planOf qpH
+            lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+      it "catch-all: answers such a group whose result is more than 20000 parts long, as it answers the rule written without clauses" do
+        withServiceFromSources "catchall-huge" [("rule.l4", catchAllHugeJL4)] \baseUrl mgr -> do
+          withServiceFromSources "hand-catchall-huge" [("rule.l4", handCatchAllHugeJL4)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "catchall-huge" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-catchall-huge" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldSatisfy` Maybe.isJust
+            planOf qpC `shouldBe` planOf qpH
+
+      -- A first clause that matches every input through a NEW name is not that: it
+      -- is a test the desugarer generates, with the clauses after it as the other
+      -- answer, so the group is read through and limited like any other. `main`
+      -- answers such a group with 400 "Can only visualize, as a ladder diagram, a
+      -- DECIDE that returns a boolean" (it cannot plan a clause group at all), so
+      -- these say what this branch answers; they pass with and without the guard
+      -- that exempts the own-name first clause.
+      it "new name: refuses a group whose first clause gives an input a new name when its simplified ladder is more than 300 boxes" do
+        withServiceFromSources "newname-dnf-6" [("rule.l4", newNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
+      -- `(EXACTLY n)` for the input's own name is not exempt either: only the bare
+      -- name and `_` are, so the desugarer tests it and the group is read through.
+      -- Six pairs of it are planned; a first clause of 22,000 parts is refused. (I
+      -- infer it reads through to one CONSIDER, which is one box, so that the
+      -- 300-box limit is not reached; that is not drawn.)
+      it "EXACTLY its own name: plans a group of six pairs, which reads through to one CONSIDER" do
+        withServiceFromSources "exactly-dnf-6" [("rule.l4", exactlyNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "EXACTLY its own name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "exactly-huge" [("rule.l4", exactlyHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      -- A table of optional inputs taken apart with `JUST`, with new names for the
+      -- others, was refused only after a minute (24 clauses): see the same-named
+      -- block in ClauseGroupLadderSpec. The wait is far above what it takes now
+      -- (about a second) and far below the minute.
+      it "new names: refuses a table of 24 clauses of optional inputs taken apart with JUST within seconds" do
+        withServiceFromSources "maybe-new-24" [("rule.l4", maybeTableJL4 False 24)] \baseUrl mgr -> do
+          answer <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-24" "rule" noArguments)
+          case answer of
+            Nothing -> expectationFailure "no answer within 8 seconds"
+            Just resp -> do
+              statusCode' resp `shouldBe` 400
+              LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      it "new names: still plans the same table at 8 clauses, as it plans it with the GIVEN's names" do
+        withServiceFromSources "maybe-new-8" [("rule.l4", maybeTableJL4 False 8)] \baseUrl mgr -> do
+          withServiceFromSources "maybe-own-8" [("rule.l4", maybeTableJL4 True 8)] \baseUrl' mgr' -> do
+            qpN <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-8" "rule" noArguments)
+            qpO <- timeout 8_000_000 (queryPlan' baseUrl' mgr' "maybe-own-8" "rule" noArguments)
+            fmap statusCode' qpN `shouldBe` Just 200
+            fmap statusCode' qpO `shouldBe` Just 200
+      it "new name: answers such a group when its simplified ladder is less than 300 boxes" do
+        withServiceFromSources "newname-dnf-5" [("rule.l4", newNameDnfJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-5" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "new name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "newname-huge" [("rule.l4", newNameHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
 
   -- A deployment outlives the process that compiled it. On restart the service
   -- compiles the stored sources again, as a deploy does. Everything below asks
@@ -2123,6 +2603,33 @@ assertNoClauseForBlue resp = case Aeson.decode (responseBody resp) :: Maybe Simp
   Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf noClauseForBlue
   other -> expectationFailure ("Expected " <> show noClauseForBlue <> ", got: " <> show other)
 
+-- | Run an action with no copy of the standard library in the places a test can
+-- control, and put everything back afterwards: JL4_LIBRARY_PATH is dropped,
+-- XDG_DATA_HOME points at an empty directory (the service looks in its
+-- jl4/libraries), and the working directory is that empty directory too. The
+-- path beside the executable is not touched. CI exports JL4_LIBRARY_PATH for the
+-- whole run, and a developer's host can hold a library under
+-- ~/.local/share/jl4/libraries, so either would hide a wrapper that reached for
+-- the host's library.
+withNoLibraryOnTheHost :: IO a -> IO a
+withNoLibraryOnTheHost act = bracket acquire release (\(_, _, empty) -> withCurrentDirectory empty act)
+  where
+    acquire = do
+      savedLibrary <- lookupEnv "JL4_LIBRARY_PATH"
+      savedXdg <- lookupEnv "XDG_DATA_HOME"
+      tmp <- getTemporaryDirectory
+      stamp <- (floor . (* 1000000)) <$> getPOSIXTime :: IO Integer
+      let empty = tmp </> ("jl4-service-no-library-" <> show stamp)
+      createDirectoryIfMissing True empty
+      unsetEnv "JL4_LIBRARY_PATH"
+      setEnv "XDG_DATA_HOME" empty
+      pure (savedLibrary, savedXdg, empty)
+    release (savedLibrary, savedXdg, empty) = do
+      restore "JL4_LIBRARY_PATH" savedLibrary
+      restore "XDG_DATA_HOME" savedXdg
+      removeDirectoryRecursive empty
+    restore name = maybe (unsetEnv name) (setEnv name)
+
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
 -- | A clause group published with @export, under the given signature lines
@@ -2734,6 +3241,19 @@ decodeObject = Aeson.decode
 lookupKey :: Text -> Maybe Aeson.Object -> Maybe Aeson.Value
 lookupKey k = (>>= Aeson.KeyMap.lookup (Aeson.Key.fromText k))
 
+-- | The text of an MCP tool call's answer, and whether the call was an error.
+mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
+mcpToolText body = do
+  Aeson.Object o <- Aeson.decode body
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  Aeson.Object c : _ <- pure (toList cs)
+  Aeson.String t <- Aeson.KeyMap.lookup "text" c
+  let isErr = case Aeson.KeyMap.lookup "isError" r of
+        Just (Aeson.Bool b) -> b
+        _                   -> False
+  pure (isErr, t)
+
 -- | Look up a JSON array in a Maybe Object, returning its length.
 lookupArrayLength :: Text -> Maybe Aeson.Object -> Maybe Int
 lookupArrayLength k obj = do
@@ -2764,3 +3284,32 @@ testOptions = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   }
+
+-- | A JSON answer without the numbers the visualizer gave its nodes: the
+-- @id@ and @unique@ fields, the per-node @impact@ table keyed by them, and the
+-- document version. What is left is the shape of the answer and its atom ids.
+withoutNodeIds :: Aeson.Value -> Aeson.Value
+withoutNodeIds = \case
+  Aeson.Object o ->
+    Aeson.Object (Aeson.KeyMap.map withoutNodeIds
+      (Aeson.KeyMap.filterWithKey (\k _ -> k `notElem` ["id", "unique", "impact", "verDocId"]) o))
+  Aeson.Array xs -> Aeson.Array (fmap withoutNodeIds xs)
+  v -> v
+
+-- | A field of every node of a ladder's body: the text if it is a string, or
+-- the @label@ if it is a name.
+ladderLeafField :: Text -> Aeson.Object -> [Text]
+ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
+ where
+  go :: Aeson.Value -> [Text]
+  go (Aeson.Object o) =
+    let here = case Aeson.KeyMap.lookup (Aeson.Key.fromText field) o of
+          Just (Aeson.String t) -> [t]
+          Just (Aeson.Object nm) -> case Aeson.KeyMap.lookup "label" nm of
+            Just (Aeson.String t) -> [t]
+            _ -> []
+          _ -> []
+        kids = concatMap go (Aeson.KeyMap.elems o)
+     in here <> kids
+  go (Aeson.Array xs) = concatMap go (toList xs)
+  go _ = []

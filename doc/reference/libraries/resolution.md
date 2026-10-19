@@ -1,4 +1,6 @@
-# Library Resolution: How `IMPORT` Finds Files, and How to Work with Dev vs Prod Preludes
+# How IMPORT finds libraries
+
+This page is for people who run L4 tooling or develop the standard library. For how to write an `IMPORT`, see [IMPORT](README.md#import).
 
 When an L4 file says `IMPORT prelude`, the toolchain has to find _a_ file
 called `prelude` — but on a developer's machine there may be **several**: one
@@ -10,9 +12,6 @@ store, one shipped inside the VSCode extension. This page explains, in order:
 3. [how to read the resolver's logs and warnings](#reading-the-resolvers-output)
 4. [the embed-staleness gotcha](#the-embed-staleness-gotcha) (why `cabal build`
    doesn't pick up your prelude edit)
-5. [the shadow saga](#the-shadow-saga-how-we-got-here) — the two incidents that
-   forced this design, preserved so future devs understand _why_ the rules are
-   what they are
 
 An as-built description of the code behind all of this lives in
 `specs/as-built/import-resolution.md` in the repository.
@@ -131,10 +130,10 @@ freshly-edited prelude loses to the stale embed on every bare `IMPORT`.
 
 Do **not** try to accomplish this with symlinks in
 `~/.local/share/jl4/libraries/` pointing into a checkout. That was the old
-convenience and it is exactly what caused the incidents below: with several
+convenience and it is what this ordering guards against: with several
 worktrees, a machine-global symlink points at _one_ of them and silently lies
-to all the others. Since the B′ reordering it also no longer works for stdlib
-modules (the embed outranks it) — the env var is both safer and the only
+to all the others. It also no longer works for stdlib modules, because the
+embedded copy outranks the XDG store; the env var is both safer and the only
 supported mechanism.
 
 ### I'm running the test suites
@@ -272,71 +271,3 @@ in; this page does not claim to have measured those.
 This is documented at the code site too
 (`jl4-core/src/L4/API/EmbeddedLibraries/TH.hs`) and in
 `jl4-core/libraries/README.md`.
-
----
-
-## The shadow saga (how we got here)
-
-Preserved so the next generation understands why the ordering is the way it
-is, and why the warning exists.
-
-**The setup (early 2026).** Two well-intentioned commits gave a deployed
-binary ways to find the stdlib without a checkout: the VSCode bundle path
-(`8c796c24`, 2026-01-10) and the XDG + env-var search (`7d763367`,
-2026-02-05). Both filesystem tiers were placed _above_ the embedded copy,
-which became the last resort. Separately, on dev machines it became customary
-to symlink `~/.local/share/jl4/libraries/*.l4` into a checkout so an installed
-binary would "just work" against the working tree.
-
-**The trap.** This repository's development convention uses many parallel git
-worktrees. A machine-global symlink points into exactly _one_ of them. In
-every other worktree, a bare `IMPORT prelude` (no project-local copy — the
-normal case for corpus files) fell through root and importer-relative tiers
-and landed on the XDG symlink: the resolver loaded **another checkout's
-prelude**, resolved successfully, and said nothing. The log line that did
-exist printed the symlink path, not its target, was emitted at a priority the
-CLI filtered out — and the parser-hints resolver (mixfix) logged nothing at
-all.
-
-**Incident 1 (2026-07).** During the CONSIDER-exhaustiveness work, library
-changes appeared to have no effect; the XDG store was found to be shadowing
-the worktree and was _moved aside by hand_ (`libraries.stale-2026-07-03`). A
-hand-move fixes one machine once; the next worktree recreates the hazard.
-
-**Incident 2 (2026-07-18).** A session added `@infixl` fixity annotations to
-its worktree's `prelude.l4`. With `JL4_LIBRARY_PATH` unset, `IMPORT prelude`
-resolved via the XDG symlink to the main checkout's un-annotated prelude. The
-annotations "didn't take effect" — hours went into debugging the parser and
-the fixity machinery, which were both fine. The binary had simply never
-loaded the file containing the annotations.
-
-**The diagnosis.** Three compounding failures:
-
-1. **Ordering** — ambient machine-global paths outranked the binary's own
-   hermetic embedded copy, so global state could silently override it.
-2. **Silence** — one of the two resolvers logged nothing, the other logged at
-   a filtered priority, and neither dereferenced symlinks.
-3. **Duplication** — parser-hint resolution and import resolution were
-   copy-pasted twins that could drift into loading _different_ files for the
-   same import.
-
-**The fix (2026-07-19).** Implemented in `jl4-lsp/src/LSP/L4/Rules.hs`:
-
-- **One resolver** (`resolveImportShared`) shared by both rules — parse and
-  typecheck can never disagree about which file a module is.
-- **The B′ reorder** — embedded moved above XDG/bundle; project-scoped tiers
-  and the env override kept above embedded, so every _intentional_ override
-  still works. (The fully-hermetic alternative — nothing off-binary without
-  an env var — was rejected because project-local overrides are a real
-  affordance, not an accident.)
-- **The shadow warning** — differing copies are named, symlinks dereferenced,
-  the winner marked, once per session. Identical copies stay silent, so a
-  benign mirror doesn't nag.
-- **Visible logging** — winner + candidate table as shown above; the CLI
-  passes Warning-level resolution lines through to stderr.
-
-**The moral.** If a resolver consults global state, the global state _will_
-eventually be wrong, and the failure will be attributed to whatever code the
-victim happened to be editing. Hermetic-by-default with conscious, visible
-overrides — and a loud message when two sources disagree — is the only
-configuration that fails debuggably.

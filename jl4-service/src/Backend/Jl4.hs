@@ -406,6 +406,8 @@ data ModuleInfo = ModuleInfo
     -- ^ record type unique -> (type-constructor ref, [(field name, field type)])
   , miEnumVariants :: Map Unique [(Text, Resolved)]
     -- ^ enum type unique -> [(variant name, variant constructor ref)]
+  , miSynonyms     :: Map Unique ([Unique], Type' Resolved)
+    -- ^ synonym type unique -> (its parameters, its body)
   }
 
 -- | Flatten a module's own top-level + nested DECLAREs. Does not
@@ -425,6 +427,9 @@ buildModuleInfo :: [Declare Resolved] -> ModuleInfo
 buildModuleInfo decls = ModuleInfo
   { miRecords      = Map.fromList [ r | Just r <- map recordFor decls ]
   , miEnumVariants = Map.fromList [ r | Just r <- map enumFor   decls ]
+  , miSynonyms     = Map.fromList
+      [ (getUnique tyName, (map getUnique params, body))
+      | MkDeclare _ _ (MkAppForm _ tyName params _) (SynonymDecl _ body) <- decls ]
   }
   where
 
@@ -456,6 +461,52 @@ stripList :: Type' Resolved -> Maybe (Type' Resolved)
 stripList (TyApp _ name [inner]) | getUnique name == TypeCheck.listUnique = Just inner
 stripList _ = Nothing
 
+-- | A type with its synonyms expanded at the head, so that a synonym for MAYBE
+-- is a MAYBE when deciding what a missing or @null@ value means, and a synonym
+-- for a record or an enum is found. A synonym that takes parameters is expanded
+-- when every parameter is given.
+expandSyn :: ModuleInfo -> Type' Resolved -> Type' Resolved
+expandSyn mi = go (16 :: Int)
+  where
+    go 0 ty = ty
+    go n ty@(TyApp _ name args)
+      | Just (params, body) <- Map.lookup (getUnique name) mi.miSynonyms
+      , length params == length args =
+          go (n - 1) (subst (Map.fromList (zip params args)) body)
+      | otherwise = ty
+    go _ ty = ty
+    subst sub = \case
+      TyApp ann r []
+        | Just t <- Map.lookup (getUnique r) sub -> t
+        | otherwise -> TyApp ann r []
+      TyApp ann r ts -> TyApp ann r (map (subst sub) ts)
+      other -> other
+
+-- | The types of a function's inputs, with a synonym for a MAYBE at the head of
+-- a type replaced by the MAYBE it stands for. Any other type is left as written.
+--
+-- The generated wrapper decides from the head of an input's type whether the
+-- input may be left out or sent as @null@ ('Backend.CodeGen.isMaybeType'), and
+-- it does not expand a synonym. So an input declared through a synonym for a
+-- MAYBE was a required one: a @null@ for it, in a batch case or an MCP call, or
+-- a @{}@ value anywhere, was refused as a missing parameter. Expanding the head
+-- fixes that.
+--
+-- Every other kind of synonym is left as written. The JSON decoder expands a
+-- synonym itself ('L4.EvaluateLazy.Machine.expandTypeSynonyms'), which is why the
+-- wrapper answers a record, an enum or a DATE declared through one. It answers a
+-- LIST, a TIME, a DATETIME or a BOOLEAN declared through one because it leaves
+-- the synonym's name alone; expanding those here would break a LIST, a TIME and
+-- a DATETIME, which the wrapper fails when they are written out. Only the head of
+-- the type is looked at.
+maybeSynonymHeads :: [Declare Resolved] -> [(Text, Type' Resolved)] -> [(Text, Type' Resolved)]
+maybeSynonymHeads decls tys = [ (name, headOf ty) | (name, ty) <- tys ]
+  where
+    mi = buildModuleInfo decls
+    headOf ty = case expandSyn mi ty of
+      expanded | isJust (stripMaybe expanded) -> expanded
+      _                                        -> ty
+
 -- | Look up an enum or record type by unique.
 lookupEnum :: ModuleInfo -> Type' Resolved -> Maybe [(Text, Resolved)]
 lookupEnum mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miEnumVariants
@@ -477,7 +528,7 @@ fnLiteralToExprTyped
   -> Type' Resolved
   -> Maybe FnLiteral
   -> Either Text (Expr Resolved)
-fnLiteralToExprTyped mi ty mVal
+fnLiteralToExprTyped mi ty0 mVal
   -- MAYBE type: map missing / null / explicit NOTHING literal to NOTHING,
   -- anything else to JUST <recurse with inner type>.
   | Just inner <- stripMaybe ty =
@@ -494,6 +545,8 @@ fnLiteralToExprTyped mi ty mVal
       Just FnUnknown   -> Left "unknown value for a non-MAYBE parameter"
       Just FnUncertain -> Left "uncertain value is not supported in direct evaluation"
       Just v           -> nonMaybeValue mi ty v
+  where
+    ty = expandSyn mi ty0
 
 nonMaybeValue
   :: ModuleInfo
@@ -630,8 +683,9 @@ evaluateWithCompiledDeontic
   -> Bool
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz = do
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -784,8 +838,9 @@ evaluateWithWrapper
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
   -- Extract parameter types from the compiled function definition
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -1036,10 +1091,17 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                   Nothing -> throwError $ InterpreterError (mconcat initErrs)
                   Just tcRes -> pure tcRes
 
-                -- 2. Get function definition and extract parameter types
+                -- 2. Get function definition and extract parameter types.
+                -- The entry module's own declarations are all this path has, as in
+                -- precompileModule's single-file fallback. It runs only after
+                -- precompileModule failed, and that fails only where typecheckModule
+                -- or getFunctionDefinition does (buildImportEnvironment falls back
+                -- to an empty environment instead). Both are repeated here with the
+                -- same arguments, so a request stops before it reaches the wrapper.
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
-                let givenParamTypes = extractParamTypes funDecide
-                    assumeParamTypes = extractAssumeParamTypes tcRes.module' funDecide
+                let givenParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module') (extractParamTypes funDecide)
+                    assumeParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module')
+                      (extractAssumeParamTypes tcRes.module' funDecide)
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting

@@ -23,7 +23,7 @@ aContract MEANS
 #TRACE aContract AT 0 WITH
   PARTY S DOES delivery AT 2
   PARTY B DOES payment 21 AT 4
-  (`WAIT UNTIL` 10)
+  (WAITUNTIL 10)
 
 
 #TRACE aContract AT 0 WITH
@@ -64,7 +64,7 @@ DECLARE baz IS ONE OF baz HAS x IS A foo
                       quuux
 
 quux MEANS 
-  PARTY B MAY DO baz bar 
+  PARTY B MAY baz bar 
 
 #TRACE quux AT 0 WITH
   PARTY B DOES quuux AT 1

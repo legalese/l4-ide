@@ -175,7 +175,6 @@ test-suite jl4-core-test
   other-modules:
     Paths_jl4_core
     ImportResolutionSpec
-    TemporalContextSpec
     UnifySpec
     MixfixParserSpec
     PatternMatchParserSpec
@@ -184,6 +183,7 @@ test-suite jl4-core-test
     FormatFidelitySpec
     UUID5Spec
     ExportValidationSpec
+    DisambiguationWarningsSpec
     NumberLiteralSpec
     DirectiveRenameSpec
     MultiClausePrintSpec

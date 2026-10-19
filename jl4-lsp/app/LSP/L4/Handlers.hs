@@ -13,7 +13,6 @@ import Control.Monad.Extra (guard)
 import qualified Control.Monad.Extra as Extra
 import Control.Monad.Reader (MonadReader (..))
 import Control.Monad.Trans.Reader (ReaderT)
-import Data.Either (isRight)
 import Data.Monoid (Ap (..))
 import Data.Tuple (swap)
 import UnliftIO (MonadUnliftIO, atomically, STM, MonadIO(..))
@@ -380,33 +379,8 @@ handlers evalConfig recorder =
           use_ TypeCheck (toNormalizedUri verTextDocId._uri)
 
         let
-          mkDecisionGraphCodeLens srcPos = CodeLens
-            { _command = Just Command
-              { _title = "Show decision graph"
-              , _command = "l4.visualize"
-              , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
-              }
-            , _range = pointRange $ srcPosToPosition srcPos
-            , _data_ = Nothing
-            }
-
-          --  Check if can make viz (without simplification — simplification is now a toggle inside the panel)
-          canVisualize decide =
-            let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
-            in isRight (Ladder.doVisualize decide cfg)
-
-          decideToCodeLens decide =
-            -- NOTE: there's a lot of DECIDE/MEANS statements that the visualizer currently doesn't work on
-            -- We try to not offer any code lenses for the visualizer if that's the case.
-            -- If in future this is too slow, we should think about caching these results or, even better,
-            -- make the visualizer work on as many examples as possible.
-            case rangeOfNode decide of
-              Just node
-                | canVisualize decide -> [mkDecisionGraphCodeLens node.start]
-              _ -> []
-
           -- adds codelenses to visualize DECIDE or MEANS clauses
-          visualizeDecides :: [CodeLens] = foldTopLevelDecides decideToCodeLens typeCheck.module'
+          visualizeDecides :: [CodeLens] = decisionGraphCodeLenses verTextDocId typeCheck
 
           directiveLabel :: Directive Resolved -> Text
           directiveLabel = \case

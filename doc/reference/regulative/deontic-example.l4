@@ -54,12 +54,12 @@ GIVETH A DEONTIC Actor Action
     LEST BREACH
 
 GIVEN price IS A NUMBER
-      paymentDeadline IS A NUMBER
+      `payment deadline` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `payment obligation` MEANS
     PARTY Buyer
-    MUST `pay invoice` price
-    WITHIN paymentDeadline
+    MUST `pay invoice` (EXACTLY price)
+    WITHIN `payment deadline`
     HENCE FULFILLED
     LEST BREACH
 
@@ -77,7 +77,7 @@ GIVETH A DEONTIC Actor Action
     WITHIN 14
     HENCE
         PARTY Buyer
-        MUST `pay invoice` price
+        MUST `pay invoice` (EXACTLY price)
         WITHIN 30
         HENCE FULFILLED
         LEST BREACH BY Buyer BECAUSE "failed to pay"
@@ -130,10 +130,10 @@ GIVETH A DEONTIC Actor Action
 
 -- DEONTIC values can be computed conditionally
 
-GIVEN isUrgent IS A BOOLEAN
+GIVEN `is urgent` IS A BOOLEAN
 GIVETH A DEONTIC Actor Action
 `conditional delivery` MEANS
-    IF isUrgent
+    IF `is urgent`
     THEN
         PARTY Seller
         MUST `deliver goods` "urgent delivery"
@@ -155,10 +155,10 @@ GIVETH A DEONTIC Actor Action
 -- Type: FORALL party action. DEONTIC party action -> NUMBER -> LIST (EVENT party action) -> DEONTIC party action
 
 -- Create events using the EVENT constructor
-testEvents MEANS LIST EVENT Seller (`deliver goods` "standard package") 5, EVENT Buyer (`pay invoice` 100) 20
+`test events` MEANS LIST EVENT Seller (`deliver goods` "standard package") 5, EVENT Buyer (`pay invoice` 100) 20
 
 -- Evaluate a contract against events starting at time 0
-#EVAL EVALTRACE `simple delivery obligation` 0 testEvents
+#EVAL EVALTRACE `simple delivery obligation` 0 `test events`
 
 -- ============================================================
 -- § Testing DEONTIC Values with #TRACE
@@ -232,11 +232,11 @@ GIVETH A DEONTIC Actor Action
 
 -- EXACTLY requires an exact value match in patterns
 
-GIVEN requiredAmount IS A NUMBER
+GIVEN `required amount` IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `exact payment required` MEANS
     PARTY Buyer
-    MUST EXACTLY `pay invoice` requiredAmount
+    MUST EXACTLY `pay invoice` `required amount`
     WITHIN 30
     HENCE FULFILLED
     LEST BREACH
@@ -250,14 +250,14 @@ GIVETH A DEONTIC Actor Action
     PARTY Buyer DOES `pay invoice` 499 AT 15
 
 -- ============================================================
--- § Advanced: WAIT UNTIL for Time Advancement
+-- § Advanced: WAITUNTIL for Time Advancement
 -- ============================================================
 
--- WAIT UNTIL advances time without an event
+-- WAITUNTIL advances time without an event
 -- Useful for testing deadline behavior
 
 #TRACE `simple delivery obligation` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    (WAITUNTIL 20)
 
 -- ============================================================
 -- § DEONTIC as Return Values
@@ -265,18 +265,18 @@ GIVETH A DEONTIC Actor Action
 
 -- Functions can compute and return DEONTIC values dynamically
 
-GIVEN orderType IS A STRING
+GIVEN `order type` IS A STRING
       price IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `create order contract` MEANS
-    IF orderType EQUALS "express"
+    IF `order type` EQUALS "express"
     THEN
         PARTY Seller
         MUST `deliver goods` "express order"
         WITHIN 3
         HENCE
             PARTY Buyer
-            MUST `pay invoice` expressPrice
+            MUST `pay invoice` (EXACTLY `express price`)
             WITHIN 7
             HENCE FULFILLED
             LEST BREACH
@@ -287,13 +287,13 @@ GIVETH A DEONTIC Actor Action
         WITHIN 14
         HENCE
             PARTY Buyer
-            MUST `pay invoice` price
+            MUST `pay invoice` (EXACTLY price)
             WITHIN 30
             HENCE FULFILLED
             LEST BREACH
         LEST BREACH
     WHERE
-        expressPrice MEANS price + 50
+        `express price` MEANS price + 50
 
 -- Test express order
 #TRACE `create order contract` "express" 200 AT 0 WITH

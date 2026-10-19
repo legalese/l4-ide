@@ -25,15 +25,16 @@ DECLARE Shape IS ONE OF
 -- Type Synonyms
 
 DECLARE Age IS NUMBER
-DECLARE PersonName IS STRING
+DECLARE `Person name` IS STRING
 
--- Parameterized Types
+-- Parameterised Types
 
-GIVEN a IS A TYPE
-DECLARE Box HAS contents IS AN a
+-- The type parameter written after the name ...
+DECLARE Box OF a HAS contents IS AN a
 
+-- ... or declared with GIVEN above the DECLARE
 GIVEN a IS A TYPE, b IS A TYPE
-DECLARE MyPair HAS first IS AN a, second IS A b
+DECLARE `Pair of values` HAS first IS AN a, second IS A b
 
 -- Usage Examples
 
@@ -45,11 +46,17 @@ DECIDE `the origin` IS Point WITH x IS 0, y IS 0
 DECIDE `my favourite colour` IS `bright red`
 DECIDE `my shape` IS Circle WITH radius IS 5
 
--- Use parameterized types
+-- Use parameterised types
+GIVETH A Box OF NUMBER
 DECIDE `box with number` IS Box WITH contents IS 42
+GIVETH A Box OF STRING
 DECIDE `box with text` IS Box WITH contents IS "hello"
+GIVETH A `Pair of values` OF NUMBER, STRING
+DECIDE `a pair` IS `Pair of values` WITH first IS 1, second IS "one"
 
 -- Evaluate examples
 #EVAL `the applicant`'s `full name`
 #EVAL `the applicant`'s age
 #EVAL `my favourite colour`
+#EVAL `box with text`'s contents
+#EVAL `a pair`'s second

@@ -1310,7 +1310,10 @@ clausesSrcAnno (c : _) = fixAnnoSrcRange (mkHoleAnnoFor (pmBody c))
 -- source range (see 'clausesSrcAnno').
 bindFallthrough :: PmSynthetic -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
 bindFallthrough mark ftName ftAnno ftExpr body =
-  LetIn emptyAnno
+  -- The LET carries the binding's mark too, so that the checker, which cannot
+  -- give a node with no range a type (and this one has none, see
+  -- 'clausesSrcAnno'), still records the group's result type on it.
+  LetIn (setPmSynthetic mark emptyAnno)
     [ LocalDecide emptyAnno
         (MkDecide (setPmSynthetic mark ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
     ]
@@ -2462,12 +2465,10 @@ must current = attachAnno $
      <$> asum
       -- Parse MUST, then check for optional NOT to determine modal
       [ annoLexeme (spacedKeyword_ TKMust) *>
-        (DMustNot <$ annoLexeme (spacedKeyword_ TKNot) <* optional (annoLexeme (spacedKeyword_ TKDo))
-         <|> DMust <$ optional (annoLexeme (spacedKeyword_ TKDo)))
+        (DMustNot <$ annoLexeme (spacedKeyword_ TKNot)
+         <|> pure DMust)
       , DMay <$ annoLexeme (spacedKeyword_ TKMay)
-        <* optional (annoLexeme (spacedKeyword_ TKDo))
       , DMustNot <$ annoLexeme (spacedKeyword_ TKShant)
-        <* optional (annoLexeme (spacedKeyword_ TKDo))
       , DDo <$ annoLexeme (spacedKeyword_ TKDo)
       ]
      <*> annoHole (indentedPattern current)

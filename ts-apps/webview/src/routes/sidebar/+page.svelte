@@ -1538,7 +1538,7 @@
   // claude.ai accepts (it only adds marketplaces from a GitHub repo).
   const MARKETPLACE_URL = 'https://github.com/legalese/cloud-rules'
   const MARKETPLACE_DOC =
-    'https://legalese.com/l4/tutorials/legalese-cloud/agent-marketplace.md'
+    'https://legalese.com/l4/tutorials/legalese-cloud/ai-agents.md#install-all-your-rules-skills-marketplace'
 
   function installMarketplace(harness: Harness) {
     messenger?.sendNotification(RequestInstallMarketplace, HOST_EXTENSION, {

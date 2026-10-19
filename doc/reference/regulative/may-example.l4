@@ -7,8 +7,8 @@
 -- Key Concepts:
 --   • MAY creates a permission or option to perform an action
 --   • WITHIN specifies the time period during which the option can be exercised
---   • HENCE specifies what happens if the option IS exercised
---   • LEST specifies what happens if the option is NOT exercised
+--   • HENCE specifies what follows, whether or not the option is exercised:
+--     when the deadline passes without it, the rule also continues with HENCE
 --   • Unlike MUST, not exercising a MAY option is never a breach
 --
 -- Common Legal Uses:
@@ -123,8 +123,7 @@ DECLARE `Contract Action` IS ONE OF
   PARTY `The Tenant`
   MAY `terminate early`
   WITHIN 180  -- Can terminate within first 6 months
-  HENCE FULFILLED
-  LEST FULFILLED  -- If not exercised, lease continues normally
+  HENCE FULFILLED  -- exercised or not, nothing further follows
 
 -- Chained Permissions
 
@@ -149,8 +148,9 @@ DECLARE `Contract Action` IS ONE OF
 #TRACE `prepayment option` AT 0 WITH
   PARTY `The Borrower` DOES `prepay loan` 100000 AT 180
 
--- Test 2: Prepayment option not exercised (valid - no breach)
+-- Test 2: Prepayment option not exercised before the deadline (valid - no breach)
 #TRACE `prepayment option` AT 0 WITH
+  (WAITUNTIL 366)
 
 -- Test 3: Purchase with warranty - full path
 #TRACE `purchase with warranty` AT 0 WITH
@@ -172,6 +172,7 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 7: Acceleration right triggered by breach
 #TRACE `payment with acceleration right` AT 0 WITH
+  (WAITUNTIL 31)
   PARTY `The Lender` DOES `demand acceleration` AT 35
 
 -- Test 8: Acceleration right not needed (payment made)
@@ -190,8 +191,9 @@ DECLARE `Contract Action` IS ONE OF
 #TRACE `early termination clause` AT 0 WITH
   PARTY `The Tenant` DOES `terminate early` AT 90
 
--- Test 12: Early termination not exercised
+-- Test 12: Early termination not exercised before the deadline
 #TRACE `early termination clause` AT 0 WITH
+  (WAITUNTIL 181)
 
 -- Test 13: Warranty claim process - complete workflow
 #TRACE `warranty claim process` AT 0 WITH

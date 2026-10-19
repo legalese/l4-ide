@@ -77,7 +77,7 @@ DECLARE `Contract Action` IS ONE OF
   LEST
     PARTY `The Borrower`
     MUST `make payment` 12000  -- Original amount plus 20% late fee
-    WITHIN 45  -- 15-day grace period
+    WITHIN 15  -- 15-day grace period, counted from when the first deadline is found to have passed
     LEST BREACH
 
 -- Landlord repair obligation: Must repair within deadline,
@@ -147,8 +147,9 @@ DECLARE `Contract Action` IS ONE OF
 #TRACE `monthly loan payment` AT 0 WITH
   PARTY `The Borrower` DOES `make payment` 10000 AT 20
 
--- Test 2: Basic obligation breached (no payment made)
+-- Test 2: Basic obligation breached (no payment made; time passes the deadline)
 #TRACE `monthly loan payment` AT 0 WITH
+  (WAITUNTIL 31)
 
 -- Test 3: Conditional obligation - full chain executed
 #TRACE `purchase and delivery agreement` AT 0 WITH
@@ -157,10 +158,13 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 4: Payment with late fee - paid during grace period
 #TRACE `payment with late fee` AT 0 WITH
+  (WAITUNTIL 31)
   PARTY `The Borrower` DOES `make payment` 12000 AT 40
 
 -- Test 5: Payment with late fee - breached (no payment at all)
 #TRACE `payment with late fee` AT 0 WITH
+  (WAITUNTIL 31)
+  (WAITUNTIL 50)
 
 -- Test 6: Staged service contract - complete workflow
 #TRACE `staged service contract` AT 0 WITH
@@ -185,5 +189,6 @@ DECLARE `Contract Action` IS ONE OF
 #TRACE `landlord repair obligation` AT 0 WITH
   PARTY `The Landlord` DOES `complete repairs` "fix leaking roof" AT 10
 
--- Test 10: Landlord repair obligation - tenant must notify
+-- Test 10: Landlord repair obligation - landlord misses the deadline, so the tenant must notify
 #TRACE `landlord repair obligation` AT 0 WITH
+  (WAITUNTIL 15)
