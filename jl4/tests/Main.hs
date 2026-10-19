@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Base
+import Control.Exception (SomeException, evaluate, throwIO, try)
 import Control.Monad.Trans.Maybe
 import Data.Char (isAlphaNum)
 import qualified Data.Aeson.Encode.Pretty as AP
@@ -9,8 +10,10 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text.Encoding as TE
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified L4.Annotation as JL4
 import qualified L4.EvaluateLazy as JL4Lazy
+import qualified L4.ExactPrint as ExactPrint
 import L4.TracePolicy (lspDefaultPolicy)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Export (ExportedFunction (..))
@@ -40,6 +43,7 @@ import System.Environment (getExecutablePath, lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
+import GHC.Clock (getMonotonicTimeNSec)
 import Test.Hspec
 import Text.Read (readMaybe)
 import Test.Hspec.Golden
@@ -113,6 +117,21 @@ main = do
   -- library must stay out of every glob. These two import a module that exists
   -- nowhere, so they need no neighbour at all.
   importUnresolvedFiles <- sort <$> globDir1 (compile "not-ok/import/unresolved-*.l4") examplesRoot
+  -- ONE name for the corpus these three blocks share. It was written out
+  -- three times, and adding canon/** would have made that four places to keep
+  -- in step -- the exact shape of drift CLAUDE.md warns about, and invisible
+  -- when it happens because a block that silently covers fewer files still
+  -- passes.
+  let goldenCorpus = okFiles <> legalFiles <> librariesFiles <> canonFiles
+  -- What the goldens of one file share. See 'CheckMemo'.
+  --
+  -- The prettyLayout block starts from something its file's "parses and checks"
+  -- golden derives (see 'checkFile'), for the files of the corpus both read.
+  -- @JL4_EVALDIFF@ needs the module itself, which is not what is held, so that
+  -- mode takes the unshared path.
+  evalDiff <- lookupEnv "JL4_EVALDIFF"
+  let keep = if isJust evalDiff then Set.empty else Set.fromList goldenCorpus
+  checkMemo <- newCheckMemo keep
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -127,13 +146,7 @@ main = do
       corpusNonEmpty "export-placement" exportPlacementFiles
       corpusNonEmpty "import-refusal"   importRefusalFiles
       corpusNonEmpty "import-unresolved" importUnresolvedFiles
-    -- ONE name for the corpus these three blocks share. It was written out
-    -- three times, and adding canon/** would have made that four places to keep
-    -- in step -- the exact shape of drift CLAUDE.md warns about, and invisible
-    -- when it happens because a block that silently covers fewer files still
-    -- passes.
-    let goldenCorpus = okFiles <> legalFiles <> librariesFiles <> canonFiles
-    describe "ok files" $ tests evalConfig (True, True) goldenCorpus examplesRoot
+    describe "ok files" $ tests checkMemo evalConfig (True, True) goldenCorpus examplesRoot
     -- The built-in connectives used to be closures over two parameters named
     -- @a@ and @b@, whose @IF a THEN b ELSE FALSE@ bodies showed in every trace
     -- that reached one. They are frames now, with no parameters to name
@@ -170,7 +183,7 @@ main = do
     describe "prettyLayout round-trip (filter -> print -> parse; #932)" $
       forM_ goldenCorpus $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
-          jl4PrettyLayoutRoundTrip evalConfig inputFile
+          jl4PrettyLayoutRoundTrip checkMemo evalConfig inputFile
     -- Invariant: the parser's memo of bracketed groups changes nothing
     -- (MATRYOSHKA, smucclaw/l4-ide#1017). 'L4.Parser.memoGroup' replays a
     -- group's first parse wherever the group is reached again, which is exact
@@ -185,14 +198,14 @@ main = do
       forM_ (goldenCorpus <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles <> exportPlacementFiles <> importRefusalFiles <> importUnresolvedFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ParserMemoChangesNothing inputFile
-    describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
+    describe "tc fails" $ tests checkMemo evalConfig (False, True) tcFailsFiles examplesRoot
     describe "import refusal (@export whose read-set crosses an IMPORT)" $
-      tests evalConfig (False, True) importRefusalFiles examplesRoot
+      tests checkMemo evalConfig (False, True) importRefusalFiles examplesRoot
     describe "unresolvable IMPORT (#971)" $
-      tests evalConfig (False, True) importUnresolvedFiles examplesRoot
-    describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
+      tests checkMemo evalConfig (False, True) importUnresolvedFiles examplesRoot
+    describe "nlg fails" $ tests checkMemo evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
-      tests evalConfig (True, True) exportPlacementFiles examplesRoot
+      tests checkMemo evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     describe "viz" VizAutoRefresh.spec
@@ -204,23 +217,23 @@ main = do
     describe "bpmn export" BpmnExport.spec
     describe "lts list" LtsList.spec
   where
-    tests evalConfig (tcOk, nlgOk) files root =
+    tests memo evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do
         let testCase = makeRelative root inputFile
         let goldenDir = takeDirectory inputFile </> "tests"
         describe testCase $ do
           it "parses and checks" $
-            l4Golden evalConfig tcOk root goldenDir inputFile
+            l4Golden memo evalConfig tcOk root goldenDir inputFile
           it "exactprints" $
-            jl4ExactPrintGolden evalConfig goldenDir inputFile
+            jl4ExactPrintGolden memo evalConfig goldenDir inputFile
           it "natural language annotations" $
-            jl4NlgAnnotationsGolden evalConfig nlgOk goldenDir inputFile
+            jl4NlgAnnotationsGolden memo evalConfig nlgOk goldenDir inputFile
           it "json schema" $
-            jl4JsonSchemaGolden evalConfig goldenDir inputFile
+            jl4JsonSchemaGolden memo evalConfig goldenDir inputFile
 
-l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> String -> IO (Golden String)
-l4Golden evalConfig isOk examplesRoot dir inputFile = do
-  (output, _) <- capture (checkFile evalConfig isOk inputFile)
+l4Golden :: CheckMemo -> JL4Lazy.EvalConfig -> Bool -> String -> String -> String -> IO (Golden String)
+l4Golden memo evalConfig isOk examplesRoot dir inputFile = do
+  (output, _) <- capture (checkFile memo evalConfig isOk inputFile)
   scrubPaths <- mkPathScrubber examplesRoot
   let normalize = scrubPaths . normalizeWhitespaceString . stripAnsiCodesString
   pure
@@ -301,12 +314,24 @@ mkPathScrubber examplesRoot = do
         ]
   pure $ \ txt -> foldl' (\ acc (prefix, token) -> sub prefix token acc) txt subs
 
-jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
-jl4ExactPrintGolden evalConfig dir inputFile = do
-  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
-    let uri = normalizedFilePathToUri nfp
-    _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.ExactPrint uri
+jl4ExactPrintGolden :: CheckMemo -> JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
+jl4ExactPrintGolden memo evalConfig dir inputFile = do
+  -- The golden is the exact-printer's output, which is a pure function of the
+  -- parse the "parses and checks" golden's session already has. When that
+  -- session ran for this file and the printer succeeded, read it from there.
+  -- Otherwise (the printer failed, or no parse, or that golden did not run)
+  -- start the session of its own, because then the session's log is the
+  -- golden. The identity test below still goes through 'Rules.ExactPrint' for
+  -- every file, so the rule itself stays covered.
+  shared <- readIORef memo.exactPrint
+  (errs, moutput) <- case shared of
+    Just (f, Just printed) | f == inputFile -> do
+      logEvent "exactprint-golden-memo" inputFile
+      pure ([], Just printed)
+    _ -> logSession "exactprint-golden" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+      let uri = normalizedFilePathToUri nfp
+      _ <- Shake.addVirtualFileFromFS nfp
+      Shake.use Rules.ExactPrint uri
 
   -- NOTE: we sort the output, because the traces are concurrent and might not be in order
   -- Strip ANSI codes and normalize whitespace for cross-platform consistency
@@ -330,7 +355,7 @@ jl4ExactPrintGolden evalConfig dir inputFile = do
 -- stay legible instead of dumping the whole file.
 jl4ExactPrintIdentity :: JL4Lazy.EvalConfig -> FilePath -> IO ()
 jl4ExactPrintIdentity evalConfig inputFile = do
-  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+  (errs, moutput) <- logSession "exactprint-identity" inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.ExactPrint uri
@@ -396,23 +421,29 @@ jl4ParserMemoChangesNothing inputFile = do
 -- is a failure of @l4 batch@ on that file. We stop at the parser because the
 -- reported defect is a parser diagnostic; a stricter re-typecheck would fold in
 -- unrelated name-resolution questions.
-jl4PrettyLayoutRoundTrip :: JL4Lazy.EvalConfig -> FilePath -> IO ()
-jl4PrettyLayoutRoundTrip evalConfig inputFile = do
-  (errs, mtc) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
-    let uri = normalizedFilePathToUri nfp
-    _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
-  case mtc of
-    Nothing ->
+jl4PrettyLayoutRoundTrip :: CheckMemo -> JL4Lazy.EvalConfig -> FilePath -> IO ()
+jl4PrettyLayoutRoundTrip memo evalConfig inputFile = do
+  -- Either what the "parses and checks" golden already derived from this file's
+  -- module (or the exception deriving it raised: it is raised again here, in
+  -- the test it belongs to), or a module of our own, which may still come from
+  -- the slot ('LogNeededOnFailure': the log is read only when there is no
+  -- module, so a memoised module is fine and a memoised failure is not).
+  kept <- atomicModifyIORef' memo.kept \m -> (Map.delete inputFile m, Map.lookup inputFile m)
+  derived <- case kept of
+    Just (Left e) -> throwIO e
+    Just (Right p) -> logEvent "prettylayout-tc-kept" inputFile >> pure (Right (Nothing, p))
+    Nothing -> do
+      (errs, mtc) <- typeCheckedShared memo "prettylayout-tc" evalConfig inputFile LogNeededOnFailure Forget
+      pure case mtc of
+        Nothing -> Left errs
+        Just tc -> Right (Just tc, printedOf tc)
+  case derived of
+    Left errs ->
       expectationFailure $
         "typecheck produced no module for " <> inputFile <> ":\n"
           <> Text.unpack (Text.unlines errs)
-    Just tc -> do
-      -- restoreMixfixPatterns first: without it the printer emits only a
-      -- mixfix name's head keyword and two operators sharing one collapse
-      -- together (smucclaw/l4-ide#967).
-      let printed = prettyLayout (filterIdeDirectives (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
-          printUri = toNormalizedUri (Uri "file:///pretty-layout-roundtrip")
+    Right (mtc, MkPrinted printed leaked) -> do
+      let printUri = toNormalizedUri (Uri "file:///pretty-layout-roundtrip")
       -- Debugging affordance: prettyLayout output for a corpus module runs to
       -- thousands of columns, so the inline excerpt below is rarely enough to
       -- diagnose a layout failure. Point JL4_PRETTY_DUMP_DIR at a scratch
@@ -429,15 +460,10 @@ jl4PrettyLayoutRoundTrip evalConfig inputFile = do
       -- `l4 run` both and compare the `Result:` blocks; see CLAUDE.md §3.2 for
       -- the loop and the cleanup, which you MUST run — these files are inside
       -- the corpus globs and a later run would try to golden them.
+      -- (This mode keeps no module for later, so @mtc@ is always there.)
       mEvalDiff <- lookupEnv "JL4_EVALDIFF"
-      for_ mEvalDiff $ \_ ->
+      for_ (mEvalDiff *> mtc) $ \tc ->
         Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
-      -- No gensym may reach the output. Every inference variable in the
-      -- type-checked module is rendered exactly as `seed <> uniq` by the
-      -- 'Type'' printer, so we can name the forbidden strings precisely rather
-      -- than pattern-matching on "looks like an identifier ending in digits" —
-      -- which would false-positive on `identity1`, `const1a`, `s24`.
-      let leaked = leakedInfVars tc.module' printed
       unless (null leaked) $
         expectationFailure $
           "prettyLayout leaked an inference variable (gensym) for " <> inputFile
@@ -459,7 +485,7 @@ jl4PrettyLayoutRoundTrip evalConfig inputFile = do
         -- places its `<file>.batchN.l4`.
         Right _ -> do
           let virtualPath = inputFile <> ".prettylayout.l4"
-          (errs2, mtc2) <- oneshotL4ActionAndErrors evalConfig virtualPath \_nfp -> do
+          (errs2, mtc2) <- logSession "prettylayout-retc" inputFile $ oneshotL4ActionAndErrors evalConfig virtualPath \_nfp -> do
             let uri2 = normalizedFilePathToUri (toNormalizedFilePath virtualPath)
             _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) printed
             Shake.use Rules.SuccessfulTypeCheck uri2
@@ -506,12 +532,35 @@ leakedInfVars m printed =
     tokens = Text.split (not . isTokenChar) printed
     isTokenChar c = isAlphaNum c || c == '_'
 
-jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
-jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
-  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
-    let uri = normalizedFilePathToUri nfp
-    _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
+-- | What the prettyLayout round-trip derives from a type-checked module before it
+-- re-parses the result: the printed module, and the inference variables that
+-- leaked into it.
+data Printed = MkPrinted !Text ![Text]
+
+printedOf :: TypeCheckResult -> Printed
+printedOf tc = MkPrinted printed leaked
+  where
+    -- No gensym may reach the output. Every inference variable in the
+    -- type-checked module is rendered exactly as `seed <> uniq` by the
+    -- 'Type'' printer, so we can name the forbidden strings precisely rather
+    -- than pattern-matching on "looks like an identifier ending in digits" —
+    -- which would false-positive on `identity1`, `const1a`, `s24`.
+    leaked = leakedInfVars tc.module' printed
+    -- restoreMixfixPatterns first: without it the printer emits only a mixfix
+    -- name's head keyword and two operators sharing one collapse together
+    -- (smucclaw/l4-ide#967).
+    printed = prettyLayout (filterIdeDirectives (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
+
+jl4NlgAnnotationsGolden :: CheckMemo -> JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
+jl4NlgAnnotationsGolden memo evalConfig isOk dir inputFile = do
+  -- The session's log is part of the golden when the file is expected NOT to
+  -- linearize (@not isOk@), and a log belongs to the session that wrote it, so
+  -- that case keeps its own session. Otherwise the log is dropped below and the
+  -- module may come from the memo.
+  (errs, moutput) <-
+    if isOk
+      then typeCheckedShared memo "nlg-golden" evalConfig inputFile LogNotNeeded Remember
+      else typeCheckedFresh "nlg-golden" evalConfig inputFile
   let output_ = case moutput of
         Nothing -> "Cannot linearize module that doesn't typecheck\n"
         Just checkResult ->
@@ -538,12 +587,9 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
       , failFirstTime = True
       }
 
-jl4JsonSchemaGolden :: JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden String)
-jl4JsonSchemaGolden evalConfig dir inputFile = do
-  (_, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
-    let uri = normalizedFilePathToUri nfp
-    _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
+jl4JsonSchemaGolden :: CheckMemo -> JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden String)
+jl4JsonSchemaGolden memo evalConfig dir inputFile = do
+  (_, moutput) <- typeCheckedShared memo "schema-golden" evalConfig inputFile LogNotNeeded Remember
   let output = case moutput of
         Nothing -> "Cannot generate schema for module that doesn't typecheck\n"
         Just checkResult ->
@@ -677,19 +723,45 @@ normalizeWhitespaceString = unlines . map normalizeLine . lines
       let (indent, rest) = span (== ' ') line
       in indent ++ unwords (words rest)
 
-checkFile :: JL4Lazy.EvalConfig -> Bool -> FilePath -> IO ()
-checkFile evalConfig isOk file = do
-  (errs, diags, isJust -> typechecked) <- oneshotL4ActionAndDiagnostics evalConfig file \nfp -> runMaybeT do
+checkFile :: CheckMemo -> JL4Lazy.EvalConfig -> Bool -> FilePath -> IO ()
+checkFile memo evalConfig isOk file = do
+  (errs, diags, (isJust -> typechecked, (mparsed, mchecked))) <- logSession "check-golden" file $ oneshotL4ActionAndDiagnostics evalConfig file \nfp -> do
+    -- What @SuccessfulTypeCheck@ answered, whether or not the evaluation after
+    -- it did: this is the value the goldens that only read the type-checked
+    -- module can be handed instead of starting a session of their own.
+    checkedRef <- liftIO (newIORef Nothing)
+    parsedRef <- liftIO (newIORef Nothing)
+    done <- runMaybeT do
       let uri = normalizedFilePathToUri nfp
       _        <- lift   $ Shake.addVirtualFileFromFS nfp
-      _        <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
+      parsed   <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
+      liftIO $ writeIORef parsedRef (Just parsed)
       checked  <- MaybeT $ Shake.use SuccessfulTypeCheck uri <* liftIO (Text.putStrLn "Typechecking successful")
+      liftIO $ writeIORef checkedRef (Just checked)
       results' <- MaybeT $ Shake.use EvaluateLazy uri
       when (not (null results')) $ liftIO $ Text.putStrLn "Evaluation successful"
       let msgs  =    map typeErrorToMessage checked.infos
                   <> map evalLazyDirectiveResultToMessage results'
           formatted = foldMap (sanitizeFilePaths . renderMessage) $ sortOn fst msgs
       liftIO $ Text.putStr formatted
+    (,) done <$> liftIO ((,) <$> readIORef parsedRef <*> readIORef checkedRef)
+  writeIORef memo.slot (Just (file, mchecked))
+  -- The prettyLayout round-trip comes much later in the tree and starts from
+  -- the same module. Holding the MODULE of every corpus file until then also
+  -- works and is as fast (measured on nye, 2026-10-18: 298 s and 345 s against
+  -- 302-307 s for what is done here), but takes the run from 0.6 GB to 1.4-1.5
+  -- GB resident and the collector's maximum residency from 0.17 GB to 0.43-0.49
+  -- GB. So derive what that test needs now and hold only that, the printed text
+  -- and the leaked-gensym list. An exception the derivation raises is held too,
+  -- and raised again in the test that owns it, so a failure still lands on the
+  -- prettyLayout example.
+  when (file `Set.member` memo.keepFor) $
+    for_ mchecked \tc -> do
+      derived <- try @SomeException $ evaluate case printedOf tc of
+        p@(MkPrinted printed leaked) -> rnf (printed, leaked) `seq` p
+      modifyIORef' memo.kept (Map.insert file derived)
+  writeIORef memo.exactPrint
+    (Just (file, mparsed >>= either (const Nothing) Just . ExactPrint.exactprint))
   -- NOTE: if we're okay, we don't expect any errors, if we are not, we do expect them
   --
   -- 'typechecked' alone is not the whole verdict: a rule OTHER than the
@@ -718,9 +790,122 @@ checkFile evalConfig isOk file = do
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt
 
+-- | What the goldens of one corpus file share, so that the file is not parsed and
+-- type-checked once per golden.
+--
+-- A file's goldens ("parses and checks", "exactprints", "natural language
+-- annotations", "json schema") each used to start a Shake session of their own,
+-- and so did the exactprint-identity and prettyLayout blocks much later. The
+-- "parses and checks" golden's session now leaves what the others need. It is
+-- NOT a cache of sessions: only pure values cross (a rule's result is forced to
+-- normal form and carries no handle on the session that produced it).
+--
+-- The rule for what may be read from here is about the session's /log/. Every
+-- session has its own recorder, and what it holds depends on the rules that ran
+-- in the session: the check golden's session also runs @EvaluateLazy@, and its
+-- log carries every #EVAL result as a diagnostic that a session which only
+-- type-checks never publishes (measured 2026-10-18: 322 of the 598 files have a
+-- different log in the two sessions). Some goldens print that log. A golden may
+-- take a value from here only if it does not print the log, or prints it only on
+-- a path that falls back to a session of its own ('LogNeed'; the exactprint
+-- golden, and the nlg golden of a file expected NOT to linearize, do the same).
+--
+-- The per-file slots hold ONE file, keyed by path: the goldens of a file are
+-- adjacent in the tree, so a slot never holds more than one file's closure, and
+-- under @--match@, @--skip@ or @--randomize@ a golden whose neighbours did not
+-- run simply finds another file there and starts its own session, as it always
+-- did. Nothing here needs another example to have run first.
+data CheckMemo = CheckMemo
+  { slot :: IORef (Maybe (FilePath, Maybe TypeCheckResult))
+    -- ^ what @SuccessfulTypeCheck@ answered for the last file; read by the nlg
+    -- and schema goldens
+  , exactPrint :: IORef (Maybe (FilePath, Maybe Text))
+    -- ^ the exact-printer's output for the last file the check golden parsed,
+    -- 'Nothing' when there was no parse or the printer failed (lazy: computed
+    -- by the first golden that asks); read by the exactprints golden
+  , kept :: IORef (Map FilePath (Either SomeException Printed))
+    -- ^ for the prettyLayout round-trip, which runs long after the file's other
+    -- goldens: one entry per file, taken (and so dropped) by the test that
+    -- reads it. See 'checkFile'.
+  , keepFor :: Set.Set FilePath
+    -- ^ the files whose entry is made: none when the run is filtered
+  }
+
+newCheckMemo :: Set.Set FilePath -> IO CheckMemo
+newCheckMemo keepFor = do
+  slot <- newIORef Nothing
+  exactPrint <- newIORef Nothing
+  kept <- newIORef Map.empty
+  pure CheckMemo{slot, exactPrint, kept, keepFor}
+
+-- | Does the caller read the session's log?
+data LogNeed
+  = LogNotNeeded
+    -- ^ it never reads it.
+  | LogNeededOnFailure
+    -- ^ it reads it only when there is no type-checked module.
+
+-- | Does a golden that had to start its own session leave the answer in the slot?
+data Remembers
+  = Remember
+    -- ^ yes: its neighbours in the tree read the same file next.
+  | Forget
+    -- ^ no: nothing is next to it, and holding the module would only keep a
+    -- whole file's closure alive while the golden goes on to type-check
+    -- /another/ module (the prettyLayout round-trip does).
+
+-- | @SuccessfulTypeCheck@ for a file, from the memo slot when it holds this file
+-- and the caller can do without the log; otherwise from a session of its own.
+typeCheckedShared :: CheckMemo -> String -> JL4Lazy.EvalConfig -> FilePath -> LogNeed -> Remembers -> IO ([Text], Maybe TypeCheckResult)
+typeCheckedShared memo site evalConfig inputFile logNeed remembers = do
+  slot <- readIORef memo.slot
+  case slot of
+    Just (f, r)
+      | f == inputFile, usable r -> do
+          logEvent (site <> "-memo") inputFile
+          pure ([], r)
+    _ -> do
+      (errs, r) <- typeCheckedFresh site evalConfig inputFile
+      case remembers of
+        Remember -> writeIORef memo.slot (Just (inputFile, r))
+        Forget -> pure ()
+      pure (errs, r)
+  where
+    usable r = case logNeed of
+      LogNotNeeded -> True
+      LogNeededOnFailure -> isJust r
+
+-- | A session of its own: @SuccessfulTypeCheck@ and nothing else. This is what
+-- every golden that reads the type-checked module ran before the memo existed.
+typeCheckedFresh :: String -> JL4Lazy.EvalConfig -> FilePath -> IO ([Text], Maybe TypeCheckResult)
+typeCheckedFresh site evalConfig inputFile =
+  logSession site inputFile $ oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.SuccessfulTypeCheck uri
+
 cliErrorMessage :: Maybe JL4.SrcRange -> [Text] -> Text
 cliErrorMessage mrange msg =
   Text.unlines
     ( JL4.prettySrcRangeM  mrange <> ":"
         : map ("  " <>) msg
     )
+
+-- | Test-support instrumentation: with @JL4_TEST_SESSION_LOG=<file>@ set, append
+-- one line per Shake session the suite starts: @site<TAB>file<TAB>seconds@.
+logEvent :: String -> FilePath -> IO ()
+logEvent site file = do
+  mLog <- lookupEnv "JL4_TEST_SESSION_LOG"
+  for_ mLog \logFile -> appendFile logFile (site <> "\t" <> file <> "\t0\n")
+
+logSession :: String -> FilePath -> IO a -> IO a
+logSession site file act = do
+  mLog <- lookupEnv "JL4_TEST_SESSION_LOG"
+  case mLog of
+    Nothing -> act
+    Just logFile -> do
+      t0 <- getMonotonicTimeNSec
+      r <- act
+      t1 <- getMonotonicTimeNSec
+      appendFile logFile (site <> "\t" <> file <> "\t" <> show (fromIntegral (t1 - t0) / 1e9 :: Double) <> "\n")
+      pure r
