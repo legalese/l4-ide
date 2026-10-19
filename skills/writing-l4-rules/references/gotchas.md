@@ -239,15 +239,23 @@ Both introduce local bindings. Pick by position:
 - **`LET … IN`** — leading. Use for a single binding consumed immediately.
 
 ```l4
--- WHERE: trailing helpers
-circleArea radius IS pi TIMES radius TIMES radius
-WHERE
-    pi MEANS 3.14159
+-- WHERE: trailing helpers, indented under the body
+GIVEN radius IS A NUMBER
+GIVETH A NUMBER
+`circle area` radius MEANS
+    pi TIMES radius TIMES radius
+    WHERE
+        pi MEANS 3.14159
 
 -- LET ... IN: inline
-LET taxRate MEANS 0.08 IN
-    price TIMES (1 PLUS taxRate)
+GIVEN price IS A NUMBER
+GIVETH A NUMBER
+`price with tax` price MEANS
+    LET `tax rate` MEANS 0.08 IN
+        price TIMES (1 PLUS `tax rate`)
 ```
+
+`WHERE` must be indented under the body it belongs to; at column 1 it is a parse error (`unexpected WHERE`).
 
 ---
 

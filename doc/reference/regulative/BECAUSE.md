@@ -37,7 +37,7 @@ GIVETH A DEONTIC Party Action
   LEST BREACH BY Buyer BECAUSE (CONCAT "failed to pay ", TOSTRING `the amount due`)
 
 #TRACE `payment` AT 0 WITH
-  (`WAIT UNTIL` 31)
+  (WAITUNTIL 31)
 ```
 
 The `#TRACE` result shows the breach with its party and reason: `BREACH BY Buyer BECAUSE "failed to pay 1000"`.

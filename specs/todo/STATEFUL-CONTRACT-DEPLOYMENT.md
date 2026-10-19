@@ -266,7 +266,7 @@ With `rule` supplied, `results` has length 1.
 | --- | --------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 6   | `submit_event`  | `rule?, party, action, at?, idempotencyKey?` | Fan-out: applied to every rule whose actor/action types accept the payload. Auto-creates instance(s) keyed per §3.3 if unseen. Returns per-rule transition outcome. |
 | 7   | `submit_events` | `rule?, events[]`                            | Each event independently applied as in (6).                                                                                                                         |
-| 8   | `tick`          | `rule?, actor, at?`                          | Advances `actor`'s clock in every rule they have state in, via a synthetic `WAIT UNTIL`.                                                                            |
+| 8   | `tick`          | `rule?, actor, at?`                          | Advances `actor`'s clock in every rule they have state in, via a synthetic `WAITUNTIL`.                                                                             |
 | 9   | `tick_all`      | `rule?, at?`                                 | Same for every tracked actor in every (matching) rule.                                                                                                              |
 
 In wall-clock mode `at` defaults to `now()`. In abstract mode it is mandatory.

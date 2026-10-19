@@ -147,14 +147,14 @@ LEST    penaltyState           -- optional; consequence on failure
 
 **Deontic polarity** — which branch fires for each modal:
 
-| Modal   | HENCE fires when                        | LEST fires when                        |
-| ------- | --------------------------------------- | -------------------------------------- |
-| `MUST`  | action is taken                         | deadline passes without action         |
-| `MAY`   | action is taken                         | deadline passes (permission unused)    |
-| `SHANT` | deadline passes (prohibition respected) | action is taken (prohibition violated) |
-| `DO`    | action is taken                         | deadline passes                        |
+| Modal   | HENCE fires when                             | LEST fires when                        |
+| ------- | -------------------------------------------- | -------------------------------------- |
+| `MUST`  | action is taken                              | deadline passes without action         |
+| `MAY`   | action is taken, or deadline passes (unused) | never — a `LEST` after `MAY` is unused |
+| `SHANT` | deadline passes (prohibition respected)      | action is taken (prohibition violated) |
+| `DO`    | action is taken                              | deadline passes                        |
 
-`SHANT` flips polarity — for prohibitions, doing the action is the failure.
+`SHANT` flips polarity — for prohibitions, doing the action is the failure. Not using a permission is never a breach.
 
 **Actors and actions are sum types.** Declare them first; a regulative rule's type is `DEONTIC Party Action`, not `CONTRACT`:
 
@@ -167,17 +167,21 @@ DECLARE PaymentAction IS ONE OF
     `pay invoice`   HAS amount IS A NUMBER, recipient IS AN Actor
     `waive payment` HAS reason IS A STRING
 
+DECLARE Invoice HAS
+    customer IS AN Actor
+    amount   IS A NUMBER
+
 GIVEN invoice IS AN Invoice
 GIVETH A DEONTIC Actor PaymentAction
 DECIDE obligation IS
-    PARTY Customer
-    MUST  (`pay invoice` (invoice's amount) Company)
+    PARTY invoice's customer
+    MUST  `pay invoice` (EXACTLY (invoice's amount)) Company
     WITHIN 30
     HENCE FULFILLED
-    LEST  BREACH BY Customer BECAUSE "payment overdue"
+    LEST  BREACH BY (invoice's customer) BECAUSE "payment overdue"
 ```
 
-Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors. Always include `BECAUSE "reason"` on `LEST BREACH` — that string is what auditors read.
+Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors. The action is a **pattern**: a plain name in it matches any value, so compare with an input or a computed value through `EXACTLY`, as above. Always include `BECAUSE "reason"` on `LEST BREACH` — that string is what auditors read.
 
 Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, `EXACTLY` matching, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
 

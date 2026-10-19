@@ -102,25 +102,25 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 
 ## Regulative rules
 
-| Keyword              | Meaning                                                                                                | Reference                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| **PARTY**            | Who the rule applies to                                                                                | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
-| **MUST**             | Obligation                                                                                             | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
-| **MAY**              | Permission                                                                                             | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
-| **SHANT / MUST NOT** | Prohibition; the two are synonyms                                                                      | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md#shant-and-must-not) |
-| **DO**               | An action with no default outcome, so HENCE and LEST must be given; optional after MUST, MAY and SHANT | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
-| **PROVIDED**         | A condition the action must meet                                                                       | [Deadlines and consequences](regulative/consequences.md)          |
-| **WITHIN**           | The deadline, counted from when the rule starts                                                        | [Deadlines and consequences](regulative/consequences.md)          |
-| **HENCE**            | What follows when the rule is complied with                                                            | [Deadlines and consequences](regulative/consequences.md)          |
-| **LEST**             | What follows when it is not                                                                            | [Deadlines and consequences](regulative/consequences.md)          |
-| **FULFILLED**        | The end state: nothing more is owed                                                                    | [Deadlines and consequences](regulative/consequences.md)          |
-| **BREACH**           | The end state: a rule was broken; `BREACH BY party BECAUSE reason`                                     | [Deadlines and consequences](regulative/consequences.md)          |
-| **BY**               | Names the party in `BREACH BY`                                                                         | [Deadlines and consequences](regulative/consequences.md)          |
-| **RAND**             | Both rules apply at once                                                                               | [Deadlines and consequences](regulative/consequences.md)          |
-| **ROR**              | Either rule may be complied with                                                                       | [Deadlines and consequences](regulative/consequences.md)          |
-| **BECAUSE**          | The reason given for a breach                                                                          | [BECAUSE](regulative/BECAUSE.md)                                  |
-| **DOES**             | In a trace event: `PARTY Seller DOES deliver AT 3`                                                     | [EVENT](regulative/EVENT.md)                                      |
-| **AT**               | The time of an event, or the start time of a `#TRACE`                                                  | [EVENT](regulative/EVENT.md)                                      |
+| Keyword              | Meaning                                                                               | Reference                                                         |
+| -------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **PARTY**            | Who the rule applies to                                                               | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **MUST**             | Obligation                                                                            | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **MAY**              | Permission                                                                            | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **SHANT / MUST NOT** | Prohibition; the two are synonyms                                                     | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md#shant-and-must-not) |
+| **DO**               | An action neither required nor forbidden; without HENCE and LEST it behaves like MUST | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **PROVIDED**         | A condition the action must meet                                                      | [Deadlines and consequences](regulative/consequences.md)          |
+| **WITHIN**           | The deadline, counted from when the rule starts                                       | [Deadlines and consequences](regulative/consequences.md)          |
+| **HENCE**            | What follows when the rule is complied with                                           | [Deadlines and consequences](regulative/consequences.md)          |
+| **LEST**             | What follows when it is not                                                           | [Deadlines and consequences](regulative/consequences.md)          |
+| **FULFILLED**        | The end state: nothing more is owed                                                   | [Deadlines and consequences](regulative/consequences.md)          |
+| **BREACH**           | The end state: a rule was broken; `BREACH BY party BECAUSE reason`                    | [Deadlines and consequences](regulative/consequences.md)          |
+| **BY**               | Names the party in `BREACH BY`                                                        | [Deadlines and consequences](regulative/consequences.md)          |
+| **RAND**             | Both rules apply at once                                                              | [Deadlines and consequences](regulative/consequences.md)          |
+| **ROR**              | Either rule may be complied with                                                      | [Deadlines and consequences](regulative/consequences.md)          |
+| **BECAUSE**          | The reason given for a breach                                                         | [BECAUSE](regulative/BECAUSE.md)                                  |
+| **DOES**             | In a trace event: `PARTY Seller DOES deliver AT 3`                                    | [EVENT](regulative/EVENT.md)                                      |
+| **AT**               | The time of an event, or the start time of a `#TRACE`                                 | [EVENT](regulative/EVENT.md)                                      |
 
 ## Files and modules
 
