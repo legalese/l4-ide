@@ -2462,12 +2462,10 @@ must current = attachAnno $
      <$> asum
       -- Parse MUST, then check for optional NOT to determine modal
       [ annoLexeme (spacedKeyword_ TKMust) *>
-        (DMustNot <$ annoLexeme (spacedKeyword_ TKNot) <* optional (annoLexeme (spacedKeyword_ TKDo))
-         <|> DMust <$ optional (annoLexeme (spacedKeyword_ TKDo)))
+        (DMustNot <$ annoLexeme (spacedKeyword_ TKNot)
+         <|> pure DMust)
       , DMay <$ annoLexeme (spacedKeyword_ TKMay)
-        <* optional (annoLexeme (spacedKeyword_ TKDo))
       , DMustNot <$ annoLexeme (spacedKeyword_ TKShant)
-        <* optional (annoLexeme (spacedKeyword_ TKDo))
       , DDo <$ annoLexeme (spacedKeyword_ TKDo)
       ]
      <*> annoHole (indentedPattern current)

@@ -53,8 +53,6 @@ PARTY Alice SHANT smoke WITHIN 30          -- prohibition
 PARTY Alice MUST NOT smoke WITHIN 30       -- the same prohibition
 ```
 
-A `DO` may follow the modal without changing the meaning: `MUST DO pay 100` is `MUST pay 100`.
-
 ---
 
 ## HENCE and LEST — the success and failure paths

@@ -12,7 +12,6 @@ PARTY party MUST NOT action
 PARTY party DO action
 ```
 
-After `MUST`, `MAY`, `SHANT` and `MUST NOT`, a `DO` may be added: `MUST DO action` means the same as `MUST action`.
 The rest of the rule (`PROVIDED`, `WITHIN`, `HENCE`, `LEST`) is described in [Deadlines and consequences](consequences.md).
 
 **Example files:** [party-example.l4](party-example.l4), [must-example.l4](must-example.l4), [may-example.l4](may-example.l4), [shant-example.l4](shant-example.l4)
@@ -110,7 +109,7 @@ GIVETH A DEONTIC Party Action
 
 ## DO
 
-`DO` without a modal names an action that is neither required nor forbidden. It is meant for rules that give both `HENCE` and `LEST`; when they are left out, it behaves like `MUST`.
+`DO` names an action that is neither required nor forbidden. It is meant for rules that give both `HENCE` and `LEST`; when they are left out, it behaves like `MUST`.
 
 ## Summary
 

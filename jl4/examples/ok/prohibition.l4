@@ -67,17 +67,29 @@ breachInHence MEANS
   WITHIN 30
   HENCE BREACH BY Alice BECAUSE "smoking is always a breach"
 
--- Test MAY DO (permission - existing functionality)
+-- Test MAY (permission)
 mayDrink MEANS
   PARTY Bob
-  MAY DO drink
+  MAY drink
   WITHIN 30
 
--- Test MUST DO (obligation - existing functionality)
+-- Test MUST (obligation)
 mustDrink MEANS
   PARTY Alice
-  MUST DO drink
+  MUST drink
   WITHIN 30
+
+-- Test DO (bare action): without HENCE and LEST it behaves like MUST
+doDrink MEANS
+  PARTY Alice
+  DO drink
+  WITHIN 30
+
+#TRACE doDrink AT 0 WITH
+  PARTY Alice DOES drink AT 10
+
+#TRACE doDrink AT 0 WITH
+  (WAITUNTIL 31)
 
 -- Behavior Tests using #TRACE
 -- NOTE: As of Phase 1-3 implementation, only PARSING is complete.
