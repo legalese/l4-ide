@@ -61,7 +61,7 @@ The seller delivers at 2, within 3; the buyer then has 7 from 2, and pays at 5. 
 ```text
 #TRACE rule AT start-time WITH
   PARTY party DOES action AT time
-  (WAITUNTIL time)
+  WAITUNTIL time
 ```
 
 `#TRACE` reads the events in order and gives `FULFILLED`, `BREACH`, or the rule still waiting for more events. A `WAITUNTIL` event lets time pass without anyone acting.

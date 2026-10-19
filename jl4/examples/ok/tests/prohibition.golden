@@ -3,7 +3,7 @@ Typechecking successful
 Evaluation successful
 prohibition.l4:88:1-89:31:
   FULFILLED
-prohibition.l4:91:1-92:17:
+prohibition.l4:91:1-92:15:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY

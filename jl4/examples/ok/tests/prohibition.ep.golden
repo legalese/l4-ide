@@ -89,7 +89,7 @@ doDrink MEANS
   PARTY 10
 
 DOES Alice AT drink #TRACE doDrink AT 0 WITH
-  (WAITUNTIL 31)
+  WAITUNTIL 31
 
 -- Behavior Tests using #TRACE
 -- NOTE: As of Phase 1-3 implementation, only PARSING is complete.
