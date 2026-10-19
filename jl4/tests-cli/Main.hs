@@ -1378,6 +1378,25 @@ spec bin = do
       renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
       renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
 
+    it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15, 16)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Ruled 2026-10-02: indented past the GIVEN keyword, it describes the
+      -- input above it, with a GIVETH next (row 15) or without (row 16).
+      -- Before, row 15's was dropped and row 16's became the rule's sentence.
+      nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` (joinLines ["`row sixteen` with 200", "`row sixteen` where the sum of money is 200"] `isInfixOf`)
+      -- Render describes each rule by its own body.
+      renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen means amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
+
+    it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      nlgOut `shouldSatisfy` endsLine "row seventeen saw 200"
+      renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
+
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]

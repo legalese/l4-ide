@@ -87,7 +87,7 @@ DECIDE `is large` IF amount GREATER THAN 100
 
 **Trailing a line, it describes what is on that line.**
 **Starting a line of its own, it describes what follows.**
-That holds whether the thing is a rule, an input, a field or a type declaration, with one exception, for a list of fields, below.
+That holds whether the thing is a rule, an input, a field or a type declaration, with two exceptions, for a list of fields and a list of inputs, below.
 
 **Put a rule's sentence trailing its head, or on its own line between its `GIVEN` block and the `DECIDE`, never above the `GIVEN`.**
 An annotation on its own line above a `GIVEN` is not the rule's, because the `GIVEN` comes between them.
@@ -116,6 +116,23 @@ DECLARE Employee
 ```
 
 A field list is a column of things rather than a sequence of declarations, and writing the gloss under the field it belongs to is what authors do.
+
+**A `GIVEN` list is the other exception, last input included.**
+Underneath an input, an annotation describes that input.
+Under the LAST input, with no `GIVETH` before the rule, the same line is also the line above the rule, so the column decides: indented further than the `GIVEN` keyword, the annotation describes the input; at the keyword's column or left of it, it describes the rule.
+
+```l4
+GIVEN floor  IS A NUMBER
+      amount IS A NUMBER
+      @nlg the sum of money
+@nlg the claim of %amount% is over %floor%
+DECIDE `is large` IF amount GREATER THAN floor
+```
+
+Here `the sum of money` is `amount`'s gloss and the second annotation is the rule's sentence.
+It is the `GIVEN` keyword's column that counts, not the left margin, so a `GIVEN` indented under a section heading or inside a `WHERE` reads the same way.
+The column is all it reads: a rule's sentence indented under the last input, by even one space, becomes that input's gloss, and nothing warns.
+The exceptions are confined to those two lists: between `GIVETH` and `DECIDE`, an annotation on its own line describes the rule below it at any indentation.
 
 #### Writing a literal `%` or `]`
 
