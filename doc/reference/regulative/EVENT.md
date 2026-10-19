@@ -53,7 +53,7 @@ GIVETH A DEONTIC Person Action
 
 ## WAITUNTIL
 
-`` `WAITUNTIL` time `` is an event that matches no party and no action. Use it to let time pass without anyone acting, so that a deadline runs out:
+`WAITUNTIL time` is an event that matches no party and no action. Use it to let time pass without anyone acting, so that a deadline runs out:
 
 ```l4
 DECLARE Person IS ONE OF Seller, Buyer
@@ -66,7 +66,7 @@ GIVETH A DEONTIC Person Action
   WITHIN 3
 
 #TRACE `delivery duty` AT 0 WITH
-  (WAITUNTIL 10)
+  WAITUNTIL 10
 ```
 
 This gives a breach: the deadline at 3 passed with no delivery.

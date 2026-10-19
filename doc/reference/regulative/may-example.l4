@@ -150,7 +150,7 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 2: Prepayment option not exercised before the deadline (valid - no breach)
 #TRACE `prepayment option` AT 0 WITH
-  (WAITUNTIL 366)
+  WAITUNTIL 366
 
 -- Test 3: Purchase with warranty - full path
 #TRACE `purchase with warranty` AT 0 WITH
@@ -172,7 +172,7 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 7: Acceleration right triggered by breach
 #TRACE `payment with acceleration right` AT 0 WITH
-  (WAITUNTIL 31)
+  WAITUNTIL 31
   PARTY `The Lender` DOES `demand acceleration` AT 35
 
 -- Test 8: Acceleration right not needed (payment made)
@@ -193,7 +193,7 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 12: Early termination not exercised before the deadline
 #TRACE `early termination clause` AT 0 WITH
-  (WAITUNTIL 181)
+  WAITUNTIL 181
 
 -- Test 13: Warranty claim process - complete workflow
 #TRACE `warranty claim process` AT 0 WITH
