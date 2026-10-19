@@ -38,13 +38,10 @@ subjects/<jurisdiction>/<slug>/
 **`encoding.json`** — `id`, `encoder`, `display_name`, `status` (`draft` until a domain expert has reviewed it), `version` (semver, starting `0.1.0`), `license`, `maintainer`, `modules` (the list, in reading order), `scope` (the provisions encoded, and those not), and a `not_reviewed` note saying who has and has not read it against the source.
 If some tests are meant to fail, say which file and how many under `expected_red`.
 
-**The target.** Two more fields say which compiler the row was written for and checked against:
-`target` is `main` or `unstable` (the brief's target), and `main_build` is the `l4 --version` line of the main build `check.sh` compared the modules with, such as `1.6.98 (main, 7689b0d, 2026-10-19)`.
-Omit `main_build` when the target is `unstable`, because nothing was compared.
-Also paste `check.sh`'s output, main columns included, into `NOTES.md` with the date.
-They are fields, and not only a line in `NOTES.md`, so that a reader or a tool can tell which compiler a row needs without opening the notes.
-Nothing in canon validates `encoding.json`: `docs/directory-conventions.md` §4.2 names its fields without a schema, §7's lint rules cover paths, row shape and pointer files only, and committed rows already carry fields beyond the documented list (`method`, `cases`, `gates`, `checks`).
-If canon ever gains a schema that refuses unknown fields, move the two fields into `NOTES.md` and say so here.
+**The target.** An encoding deposited in commons states which compiler it was written to be read by, `main` or `unstable` (the brief's target), in `NOTES.md`.
+For target `main`, `NOTES.md` also carries the output of `check.sh` with its main columns, and the main build it compared with: the `l4 --version` line, such as `1.6.98 (main, 7689b0d, 2026-10-19)`.
+If the row's `encoding.json` already has a `checks` object with a `note`, put the main step's result there too; some rows also have `l4_build`, which records the build the encoding was written with.
+If it has no such field, leave `encoding.json` alone.
 
 The fullest worked example is `subjects/il/hvac-work-licensing-2025/encodings/legalese/`; read its `encoding.json` and `NOTES.md` before writing your own.
 

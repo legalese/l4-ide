@@ -144,7 +144,8 @@ A reviewer reads this first. It carries:
 3. **The fork register**: every ambiguity you met — the readings you saw, the one you took, and why, with the text that licenses each reading.
    A fork resolved by a court or the regulator says who settled it. "No ambiguities found" is a claim a reviewer will not believe; if you found none, say where you looked.
 4. **An answer table** where the subject has one — the fee for each service in each vintage, the threshold for each grade — with the provision cited per cell.
-5. **What `check.sh` prints**, and which failing assertions are expected, and why.
+5. **What `check.sh` prints**, main columns included, and the main build it compared with, and which failing assertions are expected, and why.
+   Also the **target** the encoding was written for, `main` or `unstable`.
 6. **Open questions** for a domain expert.
 
 ### 10. Deposit it in canon

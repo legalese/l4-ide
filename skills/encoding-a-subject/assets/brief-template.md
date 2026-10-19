@@ -65,7 +65,7 @@ Name anything deliberately left out, and why.⟩
 
 **Target compiler: `main`, build 98 or later.**
 
-<!-- Change this to `unstable` only if the encoding will not be read by a main build. Build 98 is the build references/dialects.md in the writing-l4-rules skill was measured at; use the number its header gives now. -->
+<!-- The default is `main` (assumed, not ruled): encodings are often written with an unstable binary and filed in commons, where a main build has to read them. Change it to `unstable` only if the encoding will not be read by a main build. Build 98 is the build references/dialects.md in the writing-l4-rules skill was measured at; use the number its header gives now. -->
 
 This is the compiler that has to read the deposit, and it is not the compiler you run: running an `unstable` binary does not license `unstable` syntax.
 `main` rejects, or reads differently, much of what the authoring skill teaches, so read `references/dialects.md` in the `writing-l4-rules` skill first, and use only what it says `main` reads.

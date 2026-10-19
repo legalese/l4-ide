@@ -21,8 +21,8 @@
 # differently, much of what `unstable` accepts (references/dialects.md in the writing-l4-rules
 # skill), and the only mechanical way to know is to run a main build over the module too. With the
 # target `main` (the default) this script runs every module with BOTH binaries and compares the four
-# counts. A module whose counts differ, or that errors on main, is red, and its line says "reads
-# differently on main". The counts are what it compares, so it catches a module main rejects and a
+# counts. A module whose counts differ, or that errors on main, is red, its line says "reads
+# differently on main", and the next line shows the first error main gives. The counts are what it compares, so it catches a module main rejects and a
 # difference that changes an assertion's outcome; it cannot catch one that no assertion exercises
 # (an input named in a MUST action matches any payload on main, and only a test of a WRONG payload
 # shows it). Write that test, or use the spelling dialects.md gives.
@@ -30,8 +30,8 @@
 # Usage:  check.sh [DIR]          (DIR defaults to the directory this script is in)
 # Env:    L4         the l4 binary you write with        (default: `l4` on PATH)
 #         L4_TARGET  main | unstable                    (default: main)
-#                    `unstable` skips the main check; the output and exit status are then what
-#                    this script printed before the target check existed.
+#                    `unstable` skips the main check and says so on stderr; stdout and the exit
+#                    status are then what this script printed before the target check existed.
 #         L4_MAIN    the path of a main-build l4         (default: whatever fetch-main-l4.sh,
 #                    next to this script, prints: the newest main build, cached)
 #         L4_FETCH   a fetch-main-l4.sh somewhere else   (default: next to this script)
@@ -51,6 +51,27 @@ L4="${L4:-l4}"
 TARGET="${L4_TARGET:-main}"
 MAIN_TIMEOUT="${L4_MAIN_TIMEOUT:-300}"
 
+# The first error in a run's output, on one line: its kind (parse or type), where, and what it says.
+# The same extraction as etc/dialect-census.sh.
+first_error() {
+  awk '
+    /^File:/ { if (found) exit; src = ""; rng = "" }
+    /^  Range:/ { rng = $2 }
+    /^  Source:/ { src = $2 }
+    /^  Severity: DiagnosticSeverity_Error/ { found = 1; next }
+    found && /^  Message:/ { inmsg = 1; next }
+    found && inmsg {
+      line = $0
+      if (line ~ /^ *[0-9]* *\|/) next
+      if (line ~ /^ *$/) next
+      sub(/^ +/, "", line); sub(/ +$/, "", line)
+      text = text (taken ? " " : "") line; taken++
+      if (taken >= ((src == "parser" || src == "lexer") ? 1 : 3)) exit
+    }
+    END { if (found) printf "%s %s: %s\n", (src == "parser" || src == "lexer") ? "parse" : ((src == "check") ? "type" : src), rng, substr(text, 1, 150) }
+  '
+}
+
 # A module that is MEANT to fail (a draft's test cases run against the text as made,
 # say) is listed here with its exact count, and named in encoding.json `expected_red`.
 expected_failed() {
@@ -68,7 +89,7 @@ fi
 # --- the main binary, when the target is main --------------------------------------------------
 MAIN="" MAIN_VERSION=""
 case "$TARGET" in
-  unstable) ;;
+  unstable) echo "check.sh: the target is unstable, so the main check was skipped." >&2 ;;
   main)
     MAIN="${L4_MAIN:-}"
     if [ -z "$MAIN" ]; then
@@ -134,7 +155,7 @@ for f in "$DIR"/*.l4; do
     # library path newer than the binary breaks it with errors that look like the module's.
     # It is bounded by L4_MAIN_TIMEOUT: a module main cannot finish is not readable by main.
     mtmp="$(mktemp "${TMPDIR:-/tmp}/check-main.XXXXXX")" || { echo "check.sh: cannot make a temporary file." >&2; exit 2; }
-    ( exec env -u JL4_LIBRARY_PATH "$MAIN" run "$f" >"$mtmp" 2>&1 ) &
+    ( cd "$DIR" && exec env -u JL4_LIBRARY_PATH "$MAIN" run "$m" >"$mtmp" 2>&1 ) &
     mpid=$!
     wd=""
     if [ "$MAIN_TIMEOUT" -gt 0 ]; then
@@ -161,6 +182,9 @@ for f in "$DIR"/*.l4; do
     fi
     [ "$verdict" = same ] || { status=1; differ=$((differ + 1)); }
     printf '%-40s %7d %9d %7d %8d %9d | %6d %9d %7d %8d  %s\n' "$m" "$err" "$ok" "$bad" "$ref" "$exp" "$merr" "$mok" "$mbad" "$mref" "$verdict"
+    if [ "$verdict" != same ] && [ "$merr" -gt 0 ]; then
+      printf '    main says: %s\n' "$(printf '%s\n' "$mout" | first_error)"
+    fi
     m_err=$((m_err + merr)) m_ok=$((m_ok + mok)) m_bad=$((m_bad + mbad)) m_ref=$((m_ref + mref))
   else
     printf '%-40s %7d %9d %7d %8d %9d\n' "$m" "$err" "$ok" "$bad" "$ref" "$exp"
