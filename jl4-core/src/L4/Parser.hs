@@ -14,6 +14,8 @@ module L4.Parser (
   PError (..),
   mkPError,
   PState (..),
+  langTagOfToken,
+  redundantLangEnRanges,
   MixfixHintRegistry,
   buildMixfixHintRegistry,
   emptyMixfixHintRegistry,
@@ -119,10 +121,41 @@ spaceOrAnnotations = do
 -- | @\@lang he@. Collected like any other annotation, so its tokens ride in
 -- the same hidden cluster and exactprint re-emits the line unchanged.
 langP :: Parser (Epa LangTag)
-langP = hidden $ spacedTokenWs (\ case
+langP = hidden $ spacedTokenWs langTagOfToken "Language declaration"
+
+-- | The language tag a @\@lang@ token carries, if that is what this token is.
+--
+-- Factored out so that the two things that read a @\@lang@ declaration — the
+-- parser, through 'langP', and 'redundantLangEnRanges', which scans a bare
+-- token stream — agree on what the token looks like by construction rather
+-- than by both being edited together.
+langTagOfToken :: TokenType -> Maybe LangTag
+langTagOfToken = \ case
   TAnnotations (TLang tag _) -> Just tag
-  _ -> Nothing)
-  "Language declaration"
+  _ -> Nothing
+
+-- | The ranges of the @\@lang en@ lines that say nothing the module does not
+-- already say, read off the token stream.
+--
+-- A module that declares no @\@lang@ is English ('defaultModuleLang'), so
+-- a declaration of @en@ changes nothing. That holds only while EVERY
+-- declaration in the module is @en@: the last declaration wins, so in a
+-- module that also says @\@lang he@ an @en@ line is not redundant (written
+-- last it is the one that counts; written first it is overridden, and neither
+-- is "this line can go"). Such a module gets no hint at all.
+--
+-- The tag is compared exactly. The lexer does not fold case ('isLangTagChar'
+-- admits capitals) and 'MkLangTag' is compared as written, so @\@lang EN@ and
+-- @\@lang en-GB@ are NOT the default language as far as the pipeline is
+-- concerned, and are left alone.
+--
+-- The range is the token's own, which is the whole @\@lang@ line.
+redundantLangEnRanges :: [PosToken] -> [SrcRange]
+redundantLangEnRanges ts
+  | all ((== defaultModuleLang) . snd) decls = fst <$> decls
+  | otherwise = []
+  where
+    decls = [ (t.range, tag) | t <- ts, Just tag <- [langTagOfToken (computedPayload t)] ]
 
 refP :: Parser (Epa Ref)
 refP = do

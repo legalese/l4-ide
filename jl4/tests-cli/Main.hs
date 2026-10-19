@@ -15,6 +15,7 @@ import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (IOException, finally, throwIO, try)
 import Control.Monad (forM_, unless, void, when)
 import qualified Data.Char as Char
+import Data.Foldable (toList)
 import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
@@ -304,6 +305,12 @@ evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
 
+-- | A module that declares @\@lang en@, which a module that declares nothing
+-- already is; and one that declares @en@ and then @he@, so is not redundant.
+langEnHintFixture, langEnThenHeFixture :: FilePath
+langEnHintFixture   = fixtureDir </> "lang-en-hint.l4"
+langEnThenHeFixture = fixtureDir </> "lang-en-then-he.l4"
+
 evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
@@ -483,6 +490,7 @@ main = do
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
        , evalTraceFixture, refTrailingFixture
+       , langEnHintFixture, langEnThenHeFixture
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
@@ -715,6 +723,52 @@ spec bin = do
     it "keeps a string that spans lines in a clause body" $ do
       results [batchClausesString, "--inputs", batchClausesColours]
         >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
+
+  -- `@lang en` says what a module that declares nothing already is, so
+  -- `l4 check` hints that the line can go. It is a HINT: the check still
+  -- succeeds, with the same exit code and the same JSON verdict it would give
+  -- without the line. Without the controls below a hint that fired on every
+  -- module would pass the first case, so they are the half that matters.
+  describe "l4 check: a redundant @lang en" $ do
+    let hintText = "A module that declares nothing is English; this line can go."
+
+    it "hints that the line can go, at Hint severity, and the check still succeeds" $ do
+      Output code sout serr <- runL4 bin ["check", langEnHintFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      serr `shouldSatisfy` (hintText `isInfixOf`)
+      serr `shouldSatisfy` ("DiagnosticSeverity_Hint" `isInfixOf`)
+      -- not a warning, and not anything louder
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Warning" `isInfixOf`)
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+
+    it "points at the @lang line" $ do
+      Output _ _ serr <- runL4 bin ["check", langEnHintFixture]
+      -- the fixture's third line, from its first column, and it ends on that
+      -- same line: the range is rendered "line:col-line:col"
+      serr `shouldSatisfy` ("3:1-3:" `isInfixOf`)
+
+    it "leaves the JSON verdict at ok=true" $ do
+      env <- jsonEnvelope bin ["check", langEnHintFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "diagnostics" of
+        Just (Array v) -> [t | String t <- toList v] `shouldSatisfy` any (T.pack hintText `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+    it "says nothing to a module that declares another language" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/ok/nlg-module-lang.l4"]   -- `@lang he`
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    it "says nothing to a module that declares nothing" $ do
+      Output code _ serr <- runL4 bin ["check", cleanFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    it "says nothing on an `en` line in a module that also declares `he`" $ do
+      Output code _ serr <- runL4 bin ["check", langEnThenHeFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
 
   describe "l4 format" $ do
     it "prints a clean file to stdout as written" $ do
