@@ -257,7 +257,7 @@ GIVETH A DEONTIC Actor Action
 -- Useful for testing deadline behavior
 
 #TRACE `simple delivery obligation` AT 0 WITH
-    (WAITUNTIL 20)
+    WAITUNTIL 20
 
 -- ============================================================
 -- § DEONTIC as Return Values

@@ -32,7 +32,7 @@ No standard library used any of them; only the built-ins page, its example file 
 | Before                                                                                               | After                                         |
 | ---------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `` `IS INTEGER` x ``                                                                                 | `ISINTEGER x`                                 |
-| ``(`WAIT UNTIL` t)`` in a `#TRACE`                                                                   | `(WAITUNTIL t)`                               |
+| ``(`WAIT UNTIL` t)`` in a `#TRACE`                                                                   | `WAITUNTIL t`                                 |
 | `` `EVER BETWEEN` ``, `` `ALWAYS BETWEEN` ``, `` `WHEN LAST` ``, `` `WHEN NEXT` ``, `` `VALUE AT` `` | an ordinary function over the dates concerned |
 | the four `` `EVAL …` `` built-ins                                                                    | none                                          |
 

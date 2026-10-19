@@ -92,7 +92,7 @@ GIVETH A DEONTIC Party Action
         -- no LEST: missing this deadline is a breach
 
 #TRACE `repayment` 1000 AT 0 WITH
-    (WAITUNTIL 31)
+    WAITUNTIL 31
     PARTY `The Borrower` DOES pay 1050 AT 40
 -- Result: FULFILLED
 ```
@@ -288,7 +288,7 @@ The `HENCE` branch reduces the balance; the `LEST` branch increases it with a pe
 #TRACE contractName AT startTime WITH
     PARTY partyName DOES action AT eventTime
     PARTY partyName DOES action AT eventTime
-    (WAITUNTIL time)
+    WAITUNTIL time
 ```
 
 Timestamps are numbers on a shared timeline. For date-based contracts, count in days: with `IMPORT daydate`, `Day (Date 10 2 2025)` is a day number, so a trace can start `AT Day (Date 1 2 2025)` and give each event `AT Day (…)`, with `WITHIN` in days.
@@ -311,12 +311,12 @@ With no events, or only events that settle nothing, the trace returns the rule s
 
 ```text
 #TRACE `repayment` 1000 AT 0 WITH
-    (WAITUNTIL 31)
+    WAITUNTIL 31
 -- Result: the LEST obligation, still waiting: pay 1050 within 15
 
 #TRACE `repayment` 1000 AT 0 WITH
-    (WAITUNTIL 31)
-    (WAITUNTIL 50)
+    WAITUNTIL 31
+    WAITUNTIL 50
 -- Result: BREACH (the second deadline, at 46, passed too)
 ```
 
