@@ -1290,10 +1290,9 @@ spec bin = do
   -- sides, because only one side has a golden: the `.nlg.golden` beside the
   -- fixture pins the `l4 nlg` column and nothing anywhere pins `l4 render`'s.
   --
-  -- Rows 5, 7, 8 and 12 of the fixture are the repaired ones. The rows whose
-  -- herald stands on a line of its own ABOVE a head or a GIVETH (2, 4, 6, 11,
-  -- 13) depend on where an annotation attaches, and are asserted with that
-  -- rule, not here.
+  -- Rows 5, 7, 8 and 12 of the fixture are the repaired ones; row 13 and the
+  -- `AKA` rows are the controls, and they are the assertions that fail if the
+  -- repair is widened into an unconditional promotion.
   describe "an @nlg on a rule head's input" $ do
     -- Windows ends a process's lines with a carriage return, which would sit
     -- between a needle and the line break it expects; drop it on the way in.
@@ -1333,7 +1332,17 @@ spec bin = do
       Output _ sout _ <- nlgOf
       sout `shouldSatisfy` endsLine "row one saw 200"
       sout `shouldSatisfy` endsLine "row three saw 200"
+      sout `shouldSatisfy` endsLine "row four saw 200"
+      sout `shouldSatisfy` endsLine "row six saw 200"
       sout `shouldSatisfy` endsLine "row nine saw 200"
+
+    it "keeps a rule's OWN sentence when it also heralds itself (row 13)" $ do
+      Output _ sout _ <- nlgOf
+      -- The rule's own annotation is found first, so nothing is moved and the
+      -- inner herald stays the input's gloss. An unconditional promotion would
+      -- overwrite the outer one with the inner.
+      sout `shouldSatisfy` endsLine "row thirteen the rule saw 200"
+      sout `shouldSatisfy` ("row thirteen the input" `isInfixOf`)
 
     it "reads a herald on an AKA head as the rule's sentence at every call shape (#978)" $ do
       Output _ nlgOut _ <- nlgOf
@@ -1345,16 +1354,26 @@ spec bin = do
       nlgOut `shouldNotSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
       nlgOut `shouldSatisfy` (unlines ["row ten saw 200", "row ten saw `amount` where `amount` is 200", "row ten saw 200"] `isInfixOf`)
       renOut `shouldSatisfy` ("row ten saw amount" `isInfixOf`)
+      -- Row 11: the herald above the head lands on the declaration. A `WITH`
+      -- call used to print the bare name, "`row eleven` where ...".
+      nlgOut `shouldSatisfy` endsLine "row eleven saw 200"
+      nlgOut `shouldSatisfy` ("row eleven saw `amount` where `amount` is 200" `isInfixOf`)
+      nlgOut `shouldNotSatisfy` ("`row eleven` where" `isInfixOf`)
+      renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
+
+    it "heads a WITH call with the herald without re-expanding an input's gloss (row 13)" $ do
+      Output _ nlgOut _ <- nlgOf
+      nlgOut `shouldSatisfy` ("row thirteen the rule saw `amount` where row thirteen the input is 200" `isInfixOf`)
 
     it "reads a GIVEN gloss as the input's label, never as the rule's sentence (row 14)" $ do
       Output _ nlgOut _ <- nlgOf
       Output _ renOut _ <- renderOf
       -- The head names no input, so the type checker hoists the GIVEN name
       -- into it; the gloss must not be taken for the rule's herald on that
-      -- account (smucclaw/l4-ide#977). Positional: the bare name. Render: the
-      -- rule's own body. (That the gloss then labels the input in a `WITH`
-      -- call's `where` clause is a matter of where the annotation attaches.)
+      -- account (smucclaw/l4-ide#977). Positional: the bare name. WITH: the
+      -- gloss labels the input. Render: the rule's own body.
       nlgOut `shouldSatisfy` endsLine "`row fourteen` with 200"
+      nlgOut `shouldSatisfy` ("`row fourteen` where the sum of money is 200" `isInfixOf`)
       nlgOut `shouldNotSatisfy` ("the sum of money with 200" `isInfixOf`)
       renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
       renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)

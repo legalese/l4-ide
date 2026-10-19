@@ -71,6 +71,39 @@ GIVETH A NUMBER
 Text in square brackets after a name, as in ``DECIDE `the limit` [the statutory limit] IS 5``, is a short inline wording for that name.
 How to use `@nlg` well: [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md).
 
+#### Where to put it
+
+An annotation describes the thing it sits with, and there are two places to sit:
+
+```l4
+-- trailing: describes `amount`
+GIVEN amount IS A NUMBER @nlg the claim amount
+
+GIVETH A BOOLEAN
+-- own line: describes the rule
+@nlg the claim of %amount% is large
+DECIDE `is large` IF amount GREATER THAN 100
+```
+
+**Trailing a line, it describes what is on that line.**
+**Starting a line of its own, it describes what follows.**
+That holds whether the thing is a rule, an input, a field or a type declaration.
+
+**Put a rule's sentence trailing its head, or on its own line between its `GIVEN` block and the `DECIDE`, never above the `GIVEN`.**
+An annotation on its own line above a `GIVEN` is not the rule's, because the `GIVEN` comes between them.
+When something written just before it can take it, such as an `IMPORT` or a section heading, it is read as that one's and nothing is reported; when nothing can, L4 warns "Not attached to any valid syntax node".
+
+**Before this rule, an annotation attached to the nearest name before it.**
+`GIVEN a IS A STRING @nlg the amount` then annotated `STRING`, and an annotation on its own line above a `DECIDE` annotated the `GIVETH` type.
+Both attached to a node nothing reads, so the annotation rendered nowhere and nothing said so.
+
+**An empty `@nlg` is ignored, and says so.**
+A rendering replaces what it annotates, so `@nlg` with nothing after it would erase the name from the output rather than leave it alone.
+L4 drops it and warns instead.
+
+**A record field can carry two.**
+`head [the first item] IS AN a [an element]` glosses the field and its type separately, because each annotation sits with the token it follows.
+
 #### Writing a literal `%` or `]`
 
 Inside `@nlg`, `%` marks an input to fill in, and `%age%` is replaced by the value of `age`.

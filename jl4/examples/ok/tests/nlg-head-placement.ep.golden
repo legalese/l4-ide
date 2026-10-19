@@ -42,21 +42,13 @@
 --   8  DECIDE `r` p IS ...             trailing the head       herald          herald     herald
 --   9  `r` / herald / p MEANS ...      own line ABOVE the p    herald          herald     herald
 --  10  `r` p AKA `a` / herald / MEANS  own line below the AKA  herald          herald     herald
---  11  herald / `r` p AKA `a` MEANS    own line above          BARE NAME       BARE NAME  herald
+--  11  herald / `r` p AKA `a` MEANS    own line above          herald          herald     herald
 --  12  `r` p q / herald / MEANS ...    own line below the q    herald          herald     herald
 --  13  herald / `r` p / herald / MEANS both                    OUTER           OUTER      OUTER
 --  14  GIVEN p @nlg g / DECIDE `r` IF  trailing the GIVEN name  BARE NAME       gloss      rule's own body
 --
--- The table is what reads WITH the rule that an annotation on a line of its own
--- describes what follows. Under the older rule, in which an annotation attaches
--- to the nearest name before it, rows 2, 4, 6 and 11 land the herald on a type
--- that nothing reads, so they print the rule's bare name, and row 13 loses the
--- rule's own sentence; the golden next to this file records whichever rule the
--- tree has.
---
 -- Rows 5, 7, 8 and 12 are the repair. Before it they printed the bare rule name
--- positionally; rows 1, 3 and 9 already read the herald and are unchanged (and 2, 4
--- and 6 do too, under the attachment rule above),
+-- positionally; rows 1-4, 6 and 9 already read the herald and are unchanged,
 -- which is the point of keeping them here -- the fix must not disturb the
 -- placements that already worked.
 --
@@ -76,10 +68,11 @@
 --
 -- (c) An `AKA` on the head is a SEPARATE axis (smucclaw/l4-ide#978). Row 10's
 -- herald lands on the AKA's NAME, which L4.Nlg.decideNlg searches as another
--- spelling of the head, so it reads as the rule's sentence everywhere, and a
--- call through the alias name reads the same as one through the head name. A
--- herald above an AKA head (row 11) lands on the declaration; whether that
--- reaches the rule is the attachment rule's business, as for rows 2, 4 and 6.
+-- spelling of the head. Row 11's herald lands on the declaration, which the
+-- head name does not carry, so a `WITH` call reaches it through the directive
+-- splice, which heads a named-argument call with the rule's herald. Both
+-- placements read as the rule's sentence everywhere, and a call through the
+-- alias name reads the same as one through the head name.
 --
 -- The prelude carries 57 lines with an `@nlg` herald (measured 2026-10-19 on
 -- `jl4-core/libraries/prelude.l4`), many of them in row 5's shape
@@ -196,11 +189,11 @@ GIVETH A BOOLEAN
 #EVAL `row ten` WITH amount IS 200
 #EVAL `row ten alias` 200
 
--- Row 11: the same AKA head with the herald ABOVE it. `l4 render` finds it, and
--- so does `l4 nlg` -- not through the head-input repair (the herald is on no
--- appform argument) but through the directive splice, which reads a herald
--- wherever `decideNlg` finds one and fills its slots from the call. Row 10 is
--- now the one row in this table where the two projections still disagree.
+-- Row 11: the same AKA head with the herald ABOVE it. It lands on the
+-- declaration, not on the head name, so `l4 nlg` reaches it through the
+-- directive splice: a positional call fills its slots from the arguments, and
+-- a `WITH` call takes it as its heading and keeps its `where` clause
+-- (smucclaw/l4-ide#978).
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
 @nlg row eleven saw %amount%
