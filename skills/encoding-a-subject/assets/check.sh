@@ -16,15 +16,36 @@
 # A script that greps the Message line alone undercounts the first and never sees the
 # second; a refusing assertion then looks green.
 #
+# The target check. An encoding is written for a TARGET compiler, `main` or `unstable`, and the
+# target comes from the brief, not from the binary you happen to run. `main` rejects, or reads
+# differently, much of what `unstable` accepts (references/dialects.md in the writing-l4-rules
+# skill), and the only mechanical way to know is to run a main build over the module too. With the
+# target `main` (the default) this script runs every module with BOTH binaries and compares the four
+# counts. A module whose counts differ, or that errors on main, is red, and its line says "reads
+# differently on main". The counts are what it compares, so it catches a module main rejects and a
+# difference that changes an assertion's outcome; it cannot catch one that no assertion exercises
+# (an input named in a MUST action matches any payload on main, and only a test of a WRONG payload
+# shows it). Write that test, or use the spelling dialects.md gives.
+#
 # Usage:  check.sh [DIR]          (DIR defaults to the directory this script is in)
-# Env:    L4   the l4 binary      (default: `l4` on PATH)
+# Env:    L4         the l4 binary you write with        (default: `l4` on PATH)
+#         L4_TARGET  main | unstable                    (default: main)
+#                    `unstable` skips the main check; the output and exit status are then what
+#                    this script printed before the target check existed.
+#         L4_MAIN    the path of a main-build l4         (default: whatever fetch-main-l4.sh,
+#                    next to this script, prints: the newest main build, cached)
+#         L4_FETCH   a fetch-main-l4.sh somewhere else   (default: next to this script)
 #
 # Exit status: 0 only when no module has an error other than its expected failed
-# assertions, no assertion refused, and each module fails exactly as often as
-# expected_failed says.
+# assertions, no assertion refused, each module fails exactly as often as
+# expected_failed says, and (target main) every module reads the same on main.
+# 2 when a step could not be run: no l4, a bad L4_TARGET, or target main and no main binary.
+# A run with a step missing is not a full check, so it does not return 0 or 1.
 set -u
-DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIR="${1:-$HERE}"
 L4="${L4:-l4}"
+TARGET="${L4_TARGET:-main}"
 
 # A module that is MEANT to fail (a draft's test cases run against the text as made,
 # say) is listed here with its exact count, and named in encoding.json `expected_red`.
@@ -40,22 +61,102 @@ if ! command -v "$L4" >/dev/null 2>&1; then
   exit 2
 fi
 
+# --- the main binary, when the target is main --------------------------------------------------
+MAIN="" MAIN_VERSION=""
+case "$TARGET" in
+  unstable) ;;
+  main)
+    MAIN="${L4_MAIN:-}"
+    if [ -z "$MAIN" ]; then
+      fetch="${L4_FETCH:-$HERE/fetch-main-l4.sh}"
+      [ -x "$fetch" ] || fetch="$(command -v fetch-main-l4.sh 2>/dev/null || true)"
+      if [ -z "$fetch" ] || [ ! -x "$fetch" ]; then
+        echo "check.sh: the target is main, and there is no main-build l4 to compare with: L4_MAIN is not set and fetch-main-l4.sh was not found next to this script." >&2
+        echo "          Copy fetch-main-l4.sh from the encoding-a-subject skill's assets/ beside check.sh, or set L4_MAIN=/path/to/a/main/l4." >&2
+        echo "          A run with this step missing is not a full check; if the brief says the target is unstable, set L4_TARGET=unstable." >&2
+        exit 2
+      fi
+      MAIN="$("$fetch")" || {
+        echo "check.sh: the target is main, and fetch-main-l4.sh could not get a main-build l4 (its message is above)." >&2
+        echo "          A run with this step missing is not a full check. Set L4_MAIN=/path/to/a/main/l4 to supply one;" >&2
+        echo "          if the brief says the target is unstable, set L4_TARGET=unstable." >&2
+        exit 2
+      }
+    fi
+    if ! command -v "$MAIN" >/dev/null 2>&1; then
+      echo "check.sh: the target is main, and '$MAIN' is not an executable l4. A run with this step missing is not a full check." >&2
+      exit 2
+    fi
+    MAIN_VERSION="$(env -u JL4_LIBRARY_PATH "$MAIN" --version 2>/dev/null | tr -d '\000' | head -n 1)"
+    case "$MAIN_VERSION" in
+      unstable-*)
+        echo "check.sh: L4_MAIN is an unstable build ($MAIN_VERSION), not a main build. The target is main, so there is nothing to compare." >&2
+        exit 2 ;;
+      [0-9]*"(main,"*) ;;
+      *) echo "check.sh: warning: cannot confirm that $MAIN is a main build (its --version says '${MAIN_VERSION:-nothing}')." >&2 ;;
+    esac
+    ;;
+  *)
+    echo "check.sh: L4_TARGET must be main or unstable, not '$TARGET'." >&2
+    exit 2 ;;
+esac
+
 status=0 total_err=0 total_ok=0 total_bad=0 total_ref=0 n=0
-printf '%-40s %7s %9s %7s %8s %9s\n' module errors satisfied failed refused expected
+m_err=0 m_ok=0 m_bad=0 m_ref=0 differ=0
+if [ "$TARGET" = main ]; then
+  echo "target: main. Each module is run with your l4 and with the main build below; the main columns must match."
+  echo "main build: ${MAIN_VERSION:-unversioned}"
+  printf '%-40s %7s %9s %7s %8s %9s | %6s %9s %7s %8s  %s\n' module errors satisfied failed refused expected "errors" satisfied failed refused "main"
+else
+  printf '%-40s %7s %9s %7s %8s %9s\n' module errors satisfied failed refused expected
+fi
 for f in "$DIR"/*.l4; do
   [ -e "$f" ] || { echo "check.sh: no .l4 files in $DIR" >&2; exit 2; }
   m="$(basename "$f")"
-  out="$("$L4" run "$f" 2>&1)"
+  out="$("$L4" run "$f" 2>&1)"; rc=$?
   msgs="$(printf '%s\n' "$out" | grep -A1 -E '^[[:space:]]*Message:')"
   err=$(printf '%s\n' "$out" | grep -c 'DiagnosticSeverity_Error')
   ok=$(printf '%s\n' "$msgs" | grep -cE 'assertion satisfied')
   bad=$(printf '%s\n' "$msgs" | grep -cE 'assertion failed|assertion could not be evaluated')
   ref=$(printf '%s\n' "$msgs" | grep -cE 'assertion refused')
   exp=$(expected_failed "$m")
-  printf '%-40s %7d %9d %7d %8d %9d\n' "$m" "$err" "$ok" "$bad" "$ref" "$exp"
   [ $((err - bad)) -eq 0 ] && [ "$ref" -eq 0 ] && [ "$bad" -eq "$exp" ] || status=1
   total_err=$((total_err + err)) total_ok=$((total_ok + ok)) total_bad=$((total_bad + bad)) total_ref=$((total_ref + ref)) n=$((n + 1))
+  if [ "$TARGET" = main ]; then
+    # The same module, the same counting, with the main build. JL4_LIBRARY_PATH is unset for it: a
+    # library path newer than the binary breaks it with errors that look like the module's.
+    mout="$(env -u JL4_LIBRARY_PATH "$MAIN" run "$f" 2>&1; echo "check-rc=$?")"
+    mrc="$(printf '%s\n' "$mout" | sed -n 's/^check-rc=//p' | tail -n 1)"
+    mout="$(printf '%s\n' "$mout" | tr -d '\000' | grep -a -v '^check-rc=')"
+    mmsgs="$(printf '%s\n' "$mout" | grep -a -A1 -E '^[[:space:]]*Message:')"
+    merr=$(printf '%s\n' "$mout" | grep -a -c 'DiagnosticSeverity_Error')
+    mok=$(printf '%s\n' "$mmsgs" | grep -a -cE 'assertion satisfied')
+    mbad=$(printf '%s\n' "$mmsgs" | grep -a -cE 'assertion failed|assertion could not be evaluated')
+    mref=$(printf '%s\n' "$mmsgs" | grep -a -cE 'assertion refused')
+    verdict="same"
+    if [ "$merr" -ne "$err" ] || [ "$mok" -ne "$ok" ] || [ "$mbad" -ne "$bad" ] || [ "$mref" -ne "$ref" ]; then
+      verdict="reads differently on main"
+    elif [ "$mrc" != 0 ] && [ "$merr" -eq 0 ] && [ "$rc" = 0 ]; then
+      verdict="reads differently on main (it exited $mrc and printed no error)"
+    fi
+    [ "$verdict" = same ] || { status=1; differ=$((differ + 1)); }
+    printf '%-40s %7d %9d %7d %8d %9d | %6d %9d %7d %8d  %s\n' "$m" "$err" "$ok" "$bad" "$ref" "$exp" "$merr" "$mok" "$mbad" "$mref" "$verdict"
+    m_err=$((m_err + merr)) m_ok=$((m_ok + mok)) m_bad=$((m_bad + mbad)) m_ref=$((m_ref + mref))
+  else
+    printf '%-40s %7d %9d %7d %8d %9d\n' "$m" "$err" "$ok" "$bad" "$ref" "$exp"
+  fi
 done
-printf '%-40s %7d %9d %7d %8d\n' "TOTAL ($n modules)" "$total_err" "$total_ok" "$total_bad" "$total_ref"
+if [ "$TARGET" = main ]; then
+  printf '%-40s %7d %9d %7d %8d %9s | %6d %9d %7d %8d\n' "TOTAL ($n modules)" "$total_err" "$total_ok" "$total_bad" "$total_ref" "" "$m_err" "$m_ok" "$m_bad" "$m_ref"
+else
+  printf '%-40s %7d %9d %7d %8d\n' "TOTAL ($n modules)" "$total_err" "$total_ok" "$total_bad" "$total_ref"
+fi
 echo "(a failed assertion is also an error; any other error, or any refused assertion, makes the run red)"
+if [ "$TARGET" = main ]; then
+  if [ "$differ" -eq 0 ]; then
+    echo "(target main: every module has the same four counts on the main build. That rules out a module main rejects, and a difference an assertion exercises; it does not rule out one no assertion exercises)"
+  else
+    echo "(target main: $differ module(s) read differently on main, so this encoding is not readable by main as it stands; see references/dialects.md in the writing-l4-rules skill, or set L4_TARGET=unstable if the brief says the target is unstable)"
+  fi
+fi
 exit $status
