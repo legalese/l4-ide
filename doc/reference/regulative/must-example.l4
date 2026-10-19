@@ -149,7 +149,7 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 2: Basic obligation breached (no payment made; time passes the deadline)
 #TRACE `monthly loan payment` AT 0 WITH
-  (`WAIT UNTIL` 31)
+  (WAITUNTIL 31)
 
 -- Test 3: Conditional obligation - full chain executed
 #TRACE `purchase and delivery agreement` AT 0 WITH
@@ -158,13 +158,13 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 4: Payment with late fee - paid during grace period
 #TRACE `payment with late fee` AT 0 WITH
-  (`WAIT UNTIL` 31)
+  (WAITUNTIL 31)
   PARTY `The Borrower` DOES `make payment` 12000 AT 40
 
 -- Test 5: Payment with late fee - breached (no payment at all)
 #TRACE `payment with late fee` AT 0 WITH
-  (`WAIT UNTIL` 31)
-  (`WAIT UNTIL` 50)
+  (WAITUNTIL 31)
+  (WAITUNTIL 50)
 
 -- Test 6: Staged service contract - complete workflow
 #TRACE `staged service contract` AT 0 WITH
@@ -191,4 +191,4 @@ DECLARE `Contract Action` IS ONE OF
 
 -- Test 10: Landlord repair obligation - landlord misses the deadline, so the tenant must notify
 #TRACE `landlord repair obligation` AT 0 WITH
-  (`WAIT UNTIL` 15)
+  (WAITUNTIL 15)

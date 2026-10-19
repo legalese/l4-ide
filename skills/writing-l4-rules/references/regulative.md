@@ -94,7 +94,7 @@ GIVETH A DEONTIC Party Action
         -- no LEST: missing this deadline is a breach
 
 #TRACE `repayment` 1000 AT 0 WITH
-    (`WAIT UNTIL` 31)
+    (WAITUNTIL 31)
     PARTY `The Borrower` DOES pay 1050 AT 40
 -- Result: FULFILLED
 ```
@@ -192,7 +192,7 @@ Reference: <https://legalese.com/l4/reference/regulative/consequences.md>
 - A deadline counts from the moment its rule becomes active: from the start time for the first rule, and from the event that led to it for a rule under `HENCE` or `LEST`.
 - There are no absolute deadlines and no `WITHIN 5 days OF event` (that is a parse error). To count from an event, put the rule under the `HENCE` of the rule for that event.
 - A rule without `WITHIN` waits for its action indefinitely; time alone never takes it to `LEST`.
-- L4 notices that a deadline has passed only when it reads a later event, or a `` `WAIT UNTIL` ``. The rule that follows starts at that event's time, and that event is **not** matched against it.
+- L4 notices that a deadline has passed only when it reads a later event, or a `WAITUNTIL`. The rule that follows starts at that event's time, and that event is **not** matched against it.
 
 ```l4
 DECLARE Party IS ONE OF Buyer, Seller
@@ -290,7 +290,7 @@ The `HENCE` branch reduces the balance; the `LEST` branch increases it with a pe
 #TRACE contractName AT startTime WITH
     PARTY partyName DOES action AT eventTime
     PARTY partyName DOES action AT eventTime
-    (`WAIT UNTIL` time)
+    (WAITUNTIL time)
 ```
 
 Timestamps are numbers on a shared timeline. For date-based contracts, count in days: with `IMPORT daydate`, `Day (Date 10 2 2025)` is a day number, so a trace can start `AT Day (Date 1 2 2025)` and give each event `AT Day (…)`, with `WITHIN` in days.
@@ -309,16 +309,16 @@ Using `repayment` from [HENCE and LEST](#hence-and-lest--the-success-and-failure
 
 ### Residual-obligation example
 
-With no events, or only events that settle nothing, the trace returns the rule still waiting — not `BREACH`. To let a deadline pass without anyone acting, add a `` `WAIT UNTIL` `` event:
+With no events, or only events that settle nothing, the trace returns the rule still waiting — not `BREACH`. To let a deadline pass without anyone acting, add a `WAITUNTIL` event:
 
 ```text
 #TRACE `repayment` 1000 AT 0 WITH
-    (`WAIT UNTIL` 31)
+    (WAITUNTIL 31)
 -- Result: the LEST obligation, still waiting: pay 1050 within 15
 
 #TRACE `repayment` 1000 AT 0 WITH
-    (`WAIT UNTIL` 31)
-    (`WAIT UNTIL` 50)
+    (WAITUNTIL 31)
+    (WAITUNTIL 50)
 -- Result: BREACH (the second deadline, at 46, passed too)
 ```
 
@@ -364,6 +364,6 @@ saleContract MEANS
 - <https://legalese.com/l4/reference/regulative/consequences.md> — WITHIN, HENCE, LEST, PROVIDED, EXACTLY, RAND, ROR
 - <https://legalese.com/l4/reference/regulative/BECAUSE.md>
 - <https://legalese.com/l4/reference/regulative/DEONTIC.md>
-- <https://legalese.com/l4/reference/regulative/EVENT.md> — events and `WAIT UNTIL`
+- <https://legalese.com/l4/reference/regulative/EVENT.md> — events and `WAITUNTIL`
 - <https://legalese.com/l4/concepts/legal-modeling/regulative-rules.md> — conceptual overview
 - <https://legalese.com/l4/courses/foundation/module-6-regulative.md> — foundation course module

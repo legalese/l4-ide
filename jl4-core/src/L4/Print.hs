@@ -892,9 +892,6 @@ instance LayoutPrinter BinOp where
     BinOpIndexOf -> "INDEXOF"
     BinOpSplit -> "SPLIT"
     BinOpCharAt -> "CHARAT"
-    BinOpWhenLast -> "WHEN LAST"
-    BinOpWhenNext -> "WHEN NEXT"
-    BinOpValueAt -> "VALUE AT"
 
 instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
   printWithLayout = \ case

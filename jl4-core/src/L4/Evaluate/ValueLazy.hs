@@ -144,8 +144,6 @@ data TernaryBuiltinFun
   | TernaryReplace       -- STRING → STRING → STRING → STRING
   | TernaryPost          -- from main
   | TernaryDateFromDMY   -- NUMBER → NUMBER → NUMBER → DATE
-  | TernaryEverBetween
-  | TernaryAlwaysBetween
   -- TIME/DATETIME constructors
   | TernaryTimeFromHMS      -- NUMBER → NUMBER → NUMBER → TIME
   | TernaryDatetimeFromDTZ  -- DATE → TIME → STRING → DATETIME
@@ -243,8 +241,6 @@ instance NFData TernaryBuiltinFun where
   rnf TernaryPost = ()
   -- new temporals
   rnf TernaryDateFromDMY = ()
-  rnf TernaryEverBetween = ()
-  rnf TernaryAlwaysBetween = ()
   rnf TernaryTimeFromHMS = ()
   rnf TernaryDatetimeFromDTZ = ()
 

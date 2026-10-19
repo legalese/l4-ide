@@ -61,10 +61,10 @@ The seller delivers at 2, within 3; the buyer then has 7 from 2, and pays at 5. 
 ```text
 #TRACE rule AT start-time WITH
   PARTY party DOES action AT time
-  (`WAIT UNTIL` time)
+  (WAITUNTIL time)
 ```
 
-`#TRACE` reads the events in order and gives `FULFILLED`, `BREACH`, or the rule still waiting for more events. A `` `WAIT UNTIL` `` event lets time pass without anyone acting.
+`#TRACE` reads the events in order and gives `FULFILLED`, `BREACH`, or the rule still waiting for more events. A `WAITUNTIL` event lets time pass without anyone acting.
 `#EVAL` of a rule only shows the rule itself; see [#EVAL shows the rule instead of an outcome](../errors/README.md#eval-shows-the-rule-instead-of-an-outcome).
 See [DEONTIC: Evaluation](DEONTIC.md#evaluation) and [EVENT](EVENT.md).
 
@@ -74,6 +74,6 @@ See [DEONTIC: Evaluation](DEONTIC.md#evaluation) and [EVENT](EVENT.md).
 - [Deadlines and consequences](consequences.md): `WITHIN`, `HENCE`, `LEST`, `PROVIDED`, `EXACTLY`, `FULFILLED`, `BREACH`, `RAND`, `ROR`
 - [BECAUSE](BECAUSE.md): reasons for a breach
 - [DEONTIC](DEONTIC.md): the type of rules, and `EVALTRACE`
-- [EVENT](EVENT.md): events and `` `WAIT UNTIL` ``
+- [EVENT](EVENT.md): events and `WAITUNTIL`
 
 [How obligations unfold](../../concepts/legal-modeling/regulative-rules.md) explains the model, and [Foundation module 6](../../courses/foundation/module-6-regulative.md) teaches it step by step.
