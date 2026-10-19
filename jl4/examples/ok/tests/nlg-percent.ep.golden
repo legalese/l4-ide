@@ -51,6 +51,12 @@ DECIDE `the levy on` IS n TIMES 0.1
 -- early and the remainder hits the enclosing parser as `unexpected ]`. That one
 -- is loud; the percent above is silent, which is why both are tested but only
 -- this one could ever have been caught by a golden.
+--
+-- This one and `note on` below are written INSIDE the head, after the input, so
+-- until smucclaw/l4-ide#972 was fixed the `.nlg.golden` beside this file showed
+-- their rules' bare names while `l4 render` showed the sentences. They now head
+-- their calls in both projections, which is what makes the escapes visible to a
+-- golden at all -- see `ok/nlg-head-placement.l4` for the whole placement table.
 GIVEN m IS A NUMBER
 GIVETH A NUMBER
 `the duty on` m [rate \] per unit, see s.3 \% of value] MEANS m TIMES 0.2

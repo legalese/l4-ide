@@ -29,7 +29,6 @@ import qualified LSP.Core.Shake as Shake
 import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
-import Optics
 import System.Environment (lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
@@ -206,11 +205,14 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
   let output_ = case moutput of
         Nothing -> "Cannot linearize module that doesn't typecheck\n"
         Just checkResult ->
-          let
-            mod' = checkResult.module'
-            directives = toListOf (gplate @(Directive Resolved)) mod'
-          in
-            Text.unlines $ fmap Nlg.simpleLinearizer directives
+          -- The SAME function @l4 nlg@ calls (see its module header). Both sides
+          -- used to spell the payload out and a comment asked the reader to keep
+          -- them in step; they now cannot diverge. The dependencies ride along:
+          -- a heralded call in a directive can name a rule an imported module
+          -- defines, and its sentence is read from there.
+          let deps = let go = concatMap (\d -> d.module' : go d.dependencies)
+                     in go checkResult.dependencies
+          in Text.unlines $ Nlg.linearizeDirectives Nothing checkResult.module' deps
   -- Strip ANSI codes and normalize whitespace for cross-platform consistency
   let output = normalizeWhitespace $ stripAnsiCodes $
         if isOk

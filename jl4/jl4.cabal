@@ -44,7 +44,6 @@ executable l4
     http-types,
     lsp-types,
     network-uri,
-    optics,
     process,
     text,
     time,

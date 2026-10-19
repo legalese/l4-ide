@@ -1,0 +1,28 @@
+row one saw 200
+row one saw `amount` where `amount` is 200
+`row two` with 200
+`row two` where `amount` is 200
+row three saw 200
+row three saw `amount` where `amount` is 200
+`row four` with 200
+`row four` where `amount` is 200
+row five saw 200
+row five saw `amount` where `amount` is 200
+`row six` with 200
+`row six` where `amount` is 200
+row seven saw 200
+row seven saw `amount` where `amount` is 200
+row eight saw 200
+row eight saw `amount` where `amount` is 200
+row nine saw 200
+row nine saw `amount` where `amount` is 200
+row ten saw `amount` with 200
+row ten saw `amount` where `amount` is 200
+`row eleven` with 200
+`row eleven` where `amount` is 200
+row twelve saw 200 over 100
+row twelve saw `amount` over `floor` where `floor` is 100 and `amount` is 200
+row thirteen the input with 200
+row thirteen the input where `amount` is 200
+`row fourteen` with 200
+`row fourteen` where `amount` is 200
