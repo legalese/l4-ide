@@ -11,7 +11,7 @@ Two questions are easy to run together, and this page keeps them apart.
   `l4 --version` names it: a leading number, as in `1.6.98 (main, 7689b0d, 2026-10-19)`, is a `main` build, and `unstable-` with a date is the prerelease shelf.
 - **The dialect you write** is the target: the compiler that has to read the finished file.
   The brief names it.
-  If the brief is silent and the encoding is bound for commons, the target is `main`.
+  If the brief is silent, the target is `main`.
   It is `unstable` only when the brief says so.
 
 Running an `unstable` binary does not license `unstable` syntax.

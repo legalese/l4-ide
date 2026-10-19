@@ -61,8 +61,8 @@ Two questions decide what you may write, and they are not the same question.
   `dev` is a build from a working tree and does not say, and a build older than 2026-10-14 may not answer `--version` at all; for either, run `l4 check` on [references/dialect-probes/02-refuse.l4](references/dialect-probes/02-refuse.l4), which passes on `unstable` and on `main` fails with `I could not find a definition for the identifier REFUSE`.
 - **The dialect you write** is the target, the compiler that has to read the finished file.
   The brief names it.
-  If the brief is silent and the encoding is bound for commons, the target is `main`; it is `unstable` only when the brief says so.
-  With no brief and nothing bound for commons, write for the binary you run, and say so.
+  If the brief is silent, the target is `main`; it is `unstable` only when the brief says so.
+  With no brief at all, assume `main` and say that you did.
 
 Running an `unstable` binary does not license `unstable` syntax.
 For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too, and goes red when `main` reads it differently.
