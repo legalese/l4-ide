@@ -1309,12 +1309,16 @@ spec bin = do
       sout `shouldSatisfy` endsLine "row three saw 200"
       sout `shouldSatisfy` endsLine "row nine saw 200"
 
-    it "does not touch an AKA head, where the disagreement is a different one" $ do
+    it "reads a herald on an AKA head as the rule's sentence at every call shape (#978)" $ do
       Output _ nlgOut _ <- nlgOf
-      -- Row 10: the AKA's name claims the herald, so `l4 nlg` prints it — as
-      -- the bare linearizer does, slot unfilled and the argument appended,
-      -- because the herald is on no position `decideNlg` searches.
-      nlgOut `shouldSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      Output _ renOut _ <- renderOf
+      -- Row 10: the herald lands on the AKA's NAME. `L4.Nlg.decideNlg` searches
+      -- that position, so `l4 render` finds it and `l4 nlg` fills its slot;
+      -- before, render lost it and nlg printed "row ten saw `amount` with 200".
+      -- A call through the alias reads the same.
+      nlgOut `shouldNotSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` (unlines ["row ten saw 200", "row ten saw `amount` where `amount` is 200", "row ten saw 200"] `isInfixOf`)
+      renOut `shouldSatisfy` ("row ten saw amount" `isInfixOf`)
 
     it "reads a GIVEN gloss as the input's label, never as the rule's sentence (row 14)" $ do
       Output _ nlgOut _ <- nlgOf
