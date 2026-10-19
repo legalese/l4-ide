@@ -13,7 +13,6 @@ import Control.Monad.Extra (guard)
 import qualified Control.Monad.Extra as Extra
 import Control.Monad.Reader (MonadReader (..))
 import Control.Monad.Trans.Reader (ReaderT)
-import Data.Either (isRight)
 import Data.Monoid (Ap (..))
 import Data.Tuple (swap)
 import UnliftIO (MonadUnliftIO, atomically, STM, MonadIO(..))
@@ -63,6 +62,7 @@ import Language.LSP.Server hiding (notificationHandler, requestHandler)
 import qualified Language.LSP.Server as LSP
 import Language.LSP.VFS (VFS)
 import LSP.L4.Actions
+import LSP.L4.EmbeddedLibrary
 import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
@@ -379,33 +379,8 @@ handlers evalConfig recorder =
           use_ TypeCheck (toNormalizedUri verTextDocId._uri)
 
         let
-          mkDecisionGraphCodeLens srcPos = CodeLens
-            { _command = Just Command
-              { _title = "Show decision graph"
-              , _command = "l4.visualize"
-              , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
-              }
-            , _range = pointRange $ srcPosToPosition srcPos
-            , _data_ = Nothing
-            }
-
-          --  Check if can make viz (without simplification — simplification is now a toggle inside the panel)
-          canVisualize decide =
-            let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
-            in isRight (Ladder.doVisualize decide cfg)
-
-          decideToCodeLens decide =
-            -- NOTE: there's a lot of DECIDE/MEANS statements that the visualizer currently doesn't work on
-            -- We try to not offer any code lenses for the visualizer if that's the case.
-            -- If in future this is too slow, we should think about caching these results or, even better,
-            -- make the visualizer work on as many examples as possible.
-            case rangeOfNode decide of
-              Just node
-                | canVisualize decide -> [mkDecisionGraphCodeLens node.start]
-              _ -> []
-
           -- adds codelenses to visualize DECIDE or MEANS clauses
-          visualizeDecides :: [CodeLens] = foldTopLevelDecides decideToCodeLens typeCheck.module'
+          visualizeDecides :: [CodeLens] = decisionGraphCodeLenses verTextDocId typeCheck
 
           directiveLabel :: Directive Resolved -> Text
           directiveLabel = \case
@@ -816,6 +791,20 @@ handlers evalConfig recorder =
                     , _xdata = Nothing
                     }
 
+    , requestHandler (SMethod_CustomMethod (Proxy @EmbeddedLibraryMethodName)) $ \_ide params ->
+        pure case Aeson.fromJSON params of
+          Aeson.Error err -> Left $ TResponseError
+            { _code = InR ErrorCodes_InvalidParams
+            , _message = "Failed to parse l4/embeddedLibrary params: " <> Text.pack err
+            , _xdata = Nothing
+            }
+          Aeson.Success reqParams -> case embeddedLibraryResponse reqParams of
+            Nothing -> Left $ TResponseError
+              { _code = InR ErrorCodes_InvalidParams
+              , _message = "Not an embedded library: " <> reqParams.uri
+              , _xdata = Nothing
+              }
+            Just response -> Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.GetExportedFunctionsMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.GetExportedFunctionsParams
             parseParams v = case Aeson.fromJSON v of

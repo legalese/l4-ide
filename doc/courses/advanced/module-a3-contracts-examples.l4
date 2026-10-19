@@ -387,7 +387,7 @@ GIVETH A DEONTIC `Tenancy Party` `Tenancy Action`
 -- Escrow: seller fails to deliver, funds returned
 #TRACE `escrow arrangement` (USD 5000) AT 0 WITH
     PARTY `the buyer` DOES `deposit funds` (USD 5000) AT 2
-    (`WAIT UNTIL` 17)
+    WAITUNTIL 17
     PARTY `the escrow agent` DOES `return funds to buyer` AT 18
 
 -- Milestones: first milestone completed and paid

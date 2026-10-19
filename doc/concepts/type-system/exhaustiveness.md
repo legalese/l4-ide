@@ -10,7 +10,7 @@ A legal determination over a closed category must have an answer for **every** m
 
 Law is unusually exposed to this failure mode, for two reasons:
 
-1. **Legal categories are closed enumerations.** Statutes define exhaustive lists ("'person' means (a)…, (b)…, or (c)…"), so "cover every case" is a well-defined, checkable demand. See [Algebraic Types](algebraic-types.md) on why these lists become sum types.
+1. **Legal categories are closed enumerations.** Statutes define exhaustive lists ("'person' means (a)…, (b)…, or (c)…"), so "cover every case" is a well-defined, checkable demand. See [Types as legal categories](algebraic-types.md) on why these lists become sum types.
 2. **Legal categories change.** Amendments add variants: a new visa class, a new entity type, a new ground of refusal. Every determination written against the old category is now potentially incomplete — and nothing about its text looks wrong.
 
 **Exhaustiveness checking** (totality over the scrutinised type) turns both problems into compiler diagnostics.
@@ -67,9 +67,9 @@ Warning: The following CONSIDER branch is redundant:
 
 Redundancy matters legally too — an unreachable branch is usually a sign that the author _believed_ some case was being handled there, when in fact an earlier branch is absorbing it.
 
-### Multi-clause DECIDE
+### Rules written as clauses
 
-A function written as [one DECIDE clause per case](../../reference/functions/multi-clause-DECIDE.md) is checked the same way, as a whole group: the warning lists the clauses still needed, ready to paste.
+A rule written as several `DECIDE` clauses, one per case (see [DECIDE](../../reference/functions/DECIDE.md#several-clauses)), is checked the same way, as one group. The warning lists the clauses still needed, ready to paste in and finish:
 
 ```
 This multi-clause definition does not cover all cases. The following clauses are still needed:
@@ -77,9 +77,7 @@ This multi-clause definition does not cover all cases. The following clauses are
   DECIDE `price` Blue IS
 ```
 
-Clauses that match enumeration values or `TRUE`/`FALSE` are checked, and so are clauses that match particular numbers or texts, for which the clause written with the input's name is suggested.
-The page linked above lists the groups that are not.
-A clause below one that matches every input is never reached, and is warned about too.
+L4 tries clauses from the top, so a clause below one that matches every input is never reached. That is warned about too.
 
 ### The amendment scenario
 
@@ -91,8 +89,7 @@ The payoff comes when a category grows. Add a fourth variant to `` `visa status`
 
 ### Numbers, text and dates
 
-The analysis works by enumerating constructors, and a `NUMBER`, a `STRING` or a `DATE` has none to enumerate: its values have no end.
-So a `WHEN` with a number or a piece of text matches one value, and a `CONSIDER` over such a scrutinee is complete only with an `OTHERWISE`, which the missing-case warning suggests:
+The check works by listing constructors, and a `NUMBER`, a `STRING` or a `DATE` has none to list: its values never run out. A `WHEN 0` or a `WHEN "Saturday"` matches one value, so the only way to complete such a match is a branch that matches everything. In a `CONSIDER` that is `OTHERWISE`; in a rule written as clauses it is a clause written with the input's `GIVEN` name. The warning suggests exactly that:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -102,28 +99,41 @@ GIVETH A STRING
     WHEN 0 THEN "none"
     WHEN 1 THEN "one"
     -- warns: OTHERWISE
-```
 
-A number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is reported as a redundant branch.
-
-`BOOLEAN`, with exactly `TRUE` and `FALSE`, _is_ analysed — a `CONSIDER` covering only `WHEN TRUE` warns about the missing `WHEN FALSE` branch. The builtin container types (`MAYBE`, `EITHER`, `LIST`) are analysed only inside: a missing `WHEN NOTHING` or `WHEN EMPTY` is not reported, but `WHEN JUST Basic` over a `MAYBE Tier` asks for `WHEN JUST Premium` and `WHEN JUST Gold`.
-
-A rule written as clauses, one `DECIDE` line per case, is read the same way.
-A number or a piece of text in a clause matches one value of its input, so such a rule is complete only with a clause written with the input's name, and the missing-case warning suggests that clause:
-
-```l4
 GIVEN n IS A NUMBER
 GIVETH A STRING
-DECIDE `describe count` 0 IS "none"
-DECIDE `describe count` 1 IS "one"
--- warns: DECIDE `describe count` n IS
+DECIDE `describe number` 0 IS "none"
+DECIDE `describe number` 1 IS "one"
+-- warns: DECIDE `describe number` n IS
 ```
 
-The enumeration inputs of the same rule are still analysed, and the two spellings of one determination warn alike over enumerations declared in the same file, numbers, text and `EXACTLY`; they can differ for a repeated value, and where a branch or clause names a constructor of a `MAYBE`, an `EITHER`, a list or a type declared in another file (see [CONSIDER](../../reference/control-flow/CONSIDER.md)).
+The other inputs of a rule are still checked. Over `DECLARE Colour IS ONE OF Red, Green, Blue`, the clauses `DECIDE charge Red 0 IS 0`, `DECIDE charge Red n IS n` and `DECIDE charge Green n IS n TIMES 2` draw a warning for ``DECIDE `charge` Blue n IS``: the clause for `0` covers one value, the clause below it the rest of `Red`, and `Blue` is still missing.
 
-The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the check can only ask for an `OTHERWISE`; it cannot tell you which categories you left out. Declare an enumeration instead — it is precisely what makes the completeness of your determinations checkable.
+A few more details:
 
-The check applies wherever the `CONSIDER` appears — in a rule's main body and equally inside `WHERE`- or `LET`-bound local definitions.
+- `EXACTLY` of a number, a piece of text or a value of an enumeration is read as that value. An `EXACTLY` of anything else cannot be counted: over a number, text or date it covers nothing as far as the check knows, and over an enumeration it stops the check for that match.
+- In a `CONSIDER`, a number repeated in another spelling (`WHEN 1.0` after `WHEN 1`) is reported as a redundant branch. A repeated value in a rule written as clauses is not reported.
+- A type declared as another name for a number, text or date (`DECLARE Age IS A NUMBER`) is treated like that type.
+
+The practical consequence: when a statutory category is modelled as a `STRING` (status codes, category letters), the check can only ask for an `OTHERWISE`; it cannot tell you which categories you left out. Declare an enumeration instead. It is precisely what makes the completeness of your determinations checkable.
+
+### Booleans, MAYBE, EITHER and lists
+
+`BOOLEAN` is checked like an enumeration of `TRUE` and `FALSE`: a `CONSIDER` with only `WHEN TRUE` warns about the missing `WHEN FALSE`.
+
+`MAYBE`, `EITHER` and lists are checked only inside. Their own constructors are not listed, so a missing `WHEN NOTHING`, `WHEN RIGHT` or `WHEN EMPTY` is not reported. What they hold is checked: `WHEN JUST Basic` over a `MAYBE Tier` asks for `WHEN JUST Premium` and `WHEN JUST Gold`. A rule written as clauses goes less far. Where a missing case could only be found by telling such values apart, it gets no warning: over a `MAYBE Colour`, the clauses `DECIDE f (JUST Red) IS 1` and `DECIDE f NOTHING IS 0` draw none, while the same two branches in a `CONSIDER` ask for `WHEN JUST Green` and `WHEN JUST Blue`.
+
+### Types from another file
+
+An enumeration declared in another file and brought in with `IMPORT` is not analysed. A `CONSIDER` or a rule written as clauses over it gets no missing-case warning, so cover such a type with extra care, or test every value.
+
+### Very large tables
+
+For a rule written as clauses, the check gives up without a warning when it would have to list more than 64 clauses, or needs more than 10,000 steps to find them. When the clauses match numbers or text, it does not fall silent at that limit, but gives a shorter, coarser list. A large `CONSIDER` still warns, but may list only some of the missing branches.
+
+### Where the check applies
+
+The check applies wherever the `CONSIDER` appears, in a rule's main body and equally inside `WHERE`- or `LET`-bound local definitions. Rules written as clauses are only recognised at the top level of a file or section.
 
 ### OTHERWISE trades checking for coverage
 
@@ -141,7 +151,7 @@ Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
 The typechecker's exhaustiveness warning lists all missing branches.
 ```
 
-`l4 run` exits non-zero when any directive crashes this way. The warning exists so you find the hole before an applicant does.
+A rule written as clauses fails the same way, with "No clause of `describe` matches these inputs." and the value it could not match. `l4 run` exits non-zero when any directive fails this way. The warning exists so you find the hole before an applicant does.
 
 ---
 
@@ -167,6 +177,8 @@ The intended discipline: treat the warnings as a completeness report. A finished
 | Clauses over a `NUMBER` or `STRING` input         | Analysed; the clause with the input's name is suggested when it is missing |
 | `BOOLEAN` and declared enumerations (`IS ONE OF`) | Fully analysed                                                             |
 | `MAYBE` / `EITHER` / `LIST` scrutinee             | Their contents analysed; their own constructors not listed                 |
+| Enumeration declared in an imported file          | Not analysed                                                               |
+| More than 64 missing clauses                      | No warning for a rule written as clauses                                   |
 | `CONSIDER` inside `WHERE` / `LET`                 | Analysed like any other                                                    |
 | `OTHERWISE`                                       | Completes the match, disables missing-case warnings                        |
 | Hole reached at runtime                           | Evaluation fails, naming the unmatched value; `l4 run` exits non-zero      |
@@ -176,6 +188,6 @@ The intended discipline: treat the warnings as a completeness report. A finished
 
 ## Further Reading
 
-- [Algebraic Types](algebraic-types.md) — Why legal categories become sum types in the first place
-- [CONSIDER Reference](../../reference/control-flow/CONSIDER.md) — Full pattern-matching syntax
-- [Constitutive vs Regulative Rules](../legal-modeling/constitutive-vs-regulative.md) — Where determinations sit in the larger architecture
+- [Types as legal categories](algebraic-types.md) — Why legal categories become sum types in the first place
+- [CONSIDER](../../reference/control-flow/CONSIDER.md) — Full pattern-matching syntax
+- [Definitions and duties](../legal-modeling/constitutive-vs-regulative.md) — Where determinations sit in the larger architecture

@@ -261,5 +261,6 @@ starting with `@nlg` or within square brackets.
 For references, we allow to write them as a comment
 starting with `@ref` or within double angle brackets.
 
-Annotations for specific entities refer to whatever
-precedes them.
+On a line of its own, a `@ref`, `@desc` or `@nlg` annotation refers to what follows it.
+At the end of a line of code, `@desc` and `@nlg` refer to what precedes them, and a `@ref` refers to nothing.
+A node keeps every reference written before it, in order.

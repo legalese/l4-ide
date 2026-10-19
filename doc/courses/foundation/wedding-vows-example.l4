@@ -1,0 +1,55 @@
+-- Wedding Vows as L4 Regulative Rules
+
+§ `Wedding Vows`
+
+-- The parties to the marriage
+DECLARE Person IS ONE OF Spouse1, Spouse2
+
+-- The actions the vows talk about
+DECLARE Action IS ONE OF
+    `exchange vows`
+    `love and cherish`
+    `be unfaithful`
+
+-- The ceremony: each spouse must exchange vows on the day
+GIVETH A DEONTIC Person Action
+`wedding ceremony` MEANS
+    PARTY Spouse1
+    MUST `exchange vows`
+    WITHIN 1
+    HENCE
+        PARTY Spouse2
+        MUST `exchange vows`
+        WITHIN 1
+        HENCE FULFILLED
+        LEST BREACH BY Spouse2 BECAUSE "failed to exchange vows"
+    LEST BREACH BY Spouse1 BECAUSE "failed to exchange vows"
+
+-- "To love and to cherish": two obligations that hold at the same time
+GIVETH A DEONTIC Person Action
+`love obligation` MEANS
+    (PARTY Spouse1 MUST `love and cherish` HENCE FULFILLED LEST BREACH BY Spouse1)
+    RAND
+    (PARTY Spouse2 MUST `love and cherish` HENCE FULFILLED LEST BREACH BY Spouse2)
+
+-- "Forsaking all others": two prohibitions
+GIVETH A DEONTIC Person Action
+`fidelity clause` MEANS
+    (PARTY Spouse1 SHANT `be unfaithful` HENCE FULFILLED LEST BREACH BY Spouse1 BECAUSE "was unfaithful")
+    RAND
+    (PARTY Spouse2 SHANT `be unfaithful` HENCE FULFILLED LEST BREACH BY Spouse2 BECAUSE "was unfaithful")
+
+§§ `Tests`
+
+-- Both spouses exchange vows on the day: FULFILLED
+#TRACE `wedding ceremony` AT 0 WITH
+    PARTY Spouse1 DOES `exchange vows` AT 0
+    PARTY Spouse2 DOES `exchange vows` AT 0
+
+-- Spouse1 does not show up; the next event comes on day 2: BREACH BY Spouse1
+#TRACE `wedding ceremony` AT 0 WITH
+    PARTY Spouse2 DOES `exchange vows` AT 2
+
+-- Spouse1 is unfaithful on day 100: BREACH BY Spouse1 BECAUSE "was unfaithful"
+#TRACE `fidelity clause` AT 0 WITH
+    PARTY Spouse1 DOES `be unfaithful` AT 100

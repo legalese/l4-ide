@@ -52,6 +52,7 @@ library
     safe-exceptions,
     stm,
     stm-containers,
+    template-haskell,
     text,
     text-rope,
     time,
@@ -98,6 +99,8 @@ library
     LSP.Core.Types.Shake
 
     LSP.L4.Actions
+    LSP.L4.BuildInfo
+    LSP.L4.EmbeddedLibrary
     LSP.L4.Inspector
     LSP.L4.SemanticTokens
     LSP.L4.Rules
@@ -158,11 +161,18 @@ test-suite jl4-lsp-test
   hs-source-dirs: test
   main-is: Spec.hs
   other-modules:
+    BuildInfoSpec
     CheckSource
     ClauseGeneratedNamesSpec
+    ClauseGroupLadderSpec
+    EmbeddedLibrarySpec
+    HoverDisplaySpec
+    LibraryResolutionSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
+    containers,
     directory,
     filepath,
     hspec,

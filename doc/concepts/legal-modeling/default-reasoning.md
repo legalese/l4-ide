@@ -1,4 +1,4 @@
-# Default Reasoning and Exceptions
+# Exceptions and defaults
 
 How L4 encodes the law's most common shape: a general rule, followed by exceptions.
 
@@ -50,7 +50,7 @@ Consider a rule with an exception that itself has an exception (a very common st
 Flattened into one boolean expression:
 
 ```l4
--- ❌ Truth-functionally correct, structurally opaque
+-- Correct, but the structure is lost
 DECIDE `may drive (flattened)` IF
     `holds licence`
     AND (NOT `licence suspended` OR `suspension stayed by court order`)
@@ -61,7 +61,7 @@ This is correct, but the drafting structure is gone. Nothing in the code corresp
 The isomorphic encoding names each layer:
 
 ```l4
--- ✅ One named rule per provision
+-- One named rule per provision
 DECIDE `suspension is operative` IF
     `licence suspended`
     UNLESS `suspension stayed by court order`
@@ -135,6 +135,6 @@ A lawyer checking the encoding reads the statute one provision at a time. If the
 ## Further Reading
 
 - [UNLESS Reference](../../reference/operators/UNLESS.md) — Semantics, precedence, truth table
-- [Constitutive vs Regulative Rules](constitutive-vs-regulative.md) — Where exception structure lives in the larger architecture
-- [Design Principles](../language-design/principles.md) — Legal isomorphism, the principle this pattern serves
-- [Common Patterns](../../reference/patterns/common-patterns.md) — More encoding patterns
+- [Definitions and duties](constitutive-vs-regulative.md) — Where exception structure lives in the larger architecture
+- [Design principles](../language-design/principles.md) — Legal isomorphism, the principle this pattern serves
+- [Common patterns](../../tutorials/getting-started/common-patterns.md) — More encoding patterns

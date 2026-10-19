@@ -1,8 +1,8 @@
 # Using the l4 CLI
 
-Run, check, format, and render L4 files from the command line.
+Run, check, format, render, and deploy L4 files from the command line.
 
-**Prerequisites:** [Your First L4 File](first-l4-file.md)
+**Prerequisites:** [Install L4 and write your first rule](first-l4-file.md)
 
 ---
 
@@ -42,7 +42,8 @@ l4 --help
 ```
 l4 — the L4 computational-law CLI
 
-Usage: l4 (COMMAND | FILE [--json] [-t|--trace MODE] [--fixed-now ISO8601])
+Usage: l4 [--version]
+          (COMMAND | FILE [--json] [-t|--trace MODE] [--fixed-now ISO8601])
 
 Available commands:
   run                      Typecheck and evaluate an L4 file (prints diagnostics
@@ -51,16 +52,42 @@ Available commands:
   format                   Reformat an L4 file and print to stdout
   ast                      Dump the parsed AST of an L4 file
   batch                    Evaluate an @export function against many input rows
-                           (NDJSON streaming)
+                           (json|yaml|csv in, NDJSON streaming out)
   trace                    Render #EVALTRACE evaluation traces as GraphViz
                            (dot|png|svg)
   state-graph              Extract regulative-rule state transition graphs as
                            GraphViz DOT
   render                   Render an L4 file to a formatted document
                            (html|text|json|plan)
+  deploy                   Deploy an L4 file and its imports as a new deployment
+                           (Legalese Cloud, or --server)
+  redeploy                 Update an existing deployment; refuses breaking
+                           changes unless --force
+  undeploy                 Delete a deployment
+  deployments              List deployments
+  install                  Install a companion tool: `l4 install legalese` (the
+                           Legalese Cloud CLI)
 ```
 
 Run `l4 <command> --help` for the options of any subcommand.
+
+### Which build is this?
+
+```bash
+l4 --version
+```
+
+This prints one line that names the build you are running, so you can say which one you have when you report a problem, or check that an upgrade took:
+
+```
+1.6.91 (main, a1b2c3d, 2026-10-14)
+```
+
+The line is the release, then in brackets the branch it was built from, the commit, and the day it was built.
+
+A build that someone made from a working copy of the source is not a release, and says just `dev`.
+
+`jl4-lsp --version`, the language server that the editor runs, prints the same line. The server also sends it to the editor as its `serverInfo` when the editor connects, and writes it to its log when it starts.
 
 ---
 
@@ -179,10 +206,11 @@ When a file says `IMPORT daydate` (or `time`, `currency`, ...), the tools resolv
 1. The `JL4_LIBRARY_PATH` environment variable (user/operator override)
 2. The project root directory
 3. The directory of the importing file
-4. The XDG data directory (`~/.local/share/jl4/libraries/`)
-5. The libraries bundled with the VS Code extension
+4. The standard library built into the `l4` you are running
+5. The XDG data directory (`~/.local/share/jl4/libraries/`)
+6. The libraries bundled with the VS Code extension
 
-When `JL4_LIBRARY_PATH` is set, it takes explicit control: the embedded fallback libraries are skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
+When `JL4_LIBRARY_PATH` is set, it takes explicit control: the built-in standard library is skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
 
 ```bash
 JL4_LIBRARY_PATH=jl4-core/libraries l4 run myfile.l4
@@ -293,7 +321,89 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
-Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`). With CSV inputs, cells are plain text in the file, but values for parameters declared as `NUMBER` or `BOOLEAN` are converted automatically — a `100` or `true` cell arrives as a number or boolean, not a string.
+Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
+A value is read as the type its parameter declares, whichever kind of file the case comes from.
+A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
+Text that does not spell one is left as it is, and the line is an error that names the text.
+A parameter declared through a synonym, such as `DECLARE Year IS A NUMBER`, is read as the type the synonym stands for, and so is a synonym for a `MAYBE`.
+A synonym that takes a type, such as `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`, is not read this way from a CSV cell or from text: a cell `2020` or the text `"2020"` is refused, so give such a parameter a plain number in a JSON file.
+Every other kind of parameter keeps a non-blank CSV cell exactly as written, however much it looks like a number or a boolean.
+A `STRING` receives `123456`, `018956` and `1.50` as the codes they are, a choice such as `DECLARE Answer IS ONE OF True, False, Unknown` receives the name `True` and not a boolean, and a `DATE` receives `2026-10-13` as text, so a cell that is not a date, such as `20261013`, is an error that names it.
+A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
+A blank CSV cell is not text, for a `STRING` parameter as for any other: an empty cell, a cell holding only spaces and a quoted `""` all leave the fact out, exactly as a column missing from the file does. A fact that has to be given is then missing, which makes the line an error that says `Missing required field` and names it; a `MAYBE` fact is `NOTHING`.
+So a line of nothing but empty cells, such as `,,`, is an error when the rules need any fact, and the run stops there unless you pass `--continue-on-error`.
+A CSV file cannot carry empty text, or text of only spaces, as a value: to give a fact that value, use a JSON or YAML file (`"note": ""`).
+A line with nothing on it, or only spaces or tabs, is not a case at all, while a quoted `""` or `"   "` is a case whose cell is blank.
+A byte-order mark at the start of the file, which Excel's CSV UTF-8 export writes, is ignored.
+A line with more or fewer cells than the header is refused and counted as an error, and the message gives its line number.
+A CSV cell for any other kind of parameter is typed by its content: `true` or `false` (any case) is a boolean, a plain number such as `3.5` is a number (a cell containing `e` or `E` stays text), and anything else is a string.
+
+`--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
+
+#### What each line says
+
+Every case that is run produces one line, or one item with `--format json` or `yaml`, with four keys:
+
+- `input` is the case as the rules read it: a CSV cell is shown as the number, boolean or text it was read as, and a blank cell that was left out is not shown.
+- `output` is what the rules came to for the case: a list holding one `result`, or `null` when no answer could be reached at all.
+- `status` says how the case went, as below.
+- `diagnostics` is the list of messages for a case that did not succeed, and `[]` for one that did.
+
+`status` is one of two words:
+
+- `success`: the rules gave an answer.
+- `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, a CSV line has a different number of cells from the header, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+
+The command exits with status 0 when every case was `success`, and 1 when any case was `error`, once every case that was going to run has run.
+
+#### Checking cases without running them
+
+`--validate-only` checks each case against the facts the rules need, and runs nothing. Its lines have three keys, not four: `input`, `status` (`valid` or `invalid`) and `errors`, the list of problems, which is `[]` for a valid case. The command exits with status 1 when any case is `invalid`, and `--continue-on-error` works as it does in a run.
+
+It checks that every fact the rules need, other than a `MAYBE`, is in the case and is not `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`. A synonym that takes a type (`Optional OF NUMBER`) is not: a case can be `valid` that a run refuses, and `invalid` that a run answers.
+
+**It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
+
+```l4
+@export Echo a date
+GIVEN d IS A DATE
+GIVETH A DATE
+`echo date` MEANS d
+```
+
+and the cases `[{"d": "2024-01-15"}, {"d": "not a date"}]`, validation passes both, and a run fails the second:
+
+```
+$ l4 batch echo-date.l4 --inputs dates.json --validate-only
+{"errors":[],"input":{"d":"2024-01-15"},"status":"valid"}
+{"errors":[],"input":{"d":"not a date"},"status":"valid"}
+
+$ l4 batch echo-date.l4 --inputs dates.json --continue-on-error
+{"diagnostics":[],"input":{"d":"2024-01-15"},"output":[{"result":"2024-01-15","trace":null}],"status":"success"}
+{"diagnostics":["Could not parse date string 'not a date'. Expected format: YYYY-MM-DD"],"input":{"d":"not a date"},"output":[{"result":{"error":"Could not parse date string 'not a date'. Expected format: YYYY-MM-DD\n"},"trace":null}],"status":"error"}
+```
+
+So `valid` means a case has the right shape, not that the rules will accept every value in it.
+
+#### What the rules and the file have to be
+
+`l4 batch` does not run your rules file as it stands. It checks the file, prints the checked module back as source with its directives taken out, and for each case adds a small wrapper that reads the case and applies the exported function; then it checks and runs that text. Four things follow.
+
+- **The printed module has to be valid source.** If it is not, every case is an `error` line with the parser's message, and the cause is the rules file and not the cases. One shape that does this is a bare quoted string used as a condition inside a boolean expression, such as `a AND "and also" AND TRUE`.
+- **An exported function whose `MAYBE` input is followed by another input cannot be run.** The wrapper it needs is not valid, and every case is an `error` line. Put the `MAYBE` input last.
+- **Every case checks the whole module again,** and the modules it imports, so a large rules file with many cases takes time.
+- **A CSV file has to be UTF-8** (in Excel, save as "CSV UTF-8"). A file in another encoding stops the command at the first bad byte, with an error message from the Haskell runtime and a backtrace, exit status 1, and no `Error:` line; in the default streaming output, the cases before the bad byte have already run and printed.
+
+#### When the command cannot start
+
+If `l4 batch` cannot read the cases or the rules, it prints no line for any case and exits with status 1. It says why in one plain line that starts `Error:`, on standard output, which is where the case lines go, so a script that reads the output as JSON should look at the exit status before it parses:
+
+- `Error: failed to parse inputs: …` for a cases file that is not valid JSON, YAML or CSV; for a CSV file it names the line, as in ``line 2 of the CSV file is not valid CSV, near `"c` ``, an empty CSV file is said to be empty, and a quote that opens a cell and is never closed is refused at the line where it opens;
+- `Error: --input-format is required when the extension can't be inferred (e.g. reading from stdin)`;
+- `Error: type checking failed` for rules that do not type-check, with the type errors themselves on standard error;
+- `Error: no @export functions found in module`, or `Error: no @export function named 'name' found` when `--entrypoint` names one that is not there.
+
+A cases file or a rules file that does not exist ends the command with the operating system's message on standard error instead.
 
 ### `l4 trace` and `l4 state-graph` — visualization
 
@@ -306,7 +416,59 @@ Natural-language names work too: exported functions and parameters written with 
 
 ---
 
-## Step 7: The REPL
+## Step 7: Deploy as an API
+
+`l4 deploy` turns a file into a live REST API on [Legalese Cloud](https://legalese.cloud), as the VS Code extension's **Deploy** tab does. Only rules marked `@export` become endpoints; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) explains how to mark them.
+
+### Sign in
+
+`l4` gets your Legalese Cloud credentials from the `legalese` CLI, so you sign in once and `l4` never stores a token:
+
+```bash
+l4 install legalese    # downloads it (checksum-verified) to /usr/local/bin or ~/.local/bin
+legalese login         # signs you in through the browser and picks your organization
+```
+
+`l4 install legalese` runs on macOS and Linux. Run it again to upgrade.
+
+### Deploy, update, list, remove
+
+```bash
+l4 deploy late-fee.l4 --description "Late fees for overdue invoices"
+```
+
+```
+Deploying 'late-fee' to Legalese Cloud org 'acme' (as you@example.com): late-fee.l4
+Compiling…
+Deployed 'late-fee' (version 1.0.0) with 1 function:
+  fee
+API: https://api.legalese.cloud/acme/late-fee
+```
+
+The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
+
+| Command            | What it does                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `l4 deploy FILE`   | Creates a deployment. Refuses if the name is taken.                                                                                                                 |
+| `l4 redeploy FILE` | Updates an existing deployment. If the update would break existing integrations (a rule removed, a parameter changed), it is rejected; `--force` applies it anyway. |
+| `l4 deployments`   | Lists your organization's deployments.                                                                                                                              |
+| `l4 undeploy NAME` | Deletes a deployment after you type its name to confirm. In scripts, pass `--yes`.                                                                                  |
+
+`--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile.
+
+### Your own jl4-service
+
+To deploy to a jl4-service you run yourself, name it with `--server`:
+
+```bash
+l4 deploy late-fee.l4 --server http://localhost:8080
+```
+
+If it needs an API key, put the key in the `L4_API_KEY` environment variable or in a file passed with `--api-key-file`. `l4` won't send a key over plain `http` to anything but `localhost`.
+
+---
+
+## Step 8: The REPL
 
 For interactive exploration there is a separate REPL executable. From a source checkout:
 
@@ -332,6 +494,7 @@ Useful REPL commands: `:help`, `:load <file>` / `:reload`, `:type <expr>`, `:inf
 - `--json` gives machine-readable output; `--fixed-now` pins the clock
 - `JL4_LIBRARY_PATH` controls where `IMPORT`ed libraries come from
 - `format`, `render`, `batch`, `trace`, `state-graph`, and `ast` round out the toolset
+- `l4 deploy`, `redeploy`, `deployments`, and `undeploy` manage live APIs on Legalese Cloud or your own jl4-service
 - `cabal run jl4-repl` starts an interactive session
 
 ---

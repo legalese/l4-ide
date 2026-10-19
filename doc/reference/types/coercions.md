@@ -1,6 +1,7 @@
-# Type Coercion
+# Coercions
 
-L4 provides built-in type coercion functions that are always available without importing any library. These are implemented in the compiler core for performance and consistency.
+These built-in functions convert values from one type to another. They need no `IMPORT`.
+Functions that parse text return a `MAYBE`: `JUST` the value, or `NOTHING` when the text cannot be read.
 
 ## Functions
 
@@ -16,7 +17,7 @@ Converts a value to its string representation.
 - Booleans render as `TRUE` or `FALSE`
 - Dates render as `YYYY-MM-DD`
 - Times render as `HH:MM:SS`
-- DateTimes render as ISO-8601 (e.g., `2024-06-15T10:30:00+08:00`)
+- DateTimes render as ISO-8601 with an offset (e.g., `2024-06-15T02:30:00+0000`)
 - Strings pass through unchanged
 
 **Example:**
@@ -77,16 +78,14 @@ Parses a string to a time.
 
 **Signature:** `STRING → MAYBE TIME`
 
-**Accepted formats:**
+**Accepted formats (24-hour clock only):**
 
-- `HH:MM:SS`: `"14:30:00"`
+- `HH:MM:SS`: `"14:30:00"`, also with fractions of a second: `"14:30:00.5"`
 - `HH:MM`: `"14:30"`
-- `h:MM AM/PM`: `"2:30 PM"`
 
 **Behavior:**
 
-- Returns `NOTHING` for invalid times
-- 24-hour and 12-hour (AM/PM) formats accepted
+- Returns `NOTHING` for anything else, including 12-hour times such as `"2:30 PM"`
 
 ---
 
@@ -98,13 +97,14 @@ Parses a string to a datetime.
 
 **Accepted formats:**
 
-- ISO-8601 with timezone: `"2024-06-15T10:30:00+08:00"`
+- ISO-8601 with an offset: `"2024-06-15T10:30:00+08:00"`
 - ISO-8601 with Z (UTC): `"2024-06-15T10:30:00Z"`
+- A space in place of the `T`: `"2024-06-15 10:30:00Z"`
 
 **Behavior:**
 
 - Returns `NOTHING` for invalid datetime strings
-- Timezone offset is preserved in the parsed value
+- The value is stored in UTC: `"2024-06-15T10:30:00+08:00"` becomes `2024-06-15T02:30:00+0000`
 
 ---
 
@@ -144,18 +144,18 @@ Inline syntax for type conversion, equivalent to `TOSTRING`.
 
 - `42 AS STRING` → `"42"`
 - `TRUE AS STRING` → `"TRUE"`
-- `(Date 1 1 2024) AS STRING` → `"2024-01-01"`
+- `(Date 1 1 2024) AS STRING` → `"2024-01-01"` (`Date` comes from [daydate](../libraries/daydate.md))
 
 ---
 
-## Locale Independence
+## Locale independence
 
-All coercion functions are **deterministic and locale-independent**. This ensures consistent behavior across different systems and environments.
+All coercion functions give the same result on every system: they do not depend on the locale.
 
 ---
 
-## See Also
+## Related pages
 
-- **[Types](README.md)** - Type system documentation
-- **[Functions](../functions/README.md)** - Function keywords
-- **[Libraries](../libraries/README.md)** - Core libraries
+- [Types](README.md)
+- [Built-in functions](../builtins/README.md)
+- [daydate](../libraries/daydate.md), [time](../libraries/time.md), [datetime](../libraries/datetime.md): more on dates and times

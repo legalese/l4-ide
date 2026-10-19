@@ -239,15 +239,23 @@ Both introduce local bindings. Pick by position:
 - **`LET … IN`** — leading. Use for a single binding consumed immediately.
 
 ```l4
--- WHERE: trailing helpers
-circleArea radius IS pi TIMES radius TIMES radius
-WHERE
-    pi MEANS 3.14159
+-- WHERE: trailing helpers, indented under the body
+GIVEN radius IS A NUMBER
+GIVETH A NUMBER
+`circle area` radius MEANS
+    pi TIMES radius TIMES radius
+    WHERE
+        pi MEANS 3.14159
 
 -- LET ... IN: inline
-LET taxRate MEANS 0.08 IN
-    price TIMES (1 PLUS taxRate)
+GIVEN price IS A NUMBER
+GIVETH A NUMBER
+`price with tax` price MEANS
+    LET `tax rate` MEANS 0.08 IN
+        price TIMES (1 PLUS `tax rate`)
 ```
+
+`WHERE` must be indented under the body it belongs to; at column 1 it is a parse error (`unexpected WHERE`).
 
 ---
 
@@ -285,6 +293,12 @@ All annotations begin with `@` and apply to the following definition:
 | `@ref-map` | Mapping table for references                                       |
 
 `@ref` / `@ref-src` / `@ref-map` are the "link this rule to §3.2 of the statute" annotations — use them whenever the source document has stable citations.
+An `@ref` on its own line binds to the next syntax node, whatever it is, so it goes above the rule it cites.
+Measured with `l4 check` and `l4 ast`: one written under its rule attached to the next rule, with no message; one above a `§` heading attached to the heading.
+Two above one rule are both kept, in the order written, and a tool that shows one citation shows the nearest, the lower.
+One written at the end of a line of code attaches to nothing, and draws a warning that says to put it on the line above.
+One at the end of a file, with nothing after it, draws a warning that there is nothing to attach it to.
+Both warnings leave `l4 check` exiting 0.
 
 ---
 

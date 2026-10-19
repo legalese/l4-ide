@@ -19,36 +19,36 @@ GIVEN a IS A BOOLEAN
       b IS A BOOLEAN
 
 -- These are logically equivalent
-impliesVersion a b MEANS a IMPLIES b
-orVersion a b MEANS NOT a OR b
+`implies version` a b MEANS a IMPLIES b
+`or version` a b MEANS NOT a OR b
 
 -- Test equivalence
-#EVAL impliesVersion TRUE TRUE
-#EVAL orVersion TRUE TRUE
+#EVAL `implies version` TRUE TRUE
+#EVAL `or version` TRUE TRUE
 
-#EVAL impliesVersion TRUE FALSE
-#EVAL orVersion TRUE FALSE
+#EVAL `implies version` TRUE FALSE
+#EVAL `or version` TRUE FALSE
 
-#EVAL impliesVersion FALSE TRUE
-#EVAL orVersion FALSE TRUE
+#EVAL `implies version` FALSE TRUE
+#EVAL `or version` FALSE TRUE
 
 -- Legal Rule Examples
 
 -- "If you are an employee, you must have a badge"
-ASSUME isEmployee IS A BOOLEAN
-ASSUME hasBadge IS A BOOLEAN
+ASSUME `is employee` IS A BOOLEAN
+ASSUME `has badge` IS A BOOLEAN
 
-DECIDE badgeRule IS isEmployee IMPLIES hasBadge
+DECIDE `badge rule` IS `is employee` IMPLIES `has badge`
 
-#CHECK badgeRule
+#CHECK `badge rule`
 
 -- "A minor must have parental consent"
-ASSUME personAge IS A NUMBER
-ASSUME hasParentalConsent IS A BOOLEAN
+ASSUME `person age` IS A NUMBER
+ASSUME `has parental consent` IS A BOOLEAN
 
-DECIDE consentRule IS (personAge < 18) IMPLIES hasParentalConsent
+DECIDE `consent rule` IS (`person age` < 18) IMPLIES `has parental consent`
 
-#CHECK consentRule
+#CHECK `consent rule`
 
 -- Chained Implications
 
@@ -56,11 +56,11 @@ DECIDE consentRule IS (personAge < 18) IMPLIES hasParentalConsent
 GIVEN x IS A BOOLEAN
       y IS A BOOLEAN
       z IS A BOOLEAN
-chainedImpl x y z MEANS x => y => z
+`chained impl` x y z MEANS x => y => z
 
-#EVAL chainedImpl TRUE TRUE TRUE
-#EVAL chainedImpl TRUE TRUE FALSE
-#EVAL chainedImpl FALSE FALSE FALSE
+#EVAL `chained impl` TRUE TRUE TRUE
+#EVAL `chained impl` TRUE TRUE FALSE
+#EVAL `chained impl` FALSE FALSE FALSE
 
 -- Combined with AND/OR
 
@@ -69,12 +69,12 @@ GIVEN p IS A BOOLEAN
       r IS A BOOLEAN
 
 -- "(P AND Q) implies R"
-conjunctionImplies p q r MEANS (p AND q) IMPLIES r
+`conjunction implies` p q r MEANS (p AND q) IMPLIES r
 
 -- "P implies (Q OR R)"
-impliesDisjunction p q r MEANS p IMPLIES (q OR r)
+`implies disjunction` p q r MEANS p IMPLIES (q OR r)
 
-#EVAL conjunctionImplies TRUE TRUE TRUE
-#EVAL conjunctionImplies TRUE TRUE FALSE
-#EVAL impliesDisjunction TRUE FALSE TRUE
-#EVAL impliesDisjunction TRUE FALSE FALSE
+#EVAL `conjunction implies` TRUE TRUE TRUE
+#EVAL `conjunction implies` TRUE TRUE FALSE
+#EVAL `implies disjunction` TRUE FALSE TRUE
+#EVAL `implies disjunction` TRUE FALSE FALSE

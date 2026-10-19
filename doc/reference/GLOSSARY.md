@@ -1,387 +1,181 @@
-# L4 Language Glossary
+# Glossary
 
-Complete reference index of all L4 language features. Links point to the consolidated reference pages which contain detailed documentation.
+Every keyword, operator, type, directive and annotation in L4, with a one-line meaning and a link to the page that describes it. Functions are listed under [Built-in functions](builtins/README.md) and [Standard libraries](libraries/README.md).
 
----
+## Functions
 
-## Keywords
-
-Keywords are reserved words that form the structure of L4 programs.
-
-### Function Keywords
-
-| Keyword                | Purpose                                                              | Reference                          |
-| ---------------------- | -------------------------------------------------------------------- | ---------------------------------- |
-| **AKA**                | Provides alternate names (aliases)                                   | [AKA](functions/AKA.md)            |
-| **DECIDE**             | Defines a decision function                                          | [DECIDE](functions/DECIDE.md)      |
-| **FUNCTION**           | Declares a function type                                             | [TYPE-KEYWORDS](types/keywords.md) |
-| **GIVEN**              | Introduces function parameters                                       | [GIVEN](functions/GIVEN.md)        |
-| **GIVETH** / **GIVES** | Specifies function return type                                       | [GIVETH](functions/GIVETH.md)      |
-| **IN**                 | Used with LET for scoped bindings                                    | [LET](functions/LET.md)            |
-| **LET**                | Introduces a local binding                                           | [LET](functions/LET.md)            |
-| **MEANS**              | Defines the body of a function, decision, or computed field (method) | [MEANS](functions/MEANS.md)        |
-| **WHERE**              | Introduces local declarations                                        | [WHERE](functions/WHERE.md)        |
-| **YIELD**              | Creates anonymous functions (lambdas)                                | [YIELD](functions/YIELD.md)        |
-
-### Control Flow Keywords
-
-| Keyword       | Purpose                              | Reference                              |
-| ------------- | ------------------------------------ | -------------------------------------- |
-| **BRANCH**    | Alternative pattern matching keyword | [CONTROL-FLOW](control-flow/README.md) |
-| **CONSIDER**  | Pattern matching on values           | [CONSIDER](control-flow/CONSIDER.md)   |
-| **ELSE**      | Alternative branch of IF             | [CONTROL-FLOW](control-flow/README.md) |
-| **IF**        | Conditional expression               | [IF](control-flow/IF.md)               |
-| **THEN**      | Consequent branch of IF              | [CONTROL-FLOW](control-flow/README.md) |
-| **OTHERWISE** | Default case in CONSIDER             | [CONTROL-FLOW](control-flow/README.md) |
-| **WHEN**      | Introduces a pattern match case      | [CONSIDER](control-flow/CONSIDER.md)   |
-
-### Logical Keywords
-
-| Keyword           | Purpose                    | Reference                       |
-| ----------------- | -------------------------- | ------------------------------- |
-| **AND** / **...** | Logical conjunction        | [AND](operators/AND.md)         |
-| **IMPLIES**       | Logical implication        | [IMPLIES](operators/IMPLIES.md) |
-| **NOT**           | Logical negation           | [NOT](operators/NOT.md)         |
-| **OR** / **..**   | Logical disjunction        | [OR](operators/OR.md)           |
-| **UNLESS**        | Exception clause (AND NOT) | [UNLESS](operators/UNLESS.md)   |
-
-### Comparison Keywords
-
-| Keyword     | Purpose                     | Reference                                      |
-| ----------- | --------------------------- | ---------------------------------------------- |
-| **ABOVE**   | Synonym for GREATER THAN    | [COMPARISONS](operators/comparisons/README.md) |
-| **BELOW**   | Synonym for LESS THAN       | [COMPARISONS](operators/comparisons/README.md) |
-| **EQUALS**  | Equality test               | [COMPARISONS](operators/comparisons/README.md) |
-| **GREATER** | Greater than comparison     | [COMPARISONS](operators/comparisons/README.md) |
-| **LESS**    | Less than comparison        | [COMPARISONS](operators/comparisons/README.md) |
-| **THAN**    | Comparison conjunction word | [COMPARISONS](operators/comparisons/README.md) |
-| **LEAST**   | Used in "AT LEAST" (≥)      | [COMPARISONS](operators/comparisons/README.md) |
-| **MOST**    | Used in "AT MOST" (≤)       | [COMPARISONS](operators/comparisons/README.md) |
-
-### Type Keywords
-
-| Keyword        | Purpose                                                                 | Reference                          |
-| -------------- | ----------------------------------------------------------------------- | ---------------------------------- |
-| **A** / **AN** | Type articles                                                           | [ARTICLES](types/A-AN.md)          |
-| **ASSUME**     | Declares a variable of assumed type                                     | [ASSUME](types/ASSUME.md)          |
-| **DECLARE**    | Defines a type                                                          | [DECLARE](types/DECLARE.md)        |
-| **IS**         | Type assertion or definition                                            | [TYPE-KEYWORDS](types/keywords.md) |
-| **HAS**        | Record field declaration (supports computed fields / methods via MEANS) | [TYPE-KEYWORDS](types/keywords.md) |
-| **LIST**       | List type or list literal                                               | [TYPE-KEYWORDS](types/keywords.md) |
-| **ONE OF**     | Used for enum types                                                     | [TYPE-KEYWORDS](types/keywords.md) |
-| **OF**         | Type application or constructor pattern                                 | [TYPE-KEYWORDS](types/keywords.md) |
-| **TYPE**       | The kind of types                                                       | [TYPE-KEYWORDS](types/keywords.md) |
-| **WITH**       | Record construction with named fields                                   | [TYPE-KEYWORDS](types/keywords.md) |
-| **FOR ALL**    | Universal quantifier for polymorphism                                   | [FOR ALL](types/for-all.md)        |
-
-### Regulative Keywords
-
-For expressing legal obligations, permissions, and prohibitions.
-
-| Keyword       | Purpose                            | Reference                          |
-| ------------- | ---------------------------------- | ---------------------------------- |
-| **PARTY**     | Declares a legal party             | [PARTY](regulative/PARTY.md)       |
-| **MUST**      | Obligation (deontic necessity)     | [MUST](regulative/MUST.md)         |
-| **MAY**       | Permission (deontic possibility)   | [MAY](regulative/MAY.md)           |
-| **SHANT**     | Prohibition                        | [SHANT](regulative/SHANT.md)       |
-| **MUST NOT**  | Prohibition (synonym for SHANT)    | [SHANT](regulative/SHANT.md)       |
-| **DO**        | Optionality (deontic possibility)  | [REGULATIVE](regulative/README.md) |
-| **DOES**      | Action verb in directive           | [REGULATIVE](regulative/README.md) |
-| **EXACTLY**   | Exact value matching on action     | [REGULATIVE](regulative/README.md) |
-| **WITHIN**    | Temporal deadline (relative)       | [REGULATIVE](regulative/README.md) |
-| **HENCE**     | Consequence on fulfillment         | [REGULATIVE](regulative/README.md) |
-| **LEST**      | Consequence on breach              | [REGULATIVE](regulative/README.md) |
-| **BREACH**    | Terminal violation state           | [REGULATIVE](regulative/README.md) |
-| **FULFILLED** | Terminal success state             | [REGULATIVE](regulative/README.md) |
-| **BECAUSE**   | Justification or reason for breach | [BECAUSE](regulative/BECAUSE.md)   |
-| **PROVIDED**  | Guard condition on action          | [REGULATIVE](regulative/README.md) |
-| **AT**        | Temporal specification             | [REGULATIVE](regulative/README.md) |
-| **RAND**      | Parallel AND of obligations        | [REGULATIVE](regulative/README.md) |
-| **ROR**       | Parallel OR of obligations         | [REGULATIVE](regulative/README.md) |
-
-### Arithmetic Keywords
-
-| Keyword     | Purpose                   | Reference                                    |
-| ----------- | ------------------------- | -------------------------------------------- |
-| **PLUS**    | Addition                  | [ARITHMETIC](operators/arithmetic/README.md) |
-| **MINUS**   | Subtraction               | [ARITHMETIC](operators/arithmetic/README.md) |
-| **TIMES**   | Multiplication            | [ARITHMETIC](operators/arithmetic/README.md) |
-| **DIVIDED** | Division (use with BY)    | [ARITHMETIC](operators/arithmetic/README.md) |
-| **BY**      | Division conjunction word | [ARITHMETIC](operators/arithmetic/README.md) |
-| **MODULO**  | Modulus (remainder)       | [ARITHMETIC](operators/arithmetic/README.md) |
-
-### Other Keywords
-
-| Keyword         | Purpose                               | Reference                          |
-| --------------- | ------------------------------------- | ---------------------------------- |
-| **IMPORT**      | Imports definitions from another file | [IMPORT](libraries/IMPORT.md)      |
-| **TIMEZONE IS** | Sets document timezone (IANA name)    | [timezone](libraries/timezone.md)  |
-| **TO**          | Function type return separator        | [SYNTAX](syntax/README.md)         |
-| **OF**          | Positional argument / type syntax     | [TYPE-KEYWORDS](types/keywords.md) |
-
----
+| Keyword                | Meaning                                                                  | Reference                                     |
+| ---------------------- | ------------------------------------------------------------------------ | --------------------------------------------- |
+| **DECIDE**             | Defines a value, a function or a rule; one definition or several clauses | [DECIDE](functions/DECIDE.md)                 |
+| **MEANS**              | Gives the body of a function, a value or a computed field                | [MEANS](functions/MEANS.md)                   |
+| **IS**                 | Gives the body after `DECIDE name`; also states a type (`IS A NUMBER`)   | [DECIDE](functions/DECIDE.md)                 |
+| **IF** (after DECIDE)  | `DECIDE x IF condition` defines a BOOLEAN                                | [DECIDE](functions/DECIDE.md)                 |
+| **GIVEN**              | Names and types the inputs of a function                                 | [GIVEN and GIVETH](functions/GIVEN.md)        |
+| **GIVETH** / **GIVES** | States the type of the result                                            | [GIVEN and GIVETH](functions/GIVEN.md#giveth) |
+| **LET** ... **IN**     | Local definitions before an expression                                   | [LET and WHERE](functions/LET.md)             |
+| **BE** / **MEAN**      | Alternatives to IS and MEANS in a LET binding                            | [LET and WHERE](functions/LET.md)             |
+| **WHERE**              | Local definitions after an expression                                    | [LET and WHERE](functions/LET.md#where)       |
+| **YIELD**              | A function without a name: `GIVEN n YIELD n + 1`                         | [YIELD](functions/YIELD.md)                   |
+| **AKA**                | Another name for the same function, value, type or section               | [AKA](functions/AKA.md)                       |
+| Several clauses        | A rule written as one line per case: `DECIDE price Red IS 1`             | [DECIDE](functions/DECIDE.md#several-clauses) |
 
 ## Types
 
-L4's type system includes primitive types, algebraic types, and polymorphic types.
+| Keyword                      | Meaning                                                                            | Reference                       |
+| ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------- |
+| **DECLARE**                  | Defines a new type                                                                 | [DECLARE](types/DECLARE.md)     |
+| **HAS**                      | Lists the fields of a record, including computed fields with MEANS                 | [DECLARE](types/DECLARE.md)     |
+| **ONE OF**                   | Lists the alternatives of an enumeration                                           | [DECLARE](types/DECLARE.md)     |
+| **IS A** / **IS AN**         | States a type: `age IS A NUMBER`                                                   | [DECLARE](types/DECLARE.md)     |
+| **A** / **AN** / **THE**     | Articles before a type name; they do not change the meaning                        | [DECLARE](types/DECLARE.md)     |
+| **OF**                       | Applies a type or a constructor to its arguments: `LIST OF NUMBER`, `PAIR OF x, y` | [DECLARE](types/DECLARE.md)     |
+| **WITH**                     | Builds a record by field name: `Person WITH name IS "Ann"`                         | [DECLARE](types/DECLARE.md)     |
+| **ASSUME**                   | Declares a name with a type but no definition                                      | [ASSUME](types/ASSUME.md)       |
+| **TYPE**                     | The type of types, for type inputs: `GIVEN a IS A TYPE`                            | [FOR ALL](types/for-all.md)     |
+| **FOR ALL**                  | Introduces type variables in a type                                                | [FOR ALL](types/for-all.md)     |
+| **FUNCTION FROM** ... **TO** | A function type: `FUNCTION FROM NUMBER TO BOOLEAN`                                 | [Types](types/README.md)        |
+| **AS**                       | `x AS STRING` turns a value into text                                              | [Coercions](types/coercions.md) |
 
-For complete documentation, see **[Types Reference](types/README.md)**.
+## Built-in types
 
-### Primitive Types
+| Type           | Meaning                                                           | Reference                                    |
+| -------------- | ----------------------------------------------------------------- | -------------------------------------------- |
+| **NUMBER**     | Whole numbers and exact fractions                                 | [Types](types/README.md)                     |
+| **STRING**     | Text                                                              | [Types](types/README.md)                     |
+| **BOOLEAN**    | `TRUE` or `FALSE`                                                 | [Types](types/README.md)                     |
+| **DATE**       | A calendar date                                                   | [Types](types/README.md)                     |
+| **TIME**       | A time of day, with no date or time zone                          | [Types](types/README.md)                     |
+| **DATETIME**   | A moment in time, with a time zone                                | [Types](types/README.md)                     |
+| **LIST**       | A list of values of one type; also writes a list: `LIST 1, 2, 3`  | [Types](types/README.md)                     |
+| **MAYBE**      | A value that may be missing: `JUST x` or `NOTHING`                | [Types](types/README.md)                     |
+| **EITHER**     | One of two values: `LEFT x` or `RIGHT y`                          | [Types](types/README.md)                     |
+| **PAIR**       | Two values together, from the prelude                             | [prelude](libraries/prelude.md#pairs)        |
+| **Dictionary** | Keys mapped to values, from the prelude                           | [prelude](libraries/prelude.md#dictionaries) |
+| **DEONTIC**    | The type of a regulative rule: `DEONTIC party action`             | [DEONTIC](regulative/DEONTIC.md)             |
+| **PROVISION**  | An older name for DEONTIC                                         | [DEONTIC](regulative/DEONTIC.md)             |
+| **EVENT**      | Something a party did at a time, for traces: `EVENT party action` | [EVENT](regulative/EVENT.md)                 |
 
-| Type         | Description                             |
-| ------------ | --------------------------------------- |
-| **NUMBER**   | Numeric values (integers and rationals) |
-| **STRING**   | Text strings                            |
-| **BOOLEAN**  | Truth values (TRUE, FALSE)              |
-| **DATE**     | Calendar dates                          |
-| **TIME**     | Wall-clock time-of-day (no timezone)    |
-| **DATETIME** | Absolute point in time with timezone    |
+## Constants and constructors
 
-### Polymorphic Types
+| Name                                              | Meaning                                                                | Reference                                |
+| ------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------- |
+| **TRUE** / **FALSE**                              | The two BOOLEAN values                                                 | [Types](types/README.md)                 |
+| **JUST** / **NOTHING**                            | A present or a missing MAYBE value                                     | [Types](types/README.md)                 |
+| **LEFT** / **RIGHT**                              | The two sides of an EITHER                                             | [Types](types/README.md)                 |
+| **EMPTY**                                         | The empty list                                                         | [Types](types/README.md)                 |
+| **TODAY**, **NOW**, **CURRENTTIME**, **TIMEZONE** | The current date, moment and time of day, and the document's time zone | [Built-in functions](builtins/README.md) |
 
-| Type       | Description                               |
-| ---------- | ----------------------------------------- |
-| **LIST**   | Ordered collection of elements            |
-| **MAYBE**  | Optional values (JUST x or NOTHING)       |
-| **EITHER** | Choice between two values (LEFT or RIGHT) |
+## Control flow
 
-### Special Types
-
-| Type          | Description                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| **TYPE**      | The kind of types                                                                                |
-| **FUNCTION**  | Function types                                                                                   |
-| **DEONTIC**   | Regulative rule type `DEONTIC party action` — see [DEONTIC](regulative/DEONTIC.md)               |
-| **PROVISION** | Deprecated alias for DEONTIC                                                                     |
-| **EVENT**     | Event type `EVENT party action` consumed by regulative traces — see [EVENT](regulative/EVENT.md) |
-
----
+| Keyword                          | Meaning                                                                              | Reference                            |
+| -------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ |
+| **IF** ... **THEN** ... **ELSE** | Chooses between two values                                                           | [IF](control-flow/IF.md)             |
+| **BRANCH**                       | A multi-way conditional: a list of `IF ... THEN` lines and an `OTHERWISE`            | [BRANCH](control-flow/BRANCH.md)     |
+| **CONSIDER**                     | Pattern matching: picks a branch by the shape of a value                             | [CONSIDER](control-flow/CONSIDER.md) |
+| **WHEN**                         | One branch of a CONSIDER                                                             | [CONSIDER](control-flow/CONSIDER.md) |
+| **OTHERWISE**                    | The branch for every remaining case, in CONSIDER and BRANCH                          | [CONSIDER](control-flow/CONSIDER.md) |
+| **EXACTLY**                      | In a pattern, matches a given value; in a regulative rule, matches an action exactly | [CONSIDER](control-flow/CONSIDER.md) |
 
 ## Operators
 
-For complete documentation, see **[Operators Reference](operators/README.md)**.
+| Operator                         | Meaning                                                     | Reference                                      |
+| -------------------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
+| **AND**, `&&`, `...`             | Both are true                                               | [AND, OR, NOT, IMPLIES](operators/logical.md)  |
+| **OR**, `\|\|`, `..`             | At least one is true                                        | [AND, OR, NOT, IMPLIES](operators/logical.md)  |
+| **NOT**                          | Negation                                                    | [AND, OR, NOT, IMPLIES](operators/logical.md)  |
+| **IMPLIES**, `=>`                | If the first is true, so is the second                      | [AND, OR, NOT, IMPLIES](operators/logical.md)  |
+| **UNLESS**                       | `a UNLESS b` is `a AND NOT b`, binding more loosely than OR | [UNLESS](operators/UNLESS.md)                  |
+| **PLUS**, `+`                    | Addition; also adds days to a date                          | [Arithmetic](operators/arithmetic/README.md)   |
+| **MINUS**, `-`                   | Subtraction                                                 | [Arithmetic](operators/arithmetic/README.md)   |
+| **TIMES**, `*`                   | Multiplication                                              | [Arithmetic](operators/arithmetic/README.md)   |
+| **DIVIDED BY**, `/`              | Division                                                    | [Arithmetic](operators/arithmetic/README.md)   |
+| **MODULO**                       | Remainder of a division of whole numbers                    | [Arithmetic](operators/arithmetic/README.md)   |
+| `%`                              | Percent after a number: `5%` is 0.05                        | [Arithmetic](operators/arithmetic/README.md)   |
+| **EQUALS**, `=`                  | Equality                                                    | [Comparisons](operators/comparisons/README.md) |
+| **GREATER THAN**, **ABOVE**, `>` | Greater than                                                | [Comparisons](operators/comparisons/README.md) |
+| **LESS THAN**, **BELOW**, `<`    | Less than                                                   | [Comparisons](operators/comparisons/README.md) |
+| **AT LEAST**, `>=`               | Greater than or equal                                       | [Comparisons](operators/comparisons/README.md) |
+| **AT MOST**, `<=`                | Less than or equal                                          | [Comparisons](operators/comparisons/README.md) |
+| **FOLLOWED BY**                  | Puts an item in front of a list                             | [Operators](operators/README.md)               |
+| **CONCAT**                       | Joins strings: `CONCAT "a", "b"`                            | [Built-in functions](builtins/README.md#text)  |
+| `'s`                             | Reads a field: `person's age`                               | [Syntax and directives](syntax/README.md)      |
 
-### Symbolic Operators
+## Regulative rules
 
-| Operator | Textual Form         | Description           |
-| -------- | -------------------- | --------------------- |
-| `*`      | TIMES                | Multiplication        |
-| `+`      | PLUS                 | Addition              |
-| `-`      | MINUS                | Subtraction           |
-| `/`      | DIVIDED BY           | Division              |
-| `>=`     | AT LEAST             | Greater than or equal |
-| `<=`     | AT MOST              | Less than or equal    |
-| `>`      | GREATER THAN / ABOVE | Greater than          |
-| `<`      | LESS THAN / BELOW    | Less than             |
-| `=`      | EQUALS               | Equality              |
-| `&&`     | AND                  | Logical conjunction   |
-| `\|\|`   | OR                   | Logical disjunction   |
-| `=>`     | IMPLIES              | Logical implication   |
+| Keyword              | Meaning                                                                               | Reference                                                         |
+| -------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **PARTY**            | Who the rule applies to                                                               | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **MUST**             | Obligation                                                                            | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **MAY**              | Permission                                                                            | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **SHANT / MUST NOT** | Prohibition; the two are synonyms                                                     | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md#shant-and-must-not) |
+| **DO**               | An action neither required nor forbidden; without HENCE and LEST it behaves like MUST | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)                    |
+| **PROVIDED**         | A condition the action must meet                                                      | [Deadlines and consequences](regulative/consequences.md)          |
+| **WITHIN**           | The deadline, counted from when the rule starts                                       | [Deadlines and consequences](regulative/consequences.md)          |
+| **HENCE**            | What follows when the rule is complied with                                           | [Deadlines and consequences](regulative/consequences.md)          |
+| **LEST**             | What follows when it is not                                                           | [Deadlines and consequences](regulative/consequences.md)          |
+| **FULFILLED**        | The end state: nothing more is owed                                                   | [Deadlines and consequences](regulative/consequences.md)          |
+| **BREACH**           | The end state: a rule was broken; `BREACH BY party BECAUSE reason`                    | [Deadlines and consequences](regulative/consequences.md)          |
+| **BY**               | Names the party in `BREACH BY`                                                        | [Deadlines and consequences](regulative/consequences.md)          |
+| **RAND**             | Both rules apply at once                                                              | [Deadlines and consequences](regulative/consequences.md)          |
+| **ROR**              | Either rule may be complied with                                                      | [Deadlines and consequences](regulative/consequences.md)          |
+| **BECAUSE**          | The reason given for a breach                                                         | [BECAUSE](regulative/BECAUSE.md)                                  |
+| **DOES**             | In a trace event: `PARTY Seller DOES deliver AT 3`                                    | [EVENT](regulative/EVENT.md)                                      |
+| **AT**               | The time of an event, or the start time of a `#TRACE`                                 | [EVENT](regulative/EVENT.md)                                      |
 
-### List Operators
+## Files and modules
 
-| Operator        | Description                 |
-| --------------- | --------------------------- |
-| **FOLLOWED BY** | List cons (prepend element) |
-| **EMPTY**       | Empty list                  |
-
-### String Operators
-
-| Operator   | Description                  |
-| ---------- | ---------------------------- |
-| **CONCAT** | String concatenation         |
-| **APPEND** | String concatenation (infix) |
-
-### Temporal Operators
-
-| Operator   | Description              |
-| ---------- | ------------------------ |
-| **AT**     | Point in time            |
-| **WITHIN** | Time duration constraint |
-
----
-
-## Syntax Patterns
-
-Special syntax features and patterns in L4.
-
-For complete documentation, see **[Syntax Reference](syntax/README.md)**.
-
-| Feature             | Description                                   |
-| ------------------- | --------------------------------------------- |
-| **Layout Rules**    | Indentation-based grouping                    |
-| **Comments**        | `--` line comments and `{- -}` block comments |
-| **Identifiers**     | Backtick-quoted identifiers                   |
-| **Annotations**     | `@desc`, `@nlg`, `@ref`, `@export`            |
-| **Directives**      | `#EVAL`, `#TRACE`, `#CHECK`, `#ASSERT`        |
-| **Ditto**           | `^` copy from previous line                   |
-| **Asyndetic**       | `...` (AND) and `..` (OR) implicit operators  |
-| **Computed Fields** | Derived attributes / methods via MEANS in HAS |
-| **Genitive**        | `'s` for record field access                  |
-| **Section Markers** | `§` for document sections                     |
-
----
-
-## Symbols
-
-| Symbol | Name            | Purpose                    |
-| ------ | --------------- | -------------------------- |
-| `()`   | Parentheses     | Grouping, tuples           |
-| `{}`   | Braces          | Block comments             |
-| `[]`   | Square brackets | NLG inline annotations     |
-| `<<>>` | Double angles   | Reference annotations      |
-| `§`    | Section symbol  | Document sections          |
-| `^`    | Caret           | Ditto (copy above)         |
-| `,`    | Comma           | Separator                  |
-| `;`    | Semicolon       | Statement separator        |
-| `.`    | Dot             | Decimal point, punctuation |
-| `...`  | Ellipsis        | Asyndetic AND              |
-| `..`   | Double dot      | Asyndetic OR               |
-| `:`    | Colon           | Type signature separator   |
-| `%`    | Percent         | Percentage, NLG delimiter  |
-| `'s`   | Genitive        | Possession/field access    |
-
----
-
-## Literals
-
-| Literal Type | Syntax                               | Example                           |
-| ------------ | ------------------------------------ | --------------------------------- |
-| **Integer**  | Digits                               | `42`, `-17`, `100_000`            |
-| **Rational** | Digits with decimal point or percent | `3.14`, `-0.5`, `1_000.5`, `0.3%` |
-| **String**   | Double quotes                        | `"hello world"`                   |
-| **Boolean**  | TRUE or FALSE                        | `TRUE`, `FALSE`                   |
-| **List**     | LIST or FOLLOWED BY                  | `LIST 1, 2, 3`                    |
-
-Numeric literals accept `_` between digits as a visual thousand-separator (`100_000` = `100000`). Underscores must not lead or trail the digit run.
-
----
-
-## Core Libraries
-
-Libraries shipped with L4.
-
-For complete documentation, see **[Libraries Reference](libraries/README.md)**.
-
-| Library           | Purpose                              |
-| ----------------- | ------------------------------------ |
-| **prelude**       | Standard functions (always imported) |
-| **daydate**       | Date calculations and temporal logic |
-| **time**          | Wall-clock time-of-day operations    |
-| **datetime**      | Absolute points in time (with tz)    |
-| **timezone**      | IANA timezone constants              |
-| **actus**         | ACTUS financial contract standards   |
-| **excel-date**    | Excel date compatibility             |
-| **math**          | Mathematical functions               |
-| **currency**      | ISO 4217 currency handling           |
-| **legal-persons** | Legal entity types                   |
-| **jurisdiction**  | Jurisdiction definitions             |
-| **llm**           | LLM API integration                  |
-
-### Built-in Functions
-
-These are built into the compiler (not a library):
-
-#### Type Coercion
-
-| Function       | Purpose             |
-| -------------- | ------------------- |
-| **TOSTRING**   | Convert to STRING   |
-| **TONUMBER**   | Convert to NUMBER   |
-| **TODATE**     | Convert to DATE     |
-| **TOTIME**     | Convert to TIME     |
-| **TODATETIME** | Convert to DATETIME |
-| **TRUNC**      | Truncate number     |
-
-See [coercions documentation](types/coercions.md) for details.
-
-#### HTTP and JSON
-
-| Function       | Purpose                      |
-| -------------- | ---------------------------- |
-| **FETCH**      | HTTP GET request             |
-| **POST**       | HTTP POST request            |
-| **ENV**        | Read environment variable    |
-| **JSONENCODE** | Convert value to JSON string |
-| **JSONDECODE** | Parse JSON string to value   |
-
-See [HTTP and JSON documentation](builtins/http-json.md) for details.
-
----
+| Keyword         | Meaning                                             | Reference                                        |
+| --------------- | --------------------------------------------------- | ------------------------------------------------ |
+| **IMPORT**      | Uses the definitions of another file or a library   | [Standard libraries](libraries/README.md#import) |
+| **TIMEZONE IS** | Sets the document's time zone, an IANA name         | [timezone](libraries/timezone.md)                |
+| `§`             | Starts a section of the document; `§§` a subsection | [Syntax and directives](syntax/README.md)        |
 
 ## Directives
 
-Compiler directives for testing and evaluation.
-
-| Directive    | Purpose                       |
-| ------------ | ----------------------------- |
-| `#EVAL`      | Evaluate and print expression |
-| `#EVALTRACE` | Evaluate with execution trace |
-| `#TRACE`     | Contract/state graph tracing  |
-| `#CHECK`     | Type check expression         |
-| `#ASSERT`    | Assert truth value            |
-
----
+| Directive    | Meaning                                                                                               | Reference                                            |
+| ------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `#EVAL`      | Evaluates an expression and shows the result                                                          | [Syntax and directives](syntax/README.md#directives) |
+| `#EVALTRACE` | Evaluates and shows each step                                                                         | [Syntax and directives](syntax/README.md#directives) |
+| `#CHECK`     | Shows the type of an expression without evaluating it                                                 | [Syntax and directives](syntax/README.md#directives) |
+| `#ASSERT`    | Reports an error unless the expression is TRUE                                                        | [Syntax and directives](syntax/README.md#directives) |
+| `#TRACE`     | Runs a regulative rule against events: `#TRACE rule AT 0 WITH ...`; `STARTING AT` is the same as `AT` | [Syntax and directives](syntax/README.md#directives) |
 
 ## Annotations
 
-Metadata annotations for documentation and generation.
+| Annotation             | Meaning                                                           | Reference                                             |
+| ---------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
+| `@desc`                | A description of a definition, shown in tools and APIs            | [Syntax and directives](syntax/README.md#annotations) |
+| `@nlg`, `[...]`        | Wording used when a rule is put into natural language             | [Syntax and directives](syntax/README.md#annotations) |
+| `@ref`, `<<...>>`      | A reference to the legal source                                   | [Syntax and directives](syntax/README.md#annotations) |
+| `@ref-src`, `@ref-map` | Where references are looked up                                    | [Syntax and directives](syntax/README.md#annotations) |
+| `@export`              | Publishes a function as an API endpoint when the file is deployed | [Syntax and directives](syntax/README.md#annotations) |
+| `@export default`      | The function a deployment calls when no function is named         | [Syntax and directives](syntax/README.md#annotations) |
 
-| Annotation        | Purpose                                                       |
-| ----------------- | ------------------------------------------------------------- |
-| `@desc`           | Human-readable description                                    |
-| `@nlg`            | Natural language generation hint                              |
-| `@ref`            | Cross-reference to legal source                               |
-| `@ref-src`        | Source reference                                              |
-| `@ref-map`        | Reference mapping                                             |
-| `@export`         | Mark a function for export/deployment                         |
-| `@export default` | Mark the default exported function (entry point of a service) |
+## Symbols
 
----
+| Symbol             | Meaning                                                    | Reference                                 |
+| ------------------ | ---------------------------------------------------------- | ----------------------------------------- |
+| `--`, `//`         | A comment to the end of the line                           | [Syntax and directives](syntax/README.md) |
+| `{- -}`, `/* */`   | A comment over several lines                               | [Syntax and directives](syntax/README.md) |
+| `` ` ` ``          | Backticks around a name with spaces: `` `the applicant` `` | [Syntax and directives](syntax/README.md) |
+| `"..."`            | A STRING                                                   | [Syntax and directives](syntax/README.md) |
+| `^`                | Ditto: repeats the word above                              | [Syntax and directives](syntax/README.md) |
+| `( )`              | Groups an expression                                       | [Syntax and directives](syntax/README.md) |
+| `,`                | Separates list items and arguments after OF                | [Syntax and directives](syntax/README.md) |
+| `` `_` ``          | In a pattern, matches anything                             | [CONSIDER](control-flow/CONSIDER.md)      |
+| `_` between digits | Groups digits: `100_000` is 100000                         | [Syntax and directives](syntax/README.md) |
 
-## Built-in Constants
+## Terms
 
-| Constant        | Type           | Description                                                   |
-| --------------- | -------------- | ------------------------------------------------------------- |
-| **TRUE**        | BOOLEAN        | Boolean true value                                            |
-| **FALSE**       | BOOLEAN        | Boolean false value                                           |
-| **NOTHING**     | MAYBE a        | Absence of value                                              |
-| **JUST**        | a → MAYBE a    | Present value constructor                                     |
-| **LEFT**        | a → EITHER a b | Left alternative                                              |
-| **RIGHT**       | b → EITHER a b | Right alternative                                             |
-| **EMPTY**       | LIST a         | Empty list                                                    |
-| **TODAY**       | DATE           | Current date (requires `TIMEZONE IS`)                         |
-| **NOW**         | DATETIME       | Current date and time (defaults to UTC without `TIMEZONE IS`) |
-| **CURRENTTIME** | TIME           | Current local time (requires `TIMEZONE IS`)                   |
-| **TIMEZONE**    | STRING         | Document timezone (requires `TIMEZONE IS`)                    |
-
----
-
-## Concepts & Terms
-
-Conceptual vocabulary used throughout the L4 documentation.
-
-| Term                    | Meaning                                                                                                                                                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Regulative rule**     | A rule that regulates behaviour: it says who MUST, MAY, or SHANT do what, by when, and with what consequences. Expressed with PARTY/MUST/MAY/SHANT and typed as [DEONTIC](regulative/DEONTIC.md).                                                       |
-| **Constitutive rule**   | A rule that defines or computes something (definitions, classifications, calculations) rather than regulating behaviour. Expressed with DECIDE/MEANS.                                                                                                   |
-| **Deontic modality**    | The mode of a regulative rule: obligation (MUST), permission (MAY), or prohibition (SHANT/MUST NOT).                                                                                                                                                    |
-| **Defeasibility**       | The property that a general rule can be overridden by exceptions ("unless...", "notwithstanding..."). In L4 this is modeled explicitly, e.g. with UNLESS or guarded branches.                                                                           |
-| **Mixfix**              | A function definition style in which parameters are interleaved with the words of the function name (e.g. ``borrower `pays` lender``), letting expressions read like natural language.                                                                  |
-| **Isomorphism**         | The design goal that L4 code mirrors the structure of the legal source text (legal text ↔ code), so each clause of the statute or contract maps to an identifiable piece of code, and vice versa.                                                      |
-| **Residual obligation** | What remains of a contract after some events have been processed: the not-yet-discharged obligations that still bind the parties (the DEONTIC value returned by EVALTRACE / `#TRACE`).                                                                  |
-| **Reparation**          | A secondary obligation that arises when a primary obligation is breached (e.g. a penalty payment), expressed with a LEST clause that contains a further regulative rule instead of a bare BREACH.                                                       |
-| **Clauses**             | A rule written as several lines, one per case, each with values to match in place of its inputs (`DECIDE price Red IS 1`, `DECIDE price Green IS 2`); L4 uses the first line that matches. See [Multi-clause DECIDE](functions/multi-clause-DECIDE.md). |
-| **Exhaustiveness**      | Whether a CONSIDER pattern match covers all constructors of the scrutinee's type. The typechecker warns on missing and redundant branches — see [CONSIDER](control-flow/CONSIDER.md#exhaustiveness-checking).                                           |
-
----
-
-## Navigation
-
-- **[Reference Home](README.md)** - Reference documentation overview
-- **[Main Documentation](../README.md)** - Return to docs home
-- **[Courses](../courses/README.md)** - Learning paths
-- **[Tutorials](../tutorials/README.md)** - Task-oriented guides
-- **[Concepts](../concepts/README.md)** - Understanding L4's design
-- **[Specifications](https://github.com/legalese/l4-ide/tree/main/specs)** - Technical specifications
+| Term                    | Meaning                                                                                                        | Reference                                                |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Regulative rule**     | A rule about behaviour: who MUST, MAY or SHANT do what, by when, and what follows                              | [Regulative rules](regulative/README.md)                 |
+| **Constitutive rule**   | A rule that defines, classifies or calculates, written with DECIDE or MEANS                                    | [Functions](functions/README.md)                         |
+| **Deontic modality**    | Obligation (MUST), permission (MAY) or prohibition (SHANT/MUST NOT)                                            | [PARTY, MUST, MAY, SHANT](regulative/PARTY.md)           |
+| **Defeasibility**       | A general rule giving way to an exception ("unless", "notwithstanding"), written with UNLESS or branches       | [UNLESS](operators/UNLESS.md)                            |
+| **Mixfix**              | A name with inputs between its words, such as ``borrower `pays` lender``, so a call reads like a sentence      | [Functions](functions/README.md)                         |
+| **Isomorphism**         | Code that follows the structure of the legal text, clause for clause                                           | [Concepts](../concepts/README.md)                        |
+| **Residual obligation** | What is still owed after some events: the DEONTIC value a `#TRACE` gives                                       | [DEONTIC](regulative/DEONTIC.md)                         |
+| **Reparation**          | A further obligation that follows a breach, written in a LEST                                                  | [Deadlines and consequences](regulative/consequences.md) |
+| **Clauses**             | A rule written as one line per case, each with values to match in place of its inputs; the first match applies | [DECIDE](functions/DECIDE.md#several-clauses)            |
+| **Exhaustiveness**      | Whether the branches of a CONSIDER, or the clauses of a rule, cover every case; L4 warns when they do not      | [CONSIDER](control-flow/CONSIDER.md)                     |

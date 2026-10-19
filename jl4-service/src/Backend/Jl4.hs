@@ -25,12 +25,12 @@ import L4.TypeCheck.Types (EntityInfo, Environment)
 import L4.Utils.Ratio
 import qualified LSP.Core.Shake as Shake
 import LSP.Core.Types.Diagnostics (FileDiagnostic (..), prettyDiagnostic)
-import LSP.L4.Oneshot (oneshotL4ActionAndDiagnostics, oneshotL4ActionAndErrors)
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnosticsIn, oneshotL4ActionAndErrorsIn)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
 
 import Language.LSP.Protocol.Types (Diagnostic (..), DiagnosticSeverity (..), normalizedFilePathToUri, toNormalizedFilePath)
-import System.FilePath ((<.>), takeFileName)
+import System.FilePath ((<.>), takeExtension, takeFileName)
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -131,13 +131,38 @@ buildCompiledFromShared shared funName = runExceptT $ do
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
 
+-- | Where the 'IMPORT's of a deployed bundle may be resolved: the bundle's own
+-- files (the VFS tier, consulted first), then the standard library built into
+-- this binary, and nothing from the host. The service serves bundles that
+-- somebody else uploaded, to callers who cannot see the machine it runs on, so
+-- a `prelude.l4` in the working directory or a `JL4_LIBRARY_PATH` in the
+-- environment must not be able to replace the stdlib for every deployment.
+-- (Before this scope existed the service registered the stdlib at
+-- `./<name>.l4`, which the VFS tier hits first, so the host could not replace
+-- it either; registering it at `jl4-embedded:` made the host's files win,
+-- silently — a deploy "applied" and every call answered 422 `sum is not in
+-- scope` — and this scope is what makes that impossible.) Every session the
+-- service opens uses this.
+--
+-- Ruled 2026-10-12: a deployment resolves its own files and the built-in
+-- stdlib, nothing from the host. One of the conditions is that an IMPORT that
+-- resolves to nothing is logged at WARN when a bundle is compiled, which a restart
+-- does again ('typecheckAndEvalBundle' returns them); a refusal would need a
+-- later ruling.
+bundleScope :: Rules.LibraryScope
+bundleScope = Rules.EmbeddedStdlibOnly
+
 -- | Typecheck and evaluate all files in a bundle in a SINGLE Shake session.
 -- This avoids creating N independent IDE sessions that redundantly re-parse
 -- and re-typecheck overlapping imports. Shake caches intermediate results
 -- (parse, import resolution, typecheck) and shares them across all files.
 --
 -- Returns per-file typecheck results and per-file evaluator environments
--- (for files that have exports and need import environments).
+-- (for files that have exports and need import environments), and the IMPORTs
+-- of the bundle's @.l4@ files that resolved to nothing, as (importing file,
+-- module name). The caller says so in its log: the diagnostic for one is in the
+-- session's store, which this function does not hand back, and a bundle with an
+-- unresolvable IMPORT still compiles.
 typecheckAndEvalBundle
   :: ModuleContext
   -- ^ All source files in the bundle (filepath -> content)
@@ -152,36 +177,45 @@ typecheckAndEvalBundle
         -- ^ Typecheck results per file (Nothing if typecheck failed)
         , Map FilePath EvalEnv.Environment
         -- ^ Evaluator import environments for requested files
+        , [(FilePath, Text)]
+        -- ^ IMPORTs that resolved to nothing: (importing file, module name)
         )
 typecheckAndEvalBundle moduleContext evalFiles = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  -- Core libraries (prelude, …) to register as stable virtual files, unless the
-  -- deployment ships its own copy of the same name (which then shadows the
-  -- embedded one). Registering them up front means `IMPORT prelude` resolves via
-  -- the VFS, instead of the resolver's on-demand `addVirtualFile` embedded
-  -- fallback (LSP.L4.Rules). That fallback mutates the VFS mid-rule and — under
-  -- -O, in the multi-pass compileBundle/eval path — yields an unstable/duplicate
-  -- prelude module and spurious overload ambiguity (e.g. `count xs >= n` →
-  -- "ambiguous __GEQ__"). Verified: the same source is rejected via the embedded
-  -- fallback and accepted when the library is a real virtual file. The libraries
-  -- stay *dependencies* (NOT added to `allUris`), so they are never serialized or
-  -- surfaced as deployment files — only resolved when imported.
+  -- Core libraries (prelude, …) to register as virtual files, unless the
+  -- deployment ships a file of the same basename. They are registered at
+  -- `Shake.embeddedLibraryUri`, the one URI the resolver hands back for an
+  -- embedded winner, so every importer that falls through to the embedded tier
+  -- names the same module: a bundle must not hold two `prelude` modules (the
+  -- duplicate-module ambiguity, e.g. "ambiguous __GEQ__" on `count xs >= n`).
+  -- This service used to register them at `./<name>.l4`; see
+  -- `Shake.embeddedLibraryUriScheme` for why that key is forgeable.
+  --
+  -- This registration does NOT make `IMPORT prelude` resolve to the stdlib.
+  -- The VFS tier probes `project:/` and `./<module>.l4` keys, which a
+  -- `jl4-embedded:/` URI can never match, so what makes the stdlib the answer
+  -- is the resolver's embedded tier, and what keeps anything else from
+  -- standing in for it is that every session below runs under
+  -- `Rules.EmbeddedStdlibOnly` ('bundleScope'). Since 'Shake.getVirtualFile'
+  -- serves the same libraries from a pure map, these writes are redundant for
+  -- lookup; they stay *dependencies* (NOT added to `allUris`), so they are
+  -- never serialized or surfaced as deployment files — only resolved when
+  -- imported.
   let bundleBasenames = Set.fromList (map takeFileName (StrictMap.keys moduleContext))
       embeddedLibFiles =
-        [ (libName, content)
+        [ (name, content)
         | (name, content) <- StrictMap.toList EmbeddedLibraries.embeddedLibraries
-        , let libName = Text.unpack name <.> "l4"
-        , not (libName `Set.member` bundleBasenames)
+        , not ((Text.unpack name <.> "l4") `Set.member` bundleBasenames)
         ]
 
   -- Use the first file's directory as the session root (arbitrary but required)
   let allFiles = StrictMap.toList moduleContext
   case allFiles of
-    [] -> pure ([], StrictMap.empty, StrictMap.empty)
+    [] -> pure ([], StrictMap.empty, StrictMap.empty, [])
     ((firstPath, _) : _) -> do
-      (_log, diags, (tcMap, evalMap)) <- oneshotL4ActionAndDiagnostics evalConfig firstPath $ \_nfp -> do
+      (_log, diags, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndDiagnosticsIn bundleScope evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
         -- Use the full path from the bundle (not just the basename) to avoid
         -- collisions when multiple files share the same filename in different dirs.
@@ -193,7 +227,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         -- Register embedded core libraries as stable virtual files (dependencies
         -- only — deliberately NOT added to allUris, see note above).
         forM_ embeddedLibFiles $ \(libName, content) ->
-          void $ Shake.addVirtualFile (toNormalizedFilePath ("./" <> libName)) content
+          void $ Shake.addVirtualFileUri (Shake.embeddedLibraryUri libName) content
 
         -- Typecheck ALL bundle files in one batch — Shake shares import resolution
         let allUris = [uri | (_, _, uri) <- fileNfps]
@@ -201,6 +235,12 @@ typecheckAndEvalBundle moduleContext evalFiles = do
 
         let tcMap = StrictMap.fromList
               [(path, mTc) | ((path, _, _), mTc) <- zip fileNfps (toList tcResults)]
+
+        -- The IMPORTs that found nothing. The typecheck above has already
+        -- resolved every import, so this reads memoised results.
+        unresolved <- fmap concat $
+          forM [(path, uri) | (path, _, uri) <- fileNfps, takeExtension path == ".l4"] $
+            \(path, uri) -> map (path,) <$> Rules.unresolvedImports uri
 
         -- Build evaluator import environments for files that need them.
         -- Uses GetLazyEvaluationDependencies which recursively evaluates imports.
@@ -218,7 +258,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
               | (path, Just (env, _dirResults)) <- evalPairs
               ]
 
-        pure (tcMap, evalMap)
+        pure (tcMap, evalMap, unresolved)
 
       -- The errors of the bundle's own files; a library's are its own business.
       let uriToPath = StrictMap.fromList
@@ -230,7 +270,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
             | d@FileDiagnostic{fdFilePath = uri, fdLspDiagnostic = Diagnostic{_severity = Just DiagnosticSeverity_Error}} <- diags
             , Just path <- [StrictMap.lookup uri uriToPath]
             ]
-      pure (errs, tcMap, evalMap)
+      pure (errs, tcMap, evalMap, unresolved)
 
 buildFunDecide :: Text -> FunctionDeclaration -> ExceptT EvaluatorError IO (Decide Resolved)
 buildFunDecide fnImpl fnDecl = do
@@ -366,6 +406,8 @@ data ModuleInfo = ModuleInfo
     -- ^ record type unique -> (type-constructor ref, [(field name, field type)])
   , miEnumVariants :: Map Unique [(Text, Resolved)]
     -- ^ enum type unique -> [(variant name, variant constructor ref)]
+  , miSynonyms     :: Map Unique ([Unique], Type' Resolved)
+    -- ^ synonym type unique -> (its parameters, its body)
   }
 
 -- | Flatten a module's own top-level + nested DECLAREs. Does not
@@ -385,6 +427,9 @@ buildModuleInfo :: [Declare Resolved] -> ModuleInfo
 buildModuleInfo decls = ModuleInfo
   { miRecords      = Map.fromList [ r | Just r <- map recordFor decls ]
   , miEnumVariants = Map.fromList [ r | Just r <- map enumFor   decls ]
+  , miSynonyms     = Map.fromList
+      [ (getUnique tyName, (map getUnique params, body))
+      | MkDeclare _ _ (MkAppForm _ tyName params _) (SynonymDecl _ body) <- decls ]
   }
   where
 
@@ -416,6 +461,52 @@ stripList :: Type' Resolved -> Maybe (Type' Resolved)
 stripList (TyApp _ name [inner]) | getUnique name == TypeCheck.listUnique = Just inner
 stripList _ = Nothing
 
+-- | A type with its synonyms expanded at the head, so that a synonym for MAYBE
+-- is a MAYBE when deciding what a missing or @null@ value means, and a synonym
+-- for a record or an enum is found. A synonym that takes parameters is expanded
+-- when every parameter is given.
+expandSyn :: ModuleInfo -> Type' Resolved -> Type' Resolved
+expandSyn mi = go (16 :: Int)
+  where
+    go 0 ty = ty
+    go n ty@(TyApp _ name args)
+      | Just (params, body) <- Map.lookup (getUnique name) mi.miSynonyms
+      , length params == length args =
+          go (n - 1) (subst (Map.fromList (zip params args)) body)
+      | otherwise = ty
+    go _ ty = ty
+    subst sub = \case
+      TyApp ann r []
+        | Just t <- Map.lookup (getUnique r) sub -> t
+        | otherwise -> TyApp ann r []
+      TyApp ann r ts -> TyApp ann r (map (subst sub) ts)
+      other -> other
+
+-- | The types of a function's inputs, with a synonym for a MAYBE at the head of
+-- a type replaced by the MAYBE it stands for. Any other type is left as written.
+--
+-- The generated wrapper decides from the head of an input's type whether the
+-- input may be left out or sent as @null@ ('Backend.CodeGen.isMaybeType'), and
+-- it does not expand a synonym. So an input declared through a synonym for a
+-- MAYBE was a required one: a @null@ for it, in a batch case or an MCP call, or
+-- a @{}@ value anywhere, was refused as a missing parameter. Expanding the head
+-- fixes that.
+--
+-- Every other kind of synonym is left as written. The JSON decoder expands a
+-- synonym itself ('L4.EvaluateLazy.Machine.expandTypeSynonyms'), which is why the
+-- wrapper answers a record, an enum or a DATE declared through one. It answers a
+-- LIST, a TIME, a DATETIME or a BOOLEAN declared through one because it leaves
+-- the synonym's name alone; expanding those here would break a LIST, a TIME and
+-- a DATETIME, which the wrapper fails when they are written out. Only the head of
+-- the type is looked at.
+maybeSynonymHeads :: [Declare Resolved] -> [(Text, Type' Resolved)] -> [(Text, Type' Resolved)]
+maybeSynonymHeads decls tys = [ (name, headOf ty) | (name, ty) <- tys ]
+  where
+    mi = buildModuleInfo decls
+    headOf ty = case expandSyn mi ty of
+      expanded | isJust (stripMaybe expanded) -> expanded
+      _                                        -> ty
+
 -- | Look up an enum or record type by unique.
 lookupEnum :: ModuleInfo -> Type' Resolved -> Maybe [(Text, Resolved)]
 lookupEnum mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miEnumVariants
@@ -437,7 +528,7 @@ fnLiteralToExprTyped
   -> Type' Resolved
   -> Maybe FnLiteral
   -> Either Text (Expr Resolved)
-fnLiteralToExprTyped mi ty mVal
+fnLiteralToExprTyped mi ty0 mVal
   -- MAYBE type: map missing / null / explicit NOTHING literal to NOTHING,
   -- anything else to JUST <recurse with inner type>.
   | Just inner <- stripMaybe ty =
@@ -454,6 +545,8 @@ fnLiteralToExprTyped mi ty mVal
       Just FnUnknown   -> Left "unknown value for a non-MAYBE parameter"
       Just FnUncertain -> Left "uncertain value is not supported in direct evaluation"
       Just v           -> nonMaybeValue mi ty v
+  where
+    ty = expandSyn mi ty0
 
 nonMaybeValue
   :: ModuleInfo
@@ -590,8 +683,9 @@ evaluateWithCompiledDeontic
   -> Bool
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz = do
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -744,8 +838,9 @@ evaluateWithWrapper
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
   -- Extract parameter types from the compiled function definition
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -996,10 +1091,17 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                   Nothing -> throwError $ InterpreterError (mconcat initErrs)
                   Just tcRes -> pure tcRes
 
-                -- 2. Get function definition and extract parameter types
+                -- 2. Get function definition and extract parameter types.
+                -- The entry module's own declarations are all this path has, as in
+                -- precompileModule's single-file fallback. It runs only after
+                -- precompileModule failed, and that fails only where typecheckModule
+                -- or getFunctionDefinition does (buildImportEnvironment falls back
+                -- to an empty environment instead). Both are repeated here with the
+                -- same arguments, so a request stops before it reaches the wrapper.
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
-                let givenParamTypes = extractParamTypes funDecide
-                    assumeParamTypes = extractAssumeParamTypes tcRes.module' funDecide
+                let givenParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module') (extractParamTypes funDecide)
+                    assumeParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module')
+                      (extractAssumeParamTypes tcRes.module' funDecide)
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting
@@ -1090,11 +1192,12 @@ buildImportEnvironment filepath source moduleContext _entityInfo = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  result <- oneshotL4ActionAndErrors evalConfig filepath $ \nfp -> do
+  result <- oneshotL4ActionAndErrorsIn bundleScope evalConfig filepath $ \nfp -> do
     let uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1383,12 +1486,13 @@ typecheckModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text]
 typecheckModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1402,12 +1506,13 @@ evaluateModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text],
 evaluateModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)

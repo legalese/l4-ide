@@ -181,11 +181,17 @@ runOneshot evalConfig fp act = do
 -- The rendered format puts priority + content inline, e.g.
 -- @"Info | [Import Resolution] Found on filesystem: ..."@, so we look
 -- past the @"Priority | "@ prefix.
+--
+-- Import-resolution lines at Warning/Error priority are NOT chatter: they
+-- carry the library-shadow warning (multiple differing copies of a module
+-- visible; see specs/as-built/import-resolution.md) and module-not-found notices,
+-- which a CLI user must see.
 isProgressChatter :: Text -> Bool
 isProgressChatter txt =
-  let body    = dropPriorityPrefix txt
+  let (mPriority, body) = splitPriorityPrefix txt
       starts p = p `Text.isPrefixOf` body
-  in  starts "[Import Resolution]"
+      warningOrWorse = mPriority `elem` [Just "Warning", Just "Error"]
+  in  (starts "[Import Resolution]" && not warningOrWorse)
    || starts "[VFS"
    || starts "Ide: Shake"
    || starts "Shake:"
@@ -193,11 +199,12 @@ isProgressChatter txt =
    || starts "Opening Shake database"
    || Text.null (Text.strip body)
 
-dropPriorityPrefix :: Text -> Text
-dropPriorityPrefix txt =
+-- | Split a rendered log line into its priority column (if present) and body.
+splitPriorityPrefix :: Text -> (Maybe Text, Text)
+splitPriorityPrefix txt =
   case Text.breakOn " | " txt of
-    (_, rest) | not (Text.null rest) -> Text.stripStart (Text.drop 3 rest)
-    _                                -> txt
+    (prio, rest) | not (Text.null rest) -> (Just (Text.strip prio), Text.stripStart (Text.drop 3 rest))
+    _                                   -> (Nothing, txt)
 
 -- | Like 'runOneshot', but routes LSP diagnostics through a caller-supplied
 -- recorder (e.g. one backed by stderr) and returns only the action's result.

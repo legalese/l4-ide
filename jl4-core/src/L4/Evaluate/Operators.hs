@@ -22,8 +22,5 @@ data BinOp =
   | BinOpSplit           -- STRING → STRING → LIST OF STRING
   | BinOpCharAt          -- STRING → NUMBER → STRING
   | BinOpTrunc           -- NUMBER → NUMBER → NUMBER (truncate with digits)
-  | BinOpWhenLast        -- DATE → (DATE → BOOLEAN) → MAYBE DATE
-  | BinOpWhenNext        -- DATE → (DATE → BOOLEAN) → MAYBE DATE
-  | BinOpValueAt         -- DATE → (DATE → a) → a
   deriving stock (Show, Generic)
   deriving anyclass (NFData)

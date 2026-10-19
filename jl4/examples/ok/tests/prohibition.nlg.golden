@@ -1,3 +1,5 @@
+executing contract `doDrink` at 0 with the following events:  party `Alice` did `drink` at 10
+executing contract `doDrink` at 0 with the following events:  `WAITUNTIL` with 31
 executing contract `noSmoking` at 0 with the following events: 
 executing contract `noSmoking` at 0 with the following events:  party `Alice` did `smoke` at 15
 executing contract `noDrinking` at 0 with the following events: 

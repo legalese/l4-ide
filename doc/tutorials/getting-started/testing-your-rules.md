@@ -1,32 +1,32 @@
-# Testing Your Rules
+# Test your rules
 
-Assert expected outcomes with `#EVAL`, `#ASSERT`, and `#CHECK`, and simulate obligations with `#TRACE`.
+Check that your rules give the answers you expect, with `#EVAL` and `#ASSERT`, and simulate obligations over time with `#TRACE`.
 
-**Prerequisites:** [Your First L4 File](first-l4-file.md), [Using the l4 CLI](l4-cli.md)
+**Before you start:** [Install L4 and write your first rule](first-l4-file.md).
 
----
+You will build a small loan rulebook: an eligibility decision and a repayment obligation, with tests in the same file. When someone later edits a rule, the tests show at once whether the expected outcomes still hold.
 
-## What You'll Build
-
-A small loan rulebook with two kinds of rules — an eligibility decision and a repayment obligation — plus a test suite that lives in the same file as the rules. When the law changes and someone edits a rule, the tests say immediately whether the encoded outcomes still hold.
+**Complete example:** [loan-rules-example.l4](loan-rules-example.l4)
 
 ---
 
-## The Testing Directives
+## The test directives
 
-L4 has five built-in directives. They start with `#`, appear at the top level of a file, and run every time the file is evaluated (in VS Code, on hover; on the command line, with `l4 run`):
+Directives start with `#` and sit at the top level of a file. VS Code runs them as you type; on the command line, `l4 run` runs them.
 
-| Directive    | What it does                                                                    |
-| ------------ | ------------------------------------------------------------------------------- |
-| `#EVAL`      | Evaluate an expression and show the result                                      |
-| `#EVALTRACE` | Like `#EVAL`, but also show the full evaluation trace                           |
-| `#ASSERT`    | Assert that a boolean expression is TRUE — your regression tests                |
-| `#CHECK`     | Typecheck an expression without evaluating it, and report its inferred type     |
-| `#TRACE`     | Simulate a regulative rule against a timeline of `PARTY ... DOES ... AT` events |
+| Directive    | What it does                                                                 |
+| ------------ | ---------------------------------------------------------------------------- |
+| `#EVAL`      | Evaluates an expression and shows the result.                                |
+| `#EVALTRACE` | Like `#EVAL`, and also shows each step of the evaluation.                    |
+| `#ASSERT`    | Evaluates a boolean expression and reports whether it is `TRUE`.             |
+| `#CHECK`     | Type-checks an expression and reports its type. It evaluates nothing.        |
+| `#TRACE`     | Runs a regulative rule against a timeline of `PARTY ... DOES ... AT` events. |
+
+The [syntax reference](../../reference/syntax/README.md#directives) has the exact form of each.
 
 ---
 
-## Step 1: A Rule and Its Test Data
+## Step 1: A rule and its test data
 
 Create `loan-rules.l4`:
 
@@ -60,13 +60,13 @@ DECIDE `is eligible for a loan` IF
     `annual income` IS 42000
 ```
 
-Alice should qualify; Bob is under 21 and should not.
+Alice should qualify. Bob is under 21 and should not.
 
 ---
 
-## Step 2: Inspect with `#EVAL`
+## Step 2: See results with `#EVAL`
 
-Add evaluation directives and run the file:
+Add these lines to the end of the file and run it:
 
 ```l4
 §§ `Tests`
@@ -84,41 +84,29 @@ Evaluation[1] @ loan-rules.l4:31:1-39
 
 Result:
   TRUE
-
+...
 
 Evaluation[2] @ loan-rules.l4:32:1-37
 
 Result:
   FALSE
+...
 ```
 
-`#EVAL` is exploratory: it shows you what a rule decides, but it does not say whether that is the _right_ answer. For that, use assertions.
+`#EVAL` shows what a rule decides, but not whether that is the right answer. For that, use `#ASSERT`.
 
 ---
 
-## Step 3: Assert Expected Outcomes with `#ASSERT`
+## Step 3: Pin down outcomes with `#ASSERT`
 
-An `#ASSERT` records the outcome you expect. It documents the intended legal result and fails visibly when a later edit changes it:
+An `#ASSERT` states the outcome you expect. It records the intended legal result and fails visibly when a later edit changes it:
 
 ```l4
 #ASSERT `is eligible for a loan` `Alice`
 #ASSERT NOT `is eligible for a loan` `Bob`
 ```
 
-```
-Evaluation[3] @ loan-rules.l4:34:1-41
-
-Result:
-  assertion satisfied
-
-
-Evaluation[4] @ loan-rules.l4:35:1-43
-
-Result:
-  assertion satisfied
-```
-
-### What failure looks like
+Each prints `assertion satisfied`. To compare a value instead of a boolean, use `EQUALS` or `=`. A failing assertion looks like this:
 
 ```l4
 GIVEN x IS A NUMBER
@@ -135,53 +123,53 @@ Result:
   assertion failed
 ```
 
-> **CI note:** `l4 run` exits non-zero for _type errors_ and for directives that _crash during evaluation_ (runtime errors), but not for failed assertions — a file with a failing `#ASSERT` still typechecks, so the exit code is `0`. In a CI pipeline, run with `--json` and check each result of `"kind": "assertion"` for `"value": false`, or simply grep the text output for `assertion failed`.
+`l4 run` exits with a non-zero code for type errors and for directives that fail while evaluating, but **not** for a failed assertion: the file is still valid L4, so the exit code is `0`. In CI, look for failures explicitly: grep the output for `assertion failed`, or run `l4 run --json` and check each result whose `"kind"` is `"assertion"` for `"value": false`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
 
 ---
 
-## Step 4: Typecheck Expressions with `#CHECK`
+## Step 4: Type-check with `#CHECK`
 
-`#CHECK` never evaluates anything. It confirms that an expression is well-typed and reports the inferred type as an informational diagnostic:
+`#CHECK` never evaluates anything. It only type-checks an expression and reports its type as an information message:
 
 ```l4
 #CHECK `is eligible for a loan`
 ```
 
 ```
-File:     loan-rules.l4
-  Range:    37:1-37:32
-  Severity: DiagnosticSeverity_Information
-  Message:  FUNCTION FROM Applicant TO BOOLEAN
+Message:  FUNCTION FROM Applicant TO BOOLEAN
 ```
 
-This is useful for pinning down a rule's _interface_: if a refactor accidentally changes the argument types of `is eligible for a loan`, the `#CHECK` on a specific application fails with a type error even before anything runs:
+Use it to pin down a rule's inputs and output. If a later edit changes what `` `is eligible for a loan` `` accepts, a `#CHECK` that applies it to an example becomes a type error, before anything runs. With the `twice` rule from Step 3:
 
 ```l4
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `twice` IS x TIMES 2
+
 #CHECK `twice` "twenty-one"
 ```
 
 ```
-File:     failing-check.l4
-  Severity: DiagnosticSeverity_Error
-  Message:
-    The first argument of function
+The first argument of function
 
-      twice (defined at failing-check.l4:3:8-15)
+  twice (defined at failing-check.l4:3:8-15)
 
-    is expected to be of type
+is expected to be of type
 
-      NUMBER
+  NUMBER
 
-    but is here of type
+but is here of type
 
-      STRING
+  STRING
 ```
+
+Because `#CHECK` does not evaluate, it cannot tell you whether a rule gives the right answer. Use `#ASSERT` for that.
 
 ---
 
-## Step 5: A Regulative Rule to Simulate
+## Step 5: A regulative rule to simulate
 
-Decisions are only half of legal drafting; the other half is obligations. Add a repayment obligation to `loan-rules.l4`:
+Decisions are half of legal drafting; obligations are the other half. Add a repayment obligation to `loan-rules.l4`:
 
 ```l4
 §§ `Repayment obligation`
@@ -201,21 +189,15 @@ DECIDE `repayment obligation` IS
     LEST BREACH BY Borrower BECAUSE "the loan was not repaid on time"
 ```
 
-This says: the borrower must repay the loan amount within 30 time units; doing so fulfills the contract, failing to do so is a breach.
+The borrower must repay the loan amount within 30 time units. Doing so fulfils the obligation; not doing so is a breach.
 
 ---
 
-## Step 6: Simulate Timelines with `#TRACE`
+## Step 6: Simulate timelines with `#TRACE`
 
-`#TRACE` runs a regulative rule against a hypothetical sequence of events. The general form is:
+`#TRACE` runs a regulative rule against a sequence of events: `#TRACE rule AT start-time WITH` followed by one `PARTY ... DOES ... AT time` line per event.
 
-```l4
-#TRACE deonticExpression AT startTime WITH
-    PARTY partyName DOES action AT eventTime
-    ...
-```
-
-### A compliant timeline
+**A compliant timeline:**
 
 ```l4
 §§ `Behaviour tests`
@@ -226,15 +208,11 @@ This says: the borrower must repay the loan amount within 30 time units; doing s
 ```
 
 ```
-Evaluation[5] @ loan-rules.l4:58:1-59:49
-
 Result:
   FULFILLED
 ```
 
-### A breaching timeline
-
-An event only discharges an obligation if the right party does the right action in time. Here the _lender_ acts, and only on day 45 — past the 30-day deadline — so the `LEST` branch fires:
+**A breaching timeline.** An event discharges an obligation only if the right party does the right action in time. Here the lender acts, on day 45, after the 30-day deadline, so the `LEST` branch applies:
 
 ```l4
 -- The wrong party, too late: the deadline passes and the LEST branch fires.
@@ -243,8 +221,6 @@ An event only discharges an obligation if the right party does the right action 
 ```
 
 ```
-Evaluation[6] @ loan-rules.l4:62:1-63:47
-
 Result:
   DEONTIC BREACHED:
     BREACH
@@ -252,37 +228,26 @@ Result:
     BECAUSE "the loan was not repaid on time"
 ```
 
-The `BECAUSE` string you wrote in the rule is exactly what shows up in the breach report — write it for the auditor who will read it.
+The `BECAUSE` text in the rule appears in the breach report, so write it for the person who will read it.
 
-A `#TRACE` can also end in neither state: if the trace stops while an obligation is still open (deadline not yet reached, no discharging event), the result is the _residual_ obligation — a description of what is still owed and by whom. That is not a test failure; it tells you your timeline was incomplete.
-
----
-
-## Step 7: Keep Tests Next to the Rules
-
-Directives are ignored by deployment (`@export` publishes functions, not tests), so there is no cost to keeping a `§§ Tests` section in every rule file:
-
-- one `#ASSERT` per legally meaningful outcome, positive and negative
-- one `#TRACE` per obligation, for at least the compliant and the breaching timeline
-- `#EVAL` for values a human reviewer will want to eyeball
-
-Run the whole suite with `l4 run loan-rules.l4`; wire the same command into CI as described in [Version Control for Rules](version-control-for-rules.md).
+A trace can also end with neither result. If the events stop while an obligation is still open (the deadline has not passed and nothing discharged it), the result is the remaining obligation: what is still owed, by whom, and how long is left. That is not a failure; it means the timeline is incomplete.
 
 ---
 
-## What You Learned
+## Keep tests next to the rules
 
-- `#EVAL` shows what a rule decides; `#ASSERT` pins down what it _should_ decide
-- `#CHECK` typechecks an expression and reports its type without running it
-- `#TRACE ... AT ... WITH PARTY ... DOES ... AT ...` simulates obligations over a timeline
-- Fulfillment prints `FULFILLED`; breach prints `DEONTIC BREACHED` with your `BECAUSE` reason
-- Failed assertions print `assertion failed` but do not change the exit code — check for them explicitly in CI
+Deployment publishes only the functions marked `@export`, so a `§§ Tests` section can stay in every rule file. A good minimum:
+
+- one `#ASSERT` per legally meaningful outcome, positive and negative, and on both sides of each threshold;
+- one `#TRACE` per obligation, for at least a compliant and a breaching timeline;
+- `#EVAL` for values a reviewer will want to see.
+
+Run the whole suite with `l4 run loan-rules.l4`.
 
 ---
 
-## Next Steps
+## Next steps
 
-- [Debugging Type Errors](debugging-type-errors.md) — when the file will not even typecheck
-- [Directive reference](../../reference/syntax/README.md#directives) — full syntax of every directive
-- [Regulative rules reference](../../reference/regulative/README.md) — `PARTY`, `MUST`, `MAY`, `SHANT`, `DEONTIC`
-- [Version Control for Rules](version-control-for-rules.md) — running these tests on every change
+- [Fix errors](debugging-type-errors.md): when the file does not type-check.
+- [Manage rules in git and CI](version-control-for-rules.md): run these tests on every change.
+- [Regulative rules](../../reference/regulative/README.md): `PARTY`, `MUST`, `MAY`, `SHANT` and `DEONTIC`.
