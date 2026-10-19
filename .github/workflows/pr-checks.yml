@@ -21,6 +21,7 @@ jobs:
     outputs:
       haskell: ${{ steps.filter.outputs.haskell }}
       typescript: ${{ steps.filter.outputs.typescript }}
+      wasm-runtime: ${{ steps.filter.outputs.wasm-runtime }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: dorny/paths-filter@v4
@@ -42,6 +43,8 @@ jobs:
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+            wasm-runtime:
+              - 'jl4-mlir/runtime/**'
             docs:
               - 'doc/**'
 
@@ -77,6 +80,28 @@ jobs:
       - run: npm run format:check
       - run: npm run check
       - run: xvfb-run -a npm run test
+
+  # ============================================
+  # jl4-mlir: JS runtime of the WASM backend (pure Node, no toolchain)
+  # ============================================
+  wasm-runtime:
+    name: WASM Runtime Tests
+    needs: changes
+    if: needs.changes.outputs.wasm-runtime == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      - name: Run runtime tests
+        working-directory: jl4-mlir
+        run: |
+          for t in runtime/*.test.mjs; do
+            echo "::group::$t"
+            node "$t"
+            echo "::endgroup::"
+          done
 
   # ============================================
   # Haskell: Build & Tests

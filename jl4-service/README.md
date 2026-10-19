@@ -256,8 +256,9 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 
 In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
 An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
-A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it) and in `obligationAction` (the obligation that was missed).
+A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligationAction` (the obligation that was missed), and, for a breach the rule states with `BREACH BY`, in `party`.
 So a client can ask whether the party who acted is the party who was obliged by comparing two strings: for a party the rule writes as `` `the seller` ``, both are `the seller`.
+A name taken from an answer can also be sent back unchanged as the `party` or `action` of an event in the next request's `events`: an answer that says `party` is `the seller` and `action` is `deliver the goods` is met by the event `{"party": "the seller", "action": "deliver the goods", "at": 5}`.
 The name is the identifier the rule uses, not the party it stands for: a party written as a `GIVEN` input or as a `MEANS` definition answers with that identifier until an event has been compared with it, so the comparison is still false there.
 Rule source stays L4, backticks included: an action that carries a value, such as `say "pay now"`, and the reasoning tree and the graphviz source of a trace.
 
