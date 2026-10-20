@@ -43,6 +43,7 @@ module L4.Parser.ResolveAnnotation (
   locRangeTo,
   LowerBound(..),
   locRangeFrom,
+  splitNlgsInRange,
 )
 where
 
@@ -2165,39 +2166,53 @@ prettyLocRange locRange =
 inLocRange :: LocRange -> NlgM a -> NlgM a
 inLocRange r (MkNlgM m) = MkNlgM $ \r' -> m (r <> r')
 
--- | Get all the 'Nlg' comments that are within
--- the range of 'LocRange'.
+-- | Split the 'Nlg' comments for one node.
 --
 -- @
---   'takeNlgsInRange' locRange nlgs
+--   'splitNlgsInRange' locRange p nlgs
 -- @
 --
--- The first component of the result are the 'nlgs' within the 'LocRange',
--- and the second component are the nlgs that aren't within the 'LocRange'.
-takeNlgsInRange :: LocRange -> [NlgWithSpan] -> ([NlgWithSpan], [NlgWithSpan])
-takeNlgsInRange locRange nlgs =
-  partition
-    (\nlg -> nlg.range `subRangeOf` desiredRange)
-    nlgs
+-- The first component of the result are the 'nlgs' that are within the
+-- 'LocRange' and satisfy @p@, in the order they came. The second component is
+-- what stays for a later node to claim: first the ones within the 'LocRange'
+-- that @p@ declined, then the ones outside it, each group in the order it came.
+--
+-- One strict pass, and the tail of the list after the last annotation in range
+-- is shared with the input rather than copied. A module with thousands of
+-- annotations asks this once per name, so what a call allocates is what sets
+-- how much the garbage collector has to copy.
+splitNlgsInRange ::
+  LocRange -> (NlgWithSpan -> Bool) -> [NlgWithSpan] -> ([NlgWithSpan], [NlgWithSpan])
+splitNlgsInRange locRange p nlgs0 = go [] [] [] 0 nlgs0 nlgs0
  where
   desiredRange = MkSrcSpan start end
   end = upperBoundToSrcSpan locRange.rangeTo
   start = lowerBoundToSrcSpan locRange.rangeFrom
+  within nlg = nlg.range `subRangeOf` desiredRange
 
--- | Monadic version of 'takeNlgsInRange'.
--- Takes the 'Nlg's that are currently in scope and removes
--- them from the internal state.
---
--- | 'takeNlgComments', but only those in range that also satisfy @p@. The rest
--- stay in the state for a later node to claim.
+  -- @taken@ and @declined@ are the ones in range so far, newest first.
+  -- @before@ is the ones out of range that precede the last one in range,
+  -- newest first, and @skipped@ counts the out-of-range ones after it, which
+  -- are the front of @shared@: the input from just after the last one in range.
+  go !taken !declined !before !skipped shared = \ case
+    [] -> (reverse taken, reverse declined <> (reverse before <> shared))
+    n : ns
+      | within n ->
+          let before' = reverse (List.take skipped shared) <> before
+          in if p n
+               then go (n : taken) declined before' 0 ns ns
+               else go taken (n : declined) before' 0 ns ns
+      | otherwise -> go taken declined before (skipped + 1) shared ns
+
+-- | Take the 'Nlg' comments that are within the range of the current
+-- 'LocRange' and satisfy @p@, and remove them from the internal state. The
+-- rest stay in the state for a later node to claim.
 takeNlgCommentsWhere :: (NlgWithSpan -> Bool) -> NlgM [NlgWithSpan]
 takeNlgCommentsWhere p = do
   s <- get
   locRange <- ask
-  let
-    (here, elsewhere) = takeNlgsInRange locRange s.nlgs
-    (taken, declined) = List.partition p here
-  put (s{nlgs = declined <> elsewhere})
+  let (taken, rest) = splitNlgsInRange locRange p s.nlgs
+  put (s{nlgs = rest})
   pure taken
 
 {- Note [Adding Haddock comments to the syntax tree]

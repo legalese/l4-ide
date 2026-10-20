@@ -24,11 +24,19 @@ module NlgAttachmentSpec (spec) where
 
 import Base
 
-import L4.Annotation (getAnno)
+import L4.Annotation (emptyAnno, getAnno)
 import L4.Nlg (simpleLinearizer)
 import L4.Parser (execProgramParserWithHintPass)
-import L4.Parser.ResolveAnnotation (Warning (..))
-import L4.Syntax (Module, Name, annNlg, nameToText)
+import L4.Parser.ResolveAnnotation
+  ( LocRange (..)
+  , LowerBound (..)
+  , UpperBound (..)
+  , Warning (..)
+  , WithSpan (..)
+  , splitNlgsInRange
+  )
+import L4.Parser.SrcSpan (SrcPos (..), SrcSpan (..), subRangeOf)
+import L4.Syntax (Module, Name, Nlg (..), annNlg, nameToText)
 import qualified Optics
 import Test.Hspec
 
@@ -430,3 +438,59 @@ spec = describe "which node an @nlg attaches to" $ do
         \@nlg the output rule\n\
         \DECIDE `out` IS `the input`\n"
       attachments m `shouldBe` [("the input", "the assumed input"), ("out", "the output rule")]
+
+  -- Every attachment goes through one split of the annotations still waiting:
+  -- the ones in the node's range that it accepts, and the rest in the order
+  -- later nodes will see them. These pin that split against the two-partition
+  -- formulation it replaced, so that making it cheaper cannot change which node
+  -- takes which annotation.
+  describe "splitNlgsInRange" $ do
+    let pos l c = MkSrcPos l c
+        nlgAt l c w = WithSpan (MkSrcSpan (pos l c) (pos l (c + w))) (MkInvalidNlg emptyAnno)
+        spans = fmap (.range)
+        locOf lo hi = MkLocRange (StartPos lo) (EndPos hi)
+
+        -- the plain formulation: everything in range, then those it accepts
+        reference (lo, hi) accept nlgs =
+          let (here, elsewhere) = partition (\ n -> n.range `subRangeOf` MkSrcSpan lo hi) nlgs
+              (taken, declined) = partition accept here
+          in (taken, declined <> elsewhere)
+
+        agrees (lo, hi) accept nlgs =
+          let (taken, rest) = splitNlgsInRange (locOf lo hi) accept nlgs
+              (taken', rest') = reference (lo, hi) accept nlgs
+          in (spans taken, spans rest) == (spans taken', spans rest')
+
+    it "returns an empty list unchanged" $
+      spans (snd (splitNlgsInRange (locOf (pos 1 1) (pos 9 9)) (const True) [])) `shouldBe` []
+
+    it "leaves the input alone when nothing is in range" $ do
+      let nlgs = [nlgAt 1 1 3, nlgAt 2 1 3, nlgAt 5 1 3]
+          (taken, rest) = splitNlgsInRange (locOf (pos 3 1) (pos 4 9)) (const True) nlgs
+      (spans taken, spans rest) `shouldBe` ([], spans nlgs)
+
+    it "puts the in-range ones it declines before the ones out of range" $ do
+      let nlgs = [nlgAt 1 1 3, nlgAt 2 1 3, nlgAt 3 1 3, nlgAt 4 1 3, nlgAt 5 1 3]
+          wanted n = n.range.start.line /= 3
+          (taken, rest) = splitNlgsInRange (locOf (pos 2 1) (pos 4 9)) wanted nlgs
+      (fmap (.start.line) (spans taken), fmap (.start.line) (spans rest)) `shouldBe` ([2, 4], [3, 1, 5])
+
+    it "agrees with the two-partition formulation on 400 generated lists" $ do
+      let next x = (x * 1103515245 + 12345) `mod` 2147483648 :: Int
+          draws seed = drop 1 (iterate next seed)
+          pick r k = (r `div` 7) `mod` k
+          oneCase seed =
+            let rs = draws seed
+                howMany = pick (rs !! 0) 25
+                nlgs = [ nlgAt (1 + pick (rs !! (3 * i + 1)) 12) (1 + pick (rs !! (3 * i + 2)) 9) (pick (rs !! (3 * i + 3)) 5)
+                       | i <- [0 .. howMany - 1] ]
+                a = (1 + pick (rs !! 80) 12, 1 + pick (rs !! 81) 9)
+                b = (1 + pick (rs !! 82) 12, 1 + pick (rs !! 83) 9)
+                bounds = (uncurry pos (min a b), uncurry pos (max a b))
+                accept n = odd (n.range.start.column + pick (rs !! 84) 2)
+                (taken, _) = splitNlgsInRange (uncurry locOf bounds) accept nlgs
+            in (agrees bounds accept nlgs, not (null taken) && length taken < length nlgs)
+          results = fmap oneCase [1 .. 400]
+      all fst results `shouldBe` True
+      -- the generator reaches the interesting shape: some in range taken, some left behind
+      length (filter snd results) `shouldSatisfy` (> 100)
