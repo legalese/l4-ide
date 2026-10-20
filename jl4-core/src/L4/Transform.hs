@@ -94,7 +94,18 @@ equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)
 -- binding that applies one of its own parameters as a function (see
 -- 'unfoldableDecide').
 inlineLocalBindings :: Expr Resolved -> Expr Resolved
-inlineLocalBindings = inlineLocalBindingsWhere (const True) . inlineGeneratedLets
+inlineLocalBindings e
+  | hasLocalScopes e = inlineLocalBindingsWhere (const True) (inlineGeneratedLets e)
+  | otherwise = e
+
+-- | Does this expression hold a @WHERE@ or a @LET@? The passes that put locals
+-- in rewrite nothing else, so an expression with none is returned as it is
+-- ('inlineLocalBindings'), without a rebuild of each of its nodes.
+hasLocalScopes :: Expr Resolved -> Bool
+hasLocalScopes = anyOf cosmosExpr \ case
+  Where {} -> True
+  LetIn {} -> True
+  _        -> False
 
 -- | 'inlineLocalBindings' for a consumer that draws or analyses what comes out
 -- (@l4 verify@, a call's panel, the expand gesture).

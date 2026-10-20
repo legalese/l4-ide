@@ -111,7 +111,7 @@ import Optics
 import L4.Annotation (Anno_ (..), emptyAnno, getAnno)
 import L4.Syntax
 import L4.TypeCheck.Environment (jsonDecodeUnique)
-import qualified L4.Transform as Transform (inlineLocalBindings, positionalCall)
+import qualified L4.Transform as Transform (hasLocalScopes, inlineLocalBindings, positionalCall)
 import qualified L4.Crypto.SHA1 as SHA1
 import qualified L4.Crypto.UUID5 as UUID5
 import qualified L4.Transform as Transform (Unfoldable (..), callees, pruneRecursive, unfoldableDecide)
@@ -360,7 +360,11 @@ inlinedSize = inlinedSizeUpTo digestThreshold
 
 -- | 'inlinedSize' saturating just above the given limit instead.
 inlinedSizeUpTo :: Int -> Expr Resolved -> Int
-inlinedSizeUpTo limit expr = evalState (size Set.empty Map.empty expr) Map.empty
+inlinedSizeUpTo limit expr
+  -- With no local in it there is nothing to put in, and the count is the number
+  -- of nodes (stopped just past the limit, as the sizes below are).
+  | not (Transform.hasLocalScopes expr) = length (take (limit + 1) (toListOf cosmosExpr expr))
+  | otherwise = evalState (size Set.empty Map.empty expr) Map.empty
   where
     cap = limit + 1
     clamp = min cap
@@ -553,7 +557,14 @@ eraseInfVars = transformOf (gplate @(Type' Resolved)) $ \case
 -- a parameter, and such a call keeps its named form, with each supply keyed by
 -- the name it supplies.
 positional :: Expr Resolved -> Expr Resolved
-positional = transformOf (gplate @(Expr Resolved)) positionalStep
+positional expr
+  -- 'positionalStep' rewrites a named call and nothing else.
+  | anyOf cosmosExpr isNamedCall expr = transformOf (gplate @(Expr Resolved)) positionalStep expr
+  | otherwise = expr
+  where
+    isNamedCall = \case
+      AppNamed {} -> True
+      _           -> False
 
 -- | 'positional' at one node.
 positionalStep :: Expr Resolved -> Expr Resolved
@@ -618,12 +629,17 @@ positionalStep = \case
 -- input @r.Alpha.w@ where @r's w@ names @r.w@ (found by adversarial review). The
 -- key does not see the spelling, only the 'Unique'.
 fieldReads :: Expr Resolved -> Expr Resolved
-fieldReads = transformOf (gplate @(Expr Resolved)) $ \case
-  e@Proj {} -> e
-  e | Just (f, [record]) <- Transform.positionalCall e
-    , isSelector f -> Proj (getAnno e) record (asWritten f)
-  e -> e
+fieldReads expr
+  -- Whether a node is a field read is a fact about the node alone, so an
+  -- expression with none in it is returned as it is.
+  | anyOf cosmosExpr (isJust . selectorRead) expr = transformOf (gplate @(Expr Resolved)) (\ e -> fromMaybe e (selectorRead e)) expr
+  | otherwise = expr
   where
+    selectorRead = \case
+      Proj {} -> Nothing
+      e | Just (f, [record]) <- Transform.positionalCall e
+        , isSelector f -> Just (Proj (getAnno e) record (asWritten f))
+      _ -> Nothing
     isSelector r = any selectorKind [getActual r, getOriginal r]
     selectorKind (MkName a _) = case a.extra.resolvedInfo of
       Just (TypeInfo _ (Just Selector)) -> True
