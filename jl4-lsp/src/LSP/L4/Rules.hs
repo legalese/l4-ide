@@ -1179,6 +1179,23 @@ prettyNlgResolveWarning = \ case
       , "L4 uses the last @lang in the file, so the module's language is `" <> langOf winningLine.payload
           <> "` and this line has no effect. Keep one @lang line."
       ]
+  Resolve.LoneLangTag name nlg ->
+    let tag = maybe "" (\ (Lexer.MkLangTag t) -> t) (nlgLangTag nlg.payload)
+        described = Print.prettyLayout name
+    in Text.unlines
+      [ "`@nlg:" <> tag <> "` tags the wording on " <> described <> " as language `" <> tag
+          <> "`, but " <> described <> " has no other wording, no other wording in the module is in `"
+          <> tag <> "`, and no `@lang " <> tag <> "` line declares it."
+      , "A tag tells apart renderings of one rule in different languages. If `" <> tag
+          <> "` is the first word of the sentence, write `@nlg " <> tag
+          <> " …` with no colon. If the wording is in `" <> tag <> "`, add `@lang " <> tag
+          <> "`, or give the rule a wording in another language."
+      ]
+  Resolve.SpacedSlot written name ->
+    Text.unlines
+      [ "This wording has `" <> written.payload <> "`, with spaces inside the percent signs, so it prints as plain text."
+      , "A slot is written `%" <> name <> "%`, with no spaces. For a percent sign meant literally, write `\\%`."
+      ]
   Resolve.RefUnattached r ->
     Resolve.refUnattachedMessage r.payload
   Resolve.RefTrailing r code ->
@@ -1204,6 +1221,10 @@ rangeOfResolveWarning = \ case
     srcRangeToLspRange $ rangeOf name
   Resolve.LangOverridden overriddenLine _ ->
     srcSpanToLspRange $ Just overriddenLine.range
+  Resolve.LoneLangTag _ nlg ->
+    srcSpanToLspRange $ Just nlg.range
+  Resolve.SpacedSlot written _ ->
+    srcSpanToLspRange $ Just written.range
   Resolve.RefUnattached r ->
     srcSpanToLspRange $ Just r.range
   Resolve.RefTrailing r _ ->

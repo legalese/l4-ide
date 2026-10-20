@@ -1,0 +1,11 @@
+
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: nlg_lone_tag.l4
+  Hidden: no
+  Range: 7:21-7:65
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    `@nlg:the` tags the wording on `over limit` as language `the`, but `over limit` has no other wording, no other wording in the module is in `the`, and no `@lang the` line declares it.
+    A tag tells apart renderings of one rule in different languages. If `the` is the first word of the sentence, write `@nlg the …` with no colon. If the wording is in `the`, add `@lang the`, or give the rule a wording in another language.

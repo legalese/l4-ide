@@ -18,6 +18,9 @@ module L4.Parser (
   declaredModuleLang,
   redundantLangEnRanges,
   overriddenLangWarnings,
+  loneLangTags,
+  spacedSlotsIn,
+  spacedSlotWarnings,
   MixfixHintRegistry,
   buildMixfixHintRegistry,
   emptyMixfixHintRegistry,
@@ -39,6 +42,7 @@ module L4.Parser (
 import Base
 
 import qualified Control.Applicative as Applicative
+import Data.Char (isAlpha, isAlphaNum, isSpace)
 import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
 import qualified Data.List.Extra as List
@@ -202,6 +206,102 @@ overriddenLangWarnings ts = case reverse decls of
       | t <- ts
       , Just tag <- [langTagOfToken (computedPayload t)]
       ]
+
+-- | The language tags that nothing else in the module backs.
+--
+-- A tag exists to tell renderings of one name apart, so a tag that no
+-- @\@lang@ line declares and no second wording carries is the shape of a
+-- sentence whose first word was joined to the colon: @\@nlg:the employee
+-- pays@ takes @the@ for its tag, and the sentence reads @employee pays@.
+-- The tags are compared exactly, as the pipeline compares them. @en@ and @he@
+-- are never reported, because L4 gives them meaning ('phrasebookFor' and the
+-- default language), whatever their case.
+--
+-- This is the module-wide half of the test. The other half is that the name
+-- the wording attaches to has no other wording, which only attachment knows;
+-- 'Resolve.attachNlgsByLanguage' applies it.
+--
+-- The annotations are the ones already stamped with the module's language, so
+-- an untagged wording in a module that declares @\@lang fr@ counts as a
+-- wording in @fr@.
+loneLangTags :: [LangTag] -> [Nlg] -> Set LangTag
+loneLangTags declared nlgs =
+  Set.fromList
+    [ tag
+    | [tag] <- List.group (List.sort (mapMaybe nlgLangTag nlgs))
+    , tag `notElem` declared
+    , not (hasMeaning tag)
+    ]
+  where
+    hasMeaning (MkLangTag t) = Text.toLower t `elem` ["en", "he"]
+
+-- | The percent pairs in an annotation's text that have spaces inside them
+-- around one name, each as @(the pair as written, the name)@.
+--
+-- A slot is @%name%@ with no spaces ('nameRefP'), so @% amount %@ is plain
+-- text and the author's slot is lost without a message. Three things keep the
+-- test from firing on prose:
+--
+-- * a tight slot is consumed whole, so the percent signs of @%amount%@ never
+--   pair with a neighbour;
+--
+-- * a pair whose closing @%@ runs into a word, as in @5% with %amount%@, is
+--   not reported: that is the literal percent sign the tight rule exists to
+--   protect (smucclaw\/l4-ide#957), not a slot with stray spaces;
+--
+-- * a backslash escape ('isNlgEscapable') is skipped, so @\\%@ is a literal
+--   percent sign and never opens a pair.
+--
+-- A name is an identifier or a backtick-quoted name, which is what a tight
+-- slot takes. It is read off the text, because that is all there is by the
+-- time the annotation has parsed: the spaced pair is never a node.
+spacedSlotsIn :: Text -> [(Text, Text)]
+spacedSlotsIn = go . Text.unpack
+  where
+    go :: String -> [(Text, Text)]
+    go = \ case
+      [] -> []
+      '\\' : c : rest | isNlgEscapable c -> go rest
+      '%' : rest
+        | Just (_, '%' : after) <- slotName rest -> go after
+        | Just (written, nm, after) <- spaced rest -> (Text.pack ('%' : written), Text.pack nm) : go after
+        | otherwise -> go rest
+      _ : rest -> go rest
+
+    spaced :: String -> Maybe (String, String, String)
+    spaced rest = do
+      let (before, afterBefore) = span isSpace rest
+      (nm, afterName) <- slotName afterBefore
+      let (trailing, afterTrailing) = span isSpace afterName
+      '%' : after <- Just afterTrailing
+      guard (not (null before && null trailing))
+      guard (not (runsIntoWord after))
+      pure (before <> nm <> trailing <> "%", nm, after)
+
+    runsIntoWord = \ case
+      c : _ -> isAlphaNum c || c `elem` ['_', '\'', '`']
+      [] -> False
+
+    slotName :: String -> Maybe (String, String)
+    slotName = \ case
+      '`' : rest
+        | (inside@(_ : _), '`' : after) <- break (== '`') rest -> Just ('`' : inside <> "`", after)
+      c : rest
+        | isAlpha c || c == '_' ->
+            let (more, after) = span (\ x -> isAlphaNum x || x == '_' || x == '\'') rest
+            in Just (c : more, after)
+      _ -> Nothing
+
+-- | One 'Resolve.SpacedSlot' per spaced percent pair, read off the token
+-- stream like 'overriddenLangWarnings', so the warning carries the range of
+-- the annotation, which the parser state does not keep.
+spacedSlotWarnings :: [PosToken] -> [Resolve.Warning]
+spacedSlotWarnings ts =
+  [ Resolve.SpacedSlot (Resolve.WithSpan (fromSrcRange t.range) written) nm
+  | t <- ts
+  , TAnnotations (TNlg _ text _) <- [computedPayload t]
+  , (written, nm) <- spacedSlotsIn text
+  ]
 
 refP :: Parser (Epa Ref)
 refP = do
@@ -3005,12 +3105,12 @@ execParserForTokensWithHints hints p file input ts =
         -- `:he`" rather than a second mechanism with its own precedence — and
         -- makes it order-independent, since pstate is complete by now.
         localisedNlgs = fmap (withDefaultLang moduleLang) pstate.nlgs
-        (withNlg, nlgS) = Resolve.addNlgCommentsToAst moduleLang localisedNlgs a
+        (withNlg, nlgS) = Resolve.addNlgCommentsToAst moduleLang (loneLangTags pstate.langs localisedNlgs) localisedNlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
         (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withDesc
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
-        Right (annotatedA, overriddenLangWarnings ts ++ nlgS.warnings ++ refWarnings, pstate)
+        Right (annotatedA, overriddenLangWarnings ts ++ spacedSlotWarnings ts ++ nlgS.warnings ++ refWarnings, pstate)
   where
     env = Env
       { moduleUri = file

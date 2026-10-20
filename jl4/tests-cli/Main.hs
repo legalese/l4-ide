@@ -806,6 +806,20 @@ spec bin = do
       code `shouldBe` ExitSuccess
       serr `shouldNotSatisfy` ("two different languages" `isInfixOf`)
 
+    it "warns that a percent pair with spaces inside it is plain text, naming the slot to write" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/not-ok/nlg/nlg_spaced_slot.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("This wording has `% amount %`, with spaces inside the percent signs, so it prints as plain text." `isInfixOf`)
+      serr `shouldSatisfy` ("A slot is written `%amount%`, with no spaces." `isInfixOf`)
+
+    it "warns that a language tag nothing else backs may be the first word of a sentence" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/not-ok/nlg/nlg_lone_tag.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("`@nlg:the` tags the wording on `over limit` as language `the`" `isInfixOf`)
+      serr `shouldSatisfy` ("write `@nlg the …` with no colon." `isInfixOf`)
+
   describe "l4 format" $ do
     it "prints a clean file to stdout as written" $ do
       src <- readFile cleanFixture

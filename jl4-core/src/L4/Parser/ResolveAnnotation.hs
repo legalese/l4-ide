@@ -52,6 +52,7 @@ import Base
 import Data.Char (isSpace)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import L4.Annotation
@@ -82,6 +83,19 @@ data Warning
     -- overridden line and the second is the line that wins. One per
     -- overridden line; a line that repeats the winning tag contradicts
     -- nothing and is not reported.
+  | LoneLangTag Name NlgWithSpan
+    -- ^ A wording tagged with a language that nothing else in the module
+    -- backs: the name has no other wording, no other wording in the module
+    -- carries the tag, and no @\@lang@ line declares it. A tag exists to tell
+    -- renderings of one name apart, so this is the shape of a sentence whose
+    -- first word was joined to the colon (@\@nlg:the employee pays@). 'en' and
+    -- 'he' are exempt, because L4 gives them meaning. The wording is attached
+    -- all the same.
+  | SpacedSlot (WithSpan Text) Text
+    -- ^ A percent pair with spaces inside it around one name, such as
+    -- @% amount %@, in an annotation. It prints as plain text, because a slot
+    -- is @%amount%@ with no spaces. The first is the pair as written, with the
+    -- range of the whole annotation; the second is the name between the signs.
   | RefUnattached RefWithSpan
     -- ^ A @ref has no AST node after it to attach to: it comes after the last
     -- one, at the end of the file.
@@ -149,13 +163,14 @@ data WithSpan a = WithSpan
 --
 -- Note, the 'Program Name's exactprint annotations are not modified,
 -- we merely add structured data to the ast node's respective 'Anno'.
-addNlgCommentsToAst :: HasNlg a => LangTag -> [Nlg] -> a -> (a, NlgS)
-addNlgCommentsToAst moduleLang nlgs p = do
+addNlgCommentsToAst :: HasNlg a => LangTag -> Set LangTag -> [Nlg] -> a -> (a, NlgS)
+addNlgCommentsToAst moduleLang loneTags nlgs p = do
   let
     (nlgWithSpan, unfindable) = preprocessNlgs nlgs
 
     initialNlgS = NlgS
       { moduleLang = moduleLang
+      , loneTags = loneTags
       , nlgs = nlgWithSpan
       , warnings = fmap UnknownLocation unfindable
       }
@@ -837,6 +852,13 @@ attachNlgsByLanguage a ann nlgs0 = do
     case grp of
       (_ : _ : _) -> addWarning $ Ambiguous a tag grp
       _           -> pure ()
+  lone <- use #loneTags
+  case nlgs0 of
+    [one]
+      | Just tag <- nlgLangTag one.payload
+      , tag `Set.member` lone
+      , not (nlgIsBlank one.payload) -> addWarning $ LoneLangTag a one
+    _ -> pure ()
   lang <- use #moduleLang
   pure $ case pickDefault lang unique of
     Nothing         -> ann
@@ -2031,6 +2053,10 @@ data NlgS = NlgS
     -- ^ The module's declared @\@lang@, or 'defaultModuleLang'. Read by
     -- 'pickDefault' to decide which of several renderings is the one a caller
     -- who named no language should get.
+  , loneTags :: !(Set LangTag)
+    -- ^ The language tags that nothing else in the module backs: no @\@lang@
+    -- line declares them and no other wording carries them. A name whose only
+    -- wording carries one of these draws a 'LoneLangTag'.
   , nlgs :: ![NlgWithSpan]
     -- ^ Nlg annotations that haven't been assigned to a specific 'Name' or
     -- other abstract syntax node.

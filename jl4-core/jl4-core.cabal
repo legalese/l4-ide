@@ -199,6 +199,7 @@ test-suite jl4-core-test
     DirectiveAmbiguitySpec
     NlgMultiplicitySpec
     NlgAttachmentSpec
+    NlgSilentReadingSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

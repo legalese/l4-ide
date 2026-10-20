@@ -1,0 +1,8 @@
+-- A language tag that nothing else backs. The rule has no other wording, no
+-- other wording in the module is in `the`, and no `@lang` line declares it, so
+-- `the` is almost certainly the first word of the sentence and not a language.
+-- The wording is attached either way; the diagnostic says what to write.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `over limit` @nlg:the claim of %amount% is over the limit
+  IF amount GREATER THAN 100
