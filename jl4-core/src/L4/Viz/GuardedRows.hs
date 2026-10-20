@@ -205,7 +205,7 @@ exclusive a b = case (a, b) of
 -- | @BRANCH@ short-circuits; the And\/Or expansion does not. Expanding a chain whose
 -- guards perform I\/O would therefore change how often the effect runs, so bail.
 hasEffectfulNode :: Expr Resolved -> Bool
-hasEffectfulNode = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+hasEffectfulNode = anyOf cosmosExpr $ \case
   Fetch {} -> True
   Post {}  -> True
   _        -> False

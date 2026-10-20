@@ -168,6 +168,7 @@ test-suite jl4-lsp-test
     ClauseGeneratedNamesSpec
     ClauseGroupLadderSpec
     CorpusSweep
+    CosmosExprSpec
     EmbeddedLibrarySpec
     HoverDisplaySpec
     ImportDiagnosticSpec

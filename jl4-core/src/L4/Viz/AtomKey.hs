@@ -191,7 +191,7 @@ mkKeyEnv (MkModule _ uri root) =
     whereDefs =
       [ d
       | e <- exprs
-      , w@Where {} <- toListOf (cosmosOf (gplate @(Expr Resolved))) e
+      , w@Where {} <- toListOf cosmosExpr e
       , d <- directDefs w
       ]
 
@@ -209,7 +209,7 @@ mkKeyEnv (MkModule _ uri root) =
 -- evaluated once and shared, so every reference to it reads the same value. A
 -- rule from another module is assumed not to; its body is not here to read.
 isEffectful :: KeyEnv -> Expr Resolved -> Bool
-isEffectful env = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+isEffectful env = anyOf cosmosExpr $ \case
   App _ r (_ : _) -> Set.member (getUnique r) env.effectfulRules
   AppNamed _ r _ _ -> Set.member (getUnique r) env.effectfulRules
   -- @a's f@ is @f a@ (R3b): a rule that reads the ledger, called by projection,
@@ -235,7 +235,7 @@ effectfulRulesOf root = grow direct
       [ (getUnique n, body)
       | MkDecide _ _ (MkAppForm _ n _ _) body <- toListOf (gplate @(Decide Resolved)) root
       ]
-    direct = Set.fromList [u | (u, body) <- bodies, anyOf (cosmosOf (gplate @(Expr Resolved))) touchesWorld body]
+    direct = Set.fromList [u | (u, body) <- bodies, anyOf cosmosExpr touchesWorld body]
     calls = [(u, Set.fromList [getUnique r | r <- toList body]) | (u, body) <- bodies]
     grow known =
       let known' = known <> Set.fromList [u | (u, named) <- calls, not (Set.disjoint named known)]
@@ -371,7 +371,7 @@ inlinedSizeUpTo limit expr = evalState (size Set.empty Map.empty expr) Map.empty
     usable =
       Transform.pruneRecursive . Map.fromList $
         [ p
-        | LocalDecide _ d <- concatMap localsOf (toListOf (cosmosOf (gplate @(Expr Resolved))) expr)
+        | LocalDecide _ d <- concatMap localsOf (toListOf cosmosExpr expr)
         , Just p <- [Transform.unfoldableDecide d]
         ]
 
@@ -446,7 +446,7 @@ inlinedSizeUpTo limit expr = evalState (size Set.empty Map.empty expr) Map.empty
 -- called with too few or too many. Such a local is not put in at that name, so it
 -- stays.
 offArity :: Map Unique Int -> Expr Resolved -> Set Unique
-offArity here = foldMapOf (cosmosOf (gplate @(Expr Resolved))) \e ->
+offArity here = foldMapOf cosmosExpr \e ->
   case e of
     App _ r _ -> check r e
     AppNamed _ r _ _ -> check r e
@@ -511,7 +511,7 @@ textKey env expr =
       tys -> "|decodes " <> Text.pack (show (map (fmap nameKey) tys))
     decodeTypes =
       [ eraseInfVars (over (gplate @Anno) (const emptyAnno) (env.expandType ty))
-      | App (Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}}) r _ <- toListOf (cosmosOf (gplate @(Expr Resolved))) inlined
+      | App (Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}}) r _ <- toListOf cosmosExpr inlined
       , getUnique r == jsonDecodeUnique
       ]
 
@@ -781,7 +781,7 @@ digestKey env expr
       let (root, w) = runState (digest Map.empty expr) (MkWalk Map.empty 0 0)
        in Just (digestPrefix <> hexDigest root, MkDigestStats w.calls w.nodes)
   where
-    decls = concat [ds | e <- toListOf (cosmosOf (gplate @(Expr Resolved))) expr, ds <- [declsOf e]]
+    decls = concat [ds | e <- toListOf cosmosExpr expr, ds <- [declsOf e]]
     declsOf = \case
       Where _ _ ds -> ds
       LetIn _ ds _ -> ds
@@ -796,7 +796,7 @@ digestKey env expr
         && Map.size locals == length decls
         && Map.size (Transform.pruneRecursive locals) == Map.size locals
         && Set.null (offArity (Map.map (\(Transform.MkUnfoldable ps _) -> length ps) locals) expr)
-        && all binderFree (toListOf (cosmosOf (gplate @(Expr Resolved))) expr)
+        && all binderFree (toListOf cosmosExpr expr)
 
     -- a node other than a scope defines no name of its own
     binderFree = \case

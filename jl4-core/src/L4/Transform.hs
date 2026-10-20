@@ -130,7 +130,7 @@ clausesReadThrough e = not (hasGeneratedLets e) || either (const False) (const T
 
 -- | Does this expression hold a LET the clause desugarer generated?
 hasGeneratedLets :: Expr Resolved -> Bool
-hasGeneratedLets = anyOf (cosmosOf (gplate @(Expr Resolved))) isGeneratedLet
+hasGeneratedLets = anyOf cosmosExpr isGeneratedLet
   where
     isGeneratedLet = \ case
       LetIn _ ds@(_ : _) _ -> all generatedBinding ds
@@ -535,7 +535,7 @@ data Unfoldable = MkUnfoldable [Unique] (Expr Resolved)
 -- not attempt it.
 unfoldableDecide :: Decide Resolved -> Maybe (Unique, Unfoldable)
 unfoldableDecide (MkDecide _ _ (MkAppForm _ n args _) rhs)
-  | anyOf (cosmosOf (gplate @(Expr Resolved))) appliesParam rhs = Nothing
+  | anyOf cosmosExpr appliesParam rhs = Nothing
   | otherwise = Just (getUnique n, MkUnfoldable (map getUnique args) rhs)
   where
     params = Set.fromList (map getUnique args)
@@ -548,7 +548,7 @@ unfoldableDecide (MkDecide _ _ (MkAppForm _ n args _) rhs)
 -- arity. A bare variable is an application of arity zero, so it is included, and
 -- so is the head of every named call, whether or not 'positionalCall' can read it.
 callees :: Expr Resolved -> Set.Set Unique
-callees = foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \ case
+callees = foldMapOf cosmosExpr $ \ case
   App _ r _        -> Set.singleton (getUnique r)
   AppNamed _ r _ _ -> Set.singleton (getUnique r)
   Proj _ _ r       -> Set.singleton (getUnique r)
@@ -669,7 +669,7 @@ withTypeOfSite site e = case view annInfo site of
 
 -- | How many call sites 'unfoldOnce' would replace in this expression.
 unfoldableCallSites :: Map.Map Unique Unfoldable -> Expr Resolved -> Int
-unfoldableCallSites m = lengthOf (cosmosOf (gplate @(Expr Resolved)) % filtered isSite)
+unfoldableCallSites m = lengthOf (cosmosExpr % filtered isSite)
   where
     isSite e = case positionalCall e of
       Just (r, args)
@@ -705,7 +705,7 @@ unfoldCalls budget m = go (Map.size m + 1) 0
         e'   = unfoldOnce m e
         -- Counted lazily and cut off just past the budget, so an expression that
         -- has blown up costs O(budget) to refuse rather than O(size) to measure.
-        size = length (take (budget + 1) (toListOf (cosmosOf (gplate @(Expr Resolved))) e'))
+        size = length (take (budget + 1) (toListOf cosmosExpr e'))
 
 -- | 'inlineLocalBindings' over a decision's body, for consumers holding a 'Decide'.
 inlineLocalBindingsInDecide :: Decide Resolved -> Decide Resolved

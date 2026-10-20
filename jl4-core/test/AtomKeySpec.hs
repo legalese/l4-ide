@@ -8,9 +8,10 @@
 -- adversarial review of the design (smucclaw/l4-ide#1013).
 module AtomKeySpec (spec) where
 
+import Data.Foldable (for_)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Optics (cosmosOf, gplate, lengthOf)
+import Optics (cosmosOf, gplate, lengthOf, toListOf)
 import Test.Hspec
 
 import Base (NormalizedUri, Uri (..), toNormalizedUri)
@@ -219,3 +220,30 @@ spec = describe "L4.Viz.AtomKey.termKey" $ do
     it "keys a small local and the same text written out alike, doubling chains included" $ do
       -- the control for everything below: at this size nothing has changed
       mapM_ (\k -> key (chainLet k) `shouldBe` key (writtenOut (k - 1))) [1 .. 8]
+
+  -- Keying a leaf walks its term several times, and a term that a clause group
+  -- reads through to can be 13,500 nodes. The walk is 'cosmosExpr', not
+  -- 'cosmosOf', and an atomId depends on the order it visits in.
+  describe "cosmosExpr" $ do
+    it "visits the same expressions, in the same order, as cosmosOf over gplate" $ do
+      let a = var (ref (u 2) "a")
+          b = var (ref (u 3) "b")
+          withLet =
+            LetIn
+              emptyAnno
+              [ LocalDecide emptyAnno $
+                  MkDecide emptyAnno
+                    (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+                    (MkAppForm emptyAnno (Def (u 5) (nm "c")) [] Nothing)
+                    a
+              ]
+              (And emptyAnno (var (ref (u 5) "c")) b)
+          terms =
+            [ a
+            , And emptyAnno a (Not emptyAnno b)
+            , Or emptyAnno (And emptyAnno a b) (Not emptyAnno (Or emptyAnno a b))
+            , lam (Def (u 4) (nm "p")) (And emptyAnno a (var (ref (u 4) "p")))
+            , withLet
+            ]
+      for_ terms \ e ->
+        toListOf cosmosExpr e `shouldBe` toListOf (cosmosOf (gplate @(Expr Resolved))) e
