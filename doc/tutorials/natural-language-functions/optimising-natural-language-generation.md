@@ -289,7 +289,7 @@ In
 @nlg a 5% levy on %amount%
 ```
 
-the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot; `%amount%` still is one.
+the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot, while `%amount%` is one.
 Where a percent sign would end up flush against a word, as in `5%levy`, wrap it in backticks (`` `5%` ``) or spell it out ("5 percent"), either of which puts it beyond doubt.
 
 **It replaces the body.** A function with `@nlg` renders as its sentence, not as its implementation. That is what makes recursive library functions readable; the prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so a call reads as a sentence instead of exposing the recursion.
@@ -330,12 +330,13 @@ l4 render --lang he --format html contract.l4 > contract.he.html
 l4 nlg --lang he contract.l4
 ```
 
-A rule with no sentence in that language keeps its default one, so a half-translated file still produces a whole document.
+A rule with no sentence in that language keeps its default one, so a half-translated file produces a whole document.
 When a whole module is in one language, say it once with `@lang he` on a line of its own instead of tagging every sentence; the tag then means "every untagged `@nlg` in this module is Hebrew".
 
 What this does not do is translate.
 L4 prints the words you wrote.
-The little words it adds itself, such as "is equal to" or "with", stay English unless L4 has a phrase table for the language, and today the only table is a draft for Hebrew.
+The little words it adds itself, such as "is equal to" or "with", stay English unless L4 has a phrase table for the language.
+Hebrew is the one language with a table, and it is small, so have a Hebrew speaker read its output before you rely on it.
 [The syntax reference](../../reference/syntax/README.md#labelling-the-language-nlghe) has the details and the limits.
 
 ---
