@@ -176,9 +176,8 @@ A slot is `%amount%` with no spaces, so `% amount %` prints as plain text and th
 In `5% with %amount%` the second percent sign opens the slot `%amount%`, so L4 does not warn.
 
 **An opening `[` never needs escaping, and you may escape it anyway.**
-Only the closing bracket ends an annotation, so `[see note [3] here]` is correct as written.
-But nobody writes half a pair: reach for the backslash on the `]` and your hand puts one on the `[` too.
-So `\[` means a literal `[`, exactly as the bare character does, and the two spellings come out the same.
+A closing `]` ends the annotation unless it is written `\]`, so `[see note [3\] here]` is correct as written, and so is `[see note \[3\] here]`.
+`\[` means a literal `[`, exactly as the bare character does, so the two spellings come out the same.
 
 **To end an annotation with a backslash, write `\\`.**
 A backslash immediately before the closing `]` is an escape, so `\]` is a literal `]` and the annotation goes on.
