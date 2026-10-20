@@ -186,7 +186,7 @@ Any other character after a backslash is left completely alone: `\q` is a backsl
 
 #### Labelling the language: `@nlg:he`
 
-A heralded `@nlg` can say which language its prose is in, by putting a language subtag straight after the herald:
+An `@nlg` annotation can say which language its prose is in, by putting a language subtag straight after `@nlg`:
 
 ```l4
 GIVEN amount IS A NUMBER
@@ -201,13 +201,14 @@ The tag does not translate anything.
 What it does is let you attach _more than one_ rendering to the same rule and say which is which.
 
 **The bare inline form cannot be tagged.**
-`[…]` has nowhere to put a subtag, so `@nlg:he` is available only on the heralded form.
+`[…]` has nowhere to put a subtag, so `@nlg:he` is available only on the `@nlg` form.
 
 **A word glued to the colon is a tag, and a colon with a space after it is ordinary text.**
 A subtag is letters, digits and hyphens, so `@nlg:he` and `@nlg:zh-Hant` are tags, while `@nlg: see below` has no tag and the colon is simply the first character of the prose.
 So `@nlg:total of the first` has the tag `total` and the prose `of the first`, and `@nlg:Test` on its own is a tag with no prose, which is ignored with a warning.
 L4 does not check that a tag names a real language: an English sentence that begins with a colon-joined word, as in `@nlg:the employee pays`, takes `the` for its tag, and the sentence reads `employee pays`.
 L4 warns when a tag other than `en` or `he` is on a rule, input or field that has no other wording, no other wording in the module uses the tag, and no `@lang` line declares it, because a tag exists to tell renderings apart.
+The same word used as a tag on two rules, inputs or fields draws no warning at either.
 If the tag was the first word of the sentence, drop the colon, and if you want the colon as text, leave a space after it.
 
 #### Writing the same rule in two languages
@@ -229,13 +230,13 @@ $ l4 nlg --lang he mymodule.l4
 $ l4 render --format html --lang he mymodule.l4 -o mymodule.he.html
 ```
 
-`l4 nlg` gives the linearized prose of the file's directives; `l4 render` gives the formatted document, in any of its formats.
+`l4 nlg` gives the file's directives as plain prose; `l4 render` gives the formatted document, in any of its formats.
 Both take `--lang`.
 Two runs of the same command over the same source produce the two documents, and nothing about the rule is duplicated, only its wording.
 
-In both, a call to a rule that carries a herald reads as that herald with the call's arguments in its `%slots%`: ``#EVAL `is large` 150`` linearizes as `the amount 150 is large`.
-An argument the herald does not mention is not dropped; it follows the sentence as `with …`, so a herald written without slots shows every value the call supplied.
-A herald written on the `GIVEN` name is a gloss for that input, not a sentence for the rule, and is never used for the rule.
+In both, a call to a rule that has an `@nlg` wording reads as that wording with the call's arguments in its `%slots%`: ``#EVAL `is large` 150`` reads as `the amount 150 is large`.
+An argument the wording does not mention is not dropped; it follows the sentence as `with …`, so a wording written without slots shows every value the call supplied.
+A wording written on the `GIVEN` name is a gloss for that input, not a sentence for the rule, and is never used for the rule.
 
 `l4 nlg` also writes a date given as literals as a date: `Date 16 7 2025` reads `16 July 2025`.
 That covers only daydate's own `Date`, only when all three arguments are whole numbers, and only when they name a real day.
@@ -246,9 +247,9 @@ A percentage reads `50%`.
 For ``#EVAL `is large` 150 EQUALS TRUE`` over the rule above, `l4 nlg --lang he` prints ``150 עולה על הסף שווה ל־`TRUE` `` where `l4 nlg` prints ``the amount 150 is large is equal to `TRUE` ``.
 They come from a table of phrases, not a grammar, so the English word order stays: a Hebrew line is Hebrew words in the order English would put them.
 A word the table has no entry for stays English, and `l4 nlg` names it on stderr, so you can see what was not translated.
-The table is small and fixed, and it gives each connecting word one rendering whatever the sentence around it, so have a Hebrew speaker read a Hebrew linearization before you rely on it.
+The table is small and fixed, and it gives each connecting word one rendering whatever the sentence around it, so have a Hebrew speaker read the Hebrew output before you rely on it.
 Hebrew is the one language with a table.
-For every other language, `--lang` selects your own wordings and leaves the linearizer's connecting words in English.
+For every other language, `--lang` selects your own wordings and leaves L4's own connecting words in English.
 `l4 render` does not use the table.
 Without `--lang`, the connecting words are English.
 
@@ -273,7 +274,7 @@ A clash in one language does not affect the others: two `@nlg:he` and one `@nlg:
 
 #### Declaring the module's language: `@lang he`
 
-Tagging every herald gets repetitive the moment a whole module is in one language.
+Tagging every `@nlg` gets repetitive the moment a whole module is in one language.
 Say it once instead, on a line of its own:
 
 ```l4
@@ -287,8 +288,8 @@ DECIDE `is large` @nlg %amount% עולה על הסף
 ```
 
 **`@lang he` means "every untagged `@nlg` in this module is Hebrew".**
-It is not a separate mechanism with its own precedence: it is exactly equivalent to writing `:he` on each of those heralds, and you can mix the two freely.
-A herald that names its own language keeps it, which is how the English rendering above survives in a Hebrew module.
+It is not a separate mechanism with its own precedence: it is exactly equivalent to writing `:he` on each of those `@nlg` annotations, and you can mix the two freely.
+An `@nlg` that names its own language keeps it, which is how the English rendering above survives in a Hebrew module.
 
 **`@lang` does not translate anything.**
 It labels what you wrote.

@@ -2040,7 +2040,7 @@ registerNlgA a = registerSrcSpanNlgA (fromSrcRange <$> rangeOf a)
 -- ----------------------------------------------------------------------------
 
 -- | The state of 'NlgM' contains a list of pending 'Nlg' comments. We go
--- over the AST, looking up these comments using 'takeNlgComments' and removing
+-- over the AST, looking up these comments using 'takeNlgCommentsWhere' and removing
 -- them from the state. Also, using a state means we never use the same
 -- 'Nlg' twice.
 --
@@ -2170,7 +2170,7 @@ prettyLocRange locRange =
 --
 --   inLocRange r1 $
 --   inLocRange r2 $
---     takeNlgComments ...  -- Only takes comments in the (r1 <> r2) location range.
+--     takeNlgCommentsWhere ...  -- Only takes comments in the (r1 <> r2) location range.
 --
 -- Note that it does not blindly override the range but tightens it using (<>).
 -- At many use sites, you will see something along the lines of:

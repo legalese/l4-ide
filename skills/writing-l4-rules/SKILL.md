@@ -493,6 +493,7 @@ DECIDE `is large` IF amount GREATER THAN 100
   `l4 nlg --lang he` and `l4 render --lang he` pick the Hebrew wording, and a rule with none keeps its default one.
   A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the` and reads `employee pays`, so write `@nlg the employee pays`, with no colon, for a sentence that starts with that word.
   `l4 check` warns when such a tag is on a rule, input or field with no other wording, no other wording in the module uses it, and no `@lang` line declares it.
+  The same word used as a tag on two rules, inputs or fields draws no warning at either, so look for it when a sentence has lost its first word.
 - **A module in one language says so once**, on a line of its own: `@lang he` makes every untagged `@nlg` Hebrew.
   Do not write `@lang en`: a module without a declaration is English, and `l4 check` hints that the line can go.
   Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.

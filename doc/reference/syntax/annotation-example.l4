@@ -39,7 +39,7 @@ GIVETH A BOOLEAN
 
 #EVAL `is eligible` TRUE
 
--- A heralded `@nlg` may carry a language subtag, and one rule may carry a
+-- An `@nlg` may carry a language subtag, and one rule may carry a
 -- rendering per language. `l4 nlg --lang he` and `l4 render --lang he` select
 -- the Hebrew one; with no flag, or for a rule that has none in that language,
 -- the default rendering is used.

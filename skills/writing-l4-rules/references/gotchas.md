@@ -321,7 +321,8 @@ The failures, sorted by whether L4 tells you:
 | the rule's sentence above the `GIVEN`, with an `IMPORT` or `§` heading above            | that `IMPORT` or heading takes it; the rule reads by its name            | no              |
 | the rule's sentence indented under the last input, even by one space                    | it becomes that input's gloss                                            | no              |
 | `10%and%20` in a wording, with an input called `and`                                    | `and` is replaced by the input's value: `10520`                          | no              |
-| `@nlg:the employee pays`, alone on its rule                                             | `the` is the language tag; the sentence reads `employee pays`            | yes, a warning  |
+| `@nlg:the employee pays`, the only use of the tag `the` in the module                   | `the` is the language tag; the sentence reads `employee pays`            | yes, a warning  |
+| `@nlg:the …` written the same way on a second rule                                      | `the` is the tag on each; each sentence loses its first word             | no              |
 | `% amount %` in a wording                                                               | it prints as plain text, and the slot is lost                            | yes, a warning  |
 | a field's gloss that repeats its owner: `@nlg the employee's date of birth` under `dob` | it reads "the employee's the employee's date of birth"                   | no              |
 | `HAS dob IS A NUMBER @nlg date of birth`                                                | the wording belongs to the type `NUMBER`; the field keeps the name `dob` | no              |
