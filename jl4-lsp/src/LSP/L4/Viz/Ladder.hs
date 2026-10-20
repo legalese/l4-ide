@@ -1055,7 +1055,7 @@ instantiateTypesWith expand vars call actuals body
   where
     paramUses =
       [ (getAnno ref, getAnno actual)
-      | ref@(App _ r []) <- toListOf (cosmosOf (gplate @(Expr Resolved))) body
+      | ref@(App _ r []) <- toListOf cosmosExpr body
       , Just actual <- [lookup (getUnique r) actuals]
       ]
     theta = foldl' (\m (p, a) -> DataMap.union m (matchType p a)) DataMap.empty
@@ -1086,7 +1086,7 @@ instantiateTypesWith expand vars call actuals body
 
 -- | Does a @WHERE@ or @LET … IN@ survive anywhere in this expression?
 bindsLocally :: Expr Resolved -> Bool
-bindsLocally = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+bindsLocally = anyOf cosmosExpr $ \case
   Where {} -> True
   LetIn {} -> True
   _ -> False

@@ -849,6 +849,23 @@ foldDecides
   :: forall n m. (Monoid m) => (Decide n -> m) -> Decide n -> m
 foldDecides = Optics.foldMapOf $ Optics.cosmosOf (Optics.gplate @(Decide n))
 
+-- | Every sub-expression of an expression, the expression itself first and the
+-- children in order: the same expressions in the same order as
+-- @Optics.cosmosOf (Optics.gplate \@(Expr Resolved))@, found by a walk that takes
+-- one level of 'Optics.gplate' at a time.
+--
+-- Use it where the expression can be large. Counting the nodes of a 13,500-node
+-- expression took 1.8 s through 'Optics.cosmosOf' and 0.03 s through this
+-- (measured on a 4-core Linux host, 2026-10-19; through 'Optics.cosmosOf' it was
+-- 130 microseconds a node at 1,512 nodes and at 13,500, so the cost grows with
+-- the size and does not blow up). The passes that key a leaf ("L4.Viz.AtomKey")
+-- each walk the whole of its term, and a clause group that takes apart optional
+-- inputs reads through to a term that size.
+cosmosExpr :: Optics.Fold (Expr Resolved) (Expr Resolved)
+cosmosExpr = Optics.folding (\ e -> universe e [])
+  where
+    universe e rest = e : foldr universe rest (Optics.toListOf (Optics.gplate @(Expr Resolved)) e)
+
 overImports :: forall nodeType n. (Optics.GPlate (Import n) (nodeType n)) => (Import n -> Import n) -> nodeType n -> nodeType n
 overImports = Optics.over Optics.gplate
 

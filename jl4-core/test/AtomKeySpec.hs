@@ -8,16 +8,17 @@
 -- adversarial review of the design (smucclaw/l4-ide#1013).
 module AtomKeySpec (spec) where
 
+import Data.Foldable (for_)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Optics (cosmosOf, gplate, lengthOf)
+import Optics (cosmosOf, gplate, lengthOf, toListOf)
 import Test.Hspec
 
 import Base (NormalizedUri, Uri (..), toNormalizedUri)
 import L4.Annotation (emptyAnno)
 import L4.Syntax
 import qualified L4.Transform as Transform
-import L4.Viz.AtomKey (inlinedSize, mkKeyEnv, termKey)
+import L4.Viz.AtomKey (fieldReads, inlinedSize, mkKeyEnv, termKey)
 
 uri :: Text -> NormalizedUri
 uri = toNormalizedUri . Uri
@@ -117,6 +118,15 @@ spec = describe "L4.Viz.AtomKey.termKey" $ do
     termKey env (named [1, 0]) `shouldBe` termKey env (App emptyAnno f [x, y])
     -- a negative entry supplies a section binder, not a parameter: left alone
     termKey env (named [1, -1]) `shouldNotBe` termKey env (App emptyAnno f [x, y])
+
+  it "a named call below the root keys as the positional call" $ do
+    let f = ref (u 1) "f"
+        x = var (ref (u 2) "x")
+        y = var (ref (u 3) "y")
+        z = var (ref (u 4) "z")
+        named order = AppNamed emptyAnno f [MkNamedExpr emptyAnno (ref (u 11) "second") y, MkNamedExpr emptyAnno (ref (u 10) "first") x] (Just order)
+        env = mkKeyEnv (moduleOf [rule (u 1) "f" [Def (u 10) (nm "first"), Def (u 11) (nm "second")] x])
+    termKey env (And emptyAnno z (named [1, 0])) `shouldBe` termKey env (And emptyAnno z (App emptyAnno f [x, y]))
 
   it "renaming a lambda's variable in one place does not move a WHERE local named like it" $ do
     -- rule r: `t AND (GIVEN t YIELD t) ...`, where the first t is a WHERE local
@@ -219,3 +229,51 @@ spec = describe "L4.Viz.AtomKey.termKey" $ do
     it "keys a small local and the same text written out alike, doubling chains included" $ do
       -- the control for everything below: at this size nothing has changed
       mapM_ (\k -> key (chainLet k) `shouldBe` key (writtenOut (k - 1))) [1 .. 8]
+
+  -- Keying a leaf walks its term several times, and a term that a clause group
+  -- reads through to can be 13,500 nodes. The walk is 'cosmosExpr', not
+  -- 'cosmosOf', and an atomId depends on the order it visits in.
+  describe "cosmosExpr" $ do
+    it "visits the same expressions, in the same order, as cosmosOf over gplate" $ do
+      let a = var (ref (u 2) "a")
+          b = var (ref (u 3) "b")
+          withLet =
+            LetIn
+              emptyAnno
+              [ LocalDecide emptyAnno $
+                  MkDecide emptyAnno
+                    (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+                    (MkAppForm emptyAnno (Def (u 5) (nm "c")) [] Nothing)
+                    a
+              ]
+              (And emptyAnno (var (ref (u 5) "c")) b)
+          terms =
+            [ a
+            , And emptyAnno a (Not emptyAnno b)
+            , Or emptyAnno (And emptyAnno a b) (Not emptyAnno (Or emptyAnno a b))
+            , lam (Def (u 4) (nm "p")) (And emptyAnno a (var (ref (u 4) "p")))
+            , withLet
+            ]
+      for_ terms \ e ->
+        toListOf cosmosExpr e `shouldBe` toListOf (cosmosOf (gplate @(Expr Resolved))) e
+
+  -- A pass over a term with nothing in it for the pass to rewrite returns the
+  -- term as it is, and the walk that finds that out is a node count, not a
+  -- rebuild of each node.
+  describe "a term with no WHERE, no LET and no selector call in it" $ do
+    let a = var (ref (u 2) "a")
+        b = var (ref (u 3) "b")
+        terms =
+          [ a
+          , And emptyAnno a (Not emptyAnno b)
+          , Or emptyAnno (And emptyAnno a b) (Not emptyAnno (Or emptyAnno a b))
+          , lam (Def (u 4) (nm "p")) (And emptyAnno a (var (ref (u 4) "p")))
+          ]
+
+    it "is returned as it is by inlineLocalBindings and by fieldReads" $
+      for_ terms \ e -> do
+        Transform.inlineLocalBindings e `shouldBe` e
+        fieldReads e `shouldBe` e
+
+    it "has an inlinedSize of its number of nodes" $
+      for_ terms \ e -> inlinedSize e `shouldBe` length (toListOf cosmosExpr e)
