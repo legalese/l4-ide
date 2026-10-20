@@ -321,12 +321,14 @@ The failures, sorted by whether L4 tells you:
 | the rule's sentence above the `GIVEN`, with an `IMPORT` or `§` heading above            | that `IMPORT` or heading takes it; the rule reads by its name            | no              |
 | the rule's sentence indented under the last input, even by one space                    | it becomes that input's gloss                                            | no              |
 | `10%and%20` in a wording, with an input called `and`                                    | `and` is replaced by the input's value: `10520`                          | no              |
-| `@nlg:the employee pays`                                                                | `the` is the language tag; the sentence reads `employee pays`            | no              |
+| `@nlg:the employee pays`, alone on its rule                                             | `the` is the language tag; the sentence reads `employee pays`            | yes, a warning  |
+| `% amount %` in a wording                                                               | it prints as plain text, and the slot is lost                            | yes, a warning  |
 | a field's gloss that repeats its owner: `@nlg the employee's date of birth` under `dob` | it reads "the employee's the employee's date of birth"                   | no              |
 | `HAS dob IS A NUMBER @nlg date of birth`                                                | the wording belongs to the type `NUMBER`; the field keeps the name `dob` | no              |
 
 Write `\%` and `\]` for a literal percent sign or close bracket.
 A percent sign followed by a space is plain text, so `a 5% levy on %amount%` needs no escape.
+A pair with spaces inside it around one word, `% amount %`, is plain text too and draws a warning: write `%amount%`.
 
 **One wording per language.**
 `@nlg:he …` tags a wording with its language, each further wording goes on a continuation line, and `l4 nlg --lang he` or `l4 render --lang he` picks it.

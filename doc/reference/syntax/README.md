@@ -166,9 +166,14 @@ The backslash is for the case with no space, such as `10%and%20`, where L4 canno
 
 **The two mistakes fail very differently, and the quiet one is the one to watch.**
 A stray `]` ends the annotation early and you get a parse error pointing at the leftover text, which is annoying but tells you.
-A stray `%` pair tells you nothing.
+A stray `%` pair with no spaces inside it tells you nothing.
 If the word between the two percent signs happens to name one of your inputs, L4 quietly substitutes that value, and your sentence comes out with a number where you wrote a word.
 Nothing is reported, and the rule runs.
+
+**A pair with spaces inside it, such as `% amount %`, is plain text, and L4 warns.**
+A slot is `%amount%` with no spaces, so `% amount %` prints as plain text and the slot is lost.
+`l4 check` succeeds, and the warning names the pair and the slot to write instead.
+In `5% with %amount%` the second percent sign opens the slot `%amount%`, so L4 does not warn.
 
 **An opening `[` never needs escaping, and you may escape it anyway.**
 Only the closing bracket ends an annotation, so `[see note [3] here]` is correct as written.
@@ -201,8 +206,9 @@ What it does is let you attach _more than one_ rendering to the same rule and sa
 **A word glued to the colon is a tag, and a colon with a space after it is ordinary text.**
 A subtag is letters, digits and hyphens, so `@nlg:he` and `@nlg:zh-Hant` are tags, while `@nlg: see below` has no tag and the colon is simply the first character of the prose.
 So `@nlg:total of the first` has the tag `total` and the prose `of the first`, and `@nlg:Test` on its own is a tag with no prose, which is ignored with a warning.
-L4 does not check that a tag is a language anyone uses: an English sentence that begins with a colon-joined word, as in `@nlg:the employee pays`, takes `the` for its tag, and the sentence reads `employee pays`.
-If you want the colon as text, leave a space after it.
+L4 does not check that a tag names a real language: an English sentence that begins with a colon-joined word, as in `@nlg:the employee pays`, takes `the` for its tag, and the sentence reads `employee pays`.
+L4 warns when a tag other than `en` or `he` is on a rule, input or field that has no other wording, no other wording in the module uses the tag, and no `@lang` line declares it, because a tag exists to tell renderings apart.
+If the tag was the first word of the sentence, drop the colon, and if you want the colon as text, leave a space after it.
 
 #### Writing the same rule in two languages
 
