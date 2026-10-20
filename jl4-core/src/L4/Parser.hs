@@ -17,6 +17,7 @@ module L4.Parser (
   langTagOfToken,
   declaredModuleLang,
   redundantLangEnRanges,
+  overriddenLangWarnings,
   MixfixHintRegistry,
   buildMixfixHintRegistry,
   emptyMixfixHintRegistry,
@@ -84,8 +85,9 @@ data PState = PState
   , descs :: [Desc]
   , langs :: [LangTag]
     -- ^ @\@lang@ declarations seen, most recent first. A list rather than a
-    -- 'Maybe' so that a second declaration is a fact we could report on later
-    -- rather than one silently overwriting the other.
+    -- 'Maybe', so that a second declaration does not silently overwrite the
+    -- first. Only the tags are kept; 'overriddenLangWarnings' reports a
+    -- conflict from the token stream, which has each line's range.
   }
   deriving stock (Show, Eq, Generic)
   deriving (Semigroup, Monoid) via Generically PState
@@ -174,6 +176,32 @@ redundantLangEnRanges ts
   | otherwise = []
   where
     decls = [ (t.range, tag) | t <- ts, Just tag <- [langTagOfToken (computedPayload t)] ]
+
+-- | The @\@lang@ lines that name a different language from the module's last
+-- one, which is the one in force ('declaredModuleLang', and the
+-- @listToMaybe pstate.langs@ in 'execParserForTokensWithHints').
+--
+-- One warning per such line, carrying that line and the winning line. A line
+-- that repeats the winning tag is not reported, because it contradicts nothing:
+-- the module says the same thing twice.
+--
+-- Read off the token stream, like 'redundantLangEnRanges', so the two agree
+-- on what a @\@lang@ line is ('langTagOfToken'), and so the warning has the
+-- line's range, which the parser state does not keep.
+overriddenLangWarnings :: [PosToken] -> [Resolve.Warning]
+overriddenLangWarnings ts = case reverse decls of
+  [] -> []
+  winner : earlier ->
+    [ Resolve.LangOverridden line winner
+    | line <- reverse earlier
+    , line.payload /= winner.payload
+    ]
+  where
+    decls =
+      [ Resolve.WithSpan (fromSrcRange t.range) tag
+      | t <- ts
+      , Just tag <- [langTagOfToken (computedPayload t)]
+      ]
 
 refP :: Parser (Epa Ref)
 refP = do
@@ -2968,9 +2996,9 @@ execParserForTokensWithHints hints p file input ts =
       let
         -- The module's declared language, or `en`. Taken as the LAST
         -- declaration in source order: `langs` accumulates by prepending, so
-        -- the head is the last one written. Two declarations in one module is
-        -- not diagnosed here — the list keeps both, so a check for it has
-        -- something to read.
+        -- the head is the last one written. Two declarations that name
+        -- different languages are reported by 'overriddenLangWarnings', which
+        -- reads the token stream because it needs each line's range.
         moduleLang = fromMaybe defaultModuleLang (listToMaybe pstate.langs)
         -- Stamp every untagged annotation with it BEFORE attachment, which is
         -- what makes `@lang he` mean exactly "tag every herald in this module
@@ -2982,7 +3010,7 @@ execParserForTokensWithHints hints p file input ts =
         (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withDesc
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
-        Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)
+        Right (annotatedA, overriddenLangWarnings ts ++ nlgS.warnings ++ refWarnings, pstate)
   where
     env = Env
       { moduleUri = file

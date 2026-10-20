@@ -317,6 +317,7 @@ The failures, sorted by whether L4 tells you:
 | the rule's sentence on its own line above the `GIVEN`, nothing before it                | the wording is dropped                                                   | yes, a warning  |
 | two wordings in the same language on one rule                                           | neither is used; the rule reads by its name                              | yes, a warning  |
 | an `@nlg` with no text, or only a tag                                                   | ignored                                                                  | yes, a warning  |
+| two `@lang` lines that name different languages                                         | the last is used and the earlier has no effect                           | yes, a warning  |
 | the rule's sentence above the `GIVEN`, with an `IMPORT` or `§` heading above            | that `IMPORT` or heading takes it; the rule reads by its name            | no              |
 | the rule's sentence indented under the last input, even by one space                    | it becomes that input's gloss                                            | no              |
 | `10%and%20` in a wording, with an input called `and`                                    | `and` is replaced by the input's value: `10520`                          | no              |
@@ -331,6 +332,7 @@ A percent sign followed by a space is plain text, so `a 5% levy on %amount%` nee
 `@nlg:he …` tags a wording with its language, each further wording goes on a continuation line, and `l4 nlg --lang he` or `l4 render --lang he` picks it.
 `@lang he` on a line of its own labels every untagged `@nlg` in the module.
 A module that declares nothing is English, and `@lang en` draws a hint that the line can go.
+Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.
 
 ---
 

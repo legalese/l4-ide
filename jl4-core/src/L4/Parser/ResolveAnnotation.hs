@@ -75,6 +75,12 @@ data Warning
     -- ^ Two or more annotations on one name IN THE SAME LANGUAGE (the tag, or
     -- 'Nothing' for untagged). Must be at least two. Annotations in other
     -- languages on the same name are unaffected and still attach.
+  | LangOverridden (WithSpan LangTag) (WithSpan LangTag)
+    -- ^ A @\@lang@ line that names a different language from the LAST @\@lang@
+    -- line in the module, which is the one in force. The first is the
+    -- overridden line and the second is the line that wins. One per
+    -- overridden line; a line that repeats the winning tag contradicts
+    -- nothing and is not reported.
   | RefUnattached RefWithSpan
     -- ^ A @ref has no AST node after it to attach to: it comes after the last
     -- one, at the end of the file.

@@ -795,6 +795,17 @@ spec bin = do
       code `shouldBe` ExitSuccess
       serr `shouldNotSatisfy` (hintText `isInfixOf`)
 
+    it "warns that the earlier of two different `@lang` lines is overridden, naming both" $ do
+      Output code _ serr <- runL4 bin ["check", langEnThenHeFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("declares two different languages with @lang: `en` here and `he` on line 4." `isInfixOf`)
+
+    it "does not warn when every `@lang` line names the same language" $ do
+      Output code _ serr <- runL4 bin ["check", langEnHintFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("two different languages" `isInfixOf`)
+
   describe "l4 format" $ do
     it "prints a clean file to stdout as written" $ do
       src <- readFile cleanFixture

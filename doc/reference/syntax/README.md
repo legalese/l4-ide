@@ -297,6 +297,11 @@ So declare it if your module is not English.
 It is only a hint: `l4 check` succeeds with the line or without it.
 A module that also declares another language gets no hint, and neither does a tag other than `en`.
 
+**A module declares one language.**
+If two `@lang` lines name different languages, L4 uses the last one in the file and warns on each of the others.
+The warning names both languages and the line that is used, and the earlier line has no effect.
+Two `@lang` lines that name the same language are not reported.
+
 **It applies to the whole file, wherever you write it**, including annotations above the declaration.
 Convention is the top; nothing breaks if it is not.
 

@@ -494,6 +494,7 @@ DECIDE `is large` IF amount GREATER THAN 100
   A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the` and reads `employee pays`, so write `@nlg the employee pays`, with no colon, for a sentence that starts with that word.
 - **A module in one language says so once**, on a line of its own: `@lang he` makes every untagged `@nlg` Hebrew.
   Do not write `@lang en`: a module without a declaration is English, and `l4 check` hints that the line can go.
+  Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.
 - **Two wordings in the same language on one rule** draw a warning, `l4 check` succeeds, and neither is used.
 - **A literal `%` or `]` inside an `@nlg`** is written `\%` or `\]`.
   A bare `%and%` is read as the input `and`, and nothing is reported.

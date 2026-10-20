@@ -1170,6 +1170,15 @@ prettyNlgResolveWarning = \ case
     [ "The following annotations would be attached:"
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
+  Resolve.LangOverridden overriddenLine winningLine ->
+    let langOf (Lexer.MkLangTag tag) = tag
+    in Text.unlines
+      [ "This module declares two different languages with @lang: `" <> langOf overriddenLine.payload
+          <> "` here and `" <> langOf winningLine.payload
+          <> "` on line " <> Text.pack (show winningLine.range.start.line) <> "."
+      , "L4 uses the last @lang in the file, so the module's language is `" <> langOf winningLine.payload
+          <> "` and this line has no effect. Keep one @lang line."
+      ]
   Resolve.RefUnattached r ->
     Resolve.refUnattachedMessage r.payload
   Resolve.RefTrailing r code ->
@@ -1193,6 +1202,8 @@ rangeOfResolveWarning = \ case
     srcSpanToLspRange $ Just nlg.range
   Resolve.Ambiguous name _ _ ->
     srcRangeToLspRange $ rangeOf name
+  Resolve.LangOverridden overriddenLine _ ->
+    srcSpanToLspRange $ Just overriddenLine.range
   Resolve.RefUnattached r ->
     srcSpanToLspRange $ Just r.range
   Resolve.RefTrailing r _ ->
