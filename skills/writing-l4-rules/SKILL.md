@@ -491,7 +491,7 @@ DECIDE `is large` IF amount GREATER THAN 100
 - **One wording per language.**
   Write the language subtag straight after `@nlg`, joined by a colon, as in `@nlg:he …`, and put each further wording on a continuation line under the first.
   `l4 nlg --lang he` and `l4 render --lang he` pick the Hebrew wording, and a rule with none keeps its default one.
-  A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the`, so leave a space after the colon when the sentence starts there.
+  A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the` and reads `employee pays`, so write `@nlg the employee pays`, with no colon, for a sentence that starts with that word.
 - **A module in one language says so once**, on a line of its own: `@lang he` makes every untagged `@nlg` Hebrew.
   Do not write `@lang en`: a module without a declaration is English, and `l4 check` hints that the line can go.
 - **Two wordings in the same language on one rule** draw a warning, `l4 check` succeeds, and neither is used.
