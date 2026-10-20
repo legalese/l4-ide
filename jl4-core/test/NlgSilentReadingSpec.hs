@@ -117,6 +117,15 @@ spec = describe "an annotation read differently from how it was written" $ do
         ws <- warningsOf ("@lang he\n" <> withHerald "@nlg:the claim of %amount% is over the limit")
         lone ws `shouldBe` [("over limit", "the")]
 
+      it "for a tag that opens like English or Hebrew but is another language" $ do
+        ws <- warningsOf (withHerald "@nlg:hei the claim is over the limit")
+        lone ws `shouldBe` [("over limit", "hei")]
+        ws' <- warningsOf (withHerald "@nlg:zh-Hant the claim is over the limit")
+        lone ws' `shouldBe` [("over limit", "zh-Hant")]
+        forM_ ["english", "enx", "heb"] $ \ tag -> do
+          ws'' <- warningsOf (withHerald ("@nlg:" <> tag <> " the claim is over the limit"))
+          lone ws'' `shouldBe` [("over limit", tag)]
+
       it "for a tag that differs from the declared one only in case" $ do
         ws <- warningsOf ("@lang fr\n" <> withHerald "@nlg:FR le montant")
         lone ws `shouldBe` [("over limit", "FR")]
@@ -165,6 +174,11 @@ spec = describe "an annotation read differently from how it was written" $ do
         lone ws `shouldBe` []
         ws' <- warningsOf (withHerald "@nlg:EN the claim is over the limit")
         lone ws' `shouldBe` []
+
+      it "for English or Hebrew with a region or script, such as en-GB or he-IL" $ do
+        forM_ ["en-GB", "EN-gb", "he-IL", "he-Latn"] $ \ tag -> do
+          ws <- warningsOf (withHerald ("@nlg:" <> tag <> " the claim is over the limit"))
+          lone ws `shouldBe` []
 
       it "for a colon with a space after it, which is not a tag" $ do
         ws <- warningsOf (withHerald "@nlg: see below %amount%")

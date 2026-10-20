@@ -214,8 +214,15 @@ overriddenLangWarnings ts = case reverse decls of
 -- sentence whose first word was joined to the colon: @\@nlg:the employee
 -- pays@ takes @the@ for its tag, and the sentence reads @employee pays@.
 -- The tags are compared exactly, as the pipeline compares them. @en@ and @he@
--- are never reported, because L4 gives them meaning ('phrasebookFor' and the
--- default language), whatever their case.
+-- are never reported (@en@ is the default language and @he@ has a phrasebook,
+-- 'phrasebookFor'), and the case of the tag does not matter to this check.
+-- The part before the first hyphen decides, so @en-GB@ and @he-IL@ are not
+-- reported either, because a tag that starts that way is taken to be a
+-- language and not the first word of a sentence: a module in British English
+-- that tags its one rule @en-GB@ is using the tag as intended. A hyphenated
+-- English word such as @en-route@ is exempt too, which is the cost of deciding
+-- by the first hyphen. This only silences a warning; which wording a @--lang@
+-- selects is not affected.
 --
 -- This is the module-wide half of the test. The other half is that the name
 -- the wording attaches to has no other wording, which only attachment knows;
@@ -233,7 +240,7 @@ loneLangTags declared nlgs =
     , not (hasMeaning tag)
     ]
   where
-    hasMeaning (MkLangTag t) = Text.toLower t `elem` ["en", "he"]
+    hasMeaning (MkLangTag t) = Text.toLower (Text.takeWhile (/= '-') t) `elem` ["en", "he"]
 
 -- | The percent pairs in an annotation's text that have spaces inside them
 -- around one name, each as @(the pair as written, the name)@.

@@ -89,8 +89,10 @@ data Warning
     -- carries the tag, and no @\@lang@ line declares it. A tag exists to tell
     -- renderings of one name apart, so this is the shape of a sentence whose
     -- first word was joined to the colon (@\@nlg:the employee pays@). 'en' and
-    -- 'he' are exempt, because L4 gives them meaning. The wording is attached
-    -- all the same.
+    -- 'he' are exempt, and so is any tag whose part before the first hyphen is
+    -- one of them (@en-GB@), which is taken to be a language and not the first
+    -- word of a sentence; so a hyphenated word such as @en-route@ is exempt
+    -- too. The wording is attached all the same.
   | SpacedSlot (WithSpan Text) Text
     -- ^ A percent pair with spaces inside it around one name, such as
     -- @% amount %@, in an annotation. It prints as plain text, because a slot

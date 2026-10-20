@@ -207,8 +207,9 @@ What it does is let you attach _more than one_ rendering to the same rule and sa
 A subtag is letters, digits and hyphens, so `@nlg:he` and `@nlg:zh-Hant` are tags, while `@nlg: see below` has no tag and the colon is simply the first character of the prose.
 So `@nlg:total of the first` has the tag `total` and the prose `of the first`, and `@nlg:Test` on its own is a tag with no prose, which is ignored with a warning.
 L4 does not check that a tag names a real language: an English sentence that begins with a colon-joined word, as in `@nlg:the employee pays`, takes `the` for its tag, and the sentence reads `employee pays`.
-L4 warns when a tag other than `en` or `he` is on a rule, input or field that has no other wording, no other wording in the module uses the tag, and no `@lang` line declares it, because a tag exists to tell renderings apart.
+L4 warns when a tag is on a rule, input or field that has no other wording, no other wording in the module uses the tag, and no `@lang` line declares it, because a tag exists to tell renderings apart.
 The same word used as a tag on two rules, inputs or fields draws no warning at either.
+A tag is never reported when the part before its first hyphen is `en` or `he`, in any case, so `en-GB` and `he-IL` are not.
 If the tag was the first word of the sentence, drop the colon, and if you want the colon as text, leave a space after it.
 
 #### Writing the same rule in two languages
