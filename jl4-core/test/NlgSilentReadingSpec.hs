@@ -30,9 +30,13 @@ warningsOf src =
 lone :: [Warning] -> [(Text, Text)]
 lone ws =
   [ (nameToText name, tag)
-  | LoneLangTag name nlg <- ws
+  | LoneLangTag name nlg _ <- ws
   , Just (MkLangTag tag) <- [nlgLangTag nlg.payload]
   ]
+
+-- | The declared tag each lone tag differs from only in case, if any.
+twins :: [Warning] -> [Maybe Text]
+twins ws = [ fmap (\ (MkLangTag t) -> t) twin | LoneLangTag _ _ twin <- ws ]
 
 -- | The spaced percent pairs a parse reports, each as @(the pair, the name)@.
 spaced :: [Warning] -> [(Text, Text)]
@@ -126,9 +130,20 @@ spec = describe "an annotation read differently from how it was written" $ do
           ws'' <- warningsOf (withHerald ("@nlg:" <> tag <> " the claim is over the limit"))
           lone ws'' `shouldBe` [("over limit", tag)]
 
-      it "for a tag that differs from the declared one only in case" $ do
+      it "for a tag that differs from the declared one only in case, naming the declared one" $ do
         ws <- warningsOf ("@lang fr\n" <> withHerald "@nlg:FR le montant")
         lone ws `shouldBe` [("over limit", "FR")]
+        twins ws `shouldBe` [Just "fr"]
+
+      it "naming the module's language, which is the last @lang, and not an earlier one" $ do
+        ws <- warningsOf ("@lang fr\n@lang he\n" <> withHerald "@nlg:FR le montant")
+        twins ws `shouldBe` [Nothing]
+        ws' <- warningsOf ("@lang he\n@lang fr\n" <> withHerald "@nlg:FR le montant")
+        twins ws' `shouldBe` [Just "fr"]
+
+      it "without a declared twin when the declared tag is another language" $ do
+        ws <- warningsOf ("@lang he\n" <> withHerald "@nlg:FR le montant")
+        twins ws `shouldBe` [Nothing]
 
       it "per name: an input's lone wording draws one even when the rule has others" $ do
         ws <- warningsOf

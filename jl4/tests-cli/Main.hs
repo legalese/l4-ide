@@ -334,6 +334,11 @@ langEnHintFixture, langEnThenHeFixture :: FilePath
 langEnHintFixture   = fixtureDir </> "lang-en-hint.l4"
 langEnThenHeFixture = fixtureDir </> "lang-en-then-he.l4"
 
+-- | A French module whose one wording is tagged @FR@, which differs from the
+-- declared @fr@ only in case.
+langTagCaseFixture :: FilePath
+langTagCaseFixture = fixtureDir </> "lang-tag-case.l4"
+
 evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
@@ -513,7 +518,7 @@ main = do
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
        , evalTraceFixture, refTrailingFixture
-       , langEnHintFixture, langEnThenHeFixture
+       , langEnHintFixture, langEnThenHeFixture, langTagCaseFixture
        , bilingualFixture, bilingualFramesFixture
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
@@ -819,6 +824,14 @@ spec bin = do
       serr `shouldSatisfy`
         ("`@nlg:the` tags the wording on `over limit` as language `the`" `isInfixOf`)
       serr `shouldSatisfy` ("write `@nlg the …` with no colon." `isInfixOf`)
+
+    it "names the declared tag when a lone tag differs from it only in case" $ do
+      Output code _ serr <- runL4 bin ["check", langTagCaseFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("the module declares `@lang fr`: `FR` and `fr` differ only in case." `isInfixOf`)
+      serr `shouldSatisfy` ("Write `@nlg:fr`, or leave the tag off" `isInfixOf`)
+      serr `shouldNotSatisfy` ("add `@lang" `isInfixOf`)
 
   describe "l4 format" $ do
     it "prints a clean file to stdout as written" $ do

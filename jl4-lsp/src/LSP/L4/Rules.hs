@@ -1179,7 +1179,17 @@ prettyNlgResolveWarning = \ case
       , "L4 uses the last @lang in the file, so the module's language is `" <> langOf winningLine.payload
           <> "` and this line has no effect. Keep one @lang line."
       ]
-  Resolve.LoneLangTag name nlg ->
+  Resolve.LoneLangTag name nlg (Just (Lexer.MkLangTag declared)) ->
+    let tag = maybe "" (\ (Lexer.MkLangTag t) -> t) (nlgLangTag nlg.payload)
+        described = Print.prettyLayout name
+    in Text.unlines
+      [ "`@nlg:" <> tag <> "` tags the wording on " <> described <> " as language `" <> tag
+          <> "`, but " <> described <> " has no other wording and the module declares `@lang " <> declared
+          <> "`: `" <> tag <> "` and `" <> declared <> "` differ only in case."
+      , "Tags are compared exactly, so `" <> tag <> "` is not `" <> declared <> "`. Write `@nlg:" <> declared
+          <> "`, or leave the tag off, since a wording with no tag is already in `" <> declared <> "`."
+      ]
+  Resolve.LoneLangTag name nlg Nothing ->
     let tag = maybe "" (\ (Lexer.MkLangTag t) -> t) (nlgLangTag nlg.payload)
         described = Print.prettyLayout name
     in Text.unlines
@@ -1221,7 +1231,7 @@ rangeOfResolveWarning = \ case
     srcRangeToLspRange $ rangeOf name
   Resolve.LangOverridden overriddenLine _ ->
     srcSpanToLspRange $ Just overriddenLine.range
-  Resolve.LoneLangTag _ nlg ->
+  Resolve.LoneLangTag _ nlg _ ->
     srcSpanToLspRange $ Just nlg.range
   Resolve.SpacedSlot written _ ->
     srcSpanToLspRange $ Just written.range

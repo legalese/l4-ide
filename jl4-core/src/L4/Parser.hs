@@ -47,6 +47,7 @@ import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
 import qualified Data.List.Extra as List
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -207,7 +208,8 @@ overriddenLangWarnings ts = case reverse decls of
       , Just tag <- [langTagOfToken (computedPayload t)]
       ]
 
--- | The language tags that nothing else in the module backs.
+-- | The language tags that nothing else in the module backs, each with the
+-- module's language when that differs from it only in case.
 --
 -- A tag exists to tell renderings of one name apart, so a tag that no
 -- @\@lang@ line declares and no second wording carries is the shape of a
@@ -231,13 +233,21 @@ overriddenLangWarnings ts = case reverse decls of
 -- The annotations are the ones already stamped with the module's language, so
 -- an untagged wording in a module that declares @\@lang fr@ counts as a
 -- wording in @fr@.
-loneLangTags :: [LangTag] -> [Nlg] -> Set LangTag
+--
+-- The declared tags are newest first, as in @pstate.langs@, so the head is
+-- the module's language. A caller that passes them in source order gets the
+-- wrong case twin and no error.
+loneLangTags :: [LangTag] -> [Nlg] -> Map.Map LangTag (Maybe LangTag)
 loneLangTags declared nlgs =
-  Set.fromList
-    [ tag
-    | [tag] <- List.group (List.sort (mapMaybe nlgLangTag nlgs))
+  Map.fromList
+    [ (tag, caseTwin)
+    | [tag@(MkLangTag t)] <- List.group (List.sort (mapMaybe nlgLangTag nlgs))
     , tag `notElem` declared
     , not (hasMeaning tag)
+    -- Only the module's language, which is the head, is offered as the twin:
+    -- an earlier @\@lang@ line that the last one overrides is not the
+    -- language the author is writing in.
+    , let caseTwin = List.find (\ (MkLangTag d) -> Text.toLower d == Text.toLower t) (take 1 declared)
     ]
   where
     hasMeaning (MkLangTag t) = Text.toLower (Text.takeWhile (/= '-') t) `elem` ["en", "he"]
