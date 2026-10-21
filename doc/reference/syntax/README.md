@@ -96,14 +96,14 @@ When something written just before it can take it, such as an `IMPORT` or a sect
 **An annotation belongs to the name it sits with, not to a type nearby.**
 In `GIVEN a IS A STRING @nlg the amount` the wording is `a`'s, not `STRING`'s, and it labels `a` wherever a call lists its inputs: ``#EVAL `is large` WITH a IS "x"`` reads `… where the amount is x`.
 An annotation on its own line between a `GIVETH` and its `DECIDE` belongs to the rule, not to the type written after the `GIVETH`.
-A wording written after a type, as in `HAS dob IS A NUMBER @nlg date of birth`, belongs to that type, not to the field, so the field is read under its own name, `dob`.
+A record field works the same way: in `HAS dob IS A DATE @nlg date of birth` the wording is `dob`'s, as it would be under the field.
 
 **An empty `@nlg` is ignored, and says so.**
 A rendering replaces what it annotates, so `@nlg` with nothing after it would erase the name from the output rather than leave it alone.
 L4 drops it and warns instead.
 
-**A record field can carry two.**
-`head [the first item] IS AN a [an element]` glosses the field and its type separately, because each annotation sits with the token it follows.
+**Two wordings in one language on one field collide.**
+`head [the first item] IS AN a [an element]` gives `head` two wordings, one before its type and one after it, so L4 warns and uses neither, as it does for two on an input.
 
 **A field list is an exception to "own line describes what follows".**
 Underneath a field, an annotation describes _that_ field, the one above it, not the next one:
@@ -206,9 +206,14 @@ What it does is let you attach _more than one_ rendering to the same rule and sa
 A subtag is letters, digits and hyphens, so `@nlg:he` and `@nlg:zh-Hant` are tags, while `@nlg: see below` has no tag and the colon is simply the first character of the prose.
 So `@nlg:total of the first` has the tag `total` and the prose `of the first`, and `@nlg:Test` on its own is a tag with no prose, which is ignored with a warning.
 L4 does not check that a tag names a real language: an English sentence that begins with a colon-joined word, as in `@nlg:the employee pays`, takes `the` for its tag, and the sentence reads `employee pays`.
-L4 warns when a tag is on a rule, input or field that has no other wording, no other wording in the module uses the tag, and no `@lang` line declares it, because a tag exists to tell renderings apart.
-The same word used as a tag on two rules, inputs or fields draws no warning at either.
-A tag is never reported when the part before its first hyphen is `en` or `he`, in any case, so `en-GB` and `he-IL` are not.
+So L4 warns when a rule, input or field has only one wording and nothing in the module backs its tag as a language.
+A tag is backed when:
+
+- a `@lang` line declares it;
+- some rule, input or field has a wording in it beside a wording in another language; or
+- it is `en`, `he` or a language a `@lang` line declares, with nothing after it but a script or a region: `en-GB`, `he-IL`, `zh-Hant`, and `pt-BR` in a module that declares `@lang pt`. `en` and `he` count in any case.
+
+So `@nlg:en-route for %days% days` draws the warning, because `route` is neither a script nor a region, and so does a word used as the tag of several rules when none of them has another wording.
 If the tag was the first word of the sentence, drop the colon, and if you want the colon as text, leave a space after it.
 
 #### Writing the same rule in two languages
@@ -231,7 +236,12 @@ $ l4 render --format html --lang he mymodule.l4 -o mymodule.he.html
 ```
 
 `l4 nlg` gives the file's directives as plain prose; `l4 render` gives the formatted document, in any of its formats.
-Both take `--lang`.
+Both take `--lang`, and so does the Render tab of the VS Code extension, which shows a language menu beside its imports menu when the file has wordings in more than one language.
+
+**A request reads a wording in its language, whatever region either names.**
+`--lang he` reads a wording tagged `he-IL` when the rule has none tagged `he`, and `--lang he-IL` reads one tagged `he`.
+A wording tagged exactly as asked comes first, then one whose tag the request extends (`he` for `he-IL`), then any other in the same language.
+The language is compared as written, so `HE` is not `he`.
 Two runs of the same command over the same source produce the two documents, and nothing about the rule is duplicated, only its wording.
 
 In both, a call to a rule that has an `@nlg` wording reads as that wording with the call's arguments in its `%slots%`: ``#EVAL `is large` 150`` reads as `the amount 150 is large`.
@@ -248,7 +258,7 @@ For ``#EVAL `is large` 150 EQUALS TRUE`` over the rule above, `l4 nlg --lang he`
 They come from a table of phrases, not a grammar, so the English word order stays: a Hebrew line is Hebrew words in the order English would put them.
 A word the table has no entry for stays English, and `l4 nlg` names it on stderr, so you can see what was not translated.
 The table is small and fixed, and it gives each connecting word one rendering whatever the sentence around it, so have a Hebrew speaker read the Hebrew output before you rely on it.
-Hebrew is the one language with a table.
+Hebrew is the one language with a table, and it serves every Hebrew tag, `he-IL` as well as `he`.
 For every other language, `--lang` selects your own wordings and leaves L4's own connecting words in English.
 `l4 render` does not use the table.
 Without `--lang`, the connecting words are English.
@@ -335,11 +345,11 @@ A rule whose own name carries an annotation keeps that one, and the one on the i
 
 **An annotation in the `GIVEN` is an input gloss, never the rule's sentence.**
 It labels the input in a `WITH` call's `where` clause.
-Which occurrence BINDS is what decides this, not which line you wrote on: when the head names the input, the head is the binding occurrence and the `GIVEN` is a reference back to it, so a gloss written in the `GIVEN` there reaches nothing at all.
+When the rule's head names the input too, as in `` `is large` amount MEANS … ``, L4 takes the input from the head, so a gloss written in the `GIVEN` of that rule labels nothing.
 Put a sentence for the rule on the rule, and a gloss for an input in the `GIVEN` of a head that does not repeat it.
 
-**Two annotations in the same language on one input collide**, neither attaches, and both projections fall back to their own paraphrase.
-L4 reports that separately, as an ambiguity naming the input.
+**Two annotations in the same language on one input collide**: L4 warns, naming the input, and uses neither.
+`l4 nlg` and `l4 render` then read the input under its own name, and the rule as they would read it with no annotations.
 
 Where a wording sits decides whose it is:
 

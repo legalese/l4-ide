@@ -312,20 +312,20 @@ A rule's own sentence goes trailing its head, or on its own line between the `GI
 
 The failures, sorted by whether L4 tells you:
 
-| what you wrote                                                                          | what happens                                                             | does L4 say so? |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------- |
-| the rule's sentence on its own line above the `GIVEN`, nothing before it                | the wording is dropped                                                   | yes, a warning  |
-| two wordings in the same language on one rule                                           | neither is used; the rule reads by its name                              | yes, a warning  |
-| an `@nlg` with no text, or only a tag                                                   | ignored                                                                  | yes, a warning  |
-| two `@lang` lines that name different languages                                         | the last is used and the earlier has no effect                           | yes, a warning  |
-| the rule's sentence above the `GIVEN`, with an `IMPORT` or `§` heading above            | that `IMPORT` or heading takes it; the rule reads by its name            | no              |
-| the rule's sentence indented under the last input, even by one space                    | it becomes that input's gloss                                            | no              |
-| `10%and%20` in a wording, with an input called `and`                                    | `and` is replaced by the input's value: `10520`                          | no              |
-| `@nlg:the employee pays`, the only use of the tag `the` in the module                   | `the` is the language tag; the sentence reads `employee pays`            | yes, a warning  |
-| `@nlg:the …` written the same way on a second rule                                      | `the` is the tag on each; each sentence loses its first word             | no              |
-| `% amount %` in a wording                                                               | it prints as plain text, and the slot is lost                            | yes, a warning  |
-| a field's gloss that repeats its owner: `@nlg the employee's date of birth` under `dob` | it reads "the employee's the employee's date of birth"                   | no              |
-| `HAS dob IS A NUMBER @nlg date of birth`                                                | the wording belongs to the type `NUMBER`; the field keeps the name `dob` | no              |
+| what you wrote                                                                          | what happens                                                           | does L4 say so? |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------- |
+| the rule's sentence on its own line above the `GIVEN`, nothing before it                | the wording is dropped                                                 | yes, a warning  |
+| two wordings in the same language on one rule                                           | neither is used; the rule reads by its name                            | yes, a warning  |
+| an `@nlg` with no text, or only a tag                                                   | ignored                                                                | yes, a warning  |
+| two `@lang` lines that name different languages                                         | the last is used and the earlier has no effect                         | yes, a warning  |
+| the rule's sentence above the `GIVEN`, with an `IMPORT` or `§` heading above            | that `IMPORT` or heading takes it; the rule reads by its name          | no              |
+| the rule's sentence indented under the last input, even by one space                    | it becomes that input's gloss                                          | no              |
+| `10%and%20` in a wording, with an input called `and`                                    | `and` is replaced by the input's value: `10520`                        | no              |
+| `@nlg:the employee pays`, or `@nlg:en-route …`, on a rule with no other wording         | the first word is the language tag; the sentence reads `employee pays` | yes, a warning  |
+| `@nlg:the …` beside a wording in another language, on the same rule                     | `the` is taken for a language; the sentence loses its first word       | no              |
+| `% amount %` in a wording                                                               | it prints as plain text, and the slot is lost                          | yes, a warning  |
+| a field's gloss that repeats its owner: `@nlg the employee's date of birth` under `dob` | it reads "the employee's the employee's date of birth"                 | no              |
+| two wordings in one language on one field: `head [the first] IS AN a [an item]`         | neither is used; the field reads by its name                           | yes, a warning  |
 
 Write `\%` and `\]` for a literal percent sign or close bracket.
 A percent sign followed by a space is plain text, so `a 5% levy on %amount%` needs no escape.
