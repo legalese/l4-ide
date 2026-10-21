@@ -471,7 +471,7 @@ Directives are instructions to the tools, written at the top level of a file. `l
 | `#EVAL`      | evaluates an expression and shows the result                                                      |
 | `#EVALTRACE` | evaluates an expression and also shows the steps that led to the result (`l4 trace` draws them)   |
 | `#CHECK`     | type-checks an expression and shows its type, without evaluating it                               |
-| `#ASSERT`    | evaluates an expression and reports "assertion failed" when it is not TRUE                        |
+| `#ASSERT`    | evaluates an expression and reports whether it is TRUE ([what it reports](#what-assert-reports))  |
 | `#TRACE`     | runs a regulative rule against a list of events (see [Regulative rules](../regulative/README.md)) |
 
 ```text
@@ -497,6 +497,21 @@ DECIDE `is an adult` IF age >= 18
 ```
 
 **Example:** [directive-example.l4](directive-example.l4)
+
+### What `#ASSERT` reports
+
+An `#ASSERT` has one of three outcomes:
+
+| When the expression…                                                                                         | It prints                                          | The editor shows          | `l4 run` exit code | In `l4 run --json`                               |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ------------------------- | ------------------ | ------------------------------------------------ |
+| is TRUE                                                                                                      | `assertion satisfied`                              | information               | not affected       | `"value": true`                                  |
+| is FALSE                                                                                                     | `assertion failed`                                 | an error                  | not affected       | `"value": false`                                 |
+| cannot be evaluated: a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d | `assertion could not be evaluated:` and the reason | an error, with the reason | non-zero           | `"value": null`, with the reason under `"error"` |
+
+In `--json` the result's `"kind"` is `"assertion"` in all three.
+
+An assertion that cannot be evaluated is not a verdict, so `#ASSERT P` and `#ASSERT NOT P` then report the same thing. Asserting an `ASSUME`d `BOOLEAN` directly, as in `#ASSERT b`, is one such case: `b` has no value to check.
+[Testing your rules](../../tutorials/getting-started/testing-your-rules.md#what-an-error-looks-like) shows an example.
 
 ## Sections
 
