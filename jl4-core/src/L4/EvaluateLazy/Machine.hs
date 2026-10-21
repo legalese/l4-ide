@@ -1666,7 +1666,16 @@ runBuiltin es op mTy = do
               TypeCheck.KnownTerm conType Constructor -> do
                 -- Extract field names from the constructor's function type
                 fieldNames <- extractFieldNames conType
-                if length fieldNames /= length fields
+                case (fieldNames, fields) of
+                 ([], [field]) -> do
+                  -- One argument without a name, as in LEFT x and RIGHT x:
+                  -- an object keyed by the constructor, {"LEFT": x}, so the
+                  -- two sides of an EITHER stay apart.
+                  pushFrame (JsonEncodeConstructorFrame [] (nameToText (TypeCheck.getName conRef)) [])
+                  pushFrame (UnaryBuiltin0 UnaryJsonEncode Nothing)
+                  continueRef field
+                 _ ->
+                  if length fieldNames /= length fields
                   then internalException $ RuntimeTypeError $
                     "Field count mismatch for constructor " <> nameToText (TypeCheck.getName conRef) <>
                     ": expected " <> Text.pack (show (length fieldNames)) <>
