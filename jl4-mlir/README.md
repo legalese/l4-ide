@@ -97,8 +97,9 @@ This is a working compiler, not a finished one. Out of 431 `.l4` files in this r
 Known gaps:
 
 - String operations (`__l4_str_concat`, `__l4_str_len`, `__l4_to_string`) are stubbed at runtime — good for passing strings through, not for heavy string work.
-- DEONTIC functions are evaluated, but not as compiled wasm: the wasm body of a regulative/deontic function is an inert `0.0` placeholder ([Lower.hs](src/L4/MLIR/Lower.hs)), and the actual deontic interpreter (`runDeonticInternal`, M6) runs in the JS runtime, walking the schema-baked `deonticContract` tree against the request's `events` stream.
-- State graphs and reasoning traces both exist. State graphs (M3) are baked at compile time via jl4-core's `stateGraphToDot` into the `.schema.json`; reasoning traces (M5) are produced by the JS runtime when the request asks for `?trace=full`, returning a `ResponseWithReason` envelope (otherwise the envelope is `SimpleResponse`).
+- A function that returns `DEONTIC` is not compiled to wasm. Its wasm body is a placeholder that returns `0.0` ([Lower.hs](src/L4/MLIR/Lower.hs)); the JS runtime evaluates the function instead, walking the contract stored in the `.schema.json` against the request's `events`.
+- No GraphViz rendering of a trace. jl4-service answers an evaluation with `?trace=full&graphviz=true` with one, tagged `GraphVizResponse`; the WASM server ignores `graphviz`. A request with `?trace=full` gets the trace itself, tagged `TraceResponse`, with `result` and `reasoning`.
+- The WASM server answers only the evaluation route, and reads the trace level only from the `?trace=` query, not from the `X-L4-Trace` header that jl4-service also accepts. It has no state-graphs route: each state graph's GraphViz source is in the `.schema.json`, written when the program is compiled.
 - Only the Node.js wasm runtime is wired end-to-end for marshaling. `--wasmtime` / `--wasmer` flags exist but are not yet connected to the schema-driven marshaler.
 
 ## Performance
