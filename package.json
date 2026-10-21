@@ -28,6 +28,7 @@
   },
   "overrides": {
     "vite": "^6.0.7",
-    "marked": "14.0.0"
+    "marked": "14.0.0",
+    "vscode": "npm:@codingame/monaco-vscode-extension-api@14.0.4"
   }
 }
