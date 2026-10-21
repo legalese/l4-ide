@@ -12,6 +12,8 @@ module NlgSilentReadingSpec (spec) where
 
 import Base
 
+import qualified Base.Text as Text
+import L4.API (l4Check)
 import L4.Lexer (LangTag (..))
 import L4.Parser (execProgramParserWithHintPass, spacedSlotsIn)
 import L4.Parser.ResolveAnnotation (Warning (..), WithSpan (..))
@@ -30,13 +32,17 @@ warningsOf src =
 lone :: [Warning] -> [(Text, Text)]
 lone ws =
   [ (nameToText name, tag)
-  | LoneLangTag name nlg _ <- ws
+  | LoneLangTag name _ nlg _ <- ws
   , Just (MkLangTag tag) <- [nlgLangTag nlg.payload]
   ]
 
+-- | The rule each lone tag names as the one whose sentence it is, if any.
+sentenceOf :: [Warning] -> [Maybe Text]
+sentenceOf ws = [ nameToText <$> rule | LoneLangTag _ rule _ _ <- ws ]
+
 -- | The declared tag each lone tag differs from only in case, if any.
 twins :: [Warning] -> [Maybe Text]
-twins ws = [ fmap (\ (MkLangTag t) -> t) twin | LoneLangTag _ _ twin <- ws ]
+twins ws = [ fmap (\ (MkLangTag t) -> t) twin | LoneLangTag _ _ _ twin <- ws ]
 
 -- | The spaced percent pairs a parse reports, each as @(the pair, the name)@.
 spaced :: [Warning] -> [(Text, Text)]
@@ -107,6 +113,21 @@ spec = describe "an annotation read differently from how it was written" $ do
       ws <- warningsOf (withHerald "@nlg a 5% levy on %amount%")
       spaced ws `shouldBe` []
 
+  -- The web editor checks through 'l4Check', which has no language server
+  -- under it, so it carries the parser's warnings itself.
+  describe "the web editor's check" $ do
+    it "reports a lone tag as a warning, in the language server's words" $ do
+      let diagnostics = l4Check (withHerald "@nlg:the claim of %amount% is over the limit")
+      diagnostics `shouldSatisfy` Text.isInfixOf "`@nlg:the` tags the wording on `over limit`"
+      diagnostics `shouldSatisfy` Text.isInfixOf "\"severity\":2"
+
+    it "reports a percent pair with spaces inside it" $ do
+      let diagnostics = l4Check (withHerald "@nlg the claim of % amount % is over the limit")
+      diagnostics `shouldSatisfy` Text.isInfixOf "with spaces inside the percent signs"
+
+    it "reports nothing for a wording that reads as written" $
+      l4Check (withHerald "@nlg the claim of %amount% is over the limit") `shouldBe` "[]"
+
   describe "a language tag that nothing else in the module backs" $ do
     describe "is reported" $ do
       it "for a lone tag that is the first word of a sentence" $ do
@@ -145,6 +166,44 @@ spec = describe "an annotation read differently from how it was written" $ do
         ws <- warningsOf ("@lang he\n" <> withHerald "@nlg:FR le montant")
         twins ws `shouldBe` [Nothing]
 
+      it "for English or Hebrew followed by a word that is not a region or a script" $ do
+        ws <- warningsOf (withHerald "@nlg:en-route for %amount% days")
+        lone ws `shouldBe` [("over limit", "en-route")]
+        forM_ ["he-quickly", "en-", "en-GB-route"] $ \ tag -> do
+          ws' <- warningsOf (withHerald ("@nlg:" <> tag <> " the claim is over the limit"))
+          lone ws' `shouldBe` [("over limit", tag)]
+
+      it "on each rule when the same word is the tag of several, none with another wording" $ do
+        ws <- warningsOf
+          "GIVEN amount IS A NUMBER\n\
+          \GIVETH A BOOLEAN\n\
+          \DECIDE `over limit` @nlg:the claim is over the limit\n\
+          \  IF amount GREATER THAN 100\n\
+          \\n\
+          \GIVEN amount IS A NUMBER\n\
+          \GIVETH A BOOLEAN\n\
+          \DECIDE `under limit` @nlg:the claim is under the limit\n\
+          \  IF amount LESS THAN 100\n"
+        lone ws `shouldMatchList` [("over limit", "the"), ("under limit", "the")]
+
+      it "naming the rule, for a wording written after an input in the rule's head" $ do
+        ws <- warningsOf
+          "GIVEN income IS A NUMBER\n\
+          \GIVETH A BOOLEAN\n\
+          \`is taxable` income @nlg:the income is over the threshold\n\
+          \  MEANS income GREATER THAN 100\n"
+        lone ws `shouldBe` [("income", "the")]
+        sentenceOf ws `shouldBe` [Just "is taxable"]
+
+      it "naming the input, when the rule's name has a wording of its own" $ do
+        ws <- warningsOf
+          "GIVEN income IS A NUMBER\n\
+          \GIVETH A BOOLEAN\n\
+          \`is taxable` [the income is taxable] income @nlg:the yearly income\n\
+          \  MEANS income GREATER THAN 100\n"
+        lone ws `shouldBe` [("income", "the")]
+        sentenceOf ws `shouldBe` [Nothing]
+
       it "per name: an input's lone wording draws one even when the rule has others" $ do
         ws <- warningsOf
           "GIVEN amount IS A NUMBER @nlg:the amount\n\
@@ -167,7 +226,7 @@ spec = describe "an annotation read differently from how it was written" $ do
         ws <- warningsOf ("@lang fr\n" <> withHerald "@nlg:fr la demande dépasse la limite")
         lone ws `shouldBe` []
 
-      it "when another rule carries the same tag" $ do
+      it "when another rule carries the tag beside a wording in another language" $ do
         ws <- warningsOf
           "GIVEN amount IS A NUMBER\n\
           \GIVETH A BOOLEAN\n\
@@ -176,8 +235,13 @@ spec = describe "an annotation read differently from how it was written" $ do
           \\n\
           \GIVEN amount IS A NUMBER\n\
           \GIVETH A BOOLEAN\n\
-          \DECIDE `under limit` @nlg:fr la demande reste sous la limite\n\
+          \DECIDE `under limit` @nlg the claim is under the limit\n\
+          \                     @nlg:fr la demande reste sous la limite\n\
           \  IF amount LESS THAN 100\n"
+        lone ws `shouldBe` []
+
+      it "for the module's language with a region or script" $ do
+        ws <- warningsOf ("@lang pt\n" <> withHerald "@nlg:pt-BR o valor é alto")
         lone ws `shouldBe` []
 
       it "for Hebrew, which L4 gives meaning to" $ do

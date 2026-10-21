@@ -60,6 +60,7 @@ import L4.Annotation (emptyAnno)
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
+import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (doCheckProgramWithDependencies, initialCheckState, initialCheckEnv, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext, Substitution, Environment, EntityInfo, MixfixRegistry, InfoMap, ScopeMap, NlgMap, DescMap)
 import qualified L4.TypeCheck as TypeCheck
@@ -276,6 +277,9 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdSuccess :: Bool
   , tcdResolvedImports :: [ResolvedImport]
   , tcdUri :: NormalizedUri  -- ^ URI of the main module
+  , tcdAnnotationWarnings :: [Resolve.Warning]
+    -- ^ The main module's annotation warnings, from the parser: an @\@nlg@
+    -- that attaches to nothing, a lone language tag, a slot with spaces in it.
   }
   deriving stock (Generic)
 
@@ -294,7 +298,7 @@ typecheckWithDependencies lookupModule uri source = do
     Left parseErrors ->
       pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
     
-    Right (parsed, _hints, _warnings) -> do
+    Right (parsed, _hints, annotationWarnings) -> do
       -- Extract and resolve imports
       let importNames = extractImportNames parsed
       
@@ -337,6 +341,7 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdSuccess = not (any ((== TypeCheck.SError) . TypeCheck.severity) result.errors)
             , tcdResolvedImports = resolvedImports
             , tcdUri = uri
+            , tcdAnnotationWarnings = annotationWarnings
             }
 
 -- ----------------------------------------------------------------------------

@@ -1,0 +1,21 @@
+
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: nlg_lone_tag_head.l4
+  Hidden: no
+  Range: 11:18-11:47
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    `@nlg:en-route` tags the wording on `is late` as language `en-route`, but it is `is late`'s only wording, and nothing else in the module makes `en-route` a language: no `@lang en-route` line declares it, and nothing has a wording in it beside one in another language.
+    A tag tells apart wordings of one rule in different languages. If `en-route` is the first word of the sentence, write `@nlg en-route …` with no colon. If the wording is in `en-route`, add `@lang en-route`, or give `is late` a wording in another language too.
+
+File: nlg_lone_tag_head.l4
+  Hidden: no
+  Range: 16:21-16:70
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    `@nlg:the` tags the sentence of `is taxable`, written after its input `income`, as language `the`, but it is `is taxable`'s only wording, and nothing else in the module makes `the` a language: no `@lang the` line declares it, and nothing has a wording in it beside one in another language.
+    A tag tells apart wordings of one rule in different languages. If `the` is the first word of the sentence, write `@nlg the …` with no colon. If the wording is in `the`, add `@lang the`, or give `is taxable` a wording in another language too.

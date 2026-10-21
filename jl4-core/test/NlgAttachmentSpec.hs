@@ -97,13 +97,12 @@ spec = describe "which node an @nlg attaches to" $ do
       \DECIDE `sorted` IS list\n"
     attachments m `shouldBe` [("list", "an already ordered list")]
 
-  -- The narrowing, and the reason for it. A RECORD FIELD may carry two
-  -- annotations on one line — one for the field, one for its type — and
-  -- `ok/nlg_declare1.l4` does exactly that on purpose. Letting the field's
-  -- name claim the whole line makes them collide, and multiplicity then
-  -- correctly refuses both, so the "repair" would delete working annotations.
-  -- Record fields therefore keep the old behaviour.
-  it "leaves a record field's two annotations attached separately" $ do
+  -- A RECORD FIELD's line is the field's, as an input's line is the input's:
+  -- a wording after the field's type describes the field, because nothing
+  -- reads one on a type reference. So two wordings in one language on the
+  -- line, one before the type and one after it, are two for the field: they
+  -- collide and say so, as they would on an input.
+  it "reads two wordings on a record field's line as two for the field, and says so" $ do
     (m, ws) <- parsed
       "DECLARE List [The List] OF a [Elements]\n\
       \  IS ONE OF\n\
@@ -115,10 +114,8 @@ spec = describe "which node an @nlg attaches to" $ do
                  , ("a", "Elements")
                  , ("Nil", "Empty Case")
                  , ("Cons", "Followed By")
-                 , ("head", "Get First Element")
-                 , ("a", "Start Element")
                  ]
-    [ () | Ambiguous{} <- ws ] `shouldBe` []
+    [ nameToText n | Ambiguous n _ _ <- ws ] `shouldBe` ["head"]
 
   -- An annotation with no prose is DROPPED, not attached. A rendering replaces
   -- the thing it annotates, so an empty one erases the name from the output.
@@ -153,26 +150,13 @@ spec = describe "which node an @nlg attaches to" $ do
       attachments m `shouldBe` [("full name", "the employee's full name")]
       [ () | EmptyNlg{} <- ws ] `shouldBe` []
 
-    it "still gives a field and its TYPE separate trailing glosses" $ do
-      -- `ok/nlg_declare1.l4`. This is why the field name claims two disjoint
-      -- regions rather than simply everything: before its type (its own
-      -- trailing gloss) and below its line. What falls between — trailing the
-      -- TYPE on the field's own line — stays with the type. Giving the name
-      -- the whole line instead makes these two collide and loses both.
+    it "gives a field the wording written after its type, as a GIVEN gives an input" $ do
       (m, ws) <- parsed
-        "DECLARE List [The List] OF a [Elements]\n\
-        \  IS ONE OF\n\
-        \    Nil [Empty Case]\n\
-        \    Cons [Followed By] HAS\n\
-        \      head [Get First Element] IS AN a [Start Element]\n"
-      attachments m
-        `shouldBe` [ ("List", "The List")
-                   , ("a", "Elements")
-                   , ("Nil", "Empty Case")
-                   , ("Cons", "Followed By")
-                   , ("head", "Get First Element")
-                   , ("a", "Start Element")
-                   ]
+        "DECLARE Employee\n\
+        \  HAS dob IS A DATE @nlg date of birth\n\
+        \      `start date` IS A DATE\n"
+      attachments m `shouldBe` [("dob", "date of birth")]
+      [ () | Ambiguous{} <- ws ] `shouldBe` []
       [ () | Ambiguous{} <- ws ] `shouldBe` []
 
     it "handles both shapes on adjacent fields without either stealing the other" $ do
@@ -403,10 +387,11 @@ spec = describe "which node an @nlg attaches to" $ do
         "DECLARE Shape IS ONE OF\n    Dot\n    Disc HAS\n        base IS A NUMBER\n        @nlg the base\n"
       attachments m `shouldBe` [("base", "the base")]
 
-    it "keeps a field's own trailing gloss and its type's separate" $ do
-      (m, _) <- parsed
-        "DECLARE Rec HAS\n    base [the base] IS A NUMBER @nlg the number\n"
-      attachments m `shouldBe` [("base", "the base"), ("NUMBER", "the number")]
+    it "gives the last field the wording written after its type" $ do
+      (m, ws) <- parsed
+        "DECLARE Rec HAS\n    base IS A NUMBER @nlg the base\n"
+      attachments m `shouldBe` [("base", "the base")]
+      [ () | NotAttached{} <- ws ] `shouldBe` []
 
   -- ASSUME is one declaration, so a herald at the margin under it is the NEXT
   -- declaration's and one indented past it is its own, the column test of the

@@ -18,7 +18,6 @@ module L4.Parser (
   declaredModuleLang,
   redundantLangEnRanges,
   overriddenLangWarnings,
-  loneLangTags,
   spacedSlotsIn,
   spacedSlotWarnings,
   MixfixHintRegistry,
@@ -47,7 +46,6 @@ import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
 import qualified Data.List.Extra as List
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -207,50 +205,6 @@ overriddenLangWarnings ts = case reverse decls of
       | t <- ts
       , Just tag <- [langTagOfToken (computedPayload t)]
       ]
-
--- | The language tags that nothing else in the module backs, each with the
--- module's language when that differs from it only in case.
---
--- A tag exists to tell renderings of one name apart, so a tag that no
--- @\@lang@ line declares and no second wording carries is the shape of a
--- sentence whose first word was joined to the colon: @\@nlg:the employee
--- pays@ takes @the@ for its tag, and the sentence reads @employee pays@.
--- The tags are compared exactly, as the pipeline compares them. @en@ and @he@
--- are never reported (@en@ is the default language and @he@ has a phrasebook,
--- 'phrasebookFor'), and the case of the tag does not matter to this check.
--- The part before the first hyphen decides, so @en-GB@ and @he-IL@ are not
--- reported either, because a tag that starts that way is taken to be a
--- language and not the first word of a sentence: a module in British English
--- that tags its one rule @en-GB@ is using the tag as intended. A hyphenated
--- English word such as @en-route@ is exempt too, which is the cost of deciding
--- by the first hyphen. This only silences a warning; which wording a @--lang@
--- selects is not affected.
---
--- This is the module-wide half of the test. The other half is that the name
--- the wording attaches to has no other wording, which only attachment knows;
--- 'Resolve.attachNlgsByLanguage' applies it.
---
--- The annotations are the ones already stamped with the module's language, so
--- an untagged wording in a module that declares @\@lang fr@ counts as a
--- wording in @fr@.
---
--- The declared tags are newest first, as in @pstate.langs@, so the head is
--- the module's language. A caller that passes them in source order gets the
--- wrong case twin and no error.
-loneLangTags :: [LangTag] -> [Nlg] -> Map.Map LangTag (Maybe LangTag)
-loneLangTags declared nlgs =
-  Map.fromList
-    [ (tag, caseTwin)
-    | [tag@(MkLangTag t)] <- List.group (List.sort (mapMaybe nlgLangTag nlgs))
-    , tag `notElem` declared
-    , not (hasMeaning tag)
-    -- Only the module's language, which is the head, is offered as the twin:
-    -- an earlier @\@lang@ line that the last one overrides is not the
-    -- language the author is writing in.
-    , let caseTwin = List.find (\ (MkLangTag d) -> Text.toLower d == Text.toLower t) (take 1 declared)
-    ]
-  where
-    hasMeaning (MkLangTag t) = Text.toLower (Text.takeWhile (/= '-') t) `elem` ["en", "he"]
 
 -- | The percent pairs in an annotation's text that have spaces inside them
 -- around one name, each as @(the pair as written, the name)@.
@@ -3122,7 +3076,7 @@ execParserForTokensWithHints hints p file input ts =
         -- `:he`" rather than a second mechanism with its own precedence — and
         -- makes it order-independent, since pstate is complete by now.
         localisedNlgs = fmap (withDefaultLang moduleLang) pstate.nlgs
-        (withNlg, nlgS) = Resolve.addNlgCommentsToAst moduleLang (loneLangTags pstate.langs localisedNlgs) localisedNlgs a
+        (withNlg, nlgS) = Resolve.addNlgCommentsToAst moduleLang pstate.langs localisedNlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
         (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withDesc
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings

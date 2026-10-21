@@ -14,9 +14,9 @@ import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
 import qualified L4.Lexer as Lexer
 import qualified L4.Parser as Parser
+import L4.Parser.AnnotationWarning (annotationWarningMessage, annotationWarningSpan)
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
-import qualified L4.Print as Print
 import L4.Syntax
 import L4.TypeCheck (CheckErrorWithContext (..), CheckResult (..), Substitution, applyFinalSubstitution, toResolved)
 import qualified L4.TypeCheck as TypeCheck
@@ -1137,81 +1137,10 @@ lspPositionToSrcPos :: LSP.Position -> SrcPos
 lspPositionToSrcPos (LSP.Position { _character = c, _line = l }) =
   MkSrcPos (fromIntegral $ l + 1) (fromIntegral $ c + 1)
 
+-- | The text of an annotation warning, shared with the web editor's check
+-- ('L4.API.l4Check').
 prettyNlgResolveWarning :: Resolve.Warning -> Text
-prettyNlgResolveWarning = \ case
-  Resolve.NotAttached _ ->
-    "Not attached to any valid syntax node."
-  Resolve.UnknownLocation nlg -> Text.unlines
-    [ "The following NLG Annotation has no source location. This might be an internal compiler error."
-    , "```"
-    , Print.prettyLayout nlg
-    , "```"
-    ]
-  Resolve.EmptyNlg name _ ->
-    "This @nlg annotation has no text, so it is ignored: "
-      <> Print.prettyLayout name
-      <> " would otherwise render as nothing at all, because an annotation replaces what it annotates."
-  Resolve.Ambiguous name mtag nlgs -> Text.unlines $
-    ( case mtag of
-        -- Every parsed annotation carries a language by the time it gets
-        -- here: an untagged one is stamped with the module's `@lang`, or with
-        -- `en`. So the hint has to cover BOTH shapes at once — it is wrong to
-        -- say "tag these" to someone who already tagged them `:he` twice, and
-        -- wrong to talk about `en` without saying where `en` came from.
-        Just (Lexer.MkLangTag tag) ->
-          [ "More than one NLG annotation in language `" <> tag <> "` attached to: "
-              <> Print.prettyLayout name
-          , "An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags."
-          ]
-        -- Only an annotation we could not parse reaches here without one.
-        Nothing ->
-          [ "More than one NLG annotation attached to: " <> Print.prettyLayout name ]
-    ) <>
-    [ "The following annotations would be attached:"
-    , ""
-    ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
-  Resolve.LangOverridden overriddenLine winningLine ->
-    let langOf (Lexer.MkLangTag tag) = tag
-    in Text.unlines
-      [ "This module declares two different languages with @lang: `" <> langOf overriddenLine.payload
-          <> "` here and `" <> langOf winningLine.payload
-          <> "` on line " <> Text.pack (show winningLine.range.start.line) <> "."
-      , "L4 uses the last @lang in the file, so the module's language is `" <> langOf winningLine.payload
-          <> "` and this line has no effect. Keep one @lang line."
-      ]
-  Resolve.LoneLangTag name nlg (Just (Lexer.MkLangTag declared)) ->
-    let tag = maybe "" (\ (Lexer.MkLangTag t) -> t) (nlgLangTag nlg.payload)
-        described = Print.prettyLayout name
-    in Text.unlines
-      [ "`@nlg:" <> tag <> "` tags the wording on " <> described <> " as language `" <> tag
-          <> "`, but " <> described <> " has no other wording and the module declares `@lang " <> declared
-          <> "`: `" <> tag <> "` and `" <> declared <> "` differ only in case."
-      , "Tags are compared exactly, so `" <> tag <> "` is not `" <> declared <> "`. Write `@nlg:" <> declared
-          <> "`, or leave the tag off, since a wording with no tag is already in `" <> declared <> "`."
-      ]
-  Resolve.LoneLangTag name nlg Nothing ->
-    let tag = maybe "" (\ (Lexer.MkLangTag t) -> t) (nlgLangTag nlg.payload)
-        described = Print.prettyLayout name
-    in Text.unlines
-      [ "`@nlg:" <> tag <> "` tags the wording on " <> described <> " as language `" <> tag
-          <> "`, but " <> described <> " has no other wording, no other wording in the module is in `"
-          <> tag <> "`, and no `@lang " <> tag <> "` line declares it."
-      , "A tag tells apart renderings of one rule in different languages. If `" <> tag
-          <> "` is the first word of the sentence, write `@nlg " <> tag
-          <> " …` with no colon. If the wording is in `" <> tag <> "`, add `@lang " <> tag
-          <> "`, or give the rule a wording in another language."
-      ]
-  Resolve.SpacedSlot written name ->
-    Text.unlines
-      [ "This wording has `" <> written.payload <> "`, with spaces inside the percent signs, so it prints as plain text."
-      , "A slot is written `%" <> name <> "%`, with no spaces. For a percent sign meant literally, write `\\%`."
-      ]
-  Resolve.RefUnattached r ->
-    Resolve.refUnattachedMessage r.payload
-  Resolve.RefTrailing r code ->
-    Resolve.refTrailingMessage r.payload code
-  Resolve.RefNoLocation ref ->
-    Resolve.refNoLocationMessage ref
+prettyNlgResolveWarning = annotationWarningMessage
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1220,27 +1149,7 @@ listL4Files dir = do
 
 
 rangeOfResolveWarning :: Resolve.Warning -> LSP.Range
-rangeOfResolveWarning = \ case
-  Resolve.NotAttached nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.UnknownLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.EmptyNlg _ nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.Ambiguous name _ _ ->
-    srcRangeToLspRange $ rangeOf name
-  Resolve.LangOverridden overriddenLine _ ->
-    srcSpanToLspRange $ Just overriddenLine.range
-  Resolve.LoneLangTag _ nlg _ ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.SpacedSlot written _ ->
-    srcSpanToLspRange $ Just written.range
-  Resolve.RefUnattached r ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefTrailing r _ ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefNoLocation _ ->
-    srcSpanToLspRange Nothing
+rangeOfResolveWarning = srcSpanToLspRange . annotationWarningSpan
 
 -- ----------------------------------------------------------------------------
 -- Helpers for implementing syntax highlighting
