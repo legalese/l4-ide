@@ -176,6 +176,9 @@ export interface RenderPreviewParams {
   toc: boolean
   /** Module URIs the user deselected in the imports checklist. */
   excludeModules?: string[]
+  /** The language the user picked in the language menu, as one of
+   *  {@link RenderInlineResponse.languages}. Omitted: the module's own. */
+  lang?: string
   /** Whether to surface the rendered document in an editor/browser
    *  tab. Defaults to true. The Render tab sets this to false when it
    *  is about to hand the render off to Legalese AI for refinement —
@@ -232,6 +235,9 @@ export interface RenderInlineParams {
   includeUnused: boolean
   /** Module URIs the user deselected in the imports tray. */
   excludeModules?: string[]
+  /** The language the user picked in the language menu, as one of
+   *  {@link RenderInlineResponse.languages}. Omitted: the module's own. */
+  lang?: string
 }
 
 export interface RenderInlineResponse {
@@ -240,6 +246,12 @@ export interface RenderInlineResponse {
   html?: string
   /** The document title, echoed for the sidebar. */
   title?: string
+  /** The languages the active file's wordings are in, the module's own
+   *  first — what the language menu offers. Empty when the file has no
+   *  wordings; absent when the language server predates it. */
+  languages?: string[]
+  /** The language the returned document is in. */
+  lang?: string
   error?: string
 }
 
@@ -262,6 +274,9 @@ export interface RenderSaveParams {
   toc: boolean
   includeUnused: boolean
   excludeModules?: string[]
+  /** The language the user picked in the language menu. Omitted: the
+   *  module's own. */
+  lang?: string
 }
 
 export interface RenderSaveResponse {
