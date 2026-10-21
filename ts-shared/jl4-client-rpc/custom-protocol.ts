@@ -271,6 +271,9 @@ export interface ExportDocumentParams {
   toc?: boolean
   /** Module URIs to exclude from the render (deselected imports). */
   excludeModules?: string[]
+  /** The language to render, spelled exactly as one of the result's
+   *  `languages` (e.g. "he", "he-IL"). Omitted: the module's own language. */
+  lang?: string
 }
 
 export interface ExportDocumentResult {
@@ -279,6 +282,13 @@ export interface ExportDocumentResult {
   content: string
   /** The structured document IR (always present). */
   ir: unknown
+  /** The distinct languages the main file's wordings are in: the module's
+   *  own language first, then the others. Empty when the file has no
+   *  wordings. Absent from servers that predate it. */
+  languages?: string[]
+  /** The language the returned document is in. Absent from servers that
+   *  predate it. */
+  lang?: string
 }
 
 export const ExportDocumentRequestType = makeL4RpcRequestType<

@@ -23,11 +23,7 @@ File: computed-fields-self-cycle.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
-
-      `__PLUS__` (predefined)
-
-    is expected to be of type
+    The first argument of '+' is expected to be of type
 
       NUMBER
 

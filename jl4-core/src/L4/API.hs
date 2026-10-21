@@ -38,7 +38,9 @@ import qualified Data.Vector as Vector
 import L4.Lexer (execLexer, PosToken(..), TokenType(..), TLiterals(..), TSpaces(..), TIdentifiers(..))
 
 import L4.Annotation (HasSrcRange(..), rangeOfNode)
-import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
+import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..), SrcSpan(..))
+import L4.Parser.AnnotationWarning (annotationWarningMessage, annotationWarningSpan)
+import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (severity, prettyCheckErrorWithContext, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext(..), Severity(..), Substitution)
 import L4.Print (prettyLayout, prettyLayoutNF, ConstructorFieldNames, extractConstructorFieldNames)
@@ -95,8 +97,12 @@ l4Check source =
       -- Import/parse errors
       encodeJson $ Vector.fromList $ map importErrorToDiagnostic errors
     Right result ->
-      -- Type check errors (if any)
-      let diagnostics = map checkErrorToDiagnostic result.tcdErrors
+      -- Type check errors (if any), and the parser's annotation warnings, which
+      -- the language server reports too: without them a wording that L4 reads
+      -- differently from how it was written changes with no message here.
+      let diagnostics =
+            map checkErrorToDiagnostic result.tcdErrors
+              <> map annotationWarningToDiagnostic result.tcdAnnotationWarnings
       in encodeJson $ Vector.fromList diagnostics
 
 -- | Get hover information at a position.
@@ -462,6 +468,21 @@ checkErrorToDiagnostic err =
     , "source" .= ("l4" :: Text)
     ]
 
+-- | Convert a parser annotation warning to an LSP diagnostic, in the words
+-- the language server uses ('annotationWarningMessage').
+annotationWarningToDiagnostic :: Resolve.Warning -> Aeson.Value
+annotationWarningToDiagnostic warn =
+  Aeson.object
+    [ "range" .= spanToJson (annotationWarningSpan warn)
+    , "severity" .= (2 :: Int)  -- Warning
+    , "message" .= annotationWarningMessage warn
+    , "source" .= ("parser" :: Text)
+    ]
+  where
+    spanToJson = \ case
+      Just sp -> Aeson.object [ "start" .= posToJson sp.start, "end" .= posToJson sp.end ]
+      Nothing -> Aeson.object [ "start" .= posToJson (MkSrcPos 1 1), "end" .= posToJson (MkSrcPos 1 1) ]
+
 -- | Get the source range for an error, with a default fallback.
 errorRange :: CheckErrorWithContext -> SrcRange
 errorRange err = fromMaybe defaultRange (rangeOf err)
@@ -823,7 +844,7 @@ tokenToSemanticType tok = case tok.payload of
   -- Literals
   TLiterals (TIntLit _ _) -> Just 4      -- Numbers (type index 4)
   TLiterals (TRationalLit _ _) -> Just 4 -- Numbers (type index 4)
-  TLiterals (TStringLit _) -> Just 5     -- Strings (type index 5)
+  TLiterals (TStringLit _ _) -> Just 5   -- Strings (type index 5)
   
   -- Operators (type index 6)
   TOperators _ -> Just 6

@@ -29,10 +29,11 @@ import Types
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch)
+import Control.Exception (catch, evaluate)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
@@ -349,6 +350,11 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
         batchArgs.outcomes
 
 -- | POST /deployments/{id}/functions/{fn}/query-plan
+--
+-- The plan is computed here, under --eval-timeout. Returned unevaluated, it
+-- would be computed while Warp sends the response, and by then Warp's own
+-- connection timeout (30 s) is running again: a plan that took longer was cut
+-- off at 30 to 60 s, the connection closed with no status and no error.
 queryPlanHandler' :: DeploymentId -> Text -> FnArguments -> AppM QueryPlanResponse
 queryPlanHandler' deployId fnName fnArgs = do
   logger <- asks (.logger)
@@ -366,10 +372,16 @@ queryPlanHandler' deployId fnName fnArgs = do
         Nothing -> throwError err500 { errBody = jsonError "No compiled module available for query-plan" }
         Just c -> pure c
       c <- buildDecisionQueryCacheFromCompiled fnName compiled vf.fnSourceText
+      -- Stored before it is computed: what a timed-out request got through
+      -- is kept for the next one.
       storeDecisionQueryCache deployId fnName c
       pure c
 
-  pure $ queryPlan fnName cached fnArgs
+  withinEvalTimeout $ do
+    let plan = queryPlan fnName cached fnArgs
+    -- Encoding computes all of the plan that is sent.
+    _ <- evaluate (LBS.length (Aeson.encode plan))
+    pure plan
 
 -- | Persist a freshly-built decision query cache back into the deployment registry
 -- so subsequent requests can reuse it without rebuilding.
@@ -576,6 +588,17 @@ timeoutAction act = do
       pure Nothing
   case result of
     Nothing -> throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
+    Just x -> pure x
+
+-- | Run an action under --eval-timeout only. Unlike 'timeoutAction' it sets no
+-- allocation limit: that limit counts every byte allocated, not memory held,
+-- and query plans have never been held to it.
+withinEvalTimeout :: IO a -> AppM a
+withinEvalTimeout act = do
+  cfg <- asks (.options)
+  result <- liftIO $ timeout (cfg.evalTimeout * 1_000_000) act
+  case result of
+    Nothing -> throwError err500 { errBody = jsonError "Query plan timed out" }
     Just x -> pure x
 
 -- ----------------------------------------------------------------------------

@@ -10,9 +10,6 @@ module L4.EvaluateLazy
 , AssertionOutcome(..)
 , ReductionOutcome(..)
 , EntityInfo
-, getTemporalContext
-, setTemporalContext
-, withEvalClauses
 , execEvalModuleWithEnv
 , execEvalModuleWithJSON
 , execEvalExprInContextOfModule
@@ -37,10 +34,10 @@ import L4.Annotation
 import L4.Print
 import L4.Syntax
 import L4.TypeCheck.Types (EntityInfo)
-import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext)
+import L4.TemporalContext (initialTemporalContext)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Exception (throwIO, try)
+import Control.Exception (try)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
@@ -81,20 +78,6 @@ readFixedNowEnv :: IO (Maybe UTCTime)
 readFixedNowEnv = do
   menv <- lookupEnv "JL4_FIXED_NOW"
   pure $ menv >>= parseFixedNow . Text.pack
-
--- | The previous temporal context is restored afterwards.
-setTemporalContext :: TemporalContext -> Eval ()
-setTemporalContext = putTemporalContext
-
--- | Apply runtime EVAL clauses for the duration of an action,
--- restoring the previous temporal context afterwards.
-withEvalClauses :: [EvalClause] -> Eval a -> Eval a
-withEvalClauses clauses action = do
-  original <- getTemporalContext
-  setTemporalContext (applyEvalClauses clauses original)
-  result <- tryEval action
-  setTemporalContext original
-  either (liftIO . throwIO) pure result
 
 -- | For the given eval action, enable tracing and accumulate a trace.
 --

@@ -612,6 +612,79 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
     ratio `shouldBe` Nothing
     (t1 - t0) `shouldSatisfy` (< 30)
 
+  -- The inline `<<…>>` form shares its lexer with `@nlg`'s `[…]` form only in
+  -- the sense that both are "an annotation between heralds". They must NOT
+  -- share an escape: `L4.Nlg.unescapeNlgText` runs on the NLG linearizer's path
+  -- alone, so a backslash consumed on the ref path would be kept for ever and
+  -- the pre-escape text would stop being writable.
+  --
+  -- Both cases below were broken, briefly, by a first cut of the `\%`/`\]`
+  -- escape that let `refAnnotation` share the escaping body. Neither had a
+  -- witness anywhere in the corpus or the specs, which is why they are here.
+  -- An inline @ref attaches to the node that FOLLOWS it, so these put the
+  -- annotation above the body rather than after it; trailing it would leave it
+  -- unattached and the assertion would be about nothing.
+  --
+  -- `\>` escapes a right angle bracket (ruled 2026-09-17). Before that a
+  -- literal `>>` inside a citation was unrepresentable, because the annotation
+  -- terminated at the first one. The decode happens where the parser builds the
+  -- 'Ref' node, NOT in the lexer: the token stays verbatim so exactprint
+  -- re-emits the citation byte for byte.
+  -- The expected values keep their `<<`/`>>`: 'getRef' hands back the
+  -- annotation as the lexer captured it, delimiters and all, and every reader
+  -- strips them itself ('L4.Docassemble.Lower.citationText' does, with
+  -- stripPrefix/stripSuffix — checked, because a reader that split on the FIRST
+  -- `>>` would mis-strip a citation that now legitimately contains one; none
+  -- does).
+  describe "the inline @ref form escapes its closing herald" $ do
+    it "keeps a lone > as ordinary text rather than ending the annotation" $ do
+      -- Unchanged by the escape, and it must stay that way: a `>` that does not
+      -- complete the herald is ordinary text and always has been.
+      bodies <-
+        decideBodyRefs
+          "GIVEN x IS A BOOLEAN\nDECIDE p IF\n  <<s.5 > s.3>>\n  x\n"
+      case bodies of
+        [(_, Just t)] -> t `shouldBe` "<<s.5 > s.3>>"
+        _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
+    it "carries a literal >> through an escaped herald, decoded for the reader" $ do
+      bodies <-
+        decideBodyRefs
+          "GIVEN x IS A BOOLEAN\nDECIDE p IF\n  <<see s.5 \\>> onward>>\n  x\n"
+      case bodies of
+        [(_, Just t)] -> t `shouldBe` "<<see s.5 >> onward>>"
+        _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
+    it "leaves a backslash that cannot begin an escape as ordinary text" $ do
+      -- `\q` is not an escape, so it stays two characters — the same rule the
+      -- NLG side follows, and the reason the lexer consumes exactly the set the
+      -- decoder honours.
+      bodies <-
+        decideBodyRefs
+          "GIVEN x IS A BOOLEAN\nDECIDE p IF\n  <<see s.5\\q here>>\n  x\n"
+      case bodies of
+        [(_, Just t)] -> t `shouldBe` "<<see s.5\\q here>>"
+        _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
+    it "decodes an escaped backslash" $ do
+      bodies <-
+        decideBodyRefs
+          "GIVEN x IS A BOOLEAN\nDECIDE p IF\n  <<see s.5 \\\\ here>>\n  x\n"
+      case bodies of
+        [(_, Just t)] -> t `shouldBe` "<<see s.5 \\ here>>"
+        _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
+    it "decodes in the LINE form too, where the herald is not special" $ do
+      -- Nothing needs escaping on a line annotation — it runs to end of line —
+      -- but the decode is applied at the Ref node, which both forms share, so
+      -- the two spellings cannot disagree about what `\>` means.
+      bodies <-
+        decideBodyRefs
+          "GIVEN x IS A BOOLEAN\nDECIDE p IF\n  @ref see s.5 \\> onward\n  x\n"
+      case bodies of
+        [(_, Just t)] -> t `shouldSatisfy` Text.isInfixOf "s.5 > onward"
+        _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
 -- | The message for a @\@ref@ with nothing after it. Quoted in
 -- @doc/reference/syntax/README.md@, which is the page to change with it.
 endOfFile :: Text -> Text

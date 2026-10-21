@@ -65,6 +65,7 @@ executable l4
     L4.Cli.Deploy
     L4.Cli.Format
     L4.Cli.Install
+    L4.Cli.Nlg
     L4.Cli.Render
     L4.Cli.Run
     L4.Cli.StateGraph

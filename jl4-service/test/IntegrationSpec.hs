@@ -25,7 +25,8 @@ import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
 import Control.Exception (bracket, try)
-import Data.Foldable (toList)
+import System.Timeout (timeout)
+import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
 import Data.Time.Clock.POSIX (getPOSIXTime)
@@ -50,10 +51,11 @@ import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileE
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
+import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -961,11 +963,250 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp2)
         lookupKey "determined" body `shouldBe` Just (Aeson.Bool True)
 
+    it "is held to --eval-timeout, and says so when it runs out" do
+      -- A timeout of zero is over before the plan is computed. A plan left to
+      -- be computed while the response was sent was under no limit of ours,
+      -- and one that took too long lost its connection without a reason.
+      withServicesRestartedOpts testOptions {evalTimeout = 0}
+        [("qp-timeout", [("qualifies.l4", qualifiesJL4)])] (const (pure ())) \_ baseUrl mgr -> do
+          status <- deploymentStatus baseUrl mgr "qp-timeout"
+          fmap (.dsStatus) status `shouldBe` Just "ready"
+          resp <- queryPlan' baseUrl mgr "qp-timeout" "compute_qualifies"
+            (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldBe` 500
+          lookupKey "error" (decodeObject (responseBody resp))
+            `shouldBe` Just (Aeson.String "Query plan timed out")
+
     it "returns 404 for unknown function" do
       withServiceFromSources "qp-404" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         resp <- queryPlan' baseUrl mgr "qp-404" "no_such_fn"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 404
+
+    -- A rule written as DECIDE clauses is the same rule as the CONSIDER it
+    -- stands for, so its plan, with the ladder the plan carries, must be the
+    -- same: the same inputs, the same questions, the same atoms. Compared
+    -- whole, modulo the numbering of nodes ('withoutNodeIds'), so that a clause
+    -- group drawn as one leaf that asks nothing (or one that names a generated
+    -- binding) fails. This ladder draws a CONSIDER as one box, whose atomId
+    -- hashes its printed text, so the hand-written forms below are written as
+    -- the CONSIDER the clauses read through to, nested where a table's rows are.
+    describe "a BOOLEAN rule written as DECIDE clauses" do
+      let noArguments = Aeson.object ["arguments" Aeson..= Aeson.object []]
+          sameAsHandWritten :: Text -> Text -> Text -> SpecWith ()
+          sameAsHandWritten name clauses hand =
+            it (Text.unpack ("has the plan and the ladder of its hand-written CONSIDER: " <> name)) do
+              withServiceFromSources ("cg-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hw-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  qpC <- queryPlan' baseUrl mgr ("cg-" <> name) "rule" noArguments
+                  qpH <- queryPlan' baseUrl' mgr' ("hw-" <> name) "rule" noArguments
+                  statusCode' qpC `shouldBe` 200
+                  statusCode' qpH `shouldBe` 200
+                  let planC = withoutNodeIds <$> (Aeson.decode (responseBody qpC) :: Maybe Aeson.Value)
+                      planH = withoutNodeIds <$> (Aeson.decode (responseBody qpH) :: Maybe Aeson.Value)
+                  planC `shouldBe` planH
+                  -- the plan asks something
+                  lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+                  -- and no name the desugarer made up reaches a label, an ask or an input
+                  let text = Text.pack (show (responseBody qpC))
+                  for_ ["the result of", "input 1", "__pm_", "LET"] \g ->
+                    (g, g `Text.isInfixOf` text) `shouldBe` (g, False)
+
+          -- The plans above are compared whole, atomIds included. This compares
+          -- the atomIds alone, so that a failure names them: the ladder's, and the
+          -- plan's. The two are not compared with each other: here the plan names
+          -- an atom's inputs by their labels and the ladder by their numbers, so
+          -- they differ for every rule with inputs, however it is written.
+          sameAtomIds :: Text -> Text -> Text -> SpecWith ()
+          sameAtomIds name clauses hand =
+            it (Text.unpack ("names every atom as its hand-written CONSIDER does: " <> name)) do
+              withServiceFromSources ("cga-" <> name) [("rule.l4", clauses)] \baseUrl mgr -> do
+                withServiceFromSources ("hwa-" <> name) [("rule.l4", hand)] \baseUrl' mgr' -> do
+                  qpC <- queryPlan' baseUrl mgr ("cga-" <> name) "rule" noArguments
+                  qpH <- queryPlan' baseUrl' mgr' ("hwa-" <> name) "rule" noArguments
+                  for_ [qpC, qpH] \r -> statusCode' r `shouldBe` 200
+                  let ladderIds r = case lookupKey "ladder" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object l) | Just (Aeson.Object fd) <- Aeson.KeyMap.lookup "funDecl" l ->
+                          List.sort (List.nub (ladderLeafField "atomId" fd))
+                        _ -> []
+                      planIds r = case lookupKey "impactByAtomId" (decodeObject (responseBody r)) of
+                        Just (Aeson.Object m) -> List.sort (map Aeson.Key.toText (Aeson.KeyMap.keys m))
+                        _ -> []
+                  -- both are non-empty, so the equalities below mean something
+                  ladderIds qpC `shouldSatisfy` (not . null)
+                  planIds qpC `shouldSatisfy` (not . null)
+                  ladderIds qpC `shouldBe` ladderIds qpH
+                  planIds qpC `shouldBe` planIds qpH
+
+      sameAsHandWritten "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAsHandWritten "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAsHandWritten "single" clauseGroupSingleJL4 handSingleJL4
+      -- The hand-written CONSIDER without a GIVETH is itself refused (its type is an
+      -- inference variable the service never resolves), so the group without one is
+      -- compared with the hand-written rule that has one.
+      sameAsHandWritten "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAsHandWritten "call" clauseGroupCallJL4 handCallJL4
+      -- Rows that share an earlier column: the desugarer tests it again in every
+      -- later clause, and the ladder reads each test with what the branches
+      -- around it already decided.
+      sameAsHandWritten "table" clauseTableJL4 handTableJL4
+      sameAsHandWritten "table2" clauseTable2JL4 handTable2JL4
+      -- A last clause whose pattern is a new name is the OTHERWISE.
+      sameAsHandWritten "newname" clauseNewNameJL4 handNewNameJL4
+
+      sameAtomIds "enum" clauseGroupEnumJL4 handEnumJL4
+      sameAtomIds "mixed" clauseGroupMixedJL4 handMixedJL4
+      sameAtomIds "single" clauseGroupSingleJL4 handSingleJL4
+      sameAtomIds "nogiveth" clauseGroupNoGivethJL4 handEnumJL4
+      sameAtomIds "call" clauseGroupCallJL4 handCallJL4
+      sameAtomIds "table" clauseTableJL4 handTableJL4
+      sameAtomIds "table2" clauseTable2JL4 handTable2JL4
+      sameAtomIds "newname" clauseNewNameJL4 handNewNameJL4
+
+      -- A restart compiles the stored sources again, as a deploy does (#666), so
+      -- a clause group is planned after one as it was when deployed. Before #666
+      -- a restart read a cache that kept no type for the generated nodes, and
+      -- /query-plan answered 400 for every boolean rule, written as clauses or by
+      -- hand. The fresh side must answer 200 with a body, so that two empty
+      -- answers cannot pass for equal.
+      for_ [ ("enum", clauseGroupEnumJL4), ("mixed", clauseGroupMixedJL4), ("single", clauseGroupSingleJL4)
+           , ("nogiveth", clauseGroupNoGivethJL4), ("call", clauseGroupCallJL4), ("table", clauseTableJL4)
+           , ("table2", clauseTable2JL4), ("newname", clauseNewNameJL4) ] \(name, src) ->
+        it ("restarted: is planned as it was before the restart: " <> name) do
+          let probe baseUrl mgr deployId =
+                answerOf baseUrl deployId <$> queryPlan' baseUrl mgr deployId "rule" noArguments
+          (fresh, restarted) <- beforeAndAfterRestart ("cg-restart-" <> Text.pack name) [("rule.l4", src)] probe
+          fst fresh `shouldBe` 200
+          snd fresh `shouldSatisfy` Maybe.isJust
+          restarted `shouldBe` fresh
+
+      -- A clause whose result is a LET the drafter wrote: the group around it is
+      -- read through, and the LET inside the clause stays as written.
+      it "answers a clause group whose clause result is a LET" do
+        withServiceFromSources "cg-let-result" [("rule.l4", clauseGroupLetResultJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "cg-let-result" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+          -- the colour is asked: the group's CONSIDER is read through
+          lookupArrayLength "inputs" (decodeObject (responseBody resp)) `shouldSatisfy` maybe False (> 0)
+
+      -- Only the LETs the desugarer generated are read through. A LET the
+      -- drafter wrote stays as written, so a chain of LETs that each use the one
+      -- before twice (which doubles for each LET when written out) is the one
+      -- atom it always was, however long.
+      it "answers a LET the drafter wrote as written" do
+        withServiceFromSources "let-enum" [("rule.l4", letEnumJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "let-enum" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "LET"
+      for_ [3 :: Int, 7] \n ->
+        it ("answers a chain of " <> show n <> " doubling LETs fast, as written") do
+          withServiceFromSources "chain" [("rule.l4", letChainJL4 n)] \baseUrl mgr -> do
+            resp <- queryPlan' baseUrl mgr "chain" "rule" noArguments
+            statusCode' resp `shouldBe` 200
+            LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "LET"
+
+      -- Clauses whose CONSIDER, written out, would be more than 20,000 parts are
+      -- not read through, and not drawn as the generated LETs either (one leaf
+      -- that asks nothing): the answer says why.
+      it "refuses clauses that come to more than 20000 parts, naming why" do
+        withServiceFromSources "long-rows" [("rule.l4", longClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-rows" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
+      it "says long clauses that return a number are not boolean, not that they are too long" do
+        withServiceFromSources "long-num" [("rule.l4", longNumberClausesJL4 60 200)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "long-num" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "returns a boolean"
+
+      -- A group whose first clause names each of its inputs as the GIVEN does has
+      -- nothing to read through: the clauses after it are never reached, and its
+      -- body is that clause's result, as a rule written without clauses has it.
+      -- `main` plans such a rule however long or large its result, and so does the
+      -- service. The service simplifies the ladder, and a disjunction of
+      -- conjunctions rewritten into conjunctive normal form grows past 300 boxes
+      -- at six pairs of inputs (449 boxes).
+      it "catch-all: answers a group whose first clause names each input as the GIVEN does, simplified to 193 boxes" do
+        withServiceFromSources "dnf-5" [("rule.l4", dnfClauseJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "dnf-5" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "catch-all: answers such a group whose simplified ladder is 449 boxes, as it answers the rule written without clauses" do
+        withServiceFromSources "dnf-6" [("rule.l4", dnfClauseJL4 6)] \baseUrl mgr -> do
+          withServiceFromSources "hand-dnf-6" [("rule.l4", handDnfJL4 6)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "dnf-6" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-dnf-6" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldBe` planOf qpH
+            lookupArrayLength "inputs" (decodeObject (responseBody qpC)) `shouldSatisfy` maybe False (> 0)
+      it "catch-all: answers such a group whose result is more than 20000 parts long, as it answers the rule written without clauses" do
+        withServiceFromSources "catchall-huge" [("rule.l4", catchAllHugeJL4)] \baseUrl mgr -> do
+          withServiceFromSources "hand-catchall-huge" [("rule.l4", handCatchAllHugeJL4)] \baseUrl' mgr' -> do
+            qpC <- queryPlan' baseUrl mgr "catchall-huge" "rule" noArguments
+            qpH <- queryPlan' baseUrl' mgr' "hand-catchall-huge" "rule" noArguments
+            statusCode' qpC `shouldBe` 200
+            statusCode' qpH `shouldBe` 200
+            let planOf r = withoutNodeIds <$> (Aeson.decode (responseBody r) :: Maybe Aeson.Value)
+            planOf qpC `shouldSatisfy` Maybe.isJust
+            planOf qpC `shouldBe` planOf qpH
+
+      -- A first clause that matches every input through a NEW name is not that: it
+      -- is a test the desugarer generates, with the clauses after it as the other
+      -- answer, so the group is read through and limited like any other. `main`
+      -- answers such a group with 400 "Can only visualize, as a ladder diagram, a
+      -- DECIDE that returns a boolean" (it cannot plan a clause group at all), so
+      -- these say what this branch answers; they pass with and without the guard
+      -- that exempts the own-name first clause.
+      it "new name: refuses a group whose first clause gives an input a new name when its simplified ladder is more than 300 boxes" do
+        withServiceFromSources "newname-dnf-6" [("rule.l4", newNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 300 boxes"
+      -- `(EXACTLY n)` for the input's own name is not exempt either: only the bare
+      -- name and `_` are, so the desugarer tests it and the group is read through.
+      -- Six pairs of it are planned; a first clause of 22,000 parts is refused. (I
+      -- infer it reads through to one CONSIDER, which is one box, so that the
+      -- 300-box limit is not reached; that is not drawn.)
+      it "EXACTLY its own name: plans a group of six pairs, which reads through to one CONSIDER" do
+        withServiceFromSources "exactly-dnf-6" [("rule.l4", exactlyNameDnfJL4 6)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-dnf-6" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "EXACTLY its own name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "exactly-huge" [("rule.l4", exactlyHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "exactly-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      -- A table of optional inputs taken apart with `JUST`, with new names for the
+      -- others, was refused only after a minute (24 clauses): see the same-named
+      -- block in ClauseGroupLadderSpec. The wait is far above what it takes now
+      -- (about a second) and far below the minute.
+      it "new names: refuses a table of 24 clauses of optional inputs taken apart with JUST within seconds" do
+        withServiceFromSources "maybe-new-24" [("rule.l4", maybeTableJL4 False 24)] \baseUrl mgr -> do
+          answer <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-24" "rule" noArguments)
+          case answer of
+            Nothing -> expectationFailure "no answer within 8 seconds"
+            Just resp -> do
+              statusCode' resp `shouldBe` 400
+              LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+      it "new names: still plans the same table at 8 clauses, as it plans it with the GIVEN's names" do
+        withServiceFromSources "maybe-new-8" [("rule.l4", maybeTableJL4 False 8)] \baseUrl mgr -> do
+          withServiceFromSources "maybe-own-8" [("rule.l4", maybeTableJL4 True 8)] \baseUrl' mgr' -> do
+            qpN <- timeout 8_000_000 (queryPlan' baseUrl mgr "maybe-new-8" "rule" noArguments)
+            qpO <- timeout 8_000_000 (queryPlan' baseUrl' mgr' "maybe-own-8" "rule" noArguments)
+            fmap statusCode' qpN `shouldBe` Just 200
+            fmap statusCode' qpO `shouldBe` Just 200
+      it "new name: answers such a group when its simplified ladder is less than 300 boxes" do
+        withServiceFromSources "newname-dnf-5" [("rule.l4", newNameDnfJL4 5)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-dnf-5" "rule" noArguments
+          statusCode' resp `shouldBe` 200
+      it "new name: refuses such a group whose result is more than 20000 parts long" do
+        withServiceFromSources "newname-huge" [("rule.l4", newNameHugeJL4)] \baseUrl mgr -> do
+          resp <- queryPlan' baseUrl mgr "newname-huge" "rule" noArguments
+          statusCode' resp `shouldBe` 400
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "too long to draw"
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "more than 20000 parts"
 
   -- A deployment outlives the process that compiled it. On restart the service
   -- compiles the stored sources again, as a deploy does. Everything below asks
@@ -1699,6 +1940,137 @@ spec = describe "integration" do
                 reqList `shouldSatisfy` maybe False (elem "events")
               _ -> expectationFailure "Missing required array in parameters"
           _ -> expectationFailure "Missing parameters in response"
+
+  -- One party and one action were spelled two ways in the same answer. A
+  -- BREACH's `eventParty` and `eventAction` are a constructor's name, plain,
+  -- but an OBLIGATION's `party` and `action`, and a BREACH's `obligationAction`,
+  -- were L4 source, so a name with a space in it came back in backticks. A
+  -- client asking "is the party who acted the party who was obliged?" by
+  -- comparing the two strings got a false no. The README's rule for an enum
+  -- answer is the plain name, and a party or an action NAME is an enum answer.
+  describe "deontic answers spell a party and an action one way" do
+    let seller = "the seller" :: Text
+        buyer = "the buyer" :: Text
+        delivery = "deliver the goods" :: Text
+        payment = "pay the invoice" :: Text
+        sale events = Aeson.object
+          [ "arguments" Aeson..= Aeson.object []
+          , "startTime" Aeson..= (0 :: Int)
+          , "events" Aeson..= (events :: [Aeson.Value])
+          ]
+        event who what time = Aeson.object
+          ["party" Aeson..= (who :: Text), "action" Aeson..= (what :: Text), "at" Aeson..= (time :: Int)]
+        stringAt key fields = case lookup key fields of
+          Just (FnLitString t) -> Just t
+          _ -> Nothing
+        -- the party and the action an OBLIGATION names
+        obligationNames fields = (stringAt "party" fields, stringAt "action" fields)
+
+    it "names the obliged party and its action without backticks, before any event" do
+      withServiceFromSources "deontic-names-init" [("contract.l4", deonticExportJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-init" "the sale contract" (sale [])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just seller, Just delivery)
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    it "names the obliged party and its action without backticks, after an event" do
+      withServiceFromSources "deontic-names-resid" [("contract.l4", deonticExportJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-resid" "the sale contract"
+          (sale [event seller delivery 5])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just buyer, Just payment)
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    it "spells the party and the action of a BREACH the same in every field" do
+      withServiceFromSources "deontic-names-breach" [("contract.l4", deonticDeadlineJL4)] \baseUrl mgr -> do
+        -- the seller delivers at 20, after its deadline of 14
+        resp <- evalFunction baseUrl mgr "deontic-names-breach" "the sale contract"
+          (sale [event seller delivery 20])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("BREACH", FnObject fields)]) -> do
+              -- the event that revealed the miss
+              stringAt "eventParty" fields `shouldBe` Just seller
+              stringAt "eventAction" fields `shouldBe` Just delivery
+              -- the obligation that was missed
+              stringAt "obligationAction" fields `shouldBe` Just delivery
+            other -> expectationFailure ("Expected BREACH, got: " <> show other)
+
+    -- the client's question, asked across two answers
+    it "lets a client compare the party who acted with the party who was obliged" do
+      withServiceFromSources "deontic-names-compare" [("contract.l4", deonticDeadlineJL4)] \baseUrl mgr -> do
+        punctual <- evalFunction baseUrl mgr "deontic-names-compare" "the sale contract" (sale [])
+        tardy <- evalFunction baseUrl mgr "deontic-names-compare" "the sale contract"
+          (sale [event seller delivery 20])
+        assertSuccess punctual \b -> assertSuccess tardy \l ->
+          case (Map.lookup "value" b.fnResult, Map.lookup "value" l.fnResult) of
+            (Just (FnObject [("OBLIGATION", FnObject obl)]), Just (FnObject [("BREACH", FnObject br)])) -> do
+              stringAt "eventParty" br `shouldBe` stringAt "party" obl
+              stringAt "eventAction" br `shouldBe` stringAt "action" obl
+            other -> expectationFailure ("Expected an OBLIGATION and a BREACH, got: " <> show other)
+
+    -- the operands of a ROR or a RAND are OBLIGATIONs of their own
+    it "names the party and the action of each operand of a ROR and of a RAND" do
+      withServiceFromSources "deontic-names-rops" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        let operands tag fn = do
+              resp <- evalFunction baseUrl mgr "deontic-names-rops" fn (sale [])
+              assertSuccess resp \r ->
+                case Map.lookup "value" r.fnResult of
+                  Just (FnObject [(t, FnArray [FnObject [("OBLIGATION", FnObject first)], FnObject [("OBLIGATION", FnObject second)]])])
+                    | t == tag -> do
+                        obligationNames first `shouldBe` (Just seller, Just delivery)
+                        obligationNames second `shouldBe` (Just buyer, Just payment)
+                  other -> expectationFailure ("Expected two OBLIGATIONs under " <> show tag <> ", got: " <> show other)
+        operands "OR" "the alternative"
+        operands "AND" "the conjunction"
+
+    -- an action the rule does not declare is a binder, and a space in it changes nothing
+    it "names an action that is a binder without backticks" do
+      withServiceFromSources "deontic-names-binder" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        initial <- evalFunction baseUrl mgr "deontic-names-binder" "the binder" (sale [])
+        late <- evalFunction baseUrl mgr "deontic-names-binder" "the binder"
+          (sale [event seller "inspect the goods" 50])
+        assertSuccess initial \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just seller, Just "some act")
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+        assertSuccess late \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("BREACH", FnObject fields)]) -> do
+              stringAt "obligationAction" fields `shouldBe` Just "some act"
+            other -> expectationFailure ("Expected BREACH, got: " <> show other)
+
+    -- a party read from a GIVEN: the answer is the input's name, not the party
+    -- it was given, until an event has been compared with it
+    it "names a party that is a GIVEN input by its name, without backticks" do
+      withServiceFromSources "deontic-names-given" [("contract.l4", deonticShapesJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-given" "the given party"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object ["the payer" Aeson..= seller]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) ->
+              obligationNames fields `shouldBe` (Just "the payer", Just delivery)
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    -- an action that carries a value is not a name: it is rule source
+    it "keeps an action that carries a value as rule source" do
+      withServiceFromSources "deontic-names-value" [("contract.l4", deonticValueActionJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-names-value" "the contract" (sale [])
+        assertSuccess resp \r ->
+          case Map.lookup "value" r.fnResult of
+            Just (FnObject [("OBLIGATION", FnObject fields)]) -> do
+              stringAt "party" fields `shouldBe` Just "Alice"
+              stringAt "action" fields `shouldBe` Just "say \"pay now\""
+            other -> expectationFailure ("Expected OBLIGATION, got: " <> show other)
 
   describe "deontic evaluation with record-typed parties" do
     it "evaluates to FULFILLED when record-typed party wears seatbelt then drives" do
@@ -3091,3 +3463,32 @@ testOptions = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   }
+
+-- | A JSON answer without the numbers the visualizer gave its nodes: the
+-- @id@ and @unique@ fields, the per-node @impact@ table keyed by them, and the
+-- document version. What is left is the shape of the answer and its atom ids.
+withoutNodeIds :: Aeson.Value -> Aeson.Value
+withoutNodeIds = \case
+  Aeson.Object o ->
+    Aeson.Object (Aeson.KeyMap.map withoutNodeIds
+      (Aeson.KeyMap.filterWithKey (\k _ -> k `notElem` ["id", "unique", "impact", "verDocId"]) o))
+  Aeson.Array xs -> Aeson.Array (fmap withoutNodeIds xs)
+  v -> v
+
+-- | A field of every node of a ladder's body: the text if it is a string, or
+-- the @label@ if it is a name.
+ladderLeafField :: Text -> Aeson.Object -> [Text]
+ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
+ where
+  go :: Aeson.Value -> [Text]
+  go (Aeson.Object o) =
+    let here = case Aeson.KeyMap.lookup (Aeson.Key.fromText field) o of
+          Just (Aeson.String t) -> [t]
+          Just (Aeson.Object nm) -> case Aeson.KeyMap.lookup "label" nm of
+            Just (Aeson.String t) -> [t]
+            _ -> []
+          _ -> []
+        kids = concatMap go (Aeson.KeyMap.elems o)
+     in here <> kids
+  go (Aeson.Array xs) = concatMap go (toList xs)
+  go _ = []

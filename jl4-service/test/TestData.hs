@@ -16,6 +16,9 @@ module TestData (
   inputThenInputJL4,
   saleContractJL4,
   deonticExportJL4,
+  deonticDeadlineJL4,
+  deonticShapesJL4,
+  deonticValueActionJL4,
   deonticRecordPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
@@ -27,6 +30,35 @@ module TestData (
   declineLabelsJL4,
   twoDatesJL4,
   lineBreakJL4,
+  clauseGroupEnumJL4,
+  handEnumJL4,
+  letEnumJL4,
+  clauseGroupMixedJL4,
+  handMixedJL4,
+  clauseGroupSingleJL4,
+  handSingleJL4,
+  clauseGroupCallJL4,
+  handCallJL4,
+  clauseTableJL4,
+  handTableJL4,
+  clauseTable2JL4,
+  handTable2JL4,
+  clauseNewNameJL4,
+  handNewNameJL4,
+  clauseGroupNoGivethJL4,
+  clauseGroupLetResultJL4,
+  letChainJL4,
+  longNumberClausesJL4,
+  longClausesJL4,
+  catchAllHugeJL4,
+  handCatchAllHugeJL4,
+  newNameHugeJL4,
+  newNameDnfJL4,
+  maybeTableJL4,
+  exactlyNameDnfJL4,
+  exactlyHugeJL4,
+  dnfClauseJL4,
+  handDnfJL4,
   jsonDecodePersonJL4,
   taxpayerJL4,
   implicitFlagJL4,
@@ -564,6 +596,83 @@ GIVETH A DEONTIC Party `Contract Action`
     LEST BREACH
 |]
 
+-- | As 'deonticExportJL4', but the seller's obligation has no @LEST@: missing
+-- its deadline is a breach the evaluator reports as @deadline_missed@, naming
+-- the event that revealed it and the obligation that was missed.
+deonticDeadlineJL4 :: Text
+deonticDeadlineJL4 =
+  [i|
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
+
+@export default sale contract
+GIVETH A DEONTIC Party `Contract Action`
+`the sale contract` MEANS
+    PARTY `the seller`
+    MUST `deliver the goods`
+    WITHIN 14
+|]
+
+-- | Shapes of party and action, each with a space in a name: the operands of a
+-- @ROR@ and of a @RAND@, an action the rule does not declare (a binder), and a
+-- party that is a @GIVEN@ input.
+deonticShapesJL4 :: Text
+deonticShapesJL4 =
+  [i|
+DECLARE Party IS ONE OF `the seller`, `the buyer`
+DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`, `inspect the goods`
+
+@export default alternative
+GIVETH A DEONTIC Party `Contract Action`
+`the alternative` MEANS
+    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
+    ROR
+    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
+
+@export default conjunction
+GIVETH A DEONTIC Party `Contract Action`
+`the conjunction` MEANS
+    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
+    RAND
+    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
+
+@export default binder
+GIVETH A DEONTIC Party `Contract Action`
+`the binder` MEANS
+    PARTY `the seller`
+    MUST `some act`
+    WITHIN 10
+
+@export default given party
+GIVEN `the payer` IS A Party
+GIVETH A DEONTIC Party `Contract Action`
+`the given party` MEANS
+    PARTY `the payer`
+    MUST `deliver the goods`
+    WITHIN 10
+    HENCE FULFILLED
+    LEST BREACH
+|]
+
+-- | A contract whose one action carries a value: it is not a name, so the
+-- answer prints it as the rule source it is.
+deonticValueActionJL4 :: Text
+deonticValueActionJL4 =
+  [i|
+DECLARE Party IS ONE OF Alice
+DECLARE Act IS ONE OF
+  say HAS text IS A STRING
+
+@export default the contract
+GIVETH A DEONTIC Party Act
+`the contract` MEANS
+  PARTY Alice
+  MUST say "pay now"
+  WITHIN 10
+  HENCE FULFILLED
+  LEST BREACH
+|]
+
 -- | L4 source with a deontic function that uses record-typed parties.
 -- Tests that events with JSON object parties (e.g. {"name": "Alice"})
 -- are correctly formatted as L4 record construction (Driver WITH name IS "Alice")
@@ -807,6 +916,401 @@ GIVEN `d one` IS A DATE
 GIVETH A NUMBER
 DECIDE `later` IS 1
 |]
+
+-- | BOOLEAN rules written as multi-clause DECIDE groups, each beside the
+-- CONSIDER a drafter would write by hand for the same rule. All are called
+-- @rule@, so that the two forms of a pair get the same atom ids and their
+-- query plans can be compared whole.
+--
+-- The desugarer compiles clauses to a CONSIDER (and a LET for the clauses not
+-- yet tried) that carry no source range. The checker recorded a result type
+-- only on a node that has one, so the ladder refused the rule as "not a
+-- boolean"; with the type recorded, the ladder drew the generated LET as one
+-- leaf, and the plan asked nothing.
+clauseGroupEnumJL4 :: Text
+clauseGroupEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
+|]
+
+handEnumJL4 :: Text
+handEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  CONSIDER c
+    WHEN Red THEN TRUE
+    WHEN Green THEN FALSE
+    WHEN Blue THEN FALSE
+|]
+
+-- | The same rule with the later clauses named in a LET the drafter wrote (not
+-- clauses, so read as written).
+letEnumJL4 :: Text
+letEnumJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+DECIDE rule c IS
+  LET rest BE CONSIDER c
+                WHEN Green THEN FALSE
+                WHEN Blue THEN TRUE
+  IN CONSIDER c
+       WHEN Red THEN TRUE
+       OTHERWISE rest
+|]
+
+-- | Two inputs, a literal pattern in the first clause, a bare name in the second.
+clauseGroupMixedJL4 :: Text
+clauseGroupMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule 0 b IS FALSE
+DECIDE rule n b IS b AND n GREATER THAN 5
+|]
+
+handMixedJL4 :: Text
+handMixedJL4 =
+  [i|
+@export Whether the case is made out
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule n b IS
+  CONSIDER n
+    WHEN 0 THEN FALSE
+    OTHERWISE b AND n GREATER THAN 5
+|]
+
+-- | A group of ONE clause: no LET, just the generated CONSIDER.
+clauseGroupSingleJL4 :: Text
+clauseGroupSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule (JUST b) IS b
+|]
+
+handSingleJL4 :: Text
+handSingleJL4 =
+  [i|
+@export Whether the optional flag is set
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule m IS
+  CONSIDER m
+    WHEN JUST b THEN b
+|]
+
+-- | A clause that calls another rule. The call is part of the CONSIDER's one
+-- box, so the group and its hand-written CONSIDER must print it alike.
+clauseGroupCallJL4 :: Text
+clauseGroupCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS `both hold` a b
+DECIDE rule c a b IS a OR b
+|]
+
+handCallJL4 :: Text
+handCallJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN `both hold` a b
+    OTHERWISE a OR b
+|]
+
+-- | A table of two columns whose rows share the first column and differ in the
+-- second. The desugarer tests the colour again in every later clause; the
+-- ladder reads each test with what the branches around it already decided, so
+-- the table prints as the nested CONSIDER a drafter writes for it.
+clauseTableJL4 :: Text
+clauseTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red TRUE IS TRUE
+DECIDE rule Red FALSE IS FALSE
+DECIDE rule Green b IS b
+DECIDE rule Blue b IS NOT b
+|]
+
+handTableJL4 :: Text
+handTableJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c b IS
+  CONSIDER c
+    WHEN Red THEN
+      CONSIDER b
+        WHEN TRUE THEN TRUE
+        WHEN FALSE THEN FALSE
+    WHEN Green THEN b
+    WHEN Blue THEN NOT b
+|]
+
+-- | Two BOOLEAN columns, the input's own name standing for "any value".
+clauseTable2JL4 :: Text
+clauseTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule TRUE TRUE IS TRUE
+DECIDE rule TRUE q IS q
+DECIDE rule p TRUE IS p
+DECIDE rule p q IS FALSE
+|]
+
+handTable2JL4 :: Text
+handTable2JL4 =
+  [i|
+@export Whether the case is made out
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule p q IS
+  CONSIDER p
+    WHEN TRUE THEN
+      CONSIDER q
+        WHEN TRUE THEN TRUE
+        OTHERWISE q
+    OTHERWISE
+      CONSIDER q
+        WHEN TRUE THEN p
+        OTHERWISE FALSE
+|]
+
+-- | A last clause whose pattern is a new name, not the input's own: it always
+-- matches, so it is the OTHERWISE.
+clauseNewNameJL4 :: Text
+clauseNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red a b IS a
+DECIDE rule Green a b IS b
+DECIDE rule other a b IS a AND b
+|]
+
+handNewNameJL4 :: Text
+handNewNameJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether the case is made out
+GIVEN c IS A Colour
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule c a b IS
+  CONSIDER c
+    WHEN Red THEN a
+    WHEN Green THEN b
+    OTHERWISE a AND b
+|]
+
+-- | A BOOLEAN group with no GIVETH: the type is inferred, not declared.
+clauseGroupNoGivethJL4 :: Text
+clauseGroupNoGivethJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm
+GIVEN c IS A Colour
+DECIDE rule Red IS TRUE
+DECIDE rule Green IS FALSE
+DECIDE rule Blue IS FALSE
+|]
+
+-- | A BOOLEAN group whose first clause's result is a LET the drafter wrote.
+clauseGroupLetResultJL4 :: Text
+clauseGroupLetResultJL4 =
+  [i|
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export Whether a colour is warm and the flag is set
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE rule Red b IS LET both BE b AND b IN both
+DECIDE rule c b IS FALSE
+|]
+
+-- | A drafter's chain of @n@ LETs that each use the one before twice. Written
+-- out it doubles for each LET, and its conjunctive normal form, which is what
+-- the ladder draws, grows faster than that.
+letChainJL4 :: Int -> Text
+letChainJL4 n =
+  "@export doubling let chain\nGIVEN x IS A BOOLEAN\n      y IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE rule IS\n"
+    <> "  LET a0 BE x\n  IN\n"
+    <> Text.concat
+         [ Text.replicate (3 + level) " " <> "LET a" <> Text.pack (show level) <> " BE a" <> Text.pack (show (level - 1)) <> " AND y OR a" <> Text.pack (show (level - 1)) <> "\n"
+             <> Text.replicate (3 + level) " " <> "IN\n"
+         | level <- [1 .. n - 1] ]
+    <> Text.replicate (3 + n) " " <> "a" <> Text.pack (show (n - 1)) <> "\n"
+
+-- | A BOOLEAN group of @k@ rows on one NUMBER input, each row's result a sum of
+-- @width@ ones compared with zero, then a fall-through. It is long, not
+-- branching: 60 rows of width 200 come to 24,301 parts written out.
+longClausesJL4 :: Int -> Int -> Text
+longClausesJL4 k width =
+  "@export Long rows\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS n" <> Text.concat (replicate width " + 1") <> " GREATER THAN 0" | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS FALSE\n"
+
+-- | A group of @k@ rows on one NUMBER input, each row's result a sum of
+-- @width@ ones, then a fall-through. It returns a NUMBER, so it is not a
+-- ladder at all, which is what the answer must say, not that it is too long
+-- (60 rows of width 200 come to more than 20,000 parts written out).
+longNumberClausesJL4 :: Int -> Int -> Text
+longNumberClausesJL4 k width =
+  "@export Long numeric rows\nGIVEN n IS A NUMBER\nGIVETH A NUMBER\n"
+    <> Text.unlines [ "DECIDE rule " <> Text.pack (show row) <> " IS n" <> Text.concat (replicate width " + 1") | row <- [0 .. k - 1] ]
+    <> "DECIDE rule n IS 0\n"
+
+-- | A group whose first clause names every input as the @GIVEN@ does, so it
+-- matches every input and the group is that clause's body: a disjunction of @k@
+-- conjunctions of two inputs. (The second clause is never used, and the
+-- checker says so.) The service simplifies the ladder into conjunctive normal
+-- form, which has @2^k@ disjunctions of @k@ inputs: 193 boxes for 5, and 449
+-- for 6.
+dnfClauseJL4 :: Int -> Text
+dnfClauseJL4 k = dnfRule k True
+
+-- | A first clause that names its input as the @GIVEN@ does and whose result is
+-- 22,000 parts or so: more than the 20,000 that clauses are limited to when
+-- they are read through. The clause after it is never reached.
+catchAllHugeJL4 :: Text
+catchAllHugeJL4 = hugeRule "n" "n" True
+
+-- | 'catchAllHugeJL4' without the clause after the first: a rule written without
+-- clauses, which is what the group is answered as.
+handCatchAllHugeJL4 :: Text
+handCatchAllHugeJL4 = hugeRule "n" "n" False
+
+-- | 'catchAllHugeJL4' with the first clause's input given a new name, @m@. That
+-- clause matches every input, but not as the @GIVEN@ names it, so it is a test
+-- the desugarer generates, and the group is read through and limited.
+newNameHugeJL4 :: Text
+newNameHugeJL4 = hugeRule "m" "m" True
+
+-- | 'catchAllHugeJL4' with the first clause's input written @(EXACTLY n)@.
+exactlyHugeJL4 :: Text
+exactlyHugeJL4 = hugeRule "(EXACTLY n)" "n" True
+
+-- | The first clause's pattern for the @GIVEN@'s @n@, the name its result uses
+-- for it, and whether the clause after it is written.
+hugeRule :: Text -> Text -> Bool -> Text
+hugeRule pat var clauses =
+  "@export Huge\nGIVEN n IS A NUMBER\nGIVETH A BOOLEAN\n"
+    <> "DECIDE rule " <> pat <> " IS " <> var <> Text.concat (replicate 11000 " + 1") <> " GREATER THAN 0\n"
+    <> (if clauses then "DECIDE rule 0 IS FALSE\n" else "")
+
+-- | 'dnfClauseJL4' with the first clause's @n@ given a new name, @m@: read
+-- through and limited, where 'dnfClauseJL4' is not.
+newNameDnfJL4 :: Int -> Text
+newNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule m " (dnfClauseJL4 k)
+
+-- | A table of @k@ clauses over five @MAYBE BOOLEAN@ inputs, each clause taking
+-- three of them apart with @(JUST x)@ (inputs @i@, @i+1@, @i+2@, going round) and
+-- returning the @AND@ of what it took apart. The other two inputs are given new
+-- names, or, when @own@, are written as the @GIVEN@ names them. The last clause
+-- names every input and is @IS FALSE@.
+maybeTableJL4 :: Bool -> Int -> Text
+maybeTableJL4 own k =
+  Text.unlines $
+    ["@export Maybes"]
+      <> [ (if c == 1 then "GIVEN " else "      ") <> "a" <> Text.pack (show c) <> " IS A MAYBE BOOLEAN" | c <- [1 .. inputsN] ]
+      <> ["GIVETH A BOOLEAN"]
+      <> [ "DECIDE rule " <> Text.unwords [ patOf row c | c <- [1 .. inputsN] ] <> " IS " <> Text.intercalate " AND " [ boundName row c | c <- takenApart row ] | row <- [1 .. k - 1] ]
+      <> [ "DECIDE rule " <> Text.unwords [ otherOf k c | c <- [1 .. inputsN] ] <> " IS FALSE" ]
+  where
+    inputsN = 5 :: Int
+    takenApart row = [ ((row + d - 1) `mod` inputsN) + 1 | d <- [0 .. 2] ]
+    boundName row c = "p" <> Text.pack (show row) <> "c" <> Text.pack (show c)
+    otherOf row c = if own then "a" <> Text.pack (show c) else boundName row c
+    patOf row c = if c `elem` takenApart row then "(JUST " <> boundName row c <> ")" else otherOf row c
+
+-- | 'dnfClauseJL4' with the first clause's @n@ written @(EXACTLY n)@. The
+-- missing-case check counts that as the input's own name, but the desugarer
+-- tests it (only the bare name and @_@ are exempt), so the group is read
+-- through. Six pairs are planned (probably because it reads through to one
+-- CONSIDER, which is one box; not drawn); 'exactlyHugeJL4' is refused as too
+-- long.
+exactlyNameDnfJL4 :: Int -> Text
+exactlyNameDnfJL4 k = Text.replace "DECIDE rule n " "DECIDE rule (EXACTLY n) " (dnfClauseJL4 k)
+
+-- | 'dnfClauseJL4' without clauses.
+handDnfJL4 :: Int -> Text
+handDnfJL4 k = dnfRule k False
+
+dnfRule :: Int -> Bool -> Text
+dnfRule k clauses =
+  "@export Dnf\nGIVEN n IS A NUMBER\n"
+    <> Text.concat [ "      a" <> Text.pack (show j) <> " IS A BOOLEAN\n      b" <> Text.pack (show j) <> " IS A BOOLEAN\n" | j <- [1 .. k] ]
+    <> "GIVETH A BOOLEAN\n"
+    <> "DECIDE rule n " <> inputs <> " IS " <> Text.intercalate " OR " [ "(a" <> Text.pack (show j) <> " AND b" <> Text.pack (show j) <> ")" | j <- [1 .. k] ] <> "\n"
+    <> (if clauses then "DECIDE rule 0 " <> inputs <> " IS FALSE\n" else "")
+  where
+    inputs = Text.unwords (concat [ ["a" <> Text.pack (show j), "b" <> Text.pack (show j)] | j <- [1 .. k] ])
 
 -- | A record read from a JSON string by JSONDECODE, as written in
 -- smucclaw/l4-ide#1040. What the decoder builds depends on the type the type

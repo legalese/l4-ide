@@ -11,6 +11,7 @@ import qualified Data.Aeson as Aeson
 import Data.Char (isAlphaNum)
 import qualified Data.List as List
 import Data.Ord (Down (..))
+import GHC.Generics (Generically (..))
 import Data.Text.Mixed.Rope (Rope)
 import qualified Data.Text.Mixed.Rope as Rope
 import qualified Text.Fuzzy as Fuzzy
@@ -29,6 +30,7 @@ import qualified L4.Utils.IntervalMap as IV
 import LSP.Core.PositionMapping
 import LSP.Core.Shake
 import LSP.L4.Rules
+import LSP.L4.SemanticTokens (srcPosToPosition)
 
 import qualified LSP.L4.Viz.Ladder as Ladder
 import qualified LSP.L4.Viz.VizExpr as Ladder
@@ -454,3 +456,48 @@ typeFunction :: Kind -> Type' Resolved
 typeFunction 0 = Type emptyAnno
 typeFunction n | n > 0 = Fun emptyAnno (replicate n (MkOptionallyNamedType emptyAnno Nothing (Type emptyAnno))) (Type emptyAnno)
 typeFunction _ = error "Internal error: negative arity of type constructor"
+
+-- ----------------------------------------------------------------------------
+-- Code lenses above DECIDEs
+-- ----------------------------------------------------------------------------
+
+-- | The ladder's lens: "Show decision graph" above every top-level @DECIDE@
+-- the visualiser can draw. The gate is speculative (each candidate is
+-- actually visualised and kept only if that succeeds) because there are many
+-- @DECIDE@/@MEANS@ shapes the visualiser does not handle yet, and a lens that
+-- fails when clicked is worse than none. If this is ever too slow the fix is
+-- to cache, or better, to make the visualiser accept more.
+--
+-- One refusal keeps its lens: a rule written as DECIDE clauses that is too
+-- large to draw. Its drafter has done nothing wrong, and a lens that silently
+-- went missing would not say why, so the lens's title says it, and clicking it
+-- answers with the whole message.
+decisionGraphCodeLenses :: VersionedTextDocumentIdentifier -> TypeCheckResult -> [CodeLens]
+decisionGraphCodeLenses verTextDocId typeCheck =
+  foldTopLevelDecides decideToCodeLens typeCheck.module'
+  where
+    mkDecisionGraphCodeLens title srcPos = CodeLens
+      { _command = Just Command
+        { _title = title
+        , _command = "l4.visualize"
+        , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
+        }
+      , _range = pointRange $ srcPosToPosition srcPos
+      , _data_ = Nothing
+      }
+
+    -- Without simplification: simplification is a toggle inside the panel.
+    lensTitle decide =
+      let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
+      in case Ladder.doVisualize decide cfg of
+           Right _ -> Just "Show decision graph"
+           Left (Ladder.ClauseGroupTooLarge budget) ->
+             Just ("No decision graph: these clauses would draw more than " <> Text.pack (show budget) <> " boxes")
+           Left (Ladder.ClauseGroupTooLong _) ->
+             Just "No decision graph: these clauses are too long to draw"
+           Left _ -> Nothing
+
+    decideToCodeLens decide =
+      case (rangeOfNode decide, lensTitle decide) of
+        (Just node, Just title) -> [mkDecisionGraphCodeLens title node.start]
+        _ -> []

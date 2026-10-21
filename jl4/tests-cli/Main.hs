@@ -15,6 +15,7 @@ import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (IOException, finally, throwIO, try)
 import Control.Monad (forM_, unless, void, when)
 import qualified Data.Char as Char
+import Data.Foldable (toList)
 import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
@@ -255,6 +256,30 @@ expectFail bin args = do
     ExitFailure _ -> pure ()
     ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
 
+-- | Whether some line of the text ends with the needle. Written against text
+-- whose carriage returns are already gone, so a needle never has to span a line
+-- break (and so never has to name one).
+endsLine :: String -> String -> Bool
+endsLine needle = any (needle `isSuffixOf`) . lines
+
+-- | The lines joined by line feeds, for a needle that spans several of them.
+joinLines :: [String] -> String
+joinLines = intercalate "\n"
+
+-- | Assert @l4 nlg SOURCE@ exits 0 and prints exactly the committed golden,
+-- line endings aside: on Windows the output, or a golden checked out there, can
+-- end its lines with a carriage return.
+expectNlgGolden :: FilePath -> FilePath -> FilePath -> IO ()
+expectNlgGolden bin source golden = do
+  Output code sout serr <- runL4 bin ["nlg", source]
+  expected <- T.unpack . TE.decodeUtf8Lenient <$> BS.readFile golden
+  code `shouldBe` ExitSuccess
+  unless (filter (/= '\r') sout == filter (/= '\r') expected) $
+    expectationFailure $
+      "l4 nlg " ++ source ++ " differs from " ++ golden
+      ++ "\n--- stdout ---\n" ++ sout
+      ++ "\n--- stderr ---\n" ++ serr
+
 -- | Parse the stdout of a --json run as a JSON envelope.
 jsonEnvelope :: FilePath -> [String] -> IO Value
 jsonEnvelope bin args = do
@@ -276,11 +301,46 @@ objField _ _ = Nothing
 fixtureDir :: FilePath
 fixtureDir = "tests-cli/fixtures"
 
+-- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
+-- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
+-- the tree, so the tests below are the only thing pinning that the two
+-- projections agree (smucclaw/l4-ide#972).
+nlgHeadPlacementSource :: FilePath
+nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
+
+-- The `l4 nlg` differential pairs: a corpus module and the golden jl4-test
+-- wrote for it.
+nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden :: FilePath
+nlgPromissorySource = "examples/legal/promissory-note.l4"
+nlgPromissoryGolden = "examples/legal/tests/promissory-note.nlg.golden"
+nlgShowcaseSource   = "examples/legal/directive-showcase.l4"
+nlgShowcaseGolden   = "examples/legal/tests/directive-showcase.nlg.golden"
+
+bilingualFixture :: FilePath
+bilingualFixture = fixtureDir </> "bilingual.l4"
+
+bilingualFramesFixture :: FilePath
+bilingualFramesFixture = fixtureDir </> "bilingual-frames.l4"
+
+bilingualFramesRegionFixture :: FilePath
+bilingualFramesRegionFixture = fixtureDir </> "bilingual-frames-region.l4"
+
 cleanFixture, evalFixture, errorFixture, garbageFixture :: FilePath
 cleanFixture   = fixtureDir </> "clean.l4"
 evalFixture    = fixtureDir </> "eval.l4"
 errorFixture   = fixtureDir </> "typecheck-error.l4"
 garbageFixture = fixtureDir </> "garbage.l4"
+
+-- | A module that declares @\@lang en@, which a module that declares nothing
+-- already is; and one that declares @en@ and then @he@, so is not redundant.
+langEnHintFixture, langEnThenHeFixture :: FilePath
+langEnHintFixture   = fixtureDir </> "lang-en-hint.l4"
+langEnThenHeFixture = fixtureDir </> "lang-en-then-he.l4"
+
+-- | A French module whose one wording is tagged @FR@, which differs from the
+-- declared @fr@ only in case.
+langTagCaseFixture :: FilePath
+langTagCaseFixture = fixtureDir </> "lang-tag-case.l4"
 
 evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
@@ -461,10 +521,14 @@ main = do
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
        , evalTraceFixture, refTrailingFixture
+       , langEnHintFixture, langEnThenHeFixture, langTagCaseFixture
+       , bilingualFixture, bilingualFramesFixture
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
        , multiClauseRenderFixture
+       , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
+       , nlgHeadPlacementSource
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
@@ -488,6 +552,7 @@ spec bin = do
       sout `shouldSatisfy` ("batch" `isInfixOf`)
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
+      sout `shouldSatisfy` ("nlg" `isInfixOf`)
 
   describe "l4 deploy / redeploy / undeploy / deployments (no network)" $ do
     let expectStderr args mEnv needle = do
@@ -886,13 +951,111 @@ spec bin = do
       sout `shouldSatisfy`
         ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
       sout `shouldSatisfy` ("\"result\":100" `isInfixOf`)
+
+  -- `@lang en` says what a module that declares nothing already is, so
+  -- `l4 check` hints that the line can go. It is a HINT: the check still
+  -- succeeds, with the same exit code and the same JSON verdict it would give
+  -- without the line. Without the controls below a hint that fired on every
+  -- module would pass the first case, so they are the half that matters.
+  describe "l4 check: a redundant @lang en" $ do
+    let hintText = "A module that declares nothing is English; this line can go."
+
+    it "hints that the line can go, at Hint severity, and the check still succeeds" $ do
+      Output code sout serr <- runL4 bin ["check", langEnHintFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      serr `shouldSatisfy` (hintText `isInfixOf`)
+      serr `shouldSatisfy` ("DiagnosticSeverity_Hint" `isInfixOf`)
+      -- not a warning, and not anything louder
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Warning" `isInfixOf`)
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+
+    it "points at the @lang line" $ do
+      Output _ _ serr <- runL4 bin ["check", langEnHintFixture]
+      -- the fixture's third line, from its first column, and it ends on that
+      -- same line: the range is rendered "line:col-line:col"
+      serr `shouldSatisfy` ("3:1-3:" `isInfixOf`)
+
+    it "leaves the JSON verdict at ok=true" $ do
+      env <- jsonEnvelope bin ["check", langEnHintFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "diagnostics" of
+        Just (Array v) -> [t | String t <- toList v] `shouldSatisfy` any (T.pack hintText `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+    it "says nothing to a module that declares another language" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/ok/nlg-module-lang.l4"]   -- `@lang he`
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    it "says nothing to a module that declares nothing" $ do
+      Output code _ serr <- runL4 bin ["check", cleanFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    it "says nothing on an `en` line in a module that also declares `he`" $ do
+      Output code _ serr <- runL4 bin ["check", langEnThenHeFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    it "warns that the earlier of two different `@lang` lines is overridden, naming both" $ do
+      Output code _ serr <- runL4 bin ["check", langEnThenHeFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("declares two different languages with @lang: `en` here and `he` on line 4." `isInfixOf`)
+
+    it "does not warn when every `@lang` line names the same language" $ do
+      Output code _ serr <- runL4 bin ["check", langEnHintFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("two different languages" `isInfixOf`)
+
+    it "warns that a percent pair with spaces inside it is plain text, naming the slot to write" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/not-ok/nlg/nlg_spaced_slot.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("This wording has `% amount %`, with spaces inside the percent signs, so it prints as plain text." `isInfixOf`)
+      serr `shouldSatisfy` ("A slot is written `%amount%`, with no spaces." `isInfixOf`)
+
+    it "warns that a language tag nothing else backs may be the first word of a sentence" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/not-ok/nlg/nlg_lone_tag.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("`@nlg:the` tags the wording on `over limit` as language `the`" `isInfixOf`)
+      serr `shouldSatisfy` ("write `@nlg the …` with no colon." `isInfixOf`)
+
+    it "names the declared tag when a lone tag differs from it only in case" $ do
+      Output code _ serr <- runL4 bin ["check", langTagCaseFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("the module declares `@lang fr`: `FR` and `fr` differ only in case." `isInfixOf`)
+      serr `shouldSatisfy` ("Write `@nlg:fr`, or leave the tag off" `isInfixOf`)
+      serr `shouldNotSatisfy` ("add `@lang" `isInfixOf`)
+
   describe "l4 format" $ do
-    it "prints the reformatted source of a clean file to stdout" $ do
+    it "prints a clean file to stdout as written" $ do
+      src <- readFile cleanFixture
       Output code sout _ <- runL4 bin ["format", cleanFixture]
       code `shouldBe` ExitSuccess
-      -- Formatter output should contain the DECIDE (exact spelling may
-      -- differ from input, so we only look for the identifier).
-      sout `shouldSatisfy` ("xor" `isInfixOf`)
+      -- Carriage returns are dropped on both sides: the checkout may have
+      -- CRLF line endings, which 'readFile' turns into LF on Windows.
+      filter (/= '\r') sout `shouldBe` filter (/= '\r') src
+
+    -- The output has the file's own line endings, compared byte for byte. On
+    -- Windows, reading the file or writing stdout in text mode would turn LF
+    -- into CRLF or the other way round.
+    it "keeps LF and CRLF line endings as they are in the file" $
+      withSystemTempDirectory "l4-format-line-endings" \dir ->
+        forM_ [("lf.l4", "\n"), ("crlf.l4", "\r\n")] \(name, eol) -> do
+          let file = dir </> name
+              bytes = TE.encodeUtf8 $ T.intercalate eol
+                [ "GIVETH A STRING"
+                , "DECIDE `the city` IS \"São Paulo\""
+                , ""
+                ]
+          BS.writeFile file bytes
+          Output code sout _ <- runL4 bin ["format", file]
+          code `shouldBe` ExitSuccess
+          sout `shouldBe` T.unpack (TE.decodeUtf8 bytes)
 
     -- A postfix call used to lose its argument, and a call written between its
     -- arguments used to be printed head first, with exit code 0 and output that
@@ -930,6 +1093,255 @@ spec bin = do
       Output code sout _ <- runL4 bin ["format", fixture]
       code `shouldBe` ExitSuccess
       filter (/= '\r') sout `shouldBe` filter (/= '\r') src
+
+  ----------------------------------------------------------------------------
+  -- One encoding, several languages.
+  --
+  -- The property that matters is not just "--lang he prints Hebrew" but the
+  -- pair with it: a rule that has NO rendering in the requested language falls
+  -- back to its default, so a half-finished translation produces a whole
+  -- document rather than one with holes in it. The fixture carries one rule
+  -- with both renderings and one with only English, so a single run shows
+  -- both halves.
+  --
+  -- Asserted at the CLI rather than only in `NlgMultiplicitySpec` because the
+  -- flag is the user surface, and because `l4 render` reaches the annotation
+  -- through a completely different path from `l4 nlg` — the exporter in
+  -- `L4.Export.Document`, not the linearizer. Both are language-aware for the
+  -- same reason (`L4.Nlg.selectLanguage` moves the chosen rendering into the
+  -- slot each already reads), and that shared reason is exactly the kind that
+  -- looks fine until one of the two paths is changed.
+  ----------------------------------------------------------------------------
+  describe "l4 --lang (one encoding, several languages)" $ do
+    it "l4 nlg selects the requested language" $ do
+      Output code sout _ <- runL4 bin ["nlg", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    it "l4 nlg falls back for a rule with no rendering in that language" $ do
+      Output code sout _ <- runL4 bin ["nlg", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      -- `is small` is English-only; asking for Hebrew must still render it.
+      sout `shouldSatisfy` ("is under the threshold" `isInfixOf`)
+
+    it "l4 nlg with no --lang uses the default rendering" $ do
+      Output code sout _ <- runL4 bin ["nlg", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("exceeds the threshold" `isInfixOf`)
+      sout `shouldNotSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    -- The frame words: the ones the linearizer supplies, not the author.
+    -- `--lang he` renders them from the Hebrew phrasebook, a phrase at a time;
+    -- the maqaf-final "ל־" meets its value with no space; a month is a frame
+    -- word too; and a word with no entry stays English and is NAMED on stderr,
+    -- so the gap is visible. With no flag nothing changes.
+    it "l4 nlg --lang he renders the frame words from the phrasebook" $ do
+      Output code sout serr <- runL4 bin ["nlg", "--lang", "he", bilingualFramesFixture]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "150 עולה על הסף שווה ל־`TRUE`"
+        , "לא 5 עולה על הסף"
+        , "16 ביולי 2025"
+        , "150 as string"
+        ]
+      serr `shouldSatisfy` ("have no he rendering and stay English: as, string" `isInfixOf`)
+
+    -- A region on the tag, or on the request, changes neither the wording
+    -- picked nor the frame words: one language, one set of frame words.
+    it "l4 nlg --lang he and --lang he-IL both read a he-IL wording, with Hebrew frame words" $
+      forM_ ["he", "he-IL"] $ \ lang -> do
+        Output code sout _ <- runL4 bin ["nlg", "--lang", lang, bilingualFramesRegionFixture]
+        code `shouldBe` ExitSuccess
+        map (filter (/= '\r')) (lines sout) `shouldBe`
+          [ "150 עולה על הסף שווה ל־`TRUE`"
+          , "לא 5 עולה על הסף"
+          ]
+
+    it "l4 nlg with no --lang keeps English frame words and reports nothing" $ do
+      Output code sout serr <- runL4 bin ["nlg", bilingualFramesFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("exceeds the threshold is equal to `TRUE`" `isInfixOf`)
+      sout `shouldSatisfy` ("16 July 2025" `isInfixOf`)
+      serr `shouldNotSatisfy` ("stay English" `isInfixOf`)
+
+    it "l4 render reaches the same annotations, through the exporter" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
+      sout `shouldSatisfy` ("is under the threshold" `isInfixOf`)
+
+    it "a language the file does not carry leaves the output unchanged" $ do
+      -- The safety property for every existing caller: selection can only ever
+      -- swap in a rendering that is actually there. `zz` is carried by nothing,
+      -- so this must equal the no-flag output byte for byte.
+      Output _ plain _ <- runL4 bin ["render", "--format", "text", bilingualFixture]
+      Output _ asked _ <- runL4 bin ["render", "--format", "text", "--lang", "zz", bilingualFixture]
+      asked `shouldBe` plain
+
+  ----------------------------------------------------------------------------
+  -- The HTML wrapper's own language (smucclaw/l4-ide#970).
+  --
+  -- `<html lang=...>` used to be the literal "en" whatever was rendered, so a
+  -- Hebrew document arrived labelled English and with no `dir`, leaving the
+  -- browser to guess direction from the characters. The label is what a screen
+  -- reader picks a voice from and what `dir` hangs off, so it is not cosmetic.
+  --
+  -- Asserted here rather than as a golden because NO golden captures
+  -- `renderHtml` at all (measured 2026-09-21: its only callers are this CLI
+  -- verb and the LSP export handler), so a black-box CLI assertion is the only
+  -- guard this wrapper has.
+  ----------------------------------------------------------------------------
+  describe "l4 render --format html (document language)" $ do
+    let langModule = "examples/ok/nlg-module-lang.l4"   -- carries `@lang he`
+        -- The `<html>` wrapper ALONE, not the whole document. Asserting "no
+        -- `dir=` anywhere" would also forbid a per-element `dir="auto"` on a
+        -- prose span, which is the natural remedy for a MIXED document and is
+        -- not what any of these cases is about.
+        -- (A Windows process ends the line with a carriage return; drop it.)
+        htmlTag s = unwords [ filter (/= '\r') l | l <- lines s, "<html" `isPrefixOf` l ]
+
+    it "labels a Hebrew rendering he and marks it right-to-left" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "labels the document en when English is asked for, and puts no dir on the wrapper" $ do
+      -- NOT "an English rendering", which is what this case used to be called:
+      -- the fixture's own comment says `is small` has no English herald, so
+      -- asking for English still renders that clause in Hebrew. The document is
+      -- MIXED and the label follows the REQUEST — ruled 2026-09-21 and written
+      -- up on doc/tutorials/natural-language-functions/optimising-natural-language-generation.md.
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "en", langModule]
+      code `shouldBe` ExitSuccess
+      -- The absence of `dir` is half the assertion: `ltr` is the HTML default,
+      -- so the attribute appearing at all is what means "this runs the other way".
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+      -- … and this is the mixture the label is being honest about.
+      sout `shouldSatisfy` ("קטן מן הסף" `isInfixOf`)
+
+    it "falls back to the module's own @lang when no --lang is given" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "falls back to en for a module that declares no language" $ do
+      -- bilingual.l4 tags its heralds individually and declares no `@lang`.
+      Output code sout _ <- runL4 bin ["render", "--format", "html", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+
+    ------------------------------------------------------------------------
+    -- A label the document cannot support.
+    --
+    -- `--lang he` on an all-English encoding used to emit
+    -- `<html lang="he" dir="rtl">`: not merely a wrong label but a layout
+    -- instruction, which moves an English full stop to the left end of its
+    -- line. Measured with fribidi on regcf.l4, which has 0 Hebrew codepoints.
+    -- Ruled 2026-09-21: when NOTHING in the module renders in the asked-for
+    -- language, the document keeps the language it declares and stderr says so.
+    ------------------------------------------------------------------------
+    it "does not relabel a document for a language nothing in it renders" $ do
+      -- clean.l4 carries no @nlg at all and declares no @lang.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he", cleanFixture]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+      serr `shouldSatisfy` ("no renderings in \"he\"" `isInfixOf`)
+      serr `shouldSatisfy` ("labelled \"en\"" `isInfixOf`)
+
+    it "keeps the module's declared language when the asked-for one is carried by nothing" $ do
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "zz", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      serr `shouldSatisfy` ("no renderings in \"zz\"" `isInfixOf`)
+
+    it "says nothing on stderr for a format that does not label its language" $ do
+      -- `text`, `json` and `plan` carry the chosen WORDINGS and say nothing
+      -- about which language they are, so the note would be noise — and this
+      -- keeps `--format text --lang zz` byte-identical on both streams.
+      Output code _ serr <- runL4 bin ["render", "--format", "text", "--lang", "zz", langModule]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("no renderings" `isInfixOf`)
+
+    ------------------------------------------------------------------------
+    -- The flag's own hygiene. Before this, `--lang` was echoed verbatim into
+    -- the attribute: `--lang 'he '` labelled the document `he ` AND silently
+    -- lost `dir="rtl"`, because the direction lookup compared `"he "` against
+    -- the table and missed. Exit 0, no diagnostic — a trailing space out of a
+    -- shell variable is how it arrives.
+    ------------------------------------------------------------------------
+    it "trims a --lang value, so a trailing space does not cost the direction" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he ", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "lowercases the primary subtag, which also makes --lang HE select the Hebrew heralds" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "HE", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    it "labels the document with a region its Hebrew answers" $ do
+      -- The module's wordings are `he`, and a request for `he-IL` reads them
+      -- (`L4.Lexer.langMatchRank`), so the document is honestly `he-IL`, as
+      -- typed, and nothing is reported.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he-IL", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he-IL\" dir=\"rtl\">"
+      serr `shouldNotSatisfy` ("no renderings" `isInfixOf`)
+
+    it "passes a region subtag through unmangled, and falls back because nothing carries it" $ do
+      -- Two things at once, and the name says both because the label alone would
+      -- mislead: the reader keeps `fr-CA` as typed (the stderr note quotes it
+      -- back verbatim), and the LABEL is still the module's `he`, because no
+      -- wording in the module is in French.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "fr-CA", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      serr `shouldSatisfy` ("no renderings in \"fr-CA\"" `isInfixOf`)
+
+    it "rejects an empty or malformed --lang instead of putting it in the markup" $ do
+      -- `he-`, `he--IL` and the over-long subtag are the SHAPE cases: every
+      -- character is legal and the tag is still not one, so a character-class
+      -- check alone would have let them into the attribute.
+      forM_ ["", "  ", "-he", "he-", "he--IL", "abcdefghij", "he_IL", "en\"><script>"] \bad -> do
+        Output code _ serr <- runL4 bin ["render", "--format", "html", "--lang", bad, langModule]
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` ("Invalid --lang value" `isInfixOf`)
+
+  ----------------------------------------------------------------------------
+  -- The AKN document's own language.
+  --
+  -- Akoma Ntoso identifies an EXPRESSION by `/akn/doc/main/<lang>@<version>`,
+  -- where `<lang>` is an ISO 639-2 code. That literal was `eng` whatever was
+  -- rendered, so a Hebrew act was identified as an English expression — the same
+  -- defect as `<html lang="en">` (smucclaw/l4-ide#970), in the neighbouring
+  -- writer, and equally silent: the XML is well formed either way.
+  ----------------------------------------------------------------------------
+  describe "l4 render --format akn (expression language)" $ do
+    let langModule = "examples/ok/nlg-module-lang.l4"   -- carries `@lang he`
+        frbrOf s = unwords [ l | l <- lines s, "FRBRExpression" `isInfixOf` l ]
+
+    it "identifies a Hebrew expression as heb, from the module's own @lang" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", langModule]
+      code `shouldBe` ExitSuccess
+      frbrOf sout `shouldSatisfy` ("/akn/doc/main/heb@" `isInfixOf`)
+      frbrOf sout `shouldNotSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "follows --lang, translating the subtag to the ISO 639-2 code" $ do
+      Output _ he _ <- runL4 bin ["render", "--format", "akn", "--lang", "he", langModule]
+      Output _ en _ <- runL4 bin ["render", "--format", "akn", "--lang", "en", langModule]
+      frbrOf he `shouldSatisfy` ("/akn/doc/main/heb@" `isInfixOf`)
+      frbrOf en `shouldSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "says eng for a module that declares nothing" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      frbrOf sout `shouldSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "puts the same language in the Manifestation URIs" $ do
+      Output _ sout _ <- runL4 bin ["render", "--format", "akn", langModule]
+      sout `shouldSatisfy` ("/akn/doc/main/heb@.xml" `isInfixOf`)
+      sout `shouldNotSatisfy` ("eng@" `isInfixOf`)
 
   describe "l4 ast" $ do
     it "dumps a parsed AST for a clean file" $ do
@@ -1106,6 +1518,140 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+  -- `l4 nlg` must reproduce what jl4-test writes into a committed
+  -- `.nlg.golden`, byte for byte: that equality is what lets anyone regenerate
+  -- a golden without running the whole golden suite.
+  describe "l4 nlg" $ do
+    it "linearizes a clean module and exits 0" $ do
+      Output code sout _ <- runL4 bin ["nlg", cleanFixture]
+      code `shouldBe` ExitSuccess
+      -- clean.l4 has no directives, so the payload is empty. That is the
+      -- correct answer and not a failure: `nlg` linearizes DIRECTIVES.
+      sout `shouldBe` ""
+
+    it "refuses to emit prose for a module that does not typecheck" $
+      expectFail bin ["nlg", errorFixture]
+
+    it "reproduces the committed promissory-note NLG golden byte for byte" $
+      expectNlgGolden bin nlgPromissorySource nlgPromissoryGolden
+
+    it "reproduces the committed directive-showcase NLG golden byte for byte" $
+      expectNlgGolden bin nlgShowcaseSource nlgShowcaseGolden
+
+  -- An @nlg on a rule head's INPUT, which is the one placement the two
+  -- projections used to disagree about (smucclaw/l4-ide#972). `l4 render` read it
+  -- as the rule's sentence and `l4 nlg` as the input's gloss, so a positional
+  -- call printed the rule's bare name. These assert the AGREEMENT, from both
+  -- sides, because only one side has a golden: the `.nlg.golden` beside the
+  -- fixture pins the `l4 nlg` column and nothing anywhere pins `l4 render`'s.
+  --
+  -- Rows 5, 7, 8 and 12 of the fixture are the repaired ones; row 13 and the
+  -- `AKA` rows are the controls, and they are the assertions that fail if the
+  -- repair is widened into an unconditional promotion.
+  describe "an @nlg on a rule head's input" $ do
+    -- Windows ends a process's lines with a carriage return, which would sit
+    -- between a needle and the line break it expects; drop it on the way in.
+    let lf (Output c o e) = Output c (filter (/= '\r') o) e
+        nlgOf   = lf <$> runL4 bin ["nlg", nlgHeadPlacementSource]
+        renderOf = lf <$> runL4 bin ["render", "--format", "text", nlgHeadPlacementSource]
+
+    it "reaches l4 nlg at a POSITIONAL call site, whichever side of the input it sits" $ do
+      Output code sout _ <- nlgOf
+      code `shouldBe` ExitSuccess
+      -- Trailing the head (row 5), under the input (row 7), the DECIDE spelling
+      -- (row 8) and the two-input case (row 12). The argument sits in the
+      -- sentence's slot — a heralded call in a directive reads as its sentence
+      -- (`L4.Nlg.substituteNlgDirective`) — so these pin the sentence as the
+      -- whole line, with nothing appended.
+      sout `shouldSatisfy` endsLine "row five saw 200"
+      sout `shouldSatisfy` endsLine "row seven saw 200"
+      sout `shouldSatisfy` endsLine "row eight saw 200"
+      sout `shouldSatisfy` endsLine "row twelve saw 200 over 100"
+
+    it "reaches l4 nlg at a NAMED-argument call site without printing twice" $ do
+      Output _ sout _ <- nlgOf
+      -- The sentence MOVES rather than being copied: leaving it on the input as
+      -- well printed it once as the heading and again as the input's gloss.
+      sout `shouldSatisfy` ("row five saw `amount` where `amount` is 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row seven saw `amount` where `amount` is 200" `isInfixOf`)
+
+    it "renders the same sentences through l4 render, which is the point" $ do
+      Output code sout _ <- renderOf
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("row five saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("row seven saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("row eight saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("row twelve saw amount over floor" `isInfixOf`)
+
+    it "reads the placements that already worked the same way, argument in the slot" $ do
+      Output _ sout _ <- nlgOf
+      sout `shouldSatisfy` endsLine "row one saw 200"
+      sout `shouldSatisfy` endsLine "row three saw 200"
+      sout `shouldSatisfy` endsLine "row four saw 200"
+      sout `shouldSatisfy` endsLine "row six saw 200"
+      sout `shouldSatisfy` endsLine "row nine saw 200"
+
+    it "keeps a rule's OWN sentence when it also heralds itself (row 13)" $ do
+      Output _ sout _ <- nlgOf
+      -- The rule's own annotation is found first, so nothing is moved and the
+      -- inner herald stays the input's gloss. An unconditional promotion would
+      -- overwrite the outer one with the inner.
+      sout `shouldSatisfy` endsLine "row thirteen the rule saw 200"
+      sout `shouldSatisfy` ("row thirteen the input" `isInfixOf`)
+
+    it "reads a herald on an AKA head as the rule's sentence at every call shape (#978)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Row 10: the herald lands on the AKA's NAME. `L4.Nlg.decideNlg` searches
+      -- that position, so `l4 render` finds it and `l4 nlg` fills its slot;
+      -- before, render lost it and nlg printed "row ten saw `amount` with 200".
+      -- A call through the alias reads the same.
+      nlgOut `shouldNotSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` (unlines ["row ten saw 200", "row ten saw `amount` where `amount` is 200", "row ten saw 200"] `isInfixOf`)
+      renOut `shouldSatisfy` ("row ten saw amount" `isInfixOf`)
+      -- Row 11: the herald above the head lands on the declaration. A `WITH`
+      -- call used to print the bare name, "`row eleven` where ...".
+      nlgOut `shouldSatisfy` endsLine "row eleven saw 200"
+      nlgOut `shouldSatisfy` ("row eleven saw `amount` where `amount` is 200" `isInfixOf`)
+      nlgOut `shouldNotSatisfy` ("`row eleven` where" `isInfixOf`)
+      renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
+
+    it "heads a WITH call with the herald without re-expanding an input's gloss (row 13)" $ do
+      Output _ nlgOut _ <- nlgOf
+      nlgOut `shouldSatisfy` ("row thirteen the rule saw `amount` where row thirteen the input is 200" `isInfixOf`)
+
+    it "reads a GIVEN gloss as the input's label, never as the rule's sentence (row 14)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- The head names no input, so the type checker hoists the GIVEN name
+      -- into it; the gloss must not be taken for the rule's herald on that
+      -- account (smucclaw/l4-ide#977). Positional: the bare name. WITH: the
+      -- gloss labels the input. Render: the rule's own body.
+      nlgOut `shouldSatisfy` endsLine "`row fourteen` with 200"
+      nlgOut `shouldSatisfy` ("`row fourteen` where the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldNotSatisfy` ("the sum of money with 200" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
+
+    it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15, 16)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Ruled 2026-10-02: indented past the GIVEN keyword, it describes the
+      -- input above it, with a GIVETH next (row 15) or without (row 16).
+      -- Before, row 15's was dropped and row 16's became the rule's sentence.
+      nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` (joinLines ["`row sixteen` with 200", "`row sixteen` where the sum of money is 200"] `isInfixOf`)
+      -- Render describes each rule by its own body.
+      renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen means amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
+
+    it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      nlgOut `shouldSatisfy` endsLine "row seventeen saw 200"
+      renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do
@@ -1773,6 +2319,38 @@ spec bin = do
     it "evaluates an exported division" $
       batchAnswer bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
         `shouldReturn` Number 2
+
+  -- `l4 batch` prints the checked module back and checks it again beside a
+  -- generated record with a field for each input. An annotation that names an
+  -- input (`%a%`) would then have two candidates and no expected type to choose
+  -- between them, and `main`'s checker refuses that ("multiple definitions").
+  -- `prettyLayout` writes no annotation back, so the row runs; this pins it.
+  describe "l4 batch runs an export whose annotation names its input" $
+    it "answers instead of refusing the printed module" $
+      batchAnswer bin (fixtureDir </> "batch-nlg-input-slot.l4") (fixtureDir </> "batch-nlg-input-slot.json") "is large"
+        `shouldReturn` Bool True
+
+  -- An `@nlg` annotation is wording for the reader of a rule, not part of what
+  -- the rule evaluates to. `prettyLayout` prints evaluation results, and it
+  -- writes no annotation back; a printer that did would put `[a red colour]`
+  -- inside `Shape OF Red [a red colour], 3`.
+  describe "l4 run prints a value without its annotations" $ do
+    let runOut = do
+          Output code sout0 _ <- runL4 bin ["run", fixtureDir </> "annotated-values.l4"]
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout0)
+    it "leaves an annotation off a constructor inside a value" $ do
+      sout <- runOut
+      sout `shouldSatisfy` ("Shape OF Red, 3" `isInfixOf`)
+      sout `shouldSatisfy` ("JUST OF Green" `isInfixOf`)
+      sout `shouldNotSatisfy` ("a red colour" `isInfixOf`)
+      sout `shouldNotSatisfy` ("a green colour" `isInfixOf`)
+    it "leaves an annotation off the party and the action of an obligation" $ do
+      sout <- runOut
+      sout `shouldSatisfy` ("PARTY Alice" `isInfixOf`)
+      sout `shouldSatisfy` ("MUST `pay the price`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("the payer" `isInfixOf`)
+      sout `shouldNotSatisfy` ("paying" `isInfixOf`)
 
   -- Regression test for smucclaw/l4-ide#906: a diamond import over the
   -- embedded-library fallback used to starve the second sibling of the shared

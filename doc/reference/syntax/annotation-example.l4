@@ -18,3 +18,35 @@ DECIDE `is old enough` IF age >= 18
 
 #EVAL `the greater of` 3 7
 #EVAL `is old enough` 20
+
+-- A literal percent sign or close bracket in an `@nlg` annotation is written
+-- with a backslash in front of it. Here the rate range `10%and%20` would
+-- otherwise read `and` as a parameter name, silently.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`the levy on` amount [a rate between 10\%and\%20 applied to %amount%]
+MEANS amount TIMES 0.15
+
+#EVAL `the levy on` 100
+
+-- A citation containing a literal `>>` needs a backslash before the angle
+-- bracket, or the inline `@ref` form would end halfway through it.
+GIVEN claimant IS A BOOLEAN
+GIVETH A BOOLEAN
+`is eligible` claimant MEANS
+  <<Section 4(1)(a) \>> as amended>>
+  claimant
+
+#EVAL `is eligible` TRUE
+
+-- An `@nlg` may carry a language subtag, and one rule may carry a
+-- rendering per language. `l4 nlg --lang he` and `l4 render --lang he` select
+-- the Hebrew one; with no flag, or for a rule that has none in that language,
+-- the default rendering is used.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is a large amount` @nlg:en the amount %amount% is large
+                           @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+
+#EVAL `is a large amount` 150

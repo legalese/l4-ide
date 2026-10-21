@@ -51,6 +51,42 @@ data AnnoType
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (ToExpr, NFData)
 
+-- | A language subtag on an @\@nlg@ annotation: the @he@ in @\@nlg:he@.
+--
+-- Carried on the HERALDED form only. The bare inline @[…]@ form has no free
+-- position for one — 'toAnno's inline branch is @oh <> t <> ch@ with nothing
+-- between the opening bracket and the text — which is why that form stays
+-- untaggable (ruled 2026-09-17; @[\@he …]@ is pre-approved for later).
+--
+-- Not validated as BCP 47 here. The lexer's job is to capture it; rejecting
+-- @\@nlg:klingon@ belongs later, where a diagnostic can carry a source span.
+newtype LangTag = MkLangTag Text
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (ToExpr, NFData)
+
+-- | The language part of a tag, before its first hyphen: the @he@ of @he-IL@.
+langPrimary :: LangTag -> Text
+langPrimary (MkLangTag t) = Text.takeWhile (/= '-') t
+
+-- | How closely a wording's language answers a request for another, or
+-- 'Nothing' when it does not answer it at all. Lower is closer:
+--
+-- * 0, the same tag;
+-- * 1, the wording's tag is a prefix of the request: @he@ answers @he-IL@;
+-- * 2, the two share their language: @he-IL@ answers @he@, and @he-IL@
+--   answers @he-XX@.
+--
+-- Every reader that asks "is this wording in that language" goes through
+-- this, so a wording tagged @he-IL@ is picked by @--lang he@, and the Hebrew
+-- frame words reach it, without each reader deciding that again. The tags are
+-- compared as written, as everywhere else: @HE@ is not @he@.
+langMatchRank :: LangTag -> LangTag -> Maybe Int
+langMatchRank want@(MkLangTag w) have@(MkLangTag h)
+  | want == have                        = Just 0
+  | (h <> "-") `Text.isPrefixOf` w      = Just 1
+  | langPrimary want == langPrimary have = Just 2
+  | otherwise                           = Nothing
+
 data TDirectives
   = TLazyEvalDirective
   | TLazyEvalTraceDirective
@@ -71,14 +107,20 @@ directives = Map.fromList
   ]
 
 data TAnnotations
-  = TNlg          !Text !AnnoType
+  = TNlg          !(Maybe LangTag) !Text !AnnoType
   | TRefSrc       !Text
   | TRefMap       !Text
   | TRef          !Text !AnnoType
   | TNlgString    !Text
-  | TNlgPrefix    -- ^ "@nlg"
+  | TNlgPrefix    !(Maybe LangTag) -- ^ "@nlg", optionally ":he"
   | TDesc         !Text -- ^ "@desc"
   | TExport       !Text -- ^ "@export"
+  | TLang         !LangTag !Text
+    -- ^ @\@lang he@ — the module's default language, the one an untagged
+    -- @\@nlg@ in that module is written in. The 'Text' is the RAW remainder
+    -- after the herald, spacing and any trailing comment included, because
+    -- 'displayTokenType' re-emits it for exactprint; the 'LangTag' is the
+    -- parsed subtag, so no reader has to re-split the line.
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -347,7 +389,12 @@ data TSpaces
 data TLiterals
   = TIntLit       !Text !Integer
   | TRationalLit  !Text !Rational
-  | TStringLit    !Text
+  | TStringLit    !Text !Text
+  -- ^ @TStringLit raw decoded@. The first field is the verbatim source slice
+  -- (including quotes and any escapes as written); the second is the decoded
+  -- value. Keeping the raw slice — mirroring 'TIntLit'/'TRationalLit' — lets
+  -- exactprint reproduce the source byte-for-byte instead of re-escaping
+  -- non-ASCII characters through 'showLitString'.
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -367,11 +414,33 @@ data TokenType
 annotations :: [Text]
 annotations = ["nlg", "ref", "ref-map", "ref-src"]
 
-nlgAnnotation :: Lexer (Text, AnnoType)
+nlgAnnotation :: Lexer (Maybe LangTag, Text, AnnoType)
 nlgAnnotation =
-  lineAnno "@nlg"
-    <|> inlineAnno (Text.singleton nlgInlineAnnotationOpenChar) (Text.singleton nlgInlineAnnotationCloseChar)
+  lineNlgAnno
+    <|> (\ (t, ty) -> (Nothing, t, ty)) <$> inlineNlgAnno
   <?> "Natural Language Generation Annotation"
+
+-- | @\@nlg@ or @\@nlg:he@, then the rest of the line.
+--
+-- Deliberately NOT a widening of 'lineAnno': that is shared by @\@ref-src@,
+-- @\@ref-map@, @\@desc@, @\@export@, @\@infixl@ and @\@nonexhaustive@, none
+-- of which takes a colon parameter.
+lineNlgAnno :: Lexer (Maybe LangTag, Text, AnnoType)
+lineNlgAnno = do
+  _ <- string "@nlg"
+  mtag <- optional langTag
+  t <- takeWhileP (Just "character") (/= '\n')
+  pure (mtag, t, LineAnno)
+
+-- | @:he@. Backtracks whole, so a colon that does not begin a well-formed tag
+-- stays ordinary annotation text — @\@nlg: see below@ means what it did before
+-- tags existed.
+langTag :: Lexer LangTag
+langTag =
+  try (char ':' *> (MkLangTag <$> takeWhile1P (Just "language subtag") isLangTagChar))
+
+isLangTagChar :: Char -> Bool
+isLangTagChar c = isAsciiLower c || isAsciiUpper c || isDigit c || c == '-'
 
 nlgInlineAnnotationCloseChar :: Char
 nlgInlineAnnotationCloseChar = ']'
@@ -382,7 +451,7 @@ nlgInlineAnnotationOpenChar = '['
 refAnnotation :: Lexer (Text, AnnoType)
 refAnnotation =
   lineAnno "@ref"
-    <|> inlineAnno "<<" ">>"
+    <|> inlineRefAnno
   <?> "Reference Annotation"
 
 refSrcAnnotation :: Lexer Text
@@ -391,20 +460,129 @@ refSrcAnnotation = fst <$> lineAnno "@ref-src"
 refMapAnnotation :: Lexer Text
 refMapAnnotation = fst <$> lineAnno "@ref-map"
 
+-- | @\@lang he@ — a module's default language.
+--
+-- Deliberately NOT a 'lineAnno': the subtag's SHAPE is checked here, by the
+-- same 'isLangTagChar' as @\@nlg:he@, so the two spellings cannot drift into
+-- disagreeing about what a subtag is. Everything after the subtag is kept
+-- verbatim (a trailing comment is ordinary), so exactprint re-emits the line
+-- byte for byte including the author's spacing.
+--
+-- 'try', so that a herald which merely starts with these characters is not
+-- half-consumed on the way to failing.
+langAnnotation :: Lexer (LangTag, Text)
+langAnnotation = try $ do
+  _    <- string "@lang"
+  sp   <- takeWhile1P (Just "space") (== ' ')
+  tag  <- takeWhile1P (Just "language subtag") isLangTagChar
+  rest <- takeWhileP (Just "character") (/= '\n')
+  pure (MkLangTag tag, sp <> tag <> rest)
+
 descAnnotation :: Lexer Text
 descAnnotation = fst <$> lineAnno "@desc"
 
 exportAnnotation :: Lexer Text
 exportAnnotation = fst <$> lineAnno "@export"
 
+-- | A run of literal text inside an NLG annotation.
+--
+-- This is the RENDER-side lexer: it runs over the text an annotation already
+-- captured, so it looks like the right place to DECODE escapes. It is not.
+-- The annotation token keeps the raw slice (see 'inlineNlgAnno'), because
+-- 'toNlgAnno' re-emits that text verbatim for exactprint.
+--
+-- A backslash escape is consumed as a UNIT and kept VERBATIM — @\\%@ stays the
+-- two characters @\\@ and @%@. Two things follow, and both are the point:
+--
+--   * the @%@ inside @\\%@ never reaches 'nlgExprDelimiter', so it cannot open
+--     an interpolation. That is what makes @10\\%and\\%20@ mean what it says
+--     instead of silently rendering as @10\`and\`20@.
+--   * 'displayTokenType' re-emits this text for exactprint, so keeping the
+--     backslash is what makes @l4 format@ round-trip. DECODING HERE IS A BUG:
+--     it was written that way first, and the formatter duly stripped the
+--     backslash, turning a correct annotation into one that either fails to
+--     parse (@\\]@) or silently changes meaning (@\\%@).
+--
+-- Decoding happens once, at render time, in 'L4.Nlg.unescapeNlgText'.
 nlgString :: Lexer Text
 nlgString =
-  takeWhile1P (Just "character") (\c -> c `notElem` nlgSpecialChars && not (isSpace c))
+  Text.concat <$> some (escaped <|> plain <|> loneBackslash)
   where
+    escaped = try (Text.cons <$> char '\\' <*> (Text.singleton <$> satisfy isNlgEscapable))
+    plain = takeWhile1P (Just "character") (\c -> not (isNlgSpecial c) && not (isSpace c))
+
+    -- A backslash that cannot begin an escape is an ordinary character, which
+    -- is exactly what it was before escapes existed. Without this alternative
+    -- an annotation whose text ENDS in a backslash stops lexing altogether —
+    -- @\@nlg a discount of 50\\@ — because 'escaped' needs a character after
+    -- the backslash and 'plain' excludes it. There is no closing herald on a
+    -- line annotation, so there is nothing there to escape.
+    loneBackslash = Text.singleton <$> char '\\'
+
+    isNlgSpecial c = c == '\\' || c `elem` nlgSpecialChars
     nlgSpecialChars =
       [ nlgInlineAnnotationCloseChar
       , nlgExprDelimiterSymbol
       ]
+
+-- | The characters a backslash may escape inside an NLG annotation.
+--
+-- This set is deliberately EQUAL to the set 'L4.Nlg.unescapeNlgText' decodes.
+-- A lexer that swallows a @\\x@ the decoder will not decode is how a stray
+-- backslash changes what an annotation captures without changing what it
+-- renders: the two sides disagree about whether an escape happened. Any other
+-- @\\x@ is two ordinary characters, on both sides alike.
+--
+-- __The open bracket is here even though it never needs escaping__ (ruled
+-- 2026-09-19). A bare @[@ is ordinary text in both annotation forms — it does
+-- not nest and it cannot end an annotation — so @\\[@ protects nothing. It is
+-- accepted because an author who escapes the closing bracket of a citation
+-- will escape its opening bracket in the same keystroke, @[see note \\[3\\]
+-- here]@, and the asymmetric set rendered that as @see note \\[3] here@: the
+-- @\\]@ decoded, the @\\[@ did not, and a backslash the author never meant to
+-- write reached the generated prose. That failure is SILENT — no diagnostic,
+-- no parse error, just a wrong character in the output — which is the kind
+-- worth spending a rule on. Accepting the habit costs nothing, because the two
+-- spellings now decode to the same text.
+isNlgEscapable :: Char -> Bool
+isNlgEscapable c =
+  c == '\\'
+    || c == nlgExprDelimiterSymbol
+    || c == nlgInlineAnnotationCloseChar
+    || c == nlgInlineAnnotationOpenChar
+
+-- | The characters a backslash may escape inside an @\@ref@ annotation.
+--
+-- Deliberately NOT the same set as 'isNlgEscapable': @%@ and @]@ are ordinary
+-- text in a citation, and an escape nobody needs is one more way to surprise a
+-- reader. Only the closing herald's character, and the backslash itself.
+isRefEscapable :: Char -> Bool
+isRefEscapable c = c == '\\' || c == '>'
+
+-- | Decode the backslash escapes an @\@ref@ annotation may carry.
+--
+-- Applied once, where the parser stores the citation on the 'L4.Syntax.Ref'
+-- node. That is safe: the exact printer walks the annotation's TOKENS
+-- ('L4.ExactPrint.exactprint' is @concreteNodesToTokens@ then
+-- @displayPosToken@), not the 'Text' the node carries. The 'Text' is what a
+-- reader of the citation sees, and @exactprint identity@ does not depend on
+-- it, which is the whole argument.
+--
+-- Contrast 'L4.Nlg.unescapeNlgText', which canNOT decode at its node: the text
+-- 'L4.Syntax.MkNlgText' holds is 'displayTokenType' of the annotation's inner
+-- token (@TNlgString t -> t@), which is also what exactprint prints back, so it
+-- has to stay raw. 'L4.Print.prettyLayout' writes no annotation back at all.
+-- Same feature, opposite placement, and the difference is which text exactprint
+-- reads.
+unescapeRefText :: Text -> Text
+unescapeRefText t
+  | not (Text.any (== '\\') t) = t
+  | otherwise = Text.pack (go (Text.unpack t))
+  where
+    go = \ case
+      '\\' : c : rest | isRefEscapable c -> c : go rest
+      c : rest -> c : go rest
+      [] -> []
 
 nlgExprDelimiter :: Lexer Char
 nlgExprDelimiter =
@@ -413,11 +591,71 @@ nlgExprDelimiter =
 nlgExprDelimiterSymbol :: Char
 nlgExprDelimiterSymbol = '%'
 
-inlineAnno :: Text -> Text -> Lexer (Text, AnnoType)
-inlineAnno openingHerald closingHerald = do
-  _o <- string openingHerald
-  (anno, _c) <- manyTill_ anySingle (string closingHerald)
-  pure (Text.pack anno, InlineAnno)
+-- | The NLG inline annotation, @[...]@, in which a backslash escapes.
+--
+-- @[a \\] b]@ is one annotation whose text is @a \\] b@, rather than truncating
+-- at the first @]@ and leaving @ b]@ to fail the enclosing parse with
+-- @unexpected ]@.
+--
+-- The backslash is KEPT in the captured text. That text is what 'toNlgAnno'
+-- re-emits for exactprint, so dropping it here would make the printer lose the
+-- escape and change the annotation's meaning on the next parse. Decoding
+-- happens on the render side; see 'L4.Nlg.unescapeNlgText'.
+--
+-- The single thing this costs: @[note\\]@, a backslash immediately before the
+-- terminator, no longer closes the annotation, because @\\]@ is now an escaped
+-- @]@. Write @[note\\\\]@ for a trailing backslash. Measured 2026-10-19 on
+-- @main@: no bracketed or heralded @\@nlg@ annotation in any @.l4@ file
+-- contains a backslash, so nothing existing is affected -- which is a
+-- measurement, not a guarantee.
+inlineNlgAnno :: Lexer (Text, AnnoType)
+inlineNlgAnno = do
+  _o <- char nlgInlineAnnotationOpenChar
+  anno <- Text.concat <$> many (escapedChar <|> plainChunk <|> loneBackslash)
+  _c <- char nlgInlineAnnotationCloseChar
+  pure (anno, InlineAnno)
+  where
+    escapedChar = try (Text.cons <$> char '\\' <*> (Text.singleton <$> satisfy isNlgEscapable))
+    plainChunk =
+      takeWhile1P (Just "character") (\c -> c /= '\\' && c /= nlgInlineAnnotationCloseChar)
+    -- As in 'nlgString': a backslash that cannot begin an escape stays an
+    -- ordinary character, so @[note\\q]@ still lexes and still means what it
+    -- meant. Every alternative consumes at least one character, so 'many'
+    -- cannot spin on a zero-width success.
+    loneBackslash = Text.singleton <$> char '\\'
+
+-- | The @\@ref@ inline annotation, @\<\<...\>\>@, in which a backslash escapes.
+--
+-- @\<\<see s.5 \\\>\> onward\>\>@ is one annotation whose text is
+-- @see s.5 \\\>\> onward@, rather than terminating at the first @\>\>@ and
+-- leaving the remainder to fail the enclosing parse. Before this, a literal
+-- @\>\>@ inside a citation was unrepresentable (ruled 2026-09-17).
+--
+-- Two details that are not decoration:
+--
+--   * A LONE @\>@ is still ordinary text — @\<\<a \> b\>\>@ has always worked and
+--     must keep working, so a @\>@ that does not complete the herald falls
+--     through to 'loneGt'. This is why the closing herald is matched whole
+--     rather than by its first character.
+--   * The backslash is KEPT here, verbatim, and decoded later by
+--     'unescapeRefText' where the parser builds the 'L4.Syntax.Ref'. The token
+--     is what exactprint re-emits, so dropping the backslash here would lose
+--     the escape on the next parse.
+inlineRefAnno :: Lexer (Text, AnnoType)
+inlineRefAnno = do
+  _o <- string "<<"
+  anno <- Text.concat <$> many (escapedChar <|> plainChunk <|> loneBackslash <|> loneGt)
+  _c <- string ">>"
+  pure (anno, InlineAnno)
+  where
+    escapedChar = try (Text.cons <$> char '\\' <*> (Text.singleton <$> satisfy isRefEscapable))
+    plainChunk = takeWhile1P (Just "character") (\c -> c /= '\\' && c /= '>')
+    -- A backslash that cannot begin an escape stays an ordinary character, as
+    -- it was before escapes existed.
+    loneBackslash = Text.singleton <$> char '\\'
+    -- A '>' that does not complete the closing herald.
+    loneGt = try (notFollowedBy (string ">>") *> (Text.singleton <$> char '>'))
+
 
 lineAnno :: Text -> Lexer (Text, AnnoType)
 lineAnno herald = do
@@ -439,9 +677,12 @@ blockComment =
   where
     inner = blockComment <|> Text.singleton <$> anySingle
 
-stringLiteral :: Lexer Text
+-- | Lex a string literal, returning @(raw, decoded)@: the verbatim source
+-- slice (quotes included) and the escape-decoded value. 'Megaparsec.match'
+-- captures the raw slice so exactprint can reproduce it exactly.
+stringLiteral :: Lexer (Text, Text)
 stringLiteral =
-  char '"' *> (Text.pack <$> manyTill Lexer.charLiteral (char '"'))
+  Megaparsec.match (char '"' *> (Text.pack <$> manyTill Lexer.charLiteral (char '"')))
 
 -- | A quoted identifier between backticks.
 quoted :: Lexer Text
@@ -526,7 +767,7 @@ literalPayload :: Lexer TLiterals
 literalPayload = asum
   [ uncurry TRationalLit <$> try rationalLiteral
   , uncurry TIntLit      <$> try integerLiteral
-  , TStringLit           <$> stringLiteral
+  , uncurry TStringLit   <$> stringLiteral
   ]
 
 identifiersPayload :: Lexer TIdentifiers
@@ -539,9 +780,10 @@ annotationsPayload :: Lexer TAnnotations
 annotationsPayload = asum
   [ TRefSrc       <$> refSrcAnnotation
   , TRefMap       <$> refMapAnnotation
+  , uncurry TLang <$> langAnnotation
   , TDesc         <$> descAnnotation
   , TExport       <$> exportAnnotation
-  , uncurry TNlg  <$> nlgAnnotation
+  , (\ (mtag, t, ty) -> TNlg mtag t ty) <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
 
@@ -582,7 +824,7 @@ nlgTokenPayload = asum
   , TIdentifiers . TIdentifier <$> identifier
   , TSymbols TNlgOpen          <$  char nlgInlineAnnotationOpenChar
   , TSymbols TNlgClose         <$  char nlgInlineAnnotationCloseChar
-  , TAnnotations TNlgPrefix    <$  "@nlg"
+  , TAnnotations . TNlgPrefix  <$> (string "@nlg" *> optional langTag)
   , TAnnotations . TNlgString  <$> nlgString
   ]
 
@@ -983,9 +1225,23 @@ toAnno lh oh ch t = \ case
   LineAnno -> lh <> t
 
 
-toRefAnno, toNlgAnno :: Text -> AnnoType -> Text
+toRefAnno :: Text -> AnnoType -> Text
 toRefAnno = toAnno "@ref" "<<" ">>"
-toNlgAnno = toAnno "@nlg" "[" "]"
+
+-- | Re-emit an @\@nlg@ annotation's source text, tag included.
+--
+-- This is on the EXACTPRINT path twice over, so the tag is not cosmetic here:
+-- 'L4.Parser.nlgAnnotationP' rebuilds the annotation with this function and
+-- re-lexes the result, and inner token positions are seeded by advancing over
+-- that text ('mkPosTokens'). Drop the @:he@ and every inner token's column
+-- shifts by three, silently.
+toNlgAnno :: Maybe LangTag -> Text -> AnnoType -> Text
+toNlgAnno mtag t = \ case
+  InlineAnno -> "[" <> t <> "]"
+  LineAnno   -> "@nlg" <> langTagSuffix mtag <> t
+
+langTagSuffix :: Maybe LangTag -> Text
+langTagSuffix = maybe "" (\ (MkLangTag tag) -> ":" <> tag)
 
 displayPosToken :: PosToken -> Text
 displayPosToken (MkPosToken _r tt) =
@@ -1016,16 +1272,17 @@ displayTokenType = \case
   TLiterals lit -> case lit of
     TIntLit t _i      -> t
     TRationalLit t _i -> t
-    TStringLit s      -> showStringLit s
+    TStringLit raw _  -> raw
   TAnnotations ann -> case ann of
-    TNlg t ty         -> toNlgAnno t ty
+    TNlg mtag t ty    -> toNlgAnno mtag t ty
     TRef t ty         -> toRefAnno t ty
     TRefSrc t         -> "@ref-src" <> t
     TRefMap t         -> "@ref-map" <> t
     TNlgString t      -> t
-    TNlgPrefix        -> "@nlg"
+    TNlgPrefix mtag   -> "@nlg" <> langTagSuffix mtag
     TDesc t           -> "@desc" <> t
     TExport t         -> "@export" <> t
+    TLang _ raw       -> "@lang" <> raw
   TIdentifiers i -> case i of
     TGenitive         -> "'s"
     TIdentifier t     -> t

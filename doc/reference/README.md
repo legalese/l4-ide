@@ -67,7 +67,7 @@ Obligations, permissions and prohibitions: who must, may or must not do what, by
 | [Deadlines and consequences](regulative/consequences.md) | WITHIN, HENCE and LEST, FULFILLED and BREACH, PROVIDED, EXACTLY, RAND and ROR |
 | [BECAUSE](regulative/BECAUSE.md)                         | The reason given for a breach                                                 |
 | [DEONTIC](regulative/DEONTIC.md)                         | The type of a regulative rule, and how a rule is evaluated                    |
-| [EVENT](regulative/EVENT.md)                             | What a party did and when; WAIT UNTIL                                         |
+| [EVENT](regulative/EVENT.md)                             | What a party did and when; WAITUNTIL                                          |
 
 ### [Syntax and directives](syntax/README.md)
 
@@ -86,7 +86,7 @@ How an L4 file is written, on one page:
 Functions every L4 file can use without `IMPORT`:
 
 - [Numbers](builtins/README.md#numbers), [text](builtins/README.md#text), [dates](builtins/README.md#dates), [times of day](builtins/README.md#times-of-day), [date and time together](builtins/README.md#date-and-time-together)
-- [Looking across days](builtins/README.md#looking-across-days) and [regulative traces](builtins/README.md#regulative-traces)
+- [Regulative traces](builtins/README.md#regulative-traces)
 - [HTTP and JSON](builtins/http-json.md): FETCH, POST, ENV, JSONENCODE, JSONDECODE
 
 ### [Standard libraries](libraries/README.md)

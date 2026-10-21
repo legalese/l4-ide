@@ -92,7 +92,7 @@ GIVETH A DEONTIC Actor Action
 #EVAL EVALTRACE `delivery obligation` 0 (LIST EVENT Seller `deliver goods` 10)
 ```
 
-Both give `FULFILLED`. With no events at all, both give the rule still waiting, not `BREACH`: to let a deadline pass without anyone acting, add a `` `WAIT UNTIL` `` event.
+Both give `FULFILLED`. With no events at all, both give the rule still waiting, not `BREACH`: to let a deadline pass without anyone acting, add a `WAITUNTIL` event.
 
 `l4 state-graph` draws a rule's possible paths as a state diagram; see [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md).
 

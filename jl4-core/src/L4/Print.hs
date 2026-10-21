@@ -744,8 +744,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Pattern a) where
 instance LayoutPrinter Nlg where
   printWithLayout = \ case
     MkInvalidNlg _ -> "Invalid Nlg"
-    MkParsedNlg _ frags -> prettyNlgs frags
-    MkResolvedNlg _ frags -> prettyNlgs frags
+    MkParsedNlg _ _ frags -> prettyNlgs frags
+    MkResolvedNlg _ _ frags -> prettyNlgs frags
     where
       prettyNlgs [] = mempty
       prettyNlgs [x@MkNlgRef{}] = printWithLayout x
@@ -897,9 +897,6 @@ instance LayoutPrinter BinOp where
     BinOpIndexOf -> "INDEXOF"
     BinOpSplit -> "SPLIT"
     BinOpCharAt -> "CHARAT"
-    BinOpWhenLast -> "WHEN LAST"
-    BinOpWhenNext -> "WHEN NEXT"
-    BinOpValueAt -> "VALUE AT"
 
 instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
   printWithLayout = \ case
