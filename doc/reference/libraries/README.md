@@ -56,7 +56,7 @@ IMPORT `legal-persons`
 
 - Every top-level definition of the imported file: its types, constructors, functions and constants.
 - Nothing is imported for you. A file that uses `map`, `sum` or `fromMaybe` needs `IMPORT prelude` like any other library.
-- Import each library you use by name. The definitions a library imports for itself also reach your file, but do not count on it: `IMPORT datetime`, for example, does not give you `Date`; that needs `IMPORT daydate`.
+- What a library imports also reaches your file: `IMPORT datetime` gives you `daydate` too, and `IMPORT daydate` gives you `date-compat`. Importing each library you use by name still makes a file easier to read.
 
 ### Where modules are found
 
