@@ -33,6 +33,7 @@ import Types
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
@@ -398,6 +399,11 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
         batchArgs.outcomes
 
 -- | POST /deployments/{id}/functions/{fn}/query-plan
+--
+-- The plan is computed here, under --eval-timeout. Returned unevaluated, it
+-- would be computed while Warp sends the response, and by then Warp's own
+-- connection timeout (30 s) is running again: a plan that took longer was cut
+-- off at 30 to 60 s, the connection closed with no status and no error.
 queryPlanHandler' :: DeploymentId -> Text -> FnArguments -> AppM QueryPlanResponse
 queryPlanHandler' deployId fnName fnArgs = do
   logger <- asks (.logger)
@@ -408,7 +414,11 @@ queryPlanHandler' deployId fnName fnArgs = do
   (fns, _meta) <- requireDeploymentReady deployId
   vf <- requireFunction fns fnName
   cached <- requireDecisionQueryCache deployId fnName vf
-  pure $ queryPlan fnName cached fnArgs
+  withinEvalTimeout $ do
+    let plan = queryPlan fnName cached fnArgs
+    -- Encoding computes all of the plan that is sent.
+    _ <- evaluate (LBS.length (Aeson.encode plan))
+    pure plan
 
 -- | GET /deployments/{id}/functions/{fn}/ladder
 --
@@ -501,8 +511,9 @@ ladderHandler deployId fnName = do
 -- the constructor cannot be returned without entering each.
 --
 -- What that does NOT cover is serialization: Servant encodes the response after
--- this returns, outside the timeout. That is not an oversight, it is why the
--- node budget exists and why it is a separate limit. Removing the budget and
+-- this returns, outside the timeout. That holds for 'ladderHandler';
+-- 'queryPlanHandler'' encodes its plan itself, under the timeout. It is not an
+-- oversight, it is why the node budget exists and why it is a separate limit. Removing the budget and
 -- leaving only this timeout was measured: the 32-variable case then passes the
 -- timeout in well under a second and the request still does not complete.
 requireDecisionQueryCache :: DeploymentId -> Text -> ValidatedFunction -> AppM CachedDecisionQuery
@@ -757,6 +768,17 @@ withEvalLimits :: NFData b => IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
 withEvalLimits act = do
   cfg <- asks (.options)
   liftIO (EvalLimits.withEvalLimits cfg act)
+
+-- | Run an action under --eval-timeout only. Unlike 'timeoutAction' it sets no
+-- allocation limit: that limit counts every byte allocated, not memory held,
+-- and query plans have never been held to it.
+withinEvalTimeout :: IO a -> AppM a
+withinEvalTimeout act = do
+  cfg <- asks (.options)
+  result <- liftIO $ timeout (cfg.evalTimeout * 1_000_000) act
+  case result of
+    Nothing -> throwError err500 { errBody = jsonError "Query plan timed out" }
+    Just x -> pure x
 
 -- ----------------------------------------------------------------------------
 -- Helpers
