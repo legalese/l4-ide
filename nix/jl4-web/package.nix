@@ -7,8 +7,22 @@
   pkg-config,
   libsecret,
   lib,
+  fetchurl,
   ...
 }:
+let
+  # The in-browser LSP the editor prefers (VITE_PREFER_WASM in
+  # ts-apps/jl4-web/.env.production), as a release of main-tag.yml built it.
+  # Bump the tag and both hashes after a release to keep it up to date; the
+  # tag is also the cache key browsers keep the WASM under.
+  wasm-release = "l4-ide-build-98";
+  fetchWasm = name: hash: fetchurl {
+    url = "https://github.com/legalese/l4-ide/releases/download/${wasm-release}/${name}";
+    inherit hash;
+  };
+  jl4-core-wasm = fetchWasm "jl4-core.wasm" "sha256-IR6Y+A5eYUFtxHbfWoGQ1mi6YApmIvisaqAh1/dqZHU=";
+  jl4-core-mjs = fetchWasm "jl4-core.mjs" "sha256-eeDBcTyysrsjtLvhOHMhynMp6QfcFR1/DqV54yIihuY=";
+in
 buildNpmPackage rec {
   pname = "jl4-web";
   version = "0-latest";
@@ -36,6 +50,10 @@ buildNpmPackage rec {
     set -x
     export VITE_SOCKET_URL=${if secure then "wss" else "ws"}://${socket-url};
     export VITE_SESSION_URL=${if secure then "https" else "http"}://${session-url};
+    export VITE_WASM_VERSION=${wasm-release};
+    mkdir -p ./ts-apps/jl4-web/static/wasm
+    cp ${jl4-core-wasm} ./ts-apps/jl4-web/static/wasm/jl4-core.wasm
+    cp ${jl4-core-mjs} ./ts-apps/jl4-web/static/wasm/jl4-core.mjs
 
     pushd ./ts-shared
 
