@@ -70,6 +70,7 @@ import qualified L4.Export as Export
 import qualified L4.Export.Document as ExportDoc
 import qualified L4.Export.Render as ExportRender
 import qualified L4.FunctionSchema as FSchema
+import qualified L4.Nlg as Nlg
 
 data ReactorMessage
   = ReactorNotification (IO ())
@@ -881,7 +882,14 @@ handlers evalConfig recorder =
             , _xdata = Nothing }
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
-            mTc <- liftIO $ runAction "l4/exportDocument" _ide $ use TypeCheck nuri
+            -- The token stream alongside the type-check result, for the same
+            -- reason `l4 render` reads it: the document's language — the HTML
+            -- wrapper's @lang@, and the AKN Expression FRBR URIs — comes from the
+            -- module's declared @\@lang@, which lives in the tokens, unless the
+            -- request names one (@lang@, which the Render tab's language picker
+            -- sets, as @--lang@ does for the CLI).
+            (mTc, mToks) <- liftIO $ runAction "l4/exportDocument" _ide $
+              (,) <$> use TypeCheck nuri <*> use GetLexTokens nuri
             case mTc of
               Nothing -> pure $ Left $ TResponseError
                 { _code = InR ErrorCodes_InvalidRequest
@@ -897,7 +905,17 @@ handlers evalConfig recorder =
                     excludedUris = Set.fromList
                       [ toNormalizedUri (Uri u) | u <- reqParams.excludeModules ]
                     keepModule (MkModule _ u _) = not (u `Set.member` excludedUris)
-                    deps = filter keepModule (drop 1 (flattenExportModules tcResult))
+                    rawDeps = filter keepModule (drop 1 (flattenExportModules tcResult))
+                    declaredLang =
+                      Maybe.fromMaybe defaultModuleLang (declaredModuleLang . fst =<< mToks)
+                    requestedLang = MkLangTag <$> reqParams.lang
+                    -- Chosen before the document is built, and in the imports
+                    -- too, as `l4 render --lang` does ('Nlg.selectLanguage').
+                    -- With no @lang@ it is the identity.
+                    localise = Nlg.selectLanguage requestedLang
+                    (docLang, _unsupported) =
+                      Nlg.documentLanguage declaredLang requestedLang (tcResult.module' : rawDeps)
+                    deps = map localise rawDeps
                     ecfg = ExportDoc.defaultExportConfig
                       { ExportDoc.dropUnused = not reqParams.includeUnused
                       , ExportDoc.mixfixHeadings =
@@ -906,17 +924,25 @@ handlers evalConfig recorder =
                     rcfg = ExportRender.MkRenderConfig
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
-                             , ExportRender.toc = reqParams.toc }
-                    doc = ExportDoc.buildDocument ecfg tcResult.module' deps
+                             , ExportRender.toc = reqParams.toc
+                             , ExportRender.docLang = docLang }
+                    doc = ExportDoc.buildDocument ecfg (localise tcResult.module') deps
+                    -- What the Render tab offers to switch to: the languages
+                    -- of the file's own wordings, not of its imports, whose
+                    -- English would otherwise be offered for every file.
+                    languages = Nlg.moduleLanguages declaredLang tcResult.module'
+                    langText (MkLangTag t) = t
                     content = case reqParams.format of
                       "text" -> ExportRender.renderText rcfg doc
-                      "akn"  -> ExportRender.renderAkn doc
+                      "akn"  -> ExportRender.renderAkn rcfg doc
                       "json" -> ""
                       _      -> ExportRender.renderHtml rcfg doc
                 pure $ Right $ Aeson.object
-                  [ "format"  Aeson..= reqParams.format
-                  , "content" Aeson..= content
-                  , "ir"      Aeson..= doc
+                  [ "format"    Aeson..= reqParams.format
+                  , "content"   Aeson..= content
+                  , "ir"        Aeson..= doc
+                  , "languages" Aeson..= map langText languages
+                  , "lang"      Aeson..= langText docLang
                   ]
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportPlanMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Ladder.ExportPlanParams

@@ -8,7 +8,7 @@ module L4.Syntax where
 
 import Base
 import L4.Annotation
-import L4.Lexer (PosToken)
+import L4.Lexer (LangTag (..), PosToken, langMatchRank)
 import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
@@ -89,6 +89,16 @@ rawNameToText :: RawName -> Text
 rawNameToText (NormalName n)       = n
 rawNameToText (PreDef n)           = n
 rawNameToText (QualifiedName qs n) = Text.intercalate "." (NE.toList qs <> [n])
+
+-- | As 'rawNameToText', dropping any section qualification.
+--
+-- 'rawNameToText' joins the section path with @.@, which is right inside L4 and
+-- wrong wherever a name is compared with a library's own spelling: the date
+-- literal check in "L4.Nlg" asks whether a call is daydate's @Date@, and a call
+-- written through a section qualifier is still that function.
+unqualifiedRawNameToText :: RawName -> Text
+unqualifiedRawNameToText (QualifiedName _ n) = n
+unqualifiedRawNameToText rn                  = rawNameToText rn
 
 nameToText :: Name -> Text
 nameToText = rawNameToText . rawName
@@ -575,6 +585,9 @@ data PmSynthetic
 data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
+    -- ^ The rendering to use when no language was asked for. See 'annNlg'.
+  , nlgAlts      :: [Nlg]
+    -- ^ Further renderings of the same node in OTHER languages. See 'annNlgAlts'.
   , desc         :: Maybe Desc
   , ref          :: Refs
     -- ^ Every @\@ref@ written before this node and after the node before it,
@@ -608,11 +621,11 @@ instance ToExpr Refs where
   toExpr (MkRefs rs) = toExpr rs
 
 instance Semigroup Extension where
-  Extension i1 nlg1 desc ref1 pm1 syn1 <> Extension i2 nlg2 desc' ref2 pm2 syn2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <> ref2) (pm1 <|> pm2) (syn1 <|> syn2)
+  Extension i1 nlg1 alts1 desc ref1 pm1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 pm2 syn2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (pm1 <|> pm2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing (MkRefs []) Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -622,7 +635,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing (MkRefs []) Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -632,8 +645,50 @@ annoOf = lens
 annInfo :: Lens' Anno (Maybe Info)
 annInfo = annoExtra % #resolvedInfo
 
+-- | The rendering to reach for when the caller has not asked for a language.
+--
+-- Its meaning is deliberately UNCHANGED by the arrival of language tags, and
+-- that is what keeps the existing uses correct without being revisited. Every
+-- one of them is asking WHICH NODE carries an annotation — walking a node's
+-- children — not which language it is in. A tagged annotation that is the only
+-- one on its name is therefore found here, exactly as it was before tags
+-- existed; a monolingual Hebrew document keeps working without a single reader
+-- knowing about tags.
 annNlg :: Lens' Anno (Maybe Nlg)
 annNlg = #extra % #nlg
+
+-- | The OTHER renderings of this node, one per further language.
+--
+-- Invariants, established by 'L4.Parser.ResolveAnnotation.addNlg' and relied on
+-- by 'nlgFor': every entry has a tag ('nlgLangTag' is 'Just'), no two entries
+-- share a tag, and no entry shares a tag with 'annNlg'. A genuine collision —
+-- two annotations on one name in the SAME language — is a warning and attaches
+-- neither, which is what the whole pre-tag mechanism did for any two.
+annNlgAlts :: Lens' Anno [Nlg]
+annNlgAlts = #extra % #nlgAlts
+
+-- | Pick the rendering for a requested language, falling back to the default.
+--
+-- @'nlgFor' 'Nothing'@ is the default rendering, which is what every caller
+-- that predates tags wants. @'nlgFor' ('Just' he)@ prefers the @he@ rendering
+-- and falls back to the default when there is none — so asking for a language
+-- a document does not have yields the document's own wording rather than
+-- nothing, which is the behaviour a reader wants from a partial translation.
+--
+-- The closest rendering wins ('langMatchRank'), so @he@ picks a rendering
+-- tagged @he-IL@ when there is no @he@ one, and @he-IL@ picks a @he@ one.
+-- Among equally close renderings the first, default first, wins.
+nlgFor :: Maybe LangTag -> Anno -> Maybe Nlg
+nlgFor Nothing a = view annNlg a
+nlgFor (Just want) a =
+  case sortOn fst
+         [ (rank, n)
+         | n <- toList (view annNlg a) <> view annNlgAlts a
+         , Just have <- [nlgLangTag n]
+         , Just rank <- [langMatchRank want have]
+         ] of
+    ((_, n) : _) -> Just n
+    []           -> view annNlg a
 
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
@@ -655,6 +710,10 @@ annRef = annRefs % to (listToMaybe . reverse)
 
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
+
+-- | Attach a default rendering plus the alternatives in other languages.
+setNlgs :: Nlg -> [Nlg] -> Anno -> Anno
+setNlgs n alts a = a & annNlg ?~ n & annNlgAlts .~ alts
 
 setDesc :: Desc -> Anno -> Anno
 setDesc d a = a & annDesc ?~ d
@@ -878,14 +937,58 @@ data Nlg =
     MkInvalidNlg Anno
     -- ^ This is an invalid annotation, we failed to parse it further.
     -- This means it likely has mismatching '%' tokens or the 'name' parser failed.
-  | MkParsedNlg Anno [NlgFragment Name]
+  | MkParsedNlg Anno (Maybe LangTag) [NlgFragment Name]
     -- ^ An annotation where we extracted the 'Name's that are mentioned.
-  | MkResolvedNlg Anno [NlgFragment Resolved]
+  | MkResolvedNlg Anno (Maybe LangTag) [NlgFragment Resolved]
     -- ^ Same as 'MkParsedNlg', but we have additionally typechecked and resolved the
     -- annotation.
     -- Typechecking merely means we have performed scope checking.
   deriving stock (Show, Eq, Ord, GHC.Generic)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The language an annotation says its prose is in — the @he@ of @\@nlg:he@ —
+-- or 'Nothing' for an untagged one.
+--
+-- __Why this is a field and not something recovered from the tokens.__ The tag
+-- IS in the annotation's concrete tokens, as the payload of 'L4.Lexer.TNlgPrefix',
+-- because exactprint has to re-emit it. Reading it back from there would make
+-- every consumer re-derive a fact the parser already knew, and would tie the
+-- meaning of an annotation to the shape of its token stream. A rendering
+-- knowing what language it is in is ordinary structure, so it is structure.
+--
+-- 'MkInvalidNlg' has no tag: the annotation failed to parse, and reporting a
+-- language for prose we could not read would be asserting more than we know.
+nlgLangTag :: Nlg -> Maybe LangTag
+nlgLangTag = \ case
+  MkInvalidNlg _      -> Nothing
+  MkParsedNlg _ t _   -> t
+  MkResolvedNlg _ t _ -> t
+
+-- | The language a module is written in when it does not say (ruled
+-- 2026-09-17): @en@.
+--
+-- This is a DEFAULT, not a detection. L4 has no idea what language an
+-- annotation is in, and a corpus of Hebrew annotations that declares nothing
+-- is labelled @en@ by this and still renders Hebrew — the label is wrong, the
+-- output is not. The label shows in @l4 render@'s document language.
+defaultModuleLang :: LangTag
+defaultModuleLang = MkLangTag "en"
+
+-- | Give an untagged annotation the module's language.
+--
+-- Applied once, after parsing, to every annotation the module collected —
+-- which is what makes @\@lang he@ mean exactly "tag every herald in this
+-- module @:he@", and makes it order-independent: a declaration at the bottom
+-- of the file reaches the annotations above it.
+withDefaultLang :: LangTag -> Nlg -> Nlg
+withDefaultLang lang = \ case
+  -- An invalid annotation is left alone: we could not read its prose, so
+  -- asserting a language for it would be claiming more than we know.
+  n@MkInvalidNlg{}          -> n
+  MkParsedNlg a Nothing fs  -> MkParsedNlg a (Just lang) fs
+  n@MkParsedNlg{}           -> n
+  MkResolvedNlg a Nothing fs -> MkResolvedNlg a (Just lang) fs
+  n@MkResolvedNlg{}         -> n
 
 data NlgFragment n
   = MkNlgText Anno Text
@@ -961,6 +1064,18 @@ instance ToConcreteNodes PosToken Int where
 -- Text has no concrete syntax nodes (used in Inert expressions for the string content)
 instance ToConcreteNodes PosToken Text where
   toNodes _ = pure []
+
+-- A language tag has no concrete syntax nodes OF ITS OWN, and that is not the
+-- same as having no surface. Its surface is the @:he@ inside the @\@nlg:he@
+-- herald, which is already one token and already captured by the herald's own
+-- lexeme; 'L4.Lexer.displayTokenType' re-emits it from
+-- 'L4.Lexer.TNlgPrefix''s payload. Handing it a node here would make
+-- exactprint emit the tag twice.
+instance ToConcreteNodes PosToken LangTag where
+  toNodes _ = pure []
+
+instance HasSrcRange LangTag where
+  rangeOf _ = Nothing
 
 -- InertContext has no concrete syntax nodes (derived during desugaring)
 instance ToConcreteNodes PosToken InertContext where
@@ -1118,6 +1233,7 @@ instance Serialise Anno where
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
+deriving anyclass instance Serialise LangTag
 deriving anyclass instance Serialise Nlg
 deriving anyclass instance Serialise n => Serialise (NlgFragment n)
 deriving anyclass instance Serialise Comment

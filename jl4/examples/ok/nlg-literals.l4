@@ -1,0 +1,31 @@
+IMPORT daydate
+
+-- How `l4 nlg` writes two literals.
+--
+-- A percentage reads `50%`, glued to its number. It used to read `50 %` with a
+-- space before the sign and another after it, because the number and a
+-- punctuation `%` were joined with a space and the punctuation carries its own
+-- trailing space.
+#EVAL 200 TIMES 50%
+
+-- A call to daydate's `Date` on three whole-number literals reads as the date
+-- it names, in either spelling of the constructor.
+#EVAL Date 16 7 2025
+#EVAL `Days to date` 1 1 2026
+
+-- Every miss falls through to the ordinary call, unchanged.
+--
+-- A component that is not a literal: a variable has no date to print.
+GIVEN day IS A NUMBER
+GIVETH A DATE
+`the july day` MEANS Date day 7 2025
+
+#EVAL `the july day` 16
+
+-- A date that does not exist. `Date` rolls an out-of-range component forward
+-- (31 February becomes March), so printing it as a calendar date would state a
+-- day that is not in the text.
+#EVAL Date 31 2 2025
+
+-- A literal that is not whole.
+#EVAL Date 16.5 7 2025

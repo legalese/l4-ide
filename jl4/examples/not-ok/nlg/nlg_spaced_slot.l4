@@ -1,0 +1,7 @@
+-- A percent pair with spaces inside it is plain text, not a slot, so the
+-- `amount` the author meant to fill in is lost. The diagnostic names the pair
+-- and the slot to write instead.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `over limit` @nlg the claim of % amount % is over the limit
+  IF amount GREATER THAN 100

@@ -146,6 +146,8 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 | ---------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
 | `@desc`                | A description of a definition, shown in tools and APIs            | [Syntax and directives](syntax/README.md#annotations) |
 | `@nlg`, `[...]`        | Wording used when a rule is put into natural language             | [Syntax and directives](syntax/README.md#annotations) |
+| `@nlg:he`              | A wording in a named language; a rule can carry one per language  | [Syntax and directives](syntax/README.md#nlg)         |
+| `@lang he`             | The language an untagged `@nlg` in the module is written in       | [Syntax and directives](syntax/README.md#nlg)         |
 | `@ref`, `<<...>>`      | A reference to the legal source                                   | [Syntax and directives](syntax/README.md#annotations) |
 | `@ref-src`, `@ref-map` | Where references are looked up                                    | [Syntax and directives](syntax/README.md#annotations) |
 | `@export`              | Publishes a function as an API endpoint when the file is deployed | [Syntax and directives](syntax/README.md#annotations) |

@@ -135,9 +135,11 @@ library
     L4.Mixfix
     L4.Names
     L4.Nlg
+    L4.Nlg.Phrasebook
     L4.Parser
     L4.Parser.Anno
     L4.Parser.MixfixRegistry
+    L4.Parser.AnnotationWarning
     L4.Parser.ResolveAnnotation
     L4.Parser.SrcSpan
     L4.ParserCombinators
@@ -185,13 +187,20 @@ test-suite jl4-core-test
     ExportValidationSpec
     DisambiguationWarningsSpec
     NumberLiteralSpec
+    NlgLangTagSpec
+    RenderLangDirSpec
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     RefAnnotationSpec
+    NlgPercentSpec
+    NlgRenderSpec
     DirectiveAmbiguitySpec
+    NlgMultiplicitySpec
+    NlgAttachmentSpec
+    NlgSilentReadingSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
@@ -201,6 +210,7 @@ test-suite jl4-core-test
     deepseq,
     hspec,
     jl4-core,
+    megaparsec,
     optics,
     text,
     time

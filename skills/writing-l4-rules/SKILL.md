@@ -462,8 +462,51 @@ application's employee's nationality   -- chaining
 
 - `@desc` — human-readable description behind any line or `GIVEN` parameter (internal unless paired with `@export`)
 - `@export` — atop the `GIVEN`. mark a function for deployment
-- `@nlg` — natural-language generation hint
+- `@nlg` — the wording `l4 nlg` and `l4 render` print for a rule, an input or a field; where it sits and how to tag its language are below
+- `@lang` — the language an untagged `@nlg` in the module is written in
 - `@ref`, `@ref-src`, `@ref-map` — cross-reference to a legal source
+
+#### `@nlg`: where a wording sits, and its language
+
+An `@nlg` gives a rule, an input or a record field the words that `l4 nlg` and `l4 render` print for it, with `%name%` slots for a rule's inputs.
+What it describes depends on where it sits.
+Trailing a line, it describes what is on that line.
+On a line of its own, it describes what follows.
+
+```l4
+GIVEN amount IS A NUMBER @nlg the claim amount
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large
+DECIDE `is large` IF amount GREATER THAN 100
+```
+
+- **A rule's sentence** goes trailing the head, or on its own line between the `GIVEN` block and the `DECIDE`.
+  Never above the `GIVEN`: the `GIVEN` comes between them, so the wording is not the rule's.
+  When nothing written just before it can take it, L4 warns "Not attached to any valid syntax node"; when an `IMPORT` or a `§` heading comes just before it, that one takes the wording and nothing is reported.
+- **An input's gloss** trails the input's name in the `GIVEN`, or sits on its own line under the input, indented further than the `GIVEN` keyword.
+  It labels the input in a `WITH` call's `where` clause, and it is never the rule's sentence.
+- **A field's gloss** trails the field, `HAS dob IS A DATE @nlg date of birth`, or sits on its own line under the field, indented further than the `DECLARE` keyword.
+  It is read after the owner's name, so `@nlg date of birth` on `dob` reads "the employee's date of birth"; do not repeat the owner in it.
+- **One wording per language.**
+  Write the language subtag straight after `@nlg`, joined by a colon, as in `@nlg:he …`, and put each further wording on a continuation line under the first.
+  `l4 nlg --lang he` and `l4 render --lang he` pick the Hebrew wording, `he` or `he-IL` alike, and a rule with none keeps its default one.
+  A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the` and reads `employee pays`, so write `@nlg the employee pays`, with no colon, for a sentence that starts with that word.
+  `l4 check` warns when a rule, input or field has only one wording and nothing backs its tag as a language: no `@lang` line declares it, nothing else has a wording in it beside one in another language, and it is not `en`, `he` or a declared language with only a region or script after it (`en-GB`, `he-IL`). So `@nlg:en-route …` and the same word used as the tag of several rules draw it too.
+- **A module in one language says so once**, on a line of its own: `@lang he` makes every untagged `@nlg` Hebrew.
+  Do not write `@lang en`: a module without a declaration is English, and `l4 check` hints that the line can go.
+  Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.
+- **Two wordings in the same language on one rule** draw a warning, `l4 check` succeeds, and neither is used.
+- **A literal `%` or `]` inside an `@nlg`** is written `\%` or `\]`.
+  A bare `%and%` is read as the input `and`, and nothing is reported.
+- **A percent pair with spaces inside it**, `% amount %`, is plain text and draws a warning: write the slot as `%amount%`.
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
 
 ### Imports
 

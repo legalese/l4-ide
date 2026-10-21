@@ -281,6 +281,17 @@ Each slot is filled with the input's name in the definition itself, and with the
 • The deadline means whichever is larger of start date and end date.
 ```
 
+A slot is **tight**: `%amount%`, with no spaces inside the delimiters.
+That is what keeps a written-out percentage from being mistaken for one.
+In
+
+```l4
+@nlg a 5% levy on %amount%
+```
+
+the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot, while `%amount%` is one.
+Where a percent sign would end up flush against a word, as in `5%levy`, wrap it in backticks (`` `5%` ``) or spell it out ("5 percent"), either of which puts it beyond doubt.
+
 **It replaces the body.** A function with `@nlg` renders as its sentence, not as its implementation. That is what makes recursive library functions readable; the prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so a call reads as a sentence instead of exposing the recursion.
 
 | Situation                                            | Why `@nlg` helps                                   |
@@ -295,6 +306,38 @@ Tips:
 - Use only the function's own inputs as slots, and write the sentence so that it reads well with each slot as a noun phrase.
 - Try names and shape first. An `@nlg` sentence can drift away from the logic it describes, so use it where it pays off.
 - One sentence per definition. For branching prose, let `CONSIDER` or `IF` render as an outline instead.
+
+---
+
+## One encoding, several languages
+
+An `@nlg` sentence is in whatever language you wrote it in.
+To keep the same rule readable in two languages, give it one sentence per language and tag each with its language:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
+
+Nothing about the rule is duplicated, only its wording.
+Ask for the language you want:
+
+```bash
+l4 render --lang he --format html contract.l4 > contract.he.html
+l4 nlg --lang he contract.l4
+```
+
+A rule with no sentence in that language keeps its default one, so a half-translated file produces a whole document.
+When a whole module is in one language, say it once with `@lang he` on a line of its own instead of tagging every sentence; the tag then means "every untagged `@nlg` in this module is Hebrew".
+
+What this does not do is translate.
+L4 prints the words you wrote.
+The little words it adds itself, such as "is equal to" or "with", stay English unless L4 has a phrase table for the language.
+Hebrew is the one language with a table, and it is small, so have a Hebrew speaker read its output before you rely on it.
+[The syntax reference](../../reference/syntax/README.md#labelling-the-language-nlghe) has the details and the limits.
 
 ---
 

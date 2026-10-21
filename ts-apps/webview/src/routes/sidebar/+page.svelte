@@ -109,6 +109,23 @@
   let importedFiles: SidebarImportedFile[] = $state([])
   let excludedModules: Set<string> = $state(new Set())
   let importsLoading: boolean = $state(false)
+  // Render language: the languages the active file's wordings are in (the
+  // module's own first), as the last live render reported them, and the
+  // language that render is in. The language menu shows only when there is
+  // more than one to choose from.
+  let renderLanguages: string[] = $state([])
+  let renderDocLang: string | undefined = $state(undefined)
+  // The user's language pick per file URI, for this session. A file with no
+  // pick renders in its module's own language: no `lang` is sent at all.
+  let renderLangByFile: Map<string, string> = $state(new Map())
+  const renderLang: string | undefined = $derived(
+    renderLangByFile.get(activeFileUri)
+  )
+  // The language the button shows and the menu marks: the pick, else the
+  // language the server says the preview is in, else the module's own.
+  const renderLangShown: string = $derived(
+    renderLang ?? renderDocLang ?? renderLanguages[0] ?? ''
+  )
 
   // Live inline HTML preview: the rendered HTML for the iframe `srcdoc`,
   // re-fetched (debounced) whenever the active file, its in-memory version
@@ -167,6 +184,7 @@
   let saveBusy: boolean = $state(false)
   let refineTrayOpen: boolean = $state(false)
   let importsTrayOpen: boolean = $state(false)
+  let langMenuOpen: boolean = $state(false)
   // Light/dark theme for the rendered iframe. The generated HTML is
   // hardcoded light, so dark mode injects an override stylesheet. Defaults
   // to VSCode's current theme (resolved in onMount), then user-overridable.
@@ -275,6 +293,62 @@
     if (next.has(uri)) next.delete(uri)
     else next.add(uri)
     excludedModules = next
+  }
+
+  // The primary language subtag, upper-cased, for the language button:
+  // "he-IL" → "HE".
+  function langCode(tag: string): string {
+    return tag.split('-')[0].toUpperCase()
+  }
+
+  // A language-menu entry: the language's name and its full tag, so "he"
+  // and "he-IL" stay apart ("Hebrew · he", "Hebrew (Israel) · he-IL"). Falls
+  // back to the upper-cased code when the runtime has no name for the tag.
+  function langLabel(tag: string): string {
+    let name: string | undefined
+    try {
+      name = new Intl.DisplayNames(['en'], { type: 'language' }).of(tag)
+    } catch {
+      name = undefined
+    }
+    return name && name !== tag
+      ? `${name} · ${tag}`
+      : `${langCode(tag)} · ${tag}`
+  }
+
+  // Pick the render language for the active file. Picking the module's own
+  // language (the first one offered) clears the pick, so the render request
+  // goes back to carrying no `lang`.
+  function pickRenderLang(tag: string) {
+    langMenuOpen = false
+    if (!activeFileUri) return
+    const next = new Map(renderLangByFile)
+    if (tag === renderLanguages[0]) next.delete(activeFileUri)
+    else next.set(activeFileUri, tag)
+    renderLangByFile = next
+  }
+
+  // Take the languages a live render reported for `uri`. A pick the file no
+  // longer offers (its wordings were removed), or that is now the module's
+  // own language, is dropped, which re-renders without a `lang`.
+  function takeRenderLanguages(
+    uri: string,
+    languages: string[],
+    lang: string | undefined
+  ) {
+    renderLanguages = languages
+    renderDocLang = lang
+    // The menu's button goes away with the second language; so does the menu.
+    if (languages.length <= 1) langMenuOpen = false
+    const picked = renderLangByFile.get(uri)
+    if (
+      picked !== undefined &&
+      (picked === languages[0] || !languages.includes(picked))
+    ) {
+      const next = new Map(renderLangByFile)
+      next.delete(uri)
+      renderLangByFile = next
+    }
   }
 
   // Refresh the imports checklist when the Render tab is shown or the
@@ -395,6 +469,9 @@
       renderHtml = ''
       return
     }
+    // The file this render is for, so a reply that lands after a file switch
+    // does not set the languages of the file now active.
+    const uri = activeFileUri
     renderInlineBusy = true
     try {
       const res = await messenger.sendRequest(
@@ -406,11 +483,15 @@
           numberClauses: renderNumberClauses,
           toc: renderToc,
           excludeModules: [...excludedModules],
+          lang: renderLang,
         }
       )
       if (res.success) {
         renderHtml = res.html ?? ''
         renderInlineError = ''
+        if (uri === activeFileUri) {
+          takeRenderLanguages(uri, res.languages ?? [], res.lang)
+        }
       } else {
         renderInlineError = res.error ?? 'Render failed.'
       }
@@ -440,6 +521,7 @@
       renderToc,
       renderIncludeUnused,
       excludedModules,
+      renderLang,
     ]
     void _deps
     if (activeTab === 'render' && activeFileUri && messenger) {
@@ -464,6 +546,7 @@
           numberClauses: renderNumberClauses,
           toc: renderToc,
           excludeModules: [...excludedModules],
+          lang: renderLang,
         }
       )
       if (res.canceled) return
@@ -515,6 +598,7 @@
           numberClauses: renderNumberClauses,
           toc: renderToc,
           excludeModules: [...excludedModules],
+          lang: renderLang,
           openInEditor: false,
         }
       )
@@ -1644,6 +1728,9 @@
         functions = []
         renderHtml = ''
         renderInlineError = ''
+        renderLanguages = []
+        renderDocLang = undefined
+        langMenuOpen = false
         if (previewDebounceTimer) clearTimeout(previewDebounceTimer)
         if (deployView !== 'preview') deployView = 'preview'
         undeployConfirm = null
@@ -1657,6 +1744,11 @@
         if (uri !== activeFileUri) {
           renderScrollX = 0
           renderScrollY = 0
+          // The languages on offer are the new file's; its next render
+          // reports them.
+          renderLanguages = []
+          renderDocLang = undefined
+          langMenuOpen = false
         }
         activeFileUri = uri
         activeFileVersion = version
@@ -1691,6 +1783,10 @@
       if (saveMenuOpen && !target.closest('.render-save-wrap')) {
         saveMenuOpen = false
       }
+      // So does the render-language menu.
+      if (langMenuOpen && !target.closest('.render-lang-wrap')) {
+        langMenuOpen = false
+      }
       // Render-tab trays close on any click outside the tray itself and the
       // button that owns it — so clicking another icon-bar button (a toggle,
       // Save, help, …) dismisses the tray too. The owning toggle buttons
@@ -1711,12 +1807,14 @@
     // render menus/trays. (Native <select> popups keep focus on the
     // <select>, so opening the format dropdown won't trip this.)
     window.addEventListener('blur', () => {
-      if (!saveMenuOpen && !refineTrayOpen && !importsTrayOpen) return
+      if (!saveMenuOpen && !refineTrayOpen && !importsTrayOpen && !langMenuOpen)
+        return
       setTimeout(() => {
         if (document.activeElement?.tagName === 'IFRAME') {
           saveMenuOpen = false
           refineTrayOpen = false
           importsTrayOpen = false
+          langMenuOpen = false
         }
       }, 0)
     })
@@ -2062,6 +2160,56 @@
                   />
                 </svg>
               </button>
+
+              <!-- Render language (with the language menu above) — only
+                   when the file's wordings come in more than one language. -->
+              {#if renderLanguages.length > 1}
+                <div class="render-lang-wrap">
+                  <button
+                    class="render-bar-btn"
+                    class:on={langMenuOpen}
+                    onclick={() => (langMenuOpen = !langMenuOpen)}
+                    aria-label={`Render language: ${renderLangShown}`}
+                    aria-haspopup="menu"
+                    aria-expanded={langMenuOpen}
+                    title="Render language"
+                  >
+                    <!-- The code is the button's icon, so it is bare text
+                         rather than a <span>: a narrow bar hides the
+                         buttons' label spans. -->
+                    {langCode(renderLangShown)}
+                    <svg
+                      class="render-chevron"
+                      class:flipped={langMenuOpen}
+                      viewBox="0 0 10 10"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M2 6.5 L5 3 L8 6.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  {#if langMenuOpen}
+                    <div class="dropdown-menu render-lang-menu">
+                      {#each renderLanguages as tag (tag)}
+                        <button
+                          class="menu-item"
+                          aria-pressed={tag === renderLangShown}
+                          onclick={() => pickRenderLang(tag)}
+                          ><span class="render-lang-check" aria-hidden="true"
+                            >{tag === renderLangShown ? '✓' : ''}</span
+                          >{langLabel(tag)}</button
+                        >
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
 
               <!-- Section numbers toggle -->
               <button
@@ -3266,8 +3414,10 @@
       padding: 0 6px;
     }
   }
-  /* Save split wrapper — anchors the format dropdown above the button. */
-  .render-save-wrap {
+  /* Save split wrapper — anchors the format dropdown above the button.
+     The render-language wrapper does the same for its menu. */
+  .render-save-wrap,
+  .render-lang-wrap {
     position: relative;
     display: flex;
     align-items: center;
@@ -3276,6 +3426,20 @@
     left: 0;
     bottom: calc(100% + 6px);
     min-width: 180px;
+  }
+  /* Combined selector to outweigh `.dropdown-menu` (defined later in this
+     stylesheet). The language menu aligns to its button's right edge and
+     opens leftwards, so it stays inside the sidebar. */
+  .dropdown-menu.render-lang-menu {
+    left: auto;
+    right: 0;
+    bottom: calc(100% + 6px);
+    min-width: 150px;
+  }
+  /* Fixed-width column for the check mark on the language being rendered. */
+  .render-lang-check {
+    display: inline-block;
+    width: 1.3em;
   }
   /* Trays float above the bar (refine prompt, imports checklist). */
   .render-tray {

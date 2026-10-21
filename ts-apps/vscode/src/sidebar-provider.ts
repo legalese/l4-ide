@@ -487,6 +487,7 @@ export function initializeSidebarMessenger(
           numberClauses: params.numberClauses,
           toc: params.toc,
           excludeModules: params.excludeModules ?? [],
+          lang: params.lang,
         })
         if (!res) {
           return {
@@ -561,8 +562,9 @@ export function initializeSidebarMessenger(
   })
 
   // Render the active L4 document to a content string in the requested
-  // format via the LSP. Returns the rendered content and the IR title.
-  // Shared by the inline preview and the Save action. Throws on LSP failure.
+  // format via the LSP. Returns the rendered content, the IR title, and the
+  // languages the file offers / the one the content is in. Shared by the
+  // inline preview and the Save action. Throws on LSP failure.
   async function renderToContent(
     verDocId: { uri: string; version: number },
     params: {
@@ -572,8 +574,14 @@ export function initializeSidebarMessenger(
       numberClauses: boolean
       toc: boolean
       excludeModules?: string[]
+      lang?: string
     }
-  ): Promise<{ content: string; title: string | undefined }> {
+  ): Promise<{
+    content: string
+    title: string | undefined
+    languages?: string[]
+    lang?: string
+  }> {
     if (params.format === 'plan') {
       const plan = await client.sendRequest(ExportPlanRequestType, { verDocId })
       return { content: JSON.stringify(plan ?? {}, null, 2), title: undefined }
@@ -586,6 +594,7 @@ export function initializeSidebarMessenger(
       numberClauses: params.numberClauses,
       toc: params.toc,
       excludeModules: params.excludeModules ?? [],
+      lang: params.lang,
     })
     if (!res) throw new Error('No response from the language server.')
     const title =
@@ -596,7 +605,7 @@ export function initializeSidebarMessenger(
       params.format === 'json'
         ? JSON.stringify(res.ir ?? {}, null, 2)
         : res.content
-    return { content, title }
+    return { content, title, languages: res.languages, lang: res.lang }
   }
 
   // Handle Render-tab live inline preview: render the active file as HTML
@@ -612,15 +621,19 @@ export function initializeSidebarMessenger(
     }
     try {
       const verDocId = { uri: doc.uri.toString(), version: doc.version }
-      const { content, title } = await renderToContent(verDocId, {
-        format: 'html',
-        includeUnused: params.includeUnused,
-        numberSections: params.numberSections,
-        numberClauses: params.numberClauses,
-        toc: params.toc,
-        excludeModules: params.excludeModules ?? [],
-      })
-      return { success: true, html: content, title }
+      const { content, title, languages, lang } = await renderToContent(
+        verDocId,
+        {
+          format: 'html',
+          includeUnused: params.includeUnused,
+          numberSections: params.numberSections,
+          numberClauses: params.numberClauses,
+          toc: params.toc,
+          excludeModules: params.excludeModules ?? [],
+          lang: params.lang,
+        }
+      )
+      return { success: true, html: content, title, languages, lang }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       return { success: false, error: msg }
