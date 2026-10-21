@@ -118,12 +118,15 @@ jobs:
             l4 check "$f"
           done
 
-      - name: Run tests (fail on failed assertions)
+      - name: Run tests (fail on failed assertions and on assertions that cannot be evaluated)
         run: |
           status=0
           for f in $(git ls-files '*.l4'); do
-            out=$(l4 run "$f" 2>&1) || status=1
-            if echo "$out" | grep -q "assertion failed"; then
+            if ! out=$(l4 run "$f" 2>&1); then
+              echo "::error file=$f::l4 run failed for $f (a type error, or a directive that could not be evaluated)"
+              echo "$out"
+              status=1
+            elif echo "$out" | grep -q "assertion failed"; then
               echo "::error file=$f::assertion failed in $f"
               echo "$out"
               status=1
@@ -137,7 +140,7 @@ To pin a version, replace the `tag=$(...)` line with a fixed tag, such as `tag=l
 Two details worth knowing:
 
 - `l4 check` exits non-zero on any parse or type error, so the typecheck step needs no extra logic.
-- `l4 run` exits non-zero on type errors and on directives that crash during evaluation, but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step greps for it (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
+- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step checks two things: the exit code, which catches the type errors and the assertions that could not be evaluated, and a grep for `assertion failed`, which catches the verdicts (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
 
 If rules use `NOW` or `TODAY`, add `--fixed-now <ISO8601>` to the `l4 run` calls so CI results do not depend on the day the job runs.
 

@@ -78,10 +78,14 @@ runCmd opts = do
       -- diagnostics via the logger, so a file with passing `#EVAL`s still
       -- produces non-empty `errs` — treating that as failure would be a
       -- false positive. A directive that crashed during evaluation
-      -- (e.g. a CONSIDER hole) is a real failure, though.
+      -- (e.g. a CONSIDER hole) is a real failure, though. So is an #ASSERT
+      -- whose expression RAISED: it did not evaluate cleanly, and it was
+      -- exiting 0 only because the exception was hidden inside
+      -- @Assertion False@. A clean @Assertion (Right False)@ stays exit 0.
       evalOk = all
         (\r -> case r.result of
           Reduction (Left _) -> False
+          Assertion (Left _) -> False
           _                  -> True)
         evalResults
       overallOk = typecheckOk && evalOk
@@ -121,17 +125,21 @@ runCmd opts = do
 
 evalResultToJson :: EvalDirectiveResult -> Aeson.Value
 evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _} =
-  Aeson.object
+  Aeson.object $
     [ Key.fromString "range" Aeson..= fmap prettySrcRange mRange
     , Key.fromString "kind"  Aeson..= kindText
     , Key.fromString "value" Aeson..= valueJson
-    ]
+    ] <> errorField
   where
-    (kindText, valueJson) = case result of
-      Assertion b             -> ("assertion" :: Text, Aeson.Bool b)
+    (kindText, valueJson, errorField) = case result of
+      Assertion (Right b)     -> ("assertion" :: Text, Aeson.Bool b, [])
+      -- An assertion that raised keeps kind "assertion" (it IS one, and a
+      -- consumer counting assertions must still see it) with a null value —
+      -- neither true nor false — and the reason under "error".
+      Assertion (Left _)      -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= renderEvalValue result])
       -- 'prettyEvalException', not 'show': 'show' leaks the raw Haskell
       -- constructor names of the exception into the JSON (as on unstable,
       -- 75e08b55e). A multi-clause group's no-match error would otherwise
       -- print its internal 'MkPmGroup' record.
-      Reduction (Left exc)    -> ("error" :: Text, Aeson.String (Text.unlines ("evaluation exception:" : prettyEvalException exc)))
-      Reduction (Right val)   -> ("value" :: Text, Aeson.String (renderEvalValue (Reduction (Right val))))
+      Reduction (Left exc)    -> ("error", Aeson.String (Text.unlines ("evaluation exception:" : prettyEvalException exc)), [])
+      Reduction (Right val)   -> ("value", Aeson.String (renderEvalValue (Reduction (Right val))), [])

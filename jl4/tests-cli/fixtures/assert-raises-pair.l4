@@ -1,0 +1,10 @@
+-- Typechecks cleanly. `boom 0` divides by zero, so neither it nor its negation
+-- is decided. `boom 1` and `boom 2` are the controls: one holds, one does not.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`boom` n MEANS (1 DIVIDED BY n) EQUALS 1
+
+#ASSERT `boom` 0
+#ASSERT NOT `boom` 0
+#ASSERT `boom` 1
+#ASSERT `boom` 2
