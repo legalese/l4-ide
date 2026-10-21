@@ -3911,8 +3911,18 @@ inferFlatApp preambleErr ann n es = do
                   (res, rt) <- matchFunTy False rn t actualArgs
                   pure (App ann rn res, rt)
 
+      -- The rescue is asked for only when the head could be such a
+      -- constructor ('couldCollectVariadically'), decided before any argument
+      -- is checked: otherwise its fallback only checks the arguments a second
+      -- time and fails as the direct attempt did (the overload pre-filter of
+      -- #929 aside), and a nest of calls with an error at the bottom doubled
+      -- its work at every level.
       case actualArgs of
-        _ : _ : _ -> directApp `orElseKeepAll` variadicRescue
+        _ : _ : _ -> do
+          rescuable <- couldCollectVariadically actualFuncName
+          if rescuable
+            then directApp `orElseKeepAll` variadicRescue
+            else directApp
         _         -> directApp
 
 -- ----------------------------------------------------------------------------
@@ -7032,6 +7042,28 @@ isConstructorKind r = case getActual r of
   MkName cAnn _ -> case cAnn.extra.resolvedInfo of
     Just (TypeInfo _ (Just Constructor)) -> True
     _ -> False
+
+-- | Could the variadic-construction rescue of 'inferFlatApp' apply to a call
+-- headed by this name? It applies to a data constructor with exactly one
+-- parameter, of a LIST type, and to nothing else, so when no term in scope
+-- under the name has that shape the rescue can only check the arguments
+-- again and fail as the direct attempt did, bar the overload pre-filter
+-- ('appCandidateFilter'), which the rescue does not apply.
+--
+-- Answers from every term in scope under the name, before the filtering by
+-- section and by local binding that 'resolveTerm' does, so it can say 'True'
+-- where the rescue would find nothing and never 'False' where it would find
+-- something. It does not fork: a name with several candidates answers once.
+couldCollectVariadically :: Name -> Check Bool
+couldCollectVariadically n = do
+  options <- lookupRawNameInEnvironment (rawName n)
+  pure $ or [ oneListParameter ty | (_, _, KnownTerm ty Constructor) <- options ]
+  where
+    oneListParameter :: Type' Resolved -> Bool
+    oneListParameter = \ case
+      Forall _ _ t -> oneListParameter t
+      Fun _ [MkOptionallyNamedType _ _ argT] _ -> isListTyCon argT
+      _ -> False
 
 -- | Is this type an application of the builtin LIST type constructor?
 isListTyCon :: Type' Resolved -> Bool

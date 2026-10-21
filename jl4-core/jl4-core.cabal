@@ -301,6 +301,7 @@ test-suite jl4-core-test
     SmartPunctuationSpec
     TimezoneTimeoutSpec
     ConsiderScaleSpec
+    VariadicRescueScaleSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
