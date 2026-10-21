@@ -25,6 +25,7 @@ module TestData (
   importedRecordDeclJL4,
   importedRecordMainJL4,
   dnfBlowupJL4,
+  considerPlanJL4,
   twinLeavesJL4,
   missingBooleanJL4,
   sectionBooleanJL4,
@@ -327,6 +328,38 @@ dnfBlowupJL4 n =
     ]
  where
   param k = "x" <> Text.pack (show (k :: Int))
+
+-- | A boolean function that @CONSIDER@s an enumeration of @n@ kinds, each
+-- branch an @OR@ of three string tests, as an @\@export@.
+--
+-- Cheap to build the cached decision structure of, and out of reach for a
+-- query plan: the plan is read off a normal form in which each branch
+-- carries its own tests together with the choice of its kind. Used to pin
+-- that computing a plan is held to @--eval-timeout@, which the build of the
+-- cache has its own limit for and the plan itself did not. The shape is that
+-- of a classifier in the public miles-card encoding, whose plan the service
+-- could not finish within its limit.
+considerPlanJL4 :: Int -> Text
+considerPlanJL4 n =
+  Text.unlines $
+    [ "DECLARE Kind IS ONE OF " <> Text.intercalate ", " [kind k | k <- [0 .. n - 1]]
+    , ""
+    , "GIVEN d IS A STRING"
+    , "      s IS A STRING"
+    , "GIVETH A BOOLEAN"
+    , "`has` d s MEANS d EQUALS s"
+    , ""
+    , "@export carries"
+    , "GIVEN d IS A STRING"
+    , "      p IS A Kind"
+    , "GIVETH A BOOLEAN"
+    , "carries d p MEANS"
+    , "    CONSIDER p"
+    ]
+      <> [ "    WHEN " <> kind k <> " THEN " <> Text.intercalate " OR " [ "`has` d \"" <> lit <> Text.pack (show k) <> "\"" | lit <- ["a", "b", "c"] ]
+         | k <- [0 .. n - 1] ]
+ where
+  kind k = "kind" <> Text.pack (show (k :: Int))
 
 -- | L4 source with a module-level ASSUME referenced by an @export.
 -- Exercises the ASSUME→parameter promotion path in the direct-AST
