@@ -14,6 +14,12 @@ module L4.Parser (
   PError (..),
   mkPError,
   PState (..),
+  langTagOfToken,
+  declaredModuleLang,
+  redundantLangEnRanges,
+  overriddenLangWarnings,
+  spacedSlotsIn,
+  spacedSlotWarnings,
   MixfixHintRegistry,
   buildMixfixHintRegistry,
   emptyMixfixHintRegistry,
@@ -35,6 +41,7 @@ module L4.Parser (
 import Base
 
 import qualified Control.Applicative as Applicative
+import Data.Char (isAlpha, isAlphaNum, isSpace)
 import Generics.SOP.BasicFunctors
 import Generics.SOP.NS
 import qualified Data.List.Extra as List
@@ -79,12 +86,20 @@ data PState = PState
   , nlgs :: [Nlg]
   , refs :: [Ref]
   , descs :: [Desc]
+  , langs :: [LangTag]
+    -- ^ @\@lang@ declarations seen, most recent first. A list rather than a
+    -- 'Maybe', so that a second declaration does not silently overwrite the
+    -- first. Only the tags are kept; 'overriddenLangWarnings' reports a
+    -- conflict from the token stream, which has each line's range.
   }
   deriving stock (Show, Eq, Generic)
   deriving (Semigroup, Monoid) via Generically PState
 
 addNlg :: Nlg -> PState -> PState
 addNlg n s = over #nlgs (n:) s
+
+addLang :: LangTag -> PState -> PState
+addLang l s = over #langs (l:) s
 
 addRef :: Ref -> PState -> PState
 addRef ref s = over #refs (ref:) s
@@ -99,7 +114,7 @@ spaces =
 spaceOrAnnotations :: Parser (Lexeme ())
 spaceOrAnnotations = do
   ws <- spaces
-  nlgs :: [NS Epa [Ref, Nlg, Desc, ()]] <- many (fmap (S . S . S . Z) refAdditionalP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
+  nlgs :: [NS Epa [Ref, Nlg, Desc, (), LangTag]] <- many (fmap (S . S . S . S . Z) langP <|> fmap (S . S . S . Z) refAdditionalP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
   traverse_ addAnnotation nlgs
   let
     epaNlgs = fmap (collapse_NS . map_NS (K . epaToHiddenCluster)) nlgs
@@ -109,10 +124,163 @@ spaceOrAnnotations = do
     , hiddenClusters = epaNlgs
     }
 
+-- | @\@lang he@. Collected like any other annotation, so its tokens ride in
+-- the same hidden cluster and exactprint re-emits the line unchanged.
+langP :: Parser (Epa LangTag)
+langP = hidden $ spacedTokenWs langTagOfToken "Language declaration"
+
+-- | The language tag a @\@lang@ token carries, if that is what this token is.
+--
+-- Factored out so that the two things that read a @\@lang@ declaration — the
+-- parser, through 'langP', and 'redundantLangEnRanges', which scans a bare
+-- token stream — agree on what the token looks like by construction rather
+-- than by both being edited together.
+langTagOfToken :: TokenType -> Maybe LangTag
+langTagOfToken = \ case
+  TAnnotations (TLang tag _) -> Just tag
+  _ -> Nothing
+
+-- | A module's declared @\@lang@, read straight off its token stream, or
+-- 'Nothing' when it declares none.
+--
+-- The LAST declaration in source order wins, which is the same rule
+-- 'execParserForTokensWithHints' applies below: it takes @listToMaybe
+-- pstate.langs@, and 'addLang' accumulates by prepending, so that head IS the
+-- last one written. Stated in both places because the two have different
+-- inputs (a token list here, the parser state there).
+--
+-- This exists because a consumer downstream of the parse — @l4 render@, which
+-- labels its HTML @<html lang="…">@ — needs the declaration itself, not its
+-- effect on annotations. The effect ('withDefaultLang') is unrecoverable for a
+-- module that declares a language and carries no @\@nlg@ at all.
+declaredModuleLang :: [PosToken] -> Maybe LangTag
+declaredModuleLang ts =
+  listToMaybe [ tag | t <- reverse ts, Just tag <- [langTagOfToken t.payload] ]
+
+-- | The ranges of the @\@lang en@ lines that say nothing the module does not
+-- already say, read off the token stream.
+--
+-- A module that declares no @\@lang@ is English ('defaultModuleLang'), so
+-- a declaration of @en@ changes nothing. That holds only while EVERY
+-- declaration in the module is @en@: the last declaration wins, so in a
+-- module that also says @\@lang he@ an @en@ line is not redundant (written
+-- last it is the one that counts; written first it is overridden, and neither
+-- is "this line can go"). Such a module gets no hint at all.
+--
+-- The tag is compared exactly. The lexer does not fold case ('isLangTagChar'
+-- admits capitals) and 'MkLangTag' is compared as written, so @\@lang EN@ and
+-- @\@lang en-GB@ are NOT the default language as far as the pipeline is
+-- concerned, and are left alone.
+--
+-- The range is the token's own, which is the whole @\@lang@ line.
+redundantLangEnRanges :: [PosToken] -> [SrcRange]
+redundantLangEnRanges ts
+  | all ((== defaultModuleLang) . snd) decls = fst <$> decls
+  | otherwise = []
+  where
+    decls = [ (t.range, tag) | t <- ts, Just tag <- [langTagOfToken (computedPayload t)] ]
+
+-- | The @\@lang@ lines that name a different language from the module's last
+-- one, which is the one in force ('declaredModuleLang', and the
+-- @listToMaybe pstate.langs@ in 'execParserForTokensWithHints').
+--
+-- One warning per such line, carrying that line and the winning line. A line
+-- that repeats the winning tag is not reported, because it contradicts nothing:
+-- the module says the same thing twice.
+--
+-- Read off the token stream, like 'redundantLangEnRanges', so the two agree
+-- on what a @\@lang@ line is ('langTagOfToken'), and so the warning has the
+-- line's range, which the parser state does not keep.
+overriddenLangWarnings :: [PosToken] -> [Resolve.Warning]
+overriddenLangWarnings ts = case reverse decls of
+  [] -> []
+  winner : earlier ->
+    [ Resolve.LangOverridden line winner
+    | line <- reverse earlier
+    , line.payload /= winner.payload
+    ]
+  where
+    decls =
+      [ Resolve.WithSpan (fromSrcRange t.range) tag
+      | t <- ts
+      , Just tag <- [langTagOfToken (computedPayload t)]
+      ]
+
+-- | The percent pairs in an annotation's text that have spaces inside them
+-- around one name, each as @(the pair as written, the name)@.
+--
+-- A slot is @%name%@ with no spaces ('nameRefP'), so @% amount %@ is plain
+-- text and the author's slot is lost without a message. Three things keep the
+-- test from firing on prose:
+--
+-- * a tight slot is consumed whole, so the percent signs of @%amount%@ never
+--   pair with a neighbour;
+--
+-- * a pair whose closing @%@ runs into a word, as in @5% with %amount%@, is
+--   not reported: that is the literal percent sign the tight rule exists to
+--   protect (smucclaw\/l4-ide#957), not a slot with stray spaces;
+--
+-- * a backslash escape ('isNlgEscapable') is skipped, so @\\%@ is a literal
+--   percent sign and never opens a pair.
+--
+-- A name is an identifier or a backtick-quoted name, which is what a tight
+-- slot takes. It is read off the text, because that is all there is by the
+-- time the annotation has parsed: the spaced pair is never a node.
+spacedSlotsIn :: Text -> [(Text, Text)]
+spacedSlotsIn = go . Text.unpack
+  where
+    go :: String -> [(Text, Text)]
+    go = \ case
+      [] -> []
+      '\\' : c : rest | isNlgEscapable c -> go rest
+      '%' : rest
+        | Just (_, '%' : after) <- slotName rest -> go after
+        | Just (written, nm, after) <- spaced rest -> (Text.pack ('%' : written), Text.pack nm) : go after
+        | otherwise -> go rest
+      _ : rest -> go rest
+
+    spaced :: String -> Maybe (String, String, String)
+    spaced rest = do
+      let (before, afterBefore) = span isSpace rest
+      (nm, afterName) <- slotName afterBefore
+      let (trailing, afterTrailing) = span isSpace afterName
+      '%' : after <- Just afterTrailing
+      guard (not (null before && null trailing))
+      guard (not (runsIntoWord after))
+      pure (before <> nm <> trailing <> "%", nm, after)
+
+    runsIntoWord = \ case
+      c : _ -> isAlphaNum c || c `elem` ['_', '\'', '`']
+      [] -> False
+
+    slotName :: String -> Maybe (String, String)
+    slotName = \ case
+      '`' : rest
+        | (inside@(_ : _), '`' : after) <- break (== '`') rest -> Just ('`' : inside <> "`", after)
+      c : rest
+        | isAlpha c || c == '_' ->
+            let (more, after) = span (\ x -> isAlphaNum x || x == '_' || x == '\'') rest
+            in Just (c : more, after)
+      _ -> Nothing
+
+-- | One 'Resolve.SpacedSlot' per spaced percent pair, read off the token
+-- stream like 'overriddenLangWarnings', so the warning carries the range of
+-- the annotation, which the parser state does not keep.
+spacedSlotWarnings :: [PosToken] -> [Resolve.Warning]
+spacedSlotWarnings ts =
+  [ Resolve.SpacedSlot (Resolve.WithSpan (fromSrcRange t.range) written) nm
+  | t <- ts
+  , TAnnotations (TNlg _ text _) <- [computedPayload t]
+  , (written, nm) <- spacedSlotsIn text
+  ]
+
 refP :: Parser (Epa Ref)
 refP = do
   refExpr <- refAnnotationP
-  pure $ fmap (MkRef (mkSimpleEpaAnno refExpr)) refExpr
+  -- The Anno keeps the tokens verbatim, so exactprint re-emits the citation
+  -- byte for byte; the stored Text is the READER's copy and is decoded here,
+  -- so this field is off the print path. See 'L4.Lexer.unescapeRefText'.
+  pure $ fmap (MkRef (mkSimpleEpaAnno refExpr)) (fmap unescapeRefText refExpr)
 
 descP :: Parser (Epa Desc)
 descP = do
@@ -129,12 +297,18 @@ nlgAnnotationP :: Parser (Epa Nlg)
 nlgAnnotationP = do
   currentPosition <- getSourcePos
   moduleUri <- asks (.moduleUri)
-  rawText <- hidden $ spacedTokenWs (\ case
-    TAnnotations (TNlg t ty) -> Just $ toNlgAnno t ty
+  rawAnno <- hidden $ spacedTokenWs (\ case
+    TAnnotations (TNlg mtag t ty) -> Just (mtag, ty, toNlgAnno mtag t ty)
     _ -> Nothing)
     "Natural Language Annotation"
 
   let
+    -- The reconstructed text MUST still carry the tag: it is what gets
+    -- re-lexed below, and 'mkPosTokens' seeds the inner tokens' positions by
+    -- advancing over it.
+    (mLangTag, nlgAnnoTy) = case rawAnno.payload of (m, ty, _) -> (m, ty)
+    rawText = (\ (_, _, t) -> t) <$> rawAnno
+
     nlgParser :: Parser Nlg
     nlgParser =
       blockNlg <|> lineNlg
@@ -145,6 +319,13 @@ nlgAnnotationP = do
       attachAnno $
         MkParsedNlg emptyAnno
           <$  annoEpa  (pure (tokenToEpa open))
+          -- The tag field's hole, in FIELD order. It has no surface of its own
+          -- here (the bare form cannot be tagged), but an empty-surface field
+          -- still occupies a holeFit slot in the generic exactprint traversal
+          -- — see the RecallMode note in 'L4.Syntax'. Without it the fragments
+          -- land in the tag's slot and exactprint emits the herald with no
+          -- text after it, silently, on every annotation in the corpus.
+          <*> annoHole (pure mLangTag)
           <*> annoHole (pure a)
           <*  annoEpa  (pure (tokenToEpa close))
 
@@ -152,7 +333,11 @@ nlgAnnotationP = do
     lineNlg = do
       attachAnno $
         MkParsedNlg emptyAnno
-          <$  annoLexeme (spacedTokenWs_ $ TAnnotations TNlgPrefix)
+          <$  annoLexeme (spacedTokenWsSatisfy isNlgPrefixToken "@nlg annotation herald")
+          -- Field order, as in 'blockNlg' above. The tag's surface — the @:he@
+          -- — is inside the herald token that the lexeme just emitted, so this
+          -- hole is empty and sits exactly where the surface already went.
+          <*> annoHole   (pure mLangTag)
           <*> annoHole   (nlgFragment False)
 
     nlgFragment :: Bool -> Parser [NlgFragment Name]
@@ -173,7 +358,7 @@ nlgAnnotationP = do
             traverse_ registerParseError (bundleErrors err)
             attachAnno $
               MkInvalidNlg emptyAnno
-                <$ annoEpa (pure $ TNlg <$> rawText)
+                <$ annoEpa (pure $ (\ t -> TNlg mLangTag t nlgAnnoTy) <$> rawText)
 
           Right nlg ->
             pure nlg
@@ -194,13 +379,19 @@ nlgAnnotationP = do
 nameRefP :: Parser (NlgFragment Name)
 nameRefP = do
   (open, n, close) <- P.between
-    (hidden $ spacedSymbol_ $ TPercent)
+    -- The delimiters are tight: a reference is @%name%@ with no whitespace inside.
+    -- Annotation prose contains literal percent signs ("a 5% levy on %amount%"),
+    -- and a spaced opening delimiter would let one of those pair with the opening
+    -- delimiter of the next real reference, capturing the word between them as an
+    -- identifier -- silently, when that word happens to be in scope, and taking the
+    -- intended reference down to plain text with it. See smucclaw/l4-ide#957.
+    (hidden $ plainToken_ $ TSymbols TPercent)
     -- We don't want to consume trailing whitespace, because we would need to "reproduce"
     -- the whitespace during natural language generation. Otherwise, the text looks scuffed.
     -- Thus, only parse the 'TPercent' here, and let the 'textFragment' parser
     -- take care of any leading whitespace.
     (plainToken_ $ TSymbols TPercent)
-    name
+    tightName
   attachAnno $
     MkNlgRef emptyAnno
       <$  annoLexeme (pure open)
@@ -253,11 +444,12 @@ lexeme p = do
     , hiddenClusters = wsOrAnnotation.hiddenClusters
     }
 
-addAnnotation :: NS Epa (Ref : Nlg : Desc : xs) -> Parser ()
+addAnnotation :: NS Epa (Ref : Nlg : Desc : () : LangTag : xs) -> Parser ()
 addAnnotation = \ case
   S (S (Z desc)) -> modify' (addDesc desc.payload)
   S (Z nlg) -> modify' (addNlg nlg.payload)
   Z ref -> modify' (addRef ref.payload)
+  S (S (S (S (Z lang)))) -> modify' (addLang lang.payload)
   _ -> pure ()
 
 lexemeWs :: Parser a -> Parser (Lexeme a)
@@ -280,9 +472,28 @@ spacedTokenWs cond lbl =
       )
     <?> lbl
 
-spacedTokenWs_ :: TokenType -> Parser (Lexeme PosToken)
-spacedTokenWs_ tt =
-  lexemeWs (plainToken tt)
+-- | 'spacedTokenWs' for a token type that carries a payload, discarding the
+-- payload.
+--
+-- Replaced the equality-matching @spacedTokenWs_@, which became dead when the
+-- @\@nlg@ herald gained a language tag: its last caller was 'lineNlg'.
+--
+-- 'plainToken' matches by EQUALITY on the whole 'TokenType', so it cannot
+-- match a constructor whose argument varies — @TNlgPrefix (Just "he")@ is not
+-- @TNlgPrefix Nothing@. Anything with a payload needs this instead.
+spacedTokenWsSatisfy :: (TokenType -> Bool) -> String -> Parser (Lexeme PosToken)
+spacedTokenWsSatisfy f lbl =
+  lexemeWs (satisfyToken f lbl)
+
+satisfyToken :: (TokenType -> Bool) -> String -> Parser PosToken
+satisfyToken f lbl =
+  token (\ t -> if f (computedPayload t) then Just t else Nothing) Set.empty
+    <?> lbl
+
+isNlgPrefixToken :: TokenType -> Bool
+isNlgPrefixToken = \ case
+  TAnnotations (TNlgPrefix _) -> True
+  _ -> False
 
 plainToken :: TokenType -> Parser PosToken
 plainToken tt = do
@@ -355,6 +566,39 @@ qualifiedName = do
 
 name :: Parser Name
 name = attachEpa (try qualifiedName <|> quotedName <|> simpleName) <?> "identifier"
+
+-- | Like 'spacedToken', but does not consume trailing whitespace.
+--
+-- For syntax where adjacency is meaningful rather than incidental -- see 'tightName'.
+tightToken :: Is k An_AffineFold => Optic' k is TokenType a -> String -> Parser (Epa a)
+tightToken cond lbl =
+  lexToEpa' . mkLexeme [] <$>
+    token
+      (\ t -> (t,) <$> preview cond (computedPayload t))
+      Set.empty
+    <?> lbl
+
+tightQuotedName :: Parser (Epa Name)
+tightQuotedName =
+  (MkName emptyAnno . NormalName) <<$>> tightToken (#_TIdentifiers % #_TQuoted) "quoted identifier"
+
+tightSimpleName :: Parser (Epa Name)
+tightSimpleName =
+  (MkName emptyAnno . NormalName) <<$>> tightToken (#_TIdentifiers % #_TIdentifier) "identifier"
+
+-- | 'name', but without consuming the whitespace that follows it.
+--
+-- Only 'nameRefP' wants this: an nlg reference is delimited on both sides by @%@,
+-- and if the name swallowed the space before the closing delimiter then @% word %@
+-- would parse as a reference, which is how a literal percent sign in prose captures
+-- the following word. See smucclaw/l4-ide#957.
+--
+-- There is deliberately no qualified-name alternative here. 'nlgTokenPayload' lexes
+-- no symbols, so an annotation never contains a @.@ token and @qualifiedName@ could
+-- not match inside one: @p.a@ arrives as the identifier @p@ followed by the text
+-- @.a@, which the closing delimiter then fails against.
+tightName :: Parser Name
+tightName = attachEpa (tightQuotedName <|> tightSimpleName) <?> "identifier"
 
 tokenAsName :: TokenType -> Parser Name
 tokenAsName tt =
@@ -1310,7 +1554,10 @@ clausesSrcAnno (c : _) = fixAnnoSrcRange (mkHoleAnnoFor (pmBody c))
 -- source range (see 'clausesSrcAnno').
 bindFallthrough :: PmSynthetic -> Name -> Anno -> Expr Name -> Expr Name -> Expr Name
 bindFallthrough mark ftName ftAnno ftExpr body =
-  LetIn emptyAnno
+  -- The LET carries the binding's mark too, so that the checker, which cannot
+  -- give a node with no range a type (and this one has none, see
+  -- 'clausesSrcAnno'), still records the group's result type on it.
+  LetIn (setPmSynthetic mark emptyAnno)
     [ LocalDecide emptyAnno
         (MkDecide (setPmSynthetic mark ftAnno) emptyTypeSig (MkAppForm emptyAnno ftName [] Nothing) ftExpr)
     ]
@@ -1956,10 +2203,13 @@ infix2' f op l r =
 infixUnless :: Lexeme PosToken -> Expr Name -> Expr Name -> Expr Name
 infixUnless op l r =
   let opAnno = mkSimpleEpaAnno (lexToEpa op)
-      -- Construct NOT r with annotation derived from UNLESS and r
-      notAnno = fixAnnoSrcRange $ opAnno <> mkHoleAnnoFor r
+      -- The synthesized NOT has no keyword in the source, so its anno is just
+      -- the operand hole: exactprint emits @r@ alone. (Putting the UNLESS
+      -- token here too would print it twice — @l UNLESS UNLESS r@.)
+      notAnno = fixAnnoSrcRange $ mkHoleAnnoFor r
       notR = Not notAnno r
-      -- Construct l AND (NOT r) with annotation spanning the whole expression
+      -- The single UNLESS token lives on the outer AND, between l and (NOT r),
+      -- so exactprint reproduces the source @l UNLESS r@.
       andAnno = fixAnnoSrcRange $ mkHoleAnnoFor l <> opAnno <> mkHoleAnnoFor r
   in And andAnno l notR
 
@@ -2241,7 +2491,7 @@ stringLit :: Parser Lit
 stringLit =
   attachAnno $
     StringLit emptyAnno
-      <$> annoEpa (spacedToken (#_TLiterals % #_TStringLit) "String Literal")
+      <$> annoEpa (spacedToken (#_TLiterals % #_TStringLit % _2) "String Literal")
 
 -- Note: The `...` syntax is now handled by `implicitAndCont` as syntactic sugar for AND.
 -- String literals in boolean context are converted to Inert nodes during type checking.
@@ -2459,12 +2709,10 @@ must current = attachAnno $
      <$> asum
       -- Parse MUST, then check for optional NOT to determine modal
       [ annoLexeme (spacedKeyword_ TKMust) *>
-        (DMustNot <$ annoLexeme (spacedKeyword_ TKNot) <* optional (annoLexeme (spacedKeyword_ TKDo))
-         <|> DMust <$ optional (annoLexeme (spacedKeyword_ TKDo)))
+        (DMustNot <$ annoLexeme (spacedKeyword_ TKNot)
+         <|> pure DMust)
       , DMay <$ annoLexeme (spacedKeyword_ TKMay)
-        <* optional (annoLexeme (spacedKeyword_ TKDo))
       , DMustNot <$ annoLexeme (spacedKeyword_ TKShant)
-        <* optional (annoLexeme (spacedKeyword_ TKDo))
       , DDo <$ annoLexeme (spacedKeyword_ TKDo)
       ]
      <*> annoHole (indentedPattern current)
@@ -2791,6 +3039,7 @@ execNlgParserForTokens p uri input ts =
       , comments = []
       , refs = []
       , descs = []
+      , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 
@@ -2816,12 +3065,23 @@ execParserForTokensWithHints hints p file input ts =
     Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
     Right (a, pstate)  ->
       let
-        (withNlg, nlgS) = Resolve.addNlgCommentsToAst pstate.nlgs a
+        -- The module's declared language, or `en`. Taken as the LAST
+        -- declaration in source order: `langs` accumulates by prepending, so
+        -- the head is the last one written. Two declarations that name
+        -- different languages are reported by 'overriddenLangWarnings', which
+        -- reads the token stream because it needs each line's range.
+        moduleLang = fromMaybe defaultModuleLang (listToMaybe pstate.langs)
+        -- Stamp every untagged annotation with it BEFORE attachment, which is
+        -- what makes `@lang he` mean exactly "tag every herald in this module
+        -- `:he`" rather than a second mechanism with its own precedence — and
+        -- makes it order-independent, since pstate is complete by now.
+        localisedNlgs = fmap (withDefaultLang moduleLang) pstate.nlgs
+        (withNlg, nlgS) = Resolve.addNlgCommentsToAst moduleLang pstate.langs localisedNlgs a
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
         (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withDesc
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
       in
-        Right (annotatedA, nlgS.warnings ++ refWarnings, pstate)
+        Right (annotatedA, overriddenLangWarnings ts ++ spacedSlotWarnings ts ++ nlgS.warnings ++ refWarnings, pstate)
   where
     env = Env
       { moduleUri = file
@@ -2832,6 +3092,7 @@ execParserForTokensWithHints hints p file input ts =
       , comments = []
       , refs = []
       , descs = []
+      , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
 

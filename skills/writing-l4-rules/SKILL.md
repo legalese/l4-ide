@@ -147,14 +147,14 @@ LEST    penaltyState           -- optional; consequence on failure
 
 **Deontic polarity** — which branch fires for each modal:
 
-| Modal   | HENCE fires when                        | LEST fires when                        |
-| ------- | --------------------------------------- | -------------------------------------- |
-| `MUST`  | action is taken                         | deadline passes without action         |
-| `MAY`   | action is taken                         | deadline passes (permission unused)    |
-| `SHANT` | deadline passes (prohibition respected) | action is taken (prohibition violated) |
-| `DO`    | action is taken                         | deadline passes                        |
+| Modal   | HENCE fires when                             | LEST fires when                        |
+| ------- | -------------------------------------------- | -------------------------------------- |
+| `MUST`  | action is taken                              | deadline passes without action         |
+| `MAY`   | action is taken, or deadline passes (unused) | never — a `LEST` after `MAY` is unused |
+| `SHANT` | deadline passes (prohibition respected)      | action is taken (prohibition violated) |
+| `DO`    | action is taken                              | deadline passes                        |
 
-`SHANT` flips polarity — for prohibitions, doing the action is the failure.
+`SHANT` flips polarity — for prohibitions, doing the action is the failure. Not using a permission is never a breach.
 
 **Actors and actions are sum types.** Declare them first; a regulative rule's type is `DEONTIC Party Action`, not `CONTRACT`:
 
@@ -167,17 +167,21 @@ DECLARE PaymentAction IS ONE OF
     `pay invoice`   HAS amount IS A NUMBER, recipient IS AN Actor
     `waive payment` HAS reason IS A STRING
 
+DECLARE Invoice HAS
+    customer IS AN Actor
+    amount   IS A NUMBER
+
 GIVEN invoice IS AN Invoice
 GIVETH A DEONTIC Actor PaymentAction
 DECIDE obligation IS
-    PARTY Customer
-    MUST  (`pay invoice` (invoice's amount) Company)
+    PARTY invoice's customer
+    MUST  `pay invoice` (EXACTLY (invoice's amount)) Company
     WITHIN 30
     HENCE FULFILLED
-    LEST  BREACH BY Customer BECAUSE "payment overdue"
+    LEST  BREACH BY (invoice's customer) BECAUSE "payment overdue"
 ```
 
-Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors. Always include `BECAUSE "reason"` on `LEST BREACH` — that string is what auditors read.
+Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors. The action is a **pattern**: a plain name in it matches any value, so compare with an input or a computed value through `EXACTLY`, as above. Always include `BECAUSE "reason"` on `LEST BREACH` — that string is what auditors read.
 
 Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, `EXACTLY` matching, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
 
@@ -208,7 +212,8 @@ iterate until the check passes.
 
 **Other subcommands** (run `l4 <command> --help` for details):
 
-- `l4 format FILE` — reformat an `.l4` file to stdout (`gofmt`-style).
+- `l4 format FILE` — print an `.l4` file to stdout exactly as written
+  (it does not change the layout; exits 1 if the file does not parse).
 - `l4 ast FILE` — dump the parsed AST (debugging L4 itself or tooling).
 - `l4 batch FILE --inputs rows.{json,yaml,csv}` — evaluate an `@export`
   function against many rows, streaming NDJSON output (one object per
@@ -457,8 +462,51 @@ application's employee's nationality   -- chaining
 
 - `@desc` — human-readable description behind any line or `GIVEN` parameter (internal unless paired with `@export`)
 - `@export` — atop the `GIVEN`. mark a function for deployment
-- `@nlg` — natural-language generation hint
+- `@nlg` — the wording `l4 nlg` and `l4 render` print for a rule, an input or a field; where it sits and how to tag its language are below
+- `@lang` — the language an untagged `@nlg` in the module is written in
 - `@ref`, `@ref-src`, `@ref-map` — cross-reference to a legal source
+
+#### `@nlg`: where a wording sits, and its language
+
+An `@nlg` gives a rule, an input or a record field the words that `l4 nlg` and `l4 render` print for it, with `%name%` slots for a rule's inputs.
+What it describes depends on where it sits.
+Trailing a line, it describes what is on that line.
+On a line of its own, it describes what follows.
+
+```l4
+GIVEN amount IS A NUMBER @nlg the claim amount
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large
+DECIDE `is large` IF amount GREATER THAN 100
+```
+
+- **A rule's sentence** goes trailing the head, or on its own line between the `GIVEN` block and the `DECIDE`.
+  Never above the `GIVEN`: the `GIVEN` comes between them, so the wording is not the rule's.
+  When nothing written just before it can take it, L4 warns "Not attached to any valid syntax node"; when an `IMPORT` or a `§` heading comes just before it, that one takes the wording and nothing is reported.
+- **An input's gloss** trails the input's name in the `GIVEN`, or sits on its own line under the input, indented further than the `GIVEN` keyword.
+  It labels the input in a `WITH` call's `where` clause, and it is never the rule's sentence.
+- **A field's gloss** trails the field, `HAS dob IS A DATE @nlg date of birth`, or sits on its own line under the field, indented further than the `DECLARE` keyword.
+  It is read after the owner's name, so `@nlg date of birth` on `dob` reads "the employee's date of birth"; do not repeat the owner in it.
+- **One wording per language.**
+  Write the language subtag straight after `@nlg`, joined by a colon, as in `@nlg:he …`, and put each further wording on a continuation line under the first.
+  `l4 nlg --lang he` and `l4 render --lang he` pick the Hebrew wording, `he` or `he-IL` alike, and a rule with none keeps its default one.
+  A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the` and reads `employee pays`, so write `@nlg the employee pays`, with no colon, for a sentence that starts with that word.
+  `l4 check` warns when a rule, input or field has only one wording and nothing backs its tag as a language: no `@lang` line declares it, nothing else has a wording in it beside one in another language, and it is not `en`, `he` or a declared language with only a region or script after it (`en-GB`, `he-IL`). So `@nlg:en-route …` and the same word used as the tag of several rules draw it too.
+- **A module in one language says so once**, on a line of its own: `@lang he` makes every untagged `@nlg` Hebrew.
+  Do not write `@lang en`: a module without a declaration is English, and `l4 check` hints that the line can go.
+  Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.
+- **Two wordings in the same language on one rule** draw a warning, `l4 check` succeeds, and neither is used.
+- **A literal `%` or `]` inside an `@nlg`** is written `\%` or `\]`.
+  A bare `%and%` is read as the input `and`, and nothing is reported.
+- **A percent pair with spaces inside it**, `% amount %`, is plain text and draws a warning: write the slot as `%amount%`.
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
 
 ### Imports
 

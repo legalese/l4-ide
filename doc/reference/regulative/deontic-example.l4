@@ -250,14 +250,14 @@ GIVETH A DEONTIC Actor Action
     PARTY Buyer DOES `pay invoice` 499 AT 15
 
 -- ============================================================
--- § Advanced: WAIT UNTIL for Time Advancement
+-- § Advanced: WAITUNTIL for Time Advancement
 -- ============================================================
 
--- WAIT UNTIL advances time without an event
+-- WAITUNTIL advances time without an event
 -- Useful for testing deadline behavior
 
 #TRACE `simple delivery obligation` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    WAITUNTIL 20
 
 -- ============================================================
 -- § DEONTIC as Return Values

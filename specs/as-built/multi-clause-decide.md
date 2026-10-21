@@ -1,7 +1,11 @@
 # Multi-clause pattern-matching DECIDE (as built on main)
 
-This describes branch `carve/multi-clause-decide` (PR #545, into `main`), re-measured on 2026-10-13 (the `file:line` citations, the goldens and the test counts, after the carry of #631 described under "Review round 5"); a measurement dated earlier in the text keeps its date.
-Every `file:line` below is at the commit that last changed this file; every probe below was run on a binary built from it.
+This describes branch `carve/multi-clause-decide` (PR #545, into `main`), re-measured on 2026-10-13 (the goldens and the test counts, after the carry of #631 described under "Review round 5"); a measurement dated earlier in the text keeps its date.
+The `file:line` citations were last re-derived on 2026-10-15, after the merges of `main` into the branch that carries the ladder section (#656).
+Every `file:line` below is at the commit that last changed this file.
+The user page `doc/reference/functions/multi-clause-DECIDE.md`, named in several places below, was folded into `doc/reference/functions/DECIDE.md` on `main` (dd7521bb0) and no longer exists; this branch's section of it, on the decision graph and the query plan, is now `DECIDE.md`, "Several clauses", "The decision graph and the query plan", and the other sections the old page had are in `doc/reference/errors/README.md` and `doc/concepts/type-system/exhaustiveness.md` as `main` has them.
+The mentions of the old page below say what it said when they were written.
+The probes, test counts and timings below were run on binaries built from earlier commits, the one the text names beside each where it names one; a commit that changes only this file does not re-run them.
 The branch carries work first merged into unstable, one PR at a time, and each section below names its unstable source.
 The unstable commits named here are on unstable only: none of them is on this branch or on main.
 
@@ -44,7 +48,7 @@ In `jl4-core/src/L4/Parser.hs`:
 - `givenTermNames` (`:1094`) and `givenTermParams` (`:1099`).
 - `desugarPatternClauses`, which builds the fused `MkDecide` and records the clause matrix (`:1111`).
 - `generatedName` (`:1185`), `givenInputBinding` (`:1194`), `scrutineeRef` (`:1202`), `rawTokensAnno` (`:1215`).
-- `matchClauses` (`:1243`), `clauseMatchesAnything` (`:1274`), `fallthroughName` (`:1281`), `clausesSrcAnno` (`:1302`), `bindFallthrough` (`:1311`), `generatedConsider` (`:1322`), `matchOne` (`:1328`), `matchLast` (`:1348`).
+- `matchClauses` (`:1243`), `clauseMatchesAnything` (`:1274`), `fallthroughName` (`:1281`), `clausesSrcAnno` (`:1302`), `bindFallthrough` (`:1311`), `generatedConsider` (`:1325`), `matchOne` (`:1331`), `matchLast` (`:1351`).
 
 In `jl4-core/src/L4/Syntax.hs`: `isDistinguishablePat` (`:103`), `patAlwaysMatchesAs` (`:116`) and `isGeneratedName` (`:124`), shared by the parser, the checker, the printer and the editor.
 
@@ -76,7 +80,7 @@ A `GIVEN` that does not name one input per pattern, a type-only `GIVEN` included
 Desugaring.
 For each column, a bare name equal to the input's name, or `_` written as a quoted name, matches without a test and binds nothing new.
 Any other pattern becomes a generated `CONSIDER … WHEN <pattern>`, marked `PmConsider` (`generatedConsider`).
-It reads the input by the input's name respelled with `PreDef` (`scrutineeRef`), which the checker makes another name of the `GIVEN` input (`clauseInputSpellings`, `TypeCheck.hs:840`), so a pattern variable an earlier column binds under that name cannot capture the reference.
+It reads the input by the input's name respelled with `PreDef` (`scrutineeRef`), which the checker makes another name of the `GIVEN` input (`clauseInputSpellings`, `TypeCheck.hs:841`), so a pattern variable an earlier column binds under that name cannot capture the reference.
 A bare name that is not the input's name is a `WHEN` pattern, and the checker decides whether it is a nullary constructor or a fresh variable: in `DECIDE premium other IS 0`, `other` binds the input.
 Every non-final clause gets `OTHERWISE <the later clauses>`; the final clause gets no `OTHERWISE`, so a value no clause matches raises `NonExhaustivePatterns` at run time.
 The later clauses are bound once per clause boundary, with `LET … IN`, to a nullary local named for what it holds, `the result of clauses 2 to 3` or `the result of clause 3` (`fallthroughName`), also spelled with `PreDef`, and referenced by name, so the tree is linear in clauses times columns.
@@ -86,8 +90,8 @@ The clauses after one in which every column matches without a test are bound too
 ## Diagnostics
 
 - At run time, a generated `CONSIDER` that runs out of branches says "No clause of `k` matches these inputs.", or "The only clause of `z` does not match these inputs." (`Exceptions.hs:110`); a `CONSIDER` the drafter wrote keeps "The value … reached a CONSIDER that has no branch for it." (`:100`).
-- A `GIVEN` that does not name one input per pattern, a type-only `GIVEN` included, is one error at the first clause's head (`ClausePatternCountMismatch`, `jl4-core/src/L4/TypeCheck/Types.hs:77`; message at `TypeCheck.hs:4411`): "Each clause of `f` has 2 patterns, but its GIVEN names 1 input."
-- A pattern of the wrong type is reported as an input of the group: "The first input of `f` is declared to be of type NUMBER but the pattern written for it here is of type STRING", at the pattern (`ExpectClauseInputContext`, `Types.hs:195`; message at `TypeCheck.hs:4776`).
+- A `GIVEN` that does not name one input per pattern, a type-only `GIVEN` included, is one error at the first clause's head (`ClausePatternCountMismatch`, `jl4-core/src/L4/TypeCheck/Types.hs:77`; message at `TypeCheck.hs:4409`): "Each clause of `f` has 2 patterns, but its GIVEN names 1 input."
+- A pattern of the wrong type is reported as an input of the group: "The first input of `f` is declared to be of type NUMBER but the pattern written for it here is of type STRING", at the pattern (`ExpectClauseInputContext`, `Types.hs:195`; message at `TypeCheck.hs:4774`).
 - The missing-case warning and the never-used warning are described below.
 - Because the pattern parser is tried first, a malformed `DECIDE` head lists pattern tokens among the expected ones: `expecting (, AKA, EXACTLY, Float Literal, IF, IS, Numeric Literal, OF, String Literal, identifier, or space token` (`jl4/examples/not-ok/tc/tests/parse-error4.golden:14`).
 
@@ -119,9 +123,9 @@ This branch carries the parts that do not depend on unstable's coverage analysis
 
 Where it lives:
 
-- `jl4-core/src/L4/Syntax.hs`: `PmGroup` (`:540`) and `PmSynthetic` (`:554`: `PmConsider`, `PmFallthrough`, `PmUnreachable`), the `pmSynthetic` field of `Extension` (`:580`), `annPmSynthetic` (`:629`) and `setPmSynthetic` (`:632`); `PmMatrix` has `synthesizedScrutinees` (`:520`) and `catchAll` (`:525`).
-- `jl4-core/src/L4/Parser.hs`: `matchClauses` (`:1243`) marks every generated CONSIDER (`generatedConsider`, `:1322`) and binding of later clauses (`bindFallthrough`, `:1311`), and binds the clauses after a clause that matches every input instead of dropping them (`PmUnreachable`); `clauseMatchesAnything` (`:1274`); `givenTermParams` (`:1099`).
-- `jl4-core/src/L4/TypeCheck.hs`: `settleOneClause` (`:719`), `decideErrorContext` (`:744`), `isClausesBinding` (`:752`), `checkClausesLet` (`:886`, dispatched from `checkExpr` at `:2066`), `speculatively` (`:923`), `warnUnreachableClauses` (`:1164`); `checkConsider` (`:2187`) reads the mark; the messages (`:4630`, `:4776`).
+- `jl4-core/src/L4/Syntax.hs`: `PmGroup` (`:540`) and `PmSynthetic` (`:554`: `PmConsider`, `PmFallthrough`, `PmUnreachable`), the `pmSynthetic` field of `Extension` (`:583`), `annPmSynthetic` (`:672`) and `setPmSynthetic` (`:675`); `PmMatrix` has `synthesizedScrutinees` (`:520`) and `catchAll` (`:525`).
+- `jl4-core/src/L4/Parser.hs`: `matchClauses` (`:1243`) marks every generated CONSIDER (`generatedConsider`, `:1325`) and binding of later clauses (`bindFallthrough`, `:1311`), and binds the clauses after a clause that matches every input instead of dropping them (`PmUnreachable`); `clauseMatchesAnything` (`:1274`); `givenTermParams` (`:1099`).
+- `jl4-core/src/L4/TypeCheck.hs`: `settleOneClause` (`:720`), `decideErrorContext` (`:745`), `isClausesBinding` (`:753`), `checkClausesLet` (`:887`, dispatched from `checkExpr` at `:2067`), `speculatively` (`:924`), `warnUnreachableClauses` (`:1165`); `checkConsider` (`:2188`) reads the mark; the messages (`:4630`, `:4776`).
 - `jl4-core/src/L4/TypeCheck/Types.hs`: `UnreachableClause` (`:128`), `PatternClauseUnreachable` (`:150`), `ExpectClauseInputContext` (`:195`).
 - `jl4-core/src/L4/EvaluateLazy/Exceptions.hs:110` and `Machine.hs` (`consideredClauses`, `:363`): the run-time message in clause terms.
 
@@ -156,19 +160,19 @@ M2 is about publishing, not about missing cases; it is described under "Refusing
 
 On unstable, #185 (merge `9e684f9b8`) is seven commits: `97cc781c9` (the parser records the clause matrix), `4556d4419` (the checker), `38f0f6fb7` (the column-wildcard fix), fixtures and goldens (`683b20cb0`, `51b08333f`), a DMN test (`0cc42baf6`) and spec notes (`f0e224fd0`).
 This branch carries the code of `97cc781c9` and `38f0f6fb7`, with comments adapted to main, and `4556d4419`'s outer structure; the analysis inside it is new, because #185's runs on the residual-set coverage oracle (`analyzeGuardRows` over `analyzeBranch`, `maxUncoveredNablas`, `constructorArity`, `constructorsInScopeFromEntityInfo`), which reached unstable before #185 and is not on main.
-Main's own CONSIDER analysis is not reused either: `normalizeRefinement` merges every disjunct into one constraint set (`jl4-core/src/L4/TypeCheck.hs:3049-3056`, with the union at `:3034`), which loses the row structure a group of several columns needs: traced by hand on `f TRUE TRUE` / `f FALSE FALSE`, it reports nothing missing (not run, since a `CONSIDER` has one scrutinee).
+Main's own CONSIDER analysis is not reused either: `normalizeRefinement` merges every disjunct into one constraint set (`jl4-core/src/L4/TypeCheck.hs:3050-3057`, with the union at `:3034`), which loses the row structure a group of several columns needs: traced by hand on `f TRUE TRUE` / `f FALSE FALSE`, it reports nothing missing (not run, since a `CONSIDER` has one scrutinee).
 
 Where it lives:
 
-- `jl4-core/src/L4/Syntax.hs`: `PmMatrixClause` and `PmMatrix` (`:478`, `:518`), the `pmMatrix` field of `Extension` (`:579`), `annPmMatrix` and `setPmMatrix` (`:623-627`).
+- `jl4-core/src/L4/Syntax.hs`: `PmMatrixClause` and `PmMatrix` (`:478`, `:518`), the `pmMatrix` field of `Extension` (`:582`), `annPmMatrix` and `setPmMatrix` (`:666-670`).
 - `jl4-core/src/L4/Parser.hs:1159-1175`: `desugarPatternClauses` records the inputs and each clause's head range and patterns.
-- `jl4-core/src/L4/TypeCheck.hs`: `inferDecide` calls `checkClauseMatrix` after checking the body (`:691`); `checkClauseMatrix` (`:950`), `quietly` (`:1196`), `coverageRow` (`:1229`), `coveragePattern` (`:1269`), `constructorFamilies` (`:1332`), `uncoveredRows` (`:1396`), `maxMissingClauses` (`:1472`), `clauseMatrixFuel` (`:1510`); the message (`:4608`) and `prettyMissingClauseLhs` (`:4688`).
-- `jl4-core/src/L4/TypeCheck/Types.hs:143`: the warning `PatternClausesMissing`, whose range (`:284`) is the hull of the clause heads.
+- `jl4-core/src/L4/TypeCheck.hs`: `inferDecide` calls `checkClauseMatrix` after checking the body (`:692`); `checkClauseMatrix` (`:951`), `quietly` (`:1197`), `coverageRow` (`:1230`), `coveragePattern` (`:1270`), `constructorFamilies` (`:1333`), `uncoveredRows` (`:1397`), `maxMissingClauses` (`:1473`), `clauseMatrixFuel` (`:1511`); the message (`:4608`) and `prettyMissingClauseLhs` (`:4686`).
+- `jl4-core/src/L4/TypeCheck/Types.hs:143`: the warning `PatternClausesMissing`, whose range (`:311`) is the hull of the clause heads.
 
 Behaviour:
 
 - Every group is checked, one clause or many.
-- Each clause's patterns are checked again against the `GIVEN` types with every diagnostic discarded (`quietly`); a clause naming its column's `GIVEN` is read as matching anything before that, as the desugarer reads it (`patIsColumnWildcard`, `TypeCheck.hs:1131`, from unstable's `38f0f6fb7`).
+- Each clause's patterns are checked again against the `GIVEN` types with every diagnostic discarded (`quietly`); a clause naming its column's `GIVEN` is read as matching anything before that, as the desugarer reads it (`patIsColumnWildcard`, `TypeCheck.hs:1132`, from unstable's `38f0f6fb7`).
 - The missing rows are computed by specialisation and the default matrix (Maranget, "Warnings for pattern matching", JFP 2007, §3.1 and §5), over the constructors main's `CONSIDER` analysis knows: `TRUE`/`FALSE` and the enumerations and records declared in the module (`constructorFamilies` reads the same declarations as `buildConstructorLookup`).
 - In each suggested clause, an input that the missing case leaves open is written as its `GIVEN` name, or as `` `_` `` when the user wrote no `GIVEN` for it (#185's `renderColumnWildcard` wrote the parser's `_pm_arg_i` there, measured on unstable at `568817a6d`), and an applied constructor is parenthesised, so each suggested `DECIDE … IS` line can be pasted.
 - The warning text is unstable's: "This multi-clause definition does not cover all cases. The following clauses are still needed:".
@@ -179,7 +183,7 @@ Each is fail-open: the check gives up with no warning, and no diagnostic says th
 - A group matching lists (`EMPTY`, `FOLLOWED BY`), or values of a type declared in another module (such as `MAYBE` from the prelude), is checked only as far as the analysis need not tell those values apart: main's constructor lookup does not know those constructors, so the analysis gives up where it meets one as a column head, and answers where a row of wildcards or the other columns settle the question first (`t Red EMPTY` / `t Red xs` / `t Green xs` lists `Blue xs`; `f Red (JUST 0)` / `f Green m` lists `Red m` and `Blue m` through the coarse tier; `show NOTHING` / `show (JUST 0)` and `f (JUST 0)` / `f (JUST n)` are silent).
   A group whose every clause has a number or a piece of text in it is answered by the coarse tier below with the one all-names clause (`f (JUST 0)` alone suggests ``DECIDE `f` m IS``).
 - An `EXACTLY` the analysis cannot read: on an enumeration or `BOOLEAN` input, any `EXACTLY` other than a value of the input's type or the input's own name; on any input, an `EXACTLY` whose expression mentions the input itself; inside a pattern, the same by the type of the position, read off the pattern's annotation after the re-check's substitution, and an `EXACTLY` of a value it cannot name where that type is still an inference variable.
-  On a number, text or date input or field, or one declared under another name for one (`DECLARE Age IS A NUMBER`; synonyms are expanded for the analysis, `expandSynonymsIn`, `:1311`), an `EXACTLY` of a value the analysis cannot name (`EXACTLY someConstant`, at the top of a clause or inside a pattern, as in `f (Box (EXACTLY zero))` / `f (Box n)`) leaves its clause out instead of stopping the group, and the group then gets the coarse list alone; see "Literal patterns" below.
+  On a number, text or date input or field, or one declared under another name for one (`DECLARE Age IS A NUMBER`; synonyms are expanded for the analysis, `expandSynonymsIn`, `:1312`), an `EXACTLY` of a value the analysis cannot name (`EXACTLY someConstant`, at the top of a clause or inside a pattern, as in `f (Box (EXACTLY zero))` / `f (Box n)`) leaves its clause out instead of stopping the group, and the group then gets the coarse list alone; see "Literal patterns" below.
 - More than 64 rows at any level of the analysis (`maxMissingClauses`), or more than 10000 steps (`clauseMatrixFuel`), in both tiers.
 - A pattern that does not re-check against its `GIVEN` type.
 - There is no `@nonexhaustive`, so a group cannot be marked deliberately partial.
@@ -196,12 +200,12 @@ Unstable PR #581 (branch `fix/multi-clause-names`, six commits ending at `796cc8
 
 Where it lives:
 
-- The names: `generatedName`, `givenInputBinding`, `scrutineeRef` and `fallthroughName` in `Parser.hs` (see "Where it lives" above); `isGeneratedName` (`Syntax.hs:124`); `clauseInputSpellings` (`TypeCheck.hs:840`), added to scope in `inferDecide` (`:683`).
-- The count of inputs: `clauseInputsAgainstGiven` (`TypeCheck.hs:775`), `givenInputsInScope` (`:791`) and `givenMisnamesInputs` (`:800`), used by `scanFunSigDecide` (`:4050`) and `checkClauseMatrix` (`:950`).
-- Hover: `recordInputPatterns` (`TypeCheck.hs:974`).
+- The names: `generatedName`, `givenInputBinding`, `scrutineeRef` and `fallthroughName` in `Parser.hs` (see "Where it lives" above); `isGeneratedName` (`Syntax.hs:124`); `clauseInputSpellings` (`TypeCheck.hs:841`), added to scope in `inferDecide` (`:684`).
+- The count of inputs: `clauseInputsAgainstGiven` (`TypeCheck.hs:776`), `givenInputsInScope` (`:792`) and `givenMisnamesInputs` (`:801`), used by `scanFunSigDecide` (`:4051`) and `checkClauseMatrix` (`:951`).
+- Hover: `recordInputPatterns` (`TypeCheck.hs:975`).
 - Printing: the `Decide` printer (`jl4-core/src/L4/Print.hs:268`), `writtenClauses` (`:314`), `clauseHeadPattern` (`:338`), `unusedInputNames` (`:359`), `clauseBodies` (`:371`) and `writtenSignature` (`:394`).
 - Render: `clauseLayout` (`jl4-core/src/L4/Export/Document.hs:812`).
-- Editor: completion leaves out generated names (`jl4-lsp/src/LSP/L4/Actions.hs:350`), and so does the outline (`outlineGivenParams` and `outlineLocals`, `jl4-lsp/src/LSP/L4/Actions.hs:281` and `:288`, called at `jl4-lsp/app/LSP/L4/Handlers.hs:531-532` and `:647`; both filters were in the handler until the carry of #631, see "Review round 5").
+- Editor: completion leaves out generated names (`jl4-lsp/src/LSP/L4/Actions.hs:352`), and so does the outline (`outlineGivenParams` and `outlineLocals`, `jl4-lsp/src/LSP/L4/Actions.hs:283` and `:290`, called at `jl4-lsp/app/LSP/L4/Handlers.hs:506-507` and `:622`; both filters were in the handler until the carry of #631, see "Review round 5").
 
 Behaviour:
 
@@ -239,8 +243,8 @@ Unstable PR legalese/l4-ide#587 (commit `3dee6cc3a`, on unstable) is carried as 
 
 Where it lives:
 
-- `jl4-core/src/L4/TypeCheck.hs`: `refuseExportedClausesWithoutGiven` (`:822`), called from `inferTopDecl` (`:636`); the message (`:4409`).
-- `jl4-core/src/L4/TypeCheck/Types.hs:82`: the error `ExportedClausesWithoutGiven`, whose range (`:280`) is the `@export` annotation's.
+- `jl4-core/src/L4/TypeCheck.hs`: `refuseExportedClausesWithoutGiven` (`:823`), called from `inferTopDecl` (`:637`); the message (`:4409`).
+- `jl4-core/src/L4/TypeCheck/Types.hs:82`: the error `ExportedClausesWithoutGiven`, whose range (`:307`) is the `@export` annotation's.
 - `jl4-core/src/L4/Export.hs:440`: `isExportedDecide`, now polymorphic in the pass, so the checker can ask it before resolution.
 
 Behaviour:
@@ -249,7 +253,7 @@ Behaviour:
   It fires when the definition has a `PmMatrix` with `synthesizedScrutinees` and no `GIVEN` at all; a `GIVEN` that names the wrong number of inputs gets `ClausePatternCountMismatch` only.
 - It asks the question main's publication asks: `isExportedDecide` and `buildExportedFunction` (`Export.hs:171`) both read `parseDescText`'s `isExport` flag from the definition's `@desc`, so `@export`, `@export default`, and a `@desc` whose first word is `export` or `default` all count.
 - Main has no `isExportPublicationRefusal`, and no Blawx or relational lowering, so unstable's assumption about those does not arise here.
-- The error fails the check, so `l4 run`, the REPL and `l4 batch` refuse the file, and jl4-service rejects the deployment ("Update rejected: compilation failed: …", through `blockingErrs`, `jl4-service/src/Compiler.hs:155`).
+- The error fails the check, so `l4 run`, the REPL and `l4 batch` refuse the file, and jl4-service rejects the deployment ("Update rejected: compilation failed: …", through `blockingErrs`, `jl4-service/src/Compiler.hs:202`).
 
 Measured on this branch against `36c549226`:
 
@@ -268,7 +272,7 @@ Items 1 to 3 were made for unstable first, on branch `fix/clause-group-round3`, 
 
 Item 1, overloads.
 A run of bare-name clauses whose names differ is grouped by the parser, which cannot tell `TRUE` / `FALSE` from two overloads told apart by their types.
-`separateOverloads` (`TypeCheck.hs:274`), called from `checkProgram` (`:200`) once the module's types and constructors are in scope and before the definitions' signatures are scanned, turns a group whose patterns are all bare names, none of them a constructor, back into the definitions it is made of: the first with the group's signature and annotation, the rest with no signature, each located from its clause's head to the end of its body (since round 3, each with its own clause's head, `AKA` and annotations).
+`separateOverloads` (`TypeCheck.hs:275`), called from `checkProgram` (`:201`) once the module's types and constructors are in scope and before the definitions' signatures are scanned, turns a group whose patterns are all bare names, none of them a constructor, back into the definitions it is made of: the first with the group's signature and annotation, the rest with no signature, each located from its clause's head to the end of its body (since round 3, each with its own clause's head, `AKA` and annotations).
 A group with any constructor name stays a group, a misspelt one included.
 Measured: the `show n` / `show b` file failed to check at `6d0146f27` and now gives `show 3` 4 and `show TRUE` TRUE, as main (`71ebf5ca1`) does; `ok/pattern-matching-overloads.l4` pins it.
 
@@ -276,22 +280,24 @@ Item 2, linear parsing.
 Every clause of a run the group parser turned down was then parsed as a definition of its own, where the group parser read the rest of the run again, so a file of n lines `f x MEANS i` took time quadratic in n.
 `decidePatternMatch` now records the positions of a run it turns down (`turnDownRun`, `Parser.hs:1060`) and fails at once at any of them (`runTurnedDown`, `:1066`); every suffix of a run turned down is turned down too.
 The body of a clause is parsed once per position (`clauseBody`, `:982`; `memoClauseBody`, `:1022`), so an ordinary definition replays the body the group parser read.
-Both live in `ClauseMemo` (`:988`), a layer below megaparsec in `Parser` (`:69`) that backtracking does not undo, run by `runJl4Parser` (`:2825`).
+Both live in `ClauseMemo` (`:988`), a layer below megaparsec in `Parser` (`:69`) that backtracking does not undo, run by `runJl4Parser` (`:2841`).
 On unstable the same replay is `memoGroup` (legalese/l4-ide#582), which also serves bracketed groups; main has no `memoGroup`, so `ClauseMemo` holds only these two tables, and main has no switch to turn the memo off for a comparison run.
 Measured, `l4 check`: 1,000 lines took 29.5 s at `6d0146f27`; now 2,000 take 0.38 s and 4,000 take 0.73 s.
 `PatternMatchParserSpec` required 1,000 lines to parse in less than 8 times the wall-clock time of 250; since round 3 it compares CPU time for 250 and 2,000 lines.
 
 Item 3, the clause after a new name.
-`checkClauseMatrix` resolves the patterns even where the missing-clause analysis stands down (a list, a `MAYBE` value, an `EXACTLY` it cannot read), and finds the first clause whose patterns all match anything because some are new names (`newNameCatchAll`, `TypeCheck.hs:1068`).
-`warnUnreachableClauses` (`:1164`) gives the clauses after it one warning, `AfterClauseBindingNewName` (`Types.hs:132`; message at `TypeCheck.hs:4615`): "This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input."
+`checkClauseMatrix` resolves the patterns even where the missing-clause analysis stands down (a list, a `MAYBE` value, an `EXACTLY` it cannot read), and finds the first clause whose patterns all match anything because some are new names (`newNameCatchAll`, `TypeCheck.hs:1069`).
+`warnUnreachableClauses` (`:1165`) gives the clauses after it one warning, `AfterClauseBindingNewName` (`Types.hs:132`; message at `TypeCheck.hs:4613`): "This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input."
 Main has no hint for a name close to a value, so there is no CONSIDER-worded hint to translate, as there was on unstable.
 This keeps ruling M1's condition: main warns only about clauses after one that matches every input, and a new name does; a repeated clause still draws no warning.
 Measured: Red / Gren / Blue checked clean at `6d0146f27` (`colour Blue` gives 2) and now warns; so does a group over numbers with `other`.
 
 Item 5, the clause wording after a reload.
-The evaluator words a value no clause matches from `pmSynthetic`, a mark on the annotations of the generated CONSIDERs, and jl4-service's `bundle.cbor` wrote every annotation as `()`.
-`Serialise Anno` (`Syntax.hs:1052`) now keeps `pmSynthetic` and nothing else; main serves the CBOR module after every restart, so this is the whole fix here.
-`SerialisationSpec` checks the module read back from the bundle and the service before and after a reload; both fail without the change.
+The evaluator words a value no clause matches from `pmSynthetic`, a mark on the annotations of the generated CONSIDERs.
+jl4-service's `bundle.cbor` used to write every annotation as `()`, so a restarted service had lost the mark; this item made `Serialise Anno` keep it and nothing else (`Syntax.hs:1110`).
+Since legalese/l4-ide#666 a restart compiles the stored sources again, as a deploy does, and reads no cache, so the desugarer sets the mark again; the instance stays behind `jl4-core`'s `serialise-support` flag (`jl4-core.cabal:28`), whose description says nothing in this repository uses it now.
+`IntegrationSpec` ("after a restart", "words a rule written as clauses as it did before the restart") asks a rule written as clauses for an input no clause matches, on a fresh deployment and on a restarted one, and wants the same words.
+`SerialisationSpec` went with the cache.
 
 Item 6: the `l4 render` test in `jl4/tests-cli` drops carriage returns before matching two lines, for Windows.
 
@@ -306,12 +312,12 @@ A second refuter pass found that the L2 fix made the parse quadratic in the numb
 S1 and L1, the overloads' own annotations.
 `separateOverloads` gave the first definition the first `AKA` written on any clause, and the later definitions no `AKA`, no `@desc` or `@export`, and no `@nlg`.
 Measured at `b1002d9af`: `DECIDE f n IS n + 1` / `DECIDE f m AKA g IS m > 3` gave `g 5` 6, the first overload's answer, with no diagnostic; with an `AKA` on each, the second was not found; with an `@export` above the second, `l4 batch` said "no @export functions found in module"; an `@nlg` above it was "Not attached to any valid syntax node".
-Each clause now keeps its head as written, its `AKA` and the `@desc` or `@export` above it in the clause matrix (`PmMatrixClause`, `Syntax.hs:478`), and the annotation passes give a later clause of a group the `@desc` or `@export` and the `@nlg` above it (`claimLaterClauseDescs` and `claimLaterClauseNlgs`, `jl4-core/src/L4/Parser/ResolveAnnotation.hs:725` and `:256`; until `2dd411963` only for a run of bare names).
+Each clause now keeps its head as written, its `AKA` and the `@desc` or `@export` above it in the clause matrix (`PmMatrixClause`, `Syntax.hs:478`), and the annotation passes give a later clause of a group the `@desc` or `@export` and the `@nlg` above it (`claimLaterClauseDescs` and `claimLaterClauseNlgs`, `jl4-core/src/L4/Parser/ResolveAnnotation.hs:755` and `:286`; until `2dd411963` only for a run of bare names).
 `separateOverloads` gives each definition its own clause's head, `AKA` and annotations, and the printer writes each clause's own `AKA` (`writtenClauses`, `Print.hs:314`).
 Main's printer prints no `@desc` and no `@nlg` for any definition, and `l4 batch` finds its `@export` on the checked module before printing it, so the printer change here is the `AKA` alone; on unstable the printer writes the `@desc` too.
 Measured on this branch: `g 5` is TRUE under `l4 run`, `l4 batch` (through an exported rule that calls `g`) and the REPL; the two-`AKA` file gives 6 and TRUE; `l4 batch` finds the `@export` on the second overload, and then evaluates the first overload of that name (see the known limit below); the `@nlg` is attached.
-In a group that stays a group, an annotation written between two clauses is used by nothing, and since `2dd411963` it draws a warning, one at each annotation (`ClauseAnnotationUnused`, `Types.hs:154`, from `warnLaterClauseAnnotations`, `TypeCheck.hs:1154`, called by `checkClauseMatrix`): "This @export is above the second clause of `colour code`, where it is not used."
-The second line says where that kind of annotation does go (`place`, `TypeCheck.hs:4655`): an `@desc` or `@export` is told to come from "above its GIVEN" (from "above its first clause" in a group with no `GIVEN`), and an `@nlg` from "the line above its first clause".
+In a group that stays a group, an annotation written between two clauses is used by nothing, and since `2dd411963` it draws a warning, one at each annotation (`ClauseAnnotationUnused`, `Types.hs:154`, from `warnLaterClauseAnnotations`, `TypeCheck.hs:1155`, called by `checkClauseMatrix`): "This @export is above the second clause of `colour code`, where it is not used."
+The second line says where that kind of annotation does go (`place`, `TypeCheck.hs:4653`): an `@desc` or `@export` is told to come from "above its GIVEN" (from "above its first clause" in a group with no `GIVEN`), and an `@nlg` from "the line above its first clause".
 Before that, the `@nlg` in `DECIDE k Red IS 1` / `@nlg the green value` / `DECIDE k Green IS 2` drew "Not attached to any valid syntax node" at `b1002d9af` and nothing from `8e4c920ca` on (measured at `2113516a1`), and an `@export` there drew nothing at either.
 Overloads reach `checkClauseMatrix` without a matrix, so theirs draw none.
 
@@ -319,15 +325,15 @@ A refuter then found the warning wrong in three ways, fixed on unstable as `887d
 A1, the rule's own `@nlg`.
 An `@nlg` on the line above the first clause is the rule's, and the group did not use it.
 The reason, read in code and not measured: the group's head is the first clause's, and the annotation pass gives it a region that ends before the comment, because the inputs of the head form are the `GIVEN`'s, located up in the signature (`givenInputBinding`, `Parser.hs:1194`).
-`HasNlg Decide` now claims it for the head in the head form's region (`claimFirstClauseNlgs`, `ResolveAnnotation.hs:234`, called at `:218`).
+`HasNlg Decide` now claims it for the head in the head form's region (`claimFirstClauseNlgs`, `ResolveAnnotation.hs:264`, called at `:248`).
 Measured with a control build that skips that claim: `#EVAL code Green` renders "`code` with `Green`", where with the claim it renders "the code of `c` with `Green`".
 A2, the annotations above the first clause are not the second clause's.
 `claimLaterClauseDescs` matched every `@desc` and `@export` that ends before the later clause's head, so one the first clause had left (a `@desc` between the `GIVETH` and the first clause, which belongs to no rule) was counted as above the second clause and warned.
-It then took only those that start after the line of the clause above (`ResolveAnnotation.hs:725`), as `claimLaterClauseNlgs` already did; round 4 replaces that test (see below).
+It then took only those that start after the line of the clause above (`ResolveAnnotation.hs:755`), as `claimLaterClauseNlgs` already did; round 4 replaces that test (see below).
 Measured with a control build without that bound (and with A3's fix also disabled): a `@desc` between the `GIVETH` and the first clause of `steps` draws "This @desc is above the second clause of `steps`", and an `@export` between the `GIVETH` and the first clause of `hops` draws the same for `hops`.
 A3, one warning for each.
 `PmMatrixClause` held one `Desc`, so several `@desc` and `@export` lines stacked above a later clause were reduced to one and drew one warning between them.
-It holds `clauseDescs` and `clauseNlgs`, every one written between the clause above and this one, and `warnLaterClauseAnnotations` warns at each; a separated overload still keeps one `@desc`, as a definition does (`pickDesc`, `ResolveAnnotation.hs:852`).
+It holds `clauseDescs` and `clauseNlgs`, every one written between the clause above and this one, and `warnLaterClauseAnnotations` warns at each; a separated overload still keeps one `@desc`, as a definition does (`pickDesc`, `ResolveAnnotation.hs:882`).
 Measured with a control build that keeps only the first `@desc`: the stacked group draws three warnings, where each of the four annotations should draw one.
 The group now reads its `@desc` and `@export` as a plain `DECIDE` with the same layout does: one above the `GIVEN` is the rule's, and one between the `GIVETH` and the first clause is used by neither and draws no warning for either.
 A fourth finding, that a warning from an imported module shows in `l4 run`, needed no change: `l4 run` prints the diagnostics of every module in the run, each under its own `File:` line (measured on this branch with a module that imports a library with an `@desc` and an `@export` between clauses, and with one that imports a group missing a case).
@@ -377,20 +383,20 @@ S1, the rule after a group.
 After a rule written as clauses, an `@nlg` written above the next rule was swallowed when that rule had no `GIVEN`.
 Measured with a control build of this branch without the fix: in `ok/pattern-matching-annotations-after-group.l4`, `#EVAL two` (a plain rule with no `GIVEN`) renders "`two`" and `#EVAL four` (a group with none) renders "`four`", where with the fix they render "the second rule" and "the fourth rule with `Green`".
 The CONSIDERs and LETs a group is lowered to hold names that the parser made up (`generatedName`), which have no range, and a name with no range has no bound on the region it may claim, so it took every `@nlg` up to the next token that had one.
-`HasNlg Name` now claims nothing for a name with no range (`ResolveAnnotation.hs:435`).
+`HasNlg Name` now claims nothing for a name with no range (`ResolveAnnotation.hs:465`).
 Unstable had a second cause that this branch does not: its `rawTokensAnno` kept the annotations after the last clause in the group's tokens, so the group's range ran over the next rule's `@nlg`; this branch's keeps them as trailing tokens (`d6594578b`).
 
 S2 and L1, one rule for "between two clauses".
 Which annotations counted as written above a later clause was decided by the clause head's line and column.
 An annotation indented past the head's column drew no warning (S2), and an annotation inside a `WHERE` of an earlier clause was taken by the next clause and warned about (L1).
-The clause matrix now keeps the range of each clause's body, `WHERE` included (`PmMatrixClause`, `Syntax.hs:478`, field `bodyRange`), and an annotation is between two clauses when it starts after the end of the clause above and ends before the head of this one (`betweenClauses`, `ResolveAnnotation.hs:285`, used by `claimLaterClauseDescs` and `claimLaterClauseNlgs`).
+The clause matrix now keeps the range of each clause's body, `WHERE` included (`PmMatrixClause`, `Syntax.hs:478`, field `bodyRange`), and an annotation is between two clauses when it starts after the end of the clause above and ends before the head of this one (`betweenClauses`, `ResolveAnnotation.hs:315`, used by `claimLaterClauseDescs` and `claimLaterClauseNlgs`).
 Measured with a control build without that rule and without the S1 fix: the two new `PatternClausesMissingSpec` cases fail, and so does the json schema golden of `ok/pattern-matching-later-clause-annotations.l4`, because the indented `@export`, taken by no clause, then publishes the rule after the group (`helped`).
 An `@nlg` inside a `WHERE` of a clause was "Not attached to any valid syntax node", where a rule written as one definition attaches it to the helper; see "R1" below for the second half.
 
 N1 and N2, an annotation after a clause's body.
 A second pass of the refuter found that `betweenClauses` took an annotation written after a clause's body on the same line, `DECIDE f n IS n + 1 @export published?`, for the next clause's, because it starts after the end of the clause above.
 Measured on this branch at `93be32d32`: `l4 batch` of that line followed by `DECIDE f b IS b AND TRUE` found the second overload published under it (there is no function for the rule written as one definition), `#EVAL g TRUE` rendered the inline `@nlg` of the first overload, and a group with an `@desc`, an `@nlg` and an `@export` after its first three bodies drew "This ... is above the second clause", and the third and the fourth.
-An annotation is between two clauses only if it starts on a line after the one where the clause above ends (`betweenClauses`, `ResolveAnnotation.hs:285`); one on that line stays with the clause.
+An annotation is between two clauses only if it starts on a line after the one where the clause above ends (`betweenClauses`, `ResolveAnnotation.hs:315`); one on that line stays with the clause.
 Fixture `ok/pattern-matching-inline-annotations.l4` (unstable's): its nlg and schema goldens fail with the line test replaced by the position test alone, and so does the `PatternClausesMissingSpec` case "does not move an annotation written after a clause's body to the next clause".
 
 R1, a definition in the `WHERE` of a clause.
@@ -405,14 +411,14 @@ The `@desc` half is not carried: `HasDesc` for an expression is `pure` on this b
 The next rule's `@desc`.
 Because the bodies of the clauses are not read, an `@desc` or `@export` inside a group that nothing of the group claims was taken by the top-level rule after it, which takes every one written before it and within 8 columns of its start (`descPrecedesNode`, `topLevelColumnSlack`).
 Measured at `860824ffc` on `ok/pattern-matching-unclaimed-annotations.l4`: an `@export` between a group's `GIVETH` and its first clause published the group after it, under the description "between the `GIVETH` and the first clause", and an `@export` above a definition in a `WHERE` did the same to the next one; the refuter's `r04`, with an `@desc`, made a helper's description the group's after it.
-`dropUnclaimedWithinGroup` (`ResolveAnnotation.hs:711`) runs after the group's own claims and drops the `@desc` and `@export` still unclaimed inside the group's range, so a group's `@export` between its `GIVETH` and its first clause stays unpublished, as ruled in round 3, and no other rule gets it.
+`dropUnclaimedWithinGroup` (`ResolveAnnotation.hs:741`) runs after the group's own claims and drops the `@desc` and `@export` still unclaimed inside the group's range, so a group's `@export` between its `GIVETH` and its first clause stays unpublished, as ruled in round 3, and no other rule gets it.
 The same defect remains for a rule written as one definition, on this branch (an `@desc` above a definition in its `WHERE` became the description of the rule after it) and on unstable (an `@export` between a plain rule's `GIVETH` and its `DECIDE` published the rule after it, measured at `9c3ae1088`); unstable's groups do not have it (`r04` and the layout above attach or park the `@desc` on the helper or a generated node, measured at `9c3ae1088`).
 Measured: `jl4-test`, 964 examples, passes with the change, and `l4 check` over 341 files prints the same as before; with the drop disabled alone, the fixture's schema golden fails.
 
 L5 and L2, not carried.
 On unstable the group's head form no longer claims the copies of the `GIVEN`'s inputs (`addNlgGroupHead`), so an `@nlg` above the first clause and a herald on the same head collide there as on a rule written as one definition, and an `@nlg` on a `GIVEN` item of a group is attached.
 That is not carried, for what it does here: measured in a build of this branch with that change, a rule written as clauses is claimed exactly as a plain rule is, and a plain rule's `@nlg` between its `GIVETH` and its `DECIDE` lands on the `GIVETH`'s type name (this branch has no `signatureBeforeKeyword`), so `#EVAL code Green` in `ok/pattern-matching-first-clause-annotations.l4` renders "`code` with `Green`" and round 3's A1 is lost.
-So this branch keeps `claimFirstClauseNlgs` (`ResolveAnnotation.hs:234`, called at `:218`), and two things stay as they were.
+So this branch keeps `claimFirstClauseNlgs` (`ResolveAnnotation.hs:264`, called at `:248`), and two things stay as they were.
 A rule written as clauses reports an `@nlg` on a `GIVEN` item as "Not attached to any valid syntax node" where a rule written as one definition attaches it (L2; measured with `GIVEN c IS A Colour @nlg the colour %c%`).
 An `@nlg` above the first clause together with a herald on the head draws no collision for a rule written as clauses nor for a rule written as one definition (L5; measured, no diagnostic for either).
 
@@ -431,14 +437,14 @@ Designed and critiqued adversarially in the session that built it (those notes a
 
 What changed, 2026-10-09:
 
-- `coveragePattern` (`TypeCheck.hs:1269`) reads a number or a piece of text, bare or under `EXACTLY`, as one value of its column (`CovLit`, keyed by `LitKey`, `:1216`: `1` and `1.0` are one key, as the evaluator compares them); `EXACTLY` of a value of the column's type as that value; `EXACTLY` of the column's own input as a wildcard; any other `EXACTLY` as a clause that counts for nothing on a number, text or date input (`isPrimitiveType`, `:2709`, after synonym expansion, `expandSynonymsIn`, `:1311`), and as a bail on any other input, or on any input when its expression mentions the input itself.
+- `coveragePattern` (`TypeCheck.hs:1270`) reads a number or a piece of text, bare or under `EXACTLY`, as one value of its column (`CovLit`, keyed by `LitKey`, `:1217`: `1` and `1.0` are one key, as the evaluator compares them); `EXACTLY` of a value of the column's type as that value; `EXACTLY` of the column's own input as a wildcard; any other `EXACTLY` as a clause that counts for nothing on a number, text or date input (`isPrimitiveType`, `:2710`, after synonym expansion, `expandSynonymsIn`, `:1312`), and as a bail on any other input, or on any input when its expression mentions the input itself.
   The top-level column is classified by its type after substitution and synonym expansion; a nested position by its annotation, which the re-check resolves through its substitution before that is dropped, and which is expanded through synonyms the same way, so an `EXACTLY` of a constant at a number position inside a pattern counts for nothing too (since 2026-10-09, in step with unstable); an inference variable still left there bails.
   `hasOpaque` and `patternHasOpaque` are gone.
-- `uncoveredRows` (`:1396`) takes the column count, so that no rows at all yield the one all-wildcard row; a row of wildcards ends the recursion; a column of numbers or text recurses into each key the rows name, in the order the rows first name them, and then into the wildcard rows for the rest of the column, which renders as the input's name (`renderRow`).
+- `uncoveredRows` (`:1397`) takes the column count, so that no rows at all yield the one all-wildcard row; a row of wildcards ends the recursion; a column of numbers or text recurses into each key the rows name, in the order the rows first name them, and then into the wildcard rows for the rest of the column, which renders as the input's name (`renderRow`).
   Two tiers: the exact partition, and when that bails (the cap, the fuel, or a constructor it cannot enumerate below a key) the same engine over the rows without a number or a piece of text, with fresh fuel; a group with no number or text in it has only the first tier, and a group with a clause left out only the second.
-- `prettyMissingPattern` (`:4698`) prints a number as its clause spelled it, from the token on its annotation (`literalAsWritten`, `:4728`): `1.50` stays `1.50`, `-1` keeps its sign, and `0.1234567890123456789` keeps every digit, where `prettyRatio` rounds past sixteen.
+- `prettyMissingPattern` (`:4696`) prints a number as its clause spelled it, from the token on its annotation (`literalAsWritten`, `:4726`): `1.50` stays `1.50`, `-1` keeps its sign, and `0.1234567890123456789` keeps every digit, where `prettyRatio` rounds past sixteen.
   A piece of text prints through `L4.Print`'s own printer, every printable character as it is and `"` and `\` escaped, because the lexer keeps only the decoded text and the token's own display would write `"São Paulo"` as `"S\227o Paulo"`; a text with a character that does not print keeps that Haskell-style form, which L4 reads back.
-- `settleOneClause` (`:719`): a one-clause group with a number in it now gets a verdict, so its CONSIDER warnings are withdrawn.
+- `settleOneClause` (`:720`): a one-clause group with a number in it now gets a verdict, so its CONSIDER warnings are withdrawn.
 
 Decisions, all assumed, not ruled, 2026-10-09, each kept so that it can be reverted alone:
 
@@ -533,20 +539,20 @@ That file's `.golden` and `.ep.golden` record main's behaviour for a mixfix call
 A definition after a clause group, with another number of inputs.
 `DECIDE f Red IS 1`, `DECIDE f c IS 2` and `DECIDE f Red Blue IS 3`: the parser gathers clauses by name and number of patterns, so the third is a rule of its own whose two inputs are called `Red` and `Blue`, and `f Green Red` gave `3`, with no diagnostic (measured with the build from `a022af716`).
 It now draws one warning at the name of the third, 7:8-7:9: "This definition of `f` is not another clause of the clauses above it", with the counts and what to do.
-`warnClauseArityChange` (`jl4-core/src/L4/TypeCheck.hs:234`, called from `checkProgram` at `:212`); the warning is `ClauseArityChanged` (`jl4-core/src/L4/TypeCheck/Types.hs:162`, message at `TypeCheck.hs:4641`).
+`warnClauseArityChange` (`jl4-core/src/L4/TypeCheck.hs:235`, called from `checkProgram` at `:213`); the warning is `ClauseArityChanged` (`jl4-core/src/L4/TypeCheck/Types.hs:162`, message at `TypeCheck.hs:4639`).
 A definition with a `GIVEN` of its own is not asked about, nor is a second group.
 This was assumed, not ruled, upstream; it is a commit of its own here, so it can be reverted alone.
 Test: `ok/pattern-matching-clause-arity-change.l4`, with its goldens.
 
 Tests for the editor.
 The outline and completion leave out the names a clause group is compiled with (see "Generated names, printing, editor and render"), and nothing tested it: the outline's filters were in the document-symbol handler in `jl4-lsp/app`, out of any test's reach.
-They are now `outlineGivenParams` and `outlineLocals` in `jl4-lsp/src/LSP/L4/Actions.hs` (`:281`, `:288`), which the handler calls (`jl4-lsp/app/LSP/L4/Handlers.hs:531`, `:532` and `:647`); completion's filter was already there (`:350`).
-Main had no `jl4-lsp` test suite, so this adds the stanza (`test-suite jl4-lsp-test`, `jl4-lsp/jl4-lsp.cabal:155`), modelled on unstable's with `main-is: Spec.hs` under `hs-source-dirs: test`, and only the two modules the spec needs, `CheckSource` and `ClauseGeneratedNamesSpec`, with the packages they import (`-Wunused-packages` is an error).
+They are now `outlineGivenParams` and `outlineLocals` in `jl4-lsp/src/LSP/L4/Actions.hs` (`:283`, `:290`), which the handler calls (`jl4-lsp/app/LSP/L4/Handlers.hs:506`, `:507` and `:622`); completion's filter was already there (`jl4-lsp/src/LSP/L4/Actions.hs:352`).
+Main had no `jl4-lsp` test suite, so this adds the stanza (`test-suite jl4-lsp-test`, `jl4-lsp/jl4-lsp.cabal:158`), modelled on unstable's with `main-is: Spec.hs` under `hs-source-dirs: test`, and only the two modules the spec needs, `CheckSource` and `ClauseGeneratedNamesSpec`, with the packages they import (`-Wunused-packages` is an error).
 `ClauseGeneratedNamesSpec` has ten examples: one that the module type-checks, four for the outline and four for completion over the three shapes that make the machinery name something (a group with a `GIVEN` whose input is named after a constructor, a group with no `GIVEN`, a one-clause group with a literal), and a control that a rule written without clauses keeps what was written.
 Each case first finds a generated name in the unfiltered list, so that taking a filter out turns it red.
 Measured on the carried build, with each filter taken out in turn and the suite rebuilt: without the outline's two filters, the four outline cases fail, listing `the result of clause 2`, `input 1`, `input 2`, `input 1` and `the result of clauses 2 to 3`; without completion's filter, the four completion cases fail; restored, ten pass.
 The cases did not exist at `f5eb82e5f`, so there is no earlier build to run them on; the filters were in place there and tested by nothing.
-The tests reach the filter functions (`outlineGivenParams`, `outlineLocals` and completion's filter), not the handler's calls to them: the handler is in the `jl4-lsp` executable (`jl4-lsp/app/LSP/L4/Handlers.hs:531`, `:532` and `:647`), and the test suite links the library only, so a change to a call there is not seen by it.
+The tests reach the filter functions (`outlineGivenParams`, `outlineLocals` and completion's filter), not the handler's calls to them: the handler is in the `jl4-lsp` executable (`jl4-lsp/app/LSP/L4/Handlers.hs:506`, `:507` and `:622`), and the test suite links the library only, so a change to a call there is not seen by it.
 So a change to those calls cannot fail the suite: it does not build the executable.
 What covers the handler is a run over stdio, not part of the suite: `jl4-lsp` (built from `30a0c55a2`) started on a file with a rule `price` written as three clauses under a `GIVEN` and a rule `pair` of two clauses with none, asked on 2026-10-13 for the outline and for completion in the body of `price`.
 The outline lists `price` with its input `c` and `pair` with no child, with no `input 1` and no `the result of clause 2`, and completion there offers 209 names, none of them generated; the probe file is not kept in the tree.
@@ -591,3 +597,156 @@ Hand-ported to main, where it differs from unstable:
 - `PatternMatchParserSpec.hs` on this branch has two timing guards, where unstable's has three (unstable's third times `@ref` citations, which main does not have); the new helper and the two cases were written into this file's version.
 - The five `ok/` fixtures write their mixfix calls head first (``#EVAL `plus` 3 4``), where unstable's write them as the drafter would (``#EVAL 3 `plus` 4``): main exact-prints an infix mixfix call head first (smucclaw/l4-ide#918, fixed on unstable in legalese/l4-ide#124), and for ``#EVAL Alice `is eligible` `` it also dropped the `Alice`, which the `.ep.golden` would then have recorded. Each file says so in a comment. With the calls written head first the `.ep.golden` equals the source, and the results are the same as on unstable (7 and 12; `TRUE`, `"yes"` and `"no"`; 5, 0 and 7).
 - The control's `.golden` and `.ep.golden` are re-recorded for main's parse errors, which are points (`13:1-13:1`) where unstable's span the first token (`13:1-13:4`).
+
+## The ladder and /query-plan read a BOOLEAN clause group as its CONSIDER (from #651)
+
+`/query-plan` (jl4-service) and the ladder answered "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." for a BOOLEAN rule written as clauses, a group of one clause included.
+They now read it as the `CONSIDER` it stands for, as `unstable` does since legalese/l4-ide#651.
+Two causes, and fixing the first alone turned the refusal into a misleading answer.
+
+The type.
+The generated CONSIDERs and the LET that binds the later clauses have no source range, and `setAnnResolvedType` (`jl4-core/src/L4/TypeCheck/Types.hs:806`) recorded a type only on a node with one.
+A node with a `PmSynthetic` mark now has its type recorded on the node itself, with the substitution so far applied, and not in the position index, so hover, go-to-definition and every diagnostic are as they were.
+`bindFallthrough` (`jl4-core/src/L4/Parser.hs:1311`) marks the LET with its binding's mark for this.
+
+The shape.
+With the type recorded, the ladder drew the generated LET as one leaf, and the plan asked nothing.
+`translateDecide` in both ladders (`jl4-core/src/L4/Viz/Ladder.hs:300`, `jl4-lsp/src/LSP/L4/Viz/Ladder.hs:317`) now runs `L4.Transform.inlineLetsForViz` (`jl4-core/src/L4/Transform.hs:130`) first.
+It substitutes the generated LETs into the CONSIDERs that use them (`inlineGeneratedLets`, `:67`); prunes each generated CONSIDER by what the branches around it settled, so a later clause does not ask again about an input an earlier one decided (`pruneGeneratedConsiders`, `:262`, which knows nullary constructors, literals and `EXACTLY` of a constructor the checker stamped, and reads a clause whose pattern is a new name as the `OTHERWISE`); and joins the generated CONSIDERs on one input (`joinGeneratedConsiders`, `:204`).
+A LET the drafter wrote is never read through.
+
+Pruning is what keeps the read-through small.
+Measured on two tables of two enumerations, every pair of values a row, with `rule` the name of each: 16 rows of 4 values by 4, a checkerboard (`rule Ai Bj IS TRUE` where i + j is even and `FALSE` where it is odd, so 8 of each), and 25 rows of 5 by 5, whose results are those of `jl4/tests-cli/fixtures/verify-clause-table-large.l4` on `unstable` (that file is not on this branch):
+
+| `rule`, read as                     | 16 rows                            | 25 rows                              |
+| ----------------------------------- | ---------------------------------- | ------------------------------------ |
+| written (the generated LETs)        | 125 nodes, 2,882 characters        | 197 nodes, 4,567 characters          |
+| LETs substituted, not pruned        | 327,675 nodes                      | more than 5,000,000 nodes            |
+| substituted and pruned              | 56 nodes, 2,054 characters         | 85 nodes, 3,808 characters           |
+| pruned and joined: the box's label  | 26 nodes, 950 characters           | 37 nodes, 1,488 characters           |
+| the nested CONSIDER written by hand | 26 nodes, 950 characters, the same | 37 nodes, 1,488 characters, the same |
+
+With the type fixed and nothing read through, the box's label was the first row, the generated LETs, and the plan asked nothing.
+
+Whether a rule was written as clauses is read off its `PmMatrix` mark (`writtenAsClauses`, `jl4-core/src/L4/Transform.hs:174`), and a rule that was not is drawn as it always was.
+So is a group whose first clause names each of its inputs as the `GIVEN` does, or is `_`: the desugarer drops the clauses after that one (`PmUnreachable`), so the body holds no node it generated (`holdsGeneratedNodes`, `jl4-core/src/L4/Transform.hs:189`).
+A first clause that matches every input through a new name is not that group: the desugarer generates a test of the input for it, with the clauses after it as the other answer, so the body holds a node and the group is read through (see "Bounds").
+The limits under "Bounds" apply only where the body holds one (`readsThrough`, `jl4-core/src/L4/Viz/Ladder.hs:316`).
+
+On this branch a CONSIDER is drawn as one box, labelled with the CONSIDER printed whole, and its atomId hashes that label (`generateAtomId`, `jl4-core/src/L4/Viz/Ladder.hs:512`).
+So a clause group and its hand-written CONSIDER agree, in the ladder, the plan and their atomIds, when the read-through prints as the hand form: a table reads through to the nested CONSIDER a drafter writes for it, and a flatter CONSIDER that means the same (`WHEN Red THEN b` for a nested `CONSIDER b WHEN TRUE THEN TRUE ...`) is a different box.
+The plan's atomIds and the ladder's differ here for every rule with inputs, a clause group or not: the plan renders an atom's inputs by their labels (`atomIdByUnique`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs:187`) and the ladder by their numbers.
+That is older than this work and is not changed here.
+
+### Bounds
+
+`letInliningNodeBudget` (`jl4-core/src/L4/Transform.hs:149`) is 20,000 nodes, counted on the pruned CONSIDERs before joining, as on `unstable`.
+It bounds the size of what is read through, since pruning cannot settle every copy (behind a pattern that binds a name, say); the time follows that size since the change measured below.
+Past it the ladder refuses a rule written as clauses that holds generated nodes with `ClauseGroupTooLong`: "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than 20000 parts. Split the rule into smaller groups of clauses, or into named sub-rules."
+Sixty rows on one NUMBER input, each comparing a sum of two hundred ones with zero, come to 24,301 nodes.
+Deployed over HTTP to the test service at `e393b2e4c`, that group was ready after 3.6 s, and `/query-plan` refused it, with the message above, after 2.6 s.
+Where the line falls is the total length, not the number of rows.
+Measured at `6cb5225f9` through `/query-plan`, with rows that each compare a sum of some number of ones with zero (`longClausesJL4`): of a sum of 200 terms, 49 rows are planned and 50 are refused; of 100 terms, 97 are planned and 99 refused; of 20 terms, 440 planned and 450 refused; of one term, 2,000 planned and 3,000 refused.
+The page for users gives the other way to reach it, in the words of the review of #656 and unchanged: a table over optional inputs whose clauses take values apart with JUST, each such clause written out again under every answer to the inputs after it, and it says that a table of eleven clauses over five MAYBE BOOLEAN inputs can reach it.
+It gives no row counts; they were replaced by that text on 2026-10-15.
+
+That example holds, but eleven is not where the line falls.
+Measured on 2026-10-15 at `6b3af806c` through `/query-plan` on the test service, on a Linux host, with tables over MAYBE BOOLEAN inputs built like this: clause _i_ takes _j_ of the inputs apart with `(JUST x)`, starting at input _i_ and going round, gives the others new names, and returns the AND of the values it took apart; the last clause gives every input a new name and is `IS FALSE`.
+Clauses that each take two inputs apart: twelve clauses over five inputs are planned and thirteen refused (the same over four).
+Taking three apart: eight clauses over five inputs are planned and nine refused (the same over three; over four, nine to twelve are refused, and eight was not run).
+Taking four apart: six clauses over five inputs are planned and seven refused (the same over four).
+Taking all five apart: six are planned and seven refused.
+So the line falls at a number of clauses that depends on how many inputs each takes apart, and the number of inputs matters only as the most a clause can take apart: eleven clauses over five inputs are refused when the first ten take three apart each, and planned when they take two.
+The same eleven can fall either side by one clause: six clauses that take two apart, then three that take three, then the last, ten clauses in all, are planned; one more that takes three apart, eleven clauses, is refused.
+Written with the others named as the `GIVEN` names them (and the last clause naming every input so), the tables I ran both ways are planned and refused at the same clause counts: two apart, twelve planned and thirteen refused over five inputs and over four; three apart, eight and nine over five; four apart, six and seven; all five apart, six and seven; and the ten-clause table planned and the eleven-clause one refused.
+
+The tables written with new names for the inputs not taken apart were slow to read through, and the cause was not the size.
+At `00bfa70fb`, with three inputs taken apart over five (the shape above), a refusal took, in CPU seconds on a Linux host: 22 for nine clauses, 30 for twelve, 62 for 24 and 129 for 48, in both ladders, the lens and `/query-plan` alike (the review measured 25 s and 58 s at 24 and 48 clauses); planning eight clauses took 10 to 18; thirteen clauses taking two apart ran past the test client's 30 s response timeout and took 37 s when it was lengthened.
+Written with the others named as the `GIVEN` names them, the same tables fall at the same clause counts and took 0.06 to 1.44 s (32 tables), the refused ones 1.07 to 1.20.
+`pruneGeneratedConsiders` put the input in for each name a clause bound to it with `substParams` over everything after that clause, and what follows a clause is the same later clauses reached by more than one way, so every new name rebuilt them once more, and the rebuilds stacked.
+A step budget on pruning, as the review asked, was built first (a count of calls of pruning and of the expressions the substitution read, held in a `State`) and did not help: a step cost about 270 microseconds whatever the table, the count was far above the lazy original's (a five-clause table: 15,848 steps and 4.2 s, where the original made 886 calls and took 0.3 s), and a budget tight enough to refuse in about a second would have refused tables that plan today.
+It was dropped for the cause.
+Pruning now carries the renaming down and applies it where a name is read (`rn`, and `renamePattern` for an `EXACTLY x` inside a pattern), `4a5687ff7`.
+It gives the same expression: the old and the new pruning, compared with `==` after joining, agree on 39 tables (new names and the `GIVEN`'s, one to eight clauses, rows of numbers, enumerations of five by five and ten by ten, a first clause with a new name, a name reused in several clauses, names swapped between inputs, a new name equal to a `GIVEN` name, a `CONSIDER`, a `WHERE`, a `LET` and a lambda in a clause body that mention a renamed name, `IF` on it, `EXACTLY` of an input and of a name bound above it, `MAYBE` and enumeration inputs together, one input and five).
+The whole corpus agrees too: of the 289 files under `jl4/examples` and `jl4-core/libraries`, 24 type-check and hold clause groups, 104 groups in all; the editor's and the core ladder, each plain and simplified, were built for each group with Transform.hs as before the fix and with it, and the 416 digests (length and a checksum of the printed ladder, or of its refusal) are identical, while a control group whose result was changed on purpose differs; 11 files do not type-check (ten of the `not-ok` examples and `lsp/semantic-tokens/directives.l4`), and none timed out.
+So nothing flips between planned and refused, and the 20,000-node count is unchanged; what changed is how long it takes to reach it.
+After it, through `/query-plan` at `4a5687ff7`: the 33 new-name tables of the grid (two to five apart, over four and five inputs, with the ten- and eleven-clause pair, 24 and 48 clauses) fall where the ones run before did (planned 0.06 to 1.54 s, refused 1.03 to 1.49 s), 24 clauses are refused in 1.47 s and 48 in 1.49 s, and the 32 tables written with the `GIVEN`'s names took 0.06 to 1.43 s, the refused ones 0.94 to 1.06.
+In the ladder tests the 24- and 48-clause tables were refused in 1.4 and 1.5 s by the editor's ladder, the core ladder simplified and the lens (the `GIVEN`-name table of 24 in 1.0 s), and eight clauses with new names were drawn in 1.0 s; a review had timed the lens on the tables written with the `GIVEN`'s names at about 1 s.
+Counting from a clause group of this kind the time follows the size reached before the count of 20,000 nodes stops it, which is why the comment on `letInliningNodeBudget` says refusing takes about as long as drawing a group of that size.
+`ClauseGroupLadderSpec` and `IntegrationSpec` have a test each for 24 clauses (and 48 in the ladders) refused within 8 s, each answer waited for on its own, and a control each for eight clauses still drawn and planned. Without the change the 24-clause answers do not come in 8 s, so those tests fail. The eight-clause controls pass without it on a host where eight clauses take under 8 s; here eight clauses took 10 to 18 s before it, so they failed here too (two of five in the ladder tests, two of three in the service).
+The same four tables on `main` at `12d6773ad` are answered at once, with 400 "Can only visualize ...", in 0.001 s of CPU.
+`unstable` at `bd887270e` has the text this branch had before the change (`inlineLetsForViz`, `pruneGeneratedConsiders`, `inlineGeneratedLets` and `joinGeneratedConsiders` the same), and its slowness: new-name tables 30.8 s (eight clauses, planned) and 22.1 s (nine, refused), the `GIVEN`-name ones 19.6 s and 1.3 s.
+The change to `Transform.hs` is the function and its type only, so that it can be taken to `unstable` as it is: `git apply --check` of that commit's `Transform.hs` diff is clean on `origin/unstable` at `c05e15ca0`.
+
+Nothing in the service caps the time of `/query-plan`, and a refusal is not remembered; after the change a refusal of such a table took 1.5 s at most in the grid above.
+`queryPlanHandler'` builds the plan on the first request for a function and stores it only when the build succeeded (`jl4-service/src/DataPlane.hs:362-369`); a refusal is thrown from `buildDecisionQueryCacheFromCompiled` before anything is stored (`jl4-service/src/Backend/DecisionQueryPlan.hs:182`), so every request for a refused rule pays the whole cost again.
+The deployment timeouts guard compiling (`tryCompileWithTimeout`) and evaluation (`timeoutAction`), not the plan.
+
+`ClauseGroupTooLarge` and its message ("These clauses would draw a ladder of more than 300 boxes, too many to show. ...") are kept as on `unstable` (`clauseGroupLadderBudget`, `jl4-core/src/L4/Transform.hs:168`).
+A CONSIDER is one box here, so a group that reads through to a CONSIDER is one box, however many rows it has.
+A group that reads through to something else is drawn as that, and can reach the limit: a first clause that gives an input a new name reads through to its result.
+Measured with the ladder tests on this branch: 301 BOOLEAN inputs ANDed under a new name are refused in both ladders, simplified or not, and the lens reads "No decision graph: these clauses would draw more than 300 boxes", where the same rule under the `GIVEN`'s own name is drawn; six pairs ANDed and ORed under a new name are drawn as written, with the ordinary lens, and refused once simplified, which is what the service's plan does (449 boxes for six pairs with the first clause's own names; five pairs are drawn simplified too).
+It is kept, for groups that hold generated nodes, as `unstable` has it, and for when a CONSIDER is drawn as rows (legalese/l4-ide#137).
+
+A group whose first clause names each of its inputs as the `GIVEN` does, or is `_`, is not limited.
+It had been: a disjunction of 6 two-input conjunctions as the first clause of a group whose second clause is never reached is 449 boxes in conjunctive normal form once the service simplifies it, and the service refused it, where the same rule written without the second clause was planned; a first clause of 22,000 parts was refused as too long to draw, and its lens read "No decision graph".
+The review of #656 found it, and it was measured on 2026-10-15: `main` at `12d6773ad` answers both with a plan, this branch refused both until `546414108`, and `unstable` at `bd887270e` refuses both, with these two messages, so the same fix belongs there.
+Tests: `ClauseGroupLadderSpec` draws both in both ladders, and `IntegrationSpec` plans both.
+The boolean check runs first, so a long group that returns a number is told it is not boolean.
+
+A first clause that matches every input through a new name is not that group, and is limited.
+`patAlwaysMatchesAs` (`jl4-core/src/L4/Syntax.hs:116`) is true only of `_` and the input's own name, so for a new name `matchOne` (`jl4-core/src/L4/Parser.hs:1331`) generates a test of the input, with the clauses after it as the other answer, and `holdsGeneratedNodes` is true.
+The first version of this section said "matches every input" where it meant the own-name or `_` case, and the guard's comments and the service README said the same; a second review of this branch found it and measured it, and this section, the comments, the README and the page now say which first clauses are exempt.
+The code was right and did not change.
+Measured on 2026-10-15 through `/query-plan` on a Linux host, with these six sources run unchanged on `main` at `12d6773ad`, on `unstable` at `bd887270e` and on this branch: a disjunction of 5 and of 6 two-input conjunctions as the first clause, and a first clause of 22,000 parts, each with the first clause's NUMBER input named as the `GIVEN` names it, and with a new name for it (`m` for `n`); the clause after it is never reached in the first three.
+
+| first clause           | `main`                             | `unstable`                | this branch               |
+| ---------------------- | ---------------------------------- | ------------------------- | ------------------------- |
+| own name, 5 pairs      | 200                                | 200                       | 200                       |
+| own name, 6 pairs      | 200                                | 400 "more than 300 boxes" | 200                       |
+| own name, 22,000 parts | 200                                | 400 "too long to draw"    | 200                       |
+| new name, 5 pairs      | 400 "Can only visualize" a boolean | 200                       | 200                       |
+| new name, 6 pairs      | 400 "Can only visualize" a boolean | 400 "more than 300 boxes" | 400 "more than 300 boxes" |
+| new name, 22,000 parts | 400 "Can only visualize" a boolean | 400 "too long to draw"    | 400 "too long to draw"    |
+
+The own-name rows are the fix above; the new-name rows were the same on this branch before it (the three new-name service tests pass with the two Ladder files as at `368127487`).
+`main` has no read-through, so it refuses every group that holds a generated node, with "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+So a new-name first clause is where `unstable` is, and ahead of `main` at five pairs.
+Exempting new names too, so that those groups were planned as the own-name ones are, would be a gain over `main` and not parity; it is not done, and whether to do it is for the maintainers.
+
+`(EXACTLY n)` for the input's own name is not exempt either: `patAlwaysMatchesAs` is true only of the bare name and `_`, so the desugarer tests it, and `holdsGeneratedNodes` is true for such a first clause (the premise test in `ClauseGroupLadderSpec`).
+The service plans six pairs of it (200) and refuses a first clause of 22,000 parts as too long (400); `IntegrationSpec` pins both.
+I infer that it reads through to one CONSIDER, which is one box, and that this is why the 300-box limit is not reached at six pairs; I did not draw it.
+The missing-case section of `doc/reference/errors/README.md` says that `EXACTLY` of the input's own name "matches every input"; that is true of the missing-case check, and the section on the decision graph in `doc/reference/functions/DECIDE.md` says that drawn or planned such a clause is read as a test, so the 20,000-part limit applies to it.
+
+These are `unstable`'s bounds, applied to a group that reads through, and the only ones here.
+They were checked on 111 generated tables, each run through `/query-plan` here and `/ladder` on `unstable` at `01557e40a`, on 2026-10-13: one NUMBER input of 50 to 1,200 rows; an enumeration by one BOOLEAN (24 to 200 values) and by as many BOOLEANs as values (10 to 150); two enumerations with every pair of values a row (5 by 5 to 30 by 30); rows over an enumeration whose results AND 3 or 6 number comparisons, or 10 or 20 BOOLEAN inputs; and random tables of 2 to 6 inputs, BOOLEAN or NUMBER, with results TRUE, FALSE or an input, some with a name in an earlier column before a test of a later one.
+A review re-ran them against `unstable` at `0cfcf6960`, and the two agree, in verdict and box count, on all 109 tables on which both give a verdict.
+`unstable` draws 81 of the 111 and refuses 28; for 2 (900 rows of two enumerations, 1,200 rows of one NUMBER) its deploy did not finish on 2026-10-13, and neither did it here.
+That was before #666, which removed the `bundle.cbor` write that sat between the compile and the end of a deploy; the two tables were not run again after it.
+This branch refuses none of the 81, and draws all 28: `unstable` refuses them because, drawn as rows, each would have more than 300 boxes, and here a CONSIDER is one box.
+When drawing a CONSIDER as rows (legalese/l4-ide#137) reaches this branch, that limit will apply to them here too.
+
+Their cost here is small since the SHA-1 that names each box from its label (`L4.Crypto.SHA1`, carried from `unstable`'s legalese/l4-ide#626) builds each block's message schedule once: the hash of a 38,617-character label took 2.2 s before and takes 1 ms now.
+With it, the slowest of the 111 plans in 0.39 s (a label of 881,237 characters), and of the larger tables a review chose to find the limit (two enumerations of up to 27 values, enumerations of 330 values by a BOOLEAN, 400-value enumerations by as many BOOLEANs, and 120 rows each ANDing 30 BOOLEANs), the slowest planned in 1.02 s cold and 0.01 s warm, and the editor drew it in 0.8 s.
+Without it, the same 881,237-character label planned in 102 s.
+
+The editor's decision-graph lens moved into `LSP.L4.Actions.decisionGraphCodeLenses` (`jl4-lsp/src/LSP/L4/Actions.hs:468`), so that it can be tested, and keeps its lens for a refused group, titled "No decision graph: these clauses are too long to draw" (or "... would draw more than 300 boxes", which a first clause that gives an input a new name reaches when its result as drawn is that large); clicking it shows the whole message.
+The lens never simplifies the ladder.
+
+### Not carried, because it is not on this branch
+
+- `l4 verify`, its reading of clause groups and its NOT ANALYSED and WHERE counts: there is no `l4 verify` here.
+- Call panels and reading a called group through (`expansionBodyOf`, and the bound on callers of a too-long group): a call here is one box, and the expand gesture (`l4/inlineExprs`) unfolds only a rule with no inputs, which cannot be written as clauses.
+- Term-keyed atomIds (R3): atomIds here hash the printed label.
+- Drawing a CONSIDER as rows of boxes (`L4.Viz.GuardedRows`, legalese/l4-ide#137, `unstable` only), and with it the plan cost of twin atoms that `unstable` records. On this branch a CONSIDER written by hand is one box too, so a clause group drawn as the same one box is drawn alike.
+
+After a `jl4-service` restart, a clause group is planned as it was at deploy.
+Until legalese/l4-ide#666 a restart read `bundle.cbor`, which kept no part of an annotation but the desugarer's mark, so the rehydrated DECIDE had no resolved type and `/query-plan` answered "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." for every boolean rule, a clause group or one written by hand; `/evaluation` still answered.
+#666 removed the cache, so a restart compiles the stored sources as a deploy does.
+`IntegrationSpec` pins it ("restarted: is planned as it was before the restart", one case for each of the eight clause groups of the pairs below): each group is deployed, the service is restarted from its store, and `/query-plan` is asked before and after; the answer before must be a 200 with a body, and the answer after must equal it.
+All eight pass at `e393b2e4c`.
+With a mutation, not kept, that passes each restarted function's compiled module and DECIDE through the CBOR encoding the old cache used (`Serialise Anno`, still behind the flag), all eight fail, each with the old 400 "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean." against the fresh 200.
+With a mutation, not kept, that compiles `IS FALSE` as `IS TRUE`, the five groups whose source has `IS FALSE` fail on that comparison and the other three pass.
+
+Pinned by `jl4-service/test/IntegrationSpec.hs` ("a BOOLEAN rule written as DECIDE clauses": eight pairs compared with their hand-written CONSIDER, whole plan and atomIds; the 20,000-part refusal; a group whose first clause names each input as the `GIVEN` does, planned at 193 and at 449 boxes simplified and at 22,000 parts, the 22,000-part plan equal to that of the rule written without the second clause; the same groups with a new name for the first clause, refused at six pairs and at 22,000 parts and planned at five; a first clause that writes the input `(EXACTLY n)`, planned at six pairs and refused at 22,000 parts; a table of 24 clauses of optional inputs taken apart with `JUST`, with new names for the others, refused within 8 s, and the same at eight clauses planned; the boolean check first; a drafter's LET kept as written; the eight groups planned as before after a restart) and `jl4-lsp/test/ClauseGroupLadderSpec.hs` (four pairs in both ladders, `EXACTLY` among them; the refusal in both; a group whose first clause names each input as the `GIVEN` does drawn in both, with its lens, and the premise that it holds no generated node, where a new-name first clause holds one; the new-name groups refused in both ladders, with their lens, at 22,000 parts and at 301 inputs, and drawn as written but refused simplified at six pairs; the premise that an `EXACTLY` first clause holds a generated node; that table at 24 and 48 clauses refused within 8 s in both ladders and the lens, and at eight clauses drawn; the lens).

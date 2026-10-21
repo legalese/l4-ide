@@ -99,7 +99,7 @@ import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, can
 import qualified L4.Export as Export
 import qualified L4.ExactPrint as ExactPrint
 import qualified L4.Lexer as Lexer
-import Data.Char (isPrint)
+import Data.Char (isAlpha, isPrint)
 
 import Control.Applicative
 import Data.Monoid
@@ -142,6 +142,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , computedFields = Map.empty
     , moduleUri
     , sectionStack = []
+    , unlessOperand = Nothing
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -343,8 +344,8 @@ withExtraMixfix mixfixAdds =
   local (updateMixfix mixfixAdds)
   where
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf h i) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf h i
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf h i j) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf h i j
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -2362,13 +2363,18 @@ inferExpr' g =
       let e1' = setInertContext InertCtxAnd e1
           e2' = setInertContext InertCtxAnd e2
       dsFun <- desugarBinOpToFunction (rawName andName) (And ann e1' e2') ann e1' e2'
-      inferExpr' dsFun
+      -- @l UNLESS r@ is parsed as @l AND (NOT r)@ ('L4.Parser.infixUnless'),
+      -- and that NOT has no keyword of its own: tell it which operand is @r@.
+      let withUnlessOperand = case e2 of
+            Not _ r | operatorAsWritten ann == Just "UNLESS" -> local (set #unlessOperand (rangeOf r))
+            _ -> id
+      withUnlessOperand $ inferOperatorApp (binaryOperands ann) dsFun
     Or ann e1 e2 -> do
       -- Set inert context to OR for subexpressions before desugaring
       let e1' = setInertContext InertCtxOr e1
           e2' = setInertContext InertCtxOr e2
       dsFun <- desugarBinOpToFunction (rawName orName) (Or ann e1' e2') ann e1' e2'
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     RAnd ann e1 e2 -> do
       -- Set inert context to AND for subexpressions
       let e1' = setInertContext InertCtxAnd e1
@@ -2387,43 +2393,50 @@ inferExpr' g =
       checkBinOp contractT contractT contractT "OR" ROr ann e1' e2'
     Implies ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName impliesName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Equals ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName equalsName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Leq ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName leqName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Geq ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName geqName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Lt ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName ltName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Gt ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName gtName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Not ann e -> do
       dsFun <- desugarUnaryOpToFunction (rawName notName) g ann e
-      inferExpr' dsFun
+      -- The NOT of @l UNLESS r@ (see the 'And' case) names @r@ as the second
+      -- operand of UNLESS.
+      unlessOperand <- asks (.unlessOperand)
+      let operand
+            | isJust unlessOperand, rangeOf e == unlessOperand =
+                Just (const (ExpectOperatorArgContext "UNLESS" (Just 2)))
+            | otherwise = prefixOperand ann
+      inferOperatorApp operand dsFun
     Plus ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName plusName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Minus ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName minusName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Times ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName timesName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     DividedBy ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName divideName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Modulo ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName moduloName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Cons ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName consName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Proj ann e l -> do
       -- Try to resolve as a qualified name (for section dereferencing), but only
       -- if the base is not a local binding. This ensures `r's f` prefers record
@@ -2511,7 +2524,7 @@ inferExpr' g =
           t <- instantiate pt
 
           -- 2. - 5.
-          (res, rt) <- matchFunTy True rl t [projE]
+          (res, rt) <- matchFunTy (ExpectAppArgContext True rl) rl t [projE]
 
           re <-
             case res of
@@ -2545,61 +2558,7 @@ inferExpr' g =
         nlgRe <- nlgExpr re
         pure (nlgRe, te, rgivens)
       pure (Lam ann rgivens re, fun_ rargts te)
-    App ann n es -> do
-      (initialFuncName, initialArgs, rewrotePostfix) <- reinterpretPostfixAppIfNeeded n es
-      -- We want good type error messages. Therefore, we pursue the
-      -- following strategy:
-      --
-      -- 1. We infer the type of the function and instantiate it.
-      --
-      -- 2. Then, we introduce fresh variables for the arguments and the result.
-      --
-      -- 3. Then, we unify the type of the function against a constructed
-      -- function type from the generated variables.
-      --
-      -- 4. At this point, if unification fails, we know that the function
-      -- is either not a function at all or expects a different number of
-      -- arguments than have been supplied.
-      --
-      -- 5. If unification succeeds, we can now proceed by *checking* all
-      -- arguments of the function against their expected result types.
-
-      -- First, try to match this as a mixfix call-site pattern.
-      -- If the function is a registered mixfix and the args contain the expected
-      -- keywords, restructure the args to remove the keywords.
-      -- For param-first patterns, this also returns the correct function name.
-      mMixfixMatch <- tryMatchMixfixCall initialFuncName initialArgs
-      let (actualFuncName, actualArgs, needsAnnoRebuild, mMixfixError) = case mMixfixMatch of
-            Nothing -> (initialFuncName, initialArgs, rewrotePostfix, Nothing)  -- Not a mixfix call, use original
-            Just (funcRawName, restructuredArgs, mErr) ->
-              -- Create a Name with the correct function name, preserving the annotation
-              let MkName nameAnno _ = initialFuncName
-                  newName = MkName nameAnno funcRawName
-                  -- We need to rebuild annotation if args were restructured
-                  -- (i.e., keyword placeholders were removed)
-                  argsChanged = length restructuredArgs /= length initialArgs || rewrotePostfix
-              in (newName, restructuredArgs, argsChanged, mErr)
-
-      -- Report any mixfix matching errors (e.g., wrong keyword, typo)
-      case mMixfixError of
-        Just err -> addError (MixfixMatchErrorCheck n err)
-        Nothing -> pure ()
-
-      -- 1.
-      (rn, pt) <- resolveTerm actualFuncName
-      t <- instantiate pt
-
-      -- 2. - 5.
-      -- Note that if there are no arguments, then matchFunTy does not
-      -- actually insist on the type t being a function.
-      (res, rt) <- matchFunTy False rn t actualArgs
-
-      -- If mixfix args were restructured, rebuild annotation with correct holes
-      let finalAnn = if needsAnnoRebuild
-                     then rebuildMixfixAppAnno ann actualFuncName actualArgs
-                     else ann
-
-      pure (App finalAnn rn res, rt)
+    App ann n es -> inferApp Nothing ann n es
     AppNamed ann n nes _morder -> do
       (rn, pt) <- resolveTerm n
       t <- instantiate pt
@@ -2665,10 +2624,10 @@ inferExpr' g =
       pure (Percent ann e', number)
     Fetch ann e -> do
       dsFun <- desugarUnaryOpToFunction (rawName fetchName) g ann e
-      inferExpr' dsFun
+      inferOperatorApp (prefixOperand ann) dsFun
     Env ann e -> do
       dsFun <- desugarUnaryOpToFunction (rawName envName) g ann e
-      inferExpr' dsFun
+      inferOperatorApp (prefixOperand ann) dsFun
     Post ann e1 e2 e3 -> do
       e1' <- checkExpr ExpectPostUrlContext e1 string
       e2' <- checkExpr ExpectPostHeadersContext e2 string
@@ -3119,6 +3078,66 @@ inferLit (NumericLit _ _) =
 inferLit (StringLit _ _) =
   pure string
 
+-- | Infer an application. A type error in an argument names the argument by
+-- the given context ('inferOperatorApp'), or else as an argument of the
+-- function applied.
+inferApp :: Maybe (Int -> ExpectationContext) -> Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
+inferApp argContext ann n es = do
+  (initialFuncName, initialArgs, rewrotePostfix) <- reinterpretPostfixAppIfNeeded n es
+  -- We want good type error messages. Therefore, we pursue the
+  -- following strategy:
+  --
+  -- 1. We infer the type of the function and instantiate it.
+  --
+  -- 2. Then, we introduce fresh variables for the arguments and the result.
+  --
+  -- 3. Then, we unify the type of the function against a constructed
+  -- function type from the generated variables.
+  --
+  -- 4. At this point, if unification fails, we know that the function
+  -- is either not a function at all or expects a different number of
+  -- arguments than have been supplied.
+  --
+  -- 5. If unification succeeds, we can now proceed by *checking* all
+  -- arguments of the function against their expected result types.
+
+  -- First, try to match this as a mixfix call-site pattern.
+  -- If the function is a registered mixfix and the args contain the expected
+  -- keywords, restructure the args to remove the keywords.
+  -- For param-first patterns, this also returns the correct function name.
+  mMixfixMatch <- tryMatchMixfixCall initialFuncName initialArgs
+  let (actualFuncName, actualArgs, needsAnnoRebuild, mMixfixError) = case mMixfixMatch of
+        Nothing -> (initialFuncName, initialArgs, rewrotePostfix, Nothing)  -- Not a mixfix call, use original
+        Just (funcRawName, restructuredArgs, mErr) ->
+          -- Create a Name with the correct function name, preserving the annotation
+          let MkName nameAnno _ = initialFuncName
+              newName = MkName nameAnno funcRawName
+              -- We need to rebuild annotation if args were restructured
+              -- (i.e., keyword placeholders were removed)
+              argsChanged = length restructuredArgs /= length initialArgs || rewrotePostfix
+          in (newName, restructuredArgs, argsChanged, mErr)
+
+  -- Report any mixfix matching errors (e.g., wrong keyword, typo)
+  case mMixfixError of
+    Just err -> addError (MixfixMatchErrorCheck n err)
+    Nothing -> pure ()
+
+  -- 1.
+  (rn, pt) <- resolveTerm actualFuncName
+  t <- instantiate pt
+
+  -- 2. - 5.
+  -- Note that if there are no arguments, then matchFunTy does not
+  -- actually insist on the type t being a function.
+  (res, rt) <- matchFunTy (fromMaybe (ExpectAppArgContext False rn) argContext) rn t actualArgs
+
+  -- If mixfix args were restructured, rebuild annotation with correct holes
+  let finalAnn = if needsAnnoRebuild
+                 then rebuildMixfixAppAnno ann actualFuncName actualArgs
+                 else ann
+
+  pure (App finalAnn rn res, rt)
+
 -- | A special case of unification where we know the given type must
 -- be a function and we know its arguments. We special-case it because
 -- this allows us to generate substantially better error messages.
@@ -3126,10 +3145,13 @@ inferLit (StringLit _ _) =
 -- NOTE that if there are *no* arguments, we are not expecting a function,
 -- and are trivially done.
 --
-matchFunTy :: Bool -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
-matchFunTy _isProjection _r t []   =
+-- The first argument gives the context each argument is checked in, by its
+-- 1-based position.
+--
+matchFunTy :: (Int -> ExpectationContext) -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
+matchFunTy _argContext _r t []   =
   pure ([], t)
-matchFunTy  isProjection r t0 args =
+matchFunTy  argContext r t0 args =
   -- The fuel bounds the synonym-expansion chain so that a cyclic type
   -- synonym (which evades declaration-time detection when it arrives via
   -- imports) cannot make us loop; when it runs out, we report the current
@@ -3158,7 +3180,7 @@ matchFunTy  isProjection r t0 args =
                 let tf = fun_ argts rt
                 assign #substitution (Map.insert i tf subst)
 
-                rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
+                rargs <- traverse (\ (j, e, t') -> checkExpr (argContext j) e t') (zip3 [1 ..] args argts)
                 pure (rargs, rt)
 
               Just t' -> go fuel t'
@@ -3168,7 +3190,7 @@ matchFunTy  isProjection r t0 args =
             -- and then check the arguments against their expected result
             -- types.
             | nonts == nargs -> do
-              rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
+              rargs <- traverse (\ (j, e, t') -> checkExpr (argContext j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
               pure (rargs, rt)
 
             | otherwise -> do
@@ -4171,6 +4193,40 @@ desugarUnaryOpToFunction name g ann e  = do
         , payload = [mkHoleWithSrcRangeHint Nothing, mkHoleWithSrcRange as]
         }
 
+-- | Infer the call that 'desugarBinOpToFunction' or 'desugarUnaryOpToFunction'
+-- made of an operator expression. The given contexts ('binaryOperands',
+-- 'prefixOperand') name its operands in a type error after the operator the
+-- author wrote, not after the function it is checked as, such as @__PLUS__@
+-- for @+@ (predefined, or an overload the source defines).
+inferOperatorApp :: Maybe (Int -> ExpectationContext) -> Expr Name -> Check (Expr Resolved, Type' Resolved)
+inferOperatorApp argContext = \ case
+  App ann n es -> inferApp argContext ann n es
+  e            -> inferExpr' e
+
+-- | The operands of a binary operator expression with this annotation, by
+-- position. 'Nothing' if the operator is not written in the source.
+binaryOperands :: Anno -> Maybe (Int -> ExpectationContext)
+binaryOperands ann = (\ op i -> ExpectOperatorArgContext op (Just i)) <$> operatorAsWritten ann
+
+-- | The operand of a prefix operator expression, such as NOT, with this
+-- annotation. 'Nothing' if the operator is not written in the source.
+prefixOperand :: Anno -> Maybe (Int -> ExpectationContext)
+prefixOperand ann = (\ op _ -> ExpectOperatorArgContext op Nothing) <$> operatorAsWritten ann
+
+-- | An operator as its author wrote it, such as @+@, @PLUS@ or @AT LEAST@: the
+-- tokens in the annotation of the operator expression, without parentheses
+-- written around the expression. 'Nothing' if there are none, as for the NOT
+-- of @l UNLESS r@.
+operatorAsWritten :: Anno -> Maybe Text
+operatorAsWritten ann =
+  case [ Lexer.displayPosToken t
+       | AnnoCsn _ cluster <- ann.payload
+       , t <- cluster.payload.tokens
+       , t.payload `notElem` [Lexer.TSymbols Lexer.TPOpen, Lexer.TSymbols Lexer.TPClose]
+       ] of
+    []  -> Nothing
+    ops -> Just (Text.unwords ops)
+
 -- | Set the inert context for Inert nodes and convert string literals to Inert.
 -- String literals are only converted when they appear as direct operands of
 -- boolean operators (AND/OR/RAnd/ROr), not inside other expressions.
@@ -4717,16 +4773,21 @@ prettyMissingPattern = go
 -- token (one the parser did not make) prints through the generic printer.
 --
 -- A piece of text prints as L4 writes it: every printable character as it
--- is, @"@ and @\\@ escaped ('L4.Print.escapeStringLiteral'). The lexer
--- keeps only the decoded text, not its spelling, so there is no token to
--- read, and the token's own display ('L4.Lexer.showStringLit') would write
--- @"São Paulo"@ as @"S\227o Paulo"@. A text with a character that does
--- not print (a tab, a newline) is written that way instead, with
--- Haskell-style escapes, which L4 reads back.
+-- is, @"@ and @\\@ escaped ('L4.Print.escapeStringLiteral'). It is not read
+-- off the token: the token's text is the source slice, quotes and escapes
+-- as written, which for a text spelled across lines, or with a tab or a
+-- zero-width space typed in, holds that character raw and would break the
+-- suggested clause over two lines or hide the character. (Before the
+-- token kept the slice its display was 'L4.Lexer.showStringLit' of the
+-- decoded text, which would write @"São Paulo"@ as @"S\227o Paulo"@.) A text
+-- with a character that does not print is written with Haskell-style
+-- escapes instead ('L4.Lexer.showStringLit'), which L4 reads back.
 literalAsWritten :: Lit -> Text
 literalAsWritten lit =
   case lit of
-    StringLit _ t | Text.all isPrint t -> prettyLayout lit
+    StringLit _ t
+      | Text.all isPrint t -> prettyLayout lit
+      | otherwise -> Lexer.showStringLit t
     _ -> case runExcept (ExactPrint.concreteNodesToTokens lit) of
       Right toks
         | (tok : _) <- [ t | t@(Lexer.MkPosToken _ (Lexer.TLiterals _)) <- toks ]
@@ -4753,8 +4814,16 @@ prettyNonDistinctContext NonDistinctTermAppForm =
 prettyTypeMismatch :: ExpectationContext -> Type' Resolved -> Type' Resolved -> [Text]
 prettyTypeMismatch ExpectIfConditionContext expected given =
   standardTypeMismatch [ "The condition in IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs is expected to be of type" ] expected given
-prettyTypeMismatch ExpectNotArgumentContext expected given =
-  standardTypeMismatch [ "The argument of NOT is expected to be of type" ] expected given
+prettyTypeMismatch (ExpectOperatorArgContext op i) expected given =
+  standardTypeMismatch
+    [ maybe "The argument" (\ n -> "The " <> prettyOrdinal n <> " argument") i
+        <> " of " <> operator <> " is expected to be of type"
+    ] expected given
+  where
+    -- A keyword as it is, a symbol quoted, as in "The argument of '%'".
+    operator
+      | Text.any isAlpha op = op
+      | otherwise           = "'" <> op <> "'"
 prettyTypeMismatch ExpectPercentArgumentContext expected given =
   standardTypeMismatch [ "The argument of '%' is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostUrlContext expected given =

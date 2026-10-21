@@ -19,9 +19,9 @@ the sum of `ROUND` with `pi` and `FLOOR` with `pi`
 the sum of `pi` and the product of `ROUND` with `pi` and `pi`
 the product of `FLOOR` with `pi` and `FLOOR` with `pi`
 `CEILING` with `pi`
-`IS INTEGER`
-`IS INTEGER` with `pi`
-`IS INTEGER` with 2
-`IS INTEGER` with 2
-`IS INTEGER` with 2.00000001
-consider the case distinctions of `IS INTEGER` with `pi` :  when `TRUE` has  then `pi`. when `FALSE` has  then the sum of 0.1 and 0.2
+`ISINTEGER`
+`ISINTEGER` with `pi`
+`ISINTEGER` with 2
+`ISINTEGER` with 2
+`ISINTEGER` with 2.00000001
+consider the case distinctions of `ISINTEGER` with `pi` :  when `TRUE` has  then `pi`. when `FALSE` has  then the sum of 0.1 and 0.2

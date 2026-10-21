@@ -96,6 +96,7 @@ data ExportDocumentParams = ExportDocumentParams
   , numberClauses  :: Bool
   , toc            :: Bool     -- ^ prepend a table of contents (HTML)
   , excludeModules :: [T.Text] -- ^ module URIs to exclude (deselected imports)
+  , lang           :: Maybe T.Text -- ^ the language to render, as tagged in the file; the module's own when absent
   }
   deriving stock (Eq, Show, Generic)
 
@@ -108,6 +109,7 @@ instance ToJSON ExportDocumentParams where
     , "numberClauses" .= p.numberClauses
     , "toc" .= p.toc
     , "excludeModules" .= p.excludeModules
+    , "lang" .= p.lang
     ]
 
 instance FromJSON ExportDocumentParams where
@@ -120,6 +122,7 @@ instance FromJSON ExportDocumentParams where
       <*> o .:? "numberClauses"  .!= False
       <*> o .:? "toc"            .!= False
       <*> o .:? "excludeModules" .!= []
+      <*> o .:? "lang"
 
 -- | Params for the export plan (imports/rules tree + reachability).
 newtype ExportPlanParams = ExportPlanParams

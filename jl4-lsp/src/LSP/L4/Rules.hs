@@ -14,9 +14,9 @@ import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
 import qualified L4.Lexer as Lexer
 import qualified L4.Parser as Parser
+import L4.Parser.AnnotationWarning (annotationWarningMessage, annotationWarningSpan)
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
-import qualified L4.Print as Print
 import L4.Syntax
 import L4.TypeCheck (CheckErrorWithContext (..), CheckResult (..), Substitution, applyFinalSubstitution, toResolved)
 import qualified L4.TypeCheck as TypeCheck
@@ -701,7 +701,13 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
             let diags = toList $ fmap mkParseErrorDiagnostic errs
             pure (fmap (mkSimpleFileDiagnostic uri) diags, Nothing)
           Right ts ->
-            pure ([], Just (ts, contents))
+            -- The redundant-@lang hint: a module that declares nothing is
+            -- English, so `@lang en` can go. A hint, the lowest severity the
+            -- LSP has: it exists so that a stale skill or generator cannot
+            -- quietly put the line back, and it changes nothing about exit
+            -- codes or evaluation.
+            let langHints = map (mkSimpleFileDiagnostic uri . mkRedundantLangEnHint) (Parser.redundantLangEnRanges ts)
+            in pure (langHints, Just (ts, contents))
 
   -- | GetMixfixRegistry collects mixfix hints from the current module AND all imports.
   -- This enables cross-module mixfix resolution.
@@ -1055,6 +1061,23 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , _data_ = Nothing
         }
 
+    -- | The redundant @\@lang en@ hint: severity Hint, the lowest the LSP
+    -- has, sourced "linter" like the lints above. The range is the whole
+    -- @\@lang@ line, which is the thing to delete.
+    mkRedundantLangEnHint :: SrcRange -> Diagnostic
+    mkRedundantLangEnHint range =
+      Diagnostic
+        { _range = srcRangeToLspRange (Just range)
+        , _severity = Just LSP.DiagnosticSeverity_Hint
+        , _code = Nothing
+        , _codeDescription = Nothing
+        , _source = Just "linter"
+        , _message = "A module that declares nothing is English; this line can go."
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
     evalLazyResultToDiagnostic :: EvaluateLazy.EvalDirectiveResult -> Diagnostic
     evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace) = do
       Diagnostic
@@ -1115,27 +1138,10 @@ lspPositionToSrcPos :: LSP.Position -> SrcPos
 lspPositionToSrcPos (LSP.Position { _character = c, _line = l }) =
   MkSrcPos (fromIntegral $ l + 1) (fromIntegral $ c + 1)
 
+-- | The text of an annotation warning, shared with the web editor's check
+-- ('L4.API.l4Check').
 prettyNlgResolveWarning :: Resolve.Warning -> Text
-prettyNlgResolveWarning = \ case
-  Resolve.NotAttached _ ->
-    "Not attached to any valid syntax node."
-  Resolve.UnknownLocation nlg -> Text.unlines
-    [ "The following NLG Annotation has no source location. This might be an internal compiler error."
-    , "```"
-    , Print.prettyLayout nlg
-    , "```"
-    ]
-  Resolve.Ambiguous name nlgs -> Text.unlines $
-    [ "More than one NLG annotation attached to: " <> Print.prettyLayout name
-    , "The following annotations would be attached:"
-    , ""
-    ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
-  Resolve.RefUnattached r ->
-    Resolve.refUnattachedMessage r.payload
-  Resolve.RefTrailing r code ->
-    Resolve.refTrailingMessage r.payload code
-  Resolve.RefNoLocation ref ->
-    Resolve.refNoLocationMessage ref
+prettyNlgResolveWarning = annotationWarningMessage
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1144,19 +1150,7 @@ listL4Files dir = do
 
 
 rangeOfResolveWarning :: Resolve.Warning -> LSP.Range
-rangeOfResolveWarning = \ case
-  Resolve.NotAttached nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.UnknownLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.Ambiguous name _ ->
-    srcRangeToLspRange $ rangeOf name
-  Resolve.RefUnattached r ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefTrailing r _ ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefNoLocation _ ->
-    srcSpanToLspRange Nothing
+rangeOfResolveWarning = srcSpanToLspRange . annotationWarningSpan
 
 -- ----------------------------------------------------------------------------
 -- Helpers for implementing syntax highlighting

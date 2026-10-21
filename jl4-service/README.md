@@ -254,6 +254,16 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 - `startTime` — start time for contract simulation (required for DEONTIC)
 - `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
 
+In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
+An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
+A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligationAction` (the obligation that was missed), and, for a breach the rule states with `BREACH BY`, in `party`.
+So a client can ask whether the party who acted is the party who was obliged by comparing two strings: for a party the rule writes as `` `the seller` ``, both are `the seller`.
+A name taken from an answer can also be sent back unchanged as the `party` or `action` of an event in the next request's `events`, when the rule's file defines that name at the top level, as an enum constructor, a `MEANS` definition or a record constant, or when a file that it imports declares that name as an enum constructor: an answer that says `party` is `the seller` and `action` is `deliver the goods` is met by the event `{"party": "the seller", "action": "deliver the goods", "at": 5}`.
+The name is the identifier the rule uses, not the party it stands for: a party written as a `GIVEN` input or as a `MEANS` definition answers with that identifier until an event has been compared with it, so the comparison is still false there.
+A name that exists only inside the rule cannot be sent back: a party that is a `GIVEN` input, or an action the rule never declares, makes the evaluation fail with "I could not find a definition for the identifier" and the name.
+Name the value instead: the value you gave for the input, or a declared action.
+Rule source stays L4, backticks included: an action that carries a value, such as `say "pay now"`, and the reasoning tree and the graphviz source of a trace.
+
 ### Batch Evaluation
 
 Evaluate a function across many input cases in parallel:
@@ -311,6 +321,14 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+
+A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
+There are three such answers.
+A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
+A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
+A rule whose first clause names each input as its `GIVEN` does, or is `` `_` ``, is not read through, and is planned however long it is.
+A first clause that gives an input a new name is read through, and is limited like any other.
 
 An atom's `label` is rule source too, so a string literal in it is escaped in the same way, and the atom's `atomId` is computed from the label.
 

@@ -10,19 +10,19 @@
 --------------------------------------------------------------------------------
 
 -- TRUE UNLESS TRUE = TRUE AND NOT TRUE = TRUE AND FALSE = FALSE
-DECIDE basic_unless_true IF TRUE UNLESS UNLESS TRUE
+DECIDE basic_unless_true IF TRUE UNLESS TRUE
 #ASSERT NOT basic_unless_true
 
 -- TRUE UNLESS FALSE = TRUE AND NOT FALSE = TRUE AND TRUE = TRUE
-DECIDE basic_unless_false IF TRUE UNLESS UNLESS FALSE
+DECIDE basic_unless_false IF TRUE UNLESS FALSE
 #ASSERT basic_unless_false
 
 -- FALSE UNLESS TRUE = FALSE AND NOT TRUE = FALSE AND FALSE = FALSE
-DECIDE false_unless_true IF FALSE UNLESS UNLESS TRUE
+DECIDE false_unless_true IF FALSE UNLESS TRUE
 #ASSERT NOT false_unless_true
 
 -- FALSE UNLESS FALSE = FALSE AND NOT FALSE = FALSE AND TRUE = FALSE
-DECIDE false_unless_false IF FALSE UNLESS UNLESS FALSE
+DECIDE false_unless_false IF FALSE UNLESS FALSE
 #ASSERT NOT false_unless_false
 
 --------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ DECIDE and_unless_test1 IF
          TRUE
   AND    TRUE
   AND    TRUE
-  UNLESS UNLESS TRUE
+  UNLESS TRUE
 
 #ASSERT NOT and_unless_test1
 
@@ -43,7 +43,7 @@ DECIDE and_unless_test2 IF
          TRUE
   AND    TRUE
   AND    TRUE
-  UNLESS UNLESS FALSE
+  UNLESS FALSE
 
 #ASSERT and_unless_test2
 
@@ -57,7 +57,7 @@ DECIDE or_unless_test IF
          FALSE
   OR     TRUE
   OR     TRUE
-  UNLESS UNLESS TRUE
+  UNLESS TRUE
 
 #ASSERT NOT or_unless_test
 
@@ -67,7 +67,7 @@ DECIDE or_unless_test2 IF
          FALSE
   OR     FALSE
   OR     FALSE
-  UNLESS UNLESS FALSE
+  UNLESS FALSE
 
 #ASSERT NOT or_unless_test2
 
@@ -76,7 +76,7 @@ DECIDE or_unless_test2 IF
 DECIDE or_unless_test3 IF
          FALSE
   OR     TRUE
-  UNLESS UNLESS FALSE
+  UNLESS FALSE
 
 #ASSERT or_unless_test3
 
@@ -84,10 +84,10 @@ DECIDE or_unless_test3 IF
 -- SINGLE-LINE VARIANTS
 --------------------------------------------------------------------------------
 
-DECIDE single_and_unless_1 IF TRUE AND TRUE AND TRUE UNLESS UNLESS TRUE
-DECIDE single_and_unless_2 IF TRUE AND TRUE AND TRUE UNLESS UNLESS FALSE
-DECIDE single_or_unless_1 IF FALSE OR TRUE OR TRUE UNLESS UNLESS TRUE
-DECIDE single_or_unless_2 IF FALSE OR TRUE UNLESS UNLESS FALSE
+DECIDE single_and_unless_1 IF TRUE AND TRUE AND TRUE UNLESS TRUE
+DECIDE single_and_unless_2 IF TRUE AND TRUE AND TRUE UNLESS FALSE
+DECIDE single_or_unless_1 IF FALSE OR TRUE OR TRUE UNLESS TRUE
+DECIDE single_or_unless_2 IF FALSE OR TRUE UNLESS FALSE
 
 #ASSERT NOT single_and_unless_1
 #ASSERT single_and_unless_2
@@ -114,7 +114,7 @@ DECIDE single_or_unless_2 IF FALSE OR TRUE UNLESS UNLESS FALSE
 -- Test: TRUE OR FALSE UNLESS TRUE
 -- Correct (UNLESS binds loose): (TRUE OR FALSE) AND NOT TRUE = TRUE AND FALSE = FALSE
 -- Wrong (UNLESS binds tight):   TRUE OR (FALSE AND NOT TRUE) = TRUE OR FALSE = TRUE
-DECIDE precedence_test IF TRUE OR FALSE UNLESS UNLESS TRUE
+DECIDE precedence_test IF TRUE OR FALSE UNLESS TRUE
 #ASSERT NOT precedence_test  -- Proves UNLESS binds looser than OR
 
 -- Test: FALSE OR TRUE UNLESS TRUE
@@ -124,5 +124,5 @@ DECIDE precedence_test IF TRUE OR FALSE UNLESS UNLESS TRUE
 -- Test: TRUE OR TRUE UNLESS TRUE
 -- Correct: (TRUE OR TRUE) AND NOT TRUE = TRUE AND FALSE = FALSE
 -- Wrong:   TRUE OR (TRUE AND NOT TRUE) = TRUE OR FALSE = TRUE
-DECIDE precedence_test2 IF TRUE OR TRUE UNLESS UNLESS TRUE
+DECIDE precedence_test2 IF TRUE OR TRUE UNLESS TRUE
 #ASSERT NOT precedence_test2  -- Another proof UNLESS binds looser than OR

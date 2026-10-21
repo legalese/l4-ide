@@ -8,7 +8,7 @@ Operators (`+`, `AND`, `EQUALS`, `UNLESS`, `FOLLOWED BY` and the rest) are descr
 
 | Function            | Inputs         | Gives   | What it does                                                                                                                                                   |
 | ------------------- | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IS INTEGER`        | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
+| `ISINTEGER`         | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
 | `FLOOR`             | NUMBER         | NUMBER  | Rounds down to a whole number                                                                                                                                  |
 | `CEILING`           | NUMBER         | NUMBER  | Rounds up to a whole number                                                                                                                                    |
 | `ROUND`             | NUMBER         | NUMBER  | Rounds to the nearest whole number; a half goes to the even number, so 2.5 gives 2 and 3.5 gives 4                                                             |
@@ -87,35 +87,12 @@ The [daydate](../libraries/daydate.md) library builds on these with `Date`, week
 
 `TIMEZONE IS` is a line of its own at the top level of a file that sets the document's time zone, such as `TIMEZONE IS "Asia/Singapore"`. The [timezone](../libraries/timezone.md) library has constants for common zones, and [datetime](../libraries/datetime.md) builds on these functions.
 
-## Looking across days
-
-These functions change the date at which an expression is evaluated. While a predicate is checked for a day, the valid time and the date the rules are in effect are both set to that day. Ranges include both ends.
-
-**Example:** [temporal-example.l4](temporal-example.l4)
-
-| Function         | Inputs                                    | Gives      | What it does                                                                                              |
-| ---------------- | ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
-| `EVER BETWEEN`   | DATE, DATE, FUNCTION FROM DATE TO BOOLEAN | BOOLEAN    | TRUE if the predicate holds on any day from the start to the end; FALSE if the start is after the end     |
-| `ALWAYS BETWEEN` | DATE, DATE, FUNCTION FROM DATE TO BOOLEAN | BOOLEAN    | TRUE if the predicate holds on every day from the start to the end; TRUE if the start is after the end    |
-| `WHEN LAST`      | DATE, FUNCTION FROM DATE TO BOOLEAN       | MAYBE DATE | The latest day on or before the date on which the predicate holds, or `NOTHING`                           |
-| `WHEN NEXT`      | DATE, FUNCTION FROM DATE TO BOOLEAN       | MAYBE DATE | The earliest day on or after the date on which the predicate holds (up to 31 December 9999), or `NOTHING` |
-| `VALUE AT`       | DATE, FUNCTION FROM DATE TO a             | a          | The function evaluated at the date, with the valid time and rules date set to it                          |
-
-The `EVAL ...` functions evaluate an expression in a different temporal setting and then restore the original one. The first input is a serial number (see `DATE_SERIAL` and `DATETIME_SERIAL`); the second is the expression.
-
-| Function                        | Inputs    | Gives | What it does                                                         |
-| ------------------------------- | --------- | ----- | -------------------------------------------------------------------- |
-| `EVAL AS OF SYSTEM TIME`        | NUMBER, a | a     | Evaluates as if the system time were the given moment                |
-| `EVAL UNDER VALID TIME`         | NUMBER, a | a     | Evaluates with the valid time set to the given date                  |
-| `EVAL UNDER RULES EFFECTIVE AT` | NUMBER, a | a     | Evaluates under the version of the rules in effect on the given date |
-| `EVAL UNDER RULES ENCODED AT`   | NUMBER, a | a     | Evaluates under the rules as they were written at the given moment   |
-
 ## Regulative traces
 
-| Function     | Inputs                                 | Gives       | What it does                                                                                        |
-| ------------ | -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
-| `WAIT UNTIL` | NUMBER                                 | EVENT a b   | An event that matches no party and no action; in a `#TRACE` it moves time forward to the given time |
-| `EVALTRACE`  | DEONTIC a b, NUMBER, LIST OF EVENT a b | DEONTIC a b | The function behind `#TRACE`: what remains of a rule after the events, starting at the given time   |
+| Function    | Inputs                                 | Gives       | What it does                                                                                        |
+| ----------- | -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
+| `WAITUNTIL` | NUMBER                                 | EVENT a b   | An event that matches no party and no action; in a `#TRACE` it moves time forward to the given time |
+| `EVALTRACE` | DEONTIC a b, NUMBER, LIST OF EVENT a b | DEONTIC a b | The function behind `#TRACE`: what remains of a rule after the events, starting at the given time   |
 
 See [EVENT](../regulative/EVENT.md) and [Regulative rules](../regulative/README.md).
 

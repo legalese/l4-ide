@@ -42,7 +42,7 @@ GIVETH A DEONTIC Party Action
 - Deadlines are relative. There is no absolute date such as "by 1 January 2026", and no `WITHIN 5 days OF event`: to count from an event, put the rule after the `HENCE` of the rule for that event, as above.
 - As events are read, the time left shrinks: after an event at 12, what was `WITHIN 14` from 0 has 2 left.
 - A rule without `WITHIN` has no deadline. It waits for its action however long it takes, and time alone never takes it to `LEST`.
-- L4 finds that a deadline has passed when it reads an event, or a `` `WAIT UNTIL` `` (see [EVENT](EVENT.md)), with a later time. The rule that follows starts at that event's time, and that event is not matched against it.
+- L4 finds that a deadline has passed when it reads an event, or a `WAITUNTIL` (see [EVENT](EVENT.md)), with a later time. The rule that follows starts at that event's time, and that event is not matched against it.
 
 ## HENCE and LEST
 

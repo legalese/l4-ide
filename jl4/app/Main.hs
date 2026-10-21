@@ -47,6 +47,7 @@ import L4.Cli.Deploy
   )
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
+import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
@@ -70,6 +71,7 @@ data Command
   | CmdUndeploy   UndeployOptions
   | CmdDeployments DeploymentsOptions
   | CmdInstall    InstallOptions
+  | CmdNlg        NlgOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -87,7 +89,7 @@ commandParser =
              (progDesc "Typecheck an L4 file only (fast path; no evaluation)"))
       <> command "format"
            (info (helper <*> (CmdFormat <$> formatOptionsParser))
-             (progDesc "Reformat an L4 file and print to stdout"))
+             (progDesc "Print an L4 file to stdout exactly as written"))
       <> command "ast"
            (info (helper <*> (CmdAst <$> astOptionsParser))
              (progDesc "Dump the parsed AST of an L4 file"))
@@ -122,6 +124,9 @@ commandParser =
       <> command "install"
            (info (helper <*> (CmdInstall <$> installOptionsParser))
              (progDesc "Install a companion tool: `l4 install legalese` (the Legalese Cloud CLI)"))
+      <> command "nlg"
+           (info (helper <*> (CmdNlg <$> nlgOptionsParser))
+             (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
 
 commandInfo :: ParserInfo Command
 commandInfo = info (helper <*> versionOption <*> commandParser)
@@ -177,6 +182,7 @@ main = do
     CmdUndeploy   opts -> undeployCmd   opts
     CmdDeployments opts -> deploymentsCmd opts
     CmdInstall    opts -> installCmd    opts
+    CmdNlg        opts -> nlgCmd        opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.

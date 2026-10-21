@@ -1,6 +1,6 @@
 # Using the l4 CLI
 
-Run, check, format, render, and deploy L4 files from the command line.
+Run, check, render, and deploy L4 files from the command line.
 
 **Prerequisites:** [Install L4 and write your first rule](first-l4-file.md)
 
@@ -49,7 +49,7 @@ Available commands:
   run                      Typecheck and evaluate an L4 file (prints diagnostics
                            + #EVAL results)
   check                    Typecheck an L4 file only (fast path; no evaluation)
-  format                   Reformat an L4 file and print to stdout
+  format                   Print an L4 file to stdout exactly as written
   ast                      Dump the parsed AST of an L4 file
   batch                    Evaluate an @export function against many input rows
                            (json|yaml|csv in, NDJSON streaming out)
@@ -244,9 +244,9 @@ See the [library reference](../../reference/libraries/README.md) for what each l
 
 ## Step 6: The Other Subcommands
 
-### `l4 format` — canonical formatting
+### `l4 format` — print a file as written
 
-Reformats a file and prints the result to stdout (like `gofmt`):
+Prints a file to stdout exactly as it is written: the same layout, comments, line endings and spelling of every literal. It does not change the layout. It only parses the file, without type-checking it (use `l4 check` for that); if the file does not parse, it prints the parse errors instead and exits with status 1.
 
 ```bash
 l4 format late-fee.l4
@@ -280,7 +280,36 @@ Provisions
     - otherwise: the invoice's amount × 0.05
 ```
 
-Options: `--format html|text|json|plan`, `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, and `--include-unused`.
+Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
+
+### `l4 nlg` — the directives, as sentences
+
+Writes each `#EVAL`, `#ASSERT` and other directive of a file as one line of prose.
+It is the quick way to read what a set of test cases says without running them.
+Where a definition has an `@nlg` wording, `l4 nlg` uses it in place of the name.
+
+```l4
+GIVEN days_overdue IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is late` @nlg the invoice is late
+  IF days_overdue GREATER THAN 30
+
+#EVAL `is late` 45
+#EVAL NOT `is late` 5
+```
+
+```bash
+l4 nlg is-late.l4
+```
+
+```
+the invoice is late with 45
+not the invoice is late with 5
+```
+
+`l4 nlg` prints nothing and exits non-zero if the file does not typecheck, rather than writing prose about a module that does not hold together.
+Options: `-o/--output FILE` writes to a file instead of standard output, and `--lang SUBTAG` uses the `@nlg:SUBTAG` wordings for the rules that have them (and the module's default wording for those that do not).
+See [one encoding, several languages](../natural-language-functions/optimising-natural-language-generation.md#one-encoding-several-languages).
 
 ### `l4 batch` — many cases at once
 

@@ -8,6 +8,12 @@
 module L4.Export.Render
   ( RenderConfig (..)
   , defaultRenderConfig
+  , isRtlLang
+  , rtlLangTags
+  , rtlScripts
+  , ltrScripts
+  , scriptSubtag
+  , aknLanguage
   , renderHtml
   , renderText
   , renderAkn
@@ -16,24 +22,151 @@ module L4.Export.Render
 import Base
 
 import qualified Base.Text as Text
-import Data.Char (toUpper)
+import Data.Char (isAsciiLower, isAsciiUpper, toUpper)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import L4.Export.Document
+import L4.Lexer (LangTag (..))
+import L4.Syntax (defaultModuleLang)
 
--- | Rendering knobs. Both default to off (no auto-enumeration of section
--- headings or top-level clauses).
+-- | Rendering knobs. The three numbering\/contents switches default to off (no
+-- auto-enumeration of section headings or top-level clauses, no table of
+-- contents); 'docLang' defaults to 'defaultModuleLang'.
 data RenderConfig = MkRenderConfig
   { numberSections :: !Bool
   , numberClauses  :: !Bool
   , toc            :: !Bool   -- ^ prepend a linked table of contents (HTML)
+  , docLang        :: !LangTag
+    -- ^ The language this document is being rendered in. The caller decides it;
+    -- 'L4.Cli.Render' uses @--lang@ if given (and if the module renders
+    -- anything in it), else the module's own @\@lang@, else
+    -- 'defaultModuleLang'.
+    --
+    -- Two writers report it, each in its own vocabulary: HTML as
+    -- @<html lang="…">@ plus a @dir@ when 'isRtlLang' says so, and Akoma Ntoso
+    -- as the language component of the Expression-level FRBR URIs
+    -- ('aknLanguage'). @text@, @json@ and @plan@ do not read it.
   }
   deriving stock (Eq, Show, Generic)
 
 defaultRenderConfig :: RenderConfig
 defaultRenderConfig =
-  MkRenderConfig { numberSections = False, numberClauses = False, toc = False }
+  MkRenderConfig
+    { numberSections = False
+    , numberClauses = False
+    , toc = False
+    , docLang = defaultModuleLang
+    }
+
+-- | The language subtags whose default script runs right to left.
+--
+-- One explicit list rather than a lookup into a locale database: the whole
+-- point of @dir@ is that a browser's bidi heuristics are not enough, and a
+-- short list we can read is worth more here than a complete one we cannot.
+-- Extend it when a corpus needs one — that is a one-line change with a test
+-- next to it, not a dependency.
+--
+-- __This table answers the question only when the tag names no script.__ It is
+-- keyed on the PRIMARY subtag, so @he-IL@ and @ar-EG@ are covered by @he@ and
+-- @ar@ without an entry each — but @he-Latn@ is Hebrew romanised in Latin
+-- script and runs left to right, and @az-Arab@ is Azerbaijani in Arabic script
+-- and runs right to left, and neither can be read off a primary subtag at all.
+-- So 'isRtlLang' consults 'scriptSubtag' FIRST, and only falls through to this
+-- table when the tag carries no script (or one neither script table knows).
+-- Comparison is case-insensitive: BCP 47 says subtags are case-insensitive, and
+-- @--lang HE@ is a thing a user types.
+rtlLangTags :: Set.Set Text
+rtlLangTags = Set.fromList
+  [ "he"   -- Hebrew
+  , "iw"   -- Hebrew, the deprecated ISO 639-1 code older locale stacks still emit
+  , "ar"   -- Arabic
+  , "fa"   -- Persian
+  , "prs"  -- Dari (Afghan Persian)
+  , "ur"   -- Urdu
+  , "yi"   -- Yiddish
+  , "ji"   -- Yiddish, deprecated code (as @iw@ is for Hebrew)
+  , "ps"   -- Pashto
+  , "ckb"  -- Central Kurdish (Sorani)
+  , "sd"   -- Sindhi (Arabic script by default; @sd-Deva@ is not)
+  , "ug"   -- Uyghur
+  , "ks"   -- Kashmiri (Arabic script by default)
+  , "dv"   -- Divehi / Dhivehi
+  , "arc"  -- Aramaic
+  , "syr"  -- Syriac
+  , "nqo"  -- N'Ko
+  ]
+
+-- | The script subtags whose writing direction is right to left.
+--
+-- The script is the part of a language tag that actually decides direction, so
+-- this table outranks 'rtlLangTags': a tag that names a script is answered from
+-- here whatever its language is.
+rtlScripts :: Set.Set Text
+rtlScripts = Set.fromList
+  [ "arab"  -- Arabic — and so @az-Arab@, @pa-Arab@, @ku-Arab@
+  , "aran"  -- Nastaliq (a style of Arabic script; @ur-Aran@ is a real CLDR tag)
+  , "hebr"  -- Hebrew
+  , "syrc"  -- Syriac
+  , "thaa"  -- Thaana (Divehi)
+  , "nkoo"  -- N'Ko
+  , "adlm"  -- Adlam (Fulani)
+  , "rohg"  -- Hanifi Rohingya
+  ]
+
+-- | Script subtags whose writing direction is left to right.
+--
+-- Deliberately short, and short for a reason: this table only ever decides a
+-- case that 'rtlLangTags' would otherwise get WRONG — an RTL language written
+-- in a non-RTL script. In practice that is romanisation, so @Latn@ is the
+-- entry that does the work (@he-Latn@, @ar-Latn@, @fa-Latn@); @Cyrl@ covers the
+-- Central Asian spellings. Every other script here is LTR anyway by its
+-- language's primary subtag, and is listed only so a reader can see that the
+-- omission of a script is not a claim about it.
+--
+-- A script in NEITHER table falls through to 'rtlLangTags', which is the
+-- behaviour this code had before script subtags were read at all.
+ltrScripts :: Set.Set Text
+ltrScripts = Set.fromList
+  [ "latn", "cyrl", "grek", "armn", "geor"
+  , "hans", "hant", "hani", "jpan", "kana", "hira", "kore", "hang"
+  , "deva", "beng", "guru", "gujr", "taml", "telu", "knda", "mlym", "sinh"
+  , "thai", "laoo", "mymr", "khmr", "tibt", "ethi"
+  ]
+
+-- | The script subtag of a BCP 47 language tag, lowercased, if it carries one.
+--
+-- __Four letters, all alphabetic, is what identifies a script__ — BCP 47 gives
+-- every other subtag a shape that cannot collide with that: a region is two
+-- letters or three digits, an extended language subtag three letters, a variant
+-- five to eight alphanumerics or four starting with a DIGIT. So the position of
+-- the subtag does not have to be tracked; @zh-yue-Hant-HK@ answers @hant@ by
+-- the same rule as @az-Arab@.
+--
+-- Scanning stops at a one-character subtag: @-u-@, @-t-@, @-x-@ and friends are
+-- singletons introducing an extension or private use, and a four-letter subtag
+-- after one of those is that extension's payload, not a script.
+scriptSubtag :: Text -> Maybe Text
+scriptSubtag tag =
+  listToMaybe
+    [ Text.toLower s
+    | s <- takeWhile ((/= 1) . Text.length) (drop 1 (Text.splitOn "-" tag))
+    , Text.length s == 4
+    , Text.all (\ c -> isAsciiLower c || isAsciiUpper c) s
+    ]
+
+-- | Does this language tag need @dir="rtl"@?
+--
+-- The script decides when the tag names one; otherwise the language does. See
+-- 'rtlLangTags' for why that order and not the other.
+isRtlLang :: LangTag -> Bool
+isRtlLang (MkLangTag tag) =
+  case scriptSubtag tag of
+    Just script
+      | script `Set.member` rtlScripts -> True
+      | script `Set.member` ltrScripts -> False
+    _ -> Text.toLower (Text.takeWhile (/= '-') tag) `Set.member` rtlLangTags
 
 -- ----------------------------------------------------------------------------
 -- Plain-text rendering
@@ -161,7 +294,7 @@ renderHtml :: RenderConfig -> Document -> Text
 renderHtml cfg doc =
   Text.intercalate "\n"
     [ "<!DOCTYPE html>"
-    , "<html lang=\"en\">"
+    , "<html" <> langAttrs <> ">"
     , "<head>"
     , "<meta charset=\"utf-8\">"
     , "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -178,6 +311,15 @@ renderHtml cfg doc =
     , "</html>"
     ]
  where
+  -- @lang@ always; @dir@ only for a right-to-left language. An explicit
+  -- @dir="ltr"@ for everything else would be correct but is not what the rest
+  -- of the world writes, and the HTML default is already @ltr@ — so the
+  -- attribute appearing at all is the signal that this document is RTL.
+  langAttrs =
+    let MkLangTag tag = cfg.docLang
+    in " lang=\"" <> esc tag <> "\""
+         <> (if isRtlLang cfg.docLang then " dir=\"rtl\"" else "")
+
   linkMap = collectLinks doc
 
   sectionHtml depth sec =
@@ -329,8 +471,41 @@ renderHtml cfg doc =
 -- Akoma Ntoso (AKN/XML) rendering
 -- ----------------------------------------------------------------------------
 
-renderAkn :: Document -> Text
-renderAkn doc =
+-- | The code an Akoma Ntoso Expression-level FRBR URI wants for a language.
+--
+-- AKN identifies an expression by @\/akn\/doc\/main\/\<lang\>\@\<version\>@, and
+-- @\<lang\>@ there is an ISO 639-2 code (the /terminological/ variant where the
+-- two differ — @deu@, not @ger@), not a BCP 47 tag. So the document's language
+-- is translated on the way out rather than pasted in: @he@ becomes @heb@.
+--
+-- Keyed on the primary subtag, because that is the part AKN has a place for —
+-- @he-IL@ is still the Hebrew expression. __A subtag this table does not know is
+-- emitted as it stands__, lowercased: a two-letter code where a three-letter one
+-- belongs is wrong in the same way the old hard-coded @eng@ was wrong, but it at
+-- least says which language was meant, and it keeps this table a short readable
+-- list rather than a vendored copy of the ISO register.
+aknLanguage :: LangTag -> Text
+aknLanguage (MkLangTag tag) =
+  Map.findWithDefault primary primary iso639_2T
+ where
+  primary = Text.toLower (Text.takeWhile (/= '-') tag)
+
+  -- Every language this repo's corpus renders in, plus the rest of
+  -- 'rtlLangTags' so the two tables cannot disagree about a language we
+  -- deliberately support the direction of.
+  iso639_2T :: Map.Map Text Text
+  iso639_2T = Map.fromList
+    [ ("en", "eng"), ("he", "heb"), ("iw", "heb"), ("ar", "ara")
+    , ("fa", "fas"), ("ur", "urd"), ("yi", "yid"), ("ji", "yid")
+    , ("ps", "pus"), ("sd", "snd"), ("ug", "uig"), ("ks", "kas")
+    , ("dv", "div"), ("de", "deu"), ("fr", "fra"), ("ms", "msa")
+    , ("zh", "zho"), ("es", "spa"), ("id", "ind"), ("ta", "tam")
+    -- `arc`, `syr`, `nqo`, `ckb`, `prs` are already three letters and are
+    -- their own ISO 639-2/-3 codes, so the fall-through is right for them.
+    ]
+
+renderAkn :: RenderConfig -> Document -> Text
+renderAkn cfg doc =
   Text.concat
     [ "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
     , "<akomaNtoso xmlns=\"http://docs.oasis-open.org/legaldocml/ns/akn/3.0\">\n"
@@ -342,11 +517,18 @@ renderAkn doc =
     , "</body>\n</act>\n</akomaNtoso>\n"
     ]
  where
+  -- The EXPRESSION is where a language belongs in FRBR: the Work is the act,
+  -- the Expression is the act in one language, the Manifestation is that
+  -- expression as a file. This literal used to be `eng` whatever was rendered,
+  -- which labelled a Hebrew act an English expression — the AKN sibling of the
+  -- `<html lang="en">` defect (smucclaw/l4-ide#970).
+  aknLang = aknLanguage cfg.docLang
+
   aknMeta =
     "<meta><identification source=\"#l4\">"
       <> frbr "FRBRWork" "/akn/doc/main" "/akn/doc"
-      <> frbr "FRBRExpression" "/akn/doc/main/eng@" "/akn/doc/eng@"
-      <> frbr "FRBRManifestation" "/akn/doc/main/eng@.xml" "/akn/doc/eng@.xml"
+      <> frbr "FRBRExpression" ("/akn/doc/main/" <> aknLang <> "@") ("/akn/doc/" <> aknLang <> "@")
+      <> frbr "FRBRManifestation" ("/akn/doc/main/" <> aknLang <> "@.xml") ("/akn/doc/" <> aknLang <> "@.xml")
       <> "</identification></meta>\n"
   frbr el this uri =
     "<" <> el <> "><FRBRthis value=\"" <> this <> "\"/><FRBRuri value=\"" <> uri
@@ -569,6 +751,15 @@ esc =
   . Text.replace "&" "&amp;"
 
 -- | Styling that mimics a printed legal contract.
+--
+-- Every direction-sensitive rule is written with LOGICAL properties
+-- (@padding-inline-start@, @inset-inline-start@, @text-align:start@) rather
+-- than @left@\/@right@, so the whole page mirrors when the document carries
+-- @dir="rtl"@ (see 'isRtlLang'). In a left-to-right document each one is
+-- exactly the physical property it replaced, so this changes nothing there —
+-- and without it a Hebrew document would run right to left while its clause
+-- numbers and indents stayed on the left, which looks like a layout bug
+-- rather than like a translation.
 css :: Text
 css = Text.intercalate "\n"
   [ "  :root { --ink:#000; --muted:#3a3a3a; }"
@@ -594,19 +785,21 @@ css = Text.intercalate "\n"
   , "            border:1px solid #e6e6e6; }"
   , "  nav.toc .toc-title { font-weight:700; text-transform:uppercase;"
   , "       letter-spacing:.08em; font-size:.8rem; color:var(--muted); margin-bottom:.5rem; }"
-  , "  nav.toc ul { margin:0; padding-left:1.2rem; list-style:none; }"
-  , "  nav.toc > ul { padding-left:0; }"
+  , "  nav.toc ul { margin:0; padding-inline-start:1.2rem; list-style:none; }"
+  , "  nav.toc > ul { padding-inline-start:0; }"
   , "  nav.toc li { margin:.15rem 0; }"
   , "  nav.toc a { color:inherit; text-decoration:none;"
   , "       border-bottom:1px dotted color-mix(in srgb, currentColor 45%, transparent); }"
   , "  nav.toc a:hover { border-bottom-style:solid; }"
   , "  ol.clauses { margin:0 0 1rem; padding:0; list-style:none; counter-reset:clause; }"
   , "  ol.clauses > li.clause { position:relative; margin:0 0 1rem; }"
-  , "  ol.tree { margin:.35rem 0 .35rem 1.6rem; padding:0; list-style:none; counter-reset:t; }"
-  , "  ol.tree > li { position:relative; margin:.28rem 0; padding-left:1.9rem; }"
+  , "  ol.tree { margin:.35rem 0; margin-inline-start:1.6rem; padding:0;"
+  , "            list-style:none; counter-reset:t; }"
+  , "  ol.tree > li { position:relative; margin:.28rem 0; padding-inline-start:1.9rem; }"
   , "  ol.tree > li::before {"
   , "       counter-increment:t; content:'(' counter(t, lower-alpha) ')';"
-  , "       position:absolute; left:0; top:0; width:1.5rem; color:var(--muted); }"
+  , "       position:absolute; inset-inline-start:0; top:0; width:1.5rem;"
+  , "       color:var(--muted); }"
   , "  ol.tree ol.tree > li::before { content:'(' counter(t, lower-roman) ')'; }"
   , "  ol.tree ol.tree ol.tree > li::before { content:'(' counter(t, decimal) ')'; }"
   , "  ol.tree ol.tree ol.tree ol.tree > li::before { content:'(' counter(t, upper-alpha) ')'; }"
@@ -617,22 +810,23 @@ css = Text.intercalate "\n"
   , "  a.ref:hover { border-bottom-style:solid; }"
   , "  .field { font-weight:600; }"
   -- Local WHERE / LET definitions attached to a rule.
-  , "  .where-label { font-style:italic; color:var(--muted); margin-left:.15rem; }"
-  , "  ol.where-defs { margin:.25rem 0 .35rem 1.6rem; padding-left:0; list-style:none; }"
+  , "  .where-label { font-style:italic; color:var(--muted); margin-inline-start:.15rem; }"
+  , "  ol.where-defs { margin:.25rem 0 .35rem; margin-inline-start:1.6rem;"
+  , "                  padding-inline-start:0; list-style:none; }"
   , "  ol.where-defs > li { margin:.2rem 0; }"
   -- Tables for list-of-record definitions.
   , "  table.l4-table { border-collapse:collapse; margin:.6rem 0; width:100%;"
   , "                   font-size:.95em; }"
   , "  table.l4-table th, table.l4-table td {"
-  , "       border:1px solid #cfcfcf; padding:.3rem .55rem; text-align:left;"
+  , "       border:1px solid #cfcfcf; padding:.3rem .55rem; text-align:start;"
   , "       vertical-align:top; }"
   , "  table.l4-table th { background:#f0f0f0; font-weight:700; }"
   , "  table.l4-table tbody tr:nth-child(even) { background:#fafafa; }"
   , "  table.l4-table table.l4-table { margin:.2rem 0; }"
-  , "  .num-clauses ol.clauses > li.clause { padding-left:2.4rem; }"
+  , "  .num-clauses ol.clauses > li.clause { padding-inline-start:2.4rem; }"
   , "  .num-clauses ol.clauses > li.clause::before {"
   , "       counter-increment:clause; content:counter(clause) '.';"
-  , "       position:absolute; left:0; top:0; width:1.9rem; text-align:right;"
+  , "       position:absolute; inset-inline-start:0; top:0; width:1.9rem; text-align:end;"
   , "       font-variant-numeric:tabular-nums; }"
   -- Tighten the page margins on narrow viewports (e.g. the IDE preview
   -- pane) so the content isn't crowded by generous desktop padding.
