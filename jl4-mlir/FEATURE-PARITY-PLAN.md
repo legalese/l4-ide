@@ -1266,7 +1266,8 @@ Lands the schema/runtime/HTTP plumbing on the canonical
 - **Schema** — new `DeonticContract` ADT (`OBLIGATION` / `FULFILLED` /
   `BREACH`) baked under `FunctionExport.deonticContract`; party / action
   / deadline pre-rendered via `L4.Print.prettyLayout` so the runtime
-  never re-runs the pretty-printer. `extractDeonticContract` walks
+  never re-runs the pretty-printer. (A bare party or action name is
+  no longer baked this way; see Slice 7.) `extractDeonticContract` walks
   `Regulative` / nested HENCE-LEST / bare FULFILLED / `Breach`.
 - **Lower** — `Regulative{}` / `Breach{}` stop `markUnsupported`-ing
   (they emit an `arith.constant 0.0` placeholder). The wasm body is
@@ -1459,6 +1460,35 @@ Net: 3 more trace-byte-identical cells. Full corpus is now
 20/20 on both M0 (value) and M5 (trace) parity. The synthesizer
 is hidden behind `?trace=full`, so it adds zero cost to the
 default `M0` value path.
+
+### Slice 7 — party and action names spelled as jl4-service answers them
+
+jl4-service answers a party and an action in the structured fields
+(`party`, `action`, `eventParty`, `eventAction`, `obligationAction`,
+and the `party` of a `BREACH` from an explicit `BREACH BY`) as the
+plain name, without backticks: `the seller`, not `` `the seller` ``.
+The schema now bakes them the same way.
+
+- **Schema** — `DeonticExpr` gains `DEName` beside `DELiteral` and
+  `DEParam`. A bare name (an obligation's party or action, or the
+  party of `BREACH BY`) is baked as its plain name; anything more
+  than a name (an action that carries a value, `say "pay now"`)
+  stays rule source from `prettyLayout`. On the wire a `DEName` is
+  the same bare string as a `DELiteral`; the difference travels in a
+  sibling key, `partyKind` / `actionKind` on an `OBLIGATION` and
+  `byKind` on a `BREACH`, each `"name"` when present. A bundle
+  compiled before these keys existed has none, and the runtime
+  prints its strings as given.
+- **Runtime** — the trace's source text backticks a name the way
+  L4's printer does, so ``PARTY `the seller` MUST ...`` still parses.
+
+Known divergences from jl4-service, both predating this slice:
+
+- A `BREACH BY` whose party is a `GIVEN` input answers the input's
+  name (`debtor`) here and its value (`the borrower`) in jl4-service.
+- A breach reached through a `HENCE` gets an extra
+  `BREACH BY … BECAUSE …` clause node in the WASM trace that
+  jl4-service does not print.
 
 ---
 
