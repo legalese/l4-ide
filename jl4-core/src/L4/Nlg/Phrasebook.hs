@@ -34,7 +34,7 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 
-import L4.Lexer (LangTag (..))
+import L4.Lexer (LangTag, langPrimary)
 
 -- | English phrase, as its words, to the rendering.
 type Phrasebook = Map.Map [Text] Text
@@ -46,10 +46,14 @@ type Phrasebook = Map.Map [Text] Text
 -- map. An empty map would report every frame word as missing, which is true
 -- but useless; 'Nothing' says "not localized", and the caller can say that
 -- once.
+--
+-- The table is the language's, whatever region or script the tag adds, so
+-- @he-IL@ gets the Hebrew table as @he@ does: a Hebrew wording tagged @he-IL@
+-- is never joined by English frame words.
 phrasebookFor :: LangTag -> Maybe Phrasebook
-phrasebookFor (MkLangTag t)
-  | Text.toLower t == "he" = Just hebrew
-  | otherwise              = Nothing
+phrasebookFor tag
+  | Text.toLower (langPrimary tag) == "he" = Just hebrew
+  | otherwise                              = Nothing
 
 -- | U+05BE HEBREW PUNCTUATION MAQAF. A rendering ending in it is a prefix
 -- ("ל־", "מ־", "ו־") and is written against the next word, with no space.

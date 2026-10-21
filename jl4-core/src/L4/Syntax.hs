@@ -8,7 +8,7 @@ module L4.Syntax where
 
 import Base
 import L4.Annotation
-import L4.Lexer (LangTag (..), PosToken)
+import L4.Lexer (LangTag (..), PosToken, langMatchRank)
 import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
@@ -674,12 +674,21 @@ annNlgAlts = #extra % #nlgAlts
 -- and falls back to the default when there is none — so asking for a language
 -- a document does not have yields the document's own wording rather than
 -- nothing, which is the behaviour a reader wants from a partial translation.
+--
+-- The closest rendering wins ('langMatchRank'), so @he@ picks a rendering
+-- tagged @he-IL@ when there is no @he@ one, and @he-IL@ picks a @he@ one.
+-- Among equally close renderings the first, default first, wins.
 nlgFor :: Maybe LangTag -> Anno -> Maybe Nlg
 nlgFor Nothing a = view annNlg a
-nlgFor want@(Just _) a =
-  case filter ((== want) . nlgLangTag) (toList (view annNlg a) <> view annNlgAlts a) of
-    (n : _) -> Just n
-    []      -> view annNlg a
+nlgFor (Just want) a =
+  case sortOn fst
+         [ (rank, n)
+         | n <- toList (view annNlg a) <> view annNlgAlts a
+         , Just have <- [nlgLangTag n]
+         , Just rank <- [langMatchRank want have]
+         ] of
+    ((_, n) : _) -> Just n
+    []           -> view annNlg a
 
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc

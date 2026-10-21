@@ -146,28 +146,10 @@ renderCmd opts = do
           declaredLanguage = fromMaybe defaultModuleLang
                                (Parser.declaredModuleLang . fst =<< mToks)
 
-          -- __A label the document cannot support is not taken.__ A partial
-          -- translation is fine and is the point of the flag — a rule with no
-          -- rendering in the asked-for language keeps its default one, so a
-          -- mostly-Hebrew document is honestly @lang="he"@. But when NOTHING in
-          -- the module (or its imports) renders in that language, every sentence
-          -- in the body is the fallback, and @lang@ would be a claim with no
-          -- support: with @--lang he@ on an all-English encoding, @dir="rtl"@
-          -- would then lay English out right to left, moving its full stops to
-          -- the wrong end of the line. So the document keeps the language it
-          -- declares, and stderr says so.
-          --
-          -- @want == declaredLanguage@ is checked first and separately: a module
-          -- that declares @\@lang he@ and carries no @\@nlg@ at all renders no
-          -- Hebrew prose, and asking it for Hebrew is still not a mislabelling.
-          carriesRequested want =
-            want == declaredLanguage
-              || any (Nlg.carriesLanguage want) (tc.module' : rawDeps)
-          (docLanguage, unsupportedRequest) = case opts.renderLang of
-            Nothing -> (declaredLanguage, Nothing)
-            Just want
-              | carriesRequested want -> (want, Nothing)
-              | otherwise             -> (declaredLanguage, Just want)
+          -- A label the document cannot support is not taken, and stderr
+          -- says so below ('Nlg.documentLanguage').
+          (docLanguage, unsupportedRequest) =
+            Nlg.documentLanguage declaredLanguage opts.renderLang (tc.module' : rawDeps)
           rcfg = MkRenderConfig
                    { numberSections = opts.renderNumberSections
                    , numberClauses  = opts.renderNumberClauses

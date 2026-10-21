@@ -64,6 +64,29 @@ newtype LangTag = MkLangTag Text
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (ToExpr, NFData)
 
+-- | The language part of a tag, before its first hyphen: the @he@ of @he-IL@.
+langPrimary :: LangTag -> Text
+langPrimary (MkLangTag t) = Text.takeWhile (/= '-') t
+
+-- | How closely a wording's language answers a request for another, or
+-- 'Nothing' when it does not answer it at all. Lower is closer:
+--
+-- * 0, the same tag;
+-- * 1, the wording's tag is a prefix of the request: @he@ answers @he-IL@;
+-- * 2, the two share their language: @he-IL@ answers @he@, and @he-IL@
+--   answers @he-XX@.
+--
+-- Every reader that asks "is this wording in that language" goes through
+-- this, so a wording tagged @he-IL@ is picked by @--lang he@, and the Hebrew
+-- frame words reach it, without each reader deciding that again. The tags are
+-- compared as written, as everywhere else: @HE@ is not @he@.
+langMatchRank :: LangTag -> LangTag -> Maybe Int
+langMatchRank want@(MkLangTag w) have@(MkLangTag h)
+  | want == have                        = Just 0
+  | (h <> "-") `Text.isPrefixOf` w      = Just 1
+  | langPrimary want == langPrimary have = Just 2
+  | otherwise                           = Nothing
+
 data TDirectives
   = TLazyEvalDirective
   | TLazyEvalTraceDirective

@@ -117,6 +117,43 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
     selectedFor "is large" (Just "fr") m `shouldBe` Just "the amount is large"
     selectedFor "is large" Nothing m `shouldBe` Just "the amount is large"
 
+  -- A request names a language, and a wording's tag may add a region to it,
+  -- or the request may: `--lang he` reads a file whose Hebrew is tagged
+  -- `he-IL`, and `--lang he-IL` reads one whose Hebrew is tagged `he`.
+  describe "selects across a region or script the request or the tag adds" $ do
+    let regional =
+          "GIVEN amount IS A NUMBER\n\
+          \GIVETH A BOOLEAN\n\
+          \DECIDE `is large` @nlg the amount is large\n\
+          \                  @nlg:he-IL ha-sechum gadol\n\
+          \  IF amount > 100\n"
+    it "picks a wording tagged he-IL for a request for he" $ do
+      (m, _) <- parsed regional
+      selectedFor "is large" (Just "he") m `shouldBe` Just "ha-sechum gadol"
+      selectedFor "is large" (Just "he-IL") m `shouldBe` Just "ha-sechum gadol"
+
+    it "picks a wording tagged he for a request for he-IL" $ do
+      (m, _) <- parsed bilingual
+      selectedFor "is large" (Just "he-IL") m `shouldBe` Just "ha-sechum gadol"
+
+    it "prefers the exact tag, then the tag the request extends" $ do
+      (m, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg the amount is large\n\
+        \                  @nlg:he-XX ha-sechum gadol mi-XX\n\
+        \                  @nlg:he ha-sechum gadol\n\
+        \                  @nlg:he-IL ha-sechum gadol be-yisrael\n\
+        \  IF amount > 100\n"
+      selectedFor "is large" (Just "he-IL") m `shouldBe` Just "ha-sechum gadol be-yisrael"
+      selectedFor "is large" (Just "he-YY") m `shouldBe` Just "ha-sechum gadol"
+      selectedFor "is large" (Just "he") m `shouldBe` Just "ha-sechum gadol"
+
+    it "does not match another language, or another case" $ do
+      (m, _) <- parsed regional
+      selectedFor "is large" (Just "hei") m `shouldBe` Just "the amount is large"
+      selectedFor "is large" (Just "HE") m `shouldBe` Just "the amount is large"
+
   -- Which one is the DEFAULT. An untagged rendering carries the MODULE's
   -- language — its `@lang`, or `en` when it declares none — so in a
   -- module with no declaration the untagged one is the `en` one, and that is

@@ -9,6 +9,8 @@ module L4.Nlg (
   decideNlgSite,
   promoteHeadInputNlg,
   carriesLanguage,
+  moduleLanguages,
+  documentLanguage,
   Linearize (..),
   lin,
   unescapeNlgText,
@@ -31,7 +33,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import L4.Annotation
-import L4.Lexer (LangTag, PosToken, isNlgEscapable)
+import L4.Lexer (LangTag, PosToken, isNlgEscapable, langMatchRank)
 import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 import L4.Desugar
@@ -455,14 +457,51 @@ linearizeDirectivesIn mlang mod'' deps'' =
 -- declaration is the caller's to consult, and 'L4.Cli.Render' does.
 --
 -- Same traversal as 'selectLanguage', for the same reason: an @\@nlg@ only ever
--- lands on a 'Name'.
+-- lands on a 'Name'. A rendering counts when 'selectLanguage' would pick it
+-- ('langMatchRank'), so a module whose Hebrew is tagged @he-IL@ carries @he@.
 carriesLanguage :: LangTag -> Module Resolved -> Bool
-carriesLanguage want m = any nodeCarries (toListOf (gplate @Name) m)
+carriesLanguage want m = any (any answers . renderingsOf) (toListOf (gplate @Name) m)
  where
-  nodeCarries n =
-    let a = getAnno n
-    in any ((== Just want) . nlgLangTag)
-           (toList (view annNlg a) <> view annNlgAlts a)
+  answers n = isJust (langMatchRank want =<< nlgLangTag n)
+
+-- | The language a rendered document is labelled with, given the module's
+-- declared language, the language asked for, and the modules the document is
+-- built from; and the request, when it could not be honoured.
+--
+-- __A label the document cannot support is not taken.__ A partial
+-- translation is fine and is the point of asking — a rule with no rendering
+-- in the asked-for language keeps its default one, so a mostly-Hebrew
+-- document is honestly @lang="he"@. But when NOTHING in the modules renders
+-- in that language, every sentence in the body is the fallback, and @lang@
+-- would be a claim with no support: asked for @he@, an all-English encoding
+-- would get @dir="rtl"@, which lays English out right to left and moves its
+-- full stops to the wrong end of the line. So the document keeps the language
+-- the module declares, and the caller says so.
+--
+-- The declared language answers a request by itself: a module that declares
+-- @\@lang he@ and carries no @\@nlg@ at all renders no Hebrew prose, and
+-- asking it for Hebrew is still not a mislabelling.
+documentLanguage :: LangTag -> Maybe LangTag -> [Module Resolved] -> (LangTag, Maybe LangTag)
+documentLanguage declared requested modules = case requested of
+  Nothing -> (declared, Nothing)
+  Just want
+    | isJust (langMatchRank want declared) || any (carriesLanguage want) modules -> (want, Nothing)
+    | otherwise -> (declared, Just want)
+
+-- | The languages a module's own wordings are in, each once: the module's
+-- language first, if any wording is in it, then the others in order of first
+-- appearance. Empty for a module with no wordings.
+--
+-- What a caller offers as the languages it can render this module in. Read
+-- after parsing, so an untagged wording counts as the module's language.
+moduleLanguages :: LangTag -> Module Resolved -> [LangTag]
+moduleLanguages moduleLang m = sortOn (/= moduleLang) (nubOrd tags)
+ where
+  tags = mapMaybe nlgLangTag (concatMap renderingsOf (toListOf (gplate @Name) m))
+
+-- | Every rendering a name carries, the default first.
+renderingsOf :: Name -> [Nlg]
+renderingsOf n = let a = getAnno n in toList (view annNlg a) <> view annNlgAlts a
 
 -- | Translate an 'a' to something that can be linearized.
 class Linearize a where

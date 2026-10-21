@@ -322,6 +322,9 @@ bilingualFixture = fixtureDir </> "bilingual.l4"
 bilingualFramesFixture :: FilePath
 bilingualFramesFixture = fixtureDir </> "bilingual-frames.l4"
 
+bilingualFramesRegionFixture :: FilePath
+bilingualFramesRegionFixture = fixtureDir </> "bilingual-frames-region.l4"
+
 cleanFixture, evalFixture, errorFixture, garbageFixture :: FilePath
 cleanFixture   = fixtureDir </> "clean.l4"
 evalFixture    = fixtureDir </> "eval.l4"
@@ -948,6 +951,17 @@ spec bin = do
         ]
       serr `shouldSatisfy` ("have no he rendering and stay English: as, string" `isInfixOf`)
 
+    -- A region on the tag, or on the request, changes neither the wording
+    -- picked nor the frame words: one language, one set of frame words.
+    it "l4 nlg --lang he and --lang he-IL both read a he-IL wording, with Hebrew frame words" $
+      forM_ ["he", "he-IL"] $ \ lang -> do
+        Output code sout _ <- runL4 bin ["nlg", "--lang", lang, bilingualFramesRegionFixture]
+        code `shouldBe` ExitSuccess
+        map (filter (/= '\r')) (lines sout) `shouldBe`
+          [ "150 עולה על הסף שווה ל־`TRUE`"
+          , "לא 5 עולה על הסף"
+          ]
+
     it "l4 nlg with no --lang keeps English frame words and reports nothing" $ do
       Output code sout serr <- runL4 bin ["nlg", bilingualFramesFixture]
       code `shouldBe` ExitSuccess
@@ -1071,15 +1085,24 @@ spec bin = do
       htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
       sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
 
-    it "passes a region subtag through unmangled, and falls back because nothing carries it" $ do
-      -- Two things at once, and the name says both because the label alone would
-      -- mislead: the reader keeps `he-IL` as typed (the stderr note quotes it
-      -- back verbatim), and the LABEL is still the module's `he`, because no
-      -- herald in the module is tagged `he-IL`.
+    it "labels the document with a region its Hebrew answers" $ do
+      -- The module's wordings are `he`, and a request for `he-IL` reads them
+      -- (`L4.Lexer.langMatchRank`), so the document is honestly `he-IL`, as
+      -- typed, and nothing is reported.
       Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he-IL", langModule]
       code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he-IL\" dir=\"rtl\">"
+      serr `shouldNotSatisfy` ("no renderings" `isInfixOf`)
+
+    it "passes a region subtag through unmangled, and falls back because nothing carries it" $ do
+      -- Two things at once, and the name says both because the label alone would
+      -- mislead: the reader keeps `fr-CA` as typed (the stderr note quotes it
+      -- back verbatim), and the LABEL is still the module's `he`, because no
+      -- wording in the module is in French.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "fr-CA", langModule]
+      code `shouldBe` ExitSuccess
       htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
-      serr `shouldSatisfy` ("no renderings in \"he-IL\"" `isInfixOf`)
+      serr `shouldSatisfy` ("no renderings in \"fr-CA\"" `isInfixOf`)
 
     it "rejects an empty or malformed --lang instead of putting it in the markup" $ do
       -- `he-`, `he--IL` and the over-long subtag are the SHAPE cases: every
