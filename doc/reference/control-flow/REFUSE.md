@@ -13,21 +13,21 @@ It is not an arbitrary expression: a refusal's reason is meant to be readable wi
 
 **Example file:** [refuse-example.l4](refuse-example.l4)
 
-## Why it exists
+## When to use it
 
 Some questions a model should not answer.
 The law being encoded stops somewhere: a commencement date below which there is nothing to say, a relief whose eligibility turns on facts the encoding does not model, a schedule that has not been written yet.
 The honest answer there is not a number.
 
-Before `REFUSE`, authors reached for the nearest available device, and each one was wrong in a way that mattered:
+`REFUSE` says so directly.
+Nothing downstream can turn it into an answer, and it is not a parameter of the function.
+
+The other devices each give a wrong kind of answer:
 
 - **A default value** ("return 0 below commencement") is a silently wrong answer, and the caller cannot tell it from a real one.
-- **`NOTHING`** can be handled: a `CONSIDER` downstream turns "we decline" into "use the default", which is exactly the laundering the refusal was meant to prevent.
+- **`NOTHING`** can be handled: a `CONSIDER` downstream turns "we decline" into "use the default".
 - **`ASSUME`** says "this is an unknown fact", so it becomes a required input.
   A caller of the decision is then asked to supply a value for _"no figure exists before commencement"_, and nobody can supply that, because it is not a fact.
-
-`REFUSE` says the thing directly.
-Nothing downstream can turn it into an answer, and it is not a parameter of the function.
 
 ## House style: one named definition per refusal
 
@@ -60,7 +60,7 @@ Declare the type variable whenever the refusal serves two rules of different typ
 ## Uncatchable
 
 Nothing in the language observes a refusal or converts it into an answer: not a `CONSIDER` over a refusing `MAYBE`, not a boolean connective, not a `LET`, not a `WHERE`.
-There is no catch construct, and a refusal is caught only at the directive boundary, which reports it as its own outcome rather than as a value.
+There is no catch construct. A refusal stops at the `#EVAL` or `#ASSERT` that reached it, which reports it as its own outcome rather than as a value.
 
 ### Order matters, and it is left to right
 
@@ -71,8 +71,7 @@ There is no catch construct, and a refusal is caught only at the directive bound
 #EVAL `not modelled` AND FALSE           -- refuses
 ```
 
-This is documented, not fixed.
-It means L4's connectives are not commutative in the presence of a refusal.
+So L4's connectives are not commutative in the presence of a refusal.
 
 ## What each outcome prints
 
@@ -103,13 +102,11 @@ An assertion suite must be able to tell a wrong answer from a declined one.
 
 ## Limits
 
-Stated plainly, because you find these out anyway.
-
 - **The message must be a string literal.**
   `REFUSE 42` is a type error; `REFUSE (1 PLUS 1)` does not parse.
   Interpolated or computed reasons are not supported.
 - **Order-dependence under lazy `AND` / `OR`**, as above.
-- **`REFUSE` is now a reserved word.**
+- **`REFUSE` is a reserved word.**
   A name spelled `REFUSE` must be written in backticks.
 - **A questionnaire asks about a refusal.**
   The decision service's `/query-plan`, which orders the questions for a wizard, treats a named zero-input definition as a yes/no question.
@@ -118,13 +115,13 @@ Stated plainly, because you find these out anyway.
   Do not offer a questionnaire over a rule that can refuse until the plan learns about refusals.
 - **The WASM backend does not run a refusal.**
   An exported function that contains one, or calls a definition that does, is marked unsupported, so the request is answered by the evaluator, which raises the refusal properly.
-- **A batch reports a refusal as it reports an error.**
+- **A batch carries on after a refusal.**
   In `l4 batch` the row's `status` stays `success` and its `result` is `{"refused": {"reason": …}}`; the batch carries on with the next row.
   In the service's batch endpoint the case comes back with `@error` set to `The model refuses to answer:` and the reason, and is counted in `casesIgnored`.
 - **Other displays.**
   The ladder and query-plan diagrams draw a refusal written in a rule's body as a labelled leaf, and the document export prints it as prose and does not read it as part of a formula.
-- **The refusal set is not computed.**
-  A function does not yet carry the list of reasons it can refuse for, so nothing warns that a rule can decline before it is run.
+- **Nothing lists the reasons a function can refuse for.**
+  A rule that can decline gives no warning before it is run.
 
 ## Related
 

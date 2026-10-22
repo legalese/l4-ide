@@ -500,18 +500,21 @@ DECIDE `is an adult` IF age >= 18
 
 ### What `#ASSERT` reports
 
-An `#ASSERT` has one of three outcomes:
+An `#ASSERT` has one of four outcomes:
 
 | When the expression…                                                                                         | It prints                                          | The editor shows          | `l4 run` exit code | In `l4 run --json`                               |
 | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ------------------------- | ------------------ | ------------------------------------------------ |
 | is TRUE                                                                                                      | `assertion satisfied`                              | information               | not affected       | `"value": true`                                  |
 | is FALSE                                                                                                     | `assertion failed`                                 | an error                  | not affected       | `"value": false`                                 |
 | cannot be evaluated: a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d | `assertion could not be evaluated:` and the reason | an error, with the reason | non-zero           | `"value": null`, with the reason under `"error"` |
+| reaches a [`REFUSE`](../control-flow/REFUSE.md): the rules decline to answer                                 | `assertion refused:` and the reason                | a warning with the reason | not affected       | `"value": null`, the reason under `"refused"`    |
 
-In `--json` the result's `"kind"` is `"assertion"` in all three.
+In `--json` the result's `"kind"` is `"assertion"` in all four.
 
 An assertion that cannot be evaluated is not a verdict, so `#ASSERT P` and `#ASSERT NOT P` then report the same thing. Asserting an `ASSUME`d `BOOLEAN` directly, as in `#ASSERT b`, is one such case: `b` has no value to check.
 [Testing your rules](../../tutorials/getting-started/testing-your-rules.md#what-an-error-looks-like) shows an example.
+
+A refused assertion is not a verdict either, and `l4 run` still exits `0`; a CI job that looks for failures has to look for `assertion refused` as well as `assertion failed`.
 
 ## Sections
 

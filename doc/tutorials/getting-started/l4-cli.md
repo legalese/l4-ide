@@ -173,6 +173,13 @@ l4 run late-fee.l4 --json
 }
 ```
 
+Each result has a `"kind"`:
+
+- `value`: an `#EVAL` that produced an answer, in `"value"`.
+- `assertion`: an `#ASSERT`. `"value"` is `true` or `false`, or `null` when the assertion has no verdict: the reason is then under `"error"` if it could not be evaluated, and under `"refused"` if the rules declined to answer.
+- `refused`: an `#EVAL` that reached a [`REFUSE`](../../reference/control-flow/REFUSE.md). `"value"` is `null` and `"reason"` says why.
+- `error`: an `#EVAL` that raised an error, described in `"value"`.
+
 ### Pinning the clock
 
 If your rules use `NOW` or `TODAY`, pin the evaluation clock so results are reproducible:
