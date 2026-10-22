@@ -57,7 +57,7 @@ import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWra
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
-import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4)
+import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4, ifBesideRefusalJL4, unreadableRefusalsJL4, coveredWithInputsJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1035,15 +1035,62 @@ spec = describe "integration" do
         qpYes <- queryPlan' baseUrl mgr "conditional-refuser" "eligible" (args [("adult", True), ("the cap applies", True)])
         lookupKey "determined" (decodeObject (responseBody qpYes)) `shouldBe` Just (Aeson.Bool True)
 
-    it "still asks a call to a rule with inputs that refuses" do
-      withServiceFromSources "refuser-with-inputs" [("rule.l4", refusingWithInputsJL4)] \baseUrl mgr -> do
-        qp <- queryPlan' baseUrl mgr "refuser-with-inputs" "eligible" (args [("adult", True)])
-        let plan = decodeObject (responseBody qp)
-        lookupKey "determined" plan `shouldBe` Just Aeson.Null
-        length (askedLabels plan) `shouldBe` 1
-        lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
-        qpYes <- queryPlan' baseUrl mgr "refuser-with-inputs" "eligible" (args [("adult", True), ("applicant", True)])
-        lookupKey "determined" (decodeObject (responseBody qpYes)) `shouldBe` Just (Aeson.Bool True)
+    -- A call to a rule that always refuses refuses whatever it is given, and the
+    -- plan cannot read that: an answer for the input the call names is not an
+    -- answer for the call. The plan says so instead of answering.
+    describe "a refusal the plan cannot read" do
+      let answer baseUrl mgr dep fn bs = do
+            qp <- queryPlan' baseUrl mgr dep fn (args bs)
+            pure (statusCode' qp, decodeObject (responseBody qp))
+
+          errorOf :: Maybe Aeson.Object -> Text
+          errorOf body = case lookupKey "error" body of
+            Just (Aeson.String t) -> t
+            other -> Text.pack ("no error text: " <> show other)
+
+      it "answers 400 for a call to a rule with inputs that always refuses" do
+        withServiceFromSources "refuser-with-inputs" [("rule.l4", refusingWithInputsJL4)] \baseUrl mgr -> do
+          ev <- evalFunction baseUrl mgr "refuser-with-inputs" "eligible" (args [("adult", True), ("applicant", True)])
+          statusCode' ev `shouldBe` 422
+          for_ [[], [("adult", True)], [("adult", True), ("applicant", True)]] \bs -> do
+            (status, body) <- answer baseUrl mgr "refuser-with-inputs" "eligible" bs
+            (bs, status) `shouldBe` (bs, 400)
+            Text.isInfixOf "the person is covered" (errorOf body) `shouldBe` True
+
+      it "says where the refusal sits, in one sentence" do
+        withServiceFromSources "refuser-sentence" [("rule.l4", refusingWithInputsJL4)] \baseUrl mgr -> do
+          (_, body) <- answer baseUrl mgr "refuser-sentence" "eligible" []
+          errorOf body
+            `shouldBe` "The query plan cannot order the questions for this rule, because a refusal sits inside this part of it: `the person is covered` OF applicant"
+
+      it "plans the same call as a question when the rule it calls answers" do
+        withServiceFromSources "covered-with-inputs" [("rule.l4", coveredWithInputsJL4)] \baseUrl mgr -> do
+          (status, body) <- answer baseUrl mgr "covered-with-inputs" "eligible" [("adult", True)]
+          status `shouldBe` 200
+          lookupKey "determined" body `shouldBe` Just Aeson.Null
+          askedLabels body `shouldBe` ["`the person is covered` OF applicant"]
+          lookupKey "refusal" body `shouldSatisfy` maybe True (== Aeson.Null)
+          (_, yes) <- answer baseUrl mgr "covered-with-inputs" "eligible" [("adult", True), ("applicant", True)]
+          lookupKey "determined" yes `shouldBe` Just (Aeson.Bool True)
+
+      for_ [ ("consideredArm", "an arm of a CONSIDER", "CONSIDER variant")
+           , ("comparison", "an operand of a comparison", "the fee")
+           , ("equalsRefuse", "an operand of EQUALS", "r1 EQUALS TRUE")
+           ] \(fn, where_, inLabel) ->
+        it ("answers 400 for a refusal in " <> Text.unpack where_) do
+          withServiceFromSources ("unreadable-" <> fn) [("rule.l4", unreadableRefusalsJL4)] \baseUrl mgr -> do
+            (status, body) <- answer baseUrl mgr ("unreadable-" <> fn) fn []
+            status `shouldBe` 400
+            let text = errorOf body
+            (Text.isPrefixOf "The query plan cannot order the questions for this rule, because a refusal sits inside this part of it: " text, Text.isInfixOf inLabel text)
+              `shouldBe` (True, True)
+
+      it "plans a rule of the same module that holds no refusal" do
+        withServiceFromSources "unreadable-clean" [("rule.l4", unreadableRefusalsJL4)] \baseUrl mgr -> do
+          (status, body) <- answer baseUrl mgr "unreadable-clean" "clean" [("adult", True)]
+          status `shouldBe` 200
+          lookupKey "determined" body `shouldBe` Just Aeson.Null
+          askedLabels body `shouldBe` ["variant"]
 
     -- An IMPLIES is the OR it stands for: its left side is read first, and a
     -- refusal on its right only where the left is TRUE.
@@ -1061,14 +1108,24 @@ spec = describe "integration" do
         (lookupKey "determined" yes, askedLabels yes, refusalReasons yes)
           `shouldBe` (Just Aeson.Null, [], ["the other conditions are not modelled"])
 
-    -- A REFUSE on an arm of an IF is part of the one question the IF is drawn as.
-    it "still asks an IF with a REFUSE on one arm as one question" do
+    -- An IF is the choice it stands for: its condition is read first, then only
+    -- the arm it picks, so a refusal on an arm is reached only where the condition
+    -- picks it.
+    oracleOf "refuse-if-arm" refusingArmJL4 "eligible" ["resident", "adult"]
+
+    it "reads an IF's condition first, and the refusing arm only where the condition picks it" do
       withServiceFromSources "refuse-in-if" [("rule.l4", refusingArmJL4)] \baseUrl mgr -> do
-        qp <- queryPlan' baseUrl mgr "refuse-in-if" "eligible" (args [])
-        let plan = decodeObject (responseBody qp)
-        lookupKey "determined" plan `shouldBe` Just Aeson.Null
-        length (askedLabels plan) `shouldBe` 1
-        lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
+        let planFor bs = do
+              qp <- queryPlan' baseUrl mgr "refuse-in-if" "eligible" (args bs)
+              statusCode' qp `shouldBe` 200
+              pure (decodeObject (responseBody qp))
+        ask <- planFor []
+        (lookupKey "determined" ask, take 1 (askedLabels ask), refusalReasons ask) `shouldBe` (Just Aeson.Null, ["resident"], [])
+        no <- planFor [("resident", False)]
+        (lookupKey "determined" no, askedLabels no, refusalReasons no)
+          `shouldBe` (Just Aeson.Null, [], ["the rules for non-residents are not modelled"])
+        yes <- planFor [("resident", True)]
+        (lookupKey "determined" yes, askedLabels yes, refusalReasons yes) `shouldBe` (Just Aeson.Null, ["adult"], [])
 
     -- An IMPLIES in the middle of a rule is the OR it stands for: it reads its
     -- left side first, and its right side only where the left is TRUE. A ladder
@@ -1121,6 +1178,43 @@ spec = describe "integration" do
         lookupKey "determined" plan `shouldBe` Just Aeson.Null
         askedLabels plan `shouldBe` []
         refusalReasons plan `shouldBe` ["R1"]
+
+    -- The same for an IF in the middle of a rule: its condition is read first and
+    -- only the arm it picks after, so a refusal on an arm or in the condition is
+    -- reached where evaluation reaches it. Each is checked at every number of rules
+    -- before it in a span. The last rule holds no refusal: the control.
+    forM_ [0 .. 12 :: Int] \n ->
+      describe ("an IF beside a refusal, after " <> show (n + 1) <> " rules of no inputs") do
+        let src = ifBesideRefusalJL4 n
+            depOf fn = Text.pack ("if-" <> show n <> "-") <> fn
+        oracleOf (depOf "ifElseRefuses") src "ifElseRefuses" ["a", "b", "c"]
+        oracleOf (depOf "ifThenRefuses") src "ifThenRefuses" ["a", "b", "c"]
+        oracleOf (depOf "ifConditionRefuses") src "ifConditionRefuses" ["b", "c"]
+        oracleOf (depOf "houseStyle") src "houseStyle" ["resident"]
+        oracleOf (depOf "nestedIf") src "nestedIf" ["a", "b"]
+        oracleOf (depOf "plainOr") src "plainOr" ["a", "b", "c"]
+
+    -- The two cases the sweep above reaches only after its first failure.
+    it "reads an IF before the AND that follows it" do
+      withServiceFromSources "if-before-and" [("rule.l4", ifBesideRefusalJL4 0)] \baseUrl mgr -> do
+        let planFor fn bs = do
+              qp <- queryPlan' baseUrl mgr "if-before-and" fn (args bs)
+              statusCode' qp `shouldBe` 200
+              pure (decodeObject (responseBody qp))
+        ev <- evalFunction baseUrl mgr "if-before-and" "ifElseRefuses" (args [("a", False), ("b", False), ("c", True)])
+        statusCode' ev `shouldBe` 422
+        -- a is FALSE, but the IF is read first and b is not yet answered
+        early <- planFor "ifElseRefuses" [("a", False)]
+        (lookupKey "determined" early, refusalReasons early) `shouldBe` (Just Aeson.Null, [])
+        late <- planFor "ifElseRefuses" [("a", False), ("b", False)]
+        (lookupKey "determined" late, refusalReasons late) `shouldBe` (Just Aeson.Null, ["R1"])
+        -- the house-style shape asks the one question it has
+        ask <- planFor "houseStyle" []
+        (lookupKey "determined" ask, askedLabels ask, refusalReasons ask) `shouldBe` (Just Aeson.Null, ["resident"], [])
+        no <- planFor "houseStyle" [("resident", False)]
+        (lookupKey "determined" no, askedLabels no, refusalReasons no) `shouldBe` (Just Aeson.Null, [], ["R1"])
+        yes <- planFor "houseStyle" [("resident", True)]
+        lookupKey "determined" yes `shouldBe` Just (Aeson.Bool True)
 
   -- A bare name is a variable of the diagram keyed by the name's own unique, and
   -- every other leaf (a REFUSE, an IF, a comparison) by a fresh counter. If the

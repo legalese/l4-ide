@@ -1500,6 +1500,56 @@ spec bin = do
       it ("is read as written by the REPL, with a WHERE under the " ++ n ++ " arm") $
         inRepl (whereFile n) whereQueries whereWant
 
+  -- The REPL plans from the same ladder the service does, and a plan that
+  -- reaches a refusal says so in its `refusal`, with the reasons evaluation gives.
+  -- `:queryplan` printed only `determined`, which is null there, so the answers
+  -- that lead to a refusal read as a plan with nothing left to ask.
+  describe "the REPL's :queryplan on a rule that refuses" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let planFile = fixtureDir </> "repl-query-plan-refusal.l4"
+        -- one reply per query, loading the file first, in a directory of its own
+        -- because the REPL keeps a history file in the one it is in
+        replReplies repl queries = withSystemTempDirectory "l4-repl-query-plan" \work -> do
+          absFile <- makeAbsolute planFile
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          hPutStr hin (unlines (queries <> [":quit"]))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        withRepl act = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> act repl
+
+    it "asks the one question, before anything is answered" $ withRepl \repl -> do
+      [ask] <- replReplies repl [":queryplan eligible"]
+      ("determined: Unknown" `T.isInfixOf` ask, "next: adult" `T.isInfixOf` ask) `shouldBe` (True, True)
+
+    it "says it is refused, with the reason, where the answers lead to a refusal" $ withRepl \repl -> do
+      [reached] <- replReplies repl [":queryplan eligible adult=true"]
+      ( "determined: Refused" `T.isInfixOf` reached
+        , "refusal: the other conditions are not modelled" `T.isInfixOf` reached
+        , "determined: Unknown" `T.isInfixOf` reached )
+        `shouldBe` (True, True, False)
+
+    it "says nothing of a refusal where the answers settle the plan first" $ withRepl \repl -> do
+      [settled] <- replReplies repl [":queryplan eligible adult=false"]
+      ("determined: False" `T.isInfixOf` settled, "efus" `T.isInfixOf` settled) `shouldBe` (True, False)
+
   describe "l4 trace" $ do
     it "refuses --format png without --output-dir" $ do
       Output code _ serr <- runL4 bin ["trace", cleanFixture, "--format", "png"]

@@ -9,7 +9,9 @@ import Test.Hspec
 
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate (i)
+import Data.Foldable (for_)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Control.Monad.Trans.Except (runExceptT)
 
 import Backend.Jl4 (CompiledModule (..), precompileModule)
@@ -143,6 +145,7 @@ spec = do
   describe "jl4-service query plan" serviceTests
   describe "LSP query plan" lspTests
   describe "service and LSP paths agree" agreementTests
+  describe "the note" noteTests
 
 
 serviceTests :: Spec
@@ -327,3 +330,27 @@ agreementTests = do
     testAgreement "no bindings" "eligible" refusingL4 []
     testAgreement "adult=True" "eligible" refusingL4 [("adult", True)]
     testAgreement "adult=False" "eligible" refusingL4 [("adult", False)]
+
+-- | The note of a plan for a rule with no refusal in it: the text a plan carried
+-- before refusals were a thing, byte for byte.
+plainNote :: Text
+plainNote =
+  "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
+    <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
+
+noteTests :: Spec
+noteTests = do
+  it "is unchanged for a rule with no refusing leaf, whatever has been answered" do
+    sCache <- serviceCache "simple and" simpleAndL4
+    (info, state, params) <- lspCache "simple and" simpleAndL4
+    for_ [[], [("a", True)], [("a", False)], [("a", True), ("b", True)]] \bindings -> do
+      (bindings, (svcQP sCache bindings).note) `shouldBe` (bindings, plainNote)
+      (bindings, (lspQP "simple and" params info state bindings).note) `shouldBe` (bindings, plainNote)
+
+  it "says what a refusal is for a rule with a refusing leaf, whether or not the plan reaches it" do
+    sCache <- serviceCache "eligible" refusingL4
+    (info, state, params) <- lspCache "eligible" refusingL4
+    for_ [[], [("adult", False)], [("adult", True)]] \bindings -> do
+      let said note = (Text.isPrefixOf plainNote note, Text.isInfixOf "When `refusal` is present" note)
+      (bindings, said (svcQP sCache bindings).note) `shouldBe` (bindings, (True, True))
+      (bindings, said (lspQP "eligible" params info state bindings).note) `shouldBe` (bindings, (True, True))
