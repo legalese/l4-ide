@@ -196,12 +196,15 @@ The same call to a rule that answers is planned as a question.
   A call with inputs to a rule that refuses on only some paths is a question too: once the input the call names is answered, the plan takes that answer as the call's.
   With `` `some paths` person MEANS IF person THEN TRUE ELSE REFUSE "…" `` and ``adult AND `some paths` applicant``, the plan says `"determined": false` when `applicant` is answered `FALSE`, where `/evaluation` refuses.
   And names are not followed into other files, so a refusal reached only through an `IMPORT` is not seen.
-- **In the editor and the REPL, the plan follows the ladder as drawn.**
-  The editor's wizard plans from the ladder the panel shows, and that ladder is drawn as written unless you switch simplification on.
-  With it on, a refusal inside an `OR` of `AND`s can be planned in the simplified order rather than the written one.
+- **In the editor and the REPL, the plan follows the ladder as drawn, and does not read a refusal as the service does.**
+  The editor's wizard plans from the ladder the panel shows, which is drawn as written unless you switch Simplified on.
   The REPL's `:queryplan` always plans from the simplified ladder.
-  Neither spells out an `IF` or an `IMPLIES`, and neither answers 400.
-  For a rule with a refusal inside an `IF`, they can answer where evaluation refuses, and a refusal in a comparison is listed in `stillNeeded` as a question.
+  Simplifying distributes `OR` over `AND`, so with Simplified on, and in the REPL, the plan can report a refusal where evaluation answers.
+  For `(a AND r1) OR (b AND c)`, where `r1` is a rule that always refuses, and `a` `FALSE`, `b` `TRUE` and `c` `TRUE`, evaluation answers `TRUE` and the plan reports the refusal.
+  With Simplified off, the editor draws an `IMPLIES` as one question and answers it with the value of the one input it names directly, so `b IMPLIES (NOT c)` can be answered wrongly, with a refusal in the rule or without.
+  An `IF` whose arms are not single names is drawn as one question in the editor with Simplified on or off and in the REPL, with the same result: `IF b THEN (c AND d) ELSE (NOT d)` can be answered wrongly, with a refusal in the rule or without.
+  Neither the editor nor the REPL spells out an `IF` or an `IMPLIES`, and neither answers 400.
+  A refusal inside an `IF` can be answered where evaluation refuses, and a refusal in a comparison is listed in `stillNeeded` as a question.
 - **The WASM backend does not run a refusal.**
   An exported function that contains one, or calls a definition that does, is marked unsupported, so the request is answered by the evaluator, which raises the refusal properly.
 - **A batch carries on after a refusal.**

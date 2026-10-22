@@ -108,6 +108,8 @@ What differs from unstable, because `main` lacks what unstable's version stands 
   `jl4-repl`'s `:queryplan` prints `determined: Refused` and a `refusal:` line for each reason.
 - `main` ranks by the number of answers that settle the plan, not by information gain.
   An answer that leads to a refusal counts as settling it, in `ranked` and in the scores of `inputs` and `asks`.
+  Assumed, not ruled: a question whose answer reaches a refusal ranks above one that does not, for a rule with a refusing leaf only.
+  Measured 2026-10-22: for `(x AND r1) OR (y AND z)` the plan scores `x` 4.33, and `y` and `z` 2; with `r1` replaced by a rule that is `FALSE`, all of `x`, `y` and `z` score 1.75.
 - The unit guard that no boolean decision of `regcf-denovo.l4` has a refusing leaf is not carried: the file is not on `main`.
 
 ## Two defects on `main` that this change depends on fixing
@@ -155,6 +157,8 @@ The `/query-plan` rows were measured on 2026-10-22, after the query plan change 
 - **The editor and the REPL spell out neither an `IF` nor an `IMPLIES`, and answer no 400.**
   Measured 2026-10-22 on `(IF b THEN c ELSE r1) AND a`, with `a` `FALSE`: both say `determined: false` where `/evaluation` refuses, with simplification on or off.
   On ``adult AND (`the fee` GREATER THAN 3)`` both list the comparison in `stillNeeded` as a question.
+  On `(a AND r1) OR (b AND c)` with `a` `FALSE`, `b` and `c` `TRUE`, the REPL says `Refused: R1` where `/evaluation` answers `TRUE`, because the simplified ladder distributes `OR` over `AND` and reaches `r1`.
+  With no refusal in the rule, measured by a sweep of every partial answer set against a hand-written semantics, in a temporary test over `doVisualize` and `queryPlanFromLadder` that is not in the tree: with simplification off the editor answers wrongly for `b IMPLIES (NOT c)` (5 of 9 answer sets), `b IMPLIES (c AND d)` (17 of 27) and `(a OR b) IMPLIES c` (4 of 27), and with it on for none of them; for `IF b THEN (c AND d) ELSE (NOT d)` it answers wrongly in 14 of 27 with simplification on or off, as the REPL does.
 - **The refusal set `Ref(f)` is not computed.**
   A function does not carry the list of reasons it can refuse for, so nothing warns before it is run, and `l4 verify`, which `main` does not have either, could not treat a refusal specially.
 - **The message is a literal.**
