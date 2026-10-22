@@ -383,14 +383,16 @@ Every case that is run produces one line, or one item with `--format json` or `y
 - `input` is the case as the rules read it: a CSV cell is shown as the number, boolean or text it was read as, and a blank cell that was left out is not shown.
 - `output` is what the rules came to for the case: a list holding one `result`, or `null` when no answer could be reached at all.
 - `status` says how the case went, as below.
-- `diagnostics` is the list of messages for a case that did not succeed, and `[]` for one that did.
+- `diagnostics` is the list of messages for a case whose `status` is `error`, and `[]` for any other.
 
-`status` is one of two words:
+`status` is one of three words:
 
 - `success`: the rules gave an answer.
+- `refused`: the rules declined to answer. They reached a [`REFUSE`](../../reference/control-flow/REFUSE.md), and the `result` is `{"refused": {"reason": …}}`. The batch carries on with the next case, and the case does not count as an `error`.
 - `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, a CSV line has a different number of cells from the header, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
 
-The command exits with status 0 when every case was `success`, and 1 when any case was `error`, once every case that was going to run has run.
+The command exits with status 0 when every case was `success` or `refused`, and 1 when any case was `error`, once every case that was going to run has run.
+A script that reads `result` as an answer should read it only when `status` is `success`.
 
 #### Checking cases without running them
 

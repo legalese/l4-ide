@@ -358,10 +358,15 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
               -- The wrapper evaluated; a row still "fails" if evaluation raised
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (ReducedErrored …)`.
+              -- A row that reached a REFUSE is neither an answer nor a failure:
+              -- it is "refused", its reason sits under the result, and the
+              -- batch carries on (it is not counted as an error).
               let excMsgs = concatMap resultExceptionMsgs evalResults
-              in if null excMsgs
-                   then ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
-                   else ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+              in if not (null excMsgs)
+                   then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                   else if any resultRefused evalResults
+                     then ("refused", Aeson.toJSON evalResults, Aeson.Array mempty)
+                     else ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
           env = Aeson.object
             [ Key.fromString "input"       Aeson..= input
             , Key.fromString "output"      Aeson..= outputJson
@@ -373,6 +378,12 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
     -- the case as the export's inputs declare it: what validation, the
     -- wrapper and the echoed @input@ all see
     input = declareInputs declared source cells
+
+-- | Whether an @#EVAL@ result reached a @REFUSE@: the rules declined to answer.
+resultRefused :: EvalDirectiveResult -> Bool
+resultRefused (MkEvalDirectiveResult _ res _) = case res of
+  Reduction (ReducedRefused _) -> True
+  _                            -> False
 
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.

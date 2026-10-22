@@ -116,7 +116,7 @@ An assertion suite must be able to tell a wrong answer from a declined one.
 - **The WASM backend does not run a refusal.**
   An exported function that contains one, or calls a definition that does, is marked unsupported, so the request is answered by the evaluator, which raises the refusal properly.
 - **A batch carries on after a refusal.**
-  In `l4 batch` the row's `status` stays `success` and its `result` is `{"refused": {"reason": …}}`; the batch carries on with the next row.
+  In `l4 batch` the row's `status` is `refused` and its `result` is `{"refused": {"reason": …}}`; the batch carries on with the next row, and the command still exits 0.
   In the service's batch endpoint the case comes back with `@error` set to `The model refuses to answer:` and the reason, and is counted in `casesIgnored`.
 - **Other displays.**
   The ladder and query-plan diagrams draw a refusal written in a rule's body as a labelled leaf, and the document export prints it as prose and does not read it as part of a formula.

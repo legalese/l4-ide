@@ -1,7 +1,7 @@
 -- An @export whose helper REFUSES for one input row and answers for another.
--- The refusing row reports the refusal and its reason under "result", as an
--- erroring row reports its error there, and the batch does NOT stop on it: the
--- row after it is still processed.
+-- The refusing row has status "refused" and carries its reason under "result";
+-- the batch does NOT stop on it (the row after it is still processed) and the
+-- command still exits 0.
 
 § `Export reaching a refusal for some inputs`
 

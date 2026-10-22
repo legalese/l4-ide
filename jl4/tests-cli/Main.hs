@@ -940,17 +940,21 @@ spec bin = do
           other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
-    -- (3) A refusing batch row reports the refusal under its result, as an
-    -- erroring row reports its error, and does NOT stop the batch: the row
-    -- after it is still processed.
-    it "reports a refusing batch row's reason under its result and still processes the next row" $ do
+    -- (3) A refusing batch row has status "refused" and carries the reason
+    -- under its result. Unlike an erroring row it does NOT stop the batch (the
+    -- row after it is still processed) and does not make the command fail.
+    it "gives a refusing batch row the status refused, its reason under its result, and still processes the next row" $ do
       Output code sout _ <-
         runL4 bin ["batch", fixtureDir </> "refuse-batch.l4", "--inputs", fixtureDir </> "refuse-batch.json"]
       code `shouldBe` ExitSuccess
-      length (filter (not . null) (lines sout)) `shouldBe` 2
-      sout `shouldSatisfy`
-        ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
-      sout `shouldSatisfy` ("\"result\":100" `isInfixOf`)
+      case filter (not . null) (lines sout) of
+        [refusedRow, answeredRow] -> do
+          refusedRow `shouldSatisfy` ("\"status\":\"refused\"" `isInfixOf`)
+          refusedRow `shouldSatisfy`
+            ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"result\":100" `isInfixOf`)
+        other -> expectationFailure ("Expected 2 rows, got " ++ show (length other))
 
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
