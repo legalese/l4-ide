@@ -150,6 +150,8 @@ Result:
 ```
 
 Each `Evaluation[n]` block corresponds to one `#EVAL` directive, in file order, with the source range it came from. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch, or an `#ASSERT` whose expression raises) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
+An error in a file that it imports counts too, and so does an `IMPORT` that finds no file and an `IMPORT` cycle (`a.l4` imports `b.l4`, which imports `a.l4`).
+So does an evaluation that fails outright rather than inside one directive's result, such as a `POST` that cannot connect.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -195,7 +197,12 @@ l4 check late-fee.l4
 Check succeeded.
 ```
 
-Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics). `--json` and `--fixed-now` work here too.
+Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
+The check covers the files it imports too: an error in an imported file, an `IMPORT` that finds no file, or an `IMPORT` cycle is a non-zero exit as well.
+An import cycle is reported with the engine's own technical message, not a plain-language one.
+Only `l4 check` and `l4 run` look at errors in imported files.
+`l4 format`, `l4 ast`, `l4 render`, `l4 nlg`, `l4 trace` and `l4 batch` still exit `0` when a file they read imports a broken one, so use `l4 check` as the CI gate for a project of several files.
+`--json` and `--fixed-now` work here too.
 
 ---
 
