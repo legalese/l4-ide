@@ -196,8 +196,9 @@ The same call to a rule that answers is planned as a question.
   The plan uses the answer it is given, where evaluation would evaluate the rule instead, and the rule may refuse.
   And names are not followed into other files, so a refusal reached only through an `IMPORT` is not seen.
 - **A call with inputs is planned as the input it names.**
-  When a call depends on one input, the plan takes the answer to that input as the call's own, whatever the called rule does with it.
+  When a call that is an operand of `AND`, `OR` or `NOT` depends on one input, the plan takes the answer to that input as the call's own, whatever the called rule does with it.
   So the plan can answer where evaluation answers otherwise, or refuses, and this does not depend on the called rule holding a refusal.
+  As the condition of an `IF` in a rule that holds a refusal, a call is read the same way, because the `IF` is spelled out as `AND`, `OR` and `NOT`.
   With `` `never no` person MEANS NOT person `` and ``adult AND `never no` applicant``, the plan says `"determined": true` when `adult` and `applicant` are `TRUE`, where `/evaluation` says `FALSE`.
   With `` `some paths` person MEANS IF person THEN TRUE ELSE REFUSE "…" `` and ``adult AND `some paths` applicant``, it says `"determined": false` when `applicant` is `FALSE`, where `/evaluation` refuses.
 - **In the editor and the REPL, the plan follows the ladder as drawn, and does not read a refusal as the service does.**
