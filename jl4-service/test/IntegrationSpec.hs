@@ -57,7 +57,7 @@ import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWra
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
-import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4)
+import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -920,7 +920,10 @@ spec = describe "integration" do
         -- plan's reasons exactly the ones those completions reach. No plan asks
         -- anything but an input.
         oracle :: Text -> Text -> [Text] -> SpecWith ()
-        oracle dep src inputs =
+        oracle dep src = oracleOf dep src "eligible"
+
+        oracleOf :: Text -> Text -> Text -> [Text] -> SpecWith ()
+        oracleOf dep src fn inputs =
           it (Text.unpack dep <> ": the plan agrees with /evaluation on every set of answers") do
             withServiceFromSources dep [("rule.l4", src)] \baseUrl mgr -> do
               let completions bs =
@@ -930,7 +933,7 @@ spec = describe "integration" do
                     ]
                   partials = [[a | Just a <- answers] | answers <- traverse (\n -> [Nothing, Just (n, False), Just (n, True)]) inputs]
               evaluated <- fmap Map.fromList $ forM (completions []) \bs -> do
-                ev <- evalFunction baseUrl mgr dep "eligible" (args bs)
+                ev <- evalFunction baseUrl mgr dep fn (args bs)
                 case Aeson.decode (responseBody ev) :: Maybe SimpleResponse of
                   Just (SimpleError (EvaluatorRefused reason)) -> do
                     statusCode' ev `shouldBe` 422
@@ -938,7 +941,7 @@ spec = describe "integration" do
                   Just (SimpleResponse r) | Just (FnLitBool b) <- Map.lookup "value" r.fnResult -> pure (bs, Right b)
                   other -> fail ("unexpected evaluation of " <> show bs <> ": " <> show other)
               for_ partials \bs -> do
-                qp <- queryPlan' baseUrl mgr dep "eligible" (args bs)
+                qp <- queryPlan' baseUrl mgr dep fn (args bs)
                 statusCode' qp `shouldBe` 200
                 let plan = decodeObject (responseBody qp)
                     outs = [evaluated Map.! c | c <- completions bs]
@@ -1057,6 +1060,58 @@ spec = describe "integration" do
         lookupKey "determined" plan `shouldBe` Just Aeson.Null
         length (askedLabels plan) `shouldBe` 1
         lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
+
+    -- An IMPLIES in the middle of a rule is the OR it stands for: it reads its
+    -- left side first, and its right side only where the left is TRUE. A ladder
+    -- with a refusing leaf is drawn as written, so the plan must not take an
+    -- IMPLIES there for one question of its own, answered by an input it names.
+    -- How many rules come first moves the leaf ids, so each is checked at every
+    -- number of them in a span. The last rule holds no refusal: the control.
+    forM_ [0 .. 12 :: Int] \n ->
+      describe ("an IMPLIES beside a refusal, after " <> show (n + 1) <> " rules of no inputs") do
+        let src = impliesBesideRefusalJL4 n
+            depOf fn = Text.pack ("implies-" <> show n <> "-") <> fn
+        oracleOf (depOf "orFalseAndR") src "orFalseAndR" ["b", "c"]
+        oracleOf (depOf "andTrueOrR") src "andTrueOrR" ["b", "c"]
+        oracleOf (depOf "notImpliesRefuse") src "notImpliesRefuse" ["b"]
+        oracleOf (depOf "notRefuseImplies") src "notRefuseImplies" ["b"]
+        oracleOf (depOf "viaImplies") src "viaImplies" ["c"]
+        oracleOf (depOf "plainImplies") src "plainImplies" ["b", "c"]
+
+    -- The two cases the sweep above reaches only after its first failure. An
+    -- IMPLIES that is one question answered by an input it names answers the
+    -- opposite of evaluation here, and turns a refusal into an answer.
+    it "answers an IMPLIES as the OR it is, not as the input it names" do
+      withServiceFromSources "implies-inverted" [("rule.l4", impliesBesideRefusalJL4 0)] \baseUrl mgr -> do
+        let valueOf fn bs = do
+              ev <- evalFunction baseUrl mgr "implies-inverted" fn (args bs)
+              case Aeson.decode (responseBody ev) :: Maybe SimpleResponse of
+                Just (SimpleError (EvaluatorRefused reason)) -> pure (Left reason)
+                Just (SimpleResponse r) | Just (FnLitBool b) <- Map.lookup "value" r.fnResult -> pure (Right b)
+                other -> fail ("unexpected evaluation: " <> show other)
+            planOf fn bs = do
+              qp <- queryPlan' baseUrl mgr "implies-inverted" fn (args bs)
+              statusCode' qp `shouldBe` 200
+              pure (decodeObject (responseBody qp))
+        -- (b IMPLIES NOT c) is FALSE with both TRUE, and the refusal beside it is never read.
+        valueOf "orFalseAndR" [("b", True), ("c", True)] `shouldReturn` Right False
+        -- NOT (b IMPLIES REFUSE) reads the REFUSE where b is TRUE.
+        valueOf "notImpliesRefuse" [("b", True)] `shouldReturn` Left "L2"
+        both <- planOf "orFalseAndR" [("b", True), ("c", True)]
+        refused <- planOf "notImpliesRefuse" [("b", True)]
+        ( lookupKey "determined" both
+          , (lookupKey "determined" refused, refusalReasons refused)
+          )
+          `shouldBe` (Just (Aeson.Bool False), (Just Aeson.Null, ["L2"]))
+
+    -- The refusal in an IMPLIES is read first, so nothing is asked.
+    it "reports a refusal on the left of an IMPLIES before asking anything" do
+      withServiceFromSources "implies-first" [("rule.l4", impliesBesideRefusalJL4 0)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "implies-first" "viaImplies" (args [])
+        let plan = decodeObject (responseBody qp)
+        lookupKey "determined" plan `shouldBe` Just Aeson.Null
+        askedLabels plan `shouldBe` []
+        refusalReasons plan `shouldBe` ["R1"]
 
   -- A bare name is a variable of the diagram keyed by the name's own unique, and
   -- every other leaf (a REFUSE, an IF, a comparison) by a fresh counter. If the

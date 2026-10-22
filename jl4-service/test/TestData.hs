@@ -77,6 +77,7 @@ module TestData (
   refusingImpliesJL4,
   refusingEitherJL4,
   leafCollisionJL4,
+  impliesBesideRefusalJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -1658,3 +1659,51 @@ leafCollisionJL4 n =
     )
  where
   lastRule = "p" <> Text.pack (show n)
+
+-- | @n + 1@ rules of no inputs, @p0@ to @pn@, then @r1@, a rule that always
+-- refuses, then rules that read an IMPLIES beside a refusal, in the places a
+-- ladder draws as structure. A ladder with a refusing leaf is drawn as written,
+-- where an IMPLIES must still be read as the OR it stands for: @a IMPLIES b@
+-- reads @a@ first, and reads @b@ only where @a@ is TRUE. The last rule holds no
+-- refusal, so it is drawn simplified: the control for the checks on the rest.
+impliesBesideRefusalJL4 :: Int -> Text
+impliesBesideRefusalJL4 n =
+  Text.unlines
+    ( concat [["GIVETH A BOOLEAN", "p" <> Text.pack (show k) <> " MEANS TRUE", ""] | k <- [0 .. n]]
+        <> [ "GIVETH A BOOLEAN"
+           , "r1 MEANS REFUSE \"R1\""
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "orFalseAndR b c MEANS (b IMPLIES (NOT c)) OR (FALSE AND r1)"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "andTrueOrR b c MEANS ((NOT b) IMPLIES c) AND (TRUE OR r1)"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "notImpliesRefuse b MEANS NOT (b IMPLIES (REFUSE \"L2\"))"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "notRefuseImplies b MEANS NOT ((REFUSE \"L2\") IMPLIES b)"
+           , ""
+           , "@export"
+           , "GIVEN c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "viaImplies c MEANS (r1 IMPLIES c) OR r1"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "plainImplies b c MEANS b IMPLIES (NOT c)"
+           ]
+    )
