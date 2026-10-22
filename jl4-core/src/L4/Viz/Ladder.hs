@@ -11,7 +11,7 @@ module L4.Viz.Ladder
     visualize
   , visualizeByName
   , visualizeByNameWithState
-  , visualizeByNameImpliesAsOr
+  , visualizeByNameSpelledOut
   , findAllVisualizableDecides
   , VisualizableDecide(..)
   , VizError(..)
@@ -22,6 +22,7 @@ module L4.Viz.Ladder
   , getAtomDeps
   , getAtomInputRefs
   , getRefusingAtoms
+  , getUnreadableRefusals
     -- * Utilities (shared with LSP)
   , generateAtomId
   ) where
@@ -49,7 +50,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, eliminateImplies, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
+import qualified L4.Transform as Transform (simplify, spellOutConnectives, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import L4.Desugar
 import qualified L4.Refusal as Refusal
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
@@ -110,10 +111,14 @@ data VizState = MkVizState
     -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only
     -- ever refuse at: a @REFUSE@, or a bare reference to a definition that
     -- always refuses. The query plan never asks one (R7).
-  , readImpliesAsOr :: !Bool
-    -- ^ Draw each @IMPLIES@ in connective position as the @OR@ it stands for
-    -- ('Transform.eliminateImplies'). Off unless asked for: a rule is otherwise
-    -- drawn as written, where an @IMPLIES@ is one leaf.
+  , unreadableRefusals :: [(Text, Text)]
+    -- ^ Leaves that hold a refusal without being one, newest first: what the
+    -- leaf says, and the reason it refuses with. A @CONSIDER@ arm or a comparison
+    -- operand is one. The plan cannot order its questions around a refusal there.
+  , spellOut :: !Bool
+    -- ^ Draw each @IMPLIES@ and each Boolean @IF@ in connective position as the
+    -- @AND@, @OR@ and @NOT@ it stands for ('Transform.spellOutConnectives'). Off
+    -- unless asked for: a rule is otherwise drawn as written, where each is one leaf.
   }
   deriving stock (Generic)
 
@@ -136,7 +141,8 @@ mkInitialState uri mod' subst simp = MkVizState
   , atomInputRefs = Map.empty
   , refusingDefs = Refusal.alwaysRefusing mod'
   , refusingAtoms = Map.empty
-  , readImpliesAsOr = False
+  , unreadableRefusals = []
+  , spellOut = False
   }
 
 ------------------------------------------------------
@@ -234,15 +240,15 @@ visualizeByNameWithState uri uriText version mod' subst simplify targetName =
     Nothing -> Left InvalidProgramNoDecidesFound
     Just decide -> visualizeDecideWithState uri uriText version mod' subst simplify decide
 
--- | Like 'visualizeByNameWithState', drawn as written (not simplified), with
--- each @IMPLIES@ in connective position read as the @OR@ it stands for
--- ('Transform.eliminateImplies'). Drawn as written, an @IMPLIES@ is one leaf that
--- names only the inputs directly under it.
-visualizeByNameImpliesAsOr :: NormalizedUri -> Text -> Int -> Module Resolved -> TC.Substitution -> Text -> Either VizError (RenderAsLadderInfo, VizState)
-visualizeByNameImpliesAsOr uri uriText version mod' subst targetName =
+-- | Like 'visualizeByNameWithState', drawn as written (not simplified), with each
+-- @IMPLIES@ and each Boolean @IF@ in connective position spelled out as the
+-- @AND@, @OR@ and @NOT@ it stands for ('Transform.spellOutConnectives'). Drawn as
+-- written, each is one leaf that names only the inputs directly under it.
+visualizeByNameSpelledOut :: NormalizedUri -> Text -> Int -> Module Resolved -> TC.Substitution -> Text -> Either VizError (RenderAsLadderInfo, VizState)
+visualizeByNameSpelledOut uri uriText version mod' subst targetName =
   case findDecideByName mod' targetName of
     Nothing -> Left InvalidProgramNoDecidesFound
-    Just decide -> visualizeDecideFrom (mkInitialState uri mod' subst False & #readImpliesAsOr .~ True) uriText version decide
+    Just decide -> visualizeDecideFrom (mkInitialState uri mod' subst False & #spellOut .~ True) uriText version decide
 
 -- | Internal: visualize a specific Decide, returning both the info and state.
 visualizeDecideWithState :: NormalizedUri -> Text -> Int -> Module Resolved -> TC.Substitution -> Bool -> Decide Resolved -> Either VizError (RenderAsLadderInfo, VizState)
@@ -268,6 +274,12 @@ getAtomInputRefs = (.atomInputRefs)
 -- refuses with (see 'refusingAtoms').
 getRefusingAtoms :: VizState -> IntMap Text
 getRefusingAtoms = (.refusingAtoms)
+
+-- | The leaves that hold a refusal without being one, in the order they were
+-- drawn: what the leaf says, and the reason it refuses with (see
+-- 'unreadableRefusals').
+getUnreadableRefusals :: VizState -> [(Text, Text)]
+getUnreadableRefusals = reverse . (.unreadableRefusals)
 
 -- | Find all DECIDE rules that can be visualized.
 -- Rather than just checking types, we try to visualize each DECIDE
@@ -368,12 +380,12 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   -- Mirrors 'LSP.L4.Viz.Ladder.translateDecide'.
   assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
   shouldSimplify <- getShouldSimplify
-  asOrs <- use #readImpliesAsOr
+  spelledOut <- use #spellOut
   vid <- getFresh
   -- Read after 'carameliseExpr', which is what turns a call to the IMPLIES
   -- function into the 'Implies' node, so that nothing else about the rule moves.
   let caramelised = carameliseExpr body
-  vizBody <- translateExpr shouldSimplify (if asOrs then Transform.eliminateImplies caramelised else caramelised)
+  vizBody <- translateExpr shouldSimplify (if spelledOut then Transform.spellOutConnectives caramelised else caramelised)
   -- The same limit on what is drawn as where a CONSIDER is drawn as rows (see
   -- 'Transform.clauseGroupLadderBudget'). A rule that was not written as
   -- clauses, or whose first clause names each input as the GIVEN does (or is
@@ -424,7 +436,7 @@ translateExpr False = go
       -- (@REFUSE "…"@) so the picture says what it is. Explicit above the
       -- wildcard because the wildcard would first try 'normaliseGuarded' on
       -- it, and a refusal is not ladder STRUCTURE — it is a terminal.
-      Refuse _ msg -> leafFromExpr e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
+      Refuse _ msg -> makeLeaf e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
 
       App _ resolved [] -> do
         vid <- getFresh
@@ -438,6 +450,7 @@ translateExpr False = go
         fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
         if fnOfAppIsFnFromBooleansToBoolean
           then do
+            recordUnreadableRefusal e
             vid <- getFresh
             let uniq = vid.id
                 label = prettyLayout e
@@ -493,8 +506,23 @@ refusingLeaf reason leaf = do
     _ -> pure ()
   pure leaf
 
+-- | A leaf for an expression that is none of the shapes the ladder draws as
+-- structure. A refusal inside it is one the plan cannot read.
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
+  recordUnreadableRefusal expr
+  makeLeaf expr
+
+-- | Record a leaf that holds a refusal without being one.
+recordUnreadableRefusal :: Expr Resolved -> Viz ()
+recordUnreadableRefusal expr = do
+  known <- use #refusingDefs
+  case Refusal.refusalWithin known expr of
+    Just reason -> #unreadableRefusals %= ((prettyLayout expr, reason) :)
+    Nothing -> pure ()
+
+makeLeaf :: Expr Resolved -> Viz IRExpr
+makeLeaf expr = do
   vid <- getFresh
   tempUniqueTODO <- getFresh
   let uniq = tempUniqueTODO.id

@@ -10,7 +10,7 @@ module LSP.L4.Viz.Ladder (
   -- * VizConfig, VizState
   VizConfig (..),
   mkVizConfig,
-  readingImpliesAsOr,
+  spellingOut,
   VizState,
 
   -- * Viz State helpers
@@ -19,6 +19,7 @@ module LSP.L4.Viz.Ladder (
   InputRef (..),
   getAtomInputRefs,
   getRefusingAtoms,
+  getUnreadableRefusals,
   getVizConfig,
 
   -- * Conversion
@@ -48,7 +49,7 @@ import L4.Viz.Ladder (InputRef(..), generateAtomId)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, eliminateImplies, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
+import qualified L4.Transform as Transform (simplify, spellOutConnectives, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import LSP.L4.Viz.VizExpr
   ( ID (..), IRExpr,
     RenderAsLadderInfo (..),
@@ -80,14 +81,15 @@ mkVizConfig lspVerDocId module' substitution shouldSimplify =
     , verDocId = V.fromLspVerDocId lspVerDocId
     , substitution
     , shouldSimplify
-    , readImpliesAsOr = False
+    , spellOut = False
     }
 
--- | Draw each @IMPLIES@ in connective position as the @OR@ it stands for
--- ('Transform.eliminateImplies'). A rule is otherwise drawn as written, where an
--- @IMPLIES@ is one leaf that names only the inputs directly under it.
-readingImpliesAsOr :: VizConfig -> VizConfig
-readingImpliesAsOr cfg = cfg { readImpliesAsOr = True }
+-- | Draw each @IMPLIES@ and each Boolean @IF@ in connective position as the
+-- @AND@, @OR@ and @NOT@ it stands for ('Transform.spellOutConnectives'). A rule is
+-- otherwise drawn as written, where each is one leaf that names only the inputs
+-- directly under it.
+spellingOut :: VizConfig -> VizConfig
+spellingOut cfg = cfg { spellOut = True }
 
 data VizConfig = MkVizConfig
   { moduleUri      :: !NormalizedUri
@@ -95,7 +97,7 @@ data VizConfig = MkVizConfig
   , verDocId       :: !V.VersionedDocId
   , substitution   :: !TC.Substitution
   , shouldSimplify :: !Bool
-  , readImpliesAsOr :: !Bool
+  , spellOut       :: !Bool
   }
   deriving stock (Show, Generic, Eq)
 
@@ -117,6 +119,10 @@ data VizState = MkVizState
   -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only ever
   -- refuse at: a @REFUSE@, or a bare reference to a definition that always
   -- refuses. The query plan never asks one (R7).
+  , unreadableRefusals :: [(Text, Text)]
+  -- ^ Leaves that hold a refusal without being one, newest first: what the leaf
+  -- says, and the reason it refuses with. A @CONSIDER@ arm or a comparison operand
+  -- is one. The plan cannot order its questions around a refusal there.
   }
   deriving stock (Generic)
 
@@ -142,6 +148,7 @@ mkInitialVizState cfg =
     , atomInputRefs = Map.empty
     , refusingDefs = Refusal.alwaysRefusing cfg.module'
     , refusingAtoms = Map.empty
+    , unreadableRefusals = []
     }
 
 ------------------------------------------------------
@@ -272,6 +279,12 @@ getAtomInputRefs vs = vs.atomInputRefs
 getRefusingAtoms :: VizState -> IntMap Text
 getRefusingAtoms vs = vs.refusingAtoms
 
+-- | The leaves that hold a refusal without being one, in the order they were
+-- drawn: what the leaf says, and the reason it refuses with (see
+-- 'unreadableRefusals').
+getUnreadableRefusals :: VizState -> [(Text, Text)]
+getUnreadableRefusals vs = reverse vs.unreadableRefusals
+
 getVizConfig :: VizState -> VizConfig
 getVizConfig vs = vs.cfg
 
@@ -370,13 +383,13 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
     -- Mirrors 'L4.Viz.Ladder.translateDecide'.
     assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
     shouldSimplify <- getShouldSimplify
-    asOrs          <- (.readImpliesAsOr) <$> getVizCfg
+    spelledOut     <- (.spellOut) <$> getVizCfg
     vid            <- getFresh
     -- Read after 'carameliseExpr', which is what turns a call to the IMPLIES
     -- function into the 'Implies' node, so that nothing else about the rule moves.
     -- Mirrors 'L4.Viz.Ladder.translateDecide'.
     let caramelised = carameliseExpr body
-    vizBody        <- translateExpr shouldSimplify (if asOrs then Transform.eliminateImplies caramelised else caramelised)
+    vizBody        <- translateExpr shouldSimplify (if spelledOut then Transform.spellOutConnectives caramelised else caramelised)
     when (readsThrough && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
       throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
     pure $ V.MkFunDecl
@@ -439,7 +452,7 @@ translateExpr False = go CtxNone
         -- (@REFUSE "…"@). Explicit above the wildcard because the wildcard
         -- would first try 'normaliseGuarded' on it, and a refusal is not
         -- ladder STRUCTURE — it is a terminal. (Mirrors "L4.Viz.Ladder".)
-        Refuse _ msg -> leafFromExpr e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
+        Refuse _ msg -> makeLeaf e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
 
         -- 'var'
         App _ resolved [] -> do
@@ -457,6 +470,7 @@ translateExpr False = go CtxNone
           -- for now, only translating App of boolean functions to V.App
           if fnOfAppIsFnFromBooleansToBoolean
             then do
+              recordUnreadableRefusal e
               vid <- getFresh
               prepEvalAppMaker vid e
               let uniq = vid.id
@@ -524,8 +538,23 @@ refusingLeaf reason leaf = do
     _ -> pure ()
   pure leaf
 
+-- | A leaf for an expression that is none of the shapes the ladder draws as
+-- structure. A refusal inside it is one the plan cannot read.
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
+  recordUnreadableRefusal expr
+  makeLeaf expr
+
+-- | Record a leaf that holds a refusal without being one.
+recordUnreadableRefusal :: Expr Resolved -> Viz ()
+recordUnreadableRefusal expr = do
+  known <- use #refusingDefs
+  case Refusal.refusalWithin known expr of
+    Just reason -> #unreadableRefusals %= ((prettyLayout expr, reason) :)
+    Nothing -> pure ()
+
+makeLeaf :: Expr Resolved -> Viz IRExpr
+makeLeaf expr = do
   vid <- getFresh
   tempUniqueTODO <- getFresh
   let uniq = tempUniqueTODO.id

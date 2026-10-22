@@ -47,15 +47,16 @@ l4QueryPlan source uriText functionName bindingsJson =
       if any ((== SError) . severity) result.tcdErrors
         then encodeJson $ Aeson.object ["error" Aeson..= ("Type check error" :: Text.Text)]
         else
-          -- A ladder with a leaf evaluation can only refuse at is drawn again as
-          -- written, as 'Backend.DecisionQueryPlan' does: simplifying can change
-          -- which refusal evaluation reaches first (R7). Drawn as written, an
-          -- IMPLIES would be one leaf that names only the inputs directly under
-          -- it, so it is read as the OR it stands for.
+          -- A rule that holds a refusal is drawn again as written, as
+          -- 'Backend.DecisionQueryPlan' does: simplifying can change which refusal
+          -- evaluation reaches first (R7), and drawn as written an IMPLIES or an IF
+          -- is one leaf that hides a refusal inside it, so each is spelled out as the
+          -- AND, OR and NOT it stands for.
           let drawSimplified = Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution True functionName
-              drawAsWritten = Ladder.visualizeByNameImpliesAsOr result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution functionName
+              drawSpelledOut = Ladder.visualizeByNameSpelledOut result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution functionName
+              holdsRefusal st = not (IntMap.null (Ladder.getRefusingAtoms st)) || not (null (Ladder.getUnreadableRefusals st))
               drawn = case drawSimplified of
-                Right (_, st) | not (IntMap.null (Ladder.getRefusingAtoms st)) -> drawAsWritten
+                Right (_, st) | holdsRefusal st -> drawSpelledOut
                 other -> other
           in case drawn of
             Left _ ->

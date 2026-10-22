@@ -184,17 +184,19 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
           Right x -> pure x
       vizConfig = LadderViz.mkVizConfig verDocId resolvedModule Map.empty
 
-  -- A ladder with a leaf evaluation can only refuse at is drawn again as
-  -- written. Simplifying distributes OR over AND, which keeps every leaf but can
-  -- change which refusal evaluation, reading left to right, reaches first (R7).
-  -- Drawn as written, an IMPLIES would be one leaf that names only the inputs
-  -- directly under it, so it is read as the OR it stands for. Every other ladder
-  -- is the simplified one, as before.
+  -- A rule that holds a refusal is drawn again as written. Simplifying distributes
+  -- OR over AND, which keeps every leaf but can change which refusal evaluation,
+  -- reading left to right, reaches first (R7). Drawn as written, an IMPLIES or an
+  -- IF is one leaf that names only the inputs directly under it, and hides a
+  -- refusal inside it, so each is spelled out as the AND, OR and NOT it stands
+  -- for. Every other ladder is the simplified one, as before.
   simplified <- draw (vizConfig True)
+  let holdsRefusal st =
+        not (IntMap.null (LadderViz.getRefusingAtoms st)) || not (null (LadderViz.getUnreadableRefusals st))
   (ladderInfo, vizState) <-
-    if IntMap.null (LadderViz.getRefusingAtoms (snd simplified))
-      then pure simplified
-      else draw (LadderViz.readingImpliesAsOr (vizConfig False))
+    if holdsRefusal (snd simplified)
+      then draw (LadderViz.spellingOut (vizConfig False))
+      else pure simplified
 
   let (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
       -- A leaf evaluation can only refuse at is not a question (R7).

@@ -19,13 +19,16 @@
 module L4.Refusal
   ( AlwaysRefusing
   , alwaysRefusing
+  , refusalWithin
   , refusalMessage
   ) where
 
 import L4.Syntax
 
 import qualified Data.Map.Strict as Map
+import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Text (Text)
+import Optics (gplate, toListOf)
 
 -- | Each definition of the module, local ones included, that always refuses,
 -- with the reason it refuses with. A definition absent from the map does not
@@ -57,6 +60,24 @@ alwaysRefusing m = go Map.empty
       Where _ e _  -> refusesWith known e
       LetIn _ _ e  -> refusesWith known e
       _            -> Nothing
+
+-- | The reason of the first refusal inside an expression, if there is one: a
+-- @REFUSE@, or a reference to a definition that always refuses, with or without
+-- arguments, anywhere under it.
+--
+-- The query plan asks it of a leaf that is neither of those itself, such as a
+-- @CONSIDER@ or a comparison. A refusal there is reached or not as the data
+-- decides, which the plan cannot order the questions around.
+refusalWithin :: AlwaysRefusing -> Expr Resolved -> Maybe Text
+refusalWithin known = listToMaybe . mapMaybe here . universe
+  where
+    universe e = e : concatMap universe (toListOf (gplate @(Expr Resolved)) e)
+
+    here = \case
+      Refuse _ msg        -> Just (refusalMessage msg)
+      App _ r _           -> Map.lookup (getUnique r) known
+      AppNamed _ r _ _   -> Map.lookup (getUnique r) known
+      _                   -> Nothing
 
 -- | The message of a @REFUSE@, as evaluation reports it.
 --
