@@ -658,6 +658,7 @@ export type EvalResult = EvalResultSuccess | EvalResultFailure
 
 export interface EvalDirectiveResult {
   result: string
-  success: boolean
+  /** `null` is a refusal: the rules declined to answer, which is neither a pass nor a failure. */
+  success: boolean | null
   range?: Range
 }

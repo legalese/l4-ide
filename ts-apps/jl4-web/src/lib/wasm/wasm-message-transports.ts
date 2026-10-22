@@ -803,9 +803,11 @@ export class WasmLspHandler {
    * Matches the behavior of evalLazyResultToDiagnostic in jl4-lsp.
    */
   private evalResultToDiagnostic(evalResult: EvalDirectiveResult): Diagnostic {
-    // Severity: Error (1) for failed assertions, Information (3) otherwise
+    // Severity: Error (1) for failed assertions, Warning (2) for a refusal
+    // (`success` is null), Information (3) otherwise.
     // This matches the real LSP server behavior in Rules.hs
-    const severity = evalResult.success === false ? 1 : 3
+    const severity =
+      evalResult.success === false ? 1 : evalResult.success === null ? 2 : 3
 
     return {
       range: evalResult.range ?? {

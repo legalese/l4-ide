@@ -2696,11 +2696,14 @@ breach = do
 -- without running the program), and a literal payload means 'Refuse' needs no
 -- machine 'Frame' to carry it. @REFUSE 42@ parses and is
 -- rejected by the type checker; @REFUSE (something computed)@ does not parse.
+--
+-- The label keeps the parse error to the one thing that works: without it the
+-- error lists the numeric literals too, which the type checker then refuses.
 refuse :: Parser (Expr Name)
 refuse = attachAnno $
   Refuse emptyAnno
     <$  annoLexeme (spacedKeyword_ TKRefuse)
-    <*> annoHole lit
+    <*> annoHole (lit <?> "String Literal")
 
 optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)

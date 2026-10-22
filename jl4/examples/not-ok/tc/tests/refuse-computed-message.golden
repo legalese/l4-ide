@@ -11,4 +11,4 @@ File: refuse-computed-message.l4
     11 | `bad refusal` MEANS REFUSE (1 PLUS 1)
        |                            ^
     unexpected (
-    expecting Float Literal, Numeric Literal, String Literal, or space token
+    expecting String Literal or space token
