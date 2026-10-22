@@ -57,7 +57,7 @@ import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWra
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
-import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4)
+import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -963,6 +963,10 @@ spec = describe "integration" do
     -- The refusing rule read first refuses whatever adult is.
     oracle "refuse-first" refusingFirstJL4 ["adult"]
     oracle "refuse-not" refusingNotJL4 ["adult", "resident"]
+    -- A REFUSE written in the rule, with no definition around it.
+    oracle "refuse-direct" refusingDirectJL4 ["adult"]
+    -- Two refusals, one on each side of the answer to adult.
+    oracle "refuse-either" refusingEitherJL4 ["adult"]
     -- Three rules of no inputs deep, one under a WHERE.
     oracle "refuse-deep" refusingDeepJL4 ["adult"]
     -- Inside a disjunction of conjunctions: planned as written, not simplified.
@@ -977,6 +981,23 @@ spec = describe "integration" do
         askedLabels plan `shouldBe` ["adult"]
 
     -- The reviewer's case: a named refusal, answered, is not an answer.
+    it "a refusal read first is reported before anything is asked" do
+      withServiceFromSources "refuse-first-asks" [("rule.l4", refusingFirstJL4)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "refuse-first-asks" "eligible" (args [])
+        let plan = decodeObject (responseBody qp)
+        lookupKey "determined" plan `shouldBe` Just Aeson.Null
+        askedLabels plan `shouldBe` []
+        refusalReasons plan `shouldBe` ["the other conditions are not modelled"]
+
+    it "two refusals that depend on an answer: both reasons until it is given, one after" do
+      withServiceFromSources "refuse-either" [("rule.l4", refusingEitherJL4)] \baseUrl mgr -> do
+        let reasonsFor bs = do
+              qp <- queryPlan' baseUrl mgr "refuse-either" "eligible" (args bs)
+              pure (List.sort (refusalReasons (decodeObject (responseBody qp))))
+        reasonsFor [] `shouldReturn` ["the rules for adults are not modelled", "the rules for minors are not modelled"]
+        reasonsFor [("adult", True)] `shouldReturn` ["the rules for adults are not modelled"]
+        reasonsFor [("adult", False)] `shouldReturn` ["the rules for minors are not modelled"]
+
     it "an answer for the rule that refuses changes nothing: evaluation takes none" do
       withServiceFromSources "refuse-bound" [("rule.l4", refusingConditionJL4)] \baseUrl mgr -> do
         ev <- evalFunction baseUrl mgr "refuse-bound" "eligible" (args [("adult", True)])
@@ -1018,6 +1039,15 @@ spec = describe "integration" do
         lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
         qpYes <- queryPlan' baseUrl mgr "refuser-with-inputs" "eligible" (args [("adult", True), ("applicant", True)])
         lookupKey "determined" (decodeObject (responseBody qpYes)) `shouldBe` Just (Aeson.Bool True)
+
+    -- An IMPLIES is drawn as one leaf, so a refusal inside it is part of one question.
+    it "still asks an IMPLIES with a refusal in it as one question" do
+      withServiceFromSources "refuse-in-implies" [("rule.l4", refusingImpliesJL4)] \baseUrl mgr -> do
+        qp <- queryPlan' baseUrl mgr "refuse-in-implies" "eligible" (args [])
+        let plan = decodeObject (responseBody qp)
+        lookupKey "determined" plan `shouldBe` Just Aeson.Null
+        length (askedLabels plan) `shouldBe` 1
+        lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
 
     -- A REFUSE on an arm of an IF is part of the one question the IF is drawn as.
     it "still asks an IF with a REFUSE on one arm as one question" do

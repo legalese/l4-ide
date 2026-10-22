@@ -10,6 +10,7 @@ module LSP.L4.Viz.QueryPlan (
 
 import Base
 import Data.IntMap.Lazy (IntMap)
+import qualified Data.IntMap.Lazy as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -79,7 +80,9 @@ buildQueryPlanCache :: VizExpr.RenderAsLadderInfo -> LadderViz.VizState -> QP.Ca
 buildQueryPlanCache ladderInfo vizState =
   let
     (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
-    compiled = BDQ.compileDecisionQuery order boolExpr
+    -- A leaf evaluation can only refuse at is not a question (R7).
+    refusals = LadderViz.getRefusingAtoms vizState
+    compiled = BDQ.compileDecisionQuery order (BDQ.refusing (Set.fromList (IntMap.keys refusals)) boolExpr)
     deps :: IntMap IntSet
     deps = LadderViz.getAtomDeps vizState
     inputRefs = LadderViz.getAtomInputRefs vizState
@@ -92,6 +95,7 @@ buildQueryPlanCache ladderInfo vizState =
             (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
             inputRefs
       , compiled
+      , refusalsByUnique = refusals
       }
 
 queryPlanFromLadder ::

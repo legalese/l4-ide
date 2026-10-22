@@ -17,6 +17,7 @@ module LSP.L4.Viz.Ladder (
   getAtomDeps,
   InputRef (..),
   getAtomInputRefs,
+  getRefusingAtoms,
   getVizConfig,
 
   -- * Conversion
@@ -33,6 +34,7 @@ import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntMap.Lazy as Map
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.Map.Strict as DataMap
 import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
 import Optics.State.Operators ((<%=), (%=))
@@ -54,6 +56,7 @@ import qualified LSP.L4.Viz.VizExpr as V
 import qualified LSP.L4.Viz.CustomProtocol as V (EvalAppRequestParams (..))
 import LSP.L4.Viz.VizExpr (InertContext(..))
 import L4.Desugar
+import qualified L4.Refusal as Refusal
 
 ------------------------------------------------------
 -- Monad
@@ -98,6 +101,13 @@ data VizState = MkVizState
   , defsForInlining :: IntMap (Expr Resolved)
   , atomDeps       :: IntMap IntSet
   , atomInputRefs  :: IntMap (Set InputRef)
+  , refusingDefs   :: Refusal.AlwaysRefusing
+  -- ^ The module's definitions that always refuse ("L4.Refusal"). Lazy: a pass
+  -- that names no definition never computes it.
+  , refusingAtoms  :: IntMap Text
+  -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only ever
+  -- refuse at: a @REFUSE@, or a bare reference to a definition that always
+  -- refuses. The query plan never asks one (R7).
   }
   deriving stock (Generic)
 
@@ -121,6 +131,8 @@ mkInitialVizState cfg =
     , defsForInlining = Map.empty
     , atomDeps = Map.empty
     , atomInputRefs = Map.empty
+    , refusingDefs = Refusal.alwaysRefusing cfg.module'
+    , refusingAtoms = Map.empty
     }
 
 ------------------------------------------------------
@@ -245,6 +257,11 @@ getAtomDeps vs = vs.atomDeps
 
 getAtomInputRefs :: VizState -> IntMap (Set InputRef)
 getAtomInputRefs vs = vs.atomInputRefs
+
+-- | The leaves evaluation can only refuse at, by leaf id, with the reason each
+-- refuses with (see 'refusingAtoms').
+getRefusingAtoms :: VizState -> IntMap Text
+getRefusingAtoms vs = vs.refusingAtoms
 
 getVizConfig :: VizState -> VizConfig
 getVizConfig vs = vs.cfg
@@ -401,7 +418,7 @@ translateExpr False = go CtxNone
         -- (@REFUSE "…"@). Explicit above the wildcard because the wildcard
         -- would first try 'normaliseGuarded' on it, and a refusal is not
         -- ladder STRUCTURE — it is a terminal. (Mirrors "L4.Viz.Ladder".)
-        Refuse{} -> leafFromExpr e
+        Refuse _ msg -> leafFromExpr e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
 
         -- 'var'
         App _ resolved [] -> do
@@ -470,7 +487,21 @@ varLeaf vid vname resolved = do
   recordAtomInputRefs vname.unique refs
   functionName <- use #functionName
   let atomId = generateAtomId functionName vname.label refs
-  pure $ V.UBoolVar vid vname defaultUBoolVarValue canInline atomId
+  -- A rule of no inputs that always refuses is not a question: evaluation takes
+  -- no answer for it, it forces the rule (R7). One that refuses on only some
+  -- paths stays a question.
+  refusing <- use #refusingDefs
+  refusingLeaf (DataMap.lookup (getUnique resolved) refusing) $
+    V.UBoolVar vid vname defaultUBoolVarValue canInline atomId
+
+-- | Record a leaf as one evaluation can only refuse at, with the reason, if it
+-- has one.
+refusingLeaf :: Maybe Text -> IRExpr -> Viz IRExpr
+refusingLeaf reason leaf = do
+  case (reason, leaf) of
+    (Just r, V.UBoolVar _ nm _ _ _) -> #refusingAtoms %= Map.insert nm.unique r
+    _ -> pure ()
+  pure leaf
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do

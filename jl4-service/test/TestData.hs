@@ -73,6 +73,9 @@ module TestData (
   refusingNotJL4,
   conditionalRefuserJL4,
   refusingWithInputsJL4,
+  refusingDirectJL4,
+  refusingImpliesJL4,
+  refusingEitherJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -1568,4 +1571,51 @@ GIVEN adult IS A BOOLEAN
       applicant IS A BOOLEAN
 GIVETH A BOOLEAN
 eligible adult applicant MEANS adult AND `the person is covered` applicant
+|]
+
+-- | A REFUSE written as an operand of AND, with no definition around it.
+refusingDirectJL4 :: Text
+refusingDirectJL4 =
+  [i|
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND REFUSE "the other conditions are not modelled"
+|]
+
+-- | A rule of no inputs that always refuses, on the right of an IMPLIES. The
+-- ladder draws an IMPLIES as one leaf, so the refusal is part of one question.
+refusingImpliesJL4 :: Text
+refusingImpliesJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult IMPLIES `the other conditions are not modelled`
+|]
+
+-- | Two refusals for different reasons, one on each side of the answer to
+-- @adult@: refused before @adult@ is answered, with both reasons until it is.
+-- (@NOT adult AND r@ reads as @NOT (adult AND r)@, so the second is bracketed.)
+refusingEitherJL4 :: Text
+refusingEitherJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the rules for adults are not modelled` MEANS
+    REFUSE "the rules for adults are not modelled"
+
+GIVETH A BOOLEAN
+`the rules for minors are not modelled` MEANS
+    REFUSE "the rules for minors are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS
+    (adult AND `the rules for adults are not modelled`)
+    OR ((NOT adult) AND `the rules for minors are not modelled`)
 |]

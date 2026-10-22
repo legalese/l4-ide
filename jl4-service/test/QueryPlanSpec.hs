@@ -71,6 +71,17 @@ GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 |]
 
+-- | A rule that reaches a refusal through a rule of no inputs (R7).
+refusingL4 :: Text
+refusingL4 = [i|
+GIVETH A BOOLEAN
+`not modelled` MEANS REFUSE "the other conditions are not modelled"
+
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE eligible IF adult AND `not modelled`
+|]
+
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -220,6 +231,28 @@ serviceTests = do
           rPartial = svcQP c [("walks", True)]
       length rPartial.asks `shouldSatisfy` (<= length rNone.asks)
 
+  -- A refusal is reached where evaluation reaches it, and the rule that refuses
+  -- is never asked: evaluation takes no answer for it.
+  describe "a refusal" do
+    it "is reached where evaluation reaches it, and the refusing rule is never asked" do
+      c <- serviceCache "eligible" refusingL4
+      let ask = svcQP c []
+          refused = svcQP c [("adult", True)]
+          fails = svcQP c [("adult", False)]
+      map (.label) ask.stillNeeded `shouldBe` ["adult"]
+      ask.refusal `shouldBe` Nothing
+      refused.determined `shouldBe` Nothing
+      refused.stillNeeded `shouldBe` []
+      fmap (.reasons) refused.refusal `shouldBe` Just ["the other conditions are not modelled"]
+      fails.determined `shouldBe` Just False
+      fails.refusal `shouldBe` Nothing
+
+    it "an answer for the rule that refuses changes nothing" do
+      c <- serviceCache "eligible" refusingL4
+      let r = svcQP c [("adult", True), ("not modelled", True)]
+      r.determined `shouldBe` Nothing
+      fmap (.reasons) r.refusal `shouldBe` Just ["the other conditions are not modelled"]
+
 
 lspTests :: Spec
 lspTests = do
@@ -252,6 +285,21 @@ lspTests = do
       let r = lspQP "simple or" params info state [("a", False), ("b", False)]
       r.determined `shouldBe` Just False
 
+  -- The editor's wizard plans from the same ladder state the service does, so it
+  -- reaches a refusal where evaluation does too, and never asks the rule that
+  -- refuses.
+  describe "a refusal" do
+    it "is reached where evaluation reaches it, and the refusing rule is never asked" do
+      (info, state, params) <- lspCache "eligible" refusingL4
+      let ask = lspQP "eligible" params info state []
+          refused = lspQP "eligible" params info state [("adult", True)]
+          fails = lspQP "eligible" params info state [("adult", False)]
+      map (.label) ask.stillNeeded `shouldBe` ["adult"]
+      refused.determined `shouldBe` Nothing
+      fmap (.reasons) refused.refusal `shouldBe` Just ["the other conditions are not modelled"]
+      fails.determined `shouldBe` Just False
+      fails.refusal `shouldBe` Nothing
+
 
 agreementTests :: Spec
 agreementTests = do
@@ -262,6 +310,7 @@ agreementTests = do
           let sResp = svcQP sCache bindings
               lResp = lspQP fnName params info state bindings
           sResp.determined `shouldBe` lResp.determined
+          fmap (.reasons) sResp.refusal `shouldBe` fmap (.reasons) lResp.refusal
 
   describe "simple AND" do
     testAgreement "no bindings" "simple and" simpleAndL4 []
@@ -273,3 +322,8 @@ agreementTests = do
     testAgreement "c=True" "nested" nestedL4 [("c", True)]
     testAgreement "a=False,c=False" "nested" nestedL4 [("a", False), ("c", False)]
     testAgreement "a=True" "nested" nestedL4 [("a", True)]
+
+  describe "a refusal" do
+    testAgreement "no bindings" "eligible" refusingL4 []
+    testAgreement "adult=True" "eligible" refusingL4 [("adult", True)]
+    testAgreement "adult=False" "eligible" refusingL4 [("adult", False)]

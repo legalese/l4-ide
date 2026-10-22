@@ -15,6 +15,7 @@ module Backend.DecisionQueryPlan (
   QueryImpact (..),
   QueryInput (..),
   QueryAsk (..),
+  QueryRefusal (..),
   QueryPlanResponse (..),
   queryPlan,
 ) where
@@ -30,6 +31,7 @@ import qualified Data.Char as Char
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.Ord (Down (..))
+import qualified Data.IntMap.Lazy as IntMap
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -46,7 +48,7 @@ import qualified Language.LSP.Protocol.Types as LSP
 
 import Backend.Api (FnArguments (..), FnLiteral (..))
 import qualified L4.Decision.QueryPlan as QP
-import L4.Decision.QueryPlan (QueryAtom (..), QueryImpact (..), QueryInput (..), QueryOutcome (..))
+import L4.Decision.QueryPlan (QueryAtom (..), QueryImpact (..), QueryInput (..), QueryOutcome (..), QueryRefusal (..))
 
 data CachedDecisionQuery = CachedDecisionQuery
   { cacheKey :: !Text
@@ -176,14 +178,23 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
       fileName = Text.unpack funName <> ".l4"
       verDocId = mkVerDocId fileName
       -- The module is already fully resolved; an empty substitution is sufficient.
-      vizCfg = LadderViz.mkVizConfig verDocId resolvedModule Map.empty True
+      draw simplify =
+        case LadderViz.doVisualize decide (LadderViz.mkVizConfig verDocId resolvedModule Map.empty simplify) of
+          Left e -> throwError err400 {errBody = Aeson.encode $ object ["error" .= LadderViz.prettyPrintVizError e]}
+          Right x -> pure x
 
-  (ladderInfo, vizState) <- case LadderViz.doVisualize decide vizCfg of
-    Left e -> throwError err400 {errBody = Aeson.encode $ object ["error" .= LadderViz.prettyPrintVizError e]}
-    Right x -> pure x
+  -- A ladder with a leaf evaluation can only refuse at is drawn again as
+  -- written. Simplifying distributes OR over AND, which keeps every leaf but can
+  -- change which refusal evaluation, reading left to right, reaches first (R7).
+  -- Every other ladder is the simplified one, as before.
+  simplified <- draw True
+  (ladderInfo, vizState) <-
+    if IntMap.null (LadderViz.getRefusingAtoms (snd simplified)) then pure simplified else draw False
 
   let (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
-      bddCompiled = BDQ.compileDecisionQuery order boolExpr
+      -- A leaf evaluation can only refuse at is not a question (R7).
+      refusals = LadderViz.getRefusingAtoms vizState
+      bddCompiled = BDQ.compileDecisionQuery order (BDQ.refusing (Set.fromList (IntMap.keys refusals)) boolExpr)
       deps = LadderViz.getAtomDeps vizState
       inputRefs = LadderViz.getAtomInputRefs vizState
 
@@ -200,6 +211,7 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
                   (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
                   inputRefs
             , compiled = bddCompiled
+            , refusalsByUnique = refusals
             }
       , paramSchema = parametersFromDecideWithErrors resolvedModule decide []
       }
@@ -221,6 +233,9 @@ data QueryPlanResponse = QueryPlanResponse
   , impact :: !(Map Int QueryImpact)
   , impactByAtomId :: !(Map Text QueryImpact)
   , note :: !Text
+  , refusal :: !(Maybe QueryRefusal)
+  -- ^ Where evaluation of this case is sure to refuse (R7): why, with the reason
+  -- @/evaluation@ gives. @null@ everywhere else.
   , ladder :: !(Maybe VizExpr.RenderAsLadderInfo)
   }
   deriving stock (Show, Generic)
@@ -256,7 +271,7 @@ queryPlan name cached args =
             Just v -> flattenBoolBindings k v
         | (k, mv) <- Map.toList args.fnArguments
         ]
-    QP.QueryPlanResponse{determined, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note} =
+    QP.QueryPlanResponse{determined, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note, refusal} =
       QP.queryPlan name paramsByUnique cached.core flattenedLabelBindings
 
     asksEnriched =
@@ -281,5 +296,6 @@ queryPlan name cached args =
       , impact
       , impactByAtomId
       , note
+      , refusal
       , ladder = Just cached.ladderInfo
       }

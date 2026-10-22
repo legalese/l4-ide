@@ -9,6 +9,7 @@ module L4.Decision.QueryPlan (
   QueryImpact (..),
   QueryInput (..),
   QueryAsk (..),
+  QueryRefusal (..),
   QueryPlanResponse (..),
   atomIdByUnique,
   queryPlan,
@@ -94,6 +95,11 @@ data CachedDecisionQuery = CachedDecisionQuery
   , varDepsByUnique :: !(IntMap IntSet)
   , varInputRefsByUnique :: !(IntMap (Set InputRef))
   , compiled :: !(BDQ.CompiledDecisionQuery Int)
+  , refusalsByUnique :: !(IntMap Text)
+    -- ^ The refusing leaves (a @REFUSE@, or a reference to a rule of no inputs
+    -- that always refuses), with the reason each refuses with. Each is compiled
+    -- as 'BDQ.BRefuse' and so is never asked; a plan that reaches one says so in
+    -- 'refusal'. Fill it from the ladder's state ('getRefusingAtoms').
   }
 
 data QueryAtom = QueryAtom
@@ -180,8 +186,24 @@ data QueryPlanResponse = QueryPlanResponse
   , impact :: !(Map Int QueryImpact)
   , impactByAtomId :: !(Map Text QueryImpact)
   , note :: !Text
+  , refusal :: !(Maybe QueryRefusal)
+  -- ^ Where evaluation of this case is sure to refuse: why, as it would say it.
+  -- 'Nothing' everywhere else.
   }
   deriving stock (Show, Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+-- | A refusal the plan has reached (ruling R7): evaluation of the same case
+-- refuses, with one of these reasons. Usually one; more only where which
+-- refusal evaluation reaches first is still open (@IF a THEN r1 ELSE r2@ with
+-- @a@ unanswered).
+data QueryRefusal = QueryRefusal
+  { reasons :: ![Text]
+  , atoms :: ![QueryAtom]
+  -- ^ The refusing leaves evaluation can reach first: a @REFUSE@, or a rule of no
+  -- inputs that always refuses. None of them is a question.
+  }
+  deriving stock (Show, Read, Ord, Eq, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
 atomIdByUnique ::
@@ -397,7 +419,11 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
                     [ (vi.ifTrue.determined, vi.ifTrue.support)
                     , (vi.ifFalse.determined, vi.ifFalse.support)
                     ]
-                  canDetermine = any (\(d, _s) -> d /= Nothing) impacts
+                  -- An answer that leads to a refusal settles the plan as much as
+                  -- one that leads to a value: nothing is left to ask.
+                  canDetermine =
+                    any (\(d, _s) -> d /= Nothing) impacts
+                      || not (Set.null vi.ifTrue.refusedAt && Set.null vi.ifFalse.refusedAt)
                   shrink =
                     sum
                       [ fromIntegral (Set.size res.support - Set.size s)
@@ -570,6 +596,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     noteTxt =
       "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
         <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
+        <> " When `refusal` is present, evaluation of this case refuses to answer, for the reasons it lists, and `determined` is null; a `REFUSE`, or a rule of no inputs that always refuses, is never asked."
    in
     QueryPlanResponse
       { determined = res.determined
@@ -580,4 +607,13 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       , impact = impactJson
       , impactByAtomId = impactByAtomIdJson
       , note = noteTxt
+      , refusal =
+          if Set.null res.refusedAt
+            then Nothing
+            else
+              Just
+                QueryRefusal
+                  { reasons = List.nub [r | u <- Set.toList res.refusedAt, Just r <- [IntMap.lookup u cached.refusalsByUnique]]
+                  , atoms = atomsOfSet res.refusedAt
+                  }
       }
