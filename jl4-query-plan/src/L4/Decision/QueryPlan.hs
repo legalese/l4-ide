@@ -596,7 +596,11 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     noteTxt =
       "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
         <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
-        <> " When `refusal` is present, evaluation of this case refuses to answer, for the reasons it lists, and `determined` is null; a `REFUSE`, or a rule of no inputs that always refuses, is never asked."
+        <> refusalNote
+    -- Said of a rule that has a refusing leaf, whether or not this case reaches it.
+    refusalNote
+      | IntMap.null cached.refusalsByUnique = ""
+      | otherwise = " When `refusal` is present, evaluation of this case refuses to answer, for the reasons it lists, and `determined` is null; a `REFUSE`, or a rule of no inputs that always refuses, is never asked."
    in
     QueryPlanResponse
       { determined = res.determined

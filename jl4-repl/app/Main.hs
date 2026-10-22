@@ -493,9 +493,12 @@ renderQueryPlan :: QP.QueryPlanResponse -> Text
 renderQueryPlan qp =
   let
     detTxt = case qp.determined of
-      Nothing -> "Unknown"
+      Nothing -> maybe "Unknown" (const "Refused") qp.refusal
       Just True -> "True"
       Just False -> "False"
+
+    -- Where the answers so far lead to a refusal, the reasons evaluation gives.
+    refusalLines = maybe [] (map ("refusal: " <>) . (.reasons)) qp.refusal
 
     nextAskTxt =
       case qp.asks of
@@ -532,10 +535,11 @@ renderQueryPlan qp =
         <> ")"
    in
     Text.unlines $
-      [ "determined: " <> detTxt
-      , nextAskTxt
-      , "stillNeeded atoms: " <> Text.pack (show (length qp.stillNeeded))
-      ]
+      ["determined: " <> detTxt]
+        <> refusalLines
+        <> [ nextAskTxt
+           , "stillNeeded atoms: " <> Text.pack (show (length qp.stillNeeded))
+           ]
         <> map atomLine (take 12 qp.stillNeeded)
         <> [ ""
            , "inputs (top): " <> Text.pack (show (length topInputs)) <> " of " <> Text.pack (show (length qp.inputs))
