@@ -46,7 +46,7 @@ checkOptionsParser = CheckOptions
 checkCmd :: CheckOptions -> IO ()
 checkCmd opts = do
   evalConfig <- makeEvalConfig opts.checkFixedNow
-  (errs, mTc) <- runOneshot evalConfig opts.checkFile \nfp -> do
+  (errs, diags, mTc) <- runOneshotWithDiagnostics evalConfig opts.checkFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.SuccessfulTypeCheck uri
@@ -54,9 +54,13 @@ checkCmd opts = do
   let typecheckOk = case mTc of
         Just tc | tc.success -> True
         _                    -> False
-      -- Exit code depends on the Shake rule, not the log stream: see
-      -- the same comment in L4.Cli.Run for why.
-      overallOk = typecheckOk
+      -- Exit code depends on the Shake rule and the structured diagnostics,
+      -- not the log stream: see the same comment in L4.Cli.Run for why.
+      -- The entry file's own typecheck can look successful when a module it
+      -- imports is broken (an import cycle's error attaches to an imported
+      -- file), so also require that no blocking Error diagnostic was published
+      -- anywhere in the import closure.
+      overallOk = typecheckOk && not (hasBlockingError diags)
 
   if opts.checkJsonOut
     then do

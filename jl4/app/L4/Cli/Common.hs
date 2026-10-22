@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 -- | Shared helpers for the l4 CLI subcommands.
 --
 -- Everything here is neutral to a specific command so individual
@@ -17,7 +19,9 @@ module L4.Cli.Common
 
     -- * Running the LSP pipeline
   , runOneshot
+  , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , hasBlockingError
   , transitiveDeps
   , dedupModules
 
@@ -50,6 +54,7 @@ import qualified Options.Applicative as Options
 import System.IO (hPutStrLn, stderr)
 import Control.Applicative ((<|>))
 
+import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
 import LSP.L4.Oneshot (oneshotL4Action)
 import qualified LSP.L4.Oneshot as Oneshot
 import LSP.Logger
@@ -61,7 +66,7 @@ import LSP.Logger
   , makeRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath)
+import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -241,6 +246,47 @@ runOneshot evalConfig fp act = do
   rawErrs <- getLog
   -- Post-filter: drop lines matching known progress-chatter prefixes.
   pure (filter (not . isProgressChatter) rawErrs, res)
+
+-- | Like 'runOneshot', but additionally returns the structured diagnostics
+-- published to the Shake store during the run, across every file in the import
+-- closure and not just the entry file.
+--
+-- The rendered @[Text]@ is still returned for display; the @[FileDiagnostic]@
+-- is what a caller consults for a verdict that knows severity. An import cycle
+-- is the case that needs it: the engine attaches its error to a module that is
+-- imported, so the entry file's own typecheck result can look successful.
+runOneshotWithDiagnostics
+  :: EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+runOneshotWithDiagnostics evalConfig fp act = do
+  (getLog, refRecorder) <- makeRefRecorder
+  let prettyRecorder = cmapWithPrio pretty refRecorder
+      keep wp = wp.priority /= Debug
+      filteredRec = cfilter keep prettyRecorder
+  (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
+  rawErrs <- getLog
+  pure (filter (not . isProgressChatter) rawErrs, diags, res)
+
+-- | Does the diagnostics set hold an error that should make a CLI command exit
+-- non-zero?
+--
+-- An Error-severity diagnostic from any source /except/ @\"eval\"@ counts:
+-- parse errors, type errors, an @IMPORT@ that resolves to nothing, and the raw
+-- engine exception for an import cycle.
+--
+-- The evaluator publishes every @#EVAL@ and @#ASSERT@ outcome with source
+-- @\"eval\"@, and a failed assertion is one of them, at Error severity. They
+-- are left out so that a clean verdict of FALSE does not make the file a
+-- failure, which keeps @l4 run@ at exit 0 for it. A directive that CRASHES
+-- does fail the run, but @l4 run@ decides that from the directive results, not
+-- from here.
+hasBlockingError :: [FileDiagnostic] -> Bool
+hasBlockingError = any isBlocking
+  where
+    isBlocking FileDiagnostic{fdLspDiagnostic = Diagnostic{_severity, _source}} =
+      _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
 
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather

@@ -256,6 +256,23 @@ expectFail bin args = do
     ExitFailure _ -> pure ()
     ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
 
+-- | Assert the CLI exited with status 1, which is what a failed check or run
+-- gives on every platform.
+expectExit1 :: FilePath -> [String] -> IO ()
+expectExit1 bin args = do
+  Output code _ _ <- runL4 bin args
+  code `shouldBe` ExitFailure 1
+
+-- | Assert a command run with @--json@ reports @ok: false@ and says why: the
+-- envelope must carry at least one diagnostic.
+expectJsonNotOk :: FilePath -> [String] -> IO ()
+expectJsonNotOk bin args = do
+  env <- jsonEnvelope bin (args ++ ["--json"])
+  objField env "ok" `shouldBe` Just (Bool False)
+  case objField env "diagnostics" of
+    Just (Array ds) -> length ds `shouldSatisfy` (> 0)
+    other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
 -- | Whether some line of the text ends with the needle. Written against text
 -- whose carriage returns are already gone, so a needle never has to span a line
 -- break (and so never has to name one).
@@ -509,6 +526,30 @@ batchClausesB         = fixtureDir </> "batch-multi-clause-b.json"
 multiClauseRenderFixture :: FilePath
 multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
 
+-- Import-cycle fixtures: entry points of small multi-file rings, and one whose
+-- entry file imports a ring without being part of it.
+cycle3Entry, cycle3OutsideEntry, cycle2Entry, selfImportEntry :: FilePath
+cycle3Entry        = fixtureDir </> "cycle3"     </> "cyca.l4"
+cycle3OutsideEntry = fixtureDir </> "cycle3"     </> "outside.l4"
+cycle2Entry        = fixtureDir </> "cycle2"     </> "dua.l4"
+selfImportEntry    = fixtureDir </> "selfimport" </> "solo.l4"
+
+-- Multi-file imports that are not rings: a clean one, one whose imported module
+-- only warns, and four that cannot be loaded cleanly: an imported module with a
+-- type error, with a syntax error, and with a string that is never closed, and an
+-- IMPORT of a module that does not exist. In each of those the entry file is
+-- itself fine, and never uses anything from the import. The first two are guards
+-- against the import check over-firing.
+cleanImportEntry, warningImportEntry, brokenImportEntry :: FilePath
+cleanImportEntry   = fixtureDir </> "imports-ok"      </> "main.l4"
+warningImportEntry = fixtureDir </> "imports-warning" </> "main.l4"
+brokenImportEntry  = fixtureDir </> "imports-error"   </> "main.l4"
+
+syntaxImportEntry, lexImportEntry, missingImportEntry :: FilePath
+syntaxImportEntry  = fixtureDir </> "imports-syntax"  </> "main.l4"
+lexImportEntry     = fixtureDir </> "imports-lex"     </> "main.l4"
+missingImportEntry = fixtureDir </> "imports-missing" </> "main.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -527,6 +568,9 @@ main = do
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
        , multiClauseRenderFixture
+       , cycle3Entry, cycle3OutsideEntry, cycle2Entry, selfImportEntry
+       , cleanImportEntry, warningImportEntry, brokenImportEntry
+       , syntaxImportEntry, lexImportEntry, missingImportEntry
        , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
        , nlgHeadPlacementSource
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
@@ -676,6 +720,76 @@ spec bin = do
       sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
       serr `shouldSatisfy` ("does not cover all cases" `isInfixOf`)
       serr `shouldSatisfy` ("DECIDE `price` Blue IS" `isInfixOf`)
+
+  -- An import ring used to pass `l4 check` and `l4 run` with exit 0 and "Check
+  -- succeeded." printed under the cycle's own error. The engine reports the
+  -- cycle as an Error on a module that is IMPORTED, not on the file named on the
+  -- command line, and the verdict looked only at the named file's typecheck. A
+  -- self-import is the exception: there the error lands on the entry file, so
+  -- it already failed, which makes it the positive control for the rest.
+  describe "l4 import cycles" $ do
+    forM_ ["check", "run"] \cmd -> do
+      it ("fails " <> cmd <> " on a 3-module import ring") $
+        expectExit1 bin [cmd, cycle3Entry]
+
+      it ("fails " <> cmd <> " on a 2-module import ring") $
+        expectExit1 bin [cmd, cycle2Entry]
+
+      it ("fails " <> cmd <> " on a self-import") $
+        expectExit1 bin [cmd, selfImportEntry]
+
+      -- The file named on the command line is not in the ring, so the error
+      -- cannot land on it.
+      it ("fails " <> cmd <> " when the entry file imports a ring without being in it") $
+        expectExit1 bin [cmd, cycle3OutsideEntry]
+
+      it ("reports ok=false in JSON from " <> cmd <> " on a cyclic import") $
+        expectJsonNotOk bin [cmd, cycle3Entry]
+
+    -- `l4 FILE` with no command is `l4 run FILE`.
+    it "fails the bare `l4 FILE` form on a 3-module import ring" $
+      expectExit1 bin [cycle3Entry]
+
+  -- The verdict now also looks at the modules a file imports. These are the
+  -- cases it must NOT turn into a failure, so that the check above cannot be
+  -- satisfied by failing everything that has an IMPORT.
+  describe "l4 check and run on imports that are not cycles" $ do
+    it "still succeeds on a clean multi-file import" $ do
+      expectOk bin ["check", cleanImportEntry] "Check succeeded."
+      expectOk bin ["run", cleanImportEntry] "Checking succeeded."
+
+    -- A warning in an imported module is a warning, as it is in the entry file.
+    it "still succeeds when an imported module only warns" $ do
+      expectOk bin ["check", warningImportEntry] "Check succeeded."
+      expectOk bin ["run", warningImportEntry] "Checking succeeded."
+
+    -- A failed #ASSERT is published as an Error diagnostic of the evaluator's
+    -- own. It is a verdict about the rules, not a fault in the file, so it must
+    -- not become one now that every Error in the closure counts; the plain-text
+    -- case is "leaves a clean FALSE #ASSERT at exit 0" under `l4 run`.
+    it "still reports ok=true in JSON for a failed #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-clean.l4", "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+
+  -- Not a ring, but the same blind spot: the entry file typechecks against the
+  -- modules it imports, and an error INSIDE one of them, or an IMPORT that
+  -- finds no module at all, did not fail the run. In each case the entry file is
+  -- fine and uses nothing from the import, so only the import's own error can
+  -- fail it. The unresolved IMPORT also publishes a second diagnostic (that the
+  -- module depends on itself), which the examples cannot tell apart from the
+  -- first.
+  describe "l4 check and run on an import that cannot be loaded" $
+    forM_ [ ("a type error in an imported module", brokenImportEntry)
+          , ("a syntax error in an imported module", syntaxImportEntry)
+          , ("an unclosed string in an imported module", lexImportEntry)
+          , ("an IMPORT that resolves to no module", missingImportEntry)
+          ] \(what, entry) ->
+      forM_ ["check", "run"] \cmd -> do
+        it ("fails " <> cmd <> " on " <> what) $
+          expectExit1 bin [cmd, entry]
+
+        it ("reports ok=false in JSON from " <> cmd <> " on " <> what) $
+          expectJsonNotOk bin [cmd, entry]
 
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.
@@ -2506,16 +2620,17 @@ spec bin = do
     -- `actus-schedule` itself. Before the change this checked clean: `main` saw
     -- the project `daydate` while `actus-schedule` quietly kept the embedded one.
     --
-    -- The exit code is not asserted. On main an error inside an imported module
-    -- is printed as a diagnostic and `l4 check` still exits 0, so the evidence
-    -- is the text: the arity error names `actus-schedule`, and the shadow
+    -- An error inside an imported module fails the check, as one in the entry
+    -- file does, so the exit code is asserted too. The text is the evidence of
+    -- WHICH module it is: the arity error names `actus-schedule`, and the shadow
     -- warning names the chosen project copy.
     --
     -- The positive control is the `embedded-diamond` test above: the same
     -- embedded closure with no project override checks clean.
     let expectEmbeddedImporterSeesOverride label run =
           it label $ do
-            Output _code _sout serr <- run
+            Output code _sout serr <- run
+            code `shouldBe` ExitFailure 1
             -- The diagnostic must land on the EMBEDDED importer, which is the
             -- whole point: that is the module that changed source.
             serr `shouldSatisfy` ("actus-schedule" `isInfixOf`)
