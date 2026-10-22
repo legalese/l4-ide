@@ -203,6 +203,7 @@ test-suite jl4-core-test
     NlgMultiplicitySpec
     NlgAttachmentSpec
     NlgSilentReadingSpec
+    LadderLeafIdsSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
