@@ -1061,7 +1061,7 @@ spec = describe "integration" do
         withServiceFromSources "refuser-sentence" [("rule.l4", refusingWithInputsJL4)] \baseUrl mgr -> do
           (_, body) <- answer baseUrl mgr "refuser-sentence" "eligible" []
           errorOf body
-            `shouldBe` "The query plan cannot order the questions for this rule, because a refusal sits inside this part of it: `the person is covered` OF applicant"
+            `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"coverage is not modelled\") sits inside this part of it: `the person is covered` OF applicant"
 
       it "plans the same call as a question when the rule it calls answers" do
         withServiceFromSources "covered-with-inputs" [("rule.l4", coveredWithInputsJL4)] \baseUrl mgr -> do
@@ -1082,8 +1082,10 @@ spec = describe "integration" do
             (status, body) <- answer baseUrl mgr ("unreadable-" <> fn) fn []
             status `shouldBe` 400
             let text = errorOf body
-            (Text.isPrefixOf "The query plan cannot order the questions for this rule, because a refusal sits inside this part of it: " text, Text.isInfixOf inLabel text)
-              `shouldBe` (True, True)
+            ( Text.isPrefixOf "The query plan cannot order the questions for this rule, because a refusal (" text
+              , Text.isInfixOf ") sits inside this part of it: " text
+              , Text.isInfixOf inLabel text )
+              `shouldBe` (True, True, True)
 
       it "plans a rule of the same module that holds no refusal" do
         withServiceFromSources "unreadable-clean" [("rule.l4", unreadableRefusalsJL4)] \baseUrl mgr -> do

@@ -24,6 +24,7 @@ import Base
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import L4.FunctionSchema (Parameter (..), Parameters (..), parametersFromDecideWithErrors)
 import Backend.Jl4 (CompiledModule (..))
+import qualified L4.Refusal as Refusal
 import Data.Aeson (FromJSON, ToJSON, (.=), object)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as BS
@@ -197,6 +198,12 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
     if holdsRefusal (snd simplified)
       then draw (LadderViz.spellingOut (vizConfig False))
       else pure simplified
+
+  -- A refusal the plan cannot read: in an arm of a CONSIDER, in a comparison, or in
+  -- a call, say, where whether it is reached turns on the data, so no order of the
+  -- questions is right for it. The plan answers that, and does not guess.
+  for_ (Refusal.unreadableRefusalError (LadderViz.getUnreadableRefusals vizState)) \msg ->
+    throwError err400 {errBody = Aeson.encode $ object ["error" .= msg]}
 
   let (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
       -- A leaf evaluation can only refuse at is not a question (R7).

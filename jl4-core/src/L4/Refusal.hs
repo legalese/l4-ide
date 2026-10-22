@@ -20,6 +20,7 @@ module L4.Refusal
   ( AlwaysRefusing
   , alwaysRefusing
   , refusalWithin
+  , unreadableRefusalError
   , refusalMessage
   ) where
 
@@ -28,6 +29,7 @@ import L4.Syntax
 import qualified Data.Map.Strict as Map
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Optics (gplate, toListOf)
 
 -- | Each definition of the module, local ones included, that always refuses,
@@ -78,6 +80,25 @@ refusalWithin known = listToMaybe . mapMaybe here . universe
       App _ r _           -> Map.lookup (getUnique r) known
       AppNamed _ r _ _   -> Map.lookup (getUnique r) known
       _                   -> Nothing
+
+-- | What the query plan answers with, in place of a plan, for a rule that holds
+-- a refusal it cannot read: one sentence that says where the first one sits and
+-- that the plan cannot order the questions for such a rule. @Nothing@ for a rule
+-- that holds none. Takes what the ladder recorded: what each such leaf says, and
+-- the reason it refuses with.
+unreadableRefusalError :: [(Text, Text)] -> Maybe Text
+unreadableRefusalError = \case
+  [] -> Nothing
+  (leaf, reason) : _ ->
+    Just $
+      "The query plan cannot order the questions for this rule, because a refusal (\""
+        <> reason
+        <> "\") sits inside this part of it: "
+        <> shorten (Text.unwords (Text.words leaf))
+  where
+    shorten t
+      | Text.length t > 100 = Text.take 97 t <> "..."
+      | otherwise = t
 
 -- | The message of a @REFUSE@, as evaluation reports it.
 --

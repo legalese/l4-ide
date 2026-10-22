@@ -21,6 +21,7 @@ import qualified Data.Text.Lazy.Encoding as LazyText
 import Data.Text.Encoding (encodeUtf8)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult(..))
+import qualified L4.Refusal as Refusal
 import L4.TypeCheck (severity)
 import L4.TypeCheck.Types (Severity (..))
 import qualified L4.Viz.Ladder as Ladder
@@ -61,6 +62,11 @@ l4QueryPlan source uriText functionName bindingsJson =
           in case drawn of
             Left _ ->
               encodeJson $ Aeson.object ["error" Aeson..= ("Function not found or not visualizable" :: Text.Text)]
+            -- A refusal the plan cannot read: where whether it is reached turns on the
+            -- data, so no order of the questions is right for it.
+            Right (_, vizState)
+              | Just msg <- Refusal.unreadableRefusalError (Ladder.getUnreadableRefusals vizState) ->
+                  encodeJson $ Aeson.object ["error" Aeson..= msg]
             Right (ladderInfo, vizState) ->
               let -- Build CachedDecisionQuery from viz results
                   (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
