@@ -133,6 +133,9 @@ Where more than one refusal can be the first one reached, `"reasons"` lists each
 In the service, a rule with a refusal in it is drawn as written, not simplified, so its ladder diagram shows it as written too.
 Simplifying distributes `OR` over `AND`, and that can change which refusal evaluation reaches first.
 
+An `IMPLIES` in such a rule is read as the `OR` it stands for: ``adult IMPLIES `the other conditions are not modelled` `` is ``NOT adult OR `the other conditions are not modelled` ``.
+The plan asks `adult`, says `"determined": true` where it is answered `FALSE`, and gives the refusal where it is answered `TRUE`, as evaluation does.
+
 ## Limits
 
 - **The message must be a string literal.**
@@ -144,7 +147,7 @@ Simplifying distributes `OR` over `AND`, and that can change which refusal evalu
 - **The query plan sees a refusal only where it can name one**: a `REFUSE` written as an operand of `AND`, `OR` or `NOT`, or a rule of no inputs that always refuses.
   Everything else is asked, and an answer to it is used by the plan where evaluation would refuse instead.
   That covers a rule of no inputs that refuses on only some paths, because whether it refuses can turn on what the plan does not see, such as the date the rules are read at.
-  It covers a `REFUSE` on an arm of an `IF`, and a refusal inside an `IMPLIES`, each of which the plan asks as part of one question, and a call with inputs to a rule that refuses.
+  It covers a `REFUSE` on an arm of an `IF`, which the plan asks as part of one question, and a call with inputs to a rule that refuses.
   And names are not followed into other files, so a refusal reached only through an `IMPORT` is not seen.
 - **In the editor, the plan follows the ladder as drawn.**
   The editor's wizard plans from the ladder the panel shows, and that ladder is drawn as written unless you switch simplification on.

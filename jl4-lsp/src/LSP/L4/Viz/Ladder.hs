@@ -10,6 +10,7 @@ module LSP.L4.Viz.Ladder (
   -- * VizConfig, VizState
   VizConfig (..),
   mkVizConfig,
+  readingImpliesAsOr,
   VizState,
 
   -- * Viz State helpers
@@ -47,7 +48,7 @@ import L4.Viz.Ladder (InputRef(..), generateAtomId)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
+import qualified L4.Transform as Transform (simplify, eliminateImplies, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import LSP.L4.Viz.VizExpr
   ( ID (..), IRExpr,
     RenderAsLadderInfo (..),
@@ -79,7 +80,14 @@ mkVizConfig lspVerDocId module' substitution shouldSimplify =
     , verDocId = V.fromLspVerDocId lspVerDocId
     , substitution
     , shouldSimplify
+    , readImpliesAsOr = False
     }
+
+-- | Draw each @IMPLIES@ in connective position as the @OR@ it stands for
+-- ('Transform.eliminateImplies'). A rule is otherwise drawn as written, where an
+-- @IMPLIES@ is one leaf that names only the inputs directly under it.
+readingImpliesAsOr :: VizConfig -> VizConfig
+readingImpliesAsOr cfg = cfg { readImpliesAsOr = True }
 
 data VizConfig = MkVizConfig
   { moduleUri      :: !NormalizedUri
@@ -87,6 +95,7 @@ data VizConfig = MkVizConfig
   , verDocId       :: !V.VersionedDocId
   , substitution   :: !TC.Substitution
   , shouldSimplify :: !Bool
+  , readImpliesAsOr :: !Bool
   }
   deriving stock (Show, Generic, Eq)
 
@@ -361,8 +370,13 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
     -- Mirrors 'L4.Viz.Ladder.translateDecide'.
     assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
     shouldSimplify <- getShouldSimplify
+    asOrs          <- (.readImpliesAsOr) <$> getVizCfg
     vid            <- getFresh
-    vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
+    -- Read after 'carameliseExpr', which is what turns a call to the IMPLIES
+    -- function into the 'Implies' node, so that nothing else about the rule moves.
+    -- Mirrors 'L4.Viz.Ladder.translateDecide'.
+    let caramelised = carameliseExpr body
+    vizBody        <- translateExpr shouldSimplify (if asOrs then Transform.eliminateImplies caramelised else caramelised)
     when (readsThrough && V.irExceeds Transform.clauseGroupLadderBudget vizBody) $
       throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
     pure $ V.MkFunDecl

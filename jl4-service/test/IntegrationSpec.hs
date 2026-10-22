@@ -974,6 +974,8 @@ spec = describe "integration" do
     oracle "refuse-deep" refusingDeepJL4 ["adult"]
     -- Inside a disjunction of conjunctions: planned as written, not simplified.
     oracle "refuse-dist" refusingDistributedJL4 ["adult", "resident"]
+    -- On the right of an IMPLIES: reached only where its left side is TRUE.
+    oracle "refuse-implies" refusingImpliesJL4 ["adult"]
 
     it "asks only adult, never the rule that refuses" do
       withServiceFromSources "refuse-asks" [("rule.l4", refusingConditionJL4)] \baseUrl mgr -> do
@@ -1043,14 +1045,21 @@ spec = describe "integration" do
         qpYes <- queryPlan' baseUrl mgr "refuser-with-inputs" "eligible" (args [("adult", True), ("applicant", True)])
         lookupKey "determined" (decodeObject (responseBody qpYes)) `shouldBe` Just (Aeson.Bool True)
 
-    -- An IMPLIES is drawn as one leaf, so a refusal inside it is part of one question.
-    it "still asks an IMPLIES with a refusal in it as one question" do
+    -- An IMPLIES is the OR it stands for: its left side is read first, and a
+    -- refusal on its right only where the left is TRUE.
+    it "reads an IMPLIES left to right: a refusal on its right only where its left is TRUE" do
       withServiceFromSources "refuse-in-implies" [("rule.l4", refusingImpliesJL4)] \baseUrl mgr -> do
-        qp <- queryPlan' baseUrl mgr "refuse-in-implies" "eligible" (args [])
-        let plan = decodeObject (responseBody qp)
-        lookupKey "determined" plan `shouldBe` Just Aeson.Null
-        length (askedLabels plan) `shouldBe` 1
-        lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
+        let planFor bs = do
+              qp <- queryPlan' baseUrl mgr "refuse-in-implies" "eligible" (args bs)
+              statusCode' qp `shouldBe` 200
+              pure (decodeObject (responseBody qp))
+        ask <- planFor []
+        (lookupKey "determined" ask, askedLabels ask, refusalReasons ask) `shouldBe` (Just Aeson.Null, ["adult"], [])
+        no <- planFor [("adult", False)]
+        (lookupKey "determined" no, refusalReasons no) `shouldBe` (Just (Aeson.Bool True), [])
+        yes <- planFor [("adult", True)]
+        (lookupKey "determined" yes, askedLabels yes, refusalReasons yes)
+          `shouldBe` (Just Aeson.Null, [], ["the other conditions are not modelled"])
 
     -- A REFUSE on an arm of an IF is part of the one question the IF is drawn as.
     it "still asks an IF with a REFUSE on one arm as one question" do

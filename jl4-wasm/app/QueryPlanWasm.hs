@@ -49,10 +49,13 @@ l4QueryPlan source uriText functionName bindingsJson =
         else
           -- A ladder with a leaf evaluation can only refuse at is drawn again as
           -- written, as 'Backend.DecisionQueryPlan' does: simplifying can change
-          -- which refusal evaluation reaches first (R7).
-          let draw simplify = Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution simplify functionName
-              drawn = case draw True of
-                Right (_, st) | not (IntMap.null (Ladder.getRefusingAtoms st)) -> draw False
+          -- which refusal evaluation reaches first (R7). Drawn as written, an
+          -- IMPLIES would be one leaf that names only the inputs directly under
+          -- it, so it is read as the OR it stands for.
+          let drawSimplified = Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution True functionName
+              drawAsWritten = Ladder.visualizeByNameImpliesAsOr result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution functionName
+              drawn = case drawSimplified of
+                Right (_, st) | not (IntMap.null (Ladder.getRefusingAtoms st)) -> drawAsWritten
                 other -> other
           in case drawn of
             Left _ ->

@@ -81,6 +81,10 @@ The query plan carries unstable's change in legalese/l4-ide#693, ported by funct
 Both ladders record, by leaf id with its reason, a `REFUSE` written as an operand and a bare reference to such a definition (`getRefusingAtoms`).
 The service and the editor compile those leaves as `BRefuse` nodes, which are not variables of the diagram, and read an expression that holds one as evaluation does, left to right (`compileLazy`).
 The service draws a ladder that holds such a leaf again as written, because simplifying distributes `OR` over `AND` and can change which refusal evaluation reaches first.
+It reads each `IMPLIES` in the rule as the `OR` it stands for (`Transform.eliminateImplies`), because drawn as written an `IMPLIES` is one leaf that names only the inputs directly under it, and the plan answers that leaf from the input it names.
+`a IMPLIES b` and `NOT a OR b` evaluate alike, a refusal included (`Machine.hs:414` and `:416`): `a` first, and `b` only where `a` is `TRUE`.
+Both ladders do it in `translateDecide`, straight after `carameliseExpr`, because a call to the `IMPLIES` function becomes an `Implies` node there and not before; it is a switch on the configuration (`readingImpliesAsOr`, and `visualizeByNameImpliesAsOr` for `jl4-wasm`) that is off for every other caller.
+The browser's plan builder (`jl4-wasm`) makes the same redraw.
 
 What differs from unstable, because `main` lacks what unstable's version stands on:
 
@@ -88,8 +92,9 @@ What differs from unstable, because `main` lacks what unstable's version stands 
   The `refusal` object has the same two keys, `reasons` and `atoms`.
   Measured 2026-10-22 against a build of unstable after #693, the same requests give the same `determined`, the same labels in `stillNeeded` and `asks`, and the same `refusal.reasons` for each set of answers.
   The atom ids differ between the two builds for every atom, `adult` included, so they are not compared.
-- `main`'s ladder has no `IMPLIES` seam, so `compileLazy` has no seam case, and the browser's plan builder (`jl4-wasm`) has nothing to add for one.
-  An `IMPLIES` is one leaf, and a refusal inside it is part of that one question.
+- `main`'s ladder has no `IMPLIES` seam, so `compileLazy` has no seam case.
+  Where unstable plans an `IMPLIES` through its seam, the service and the browser redraw a rule that holds a refusing leaf with each `IMPLIES` read as the `OR` it stands for, and plan that.
+  The editor's ladder is not redrawn.
 - `main` draws an `IF` or a `CONSIDER` as one leaf, so a `REFUSE` on an arm is part of that leaf's question; unstable reaches it.
 - `main` ranks by the number of answers that settle the plan, not by information gain.
   An answer that leads to a refusal counts as settling it, in `ranked` and in the scores of `inputs` and `asks`.
@@ -130,7 +135,7 @@ The `/query-plan` rows were measured on 2026-10-22, after the query plan change 
 
 - **The query plan sees a refusal only where it can name one**: a `REFUSE` written as an operand of `AND`, `OR` or `NOT`, and a definition of no inputs that always refuses.
   Everything else is still asked, and an answer to it is used by the plan where evaluation would refuse.
-  That covers a definition that refuses on only some paths, because whether it refuses can turn on what the plan does not see; a `REFUSE` on an arm of an `IF`; a refusal inside an `IMPLIES`; a call with inputs to a definition that refuses; and a name from another file.
+  That covers a definition that refuses on only some paths, because whether it refuses can turn on what the plan does not see; a `REFUSE` on an arm of an `IF`; a call with inputs to a definition that refuses; and a name from another file.
   The end-to-end tests pin each of these as a control (`jl4-service/test/IntegrationSpec.hs`).
 - **The refusal set `Ref(f)` is not computed.**
   A function does not carry the list of reasons it can refuse for, so nothing warns before it is run, and `l4 verify`, which `main` does not have either, could not treat a refusal specially.

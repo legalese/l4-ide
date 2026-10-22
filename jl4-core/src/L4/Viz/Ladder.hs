@@ -11,6 +11,7 @@ module L4.Viz.Ladder
     visualize
   , visualizeByName
   , visualizeByNameWithState
+  , visualizeByNameImpliesAsOr
   , findAllVisualizableDecides
   , VisualizableDecide(..)
   , VizError(..)
@@ -48,7 +49,7 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
+import qualified L4.Transform as Transform (simplify, eliminateImplies, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import L4.Desugar
 import qualified L4.Refusal as Refusal
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
@@ -109,6 +110,10 @@ data VizState = MkVizState
     -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only
     -- ever refuse at: a @REFUSE@, or a bare reference to a definition that
     -- always refuses. The query plan never asks one (R7).
+  , readImpliesAsOr :: !Bool
+    -- ^ Draw each @IMPLIES@ in connective position as the @OR@ it stands for
+    -- ('Transform.eliminateImplies'). Off unless asked for: a rule is otherwise
+    -- drawn as written, where an @IMPLIES@ is one leaf.
   }
   deriving stock (Generic)
 
@@ -131,6 +136,7 @@ mkInitialState uri mod' subst simp = MkVizState
   , atomInputRefs = Map.empty
   , refusingDefs = Refusal.alwaysRefusing mod'
   , refusingAtoms = Map.empty
+  , readImpliesAsOr = False
   }
 
 ------------------------------------------------------
@@ -228,11 +234,24 @@ visualizeByNameWithState uri uriText version mod' subst simplify targetName =
     Nothing -> Left InvalidProgramNoDecidesFound
     Just decide -> visualizeDecideWithState uri uriText version mod' subst simplify decide
 
+-- | Like 'visualizeByNameWithState', drawn as written (not simplified), with
+-- each @IMPLIES@ in connective position read as the @OR@ it stands for
+-- ('Transform.eliminateImplies'). Drawn as written, an @IMPLIES@ is one leaf that
+-- names only the inputs directly under it.
+visualizeByNameImpliesAsOr :: NormalizedUri -> Text -> Int -> Module Resolved -> TC.Substitution -> Text -> Either VizError (RenderAsLadderInfo, VizState)
+visualizeByNameImpliesAsOr uri uriText version mod' subst targetName =
+  case findDecideByName mod' targetName of
+    Nothing -> Left InvalidProgramNoDecidesFound
+    Just decide -> visualizeDecideFrom (mkInitialState uri mod' subst False & #readImpliesAsOr .~ True) uriText version decide
+
 -- | Internal: visualize a specific Decide, returning both the info and state.
 visualizeDecideWithState :: NormalizedUri -> Text -> Int -> Module Resolved -> TC.Substitution -> Bool -> Decide Resolved -> Either VizError (RenderAsLadderInfo, VizState)
-visualizeDecideWithState uri uriText version mod' subst simplify decide =
+visualizeDecideWithState uri uriText version mod' subst simplify =
+  visualizeDecideFrom (mkInitialState uri mod' subst simplify) uriText version
+
+visualizeDecideFrom :: VizState -> Text -> Int -> Decide Resolved -> Either VizError (RenderAsLadderInfo, VizState)
+visualizeDecideFrom initialState uriText version decide =
   let initialEnv = MkVizEnv { localDecls = [] }
-      initialState = mkInitialState uri mod' subst simplify
       verDocId = MkVersionedDocId uriText version
       (result, finalState) = (vizProgram verDocId decide).getViz initialEnv initialState
   in fmap (, finalState) result
@@ -349,8 +368,12 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   -- Mirrors 'LSP.L4.Viz.Ladder.translateDecide'.
   assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
   shouldSimplify <- getShouldSimplify
+  asOrs <- use #readImpliesAsOr
   vid <- getFresh
-  vizBody <- translateExpr shouldSimplify (carameliseExpr body)
+  -- Read after 'carameliseExpr', which is what turns a call to the IMPLIES
+  -- function into the 'Implies' node, so that nothing else about the rule moves.
+  let caramelised = carameliseExpr body
+  vizBody <- translateExpr shouldSimplify (if asOrs then Transform.eliminateImplies caramelised else caramelised)
   -- The same limit on what is drawn as where a CONSIDER is drawn as rows (see
   -- 'Transform.clauseGroupLadderBudget'). A rule that was not written as
   -- clauses, or whose first clause names each input as the GIVEN does (or is

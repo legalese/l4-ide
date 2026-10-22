@@ -54,6 +54,30 @@ neg e                 = Not emptyAnno e
 implies :: Expr Resolved -> Expr Resolved -> Expr Resolved
 implies e1 e2 = Or emptyAnno (Not emptyAnno e1) e2
 
+-- | Read each @IMPLIES@ in connective position as the @OR@ it stands for, and
+-- change nothing else: no De Morgan, no distribution, nothing inside an @IF@, a
+-- @CONSIDER@ or any other leaf. The positions are those 'nnf' recurses through:
+-- under @AND@, @OR@, @NOT@, @IMPLIES@ and @WHERE@.
+--
+-- @a IMPLIES b@ and @NOT a OR b@ evaluate alike, a refusal included: the machine
+-- reads @a@ first in both, and reads @b@ only where @a@ is @TRUE@
+-- (@IF a THEN b ELSE TRUE@ against @IF (NOT a) THEN TRUE ELSE b@). A drawing
+-- that keeps the written shape of the rest can therefore split an @IMPLIES@
+-- without changing which operand evaluation reaches first.
+--
+-- It reads the nodes, not the calls they start as: a rule's connectives are calls
+-- of builtin functions until 'L4.Desugar.carameliseExpr' turns them into nodes, so
+-- it runs on the caramelised expression.
+-- The annotation of an @IMPLIES@ goes to the @OR@ that replaces it.
+eliminateImplies :: Expr Resolved -> Expr Resolved
+eliminateImplies = \ case
+  Implies ann e1 e2 -> Or ann (Not emptyAnno (eliminateImplies e1)) (eliminateImplies e2)
+  Not ann e         -> Not ann (eliminateImplies e)
+  And ann e1 e2     -> And ann (eliminateImplies e1) (eliminateImplies e2)
+  Or ann e1 e2      -> Or ann (eliminateImplies e1) (eliminateImplies e2)
+  Where ann e ds    -> Where ann (eliminateImplies e) ds
+  e                 -> e
+
 -- | Classically interpret equivalence.
 equiv :: Expr Resolved -> Expr Resolved -> Expr Resolved
 equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)

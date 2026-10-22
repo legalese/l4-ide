@@ -178,18 +178,23 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
       fileName = Text.unpack funName <> ".l4"
       verDocId = mkVerDocId fileName
       -- The module is already fully resolved; an empty substitution is sufficient.
-      draw simplify =
-        case LadderViz.doVisualize decide (LadderViz.mkVizConfig verDocId resolvedModule Map.empty simplify) of
+      draw cfg =
+        case LadderViz.doVisualize decide cfg of
           Left e -> throwError err400 {errBody = Aeson.encode $ object ["error" .= LadderViz.prettyPrintVizError e]}
           Right x -> pure x
+      vizConfig = LadderViz.mkVizConfig verDocId resolvedModule Map.empty
 
   -- A ladder with a leaf evaluation can only refuse at is drawn again as
   -- written. Simplifying distributes OR over AND, which keeps every leaf but can
   -- change which refusal evaluation, reading left to right, reaches first (R7).
-  -- Every other ladder is the simplified one, as before.
-  simplified <- draw True
+  -- Drawn as written, an IMPLIES would be one leaf that names only the inputs
+  -- directly under it, so it is read as the OR it stands for. Every other ladder
+  -- is the simplified one, as before.
+  simplified <- draw (vizConfig True)
   (ladderInfo, vizState) <-
-    if IntMap.null (LadderViz.getRefusingAtoms (snd simplified)) then pure simplified else draw False
+    if IntMap.null (LadderViz.getRefusingAtoms (snd simplified))
+      then pure simplified
+      else draw (LadderViz.readingImpliesAsOr (vizConfig False))
 
   let (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
       -- A leaf evaluation can only refuse at is not a question (R7).

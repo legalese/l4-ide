@@ -1585,8 +1585,8 @@ GIVETH A BOOLEAN
 eligible adult MEANS adult AND REFUSE "the other conditions are not modelled"
 |]
 
--- | A rule of no inputs that always refuses, on the right of an IMPLIES. The
--- ladder draws an IMPLIES as one leaf, so the refusal is part of one question.
+-- | A rule of no inputs that always refuses, on the right of an IMPLIES. It is
+-- reached only where the left side is TRUE.
 refusingImpliesJL4 :: Text
 refusingImpliesJL4 =
   [i|
