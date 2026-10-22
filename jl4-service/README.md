@@ -321,6 +321,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+When the answers so far lead to a refusal, `determined` is `null`, nothing more is asked, and `refusal` holds the reasons `/evaluation` gives for the same answers; it is `null` otherwise (see [REFUSE](../doc/reference/control-flow/REFUSE.md)).
 
 A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
 There are three such answers.

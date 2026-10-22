@@ -46,6 +46,7 @@ What each surface does with a refusal:
 | decision service                 | `EvaluatorRefused`, wire tag `EvaluatorRefused`, HTTP 422 with the bare reason as `contents`; the text `The model refuses to answer:` and the reason is the batch `@error` and the MCP tool result (`isError: true`) | `Backend/Api.hs:253`, `:267`, `Backend/Jl4.hs:714` |
 | trace                            | `↯ refused: <reason>`, in the text trace and in the DOT node label                                                                                                                                                   | `Trace.hs:299`, `GraphViz2.hs:539`                 |
 | REPL, ladder `evalApp`           | `Refused: <reason>`; an error response carrying the reason                                                                                                                                                           | `jl4-repl/app/Main.hs`, `LSP/L4/Actions.hs`        |
+| query plan                       | `"determined": null`, no question asked, and the reasons evaluation gives under `"refusal"`; a refusal that always happens is never in `stillNeeded` or `asks`                                                       | `Refusal.hs`, `BooleanDecisionQuery.hs`            |
 
 An error keeps exit code 1 in `l4 run` (`Run.hs:92`).
 
@@ -73,6 +74,27 @@ Backends that exist on `main` and cannot carry a refusal:
 - The corpus fixtures are unstable's `4fad67ed2`, re-blessed on `main`, with each `#ASSERT REFUSED` rewritten as an `#EVAL` or a plain `#ASSERT`.
   One golden differs from unstable's text: the parse error of `not-ok/tc/refuse-computed-message.l4` reports its range as `11:28-11:28`, where unstable's says `11:28-11:29`.
 
+## The query plan
+
+The query plan carries unstable's change in legalese/l4-ide#693, ported by function (the files it touches differ heavily), in four parts.
+`L4.Refusal.alwaysRefusing` finds the definitions of the module whose evaluation can only refuse: a body that is a `REFUSE`, or names such a definition with no arguments, under a `WHERE` or a `LET`, as the least fixed point.
+Both ladders record, by leaf id with its reason, a `REFUSE` written as an operand and a bare reference to such a definition (`getRefusingAtoms`).
+The service and the editor compile those leaves as `BRefuse` nodes, which are not variables of the diagram, and read an expression that holds one as evaluation does, left to right (`compileLazy`).
+The service draws a ladder that holds such a leaf again as written, because simplifying distributes `OR` over `AND` and can change which refusal evaluation reaches first.
+
+What differs from unstable, because `main` lacks what unstable's version stands on:
+
+- The plan has no `verdict`, so a refusal is `"determined": null` with `"refusal"` set; unstable adds `"verdict": "Refused"`.
+  The `refusal` object has the same two keys, `reasons` and `atoms`.
+  Measured 2026-10-22 against a build of unstable after #693, the same requests give the same `determined`, the same labels in `stillNeeded` and `asks`, and the same `refusal.reasons` for each set of answers.
+  The atom ids differ between the two builds for every atom, `adult` included, so they are not compared.
+- `main`'s ladder has no `IMPLIES` seam, so `compileLazy` has no seam case, and the browser's plan builder (`jl4-wasm`) has nothing to add for one.
+  An `IMPLIES` is one leaf, and a refusal inside it is part of that one question.
+- `main` draws an `IF` or a `CONSIDER` as one leaf, so a `REFUSE` on an arm is part of that leaf's question; unstable reaches it.
+- `main` ranks by the number of answers that settle the plan, not by information gain.
+  An answer that leads to a refusal counts as settling it, in `ranked` and in the scores of `inputs` and `asks`.
+- The unit guard that no boolean decision of `regcf-denovo.l4` has a refusing leaf is not carried: the file is not on `main`.
+
 ## Two defects on `main` that this change depends on fixing
 
 Measured on `main`'s `l4` plus this branch's tests.
@@ -99,18 +121,17 @@ On this branch, with the service started on a one-file deployment: `fee y` refus
 | `/evaluation/batch` with one refusing and one answering case  | 200; `@error` on the first, `value: 100` on the second; `casesIgnored: 1`                                      |
 | `GET …/functions/eligible` and `…/direct`                     | `parameters` lists `adult` only: the refusal is not a parameter, written in the body or reached through a name |
 | MCP `tools/call` of the refusing rule                         | `isError: true`, text `The model refuses to answer: …`                                                         |
-| `/query-plan` of a rule that reaches a refusal through a name | the name is an `ask`; answering it gives `determined: true` or `false`                                         |
-| `/query-plan` of a rule with `REFUSE` in its body             | only the real input is asked; after it, `determined: null` and no asks                                         |
+| `/query-plan` of a rule that reaches a refusal through a name | `adult` true: `determined: null`, no asks, the reason under `refusal`; the name is never an ask                |
+| `/query-plan` of a rule with `REFUSE` in its body             | the same; with `adult` false, both give `determined: false`                                                    |
 
-The two `/query-plan` rows give the same answers on `unstable` (`3823e590d`, its service built separately, the same requests).
+The `/query-plan` rows were measured on 2026-10-22, after the query plan change described above.
 
 ## Limits
 
-- **The questionnaire asks about a refusal.**
-  `/query-plan` treats a named zero-input definition as a yes/no question.
-  That is `main`'s own treatment of any such definition: the control, the same rule with the refusal replaced by `FALSE`, asks the same question.
-  What REFUSE adds is that an answer to the question gives `determined`, where `/evaluation` refuses.
-  The fix is for the plan to know which definitions can refuse, which is the refusal set below.
+- **The query plan sees a refusal only where it can name one**: a `REFUSE` written as an operand of `AND`, `OR` or `NOT`, and a definition of no inputs that always refuses.
+  Everything else is still asked, and an answer to it is used by the plan where evaluation would refuse.
+  That covers a definition that refuses on only some paths, because whether it refuses can turn on what the plan does not see; a `REFUSE` on an arm of an `IF`; a refusal inside an `IMPLIES`; a call with inputs to a definition that refuses; and a name from another file.
+  The end-to-end tests pin each of these as a control (`jl4-service/test/IntegrationSpec.hs`).
 - **The refusal set `Ref(f)` is not computed.**
   A function does not carry the list of reasons it can refuse for, so nothing warns before it is run, and `l4 verify`, which `main` does not have either, could not treat a refusal specially.
 - **The message is a literal.**
@@ -125,5 +146,6 @@ The two `/query-plan` rows give the same answers on `unstable` (`3823e590d`, its
 - `jl4-core/src/L4/Syntax.hs`, `Lexer.hs`, `Parser.hs`, `TypeCheck.hs`, `TypeCheck/Types.hs`, `TypeCheck/Annotation.hs`, `Desugar.hs`, `Print.hs`, `Nlg.hs`, `Parser/ResolveAnnotation.hs`, `StateGraph.hs`, `Lint/AndOrDepth.hs`, `DirectiveFilter.hs`: the expression, from the lexer to the printers.
 - `jl4-core/src/L4/EvaluateLazy/Exceptions.hs`, `Machine.hs`, `Trace.hs`, `GraphViz2.hs`, and `jl4-core/src/L4/EvaluateLazy.hs`: the exception, the outcomes, the renderings.
 - `jl4-core/src/L4/API.hs`, `Diagnostic.hs`, `Export/Document.hs`, `Viz/Ladder.hs`; `jl4-lsp/src/LSP/L4/Rules.hs`, `Inspector.hs`, `Actions.hs`, `Viz/Ladder.hs`; `jl4-repl/app/Main.hs`; `jl4-service/src/Backend/Api.hs`, `Jl4.hs`; `jl4/app/L4/Cli/Run.hs`, `Common.hs`; `jl4-mlir/src/L4/MLIR/Lower.hs`, `Schema.hs`: the surfaces and backends.
-- Tests: `jl4/examples/ok/refuse*.l4` and `jl4/examples/not-ok/tc/refuse-*.l4` with their goldens; `jl4/tests-cli/Main.hs` ("l4 run on REFUSE", "l4 run on a definition whose evaluation raised"); `jl4-service/test/IntegrationSpec.hs` and `SanitizationSpec.hs`; `jl4-mlir/test/Main.hs`.
+- `jl4-core/src/L4/Refusal.hs`; `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs`; `jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs`, `QueryPlan.hs`; `jl4-service/src/Backend/DecisionQueryPlan.hs`, `Schema.hs`; `jl4-wasm/app/QueryPlanWasm.hs`; `ts-shared/jl4-client-rpc/custom-protocol.ts`: the query plan.
+- Tests: `jl4/examples/ok/refuse*.l4` and `jl4/examples/not-ok/tc/refuse-*.l4` with their goldens; `jl4/tests-cli/Main.hs` ("l4 run on REFUSE", "l4 run on a definition whose evaluation raised"); `jl4-service/test/IntegrationSpec.hs` ("query-plan and evaluation agree on refusals"), `SanitizationSpec.hs`, `BooleanDecisionQuerySpec.hs` and `QueryPlanSpec.hs`; `jl4-mlir/test/Main.hs`.
 - Docs: `doc/reference/control-flow/REFUSE.md` and `refuse-example.l4`.
