@@ -46,7 +46,7 @@ What each surface does with a refusal:
 | decision service                 | `EvaluatorRefused`, wire tag `EvaluatorRefused`, HTTP 422 with the bare reason as `contents`; the text `The model refuses to answer:` and the reason is the batch `@error` and the MCP tool result (`isError: true`) | `Backend/Api.hs:253`, `:267`, `Backend/Jl4.hs:714` |
 | trace                            | `↯ refused: <reason>`, in the text trace and in the DOT node label                                                                                                                                                   | `Trace.hs:299`, `GraphViz2.hs:539`                 |
 | REPL, ladder `evalApp`           | `Refused: <reason>`; an error response carrying the reason                                                                                                                                                           | `jl4-repl/app/Main.hs`, `LSP/L4/Actions.hs`        |
-| query plan                       | `"determined": null`, no question asked, and the reasons evaluation gives under `"refusal"`; a refusal that always happens is never in `stillNeeded` or `asks`                                                       | `Refusal.hs`, `BooleanDecisionQuery.hs`            |
+| query plan                       | `"determined": null`, no question asked, and the reasons evaluation gives under `"refusal"`; a refusal the plan reads is never in `stillNeeded` or `asks`; one it cannot read is a 400                               | `Refusal.hs`, `BooleanDecisionQuery.hs`            |
 
 An error keeps exit code 1 in `l4 run` (`Run.hs:92`).
 
@@ -80,11 +80,17 @@ The query plan carries unstable's change in legalese/l4-ide#693, ported by funct
 `L4.Refusal.alwaysRefusing` finds the definitions of the module whose evaluation can only refuse: a body that is a `REFUSE`, or names such a definition with no arguments, under a `WHERE` or a `LET`, as the least fixed point.
 Both ladders record, by leaf id with its reason, a `REFUSE` written as an operand and a bare reference to such a definition (`getRefusingAtoms`).
 The service and the editor compile those leaves as `BRefuse` nodes, which are not variables of the diagram, and read an expression that holds one as evaluation does, left to right (`compileLazy`).
-The service draws a ladder that holds such a leaf again as written, because simplifying distributes `OR` over `AND` and can change which refusal evaluation reaches first.
-It reads each `IMPLIES` in the rule as the `OR` it stands for (`Transform.eliminateImplies`), because drawn as written an `IMPLIES` is one leaf that names only the inputs directly under it, and the plan answers that leaf from the input it names.
+Both ladders also record each leaf that holds a refusal without being one: a `CONSIDER` arm, a comparison operand, a call (`getUnreadableRefusals`, from `Refusal.refusalWithin`).
+The service and the browser's plan builder draw a rule that has either kind of leaf as written and not simplified, because simplifying distributes `OR` over `AND` and can change which refusal evaluation reaches first.
+They spell out each `IMPLIES` and each Boolean `IF` in connective position as the `AND`, `OR` and `NOT` it stands for (`Transform.spellOutConnectives`), because drawn as written each is one leaf that names only the inputs directly under it, and the plan answers that leaf from the input it names.
 `a IMPLIES b` and `NOT a OR b` evaluate alike, a refusal included (`Machine.hs:414` and `:416`): `a` first, and `b` only where `a` is `TRUE`.
-Both ladders do it in `translateDecide`, straight after `carameliseExpr`, because a call to the `IMPLIES` function becomes an `Implies` node there and not before; it is a switch on the configuration (`readingImpliesAsOr`, and `visualizeByNameImpliesAsOr` for `jl4-wasm`) that is off for every other caller.
-The browser's plan builder (`jl4-wasm`) makes the same redraw.
+`IF c THEN t ELSE e` and `(c AND t) OR (NOT c AND e)` evaluate alike for the same reason (`Machine.hs:480`): `c` first, `t` only where `c` is `TRUE`, `e` only where it is `FALSE`.
+The condition is read twice, so one that is a call to a rule with inputs becomes two leaves and `stillNeeded` lists it twice; a condition made of names shares its variables.
+That can only make the plan over-ask.
+Both ladders do it in `translateDecide`, straight after `carameliseExpr`, because a call to the `IMPLIES` function is an `Implies` node only after `carameliseExpr`; it is a switch on the configuration (`spellingOut`, and `visualizeByNameSpelledOut` for `jl4-wasm`) that is off for every other caller.
+After the redraw, a rule that holds a leaf of the second kind is not planned: the service answers 400 with `{"error": …}` and `jl4-wasm` returns the same sentence in its error object (`Refusal.unreadableRefusalError`).
+The sentence names the first such part and its reason, and is cut at 100 characters.
+A reference by name to a rule that refuses on only some paths, and a call with inputs to one, are not leaves of the second kind: they stay questions.
 
 What differs from unstable, because `main` lacks what unstable's version stands on:
 
@@ -93,9 +99,12 @@ What differs from unstable, because `main` lacks what unstable's version stands 
   Measured 2026-10-22 against a build of unstable after #693, the same requests give the same `determined`, the same labels in `stillNeeded` and `asks`, and the same `refusal.reasons` for each set of answers.
   The atom ids differ between the two builds for every atom, `adult` included, so they are not compared.
 - `main`'s ladder has no `IMPLIES` seam, so `compileLazy` has no seam case.
-  Where unstable plans an `IMPLIES` through its seam, the service and the browser redraw a rule that holds a refusing leaf with each `IMPLIES` read as the `OR` it stands for, and plan that.
-  The editor's ladder is not redrawn.
-- `main` draws an `IF` or a `CONSIDER` as one leaf, so a `REFUSE` on an arm is part of that leaf's question; unstable reaches it.
+  Where unstable plans an `IMPLIES` through its seam, the service and the browser spell the `IMPLIES` out and plan that.
+  The editor's ladder is not redrawn, and the REPL's is the simplified one.
+- `main` draws an `IF` or a `CONSIDER` as one leaf.
+  Unstable reaches a refusal on an arm of either; here the service spells out a Boolean `IF` in connective position and reaches it, and answers 400 for a refusal in a `CONSIDER` arm.
+- The plan's `note` carries the sentence about `refusal` only for a rule that has a refusing leaf; any other plan carries the note without that sentence.
+  `jl4-repl`'s `:queryplan` prints `determined: Refused` and a `refusal:` line for each reason.
 - `main` ranks by the number of answers that settle the plan, not by information gain.
   An answer that leads to a refusal counts as settling it, in `ranked` and in the scores of `inputs` and `asks`.
 - The unit guard that no boolean decision of `regcf-denovo.l4` has a refusing leaf is not carried: the file is not on `main`.
@@ -128,15 +137,23 @@ On this branch, with the service started on a one-file deployment: `fee y` refus
 | MCP `tools/call` of the refusing rule                         | `isError: true`, text `The model refuses to answer: …`                                                         |
 | `/query-plan` of a rule that reaches a refusal through a name | `adult` true: `determined: null`, no asks, the reason under `refusal`; the name is never an ask                |
 | `/query-plan` of a rule with `REFUSE` in its body             | the same; with `adult` false, both give `determined: false`                                                    |
+| `/query-plan` of `IF resident THEN TRUE ELSE` a refusal       | asks `resident`; `true` gives `determined: true`, `false` gives `determined: null` and the reason              |
+| `/query-plan` of a rule with a refusal in a comparison        | 400, `{"error": …}` naming the part and the reason; no plan                                                    |
 
 The `/query-plan` rows were measured on 2026-10-22, after the query plan change described above.
 
 ## Limits
 
-- **The query plan sees a refusal only where it can name one**: a `REFUSE` written as an operand of `AND`, `OR` or `NOT`, and a definition of no inputs that always refuses.
-  Everything else is still asked, and an answer to it is used by the plan where evaluation would refuse.
-  That covers a definition that refuses on only some paths, because whether it refuses can turn on what the plan does not see; a `REFUSE` on an arm of an `IF`; a call with inputs to a definition that refuses; and a name from another file.
-  The end-to-end tests pin each of these as a control (`jl4-service/test/IntegrationSpec.hs`).
+- **The query plan reads a refusal only in a few places.**
+  They are the whole rule, and an operand of `AND`, `OR`, `NOT` or `IMPLIES`, or a condition or arm of a Boolean `IF` in one of those places: a `REFUSE`, or a bare reference to a definition of no inputs that always refuses.
+  A refusal in an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, or a call to a definition that always refuses, is a 400.
+  The `impact` of a branch that leads to a refusal shows `determined: null` and `support: []`, as a branch with nothing settled does; the plan's `refusal` for those answers is where it shows.
+- **Some refusals are questions.**
+  A definition of no inputs that refuses on only some paths, because whether it refuses can turn on what the plan does not see; a call with inputs to a definition that refuses on only some paths, where the plan binds the call from the value of the input it names (``adult AND `some paths` applicant`` with `applicant` `FALSE` is `determined: false` where `/evaluation` refuses); and a name from another file.
+  The end-to-end tests pin the first two as controls (`jl4-service/test/IntegrationSpec.hs`).
+- **The editor and the REPL spell out neither an `IF` nor an `IMPLIES`, and answer no 400.**
+  Measured 2026-10-22 on `(IF b THEN c ELSE r1) AND a`, with `a` `FALSE`: both say `determined: false` where `/evaluation` refuses, with simplification on or off.
+  On ``adult AND (`the fee` GREATER THAN 3)`` both list the comparison in `stillNeeded` as a question.
 - **The refusal set `Ref(f)` is not computed.**
   A function does not carry the list of reasons it can refuse for, so nothing warns before it is run, and `l4 verify`, which `main` does not have either, could not treat a refusal specially.
 - **The message is a literal.**
@@ -144,7 +161,7 @@ The `/query-plan` rows were measured on 2026-10-22, after the query plan change 
 - **Order-dependence** under lazy `AND` and `OR`, as above.
 - **Other exporters are not covered because `main` does not have them.**
   A later carry of a DMN, Catala, docassemble, OpenFisca or relational export has to decide what a refusal becomes there, and must not lower it as something a caller could supply.
-- **Not run**: the ladder drawings in an editor (the `/query-plan` response for `direct` carries the ladder, and it contains the `REFUSE` leaf and its message), and the Inspector's conversions (`jl4-lsp` has no test suite on `main`; `L4.API`'s `l4EvalDirective` has the same shape and is tested).
+- **Not run**: the browser's plan builder (`jl4-wasm`), which is type-checked with `ghc -fno-code` and not built or run; the ladder drawings in an editor (the `/query-plan` response for `direct` carries the ladder, and it contains the `REFUSE` leaf and its message), and the Inspector's conversions (`jl4-lsp` has no test suite on `main`; `L4.API`'s `l4EvalDirective` has the same shape and is tested).
 
 ## Where it lives
 

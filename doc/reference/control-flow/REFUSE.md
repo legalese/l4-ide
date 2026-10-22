@@ -99,7 +99,7 @@ An assertion suite must be able to tell a wrong answer from a declined one.
 | the Inspector        | `success` is **absent**, never `false`: a refusal is not a negative verdict. The browser API (`L4.API`) answers `"success": null`                                                                                                                                                                                        |
 | the REPL             | `Refused: ` and the reason                                                                                                                                                                                                                                                                                               |
 | an execution trace   | `↯ refused: <reason>`, a first-class event distinct from a crash, in the `l4 trace` text and in the `--format dot` node label                                                                                                                                                                                            |
-| the query plan       | `"determined": null`, no question asked, and the reason under `"refusal"`. A refusal that always happens is never a question, so a wizard never asks it                                                                                                                                                                  |
+| the query plan       | `"determined": null`, no question asked, and the reason under `"refusal"`. A refusal the plan reads is never a question, so a wizard never asks it; one it cannot read is a 400                                                                                                                                          |
 
 ## The query plan reaches a refusal where evaluation does
 
@@ -122,19 +122,64 @@ Answered `TRUE`, it says `"determined": null`, asks nothing more, and gives the 
 `` `the other conditions are not modelled` `` is never asked, because no answer to it would ever be used: evaluation does not take one, it reaches the `REFUSE`.
 Written the other way round, as `` `the other conditions are not modelled` AND adult ``, the plan shows the refusal before anything is asked, because evaluation reads the refusal first.
 
-The plan treats two things as a refusal that always happens: a `REFUSE` written as an operand of `AND`, `OR` or `NOT`, and a rule of no inputs that always refuses.
+The plan reads a refusal that sits in any of these places:
+
+- the whole rule;
+- an operand of `AND`, `OR`, `NOT` or `IMPLIES`;
+- the condition, or an arm, of an `IF` that itself sits in one of these places, including an `IF` inside an arm of an `IF`.
+
+What it reads there is a `REFUSE`, or a rule of no inputs that always refuses.
 A rule always refuses when its body is a `REFUSE`, or names a rule of no inputs that always refuses, however many steps away; a `WHERE` or `LET` around it makes no difference.
 A rule that refuses on only some paths, such as one ending `ELSE REFUSE "…"`, is a question (see the limits below).
 
 `"refusal"` is `null` in every other answer.
 When it is not, it holds `"reasons"`, the reasons evaluation would give, and `"atoms"`, the refusing leaves the plan reached.
 Where more than one refusal can be the first one reached, `"reasons"` lists each of them.
+An answer that would lead to a refusal shows under `"impact"` as `"determined": null` with `"support": []`, the same as an answer that settles nothing, so send the plan that answer and read its `"refusal"`.
 
 In the service, a rule with a refusal in it is drawn as written, not simplified, so its ladder diagram shows it as written too.
 Simplifying distributes `OR` over `AND`, and that can change which refusal evaluation reaches first.
 
 An `IMPLIES` in such a rule is read as the `OR` it stands for: ``adult IMPLIES `the other conditions are not modelled` `` is ``NOT adult OR `the other conditions are not modelled` ``.
 The plan asks `adult`, says `"determined": true` where it is answered `FALSE`, and gives the refusal where it is answered `TRUE`, as evaluation does.
+
+An `IF` is read as the choice it is: the condition first, and then only the arm the condition picks.
+For this rule:
+
+```l4
+GIVETH A BOOLEAN
+`not encoded for non-residents` MEANS
+    REFUSE "the rules for non-residents are not encoded"
+
+GIVEN resident IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible resident MEANS
+    IF resident
+    THEN TRUE
+    ELSE `not encoded for non-residents`
+```
+
+the plan asks one question, `resident`.
+Answered `TRUE`, it says `"determined": true`; answered `FALSE`, it says `"determined": null` and gives the refusal.
+Beside other operands, as in `(IF b THEN c ELSE r) AND a`, the `IF` is read before the `a` that follows it, so an answer to `a` alone does not settle the plan.
+A condition that is a call to a rule with inputs is read once for each arm, so `stillNeeded` lists it twice; `asks` names its input once.
+
+### A refusal the plan cannot read
+
+Anywhere else a rule can hold a refusal, the service does not plan it: `/query-plan` answers 400 with an `"error"` that says where the first one sits.
+Those places are an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, and a call, with or without inputs, to a rule that always refuses.
+Evaluation reaches a refusal there only when the part around it is evaluated, and the plan has no way to read that part: it could treat it only as one yes-or-no question, which evaluation never asks.
+For ``adult AND (`the fee` GREATER THAN 3)``, where `` `the fee` `` is a rule of no inputs that always refuses, the answer is:
+
+```json
+{
+  "error": "The query plan cannot order the questions for this rule, because a refusal (\"no fee is modelled\") sits inside this part of it: `the fee` GREATER THAN 3"
+}
+```
+
+A long part is cut short with `...`.
+Only the rule being planned is read, so another rule in the same file is planned as any rule is.
+The same call to a rule that answers is planned as a question.
 
 ## Limits
 
@@ -144,15 +189,18 @@ The plan asks `adult`, says `"determined": true` where it is answered `FALSE`, a
 - **Order-dependence under lazy `AND` / `OR`**, as above.
 - **`REFUSE` is a reserved word.**
   A name spelled `REFUSE` must be written in backticks.
-- **The query plan sees a refusal only where it can name one**: a `REFUSE` written as an operand of `AND`, `OR` or `NOT`, or a rule of no inputs that always refuses.
-  Everything else is asked, and an answer to it is used by the plan where evaluation would refuse instead.
-  That covers a rule of no inputs that refuses on only some paths, because whether it refuses can turn on what the plan does not see, such as the date the rules are read at.
-  It covers a `REFUSE` on an arm of an `IF`, which the plan asks as part of one question, and a call with inputs to a rule that refuses.
+- **Some refusals are asked as questions.**
+  A rule of no inputs that refuses on only some paths is a question, because whether it refuses can turn on what the plan does not see, such as the date the rules are read at.
+  The plan uses the answer it is given, where evaluation would evaluate the rule instead, and the rule may refuse.
+  A call with inputs to a rule that refuses on only some paths is a question too: once the input the call names is answered, the plan takes that answer as the call's.
+  With `` `some paths` person MEANS IF person THEN TRUE ELSE REFUSE "…" `` and ``adult AND `some paths` applicant``, the plan says `"determined": false` when `applicant` is answered `FALSE`, where `/evaluation` refuses.
   And names are not followed into other files, so a refusal reached only through an `IMPORT` is not seen.
-- **In the editor, the plan follows the ladder as drawn.**
+- **In the editor and the REPL, the plan follows the ladder as drawn.**
   The editor's wizard plans from the ladder the panel shows, and that ladder is drawn as written unless you switch simplification on.
   With it on, a refusal inside an `OR` of `AND`s can be planned in the simplified order rather than the written one.
   The REPL's `:queryplan` always plans from the simplified ladder.
+  Neither spells out an `IF` or an `IMPLIES`, and neither answers 400.
+  For a rule with a refusal inside an `IF`, they can answer where evaluation refuses, and a refusal in a comparison is listed in `stillNeeded` as a question.
 - **The WASM backend does not run a refusal.**
   An exported function that contains one, or calls a definition that does, is marked unsupported, so the request is answered by the evaluator, which raises the refusal properly.
 - **A batch carries on after a refusal.**
