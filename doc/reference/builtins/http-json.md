@@ -59,6 +59,7 @@ DECIDE `the API key` IS
 | constructor with fields                   | an object of its fields; the constructor's name is not included |
 | `NOTHING`                                 | `null`                                                          |
 | `JUST x`                                  | the JSON for `x`                                                |
+| `LEFT x`, `RIGHT x`                       | an object with the side as its one key: `{"LEFT": x}`           |
 
 ```l4
 DECLARE Person HAS

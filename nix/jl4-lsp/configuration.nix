@@ -6,6 +6,11 @@
 }:
 {
   options.services.jl4-lsp = {
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "run the websocket jl4-lsp; the web editor runs the LSP in the browser from WASM and only falls back to this server";
+    };
     path = lib.mkOption {
       type = lib.types.str;
       default = "/lsp";
@@ -18,7 +23,7 @@
     };
   };
 
-  config.services.nginx.virtualHosts.${config.networking.domain}.locations = {
+  config.services.nginx.virtualHosts.${config.networking.domain}.locations = lib.mkIf config.services.jl4-lsp.enable {
     ${config.services.jl4-lsp.path} = {
       proxyPass = "http://localhost:${toString config.services.jl4-lsp.port}";
       proxyWebsockets = true;
@@ -29,7 +34,7 @@
     };
   };
 
-  config.systemd.services.jl4-lsp = {
+  config.systemd.services.jl4-lsp = lib.mkIf config.services.jl4-lsp.enable {
     enable = true;
     description = "jl4-lsp";
     after = [ "network.target" "nginx.service" ];

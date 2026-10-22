@@ -1,11 +1,11 @@
+IMPORT `date-compat`
+
 § `Day & Date Definitions and Helpers`
 
 -- Library with some basic functions to enable math with dates and days following ISO 8601
 -- Functions return datestamps (Number of days since 1st January 0000).
 -- A week begins on Monday
 -- Check the test/daydate.l4 file to see examples
-
-IMPORT `date-compat`
 
 
 §§ `Constants`
@@ -556,7 +556,9 @@ GIVETH A DATE
 GIVEN date   IS A DATE
 GIVETH A DATE
 `the month before` MEANS
-    Date 1 (DATE_MONTH date MINUS 1) (DATE_YEAR date)
+    IF    DATE_MONTH date EQUALS 1
+    THEN  Date 1 12 (DATE_YEAR date MINUS 1)
+    ELSE  Date 1 (DATE_MONTH date MINUS 1) (DATE_YEAR date)
 
 GIVEN date   IS A DATE
 GIVETH A DATE

@@ -88,7 +88,7 @@ To read the day, month or year of a date as a number, use the built-ins `DATE_DA
 
 ## date-compat
 
-`date-compat` is a separate library for files written before `DATE` became a built-in type. Import it with ``IMPORT `date-compat` `` (the backticks are needed because of the hyphen). `daydate` uses it internally, but importing `daydate` does not make its functions available to you.
+`date-compat` is a separate library for files written before `DATE` became a built-in type. Import it with ``IMPORT `date-compat` `` (the backticks are needed because of the hyphen). `IMPORT daydate` (and so `IMPORT datetime`) also gives you its functions.
 
 | Function                        | Gives  | What it does                                                  |
 | ------------------------------- | ------ | ------------------------------------------------------------- |
