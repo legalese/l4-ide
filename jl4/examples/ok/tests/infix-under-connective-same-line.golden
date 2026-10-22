@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+infix-under-connective-same-line.l4:33:1-9:
+  3
+infix-under-connective-same-line.l4:34:1-16:
+  7
+infix-under-connective-same-line.l4:35:1-9:
+  3
+infix-under-connective-same-line.l4:36:1-18:
+  7
+infix-under-connective-same-line.l4:37:1-20:
+  assertion satisfied
+infix-under-connective-same-line.l4:38:1-27:
+  assertion satisfied
+infix-under-connective-same-line.l4:39:1-20:
+  assertion satisfied
+infix-under-connective-same-line.l4:40:1-29:
+  assertion satisfied
