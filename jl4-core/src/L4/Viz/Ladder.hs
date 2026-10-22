@@ -342,6 +342,12 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   let funName = mkPrettyVizName funResolved
   assign #functionName funName.label
   assign #defsForInlining =<< collectDefsForInlining
+  -- A bare reference to a name is a leaf keyed by the name's unique; every other
+  -- leaf is keyed by a fresh id from 'getFresh'. Starting the fresh ids above
+  -- every unique in the rule keeps the two ranges apart, so a fresh id cannot
+  -- equal a name's unique and make two different propositions one variable.
+  -- Mirrors 'LSP.L4.Viz.Ladder.translateDecide'.
+  assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
   shouldSimplify <- getShouldSimplify
   vid <- getFresh
   vizBody <- translateExpr shouldSimplify (carameliseExpr body)
