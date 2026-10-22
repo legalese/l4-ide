@@ -1,11 +1,11 @@
 # REFUSE (as built)
 
-As built on `main` by the REFUSE change (branch `carve/refuse`).
+As built by the REFUSE change (legalese/l4-ide#697, into `main`).
 Source spec: none on `main`.
 The design is `specs/todo/IMPLICIT-PROPS-DESIGN.md` §11.9 and `specs/todo/PROPS-REDTEAM-2026-09-03.md` §2.8 and §6, which are on `unstable` only.
 The code comes from `unstable`: `75e08b55e` (2026-09-04), with `2cb313e51` (`success` is null) and `288d9bb97` (the DOT render) folded in, and two other carried pieces named under "What is not the same as unstable".
 Line numbers were checked in this branch's tree at the commit before the one that last edited this page; a later edit to the code moves them.
-Measurements are dated 2026-10-14.
+Measurements are dated 2026-10-14, or 2026-10-22 where a line says so.
 The ones that start a service, the WASM backend or a test suite ran on Linux (x86_64, GHC 9.10.3); the `l4` command-line ones ran on a second machine.
 
 Scope: the expression `REFUSE "message"` and the outcomes every surface now distinguishes.
@@ -17,8 +17,8 @@ The directive that asserts a refusal, `#ASSERT REFUSED`, is not here.
 `REFUSE "message"` is an expression at any type that stops evaluation with the author's reason.
 It is a determinate outcome of its own kind: not a value, not an evaluation error, and not a fact the caller could supply.
 
-- `REFUSE` is a keyword and `Refuse Anno (Expr n)` an `Expr`; the word is now reserved (`Lexer.hs:217`, `:302`; `Syntax.hs:290`).
-  A parse error at an expression position now lists `REFUSE` among the tokens it expected (the `l4 run` output of `jl4/experiments/jerseyCharities2-annual-returns.l4` differs in that list and nowhere in its first 30 lines, and that of `jl4/ok/inert/simple.l4` in that list and nowhere else); no existing golden changed.
+- `REFUSE` is a keyword and `Refuse Anno (Expr n)` an `Expr`; the word is reserved (`Lexer.hs:217`, `:302`; `Syntax.hs:290`).
+  A parse error at an expression position lists `REFUSE` among the tokens it expected (the `l4 run` output of `jl4/experiments/jerseyCharities2-annual-returns.l4` differs in that list and nowhere in its first 30 lines, and that of `jl4/ok/inert/simple.l4` in that list and nowhere else); no existing golden changed.
   The message is a string literal: `REFUSE 42` is a type error and `REFUSE (1 PLUS 1)` does not parse (`Parser.hs:2702-2706`, `TypeCheck.hs:2662`).
   A literal keeps the reason readable without running the program and keeps the payload out of the machine's frame stack.
 - It is at any type, because `checkExpr` falls through to infer-then-expect and the fresh inference variable `Refuse` returns unifies with whatever the context expects (`TypeCheck.hs:2652-2664`).
@@ -68,7 +68,7 @@ Backends that exist on `main` and cannot carry a refusal:
   Unstable gives a refusing row the same status and diagnostics.
 - The service's batch endpoint returns a refused case with `@error` (`The model refuses to answer: …`) and counts it in `casesIgnored`.
   Unstable returns `@refused` instead.
-- A refusal is raised by `raiseException`, whose `unwindThunk` (`Machine.hs:243`, in the change under this one) is the blackhole part of unstable's `unwindFrame` and nothing else of it.
+- A refusal is raised by `raiseException`, whose `unwindThunk` (`Machine.hs:243`, which `main` has since the blackhole fix) is the blackhole part of unstable's `unwindFrame` and nothing else of it.
 - The propagation of unsupported flags through the call graph is the first half of unstable's `410a1743f`.
   Its other half gives each lambda-lifted helper its own WASM symbol and refines the overload-collision check; `main` has neither.
 - `doc/test-docs.sh` matches `assertion refused:` as unstable's `5ee1b7ef4` does, without its mention of `#ASSERT REFUSED`.
@@ -120,7 +120,7 @@ Measured on `main`'s `l4` plus this branch's tests.
   `raiseException` pops the stack and drops each `UpdateThunk` frame, which leaves the thunk's blackhole mark behind.
   `` `one over zero` MEANS 1 DIVIDED BY 0 `` with `#EVAL` on it twice prints `Division by zero` and then `Infinite loop detected while trying to evaluate`.
   For a refusal that is the house style (one named definition reached from many arms), so the second arm to reach it would have read as a defect.
-  This is fixed in the change under this one (`unwindThunk`, `Machine.hs:243`), which also has the control: a genuine loop is still reported as a loop at every use.
+  This is fixed by `unwindThunk` (`Machine.hs:243`), which `main` has since the blackhole fix and which keeps the control: a genuine loop is still reported as a loop at every use.
 - **A helper's unsupported flag never reached its export.**
   With `` `not modelled` MEANS REFUSE "not modelled" `` and an export that reaches it only through that name, the REFUSE arm flagged `not modelled`, and the export was still `"supported": true`, so the request would have run in a WASM module that cannot evaluate the refusal (only the flags were checked, not what that module answers).
   `propagateDiagnostics` lifts every diagnostic to all transitive callers, so the same is now true for an `EVENT`, a `FETCH`, a `POST`, an `ENV` or a lambda in a helper: the export is unsupported, where before it was flagged supported over an unsupported helper.
