@@ -60,14 +60,15 @@ Declare the type variable whenever the refusal serves two rules of different typ
 ## Uncatchable
 
 Nothing in the language observes a refusal or converts it into an answer: not a `CONSIDER` over a refusing `MAYBE`, not a boolean connective, not a `LET`, not a `WHERE`.
-There is no catch construct. A refusal stops at the `#EVAL` or `#ASSERT` that reached it, which reports it as its own outcome rather than as a value.
+There is no catch construct.
+A refusal stops at the `#EVAL` or `#ASSERT` that reached it, which reports it as its own outcome rather than as a value.
 
 ### Order matters, and it is left to right
 
 `AND` and `OR` are lazy, so which operand is forced first decides whether a refusal is reached:
 
 ```l4
-#ASSERT NOT (FALSE AND `not modelled`)   -- answers FALSE; the refusal is never forced
+#ASSERT NOT (FALSE AND `not modelled`)   -- holds: the AND answers FALSE and the refusal is never forced
 #EVAL `not modelled` AND FALSE           -- refuses
 ```
 
@@ -204,7 +205,7 @@ The same call to a rule that answers is planned as a question.
 - **The WASM backend does not run a refusal.**
   An exported function that contains one, or calls a definition that does, is marked unsupported, so the request is answered by the evaluator, which raises the refusal properly.
 - **A batch carries on after a refusal.**
-  In `l4 batch` the row's `status` is `refused` and its `result` is `{"refused": {"reason": …}}`; the batch carries on with the next row, and the command still exits 0.
+  In `l4 batch` the row's `status` is `refused`, its `result` is `{"refused": {"reason": …}}` and its `diagnostics` give the reason; the batch carries on with the next row, and the command still exits 0.
   In the service's batch endpoint the case comes back with `@error` set to `The model refuses to answer:` and the reason, and is counted in `casesIgnored`.
 - **Other displays.**
   The ladder and query-plan diagrams draw a refusal written in a rule's body as a labelled leaf, and the document export prints it as prose and does not read it as part of a formula.

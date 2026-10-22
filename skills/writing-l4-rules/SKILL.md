@@ -115,7 +115,7 @@ GIVEN n IS A NUMBER
 - Field access uses the genitive `'s`: `person's age`, `application's employee's nationality`. Note that function arguments bind stronger than genitive. `f r's foo` parses as `(f r)'s foo`, not `f (r's foo)`.
 - Multiple parameters go on one `GIVEN` separated by commas (or wrapped with matching indentation), not successive `GIVEN` lines: `GIVEN a IS A T, b IS A U`.
 
-### Where the source stops: `REFUSE`
+#### Where the source stops: `REFUSE`
 
 When the source text stops short (a commencement date, a relief that turns on facts the encoding does not model, a schedule not yet written), say that the rules decline.
 Do not return a default, which is a wrong answer the caller cannot tell from a right one.
@@ -246,8 +246,9 @@ iterate until the check passes.
   function against many rows, streaming NDJSON output (one object per
   row). `--format json|csv|yaml` and `--output FILE` change the output.
   The run stops at the first failing row and exits 1, unless
-  `--continue-on-error`; `--validate-only` checks the rows against the
-  function's inputs without evaluating.
+  `--continue-on-error`; a row whose rules refuse to answer (`REFUSE`)
+  has status `refused` and is not a failing row; `--validate-only`
+  checks the rows against the function's inputs without evaluating.
 - `l4 trace FILE [--format dot|png|svg] [-o DIR]` — render
   `#EVALTRACE` evaluation traces as GraphViz (PNG/SVG needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
