@@ -163,7 +163,7 @@ eligible resident MEANS
 the plan asks one question, `resident`.
 Answered `TRUE`, it says `"determined": true`; answered `FALSE`, it says `"determined": null` and gives the refusal.
 Beside other operands, as in `(IF b THEN c ELSE r) AND a`, the `IF` is read before the `a` that follows it, so an answer to `a` alone does not settle the plan.
-A condition that is a call to a rule with inputs is read once for each arm, so `stillNeeded` lists it twice; `asks` names its input once.
+A condition that is a call to a rule with inputs is read once for each arm, so `stillNeeded` lists it twice; `asks` names its input once. The plan reads the call itself as the limits below say.
 
 ### A refusal the plan cannot read
 
@@ -193,9 +193,12 @@ The same call to a rule that answers is planned as a question.
 - **Some refusals are asked as questions.**
   A rule of no inputs that refuses on only some paths is a question, because whether it refuses can turn on what the plan does not see, such as the date the rules are read at.
   The plan uses the answer it is given, where evaluation would evaluate the rule instead, and the rule may refuse.
-  A call with inputs to a rule that refuses on only some paths is a question too: once the input the call names is answered, the plan takes that answer as the call's.
-  With `` `some paths` person MEANS IF person THEN TRUE ELSE REFUSE "…" `` and ``adult AND `some paths` applicant``, the plan says `"determined": false` when `applicant` is answered `FALSE`, where `/evaluation` refuses.
   And names are not followed into other files, so a refusal reached only through an `IMPORT` is not seen.
+- **A call with inputs is planned as the input it names.**
+  When a call depends on one input, the plan takes the answer to that input as the call's own, whatever the called rule does with it.
+  So the plan can answer where evaluation answers otherwise, or refuses, and this does not depend on the called rule holding a refusal.
+  With `` `never no` person MEANS NOT person `` and ``adult AND `never no` applicant``, the plan says `"determined": true` when `adult` and `applicant` are `TRUE`, where `/evaluation` says `FALSE`.
+  With `` `some paths` person MEANS IF person THEN TRUE ELSE REFUSE "…" `` and ``adult AND `some paths` applicant``, it says `"determined": false` when `applicant` is `FALSE`, where `/evaluation` refuses.
 - **In the editor and the REPL, the plan follows the ladder as drawn, and does not read a refusal as the service does.**
   The editor's wizard plans from the ladder the panel shows, which is drawn as written unless you switch Simplified on.
   The REPL's `:queryplan` always plans from the simplified ladder.

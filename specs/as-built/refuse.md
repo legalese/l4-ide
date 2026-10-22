@@ -97,7 +97,7 @@ What differs from unstable, because `main` lacks what unstable's version stands 
 
 - The plan has no `verdict`, so a refusal is `"determined": null` with `"refusal"` set; unstable adds `"verdict": "Refused"`.
   The `refusal` object has the same two keys, `reasons` and `atoms`.
-  Measured 2026-10-22 against a build of unstable after #693, the same requests give the same `determined`, the same labels in `stillNeeded` and `asks`, and the same `refusal.reasons` for each set of answers.
+  Measured 2026-10-22 against a build of unstable after #693, the same requests give the same `determined`, the same labels in `stillNeeded` and `asks` (except where unstable asks more, for an `IMPLIES`), and the same `refusal.reasons` for each set of answers.
   The atom ids differ between the two builds for every atom, `adult` included, so they are not compared.
 - `main`'s ladder has no `IMPLIES` seam, so `compileLazy` has no seam case.
   Where unstable plans an `IMPLIES` through its seam, the service and the browser spell the `IMPLIES` out and plan that.
@@ -152,7 +152,11 @@ The `/query-plan` rows were measured on 2026-10-22, after the query plan change 
   A refusal in an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, or a call to a definition that always refuses, is a 400.
   The `impact` of a branch that leads to a refusal shows `determined: null` and `support: []`, as a branch with nothing settled does; the plan's `refusal` for those answers is where it shows.
 - **Some refusals are questions.**
-  A definition of no inputs that refuses on only some paths, because whether it refuses can turn on what the plan does not see; a call with inputs to a definition that refuses on only some paths, where the plan binds the call from the value of the input it names (``adult AND `some paths` applicant`` with `applicant` `FALSE` is `determined: false` where `/evaluation` refuses); and a name from another file.
+  A definition of no inputs that refuses on only some paths, because whether it refuses can turn on what the plan does not see; and a name from another file.
+- **A call with inputs is planned as the input it names, refusal or not.**
+  `queryPlan` binds a call leaf that depends on one input to that input's answer (`keyToLeafUniques`, `jl4-query-plan/src/L4/Decision/QueryPlan.hs`).
+  ``adult AND `never no` applicant`` with `` `never no` person MEANS NOT person `` is `determined: true` for `adult` and `applicant` `TRUE`, where `/evaluation` says `FALSE`; with a called rule that refuses on only some paths it is `determined: false` for `applicant` `FALSE`, where `/evaluation` refuses.
+  Measured 2026-10-22 on `main`, on this branch and on unstable, with the same answers.
   The end-to-end tests pin the first two as controls (`jl4-service/test/IntegrationSpec.hs`).
 - **The editor and the REPL spell out neither an `IF` nor an `IMPLIES`, and answer no 400.**
   Measured 2026-10-22 on `(IF b THEN c ELSE r1) AND a`, with `a` `FALSE`: both say `determined: false` where `/evaluation` refuses, with simplification on or off.
