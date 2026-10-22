@@ -7,6 +7,7 @@ An event records that a party did an action at a time. A list of events is what 
 ```text
 PARTY party DOES action AT time        -- in a #TRACE
 EVENT party action time                -- as a value, for EVALTRACE
+GIVEN e IS AN EVENT party action       -- as a type, for an input
 ```
 
 | Part     | Type            | Meaning                      |
@@ -71,7 +72,28 @@ GIVETH A DEONTIC Person Action
 
 This gives a breach: the deadline at 3 passed with no delivery.
 
-`EVENT` is both the name of the events' type and the function that makes one. Use it to make events; it cannot be written as the type of a `GIVEN` input.
+## EVENT as a type
+
+`EVENT` is both the function that makes an event and the name of the events' type.
+As a type it takes the party type and the action type, so a rule can take an event as an input and read it with `CONSIDER`.
+The time of an event is always a `NUMBER`:
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  delivery
+  payment HAS amount IS A NUMBER
+
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`when it happened` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+#EVAL `when it happened` (EVENT Seller delivery 2)
+```
+
+This gives `2`.
 
 ## Related pages
 

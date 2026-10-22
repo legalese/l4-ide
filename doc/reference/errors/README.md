@@ -25,6 +25,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Branch type mismatch](#branch-type-mismatch)
 - [Wrong number of arguments](#wrong-number-of-arguments)
 - [Argument of the wrong type](#argument-of-the-wrong-type)
+- [Two types with the same name](#two-types-with-the-same-name)
 - [Several definitions with the same name](#several-definitions-with-the-same-name)
 
 **Names and imports**
@@ -352,6 +353,31 @@ DECIDE `the same greeting` IS CONCAT "hello", " world"
 
 ---
 
+### Two types with the same name
+
+**Error:** a type mismatch whose two types are spelled the same, each followed by where it was declared, such as `Verdict (Verdict defined at verdicts.l4:1:9-16)` against `Verdict (Verdict defined at verdicts.l4:3:9-16)`
+
+```l4
+DECLARE Verdict IS ONE OF yes, no
+
+DECLARE Verdict IS ONE OF maybe, perhaps
+
+GIVEN x IS A BOOLEAN
+`pick` MEANS IF x THEN yes ELSE maybe
+```
+
+The file declares two different types called `Verdict`.
+`yes` belongs to the first and `maybe` to the second, so the two branches of the IF have different types, even though both types are called `Verdict`.
+When the two types in a mismatch are spelled the same, L4 adds where each was declared, so that you can tell them apart.
+The numbers after the file name are the line, then the columns.
+
+Naming such a type, for example in a `GIVETH`, gives a different message: [several definitions with the same name](#several-definitions-with-the-same-name), because L4 cannot tell which of the two you mean.
+
+**How to fix it:** Declare each name once.
+Rename one of the two types, or delete the `DECLARE` that repeats the other.
+
+---
+
 ### Several definitions with the same name
 
 **Error:** `There are multiple definitions for the identifier Date and I do not have sufficient information to make a choice between them.`, followed by the candidates and their types
@@ -365,6 +391,12 @@ IMPORT daydate
 
 #EVAL (Date 10 1 2024) `is before` (Date 11 1 2024)
 ```
+
+A type you declare yourself is ambiguous in the same way when it has the name and the number of parameters of a built-in type.
+`DECLARE EVENT party action HAS ...` is one: every use of `EVENT` with two arguments then has two candidates, yours and the built-in one, and so is `DECLARE MAYBE a HAS ...` for `MAYBE`.
+Each such use is reported twice: first `The arities of the types do not match` (`I expected 0 arguments, but I found 2`), then the multiple-definitions error with both candidates.
+Give your type another name.
+A type called `EVENT` with no parameters is not affected, because the built-in `EVENT` takes two.
 
 ---
 
@@ -381,6 +413,7 @@ L4 met a name that nothing in scope defines. The usual causes:
 - **The wrong case.** Keywords and built-in values are upper case: `TRUE` and `FALSE`, not `True` or `true`; `NOTHING`, `JUST`, `LEFT`, `RIGHT`.
 - **An `IMPORT` below a section heading.** `IMPORT` lines count only before the first `§`; one placed after it is ignored, so the names it should bring in are not defined. Move it to the top of the file.
 - **A name defined somewhere it cannot be seen.** A name defined in the `WHERE` or `LET` of one definition exists only inside that definition.
+- **A type that was never declared**, such as `Money` in `GIVEN amount IS A Money`. L4 reports the missing type once. It does not also report that the result of the rule fails to match its signature, because that would only repeat that `Money` is unknown.
 
 **How to fix it:** Correct the spelling, or add the `IMPORT`:
 
