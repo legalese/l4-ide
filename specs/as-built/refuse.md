@@ -63,8 +63,9 @@ Backends that exist on `main` and cannot carry a refusal:
 - `#ASSERT REFUSED [BECAUSE "…"]`, `TKRefused`, `AssertKind` and `FailsBecause` are not here.
   `nfDirective` takes the same `Bool` as before, and `AssertionOutcome` has four constructors where unstable's has five.
 - Not carried because `main` has no such module: the Catala, DMN, docassemble, OpenFisca and relational lowerings, `l4 catala`, and the ledger specs that unstable updated.
-- `l4 batch` gives a refusing row `"status": "success"` and `"result": {"refused": {"reason": …}}`, and carries on with the next row. An erroring row is `"status": "error"` and stops the batch unless `--continue-on-error` is given.
-  Unstable gives it a third status, `refused`.
+- `l4 batch` gives a refusing row `"status": "refused"`, `"result": {"refused": {"reason": …}}` and the reason in `diagnostics`, and carries on with the next row; the command still exits 0.
+  An erroring row is `"status": "error"` and stops the batch unless `--continue-on-error` is given.
+  Unstable gives a refusing row the same status and diagnostics.
 - The service's batch endpoint returns a refused case with `@error` (`The model refuses to answer: …`) and counts it in `casesIgnored`.
   Unstable returns `@refused` instead.
 - A refusal is raised by `raiseException`, whose `unwindThunk` (`Machine.hs:261`, in the change under this one) is the blackhole part of unstable's `unwindFrame` and nothing else of it.

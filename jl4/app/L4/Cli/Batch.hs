@@ -76,6 +76,7 @@ import L4.EvaluateLazy
   , EvalDirectiveValue(..)
   , ReductionOutcome(..)
   , prettyEvalException
+  , prettyRefusal
   )
 import L4.Lexer (showStringLit)
 import L4.Print (prettyLayout)
@@ -359,13 +360,15 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (ReducedErrored …)`.
               -- A row that reached a REFUSE is neither an answer nor a failure:
-              -- it is "refused", its reason sits under the result, and the
-              -- batch carries on (it is not counted as an error).
+              -- it is "refused", its reason sits under the result and in the
+              -- diagnostics, and the batch carries on (it is not counted as an
+              -- error).
               let excMsgs = concatMap resultExceptionMsgs evalResults
+                  refMsgs = concatMap resultRefusalMsgs evalResults
               in if not (null excMsgs)
                    then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
-                   else if any resultRefused evalResults
-                     then ("refused", Aeson.toJSON evalResults, Aeson.Array mempty)
+                   else if not (null refMsgs)
+                     then ("refused", Aeson.toJSON evalResults, Aeson.toJSON refMsgs)
                      else ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
           env = Aeson.object
             [ Key.fromString "input"       Aeson..= input
@@ -379,11 +382,12 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
     -- wrapper and the echoed @input@ all see
     input = declareInputs declared source cells
 
--- | Whether an @#EVAL@ result reached a @REFUSE@: the rules declined to answer.
-resultRefused :: EvalDirectiveResult -> Bool
-resultRefused (MkEvalDirectiveResult _ res _) = case res of
-  Reduction (ReducedRefused _) -> True
-  _                            -> False
+-- | The reasons of an @#EVAL@ result that reached a @REFUSE@: the rules
+-- declined to answer. An empty list means nothing in the row declined.
+resultRefusalMsgs :: EvalDirectiveResult -> [Text]
+resultRefusalMsgs (MkEvalDirectiveResult _ res _) = case res of
+  Reduction (ReducedRefused r) -> prettyRefusal r
+  _                            -> []
 
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.

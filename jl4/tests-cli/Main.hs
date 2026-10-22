@@ -952,6 +952,10 @@ spec bin = do
           refusedRow `shouldSatisfy` ("\"status\":\"refused\"" `isInfixOf`)
           refusedRow `shouldSatisfy`
             ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
+          -- the reason is also in the diagnostics, as an erroring row's message is
+          refusedRow `shouldSatisfy`
+            ("\"diagnostics\":[\"The model refuses to answer:\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"diagnostics\":[]" `isInfixOf`)
           answeredRow `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
           answeredRow `shouldSatisfy` ("\"result\":100" `isInfixOf`)
         other -> expectationFailure ("Expected 2 rows, got " ++ show (length other))
