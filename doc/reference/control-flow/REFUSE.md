@@ -138,8 +138,9 @@ When it is not, it holds `"reasons"`, the reasons evaluation would give, and `"a
 Where more than one refusal can be the first one reached, `"reasons"` lists each of them.
 An answer that would lead to a refusal shows under `"impact"` as `"determined": null` with `"support": []`, the same as an answer that settles nothing, so send the plan that answer and read its `"refusal"`.
 
-In the service, a rule with a refusal in it is drawn as written, not simplified, so its ladder diagram shows it as written too.
+In the service, a rule with a refusal in it is not simplified.
 Simplifying distributes `OR` over `AND`, and that can change which refusal evaluation reaches first.
+The `"ladder"` the response carries is the drawing the plan was made from, with each `IMPLIES` and each Boolean `IF` spelled out as `AND`, `OR` and `NOT`; a rule with only `AND`, `OR` and `NOT` in it is drawn as written.
 
 An `IMPLIES` in such a rule is read as the `OR` it stands for: ``adult IMPLIES `the other conditions are not modelled` `` is ``NOT adult OR `the other conditions are not modelled` ``.
 The plan asks `adult`, says `"determined": true` where it is answered `FALSE`, and gives the refusal where it is answered `TRUE`, as evaluation does.
@@ -168,7 +169,7 @@ A condition that is a call to a rule with inputs is read once for each arm, so `
 ### A refusal the plan cannot read
 
 Anywhere else a rule can hold a refusal, the service does not plan it: `/query-plan` answers 400 with an `"error"` that says where the first one sits.
-Those places are an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, and a call, with or without inputs, to a rule that always refuses.
+Those places are any part that is not an `AND`, `OR`, `NOT`, `IMPLIES` or Boolean `IF`: for example an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, a `LET` binding, and a call, with or without inputs, to a rule that always refuses.
 Evaluation reaches a refusal there only when the part around it is evaluated, and the plan has no way to read that part: it could treat it only as one yes-or-no question, which evaluation never asks.
 For ``adult AND (`the fee` GREATER THAN 3)``, where `` `the fee` `` is a rule of no inputs that always refuses, the answer is:
 
@@ -207,7 +208,8 @@ The same call to a rule that answers is planned as a question.
   With Simplified off, the editor draws an `IMPLIES` as one question and answers it with the value of the one input it names directly, so `b IMPLIES (NOT c)` can be answered wrongly, with a refusal in the rule or without.
   An `IF` whose arms are not single names is drawn as one question in the editor with Simplified on or off and in the REPL, with the same result: `IF b THEN (c AND d) ELSE (NOT d)` can be answered wrongly, with a refusal in the rule or without.
   Neither the editor nor the REPL spells out an `IF` or an `IMPLIES`, and neither answers 400.
-  A refusal inside an `IF` can be answered where evaluation refuses, and a refusal in a comparison is listed in `stillNeeded` as a question.
+  So the plan can answer where evaluation refuses, and report a refusal where evaluation answers: for a refusal inside an `IF`, for a refusal beside an `IMPLIES`, and for the `OR` of `AND`s above.
+  A refusal in a comparison is listed in `stillNeeded` as a question.
 - **The WASM backend does not run a refusal.**
   An exported function that contains one, or calls a definition that does, is marked unsupported, so the request is answered by the evaluator, which raises the refusal properly.
 - **A batch carries on after a refusal.**

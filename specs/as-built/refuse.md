@@ -149,7 +149,7 @@ The `/query-plan` rows were measured on 2026-10-22, after the query plan change 
 
 - **The query plan reads a refusal only in a few places.**
   They are the whole rule, and an operand of `AND`, `OR`, `NOT` or `IMPLIES`, or a condition or arm of a Boolean `IF` in one of those places: a `REFUSE`, or a bare reference to a definition of no inputs that always refuses.
-  A refusal in an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, or a call to a definition that always refuses, is a 400.
+  A refusal in any part that is not an `AND`, `OR`, `NOT`, `IMPLIES` or Boolean `IF`, such as an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, a `LET` binding, or a call to a definition that always refuses, is a 400.
   The `impact` of a branch that leads to a refusal shows `determined: null` and `support: []`, as a branch with nothing settled does; the plan's `refusal` for those answers is where it shows.
 - **Some refusals are questions.**
   A definition of no inputs that refuses on only some paths, because whether it refuses can turn on what the plan does not see; and a name from another file.
