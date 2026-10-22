@@ -76,6 +76,7 @@ module TestData (
   refusingDirectJL4,
   refusingImpliesJL4,
   refusingEitherJL4,
+  leafCollisionJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -1619,3 +1620,41 @@ eligible adult MEANS
     (adult AND `the rules for adults are not modelled`)
     OR ((NOT adult) AND `the rules for minors are not modelled`)
 |]
+
+-- | @n + 1@ rules of no inputs, @p0@ to @pn@, declared before four rules that
+-- each read the last of them (or an input) beside another leaf. A bare name is
+-- keyed by its own unique and any other leaf by a fresh counter, so how many
+-- rules come first moves the name's unique against the counter's range. The
+-- rules are checked at every @n@ in a span, so that no particular numbering is
+-- relied on.
+leafCollisionJL4 :: Int -> Text
+leafCollisionJL4 n =
+  Text.unlines
+    ( concat [["GIVETH A BOOLEAN", "p" <> Text.pack (show k) <> " MEANS TRUE", ""] | k <- [0 .. n]]
+        <> [ "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "lastOrRefuse a b MEANS " <> lastRule <> " OR (REFUSE \"L1\")"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "lastAndRefuse a b MEANS " <> lastRule <> " AND (REFUSE \"L1\")"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "lastAndIf a b MEANS " <> lastRule <> " AND (IF b THEN b ELSE b)"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "inputOrRefuse a b MEANS a OR (REFUSE \"L1\")"
+           ]
+    )
+ where
+  lastRule = "p" <> Text.pack (show n)

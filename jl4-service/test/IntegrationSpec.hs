@@ -57,7 +57,7 @@ import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWra
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
-import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4)
+import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1057,6 +1057,96 @@ spec = describe "integration" do
         lookupKey "determined" plan `shouldBe` Just Aeson.Null
         length (askedLabels plan) `shouldBe` 1
         lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
+
+  -- A bare name is a variable of the diagram keyed by the name's own unique, and
+  -- every other leaf (a REFUSE, an IF, a comparison) by a fresh counter. If the
+  -- two ranges overlap, two different propositions become ONE variable: a
+  -- refusal's reason is read for an ordinary question, or the question is
+  -- answered for the refusal. How many rules come first moves the name's unique
+  -- against the counter's range, so each rule is planned at every number of
+  -- rules before it in a span, and /evaluation is the oracle.
+  describe "query-plan keeps a rule's leaves apart" do
+    let args :: [(Text, Bool)] -> Aeson.Value
+        args bs = Aeson.object ["arguments" Aeson..= Aeson.object [Aeson.Key.fromText k Aeson..= v | (k, v) <- bs]]
+
+        planOf :: String -> Manager -> Text -> Text -> [(Text, Bool)] -> IO (Maybe Aeson.Object)
+        planOf baseUrl mgr dep fn bs = do
+          qp <- queryPlan' baseUrl mgr dep fn (args bs)
+          statusCode' qp `shouldBe` 200
+          pure (decodeObject (responseBody qp))
+
+        reasonsOf :: Maybe Aeson.Object -> [Text]
+        reasonsOf plan = case lookupKey "refusal" plan of
+          Just (Aeson.Object r) | Just (Aeson.Array rs) <- Aeson.KeyMap.lookup "reasons" r -> [t | Aeson.String t <- toList rs]
+          _ -> []
+
+        noRefusal :: Maybe Aeson.Object -> Expectation
+        noRefusal plan = lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
+
+        questions :: Maybe Aeson.Object -> [Text]
+        questions plan = case lookupKey "stillNeeded" plan of
+          Just (Aeson.Array xs) -> [l | Aeson.Object a <- toList xs, Just (Aeson.String l) <- [Aeson.KeyMap.lookup "label" a]]
+          _ -> []
+
+        evaluated :: String -> Manager -> Text -> Text -> [(Text, Bool)] -> IO (Either Text Bool)
+        evaluated baseUrl mgr dep fn bs = do
+          ev <- evalFunction baseUrl mgr dep fn (args bs)
+          case Aeson.decode (responseBody ev) :: Maybe SimpleResponse of
+            Just (SimpleError (EvaluatorRefused reason)) -> pure (Left reason)
+            Just (SimpleResponse r) | Just (FnLitBool b) <- Map.lookup "value" r.fnResult -> pure (Right b)
+            other -> fail ("unexpected evaluation: " <> show other)
+
+    forM_ [0 .. 12 :: Int] \n ->
+      describe ("after " <> show (n + 1) <> " rules of no inputs") do
+        let dep = Text.pack ("collide-" <> show n)
+            lastRule = Text.pack ("p" <> show n)
+            withRules act = withServiceFromSources dep [("rule.l4", leafCollisionJL4 n)] \baseUrl mgr ->
+              act (planOf baseUrl mgr dep) (evaluated baseUrl mgr dep)
+
+        -- OR: TRUE where the rule is; where it is FALSE evaluation reaches the REFUSE.
+        it "the rule OR a REFUSE" $ withRules \plan eval -> do
+          ask <- plan "lastOrRefuse" []
+          (questions ask, reasonsOf ask) `shouldBe` ([lastRule], [])
+          yes <- plan "lastOrRefuse" [(lastRule, True)]
+          (lookupKey "determined" yes, reasonsOf yes) `shouldBe` (Just (Aeson.Bool True), [])
+          noRefusal yes
+          no <- plan "lastOrRefuse" [(lastRule, False)]
+          (lookupKey "determined" no, reasonsOf no) `shouldBe` (Just Aeson.Null, ["L1"])
+          -- The rule is TRUE, so evaluation never reaches the REFUSE.
+          eval "lastOrRefuse" [("a", False), ("b", False)] `shouldReturn` Right True
+
+        -- AND: FALSE where the rule is; where it is TRUE evaluation reaches the REFUSE.
+        it "the rule AND a REFUSE" $ withRules \plan eval -> do
+          ask <- plan "lastAndRefuse" []
+          (questions ask, reasonsOf ask) `shouldBe` ([lastRule], [])
+          yes <- plan "lastAndRefuse" [(lastRule, True)]
+          (lookupKey "determined" yes, reasonsOf yes) `shouldBe` (Just Aeson.Null, ["L1"])
+          no <- plan "lastAndRefuse" [(lastRule, False)]
+          (lookupKey "determined" no, reasonsOf no) `shouldBe` (Just (Aeson.Bool False), [])
+          noRefusal no
+          eval "lastAndRefuse" [("a", False), ("b", False)] `shouldReturn` Left "L1"
+
+        -- An IF is one leaf beside the rule: two questions, and answering the
+        -- rule leaves the IF.
+        it "the rule AND an IF" $ withRules \plan _ -> do
+          ask <- plan "lastAndIf" []
+          length (questions ask) `shouldBe` 2
+          yes <- plan "lastAndIf" [(lastRule, True)]
+          length (questions yes) `shouldBe` 1
+          lookupKey "determined" yes `shouldBe` Just Aeson.Null
+          noRefusal yes
+          no <- plan "lastAndIf" [(lastRule, False)]
+          lookupKey "determined" no `shouldBe` Just (Aeson.Bool False)
+
+        -- An input beside a REFUSE: the plan and evaluation agree on both answers.
+        it "an input OR a REFUSE" $ withRules \plan eval -> do
+          yes <- plan "inputOrRefuse" [("a", True)]
+          (lookupKey "determined" yes, reasonsOf yes) `shouldBe` (Just (Aeson.Bool True), [])
+          noRefusal yes
+          eval "inputOrRefuse" [("a", True), ("b", False)] `shouldReturn` Right True
+          no <- plan "inputOrRefuse" [("a", False)]
+          (lookupKey "determined" no, reasonsOf no) `shouldBe` (Just Aeson.Null, ["L1"])
+          eval "inputOrRefuse" [("a", False), ("b", False)] `shouldReturn` Left "L1"
 
   describe "query-plan" do
     it "returns a query plan with no bindings" do
