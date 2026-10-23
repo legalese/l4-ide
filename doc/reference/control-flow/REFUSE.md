@@ -160,19 +160,8 @@ eligible adult MEANS adult AND `the residence test is met`
 
 ### In VS Code and the REPL
 
-VS Code plans from the ladder its panel shows, drawn as written unless Simplified is switched on, and the REPL's `:queryplan` from the simplified ladder.
-Neither spells out an `IF` or an `IMPLIES`, and neither answers 400, so a part the service cannot read is listed in `stillNeeded` as a question.
-So the plan can answer where evaluation refuses, and report a refusal where evaluation answers.
-Where `r1` and `` `the fee` `` are rules of no inputs that always refuse:
-
-| rule                                     | answers                                | VS Code and the REPL say                               | `/evaluation`                      |
-| ---------------------------------------- | -------------------------------------- | ------------------------------------------------------ | ---------------------------------- |
-| `(IF b THEN c ELSE r1) AND a`            | `a` is `FALSE`                         | `"determined": false`                                  | refuses where `b` is `FALSE`       |
-| ``adult AND (`the fee` GREATER THAN 3)`` | none                                   | the comparison is a question in `stillNeeded`          | refuses wherever `adult` is `TRUE` |
-| `(a AND r1) OR (b AND c)`                | `a` is `FALSE`, `b` and `c` are `TRUE` | refused, in the REPL and in VS Code with Simplified on | `TRUE`                             |
-
-The last is the simplified ladder at work: simplifying distributes the `OR` over the `AND`s, and the plan reaches `r1`, which evaluation never forces once `a` is `FALSE`.
-Plan with the service or the web editor, or check the answer against `/evaluation`.
+- VS Code plans from the ladder its panel shows, drawn as written unless Simplified is switched on, and the REPL's `:queryplan` from the simplified ladder; neither spells out an `IF` or an `IMPLIES`, and neither answers 400, so a part the service cannot read is listed in `stillNeeded` as a question.
+- So the plan can answer where evaluation refuses, and report a refusal where evaluation answers: plan with the service or the web editor, or check against `/evaluation`; the shapes are in `specs/as-built/refuse.md`.
 
 ## Limits
 

@@ -322,7 +322,6 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 
 Returns which inputs are still needed, ranked by impact on the outcome.
 When the answers so far lead to a refusal, `determined` is `null`, nothing more is asked, and `refusal` holds the reasons `/evaluation` gives for the same answers; it is `null` otherwise (see [REFUSE](../doc/reference/control-flow/REFUSE.md)).
-Two kinds of rule are exceptions, where the plan can give a `determined` answer that `/evaluation` does not: one that reaches a refusal only through an `IMPORT`, whose name the plan asks as a question, and one that calls a rule on one of its inputs, as an operand of `AND`, `OR` or `NOT`, or as the condition of an `IF` in a rule that holds a refusal, whose call the plan answers with that input's answer ([REFUSE, Limits](../doc/reference/control-flow/REFUSE.md#limits)).
 
 A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
 There are four such answers.
