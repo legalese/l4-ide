@@ -8,8 +8,8 @@
 -- with no parameters is not ambiguous, because the number of parameters rules
 -- the builtin out; this file is about the two-parameter one.
 --
--- The golden holds the ambiguity, and the arity message the checker also gives
--- for the same use.
+-- The golden holds the ambiguity, with both candidates, and no other error:
+-- the checker does not count the arguments of a name it could not resolve.
 
 DECLARE EVENT party action
   HAS who IS A party

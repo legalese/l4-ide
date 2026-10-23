@@ -22,6 +22,7 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
   `l4 check`, `l4 batch`, `jl4-schema` and the deploy of `jl4-service` all stop at it, as they stop at a function-typed input.
 - After a name that cannot be resolved (out of scope or ambiguous), the checker reports the resolution error, without the internal "should be reported as a bug" error and without the type mismatches that the unresolved name accounts for.
   Other diagnostics built on the unresolved name are still reported (see the limits).
+- A type name that did not resolve is not checked for its number of arguments: a use of it gives the resolution error and no arity error.
 - When two different types print the same (two `DECLARE Verdict`s), a type-mismatch message says where each was declared.
 - `jl4-service` refuses a deploy whose module names an undeclared type, with that error.
 
@@ -31,6 +32,7 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
 - `jl4-core/src/L4/TypeCheck/Types.hs`: `isOutOfScope` (`:706`), `typeHeads` (`:716`), `outOfScopeHeads` (`:726`), `sameModuloOutOfScope` (`:754`) and `getEntityInfo` (`:974`).
 - `jl4-core/src/L4/TypeCheck.hs`: `suppressResolutionCascade` (`:238`), applied to a module's final error list in `doCheckProgramWithDependencies` (`:190`); `prettyMismatchedTypes` (`:5060`), used by `standardTypeMismatch` (`:5028`) and by the `prettyTypeMismatch` arms for a clause input (`:4899`), a CONSIDER pattern scrutinee (`:4911`), IF branches (`:4926`), CONSIDER branches (`:4937`) and LIST literal elements (`:4948`).
 - `jl4-service/src/Compiler.hs`: `isOutOfScope` (`:446`), used by the list of deploy-blocking errors `blockingErrs` (`:204`, `:208`).
+- `jl4-core/src/L4/TypeCheck.hs`: `inferType` (`:1941`) counts the arguments of a type against its kind only when the name resolved; `resolveType` returns kind 0 for a name that did not.
 - `jl4-core/src/L4/Export.hs`: `validateExportInputs` takes the module's entity table and runs one pass for function-typed inputs and one for EVENT; `typeCarriesEvent` reads the table.
   The error is `ExportEventTypeInput` (`jl4-core/src/L4/TypeCheck/Types.hs`), worded in `prettyCheckError` (`TypeCheck.hs`).
 
@@ -61,6 +63,9 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
 ## Diagnostics
 
 - New rendering, pinned by `not-ok/tc/tests/same-name-types-by-constructor.golden`: `Verdict (Verdict defined at same-name-types-by-constructor.l4:21:9-16)` against `Verdict (Verdict defined at same-name-types-by-constructor.l4:23:9-16)`, in the signature message and in the clause-input message.
+- Removed from ordinary output: `The arities of the types do not match. I expected 0 arguments, but I found 2.` for a use of a type name that did not resolve, because kind 0 is the number `resolveType` makes up for a failure.
+  On `main` it came with the resolution error whenever such a name was given arguments: a type of your own named like a built-in one (`DECLARE MAYBE a HAS …`, `DECLARE EVENT party action HAS …`), a parameterised type declared twice, and a type constructor that is not declared (`Duo OF NUMBER, NUMBER` with no `Duo`).
+  A real arity mismatch, such as `MAYBE OF NUMBER, STRING`, is still reported.
 - Removed from ordinary output: `I've encountered a resolved name that has no additional information stored for it: … This is an error in this system and should be reported as a bug.` for a sentinel (the text is at `TypeCheck.hs:4613`), and the matching "namely Verdict but is here of type Verdict" mismatches.
   The same lines also went from the output of the aliased-synonym case described in `tc-soundness.md`.
 
@@ -68,7 +73,7 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
 
 - `jl4-core/test/ResolutionCascadeSpec.hs` (18 examples), including an assertion that "should be reported as a bug" does not appear, cases on both sides of the mentions-versus-accounts-for boundary, and cases that type-check a module importing a module whose type failed to resolve, with and without an unknown name of the importer's own, and with an unknown type of its own as well (the sentinel from the import is kept, the one it reported itself is dropped).
 - `jl4/examples/ok/event-type-resolves.l4` (EVENT in signatures, a CONSIDER on an EVENT, two `#EVAL`s: `alice` and `42`).
-- `jl4/examples/not-ok/tc/resolution-cascade.l4` (an ambiguous type name; the golden holds exactly the one ambiguity error), `not-ok/tc/resolution-cascade-undefined-type.l4` (an undeclared type name; exactly one error), `not-ok/tc/same-name-types-by-constructor.l4` and `not-ok/tc/user-declared-event.l4` (a type of your own named `EVENT`, with two parameters: the ambiguity, and the arity error that comes with it).
+- `jl4/examples/not-ok/tc/resolution-cascade.l4` (an ambiguous type name; the golden holds exactly the one ambiguity error), `not-ok/tc/resolution-cascade-undefined-type.l4` (an undeclared type name; exactly one error), `not-ok/tc/same-name-types-by-constructor.l4` and `not-ok/tc/user-declared-event.l4` (a type of your own named `EVENT`, with two parameters: the ambiguity with both candidates, and no other error).
 - Each fixture has four goldens under its `tests/` directory.
 - `jl4-service/test/IntegrationSpec.hs`: three examples (an undeclared result type and an undeclared input type are refused; a name an expression reads is still published as an input) and three for EVENT inputs (an EVENT input is refused with the message; an input that is a `LIST OF EVENT …` or a record with an EVENT field is refused; a rule that takes the party, the action and the time and builds the event inside is published).
 - `jl4-core/test/ExportValidationSpec.hs`: fifteen examples under "EVENT-typed inputs of an @export": the direct, list, MAYBE, synonym, record-field, sum-type-field, imported-record and ASSUME cases are refused, the message is pinned, and a rule that is not exported, one that builds the event inside, a record without an EVENT and a self-containing record are accepted.
@@ -81,7 +86,7 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
 ## Limits and known defects (verified)
 
 - Suppression covers `TypeMismatch` only (read in code, `TypeCheck.hs:250`), so other diagnostics built on a sentinel are still reported after the resolution error:
-  `GIVEN x IS A Typo` then `x 1 2` also gives "You are trying to apply x of type Typo (which is not a function) to 2 arguments", and a type constructor that is not declared, given arguments (`PAIR OF Typo, NUMBER` with no `PAIR`), also gives "The arities of the types do not match".
+  `GIVEN x IS A Typo` then `x 1 2` also gives "You are trying to apply x of type Typo (which is not a function) to 2 arguments".
 - The filter acts on a module's own error list, and drops a mismatch only when every sentinel in it was reported there.
   A module that imports one whose type failed to resolve did not report that failure, so it reports its mismatches against that type (`The first argument of function ... is expected to be of type Money but is here of type NUMBER`), whether or not it has unknown names of its own.
   The imported module's own check says the type is unknown, and the importer says what it makes of the poisoned type.

@@ -1934,7 +1934,11 @@ inferType g = softprune $ do
     Type ann -> pure (Type ann)
     TyApp ann n ts -> do
       (rn, kind) <- resolveType n
-      checkKind kind ts
+      -- A name that failed to resolve has no kind to count the arguments
+      -- against: 'resolveType' hands back kind 0 for it so that checking can
+      -- go on, and comparing the arguments with that would report "expected 0
+      -- arguments" for a type that takes two. The failure has been reported.
+      unless (isOutOfScope rn) $ checkKind kind ts
       rts <- traverse inferType ts
       pure (TyApp ann rn rts)
     Fun ann onts t -> do

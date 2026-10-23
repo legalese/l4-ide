@@ -395,7 +395,7 @@ IMPORT daydate
 
 A type you declare yourself is ambiguous in the same way when it has the name and the number of parameters of a built-in type.
 `DECLARE EVENT party action HAS ...` is one: every use of `EVENT` with two arguments then has two candidates, yours and the built-in one, and so is `DECLARE MAYBE a HAS ...` for `MAYBE`.
-Each such use is reported twice: first `The arities of the types do not match` (`I expected 0 arguments, but I found 2`), then the multiple-definitions error with both candidates.
+Each such use is reported once, as the multiple-definitions error with both candidates, yours and the built-in one.
 Give your type another name.
 A type called `EVENT` with no parameters is not affected, because the built-in `EVENT` takes two.
 

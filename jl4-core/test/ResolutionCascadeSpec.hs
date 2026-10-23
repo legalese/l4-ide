@@ -67,6 +67,10 @@ isOutOfScopeError :: CheckError -> Bool
 isOutOfScopeError OutOfScopeError {} = True
 isOutOfScopeError _ = False
 
+isKindError :: CheckError -> Bool
+isKindError KindError {} = True
+isKindError _ = False
+
 -- | The issue's repro: two @DECLARE Verdict@s, then a DECIDE whose GIVETH
 -- names the (now ambiguous) type.
 dupDeclare :: Text
@@ -324,6 +328,82 @@ spec = do
       b <- diagnostics (own <> unrelatedName)
       filter isTypeMismatch (kinds a) `shouldBe` []
       filter isTypeMismatch (kinds b) `shouldBe` []
+
+  describe "a type name that did not resolve has no arity to disagree with" $ do
+    -- A name that failed to resolve has no kind of its own, so the arguments
+    -- written after it cannot be counted against anything: "I expected 0
+    -- arguments, but I found 2" would compare them with a number made up for
+    -- the failure. The failure itself is reported, once, and that is all.
+    let source ls = Text.unlines ls
+        ambiguousUse = \ declaration use ->
+          source (declaration <> ["", use, "GIVETH A NUMBER", "f x MEANS 1"])
+
+    it "a type of your own named EVENT with two parameters is reported as the ambiguity only" $ do
+      let src = ambiguousUse
+            [ "DECLARE EVENT party action"
+            , "  HAS who IS A party"
+            , "      what IS AN action"
+            ]
+            "GIVEN x IS AN EVENT STRING NUMBER"
+      ks <- kinds <$> diagnostics src
+      filter isAmbiguousType ks `shouldSatisfy` ((== 1) . length)
+      filter isKindError ks `shouldBe` []
+
+    it "keeps both candidates in the ambiguity" $ do
+      let src = ambiguousUse
+            [ "DECLARE EVENT party action"
+            , "  HAS who IS A party"
+            , "      what IS AN action"
+            ]
+            "GIVEN x IS AN EVENT STRING NUMBER"
+      txt <- rendered src
+      txt `shouldSatisfy` Text.isInfixOf "multiple definitions for the identifier"
+      txt `shouldSatisfy` Text.isInfixOf "EVENT (predefined) of arity 2"
+      Text.count "of arity 2" txt `shouldBe` 2
+
+    it "a type of your own named MAYBE is reported as the ambiguity only" $ do
+      let src = ambiguousUse
+            [ "DECLARE MAYBE a HAS content IS AN a" ]
+            "GIVEN x IS A MAYBE NUMBER"
+      ks <- kinds <$> diagnostics src
+      filter isAmbiguousType ks `shouldSatisfy` ((== 1) . length)
+      filter isKindError ks `shouldBe` []
+
+    it "a parameterised type declared twice is reported as the ambiguity only" $ do
+      let src = ambiguousUse
+            [ "DECLARE Box a HAS content IS AN a"
+            , ""
+            , "DECLARE Box a HAS other IS AN a"
+            ]
+            "GIVEN x IS A Box NUMBER"
+      ks <- kinds <$> diagnostics src
+      filter isAmbiguousType ks `shouldSatisfy` ((== 1) . length)
+      filter isKindError ks `shouldBe` []
+
+    it "an undeclared type constructor given arguments is reported as undeclared only" $ do
+      let src = source ["GIVEN p IS A Duo OF NUMBER, NUMBER", "GIVETH A NUMBER", "f p MEANS 1"]
+      ks <- kinds <$> diagnostics src
+      filter isOutOfScopeError ks `shouldSatisfy` ((== 1) . length)
+      filter isKindError ks `shouldBe` []
+
+    it "control: a built-in type given the wrong number of arguments is still reported" $ do
+      let src = source ["GIVEN x IS A MAYBE OF NUMBER, STRING", "GIVETH A NUMBER", "f x MEANS 1"]
+      ks <- kinds <$> diagnostics src
+      filter isKindError ks `shouldSatisfy` ((== 1) . length)
+
+    it "control: a type of your own named EVENT with no parameters is not ambiguous with the built-in one" $ do
+      -- The number of parameters rules the built-in type out, so there is one
+      -- candidate and nothing to report.
+      let src = source
+            [ "DECLARE EVENT HAS who IS A STRING"
+            , ""
+            , "GIVEN x IS AN EVENT STRING NUMBER"
+            , "GIVETH A NUMBER"
+            , "f x MEANS 1"
+            ]
+      ks <- kinds <$> diagnostics src
+      filter isAmbiguousType ks `shouldBe` []
+      filter isKindError ks `shouldBe` []
 
   describe "same-named types are distinguishable in a mismatch (#920 part 2)" $ do
     it "leaves an ordinary mismatch's rendering alone" $ do

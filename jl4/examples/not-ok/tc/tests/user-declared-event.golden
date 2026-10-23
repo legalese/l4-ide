@@ -8,16 +8,6 @@ File: user-declared-event.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The arities of the types do not match.
-    I expected 0 arguments, but I found 2.
-
-File: user-declared-event.l4
-  Hidden: no
-  Range: 18:12-18:34
-  Source: check
-  Severity: DiagnosticSeverity_Error
-  Code: <none>
-  Message:
     There are multiple definitions for the identifier
 
       EVENT
