@@ -116,6 +116,11 @@ CTL-in-ATL = Alur et al. 2002. FCA strand stays parked (`notes/fca-verdict.md`).
    evaluation staging; Hart's internal point of view + crowding-out as the _semantic_
    (not magnitude) limit — correcting the spec's penalty-size test. See
    `notes/per-party-ordering.md` + `notes/s6-priorart-verdict.md`.
+   **Moral taint (2026-09-23)** is a third sign-case beside fine-is-a-price and the protestor, and the
+   only one that works through `nec` rather than `⪯_p`: a block on a later norm (library: no new loans
+   while a book is overdue) makes the cure a dominator of the goal, so it reorders acts rather than
+   repricing the breach. It requires a history summary in the state space. See `notes/moral-taint.md`
+   and `specs/todo/NORM-LOG-SPEC.md` §3.
 7. **Verification & tooling.** Compile-time: model-check the closed form, double-bind
    = unsat core (loophole / deontic-temporal race condition; TLA+/UPPAAL/SPIN/NuSMV
    lineage). Runtime: monitoring the live event-sourced trace. Transparent partial
@@ -161,6 +166,7 @@ his) pencilled. Consider Ken Satoh only if a PROLEG/defeasibility angle grows.
 - ~~Worked example?~~ → **UCC Art. 9 confirmed**, decoupled from FCA; race-condition
   dropped (temporal mismatch).
 - **Single paper vs faceted split** — deliberately deferred until thoughts are out.
+- **Moral taint in v1?** — third illustration for §6, or a later facet (`notes/moral-taint.md`).
 
 ## Immediate next actions
 
