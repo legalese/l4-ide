@@ -19,6 +19,8 @@
 module L4.Refusal
   ( AlwaysRefusing
   , alwaysRefusing
+  , SometimesRefusing
+  , sometimesRefusing
   , refusalWithin
   , unreadableRefusalError
   , refusalMessage
@@ -80,6 +82,15 @@ refusalWithin known = listToMaybe . mapMaybe here . universe
       App _ r _           -> Map.lookup (getUnique r) known
       AppNamed _ r _ _   -> Map.lookup (getUnique r) known
       _                   -> Nothing
+
+-- | Each definition of the module that refuses on only some paths, with the
+-- reason it refuses with.
+type SometimesRefusing = Map.Map Unique Text
+
+-- | The definitions of the module that refuse on only some paths. Placeholder:
+-- no definition is counted yet.
+sometimesRefusing :: AlwaysRefusing -> Module Resolved -> SometimesRefusing
+sometimesRefusing _ _ = Map.empty
 
 -- | What the query plan answers with, in place of a plan, for a rule that holds
 -- a refusal it cannot read: one sentence that says where the first one sits and

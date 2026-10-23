@@ -331,11 +331,10 @@ agreementTests = do
     testAgreement "adult=True" "eligible" refusingL4 [("adult", True)]
     testAgreement "adult=False" "eligible" refusingL4 [("adult", False)]
 
--- | The note of a plan for a rule with no refusal in it: the text a plan carried
--- before refusals were a thing, byte for byte.
+-- | The note of a plan for a rule with no refusal in it.
 plainNote :: Text
 plainNote =
-  "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
+  "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a UUIDv5 of the function name, the atom label and the inputs the atom reads: the same source gives the same atomId, but a release that corrects which inputs an atom reads gives it another). `inputs` ranks function parameters using a simple dependency-based heuristic."
     <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
 
 noteTests :: Spec

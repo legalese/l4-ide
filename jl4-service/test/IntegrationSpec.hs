@@ -57,7 +57,7 @@ import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWra
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
-import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4, ifBesideRefusalJL4, unreadableRefusalsJL4, coveredWithInputsJL4)
+import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4, ifBesideRefusalJL4, unreadableRefusalsJL4, coveredWithInputsJL4, partlyRefusingWithInputsJL4, partlyRefusingWithNumberJL4, partlyRefusingNoInputsJL4, partlyRefusingChainJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1013,8 +1013,7 @@ spec = describe "integration" do
         lookupKey "determined" plan `shouldBe` Just Aeson.Null
         refusalReasons plan `shouldBe` ["the other conditions are not modelled"]
 
-    -- The guards: a rule that cannot refuse, refuses on only one path, or takes
-    -- inputs is still a question, exactly as before.
+    -- The guard: a rule that cannot refuse is still a question.
     it "still asks a rule of no inputs that cannot refuse" do
       withServiceFromSources "answered-cond" [("rule.l4", answeredConditionJL4)] \baseUrl mgr -> do
         qp <- queryPlan' baseUrl mgr "answered-cond" "eligible" (args [("adult", True)])
@@ -1025,15 +1024,13 @@ spec = describe "integration" do
         qpYes <- queryPlan' baseUrl mgr "answered-cond" "eligible" (args [("adult", True), ("the fee is paid", True)])
         lookupKey "determined" (decodeObject (responseBody qpYes)) `shouldBe` Just (Aeson.Bool True)
 
-    it "still asks a rule of no inputs that refuses on only one path" do
+    it "answers 400 for a rule of no inputs that refuses on only one path" do
       withServiceFromSources "conditional-refuser" [("rule.l4", conditionalRefuserJL4)] \baseUrl mgr -> do
-        qp <- queryPlan' baseUrl mgr "conditional-refuser" "eligible" (args [("adult", True)])
-        let plan = decodeObject (responseBody qp)
-        lookupKey "determined" plan `shouldBe` Just Aeson.Null
-        askedLabels plan `shouldBe` ["the cap applies"]
-        lookupKey "refusal" plan `shouldSatisfy` maybe True (== Aeson.Null)
-        qpYes <- queryPlan' baseUrl mgr "conditional-refuser" "eligible" (args [("adult", True), ("the cap applies", True)])
-        lookupKey "determined" (decodeObject (responseBody qpYes)) `shouldBe` Just (Aeson.Bool True)
+        for_ [[], [("adult", True)], [("adult", True), ("the cap applies", True)]] \bs -> do
+          qp <- queryPlan' baseUrl mgr "conditional-refuser" "eligible" (args bs)
+          let body = decodeObject (responseBody qp)
+          (bs, statusCode' qp) `shouldBe` (bs, 400)
+          lookupKey "error" body `shouldSatisfy` maybe False (\case Aeson.String t -> Text.isInfixOf "the cap applies" t; _ -> False)
 
     -- A call to a rule that always refuses refuses whatever it is given, and the
     -- plan cannot read that: an answer for the input the call names is not an
@@ -1061,7 +1058,7 @@ spec = describe "integration" do
         withServiceFromSources "refuser-sentence" [("rule.l4", refusingWithInputsJL4)] \baseUrl mgr -> do
           (_, body) <- answer baseUrl mgr "refuser-sentence" "eligible" []
           errorOf body
-            `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"coverage is not modelled\") sits inside this part of it: `the person is covered` OF applicant"
+            `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"coverage is not modelled\") can be reached from this part of it: `the person is covered` OF applicant"
 
       it "plans the same call as a question when the rule it calls answers" do
         withServiceFromSources "covered-with-inputs" [("rule.l4", coveredWithInputsJL4)] \baseUrl mgr -> do
@@ -1083,9 +1080,55 @@ spec = describe "integration" do
             status `shouldBe` 400
             let text = errorOf body
             ( Text.isPrefixOf "The query plan cannot order the questions for this rule, because a refusal (" text
-              , Text.isInfixOf ") sits inside this part of it: " text
+              , Text.isInfixOf ") can be reached from this part of it: " text
               , Text.isInfixOf inLabel text )
               `shouldBe` (True, True, True)
+
+      -- A rule that refuses on only some paths is neither an always-refusal nor a
+      -- question: whether a call to it refuses depends on what it is given, or on
+      -- rules the plan does not read. /evaluation refuses where it refuses, and
+      -- the plan, which cannot say where, says so instead of guessing.
+      describe "a rule that refuses on only some paths" do
+        let argsOf :: [(Text, Aeson.Value)] -> Aeson.Value
+            argsOf bs = Aeson.object ["arguments" Aeson..= Aeson.object [Aeson.Key.fromText k Aeson..= v | (k, v) <- bs]]
+            adult b = ("adult", Aeson.Bool b)
+
+            -- The source, what evaluation refuses at, the answers to plan with,
+            -- what the 400 names, and the reason it quotes.
+            cases =
+              [ ( "called with a Boolean input", partlyRefusingWithInputsJL4
+                , [adult True, ("applicant", Aeson.Bool False)]
+                , [[], [adult True], [adult True, ("applicant", Aeson.Bool True)], [adult True, ("applicant", Aeson.Bool False)], [adult False]]
+                , "`the person is insured` OF applicant"
+                , "insurance of an applicant who is not insured is not modelled" )
+              , ( "called with a NUMBER input", partlyRefusingWithNumberJL4
+                , [adult True, ("amount", Aeson.Number 0)]
+                , [[], [adult True], [adult True, ("amount", Aeson.Number 5)], [adult True, ("amount", Aeson.Number 0)], [adult False]]
+                , "`the amount is allowed` OF amount"
+                , "an amount of nothing is not modelled" )
+              , ( "of no inputs", partlyRefusingNoInputsJL4
+                , [adult True]
+                , [[], [adult True], [adult True, ("the residence test is met", Aeson.Bool True)], [adult False]]
+                , "`the residence test is met`"
+                , "the residence test is not modelled once the scheme is closed" )
+              , ( "of no inputs, reached through another rule", partlyRefusingChainJL4
+                , [adult True]
+                , [[], [adult True], [adult False]]
+                , "`the person qualifies by residence`"
+                , "the residence test is not modelled once the scheme is closed" )
+              ]
+
+        for_ cases \(what, src, refusedAt, partials, leaf, reason) ->
+          it ("answers 400 where /evaluation refuses, for a call to a rule " <> what) do
+            let dep = "partly-" <> Text.toLower (Text.map (\c -> if c == ' ' then '-' else c) (Text.pack what))
+            withServiceFromSources dep [("rule.l4", src)] \baseUrl mgr -> do
+              ev <- evalFunction baseUrl mgr dep "eligible" (argsOf refusedAt)
+              statusCode' ev `shouldBe` 422
+              for_ partials \bs -> do
+                qp <- queryPlan' baseUrl mgr dep "eligible" (argsOf bs)
+                (map fst bs, statusCode' qp) `shouldBe` (map fst bs, 400)
+                errorOf (decodeObject (responseBody qp))
+                  `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"" <> reason <> "\") can be reached from this part of it: " <> leaf
 
       it "plans a rule of the same module that holds no refusal" do
         withServiceFromSources "unreadable-clean" [("rule.l4", unreadableRefusalsJL4)] \baseUrl mgr -> do

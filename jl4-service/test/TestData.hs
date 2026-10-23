@@ -81,6 +81,10 @@ module TestData (
   ifBesideRefusalJL4,
   unreadableRefusalsJL4,
   coveredWithInputsJL4,
+  partlyRefusingWithInputsJL4,
+  partlyRefusingWithNumberJL4,
+  partlyRefusingNoInputsJL4,
+  partlyRefusingChainJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -1724,6 +1728,85 @@ GIVEN adult IS A BOOLEAN
       applicant IS A BOOLEAN
 GIVETH A BOOLEAN
 eligible adult applicant MEANS adult AND `the person is covered` applicant
+|]
+
+-- | A call to a rule WITH an input that refuses on only some paths: where the
+-- applicant is not insured, and the adult is, evaluation refuses. The plan can
+-- neither ask the call as a question nor report the refusal, so it answers 400.
+partlyRefusingWithInputsJL4 :: Text
+partlyRefusingWithInputsJL4 =
+  [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance of an applicant who is not insured is not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult applicant MEANS adult AND `the person is insured` applicant
+|]
+
+-- | The same with a NUMBER input, where the call is not drawn as a function of
+-- Booleans but as one leaf.
+partlyRefusingWithNumberJL4 :: Text
+partlyRefusingWithNumberJL4 =
+  [i|
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`the amount is allowed` amount MEANS
+    IF amount GREATER THAN 0 THEN TRUE
+    ELSE REFUSE "an amount of nothing is not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      amount IS A NUMBER
+GIVETH A BOOLEAN
+eligible adult amount MEANS adult AND `the amount is allowed` amount
+|]
+
+-- | A rule of no inputs that refuses on only some paths: the scheme is not open,
+-- so evaluation refuses wherever the residence test is read. The plan cannot ask
+-- the test as a question, since it does not read the rule that decides it.
+partlyRefusingNoInputsJL4 :: Text
+partlyRefusingNoInputsJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the scheme is open` MEANS FALSE
+
+GIVETH A BOOLEAN
+`the residence test is met` MEANS
+    IF `the scheme is open` THEN TRUE
+    ELSE REFUSE "the residence test is not modelled once the scheme is closed"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the residence test is met`
+|]
+
+-- | The rule that refuses on some paths is reached through a second rule, which
+-- is only a name for it.
+partlyRefusingChainJL4 :: Text
+partlyRefusingChainJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the scheme is open` MEANS FALSE
+
+GIVETH A BOOLEAN
+`the residence test is met` MEANS
+    IF `the scheme is open` THEN TRUE
+    ELSE REFUSE "the residence test is not modelled once the scheme is closed"
+
+GIVETH A BOOLEAN
+`the person qualifies by residence` MEANS `the residence test is met`
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the person qualifies by residence`
 |]
 
 -- | Refusals in the places the plan cannot read: an arm of a CONSIDER, an
