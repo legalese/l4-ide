@@ -175,7 +175,7 @@ Result:
     the scheme began in 2016, so no funding limit exists before then
 ```
 
-`#ASSERT NOT` over the same expression reports the refusal too: `NOT` has to know the value, and there is none. A refusal is an answer of its own kind and not a crash, so `l4 run` exits `0`; in `--json` the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"refused"`, not under `"error"`. [REFUSE](../../reference/control-flow/REFUSE.md) has the rest.
+`#ASSERT NOT` over the same expression reports the refusal too: `NOT` has to know the value, and there is none. A refusal is an outcome of its own kind and not a crash, so `l4 run` exits `0`; in `--json` the result keeps `"kind": "assertion"` with `"value": null` and the reason under `"refused"`, not under `"error"`. [REFUSE](../../reference/control-flow/REFUSE.md) has the rest.
 
 `l4 run` exits with a non-zero code for type errors and for directives that fail while evaluating, but **not** for a failed assertion or a refusal: the file is still valid L4, so the exit code is `0`. In CI, look for them explicitly: grep the output for `assertion failed` and `assertion refused`, or run `l4 run --json` and check that each result whose `"kind"` is `"assertion"` has `"value": true`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
 

@@ -388,7 +388,7 @@ Every case that is run produces one line, or one item with `--format json` or `y
 `status` is one of three words:
 
 - `success`: the rules gave an answer.
-- `refused`: the rules declined to answer. They reached a [`REFUSE`](../../reference/control-flow/REFUSE.md), the `result` is `{"refused": {"reason": …}}`, and `diagnostics` says why. That is an answer, not a failure: the batch carries on with the next case, and the case does not count as an `error`.
+- `refused`: the rules declined to answer. They reached a [`REFUSE`](../../reference/control-flow/REFUSE.md), the `result` is `{"refused": {"reason": …}}`, and `diagnostics` says why. That is an outcome, not a failure: the batch carries on with the next case, and the case does not count as an `error`.
 - `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, a CSV line has a different number of cells from the header, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
 
 The command exits with status 0 when every case was `success` or `refused`, and 1 when any case was `error`, once every case that was going to run has run.
