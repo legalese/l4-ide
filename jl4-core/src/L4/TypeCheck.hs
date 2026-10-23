@@ -231,27 +231,38 @@ doCheckProgramWithDependencies checkState checkEnv program =
 --   mismatch is reported. What we drop is only the contentless kind: @⊥@
 --   against anything, @LIST OF ⊥@ against @LIST OF NUMBER@.
 --
--- * We only filter at all when a resolution failure is present in the same
---   list, and resolution failures are themselves never dropped. So the error
---   list can never be emptied by this function: a file that failed to check
---   still fails to check, and still says why.
+-- * We only drop it when every sentinel in it is one whose failure is reported
+--   in this very list. A sentinel is identified by the 'Name' at which
+--   resolution failed, which is also the 'Name' in the error that reported it
+--   (see 'outOfScopeHeads'). A module that imports a module whose type failed
+--   to resolve inherits the poisoned type without having reported anything
+--   about it, so its mismatches against that type are the only message it has
+--   for the problem and stay — whatever else the importer reports, so an
+--   unrelated unknown name of its own makes no difference. Resolution failures
+--   themselves are never dropped, so the error list can never be emptied by this
+--   function: a file that failed to check still fails to check, and still says
+--   why.
 suppressResolutionCascade :: [CheckErrorWithContext] -> [CheckErrorWithContext]
-suppressResolutionCascade errs
-  | any (isResolutionFailure . (.kind)) errs = filter (not . isCascade . (.kind)) errs
-  | otherwise                                = errs
+suppressResolutionCascade errs = filter (not . isCascade . (.kind)) errs
   where
-    isResolutionFailure :: CheckError -> Bool
-    isResolutionFailure = \ case
-      OutOfScopeError    {} -> True
-      AmbiguousTermError {} -> True
-      AmbiguousTypeError {} -> True
-      _                     -> False
+    -- The 'Name' of every resolution failure reported in this list.
+    reported :: Set.Set Name
+    reported = Set.fromList (mapMaybe (failedName . (.kind)) errs)
+
+    failedName :: CheckError -> Maybe Name
+    failedName = \ case
+      OutOfScopeError    n _ -> Just n
+      AmbiguousTermError n _ -> Just n
+      AmbiguousTypeError n _ -> Just n
+      _                      -> Nothing
 
     isCascade :: CheckError -> Bool
     isCascade = \ case
       TypeMismatch _ec expected given ->
-        (mentionsOutOfScope expected || mentionsOutOfScope given)
-          && sameModuloOutOfScope expected given
+        let sentinels = outOfScopeHeads expected ++ outOfScopeHeads given
+        in not (null sentinels)
+             && all ((`Set.member` reported) . getActual) sentinels
+             && sameModuloOutOfScope expected given
       _ -> False
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)

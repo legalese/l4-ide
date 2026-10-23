@@ -220,11 +220,12 @@ spec = do
       filter isTypeMismatch ks `shouldBe` []
 
     it "keeps an importer's mismatches against a name that failed to resolve in its import" $ do
-      -- The failure is in @lib@, so the importer's own list holds no resolution
-      -- failure: the filter must stay off, and the importer keeps what it
-      -- reports about the poisoned type (`Money`), alongside its own genuine
-      -- BOOLEAN-versus-NUMBER error. Without the guard, the filter would drop
-      -- every mismatch that mentions `Money` and leave only the genuine one.
+      -- The failure is in @lib@, so the importer's own list holds no failure
+      -- for @Money@: the sentinels in the importer's types were made by the
+      -- other module, and the importer has not reported them. It keeps what it
+      -- says about the poisoned type (`Money`), alongside its own genuine
+      -- BOOLEAN-versus-NUMBER error. A filter that dropped every mismatch that
+      -- mentions @Money@ would leave only the genuine one.
       let lib =
             Text.unlines
               [ "GIVEN amount IS A Money"
@@ -257,6 +258,72 @@ spec = do
       -- to check still fails to check.
       ks <- kinds <$> diagnostics dupDeclare
       ks `shouldNotBe` []
+
+  describe "the filter does not depend on errors that have nothing to do with the mismatch" $ do
+    -- @lib@ uses a type nobody declared, so the type of `total due` is poisoned
+    -- in every module that imports it. Whether an importer reports a mismatch
+    -- against that type must not depend on whether the importer happens to
+    -- have an unknown name of its own somewhere else.
+    let lib =
+          Text.unlines
+            [ "GIVEN amount IS A Money"
+            , "GIVETH A NUMBER"
+            , "`total due` MEANS amount"
+            ]
+        callIt =
+          Text.unlines
+            [ "IMPORT lib"
+            , ""
+            , "GIVETH A NUMBER"
+            , "x MEANS `total due` 5"
+            ]
+        unrelatedName =
+          Text.unlines
+            [ ""
+            , "GIVETH A NUMBER"
+            , "y MEANS `no such name`"
+            ]
+        mismatchTexts errs =
+          [ Text.unlines (prettyCheckErrorWithContext e) | e <- errs, isTypeMismatch e.kind ]
+
+    it "an importer reports its mismatch against the imported poisoned type" $ do
+      errs <- diagnosticsWithLib lib callIt
+      length (mismatchTexts errs) `shouldBe` 1
+      mismatchTexts errs `shouldSatisfy` all (Text.isInfixOf "  Money")
+
+    it "reports exactly the same mismatch when the importer also has an unknown name of its own" $ do
+      alone <- diagnosticsWithLib lib callIt
+      withOther <- diagnosticsWithLib lib (callIt <> unrelatedName)
+      filter isOutOfScopeError (kinds withOther) `shouldSatisfy` ((== 1) . length)
+      mismatchTexts withOther `shouldBe` mismatchTexts alone
+
+    it "drops the cascade of the importer's own unknown type and keeps the imported one's" $ do
+      -- Two poisoned types in one module, told apart by which module reported
+      -- them: `Typo` is the importer's own failure and what it leads to is
+      -- dropped, `Money` was reported by @lib@ and the importer's mismatch
+      -- about it stays.
+      let src =
+            callIt
+              <> Text.unlines
+                [ ""
+                , "GIVEN t IS A Typo"
+                , "GIVETH A Typo"
+                , "h MEANS t"
+                ]
+      errs <- diagnosticsWithLib lib src
+      filter isOutOfScopeError (kinds errs) `shouldSatisfy` ((== 2) . length)
+      length (mismatchTexts errs) `shouldBe` 1
+      mismatchTexts errs `shouldSatisfy` all (Text.isInfixOf "  Money")
+
+    it "within one module, drops the cascade of its own unknown type with or without an unrelated unknown name" $ do
+      -- The control: the unknown type is this module's own failure, so the
+      -- mismatch against it is dropped, and an unrelated unknown name next to
+      -- it changes nothing.
+      let own = lib <> Text.unlines ["", "GIVETH A NUMBER", "x MEANS `total due` 5"]
+      a <- diagnostics own
+      b <- diagnostics (own <> unrelatedName)
+      filter isTypeMismatch (kinds a) `shouldBe` []
+      filter isTypeMismatch (kinds b) `shouldBe` []
 
   describe "same-named types are distinguishable in a mismatch (#920 part 2)" $ do
     it "leaves an ordinary mismatch's rendering alone" $ do

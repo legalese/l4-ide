@@ -725,17 +725,23 @@ typeHeads (Fun _ onts t)  =
 typeHeads (Forall _ _ t)  = typeHeads t
 typeHeads (InfVar _ _ _)  = []
 
--- | Does this type mention a name-resolution failure sentinel anywhere?
--- Such a type is poisoned: we do not know what it was supposed to be.
-mentionsOutOfScope :: Type' Resolved -> Bool
-mentionsOutOfScope = any isOutOfScope . typeHeads
+-- | Every name-resolution failure sentinel in the type. A type with any is
+-- poisoned: we do not know what it was supposed to be.
+--
+-- A sentinel carries the 'Name' at which resolution failed, with its source
+-- range and module, and that is the same 'Name' as in the 'OutOfScopeError' \/
+-- 'AmbiguousTermError' \/ 'AmbiguousTypeError' that was reported for it. So the
+-- module that reported the failure can be told from one that only inherited the
+-- sentinel through an import: only the first holds an error with that 'Name'.
+outOfScopeHeads :: Type' Resolved -> [Resolved]
+outOfScopeHeads = filter isOutOfScope . typeHeads
 
 -- | Are these two types the same once every name-resolution sentinel is read as
 -- a wildcard matching anything?
 --
 -- This is the test for \"the mismatch between them is /caused by/ a resolution
 -- failure\", and it is much stronger than \"one of them /mentions/ a resolution
--- failure somewhere\" — which is all 'mentionsOutOfScope' can say, being a
+-- failure somewhere\" — which is all 'outOfScopeHeads' can say, being a
 -- whole-type predicate. A single poisoned sub-term is not licence to delete a
 -- diagnostic whose actual discrepancy lies between two types we did resolve:
 --

@@ -28,7 +28,7 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
 ## Where it lives
 
 - `jl4-core/src/L4/TypeCheck/Environment.hs`: `initialEnvironment` (`:844`) is built with `Map.fromListWith (flip List.union)` (`:846`); EVENT is two ordinary entries, the type (`:869`) and the constructor (`:870`).
-- `jl4-core/src/L4/TypeCheck/Types.hs`: `isOutOfScope` (`:706`), `typeHeads` (`:716`), `mentionsOutOfScope` (`:726`), `sameModuloOutOfScope` (`:754`) and `getEntityInfo` (`:974`).
+- `jl4-core/src/L4/TypeCheck/Types.hs`: `isOutOfScope` (`:706`), `typeHeads` (`:716`), `outOfScopeHeads` (`:726`), `sameModuloOutOfScope` (`:754`) and `getEntityInfo` (`:974`).
 - `jl4-core/src/L4/TypeCheck.hs`: `suppressResolutionCascade` (`:238`), applied to a module's final error list in `doCheckProgramWithDependencies` (`:190`); `prettyMismatchedTypes` (`:5060`), used by `standardTypeMismatch` (`:5028`) and by the `prettyTypeMismatch` arms for a clause input (`:4899`), a CONSIDER pattern scrutinee (`:4911`), IF branches (`:4926`), CONSIDER branches (`:4937`) and LIST literal elements (`:4948`).
 - `jl4-service/src/Compiler.hs`: `isOutOfScope` (`:446`), used by the list of deploy-blocking errors `blockingErrs` (`:204`, `:208`).
 - `jl4-core/src/L4/Export.hs`: `validateExportInputs` takes the module's entity table and runs one pass for function-typed inputs and one for EVENT; `typeCarriesEvent` reads the table.
@@ -41,7 +41,9 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
   EVENT is the only key that two entries of the table share: the table has 97 entries and 96 keys (counted at the time of writing), and the other keys that hold several uniques are the four comparison operators, which list them in one entry by design (measured by listing `initialEnvironment`'s keys that hold more than one unique).
 - **Sentinels.** A failed resolution reports the real error and returns an `OutOfScope` sentinel whose unique is never registered in `EntityInfo`.
   `getEntityInfo` returns `Nothing` silently for a sentinel (`Types.hs:980`) and still reports `MissingEntityInfo` for any other miss (`Types.hs:982`).
-- **Cascade suppression.** Only when the list contains an `OutOfScopeError`, `AmbiguousTermError` or `AmbiguousTypeError` (`TypeCheck.hs:243`), drop each `TypeMismatch` that both mentions a sentinel and is the same on both sides once sentinels are treated as wildcards (`TypeCheck.hs:250`, `sameModuloOutOfScope`).
+- **Cascade suppression.** Drop each `TypeMismatch` that is the same on both sides once sentinels are treated as wildcards (`TypeCheck.hs:250`, `sameModuloOutOfScope`) and whose sentinels were all reported in this list.
+  A sentinel carries the `Name` at which resolution failed, with its range and module, and the `OutOfScopeError`, `AmbiguousTermError` or `AmbiguousTypeError` that reported it carries the same `Name`; the filter collects those names from the list and looks each sentinel up (`TypeCheck.hs:243`).
+  A sentinel that this module inherited through an import has the name from the other module, which the list does not hold, so a mismatch that mentions one is kept.
   A mismatch that differs somewhere else survives: NUMBER against `LIST OF <unresolved>` is kept, `LIST OF <unresolved>` against `LIST OF NUMBER` is dropped.
   Resolution failures themselves are never dropped, so a failing module still fails and still says why: `l4 check` still exits 1 on it, and the deploy gate refuses it.
   Filtering happens on the finished list, so resolution, pruning and overload selection are unchanged.
@@ -64,7 +66,7 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
 
 ## Tests and fixtures that pin it
 
-- `jl4-core/test/ResolutionCascadeSpec.hs` (18 examples), including an assertion that "should be reported as a bug" does not appear, cases on both sides of the mentions-versus-accounts-for boundary, and one that type-checks a module importing a module whose type failed to resolve (the guard that keeps the filter off).
+- `jl4-core/test/ResolutionCascadeSpec.hs` (18 examples), including an assertion that "should be reported as a bug" does not appear, cases on both sides of the mentions-versus-accounts-for boundary, and cases that type-check a module importing a module whose type failed to resolve, with and without an unknown name of the importer's own, and with an unknown type of its own as well (the sentinel from the import is kept, the one it reported itself is dropped).
 - `jl4/examples/ok/event-type-resolves.l4` (EVENT in signatures, a CONSIDER on an EVENT, two `#EVAL`s: `alice` and `42`).
 - `jl4/examples/not-ok/tc/resolution-cascade.l4` (an ambiguous type name; the golden holds exactly the one ambiguity error), `not-ok/tc/resolution-cascade-undefined-type.l4` (an undeclared type name; exactly one error), `not-ok/tc/same-name-types-by-constructor.l4` and `not-ok/tc/user-declared-event.l4` (a type of your own named `EVENT`, with two parameters: the ambiguity, and the arity error that comes with it).
 - Each fixture has four goldens under its `tests/` directory.
@@ -80,8 +82,9 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
 
 - Suppression covers `TypeMismatch` only (read in code, `TypeCheck.hs:250`), so other diagnostics built on a sentinel are still reported after the resolution error:
   `GIVEN x IS A Typo` then `x 1 2` also gives "You are trying to apply x of type Typo (which is not a function) to 2 arguments", and a type constructor that is not declared, given arguments (`PAIR OF Typo, NUMBER` with no `PAIR`), also gives "The arities of the types do not match".
-- The filter acts on a module's own error list, only when that list holds a resolution failure.
-  A module that imports one whose type failed to resolve has no failure of its own, so it still reports its mismatches against that type (`The first argument of function ... is expected to be of type Money but is here of type NUMBER`).
+- The filter acts on a module's own error list, and drops a mismatch only when every sentinel in it was reported there.
+  A module that imports one whose type failed to resolve did not report that failure, so it reports its mismatches against that type (`The first argument of function ... is expected to be of type Money but is here of type NUMBER`), whether or not it has unknown names of its own.
+  The imported module's own check says the type is unknown, and the importer says what it makes of the poisoned type.
 - An ambiguous type name can hide a real mismatch until the ambiguity is fixed: with two `DECLARE Verdict`, `GIVEN x IS A Verdict`, `GIVETH A NUMBER` and `f x MEANS x` give the ambiguity and nothing else, and the `Verdict`-versus-`NUMBER` mismatch appears once one declaration is removed.
   The filter never empties the error list of a failing module (read in code), and every golden in `jl4-test` is unchanged, so no file under `not-ok/` that failed to check passes now.
 - An `@export` input of type `DEONTIC party action` is not examined by this check: measured on a service built from this tree, it deploys and publishes `{"type": "object"}`, as it does on `main`.
