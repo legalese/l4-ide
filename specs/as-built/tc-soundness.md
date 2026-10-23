@@ -112,6 +112,6 @@ Each use still unifies the whole type, so the cost grows with the depth times th
   `main` without this change accepts a chain of 1200 (measured above).
 - A program that uses an aliased synonym which collides with an imported record of the same number of parameters (`IMPORT lib` declaring `Money`, then `DECLARE Cash AKA Money IS A Money` and a definition that uses `Cash` and `Money`) gets three ambiguity errors and no cycle error.
   Before the name-resolution change (`resolution-diagnostics.md`) the same program also gave three "I've encountered a resolved name that has no additional information stored for it" errors and a "must match" error, seven diagnostics in all (measured on `main` at `b816b0c60`).
-- `TIMEZONE IS` infers its expression with no expected type (`TypeCheck.hs:709-715`), so `TIMEZONE IS 42` checks clean.
+- `TIMEZONE IS` infers its expression with no expected type (`TypeCheck.hs:720-726`), so `TIMEZONE IS 42` checks clean.
   This is as it was before the change; `timezone-mixed-ambiguity.l4` pins the other side of the same fact.
 - `ok/tests/legal-persons-tests.ep.golden` still differs from its source file in the escaping of a non-ASCII string (`\206le` for `Île`); that comes from string-literal exact-print, which this change does not touch.

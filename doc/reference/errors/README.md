@@ -414,7 +414,7 @@ L4 met a name that nothing in scope defines. The usual causes:
 - **The wrong case.** Keywords and built-in values are upper case: `TRUE` and `FALSE`, not `True` or `true`; `NOTHING`, `JUST`, `LEFT`, `RIGHT`.
 - **An `IMPORT` below a section heading.** `IMPORT` lines count only before the first `§`; one placed after it is ignored, so the names it should bring in are not defined. Move it to the top of the file.
 - **A name defined somewhere it cannot be seen.** A name defined in the `WHERE` or `LET` of one definition exists only inside that definition.
-- **A type that was never declared**, such as `Money` in `GIVEN amount IS A Money`. L4 reports the missing type once. It does not also report that the result of the rule fails to match its signature, because that would only repeat that `Money` is unknown.
+- **A type that was never declared**, such as `Money` in `GIVEN amount IS A Money`. L4 reports the type at every place it is written, each at its own position: a `Money` in two `GIVEN`s and in a `GIVETH` is three errors.
 
 **How to fix it:** Correct the spelling, or add the `IMPORT`:
 
