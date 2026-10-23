@@ -237,13 +237,19 @@ Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-l
 ### 3.0 Run the gate with `etc/verify-branch.sh`, not by hand
 
 ```
-etc/verify-branch.sh [--quick] [--base <ref>] <ABSOLUTE-worktree-path>
+etc/verify-branch.sh [--quick] [--serial] [--base <ref>] <ABSOLUTE-worktree-path>
 ```
 
 It runs the build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `jl4-service-test`,
 `check-corpus-goldens`, `check-canon-citations`, the canon-mirror check (`sync-canon.mjs --check`),
 `doc/test-docs.sh` and prettier, pins `JL4_LIBRARY_PATH` for you, and exits non-zero on any failure.
 `--quick` skips `jl4-test`, which is the ~12-minute one.
+
+By default the test suites run at the same time, after one serial `cabal build` of all of them, and the file and node checks run beside them.
+`jl4-test` runs as four processes chosen by hspec example path, and the gate fails unless their four example counts add up to the count `jl4-test --dry-run` gives, because a slice that selects nothing exits 0.
+On a host with fewer than 8 cores the four `jl4-test` processes start after the other suites instead of beside them, because on lhs (4 cores) they made `jl4-service-test`'s batch examples time out.
+`--serial` runs everything one after another, in the old order, which is the way to tell a failure caused by running together from one that is not.
+Measured on 2026-10-16 for the full gate: nye 964 s with `--serial` and 380 to 421 s by default; lhs 2080 s with `--serial` and 1129 to 1145 s by default.
 
 **The worktree is an argument, not a `cd`, and it must be absolute.** That is the point of the
 script rather than an inconvenience: the working directory of a shell command is not stable between
