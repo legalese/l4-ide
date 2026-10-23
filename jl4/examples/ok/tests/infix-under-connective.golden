@@ -1,0 +1,101 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+infix-under-connective.l4:76:1-21:
+  TRUE
+infix-under-connective.l4:77:1-21:
+  FALSE
+infix-under-connective.l4:78:1-29:
+  TRUE
+infix-under-connective.l4:79:1-22:
+  TRUE
+infix-under-connective.l4:80:1-21:
+  TRUE
+infix-under-connective.l4:81:1-26:
+  TRUE
+infix-under-connective.l4:82:1-26:
+  FALSE
+infix-under-connective.l4:86:1-64:
+  assertion satisfied
+infix-under-connective.l4:87:1-64:
+  assertion satisfied
+infix-under-connective.l4:88:1-66:
+  assertion satisfied
+infix-under-connective.l4:89:1-66:
+  assertion satisfied
+infix-under-connective.l4:90:1-62:
+  assertion satisfied
+infix-under-connective.l4:91:1-62:
+  assertion satisfied
+infix-under-connective.l4:92:1-64:
+  assertion satisfied
+infix-under-connective.l4:93:1-64:
+  assertion satisfied
+infix-under-connective.l4:96:1-28:
+  assertion satisfied
+infix-under-connective.l4:97:1-32:
+  assertion satisfied
+infix-under-connective.l4:98:1-33:
+  assertion satisfied
+infix-under-connective.l4:129:1-29:
+  TRUE
+infix-under-connective.l4:130:1-29:
+  FALSE
+infix-under-connective.l4:131:1-28:
+  FALSE
+infix-under-connective.l4:132:1-29:
+  TRUE
+infix-under-connective.l4:133:1-37:
+  TRUE
+infix-under-connective.l4:135:1-69:
+  assertion satisfied
+infix-under-connective.l4:136:1-69:
+  assertion satisfied
+infix-under-connective.l4:137:1-67:
+  assertion satisfied
+infix-under-connective.l4:148:1-27:
+  16
+infix-under-connective.l4:149:1-27:
+  16
+infix-under-connective.l4:150:1-57:
+  assertion satisfied
+infix-under-connective.l4:153:1-44:
+  TRUE
+infix-under-connective.l4:154:1-45:
+  FALSE
+infix-under-connective.l4:155:1-37:
+  TRUE
+infix-under-connective.l4:163:1-56:
+  FALSE
+infix-under-connective.l4:164:1-58:
+  FALSE
+infix-under-connective.l4:165:1-54:
+  TRUE
+infix-under-connective.l4:166:1-56:
+  TRUE
+infix-under-connective.l4:176:1-41:
+  TRUE
+infix-under-connective.l4:177:1-42:
+  FALSE
+infix-under-connective.l4:178:1-41:
+  TRUE
+infix-under-connective.l4:213:1-31:
+  assertion satisfied
+infix-under-connective.l4:214:1-37:
+  assertion satisfied
+infix-under-connective.l4:215:1-40:
+  assertion satisfied
+infix-under-connective.l4:216:1-38:
+  assertion satisfied
+infix-under-connective.l4:217:1-70:
+  assertion satisfied
+infix-under-connective.l4:218:1-87:
+  assertion satisfied
+infix-under-connective.l4:219:1-93:
+  assertion satisfied
+infix-under-connective.l4:220:1-89:
+  assertion satisfied
+infix-under-connective.l4:237:1-30:
+  TRUE
+infix-under-connective.l4:238:1-30:
+  FALSE

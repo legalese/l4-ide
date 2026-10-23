@@ -1,0 +1,49 @@
+`ok plain` with 5 and 3
+`ok plain` with 1 and 3
+`ok parenthesised` with 5 and 3
+`ok prefix` with 5 and 3
+`ok first` with 5 and 3
+`ok both sides` with 5 and 3
+`ok both sides` with 5 and 8
+`bare and` with `TRUE`, 5 and 3 is equal to `parenthesised and` with `TRUE`, 5 and 3
+`bare and` with `TRUE`, 1 and 3 is equal to `parenthesised and` with `TRUE`, 1 and 3
+`bare and` with `FALSE`, 5 and 3 is equal to `parenthesised and` with `FALSE`, 5 and 3
+`bare and` with `FALSE`, 1 and 3 is equal to `parenthesised and` with `FALSE`, 1 and 3
+`bare or` with `TRUE`, 5 and 3 is equal to `parenthesised or` with `TRUE`, 5 and 3
+`bare or` with `TRUE`, 1 and 3 is equal to `parenthesised or` with `TRUE`, 1 and 3
+`bare or` with `FALSE`, 5 and 3 is equal to `parenthesised or` with `FALSE`, 5 and 3
+`bare or` with `FALSE`, 1 and 3 is equal to `parenthesised or` with `FALSE`, 1 and 3
+`bare and` with `TRUE`, 5 and 3
+not `bare and` with `TRUE`, 1 and 3
+not `bare and` with `FALSE`, 5 and 3
+`arm plain` with `JUST` with 3 and 5
+`arm plain` with `JUST` with 8 and 5
+`arm plain` with `NOTHING` and 5
+`arm alone` with `JUST` with 3 and 5
+`arm parenthesised` with `JUST` with 3 and 5
+`arm plain` with `JUST` with 3 and 5 is equal to `arm parenthesised` with `JUST` with 3 and 5
+`arm plain` with `JUST` with 8 and 5 is equal to `arm parenthesised` with `JUST` with 8 and 5
+`arm plain` with `NOTHING` and 5 is equal to `arm parenthesised` with `NOTHING` and 5
+the sum of 10 and `_ SCALEDBY _` with 2 and 3
+the sum of `_ SCALEDBY _` with 2 and 3 and 10
+the sum of 10 and `_ SCALEDBY _` with 2 and 3 is equal to the sum of `_ SCALEDBY _` with 2 and 3 and 10
+`TRUE` is equal to `_ exceeds by at least _` with 5 and 3
+`FALSE` is equal to `_ exceeds by at least _` with 5 and 3
+`_ SCALEDBY _` with 2 and 3 is equal to 6 and `TRUE`
+`FALSE` and `_ exceeds by at least _` with `unknown count` and 3
+`FALSE` and `_ exceeds by at least _` with `unknown count` and 3
+`TRUE` or `_ exceeds by at least _` with `unknown count` and 3
+`TRUE` or `_ exceeds by at least _` with `unknown count` and 3
+`TRUE` and `_ lies from _ up to _` with 5, 1 and 9
+`TRUE` and `_ lies from _ up to _` with 12, 1 and 9
+`FALSE` or `_ lies from _ up to _` with 5, 1 and 9
+`bare in a MEANS body`
+`arithmetic in a MEANS body`
+`multi-keyword in a MEANS body`
+`multi-keyword in an IS body`
+`bare in a MEANS body` is equal to `parenthesised in a MEANS body`
+`arithmetic in a MEANS body` is equal to `parenthesised arithmetic in a MEANS body`
+`multi-keyword in a MEANS body` is equal to `parenthesised multi-keyword in a MEANS body`
+`multi-keyword in an IS body` is equal to `parenthesised multi-keyword in an IS body`
+`spread over lines` with 5 and 3
+`spread over lines` with 1 and 3
