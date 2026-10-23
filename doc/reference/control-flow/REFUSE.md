@@ -125,8 +125,7 @@ eligible adult MEANS adult AND `the other conditions are not modelled`
 ```
 
 the plan asks one question, `adult`.
-Answered `FALSE`, it says `"determined": false`, as evaluation does without ever reaching the refusal.
-Answered `TRUE`, it says `"determined": null`, asks nothing more (the refusing rule is never asked, since evaluation takes no answer for it), and gives the reason evaluation gives under `"refusal"`.
+Answered `FALSE`, it says `"determined": false`, as evaluation does without ever reaching the refusal; answered `TRUE`, it says `"determined": null`, asks nothing more (the refusing rule is never asked, since evaluation takes no answer for it), and gives the reason evaluation gives under `"refusal"`.
 
 ### What the service and the web editor read
 
@@ -135,10 +134,11 @@ What they read there is a `REFUSE`, or a rule of no inputs that always refuses: 
 
 ### When the plan answers 400
 
-A rule that holds a refusal the plan cannot read is not planned: `/query-plan` answers 400 with an `"error"` that says where the first one can be reached from, for either of these:
+A rule that holds a refusal the plan cannot read is not planned: `/query-plan` answers 400 with an `"error"` that says where the first one may be reached from, for either of these:
 
 - **A refusal inside a part that is not an `AND`, `OR`, `NOT`, `IMPLIES` or Boolean `IF`**: an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, a `LET` binding.
 - **A call to a rule that refuses, other than a rule of no inputs that always refuses**: a rule with inputs that always refuses, and any rule that refuses on only some paths, such as one ending `ELSE REFUSE "…"`, whether or not it takes inputs.
+  The plan declines such a rule even when the refusal is on a path the inputs never take, as in `a AND check a` where `check a` refuses only when `a` is `FALSE`.
 
 For this rule, where `` `the scheme is open` `` is a rule of no inputs that is `FALSE` (the `GIVEN` and `GIVETH` lines are left out):
 
@@ -154,7 +154,7 @@ eligible adult MEANS adult AND `the residence test is met`
 
 ```json
 {
-  "error": "The query plan cannot order the questions for this rule, because a refusal (\"the residence test is not modelled once the scheme is closed\") can be reached from this part of it: `the residence test is met`"
+  "error": "The query plan cannot order the questions for this rule, because a refusal (\"the residence test is not modelled once the scheme is closed\") may be reached from this part of it: `the residence test is met`"
 }
 ```
 

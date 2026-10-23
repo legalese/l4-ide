@@ -89,7 +89,7 @@ spec =
               ( Aeson.String $
                   "The query plan cannot order the questions for this rule, because a refusal (\""
                     <> reason
-                    <> "\") can be reached from this part of it: "
+                    <> "\") may be reached from this part of it: "
                     <> leaf
               )
 

@@ -328,7 +328,7 @@ There are four such answers.
 A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
 A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
 A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
-A rule that holds a refusal the plan cannot read gets "The query plan cannot order the questions for this rule, because a refusal (\"…\") can be reached from this part of it: …".
+A rule that holds a refusal the plan cannot read gets "The query plan cannot order the questions for this rule, because a refusal (\"…\") may be reached from this part of it: …".
 That is a refusal in a part that is not an `AND`, `OR`, `NOT`, `IMPLIES` or Boolean `IF` (an arm of a `CONSIDER`, an operand of a comparison or `EQUALS`, a `LET` binding), a call to a rule with inputs that always refuses, or a call to a rule, or a name for one, that refuses on only some paths.
 A rule whose first clause names each input as its `GIVEN` does, or is `` `_` ``, is not read through, and is planned however long it is.
 A first clause that gives an input a new name is read through, and is limited like any other.

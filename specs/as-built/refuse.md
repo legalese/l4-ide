@@ -92,7 +92,7 @@ Beside other operands, as in `(IF b THEN c ELSE r) AND a`, the `IF` is read befo
 That can only make the plan over-ask.
 Both ladders do it in `translateDecide`, straight after `carameliseExpr`, because a call to the `IMPLIES` function is an `Implies` node only after `carameliseExpr`; it is a switch on the configuration (`spellingOut`, and `visualizeByNameSpelledOut` for `jl4-wasm`) that is off for every other caller.
 After the redraw, a rule that holds a leaf of the second kind is not planned: the service answers 400 with `{"error": …}` and `jl4-wasm` returns the same sentence in its error object (`Refusal.unreadableRefusalError`).
-The sentence names the first such part and its reason, and is cut at 100 characters: `… because a refusal ("<reason>") can be reached from this part of it: <part>`.
+The sentence names the first such part and its reason, and is cut at 100 characters: `… because a refusal ("<reason>") may be reached from this part of it: <part>`.
 A reference by name to a rule that refuses on only some paths, and a call to one, with or without inputs, are leaves of the second kind.
 The plan cannot ask them, since evaluation does not take an answer for them, and cannot report their refusal, since there may be none.
 
@@ -167,7 +167,7 @@ For ``adult AND (`the fee` GREATER THAN 3)``, where `` `the fee` `` is a rule of
 
 ```json
 {
-  "error": "The query plan cannot order the questions for this rule, because a refusal (\"no fee is modelled\") can be reached from this part of it: `the fee` GREATER THAN 3"
+  "error": "The query plan cannot order the questions for this rule, because a refusal (\"no fee is modelled\") may be reached from this part of it: `the fee` GREATER THAN 3"
 }
 ```
 
@@ -219,6 +219,9 @@ The `/query-plan` rows were measured on 2026-10-22, except the last, which was m
 - **The map of definitions that refuse on only some paths over-approximates.**
   A `REFUSE` anywhere under a body counts, whether or not evaluation reaches it, since that turns on the inputs and on rules the plan does not read.
   A rule that calls a helper with a refusal on an arm that its inputs never take still gets the 400.
+  With `check a MEANS IF a THEN TRUE ELSE REFUSE "…"`, `a AND check a` is declined although `AND` reads `check a` only where `a` is `TRUE`, so `/evaluation` never reaches the refusal.
+  That is why the sentence says "may be reached" and not "can be": for such a rule the plan cannot tell, and declines.
+  `jl4-service/test/IntegrationSpec.hs` pins it ("answers 400 even when evaluation never reaches the refusal").
 - **A name from another file is not followed.**
   A refusal reached only through an `IMPORT` is not seen, and the name is a question.
 - **A call with inputs is planned as the input it names.**

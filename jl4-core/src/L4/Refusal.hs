@@ -119,10 +119,12 @@ refusalWithin always sometimes = listToMaybe . mapMaybe here . universe
       _                   -> Nothing
 
 -- | What the query plan answers with, in place of a plan, for a rule that holds
--- a refusal it cannot read: one sentence that says where the first one can be
--- reached from and that the plan cannot order the questions for such a rule. @Nothing@ for a rule
--- that holds none. Takes what the ladder recorded: what each such leaf says, and
--- the reason it refuses with.
+-- a refusal it cannot read: one sentence that says where the first one may be
+-- reached from and that the plan cannot order the questions for such a rule.
+-- "May", because the map of rules that refuse on some path counts a refusal
+-- whether or not evaluation reaches it ('sometimesRefusing'). @Nothing@ for a
+-- rule that holds none. Takes what the ladder recorded: what each such leaf says,
+-- and the reason it refuses with.
 unreadableRefusalError :: [(Text, Text)] -> Maybe Text
 unreadableRefusalError = \case
   [] -> Nothing
@@ -130,7 +132,7 @@ unreadableRefusalError = \case
     Just $
       "The query plan cannot order the questions for this rule, because a refusal (\""
         <> reason
-        <> "\") can be reached from this part of it: "
+        <> "\") may be reached from this part of it: "
         <> shorten (Text.unwords (Text.words leaf))
   where
     shorten t

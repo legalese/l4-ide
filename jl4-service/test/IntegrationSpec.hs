@@ -57,7 +57,7 @@ import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWra
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
-import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4, ifBesideRefusalJL4, unreadableRefusalsJL4, coveredWithInputsJL4, partlyRefusingWithInputsJL4, partlyRefusingWithNumberJL4, partlyRefusingNoInputsJL4, partlyRefusingChainJL4)
+import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4, ifBesideRefusalJL4, unreadableRefusalsJL4, coveredWithInputsJL4, partlyRefusingWithInputsJL4, partlyRefusingWithNumberJL4, partlyRefusingNoInputsJL4, partlyRefusingChainJL4, guardedRefuserJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1058,7 +1058,7 @@ spec = describe "integration" do
         withServiceFromSources "refuser-sentence" [("rule.l4", refusingWithInputsJL4)] \baseUrl mgr -> do
           (_, body) <- answer baseUrl mgr "refuser-sentence" "eligible" []
           errorOf body
-            `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"coverage is not modelled\") can be reached from this part of it: `the person is covered` OF applicant"
+            `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"coverage is not modelled\") may be reached from this part of it: `the person is covered` OF applicant"
 
       it "plans the same call as a question when the rule it calls answers" do
         withServiceFromSources "covered-with-inputs" [("rule.l4", coveredWithInputsJL4)] \baseUrl mgr -> do
@@ -1080,7 +1080,7 @@ spec = describe "integration" do
             status `shouldBe` 400
             let text = errorOf body
             ( Text.isPrefixOf "The query plan cannot order the questions for this rule, because a refusal (" text
-              , Text.isInfixOf ") can be reached from this part of it: " text
+              , Text.isInfixOf ") may be reached from this part of it: " text
               , Text.isInfixOf inLabel text )
               `shouldBe` (True, True, True)
 
@@ -1128,7 +1128,20 @@ spec = describe "integration" do
                 qp <- queryPlan' baseUrl mgr dep "eligible" (argsOf bs)
                 (map fst bs, statusCode' qp) `shouldBe` (map fst bs, 400)
                 errorOf (decodeObject (responseBody qp))
-                  `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"" <> reason <> "\") can be reached from this part of it: " <> leaf
+                  `shouldBe` "The query plan cannot order the questions for this rule, because a refusal (\"" <> reason <> "\") may be reached from this part of it: " <> leaf
+
+      -- The plan declines such a rule even when the refusal is on a path the inputs
+      -- never take: `a AND check a` reads `check a` only where `a` is TRUE, and
+      -- `check a` refuses only where `a` is FALSE, so /evaluation never refuses.
+      it "answers 400 even when evaluation never reaches the refusal" do
+        withServiceFromSources "guarded-refuser" [("rule.l4", guardedRefuserJL4)] \baseUrl mgr -> do
+          for_ [False, True] \a -> do
+            ev <- evalFunction baseUrl mgr "guarded-refuser" "eligible" (args [("a", a)])
+            (a, statusCode' ev) `shouldBe` (a, 200)
+          for_ [[], [("a", False)], [("a", True)]] \bs -> do
+            (status, body) <- answer baseUrl mgr "guarded-refuser" "eligible" bs
+            (bs, status) `shouldBe` (bs, 400)
+            Text.isInfixOf ") may be reached from this part of it: " (errorOf body) `shouldBe` True
 
       it "plans a rule of the same module that holds no refusal" do
         withServiceFromSources "unreadable-clean" [("rule.l4", unreadableRefusalsJL4)] \baseUrl mgr -> do

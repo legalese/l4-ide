@@ -85,6 +85,7 @@ module TestData (
   partlyRefusingWithNumberJL4,
   partlyRefusingNoInputsJL4,
   partlyRefusingChainJL4,
+  guardedRefuserJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -1807,6 +1808,24 @@ GIVETH A BOOLEAN
 GIVEN adult IS A BOOLEAN
 GIVETH A BOOLEAN
 eligible adult MEANS adult AND `the person qualifies by residence`
+|]
+
+-- | A rule that refuses on only some paths, called where evaluation never reaches
+-- the refusal: @check a@ is read only where @a@ is TRUE, and it refuses only where
+-- @a@ is FALSE. The plan cannot tell, and declines.
+guardedRefuserJL4 :: Text
+guardedRefuserJL4 =
+  [i|
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+check a MEANS
+    IF a THEN TRUE
+    ELSE REFUSE "the guard is not modelled"
+
+@export Whether the person is eligible
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible a MEANS a AND check a
 |]
 
 -- | Refusals in the places the plan cannot read: an arm of a CONSIDER, an
