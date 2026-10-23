@@ -266,6 +266,26 @@ spec = do
             ]
       refused emptyVFS src `shouldReturn` [("maybe an event", "me")]
 
+    it "rejects an EVENT under a FOR ALL" $ do
+      -- `FOR ALL` is how a type that holds type variables is written out; the
+      -- check looks through it, and the EVENT is no less an EVENT for it.
+      let src = parties <> Text.unlines
+            [ "@export Quantified"
+            , "GIVEN q IS FOR ALL a (EVENT Person Action)"
+            , "GIVETH A BOOLEAN"
+            , "`quantified` q MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("quantified", "q")]
+
+    it "accepts a FOR ALL that holds no EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "@export Quantified"
+            , "GIVEN q IS FOR ALL a LIST OF a"
+            , "GIVETH A BOOLEAN"
+            , "`quantified` q MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
     it "rejects an EVENT reached through a type synonym" $ do
       let src = parties <> Text.unlines
             [ "DECLARE Occurrence IS AN EVENT Person Action"

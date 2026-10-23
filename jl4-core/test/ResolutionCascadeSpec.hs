@@ -319,6 +319,33 @@ spec = do
       length (mismatchTexts errs) `shouldBe` 1
       mismatchTexts errs `shouldSatisfy` all (Text.isInfixOf "  Money")
 
+    it "tells two unknown types apart that have the same spelling and the same place in their files" $ do
+      -- @lib@ and the importer each use a type called `Money` that nobody
+      -- declared, and each writes it at line 3, columns 19 to 24. The
+      -- importer reported its own and not the other, so the mismatch of its
+      -- call against @lib@'s `Money` is the only message it has about that
+      -- one and stays. A filter that told them apart by their spelling alone,
+      -- or by their place in the file alone, would take the one for the other
+      -- and drop it.
+      let sameSpot =
+            [ "GIVEN amount IS A Money"
+            , "GIVETH A NUMBER"
+            ]
+          libSrc =
+            Text.unlines $
+              [ "", "" ] <> sameSpot <> [ "`total due` amount MEANS 1" ]
+          src =
+            Text.unlines $
+              [ "IMPORT lib", "" ] <> sameSpot <> [ "f amount MEANS `total due` 5" ]
+      errs <- diagnosticsWithLib libSrc src
+      -- the importer's own `Money`, and nothing from @lib@
+      filter isOutOfScopeError (kinds errs) `shouldSatisfy` ((== 1) . length)
+      -- the call in the last line is what the importer says about @lib@'s
+      let calls = mismatchTexts errs
+      length calls `shouldBe` 1
+      calls `shouldSatisfy` all (Text.isInfixOf "  Money")
+      calls `shouldSatisfy` all (Text.isInfixOf "  NUMBER")
+
     it "within one module, drops the cascade of its own unknown type with or without an unrelated unknown name" $ do
       -- The control: the unknown type is this module's own failure, so the
       -- mismatch against it is dropped, and an unrelated unknown name next to
