@@ -14,15 +14,17 @@
 -- The last examples pin what the change must not touch: an import cycle is
 -- still reported, and an IMPORT that names nothing is still reported as a
 -- missing module and not as a cycle.
-module ImportOnceSpec (spec, Mode (..), runTree, fun, diamond, tour) where
+module ImportOnceSpec (spec, Mode (..), runTree, withTree, fun, diamond, tour) where
 
+import Control.Exception (bracket)
 import Control.Monad (forM_)
 import Data.List (nub)
 import Data.Maybe (isJust)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import System.Directory (createDirectoryIfMissing, getTemporaryDirectory, removePathForcibly)
+import System.Directory (createDirectory, getTemporaryDirectory, removeFile, removePathForcibly)
 import System.FilePath (takeBaseName, (<.>), (</>))
+import System.IO (hClose, openTempFile)
 
 import Language.LSP.Protocol.Types
   ( Diagnostic (..)
@@ -48,16 +50,34 @@ data Mode
   = Check -- ^ type-check the entry file, as @l4 check@ does
   | Run -- ^ and evaluate it, as @l4 run@ does
 
--- | Write the files into a fresh directory (one @name.l4@ per entry) and run
--- the real rules over the entry file. Returns every diagnostic published to
--- the store, across the whole import closure, and the entry file's result.
-runTree :: String -> Mode -> [(String, T.Text)] -> String -> IO ([FileDiagnostic], Maybe TypeCheckResult)
-runTree label mode files entry = do
-  tmp <- getTemporaryDirectory
-  let dir = tmp </> "jl4-lsp-test-import-once" </> label
-  removePathForcibly dir
-  createDirectoryIfMissing True dir
+-- | Write the files (one @name.l4@ per entry) into a directory that no other
+-- run shares, hand its path to the action, and remove it afterwards.
+--
+-- The directory used to be one fixed name per label under the temporary
+-- directory, so two runs of this suite on one machine (two gates, two
+-- terminals) wrote and deleted each other's files, and one of them failed with
+-- a file that did not exist. @openTempFile@ creates its file exclusively, so
+-- the name it picks is nobody else's, and the directory takes a name made from
+-- that one. The label only makes a stray directory easy to recognise.
+withTree :: String -> [(String, T.Text)] -> (FilePath -> IO a) -> IO a
+withTree label files act = bracket reserve release \(_, dir) -> do
   forM_ files \(name, src) -> T.writeFile (dir </> name <.> "l4") src
+  act dir
+ where
+  reserve = do
+    tmp <- getTemporaryDirectory
+    (marker, h) <- openTempFile tmp ("jl4-lsp-test-import-once-" <> label)
+    hClose h
+    let dir = marker <> ".d"
+    createDirectory dir
+    pure (marker, dir)
+  release (marker, dir) = removePathForcibly dir >> removeFile marker
+
+-- | Write the files into a fresh directory ('withTree') and run the real rules
+-- over the entry file. Returns every diagnostic published to the store, across
+-- the whole import closure, and the entry file's result.
+runTree :: String -> Mode -> [(String, T.Text)] -> String -> IO ([FileDiagnostic], Maybe TypeCheckResult)
+runTree label mode files entry = withTree label files \dir -> do
   evalConfig <- resolveEvalConfig Nothing (lspDefaultPolicy defaultGraphVizOptions)
   (_logs, diags, mTc) <- oneshotL4ActionAndDiagnostics evalConfig (dir </> entry <.> "l4") \nfp -> do
     let uri = normalizedFilePathToUri nfp
