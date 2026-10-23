@@ -32,8 +32,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import L4.Annotation (getAnno)
 import L4.Syntax
-import L4.TypeCheck.Environment (maybeUnique)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
+import L4.TypeCheck.Environment (eventUnique, maybeUnique)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, optionallyNamedTypeType)
 import Optics
 
 type TypeDescMap = Map.Map Unique Text
@@ -413,16 +413,33 @@ extractImplicitAssumeParams errors =
     isFunctionType Fun{} = True
     isFunctionType _ = False
 
--- | Validate that no @export-decorated DECIDE has a function-typed input —
--- either a GIVEN parameter, or a module-level ASSUME the body calls.
+-- | Validate that no @export-decorated DECIDE has an input that a request
+-- cannot carry: a function-typed input, or an input of a type that contains
+-- an EVENT. The input is either a GIVEN parameter, or a module-level ASSUME
+-- the body uses.
+--
 -- Function-typed inputs can't be evaluated end-to-end: GIVENs can't be
 -- passed over JSON, and function-typed ASSUMEs stay 'ValAssumed' at
 -- runtime, causing a stuck "assumed term" error when the body invokes them.
-validateExportInputs :: Module Resolved -> [CheckErrorWithContext]
-validateExportInputs mod' =
+--
+-- An EVENT has no JSON form either. The service's input decoder reads a JSON
+-- object only into a declared record, and the EVENT type is builtin and has
+-- no declaration, so every evaluation answers 422; the published schema is a
+-- bare @object@; and @l4 batch@ decodes the row to NOTHING.
+validateExportInputs :: EntityInfo -> Module Resolved -> [CheckErrorWithContext]
+validateExportInputs ei mod' =
   let synonyms = collectTypeSynonyms mod'
       assumes  = allAssumesFromModule mod'
-  in concatMap (checkOneExport synonyms assumes) (collectExportedDecides mod')
+      -- one pass per kind of input a request cannot carry
+      refusals =
+        [ (isFunctionTypeExpanded synonyms, mkExportFunErr)
+        , (typeCarriesEvent ei, mkExportEventErr)
+        ]
+  in [ err
+     | decide <- collectExportedDecides mod'
+     , (refused, mkErr) <- refusals
+     , err <- checkOneExport refused mkErr assumes decide
+     ]
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
@@ -457,37 +474,40 @@ allAssumesFromModule (MkModule _ _ section) =
     _ -> []
 
 checkOneExport
-  :: Map.Map Unique (Type' Resolved)
+  :: (Type' Resolved -> Bool)
+  -> (Resolved -> Resolved -> CheckErrorWithContext)
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [CheckErrorWithContext]
-checkOneExport synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
-  checkGivenFunctionInputs synonyms fnName tySig
-  ++ checkAssumeFunctionInputs synonyms assumes fnName decide
+checkOneExport refused mkErr assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
+  checkGivenInputs refused mkErr fnName tySig
+  ++ checkAssumeInputs refused mkErr assumes fnName decide
 
-checkGivenFunctionInputs
-  :: Map.Map Unique (Type' Resolved)
+checkGivenInputs
+  :: (Type' Resolved -> Bool)
+  -> (Resolved -> Resolved -> CheckErrorWithContext)
   -> Resolved
   -> TypeSig Resolved
   -> [CheckErrorWithContext]
-checkGivenFunctionInputs synonyms fnName (MkTypeSig _ (MkGivenSig _ names) _) =
-  [ mkExportFunErr fnName paramName
+checkGivenInputs refused mkErr fnName (MkTypeSig _ (MkGivenSig _ names) _) =
+  [ mkErr fnName paramName
   | MkOptionallyTypedName _ paramName (Just ty) <- names
-  , isFunctionTypeExpanded synonyms ty
+  , refused ty
   ]
 
-checkAssumeFunctionInputs
-  :: Map.Map Unique (Type' Resolved)
+checkAssumeInputs
+  :: (Type' Resolved -> Bool)
+  -> (Resolved -> Resolved -> CheckErrorWithContext)
   -> Map.Map Unique (Assume Resolved)
   -> Resolved
   -> Decide Resolved
   -> [CheckErrorWithContext]
-checkAssumeFunctionInputs synonyms assumes fnName (MkDecide _ _ _ body) =
+checkAssumeInputs refused mkErr assumes fnName (MkDecide _ _ _ body) =
   let referencedUniques = collectReferencedUniques body
-  in [ mkExportFunErr fnName paramName
+  in [ mkErr fnName paramName
      | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
      , Set.member uniq referencedUniques
-     , isFunctionTypeExpanded synonyms ty
+     , refused ty
      ]
 
 mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
@@ -496,3 +516,63 @@ mkExportFunErr fnName paramName =
     { kind    = ExportFunctionTypeInput fnName paramName
     , context = WhileCheckingDecide (getActual fnName) None
     }
+
+mkExportEventErr :: Resolved -> Resolved -> CheckErrorWithContext
+mkExportEventErr fnName paramName =
+  MkCheckErrorWithContext
+    { kind    = ExportEventTypeInput fnName paramName
+    , context = WhileCheckingDecide (getActual fnName) None
+    }
+
+-- | Does a value of this type contain an EVENT? True for the builtin @EVENT@
+-- type itself, and for a type that holds one anywhere: as a type argument
+-- (@LIST OF EVENT …@, @MAYBE (EVENT …)@), behind a synonym, or in a field of a
+-- declared record or of a constructor of a declared sum type — also when the
+-- synonym or the record is declared in an imported module, because it is read
+-- from the checker's 'EntityInfo' and not from this module's declarations.
+--
+-- A function type is not looked into: an input of that type is refused as a
+-- function type already, and one refusal per input is enough.
+--
+-- The 'EntityInfo' records which type a constructor builds but not the
+-- converse, so the fields of every type are gathered by one pass over the
+-- constructors, shared by all the calls of the returned predicate.
+typeCarriesEvent :: EntityInfo -> Type' Resolved -> Bool
+typeCarriesEvent ei = go Set.empty
+ where
+  fieldsByType :: Map.Map Unique [Type' Resolved]
+  fieldsByType =
+    Map.fromListWith (<>)
+      [ (getUnique builtType, fieldTypes conType)
+      | (_, KnownTerm conType Constructor) <- Map.elems ei
+      , Just builtType <- [resultTypeName conType]
+      ]
+
+  resultTypeName = \case
+    Forall _ _ inner -> resultTypeName inner
+    Fun _ _ result   -> resultTypeName result
+    TyApp _ name _   -> Just name
+    _                -> Nothing
+
+  fieldTypes = \case
+    Forall _ _ inner -> fieldTypes inner
+    Fun _ onts _     -> map optionallyNamedTypeType onts
+    _                -> []
+
+  go :: Set.Set Unique -> Type' Resolved -> Bool
+  go seen = \case
+    TyApp _ name args
+      | u == eventUnique   -> True
+      | any (go seen) args -> True
+      | u `Set.member` seen -> False
+      | otherwise ->
+          let seen' = Set.insert u seen
+              behindSynonym = case Map.lookup u ei of
+                Just (_, KnownType _ _ (Just body)) -> go seen' body
+                _                                   -> False
+              inFields = any (go seen') (Map.findWithDefault [] u fieldsByType)
+          in behindSynonym || inFields
+      where
+        u = getUnique name
+    Forall _ _ inner -> go seen inner
+    _                -> False

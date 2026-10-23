@@ -1,0 +1,60 @@
+-- An EVENT has no JSON form, so an @export cannot take one as an input: the
+-- service's input decoder reads an object only into a declared record, and the
+-- builtin EVENT type has no declaration. Each rule below is refused with the
+-- same error, naming the input; the rules are exported on purpose, because the
+-- same rule without @export checks (see ok/event-type-resolves.l4).
+--
+-- The input may be an EVENT, hold one in a list or a MAYBE, reach one through a
+-- synonym, or hold one in a field of a record.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+DECLARE Occurrence IS AN EVENT Person Action
+
+DECLARE Report HAS reported IS AN EVENT Person Action
+                   note IS A STRING
+
+@export The time of an event
+GIVEN `the reported event` IS AN EVENT Person Action
+GIVETH A NUMBER
+`when it happened` `the reported event` MEANS
+  CONSIDER `the reported event`
+  WHEN EVENT party action time THEN time
+
+@export Events in a list
+GIVEN events IS A LIST OF EVENT Person Action
+GIVETH A BOOLEAN
+`any events` events MEANS TRUE
+
+@export An event that may be missing
+GIVEN `maybe an event` IS A MAYBE (EVENT Person Action)
+GIVETH A BOOLEAN
+`has an event` `maybe an event` MEANS TRUE
+
+@export An event behind a synonym
+GIVEN o IS AN Occurrence
+GIVETH A BOOLEAN
+`is an occurrence` o MEANS TRUE
+
+@export A record with an event in a field
+GIVEN r IS A Report
+GIVETH A STRING
+`report note` r MEANS r's note
+
+-- Not exported: an EVENT input is fine here, and is not reported.
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`internal time` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+-- Exported with the parts of the event as inputs, and the event built inside:
+-- accepted.
+@export The time of the event built from its parts
+GIVEN who IS A Person
+      what IS AN Action
+      `at time` IS A NUMBER
+GIVETH A NUMBER
+`time of parts` who what `at time` MEANS
+  CONSIDER EVENT who what `at time`
+  WHEN EVENT party action time THEN time

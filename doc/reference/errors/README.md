@@ -56,6 +56,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Export**
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
+- [An @export that takes an EVENT](#an-export-that-takes-an-event)
 
 ---
 
@@ -967,3 +968,55 @@ DECIDE size Blue  n IS 0
 
 The rule is then published with the inputs `c` and `n`.
 Or remove the `@export`, if the rule is not meant to be published.
+
+---
+
+### An @export that takes an EVENT
+
+**Error:**
+
+```
+EVENT inputs are not supported for @export.
+The input `the reported event` has a type that contains an EVENT, and a request has no JSON form for an event.
+Give the rule the party, the action and the time as separate inputs, and build the event inside it.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+@export The time of the reported event
+GIVEN `the reported event` IS AN EVENT Person Action
+GIVETH A NUMBER
+`when it happened` `the reported event` MEANS
+  CONSIDER `the reported event`
+  WHEN EVENT party action time THEN time
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it is JSON.
+JSON has no form for an event, so no request could supply this input.
+The same holds for an input that holds an event: a `LIST OF EVENT Person Action`, a `MAYBE (EVENT Person Action)`, a record with an event in one of its fields, or an `ASSUME` of that type that the rule uses.
+So an `@export` of such a rule is an error, reported at the rule.
+The error stops the whole file from checking: `l4 batch` and `jl4-schema` refuse the file, and jl4-service will not deploy it, until you change the input or remove the `@export`.
+Without `@export`, a rule can take an event as an input.
+
+**How to fix it:** Take the party, the action and the time as separate inputs, and build the event inside the rule with `EVENT`:
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+@export The time of an event
+GIVEN who IS A Person
+      what IS AN Action
+      `at time` IS A NUMBER
+GIVETH A NUMBER
+`when it happened` who what `at time` MEANS
+  CONSIDER EVENT who what `at time`
+  WHEN EVENT party action time THEN time
+```
+
+Each of the three inputs needs a type that a request can carry, such as an enumeration or a `NUMBER`.
+See [EVENT](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event).

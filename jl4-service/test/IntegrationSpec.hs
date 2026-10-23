@@ -2741,6 +2741,73 @@ spec = describe "integration" do
         Right (_fns, meta) ->
           [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
             `shouldBe` [["flag", "threshold"]]
+    -- An EVENT has no JSON form: the input decoder reads an object only into a
+    -- declared record, and the builtin EVENT type has no declaration. A rule
+    -- that took one used to be published with the input schema `{"type":
+    -- "object"}` and then answered every evaluation with 422. The deploy
+    -- refuses it, as it refuses a function-typed input.
+    it "rejects an @export whose input is an EVENT, and says what to do" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventin.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF delivery, payment"
+        , ""
+        , "@export When did the reported event happen"
+        , "GIVEN `the reported event` IS AN EVENT Person Action"
+        , "GIVETH A NUMBER"
+        , "`when it happened` `the reported event` MEANS"
+        , "  CONSIDER `the reported event`"
+        , "  WHEN EVENT party action time THEN time"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "EVENT inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the reported event"
+          err `shouldSatisfy` Text.isInfixOf "separate inputs"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input holds an EVENT in a list or a record" do
+      logger <- newLogger False
+      let bundle inputs = Map.singleton "eventin.l4" $ Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF delivery, payment"
+            , "DECLARE Report HAS reported IS AN EVENT Person Action"
+            , ""
+            , "@export Count"
+            , "GIVEN x IS A " <> inputs
+            , "GIVETH A BOOLEAN"
+            , "`count` x MEANS TRUE"
+            ]
+      forM_ ["LIST OF EVENT Person Action", "Report"] \inputs -> do
+        result <- compileBundle logger "test" (bundle inputs)
+        case result of
+          Left err -> err `shouldSatisfy` Text.isInfixOf "EVENT inputs are not supported for @export"
+          Right _ -> expectationFailure ("Expected rejection of an input of type " <> Text.unpack inputs)
+
+    it "still publishes an @export that builds its event from separate inputs" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventparts.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF delivery, payment"
+        , ""
+        , "@export When did the event happen"
+        , "GIVEN who IS A Person"
+        , "      what IS AN Action"
+        , "      `at time` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`when it happened` who what `at time` MEANS"
+        , "  CONSIDER EVENT who what `at time`"
+        , "  WHEN EVENT party action time THEN time"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+            `shouldBe` [["at time", "what", "who"]]
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed

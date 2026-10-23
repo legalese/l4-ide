@@ -184,7 +184,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- Combine mixfix registry from imports with this module's local definitions
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
-                exportErrs = Export.validateExportInputs rprog
+                exportErrs = Export.validateExportInputs env.entityInfo rprog
             in MkCheckResult
               { program = rprog
               , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs)
@@ -4664,6 +4664,13 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   , "The parameter "
       <> quotedName (getActual paramName)
       <> " has a function type."
+  ]
+prettyCheckError (ExportEventTypeInput _fnName paramName) =
+  [ "EVENT inputs are not supported for @export."
+  , "The input "
+      <> quotedName (getActual paramName)
+      <> " has a type that contains an EVENT, and a request has no JSON form for an event."
+  , "Give the rule the party, the action and the time as separate inputs, and build the event inside it."
   ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.

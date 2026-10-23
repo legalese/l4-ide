@@ -115,6 +115,10 @@ data CheckError =
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | ExportEventTypeInput Resolved Resolved
+    -- ^ An @export-decorated DECIDE has an input whose type contains an EVENT
+    -- (GIVEN or referenced ASSUME). Arguments: exported-function name,
+    -- offending parameter/assume name.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 

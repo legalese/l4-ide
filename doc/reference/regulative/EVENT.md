@@ -75,7 +75,7 @@ This gives a breach: the deadline at 3 passed with no delivery.
 ## EVENT as a type
 
 `EVENT` is both the function that makes an event and the name of the events' type.
-As a type it takes the party type and the action type, so a rule can take an event as an input and read it with `CONSIDER`.
+As a type it takes the party type and the action type, so a rule can take an event as an input and read it with `CONSIDER`, and another rule can make an event and pass it on.
 The time of an event is always a `NUMBER`:
 
 ```l4
@@ -90,10 +90,44 @@ GIVETH A NUMBER
   CONSIDER e
   WHEN EVENT party action time THEN time
 
-#EVAL `when it happened` (EVENT Seller delivery 2)
+GIVEN who IS A Person
+GIVETH A NUMBER
+`when it was delivered` who MEANS `when it happened` (EVENT who delivery 2)
+
+#EVAL `when it was delivered` Seller
 ```
 
 This gives `2`.
+
+### An exported rule cannot take an event
+
+A rule marked `@export` cannot take an event as an input, nor an input that holds one: a `LIST OF EVENT Person Action`, a `MAYBE (EVENT Person Action)`, or a record with an event in one of its fields.
+A request to an exported rule is JSON, and JSON has no form for an event.
+`l4 check` reports `EVENT inputs are not supported for @export` and names the input.
+`l4 batch` and `jl4-schema` check the file first and stop with the same error, and `jl4-service` refuses to deploy it.
+See [An @export that takes an EVENT](../errors/README.md#an-export-that-takes-an-event).
+
+To publish such a rule, take the party, the action and the time as three inputs, and build the event inside the rule:
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+@export The time of an event
+GIVEN who IS A Person
+      what IS AN Action
+      `at time` IS A NUMBER
+GIVETH A NUMBER
+`when it happened` who what `at time` MEANS
+  CONSIDER EVENT who what `at time`
+  WHEN EVENT party action time THEN time
+
+#EVAL `when it happened` Seller delivery 2
+```
+
+This gives `2`.
+A request gives `who` and `what` by the name of the value, and `at time` as a number.
+Each of the three inputs needs a type that a request can carry, such as an enumeration or a `NUMBER`.
 
 ## Related pages
 

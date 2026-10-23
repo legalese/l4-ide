@@ -6,10 +6,12 @@ import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportedFunction(..), getExportedFunctions, enrichReturnTypes)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Print (prettyTypeForDisplay)
+import L4.Syntax (getActual, nameToText)
+import L4.TypeCheck (prettyCheckErrorWithContext)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
 
 -- | Run typecheck on a source snippet and return the list of
@@ -22,6 +24,26 @@ exportFnErrors source =
       [ e
       | e@MkCheckErrorWithContext{kind = ExportFunctionTypeInput _ _} <- r.tcdErrors
       ]
+
+-- | Run typecheck on a source snippet and return the 'ExportEventTypeInput'
+-- errors that fired, as (function name, input name) pairs, together with the
+-- error text a user sees for the first of them. The snippet can import the
+-- modules of the given VFS.
+exportEventErrors :: VFS -> Text -> Either [Text] ([(Text, Text)], [Text])
+exportEventErrors vfs source =
+  case checkWithImports vfs source of
+    Left errs -> Left errs
+    Right r ->
+      let hits =
+            [ e
+            | e@MkCheckErrorWithContext{kind = ExportEventTypeInput _ _} <- r.tcdErrors
+            ]
+      in Right
+        ( [ (nameToText (getActual fn), nameToText (getActual p))
+          | MkCheckErrorWithContext{kind = ExportEventTypeInput fn p} <- hits
+          ]
+        , concatMap prettyCheckErrorWithContext (take 1 hits)
+        )
 
 -- | Run typecheck on a source snippet and return the exported function
 -- names (or 'Left' on fatal failure).
@@ -167,6 +189,209 @@ spec = do
       case exportFnErrors src of
         Left errs -> fail $ "Fatal: " ++ show errs
         Right fns -> length fns `shouldBe` 1
+
+  -- An EVENT has no JSON form: the service's input decoder reads an object
+  -- only into a declared record, the builtin EVENT type has none, and so an
+  -- exported rule that takes one publishes a bare @object@ schema that no
+  -- request can satisfy. The check refuses it where it refuses a function-typed
+  -- input, so that `l4 check`, `l4 batch`, `jl4-schema` and the service's
+  -- deploy all stop at the same error.
+  describe "EVENT-typed inputs of an @export" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        -- the pairs only: (function, input)
+        refused vfs src = case exportEventErrors vfs src of
+          Left errs -> fail $ "Fatal: " ++ show errs
+          Right (hits, _) -> pure hits
+
+    it "rejects a GIVEN of type EVENT, naming the function and the input" $ do
+      let src = parties <> Text.unlines
+            [ "@export When it happened"
+            , "GIVEN `the reported event` IS AN EVENT Person Action"
+            , "GIVETH A NUMBER"
+            , "`when it happened` `the reported event` MEANS"
+            , "  CONSIDER `the reported event`"
+            , "  WHEN EVENT party action time THEN time"
+            ]
+      refused emptyVFS src `shouldReturn` [("when it happened", "the reported event")]
+
+    it "says what is wrong and what to do instead" $ do
+      let src = parties <> Text.unlines
+            [ "@export When it happened"
+            , "GIVEN e IS AN EVENT Person Action"
+            , "GIVETH A NUMBER"
+            , "`when it happened` e MEANS 1"
+            ]
+      case exportEventErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `when it happened`:"
+            , "  EVENT inputs are not supported for @export."
+            , "  The input `e` has a type that contains an EVENT, and a request has no JSON form for an event."
+            , "  Give the rule the party, the action and the time as separate inputs, and build the event inside it."
+            ]
+
+    it "rejects a LIST OF EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "@export Any events"
+            , "GIVEN es IS A LIST OF EVENT Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`any events` es MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("any events", "es")]
+
+    it "rejects a MAYBE EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "@export Maybe an event"
+            , "GIVEN me IS A MAYBE (EVENT Person Action)"
+            , "GIVETH A BOOLEAN"
+            , "`maybe an event` me MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("maybe an event", "me")]
+
+    it "rejects an EVENT reached through a type synonym" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Occurrence IS AN EVENT Person Action"
+            , ""
+            , "@export Via synonym"
+            , "GIVEN o IS AN Occurrence"
+            , "GIVETH A BOOLEAN"
+            , "`via synonym` o MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("via synonym", "o")]
+
+    it "rejects an EVENT in a field of a record" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Report HAS reported IS AN EVENT Person Action"
+            , "                   note IS A STRING"
+            , ""
+            , "@export Report note"
+            , "GIVEN r IS A Report"
+            , "GIVETH A STRING"
+            , "`report note` r MEANS r's note"
+            ]
+      refused emptyVFS src `shouldReturn` [("report note", "r")]
+
+    it "rejects an EVENT in a field of a constructor of a sum type" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Entry IS ONE OF"
+            , "  unrecorded"
+            , "  recorded HAS what IS AN EVENT Person Action"
+            , ""
+            , "@export Entry kind"
+            , "GIVEN x IS AN Entry"
+            , "GIVETH A BOOLEAN"
+            , "`entry kind` x MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("entry kind", "x")]
+
+    it "rejects an EVENT that sits behind a record of an imported module" $ do
+      let lib = parties <> Text.unlines
+            [ "DECLARE Report HAS reported IS AN EVENT Person Action"
+            , ""
+            , "DECLARE Occurrence IS AN EVENT Person Action"
+            ]
+          src = Text.unlines
+            [ "IMPORT lib"
+            , ""
+            , "@export Report"
+            , "GIVEN r IS A Report"
+            , "GIVETH A BOOLEAN"
+            , "`report` r MEANS TRUE"
+            , ""
+            , "@export Occurrence"
+            , "GIVEN o IS AN Occurrence"
+            , "GIVETH A BOOLEAN"
+            , "`occurrence` o MEANS TRUE"
+            ]
+      refused (vfsFromList [("lib", lib)]) src
+        `shouldReturn` [("report", "r"), ("occurrence", "o")]
+
+    it "rejects an @export that uses an ASSUME of type EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed event` IS AN EVENT Person Action"
+            , ""
+            , "@export Assumed"
+            , "GIVETH A BOOLEAN"
+            , "`assumed` MEANS"
+            , "  CONSIDER `assumed event`"
+            , "  WHEN EVENT party action time THEN TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("assumed", "assumed event")]
+
+    it "ignores an ASSUME of type EVENT that no export uses" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed event` IS AN EVENT Person Action"
+            , ""
+            , "@export Plain"
+            , "GIVETH A BOOLEAN"
+            , "`plain` MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "reports each offending input, once" $ do
+      let src = parties <> Text.unlines
+            [ "@export Two events"
+            , "GIVEN a IS AN EVENT Person Action"
+            , "      b IS AN EVENT Person Action"
+            , "      n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`two events` a b n MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("two events", "a"), ("two events", "b")]
+
+    it "accepts a rule that takes an EVENT when it is not an @export" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN e IS AN EVENT Person Action"
+            , "GIVETH A NUMBER"
+            , "`when it happened` e MEANS"
+            , "  CONSIDER e"
+            , "  WHEN EVENT party action time THEN time"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts an @export that builds the event from its parts" $ do
+      let src = parties <> Text.unlines
+            [ "@export When it happened"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      `at time` IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`when it happened` who what `at time` MEANS"
+            , "  CONSIDER EVENT who what `at time`"
+            , "  WHEN EVENT party action time THEN time"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts an @export whose inputs are records, lists and maybes without an EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Report HAS who IS A Person"
+            , "                   note IS A STRING"
+            , "                   others IS A LIST OF Report"
+            , ""
+            , "@export Report note"
+            , "GIVEN r IS A Report"
+            , "      m IS A MAYBE NUMBER"
+            , "GIVETH A STRING"
+            , "`report note` r m MEANS r's note"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "terminates on a record that contains itself" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Tree HAS label IS A STRING"
+            , "                 children IS A LIST OF Tree"
+            , ""
+            , "@export Label"
+            , "GIVEN t IS A Tree"
+            , "GIVETH A STRING"
+            , "`label` t MEANS t's label"
+            ]
+      refused emptyVFS src `shouldReturn` []
 
   describe "exported return type display" $ do
     -- A concrete inferred return type renders normally.
