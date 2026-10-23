@@ -1,0 +1,61 @@
+-- Nothing in the language observes a refusal or converts it into an answer:
+-- not a CONSIDER over a MAYBE, not a boolean connective, not a LET, not a
+-- WHERE. A refusal stops at the directive that asked for the answer, which
+-- reports it with its reason.
+--
+-- The ONE thing that changes the answer is DEMAND ORDER. AND and OR are lazy
+-- and left to right, so `FALSE AND <refusing>` answers FALSE while
+-- `<refusing> AND FALSE` refuses. The examples below pin that order.
+
+IMPORT prelude
+
+GIVETH A BOOLEAN
+`not modelled (boolean)` MEANS REFUSE "not modelled: the boolean case"
+
+GIVETH A NUMBER
+`not modelled (number)` MEANS REFUSE "not modelled: the number case"
+
+GIVETH A MAYBE NUMBER
+`not modelled (maybe)` MEANS REFUSE "not modelled: the maybe case"
+
+-- Matching on a constructor forces the scrutinee, so neither arm is reached.
+GIVETH A NUMBER
+`consider over a refusing maybe` MEANS
+    CONSIDER `not modelled (maybe)`
+      WHEN NOTHING THEN 0
+      WHEN JUST n  THEN n
+
+#EVAL `consider over a refusing maybe`
+
+-- Boolean connectives, in the order that forces the refusal.
+#EVAL (TRUE AND `not modelled (boolean)`)
+#EVAL (`not modelled (boolean)` AND FALSE)
+#EVAL (FALSE OR `not modelled (boolean)`)
+#EVAL (NOT `not modelled (boolean)`)
+
+-- ...and the order that does not. These are ordinary verdicts, and pinning
+-- them here is what makes the order-dependence a stated property rather
+-- than a surprise.
+#ASSERT NOT (FALSE AND `not modelled (boolean)`)
+#ASSERT TRUE OR `not modelled (boolean)`
+
+-- A binding does not launder it either.
+GIVETH A NUMBER
+`let over a refusal` MEANS
+    LET x MEANS `not modelled (number)`
+    IN x PLUS 1
+
+#EVAL `let over a refusal`
+
+GIVETH A NUMBER
+`where over a refusal` MEANS
+    y PLUS 1
+    WHERE
+        y MEANS `not modelled (number)`
+
+#EVAL `where over a refusal`
+
+-- An #ASSERT that refuses is not decided, in either polarity: it reports the
+-- refusal, never "assertion satisfied" and never "assertion failed".
+#ASSERT `not modelled (boolean)`
+#ASSERT NOT `not modelled (boolean)`

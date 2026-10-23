@@ -1,0 +1,5 @@
+-- Typechecks cleanly. Its one directive asks for a named refusal.
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "not modelled"
+
+#EVAL `not modelled` PLUS 1

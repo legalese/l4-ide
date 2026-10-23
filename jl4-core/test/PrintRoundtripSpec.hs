@@ -25,6 +25,13 @@ spec =
     roundtrips "GIVEN-parametrised DECLARE" [] declareSrc
     roundtrips "GIVEN-parametrised ASSUME" [] assumeSrc
     roundtrips "a string literal with a line break and a tab" ["\"line\\nnext\\tend\""] lineBreakSrc
+    roundtrips "a REFUSE body" ["REFUSE \"not modelled\""] refuseBodySrc
+    roundtrips "a REFUSE in IF branches" ["THEN REFUSE \"young\"", "ELSE REFUSE \"old\""] refuseBranchSrc
+    -- Whole operands, so a bracket around either REFUSE fails the case: the
+    -- brackets here are the AND nested in an OR, and nothing else.
+    roundtrips "a REFUSE inside AND, OR and PLUS, unbracketed" ["(REFUSE \"left\" AND b) OR REFUSE \"right\"", "1 PLUS REFUSE \"sum\""] refuseOperandSrc
+    roundtrips "a REFUSE as a function's argument, unbracketed" ["double OF REFUSE \"argument\""] refuseArgumentSrc
+    roundtrips "a REFUSE projected with 's" ["(REFUSE \"no record\")'s amount"] refuseProjectionSrc
 
 -- | Assert that @src@ parses, its 'prettyLayout' contains every @mustContain@
 -- fragment, and that printed output parses again. A pure re-parse check catches
@@ -96,4 +103,52 @@ lineBreakSrc = T.unlines
   , "    IF x > 0"
   , "    THEN \"line\\nnext\\tend\""
   , "    ELSE \"no\""
+  ]
+
+-- | A REFUSE prints as the keyword and its literal, and stays one expression
+-- wherever it sits: a body, a branch, an operand, an argument.
+refuseBodySrc :: T.Text
+refuseBodySrc = T.unlines
+  [ "GIVETH A NUMBER"
+  , "DECIDE r IS REFUSE \"not modelled\""
+  ]
+
+refuseBranchSrc :: T.Text
+refuseBranchSrc = T.unlines
+  [ "GIVEN x IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "DECIDE r x IS"
+  , "    IF x > 18"
+  , "    THEN REFUSE \"young\""
+  , "    ELSE REFUSE \"old\""
+  ]
+
+refuseOperandSrc :: T.Text
+refuseOperandSrc = T.unlines
+  [ "GIVEN b IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE p b IS REFUSE \"left\" AND b OR REFUSE \"right\""
+  , ""
+  , "GIVETH A NUMBER"
+  , "DECIDE n IS 1 PLUS REFUSE \"sum\""
+  ]
+
+refuseArgumentSrc :: T.Text
+refuseArgumentSrc = T.unlines
+  [ "GIVEN x IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "DECIDE double x IS x TIMES 2"
+  , ""
+  , "GIVETH A NUMBER"
+  , "DECIDE r IS double OF (REFUSE \"argument\")"
+  ]
+
+-- | The left of @'s@ is parsed as an atom (a literal, a name or a bracketed
+-- expression), so a projected REFUSE must print in brackets.
+refuseProjectionSrc :: T.Text
+refuseProjectionSrc = T.unlines
+  [ "DECLARE Rec HAS amount IS A NUMBER"
+  , ""
+  , "GIVETH A NUMBER"
+  , "DECIDE a IS (REFUSE \"no record\")'s amount"
   ]

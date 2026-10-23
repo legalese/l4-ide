@@ -197,6 +197,7 @@ test-suite jl4-core-test
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     RefAnnotationSpec
+    RefuseSpec
     NlgPercentSpec
     NlgRenderSpec
     DirectiveAmbiguitySpec

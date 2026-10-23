@@ -254,6 +254,21 @@ userException = raiseException . UserEvalException
 stuckOnAssumed :: Resolved -> Eval a
 stuckOnAssumed assumedResolved = userException (Stuck assumedResolved)
 
+-- | REFUSE: stop evaluation with the author's reason.
+--
+-- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
+-- 'EvalException' inside the machine, and it is used only at the directive
+-- boundary ('L4.EvaluateLazy.nfDirective'); the module driver's own @try@
+-- sits outside every directive. There is no user-facing catch construct, so
+-- nothing between a 'Refuse' and the directive that demanded it can observe
+-- the refusal or turn it into a value: not a CONSIDER arm, not a boolean
+-- connective, not a WHERE\/LET binding. THIS IS AN INVARIANT, not an accident
+-- of the code: a static refusal analysis is only sound while it holds.
+-- Anything that adds a second @try@ (a TRY\/RECOVER construct, a
+-- service-level resume) breaks it.
+refuseWith :: Refusal -> Eval a
+refuseWith = raiseException . RefusalException
+
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
   traceEval Push
@@ -515,6 +530,18 @@ forwardExpr env = \ case
     mPartyRef <- traverse (\p -> allocate_ p env) mParty
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
     continueBackward (ValBreached (ExplicitBreach mPartyRef mReasonRef))
+  -- REFUSE only ever reaches 'forwardExpr' when the machine actually REDUCES
+  -- it, so a refusal inside an unforced thunk is never entered. That is what
+  -- makes @FALSE AND <refusing>@ answer FALSE while @<refusing> AND FALSE@
+  -- refuses: the type checker reads AND as an application of the builtin
+  -- AND, which 'andValClosure' evaluates as an 'IfThenElse' whose scrutinee
+  -- is forced first.
+  Refuse _ann (Lit _ (StringLit _ txt)) ->
+    refuseWith (MkRefusal txt)
+  Refuse _ann _msg ->
+    -- Unreachable: the parser accepts only a literal message and the type
+    -- checker requires that literal to be a STRING.
+    internalException (RuntimeTypeError "the message of a REFUSE is not a string literal")
   Inert _ann _txt ctx ->
     -- Inert elements are grammatical scaffolding with context-aware evaluation
     -- In AND context: True (identity), in OR context: False (identity)

@@ -746,6 +746,40 @@ spec = describe "integration" do
             batch.summary.casesProcessed `shouldBe` 10
             batch.summary.casesIgnored `shouldBe` 0
 
+    -- specs/as-built/service-wire-format.md states this shape for a case that
+    -- refuses; a change to it changes that sentence. The single request gets
+    -- the same message as an interpreter error.
+    it "returns a case that refuses as an errored case, with the refusal's message" do
+      let src = Text.unlines
+            [ "@export Whether a person qualifies"
+            , "GIVEN age IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "qualifies age MEANS"
+            , "  IF age >= 18 THEN TRUE ELSE REFUSE \"minors are not modelled\""
+            ]
+          refusal = "The model refuses to answer:\n  minors are not modelled\n"
+      withServiceFromSources "refuse-batch" [("refuse.l4", src)] \baseUrl mgr -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/refuse-batch/functions/qualifies/evaluation/batch")
+          (Aeson.object
+            [ "outcomes" Aeson..= ([] :: [Text])
+            , "cases" Aeson..=
+                [ Aeson.object ["@id" Aeson..= (1 :: Int), "age" Aeson..= (10 :: Int)]
+                , Aeson.object ["@id" Aeson..= (2 :: Int), "age" Aeson..= (20 :: Int)]
+                ]
+            ])
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        wireAt resp ["summary", "casesIgnored"] `shouldBe` Right (Aeson.Number 1)
+        wireAt resp ["summary", "casesProcessed"] `shouldBe` Right (Aeson.Number 1)
+        caseKeys resp ["@id", "@error", "@refused", "value"] `shouldBe`
+          Just [ [Just (Aeson.Number 1), Just (Aeson.String refusal), Nothing, Nothing]
+               , [Just (Aeson.Number 2), Nothing, Nothing, Just (Aeson.Bool True)] ]
+        single <- evalFunction baseUrl mgr "refuse-batch" "qualifies"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["age" Aeson..= (10 :: Int)]])
+        statusCode' single `shouldBe` 422
+        wireAt single ["contents", "tag"] `shouldBe` Right (Aeson.String "InterpreterError")
+        wireAt single ["contents", "contents"] `shouldBe` Right (Aeson.String refusal)
+
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
       withEmptyService \baseUrl mgr -> do

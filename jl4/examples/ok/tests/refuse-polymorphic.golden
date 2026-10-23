@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+refuse-polymorphic.l4:22:1-19:
+  The model refuses to answer:
+    this rule has not been written yet
+refuse-polymorphic.l4:23:1-20:
+  The model refuses to answer:
+    this rule has not been written yet

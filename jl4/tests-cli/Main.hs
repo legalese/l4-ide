@@ -1211,6 +1211,29 @@ spec bin = do
       it ("reports ok=false and all three results in JSON for a " <> verb <> " to an address that is not https") $
         expectMiddleLostInJson bin fixture messages
 
+  -- A REFUSE that a directive reaches stops that directive, which reports the
+  -- refusal and its reason as a diagnostic of Error severity, and the run
+  -- fails.
+  describe "l4 run on a directive that refuses" $ do
+    let refuseEvalFixture = fixtureDir </> "refuse-eval.l4"
+        refuseAssertFixture = fixtureDir </> "refuse-assert.l4"
+
+    it "reports an #EVAL that refuses with its reason, at Error severity, and exits 1" $ do
+      Output code sout serr <- runL4 bin ["run", refuseEvalFixture]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("The model refuses to answer:" `isInfixOf`)
+      sout `shouldSatisfy` ("not modelled" `isInfixOf`)
+      serr `shouldSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+
+    it "reports an #ASSERT that refuses as unevaluable in either polarity, with the refusal, and exits 1" $ do
+      Output code sout serr <- runL4 bin ["run", refuseAssertFixture]
+      code `shouldBe` ExitFailure 1
+      T.count "assertion could not be evaluated:" (T.pack sout) `shouldBe` 2
+      T.count "The model refuses to answer:" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      serr `shouldSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
   -- succeeds, with the same exit code and the same JSON verdict it would give

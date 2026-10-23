@@ -17,6 +17,7 @@ module L4.Export (
   hasTypeInferenceVars,
   validateExportInputs,
   isExportedDecide,
+  mayReachRefuse,
 ) where
 
 import Base
@@ -296,6 +297,44 @@ collectReferencedUniques =
   foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \case
     App _ (Ref _ uniq _) _ -> Set.singleton uniq
     _ -> Set.empty
+
+-- | Whether a @REFUSE@ is written anywhere in the expression, including every
+-- clause of a regulative rule and every WHERE or LET definition in it,
+-- whether or not evaluation would reach it.
+containsRefuse :: Expr Resolved -> Bool
+containsRefuse =
+  anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+    Refuse{} -> True
+    _ -> False
+
+-- | Whether evaluating the expression may reach a @REFUSE@. It may when one is
+-- written in the expression, or in the body of a definition the expression
+-- names, or in a definition that one names, and so on through the given
+-- modules. Pass the module and every module it imports, directly or not: a
+-- name defined in a module that is not passed is not followed.
+--
+-- It reads what is written and evaluates nothing, so it answers yes for a
+-- REFUSE that no input reaches. It follows each name once, so it ends on
+-- recursion, and a module passed twice changes nothing.
+mayReachRefuse :: [Module Resolved] -> Expr Resolved -> Bool
+mayReachRefuse mods = go Set.empty . (: [])
+ where
+  -- Every top-level definition, under the Unique of its name, which each of
+  -- its AKA names shares. A WHERE or LET definition needs no entry: a name
+  -- that calls it sits in the expression that defines it, which
+  -- 'containsRefuse' reads whole.
+  bodies :: Map.Map Unique (Expr Resolved)
+  bodies = Map.fromList
+    [ (getUnique h, body)
+    | m <- mods
+    , MkDecide _ _ (MkAppForm _ h _ _) body <- foldTopLevelDecides (: []) m
+    ]
+  go _ [] = False
+  go seen (e : es)
+    | containsRefuse e = True
+    | otherwise =
+        let named = Set.fromList [u | Ref _ u _ <- toList e] `Set.difference` seen
+        in go (seen <> named) (mapMaybe (`Map.lookup` bodies) (Set.toList named) <> es)
 
 -- | Extract ASSUME declarations that are referenced by a DECIDE body.
 -- Returns ExportedParams for each ASSUME that the function depends on.

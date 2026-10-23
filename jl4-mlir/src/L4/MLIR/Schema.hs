@@ -48,7 +48,7 @@ import Data.Char (isAlphaNum)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (sortOn)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, maybeToList)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -71,7 +71,7 @@ import L4.Annotation (HasSrcRange, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
 import qualified L4.Utils.IntervalMap as IV
-import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes)
+import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, mayReachRefuse)
 import qualified L4.Print as Print
 import L4.StateGraph
   ( extractStateGraphs, stateGraphToDot, defaultStateGraphOptions
@@ -407,6 +407,9 @@ bundleExports wasmPath version infoMap entInfo resolvedModule depModules =
   let declares = Map.unions (declaresFromModule resolvedModule
                             : map declaresFromModule depModules)
       exports  = enrichReturnTypes entInfo (getExportedFunctions resolvedModule)
+      -- Whether evaluating a body may reach a REFUSE, following the names
+      -- it calls through this module and every module it imports.
+      mayRefuse = mayReachRefuse (resolvedModule : depModules)
       stateGraphs =
         [ StateGraphExport sg.sgName (stateGraphToDot defaultStateGraphOptions sg)
         | sg <- extractStateGraphs resolvedModule
@@ -506,7 +509,7 @@ bundleExports wasmPath version infoMap entInfo resolvedModule depModules =
   in WasmBundle
        { bundleWasmFile = wasmPath
        , bundleVersion  = version
-       , bundleExports  = map (buildExport infoMap declares fnReturnTypes unannotatedFnNames) exports
+       , bundleExports  = map (buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFnNames) exports
        , bundleStateGraphs = stateGraphs
        , bundleHelpers     = helperMetas
        }
@@ -730,8 +733,8 @@ decideWasmSymbol :: Decide Resolved -> Text
 decideWasmSymbol (MkDecide _ _ (MkAppForm _ headRes _ _) _) =
   sanitizeWasmSymbol (rawNameToText (rawName (getActual headRes)))
 
-buildExport :: InfoMap -> Map Text (Declare Resolved) -> Map Text (Type' Resolved) -> Set.Set Text -> ExportedFunction -> FunctionExport
-buildExport infoMap declares fnReturnTypes unannotatedFns ef =
+buildExport :: (Expr Resolved -> Bool) -> InfoMap -> Map Text (Declare Resolved) -> Map Text (Type' Resolved) -> Set.Set Text -> ExportedFunction -> FunctionExport
+buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
   let name        = ef.exportName
       isDeonticFn = case ef.exportReturnType of
         Just ty -> isDeonticType ty
@@ -768,6 +771,21 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
       -- to 'Nothing' for shapes we can't recover, in which case the runtime
       -- uses the display 'returnType' string for primitive unmarshaling.
       returnSchema_ = ef.exportReturnType >>= typeToRetSchema declares Set.empty
+      -- A REFUSE has no WASM image: the compiled module cannot stop with a
+      -- reason. So an export from which evaluation may reach a REFUSE is
+      -- marked unsupported here, and a request goes to the fallback
+      -- evaluator, which raises the refusal. The REFUSE may be written in
+      -- the export's body, in any clause of a regulative rule, or in a
+      -- definition the body names, in this module or in one it imports.
+      -- This is the one mark a REFUSE gets. The lowering emits a
+      -- placeholder for a REFUSE and does not enter a regulative body or an
+      -- imported module's bodies; and the deontic contract above holds no
+      -- refusal: a HENCE or LEST it cannot read is left out, which the
+      -- runtime reads as FULFILLED or BREACH, PROVIDED is not carried, and
+      -- WITHIN is carried as printed text, which the runtime reads as a
+      -- number.
+      refuseInBody = case ef.exportDecide of
+        MkDecide _ _ _ body -> mayRefuse body
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name
@@ -777,13 +795,18 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
        , returnSchema = returnSchema_
        , isDeontic   = isDeonticFn
        , paramOrder  = paramOrder_
-       -- Assume compilable; 'applyDiagnostics' downgrades functions the
-       -- lowering flagged as unsupported.
-       , supported   = True
-       , unsupportedReason = Nothing
+       -- Assume compilable unless evaluation may reach a REFUSE;
+       -- 'applyDiagnostics' downgrades functions the lowering flagged as
+       -- unsupported.
+       , supported   = not refuseInBody
+       , unsupportedReason = if refuseInBody then Just refuseUnsupportedReason else Nothing
        , traceMeta   = Just traceMeta_
        , deonticContract = deonticContract_
        }
+
+-- | Why an export from which evaluation may reach a REFUSE is unsupported.
+refuseUnsupportedReason :: Text
+refuseUnsupportedReason = "REFUSE is not supported by the WASM backend"
 
 -- | M6: walk a 'Decide' body to extract a 'DeonticContract' tree.
 -- The body is a 'Regulative' wrapping a 'Deonton' record; the
@@ -1430,6 +1453,8 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Env{}                  -> (a, r, n)
       Post{}                 -> (a, r, n)
       Breach{}               -> (a, r, n)
+      -- A refusal has no trace children: it stops evaluation.
+      Refuse{}               -> (a, r, n)
       Inert{}                -> (a, r, n)
 
     -- M5 — force-trace a CONSIDER branch body when it's a 'Lit' or
@@ -1683,7 +1708,8 @@ kindFromL4Type t = case t of
 -- still sees it exists and can serve its read-only metadata — but
 -- @supported = False@ tells the proxy to route evaluation to a fallback
 -- engine rather than the WASM module, which cannot evaluate it
--- correctly. Functions absent from the map are left untouched.
+-- correctly. Functions absent from the map are left untouched. A reason
+-- 'buildExport' already gave (a REFUSE) is kept, ahead of the lowering's.
 applyDiagnostics :: Map Text [Text] -> WasmBundle -> WasmBundle
 applyDiagnostics diags wb =
   wb { bundleExports = map mark wb.bundleExports }
@@ -1692,7 +1718,8 @@ applyDiagnostics diags wb =
       Nothing      -> fe
       Just reasons -> fe
         { supported = False
-        , unsupportedReason = Just (Text.intercalate "; " (uniq reasons))
+        , unsupportedReason =
+            Just (Text.intercalate "; " (uniq (maybeToList fe.unsupportedReason <> reasons)))
         }
     -- De-duplicate while preserving first-seen order.
     uniq = go Set.empty

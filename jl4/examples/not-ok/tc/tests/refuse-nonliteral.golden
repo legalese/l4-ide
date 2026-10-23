@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: refuse-nonliteral.l4
+  Hidden: no
+  Range: 8:28-8:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The message of a REFUSE is expected to be a string literal, of type
+
+      STRING
+
+    but is here of type
+
+      NUMBER

@@ -93,6 +93,7 @@ test-suite jl4-test
   main-is: Main.hs
   other-modules:
     Hover
+    KeywordList
     SemanticTokens
     Paths_jl4
   autogen-modules:

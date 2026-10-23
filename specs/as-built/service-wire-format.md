@@ -23,7 +23,9 @@ This change keeps main's request handling and carries #562's handling of the wra
   The message can differ from the single-case endpoint's for the same input, since a batch case with a `null` takes the wrapper and a single request does not.
   A case that reaches `--eval-timeout` or `--max-eval-memory-mb` still fails the whole batch with `500`; unstable returns it with `@error` and `@limit`, from `0765fef5d` and `a09544dd6`, later commits of #549 that need its `EvalLimits` module and the threaded RTS, and are not carried.
   Because main runs every case of a batch at once on the non-threaded RTS, each case's clock counts its siblings' work: 40 cases of a rule that answers one request in about 0.12 s fail the batch at `--eval-timeout 3`, and 10 answer (measured 2026-10-07 on this branch's build).
-  This is the batch-response piece of #549 (`35d7b63b3`) and nothing else from it: main has no `REFUSE`, so no `@refused`, and no defaults, so no `@presumed`.
+  This is the batch-response piece of #549 (`35d7b63b3`) and nothing else from it.
+  A case that refuses is an errored case: its `@error` is the refusal's message, "The model refuses to answer:" and the reason, and it is counted in `casesIgnored`.
+  Main has no defaults, so no `@presumed`.
 
 ## Where it lives
 

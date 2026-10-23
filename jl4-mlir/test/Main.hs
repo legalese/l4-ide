@@ -220,6 +220,87 @@ main = do
     , test "deontic BREACH BY party is plain" testDeonticBreachByPlain
     , test "deontic BREACH BY tag round-trips" testDeonticBreachByRoundTrip
     , test "plain fn stays supported"          testPlainFunctionSupported
+    , test "REFUSE marks the export unsupported" testRefuseUnsupported
+    , test "deontic REFUSE after HENCE is unsupported" $
+        testDeonticRefuse False ["MUST `pay`", "WITHIN 10", "HENCE REFUSE \"after payment\""]
+    , test "deontic REFUSE after LEST is unsupported" $
+        testDeonticRefuse False ["MUST `pay`", "WITHIN 10", "LEST REFUSE \"after a miss\""]
+    , test "deontic REFUSE in a HENCE branch is unsupported" $
+        testDeonticRefuse False ["MUST `pay`", "WITHIN 10", "HENCE IF `late` THEN REFUSE \"late payment\" ELSE FULFILLED"]
+    , test "deontic HENCE branch with no REFUSE stays supported" $
+        testDeonticRefuse True ["MUST `pay`", "WITHIN 10", "HENCE IF `late` THEN BREACH ELSE FULFILLED"]
+    , test "deontic REFUSE in PROVIDED is unsupported" $
+        testDeonticRefuse False ["MUST `pay` PROVIDED REFUSE \"no guard modelled\"", "WITHIN 10"]
+    , test "deontic REFUSE in WITHIN is unsupported" $
+        testDeonticRefuse False ["MUST `pay`", "WITHIN REFUSE \"no deadline modelled\""]
+    , test "REFUSE in a called definition is unsupported" $
+        testExportMark refuseMark [] (feeInYear oldFeeRefuses "`the old fee`")
+    , test "a called definition with no REFUSE stays supported" $
+        testExportMark Nothing [] (feeInYear oldFeeIsFifty "`the old fee`")
+    , test "REFUSE two calls away is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear (oldFeeRefuses <> ["", "GIVEN y IS A NUMBER", "GIVETH A NUMBER", "`the old fee in year` y MEANS `the old fee`"])
+                     "`the old fee in year` y")
+    , test "REFUSE in the second of two called definitions is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear (firstFeeIsFifty <> [""] <> oldFeeRefuses) "`the first fee` PLUS `the old fee`")
+    , test "REFUSE in the first of two called definitions is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear (oldFeeRefuses <> [""] <> firstFeeIsFifty) "`the first fee` PLUS `the old fee`")
+    , test "REFUSE in a definition called WITH named inputs is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "`the old fee for` n MEANS REFUSE \"fees before 2000 are not encoded\""]
+                     "`the old fee for` WITH n IS y")
+    , test "REFUSE in a computed field the export reads is unsupported" $
+        testExportMark refuseMark [] adultFieldRefuses
+    , test "REFUSE in a WHERE definition is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear [] "`the old fee`" <> ["  WHERE", "    `the old fee` MEANS REFUSE \"fees before 2000 are not encoded\""])
+    , test "REFUSE in a LET in the export's body is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear [] "LET x MEANS REFUSE \"fees before 2000 are not encoded\" IN x PLUS 1")
+    , test "REFUSE in the last clause of a clause group is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear (oldFeeClauses "50" "REFUSE \"other years are not encoded\"") "`the old fee` y")
+    , test "REFUSE in the first clause of a clause group is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear (oldFeeClauses "REFUSE \"year zero is not encoded\"" "50") "`the old fee` y")
+    , test "a clause group with no REFUSE stays supported" $
+        testExportMark Nothing []
+          (feeInYear (oldFeeClauses "50" "60") "`the old fee` y")
+    , test "REFUSE in a definition called by its AKA name is unsupported" $
+        testExportMark refuseMark []
+          (feeInYear ["GIVETH A NUMBER", "`the old fee` AKA `the fee before 2000` MEANS REFUSE \"fees before 2000 are not encoded\""]
+                     "`the fee before 2000`")
+    , test "REFUSE reached through mutual recursion is unsupported" $
+        testExportMark refuseMark [] parityRefusesBelowZero
+    , test "a recursive definition with no REFUSE stays supported" $
+        testExportMark Nothing [] factorialExport
+    , test "REFUSE in a definition named by HENCE is unsupported" $
+        testExportMark refuseMark [] (deonticHenceNamed ["REFUSE \"what follows payment is not modelled\""])
+    , test "a definition named by HENCE with no REFUSE stays supported" $
+        testExportMark Nothing [] (deonticHenceNamed ["FULFILLED"])
+    , test "REFUSE in an imported definition is unsupported" $
+        testExportMark refuseMark [("fees", T.unlines oldFeeRefuses)]
+          ("IMPORT fees" : "" : feeInYear [] "`the old fee`")
+    , test "an imported definition with no REFUSE stays supported" $
+        testExportMark Nothing [("fees", T.unlines oldFeeIsFifty)]
+          ("IMPORT fees" : "" : feeInYear [] "`the old fee`")
+    , test "REFUSE two imports away, through a module imported twice, is unsupported" $
+        testExportMark refuseMark importDiamond
+          ("IMPORT older" : "IMPORT newer" : "" : feeInYear [] "`the old fee in year` y")
+    , test "REFUSE beside another unsupported construct names both reasons" $
+        testExportMark (Just (refuseReason <> "; lambda / higher-order function not supported by the WASM backend")) []
+          [ "IMPORT prelude"
+          , ""
+          , "@export Mixed"
+          , "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "`mixed` n MEANS"
+          , "    IF n > 0"
+          , "    THEN sum (map (GIVEN x YIELD x PLUS 1) (LIST n))"
+          , "    ELSE REFUSE \"not modelled\""
+          ]
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn
     , test "traceMeta pretty-print baked"      testTraceMetaBaked
@@ -420,6 +501,264 @@ testPlainFunctionSupported = do
     Right json ->
       pure $ T.isInfixOf "\"supported\":true" json
           && not (T.isInfixOf "\"supported\":false" json)
+
+-- | REFUSE has no WASM image: the compiled module has no way to stop with a
+-- reason, and lowering it to a value would answer where the program declined.
+-- So an export that contains one in its body is marked @supported: false@,
+-- which routes the request to a fallback evaluator, and that one raises the
+-- refusal.
+testRefuseUnsupported :: IO Bool
+testRefuseUnsupported = do
+  let src = T.unlines
+        [ "@export Direct refusal"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`direct` `age` MEANS IF `age` >= 18 THEN 1 ELSE REFUSE \"not modelled\""
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let ok = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "REFUSE" json
+            && not (T.isInfixOf "\"supported\":true" json)
+      if ok then pure () else putStrLn $ "\n    json: " <> T.unpack (T.take 500 json)
+      pure ok
+
+-- | A REFUSE anywhere in a DEONTIC export's body marks the export
+-- @supported: false@, wherever in the obligation it sits. The lowering does not
+-- enter a regulative body, and the runtime walks the schema's
+-- @deonticContract@, which holds no refusal: a HENCE or LEST it cannot read
+-- is left out and reads as FULFILLED or BREACH, PROVIDED is not carried, and
+-- WITHIN is carried as printed text and read as a number. Each would answer
+-- where the program refuses.
+--
+-- The clauses follow @PARTY `alice`@ in a rule that takes a BOOLEAN @late@.
+-- With @wantSupported@ the case is the control: the same shape with no
+-- REFUSE stays supported.
+testDeonticRefuse :: Bool -> [T.Text] -> IO Bool
+testDeonticRefuse wantSupported clauses = do
+  let src = T.unlines $
+        [ "DECLARE Party IS ONE OF `alice`"
+        , "DECLARE Action IS ONE OF `pay`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVEN `late` IS A BOOLEAN"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` `late` MEANS"
+        , "    PARTY `alice`"
+        ]
+        <> map ("    " <>) clauses
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let refused = T.isInfixOf "\"supported\":false" json
+            && T.isInfixOf "\"unsupportedReason\":\"REFUSE is not supported by the WASM backend\"" json
+            && not (T.isInfixOf "\"supported\":true" json)
+          supported = T.isInfixOf "\"supported\":true" json
+            && not (T.isInfixOf "\"supported\":false" json)
+          ok = if wantSupported then supported else refused
+      if ok then pure () else putStrLn $ "\n    json: " <> T.unpack (T.take 800 json)
+      pure ok
+
+-- | The reason the schema gives an export from which evaluation may reach a
+-- REFUSE.
+refuseReason :: T.Text
+refuseReason = "REFUSE is not supported by the WASM backend"
+
+-- | The mark an export that may reach a REFUSE gets, and no other.
+refuseMark :: Maybe T.Text
+refuseMark = Just refuseReason
+
+-- | The schema's mark on a module's one export is the one expected:
+-- 'Nothing' for @supported: true@, @Just reason@ for @supported: false@ with
+-- exactly that reason. The module may import the given modules (name and
+-- source), and the lowering and the schema both receive every module it
+-- imports, directly or not, as 'L4.MLIR.Pipeline' passes them.
+--
+-- A REFUSE reached through a name is the house style, one named definition
+-- per refusal, so these cases follow names: through calls, a WHERE, a LET,
+-- an AKA, recursion, a regulative rule's HENCE, and imports.
+testExportMark :: Maybe T.Text -> [(T.Text, T.Text)] -> [T.Text] -> IO Bool
+testExportMark want imports srcLines =
+  case checkWithImportsAndUri (vfsFromList imports) "main" (T.unlines srcLines) of
+    Left errs -> do
+      putStrLn $ "\n    the module did not check: " <> show errs
+      pure False
+    Right r
+      | not r.tcdSuccess -> do
+          putStrLn $ "\n    the module has type errors: " <> show (length r.tcdErrors)
+          pure False
+      | otherwise -> do
+          let deps = map (\ri -> ri.riTypeChecked.program) r.tcdResolvedImports
+              (_mlir, diags) = lowerProgramWithDiagnostics r.tcdInfoMap r.tcdModule deps
+              bundle = applyDiagnostics diags
+                (bundleExports "test.wasm" "test" r.tcdInfoMap (substitutedEntityInfo r) r.tcdModule deps)
+              json = TE.decodeUtf8 (LBS.toStrict (encodeBundle bundle))
+          case theExportMark json of
+            Left err -> do
+              putStrLn $ "\n    " <> err
+              pure False
+            Right (ok, reason) -> do
+              let got = if ok then Nothing else Just (maybe "" id reason)
+                  good = got == want && (not ok || reason == Nothing)
+              if good then pure () else
+                putStrLn $ "\n    wanted " <> show want <> ", got supported=" <> show ok <> " reason=" <> show reason
+              pure good
+
+-- | The @supported@ flag and the @unsupportedReason@ of a schema's one export.
+theExportMark :: T.Text -> Either String (Bool, Maybe T.Text)
+theExportMark json = case Aeson.decodeStrict (TE.encodeUtf8 json) of
+  Just (Aeson.Object top)
+    | Just (Aeson.Object fns) <- Aeson.KeyMap.lookup "functions" top
+    , [Aeson.Object f] <- Aeson.KeyMap.elems fns
+    , Just (Aeson.Bool ok) <- Aeson.KeyMap.lookup "supported" f ->
+        Right (ok, case Aeson.KeyMap.lookup "unsupportedReason" f of
+                     Just (Aeson.String reason) -> Just reason
+                     _ -> Nothing)
+  _ -> Left ("expected a schema with one export, got: " <> T.unpack (T.take 400 json))
+
+-- | A module with the given definitions, then an export that answers 100
+-- from the year 2000 and otherwise the given expression.
+feeInYear :: [T.Text] -> T.Text -> [T.Text]
+feeInYear defs before2000 =
+  defs <>
+  [ ""
+  , "@export The fee in a year"
+  , "GIVEN y IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "`the fee in year` y MEANS"
+  , "    IF y >= 2000"
+  , "    THEN 100"
+  , "    ELSE " <> before2000
+  ]
+
+-- | A named refusal, one definition per reason.
+oldFeeRefuses :: [T.Text]
+oldFeeRefuses =
+  [ "GIVETH A NUMBER"
+  , "`the old fee` MEANS REFUSE \"fees before 2000 are not encoded\""
+  ]
+
+-- | A clause group of two clauses, for year 0 and for any other year. The
+-- parser compiles a group into one definition whose later clauses sit in a
+-- LET definition inside its body, so a REFUSE in the last clause is one
+-- written in a LET.
+oldFeeClauses :: T.Text -> T.Text -> [T.Text]
+oldFeeClauses yearZero otherYears =
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "DECIDE `the old fee` 0 IS " <> yearZero
+  , "DECIDE `the old fee` n IS " <> otherYears
+  ]
+
+-- | The control: the same name, with a value.
+oldFeeIsFifty :: [T.Text]
+oldFeeIsFifty =
+  [ "GIVETH A NUMBER"
+  , "`the old fee` MEANS 50"
+  ]
+
+-- | A second called definition, with a value. The two sibling cases put it
+-- before and after the refusal in the source, because the walk reads the
+-- names a body holds in the order of their Uniques, which need not be the
+-- order they are written in, and a walk that read only the first of them
+-- would pass one of the two orders.
+firstFeeIsFifty :: [T.Text]
+firstFeeIsFifty =
+  [ "GIVETH A NUMBER"
+  , "`the first fee` MEANS 50"
+  ]
+
+-- | An export that reads a computed field, whose MEANS refuses for a minor.
+adultFieldRefuses :: [T.Text]
+adultFieldRefuses =
+  [ "DECLARE Person HAS"
+  , "    `age`   IS A NUMBER"
+  , "    `adult` IS A BOOLEAN"
+  , "        MEANS IF `age` >= 18 THEN TRUE ELSE REFUSE \"minors are not modelled\""
+  , ""
+  , "@export Whether a person is an adult"
+  , "GIVEN p IS A Person"
+  , "GIVETH A BOOLEAN"
+  , "`is adult` p MEANS p's `adult`"
+  ]
+
+-- | @base@ holds the refusal, @older@ and @newer@ each import it, and the
+-- main module imports both and calls @older@.
+importDiamond :: [(T.Text, T.Text)]
+importDiamond =
+  [ ("base", T.unlines oldFeeRefuses)
+  , ("older", T.unlines
+      [ "IMPORT base"
+      , ""
+      , "GIVEN y IS A NUMBER"
+      , "GIVETH A NUMBER"
+      , "`the old fee in year` y MEANS `the old fee`"
+      ])
+  , ("newer", T.unlines
+      [ "IMPORT base"
+      , ""
+      , "GIVETH A NUMBER"
+      , "`the new fee` MEANS 100"
+      ])
+  ]
+
+-- | Two definitions that call each other; the second refuses below zero.
+parityRefusesBelowZero :: [T.Text]
+parityRefusesBelowZero =
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`is even` n MEANS IF n EQUALS 0 THEN TRUE ELSE `is odd` (n - 1)"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`is odd` n MEANS"
+  , "    IF n < 0 THEN REFUSE \"negative numbers are not modelled\""
+  , "    ELSE IF n EQUALS 0 THEN FALSE ELSE `is even` (n - 1)"
+  , ""
+  , "@export Parity"
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`parity` n MEANS `is even` n"
+  ]
+
+-- | The control for recursion: a definition that calls itself, with no
+-- REFUSE anywhere, so the walk has to end without finding one.
+factorialExport :: [T.Text]
+factorialExport =
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "`factorial` n MEANS IF n <= 0 THEN 1 ELSE n * `factorial` (n - 1)"
+  , ""
+  , "@export The factorial"
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "`the factorial of` n MEANS `factorial` n"
+  ]
+
+-- | A deontic export whose HENCE names a definition with the given body.
+deonticHenceNamed :: [T.Text] -> [T.Text]
+deonticHenceNamed body =
+  [ "DECLARE Party IS ONE OF `alice`"
+  , "DECLARE Action IS ONE OF `pay`"
+  , ""
+  , "GIVETH A DEONTIC OF Party, Action"
+  , "`what follows payment` MEANS"
+  ]
+  <> map ("    " <>) body <>
+  [ ""
+  , "@export Demo obligation"
+  , "GIVETH A DEONTIC OF Party, Action"
+  , "`demo` MEANS"
+  , "    PARTY `alice`"
+  , "    MUST `pay`"
+  , "    WITHIN 10"
+  , "    HENCE `what follows payment`"
+  ]
 
 -- | A top-level regulative function yields a precomputed state graph in
 -- the schema, with Graphviz DOT rendered at compile time by the same

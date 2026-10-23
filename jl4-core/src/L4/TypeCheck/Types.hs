@@ -225,6 +225,7 @@ data ExpectationContext =
   | ExpectConcatArgumentContext -- argument of CONCAT
   | ExpectAsStringArgumentContext -- argument of AS STRING
   | ExpectBreachReasonContext -- reason argument of BREACH
+  | ExpectRefuseMessageContext -- message argument of REFUSE
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
