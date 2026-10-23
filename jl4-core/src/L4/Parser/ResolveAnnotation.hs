@@ -1114,6 +1114,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       mParty' <- traverse addNlg mParty
       mReason' <- traverse addNlg mReason
       pure $ Breach ann mParty' mReason'
+    Refuse ann msg -> Refuse ann <$> addNlg msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
@@ -1947,6 +1948,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       mParty' <- traverse addRef mParty
       mReason' <- traverse addRef mReason
       pure $ Breach ann' mParty' mReason'
+    Refuse ann msg -> attachRef expr ann >>= \ann' -> Refuse ann' <$> addRef msg
     Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
    where
     bin f ann e1 e2 = do

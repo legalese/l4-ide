@@ -132,6 +132,8 @@ test-suite jl4-service-test
     MaybeLiftSpec
     PutGuardSpec
     QueryPlanSpec
+    QueryPlanWasmUnreadableSpec
+    QueryPlanWasm
     SchemaSpec
     SanitizationSpec
     StdlibResolutionSpec
@@ -140,6 +142,8 @@ test-suite jl4-service-test
 
   hs-source-dirs:
     test
+    -- the browser's query-plan builder, whose pure function is tested natively
+    ../jl4-wasm/app
 
   build-tool-depends:
     hspec-discover:hspec-discover

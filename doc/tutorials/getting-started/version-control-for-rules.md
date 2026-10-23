@@ -118,7 +118,7 @@ jobs:
             l4 check "$f"
           done
 
-      - name: Run tests (fail on failed assertions and on assertions that cannot be evaluated)
+      - name: Run tests (fail on failed, refused and unevaluable assertions)
         run: |
           status=0
           for f in $(git ls-files '*.l4'); do
@@ -126,8 +126,8 @@ jobs:
               echo "::error file=$f::l4 run failed for $f (a type error, or a directive that could not be evaluated)"
               echo "$out"
               status=1
-            elif echo "$out" | grep -q "assertion failed"; then
-              echo "::error file=$f::assertion failed in $f"
+            elif echo "$out" | grep -qE "assertion (failed|refused)"; then
+              echo "::error file=$f::an assertion failed or was refused in $f"
               echo "$out"
               status=1
             fi
@@ -140,7 +140,7 @@ To pin a version, replace the `tag=$(...)` line with a fixed tag, such as `tag=l
 Two details worth knowing:
 
 - `l4 check` exits non-zero on any parse or type error, so the typecheck step needs no extra logic.
-- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step checks two things: the exit code, which catches the type errors and the assertions that could not be evaluated, and a grep for `assertion failed`, which catches the verdicts (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
+- `l4 run` exits non-zero on type errors and on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), but **not** on failed or refused assertions — a failing `#ASSERT` prints `assertion failed`, and one the rules decline to answer prints `assertion refused`, while the file still typechecks. That is why the test step checks two things: the exit code, which catches the type errors and the assertions that could not be evaluated, and a grep for `assertion failed` and `assertion refused`, which catches the verdicts and the refusals (alternatively, use `l4 run --json` and check that each result of `"kind": "assertion"` has `"value": true`).
 
 If rules use `NOW` or `TODAY`, add `--fixed-now <ISO8601>` to the `l4 run` calls so CI results do not depend on the day the job runs.
 

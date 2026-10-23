@@ -54,6 +54,44 @@ neg e                 = Not emptyAnno e
 implies :: Expr Resolved -> Expr Resolved -> Expr Resolved
 implies e1 e2 = Or emptyAnno (Not emptyAnno e1) e2
 
+-- | Spell out, as the @AND@, @OR@ and @NOT@ they stand for, each @IMPLIES@ and
+-- each Boolean @IF@ in connective position, and change nothing else: no De
+-- Morgan, no distribution, nothing inside a @CONSIDER@, a comparison or any
+-- other leaf.
+--
+-- Connective position is the rule's body and the operands of @AND@, @OR@, @NOT@
+-- and @IMPLIES@, under a @WHERE@, and inside what this produces. An @IF@ there is
+-- Boolean, because its parent is a connective (or the rule, which a ladder
+-- requires to be Boolean).
+--
+-- @a IMPLIES b@ becomes @NOT a OR b@, and @IF c THEN t ELSE e@ becomes
+-- @(c AND t) OR (NOT c AND e)@. Each reads its operands in the order the
+-- original does, a refusal included, because the machine reads @a@ first and @b@
+-- only where @a@ is @TRUE@ (@IF a THEN b ELSE TRUE@ against @IF (NOT a) THEN TRUE
+-- ELSE b@), and @c@ first, then @t@ only where @c@ is @TRUE@ and @e@ only where
+-- it is @FALSE@. A drawing that keeps the written shape of the rest can
+-- therefore split them without changing which operand evaluation reaches first.
+--
+-- @c@ is read twice, so a condition that is not a single name becomes two leaves.
+-- That can only make a plan over-ask, never over-determine: a case settled while
+-- the two leaves may differ is settled for the one condition they stand for.
+--
+-- It reads the nodes, not the calls they start as: a rule's connectives are calls
+-- of builtin functions until 'L4.Desugar.carameliseExpr' turns them into nodes, so
+-- it runs on the caramelised expression.
+-- The annotation of an @IMPLIES@ or @IF@ goes to the @OR@ that replaces it.
+spellOutConnectives :: Expr Resolved -> Expr Resolved
+spellOutConnectives = \ case
+  Implies ann e1 e2    -> Or ann (Not emptyAnno (spellOutConnectives e1)) (spellOutConnectives e2)
+  IfThenElse ann c t e ->
+    let c' = spellOutConnectives c
+     in Or ann (And emptyAnno c' (spellOutConnectives t)) (And emptyAnno (Not emptyAnno c') (spellOutConnectives e))
+  Not ann e            -> Not ann (spellOutConnectives e)
+  And ann e1 e2        -> And ann (spellOutConnectives e1) (spellOutConnectives e2)
+  Or ann e1 e2         -> Or ann (spellOutConnectives e1) (spellOutConnectives e2)
+  Where ann e ds       -> Where ann (spellOutConnectives e) ds
+  e                    -> e
+
 -- | Classically interpret equivalence.
 equiv :: Expr Resolved -> Expr Resolved -> Expr Resolved
 equiv e1 e2 = And emptyAnno (implies e1 e2) (implies e2 e1)

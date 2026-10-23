@@ -15,6 +15,7 @@ module Backend.DecisionQueryPlan (
   QueryImpact (..),
   QueryInput (..),
   QueryAsk (..),
+  QueryRefusal (..),
   QueryPlanResponse (..),
   queryPlan,
 ) where
@@ -23,6 +24,7 @@ import Base
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import L4.FunctionSchema (Parameter (..), Parameters (..), parametersFromDecideWithErrors)
 import Backend.Jl4 (CompiledModule (..))
+import qualified L4.Refusal as Refusal
 import Data.Aeson (FromJSON, ToJSON, (.=), object)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as BS
@@ -30,6 +32,7 @@ import qualified Data.Char as Char
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.Ord (Down (..))
+import qualified Data.IntMap.Lazy as IntMap
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -46,7 +49,7 @@ import qualified Language.LSP.Protocol.Types as LSP
 
 import Backend.Api (FnArguments (..), FnLiteral (..))
 import qualified L4.Decision.QueryPlan as QP
-import L4.Decision.QueryPlan (QueryAtom (..), QueryImpact (..), QueryInput (..), QueryOutcome (..))
+import L4.Decision.QueryPlan (QueryAtom (..), QueryImpact (..), QueryInput (..), QueryOutcome (..), QueryRefusal (..))
 
 data CachedDecisionQuery = CachedDecisionQuery
   { cacheKey :: !Text
@@ -176,14 +179,37 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
       fileName = Text.unpack funName <> ".l4"
       verDocId = mkVerDocId fileName
       -- The module is already fully resolved; an empty substitution is sufficient.
-      vizCfg = LadderViz.mkVizConfig verDocId resolvedModule Map.empty True
+      draw cfg =
+        case LadderViz.doVisualize decide cfg of
+          Left e -> throwError err400 {errBody = Aeson.encode $ object ["error" .= LadderViz.prettyPrintVizError e]}
+          Right x -> pure x
+      vizConfig = LadderViz.mkVizConfig verDocId resolvedModule Map.empty
 
-  (ladderInfo, vizState) <- case LadderViz.doVisualize decide vizCfg of
-    Left e -> throwError err400 {errBody = Aeson.encode $ object ["error" .= LadderViz.prettyPrintVizError e]}
-    Right x -> pure x
+  -- A rule that holds a refusal is drawn again as written. Simplifying distributes
+  -- OR over AND, which keeps every leaf but can change which refusal evaluation,
+  -- reading left to right, reaches first (R7). Drawn as written, an IMPLIES or an
+  -- IF is one leaf that names only the inputs directly under it, and hides a
+  -- refusal inside it, so each is spelled out as the AND, OR and NOT it stands
+  -- for. Every other ladder is the simplified one, as before.
+  simplified <- draw (vizConfig True)
+  let holdsRefusal st =
+        not (IntMap.null (LadderViz.getRefusingAtoms st)) || not (null (LadderViz.getUnreadableRefusals st))
+  (ladderInfo, vizState) <-
+    if holdsRefusal (snd simplified)
+      then draw (LadderViz.spellingOut (vizConfig False))
+      else pure simplified
+
+  -- A refusal the plan cannot read: in an arm of a CONSIDER, in a comparison, in a
+  -- call, or behind a rule that refuses on only some paths, say, where whether it
+  -- is reached turns on the data or on rules the plan does not read, so no order of
+  -- the questions is right for it. The plan answers that, and does not guess.
+  for_ (Refusal.unreadableRefusalError (LadderViz.getUnreadableRefusals vizState)) \msg ->
+    throwError err400 {errBody = Aeson.encode $ object ["error" .= msg]}
 
   let (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
-      bddCompiled = BDQ.compileDecisionQuery order boolExpr
+      -- A leaf evaluation can only refuse at is not a question (R7).
+      refusals = LadderViz.getRefusingAtoms vizState
+      bddCompiled = BDQ.compileDecisionQuery order (BDQ.refusing (Set.fromList (IntMap.keys refusals)) boolExpr)
       deps = LadderViz.getAtomDeps vizState
       inputRefs = LadderViz.getAtomInputRefs vizState
 
@@ -200,6 +226,7 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
                   (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path))
                   inputRefs
             , compiled = bddCompiled
+            , refusalsByUnique = refusals
             }
       , paramSchema = parametersFromDecideWithErrors resolvedModule decide []
       }
@@ -221,6 +248,9 @@ data QueryPlanResponse = QueryPlanResponse
   , impact :: !(Map Int QueryImpact)
   , impactByAtomId :: !(Map Text QueryImpact)
   , note :: !Text
+  , refusal :: !(Maybe QueryRefusal)
+  -- ^ Where evaluation of this case is sure to refuse (R7): why, with the reason
+  -- @/evaluation@ gives. @null@ everywhere else.
   , ladder :: !(Maybe VizExpr.RenderAsLadderInfo)
   }
   deriving stock (Show, Generic)
@@ -256,7 +286,7 @@ queryPlan name cached args =
             Just v -> flattenBoolBindings k v
         | (k, mv) <- Map.toList args.fnArguments
         ]
-    QP.QueryPlanResponse{determined, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note} =
+    QP.QueryPlanResponse{determined, stillNeeded, ranked, inputs, asks = asksRanked, impact, impactByAtomId, note, refusal} =
       QP.queryPlan name paramsByUnique cached.core flattenedLabelBindings
 
     asksEnriched =
@@ -281,5 +311,6 @@ queryPlan name cached args =
       , impact
       , impactByAtomId
       , note
+      , refusal
       , ladder = Just cached.ladderInfo
       }

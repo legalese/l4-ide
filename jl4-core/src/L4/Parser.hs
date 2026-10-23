@@ -2404,6 +2404,7 @@ baseExpr' =
   <|> try event
   <|> regulative
   <|> breach
+  <|> refuse
   <|> lam
   <|> consider
   <|> try namedApp -- This is not nice
@@ -2723,6 +2724,22 @@ breach = do
       <$  annoLexeme (spacedKeyword_ TKBreach)
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBy) *> annoHole (indentedExpr current))
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole (indentedExpr current))
+
+-- | Parse @REFUSE "message"@.
+--
+-- The message is a LITERAL, not an arbitrary expression. That is deliberate:
+-- a refusal's reason is meant to be statically readable (so it can be reported
+-- without running the program), and a literal payload means 'Refuse' needs no
+-- machine 'Frame' to carry it. @REFUSE 42@ parses and is
+-- rejected by the type checker; @REFUSE (something computed)@ does not parse.
+--
+-- The label keeps the parse error to the one thing that works: without it the
+-- error lists the numeric literals too, which the type checker then refuses.
+refuse :: Parser (Expr Name)
+refuse = attachAnno $
+  Refuse emptyAnno
+    <$  annoLexeme (spacedKeyword_ TKRefuse)
+    <*> annoHole (lit <?> "String Literal")
 
 optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)

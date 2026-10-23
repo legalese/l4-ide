@@ -144,6 +144,7 @@ library
     L4.Parser.SrcSpan
     L4.ParserCombinators
     L4.Print
+    L4.Refusal
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
@@ -202,6 +203,8 @@ test-suite jl4-core-test
     NlgMultiplicitySpec
     NlgAttachmentSpec
     NlgSilentReadingSpec
+    LadderLeafIdsSpec
+    RefusalSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

@@ -22,6 +22,7 @@ module TestData (
   deonticRecordPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
+  refuseJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
   partialClausesJL4,
@@ -62,6 +63,30 @@ module TestData (
   taxpayerJL4,
   implicitFlagJL4,
   nameClashJL4,
+  refusingConditionJL4,
+  refusingDeepJL4,
+  refusingOrJL4,
+  refusingFirstJL4,
+  refusingArmJL4,
+  answeredConditionJL4,
+  refusingDistributedJL4,
+  refusingNotJL4,
+  conditionalRefuserJL4,
+  refusingWithInputsJL4,
+  refusingDirectJL4,
+  refusingImpliesJL4,
+  refusingEitherJL4,
+  leafCollisionJL4,
+  impliesBesideRefusalJL4,
+  ifBesideRefusalJL4,
+  unreadableRefusalsJL4,
+  coveredWithInputsJL4,
+  partlyRefusingWithInputsJL4,
+  partlyRefusingWithNumberJL4,
+  partlyRefusingNoInputsJL4,
+  partlyRefusingChainJL4,
+  partlyRefusingNamedJL4,
+  guardedRefuserJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -687,6 +712,26 @@ GIVEN `first name` IS A STRING
       `is a citizen` IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `check person` IF `is a citizen`
+|]
+
+-- | L4 source whose @export REFUSES for one input and answers for another.
+-- Exercises the refusal path in the direct-AST evaluator: a refusal must reach
+-- the caller as its own error kind, not as an 'InterpreterError' (which reads
+-- as a server fault).
+refuseJL4 :: Text
+refuseJL4 =
+  [i|
+GIVETH A NUMBER
+`this schedule is not encoded for years before 2000` MEANS
+    REFUSE "this schedule is not encoded for years before 2000"
+
+@export The fee for a rule year
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+fee y MEANS
+    IF y >= 2000
+    THEN 100
+    ELSE `this schedule is not encoded for years before 2000`
 |]
 
 -- | Two-file fixture: a DECLARE'd record lives in the imported file and
@@ -1370,3 +1415,524 @@ GIVEN `a b` IS A NUMBER
 GIVETH A NUMBER
 DECIDE clash IS `a b` PLUS `a-b`
 |]
+
+-- | REFUSE (R7) reached through a rule of no inputs: house style names each
+-- refusal once, with its reason. The query plan once asked about
+-- @`the other conditions are not modelled`@ as if it were a yes/no question,
+-- and answered @eligible@ from that answer, where evaluation refuses.
+refusingConditionJL4 :: Text
+refusingConditionJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the other conditions are not modelled`
+|]
+
+-- | The refusal three definitions deep, through rules of no inputs only, one of
+-- them under a WHERE. A call with arguments is not followed (a gap the
+-- documentation names).
+refusingDeepJL4 :: Text
+refusingDeepJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the innermost condition` MEANS REFUSE "the deep condition is not modelled"
+
+GIVETH A BOOLEAN
+`the inner condition` MEANS `the innermost condition`
+    WHERE `an unused aside` MEANS TRUE
+
+GIVETH A BOOLEAN
+`the outer condition` MEANS `the inner condition`
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the outer condition`
+|]
+
+-- | 'refusingConditionJL4' with OR: TRUE where @adult@ is, refused otherwise.
+refusingOrJL4 :: Text
+refusingOrJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult OR `the other conditions are not modelled`
+|]
+
+-- | 'refusingConditionJL4' the other way round. Evaluation reads the refusing
+-- rule first, so it refuses whatever @adult@ is (R7 records this order
+-- dependence; it does not remove it).
+refusingFirstJL4 :: Text
+refusingFirstJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS `the other conditions are not modelled` AND adult
+|]
+
+-- | A REFUSE written in the rule, on one arm of an IF. The plan reads the IF as
+-- the choice it is: the condition first, then only the arm it picks.
+refusingArmJL4 :: Text
+refusingArmJL4 =
+  [i|
+@export Whether the person is eligible
+GIVEN resident IS A BOOLEAN
+      adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible resident adult MEANS
+    IF resident THEN adult
+    ELSE REFUSE "the rules for non-residents are not modelled"
+|]
+
+-- | A rule of no inputs that cannot refuse: still a question, as before.
+answeredConditionJL4 :: Text
+answeredConditionJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the fee is paid` MEANS TRUE
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the fee is paid`
+|]
+
+-- | A refusal inside a disjunction of conjunctions. Evaluation of
+-- @(adult AND r) OR resident@ with adult FALSE never reaches @r@; simplified,
+-- as the service draws a ladder, it is @(adult OR resident) AND (r OR resident)@,
+-- which does. So a ladder with a refusing leaf is drawn again unsimplified.
+refusingDistributedJL4 :: Text
+refusingDistributedJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult resident MEANS (adult AND `the other conditions are not modelled`) OR resident
+|]
+
+-- | NOT: TRUE where adult is FALSE, refused where adult is TRUE, both only once
+-- resident is TRUE.
+refusingNotJL4 :: Text
+refusingNotJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult resident MEANS resident AND NOT (adult AND `the other conditions are not modelled`)
+|]
+
+-- | A rule of no inputs that refuses on only one path. It is not marked, so it is
+-- still a question, as before: whether it refuses can turn on what the plan does
+-- not see.
+conditionalRefuserJL4 :: Text
+conditionalRefuserJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the fee is paid` MEANS TRUE
+
+GIVETH A BOOLEAN
+`the cap applies` MEANS
+    IF `the fee is paid` THEN TRUE
+    ELSE REFUSE "the cap is not modelled for unpaid fees"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the cap applies`
+|]
+
+-- | A rule WITH an input whose body is a refusal. A call to it refuses whatever
+-- it is given, which the plan cannot read: it answers 400.
+refusingWithInputsJL4 :: Text
+refusingWithInputsJL4 =
+  [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is covered` person MEANS
+    REFUSE "coverage is not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult applicant MEANS adult AND `the person is covered` applicant
+|]
+
+-- | A REFUSE written as an operand of AND, with no definition around it.
+refusingDirectJL4 :: Text
+refusingDirectJL4 =
+  [i|
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND REFUSE "the other conditions are not modelled"
+|]
+
+-- | A rule of no inputs that always refuses, on the right of an IMPLIES. It is
+-- reached only where the left side is TRUE.
+refusingImpliesJL4 :: Text
+refusingImpliesJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the other conditions are not modelled` MEANS
+    REFUSE "the other conditions are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult IMPLIES `the other conditions are not modelled`
+|]
+
+-- | Two refusals for different reasons, one on each side of the answer to
+-- @adult@: refused before @adult@ is answered, with both reasons until it is.
+-- (@NOT adult AND r@ reads as @NOT (adult AND r)@, so the second is bracketed.)
+refusingEitherJL4 :: Text
+refusingEitherJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the rules for adults are not modelled` MEANS
+    REFUSE "the rules for adults are not modelled"
+
+GIVETH A BOOLEAN
+`the rules for minors are not modelled` MEANS
+    REFUSE "the rules for minors are not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS
+    (adult AND `the rules for adults are not modelled`)
+    OR ((NOT adult) AND `the rules for minors are not modelled`)
+|]
+
+-- | @n + 1@ rules of no inputs, @p0@ to @pn@, declared before four rules that
+-- each read the last of them (or an input) beside another leaf. A bare name is
+-- keyed by its own unique and any other leaf by a fresh counter, so how many
+-- rules come first moves the name's unique against the counter's range. The
+-- rules are checked at every @n@ in a span, so that no particular numbering is
+-- relied on.
+leafCollisionJL4 :: Int -> Text
+leafCollisionJL4 n =
+  Text.unlines
+    ( concat [["GIVETH A BOOLEAN", "p" <> Text.pack (show k) <> " MEANS TRUE", ""] | k <- [0 .. n]]
+        <> [ "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "lastOrRefuse a b MEANS " <> lastRule <> " OR (REFUSE \"L1\")"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "lastAndRefuse a b MEANS " <> lastRule <> " AND (REFUSE \"L1\")"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "lastAndIf a b MEANS " <> lastRule <> " AND (IF b THEN b ELSE b)"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "inputOrRefuse a b MEANS a OR (REFUSE \"L1\")"
+           ]
+    )
+ where
+  lastRule = "p" <> Text.pack (show n)
+
+-- | @n + 1@ rules of no inputs, @p0@ to @pn@, then @r1@, a rule that always
+-- refuses, then rules that read an IMPLIES beside a refusal, in the places a
+-- ladder draws as structure. A ladder with a refusing leaf is drawn as written,
+-- where an IMPLIES must still be read as the OR it stands for: @a IMPLIES b@
+-- reads @a@ first, and reads @b@ only where @a@ is TRUE. The last rule holds no
+-- refusal, so it is drawn simplified: the control for the checks on the rest.
+impliesBesideRefusalJL4 :: Int -> Text
+impliesBesideRefusalJL4 n =
+  Text.unlines
+    ( concat [["GIVETH A BOOLEAN", "p" <> Text.pack (show k) <> " MEANS TRUE", ""] | k <- [0 .. n]]
+        <> [ "GIVETH A BOOLEAN"
+           , "r1 MEANS REFUSE \"R1\""
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "orFalseAndR b c MEANS (b IMPLIES (NOT c)) OR (FALSE AND r1)"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "andTrueOrR b c MEANS ((NOT b) IMPLIES c) AND (TRUE OR r1)"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "notImpliesRefuse b MEANS NOT (b IMPLIES (REFUSE \"L2\"))"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "notRefuseImplies b MEANS NOT ((REFUSE \"L2\") IMPLIES b)"
+           , ""
+           , "@export"
+           , "GIVEN c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "viaImplies c MEANS (r1 IMPLIES c) OR r1"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "plainImplies b c MEANS b IMPLIES (NOT c)"
+           ]
+    )
+
+-- | 'refusingWithInputsJL4' with the refusal removed: a call to a rule with an
+-- input that answers, so the plan reads the call as a question.
+coveredWithInputsJL4 :: Text
+coveredWithInputsJL4 =
+  [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is covered` person MEANS person
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult applicant MEANS adult AND `the person is covered` applicant
+|]
+
+-- | A call to a rule WITH an input that refuses on only some paths: where the
+-- applicant is not insured, and the adult is, evaluation refuses. The plan can
+-- neither ask the call as a question nor report the refusal, so it answers 400.
+partlyRefusingWithInputsJL4 :: Text
+partlyRefusingWithInputsJL4 =
+  [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance of an applicant who is not insured is not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult applicant MEANS adult AND `the person is insured` applicant
+|]
+
+-- | The same call with the input given by name, @WITH person IS applicant@.
+partlyRefusingNamedJL4 :: Text
+partlyRefusingNamedJL4 =
+  [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance of an applicant who is not insured is not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult applicant MEANS adult AND `the person is insured` WITH person IS applicant
+|]
+
+-- | The same with a NUMBER input, where the call is not drawn as a function of
+-- Booleans but as one leaf.
+partlyRefusingWithNumberJL4 :: Text
+partlyRefusingWithNumberJL4 =
+  [i|
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`the amount is allowed` amount MEANS
+    IF amount GREATER THAN 0 THEN TRUE
+    ELSE REFUSE "an amount of nothing is not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      amount IS A NUMBER
+GIVETH A BOOLEAN
+eligible adult amount MEANS adult AND `the amount is allowed` amount
+|]
+
+-- | A rule of no inputs that refuses on only some paths: the scheme is not open,
+-- so evaluation refuses wherever the residence test is read. The plan cannot ask
+-- the test as a question, since it does not read the rule that decides it.
+partlyRefusingNoInputsJL4 :: Text
+partlyRefusingNoInputsJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the scheme is open` MEANS FALSE
+
+GIVETH A BOOLEAN
+`the residence test is met` MEANS
+    IF `the scheme is open` THEN TRUE
+    ELSE REFUSE "the residence test is not modelled once the scheme is closed"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the residence test is met`
+|]
+
+-- | The rule that refuses on some paths is reached through a second rule, which
+-- is only a name for it.
+partlyRefusingChainJL4 :: Text
+partlyRefusingChainJL4 =
+  [i|
+GIVETH A BOOLEAN
+`the scheme is open` MEANS FALSE
+
+GIVETH A BOOLEAN
+`the residence test is met` MEANS
+    IF `the scheme is open` THEN TRUE
+    ELSE REFUSE "the residence test is not modelled once the scheme is closed"
+
+GIVETH A BOOLEAN
+`the person qualifies by residence` MEANS `the residence test is met`
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult MEANS adult AND `the person qualifies by residence`
+|]
+
+-- | A rule that refuses on only some paths, called where evaluation never reaches
+-- the refusal: @check a@ is read only where @a@ is TRUE, and it refuses only where
+-- @a@ is FALSE. The plan cannot tell, and declines.
+guardedRefuserJL4 :: Text
+guardedRefuserJL4 =
+  [i|
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+check a MEANS
+    IF a THEN TRUE
+    ELSE REFUSE "the guard is not modelled"
+
+@export Whether the person is eligible
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible a MEANS a AND check a
+|]
+
+-- | Refusals in the places the plan cannot read: an arm of a CONSIDER, an
+-- operand of a comparison, an operand of EQUALS. Each is exported on its own,
+-- beside @clean@, which holds none and is planned as any rule is.
+unreadableRefusalsJL4 :: Text
+unreadableRefusalsJL4 =
+  [i|
+GIVETH A BOOLEAN
+r1 MEANS REFUSE "R1"
+
+GIVETH A NUMBER
+`the fee` MEANS REFUSE "no fee is modelled"
+
+@export
+GIVEN adult IS A BOOLEAN
+      variant IS A BOOLEAN
+GIVETH A BOOLEAN
+consideredArm adult variant MEANS
+  adult AND
+    CONSIDER variant
+      WHEN TRUE THEN TRUE
+      OTHERWISE REFUSE "the other variant is not modelled"
+
+@export
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+comparison adult MEANS adult AND (`the fee` GREATER THAN 3)
+
+@export
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+equalsRefuse adult MEANS adult AND (r1 EQUALS TRUE)
+
+@export
+GIVEN adult IS A BOOLEAN
+      variant IS A BOOLEAN
+GIVETH A BOOLEAN
+clean adult variant MEANS adult AND variant
+|]
+
+-- | @n + 1@ rules of no inputs, then @r1@, a rule that always refuses, then
+-- rules that hold a refusal on an arm or in the condition of an IF, in the
+-- places a ladder draws as structure. The plan reads an IF as the choice it is:
+-- the condition first, then only the arm it picks. The last rule holds no
+-- refusal, so it is drawn simplified: the control for the checks on the rest.
+ifBesideRefusalJL4 :: Int -> Text
+ifBesideRefusalJL4 n =
+  Text.unlines
+    ( concat [["GIVETH A BOOLEAN", "p" <> Text.pack (show k) <> " MEANS TRUE", ""] | k <- [0 .. n]]
+        <> [ "GIVETH A BOOLEAN"
+           , "r1 MEANS REFUSE \"R1\""
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "ifElseRefuses a b c MEANS (IF b THEN c ELSE r1) AND a"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "ifThenRefuses a b c MEANS (IF b THEN r1 ELSE c) OR a"
+           , ""
+           , "@export"
+           , "GIVEN b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "ifConditionRefuses b c MEANS IF r1 THEN b ELSE c"
+           , ""
+           , "@export"
+           , "GIVEN resident IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "houseStyle resident MEANS IF resident THEN TRUE ELSE r1"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "nestedIf a b MEANS IF a THEN (IF b THEN TRUE ELSE r1) ELSE FALSE"
+           , ""
+           , "@export"
+           , "GIVEN a IS A BOOLEAN"
+           , "      b IS A BOOLEAN"
+           , "      c IS A BOOLEAN"
+           , "GIVETH A BOOLEAN"
+           , "plainOr a b c MEANS (b AND c) OR a"
+           ]
+    )

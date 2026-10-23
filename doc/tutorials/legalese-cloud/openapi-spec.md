@@ -78,6 +78,9 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/ca
   -d '{"arguments": {"applicant": {"is-existing-customer": true}}}'
 ```
 
+When the inputs you have lead the rule to decline to answer (a [`REFUSE`](../../reference/control-flow/REFUSE.md)), `determined` is `null`, nothing more is asked, and `refusal` gives the reasons.
+For a rule that holds a refusal the plan cannot read, the endpoint answers 400 with an `error` that says where.
+
 ## Generate a client from the OpenAPI document
 
 Every deployment publishes an OpenAPI document, with one operation per exported rule: the `GIVEN` inputs as the request body and the rule's result as the response.

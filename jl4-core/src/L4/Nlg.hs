@@ -706,6 +706,9 @@ instance Linearize (Expr Resolved) where
       [ frame "breach" ]
       <> maybe [] (\p -> [ frame "by", lin p ]) mParty
       <> maybe [] (\r -> [ frame "because", lin r ]) mReason
+    -- A refusal reads as what it is: the model declining to answer, with the
+    -- author's reason.
+    Refuse _ msg -> hcat [ "the model refuses to answer:", lin msg ]
     Inert _ txt _ctx -> text txt
 
 instance Linearize (Event Resolved) where
