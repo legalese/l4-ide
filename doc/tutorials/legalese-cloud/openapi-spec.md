@@ -81,6 +81,13 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/ca
 When the inputs you have lead the rule to decline to answer (a [`REFUSE`](../../reference/control-flow/REFUSE.md)), `determined` is `null`, nothing more is asked, and `refusal` gives the reasons.
 For a rule that holds a refusal the plan cannot read, the endpoint answers 400 with an `error` that says where.
 
+In two cases the plan can give a `determined` answer that running the rule does not give:
+
+- **The rule uses a rule from another file.** The plan does not follow a name into a file the rule imports, so it does not see a refusal there: it asks for that rule as a question and takes your answer, though running the rule refuses wherever it reaches that rule.
+- **The rule calls another rule on one of its inputs.** The plan takes your answer to that input as the call's answer, whatever the called rule does with it, so it can say `true` where running the rule says `false`. In a rule that holds a refusal, a call used as the condition of an `IF` is read the same way, so the plan can give an answer where running the rule refuses.
+
+For a rule like these, do not act on `determined`: ask for every input and run the rule with `/evaluation`. The [`REFUSE` limits](../../reference/control-flow/REFUSE.md#limits) give the details.
+
 ## Generate a client from the OpenAPI document
 
 Every deployment publishes an OpenAPI document, with one operation per exported rule: the `GIVEN` inputs as the request body and the rule's result as the response.
