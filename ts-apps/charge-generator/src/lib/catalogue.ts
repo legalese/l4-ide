@@ -16,6 +16,7 @@ export type Family =
   | 'theft'
   | 'extortion'
   | 'robbery'
+  | 'misappropriation'
   | 'cbt'
   | 'intimidation'
   | 'hurt'
@@ -75,6 +76,17 @@ export const OFFENCES: readonly Offence[] = [
     factsParam: 'f',
   },
   {
+    section: '380',
+    title: 'theft in a dwelling',
+    defines: 's 378 (with the place s 380 adds)',
+    family: 'theft',
+    offenceFn: 'offence under s 380',
+    chargeFn: 'charge under s 380',
+    definitionFns: ['commits theft'],
+    factsType: 'Theft in Dwelling Facts',
+    factsParam: 'f',
+  },
+  {
     section: '384',
     title: 'extortion',
     defines: 's 383',
@@ -103,6 +115,17 @@ export const OFFENCES: readonly Offence[] = [
     factsParam: 'f',
   },
   {
+    section: '393',
+    title: 'attempt to commit robbery',
+    defines: 's 390(2) — the same violence, the taking not completed',
+    family: 'robbery',
+    offenceFn: 'offence under s 393',
+    chargeFn: 'charge under s 393',
+    definitionFns: [],
+    factsType: 'Robbery Facts',
+    factsParam: 'f',
+  },
+  {
     section: '394',
     title: 'voluntarily causing hurt in committing robbery',
     defines: 'ss 390, 394',
@@ -120,6 +143,18 @@ export const OFFENCES: readonly Offence[] = [
     factsParam: 'f',
   },
   {
+    section: '403',
+    title: 'dishonest misappropriation of property',
+    defines:
+      's 403 (this section both defines and punishes — the ladder IS the defining section)',
+    family: 'misappropriation',
+    offenceFn: 'offence under s 403',
+    chargeFn: 'charge under s 403',
+    definitionFns: [],
+    factsType: 'Misappropriation Facts',
+    factsParam: 'f',
+  },
+  {
     section: '406',
     title: 'criminal breach of trust',
     defines: 's 405',
@@ -129,6 +164,41 @@ export const OFFENCES: readonly Offence[] = [
     definitionFns: ['commits criminal breach of trust'],
     factsType: 'CBT Facts',
     factsParam: 'f',
+  },
+  {
+    section: '407',
+    title:
+      'criminal breach of trust of property entrusted for transportation or storage',
+    defines: 's 405 (with the capacity s 407 adds)',
+    family: 'cbt',
+    offenceFn: 'offence under s 407',
+    chargeFn: 'charge under s 407',
+    definitionFns: ['commits criminal breach of trust'],
+    factsType: 'Aggravated CBT Facts',
+    factsParam: 'c',
+  },
+  {
+    section: '408',
+    title: 'criminal breach of trust by an employee',
+    defines: 's 405 (with the capacity s 408 adds)',
+    family: 'cbt',
+    offenceFn: 'offence under s 408',
+    chargeFn: 'charge under s 408',
+    definitionFns: ['commits criminal breach of trust'],
+    factsType: 'Aggravated CBT Facts',
+    factsParam: 'c',
+  },
+  {
+    section: '409',
+    title:
+      'criminal breach of trust by a public servant, or by a banker, merchant, agent, director, officer, partner, key executive or fiduciary',
+    defines: 's 405 (with the capacity s 409 adds)',
+    family: 'cbt',
+    offenceFn: 'offence under s 409',
+    chargeFn: 'charge under s 409',
+    definitionFns: ['commits criminal breach of trust'],
+    factsType: 'Aggravated CBT Facts',
+    factsParam: 'c',
   },
   {
     section: '506',
