@@ -93,7 +93,7 @@ That can only make the plan over-ask.
 Both ladders do it in `translateDecide`, straight after `carameliseExpr`, because a call to the `IMPLIES` function is an `Implies` node only after `carameliseExpr`; it is a switch on the configuration (`spellingOut`, and `visualizeByNameSpelledOut` for `jl4-wasm`) that is off for every other caller.
 After the redraw, a rule that holds a leaf of the second kind is not planned: the service answers 400 with `{"error": …}` and `jl4-wasm` returns the same sentence in its error object (`Refusal.unreadableRefusalError`).
 The sentence names the first such part and its reason, and is cut at 100 characters: `… because a refusal ("<reason>") may be reached from this part of it: <part>`.
-A reference by name to a rule that refuses on only some paths, and a call to one, with or without inputs, are leaves of the second kind.
+A reference by name to a rule that refuses on only some paths, and a call to one, with or without inputs, are leaves of the second kind, whether or not evaluation reaches the refusal.
 The plan cannot ask them, since evaluation does not take an answer for them, and cannot report their refusal, since there may be none.
 
 What differs from unstable, because `main` lacks what unstable's version stands on:
@@ -214,7 +214,7 @@ The `/query-plan` rows were measured on 2026-10-22, except the last, which was m
 - **The query plan reads a refusal only in a few places.**
   They are the whole rule, and an operand of `AND`, `OR`, `NOT` or `IMPLIES`, or a condition or arm of a Boolean `IF` in one of those places: a `REFUSE`, or a bare reference to a definition of no inputs that always refuses.
   A refusal in any part that is not an `AND`, `OR`, `NOT`, `IMPLIES` or Boolean `IF`, such as an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, or a `LET` binding, is a 400.
-  So is a call to a definition that always refuses, other than one of no inputs, and a reference to or a call to a definition that refuses on only some paths.
+  So is a call to a definition that always refuses, other than one of no inputs, and a reference to or a call to a definition that refuses on only some paths, whether or not evaluation reaches the refusal.
   The `impact` of a branch that leads to a refusal shows `determined: null` and `support: []`, as a branch with nothing settled does; the plan's `refusal` for those answers is where it shows.
 - **The map of definitions that refuse on only some paths over-approximates.**
   A `REFUSE` anywhere under a body counts, whether or not evaluation reaches it, since that turns on the inputs and on rules the plan does not read.

@@ -57,7 +57,7 @@ import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWra
 
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
-import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4, ifBesideRefusalJL4, unreadableRefusalsJL4, coveredWithInputsJL4, partlyRefusingWithInputsJL4, partlyRefusingWithNumberJL4, partlyRefusingNoInputsJL4, partlyRefusingChainJL4, guardedRefuserJL4)
+import TestData (refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, conditionalRefuserJL4, refusingWithInputsJL4, refusingDirectJL4, refusingImpliesJL4, refusingEitherJL4, leafCollisionJL4, impliesBesideRefusalJL4, ifBesideRefusalJL4, unreadableRefusalsJL4, coveredWithInputsJL4, partlyRefusingWithInputsJL4, partlyRefusingWithNumberJL4, partlyRefusingNoInputsJL4, partlyRefusingChainJL4, partlyRefusingNamedJL4, guardedRefuserJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -1100,6 +1100,11 @@ spec = describe "integration" do
                 , [adult True, ("applicant", Aeson.Bool False)]
                 , [[], [adult True], [adult True, ("applicant", Aeson.Bool True)], [adult True, ("applicant", Aeson.Bool False)], [adult False]]
                 , "`the person is insured` OF applicant"
+                , "insurance of an applicant who is not insured is not modelled" )
+              , ( "called with a named input", partlyRefusingNamedJL4
+                , [adult True, ("applicant", Aeson.Bool False)]
+                , [[], [adult True], [adult True, ("applicant", Aeson.Bool True)], [adult True, ("applicant", Aeson.Bool False)], [adult False]]
+                , "`the person is insured` WITH person IS applicant"
                 , "insurance of an applicant who is not insured is not modelled" )
               , ( "called with a NUMBER input", partlyRefusingWithNumberJL4
                 , [adult True, ("amount", Aeson.Number 0)]

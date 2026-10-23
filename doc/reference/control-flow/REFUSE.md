@@ -137,7 +137,7 @@ What they read there is a `REFUSE`, or a rule of no inputs that always refuses: 
 A rule that holds a refusal the plan cannot read is not planned: `/query-plan` answers 400 with an `"error"` that says where the first one may be reached from, for either of these:
 
 - **A refusal inside a part that is not an `AND`, `OR`, `NOT`, `IMPLIES` or Boolean `IF`**: an arm of a `CONSIDER`, an operand of a comparison or of `EQUALS`, a `LET` binding.
-- **A call to a rule that refuses, other than a rule of no inputs that always refuses**: a rule with inputs that always refuses, and any rule that refuses on only some paths, such as one ending `ELSE REFUSE "…"`, whether or not it takes inputs.
+- **A call to a rule that refuses, other than a rule of no inputs that always refuses**: a rule with inputs that always refuses, and any rule that refuses on only some paths, such as one ending `ELSE REFUSE "…"`, whether or not it takes inputs and whether or not evaluation reaches the refusal.
   The plan declines such a rule even when the refusal is on a path the inputs never take, as in `a AND check a` where `check a` refuses only when `a` is `FALSE`.
 
 For this rule, where `` `the scheme is open` `` is a rule of no inputs that is `FALSE` (the `GIVEN` and `GIVETH` lines are left out):

@@ -85,6 +85,7 @@ module TestData (
   partlyRefusingWithNumberJL4,
   partlyRefusingNoInputsJL4,
   partlyRefusingChainJL4,
+  partlyRefusingNamedJL4,
   guardedRefuserJL4,
 ) where
 
@@ -1748,6 +1749,23 @@ GIVEN adult IS A BOOLEAN
       applicant IS A BOOLEAN
 GIVETH A BOOLEAN
 eligible adult applicant MEANS adult AND `the person is insured` applicant
+|]
+
+-- | The same call with the input given by name, @WITH person IS applicant@.
+partlyRefusingNamedJL4 :: Text
+partlyRefusingNamedJL4 =
+  [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance of an applicant who is not insured is not modelled"
+
+@export Whether the person is eligible
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible adult applicant MEANS adult AND `the person is insured` WITH person IS applicant
 |]
 
 -- | The same with a NUMBER input, where the call is not drawn as a function of

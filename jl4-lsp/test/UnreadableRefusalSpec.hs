@@ -102,6 +102,11 @@ source =
     , "callWithInput adult applicant MEANS adult AND `the person is insured` applicant"
     , ""
     , "GIVEN adult IS A BOOLEAN"
+    , "      applicant IS A BOOLEAN"
+    , "GIVETH A BOOLEAN"
+    , "callWithNamedInput adult applicant MEANS adult AND `the person is insured` WITH person IS applicant"
+    , ""
+    , "GIVEN adult IS A BOOLEAN"
     , "      amount IS A NUMBER"
     , "GIVETH A BOOLEAN"
     , "callWithNumber adult amount MEANS adult AND `the amount is allowed` amount"
@@ -130,6 +135,7 @@ spec = describe "a rule that reads one that refuses on only some paths, in the e
     describe (show drawing) $ do
       forM_
         [ ("a call with a Boolean input", "callWithInput", "`the person is insured` OF applicant", "insurance is not modelled")
+        , ("a call with a named input", "callWithNamedInput", "`the person is insured` WITH person IS applicant", "insurance is not modelled")
         , ("a call with a NUMBER input", "callWithNumber", "`the amount is allowed` OF amount", "an amount of nothing is not modelled")
         , ("a rule of no inputs", "noInputs", "`the residence test is met`", "residence is not modelled")
         , ("a rule of no inputs reached through another", "throughAnother", "`the residence test is reached`", "residence is not modelled")
