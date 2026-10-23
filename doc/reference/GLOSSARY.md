@@ -67,15 +67,14 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 
 ## Control flow
 
-| Keyword                          | Meaning                                                                                                                                    | Reference                            |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| **IF** ... **THEN** ... **ELSE** | Chooses between two values                                                                                                                 | [IF](control-flow/IF.md)             |
-| **BRANCH**                       | A multi-way conditional: a list of `IF ... THEN` lines and an `OTHERWISE`                                                                  | [BRANCH](control-flow/BRANCH.md)     |
-| **CONSIDER**                     | Pattern matching: picks a branch by the shape of a value                                                                                   | [CONSIDER](control-flow/CONSIDER.md) |
-| **WHEN**                         | One branch of a CONSIDER                                                                                                                   | [CONSIDER](control-flow/CONSIDER.md) |
-| **OTHERWISE**                    | The branch for every remaining case, in CONSIDER and BRANCH                                                                                | [CONSIDER](control-flow/CONSIDER.md) |
-| **EXACTLY**                      | In a pattern, matches a given value; in a regulative rule, matches an action exactly                                                       | [CONSIDER](control-flow/CONSIDER.md) |
-| **REFUSE**                       | Declines to answer: this case is outside what the model covers. No later rule can turn a refusal into an answer; the caller sees a refusal | [REFUSE](control-flow/REFUSE.md)     |
+| Keyword                          | Meaning                                                                              | Reference                            |
+| -------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ |
+| **IF** ... **THEN** ... **ELSE** | Chooses between two values                                                           | [IF](control-flow/IF.md)             |
+| **BRANCH**                       | A multi-way conditional: a list of `IF ... THEN` lines and an `OTHERWISE`            | [BRANCH](control-flow/BRANCH.md)     |
+| **CONSIDER**                     | Pattern matching: picks a branch by the shape of a value                             | [CONSIDER](control-flow/CONSIDER.md) |
+| **WHEN**                         | One branch of a CONSIDER                                                             | [CONSIDER](control-flow/CONSIDER.md) |
+| **OTHERWISE**                    | The branch for every remaining case, in CONSIDER and BRANCH                          | [CONSIDER](control-flow/CONSIDER.md) |
+| **EXACTLY**                      | In a pattern, matches a given value; in a regulative rule, matches an action exactly | [CONSIDER](control-flow/CONSIDER.md) |
 
 ## Operators
 

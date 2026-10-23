@@ -10,7 +10,7 @@ module Schema (
 ) where
 
 import Backend.Api
-import Backend.DecisionQueryPlan (QueryPlanResponse, QueryAtom, QueryOutcome, QueryImpact, QueryInput, QueryAsk, QueryRefusal)
+import Backend.DecisionQueryPlan (QueryPlanResponse, QueryAtom, QueryOutcome, QueryImpact, QueryInput, QueryAsk)
 import L4.FunctionSchema (Parameters (..), Parameter (..))
 import Types
 
@@ -159,7 +159,6 @@ instance ToSchema QueryOutcome
 instance ToSchema QueryImpact
 instance ToSchema QueryInput
 instance ToSchema QueryAsk
-instance ToSchema QueryRefusal
 instance ToSchema QueryPlanResponse
 
 instance ToSchema Function where

@@ -143,25 +143,15 @@ evalDirectiveToResult fields dirType rng (EL.MkEvalDirectiveResult _range res mt
     { directiveType = dirType
     , prettyText = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult _range res mtrace)
     , success = case res of
-        EL.Assertion EL.Holds              -> Just True
-        EL.Assertion EL.Fails              -> Just False
-        -- 'Nothing', NOT 'Just False'. This is the one surface where a wrong
-        -- answer reaches a caller as a plausible one: a decision service that
-        -- was told a refusal is FALSE has been handed an answer the model
-        -- declined to give.
-        EL.Assertion (EL.Refused _)        -> Nothing
-        EL.Assertion (EL.Errored _)        -> Just False
-        EL.Reduction (EL.Reduced _)        -> Just True
-        EL.Reduction (EL.ReducedRefused _) -> Nothing
-        EL.Reduction (EL.ReducedErrored _) -> Just False
+        EL.Assertion (Right b) -> Just b
+        EL.Assertion (Left _)  -> Just False
+        EL.Reduction (Right _) -> Just True
+        EL.Reduction (Left _)  -> Just False
     , structuredValue = case res of
-        EL.Assertion EL.Holds              -> Just (Aeson.toJSON True)
-        EL.Assertion EL.Fails              -> Just (Aeson.toJSON False)
-        EL.Assertion (EL.Refused _)        -> Nothing
-        EL.Assertion (EL.Errored _)        -> Nothing
-        EL.Reduction (EL.ReducedErrored _) -> Nothing
-        EL.Reduction (EL.ReducedRefused _) -> Nothing
-        EL.Reduction (EL.Reduced nf)       -> Just (nfToJson nf)
+        EL.Assertion (Right b) -> Just (Aeson.toJSON b)
+        EL.Assertion (Left _)  -> Nothing
+        EL.Reduction (Left _) -> Nothing
+        EL.Reduction (Right nf) -> Just (nfToJson nf)
     , range = rng
     }
 
@@ -287,14 +277,10 @@ evalDirectiveToUpdateItem fields getLines (EL.MkEvalDirectiveResult (Just rng@(M
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
     , prettyText  = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult (Just rng) res mtrace)
     , success     = case res of
-        EL.Assertion EL.Holds              -> Just True
-        EL.Assertion EL.Fails              -> Just False
-        -- See 'evalDirectiveToResult': a refusal is not a FALSE verdict.
-        EL.Assertion (EL.Refused _)        -> Nothing
-        EL.Assertion (EL.Errored _)        -> Just False
-        EL.Reduction (EL.Reduced _)        -> Just True
-        EL.Reduction (EL.ReducedRefused _) -> Nothing
-        EL.Reduction (EL.ReducedErrored _) -> Just False
+        EL.Assertion (Right b) -> Just b
+        EL.Assertion (Left _)  -> Just False
+        EL.Reduction (Right _) -> Just True
+        EL.Reduction (Left _)  -> Just False
     , body        = getLines startLine endLine
     }
 evalDirectiveToUpdateItem _ _ _ = Nothing

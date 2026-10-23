@@ -115,33 +115,6 @@ GIVEN n IS A NUMBER
 - Field access uses the genitive `'s`: `person's age`, `application's employee's nationality`. Note that function arguments bind stronger than genitive. `f r's foo` parses as `(f r)'s foo`, not `f (r's foo)`.
 - Multiple parameters go on one `GIVEN` separated by commas (or wrapped with matching indentation), not successive `GIVEN` lines: `GIVEN a IS A T, b IS A U`.
 
-#### Where the source stops: `REFUSE`
-
-When the source text stops short (a commencement date, a relief that turns on facts the encoding does not model, a schedule not yet written), say that the rules decline.
-Do not return a default, which is a wrong answer the caller cannot tell from a right one.
-Do not `ASSUME` a fact nobody can supply, which turns the gap into a question for the user.
-
-`REFUSE "reason"` is an expression at any type, and nothing downstream turns it into an answer.
-Write each refusal as its own named definition, and let the arms that reach it read as the source does:
-
-```l4
-GIVETH A NUMBER
-`this schedule is not encoded for years before 2000` MEANS
-    REFUSE "this schedule is not encoded for years before 2000"
-
-GIVEN y IS A NUMBER
-GIVETH A NUMBER
-`the fee in year` y MEANS
-    IF y AT LEAST 2000
-    THEN 100
-    ELSE `this schedule is not encoded for years before 2000`
-```
-
-- The reason is a string literal, not a computed expression.
-- `l4 run` prints `assertion refused:` with the reason and exits `0`, so a CI job has to look for `assertion refused` as well as `assertion failed`.
-- The decision service answers a refusal with 422 `EvaluatorRefused` and the reason.
-- `AND` and `OR` are lazy, so whether a refusal is reached depends on the order of the operands: left to right.
-
 ### 4. Structure like the source
 
 **Isomorphic encoding** — match the logical shape of the source text. If legislation has sections numbered 1.1 / 1.2 / 1.3 with three clauses joined by AND, your L4 should have three conjuncts in the same order. This keeps the rule auditable against the statute.
@@ -246,9 +219,8 @@ iterate until the check passes.
   function against many rows, streaming NDJSON output (one object per
   row). `--format json|csv|yaml` and `--output FILE` change the output.
   The run stops at the first failing row and exits 1, unless
-  `--continue-on-error`; a row whose rules refuse to answer (`REFUSE`)
-  has status `refused` and is not a failing row; `--validate-only`
-  checks the rows against the function's inputs without evaluating.
+  `--continue-on-error`; `--validate-only` checks the rows against the
+  function's inputs without evaluating.
 - `l4 trace FILE [--format dot|png|svg] [-o DIR]` — render
   `#EVALTRACE` evaluation traces as GraphViz (PNG/SVG needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
@@ -592,7 +564,6 @@ All documentation for the currently-published L4 release lives under `https://le
 
 - **Start here:** <https://legalese.com/l4/README.md>
 - **Glossary of every keyword, operator, type:** <https://legalese.com/l4/reference/GLOSSARY.md>
-- **Declining to answer (`REFUSE`):** <https://legalese.com/l4/reference/control-flow/REFUSE.md>
 - **Cheat sheet (translation from other languages):** <https://legalese.com/l4/reference/cheat-sheet.md>
 - **Regulative rules:** <https://legalese.com/l4/reference/regulative.md>
 - **Libraries:** <https://legalese.com/l4/reference/libraries.md>

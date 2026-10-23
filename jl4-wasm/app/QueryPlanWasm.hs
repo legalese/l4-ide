@@ -11,7 +11,6 @@ module QueryPlanWasm (l4QueryPlan) where
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
-import qualified Data.IntMap.Lazy as IntMap
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -21,7 +20,6 @@ import qualified Data.Text.Lazy.Encoding as LazyText
 import Data.Text.Encoding (encodeUtf8)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult(..))
-import qualified L4.Refusal as Refusal
 import L4.TypeCheck (severity)
 import L4.TypeCheck.Types (Severity (..))
 import qualified L4.Viz.Ladder as Ladder
@@ -48,32 +46,13 @@ l4QueryPlan source uriText functionName bindingsJson =
       if any ((== SError) . severity) result.tcdErrors
         then encodeJson $ Aeson.object ["error" Aeson..= ("Type check error" :: Text.Text)]
         else
-          -- A rule that holds a refusal is drawn again as written, as
-          -- 'Backend.DecisionQueryPlan' does: simplifying can change which refusal
-          -- evaluation reaches first (R7), and drawn as written an IMPLIES or an IF
-          -- is one leaf that hides a refusal inside it, so each is spelled out as the
-          -- AND, OR and NOT it stands for.
-          let drawSimplified = Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution True functionName
-              drawSpelledOut = Ladder.visualizeByNameSpelledOut result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution functionName
-              holdsRefusal st = not (IntMap.null (Ladder.getRefusingAtoms st)) || not (null (Ladder.getUnreadableRefusals st))
-              drawn = case drawSimplified of
-                Right (_, st) | holdsRefusal st -> drawSpelledOut
-                other -> other
-          in case drawn of
+          case Ladder.visualizeByNameWithState result.tcdUri uriText 1 result.tcdModule result.tcdSubstitution True functionName of
             Left _ ->
               encodeJson $ Aeson.object ["error" Aeson..= ("Function not found or not visualizable" :: Text.Text)]
-            -- A refusal the plan cannot read: where whether it is reached turns on the
-            -- data or on rules the plan does not read, so no order of the questions is
-            -- right for it.
-            Right (_, vizState)
-              | Just msg <- Refusal.unreadableRefusalError (Ladder.getUnreadableRefusals vizState) ->
-                  encodeJson $ Aeson.object ["error" Aeson..= msg]
             Right (ladderInfo, vizState) ->
               let -- Build CachedDecisionQuery from viz results
                   (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
-                  -- A leaf evaluation can only refuse at is not a question (R7).
-                  refusals = Ladder.getRefusingAtoms vizState
-                  compiled = BDQ.compileDecisionQuery order (BDQ.refusing (Set.fromList (IntMap.keys refusals)) boolExpr)
+                  compiled = BDQ.compileDecisionQuery order boolExpr
                   deps = Ladder.getAtomDeps vizState
                   inputRefs = Ladder.getAtomInputRefs vizState
                   cache = QP.CachedDecisionQuery
@@ -82,7 +61,6 @@ l4QueryPlan source uriText functionName bindingsJson =
                     , varInputRefsByUnique =
                         fmap (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path)) inputRefs
                     , compiled = compiled
-                    , refusalsByUnique = refusals
                     }
 
                   -- Parse bindings from JSON

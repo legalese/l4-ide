@@ -23,7 +23,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException)
 import L4.Parser.SrcSpan (prettySrcRange)
 
 import L4.Cli.Common
@@ -81,17 +81,12 @@ runCmd opts = do
       -- (e.g. a CONSIDER hole) is a real failure, though. So is an #ASSERT
       -- whose expression RAISED: it did not evaluate cleanly, and it was
       -- exiting 0 only because the exception was hidden inside
-      -- @Assertion False@. A clean @Assertion Fails@ stays exit 0.
-      --
-      -- A REFUSAL is not a crash. The model declined to answer and said why:
-      -- that is a determinate outcome of the program, so @l4 run@ exits 0.
-      -- (Errors keep exit 1; the two must not be conflated, which is the whole
-      -- point of REFUSE.)
+      -- @Assertion False@. A clean @Assertion (Right False)@ stays exit 0.
       evalOk = all
         (\r -> case r.result of
-          Reduction (ReducedErrored _) -> False
-          Assertion (Errored _)        -> False
-          _                            -> True)
+          Reduction (Left _) -> False
+          Assertion (Left _) -> False
+          _                  -> True)
         evalResults
       overallOk = typecheckOk && evalOk
 
@@ -137,26 +132,14 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _} =
     ] <> errorField
   where
     (kindText, valueJson, errorField) = case result of
-      Assertion Holds         -> ("assertion" :: Text, Aeson.Bool True, [])
-      Assertion Fails         -> ("assertion", Aeson.Bool False, [])
-      -- A REFUSED assertion keeps kind "assertion" with a null value, and its
-      -- reason under "refused" — NOT under "error". A consumer that reads
-      -- every non-boolean assertion out of "error" would report a designed
-      -- outcome as a defect.
-      Assertion (Refused ref) ->
-        ("assertion", Aeson.Null,
-         [Key.fromString "refused" Aeson..= Aeson.object [Key.fromString "reason" Aeson..= ref.message]])
+      Assertion (Right b)     -> ("assertion" :: Text, Aeson.Bool b, [])
       -- An assertion that raised keeps kind "assertion" (it IS one, and a
       -- consumer counting assertions must still see it) with a null value —
       -- neither true nor false — and the reason under "error".
-      Assertion a@(Errored _) -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= prettyAssertionOutcome a])
-      -- A refusing #EVAL gets its OWN kind. It is neither a value nor an
-      -- error, and a consumer must be able to tell all three apart.
-      Reduction (ReducedRefused ref) ->
-        ("refused", Aeson.Null,
-         [Key.fromString "reason" Aeson..= ref.message])
+      Assertion (Left _)      -> ("assertion", Aeson.Null, [Key.fromString "error" Aeson..= renderEvalValue result])
       -- 'prettyEvalException', not 'show': 'show' leaks the raw Haskell
-      -- constructor names of the exception into the JSON.
-      Reduction (ReducedErrored exc) ->
-        ("error", Aeson.String (Text.unlines ("evaluation exception:" : prettyEvalException exc)), [])
-      Reduction (Reduced val) -> ("value", Aeson.String (renderEvalValue (Reduction (Reduced val))), [])
+      -- constructor names of the exception into the JSON (as on unstable,
+      -- 75e08b55e). A multi-clause group's no-match error would otherwise
+      -- print its internal 'MkPmGroup' record.
+      Reduction (Left exc)    -> ("error", Aeson.String (Text.unlines ("evaluation exception:" : prettyEvalException exc)), [])
+      Reduction (Right val)   -> ("value", Aeson.String (renderEvalValue (Reduction (Right val))), [])
