@@ -791,6 +791,62 @@ spec bin = do
         it ("reports ok=false in JSON from " <> cmd <> " on " <> what) $
           expectJsonNotOk bin [cmd, entry]
 
+  -- `l4 deploy` and `l4 redeploy` refuse a file for the reasons `l4 check`
+  -- does, and say so before they touch the network. Nothing listens on the
+  -- discard port, so a command that gets past the local check stops at the
+  -- first request with "Could not reach", and one that refuses never gets that
+  -- far. The refusal carries the same diagnostics `l4 check` prints.
+  describe "l4 deploy and redeploy refuse what l4 check refuses" $ do
+    let noServer = ["--server", "http://127.0.0.1:9"]
+        refusal = "doesn't typecheck; fix it before deploying (see `l4 check`)."
+        errorLabel = "Severity: DiagnosticSeverity_Error"
+        textBefore needle = go []
+          where
+            go acc s
+              | needle `isPrefixOf` s = Just (reverse acc)
+              | otherwise = case s of
+                  [] -> Nothing
+                  c : cs -> go (c : acc) cs
+
+    forM_ [ ("a type error in an imported module", brokenImportEntry)
+          , ("a syntax error in an imported module", syntaxImportEntry)
+          , ("an unclosed string in an imported module", lexImportEntry)
+          , ("an IMPORT that resolves to no module", missingImportEntry)
+          , ("a 3-module import ring", cycle3Entry)
+          , ("a file that imports a ring without being in it", cycle3OutsideEntry)
+          , ("a 2-module import ring", cycle2Entry)
+          , ("a self-import", selfImportEntry)
+          ] \(what, entry) ->
+      forM_ ["deploy", "redeploy"] \cmd ->
+        it ("refuses " <> cmd <> " of " <> what <> ", with the diagnostics, before the network") $ do
+          Output check _ _ <- runL4 bin ["check", entry]
+          check `shouldBe` ExitFailure 1
+          Output code sout serr0 <- runL4 bin ([cmd, entry] ++ noServer)
+          let serr = filter (/= '\r') serr0
+          code `shouldBe` ExitFailure 1
+          sout `shouldBe` ""
+          serr `shouldSatisfy` isInfixOf refusal
+          serr `shouldNotSatisfy` isInfixOf "Could not reach"
+          -- The error comes first, then the refusal that says what to do.
+          case textBefore refusal serr of
+            Just printed -> printed `shouldSatisfy` isInfixOf errorLabel
+            Nothing -> expectationFailure ("no refusal in:\n" ++ serr)
+
+    -- The guards: a file `l4 check` accepts, and one it accepts with a warning
+    -- from an imported module, must get past the local check, or the refusal
+    -- above could be satisfied by refusing every file that has an IMPORT.
+    forM_ [ ("a clean multi-file import", cleanImportEntry)
+          , ("an imported module that only warns", warningImportEntry)
+          ] \(what, entry) ->
+      forM_ ["deploy", "redeploy"] \cmd ->
+        it ("lets " <> cmd <> " of " <> what <> " past the local check") $ do
+          Output check _ _ <- runL4 bin ["check", entry]
+          check `shouldBe` ExitSuccess
+          Output code _ serr <- runL4 bin ([cmd, entry] ++ noServer)
+          code `shouldBe` ExitFailure 1
+          serr `shouldSatisfy` isInfixOf "Could not reach http://127.0.0.1:9"
+          serr `shouldNotSatisfy` isInfixOf "doesn't typecheck"
+
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.
   describe "multi-clause groups: the names they are compiled to" $ do
