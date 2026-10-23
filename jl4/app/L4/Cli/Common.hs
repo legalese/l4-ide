@@ -74,7 +74,7 @@ import L4.EvaluateLazy
   , EvalDirectiveValue(..)
   , parseFixedNow
   , prettyAssertionOutcome
-  , prettyReductionOutcome
+  , prettyEvalException
   , readFixedNowEnv
   , resolveEvalConfig
   )
@@ -332,7 +332,8 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
 renderEvalValue :: EvalDirectiveValue -> Text
 renderEvalValue = \case
   Assertion a -> prettyAssertionOutcome a
-  Reduction r -> prettyReductionOutcome r
+  Reduction (Left exc) -> Text.unlines (prettyEvalException exc)
+  Reduction (Right val) -> prettyLayout val
 
 indentBlockText :: Text -> Text
 indentBlockText txt =

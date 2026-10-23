@@ -8,7 +8,6 @@ L4 has no statements, only expressions, so choosing between results is done with
 - [IF](IF.md): `IF … THEN … ELSE`, one condition and two outcomes
 - [BRANCH](BRANCH.md): several conditions, tried from top to bottom, with `OTHERWISE`
 - [CONSIDER](CONSIDER.md): pattern matching with `WHEN … THEN` and `OTHERWISE`, and the check for missing branches
-- [REFUSE](REFUSE.md): `REFUSE "…"`, declining to answer with a reason that nothing downstream can convert
 
 A function can also be written as [several clauses](../functions/DECIDE.md#several-clauses), one per case, which means the same as a `CONSIDER`.
 Conditions are combined with [AND, OR, NOT, IMPLIES](../operators/logical.md) and [UNLESS](../operators/UNLESS.md).

@@ -173,13 +173,6 @@ l4 run late-fee.l4 --json
 }
 ```
 
-Each result has a `"kind"`:
-
-- `value`: an `#EVAL` that produced an answer, in `"value"`.
-- `assertion`: an `#ASSERT`. `"value"` is `true` or `false`, or `null` when the assertion has no verdict: the reason is then under `"error"` if it could not be evaluated, and under `"refused"` if the rules declined to answer.
-- `refused`: an `#EVAL` that reached a [`REFUSE`](../../reference/control-flow/REFUSE.md). `"value"` is `null` and `"reason"` says why.
-- `error`: an `#EVAL` that raised an error, described in `"value"`.
-
 ### Pinning the clock
 
 If your rules use `NOW` or `TODAY`, pin the evaluation clock so results are reproducible:
@@ -385,14 +378,12 @@ Every case that is run produces one line, or one item with `--format json` or `y
 - `status` says how the case went, as below.
 - `diagnostics` is the list of messages for a case that did not succeed, and `[]` for one that did.
 
-`status` is one of three words:
+`status` is one of two words:
 
 - `success`: the rules gave an answer.
-- `refused`: the rules declined to answer. They reached a [`REFUSE`](../../reference/control-flow/REFUSE.md), the `result` is `{"refused": {"reason": …}}`, and `diagnostics` says why. That is an outcome, not a failure: the batch carries on with the next case, and the case does not count as an `error`.
 - `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, a CSV line has a different number of cells from the header, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
 
-The command exits with status 0 when every case was `success` or `refused`, and 1 when any case was `error`, once every case that was going to run has run.
-A script that reads `result` as an answer should read it only when `status` is `success`.
+The command exits with status 0 when every case was `success`, and 1 when any case was `error`, once every case that was going to run has run.
 
 #### Checking cases without running them
 

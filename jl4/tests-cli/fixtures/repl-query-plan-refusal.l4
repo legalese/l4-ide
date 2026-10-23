@@ -1,7 +1,0 @@
-GIVETH A BOOLEAN
-`the other conditions are not modelled` MEANS
-    REFUSE "the other conditions are not modelled"
-
-GIVEN adult IS A BOOLEAN
-GIVETH A BOOLEAN
-DECIDE eligible IF adult AND `the other conditions are not modelled`

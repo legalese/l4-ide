@@ -9,7 +9,7 @@ import qualified Test.QuickCheck as Q
 import Test.QuickCheck.Instances ()
 
 import Backend.Api
-import Backend.DecisionQueryPlan (QueryAtom (..), QueryOutcome (..), QueryImpact (..), QueryInput (..), QueryAsk (..), QueryRefusal (..), QueryPlanResponse (..))
+import Backend.DecisionQueryPlan (QueryAtom (..), QueryOutcome (..), QueryImpact (..), QueryInput (..), QueryAsk (..), QueryPlanResponse (..))
 import L4.FunctionSchema (Parameters (..), Parameter (..))
 import ControlPlane (DeploymentStatusResponse (..))
 import qualified Data.Aeson as Aeson
@@ -257,11 +257,7 @@ instance Arbitrary QueryPlanResponse where
       <*> arbitrary
       <*> arbitrary
       <*> arbitrary
-      <*> arbitrary
       <*> pure Nothing
-
-instance Arbitrary QueryRefusal where
-  arbitrary = QueryRefusal <$> arbitrary <*> arbitrary
 
 instance Arbitrary StateGraphInfo where
   arbitrary = StateGraphInfo <$> arbitrary <*> arbitrary

@@ -73,9 +73,6 @@ carameliseExprWithContext ctx = carameliseNode >>> \ case
   Concat     ann es -> Concat ann (fmap (carameliseExprWithContext InertCtxNone) es)
   AsString   ann e -> AsString ann (carameliseExprWithContext InertCtxNone e)
   Breach     ann mParty mReason -> Breach ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (fmap (carameliseExprWithContext InertCtxNone) mReason)
-  -- The REFUSE message is a string literal and must not be turned into an
-  -- 'Inert' node by an enclosing AND/OR context.
-  Refuse     ann msg -> Refuse ann (carameliseExprWithContext InertCtxNone msg)
   -- Inert elements: update the context based on the desugaring context.
   -- The evaluator (Machine.hs) will read this context to determine the value.
   Inert      ann txt _oldCtx -> Inert ann txt ctx
@@ -354,7 +351,6 @@ rewriteFieldRefs fields self = go fields
       Env ann e           -> Env ann (go flds e)
       Post ann u h b      -> Post ann (go flds u) (go flds h) (go flds b)
       Breach ann mp mr    -> Breach ann (fmap (go flds) mp) (fmap (go flds) mr)
-      Refuse ann msg      -> Refuse ann (go flds msg)
       Event {}            -> expr  -- regulative events are complex; leave as-is
       Regulative {}       -> expr  -- regulative rules: leave as-is
       Inert {}            -> expr

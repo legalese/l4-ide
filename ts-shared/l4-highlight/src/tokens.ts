@@ -99,7 +99,6 @@ export const L4_KEYWORDS: ReadonlySet<string> = new Set([
   'POST',
   'PROVIDED',
   'RAND',
-  'REFUSE',
   'ROR',
   'SHANT',
   'STARTING',

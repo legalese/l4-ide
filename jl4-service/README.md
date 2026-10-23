@@ -321,16 +321,12 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
-When the answers so far lead to a refusal, `determined` is `null`, nothing more is asked, and `refusal` holds the reasons `/evaluation` gives for the same answers; it is `null` otherwise (see [REFUSE](../doc/reference/control-flow/REFUSE.md)).
-Two kinds of rule are exceptions, where the plan can give a `determined` answer that `/evaluation` does not: one that reaches a refusal only through an `IMPORT`, whose name the plan asks as a question, and one that calls a rule on one of its inputs, as an operand of `AND`, `OR` or `NOT`, or as the condition of an `IF` in a rule that holds a refusal, whose call the plan answers with that input's answer ([REFUSE, Limits](../doc/reference/control-flow/REFUSE.md#limits)).
 
 A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
-There are four such answers.
+There are three such answers.
 A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
 A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
 A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
-A rule that holds a refusal the plan cannot read gets "The query plan cannot order the questions for this rule, because a refusal (\"…\") may be reached from this part of it: …".
-That is a refusal in a part that is not an `AND`, `OR`, `NOT`, `IMPLIES` or Boolean `IF` (an arm of a `CONSIDER`, an operand of a comparison or `EQUALS`, a `LET` binding), a call to a rule with inputs that always refuses, or a call to a rule, or a name for one, that refuses on only some paths, whether or not evaluation reaches the refusal.
 A rule whose first clause names each input as its `GIVEN` does, or is `` `_` ``, is not read through, and is planned however long it is.
 A first clause that gives an input a new name is read through, and is limited like any other.
 

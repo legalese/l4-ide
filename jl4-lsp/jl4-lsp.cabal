@@ -168,7 +168,6 @@ test-suite jl4-lsp-test
     EmbeddedLibrarySpec
     HoverDisplaySpec
     LibraryResolutionSpec
-    UnreadableRefusalSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

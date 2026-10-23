@@ -117,12 +117,6 @@ export type QueryPlanResponse = {
   impact: Record<string, QueryImpact>
   impactByAtomId: Record<string, QueryImpact>
   note: string
-  /**
-   * Where evaluation of this case is sure to refuse (REFUSE, R7): the reasons it
-   * refuses with, and the refusing leaves it can reach first. `null` everywhere
-   * else.
-   */
-  refusal?: { reasons: string[]; atoms: QueryAtom[] } | null
   ladder?: unknown
 }
 

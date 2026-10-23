@@ -11,7 +11,6 @@ module L4.Viz.Ladder
     visualize
   , visualizeByName
   , visualizeByNameWithState
-  , visualizeByNameSpelledOut
   , findAllVisualizableDecides
   , VisualizableDecide(..)
   , VizError(..)
@@ -21,8 +20,6 @@ module L4.Viz.Ladder
   , InputRef(..)
   , getAtomDeps
   , getAtomInputRefs
-  , getRefusingAtoms
-  , getUnreadableRefusals
     -- * Utilities (shared with LSP)
   , generateAtomId
   ) where
@@ -34,7 +31,6 @@ import qualified Data.IntMap.Lazy as Map
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 
-import qualified Data.Map.Strict as DMap
 import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
 import qualified Data.List as List
@@ -50,9 +46,8 @@ import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify, spellOutConnectives, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
+import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import L4.Desugar
-import qualified L4.Refusal as Refusal
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
 
@@ -104,26 +99,6 @@ data VizState = MkVizState
   , defsForInlining :: IntMap (Expr Resolved)
   , atomDeps       :: IntMap IntSet
   , atomInputRefs  :: IntMap (Set InputRef)
-  , refusingDefs   :: Refusal.AlwaysRefusing
-    -- ^ The module's definitions that always refuse ("L4.Refusal"). Lazy: a
-    -- pass that names no definition never computes it.
-  , sometimesRefusingDefs :: Refusal.SometimesRefusing
-    -- ^ The module's definitions that refuse on only some paths. Lazy, like
-    -- 'refusingDefs'.
-  , refusingAtoms  :: IntMap Text
-    -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only
-    -- ever refuse at: a @REFUSE@, or a bare reference to a definition that
-    -- always refuses. The query plan never asks one (R7).
-  , unreadableRefusals :: [(Text, Text)]
-    -- ^ Leaves that hold a refusal without being one, newest first: what the
-    -- leaf says, and the reason it refuses with. A @CONSIDER@ arm, a comparison
-    -- operand, a call, and a reference to a definition that refuses on only some
-    -- paths are such leaves. The plan cannot order its questions around a refusal
-    -- there.
-  , spellOut :: !Bool
-    -- ^ Draw each @IMPLIES@ and each Boolean @IF@ in connective position as the
-    -- @AND@, @OR@ and @NOT@ it stands for ('Transform.spellOutConnectives'). Off
-    -- unless asked for: a rule is otherwise drawn as written, where each is one leaf.
   }
   deriving stock (Generic)
 
@@ -144,14 +119,7 @@ mkInitialState uri mod' subst simp = MkVizState
   , defsForInlining = Map.empty
   , atomDeps = Map.empty
   , atomInputRefs = Map.empty
-  , refusingDefs = always
-  , sometimesRefusingDefs = Refusal.sometimesRefusing always mod'
-  , refusingAtoms = Map.empty
-  , unreadableRefusals = []
-  , spellOut = False
   }
-  where
-    always = Refusal.alwaysRefusing mod'
 
 ------------------------------------------------------
 -- Monad operations
@@ -248,24 +216,11 @@ visualizeByNameWithState uri uriText version mod' subst simplify targetName =
     Nothing -> Left InvalidProgramNoDecidesFound
     Just decide -> visualizeDecideWithState uri uriText version mod' subst simplify decide
 
--- | Like 'visualizeByNameWithState', drawn as written (not simplified), with each
--- @IMPLIES@ and each Boolean @IF@ in connective position spelled out as the
--- @AND@, @OR@ and @NOT@ it stands for ('Transform.spellOutConnectives'). Drawn as
--- written, each is one leaf that names only the inputs directly under it.
-visualizeByNameSpelledOut :: NormalizedUri -> Text -> Int -> Module Resolved -> TC.Substitution -> Text -> Either VizError (RenderAsLadderInfo, VizState)
-visualizeByNameSpelledOut uri uriText version mod' subst targetName =
-  case findDecideByName mod' targetName of
-    Nothing -> Left InvalidProgramNoDecidesFound
-    Just decide -> visualizeDecideFrom (mkInitialState uri mod' subst False & #spellOut .~ True) uriText version decide
-
 -- | Internal: visualize a specific Decide, returning both the info and state.
 visualizeDecideWithState :: NormalizedUri -> Text -> Int -> Module Resolved -> TC.Substitution -> Bool -> Decide Resolved -> Either VizError (RenderAsLadderInfo, VizState)
-visualizeDecideWithState uri uriText version mod' subst simplify =
-  visualizeDecideFrom (mkInitialState uri mod' subst simplify) uriText version
-
-visualizeDecideFrom :: VizState -> Text -> Int -> Decide Resolved -> Either VizError (RenderAsLadderInfo, VizState)
-visualizeDecideFrom initialState uriText version decide =
+visualizeDecideWithState uri uriText version mod' subst simplify decide =
   let initialEnv = MkVizEnv { localDecls = [] }
+      initialState = mkInitialState uri mod' subst simplify
       verDocId = MkVersionedDocId uriText version
       (result, finalState) = (vizProgram verDocId decide).getViz initialEnv initialState
   in fmap (, finalState) result
@@ -277,17 +232,6 @@ getAtomDeps = (.atomDeps)
 -- | Get atom input references from VizState.
 getAtomInputRefs :: VizState -> IntMap (Set InputRef)
 getAtomInputRefs = (.atomInputRefs)
-
--- | The leaves evaluation can only refuse at, by leaf id, with the reason each
--- refuses with (see 'refusingAtoms').
-getRefusingAtoms :: VizState -> IntMap Text
-getRefusingAtoms = (.refusingAtoms)
-
--- | The leaves that hold a refusal without being one, in the order they were
--- drawn: what the leaf says, and the reason it refuses with (see
--- 'unreadableRefusals').
-getUnreadableRefusals :: VizState -> [(Text, Text)]
-getUnreadableRefusals = reverse . (.unreadableRefusals)
 
 -- | Find all DECIDE rules that can be visualized.
 -- Rather than just checking types, we try to visualize each DECIDE
@@ -381,19 +325,9 @@ translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funR
   let funName = mkPrettyVizName funResolved
   assign #functionName funName.label
   assign #defsForInlining =<< collectDefsForInlining
-  -- A bare reference to a name is a leaf keyed by the name's unique; every other
-  -- leaf is keyed by a fresh id from 'getFresh'. Starting the fresh ids above
-  -- every unique in the rule keeps the two ranges apart, so a fresh id cannot
-  -- equal a name's unique and make two different propositions one variable.
-  -- Mirrors 'LSP.L4.Viz.Ladder.translateDecide'.
-  assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
   shouldSimplify <- getShouldSimplify
-  spelledOut <- use #spellOut
   vid <- getFresh
-  -- Read after 'carameliseExpr', which is what turns a call to the IMPLIES
-  -- function into the 'Implies' node, so that nothing else about the rule moves.
-  let caramelised = carameliseExpr body
-  vizBody <- translateExpr shouldSimplify (if spelledOut then Transform.spellOutConnectives caramelised else caramelised)
+  vizBody <- translateExpr shouldSimplify (carameliseExpr body)
   -- The same limit on what is drawn as where a CONSIDER is drawn as rows (see
   -- 'Transform.clauseGroupLadderBudget'). A rule that was not written as
   -- clauses, or whose first clause names each input as the GIVEN does (or is
@@ -440,27 +374,18 @@ translateExpr False = go
               InertCtxNone -> InertAnd
         pure $ VizExpr.InertE vid txt inertCtx
 
-      -- A refusal is drawn as an ordinary leaf, labelled with its own source
-      -- (@REFUSE "…"@) so the picture says what it is. Explicit above the
-      -- wildcard because the wildcard would first try 'normaliseGuarded' on
-      -- it, and a refusal is not ladder STRUCTURE — it is a terminal.
-      Refuse _ msg -> makeLeaf e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
-
       App _ resolved [] -> do
         vid <- getFresh
         let vname = mkPrettyVizName resolved
         case getUnique resolved of
           u | u == TC.trueUnique  -> pure $ VizExpr.TrueE vid vname
             | u == TC.falseUnique -> pure $ VizExpr.FalseE vid vname
-          _ -> do
-            recordUnreadableReference e resolved
-            varLeaf vid vname resolved
+          _ -> varLeaf vid vname resolved
 
       App appAnno _fnResolved args -> do
         fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
         if fnOfAppIsFnFromBooleansToBoolean
           then do
-            recordUnreadableRefusal e
             vid <- getFresh
             let uniq = vid.id
                 label = prettyLayout e
@@ -500,51 +425,10 @@ varLeaf vid vname resolved = do
   recordAtomInputRefs vname.unique refs
   functionName <- use #functionName
   let atomId = generateAtomId functionName vname.label refs
-  -- A rule of no inputs that always refuses is not a question: evaluation takes
-  -- no answer for it, it forces the rule (R7). One that refuses on only some
-  -- paths is not one either; see 'recordUnreadableReference'. Mirrors
-  -- 'LSP.L4.Viz.Ladder.varLeaf'.
-  refusing <- use #refusingDefs
-  refusingLeaf (DMap.lookup (getUnique resolved) refusing) $
-    VizExpr.UBoolVar vid vname UnknownV canInline atomId
+  pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId
 
--- | Record a leaf as one evaluation can only refuse at, with the reason, if it
--- has one.
-refusingLeaf :: Maybe Text -> IRExpr -> Viz IRExpr
-refusingLeaf reason leaf = do
-  case (reason, leaf) of
-    (Just r, VizExpr.UBoolVar _ nm _ _ _) -> #refusingAtoms %= Map.insert nm.unique r
-    _ -> pure ()
-  pure leaf
-
--- | A leaf for an expression that is none of the shapes the ladder draws as
--- structure. A refusal inside it is one the plan cannot read.
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
-  recordUnreadableRefusal expr
-  makeLeaf expr
-
--- | Record a leaf that holds a refusal without being one.
-recordUnreadableRefusal :: Expr Resolved -> Viz ()
-recordUnreadableRefusal expr = do
-  always <- use #refusingDefs
-  sometimes <- use #sometimesRefusingDefs
-  case Refusal.refusalWithin always sometimes expr of
-    Just reason -> #unreadableRefusals %= ((prettyLayout expr, reason) :)
-    Nothing -> pure ()
-
--- | Record a bare reference to a definition that refuses on only some paths.
--- Whether it refuses turns on what the plan does not read, so the plan can
--- neither ask it as a question nor report its refusal.
-recordUnreadableReference :: Expr Resolved -> Resolved -> Viz ()
-recordUnreadableReference expr resolved = do
-  sometimes <- use #sometimesRefusingDefs
-  case DMap.lookup (getUnique resolved) sometimes of
-    Just reason -> #unreadableRefusals %= ((prettyLayout expr, reason) :)
-    Nothing -> pure ()
-
-makeLeaf :: Expr Resolved -> Viz IRExpr
-makeLeaf expr = do
   vid <- getFresh
   tempUniqueTODO <- getFresh
   let uniq = tempUniqueTODO.id
