@@ -53,6 +53,12 @@ GIVETH A DEONTIC Actor Action
     ELSE PARTY Seller MUST `deliver goods` WITHIN 14
 ```
 
+## In an exported rule
+
+A rule marked `@export` cannot take a `DEONTIC` value as an input, because a request has no JSON form for one.
+`l4 check` and a deploy accept such a rule, and the published schema describes the input as a bare `object`.
+A request that gives a JSON object for it is refused with HTTP 422; a string or a number is accepted, but reaches the rule as a string or a number and not as a `DEONTIC` value.
+
 ## Evaluation
 
 A rule decides nothing on its own. It is evaluated from a start time against a list of events, each saying which party did what, and when (see [EVENT](EVENT.md)).
