@@ -202,6 +202,7 @@ The type checker refuses a lifecycle anchor where the position it names does not
 The same refusals apply to the nouns used as [values](#the-anchor-words-as-values), wherever they are written: `THE JOIN` or `THE DEADLINE` in a top-level rule, in a top-level rule's `WHERE`, or in a function's body; `THE JOIN` under the `LEST` of a `MUST`, `DO` or `MAY`; `THE DEADLINE` under an obligation with no closing edge; and either of them anywhere in a join line's `WITHIN`.
 `THE ARMING` is not refused when the file is checked.
 Written where no obligation is ever entered, such as a top-level rule's `WHERE t MEANS THE ARMING` used as an anchor, it has nothing to read, and the run reports that by name when it gets there.
+That includes a top-level function or an `@export`ed decision whose body reads `THE ARMING`: it is read where the function is defined, not where it is called, so the module checks, and every evaluation of it is refused.
 
 The checker sees only where an anchor is _written_. A top-level rule referenced by name inside a `HENCE` (`HENCE cure`), and a `WHERE` local, are checked where they are written — outside any `HENCE` or `LEST` — and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`. `THE ARMING` is accepted there, and when the rule runs it names the arming of the obligation the continuation is attached to (its own, when there is none), so factoring an inline continuation out into a `WHERE` does not move its deadline, nor does putting the local inside a `RAND` or `ROR`.
 

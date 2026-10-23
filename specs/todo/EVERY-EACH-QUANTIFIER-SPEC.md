@@ -1458,18 +1458,38 @@ values", teaches the `fromMaybe THE ARMING (RECALL …)` default together with t
 failure (a fact recorded after the obligation's first scrutinised event does not move the deadline,
 and nothing says so). Measured on that branch: the witness above parses and runs (5 is in time, 6
 is a breach, `jl4/examples/ok/every/run-lifecycle-values.l4` §4), `(THE ARMING)` alone in the slot
-is the obligation's own arming (§9), and `OF THE ARMING PLUS 3` — a bare noun followed by
-arithmetic on the same line — is now the expression form (on the base binary it is a type error
-on `__PLUS__`; on this branch, at 10 with an act at 13, FULFILLED). What is built:
+is the obligation's own arming (§9, beside its bare twin `OF THE ARMING`), and
+`OF THE ARMING PLUS 3` — a bare noun followed by arithmetic, on its own line or indented on the
+next (§1) — is now the expression form (on the base binary it is a type error on `__PLUS__`; on
+this branch, at 10 with an act at 13, FULFILLED). What is built:
 `Lifecycle Anno LifecyclePoint` on `Expr`, admitted as an atom and a juxtaposed argument; the
 refusals of §5.1.1.1 applied where the value is written (`LifecycleUnavailable`; four
 `not-ok/tc/lifecycle-value-*.l4`); THE ARMING bound at an obligation's arming only where no
-hand-off bound it; and on a join line, THE ARMING as a value is the EVERY's own arming, THE JOIN
+hand-off bound it; the dossier's split, unchanged, now for the value form too: a noun inside an
+obligation handed on as a value is read where that obligation runs, since the obligation's env is
+rebound at hand-off (`rebindLifecycle`), while a `NUMBER` bound by `WHERE` is fixed where it is
+written — so moving `THE JOIN PLUS 5` from an obligation's `WITHIN` into that obligation's own
+`WHERE` moves its deadline, 15 to 9 in §12, and `consequences.md` now says so; and on a join line, THE ARMING as a value is the EVERY's own arming, THE JOIN
 and THE DEADLINE deleted from that environment (assumed, not ruled: it overrides rather than binds
-"only where absent", so that `OF (THE ARMING)` and `OF THE ARMING` agree there). What is not:
+"only where absent", so that `OF (THE ARMING)` and `OF THE ARMING` agree there; it holds for the
+noun written on the join line only, and a `WHERE` name for `THE ARMING PLUS 10` written in the
+enclosing `HENCE` is that `HENCE`'s arming, §10). One assumed, not ruled, reading changes a
+spelling that was valid before: `THE` before `JOIN`, `DEADLINE` or `ARMING` is never an article
+any more, so `WITH start IS THE DEADLINE` passes the lifecycle position even where the program
+defines its own `DEADLINE` — silently under a `HENCE` — and the checker now warns at every such
+site (`LifecycleNounHidesName`, `not-ok/tc/lifecycle-value-hides-name.l4`). What is not built:
 `Anchor` still has its three noun constructors beside `AnchorAt`, so `OF THE JOIN` and
-`OF (THE JOIN)` are two trees with one meaning; and `THE ARMING` written where no obligation is
-ever entered (a top-level rule's `WHERE`) is refused only when the run reaches it.
+`OF (THE JOIN)` are two trees with one meaning — every consumer that asks which noun an anchor
+names now asks `lifecyclePointOfAnchor`, which reads through the bracket, so the empty-window
+refusal of §5.1.2.2 covers `OF (THE JOIN)` as well (`not-ok/tc/after-empty-window-value.l4`;
+review of 2026-10-24) — and `THE ARMING` written where no obligation is ever entered (a top-level
+rule's `WHERE`, a top-level function's body, an `@export`ed decision) is refused only when the run
+reaches it, so such a module checks and refuses on every input (the review of 2026-10-24 also reported deploying one to a local `jl4-service`; not re-run here). A check-time refusal
+is feasible — outside every obligation a `NUMBER` is evaluated in the environment it was
+defined in (a top-level function's body in its closure's, even when it is called from inside an
+obligation's slot), so the definition site decides, not the use site, and the checker already
+carries `enclosingObligation` and `inSlot`; the refusal would be "`THE ARMING` with no enclosing
+obligation and not inside a deonton's own slots" — but it would be a fifth refusal, which B1 did not rule: open, for a ruling.
 
 **B3 settled by SEESAW.** Meng, 2026-09-21: _"the RAND and ROR operators ought to be commutative,
 don't you think?"_; 2026-09-22: _"do we need to break a tie? i thought we switched blame from
