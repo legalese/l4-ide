@@ -1,5 +1,5 @@
--- | Which definitions of a module always REFUSE (ruling R7; see
--- @specs/as-built/refuse.md@).
+-- | Which definitions of a module REFUSE, always or on only some paths (ruling
+-- R7; see @specs/as-built/refuse.md@).
 --
 -- A refusal is a throw at force, never a value, and it cannot be caught. A
 -- definition always refuses when evaluating it can only end in a refusal: its
@@ -12,9 +12,12 @@
 -- definition and refuses ('L4.Decision.BooleanDecisionQuery.BRefuse').
 --
 -- A definition that refuses on only some paths (a @REFUSE@ on one arm of an
--- @IF@, a @BRANCH@ or a @CONSIDER@) is NOT one of them, and stays a question:
--- whether it refuses can turn on what the plan does not see, such as the date
--- the rules are read at. Reporting a refusal there would be a new wrong answer.
+-- @IF@, a @BRANCH@ or a @CONSIDER@) is NOT one of them: whether it refuses can
+-- turn on what the plan does not see, such as the date the rules are read at.
+-- The plan cannot ask it as a question, since evaluation does not take an answer
+-- for it, and cannot report its refusal, since there may be none. A leaf that
+-- reaches one is a refusal the plan cannot read ('refusalWithin'), and the plan
+-- says so instead of guessing ('sometimesRefusing').
 -- Names from other modules are not followed.
 module L4.Refusal
   ( AlwaysRefusing
@@ -29,6 +32,7 @@ module L4.Refusal
 import L4.Syntax
 
 import qualified Data.Map.Strict as Map
+import Control.Applicative ((<|>))
 import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -39,17 +43,16 @@ import Optics (gplate, toListOf)
 -- always refuse.
 type AlwaysRefusing = Map.Map Unique Text
 
+-- | Each definition of the module, local ones included, that refuses on only
+-- some paths, with the reason it refuses with. A definition absent from the map
+-- either always refuses or holds no refusal.
+type SometimesRefusing = Map.Map Unique Text
+
 -- | The definitions of the module that always refuse.
 alwaysRefusing :: Module Resolved -> AlwaysRefusing
 alwaysRefusing m = go Map.empty
   where
-    -- Every definition, local ones included, with its body.
-    bodies :: Map.Map Unique (Expr Resolved)
-    bodies =
-      Map.fromList
-        [ (getUnique n, body)
-        | MkDecide _ _ (MkAppForm _ n _ _) body <- foldTopLevelDecides (foldDecides pure) m
-        ]
+    bodies = definitionBodies m
 
     -- Grow the map until nothing changes: a definition joins it when its body
     -- refuses, or names one already in it. The least fixed point, so a cycle of
@@ -65,36 +68,59 @@ alwaysRefusing m = go Map.empty
       LetIn _ _ e  -> refusesWith known e
       _            -> Nothing
 
--- | The reason of the first refusal inside an expression, if there is one: a
--- @REFUSE@, or a reference to a definition that always refuses, with or without
--- arguments, anywhere under it.
+-- | Every definition of the module, local ones included, with its body.
+definitionBodies :: Module Resolved -> Map.Map Unique (Expr Resolved)
+definitionBodies m =
+  Map.fromList
+    [ (getUnique n, body)
+    | MkDecide _ _ (MkAppForm _ n _ _) body <- foldTopLevelDecides (foldDecides pure) m
+    ]
+
+-- | The definitions of the module that refuse on only some paths, with the
+-- reason each refuses with: a @REFUSE@ anywhere under the body, or a reference,
+-- with or without arguments, to a definition that refuses, always or on some
+-- path. The least fixed point, so a cycle of definitions that only name each
+-- other never joins. The definitions that always refuse are left out; they are
+-- the first argument.
 --
--- The query plan asks it of a leaf that is neither of those itself, such as a
--- @CONSIDER@ or a comparison. A refusal there is reached or not as the data
--- decides, which the plan cannot order the questions around.
-refusalWithin :: AlwaysRefusing -> Expr Resolved -> Maybe Text
-refusalWithin known = listToMaybe . mapMaybe here . universe
+-- It over-approximates: a @REFUSE@ under the body counts whether or not
+-- evaluation reaches it, since that turns on the inputs and on rules the plan
+-- does not read.
+sometimesRefusing :: AlwaysRefusing -> Module Resolved -> SometimesRefusing
+sometimesRefusing always m = Map.difference (go Map.empty) always
+  where
+    bodies = definitionBodies m
+
+    -- Grow the map until its size stops changing. A definition's reason is the
+    -- first refusal under it, so for a cycle of definitions it can differ between
+    -- rounds; the set of definitions only grows.
+    go found =
+      let found' = Map.mapMaybe (refusalWithin always found) bodies
+       in if Map.size found' == Map.size found then found' else go found'
+
+-- | The reason of the first refusal inside an expression, if there is one: a
+-- @REFUSE@, or a reference to a definition that refuses, always or on some
+-- path, with or without arguments, anywhere under it.
+--
+-- The query plan asks it of a leaf that is none of those itself, such as a
+-- @CONSIDER@ or a comparison, and of a call. A refusal there is reached or not
+-- as the data decides, which the plan cannot order the questions around.
+refusalWithin :: AlwaysRefusing -> SometimesRefusing -> Expr Resolved -> Maybe Text
+refusalWithin always sometimes = listToMaybe . mapMaybe here . universe
   where
     universe e = e : concatMap universe (toListOf (gplate @(Expr Resolved)) e)
 
+    reason r = Map.lookup (getUnique r) always <|> Map.lookup (getUnique r) sometimes
+
     here = \case
       Refuse _ msg        -> Just (refusalMessage msg)
-      App _ r _           -> Map.lookup (getUnique r) known
-      AppNamed _ r _ _   -> Map.lookup (getUnique r) known
+      App _ r _           -> reason r
+      AppNamed _ r _ _    -> reason r
       _                   -> Nothing
 
--- | Each definition of the module that refuses on only some paths, with the
--- reason it refuses with.
-type SometimesRefusing = Map.Map Unique Text
-
--- | The definitions of the module that refuse on only some paths. Placeholder:
--- no definition is counted yet.
-sometimesRefusing :: AlwaysRefusing -> Module Resolved -> SometimesRefusing
-sometimesRefusing _ _ = Map.empty
-
 -- | What the query plan answers with, in place of a plan, for a rule that holds
--- a refusal it cannot read: one sentence that says where the first one sits and
--- that the plan cannot order the questions for such a rule. @Nothing@ for a rule
+-- a refusal it cannot read: one sentence that says where the first one can be
+-- reached from and that the plan cannot order the questions for such a rule. @Nothing@ for a rule
 -- that holds none. Takes what the ladder recorded: what each such leaf says, and
 -- the reason it refuses with.
 unreadableRefusalError :: [(Text, Text)] -> Maybe Text
@@ -104,7 +130,7 @@ unreadableRefusalError = \case
     Just $
       "The query plan cannot order the questions for this rule, because a refusal (\""
         <> reason
-        <> "\") sits inside this part of it: "
+        <> "\") can be reached from this part of it: "
         <> shorten (Text.unwords (Text.words leaf))
   where
     shorten t

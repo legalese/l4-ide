@@ -63,7 +63,8 @@ l4QueryPlan source uriText functionName bindingsJson =
             Left _ ->
               encodeJson $ Aeson.object ["error" Aeson..= ("Function not found or not visualizable" :: Text.Text)]
             -- A refusal the plan cannot read: where whether it is reached turns on the
-            -- data, so no order of the questions is right for it.
+            -- data or on rules the plan does not read, so no order of the questions is
+            -- right for it.
             Right (_, vizState)
               | Just msg <- Refusal.unreadableRefusalError (Ladder.getUnreadableRefusals vizState) ->
                   encodeJson $ Aeson.object ["error" Aeson..= msg]

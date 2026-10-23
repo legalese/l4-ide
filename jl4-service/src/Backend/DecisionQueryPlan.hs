@@ -199,9 +199,10 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
       then draw (LadderViz.spellingOut (vizConfig False))
       else pure simplified
 
-  -- A refusal the plan cannot read: in an arm of a CONSIDER, in a comparison, or in
-  -- a call, say, where whether it is reached turns on the data, so no order of the
-  -- questions is right for it. The plan answers that, and does not guess.
+  -- A refusal the plan cannot read: in an arm of a CONSIDER, in a comparison, in a
+  -- call, or behind a rule that refuses on only some paths, say, where whether it
+  -- is reached turns on the data or on rules the plan does not read, so no order of
+  -- the questions is right for it. The plan answers that, and does not guess.
   for_ (Refusal.unreadableRefusalError (LadderViz.getUnreadableRefusals vizState)) \msg ->
     throwError err400 {errBody = Aeson.encode $ object ["error" .= msg]}
 

@@ -107,14 +107,19 @@ data VizState = MkVizState
   , refusingDefs   :: Refusal.AlwaysRefusing
     -- ^ The module's definitions that always refuse ("L4.Refusal"). Lazy: a
     -- pass that names no definition never computes it.
+  , sometimesRefusingDefs :: Refusal.SometimesRefusing
+    -- ^ The module's definitions that refuse on only some paths. Lazy, like
+    -- 'refusingDefs'.
   , refusingAtoms  :: IntMap Text
     -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only
     -- ever refuse at: a @REFUSE@, or a bare reference to a definition that
     -- always refuses. The query plan never asks one (R7).
   , unreadableRefusals :: [(Text, Text)]
     -- ^ Leaves that hold a refusal without being one, newest first: what the
-    -- leaf says, and the reason it refuses with. A @CONSIDER@ arm or a comparison
-    -- operand is one. The plan cannot order its questions around a refusal there.
+    -- leaf says, and the reason it refuses with. A @CONSIDER@ arm, a comparison
+    -- operand, a call, and a reference to a definition that refuses on only some
+    -- paths are such leaves. The plan cannot order its questions around a refusal
+    -- there.
   , spellOut :: !Bool
     -- ^ Draw each @IMPLIES@ and each Boolean @IF@ in connective position as the
     -- @AND@, @OR@ and @NOT@ it stands for ('Transform.spellOutConnectives'). Off
@@ -139,11 +144,14 @@ mkInitialState uri mod' subst simp = MkVizState
   , defsForInlining = Map.empty
   , atomDeps = Map.empty
   , atomInputRefs = Map.empty
-  , refusingDefs = Refusal.alwaysRefusing mod'
+  , refusingDefs = always
+  , sometimesRefusingDefs = Refusal.sometimesRefusing always mod'
   , refusingAtoms = Map.empty
   , unreadableRefusals = []
   , spellOut = False
   }
+  where
+    always = Refusal.alwaysRefusing mod'
 
 ------------------------------------------------------
 -- Monad operations
@@ -444,7 +452,9 @@ translateExpr False = go
         case getUnique resolved of
           u | u == TC.trueUnique  -> pure $ VizExpr.TrueE vid vname
             | u == TC.falseUnique -> pure $ VizExpr.FalseE vid vname
-          _ -> varLeaf vid vname resolved
+          _ -> do
+            recordUnreadableReference e resolved
+            varLeaf vid vname resolved
 
       App appAnno _fnResolved args -> do
         fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
@@ -492,7 +502,8 @@ varLeaf vid vname resolved = do
   let atomId = generateAtomId functionName vname.label refs
   -- A rule of no inputs that always refuses is not a question: evaluation takes
   -- no answer for it, it forces the rule (R7). One that refuses on only some
-  -- paths stays a question. Mirrors 'LSP.L4.Viz.Ladder.varLeaf'.
+  -- paths is not one either; see 'recordUnreadableReference'. Mirrors
+  -- 'LSP.L4.Viz.Ladder.varLeaf'.
   refusing <- use #refusingDefs
   refusingLeaf (DMap.lookup (getUnique resolved) refusing) $
     VizExpr.UBoolVar vid vname UnknownV canInline atomId
@@ -516,8 +527,19 @@ leafFromExpr expr = do
 -- | Record a leaf that holds a refusal without being one.
 recordUnreadableRefusal :: Expr Resolved -> Viz ()
 recordUnreadableRefusal expr = do
-  known <- use #refusingDefs
-  case Refusal.refusalWithin known expr of
+  always <- use #refusingDefs
+  sometimes <- use #sometimesRefusingDefs
+  case Refusal.refusalWithin always sometimes expr of
+    Just reason -> #unreadableRefusals %= ((prettyLayout expr, reason) :)
+    Nothing -> pure ()
+
+-- | Record a bare reference to a definition that refuses on only some paths.
+-- Whether it refuses turns on what the plan does not read, so the plan can
+-- neither ask it as a question nor report its refusal.
+recordUnreadableReference :: Expr Resolved -> Resolved -> Viz ()
+recordUnreadableReference expr resolved = do
+  sometimes <- use #sometimesRefusingDefs
+  case DMap.lookup (getUnique resolved) sometimes of
     Just reason -> #unreadableRefusals %= ((prettyLayout expr, reason) :)
     Nothing -> pure ()
 

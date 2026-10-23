@@ -379,7 +379,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
     -- - exact label match (including dotted keys)
     -- - label with backticks added (for identifiers containing spaces)
     -- - `unique` as decimal string
-    -- - atomId (stable UUIDv5)
+    -- - atomId (a UUIDv5 of the function name, the label and the inputs read)
     -- - for record parameters, treat `i.someField = true/false` as binding any leaf atom that depends solely on that input ref.
     knownBindings :: Map Int Bool
     knownBindings =
@@ -594,7 +594,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       ]
 
     noteTxt =
-      "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
+      "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a UUIDv5 of the function name, the atom label and the inputs the atom reads: the same source gives the same atomId, but a release that corrects which inputs an atom reads gives it another). `inputs` ranks function parameters using a simple dependency-based heuristic."
         <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
         <> refusalNote
     -- Said of a rule that has a refusing leaf, whether or not this case reaches it.

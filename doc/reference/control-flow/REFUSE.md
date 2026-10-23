@@ -175,7 +175,7 @@ For ``adult AND (`the fee` GREATER THAN 3)``, where `` `the fee` `` is a rule of
 
 ```json
 {
-  "error": "The query plan cannot order the questions for this rule, because a refusal (\"no fee is modelled\") sits inside this part of it: `the fee` GREATER THAN 3"
+  "error": "The query plan cannot order the questions for this rule, because a refusal (\"no fee is modelled\") can be reached from this part of it: `the fee` GREATER THAN 3"
 }
 ```
 
