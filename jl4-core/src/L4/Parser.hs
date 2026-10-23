@@ -3475,13 +3475,19 @@ deadline current = annoHole $ attachAnno $
 --
 -- Since the nouns are also values ('lifecycleExpr', §2.6 card B1, built
 -- 2026-10-24), an anchor that STARTS with a noun and goes on to arithmetic
--- is the expression form: a bare noun followed on the same line by @PLUS@,
--- @MINUS@, @TIMES@, @DIVIDED BY@, @MODULO@ or their symbols is not taken as
--- the noun anchor, and the whole of @THE JOIN PLUS 5@ is parsed as the
--- expression. Only arithmetic, and only on the noun's own line: a @RAND@ or
--- an @AND@ after the anchor, on that line or the next, belongs to the
--- enclosing expression exactly as it did before the nouns were values, so
--- no program that parsed then parses differently now.
+-- is the expression form: a bare noun followed by @PLUS@, @MINUS@,
+-- @TIMES@, @DIVIDED BY@, @MODULO@ or their symbols is not taken as the noun
+-- anchor, and the whole of @THE JOIN PLUS 5@ is parsed as the expression,
+-- the operator on the noun's line or, indented as any continuation is, on
+-- the next. Only arithmetic: a @RAND@ or an @AND@ after the anchor, on that
+-- line or the next, belongs to the enclosing expression exactly as it did
+-- before the nouns were values. An arithmetic operator right after a bare
+-- noun anchor used to apply to the whole obligation, which no operator
+-- accepts (the only @__PLUS__@ readings are NUMBER's and the prelude's
+-- SET's), so no program that checked then reads differently now. Until
+-- 2026-10-24 (review of @lang/lifecycle-values@) the rule was same-line
+-- only, and @OF THE JOIN@ with @PLUS 5@ on the next line failed with an
+-- ambiguity about @__PLUS__@ that named nothing a drafter would recognise.
 anchor :: Pos -> AnnoParser (Anchor Name)
 anchor current = annoHole $ attachAnno $
   annoLexeme (spacedKeyword_ TKOf) *>
@@ -3490,16 +3496,16 @@ anchor current = annoHole $ attachAnno $
     )
   where
     bareNoun = do
-      (tok, p) <- lifecycleWords
-      wrapAnnoParser (WithAnno [] <$> notFollowedBy (sameLineArithmetic tok))
+      (_, p) <- lifecycleWords
+      wrapAnnoParser (WithAnno [] <$> notFollowedBy followingArithmetic)
       pure $ case p of
         LifecycleJoin     -> AnchorJoin emptyAnno
         LifecycleDeadline -> AnchorDeadline emptyAnno
         LifecycleArming   -> AnchorArming emptyAnno
-    sameLineArithmetic :: PosToken -> Parser ()
-    sameLineArithmetic tok = do
+    followingArithmetic :: Parser ()
+    followingArithmetic = do
       next <- anySingle
-      guard (next.range.start.line == tok.range.start.line && isArithmetic next.payload)
+      guard (isArithmetic next.payload)
     isArithmetic = \ case
       TKeywords k  -> k `elem` [TKPlus, TKMinus, TKTimes, TKDivided, TKModulo]
       TOperators o -> o `elem` [TPlus, TMinus, TTimes, TDividedBy]

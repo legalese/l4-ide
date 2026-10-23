@@ -93,7 +93,8 @@ LEST  (PARTY Tenant MUST cure WITHIN 0 OF (THE DEADLINE PLUS 5))
 ```
 
 The first says _by five days after the join_, which is the same deadline as `WITHIN 5 OF THE JOIN`.
-Written without the brackets, `WITHIN 0 OF THE JOIN PLUS 5` means the same: when arithmetic follows the noun on the same line, the whole of it is the anchor.
+Written without the brackets, `WITHIN 0 OF THE JOIN PLUS 5` means the same: when arithmetic follows the noun, the whole of it is the anchor.
+The operator may also start the next line, indented as any continuation is.
 
 **What a noun names depends on where it is written.**
 It is the position in the life of the obligation whose `HENCE` or `LEST` the noun is written in (and `THE ARMING` written at the top level is the obligation's own arming).
