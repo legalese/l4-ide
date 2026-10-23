@@ -3120,11 +3120,19 @@ checkAnchor edge pos a = case a of
 -- ('L4.EvaluateLazy.Machine.lifecycleValueRefusal'): a check-time refusal for it
 -- would be a fifth refusal, which B1 did not rule (assumed, not ruled).
 --
--- What a noun reads is lexical (§2.6 B1): the instant the nearest
--- enclosing obligation had where the noun is written. Inside the NEXT
--- obligation's own @PROVIDED@ or @WITHIN@ that is still the obligation this
--- one continues — @THE JOIN@ in the @PROVIDED@ of an obligation under a
--- @HENCE@ is the PREVIOUS act's time, not the time of the act being tested.
+-- What a noun reads (§2.6 B1, and the dossier's "obligation values rebind
+-- dynamically at hand-off, NUMBER aliases capture lexically"): the binding
+-- in the environment it is evaluated in. Written inline, that is the
+-- nearest enclosing obligation's position where the noun is written —
+-- inside the NEXT obligation's own @PROVIDED@ or @WITHIN@ still the
+-- obligation this one continues, so @THE JOIN@ in the @PROVIDED@ of an
+-- obligation under a @HENCE@ is the PREVIOUS act's time. Inside an
+-- obligation handed on as a value (a @WHERE@ local, a @GIVEN@), the
+-- machine rebinds the obligation's environment at hand-off
+-- ('L4.EvaluateLazy.Machine.rebindLifecycle'), so the noun reads the
+-- obligation it is attached to, as its anchors do; a NUMBER bound by
+-- @WHERE@ is a thunk closed where it is written and keeps that instant.
+-- The checker refuses by where the noun is WRITTEN either way.
 checkLifecycle :: LifecyclePoint -> Expr Name -> Check ()
 checkLifecycle p e = do
   -- A value of the program's own spelled like the noun is no longer what

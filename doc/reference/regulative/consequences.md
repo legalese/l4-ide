@@ -96,9 +96,10 @@ The first says _by five days after the join_, which is the same deadline as `WIT
 Written without the brackets, `WITHIN 0 OF THE JOIN PLUS 5` means the same: when arithmetic follows the noun, the whole of it is the anchor.
 The operator may also start the next line, indented as any continuation is.
 
-**What a noun names depends on where it is written.**
-It is the position in the life of the obligation whose `HENCE` or `LEST` the noun is written in (and `THE ARMING` written at the top level is the obligation's own arming).
-That has three consequences worth knowing before you rely on it:
+**What a noun names depends on where it is written, and on what holds it.**
+Usually it is the position in the life of the obligation whose `HENCE` or `LEST` the noun is written in (and `THE ARMING` written at the top level is the obligation's own arming).
+The exception is a noun inside an obligation that is handed on as a value, in the fourth point below.
+That has four consequences worth knowing before you rely on it:
 
 - **A function or a rule defined elsewhere receives the instant as an argument.** A top-level rule cannot read `THE JOIN`, because it is not written under any `HENCE`. Give it a `GIVEN`, and pass the instant from where it is meaningful, as the second line of the example above does (or by name, `WITH start IS THE JOIN`).
 - **A `WHERE` name for a noun keeps the instant it was written under.** In the example below, `receipt` is written in the `HENCE` of the tenant's obligation, so it is the tenant's signature, and it stays that instant two obligations further down. A bare `THE JOIN` in the refund's `WITHIN` would instead name the landlord's acknowledgement.
@@ -110,11 +111,27 @@ That has three consequences worth knowing before you rely on it:
          WHERE receipt MEANS THE JOIN)
   ```
 
-  This is different from an _obligation_ defined in a `WHERE` or passed as a value, whose anchors name the obligation it is attached to when it runs (see [Where an anchor is refused](#where-an-anchor-is-refused)). A number is fixed where it is written; an obligation's `OF THE JOIN` is resolved where the obligation runs.
-
 - **In the next obligation's own `PROVIDED` or `WITHIN`, the noun still names the obligation before it.** In `HENCE (PARTY Bob MUST pay n PROVIDED n AT LEAST THE JOIN …)`, `THE JOIN` is the time of the act that completed the _previous_ obligation, not the time of the payment being tested. The `PROVIDED` is written in the previous obligation's `HENCE`, and that is the obligation the noun belongs to.
+- **Inside an obligation handed on as a value, a noun is read where that obligation runs.** An obligation defined in a `WHERE`, passed in by a `GIVEN`, or returned by a function is attached under some other obligation's `HENCE` or `LEST` when it runs, and every noun inside it (in its `WITHIN`, its `PROVIDED`, its action) names a position of the obligation it is attached to, exactly as its anchors do (see [Where an anchor is refused](#where-an-anchor-is-refused)). That keeps a deadline where it was when a continuation written inline is factored out into a `WHERE`. A `NUMBER` is different: a `WHERE` name for a noun is fixed where it is written, as the second point says.
+
+  **So moving a noun between an obligation and a `WHERE` name changes what it means, and nothing reports it.**
+  Below, the tenant signs at 4 and the landlord acknowledges at 10, and `k` is attached under the acknowledgement's `HENCE`.
+  Written as it is, `k`'s `THE JOIN` is the acknowledgement, so the refund is due at 15.
+  Write the same deadline as `WITHIN 0 OF t WHERE t MEANS THE JOIN PLUS 5`, with the `WHERE` inside `k`'s definition, and `t` is a number fixed where `k` is defined, in the `HENCE` of the tenant's obligation: it is the signature plus 5, and the refund is due at 9.
+
+  ```l4
+  PARTY Tenant MUST sign WITHIN 30
+  HENCE (    PARTY Landlord MUST acknowledge WITHIN 30
+             HENCE k
+         WHERE k MEANS PARTY Landlord MUST refund WITHIN 0 OF (THE JOIN PLUS 5))
+  ```
+
+  The same holds for a `PROVIDED` inside `k`: `n EQUALS THE JOIN` there tests against the acknowledgement's time, 10, not the signature's, 4.
+  (`jl4/examples/ok/every/run-lifecycle-values.l4` §12 runs both pairs.)
 
 On a join line (the `WITHIN` after `ONCE ALL HAVE`), `THE ARMING` as a value is the `EVERY`'s own arming, as `OF THE ARMING` is there, however deeply the `EVERY` is nested.
+That holds for the noun written on the join line itself.
+A `WHERE` name for `THE ARMING` written in the enclosing `HENCE` is a number fixed there, so it is the arming of the obligation that `HENCE` belongs to, not the `EVERY`'s (§10 of the same file).
 
 **A default for an instant that may not exist.**
 An anchor must be an instant, never a `MAYBE`: a `RECALL` of a fact that may never have been recorded is refused there, and the language supplies no default.
