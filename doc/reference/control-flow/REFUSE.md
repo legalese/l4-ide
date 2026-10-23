@@ -110,10 +110,10 @@ An assertion suite must be able to tell a wrong answer from a declined one.
 The decision service's query plan (`/query-plan`), which a wizard uses to choose its next question, reads a rule that refuses the way evaluation does: left to right, stopping as soon as the answer is known.
 Where the plan is made decides whether a questionnaire over a rule that refuses can be trusted:
 
-| where the plan is made                  | what it does with a refusal                                                                                            |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| the decision service and the web editor | reads a refusal as `/evaluation` does, or answers 400 and says which part of the rule it cannot read                   |
-| VS Code and the REPL                    | can answer where evaluation refuses, and report a refusal where evaluation answers ([below](#in-vs-code-and-the-repl)) |
+| where the plan is made                  | what it does with a refusal                                                                                                                                                       |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the decision service and the web editor | reads a refusal as `/evaluation` does, or answers 400 and says which part of the rule it cannot read, except a refusal in another file and a call with inputs ([Limits](#limits)) |
+| VS Code and the REPL                    | can answer where evaluation refuses, and report a refusal where evaluation answers ([below](#in-vs-code-and-the-repl))                                                            |
 
 For this rule, where `adult` is a Boolean input (the `GIVEN` and `GIVETH` lines are left out):
 

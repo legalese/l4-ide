@@ -87,7 +87,8 @@ The service and the browser's plan builder draw a rule that has either kind of l
 They spell out each `IMPLIES` and each Boolean `IF` in connective position as the `AND`, `OR` and `NOT` it stands for (`Transform.spellOutConnectives`), because drawn as written each is one leaf that names only the inputs directly under it, and the plan answers that leaf from the input it names.
 `a IMPLIES b` and `NOT a OR b` evaluate alike, a refusal included (`Machine.hs:414` and `:416`): `a` first, and `b` only where `a` is `TRUE`.
 `IF c THEN t ELSE e` and `(c AND t) OR (NOT c AND e)` evaluate alike for the same reason (`Machine.hs:480`): `c` first, `t` only where `c` is `TRUE`, `e` only where it is `FALSE`.
-The condition is read twice, so one that is a call to a rule with inputs becomes two leaves and `stillNeeded` lists it twice; a condition made of names shares its variables.
+The condition is read twice, so one that is a call to a rule with inputs becomes two leaves and `stillNeeded` lists it twice while `asks` names its input once; a condition made of names shares its variables.
+The plan reads that call itself as the limits below say.
 Beside other operands, as in `(IF b THEN c ELSE r) AND a`, the `IF` is read before the `a` that follows it, so an answer to `a` alone does not settle the plan.
 That can only make the plan over-ask.
 Both ladders do it in `translateDecide`, straight after `carameliseExpr`, because a call to the `IMPLIES` function is an `Implies` node only after `carameliseExpr`; it is a switch on the configuration (`spellingOut`, and `visualizeByNameSpelledOut` for `jl4-wasm`) that is off for every other caller.
@@ -172,7 +173,7 @@ For ``adult AND (`the fee` GREATER THAN 3)``, where `` `the fee` `` is a rule of
 ```
 
 A long part is cut short with `...`.
-Only the rule being planned is read, so another rule in the same file is planned as any rule is.
+A rule that reads no rule that refuses is planned as any rule is.
 The same call to a rule that cannot refuse is planned as a question.
 
 ## Two defects on `main` that this change depends on fixing
@@ -229,6 +230,7 @@ The `/query-plan` rows were measured on 2026-10-22, except the last, which was m
   ``adult AND `never no` applicant`` with `` `never no` person MEANS NOT person `` is `determined: true` for `adult` and `applicant` `TRUE`, where `/evaluation` says `FALSE`.
   Measured 2026-10-22 on `main`, on this branch and on unstable, with the same answers.
   It involves no refusal, and no end-to-end test covers a rule such as `never no`.
+  As the condition of an `IF` in a rule that holds a refusal it is read the same way, because the `IF` is spelled out: with ``IF `never no` applicant THEN a ELSE r1``, where `r1` always refuses, the plan says `determined: true` for `a` and `applicant` `TRUE`, where `/evaluation` refuses (measured 2026-10-23 on this branch's service).
   A called rule that refuses on only some paths does not reach it: the plan answers 400 for that call.
 - **VS Code and the REPL plan from the ladder as drawn there: they spell out neither an `IF` nor an `IMPLIES`, and answer no 400.**
   VS Code's handler draws the ladder with the panel's own configuration, simplified or not, and plans it with `queryPlanFromLadder` (`jl4-lsp/app/LSP/L4/Handlers.hs:696-703`).
