@@ -3118,7 +3118,7 @@ checkAnchor edge pos a = case a of
 -- where absent"). A @THE ARMING@ that reaches no obligation at all — a
 -- top-level @WHERE t MEANS THE ARMING@, a top-level function's body — has
 -- nothing to read, and the RUN refuses it by name when it is forced
--- ('L4.EvaluateLazy.Machine.lifecycleRefusal'): a check-time refusal for it
+-- ('L4.EvaluateLazy.Machine.lifecycleValueRefusal'): a check-time refusal for it
 -- would be a fifth refusal, which B1 did not rule (assumed, not ruled).
 --
 -- What a noun reads is lexical (§2.6 B1): the instant the nearest
