@@ -57,6 +57,7 @@ IMPORT `legal-persons`
 If `a.l4` imports `b.l4`, then `b.l4`, and every file `b.l4` imports in turn, cannot import `a.l4`.
 A file cannot import itself.
 `l4 check` and `l4 run` exit non-zero on a ring and print the message described under [Import cycle](../errors/README.md#import-cycle).
+`l4 deploy` and `l4 redeploy` refuse a file with a ring in its imports.
 
 ### What an import gives you
 

@@ -399,7 +399,7 @@ DECIDE `is ready` IS TRUE
 **Error:** `I could not find a module with this name: helpers`, then `I have tried the following locations:` and the places that were tried. The list ends with the standard library built into `l4`, for example `the stdlib embedded in this binary (20 modules, not among them)`, or `the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)` when that variable is set. On the command line, `l4` also prints `Warning | [Import Resolution] Module not found: helpers`.
 
 An `IMPORT` names a module that is neither a standard library nor a file `helpers.l4` in your project's root folder or beside the importing file.
-`l4 check` and `l4 run` exit non-zero on it, even when the file uses nothing from the missing module.
+`l4 check` and `l4 run` exit non-zero on it, even when the file uses nothing from the missing module, and `l4 deploy` and `l4 redeploy` refuse the file.
 
 **How to fix it:**
 
@@ -429,7 +429,7 @@ A file that imports itself gives the same kind of message.
 Two or more files `IMPORT` each other, directly or through a third: here `a.l4` imports `b.l4` and `b.l4` imports `a.l4`.
 A file cannot be checked until the files it imports have been, so a ring can never be settled.
 The files named in the message include the ones in the ring.
-`l4 check` and `l4 run` exit non-zero.
+`l4 check` and `l4 run` exit non-zero, and `l4 deploy` and `l4 redeploy` refuse the file.
 
 **How to fix it:**
 

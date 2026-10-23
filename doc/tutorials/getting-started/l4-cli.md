@@ -201,6 +201,7 @@ Check succeeded.
 ```
 
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
+`--json` and `--fixed-now` work here too.
 The check covers the files it imports too: an error in an imported file, an `IMPORT` that finds no file, or an `IMPORT` cycle is a non-zero exit as well.
 An import cycle is reported in terms of the checker's internals, not as a cycle.
 `l4 check a.l4` prints a diagnostic whose `File:` line names one of the files in the ring, whose `Source:` is `compiler`, and whose message begins like this:
@@ -215,18 +216,19 @@ It never says `IMPORT` or "cycle".
 The files it names include the ones in the ring, so look for two or more files that `IMPORT` each other, directly or through a third.
 [Import cycle](../../reference/errors/README.md#import-cycle) says what to change.
 
-Only `l4 check` and `l4 run` look at errors in the files a file imports.
+Only `l4 check`, `l4 run`, `l4 deploy` and `l4 redeploy` look at errors in the files a file imports.
 `l4 render`, `l4 nlg` and `l4 trace` print the error on standard error and exit `0` when a file they read imports a broken one.
 `l4 state-graph` exits `0` and prints its graph, and prints no error at all.
 `l4 format`, `l4 ast` and `l4 batch` exit `0` as well.
 Use `l4 check` as the CI gate for a project of several files.
 
-`l4 deploy` and `l4 redeploy` check only the file you name before they upload it, so they can accept a file that `l4 check` rejects.
-The service then refuses an upload in which an imported file has a type error.
-It does not refuse an `IMPORT` it cannot resolve: the deployment is created without that module, and the service logs a warning.
-An imported file with a syntax error, or the file that closes an import cycle, is left out of the upload, so the service never sees it.
-Run `l4 check` on the file before you deploy it.
-`--json` and `--fixed-now` work here too.
+`l4 deploy` and `l4 redeploy` refuse a file that `l4 check` refuses, before they send anything.
+They print the diagnostics `l4 check` prints, then ``FILE doesn't typecheck; fix it before deploying (see `l4 check`).``, and exit `1`.
+That covers an error in the file you name, an error in a file it imports, an `IMPORT` that finds no file and an `IMPORT` cycle.
+A warning does not stop a deploy.
+A file that passes `l4 check` goes on to the upload.
+One limit follows from this: an `l4` older than the service cannot deploy a file that imports a standard-library module that only the newer service has, because `l4 check` fails on that file too.
+Use an `l4` at least as new as the service you deploy to.
 
 ---
 
@@ -506,7 +508,7 @@ Deployed 'late-fee' (version 1.0.0) with 1 function:
 API: https://api.legalese.cloud/acme/late-fee
 ```
 
-The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
+The deployment is named after the file unless you pass `--name`. `l4` runs the same check as `l4 check` on the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
 
 | Command            | What it does                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
