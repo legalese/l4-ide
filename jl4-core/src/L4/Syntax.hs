@@ -439,12 +439,22 @@ data LifecyclePoint
   deriving stock (GHC.Generic, Eq, Ord, Show, Enum, Bounded)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
--- | The lifecycle position a bare anchor names, if it names one.
+-- | The lifecycle position an anchor names, if it names one: a bare noun
+-- (@OF THE JOIN@), or a lifecycle value that is the WHOLE anchor
+-- (@OF (THE JOIN)@, §2.6 B1). The two spellings are two trees with one
+-- meaning, and every consumer that asks "which noun is this anchor?" asks
+-- here, so they cannot drift apart: until 2026-10-24 the check-time
+-- empty-window refusal matched the bare constructors only and let
+-- @AFTER 30 WITHIN 5 OF (THE JOIN)@ through
+-- (@not-ok/tc/after-empty-window-value.l4@). An anchor that does
+-- arithmetic on a noun (@OF (THE JOIN PLUS 5)@) names an instant, not the
+-- position, and is 'Nothing'.
 lifecyclePointOfAnchor :: Anchor n -> Maybe LifecyclePoint
 lifecyclePointOfAnchor = \ case
   AnchorJoin _     -> Just LifecycleJoin
   AnchorDeadline _ -> Just LifecycleDeadline
   AnchorArming _   -> Just LifecycleArming
+  AnchorAt _ (Lifecycle _ p) -> Just p
   AnchorAt _ _     -> Nothing
 
 -- | The words a drafter writes for a lifecycle position, in ONE place: the

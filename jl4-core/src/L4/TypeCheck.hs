@@ -2982,8 +2982,9 @@ checkOpening (MkOpening oann d ma) = do
 -- run-time note otherwise ('L4.EvaluateLazy.Machine', @Contract5@).
 --
 -- When the @AFTER@ names an anchor, the two share an origin exactly when
--- they name the same lifecycle noun. When the @AFTER@ is bare it counts
--- from the continuation's default origin — the arming at top level, the
+-- they name the same lifecycle noun, bare or bracketed — @OF THE JOIN@ and
+-- @OF (THE JOIN)@ are one noun ('lifecyclePointOfAnchor'). When the
+-- @AFTER@ is bare it counts from the continuation's default origin — the arming at top level, the
 -- join under @HENCE@, the failure time under @LEST@ (spec §5.1, §5.2) —
 -- which is NOT whatever the @WITHIN@ names. The comparison is made only
 -- where that origin is the @WITHIN@'s anchor or later, so that @d1 > d2@
@@ -3000,7 +3001,8 @@ checkOpening (MkOpening oann d ma) = do
 --     @[violation+3, deadline+2]@ and may well be open: not compared. Under
 --     @HENCE@ the join precedes the deadline for the same reason: not
 --     compared;
---   * @OF e@: an instant with no relation to the clock: never compared.
+--   * @OF e@ other than a bracketed noun: an instant with no relation to
+--     the clock: never compared.
 --
 -- The slot and the modal are those of the obligation the deonton is
 -- WRITTEN under, and they are its run-time ones only when the deonton is
@@ -3028,19 +3030,16 @@ checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
   _ -> pure ()
   where
     sharesOrigin menc moa ca = case moa of
-      Just oa -> anchorWords oa == anchorWords ca && not (isAt oa)
-      Nothing -> case ca of
-        AnchorArming{}   -> True
-        AnchorJoin{}     -> direct && (slotIs InHence || (slotIs InLest && enclosingIs DMustNot))
-        AnchorDeadline{} -> direct && slotIs InLest && not (enclosingIs DMustNot)
-        AnchorAt{}       -> False
+      Just oa -> isJust (lifecyclePointOfAnchor oa) && lifecyclePointOfAnchor oa == lifecyclePointOfAnchor ca
+      Nothing -> case lifecyclePointOfAnchor ca of
+        Just LifecycleArming   -> True
+        Just LifecycleJoin     -> direct && (slotIs InHence || (slotIs InLest && enclosingIs DMustNot))
+        Just LifecycleDeadline -> direct && slotIs InLest && not (enclosingIs DMustNot)
+        Nothing                -> False
       where
         direct = maybe False (.direct) menc
         slotIs s = maybe False (\ enc -> enc.slot == s) menc
         enclosingIs m = maybe False (\ enc -> enc.modal == m) menc
-    isAt = \ case
-      AnchorAt{} -> True
-      _          -> False
 
 -- | The anchor after @OF@.
 --
@@ -7656,11 +7655,7 @@ forkWordsText = Text.strip (prettyLayout (MkUponEach emptyAnno))
 -- | The lifecycle anchor's words as a drafter wrote them, for diagnostics
 -- ('L4.Print' is the printer's copy).
 anchorWords :: Anchor n -> Text
-anchorWords = \ case
-  AnchorJoin{}     -> "THE JOIN"
-  AnchorDeadline{} -> "THE DEADLINE"
-  AnchorArming{}   -> "THE ARMING"
-  AnchorAt{}       -> "…"
+anchorWords = maybe "…" lifecyclePointWords . lifecyclePointOfAnchor
 
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousClausePattern headName hasGiven binder ctor) =

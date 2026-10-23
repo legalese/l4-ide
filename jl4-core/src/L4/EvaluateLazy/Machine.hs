@@ -7659,7 +7659,8 @@ armedAfterDeadlineNote modal actPat due entered deadline = Text.unwords $
       DMay     -> [ "so it could never be exercised in time: it lapses at " <> prettyRatio entered <> ", when it was entered." ]
       _        -> [ "so it could never be met in time: it fails at " <> prettyRatio entered <> ", when it was entered." ]
     cause = case due of
-      Left (Just (MkDeadline _ _ (Just AnchorArming{}))) ->
+      Left (Just (MkDeadline _ _ (Just a)))
+        | lifecyclePointOfAnchor a == Just LifecycleArming ->
         [ "Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when"
         , "the obligation it continues was entered, not when this one was." ]
       Left (Just (MkDeadline _ _ (Just anchor))) ->
@@ -7756,11 +7757,8 @@ emptyWindowNote (MkOpening _ _ moa) closing openAbsolute anchorIsClock open clos
       , "Drop the anchor from the WITHIN to count it from the instant the window"
       , "opens, or make the closing offset at least the opening one —" ]
     words' a = Text.strip (prettyLayout a)
-    sameNoun a b = case (a, b) of
-      (AnchorJoin{},     AnchorJoin{})     -> True
-      (AnchorDeadline{}, AnchorDeadline{}) -> True
-      (AnchorArming{},   AnchorArming{})   -> True
-      _                                    -> False
+    -- bare or bracketed, @OF THE JOIN@ and @OF (THE JOIN)@ are one noun
+    sameNoun a b = isJust (lifecyclePointOfAnchor a) && lifecyclePointOfAnchor a == lifecyclePointOfAnchor b
     demoted = \ case
       AnchorArming a -> isEmptyAnno a
       _              -> False
