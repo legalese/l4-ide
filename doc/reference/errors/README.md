@@ -31,6 +31,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [I could not find a definition for the identifier](#i-could-not-find-a-definition-for-the-identifier)
 - [Module not found](#module-not-found)
+- [Import cycle](#import-cycle)
 
 **Definitions and clauses**
 
@@ -407,6 +408,36 @@ An `IMPORT` names a module that is neither a standard library nor a file `helper
 - If `JL4_LIBRARY_PATH` is set, the built-in standard library is not used at all, so that folder must hold every library you import, `prelude.l4` included.
 
 [IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
+
+---
+
+### Import cycle
+
+**Error:** a diagnostic with `Source: compiler`, whose `File:` line names one of the files in the ring and whose message begins like this, here for `l4 check a.l4`:
+
+```
+GraphException: SuccessfulTypeCheck; file:///…/a.l4
+GetMixfixRegistry; file:///…/b.l4
+GetMixfixRegistry; file:///…/a.l4
+GetParsedAst; file:///…/a.l4
+```
+
+With a relative path on the command line the paths read `file://a.l4`.
+The message never says `IMPORT` or "cycle", and the lines after these are more of the same.
+A file that imports itself gives the same kind of message.
+
+Two or more files `IMPORT` each other, directly or through a third: here `a.l4` imports `b.l4` and `b.l4` imports `a.l4`.
+A file cannot be checked until the files it imports have been, so a ring can never be settled.
+The files named in the message include the ones in the ring.
+`l4 check` and `l4 run` exit non-zero.
+
+**How to fix it:**
+
+- Open the files the message names and follow their `IMPORT` lines until one leads back to a file you have already visited.
+- Move what both sides need into a third file that imports neither, and have both import that file.
+- Remove an `IMPORT` of a file that does not use anything from it.
+
+[IMPORT](../libraries/README.md#import) says what an import gives you.
 
 ---
 

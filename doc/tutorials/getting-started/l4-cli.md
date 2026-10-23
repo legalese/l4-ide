@@ -151,7 +151,10 @@ Result:
 
 Each `Evaluation[n]` block corresponds to one `#EVAL` directive, in file order, with the source range it came from. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch, or an `#ASSERT` whose expression raises) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
 An error in a file that it imports counts too, and so does an `IMPORT` that finds no file and an `IMPORT` cycle (`a.l4` imports `b.l4`, which imports `a.l4`).
-So does an evaluation that fails outright rather than inside one directive's result, such as a `POST` that cannot connect.
+Whether a directive makes `l4 run` fail depends on whether it can be evaluated at all.
+An `#EVAL` that gives a result exits `0`, and so does an `#ASSERT` that comes out false (it prints `assertion failed`).
+An `#EVAL` or `#ASSERT` that cannot be evaluated exits non-zero: a `CONSIDER` with no matching branch, a division by zero, or a `POST` that cannot connect.
+A `POST` that cannot connect prints the HTTP library's error on standard error, which begins `VanillaHttpException`, and no `Evaluation[n]` block for that directive.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -199,9 +202,30 @@ Check succeeded.
 
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
 The check covers the files it imports too: an error in an imported file, an `IMPORT` that finds no file, or an `IMPORT` cycle is a non-zero exit as well.
-An import cycle is reported with the engine's own technical message, not a plain-language one.
-Only `l4 check` and `l4 run` look at errors in imported files.
-`l4 format`, `l4 ast`, `l4 render`, `l4 nlg`, `l4 trace` and `l4 batch` still exit `0` when a file they read imports a broken one, so use `l4 check` as the CI gate for a project of several files.
+An import cycle is reported in terms of the checker's internals, not as a cycle.
+`l4 check a.l4` prints a diagnostic whose `File:` line names one of the files in the ring, whose `Source:` is `compiler`, and whose message begins like this:
+
+```
+GraphException: SuccessfulTypeCheck; file:///…/a.l4
+GetMixfixRegistry; file:///…/b.l4
+GetMixfixRegistry; file:///…/a.l4
+```
+
+It never says `IMPORT` or "cycle".
+The files it names include the ones in the ring, so look for two or more files that `IMPORT` each other, directly or through a third.
+[Import cycle](../../reference/errors/README.md#import-cycle) says what to change.
+
+Only `l4 check` and `l4 run` look at errors in the files a file imports.
+`l4 render`, `l4 nlg` and `l4 trace` print the error on standard error and exit `0` when a file they read imports a broken one.
+`l4 state-graph` exits `0` and prints its graph, and prints no error at all.
+`l4 format`, `l4 ast` and `l4 batch` exit `0` as well.
+Use `l4 check` as the CI gate for a project of several files.
+
+`l4 deploy` and `l4 redeploy` check only the file you name before they upload it, so they can accept a file that `l4 check` rejects.
+The service then refuses an upload in which an imported file has a type error.
+It does not refuse an `IMPORT` it cannot resolve: the deployment is created without that module, and the service logs a warning.
+An imported file with a syntax error, or the file that closes an import cycle, is left out of the upload, so the service never sees it.
+Run `l4 check` on the file before you deploy it.
 `--json` and `--fixed-now` work here too.
 
 ---
@@ -315,6 +339,7 @@ not the invoice is late with 5
 ```
 
 `l4 nlg` prints nothing and exits non-zero if the file does not typecheck, rather than writing prose about a module that does not hold together.
+It does not look into the files that file imports: if one of them is broken, `l4 nlg` writes the prose, prints the error on standard error, and exits `0`.
 Options: `-o/--output FILE` writes to a file instead of standard output, and `--lang SUBTAG` uses the `@nlg:SUBTAG` wordings for the rules that have them (and the module's default wording for those that do not).
 See [one encoding, several languages](../natural-language-functions/optimising-natural-language-generation.md#one-encoding-several-languages).
 

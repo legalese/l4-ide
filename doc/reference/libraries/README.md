@@ -52,6 +52,12 @@ IMPORT `legal-persons`
 - A name with a hyphen goes in backticks: ``IMPORT `excel-date` ``, ``IMPORT `legal-persons` ``, ``IMPORT `date-compat` ``. Without them, `IMPORT excel-date` is a parse error ("unexpected -").
 - `IMPORT` takes a module name, not a path or a quoted string. `IMPORT "helpers.l4"` is a parse error, and a folder in front of the name is ignored: ``IMPORT `rules/helpers` `` looks for `helpers.l4`.
 
+### Files cannot import each other in a ring
+
+If `a.l4` imports `b.l4`, then `b.l4`, and every file `b.l4` imports in turn, cannot import `a.l4`.
+A file cannot import itself.
+`l4 check` and `l4 run` exit non-zero on a ring and print the message described under [Import cycle](../errors/README.md#import-cycle).
+
 ### What an import gives you
 
 - Every top-level definition of the imported file: its types, constructors, functions and constants.
