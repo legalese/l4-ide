@@ -2209,6 +2209,7 @@ unsupported e = "this construct is outside the v1 Catala fragment (§6): " <> ca
   Refuse{}     -> "REFUSE — Catala has no notion of a declined answer, and emitting one as a \
                   \value would launder a refusal into an answer (the designed image, no \
                   \definition at all, is PROPS-REDTEAM §6 item 6)"
+  Lifecycle{}  -> "THE JOIN / THE DEADLINE / THE ARMING — a position in an obligation's life; Catala models no deontic layer (§5.1)"
   RAnd{}       -> "regulative AND — Catala models no deontic layer (§5.1)"
   ROr{}        -> "regulative OR — Catala models no deontic layer (§5.1)"
   Record{}     -> "a ledger RECORD/COMMIT — Catala is pure (§5.1)"

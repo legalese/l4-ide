@@ -37,7 +37,7 @@ import L4.Syntax
   , LocalDecl(..), GuardedExpr(..)
   , NamedExpr(..), InertContext(..), OptionallyNamedType(..)
   , Info(..)
-  , rawName, rawNameToText, getActual
+  , rawName, rawNameToText, getActual, lifecyclePointWords
   , Unique, getUnique
   )
 import L4.Annotation (HasSrcRange, emptyAnno, rangeOf)
@@ -2220,6 +2220,10 @@ lowerExprCases expr expectedTy = case expr of
   -- the request to the fallback evaluator — and that one raises the refusal
   -- properly. Never lowered to a value.
   Refuse{}     -> markUnsupported "REFUSE is not supported by the WASM backend"
+  -- a lifecycle value (THE JOIN, §2.6 B1) is a position in an obligation's
+  -- life, which only the deontic interpreter knows; outside one there is no
+  -- number to emit
+  Lifecycle _ p -> markUnsupported (lifecyclePointWords p <> " (a lifecycle value) is not supported by the WASM backend")
   Event{}      -> markUnsupported "EVENT construct not supported by the WASM backend"
   Fetch{}      -> markUnsupported "FETCH (IO) not supported by the WASM backend"
   Post{}       -> markUnsupported "POST (IO) not supported by the WASM backend"
@@ -3356,6 +3360,7 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
         go (bound <> Set.fromList [resolvedName p | MkOptionallyTypedName _ p _ _ <- lamParams]) b
       Lit{} -> Set.empty
       Inert{} -> Set.empty
+      Lifecycle{} -> Set.empty
       Regulative{} -> Set.empty
       Event{} -> Set.empty
       Fetch _ a -> go bound a

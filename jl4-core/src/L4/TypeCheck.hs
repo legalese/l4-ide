@@ -168,6 +168,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , importedImplicitReaders = Set.empty
     , inNonexhaustiveDecide = False
     , enclosingObligation = Nothing
+    , onJoinLine = False
     , moduleUri
     , sectionStack = []
     , localBindings = Set.empty
@@ -550,8 +551,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo h i lb apos) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo h i lb apos
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo jl h i lb apos) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo jl h i lb apos
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -2920,7 +2921,7 @@ data DeadlinePosition = ActDeadline | JoinLineDeadline
 --     on a join line it is refused by name ('BeforeOnJoinLine') — the barrier
 --     does not lower a DATE there, and saying so beats an internal error.
 checkDeadline :: DeadlinePosition -> Deadline Name -> Check (Deadline Resolved)
-checkDeadline pos = \ case
+checkDeadline pos = onLine . \ case
   MkDeadline dann d ma -> do
     dR <- checkExpr (durationCtx ma) d number
     maR <- traverse (checkAnchor EdgeWithin pos) ma
@@ -2941,6 +2942,11 @@ checkDeadline pos = \ case
       (_, Just _)              -> ExpectAnchoredDurationContext
       (ActDeadline, Nothing)      -> ExpectRegulativeDeadlineContext
       (JoinLineDeadline, Nothing) -> ExpectJoinDeadlineContext
+    -- a lifecycle VALUE anywhere in a join line's WITHIN is refused as the
+    -- bare anchor there is ('checkLifecycle', refusal 3)
+    onLine = case pos of
+      JoinLineDeadline -> local \ env -> env { onJoinLine = True }
+      ActDeadline      -> id
 
 -- | The opening edge, @AFTER d [OF anchor]@ \/ @AFTER date@
 -- (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5; built 2026-09-16). The offset
@@ -3094,6 +3100,51 @@ checkAnchor edge pos a = case a of
       ok <- unify t rt
       if ok then pure t else empty
 
+-- | A lifecycle position read as a VALUE (@THE JOIN@, @THE DEADLINE@,
+-- @THE ARMING@ as an expression; EVERY-EACH-QUANTIFIER-SPEC §2.6 card B1,
+-- RULED 2026-09-21, built 2026-10-24). The refusals are the anchor's
+-- ('checkAnchor'), applied where the value is WRITTEN — B1 ratifies 1, 3
+-- and 4 for exactly this form — with the wording of a value:
+--
+--   1. @THE JOIN@ \/ @THE DEADLINE@ with no enclosing obligation (the top
+--      level, a @WHERE@ of a top-level rule, a top-level function's body);
+--   2. @THE JOIN@ under a @LEST@ other than a @SHANT@'s (§2.6 card A3);
+--   3. @THE JOIN@ \/ @THE DEADLINE@ anywhere in a join line's @WITHIN@;
+--   4. @THE DEADLINE@ where the enclosing obligation has no closing edge.
+--
+-- @THE ARMING@ is never refused here, as the anchor's is not: at the top
+-- level it is the obligation's own arming, which the machine binds when it
+-- arms an obligation and only where no hand-off bound one (B1's "bound only
+-- where absent"). A @THE ARMING@ that reaches no obligation at all — a
+-- top-level @WHERE t MEANS THE ARMING@, a top-level function's body — has
+-- nothing to read, and the RUN refuses it by name when it is forced
+-- ('L4.EvaluateLazy.Machine.lifecycleRefusal'): a check-time refusal for it
+-- would be a fifth refusal, which B1 did not rule (assumed, not ruled).
+--
+-- What a noun reads is lexical (§2.6 B1): the instant the nearest
+-- enclosing obligation had where the noun is written. Inside the NEXT
+-- obligation's own @PROVIDED@ or @WITHIN@ that is still the obligation this
+-- one continues — @THE JOIN@ in the @PROVIDED@ of an obligation under a
+-- @HENCE@ is the PREVIOUS act's time, not the time of the act being tested.
+checkLifecycle :: LifecyclePoint -> Expr Name -> Check ()
+checkLifecycle p e = do
+  onLine <- asks (.onJoinLine)
+  menc <- asks (.enclosingObligation)
+  let refuse = addError . LifecycleUnavailable p e
+  case p of
+    LifecycleArming -> pure ()
+    _ | onLine -> refuse OnJoinLine
+    LifecycleJoin -> case menc of
+      Nothing -> refuse NoEnclosingObligation
+      Just enc
+        | enc.slot == InLest && enc.modal /= DMustNot -> refuse JoinUnderLest
+        | otherwise -> pure ()
+    LifecycleDeadline -> case menc of
+      Nothing -> refuse NoEnclosingObligation
+      Just enc
+        | enc.hasDeadline -> pure ()
+        | otherwise -> refuse EnclosingHasNoDeadline
+
 -- | The part of a deonton after its subject: the action (with its PROVIDED
 -- guard), the deadline, and the two continuations. Shared by both subjects.
 --
@@ -3119,7 +3170,7 @@ checkDeontonBody mPartyR partyT actionT action opens due joinHasDeadline hence l
     checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
       hasDeadline = isJust due || joinHasDeadline
-      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline action.modal True) }
+      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline action.modal True), onJoinLine = False }
   opensR <- traverse checkOpening opens
   dueR <- traverse (checkDeadline ActDeadline) due
   checkWindowNotEmpty opens due
@@ -5037,6 +5088,11 @@ inferExpr' g =
       -- Inert elements are grammatical scaffolding with context-aware evaluation
       -- In AND context: True (identity), in OR context: False (identity)
       pure (Inert ann txt ctx, boolean)
+    -- A lifecycle position as a value (§2.6 card B1): an instant on the
+    -- trace's clock, so a NUMBER (an INSTANT once T1's sort exists).
+    Lifecycle ann p -> do
+      checkLifecycle p g
+      pure (Lifecycle ann p, number)
 
 isStringCoercible :: Type' Resolved -> Bool
 isStringCoercible ty = case ty of
@@ -7436,6 +7492,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Refuse ann m -> Refuse ann (go False ctx m)
       -- Other leaves don't need transformation
       e@Lit{} -> e
+      e@Lifecycle{} -> e
 
     goNamed ctx' (MkNamedExpr ann n e) = MkNamedExpr ann n (go False ctx' e)
     goGuarded ctx' (MkGuardedExpr ann c f) = MkGuardedExpr ann (go True ctx' c) (go False ctx' f)
@@ -8226,6 +8283,49 @@ prettyCheckError (AnchorUnavailable edge a reason) =
       AnchorDeadline{} -> "deadline"
       AnchorArming{}   -> "arming"
       AnchorAt{}       -> "anchor"
+prettyCheckError (LifecycleUnavailable p _ reason) =
+  case reason of
+    NoEnclosingObligation ->
+      [ word <> " is the " <> noun <> " of the obligation this expression sits in the HENCE or"
+      , "LEST of — but it is not WRITTEN inside any HENCE or LEST: it is at the top"
+      , "level, in a top-level rule's WHERE, or in the body of a function, and"
+      , "there is no " <> noun <> " there to read."
+      , ""
+      , "Write it inside the HENCE or LEST whose " <> noun <> " it means. To use it in a"
+      , "function or a rule defined elsewhere, pass it as an argument from there:"
+      , "HENCE k " <> word <> "."
+      ]
+    OnJoinLine ->
+      [ word <> " cannot be read in the WITHIN on a join line."
+      , ""
+      , "A join line's WITHIN is the deadline on the whole group, so it is what"
+      , "THE DEADLINE would name, and the group's join has not fired when it is"
+      , "read. Only THE ARMING (the EVERY's own arming) and other instants can be"
+      , "used there."
+      ]
+    JoinUnderLest ->
+      [ "THE JOIN cannot be read under LEST."
+      , ""
+      , "LEST runs because the obligation was NOT completed — its join did not"
+      , "fire — so there is no join to read. (Under a SHANT's LEST there is: the"
+      , "act that broke the prohibition.) Under LEST, read THE DEADLINE (the"
+      , "deadline that was missed) or THE ARMING instead."
+      ]
+    EnclosingHasNoDeadline ->
+      [ "THE DEADLINE is the deadline of the obligation this expression sits in the"
+      , "HENCE or LEST of, but that obligation has no closing edge — no WITHIN or"
+      , "BEFORE on its act, and no WITHIN on its join line — so it has no deadline"
+      , "to read."
+      , ""
+      , "Give the enclosing obligation a WITHIN or a BEFORE, or read THE JOIN"
+      , "(under HENCE) or THE ARMING instead."
+      ]
+  where
+    word = lifecyclePointWords p
+    noun = case p of
+      LifecycleJoin     -> "join"
+      LifecycleDeadline -> "deadline"
+      LifecycleArming   -> "arming"
 prettyCheckError (AnchorNotAnInstant edge _ given) =
   [ "The anchor after OF in " <> article <> " " <> edgeWordText edge <> " is expected to be an instant — a NUMBER on"
   , "the trace's own clock, or a DATE — but is here of type"

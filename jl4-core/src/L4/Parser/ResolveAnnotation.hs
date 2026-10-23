@@ -1111,6 +1111,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       pure $ Breach ann mParty' mReason'
     Refuse ann msg -> Refuse ann <$> addNlg msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
+    Lifecycle ann p -> pure $ Lifecycle ann p
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
   addNlg (MkDeonton ann' subj event opens deadline mjoin followup lest) = do
@@ -1430,6 +1431,7 @@ instance HasDesc (Expr n) where
     Breach     ann mp mr -> Breach     ann <$> traverse addDesc mp <*> traverse addDesc mr
     Refuse     ann msg   -> Refuse     ann <$> addDesc msg
     Inert      ann t c   -> pure (Inert ann t c)
+    Lifecycle  ann p     -> pure (Lifecycle ann p)
 
 instance HasDesc (GuardedExpr n) where
   addDesc (MkGuardedExpr ann g r) = MkGuardedExpr ann <$> addDesc g <*> addDesc r
@@ -2310,6 +2312,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       pure $ Breach ann' mParty' mReason'
     Refuse ann msg -> attachRef expr ann >>= \ann' -> Refuse ann' <$> addRef msg
     Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
+    Lifecycle ann p -> attachRef expr ann >>= \ann' -> pure (Lifecycle ann' p)
    where
     bin f ann e1 e2 = do
       ann' <- attachRef expr ann
