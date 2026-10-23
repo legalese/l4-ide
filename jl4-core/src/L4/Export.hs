@@ -537,8 +537,16 @@ mkExportEventErr fnName paramName =
 -- The 'EntityInfo' records which type a constructor builds but not the
 -- converse, so the fields of every type are gathered by one pass over the
 -- constructors, shared by all the calls of the returned predicate.
+--
+-- Each type is looked into once per call, however many fields lead to it: the
+-- set of types already looked into is kept for the whole walk and not for one
+-- path of it. A type that is met again is either finished, and then it held no
+-- EVENT or the walk would have ended there, or it is still being looked into
+-- higher up, and whatever it holds is found there. Without that, a chain of
+-- records that each have two fields of the next one is walked once per path,
+-- which takes twice as long for every record added.
 typeCarriesEvent :: EntityInfo -> Type' Resolved -> Bool
-typeCarriesEvent ei = go Set.empty
+typeCarriesEvent ei = \ty -> evalState (go ty) Set.empty
  where
   fieldsByType :: Map.Map Unique [Type' Resolved]
   fieldsByType =
@@ -559,20 +567,29 @@ typeCarriesEvent ei = go Set.empty
     Fun _ onts _     -> map optionallyNamedTypeType onts
     _                -> []
 
-  go :: Set.Set Unique -> Type' Resolved -> Bool
-  go seen = \case
+  -- The state is the set of types already looked into.
+  go :: Type' Resolved -> State (Set.Set Unique) Bool
+  go = \case
     TyApp _ name args
-      | u == eventUnique   -> True
-      | any (go seen) args -> True
-      | u `Set.member` seen -> False
-      | otherwise ->
-          let seen' = Set.insert u seen
-              behindSynonym = case Map.lookup u ei of
-                Just (_, KnownType _ _ (Just body)) -> go seen' body
-                _                                   -> False
-              inFields = any (go seen') (Map.findWithDefault [] u fieldsByType)
-          in behindSynonym || inFields
+      | u == eventUnique -> pure True
+      | otherwise -> do
+          inArgs <- anyHit go args
+          seen <- get
+          if inArgs then pure True
+          else if u `Set.member` seen then pure False
+          else do
+            put (Set.insert u seen)
+            behindSynonym <- case Map.lookup u ei of
+              Just (_, KnownType _ _ (Just body)) -> go body
+              _                                   -> pure False
+            if behindSynonym then pure True
+            else anyHit go (Map.findWithDefault [] u fieldsByType)
       where
         u = getUnique name
-    Forall _ _ inner -> go seen inner
-    _                -> False
+    Forall _ _ inner -> go inner
+    _                -> pure False
+
+  -- Stops at the first hit: the rest of the list is not looked into.
+  anyHit :: (a -> State (Set.Set Unique) Bool) -> [a] -> State (Set.Set Unique) Bool
+  anyHit _ []       = pure False
+  anyHit f (x : xs) = f x >>= \hit -> if hit then pure True else anyHit f xs

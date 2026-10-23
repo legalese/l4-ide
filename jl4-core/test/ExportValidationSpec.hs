@@ -2,9 +2,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 module ExportValidationSpec (spec) where
 
+import Control.Exception (evaluate)
 import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
+import System.Timeout (timeout)
 
 import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportedFunction(..), getExportedFunctions, enrichReturnTypes)
@@ -44,6 +46,17 @@ exportEventErrors vfs source =
           ]
         , concatMap prettyCheckErrorWithContext (take 1 hits)
         )
+
+-- | 'exportEventErrors' on a snippet with no imports, under a watchdog: the
+-- walk over a type's fields once took a time that doubled with every level
+-- of nesting, so a regression is reported as a failure and not as a hung
+-- suite. The pairs only: (function, input).
+refusedWithinWatchdog :: Text -> IO [(Text, Text)]
+refusedWithinWatchdog src = do
+  mb <- timeout (30 * 1000000) $ case exportEventErrors emptyVFS src of
+    Left errs -> fail ("Fatal: " ++ show errs)
+    Right (hits, _) -> evaluate (length hits) >> pure hits
+  maybe (fail "the export check did not finish within 30s") pure mb
 
 -- | Run typecheck on a source snippet and return the exported function
 -- names (or 'Left' on fatal failure).
@@ -392,6 +405,124 @@ spec = do
             , "`label` t MEANS t's label"
             ]
       refused emptyVFS src `shouldReturn` []
+
+    it "terminates on records that contain each other" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Ping HAS pong IS A MAYBE Pong"
+            , "                 note IS A STRING"
+            , "DECLARE Pong HAS ping IS A MAYBE Ping"
+            , ""
+            , "@export Note"
+            , "GIVEN p IS A Ping"
+            , "GIVETH A STRING"
+            , "`note` p MEANS p's note"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "finds an EVENT in a record that is part of a cycle" $ do
+      -- Both are asked for, from either end of the cycle: the EVENT is in a
+      -- field of the type that the walk was already inside when it came back
+      -- to it.
+      let types = parties <> Text.unlines
+            [ "DECLARE Ping HAS pong IS A MAYBE Pong"
+            , "                 seen IS AN EVENT Person Action"
+            , "DECLARE Pong HAS ping IS A MAYBE Ping"
+            , ""
+            ]
+          export name input = Text.unlines
+            [ "@export " <> name
+            , "GIVEN x IS A " <> input
+            , "GIVETH A BOOLEAN"
+            , "`" <> name <> "` x MEANS TRUE"
+            ]
+      refused emptyVFS (types <> export "from ping" "Ping")
+        `shouldReturn` [("from ping", "x")]
+      refused emptyVFS (types <> export "from pong" "Pong")
+        `shouldReturn` [("from pong", "x")]
+
+    it "terminates on synonyms that name each other" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE SA IS A SB"
+            , "DECLARE SB IS A SA"
+            , ""
+            , "@export Get"
+            , "GIVEN t IS AN SA"
+            , "GIVETH A NUMBER"
+            , "`get` t MEANS 1"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "rejects an EVENT in any constructor of a sum type, the first included" $ do
+      -- The constructors of a type are gathered into one list of field types.
+      -- An EVENT in the first of them must count as much as one in the last.
+      let sumType eventFirst = parties <> Text.unlines
+            ( [ "DECLARE Entry IS ONE OF" ]
+              <> (if eventFirst
+                    then [ "  recorded HAS what IS AN EVENT Person Action"
+                         , "  plain HAS n IS A NUMBER"
+                         ]
+                    else [ "  plain HAS n IS A NUMBER"
+                         , "  recorded HAS what IS AN EVENT Person Action"
+                         ]
+                 )
+              <> [ "  unrecorded"
+                 , ""
+                 , "@export Entry kind"
+                 , "GIVEN x IS AN Entry"
+                 , "GIVETH A BOOLEAN"
+                 , "`entry kind` x MEANS TRUE"
+                 ]
+            )
+      refused emptyVFS (sumType True) `shouldReturn` [("entry kind", "x")]
+      refused emptyVFS (sumType False) `shouldReturn` [("entry kind", "x")]
+
+    -- A chain of records in which each has TWO fields of the next one has
+    -- 2^n paths from the first record to the last, though only n + 1 types.
+    -- The check has to look at each type once, whichever way it got there.
+    describe "a chain of records that doubles at every level" $ do
+      let depth = 40 :: Int
+          typeName i = "T" <> Text.pack (show i)
+          chain leafField = Text.unlines $
+            [ Text.unlines
+                [ "DECLARE " <> typeName i <> " HAS"
+                , "  f0 IS A " <> typeName (i + 1)
+                , "  f1 IS A " <> typeName (i + 1)
+                ]
+            | i <- [0 .. depth - 1]
+            ]
+            <> [ "DECLARE " <> typeName depth <> " HAS " <> leafField ]
+          exportFirst = Text.unlines
+            [ "@export Chain"
+            , "GIVEN t IS A T0"
+            , "GIVETH A BOOLEAN"
+            , "`chain` t MEANS TRUE"
+            ]
+
+      it "is checked in a moment when it holds no EVENT" $ do
+        let src = parties <> chain "leaf IS A NUMBER" <> exportFirst
+        refusedWithinWatchdog src `shouldReturn` []
+
+      it "is refused when only the last record holds an EVENT" $ do
+        let src = parties <> chain "leaf IS AN EVENT Person Action" <> exportFirst
+        refusedWithinWatchdog src `shouldReturn` [("chain", "t")]
+
+      it "still finds an EVENT in a later field once the chain has been walked" $ do
+        -- The chain holds none. The EVENT is in a field that comes after the
+        -- field that leads into it, so the walk has been all through the
+        -- chain before it gets there.
+        let src = parties <> chain "leaf IS A NUMBER" <> Text.unlines
+              [ "DECLARE Root HAS"
+              , "  first IS A T0"
+              , "  second IS A Side"
+              , ""
+              , "DECLARE Side HAS later IS AN EVENT Person Action"
+              , ""
+              , "@export Root"
+              , "GIVEN r IS A Root"
+              , "GIVETH A BOOLEAN"
+              , "`root` r MEANS TRUE"
+              ]
+        refusedWithinWatchdog src `shouldReturn` [("root", "r")]
 
   describe "exported return type display" $ do
     -- A concrete inferred return type renders normally.
