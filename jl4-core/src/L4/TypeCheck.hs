@@ -3127,6 +3127,11 @@ checkAnchor edge pos a = case a of
 -- @HENCE@ is the PREVIOUS act's time, not the time of the act being tested.
 checkLifecycle :: LifecyclePoint -> Expr Name -> Check ()
 checkLifecycle p e = do
+  -- A value of the program's own spelled like the noun is no longer what
+  -- @THE <noun>@ reaches (LifecycleNounHidesName): say so where it is written.
+  hidden <- lookupRawNameInEnvironment (NormalName (lifecyclePointNoun p))
+  unless (null hidden) $
+    addWarning (LifecycleNounHidesName p (rangeOf e) [ n | (_, n, _) <- hidden ])
   onLine <- asks (.onJoinLine)
   menc <- asks (.enclosingObligation)
   let refuse = addError . LifecycleUnavailable p e
@@ -8480,6 +8485,21 @@ prettyCheckWarning = \ case
       whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
         w : _ | k >= 1 -> "the " <> w <> " clause"
         _ -> "clause " <> Text.textShow k
+  LifecycleNounHidesName p _ names ->
+    [ lifecyclePointWords p <> " here is the lifecycle position, not "
+        <> Text.intercalate ", " (map quotedName names) <> "."
+    , ""
+    , "This program also defines a value spelled " <> noun <> ", which " <> lifecyclePointWords p <> " does"
+    , "not reach: after THE, " <> noun <> " always names the " <> Text.toLower noun <> " of the obligation"
+    , "this is written under (or of the one it is handed to). Before 2026-10-24"
+    , "that THE was an optional article in front of a name, so a program written"
+    , "then may have meant its own value."
+    , ""
+    , "To pass that value, write " <> noun <> " without THE. To keep " <> lifecyclePointWords p <> " and"
+    , "silence this warning, rename the value."
+    ]
+    where
+      noun = lifecyclePointNoun p
   FixityIgnoredNonBinary n _ ->
     [ "The fixity annotation on " <> quotedName (MkName emptyAnno n) <> " is ignored."
     , ""

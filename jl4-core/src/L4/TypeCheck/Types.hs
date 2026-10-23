@@ -452,6 +452,17 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
+  | LifecycleNounHidesName LifecyclePoint (Maybe SrcRange) [Name]
+    -- ^ @THE JOIN@, @THE DEADLINE@ or @THE ARMING@ written where the program
+    -- has its own value spelled @JOIN@, @DEADLINE@ or @ARMING@ in scope
+    -- ('L4.TypeCheck.checkLifecycle'). Since the nouns became values (§2.6
+    -- card B1, 2026-10-24), @THE@ before one of them is always the lifecycle
+    -- position: before, @WITH start IS THE DEADLINE@ passed the program's own
+    -- @DEADLINE@ (the article was optional). Under a @HENCE@ that change is
+    -- silent — a different number, no error — so this says so. A warning,
+    -- never an error: dropping the @THE@ reaches the program's value, and
+    -- renaming it silences the warning. Carries the point, the range of the
+    -- @THE …@ written, and the program's bindings of that spelling.
   | OpenedFieldShadowsDefinition OpenedFieldShadow
     -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read that an opened field
     -- won over a 0-ary constructor or top-level definition of the same name.
@@ -891,6 +902,7 @@ instance HasSrcRange CheckError where
   rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
+  rangeOf (CheckWarning (LifecycleNounHidesName _ mr _)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r

@@ -465,6 +465,15 @@ lifecyclePointWords = \ case
   LifecycleDeadline -> "THE DEADLINE"
   LifecycleArming   -> "THE ARMING"
 
+-- | The noun alone, as the identifier it is spelled like (@JOIN@,
+-- @DEADLINE@, @ARMING@): the nouns are not reserved words, so a program may
+-- bind one of these names.
+lifecyclePointNoun :: LifecyclePoint -> Text
+lifecyclePointNoun = \ case
+  LifecycleJoin     -> "JOIN"
+  LifecycleDeadline -> "DEADLINE"
+  LifecycleArming   -> "ARMING"
+
 -- | Context for inert element evaluation.
 -- Inert elements evaluate to the identity for their containing boolean operator.
 data InertContext

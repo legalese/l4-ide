@@ -1,0 +1,93 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: prelude from lifecycle-value-hides-name.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from lifecycle-value-hides-name.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: lifecycle-value-hides-name.l4
+  Hidden: no
+  Range: 33:29-33:34
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message:
+    In this action, `alice` refers to
+
+      alice (at lifecycle-value-hides-name.l4:25:1-6)
+
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+
+File: lifecycle-value-hides-name.l4
+  Hidden: no
+  Range: 38:27-38:32
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message:
+    In this action, `alice` refers to
+
+      alice (at lifecycle-value-hides-name.l4:25:1-6)
+
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+
+File: lifecycle-value-hides-name.l4
+  Hidden: no
+  Range: 39:47-39:55
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    THE JOIN here is the lifecycle position, not `JOIN`.
+
+    This program also defines a value spelled JOIN, which THE JOIN does
+    not reach: after THE, JOIN always names the join of the obligation
+    this is written under (or of the one it is handed to). Before 2026-10-24
+    that THE was an optional article in front of a name, so a program written
+    then may have meant its own value.
+
+    To pass that value, write JOIN without THE. To keep THE JOIN and
+    silence this warning, rename the value.
+
+File: lifecycle-value-hides-name.l4
+  Hidden: no
+  Range: 44:27-44:32
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message:
+    In this action, `alice` refers to
+
+      alice (at lifecycle-value-hides-name.l4:25:1-6)
+
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+
+File: lifecycle-value-hides-name.l4
+  Hidden: no
+  Range: 52:23-52:35
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    THE DEADLINE is the deadline of the obligation this expression sits in the HENCE or
+    LEST of — but it is not WRITTEN inside any HENCE or LEST: it is at the top
+    level, in a top-level rule's WHERE, or in the body of a function, and
+    there is no deadline there to read.
+
+    Write it inside the HENCE or LEST whose deadline it means. To use it in a
+    function or a rule defined elsewhere, pass it as an argument from there:
+    HENCE k THE DEADLINE.
+
+File: lifecycle-value-hides-name.l4
+  Hidden: no
+  Range: 52:23-52:35
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    THE DEADLINE here is the lifecycle position, not `DEADLINE`.
+
+    This program also defines a value spelled DEADLINE, which THE DEADLINE does
+    not reach: after THE, DEADLINE always names the deadline of the obligation
+    this is written under (or of the one it is handed to). Before 2026-10-24
+    that THE was an optional article in front of a name, so a program written
+    then may have meant its own value.
+
+    To pass that value, write DEADLINE without THE. To keep THE DEADLINE and
+    silence this warning, rename the value.
