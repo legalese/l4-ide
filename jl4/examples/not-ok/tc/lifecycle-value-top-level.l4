@@ -1,0 +1,24 @@
+-- THE JOIN and THE DEADLINE as VALUES (EVERY-EACH-QUANTIFIER-SPEC §2.6 card
+-- B1, built 2026-10-24) name a position in the life of the obligation whose
+-- HENCE or LEST they are WRITTEN in, so written at the top level — in a
+-- rule's body, in a top-level rule's WHERE, as a function's result — they
+-- name nothing, and are refused as the bare anchor is (refusal 1 of
+-- §5.1.1.1). THE ARMING is not refused there: at the top level it is the
+-- obligation's own arming (run-lifecycle-values.l4 pins it).
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+    Pay  HAS amount IS A NUMBER
+
+alice MEANS Tenant OF "Alice"
+
+GIVETH A NUMBER
+`when it joined` MEANS THE JOIN PLUS 1
+
+GIVETH A DEONTIC Actor Action
+`alias at the top` MEANS
+    PARTY alice MUST Sign alice WITHIN 5 OF t
+    WHERE t MEANS THE DEADLINE

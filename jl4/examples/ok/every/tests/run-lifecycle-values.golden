@@ -1,0 +1,316 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-lifecycle-values.l4:39:27-32:
+  I found a problem while checking the definition of `join plus five`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:40:43-54:
+  I found a problem while checking the definition of `join plus five`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:43:1-45:51:
+  FULFILLED
+run-lifecycle-values.l4:47:1-49:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      14
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver theLandlord
+    before their deadline, which was at
+      13
+run-lifecycle-values.l4:53:27-32:
+  I found a problem while checking the definition of `join plus five, unbracketed`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:54:43-54:
+  I found a problem while checking the definition of `join plus five, unbracketed`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:57:1-59:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      14
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver theLandlord
+    before their deadline, which was at
+      13
+run-lifecycle-values.l4:72:35-46:
+  I found a problem while checking the definition of `refund within 30 of`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:76:27-32:
+  I found a problem while checking the definition of `passed by argument`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:79:1-81:50:
+  FULFILLED
+run-lifecycle-values.l4:83:1-85:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      35
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      34
+run-lifecycle-values.l4:89:27-32:
+  I found a problem while checking the definition of `passed by name`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:92:1-94:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      35
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      34
+run-lifecycle-values.l4:108:27-32:
+  I found a problem while checking the definition of `resolve within 30 of receipt`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:109:47-58:
+  I found a problem while checking the definition of `resolve within 30 of receipt`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:110:53-64:
+  I found a problem while checking the definition of `resolve within 30 of receipt`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:113:1-116:50:
+  FULFILLED
+run-lifecycle-values.l4:118:1-121:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      39
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      38
+run-lifecycle-values.l4:132:27-32:
+  I found a problem while checking the definition of `five days of notice, or of the arming`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:133:43-54:
+  I found a problem while checking the definition of `five days of notice, or of the arming`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:135:1-137:50:
+  FULFILLED
+run-lifecycle-values.l4:139:1-141:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      6
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver theLandlord
+    before their deadline, which was at
+      5
+run-lifecycle-values.l4:151:27-32:
+  I found a problem while checking the definition of `cure to the deadline plus five`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:153:34-39:
+  I found a problem while checking the definition of `cure to the deadline plus five`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:155:1-156:36:
+  FULFILLED
+run-lifecycle-values.l4:158:1-159:36:
+  DEONTIC BREACHED:
+    party
+      Tenant OF "Alice"
+    who did action
+      Sign OF (Tenant OF "Alice")
+    at
+      16
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      15
+run-lifecycle-values.l4:172:48-59:
+  I found a problem while checking the definition of `after everyone signs`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:174:1-177:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver theLandlord
+    before their deadline, which was at
+      10
+run-lifecycle-values.l4:190:27-32:
+  I found a problem while checking the definition of `pay at least the join`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:193:1-195:30:
+  FULFILLED
+run-lifecycle-values.l4:197:1-199:30:
+  PARTY Tenant OF "Bob" MUST Pay n PROVIDED (n AT LEAST THE JOIN) WITHIN 7 HENCE FULFILLED
+run-lifecycle-values.l4:208:27-32:
+  I found a problem while checking the definition of `record the receipt`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:210:42-53:
+  I found a problem while checking the definition of `record the receipt`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:212:1-214:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      35
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      34
+  Ledger (Tenant OF &1107@run-lifecycle-values.l4):
+    RECORD `receipt` IS 4   [party=Tenant OF &1107@run-lifecycle-values.l4, source=RECORD, at=2025-01-31T15:45:30Z]
+run-lifecycle-values.l4:223:27-32:
+  I found a problem while checking the definition of `own arming, as a value`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:225:1-226:36:
+  FULFILLED
+run-lifecycle-values.l4:228:1-229:36:
+  DEONTIC BREACHED:
+    party
+      Tenant OF "Alice"
+    who did action
+      Sign OF (Tenant OF "Alice")
+    at
+      16
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      15
+run-lifecycle-values.l4:240:36-47:
+  I found a problem while checking the definition of `join line of the arming, nested`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lifecycle-values.l4:24:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:247:1-250:36:
+  FULFILLED
+run-lifecycle-values.l4:252:1-255:36:
+  DEONTIC BREACHED:
+    BREACH
+    BECAUSE "every member acted, but the last of them acted after the ONCE line's WITHIN deadline"
+run-lifecycle-values.l4:265:27-32:
+  I found a problem while checking the definition of `arming defined outside`:
+    In this action, `alice` refers to
+    
+      alice (at run-lifecycle-values.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lifecycle-values.l4:268:1-269:36:
+  THE ARMING was read where it names nothing: it is the arming of the obligation an expression sits in the HENCE or LEST of, and this one was evaluated where no obligation had that position. One of: it was defined at the top level (a top-level rule's WHERE, or a function's body) and used there, where no obligation has been entered; it was passed in a value attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline (THE DEADLINE). Read it inside the HENCE or LEST whose position it means, and pass it to a function as an argument from there.
