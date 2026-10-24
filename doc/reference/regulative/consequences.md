@@ -75,6 +75,9 @@ For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohib
 `THE` is a keyword; `JOIN`, `DEADLINE` and `ARMING` are matched by spelling after it and are not reserved, so a program may still name a value `DEADLINE`.
 But `THE DEADLINE` is then always the lifecycle position, never that value: write the value as `DEADLINE`, without `THE`.
 Before 2026-10-24 the `THE` was an optional article, and `WITH start IS THE DEADLINE` passed the program's own value; since then it passes the enclosing obligation's deadline, and the checker warns wherever `THE` is written before a noun that the program also defines.
+The warning names the value that `THE DEADLINE` hides, and says to write `DEADLINE` without `THE` to reach it.
+When the program defines the value itself, renaming it also silences the warning; when the value comes from an `IMPORT`, the only remedy offered is to drop `THE`, because the module that defines it may not be yours to change.
+`jl4-service` goes further and refuses to deploy a module that draws this warning, naming the hidden value: a deployment publishes answers, and this is the one spelling whose answer can change with no error.
 The three are also ordinary values, usable anywhere a number is: [below](#the-anchor-words-as-values).
 
 Inside the duration, `OF` is always the anchor — everywhere in it, not only at the front — so `WITHIN f OF x` means `f` anchored at `x`, and so does an `OF` inside an `IF` branch, an operator's operand or a `WHERE` in the duration. To apply a function there, bracket the call (`WITHIN (f OF x) OF THE JOIN`) or juxtapose its arguments (`WITHIN f x OF THE JOIN`); the checker's message says so when the duration turns out to be a function.

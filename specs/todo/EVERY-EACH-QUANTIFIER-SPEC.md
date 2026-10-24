@@ -1473,11 +1473,15 @@ written — so moving `THE JOIN PLUS 5` from an obligation's `WITHIN` into that 
 and THE DEADLINE deleted from that environment (assumed, not ruled: it overrides rather than binds
 "only where absent", so that `OF (THE ARMING)` and `OF THE ARMING` agree there; it holds for the
 noun written on the join line only, and a `WHERE` name for `THE ARMING PLUS 10` written in the
-enclosing `HENCE` is that `HENCE`'s arming, §10). One assumed, not ruled, reading changes a
-spelling that was valid before: `THE` before `JOIN`, `DEADLINE` or `ARMING` is never an article
-any more, so `WITH start IS THE DEADLINE` passes the lifecycle position even where the program
-defines its own `DEADLINE` — silently under a `HENCE` — and the checker now warns at every such
-site (`LifecycleNounHidesName`, `not-ok/tc/lifecycle-value-hides-name.l4`). What is not built:
+enclosing `HENCE` is that `HENCE`'s arming, §10). One reading, RULED 2026-10-24 (B1a below),
+changes a spelling that was valid before: `THE` before `JOIN`, `DEADLINE` or `ARMING` is never an
+article any more, so `WITH start IS THE DEADLINE` passes the lifecycle position even where the
+program defines its own `DEADLINE` — silently under a `HENCE` — and the checker now warns at every
+such site (`LifecycleNounHidesName`, `not-ok/tc/lifecycle-value-hides-name.l4`), naming the hidden
+value and saying to drop `THE`; it offers renaming only when this module defines every such
+value, since an imported one may live in a file the importer does not own. `jl4-service` refuses
+to deploy a module that draws the warning (`hidesNameRefusal`, `jl4-service/src/Compiler.hs`;
+tests under "THE before a noun the program also defines" in `IntegrationSpec.hs`). What is not built:
 `Anchor` still has its three noun constructors beside `AnchorAt`, so `OF THE JOIN` and
 `OF (THE JOIN)` are two trees with one meaning — every consumer that asks which noun an anchor
 names now asks `lifecyclePointOfAnchor`, which reads through the bracket, so the empty-window
@@ -1490,6 +1494,10 @@ defined in (a top-level function's body in its closure's, even when it is called
 obligation's slot), so the definition site decides, not the use site, and the checker already
 carries `enclosingObligation` and `inSlot`; the refusal would be "`THE ARMING` with no enclosing
 obligation and not inside a deonton's own slots" — but it would be a fifth refusal, which B1 did not rule: open, for a ruling.
+
+Rulings on the build, recorded 2026-10-25:
+
+- B1a: option A plus a jl4-service deploy refusal for LifecycleNounHidesName (names the hidden name, says to drop THE), warning reworded (no history claim; drop THE for imported names). Meng's note: "I feel like some other languages would have stricter rules around punctuation in types vs terms vs reserved words. Here we have an all caps builtin. If we were as strict we might not see this problem arising in the first place. Just a thought, not design guidance." Ruled 2026-10-24, bench https://claude.ai/artifact/PgiYUak5fBxjUJ1dd3FZ2F (collection l4-event-time-1024).
 
 **B3 settled by SEESAW.** Meng, 2026-09-21: _"the RAND and ROR operators ought to be commutative,
 don't you think?"_; 2026-09-22: _"do we need to break a tie? i thought we switched blame from

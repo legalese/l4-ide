@@ -8,10 +8,12 @@
 -- falls due at 4 + 30 = 34 instead of 100 + 30 = 130. So the checker warns
 -- wherever THE is written before a noun the program also defines
 -- (LifecycleNounHidesName), and the warning says how to reach the value:
--- drop the THE. At the top level the same spelling is also refused
--- outright, because THE DEADLINE has no obligation to read there; the
--- warning comes with the refusal, so the drafter learns why the spelling
--- changed meaning. The `DEADLINE` without THE is the program's value and
+-- drop the THE. JOIN is defined in this module, so renaming it is offered
+-- too; for an imported JOIN it is not. jl4-service refuses to deploy a
+-- module that draws this warning (B1a). At the top level the same
+-- spelling is also refused outright, because THE DEADLINE has no
+-- obligation to read there; the warning comes with the refusal, so the
+-- drafter learns why the spelling changed meaning. The `DEADLINE` without THE is the program's value and
 -- draws nothing.
 
 IMPORT prelude
