@@ -110,7 +110,9 @@ data GetMixfixRegistry = GetMixfixRegistry
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
-type instance RuleResult GetTypeCheckDependencies = [(ImportResult, TypeCheckResult)]
+-- | Each import with its typecheck, 'Nothing' when it has none (it does not
+-- parse, or it is in an import cycle).
+type instance RuleResult GetTypeCheckDependencies = [(ImportResult, Maybe TypeCheckResult)]
 data GetTypeCheckDependencies = GetTypeCheckDependencies
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
@@ -141,6 +143,10 @@ data TypeCheckResult = TypeCheckResult
   , infos :: [TypeCheck.CheckErrorWithContext]  -- ^ Non-fatal diagnostics ('SInfo' and 'SWarn'); don't block 'success'
   , errors :: [TypeCheck.CheckErrorWithContext]  -- ^ Actual errors ('SError' only, e.g. OutOfScopeError) for implicit ASSUME extraction
   , dependencies :: [TypeCheckResult]
+  , importsOk :: Bool
+  -- ^ Every module this one imports, transitively, was found and typechecks.
+  -- 'success' doesn't depend on it: a module checks against what its imports
+  -- did provide.
   , mixfixRegistry :: TypeCheck.MixfixRegistry
   }
   deriving stock (Generic)
@@ -155,6 +161,7 @@ instance NFData TypeCheckResult where
     `seq` scopeMap
     `seq` descMap
     `seq` rnf success
+    `seq` rnf importsOk
     `seq` rnf environment
     `seq` rnf entityInfo
     `seq` rnf infos
@@ -831,12 +838,36 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
 
   defineWithCallStack shakeRecorder $ \GetTypeCheckDependencies cs uri -> do
     imports <- use_  GetImports uri
-    ress    <- fmap catMaybes $ zipWith (\res mres -> (res,) <$> mres) imports <$> uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) imports)
+    ress    <- zip imports <$> uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) imports)
     pure ([], Just ress)
 
   defineWithCallStack shakeRecorder $ \TypeCheckNoCallstack cs uri -> do
     parsed       <- use_ GetParsedAst uri
-    (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+    importResults <- use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+    let (imported, dependencies) = unzip [ (i, tc) | (i, Just tc) <- importResults ]
+        -- What is wrong with an imported module, if anything. The error itself
+        -- is reported in that module; this points at it from the IMPORT.
+        importProblem :: ImportResult -> Maybe TypeCheckResult -> Maybe Text
+        importProblem imp = \case
+          Nothing -> Just $ "The imported module " <> modName <> " could not be checked: it does not parse, or its imports form a cycle."
+          Just tc
+            | e : _ <- tc.errors ->
+                Just $ "The imported module " <> modName <> " has errors"
+                  <> maybe "" (\r -> " (line " <> Text.pack (show r.start.line) <> ": " <> firstLine e <> ")") (rangeOf e)
+            | not tc.success -> Just $ "The imported module " <> modName <> " has errors."
+            | not tc.importsOk -> Just $ "The imported module " <> modName <> " imports a module with errors."
+            | otherwise -> Nothing
+          where
+            modName = rawNameToText (rawName imp.importName)
+            firstLine e = Text.strip $ Maybe.fromMaybe "" $ Maybe.listToMaybe $ concatMap Text.lines $ TypeCheck.prettyCheckError e.kind
+        importDiags =
+          [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "import" msg (fromSrcRange <$> imp.importRange))
+          | (imp, mTc) <- importResults
+          -- An IMPORT that finds no module resolves to its own file, and
+          -- 'GetImports' already reports it on that IMPORT.
+          , imp.moduleUri /= uri
+          , Just msg <- [importProblem imp mTc]
+          ]
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
 
@@ -865,7 +896,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- of this partition — it decides which go to 'infos' and which to 'errors'.
         (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
     pure
-      ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
+      ( importDiags <> fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
       , Just TypeCheckResult
         { module' = result.program
         , substitution = result.substitution
@@ -883,6 +914,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , scopeMap = result.scopeMap
         , descMap = result.descMap
         , dependencies = dependencies <> foldMap (.dependencies) dependencies
+        , importsOk = all (\(_, mTc) -> maybe False (\tc -> tc.success && tc.importsOk) mTc) importResults
         , mixfixRegistry = result.mixfixRegistry
         }
       )
