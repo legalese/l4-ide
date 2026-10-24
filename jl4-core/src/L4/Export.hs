@@ -317,6 +317,17 @@ collectReadTypes =
     App ann ref@(Ref _ _ _) [] | Just (TypeInfo ty _) <- ann ^. annInfo -> [(ref, ty)]
     _ -> []
 
+-- | The ASSUMEs that a @WHERE@ in the expression declares, wherever in the
+-- expression the @WHERE@ stands, also inside a local definition. The parser
+-- accepts an ASSUME among local declarations under @WHERE@ and nowhere else: a
+-- @LET@ holds definitions only. The checker's table of what a module declares
+-- does not hold these, since they are in scope for the expression alone.
+collectLocalAssumes :: Expr Resolved -> [Assume Resolved]
+collectLocalAssumes =
+  foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+    Where _ _ decls -> [ assume | LocalAssume _ assume <- decls ]
+    _ -> []
+
 -- | Extract ASSUME declarations that are referenced by a DECIDE body.
 -- Returns ExportedParams for each ASSUME that the function depends on.
 extractAssumedDependencies
@@ -468,7 +479,12 @@ extractImplicitAssumeParams errors =
 --   with, and for the type at each read of it in the body, which is where a
 --   polymorphic ASSUME (@GIVEN a IS A TYPE GIVETH AN a ASSUME x@) holds a
 --   DEONTIC or an EVENT ('collectReadTypes'). A call of an ASSUME that is given
---   arguments has the type of its result and is not looked at.
+--   arguments has the type of its result and is not looked at;
+--
+-- * an ASSUME that the body declares itself, in a @WHERE@, and reads: the
+--   'EntityInfo' does not hold it, so it is found in the body
+--   ('collectLocalAssumes') and its declared type is the one that the checker
+--   recorded on the declaration. The reads of it are looked at as for any other.
 --
 -- The walk covers the rule's own inputs and the ASSUMEs that its own body
 -- reads. It does not look inside a rule that the exported rule calls.
@@ -569,10 +585,11 @@ writtenInputs assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) _ body) =
 
 -- | Every input that the checker knows a type for: the GIVENs, with the
 -- inferred type of one that has no written type, then every ASSUME that the
--- body reads, whichever module declares it. An ASSUME is looked at for the type
--- it is declared with, and then for the type that the checker recorded at each
--- read of it in the body ('collectReadTypes'): the two differ for a polymorphic
--- ASSUME, which is declared with a type variable and read at a type of its own.
+-- body reads, whichever module declares it, or the body itself in a WHERE. An
+-- ASSUME is looked at for the type it is declared with, and then for the type
+-- that the checker recorded at each read of it in the body
+-- ('collectReadTypes'): the two differ for a polymorphic ASSUME, which is
+-- declared with a type variable and read at a type of its own.
 inferredInputs
   :: Substitution
   -> EntityInfo
@@ -584,20 +601,30 @@ inferredInputs subst ei (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) (MkAppF
   , Just ty <- [mType <|> Map.lookup (getUnique paramName) inferredTypes]
   ]
   ++
-  [ (ref, substituteInfVars subst <$> declared : Map.findWithDefault [] uniq readAs)
+  [ (ref, substituteInfVars subst <$> declared ++ Map.findWithDefault [] uniq readAs)
   | (uniq, (ref, declared)) <- Map.toList assumedTerms
   ]
  where
   inferredTypes = inferredGivenTypes ei fnName
 
-  -- the ASSUMEs that the body reads, by identifier, one for each
-  assumedTerms :: Map.Map Unique (Resolved, Type' Resolved)
+  -- the ASSUMEs that the body reads, by identifier, one for each, with the
+  -- types that they are declared with: those of the module and its imports,
+  -- from the entity table, and those that the body declares in a WHERE, from
+  -- the type that the checker recorded on the declaration
+  assumedTerms :: Map.Map Unique (Resolved, [Type' Resolved])
   assumedTerms =
-    Map.fromList
-      [ (getUnique ref, (ref, ty))
+    Map.fromList $
+      [ (getUnique ref, (ref, [ty]))
       | ref <- collectReferencedResolveds body
       , Just (_, KnownTerm ty AssumedTerm) <- [Map.lookup (getUnique ref) ei]
       ]
+      ++
+      [ (getUnique name, (name, [ ty | Just (TypeInfo ty _) <- [getAnno assume ^. annInfo] ]))
+      | assume@(MkAssume _ _ (MkAppForm _ name _ _) _) <- collectLocalAssumes body
+      , Set.member (getUnique name) readUniques
+      ]
+
+  readUniques = collectReferencedUniques body
 
   -- the types recorded at the reads of each identifier, in the order read
   readAs :: Map.Map Unique [Type' Resolved]

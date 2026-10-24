@@ -5,6 +5,7 @@ module ExportValidationSpec (spec) where
 import Control.Exception (evaluate)
 import Control.Monad (forM_)
 import Test.Hspec
+import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Timeout (timeout)
@@ -1530,12 +1531,229 @@ spec = do
             ])
       blocks src `shouldReturn` (True, [])
 
+    it "refuses a polymorphic ASSUME that the body reads first as a NUMBER and then as a DEONTIC" $ do
+      -- The reads are looked at one by one: the first is harmless, the second is not.
+      let src = parties <> dutyHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  IF `local placeholder` + 1 > 0 THEN `fulfilled` `local placeholder` ELSE FALSE"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads in two ways", "local placeholder", SError)])
+
+    it "names the EVENT when the body reads a polymorphic ASSUME first as an EVENT and then as a DEONTIC" $ do
+      let src = parties <> dutyHelper <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  IF `time of` `local placeholder` > 0 THEN `fulfilled` `local placeholder` ELSE FALSE"
+            ]
+      blocks src `shouldReturn`
+        (False, [("EVENT", "reads in two ways", "local placeholder", SError)])
+
+    it "names the DEONTIC when the body reads a polymorphic ASSUME first as a DEONTIC and then as an EVENT" $ do
+      let src = parties <> dutyHelper <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  IF `fulfilled` `local placeholder` THEN `time of` `local placeholder` > 0 ELSE FALSE"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads in two ways", "local placeholder", SError)])
+
     it "accepts a rule that is not an @export" $ do
       let src = withPrelude (parties <> dutyHelper <> Text.unlines
             [ "GIVETH A BOOLEAN"
             , "`internal` MEANS `fulfilled` TBD"
             ])
       blocks src `shouldReturn` (True, [])
+
+  -- An ASSUME can also be declared inside a rule, under WHERE. The checker's
+  -- table of what a module declares holds the top-level and the imported
+  -- ASSUMEs and not these, so the check finds them in the body, takes their
+  -- declared type from the declaration, and goes by the type at each read as
+  -- for any other ASSUME.
+  describe "an @export that reads an ASSUME that its own WHERE declares" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        dutyHelper = Text.unlines
+          [ "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+        blocks = exportBlocks emptyVFS
+
+    it "blocks an ASSUME of type DEONTIC" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads local duty"
+            , "GIVETH A BOOLEAN"
+            , "`reads local duty` MEANS `fulfilled` `local duty`"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads local duty", "local duty", SError)])
+
+    it "blocks an ASSUME of type EVENT" $ do
+      let src = parties <> eventHelper <> Text.unlines
+            [ "@export Reads local event"
+            , "GIVETH A NUMBER"
+            , "`reads local event` MEANS `time of` `local event`"
+            , "  WHERE"
+            , "    ASSUME `local event` IS AN EVENT Person Action"
+            ]
+      blocks src `shouldReturn`
+        (False, [("EVENT", "reads local event", "local event", SError)])
+
+    it "blocks an ASSUME that has no written type, as a DEONTIC and as an EVENT" $ do
+      let duty = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads local bare"
+            , "GIVETH A BOOLEAN"
+            , "`reads local bare` MEANS `fulfilled` `local bare`"
+            , "  WHERE"
+            , "    ASSUME `local bare`"
+            ]
+          event = parties <> eventHelper <> Text.unlines
+            [ "@export Reads local bare event"
+            , "GIVETH A NUMBER"
+            , "`reads local bare event` MEANS `time of` `local bare`"
+            , "  WHERE"
+            , "    ASSUME `local bare`"
+            ]
+      blocks duty `shouldReturn`
+        (False, [("DEONTIC", "reads local bare", "local bare", SError)])
+      blocks event `shouldReturn`
+        (False, [("EVENT", "reads local bare event", "local bare", SError)])
+
+    it "blocks a polymorphic ASSUME that the body reads as a DEONTIC" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads local placeholder"
+            , "GIVETH A BOOLEAN"
+            , "`reads local placeholder` MEANS `fulfilled` `local placeholder`"
+            , "  WHERE"
+            , "    GIVEN a IS A TYPE"
+            , "    GIVETH AN a"
+            , "    ASSUME `local placeholder`"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads local placeholder", "local placeholder", SError)])
+
+    it "blocks an ASSUME that a helper of the body declares in its own WHERE" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads inner duty"
+            , "GIVETH A BOOLEAN"
+            , "`reads inner duty` MEANS helper"
+            , "  WHERE"
+            , "    helper MEANS `fulfilled` `inner duty`"
+            , "      WHERE"
+            , "        ASSUME `inner duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads inner duty", "inner duty", SError)])
+
+    it "refuses an ASSUME that the body reads twice once, and one error for each of two ASSUMEs" $ do
+      let src = parties <> dutyHelper <> eventHelper <> Text.unlines
+            [ "ASSUME `top duty` IS A DEONTIC Person Action"
+            , ""
+            , "@export Reads three"
+            , "GIVETH A BOOLEAN"
+            , "`reads three` MEANS"
+            , "  `fulfilled` `local duty` AND `fulfilled` `local duty`"
+            , "    AND `fulfilled` `top duty` AND `time of` `local event` > 0"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            , "    ASSUME `local event` IS AN EVENT Person Action"
+            ]
+      (ok, errs) <- blocks src
+      ok `shouldBe` False
+      all (\(_, _, _, sev) -> sev == SError) errs `shouldBe` True
+      sort [ (what, fn, p) | (what, fn, p, _) <- errs ] `shouldBe`
+        [ ("DEONTIC", "reads three", "local duty")
+        , ("DEONTIC", "reads three", "top duty")
+        , ("EVENT", "reads three", "local event")
+        ]
+
+    it "accepts an ASSUME of type NUMBER" $ do
+      let src = Text.unlines
+            [ "@export Reads local number"
+            , "GIVETH A NUMBER"
+            , "`reads local number` MEANS `local n` + 1"
+            , "  WHERE"
+            , "    ASSUME `local n` IS A NUMBER"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a polymorphic ASSUME that the body reads as a NUMBER" $ do
+      let src = Text.unlines
+            [ "@export Reads local placeholder as a number"
+            , "GIVETH A NUMBER"
+            , "`reads local placeholder as a number` MEANS `local placeholder` + 1"
+            , "  WHERE"
+            , "    GIVEN a IS A TYPE"
+            , "    GIVETH AN a"
+            , "    ASSUME `local placeholder`"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts an ASSUME of type DEONTIC that the body does not read" $ do
+      let src = parties <> Text.unlines
+            [ "@export Ignores local duty"
+            , "GIVETH A BOOLEAN"
+            , "`ignores local duty` MEANS TRUE"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a rule that is not an @export" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`internal` MEANS `fulfilled` `local duty`"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "goes by the ASSUME that the body reads, when a local one has the name of a top-level one" $ do
+      -- The top-level `shared` is a NUMBER and the local one a DEONTIC: the
+      -- body reads the local one. In the other order the body reads a NUMBER.
+      let numberThenDuty = parties <> dutyHelper <> Text.unlines
+            [ "ASSUME `shared` IS A NUMBER"
+            , ""
+            , "@export Reads shared"
+            , "GIVETH A BOOLEAN"
+            , "`reads shared` MEANS `fulfilled` `shared`"
+            , "  WHERE"
+            , "    ASSUME `shared` IS A DEONTIC Person Action"
+            ]
+          dutyThenNumber = parties <> Text.unlines
+            [ "ASSUME `shared` IS A DEONTIC Person Action"
+            , ""
+            , "@export Reads shared"
+            , "GIVETH A NUMBER"
+            , "`reads shared` MEANS `shared` + 1"
+            , "  WHERE"
+            , "    ASSUME `shared` IS A NUMBER"
+            ]
+      blocks numberThenDuty `shouldReturn`
+        (False, [("DEONTIC", "reads shared", "shared", SError)])
+      blocks dutyThenNumber `shouldReturn` (True, [])
 
   -- The check looks at every definition that is marked as an export, whichever
   -- way it is marked and wherever it stands.
