@@ -63,6 +63,7 @@ import qualified Language.LSP.Server as LSP
 import Language.LSP.VFS (VFS)
 import LSP.L4.Actions
 import LSP.L4.EmbeddedLibrary
+import qualified LSP.L4.BlockingErrors as BlockingErrors
 import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
@@ -821,14 +822,50 @@ handlers evalConfig recorder =
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
 
-            mTcResult <- liftIO $ runAction "l4/getExportedFunctions" _ide $
-              use TypeCheck nuri
+            (mTcResult, closure, cycles) <- liftIO $ runAction "l4/getExportedFunctions" _ide $
+              (,,) <$> use TypeCheck nuri
+                   <*> BlockingErrors.importClosure nuri
+                   <*> BlockingErrors.importCycles nuri
+            -- Read after the action: the rules it ran have published their
+            -- diagnostics for every file in the closure by now.
+            diags <- liftIO $ atomically $ getDiagnostics _ide
+            let fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
+                -- A cycle is also among the diagnostics, as the engine's raw
+                -- exception, which names rules rather than files. Name the
+                -- files first.
+                cycleErrors =
+                  [ Inspector.BlockingError
+                      { uri = getUri (fromNormalizedUri c.importer)
+                      , line = Maybe.fromMaybe 1 c.line
+                      , message = "Import cycle: " <> Text.intercalate " -> " (map fileName c.cycle)
+                      }
+                  | c <- cycles
+                  ]
+                diagErrors =
+                  [ Inspector.BlockingError
+                      { uri = getUri (fromNormalizedUri fd.fdFilePath)
+                      , line = fromIntegral fd.fdLspDiagnostic._range._start._line + 1
+                      , message = Text.strip fd.fdLspDiagnostic._message
+                      }
+                  -- The engine's own errors (a raw exception, or "depends on
+                  -- itself", which an IMPORT that finds no module also
+                  -- causes) say less than the parser's and the typechecker's,
+                  -- so they go last.
+                  | fd <- uncurry (<>) $ List.partition
+                      (\fd -> fd.fdLspDiagnostic._source `notElem` [Just "jl4", Just "compiler"])
+                      (BlockingErrors.blockingErrorsIn closure diags)
+                  ]
+                -- A diagnostic is stored once per rule that published it, and
+                -- a typecheck runs once per import path that reaches it.
+                blockingErrors = List.nub (cycleErrors <> diagErrors)
 
             case mTcResult of
-              Nothing -> pure $ Left $ TResponseError
-                { _code = InR ErrorCodes_InvalidRequest
-                , _message = "No type check result available"
-                , _xdata = Nothing
+              -- The file does not parse: nothing to export, and the parse
+              -- error is the reason Deploy is off.
+              Nothing -> pure $ Right $ Aeson.toJSON Inspector.GetExportedFunctionsResponse
+                { functions = []
+                , importedFiles = []
+                , blockingErrors
                 }
               Just tcResult -> do
                 let -- `tc.dependencies` is the transitive-import *tree*, so a
@@ -868,6 +905,7 @@ handlers evalConfig recorder =
                     response = Inspector.GetExportedFunctionsResponse
                       { functions = summaries
                       , importedFiles = importUris
+                      , blockingErrors
                       }
                 pure $ Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportDocumentMethodName)) $ \_ide params -> do

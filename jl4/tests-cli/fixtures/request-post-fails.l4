@@ -1,0 +1,8 @@
+-- The middle #EVAL is a POST that fails: 127.0.0.1 is an address, so nothing
+-- is looked up, and nothing is expected to listen on its https port.
+-- The #EVAL directives around it make no request.
+#EVAL 1 PLUS 1
+
+#EVAL POST "https://127.0.0.1/" "" "hello"
+
+#EVAL 2 PLUS 2

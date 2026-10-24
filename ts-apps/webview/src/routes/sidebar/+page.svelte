@@ -34,6 +34,7 @@
     RequestRevealLocation,
     type WebviewFrontendIsReadyMessage,
     type ExportedFunctionInfo,
+    type BlockingErrorInfo,
     type GetSidebarConnectionStatusResponse,
     type SidebarDeploymentInfo,
     type SidebarImportedFile,
@@ -52,6 +53,9 @@
   import CloudUpsell from '$lib/components/cloud-upsell.svelte'
 
   let functions: ExportedFunctionInfo[] = $state([])
+  // Errors in the active file or a module it imports. Non-empty means the
+  // file must not be deployed, so every Deploy button is disabled.
+  let blockingErrors: BlockingErrorInfo[] = $state([])
   let activeFileUri: string = $state('')
   let activeFileName: string = $state('')
   let connectionStatus: GetSidebarConnectionStatusResponse = $state({
@@ -951,6 +955,9 @@
     if (connectionStatus.status !== 'connected') return false
     // Undeploy confirm is always enabled
     if (undeployConfirm) return false
+    // Every other state of this button deploys, or leads to deploying, the
+    // active file.
+    if (blockingErrors.length > 0) return true
     // Non-deploy tabs (including Deployments) surface a "Deploy preview"
     // button that jumps to the Deploy tab. Enabled iff the active file has
     // at least one rule ready for export — otherwise the Deploy tab would
@@ -964,6 +971,33 @@
       return functions.length === 0
     if (deployView === 'preview' && functions.length === 0) return true
     return false
+  }
+
+  function actionTitle(): string | undefined {
+    if (
+      connectionStatus.status === 'connected' &&
+      !undeployConfirm &&
+      blockingErrors.length > 0
+    )
+      return `Fix the errors in ${activeFileName} or its imports before deploying`
+    return undefined
+  }
+
+  function fetchExportedFunctions(uri: string, version: number) {
+    messenger
+      ?.sendRequest(GetSidebarExportedFunctions, HOST_EXTENSION, {
+        verDocId: { uri, version },
+      })
+      .then((response) => {
+        // The user has moved to another file since: this reply is stale.
+        if (uri !== activeFileUri) return
+        functions = response.functions
+        blockingErrors = response.blockingErrors ?? []
+      })
+      .catch(() => {
+        functions = []
+        blockingErrors = []
+      })
   }
 
   function deriveDeploymentId(fileName: string): string {
@@ -1726,6 +1760,7 @@
         activeFileUri = ''
         activeFileName = ''
         functions = []
+        blockingErrors = []
         renderHtml = ''
         renderInlineError = ''
         renderLanguages = []
@@ -1759,18 +1794,23 @@
         undeployConfirm = null
         // Debounce 200ms to avoid flickering on rapid edits
         if (previewDebounceTimer) clearTimeout(previewDebounceTimer)
-        previewDebounceTimer = setTimeout(() => {
-          messenger
-            ?.sendRequest(GetSidebarExportedFunctions, HOST_EXTENSION, {
-              verDocId: { uri, version },
-            })
-            .then((response) => {
-              functions = response.functions
-            })
-            .catch(() => {
-              functions = []
-            })
-        }, 200)
+        previewDebounceTimer = setTimeout(
+          () => fetchExportedFunctions(uri, version),
+          200
+        )
+      }
+
+      // Diagnostics changed in some L4 file: the active file's blocking
+      // errors may have appeared or cleared. Ask again without leaving the
+      // Deploy form the user may be filling in.
+      if (msg?.type === 'l4-sidebar-refresh-exports' && activeFileUri) {
+        const uri = activeFileUri
+        const version = activeFileVersion
+        if (previewDebounceTimer) clearTimeout(previewDebounceTimer)
+        previewDebounceTimer = setTimeout(
+          () => fetchExportedFunctions(uri, version),
+          200
+        )
       }
     })
 
@@ -2887,7 +2927,10 @@
         {/if}
       </div>
       <span class="file-info">
-        {#if functions.length > 0}
+        {#if blockingErrors.length > 0}
+          {blockingErrors.length} error{blockingErrors.length !== 1 ? 's' : ''}
+          block deploying {activeFileName}
+        {:else if functions.length > 0}
           {functions.length} rule{functions.length !== 1 ? 's' : ''} exported in
           {activeFileName}
         {:else if activeFileName}
@@ -2903,6 +2946,7 @@
         class:action-btn-danger={isActionDanger()}
         onclick={handleAction}
         disabled={isActionDisabled()}
+        title={actionTitle()}
       >
         {actionLabel(connectionStatus)}
       </button>

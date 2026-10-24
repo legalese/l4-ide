@@ -256,6 +256,23 @@ expectFail bin args = do
     ExitFailure _ -> pure ()
     ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
 
+-- | Assert the CLI exited with status 1, which is what a failed check or run
+-- gives on every platform.
+expectExit1 :: FilePath -> [String] -> IO ()
+expectExit1 bin args = do
+  Output code _ _ <- runL4 bin args
+  code `shouldBe` ExitFailure 1
+
+-- | Assert a command run with @--json@ reports @ok: false@ and says why: the
+-- envelope must carry at least one diagnostic.
+expectJsonNotOk :: FilePath -> [String] -> IO ()
+expectJsonNotOk bin args = do
+  env <- jsonEnvelope bin (args ++ ["--json"])
+  objField env "ok" `shouldBe` Just (Bool False)
+  case objField env "diagnostics" of
+    Just (Array ds) -> length ds `shouldSatisfy` (> 0)
+    other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
 -- | Whether some line of the text ends with the needle. Written against text
 -- whose carriage returns are already gone, so a needle never has to span a line
 -- break (and so never has to name one).
@@ -293,6 +310,57 @@ jsonEnvelope bin args = do
 objField :: Value -> String -> Maybe Value
 objField (Object km) k = KeyMap.lookup (Key.fromString k) km
 objField _ _ = Nothing
+
+-- | The text of the @Evaluation[n]@ block in the output of @l4 run@: from its
+-- header up to the next block's header, or to the end. Empty when there is no
+-- such block. Written against text whose carriage returns are already gone.
+evalBlock :: Int -> String -> T.Text
+evalBlock n out =
+  let marker = T.pack ("Evaluation[" <> show n <> "]")
+      (_, fromHere) = T.breakOn marker (T.pack out)
+  in fst (T.breakOn "Evaluation[" (T.drop (T.length marker) fromHere))
+
+-- | The diagnostic that @l4 run@ printed on standard error against a range
+-- starting at column 1 of the given line: from its @Range:@ row to the next
+-- @File:@ row. Empty when none starts there.
+diagnosticAtLine :: Int -> String -> T.Text
+diagnosticAtLine line err =
+  fst $ T.breakOn "File:" $ T.drop 1 $
+    snd $ T.breakOn (T.pack ("Range:    " <> show line <> ":1-")) (T.pack err)
+
+-- | @l4 run FILE@ on a three-directive file whose middle directive, on the given
+-- line, cannot be evaluated: the run fails, and the other two directives still
+-- print their results (2 and 4). The middle one's message is in its own
+-- @Evaluation[2]@ block and is also printed on standard error against its line,
+-- as an error.
+expectMiddleLostInText :: FilePath -> FilePath -> Int -> [String] -> IO ()
+expectMiddleLostInText bin fixture midLine messages = do
+  Output code sout0 serr0 <- runL4 bin ["run", fixture]
+  let sout = filter (/= '\r') sout0
+      serr = filter (/= '\r') serr0
+  code `shouldBe` ExitFailure 1
+  evalBlock 1 sout `shouldSatisfy` T.isInfixOf "Result:\n  2\n"
+  evalBlock 3 sout `shouldSatisfy` T.isInfixOf "Result:\n  4\n"
+  forM_ messages \m -> do
+    evalBlock 2 sout `shouldSatisfy` T.isInfixOf (T.pack m)
+    diagnosticAtLine midLine serr `shouldSatisfy` T.isInfixOf "DiagnosticSeverity_Error"
+    diagnosticAtLine midLine serr `shouldSatisfy` T.isInfixOf (T.pack m)
+
+-- | The same file with @--json@: @ok@ is false, there are three results, and the
+-- two outer ones are 2 and 4. The middle one carries the message, as its @value@
+-- or, for an @#ASSERT@, its @error@.
+expectMiddleLostInJson :: FilePath -> FilePath -> [String] -> IO ()
+expectMiddleLostInJson bin fixture messages = do
+  expectExit1 bin ["run", "--json", fixture]
+  env <- jsonEnvelope bin ["run", "--json", fixture]
+  objField env "ok" `shouldBe` Just (Bool False)
+  case [ r | Array rs <- maybe [] pure (objField env "results"), r <- toList rs ] of
+    [first, middle, final] -> do
+      objField first "value" `shouldBe` Just (String "2")
+      objField final "value" `shouldBe` Just (String "4")
+      let said = T.concat [ s | k <- ["value", "error"], Just (String s) <- [objField middle k] ]
+      forM_ messages \m -> said `shouldSatisfy` T.isInfixOf (T.pack m)
+    other -> expectationFailure ("Expected three results, got " ++ show (length other))
 
 ----------------------------------------------------------------------------
 -- Fixtures
@@ -509,6 +577,30 @@ batchClausesB         = fixtureDir </> "batch-multi-clause-b.json"
 multiClauseRenderFixture :: FilePath
 multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
 
+-- Import-cycle fixtures: entry points of small multi-file rings, and one whose
+-- entry file imports a ring without being part of it.
+cycle3Entry, cycle3OutsideEntry, cycle2Entry, selfImportEntry :: FilePath
+cycle3Entry        = fixtureDir </> "cycle3"     </> "cyca.l4"
+cycle3OutsideEntry = fixtureDir </> "cycle3"     </> "outside.l4"
+cycle2Entry        = fixtureDir </> "cycle2"     </> "dua.l4"
+selfImportEntry    = fixtureDir </> "selfimport" </> "solo.l4"
+
+-- Multi-file imports that are not rings: a clean one, one whose imported module
+-- only warns, and four that cannot be loaded cleanly: an imported module with a
+-- type error, with a syntax error, and with a string that is never closed, and an
+-- IMPORT of a module that does not exist. In each of those the entry file is
+-- itself fine, and never uses anything from the import. The first two are guards
+-- against the import check over-firing.
+cleanImportEntry, warningImportEntry, brokenImportEntry :: FilePath
+cleanImportEntry   = fixtureDir </> "imports-ok"      </> "main.l4"
+warningImportEntry = fixtureDir </> "imports-warning" </> "main.l4"
+brokenImportEntry  = fixtureDir </> "imports-error"   </> "main.l4"
+
+syntaxImportEntry, lexImportEntry, missingImportEntry :: FilePath
+syntaxImportEntry  = fixtureDir </> "imports-syntax"  </> "main.l4"
+lexImportEntry     = fixtureDir </> "imports-lex"     </> "main.l4"
+missingImportEntry = fixtureDir </> "imports-missing" </> "main.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -527,6 +619,9 @@ main = do
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
        , multiClauseRenderFixture
+       , cycle3Entry, cycle3OutsideEntry, cycle2Entry, selfImportEntry
+       , cleanImportEntry, warningImportEntry, brokenImportEntry
+       , syntaxImportEntry, lexImportEntry, missingImportEntry
        , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
        , nlgHeadPlacementSource
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
@@ -676,6 +771,132 @@ spec bin = do
       sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
       serr `shouldSatisfy` ("does not cover all cases" `isInfixOf`)
       serr `shouldSatisfy` ("DECIDE `price` Blue IS" `isInfixOf`)
+
+  -- An import ring used to pass `l4 check` and `l4 run` with exit 0 and "Check
+  -- succeeded." printed under the cycle's own error. The engine reports the
+  -- cycle as an Error on a module that is IMPORTED, not on the file named on the
+  -- command line, and the verdict looked only at the named file's typecheck. A
+  -- self-import is the exception: there the error lands on the entry file, so
+  -- it already failed, which makes it the positive control for the rest.
+  describe "l4 import cycles" $ do
+    forM_ ["check", "run"] \cmd -> do
+      it ("fails " <> cmd <> " on a 3-module import ring") $
+        expectExit1 bin [cmd, cycle3Entry]
+
+      it ("fails " <> cmd <> " on a 2-module import ring") $
+        expectExit1 bin [cmd, cycle2Entry]
+
+      it ("fails " <> cmd <> " on a self-import") $
+        expectExit1 bin [cmd, selfImportEntry]
+
+      -- The file named on the command line is not in the ring, so the error
+      -- cannot land on it.
+      it ("fails " <> cmd <> " when the entry file imports a ring without being in it") $
+        expectExit1 bin [cmd, cycle3OutsideEntry]
+
+      it ("reports ok=false in JSON from " <> cmd <> " on a cyclic import") $
+        expectJsonNotOk bin [cmd, cycle3Entry]
+
+    -- `l4 FILE` with no command is `l4 run FILE`.
+    it "fails the bare `l4 FILE` form on a 3-module import ring" $
+      expectExit1 bin [cycle3Entry]
+
+  -- The verdict now also looks at the modules a file imports. These are the
+  -- cases it must NOT turn into a failure, so that the check above cannot be
+  -- satisfied by failing everything that has an IMPORT.
+  describe "l4 check and run on imports that are not cycles" $ do
+    it "still succeeds on a clean multi-file import" $ do
+      expectOk bin ["check", cleanImportEntry] "Check succeeded."
+      expectOk bin ["run", cleanImportEntry] "Checking succeeded."
+
+    -- A warning in an imported module is a warning, as it is in the entry file.
+    it "still succeeds when an imported module only warns" $ do
+      expectOk bin ["check", warningImportEntry] "Check succeeded."
+      expectOk bin ["run", warningImportEntry] "Checking succeeded."
+
+    -- A failed #ASSERT is published as an Error diagnostic of the evaluator's
+    -- own. It is a verdict about the rules, not a fault in the file, so it must
+    -- not become one now that every Error in the closure counts; the plain-text
+    -- case is "leaves a clean FALSE #ASSERT at exit 0" under `l4 run`.
+    it "still reports ok=true in JSON for a failed #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-clean.l4", "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+
+  -- Not a ring, but the same blind spot: the entry file typechecks against the
+  -- modules it imports, and an error INSIDE one of them, or an IMPORT that
+  -- finds no module at all, did not fail the run. In each case the entry file is
+  -- fine and uses nothing from the import, so only the import's own error can
+  -- fail it. The unresolved IMPORT also publishes a second diagnostic (that the
+  -- module depends on itself), which the examples cannot tell apart from the
+  -- first.
+  describe "l4 check and run on an import that cannot be loaded" $
+    forM_ [ ("a type error in an imported module", brokenImportEntry)
+          , ("a syntax error in an imported module", syntaxImportEntry)
+          , ("an unclosed string in an imported module", lexImportEntry)
+          , ("an IMPORT that resolves to no module", missingImportEntry)
+          ] \(what, entry) ->
+      forM_ ["check", "run"] \cmd -> do
+        it ("fails " <> cmd <> " on " <> what) $
+          expectExit1 bin [cmd, entry]
+
+        it ("reports ok=false in JSON from " <> cmd <> " on " <> what) $
+          expectJsonNotOk bin [cmd, entry]
+
+  -- `l4 deploy` and `l4 redeploy` refuse a file for the reasons `l4 check`
+  -- does, and say so before they touch the network. Nothing listens on the
+  -- discard port, so a command that gets past the local check stops at the
+  -- first request with "Could not reach", and one that refuses never gets that
+  -- far. The refusal carries the same diagnostics `l4 check` prints.
+  describe "l4 deploy and redeploy refuse what l4 check refuses" $ do
+    let noServer = ["--server", "http://127.0.0.1:9"]
+        refusal = "doesn't typecheck; fix it before deploying (see `l4 check`)."
+        errorLabel = "Severity: DiagnosticSeverity_Error"
+        textBefore needle = go []
+          where
+            go acc s
+              | needle `isPrefixOf` s = Just (reverse acc)
+              | otherwise = case s of
+                  [] -> Nothing
+                  c : cs -> go (c : acc) cs
+
+    forM_ [ ("a type error in an imported module", brokenImportEntry)
+          , ("a syntax error in an imported module", syntaxImportEntry)
+          , ("an unclosed string in an imported module", lexImportEntry)
+          , ("an IMPORT that resolves to no module", missingImportEntry)
+          , ("a 3-module import ring", cycle3Entry)
+          , ("a file that imports a ring without being in it", cycle3OutsideEntry)
+          , ("a 2-module import ring", cycle2Entry)
+          , ("a self-import", selfImportEntry)
+          ] \(what, entry) ->
+      forM_ ["deploy", "redeploy"] \cmd ->
+        it ("refuses " <> cmd <> " of " <> what <> ", with the diagnostics, before the network") $ do
+          Output check _ _ <- runL4 bin ["check", entry]
+          check `shouldBe` ExitFailure 1
+          Output code sout serr0 <- runL4 bin ([cmd, entry] ++ noServer)
+          let serr = filter (/= '\r') serr0
+          code `shouldBe` ExitFailure 1
+          sout `shouldBe` ""
+          serr `shouldSatisfy` isInfixOf refusal
+          serr `shouldNotSatisfy` isInfixOf "Could not reach"
+          -- The error comes first, then the refusal that says what to do.
+          case textBefore refusal serr of
+            Just printed -> printed `shouldSatisfy` isInfixOf errorLabel
+            Nothing -> expectationFailure ("no refusal in:\n" ++ serr)
+
+    -- The guards: a file `l4 check` accepts, and one it accepts with a warning
+    -- from an imported module, must get past the local check, or the refusal
+    -- above could be satisfied by refusing every file that has an IMPORT.
+    forM_ [ ("a clean multi-file import", cleanImportEntry)
+          , ("an imported module that only warns", warningImportEntry)
+          ] \(what, entry) ->
+      forM_ ["deploy", "redeploy"] \cmd ->
+        it ("lets " <> cmd <> " of " <> what <> " past the local check") $ do
+          Output check _ _ <- runL4 bin ["check", entry]
+          check `shouldBe` ExitSuccess
+          Output code _ serr <- runL4 bin ([cmd, entry] ++ noServer)
+          code `shouldBe` ExitFailure 1
+          serr `shouldSatisfy` isInfixOf "Could not reach http://127.0.0.1:9"
+          serr `shouldNotSatisfy` isInfixOf "doesn't typecheck"
 
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.
@@ -904,6 +1125,92 @@ spec bin = do
       sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
       sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
       sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+  -- A directive that cannot be evaluated is not always the same failure. A
+  -- CONSIDER with no matching branch, a division by zero and an #ASSERT whose
+  -- expression raises are caught for that one directive: the run fails, but the
+  -- other directives still print. A POST or FETCH that fails throws an HTTP
+  -- exception that nothing catches there, so the whole file loses its results.
+  -- doc/tutorials/getting-started/l4-cli.md and
+  -- doc/reference/builtins/http-json.md say both. The same file used to exit 0
+  -- and print "Checking succeeded." after a failed request.
+  --
+  -- The failing address is 127.0.0.1: it is an address, so nothing is looked
+  -- up, and nothing is expected to listen on its https port. Nothing below
+  -- depends on the operating system's wording of why the connection failed.
+  describe "l4 run on a directive that cannot be evaluated" $ do
+    forM_ [ ("POST", "request-post-fails.l4"), ("FETCH", "request-fetch-fails.l4") ] \(verb, file) -> do
+      let fixture = fixtureDir </> file
+
+      it ("fails the run and prints no result for any directive when a " <> verb <> " cannot connect") $ do
+        Output code sout serr0 <- runL4 bin ["run", fixture]
+        let serr = filter (/= '\r') serr0
+        code `shouldBe` ExitFailure 1
+        sout `shouldNotSatisfy` ("Evaluation[" `isInfixOf`)
+        sout `shouldNotSatisfy` ("Result:" `isInfixOf`)
+        sout `shouldNotSatisfy` ("Checking succeeded." `isInfixOf`)
+        -- one message, which names the host and is against the first line of
+        -- the file, not against the directive (line 6) that made the request
+        T.count "VanillaHttpException" (T.pack serr) `shouldBe` 1
+        serr `shouldSatisfy` ("\"127.0.0.1\"" `isInfixOf`)
+        diagnosticAtLine 1 serr `shouldSatisfy` T.isInfixOf "DiagnosticSeverity_Error"
+        diagnosticAtLine 1 serr `shouldSatisfy` T.isInfixOf "VanillaHttpException"
+        diagnosticAtLine 6 serr `shouldBe` ""
+
+      it ("reports ok=false, no results and one diagnostic in JSON when a " <> verb <> " cannot connect") $ do
+        expectExit1 bin ["run", "--json", fixture]
+        env <- jsonEnvelope bin ["run", "--json", fixture]
+        objField env "ok" `shouldBe` Just (Bool False)
+        objField env "results" `shouldBe` Just (Array mempty)
+        case objField env "diagnostics" of
+          Just (Array ds) -> do
+            length ds `shouldBe` 1
+            T.concat [ s | String s <- toList ds ] `shouldSatisfy` T.isInfixOf "VanillaHttpException"
+          other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+      -- `l4 check` does not evaluate, so it makes no request.
+      it ("does not make the " <> verb <> " under l4 check") $
+        expectOk bin ["check", fixture] "Check succeeded."
+
+    -- The control: take the request out and both results print.
+    it "prints both results and exits 0 for the same file without the request" $ do
+      Output code sout _ <- runL4 bin ["run", fixtureDir </> "request-none.l4"]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      evalBlock 1 out `shouldSatisfy` T.isInfixOf "Result:\n  2\n"
+      evalBlock 2 out `shouldSatisfy` T.isInfixOf "Result:\n  4\n"
+
+    it "reports ok=true and both results in JSON for the same file without the request" $ do
+      env <- jsonEnvelope bin ["run", "--json", fixtureDir </> "request-none.l4"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 2
+        other          -> expectationFailure ("Expected a results array, got " ++ show other)
+
+    -- These fail the run too, but only for the one directive.
+    forM_ [ ("a CONSIDER with no matching branch", "eval-consider-mid.l4", 14, ["reached a CONSIDER that has no branch for it"])
+          , ("a division by zero",                 "eval-div0-mid.l4",     5, ["Division by zero"])
+          , ("an #ASSERT whose expression raises", "assert-raises-mid.l4", 5, ["assertion could not be evaluated", "Division by zero"])
+          ] \(what, file, midLine, messages) -> do
+      let fixture = fixtureDir </> file
+
+      it ("fails the run but keeps the other directives' results for " <> what) $
+        expectMiddleLostInText bin fixture midLine messages
+
+      it ("reports ok=false and all three results in JSON for " <> what) $
+        expectMiddleLostInJson bin fixture messages
+
+    -- An address that does not start with https:// is not a failed request: the
+    -- evaluator reports it for that directive, and the others keep their results.
+    forM_ [ ("POST", "request-post-http.l4"), ("FETCH", "request-fetch-http.l4") ] \(verb, file) -> do
+      let fixture = fixtureDir </> file
+          messages = ["Internal error", verb <> " only supports https"]
+
+      it ("fails the run but keeps the other directives' results for a " <> verb <> " to an address that is not https") $
+        expectMiddleLostInText bin fixture 6 messages
+
+      it ("reports ok=false and all three results in JSON for a " <> verb <> " to an address that is not https") $
+        expectMiddleLostInJson bin fixture messages
 
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
@@ -2506,16 +2813,17 @@ spec bin = do
     -- `actus-schedule` itself. Before the change this checked clean: `main` saw
     -- the project `daydate` while `actus-schedule` quietly kept the embedded one.
     --
-    -- The exit code is not asserted. On main an error inside an imported module
-    -- is printed as a diagnostic and `l4 check` still exits 0, so the evidence
-    -- is the text: the arity error names `actus-schedule`, and the shadow
+    -- An error inside an imported module fails the check, as one in the entry
+    -- file does, so the exit code is asserted too. The text is the evidence of
+    -- WHICH module it is: the arity error names `actus-schedule`, and the shadow
     -- warning names the chosen project copy.
     --
     -- The positive control is the `embedded-diamond` test above: the same
     -- embedded closure with no project override checks clean.
     let expectEmbeddedImporterSeesOverride label run =
           it label $ do
-            Output _code _sout serr <- run
+            Output code _sout serr <- run
+            code `shouldBe` ExitFailure 1
             -- The diagnostic must land on the EMBEDDED importer, which is the
             -- whole point: that is the module that changed source.
             serr `shouldSatisfy` ("actus-schedule" `isInfixOf`)

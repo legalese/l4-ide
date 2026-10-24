@@ -345,9 +345,28 @@ instance ToJSON ExportedFunctionSummary where
       Nothing -> []
       Just l -> ["srcLine" .= l]
 
+-- | An error that stops the file from being deployed, in the file itself or in
+-- a module it imports (see "LSP.L4.BlockingErrors").
+data BlockingError = BlockingError
+  { uri :: !Text
+  , line :: !Int
+  -- ^ 1-based
+  , message :: !Text
+  }
+  deriving stock (Eq, Show, Generic)
+
+instance ToJSON BlockingError where
+  toJSON e = object
+    [ "uri" .= e.uri
+    , "line" .= e.line
+    , "message" .= e.message
+    ]
+
 data GetExportedFunctionsResponse = GetExportedFunctionsResponse
   { functions :: [ExportedFunctionSummary]
   , importedFiles :: [Text]
+  , blockingErrors :: [BlockingError]
+  -- ^ Non-empty when the file must not be deployed.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -355,6 +374,7 @@ instance ToJSON GetExportedFunctionsResponse where
   toJSON r = object
     [ "functions" .= r.functions
     , "importedFiles" .= r.importedFiles
+    , "blockingErrors" .= r.blockingErrors
     ]
 
 ------------------------------------------------------
