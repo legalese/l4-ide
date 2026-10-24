@@ -1,0 +1,42 @@
+-- An ASSUME needs no written type: `ASSUME x` leaves it to the checker, which
+-- infers the type from how the file reads it. A request has no JSON form for a
+-- DEONTIC or an EVENT, and an ASSUME that an exported rule reads as one of them
+-- is refused as a written type is, naming the ASSUME. The rules are exported on
+-- purpose: the same rules without @export check.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`time of` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+ASSUME `the assumed duty`
+ASSUME `the assumed event`
+ASSUME `the assumed number`
+
+-- Refused: the body takes the ASSUME apart as a DEONTIC.
+@export Is the assumed duty fulfilled
+GIVETH A BOOLEAN
+`is the duty fulfilled` MEANS
+  CONSIDER `the assumed duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Refused: the body hands the ASSUME to a helper that takes an EVENT.
+@export When did the assumed event happen
+GIVETH A NUMBER
+`when did it happen` MEANS `time of` `the assumed event`
+
+-- Not exported: reading an ASSUME as a DEONTIC is fine here, and is not reported.
+GIVETH A BOOLEAN
+`internal` MEANS
+  CONSIDER `the assumed duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Accepted: the checker infers a NUMBER.
+@export One more than the assumed number
+GIVETH A NUMBER
+`one more` MEANS `the assumed number` + 1

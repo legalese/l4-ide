@@ -1,0 +1,24 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: export-untyped-assume.l4
+  Hidden: no
+  Range: 22:1-22:24
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-untyped-assume.l4
+  Hidden: no
+  Range: 30:1-30:21
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    EVENT inputs are not supported for @export.
+    The input `the assumed event` has a type that contains an EVENT, and a request has no JSON form for an event.
+    Give the rule the party, the action and the time as separate inputs, and build the event inside it.

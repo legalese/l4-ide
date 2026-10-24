@@ -15,8 +15,8 @@ import L4.Export (ExportedFunction(..), getExportedFunctions, enrichReturnTypes)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (getActual, nameToText)
-import L4.TypeCheck (prettyCheckErrorWithContext)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
+import L4.TypeCheck (prettyCheckErrorWithContext, severity)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), Severity(..))
 
 -- | Run typecheck on a source snippet and return the list of
 -- 'ExportFunctionTypeInput' errors that fired (or 'Left' on fatal failure).
@@ -103,6 +103,26 @@ unsendableRefusals vfs src = do
   events <- either (fail . ("Fatal: " <>) . show) (pure . fst) (exportEventErrors vfs src)
   duties <- either (fail . ("Fatal: " <>) . show) (pure . fst) (exportDeonticErrors vfs src)
   pure (events, duties)
+
+-- | Whether the check of a source succeeded, and each refusal of an input that a
+-- request has no JSON form for, as (what the input holds, function, input,
+-- severity), in the order the checker reports them. The severity is the
+-- checker's own ('severity'): only an 'SError' blocks a deploy, so a refusal
+-- reported as anything less would pass every test that reads the text alone. The snippet can import the modules of the given VFS.
+exportBlocks :: VFS -> Text -> IO (Bool, [(Text, Text, Text, Severity)])
+exportBlocks vfs src =
+  case checkWithImports vfs src of
+    Left errs -> fail ("Fatal: " ++ show errs)
+    Right r -> pure
+      ( r.tcdSuccess
+      , [ (what, nameToText (getActual fn), nameToText (getActual p), severity e)
+        | e@(MkCheckErrorWithContext kind _) <- r.tcdErrors
+        , (what, fn, p) <- case kind of
+            ExportEventTypeInput f i   -> [("EVENT", f, i)]
+            ExportDeonticTypeInput f i -> [("DEONTIC", f, i)]
+            _                          -> []
+        ]
+      )
 
 -- | Run typecheck on a source snippet and return the exported function
 -- names (or 'Left' on fatal failure).
@@ -1260,6 +1280,100 @@ spec = do
             , "  OTHERWISE FALSE"
             ]
       unsendableRefusals emptyVFS src `shouldReturn` ([], [])
+
+  -- An ASSUME needs no written type either: `ASSUME x` leaves the type to the
+  -- checker, which works it out from how the file reads it. A rule that reads
+  -- one as a DEONTIC or an EVENT has an input that a request cannot supply, as
+  -- one with a written type has. Each example reads the whole answer of the
+  -- check: whether it succeeded, and the severity of each refusal.
+  describe "an @export that reads an ASSUME that has no written type" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+
+    it "blocks an ASSUME that the body takes apart as a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `untyped assume`"
+            , ""
+            , "@export Reads untyped assume"
+            , "GIVETH A BOOLEAN"
+            , "`reads untyped assume` MEANS"
+            , "  CONSIDER `untyped assume`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      exportBlocks emptyVFS src `shouldReturn`
+        (False, [("DEONTIC", "reads untyped assume", "untyped assume", SError)])
+
+    it "blocks an ASSUME that the body hands to a helper that takes an EVENT" $ do
+      let src = parties <> eventHelper <> Text.unlines
+            [ "ASSUME `untyped event`"
+            , ""
+            , "@export Reads untyped event"
+            , "GIVETH A NUMBER"
+            , "`reads untyped event` MEANS `time of` `untyped event`"
+            ]
+      exportBlocks emptyVFS src `shouldReturn`
+        (False, [("EVENT", "reads untyped event", "untyped event", SError)])
+
+    it "blocks an ASSUME that an imported module declares with no written type" $ do
+      let facts = parties <> Text.unlines
+            [ "ASSUME `imported untyped`"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`facts read it` MEANS"
+            , "  CONSIDER `imported untyped`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+          src = Text.unlines
+            [ "IMPORT facts"
+            , ""
+            , "@export Reads imported untyped"
+            , "GIVETH A BOOLEAN"
+            , "`reads imported untyped` MEANS"
+            , "  CONSIDER `imported untyped`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      exportBlocks (vfsFromList [("facts", facts)]) src `shouldReturn`
+        (False, [("DEONTIC", "reads imported untyped", "imported untyped", SError)])
+
+    it "accepts an ASSUME that the body reads as a NUMBER" $ do
+      let src = Text.unlines
+            [ "ASSUME `untyped number`"
+            , ""
+            , "@export Reads untyped number"
+            , "GIVETH A NUMBER"
+            , "`reads untyped number` MEANS `untyped number` + 1"
+            ]
+      exportBlocks emptyVFS src `shouldReturn` (True, [])
+
+    it "accepts an ASSUME that is read as a DEONTIC only by a rule that is not an @export" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `untyped assume`"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`internal` MEANS"
+            , "  CONSIDER `untyped assume`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            , "@export Plain"
+            , "GIVETH A BOOLEAN"
+            , "`plain` MEANS TRUE"
+            ]
+      exportBlocks emptyVFS src `shouldReturn` (True, [])
 
   -- The check looks at every definition that is marked as an export, whichever
   -- way it is marked and wherever it stands.

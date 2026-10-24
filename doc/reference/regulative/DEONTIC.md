@@ -112,7 +112,7 @@ The service turns each part of a request into the value the input asks for, but 
 >
 > **It may give a `DEONTIC` value as its answer.**
 >
-> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, an input with no written type that the rule uses as a duty, or an `ASSUME` of such a type that the rule's own body reads, whether the file or a file that it imports declares the `ASSUME`.
+> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the rule uses as a duty, or an `ASSUME` that the rule's own body reads as a duty, whether the `ASSUME` has a written type or not, and whether the file or a file that it imports declares it.
 
 The command `l4 check`, which checks a file for errors, refuses such a rule; [What happens if you do it anyway](#what-happens-if-you-do-it-anyway) shows the error.
 An `EVENT` input is refused in the same way; see [An exported rule cannot take an event](EVENT.md#an-exported-rule-cannot-take-an-event).
@@ -260,6 +260,8 @@ An input whose type L4 cannot work out from the rule, or works out to be a `NUMB
 An `ASSUME` that the rule's own body reads counts in the same way when another file declares it.
 With ``ASSUME `the assumed duty` IS A DEONTIC Person Action`` in a file called `facts.l4`, a file that has `IMPORT facts` and an exported rule that reads `the assumed duty` in its own body gets the same error, with `the assumed duty` in it.
 The service publishes the `ASSUME`s of the file that holds the rule and no others, so a request could not set an imported one in any case.
+An `ASSUME` needs no written type either.
+One called `the assumed duty`, with nothing after the name, is refused in the same way when the rule's own body reads it as a duty: by taking it apart with `CONSIDER` and a `WHEN FULFILLED` branch, or by handing it to a rule that takes a `DEONTIC`.
 A duty that a rule defines, with `MEANS` and a body, is not an `ASSUME` and not an input, and an exported rule may read it.
 
 ### The one shape the check does not catch
