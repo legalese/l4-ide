@@ -1452,7 +1452,7 @@ an ordinary expression (`fromMaybe 0 (RECALL …)`, where `0` is the epoch, not 
 B4 recorded now, and the anchor-slot doc page waits for B1 rather than teach the literal-`0`
 workaround.
 
-**B1 built in part, 2026-10-24 (`lang/lifecycle-values`, local, not merged).** The doc page waited
+**B1 built in part, 2026-10-24 (`lang/lifecycle-values`, a draft PR into `unstable`, not merged).** The doc page waited
 for B1 and is now written: `doc/reference/regulative/consequences.md`, "The anchor words as
 values", teaches the `fromMaybe THE ARMING (RECALL …)` default together with the freeze's silent
 failure (a fact recorded after the obligation's first scrutinised event does not move the deadline,
