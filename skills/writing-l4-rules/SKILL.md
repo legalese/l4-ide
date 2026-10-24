@@ -330,14 +330,16 @@ Both errors name the input.
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**
 
-The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, an input with no written type that the rule uses as one (the check goes by the type that L4 works out for it), or an `ASSUME` of such a type that an exported rule's own body reads.
-An `ASSUME` of the file itself becomes a required input; one that an imported file declares becomes none, so no request could set it, and it is refused all the same.
+The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as one (the check goes by the type that L4 works out for it from the whole file), or an `ASSUME` that an exported rule's own body reads as one, whether it has a written type or not.
+A polymorphic `ASSUME` (`GIVEN a IS A TYPE`, `GIVETH AN a`, as the prelude's `TBD` is) is checked by the type at the place where the body reads it.
+An `ASSUME` of the file itself with a written type becomes a required input; one that an imported file declares becomes none, so no request could set it, and it is refused all the same.
 `EVENT` and `DEONTIC` are both refused in each of these places.
 
 The check does not look inside a rule that an exported rule calls.
 A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.
 If the helper's `CONSIDER` ends in `OTHERWISE`, every request then gets that branch's answer with no error, which is the quiet failure; if it has no `OTHERWISE`, every request fails with HTTP 422.
 Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
+The test for a function-typed input goes by written types and by the `ASSUME`s of the file itself, so a `GIVEN` with no written type that the rule calls as a function, and a function-typed `ASSUME` that an imported file declares or that is written with its signature before it, also pass `l4 check`; every request to such a rule fails with HTTP 422.
 
 Take the plain facts as inputs, build the duty and the events inside the rule, and keep any helper that takes a `DEONTIC` or an `EVENT` without `@export`:
 

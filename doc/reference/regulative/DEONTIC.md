@@ -230,10 +230,10 @@ The editor shows the same error on the rule.
 Nothing is published: `l4 deploy` refuses the file before it uploads anything, `jl4-service` refuses to deploy it, and the **Deploy** button in the VS Code sidebar stays off until the error is gone.
 To publish the rule, write what [What to write instead](#what-to-write-instead) shows.
 
-### Leaving the type off, or declaring the `ASSUME` in another file, gives the same error
+### An input that is a duty without being written as one is refused too
 
 An input does not need a written type.
-When the rule leaves it off, L4 works the type out from how the rule uses the input, and the check goes by that type.
+When the rule leaves it off, L4 works the type out from how the file uses the input, in the rule's own body and in every call of the rule elsewhere in the same file, and the check goes by that type.
 Here `the duty` has no written type, and `already fulfilled` takes a `DEONTIC`, so `the duty` is one:
 
 ```l4
@@ -255,7 +255,9 @@ GIVETH A BOOLEAN
 ```
 
 `l4 check` reports the error above, with `the duty` in it.
-An input whose type L4 cannot work out from the rule, or works out to be a `NUMBER`, is not refused.
+An input whose type L4 cannot work out from the file, or works out to be a `NUMBER`, is not refused.
+Every call in the file counts, so an exported rule with `GIVEN x` and a body that ignores `x` is refused when another rule in the file calls it with a duty, and accepted when every call gives it a `NUMBER`.
+When two calls give the input different types, L4 takes the type from the first call in the file and reports a type error at the other.
 
 An `ASSUME` that the rule's own body reads counts in the same way when another file declares it.
 With ``ASSUME `the assumed duty` IS A DEONTIC Person Action`` in a file called `facts.l4`, a file that has `IMPORT facts` and an exported rule that reads `the assumed duty` in its own body gets the same error, with `the assumed duty` in it.
@@ -267,12 +269,17 @@ Its declared type holds no `DEONTIC`, and each place that reads it gives it a ty
 Handing `TBD` to a rule that takes a `DEONTIC` is refused in the same way, with `TBD` in the error, and reading it as a `NUMBER`, as `TBD + 1` does, is not.
 A duty that a rule defines, with `MEANS` and a body, is not an `ASSUME` and not an input, and an exported rule may read it.
 
-### The one shape the check does not catch
+### What the check does not catch
 
-The check looks only at the exported rule's own inputs and at the `ASSUME`s that its own body reads.
-It does not look inside a rule that the exported rule calls.
-So if a rule that an exported rule calls reads an `ASSUME` of type `DEONTIC`, `l4 check` passes, the exported rule is published without that input, and no request can supply it.
-When the `CONSIDER` that reads the `ASSUME` ends in `OTHERWISE`, every request gets the answer of that branch, with no error, and a value sent for the `ASSUME` is ignored.
+The check looks at the exported rule's own inputs and at the `ASSUME`s that its own body reads, and it does not look inside a rule that the exported rule calls.
+Its test for an input of function type goes by the types that are written and by the `ASSUME`s of the file itself.
+So some rules that no request can serve pass `l4 check` and deploy.
+They fail in one of two ways, and the quiet way is the dangerous one.
+
+**Quietly: the service answers HTTP 200, and the answer is wrong.**
+A rule that an exported rule calls reads an `ASSUME` of type `DEONTIC`, and the `CONSIDER` that reads it ends in `OTHERWISE`.
+`l4 check` passes, the exported rule is published without that input, and no request can supply it.
+Every request gets the answer of that branch, with no error, and a value sent for the `ASSUME` is ignored.
 Here every request gets `false`:
 
 ```l4
@@ -296,7 +303,14 @@ GIVETH A BOOLEAN
 Never let a rule that an exported rule calls read an `ASSUME` of type `DEONTIC`.
 Give it the `DEONTIC` as an input, as `is fulfilled by` does above.
 The same holds for an `ASSUME` of type `EVENT`.
-When the `CONSIDER` has no `OTHERWISE`, every request fails instead, with the HTTP status 422 and a message that says the value `reached a CONSIDER that has no branch for it`.
+
+**Loudly: every request is refused with HTTP 422.**
+
+- The same helper, when its `CONSIDER` has no `OTHERWISE`: the message says the value `reached a CONSIDER that has no branch for it`.
+- A `GIVEN` with no written type that the rule uses as a function, such as `f` in a rule with `GIVEN f` and the body `f 3 + 1`. The service lists no inputs for the rule. A request that leaves out `f` gets `Parameter 'f': missing required parameter`. A request that sends a value for `f` gets a message that begins `Internal error:`, says `expected a function but found: 3`, and asks for a bug report.
+- An `ASSUME` of function type that the rule calls, when an imported file declares it, or when it is written with its signature before it, as in `GIVEN n IS A NUMBER`, `GIVETH A NUMBER`, `ASSUME bump`. The message says that the service `needed to know the value of` the `ASSUME`, but `it is an assumed term`.
+
+A request cannot carry a function either, so give such a rule inputs that a request can carry.
 
 ## Related pages
 

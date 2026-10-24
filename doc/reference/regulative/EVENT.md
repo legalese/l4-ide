@@ -101,7 +101,7 @@ This gives `2`.
 
 ### An exported rule cannot take an event
 
-A rule marked `@export` cannot take an event as an input, nor an input that holds one: a `LIST OF EVENT Person Action`, a `MAYBE (EVENT Person Action)`, a record with an event in one of its fields, an input with no written type that the rule uses as an event, or an `ASSUME` of such a type that the rule's own body reads, whether the file or a file that it imports declares the `ASSUME`.
+A rule marked `@export` cannot take an event as an input, nor an input that holds one: a `LIST OF EVENT Person Action`, a `MAYBE (EVENT Person Action)`, a record with an event in one of its fields, a `GIVEN` with no written type that the file uses as an event, or an `ASSUME` that the rule's own body reads as an event, whether the `ASSUME` has a written type or not, and whether the file or a file that it imports declares it.
 A request to an exported rule is JSON, and JSON has no form for an event.
 `l4 check` reports `EVENT inputs are not supported for @export` and names the input.
 `l4 batch` and `jl4-schema` check the file first and stop with the same error, and `jl4-service` refuses to deploy it.
