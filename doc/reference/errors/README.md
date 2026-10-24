@@ -57,8 +57,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Export**
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
-- [An @export that takes an EVENT](#an-export-that-takes-an-event)
-- [An @export that takes a DEONTIC (no error)](#an-export-that-takes-a-deontic-no-error)
+- [An @export that takes an EVENT or a DEONTIC](#an-export-that-takes-an-event-or-a-deontic)
 
 ---
 
@@ -984,7 +983,7 @@ Or remove the `@export`, if the rule is not meant to be published.
 
 ---
 
-### An @export that takes an EVENT
+### An @export that takes an EVENT or a DEONTIC
 
 **Error:**
 
@@ -992,6 +991,14 @@ Or remove the `@export`, if the rule is not meant to be published.
 EVENT inputs are not supported for @export.
 The input `the reported event` has a type that contains an EVENT, and a request has no JSON form for an event.
 Give the rule the party, the action and the time as separate inputs, and build the event inside it.
+```
+
+or
+
+```
+DEONTIC inputs are not supported for @export.
+The input `the duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
 ```
 
 **What you wrote:**
@@ -1008,14 +1015,32 @@ GIVETH A NUMBER
   WHEN EVENT party action time THEN time
 ```
 
-**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it is JSON.
-JSON has no form for an event, so no request could supply this input.
-The same holds for an input that holds an event: a `LIST OF EVENT Person Action`, a `MAYBE (EVENT Person Action)`, a record with an event in one of its fields, or an `ASSUME` of that type that the rule uses.
-So an `@export` of such a rule is an error, reported at the rule.
-The error stops the whole file from checking: `l4 batch` and `jl4-schema` refuse the file, and jl4-service will not deploy it, until you change the input or remove the `@export`.
-Without `@export`, a rule can take an event as an input.
+or
 
-**How to fix it:** Take the party, the action and the time as separate inputs, and build the event inside the rule with `EVENT`:
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+@export Is the duty fulfilled
+GIVEN `the duty` IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`duty is fulfilled` `the duty` MEANS
+  CONSIDER `the duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it is JSON.
+JSON has no form for an event, and none for a `DEONTIC` value, which is a duty, a permission or a prohibition, or the outcome of one; so no request could supply this input.
+The same holds for an input that holds one of them: a `LIST OF EVENT Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with an event or a `DEONTIC` in one of its fields, or an `ASSUME` of that type that the rule uses.
+So an `@export` of such a rule is an error, reported at the rule, and it names the input.
+An input that holds both gets one error, for the first of them that L4 finds.
+The error stops the whole file from checking: `l4 batch` and `jl4-schema` refuse the file, the editor shows it as an error, and jl4-service will not deploy it, until you change the input or remove the `@export`.
+`l4 deploy` refuses the file too, and so does the **Deploy** button in the VS Code sidebar, which stays off.
+Without `@export`, a rule can take an event or a `DEONTIC` value as an input.
+A rule marked `@export` may give a `DEONTIC` value as its answer.
+
+**How to fix it:** For an event, take the party, the action and the time as separate inputs, and build the event inside the rule with `EVENT`:
 
 ```l4
 DECLARE Person IS ONE OF Seller, Buyer
@@ -1031,15 +1056,34 @@ GIVETH A NUMBER
   WHEN EVENT party action time THEN time
 ```
 
-Each of the three inputs needs a type that a request can carry, such as an enumeration or a `NUMBER`.
-See [EVENT](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event).
+For a `DEONTIC`, take the plain facts that the duty is made from as inputs, build the duty inside a rule, and keep the rule that takes a `DEONTIC` out of `@export`:
 
----
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
 
-### An @export that takes a DEONTIC (no error)
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+GIVETH A DEONTIC Person Action
+`the duty` who what deadline MEANS
+  PARTY who
+  MUST EXACTLY what
+  WITHIN deadline
+  HENCE FULFILLED
+  LEST BREACH
 
-`l4 check` and a deploy accept an `@export` rule that takes a `DEONTIC` input, though no request can supply a value for it.
-**A `DEONTIC` input is for use inside L4 only.**
-**Never give a rule marked `@export` a `DEONTIC` input.**
-**It may give a `DEONTIC` value as its answer.**
-See [An exported rule cannot take a DEONTIC input](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input) for the reason, for what happens if you do it anyway, and for what to write instead.
+@export Is the duty fulfilled when the party takes the action on a given day
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+      `day taken` IS A NUMBER
+GIVETH A BOOLEAN
+`duty fulfilled on day` who what deadline `day taken` MEANS
+  CONSIDER EVALTRACE (`the duty` who what deadline) 0 (LIST EVENT who what `day taken`)
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+```
+
+Each plain input needs a type that a request can carry, such as an enumeration or a `NUMBER`.
+See [EVENT](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event) and [DEONTIC](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).

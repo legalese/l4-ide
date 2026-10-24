@@ -23,7 +23,7 @@ Things that will trip up a general-purpose LLM because they are not in any other
 - [`AKA` aliases](#aka-aliases)
 - [`LET … IN` vs `WHERE`](#let--in-vs-where)
 - [`@export` placement](#export-placement)
-- [An exported rule that takes a `DEONTIC` looks fine and cannot work](#an-exported-rule-that-takes-a-deontic-looks-fine-and-cannot-work)
+- [An exported rule that takes a `DEONTIC` is refused](#an-exported-rule-that-takes-a-deontic-is-refused)
 - [Annotation fence](#annotation-fence)
 - [`@nlg` placement and language](#nlg-placement-and-language)
 - [NLG and reference annotations](#nlg-and-reference-annotations)
@@ -281,18 +281,18 @@ squared x MEANS x TIMES x
 
 ---
 
-## An exported rule that takes a `DEONTIC` looks fine and cannot work
+## An exported rule that takes a `DEONTIC` is refused
 
 **A `DEONTIC` input is for use inside L4 only.**
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**
 
-`l4 check` and the deploy accept the rule, and the schema calls the input a bare `object`, so nothing looks wrong.
-No request can supply the value: an object is refused (HTTP 422), and text or a number is accepted and the rule works on it as text or a number, so the answer is wrong with no warning.
+No request can supply the value, so the typechecker refuses the rule: `l4 check` fails with `DEONTIC inputs are not supported for @export`, naming the input, the editor shows it as an error, and the deploy is refused.
 The same holds for a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, and a module-level `ASSUME` of such a type that the rule uses.
+The message ends with what to do: give the rule the plain facts that the `DEONTIC` is made from as inputs, and build the `DEONTIC` inside it.
 
 ```l4
--- ✘ Wrong — passes `l4 check`, deploys, and no request can supply `duty`
+-- ✘ Wrong — `l4 check` refuses it, because no request can supply `duty`
 @export Is a duty already fulfilled
 GIVEN duty IS A DEONTIC Person Action
 GIVETH A BOOLEAN
@@ -303,7 +303,7 @@ GIVETH A BOOLEAN
 ```
 
 Take the plain facts as inputs and build the duty inside the rule; the full pattern is in [SKILL.md](../SKILL.md#inputs-no-request-can-supply-event-and-deontic).
-An `EVENT` input is different: the typechecker refuses it with `EVENT inputs are not supported for @export`.
+An `EVENT` input is refused in the same way, with `EVENT inputs are not supported for @export`.
 
 ---
 

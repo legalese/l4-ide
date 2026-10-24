@@ -105,7 +105,7 @@ A rule marked `@export` cannot take an event as an input, nor an input that hold
 A request to an exported rule is JSON, and JSON has no form for an event.
 `l4 check` reports `EVENT inputs are not supported for @export` and names the input.
 `l4 batch` and `jl4-schema` check the file first and stop with the same error, and `jl4-service` refuses to deploy it.
-See [An @export that takes an EVENT](../errors/README.md#an-export-that-takes-an-event).
+See [An @export that takes an EVENT or a DEONTIC](../errors/README.md#an-export-that-takes-an-event-or-a-deontic).
 
 To publish such a rule, take the party, the action and the time as three inputs, and build the event inside the rule:
 
@@ -129,7 +129,7 @@ This gives `2`.
 A request gives `who` and `what` by the name of the value, and `at time` as a number.
 Each of the three inputs needs a type that a request can carry, such as an enumeration or a `NUMBER`.
 
-A `DEONTIC` input of an exported rule is not refused, though no request can supply a value for it.
+A `DEONTIC` input of an exported rule is refused in the same way, with an error of its own, because no request can supply a value for it.
 **A `DEONTIC` input is for use inside L4 only.**
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**

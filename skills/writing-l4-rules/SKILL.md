@@ -322,16 +322,16 @@ such bundles with `Function type inputs are not supported for @export`.
 ### Inputs no request can supply: `EVENT` and `DEONTIC`
 
 **No request can supply an `EVENT` or a `DEONTIC` input.**
-The typechecker refuses an `EVENT` input with `EVENT inputs are not supported for @export`.
-It does not refuse a `DEONTIC` input: `l4 check` and the deploy accept it, and the published schema calls the input a bare `object`, so the deployment looks fine and cannot work.
-A JSON object for it is refused (HTTP 422), and text or a number is accepted and the rule works on it as text or a number, so the answer is wrong with no warning.
+The typechecker refuses an `EVENT` input with `EVENT inputs are not supported for @export`, and a `DEONTIC` input with `DEONTIC inputs are not supported for @export`.
+Both errors name the input.
+`l4 check` fails, the editor shows an error, `l4 deploy` and `jl4-service` refuse the file, and the sidebar's **Deploy** button stays off.
 
 **A `DEONTIC` input is for use inside L4 only.**
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**
 
-The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, or a module-level `ASSUME` of such a type that an exported rule uses (it becomes a required input, and its schema is a bare `object`).
-`EVENT` is refused in all four places.
+The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, or a module-level `ASSUME` of such a type that an exported rule uses (it becomes a required input).
+`EVENT` and `DEONTIC` are both refused in all four places.
 Take the plain facts as inputs, build the duty and the events inside the rule, and keep any helper that takes a `DEONTIC` or an `EVENT` without `@export`:
 
 ```l4

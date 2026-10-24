@@ -51,9 +51,9 @@ These built-in types take the type of the parties and the type of the actions as
 **A `DEONTIC` input is for use inside L4 only.**
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**
-A request cannot carry a `DEONTIC` value, and `l4 check` and a deploy accept the rule all the same, so it looks fine and cannot work.
+A request cannot carry a `DEONTIC` value, so `l4 check` refuses such a rule with an error, and so does a deploy.
 See [An exported rule cannot take a DEONTIC input](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input) for the reason and for what to write instead.
-An `EVENT` input is refused with an error; see [An exported rule cannot take an event](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event).
+An `EVENT` input is refused in the same way; see [An exported rule cannot take an event](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event).
 
 ## Records and enumerations
 

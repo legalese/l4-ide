@@ -255,7 +255,7 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 - `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
 
 A `DEONTIC` value cannot be supplied as an input of an exported function: a request has no form for one.
-The schema calls such an input an `object`, a JSON object for it is refused with HTTP 422, and text or a number is accepted but reaches the function as text or a number.
+The service refuses to deploy a file that has such an input, with the error `DEONTIC inputs are not supported for @export`, which names the input; an `EVENT` input is refused in the same way.
 **A `DEONTIC` input is for use inside L4 only.**
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**

@@ -115,8 +115,8 @@ The service turns each part of a request into the value the input asks for, but 
 >
 > The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, or an `ASSUME` of such a type that the rule uses.
 
-The command `l4 check`, which checks a file for errors, does not warn about it, so nothing stops you.
-An `EVENT` input is different: `l4 check` refuses it with an error; see [An exported rule cannot take an event](EVENT.md#an-exported-rule-cannot-take-an-event).
+The command `l4 check`, which checks a file for errors, refuses such a rule; [What happens if you do it anyway](#what-happens-if-you-do-it-anyway) shows the error.
+An `EVENT` input is refused in the same way; see [An exported rule cannot take an event](EVENT.md#an-exported-rule-cannot-take-an-event).
 
 ### What to write instead
 
@@ -219,13 +219,23 @@ GIVETH A BOOLEAN
   OTHERWISE FALSE
 ```
 
-It passes `l4 check` and can be published, and the schema calls the input an `object`.
-No request can supply the value.
-An object is refused (HTTP 422).
-Text or a number is accepted, and the rule works on it as text or a number, so the answer is wrong with no warning.
-This rule answers `false` to `"FULFILLED"`.
-A rule that runs the input through `EVALTRACE`, as `is fulfilled by` above does, is refused with a type error (HTTP 422) instead.
-In a `LIST OF`, a `MAYBE`, a record field or an `ASSUME`, the schema also calls the duty an `object`, and text is accepted in its place.
+`l4 check` fails, and reports this error at the rule:
+
+```text
+DEONTIC inputs are not supported for @export.
+The input `duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+```
+
+The editor shows the same error on the rule.
+Nothing is published: `l4 deploy` refuses the file before it uploads anything, `jl4-service` refuses to deploy it, and the **Deploy** button in the VS Code sidebar stays off until the error is gone.
+The error covers every input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, and an `ASSUME` of such a type that the rule uses.
+It names the input.
+To publish the rule, write what [What to write instead](#what-to-write-instead) shows.
+
+The check looks at the inputs of the exported rule and at the `ASSUME`s that its own body reads.
+It does not follow a rule that the exported rule calls.
+A rule that an exported rule calls should take its `DEONTIC` as an input, as `is fulfilled by` does above, and not read an `ASSUME` of that type: `l4 check` does not refuse it there, and no request can supply its value.
 
 ## Related pages
 
