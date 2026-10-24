@@ -14,7 +14,7 @@ import BundleStore (initStore)
 import Compiler (compileBundle, computeVersion)
 import qualified DeploymentLoader
 import qualified Version
-import ControlPlane (DeploymentStatusResponse (..))
+import ControlPlane (DeploymentStatusResponse (..), UpdateStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
 import Types
@@ -3005,6 +3005,48 @@ spec = describe "integration" do
             "Expected rejection, but published the inputs "
               <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
 
+    -- An ASSUME that the rule declares itself, under its own WHERE, is in scope
+    -- for that rule alone, and the service lists no input for it. A DEONTIC one
+    -- that the rule reads is refused as an imported one is.
+    it "rejects an @export that reads an ASSUME of type DEONTIC that its own WHERE declares" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "localduty.l4" localDutyJL4
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "local duty"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "stores no deployment of an @export that reads an ASSUME of type DEONTIC that its own WHERE declares" do
+      withEmptyService \baseUrl mgr -> do
+        -- the control: the same rule with a NUMBER ASSUME deploys, so that a
+        -- missing deployment below is the refusal and not a failure to deploy
+        okReq <- buildMultipartRequest (baseUrl <> "/deployments") "local-number" (createZipBundle [("localnumber.l4", localNumberJL4)])
+        okResp <- httpLbs okReq mgr
+        statusCode' okResp `shouldBe` 202
+        pollUntilReady baseUrl mgr "local-number" 60
+        -- the DEONTIC one is accepted for compiling, and the job is rejected
+        postReq <- buildMultipartRequest (baseUrl <> "/deployments") "local-duty" (createZipBundle [("localduty.l4", localDutyJL4)])
+        postResp <- httpLbs postReq mgr
+        statusCode' postResp `shouldBe` 202
+        jobId <- case Aeson.decode (responseBody postResp) :: Maybe DeploymentStatusResponse of
+          Just status | Just updateId <- status.dsUpdateId -> pure (Text.unpack updateId)
+          _ -> expectationFailure "the deploy named no update to poll" >> pure ""
+        job <- pollUpdateDone baseUrl mgr "local-duty" jobId 60
+        job.usStatus `shouldBe` "rejected"
+        job.usError `shouldSatisfy` maybe False (Text.isInfixOf "DEONTIC inputs are not supported for @export")
+        -- and nothing is stored: neither the deployment nor its function is found
+        getReq <- parseRequest (baseUrl <> "/deployments/local-duty")
+        getResp <- httpLbs getReq mgr
+        statusCode' getResp `shouldBe` 404
+        fnReq <- parseRequest (baseUrl <> "/deployments/local-duty/functions/r")
+        fnResp <- httpLbs fnReq mgr
+        statusCode' fnResp `shouldBe` 404
+
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed
@@ -3577,6 +3619,36 @@ beforeAndAfterRestart deployId sources probe = do
   restarted <- withServiceRestarted restartedId sources \baseUrl mgr -> probe baseUrl mgr restartedId
   pure (fresh, restarted)
 
+-- | An exported rule that reads a DEONTIC that its own WHERE declares as an ASSUME.
+localDutyJL4 :: Text
+localDutyJL4 = Text.unlines
+  [ "DECLARE Person IS ONE OF Seller, Buyer"
+  , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+  , ""
+  , "GIVEN duty IS A DEONTIC Person Action"
+  , "GIVETH A BOOLEAN"
+  , "`already fulfilled` duty MEANS"
+  , "  CONSIDER duty"
+  , "  WHEN FULFILLED THEN TRUE"
+  , "  OTHERWISE FALSE"
+  , ""
+  , "@export Is the local duty fulfilled"
+  , "GIVETH A BOOLEAN"
+  , "`r` MEANS `already fulfilled` `local duty`"
+  , "  WHERE"
+  , "    ASSUME `local duty` IS A DEONTIC Person Action"
+  ]
+
+-- | The same shape with a NUMBER: it is not refused.
+localNumberJL4 :: Text
+localNumberJL4 = Text.unlines
+  [ "@export One more than the local number"
+  , "GIVETH A NUMBER"
+  , "`r` MEANS `local number` + 1"
+  , "  WHERE"
+  , "    ASSUME `local number` IS A NUMBER"
+  ]
+
 -- | Start a service with an empty deployment registry.
 withEmptyService :: (String -> Manager -> IO a) -> IO a
 withEmptyService act = do
@@ -3639,6 +3711,18 @@ pollUntilReady baseUrl mgr deployId timeoutSec = go timeoutSec
       _ -> do
         threadDelay 500_000  -- 0.5 seconds
         go (remaining - 1)
+
+-- | Poll a deploy job until it is no longer compiling, with a timeout in seconds.
+pollUpdateDone :: String -> Manager -> String -> String -> Int -> IO UpdateStatusResponse
+pollUpdateDone baseUrl mgr deployId jobId timeoutSec = go timeoutSec
+ where
+  go 0 = fail ("Update " <> jobId <> " of " <> deployId <> " did not finish within timeout")
+  go remaining = do
+    req <- parseRequest (baseUrl <> "/deployments/" <> deployId <> "/updates/" <> jobId)
+    resp <- httpLbs req mgr
+    case Aeson.decode (responseBody resp) :: Maybe UpdateStatusResponse of
+      Just u | u.usStatus /= "compiling" -> pure u
+      _ -> threadDelay 500_000 >> go (remaining - 1)  -- 0.5 seconds
 
 -- | Create a zip archive from a list of (filename, content) pairs.
 createZipBundle :: [(FilePath, Text)] -> LBS.ByteString

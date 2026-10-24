@@ -1731,29 +1731,29 @@ spec = do
       blocks src `shouldReturn` (True, [])
 
     it "goes by the ASSUME that the body reads, when a local one has the name of a top-level one" $ do
-      -- The top-level `shared` is a NUMBER and the local one a DEONTIC: the
-      -- body reads the local one. In the other order the body reads a NUMBER.
-      let numberThenDuty = parties <> dutyHelper <> Text.unlines
-            [ "ASSUME `shared` IS A NUMBER"
+      -- A name in a WHERE does not hide a top-level one: each read resolves by
+      -- its type, so the four ways of declaring the pair differ in which of the
+      -- two `shared` the body reads. The check goes by that one.
+      let wherePair top local readIt result = parties <> dutyHelper <> Text.unlines
+            [ "ASSUME `shared` IS " <> top
             , ""
             , "@export Reads shared"
-            , "GIVETH A BOOLEAN"
-            , "`reads shared` MEANS `fulfilled` `shared`"
+            , "GIVETH A " <> result
+            , "`reads shared` MEANS " <> readIt
             , "  WHERE"
-            , "    ASSUME `shared` IS A DEONTIC Person Action"
+            , "    ASSUME `shared` IS " <> local
             ]
-          dutyThenNumber = parties <> Text.unlines
-            [ "ASSUME `shared` IS A DEONTIC Person Action"
-            , ""
-            , "@export Reads shared"
-            , "GIVETH A NUMBER"
-            , "`reads shared` MEANS `shared` + 1"
-            , "  WHERE"
-            , "    ASSUME `shared` IS A NUMBER"
-            ]
-      blocks numberThenDuty `shouldReturn`
-        (False, [("DEONTIC", "reads shared", "shared", SError)])
-      blocks dutyThenNumber `shouldReturn` (True, [])
+          number = "A NUMBER"
+          duty = "A DEONTIC Person Action"
+          refusedFor = (False, [("DEONTIC", "reads shared", "shared", SError)])
+      -- the body reads the local DEONTIC
+      blocks (wherePair number duty "`fulfilled` `shared`" "BOOLEAN") `shouldReturn` refusedFor
+      -- the body reads the top-level NUMBER, and the local DEONTIC beside it is not read
+      blocks (wherePair number duty "`shared` + 1" "NUMBER") `shouldReturn` (True, [])
+      -- the body reads the local NUMBER
+      blocks (wherePair duty number "`shared` + 1" "NUMBER") `shouldReturn` (True, [])
+      -- the body reads the top-level DEONTIC, and the local NUMBER beside it is not read
+      blocks (wherePair duty number "`fulfilled` `shared`" "BOOLEAN") `shouldReturn` refusedFor
 
   -- The check looks at every definition that is marked as an export, whichever
   -- way it is marked and wherever it stands.
