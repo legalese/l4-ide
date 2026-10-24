@@ -330,8 +330,9 @@ Both errors name the input.
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**
 
-The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, or a module-level `ASSUME` of such a type that an exported rule's own body reads (it becomes a required input).
-`EVENT` and `DEONTIC` are both refused in all four places.
+The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, an input with no written type that the rule uses as one (the check goes by the type that L4 works out for it), or an `ASSUME` of such a type that an exported rule's own body reads.
+An `ASSUME` of the file itself becomes a required input; one that an imported file declares becomes none, so no request could set it, and it is refused all the same.
+`EVENT` and `DEONTIC` are both refused in each of these places.
 
 The check does not look inside a rule that an exported rule calls.
 A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.

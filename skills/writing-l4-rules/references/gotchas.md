@@ -288,7 +288,7 @@ squared x MEANS x TIMES x
 **It may give a `DEONTIC` value as its answer.**
 
 No request can supply the value, so the typechecker refuses the rule: `l4 check` fails with `DEONTIC inputs are not supported for @export`, naming the input, the editor shows it as an error, and the deploy is refused.
-The same holds for a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, and a module-level `ASSUME` of such a type that the rule's own body reads.
+The same holds for a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, an input with no written type that the rule uses as a `DEONTIC`, and an `ASSUME` of such a type that the rule's own body reads, whether the file or a file it imports declares it.
 The message ends with what to do: give the rule the plain facts that the `DEONTIC` is made from as inputs, and build the `DEONTIC` inside it.
 
 ```l4

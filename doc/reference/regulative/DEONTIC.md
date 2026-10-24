@@ -112,7 +112,7 @@ The service turns each part of a request into the value the input asks for, but 
 >
 > **It may give a `DEONTIC` value as its answer.**
 >
-> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, or an `ASSUME` of such a type that the rule's own body reads.
+> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, an input with no written type that the rule uses as a duty, or an `ASSUME` of such a type that the rule's own body reads, whether the file or a file that it imports declares the `ASSUME`.
 
 The command `l4 check`, which checks a file for errors, refuses such a rule; [What happens if you do it anyway](#what-happens-if-you-do-it-anyway) shows the error.
 An `EVENT` input is refused in the same way; see [An exported rule cannot take an event](EVENT.md#an-exported-rule-cannot-take-an-event).
@@ -229,6 +229,38 @@ Give the rule the plain facts that the DEONTIC is made from as inputs, and build
 The editor shows the same error on the rule.
 Nothing is published: `l4 deploy` refuses the file before it uploads anything, `jl4-service` refuses to deploy it, and the **Deploy** button in the VS Code sidebar stays off until the error is gone.
 To publish the rule, write what [What to write instead](#what-to-write-instead) shows.
+
+### Leaving the type off, or declaring the `ASSUME` in another file, gives the same error
+
+An input does not need a written type.
+When the rule leaves it off, L4 works the type out from how the rule uses the input, and the check goes by that type.
+Here `the duty` has no written type, and `already fulfilled` takes a `DEONTIC`, so `the duty` is one:
+
+```l4
+-- ✘ Do not write this: `the duty` has no written type, but it is a DEONTIC all the same
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`already fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+@export Is a duty already fulfilled
+GIVEN `the duty`
+GIVETH A BOOLEAN
+`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`
+```
+
+`l4 check` reports the error above, with `the duty` in it.
+An input whose type L4 cannot work out from the rule, or works out to be a `NUMBER`, is not refused.
+
+An `ASSUME` that the rule's own body reads counts in the same way when another file declares it.
+With ``ASSUME `the assumed duty` IS A DEONTIC Person Action`` in a file called `facts.l4`, a file that has `IMPORT facts` and an exported rule that reads `the assumed duty` in its own body gets the same error, with `the assumed duty` in it.
+The service publishes the `ASSUME`s of the file that holds the rule and no others, so a request could not set an imported one in any case.
+A duty that a rule defines, with `MEANS` and a body, is not an `ASSUME` and not an input, and an exported rule may read it.
 
 ### The one shape the check does not catch
 
