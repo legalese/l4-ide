@@ -100,7 +100,7 @@ Written without the brackets, `WITHIN 0 OF THE JOIN PLUS 5` means the same: when
 The operator may also start the next line, indented as any continuation is.
 
 **What a noun names depends on where it is written, and on what holds it.**
-Usually it is the position in the life of the obligation whose `HENCE` or `LEST` the noun is written in (and `THE ARMING` written at the top level is the obligation's own arming).
+Usually it is the position in the life of the obligation whose `HENCE` or `LEST` the noun is written in (and `THE ARMING` written in a top-level obligation's own lines is that obligation's own arming).
 The exception is a noun inside an obligation that is handed on as a value, in the fourth point below.
 That has four consequences worth knowing before you rely on it:
 
@@ -203,11 +203,14 @@ The type checker refuses a lifecycle anchor where the position it names does not
 - An `OF` expression that is neither a `NUMBER` nor a `DATE`.
 
 The same refusals apply to the nouns used as [values](#the-anchor-words-as-values), wherever they are written: `THE JOIN` or `THE DEADLINE` in a top-level rule, in a top-level rule's `WHERE`, or in a function's body; `THE JOIN` under the `LEST` of a `MUST`, `DO` or `MAY`; `THE DEADLINE` under an obligation with no closing edge; and either of them anywhere in a join line's `WITHIN`.
-`THE ARMING` is not refused when the file is checked.
-Written where no obligation is ever entered, such as a top-level rule's `WHERE t MEANS THE ARMING` used as an anchor, it has nothing to read, and the run reports that by name when it gets there.
-That includes a top-level function or an `@export`ed decision whose body reads `THE ARMING`: it is read where the function is defined, not where it is called, so the module checks, and every evaluation of it is refused.
+`THE ARMING` as a value is refused wherever no obligation has been entered where it is written.
+It can be read in an obligation's own lines (its party, its action and `PROVIDED`, its `AFTER` and `WITHIN`, an `EVERY`'s join line) and anywhere inside a `HENCE` or `LEST`.
+Everywhere else it is refused when the file is checked: in a top-level rule's `WHERE t MEANS THE ARMING`, in a top-level rule's body, and in the body of a function or an `@export`ed decision, which is read where the function is defined, not where it is called.
+An `EVERY`'s `IN` roll and its `WHO` or `WHOSE` filter are not among its own lines either: they are read before any member's obligation is entered, so `THE ARMING` there is refused unless the `EVERY` sits under a `HENCE` or `LEST`.
+To use the instant in a function, pass it as an argument from one of those places: `WITHIN 0 OF (f THE ARMING)`.
+(These used to check clean and be refused by the run on every input.)
 
-The checker sees only where an anchor is _written_. A top-level rule referenced by name inside a `HENCE` (`HENCE cure`), and a `WHERE` local, are checked where they are written — outside any `HENCE` or `LEST` — and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`. `THE ARMING` is accepted there, and when the rule runs it names the arming of the obligation the continuation is attached to (its own, when there is none), so factoring an inline continuation out into a `WHERE` does not move its deadline, nor does putting the local inside a `RAND` or `ROR`.
+The checker sees only where an anchor is _written_. A top-level rule referenced by name inside a `HENCE` (`HENCE cure`), and a `WHERE` local, are checked where they are written — outside any `HENCE` or `LEST` — and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`. `THE ARMING` is accepted in such an obligation's own lines, and when the rule runs it names the arming of the obligation the continuation is attached to (its own, when there is none), so factoring an inline continuation out into a `WHERE` does not move its deadline, nor does putting the local inside a `RAND` or `ROR`.
 
 Two refusals only a run can make, because the checker cannot see them, are reported when the rule runs, naming the cause:
 

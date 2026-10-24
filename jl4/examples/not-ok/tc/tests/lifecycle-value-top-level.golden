@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: lifecycle-value-top-level.l4
   Hidden: no
-  Range: 19:24-19:37
+  Range: 22:24-22:37
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -19,20 +19,20 @@ File: lifecycle-value-top-level.l4
 
 File: lifecycle-value-top-level.l4
   Hidden: no
-  Range: 23:27-23:32
+  Range: 26:27-26:32
   Source: check
   Severity: DiagnosticSeverity_Information
   Code: <none>
   Message:
     In this action, `alice` refers to
 
-      alice (at lifecycle-value-top-level.l4:16:1-6)
+      alice (at lifecycle-value-top-level.l4:19:1-6)
 
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
 
 File: lifecycle-value-top-level.l4
   Hidden: no
-  Range: 24:19-24:31
+  Range: 27:19-27:31
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

@@ -314,18 +314,13 @@ GIVETH A DEONTIC Actor Action
   PARTY bob   DOES Sign bob   AT 15
 
 
-§ `11. a top-level WHERE reaches no obligation`
+§ `11. a top-level WHERE reaches no obligation (moved)`
 
--- `t` is a NUMBER the rule defines, outside any obligation; no arming has
--- happened where it is written, so it has nothing to read, and the run says
--- so by name when the WITHIN forces it.
-GIVETH A DEONTIC Actor Action
-`arming defined outside` MEANS
-    PARTY alice MUST Sign alice WITHIN 5 OF t
-    WHERE t MEANS THE ARMING
-
-#TRACE `arming defined outside` AT 10 WITH
-  PARTY alice DOES Sign alice AT 12
+-- This section ran `WHERE t MEANS THE ARMING` on a top-level rule and
+-- pinned the run's refusal. The checker now refuses it where it is written
+-- (refusal 8, card B1c), so it lives in
+-- not-ok/tc/lifecycle-arming-outside-obligation.l4. The number is kept so
+-- that citations of the sections after it stay right.
 
 
 § `12. inside an obligation handed on as a value, a noun is read where it runs`

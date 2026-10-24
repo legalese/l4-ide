@@ -1486,18 +1486,17 @@ tests under "THE before a noun the program also defines" in `IntegrationSpec.hs`
 `OF (THE JOIN)` are two trees with one meaning — every consumer that asks which noun an anchor
 names now asks `lifecyclePointOfAnchor`, which reads through the bracket, so the empty-window
 refusal of §5.1.2.2 covers `OF (THE JOIN)` as well (`not-ok/tc/after-empty-window-value.l4`;
-review of 2026-10-24) — and `THE ARMING` written where no obligation is ever entered (a top-level
-rule's `WHERE`, a top-level function's body, an `@export`ed decision) is refused only when the run
-reaches it, so such a module checks and refuses on every input (the review of 2026-10-24 also reported deploying one to a local `jl4-service`; not re-run here). A check-time refusal
-is feasible — outside every obligation a `NUMBER` is evaluated in the environment it was
-defined in (a top-level function's body in its closure's, even when it is called from inside an
-obligation's slot), so the definition site decides, not the use site, and the checker already
-carries `enclosingObligation` and `inSlot`; the refusal would be "`THE ARMING` with no enclosing
-obligation and not inside a deonton's own slots" — but it would be a fifth refusal, which B1 did not rule: open, for a ruling.
+review of 2026-10-24) — and that is all of what is not built.
+`THE ARMING` written where the machine would not bind it is refused at check time, RULED 2026-10-24 (B1c below), as refusal 8 of §5.1.1.1 (`ArmingUnavailable`).
+Such a module used to check and refuse on every input (the review of 2026-10-24 also reported deploying one to a local `jl4-service`; not re-run here).
+The definition site decides, not the use site: outside every obligation a `NUMBER` is evaluated in the environment it was defined in, a top-level function's body in its closure's even when it is called from inside an obligation's slot.
+So the checker carries `inOwnSlots`, set exactly where the machine's `withOwnArming` applies, beside `enclosingObligation`, and refuses `THE ARMING` where neither holds: a top-level rule's `WHERE` or body, a top-level function's body, an `@export`ed decision, and an `EVERY`'s `IN` roll and `WHO` or `WHOSE` filter not under any `HENCE` or `LEST`, which the roll call reads before any member is armed.
+Witnesses: `not-ok/tc/lifecycle-arming-outside-obligation.l4` (which took over §11 of `run-lifecycle-values.l4`, the run-time witness) and `not-ok/tc/lifecycle-arming-in-every-roll.l4`.
 
 Rulings on the build, recorded 2026-10-25:
 
 - B1a: option A plus a jl4-service deploy refusal for LifecycleNounHidesName (names the hidden name, says to drop THE), warning reworded (no history claim; drop THE for imported names). Meng's note: "I feel like some other languages would have stricter rules around punctuation in types vs terms vs reserved words. Here we have an all caps builtin. If we were as strict we might not see this problem arising in the first place. Just a thought, not design guidance." Ruled 2026-10-24, bench https://claude.ai/artifact/PgiYUak5fBxjUJ1dd3FZ2F (collection l4-event-time-1024).
+- B1c: accepted (THE ARMING refused at check time wherever the machine would not bind it, including an EVERY's IN and WHO/WHOSE; fresh refusal number and own message; fixture §11 moved to not-ok). Ruled 2026-10-24, bench https://claude.ai/artifact/PgiYUak5fBxjUJ1dd3FZ2F (collection l4-event-time-1024).
 
 **B3 settled by SEESAW.** Meng, 2026-09-21: _"the RAND and ROR operators ought to be commutative,
 don't you think?"_; 2026-09-22: _"do we need to break a tie? i thought we switched blame from
@@ -2152,6 +2151,14 @@ Two more are RUN-TIME refusals (`lifecycleRefusal`, `Machine.hs:2655`), because 
    the value is one operand of a compound. The checker accepted the anchor where it was written;
    the run refuses it where it is used (witnesses: `handed under a LEST`, `handed under a LEST,
 in a compound`, `handed to no WITHIN`).
+
+One more is a check-time refusal again, RULED 2026-10-24 by card B1c and added with the value form of B1:
+
+8. `THE ARMING` as a value written where the machine would not bind it — refused (`ArmingUnavailable`, its own message).
+   The machine binds it in a deonton's own slots as it arms the obligation (`withOwnArming`), on a join line, and at every `HENCE` or `LEST` hand-off.
+   The checker admits it inside a deonton's own slots (`inOwnSlots`: the party, the action and `PROVIDED`, the `AFTER` and `WITHIN`, an `EVERY`'s join line) or under a `HENCE` or `LEST` (`enclosingObligation`), and refuses it everywhere else: a top-level rule's `WHERE` or body, a top-level function's body, an `@export`ed decision, and an `EVERY`'s `IN` roll and `WHO` or `WHOSE` filter not under any `HENCE` or `LEST`.
+   Witnesses: `not-ok/tc/lifecycle-arming-outside-obligation.l4`, `not-ok/tc/lifecycle-arming-in-every-roll.l4`.
+   The run's refusal (`lifecycleValueRefusal`) stays as the backstop.
 
 **Printers and exporters.** `prettyLayout` prints `d [OF anchor]` with the duration bracketed
 exactly as before (`Print.hs:959`, `:968`), so every unanchored deadline prints byte-for-byte as it

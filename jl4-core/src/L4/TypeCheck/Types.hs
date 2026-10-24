@@ -307,6 +307,15 @@ data CheckError =
     -- does not exist: the same refusals as 'AnchorUnavailable', worded for
     -- a value rather than an @OF@. Carries the point, the expression for
     -- its source range, and the reason.
+  | ArmingUnavailable (Expr Name)
+    -- ^ @THE ARMING@ as a VALUE written where the machine never binds it
+    -- (refusal 8 of EVERY-EACH-QUANTIFIER-SPEC §5.1.1.1; card B1c, RULED
+    -- 2026-10-24): outside every deonton's own slots ('inOwnSlots') and
+    -- outside every @HENCE@ or @LEST@ ('enclosingObligation') — at the top
+    -- level, in a top-level rule's @WHERE@, in a function's body, in an
+    -- @EVERY@'s @IN@ roll or @WHO@\/@WHOSE@ filter. Before B1c the module
+    -- checked and the run refused it on every input. Carries the
+    -- expression for its source range.
   | AnchorNotAnInstant EdgeWord (Expr Name) (Type' Resolved)
     -- ^ The expression after @OF@ in a @WITHIN@ or an @AFTER@ (R-Q7C) is
     -- neither a NUMBER (an instant on the trace's own clock) nor a DATE.
@@ -898,6 +907,7 @@ instance HasSrcRange CheckError where
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (AnchorUnavailable _ a _)         = rangeOf a
   rangeOf (LifecycleUnavailable _ e _)      = rangeOf e
+  rangeOf (ArmingUnavailable e)             = rangeOf e
   rangeOf (AnchorNotAnInstant _ e _)        = rangeOf e
   rangeOf (OpeningNotAnInstant e _)         = rangeOf e
   rangeOf (AbsoluteEdgeAnchored a)          = rangeOf a
@@ -1155,6 +1165,20 @@ data CheckEnv =
     -- 'L4.TypeCheck.checkLifecycle') is refused as the bare anchor is
     -- (refusal 3, §5.1.1.1): that @WITHIN@ is what defines both. Set via
     -- 'local' in 'L4.TypeCheck.checkDeadline'; never carried across imports.
+    , inOwnSlots           :: !Bool
+    -- ^ Are we checking one of a deonton's own slots — its party, its action
+    -- and @PROVIDED@, its @AFTER@ and @WITHIN@, an @EVERY@'s join line? The
+    -- machine evaluates those in the obligation's environment as it is
+    -- armed, where @THE ARMING@ is bound ('L4.EvaluateLazy.Machine.withOwnArming';
+    -- on a join line 'L4.EvaluateLazy.Machine.joinLineEnv'). With
+    -- 'enclosingObligation' (a @HENCE@ or @LEST@, where the hand-off binds
+    -- it), this is exactly where @THE ARMING@ as a value may be read
+    -- (refusal 8, §5.1.1.1; card B1c). An @EVERY@'s @IN@ roll and
+    -- @WHO@\/@WHOSE@ filter are NOT among the slots: the roll call reads
+    -- them in the @EVERY@'s environment, before any member is armed. Set via
+    -- 'local' in 'L4.TypeCheck.checkDeonton' and
+    -- 'L4.TypeCheck.checkDeontonBody', inherited by everything checked
+    -- inside, and never carried across imports.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
     , localBindings        :: !(Set Unique)
@@ -1250,6 +1274,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , inNonexhaustiveDecide = False
     , enclosingObligation = Nothing
     , onJoinLine = False
+    , inOwnSlots = False
     , errorContext = None
     , sectionStack = []
     , localBindings = Set.empty
@@ -2749,6 +2774,7 @@ extendEnv cis env =
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , enclosingObligation = e.enclosingObligation
     , onJoinLine = e.onJoinLine
+    , inOwnSlots = e.inOwnSlots
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     , actionPatternPos = e.actionPatternPos
