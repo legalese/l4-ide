@@ -41,6 +41,7 @@ module L4.EvaluateLazy
 , safePostprocessTrace
 , tracePostprocessFailed
 , prettyLedger
+, ShownValue (..)
   -- * Ledger substrate (M0). Exposed for the test suite; not part of the
   -- stable public API.
 , Eval
@@ -67,8 +68,10 @@ import L4.EvaluateLazy.Trace
 import L4.Evaluate.Ledger
   ( EventRoute (..)
   , Ledger
-  , LedgerEvent (..)
-  , LedgerStore (..)
+  , LedgerEvent
+  , LedgerEvent' (..)
+  , LedgerStore
+  , LedgerStore' (..)
   , Path
   , Provenance (..)
   , emptyStore
@@ -410,8 +413,26 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- pending Meng's review).
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
-  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
+  -- The ledger as the reader will see it: every stored value forced to
+  -- normal form, for display only. A RECORD stores its value at WHNF, so a
+  -- constructor's fields and a list's cells are still heap references at the
+  -- write, and a reference prints as @&n\@file@. This pass runs LAST, after
+  -- the verdict, the trace, the deontic steps, the notes, the presumed log
+  -- and the reached inputs have all been taken: forcing can raise, refuse,
+  -- take a default, start the unknown-step counter, or even append a row
+  -- (a RECORD nested in a recorded value), and none of that may reach the
+  -- directive's result. The appended row would land in the live store, not
+  -- in the snapshot traversed here, and the store is discarded on exit.
+  shownLedger <- traverse showForLedger directiveLedger
+  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed shownLedger, steps)
   where
+    -- Per value, so that one field that cannot be evaluated hides its own
+    -- row's value and nothing else. The catch is at the directive boundary,
+    -- after the verdict is fixed: nothing resumes evaluation with a value in
+    -- a refusal's place (see 'refuseWith').
+    showForLedger :: WHNF -> Eval ShownValue
+    showForLedger v = either Unshown Shown <$> tryEval (nf v)
+
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
     captureSteps
       | withSteps = captureDeonticSteps
@@ -487,7 +508,9 @@ data EvalDirectiveResult =
       -- captured before 'withFreshLedger' discarded the per-directive store.
       -- Newest-last within each ledger. Empty for a directive that wrote nothing
       -- (pure reads / ordinary expressions) — rendered as nothing in that case
-      -- so reads do not clutter the output.
+      -- so reads do not clutter the output. The values are the machine's own
+      -- 'WHNF's, whose fields are heap references: inspect them, but print
+      -- 'shownLedger'.
     , notes :: ![Text]
       -- ^ what the run REPORTED without failing while producing the value
       -- ('L4.EvaluateLazy.Machine.tellNote'; EVERY-EACH-QUANTIFIER-SPEC
@@ -501,7 +524,24 @@ data EvalDirectiveResult =
       -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). Not rendered by the
       -- printers here; @l4 batch@ and @jl4-service@ turn it into their
       -- @presumed@ list.
+    , shownLedger :: !(LedgerStore' ShownValue)
+      -- ^ 'ledger' as the reader sees it: the same rows, each value forced to
+      -- normal form (or the reason it could not be) while the directive's
+      -- heap was still alive. This is what every printer renders; a 'WHNF'
+      -- prints its fields as @&n\@file@ references, which is what the reader
+      -- used to see for any RECORD of a record or a list.
     }
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | A ledger row's value as the reader sees it: the stored value in normal
+-- form, or the exception that forcing it for display raised. The row's
+-- write happened either way — the value is the machine's, this is only how
+-- far the printer could follow it — and the directive's own verdict was
+-- settled before the attempt ('nfDirectiveWith').
+data ShownValue =
+    Shown NF
+  | Unshown EvalException
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -601,7 +641,7 @@ prettyReductionOutcome (ReducedUndetermined ns) =
 -- >   RECORD `freezing point of water` IS 273.15   [party=Alice, source=RECORD, at=...]
 -- > Official record:
 -- >   COMMIT `fp` IS 273.15   [party=Court, source=COMMIT, at=...]
-prettyLedger :: LedgerStore -> Text
+prettyLedger :: LedgerStore' ShownValue -> Text
 prettyLedger store =
   Text.concat (ownBlocks <> [officialBlock])
   where
@@ -623,9 +663,9 @@ prettyLedger store =
         []     -> Text.empty
         events -> "\n" <> header <> ":\n" <> Text.intercalate "\n" (map prettyLedgerEvent events)
 
-prettyLedgerEvent :: LedgerEvent -> Text
+prettyLedgerEvent :: LedgerEvent' ShownValue -> Text
 prettyLedgerEvent (Assign path val prov) =
-  "  " <> verb <> " " <> renderPath path <> " IS " <> prettyLayout val
+  "  " <> verb <> " " <> renderPath path <> " IS " <> prettyShownValue val
     <> "   " <> renderProvenance prov
   where
     -- The provenance source distinguishes RECORD (own ledger) from
@@ -633,6 +673,18 @@ prettyLedgerEvent (Assign path val prov) =
     verb = case prov.source of
       "COMMIT" -> "COMMIT"
       _        -> "RECORD"
+
+-- | The value column of a ledger row. A value that could not be forced for
+-- display says so in the angle-bracket form the printer uses for anything
+-- that is not a printable value (@<function>@, @<environment>@), with the
+-- reason on the same line so the row stays one line. A refusal is named as
+-- one, as every other surface names it: it is not an error.
+prettyShownValue :: ShownValue -> Text
+prettyShownValue = \ case
+  Shown v                        -> prettyLayout v
+  Unshown (RefusalException ref) -> "<refused: " <> ref.message <> ">"
+  Unshown exc                    ->
+    "<could not be evaluated: " <> Text.unwords (map Text.strip (prettyEvalException exc)) <> ">"
 
 -- | Render a cell 'Path' back to its backtick surface form, e.g.
 -- @`freezing point of water`@. M1/M1.5 cells are single-segment; nested
@@ -658,10 +710,10 @@ renderProvenance prov =
 -- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace _ledger ns _presumed shown) =
    prettyEvalDirectiveValue res
    <> prettyNotes ns
-   <> prettyLedger led
+   <> prettyLedger shown
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -669,10 +721,10 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presu
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace _ledger ns _presumed shown) =
    prettyEvalDirectiveValueWithFields fields res
    <> prettyNotes ns
-   <> prettyLedger led
+   <> prettyLedger shown
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -687,7 +739,7 @@ prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
 -- ----------------------------------------------------------------------------
 
 instance Aeson.ToJSON EvalDirectiveResult where
-  toJSON (MkEvalDirectiveResult _range res _trace _ledger ns _presumed) = Aeson.object $
+  toJSON (MkEvalDirectiveResult _range res _trace _ledger ns _presumed _shown) = Aeson.object $
     [ "result" Aeson..= res
     , "trace"  Aeson..= Aeson.Null
     ]

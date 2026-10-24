@@ -113,8 +113,8 @@ import L4.Annotation
 import L4.Evaluate.Ledger
   ( EventRoute (..)
   , Ledger
-  , LedgerEvent (..)
-  , LedgerStore (..)
+  , LedgerEvent, LedgerEvent' (..)
+  , LedgerStore, LedgerStore' (..)
   , Provenance (..)
   , anonymousParty
   , readCellBitemporal
@@ -1221,7 +1221,9 @@ termValue = \ case
 --
 -- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
 -- 'EvalException' anywhere in the tree, and it is used only at the directive
--- boundary ('L4.EvaluateLazy.nfDirective') and in @withEvalClauses@ (which
+-- boundary ('L4.EvaluateLazy.nfDirective', including its display-only pass
+-- over the ledger AFTER the verdict is fixed, which turns a refusal into the
+-- text of a refusal and never into a value) and in @withEvalClauses@ (which
 -- rethrows). There is no user-facing catch construct, and A REFUSAL IS NEVER
 -- TURNED INTO A VALUE: not by a CONSIDER arm, not by a boolean connective, not
 -- by a WHERE\/LET binding. One frame does observe a refusal as it unwinds: the

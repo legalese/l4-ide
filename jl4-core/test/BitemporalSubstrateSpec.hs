@@ -31,7 +31,7 @@ import qualified Data.Map.Strict as Map
 
 import L4.Evaluate.Ledger
   ( Ledger
-  , LedgerEvent (..)
+  , LedgerEvent, LedgerEvent' (..)
   , Provenance (..)
   , effectiveVt
   , emptyStore

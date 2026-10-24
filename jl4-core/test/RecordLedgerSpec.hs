@@ -48,8 +48,8 @@ import L4.Syntax
   , getUnique
   )
 import L4.Evaluate.Ledger
-  ( LedgerEvent (..)
-  , LedgerStore (..)
+  ( LedgerEvent' (..)
+  , LedgerStore' (..)
   , Provenance (..)
   , readCellAll
   , snapshot
