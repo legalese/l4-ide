@@ -5,7 +5,7 @@ Source spec: none.
 The change came from `unstable`: legalese/l4-ide#103 (`80217614cf`, issue smucclaw/l4-ide#915) and the first two of the three commits of legalese/l4-ide#152, `a4471aeb6` ("merge, don't overwrite, colliding builtin environment keys") and `daa7ee180` ("stop name-resolution failures cascading into bogus diagnostics", issue smucclaw/l4-ide#920).
 The deploy gate of `jl4-service` (below) was added for `main`, and so were three changes made in the review of this pull request: the errors for an `@export` that takes an EVENT or a DEONTIC, the rule that the cascade filter drops a mismatch only for failures that its own module reported, and the rule that a name that did not resolve is not counted against its arguments.
 This page describes only what `main` has.
-Line numbers are in this PR's tree, merged with `main` at `b816b0c60`.
+Line numbers are in this PR's tree, merged with `main` at `b085e304d`.
 
 Scope: the builtin scope in `jl4-core/src/L4/TypeCheck/Environment.hs`, the sentinel helpers and `getEntityInfo` in `jl4-core/src/L4/TypeCheck/Types.hs`, the error list and the type-mismatch rendering in `jl4-core/src/L4/TypeCheck.hs`, the validation of `@export` inputs in `jl4-core/src/L4/Export.hs`, and the deploy gate in `jl4-service/src/Compiler.hs`.
 What L4 accepts changes in four ways.
@@ -122,9 +122,13 @@ Everything else is which diagnostics are shown, and how a type mismatch reads.
   The filter never empties the error list of a failing module (read in code), and every golden in `jl4-test` is unchanged, so no file under `not-ok/` that failed to check passes now.
 - An EVENT or a DEONTIC as the result of an `@export` is not an input and is not examined: an EVENT evaluates and is returned as `{"EVENT": [party, action, time]}`, and a DEONTIC is answered by running it against the `startTime` and `events` of the request (`doc/reference/regulative/deontic-export-example.l4`: `the duty` answers `FULFILLED`, measured on a service built from this tree).
 - The EVENT and DEONTIC checks examine the inputs of the `@export` rule and the `ASSUME`s that its own body reads, and do not follow a rule that it calls, as the function-type check does not.
-  With `ASSUME ev IS AN EVENT Person Action`, a helper rule that reads `ev`, and an `@export` rule that calls the helper, `l4 check` succeeds, the deploy publishes the rule with only its own inputs, and an evaluation answers HTTP 422 with `The value ev reached a CONSIDER that has no branch for it.` (measured on a service built from this tree).
-  With an `ASSUME` of type `DEONTIC Person Action` in its place, a helper rule that reads it in a `CONSIDER` with `WHEN FULFILLED THEN TRUE` and `OTHERWISE FALSE`, and an `@export` rule that calls the helper, `l4 check` succeeds, the deploy publishes the rule with only its own inputs, and an evaluation answers HTTP 200 with `false` (measured on a service built from this tree).
-  The same shape with `ASSUME bump IS A FUNCTION FROM NUMBER TO NUMBER` in place of the EVENT also passes `l4 check`, where an `@export` rule that reads `bump` itself is refused.
+  Take an `ASSUME` of type `EVENT Person Action` or of type `DEONTIC Person Action`, a helper rule that reads it in a `CONSIDER`, and an `@export` rule that calls the helper.
+  For both types `l4 check` succeeds and the deploy publishes the rule with only its own inputs.
+  What an evaluation answers depends on the helper's `CONSIDER`, not on the type.
+  With an `OTHERWISE` branch it answers HTTP 200 with that branch's answer, and a value sent for the `ASSUME` is ignored: `false` for `WHEN FULFILLED THEN TRUE` and `OTHERWISE FALSE`, `true` when the branch is `OTHERWISE TRUE`, and `0` for an EVENT helper with `WHEN EVENT party action time THEN time` and `OTHERWISE 0`.
+  Without an `OTHERWISE` branch it answers HTTP 422 with a message that says the value `reached a CONSIDER that has no branch for it`, for the EVENT helper and for the DEONTIC helper alike.
+  Measured on a service built from this tree.
+  The same shape with `ASSUME bump IS A FUNCTION FROM NUMBER TO NUMBER` also passes `l4 check`, where an `@export` rule that reads `bump` itself is refused.
 - An input whose type has an EVENT or a DEONTIC only as a type argument that the type never uses is refused too: with `DECLARE Phantom a HAS n IS A NUMBER`, `GIVEN p IS A Phantom (EVENT Person Action)` gives `EVENT inputs are not supported for @export.`, and `GIVEN p IS A Phantom (DEONTIC Person Action)` gives `DEONTIC inputs are not supported for @export.`, though a value of that type holds neither.
 - A type of your own named `EVENT` with two parameters is ambiguous with the built-in one, as a `DECLARE MAYBE a` is with `MAYBE`; before, it checked, because the built-in type could not be named (`not-ok/tc/user-declared-event.l4`).
   A declaration of `EVENT` with no parameters is not affected: the number of parameters rules the built-in type out (measured on a one-field record).

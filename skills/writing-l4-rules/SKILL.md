@@ -330,8 +330,14 @@ Both errors name the input.
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**
 
-The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, or a module-level `ASSUME` of such a type that an exported rule uses (it becomes a required input).
+The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, or a module-level `ASSUME` of such a type that an exported rule's own body reads (it becomes a required input).
 `EVENT` and `DEONTIC` are both refused in all four places.
+
+The check does not look inside a rule that an exported rule calls.
+A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.
+If the helper's `CONSIDER` ends in `OTHERWISE`, every request then gets that branch's answer with no error, which is the quiet failure; if it has no `OTHERWISE`, every request fails with HTTP 422.
+Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
+
 Take the plain facts as inputs, build the duty and the events inside the rule, and keep any helper that takes a `DEONTIC` or an `EVENT` without `@export`:
 
 ```l4

@@ -101,7 +101,6 @@ Both give `FULFILLED`. With no events at all, both give the rule still waiting, 
 A rule marked `@export` is published as a service, so that other software and people can ask it questions over the web.
 The software or person that asks is the **caller**.
 The caller sends the rule's inputs in a request, written in JavaScript Object Notation (JSON), a plain-text format for numbers, text, yes-or-no values, lists and records (JSON calls a record an `object`).
-The published description of what a rule takes is its **schema**, and it says which kind of value each input wants.
 
 A `DEONTIC` value is a duty, a permission or a prohibition, with its deadline and what follows from it, or the outcome of one: `FULFILLED` or `BREACH`.
 Below, **duty** means any of these.
@@ -113,7 +112,7 @@ The service turns each part of a request into the value the input asks for, but 
 >
 > **It may give a `DEONTIC` value as its answer.**
 >
-> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, or an `ASSUME` of such a type that the rule uses.
+> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, or an `ASSUME` of such a type that the rule's own body reads.
 
 The command `l4 check`, which checks a file for errors, refuses such a rule; [What happens if you do it anyway](#what-happens-if-you-do-it-anyway) shows the error.
 An `EVENT` input is refused in the same way; see [An exported rule cannot take an event](EVENT.md#an-exported-rule-cannot-take-an-event).
@@ -219,7 +218,7 @@ GIVETH A BOOLEAN
   OTHERWISE FALSE
 ```
 
-`l4 check` fails, and reports this error at the rule:
+`l4 check` fails, and reports this error at the rule's name, with the name of the input in it:
 
 ```text
 DEONTIC inputs are not supported for @export.
@@ -229,13 +228,38 @@ Give the rule the plain facts that the DEONTIC is made from as inputs, and build
 
 The editor shows the same error on the rule.
 Nothing is published: `l4 deploy` refuses the file before it uploads anything, `jl4-service` refuses to deploy it, and the **Deploy** button in the VS Code sidebar stays off until the error is gone.
-The error covers every input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, and an `ASSUME` of such a type that the rule uses.
-It names the input.
 To publish the rule, write what [What to write instead](#what-to-write-instead) shows.
 
-The check looks at the inputs of the exported rule and at the `ASSUME`s that its own body reads.
-It does not follow a rule that the exported rule calls.
-A rule that an exported rule calls should take its `DEONTIC` as an input, as `is fulfilled by` does above, and not read an `ASSUME` of that type: `l4 check` does not refuse it there, and no request can supply its value.
+### The one shape the check does not catch
+
+The check looks only at the exported rule's own inputs and at the `ASSUME`s that its own body reads.
+It does not look inside a rule that the exported rule calls.
+So if a rule that an exported rule calls reads an `ASSUME` of type `DEONTIC`, `l4 check` passes, the exported rule is published without that input, and no request can supply it.
+When the `CONSIDER` that reads the `ASSUME` ends in `OTHERWISE`, every request gets the answer of that branch, with no error, and a value sent for the `ASSUME` is ignored.
+Here every request gets `false`:
+
+```l4
+-- ✘ Do not write this: `l4 check` passes, and every request gets `false`
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+ASSUME `the assumed duty` IS A DEONTIC Person Action
+
+GIVETH A BOOLEAN
+`assumed duty fulfilled` MEANS
+  CONSIDER `the assumed duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+@export Is the duty fulfilled, as the helper reads it
+GIVETH A BOOLEAN
+`via helper` MEANS `assumed duty fulfilled`
+```
+
+Never let a rule that an exported rule calls read an `ASSUME` of type `DEONTIC`.
+Give it the `DEONTIC` as an input, as `is fulfilled by` does above.
+The same holds for an `ASSUME` of type `EVENT`.
+When the `CONSIDER` has no `OTHERWISE`, every request fails instead, with the HTTP status 422 and a message that says the value `reached a CONSIDER that has no branch for it`.
 
 ## Related pages
 

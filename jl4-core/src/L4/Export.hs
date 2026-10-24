@@ -424,12 +424,14 @@ extractImplicitAssumeParams errors =
 --
 -- An EVENT and a DEONTIC have no JSON form either. The service's input decoder
 -- reads a JSON object only into a declared record, and both types are builtin
--- and have no declaration, so the published schema is a bare @object@ that no
--- request can satisfy. Every evaluation of a rule that takes an EVENT answers
--- 422, and @l4 batch@ decodes the row to NOTHING. A request for a rule that
--- takes a DEONTIC is refused with 422 when the value is an object, and
--- accepted when it is a string or a number, which then reaches the rule as one
--- and gives a wrong answer without a word.
+-- and have no declaration, so a request cannot supply either one. Without this
+-- check, the published schema of such a rule would be a bare @object@, every
+-- evaluation of a rule that takes an EVENT would answer 422, and a rule that
+-- takes a DEONTIC would give a wrong answer without a word when the request
+-- sent a string or a number for it.
+--
+-- The walk covers the rule's own inputs and the ASSUMEs that its own body
+-- reads. It does not look inside a rule that the exported rule calls.
 --
 -- One input is refused once, however many such types it holds: for the EVENT or
 -- the DEONTIC that the walk meets first ('carriedUnsendable').

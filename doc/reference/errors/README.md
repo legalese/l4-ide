@@ -1032,11 +1032,11 @@ GIVETH A BOOLEAN
 
 **What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it is JSON.
 JSON has no form for an event, and none for a `DEONTIC` value, which is a duty, a permission or a prohibition, or the outcome of one; so no request could supply this input.
-The same holds for an input that holds one of them: a `LIST OF EVENT Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with an event or a `DEONTIC` in one of its fields, or an `ASSUME` of that type that the rule uses.
-So an `@export` of such a rule is an error, reported at the rule, and it names the input.
+The same holds for an input that holds one of them: a `LIST OF EVENT Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with an event or a `DEONTIC` in one of its fields, or an `ASSUME` of that type that the rule's own body reads.
+So an `@export` of such a rule is an error, reported at the rule's name, and it names the input.
 An input that holds both gets one error, for the first of them that L4 finds.
 The error stops the whole file from checking: `l4 batch` and `jl4-schema` refuse the file, the editor shows it as an error, and jl4-service will not deploy it, until you change the input or remove the `@export`.
-`l4 deploy` refuses the file too, and so does the **Deploy** button in the VS Code sidebar, which stays off.
+`l4 deploy` refuses the file too, and the **Deploy** button in the VS Code sidebar stays off.
 Without `@export`, a rule can take an event or a `DEONTIC` value as an input.
 A rule marked `@export` may give a `DEONTIC` value as its answer.
 
@@ -1056,7 +1056,7 @@ GIVETH A NUMBER
   WHEN EVENT party action time THEN time
 ```
 
-For a `DEONTIC`, take the plain facts that the duty is made from as inputs, build the duty inside a rule, and keep the rule that takes a `DEONTIC` out of `@export`:
+For a `DEONTIC`, take the plain facts that the duty is made from as inputs, build the duty in a rule of its own, and run it against the events with `EVALTRACE` inside the exported rule:
 
 ```l4
 DECLARE Person IS ONE OF Seller, Buyer
