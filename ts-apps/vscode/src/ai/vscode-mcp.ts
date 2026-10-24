@@ -6,6 +6,7 @@ import * as vscode from 'vscode'
 import type { AiLogger } from './logger.js'
 import type { AiProxyTool, ToolProvider } from '@repo/legalese-agent'
 import type { McpOAuthManager } from './mcp-oauth.js'
+import type { LocalMcpServer, McpServerSource } from '../cloud/mcp-transfer.js'
 
 /**
  * MCP servers for the Legalese AI sidebar.
@@ -148,7 +149,7 @@ class HttpStatusError extends Error {
   }
 }
 
-export class VsCodeMcpTools implements ToolProvider {
+export class VsCodeMcpTools implements ToolProvider, McpServerSource {
   readonly prefix = VSCODE_MCP_PREFIX
 
   private connections = new Map<string, Connection>()
@@ -561,6 +562,60 @@ export class VsCodeMcpTools implements ToolProvider {
     }
     if (!this.isAiUsable()) return { ok: true }
     return this.start(id, { interactive: true })
+  }
+
+  // ── Cloud sessions (spec §6.4) ────────────────────────────────────
+
+  /** Enabled servers, for passing to a cloud session. Tools the user
+   *  switched off are left out of `enabledTools` (known only for
+   *  servers that connected in this window; otherwise all tools). */
+  enabledServers(): LocalMcpServer[] {
+    if (!this.allEnabled()) return []
+    const disabledServers = getDisabledServers()
+    const disabledTools = getDisabledTools()
+    const out: LocalMcpServer[] = []
+    for (const [id, entry] of Object.entries(this.ownServers())) {
+      if (disabledServers.has(id)) continue
+      const transport: LocalMcpServer['transport'] = isHttpEntry(entry)
+        ? entry.type === 'sse'
+          ? 'sse'
+          : 'http'
+        : 'stdio'
+      const tools = this.connections.get(id)?.tools ?? []
+      const off = tools.filter((t) => disabledTools.has(toolKey(id, t.name)))
+      out.push({
+        id,
+        url: typeof entry.url === 'string' ? entry.url : '',
+        transport,
+        ...(off.length > 0
+          ? {
+              enabledTools: tools
+                .filter((t) => !disabledTools.has(toolKey(id, t.name)))
+                .map((t) => t.name),
+            }
+          : {}),
+      })
+    }
+    return out
+  }
+
+  /** Headers a cloud session needs for one server: the entry's static
+   *  headers, or a fresh OAuth access token. `null` when an OAuth
+   *  server has no stored sign-in. */
+  async headersFor(id: string): Promise<Record<string, string> | null> {
+    const entry = this.ownServers()[id]
+    if (!entry || !isHttpEntry(entry)) return {}
+    const headers = { ...(entry.headers ?? {}) }
+    if (headers['Authorization'] || !this.oauth) return headers
+    const url = entry.url as string
+    if (!(await this.oauth.hasAuth(url))) {
+      return this.connections.get(id)?.status === 'unauthorized'
+        ? null
+        : headers
+    }
+    const token = await this.oauth.getAccessToken(url)
+    if (!token) return null
+    return { ...headers, Authorization: `Bearer ${token}` }
   }
 
   // ── Tool funnel for the chat loop ─────────────────────────────────
