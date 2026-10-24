@@ -216,9 +216,22 @@ export interface GetExportedFunctionsParams {
   verDocId: { uri: string; version: number }
 }
 
+/** An error that stops the file from being deployed: a parse or type error,
+ *  an IMPORT that finds no module, or an import cycle, in the file or in a
+ *  module it imports. */
+export interface BlockingErrorInfo {
+  uri: string
+  /** 1-based */
+  line: number
+  message: string
+}
+
 export interface GetExportedFunctionsResponse {
   functions: ExportedFunctionInfo[]
   importedFiles: string[]
+  /** Non-empty when the file must not be deployed. Absent from older
+   *  language servers. */
+  blockingErrors?: BlockingErrorInfo[]
 }
 
 /**

@@ -885,6 +885,18 @@ export async function activate(context: ExtensionContext) {
     vscode.window.onDidChangeActiveTextEditor(notifySidebarActiveFile)
   )
 
+  // An error appearing or clearing in the active file, or in a module it
+  // imports, changes whether the file can be deployed. The LSP sends no
+  // l4/directiveResultsUpdated for a file that fails to typecheck, so the
+  // diagnostics are what tell the sidebar to ask again.
+  context.subscriptions.push(
+    vscode.languages.onDidChangeDiagnostics((e) => {
+      if (e.uris.some((u) => u.path.endsWith('.l4'))) {
+        sidebarProvider.refreshExportedFunctions()
+      }
+    })
+  )
+
   // Start the client. This will also launch the server
   try {
     await client.start()
