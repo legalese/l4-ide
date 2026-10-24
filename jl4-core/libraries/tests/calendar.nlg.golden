@@ -26,6 +26,12 @@ not `is a business day` with `weekdays except the dates` with list of 2 November
 `next business day on or after` with `weekdays only` and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
 `next business day on or after` with `weekdays only` and 31 October 2026 is equal to 2 November 2026
 `modified following business day` with `weekdays only` and 31 October 2026 is equal to 30 October 2026
+`next business day after` with `weekdays only` and 30 October 2026 is equal to 2 November 2026
+`previous business day on or before` with `weekdays only` and 31 October 2026 is equal to 30 October 2026
+`add business days` with `weekdays only`, 3 and 30 October 2026 is equal to 4 November 2026
+`business days between` with `weekdays only`, 30 October 2026 and 6 November 2026 is equal to 5
+`is a business day` with `weekdays only` and 30 October 2026
+not `is a business day` with `weekdays only` and 31 October 2026
 the following must refuse: `next business day on or after` with `weekdays only` and 5
 the following must refuse: `is a business day` with `weekdays only` and 364.9
 `is a business day` with given `d` then `TRUE` and 365

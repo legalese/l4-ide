@@ -30,8 +30,9 @@ IMPORT daydate
 -- A CALENDAR is a function from a day serial to BOOLEAN, TRUE meaning "this is
 -- a business day": `weekdays only` below, the calendar `weekdays except`
 -- returns for a holiday list, or a top-level function of your own with a
--- declared `GIVEN d IS A NUMBER`. Two calendars combine with AND and OR, as
--- the feiertage example combines one German Land's holidays with another's.
+-- declared `GIVEN d IS A NUMBER`. Two calendars combine with AND and OR: BGB
+-- s 193 asks for a holiday at the place of declaration OR the place of
+-- performance, which is why feiertage.l4 takes a list of places.
 --
 -- WHAT IS NOT HERE. No jurisdiction's public holidays: those are data with
 -- their own provenance and go one per module, on the template of
@@ -320,6 +321,12 @@ GIVETH A NUMBER
 -- The DATE twins agree with the serial forms.
 #ASSERT `next business day on or after` `weekdays only` (Date 31 10 2026) EQUALS Date 2 11 2026
 #ASSERT `modified following business day` `weekdays only` (Date 31 10 2026) EQUALS Date 30 10 2026
+#ASSERT `next business day after` `weekdays only` (Date 30 10 2026) EQUALS (Date 2 11 2026)
+#ASSERT `previous business day on or before` `weekdays only` (Date 31 10 2026) EQUALS (Date 30 10 2026)
+#ASSERT `add business days` `weekdays only` 3 (Date 30 10 2026) EQUALS (Date 4 11 2026)
+#ASSERT `business days between` `weekdays only` (Date 30 10 2026) (Date 6 11 2026) EQUALS 5
+#ASSERT `is a business day` `weekdays only` (Date 30 10 2026)
+#ASSERT NOT `is a business day` `weekdays only` (Date 31 10 2026)
 
 -- The refusals are asserted, not just displayed: each stops evaluation with
 -- its reason, and each assertion fails if the entry point ever returns a day.
