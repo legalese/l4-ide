@@ -18,6 +18,9 @@ module L4.EvaluateLazy.Machine
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
 , resetUnknownSteps
+, tickDisplaySteps
+, startDisplayBudget
+, stopDisplayBudget
 , reachedUnknowns
 , unknownNames
 , withPoppedFrame
@@ -353,6 +356,12 @@ data EvalState =
       -- ^ UNKNOWN-EVALUATION-SPEC §4.5's step counter (C4): negative until a
       -- site of §4.3's table first receives a term in this directive, then
       -- the machine steps still allowed. Reset per directive.
+    , displaySteps :: !(IORef Int)
+      -- ^ the display pass's own step budget (LED, 2026-10-24): negative
+      -- while no ledger row is being forced for display, then the machine
+      -- steps the current row may still take. Started and stopped per row
+      -- by 'L4.EvaluateLazy.nfDirectiveWith'; running out raises
+      -- 'DisplayBudgetExhausted', which that pass catches for the row.
     , unknownReached :: !(IORef [Term])
       -- ^ every input, or field of one, that reached a §4.3 site in this
       -- directive, first first: what a directive that runs out of steps is
@@ -1176,6 +1185,32 @@ tickUnknownSteps = do
       then userException RanOutOfSteps
       else liftIO (writeIORef stepsRef (steps - 1))
 {-# INLINE tickUnknownSteps #-}
+
+-- | One machine step against the display budget: counted only while a
+-- ledger row is being forced for display, and running out raises
+-- 'DisplayBudgetExhausted' (LED, 2026-10-24).
+tickDisplaySteps :: Eval ()
+tickDisplaySteps = do
+  stepsRef <- asks (.displaySteps)
+  steps <- liftIO (readIORef stepsRef)
+  if steps < 0
+    then pure ()
+    else if steps == 0
+      then userException DisplayBudgetExhausted
+      else liftIO (writeIORef stepsRef (steps - 1))
+{-# INLINE tickDisplaySteps #-}
+
+-- | Give the next display force a full budget of 'maximumDisplaySteps'.
+startDisplayBudget :: Eval ()
+startDisplayBudget = do
+  stepsRef <- asks (.displaySteps)
+  liftIO (writeIORef stepsRef maximumDisplaySteps)
+
+-- | Stop counting against the display budget.
+stopDisplayBudget :: Eval ()
+stopDisplayBudget = do
+  stepsRef <- asks (.displaySteps)
+  liftIO (writeIORef stepsRef (-1))
 
 -- | Start a directive with the counter stopped and nothing reached.
 resetUnknownSteps :: Eval ()

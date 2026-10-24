@@ -275,6 +275,9 @@ runConfig = \ case
     -- UNKNOWN-EVALUATION-SPEC §4.5: every step counts once the counter has
     -- started, and none before
     tickUnknownSteps
+    -- and against the display budget while a ledger row is being forced
+    -- for display (LED)
+    tickDisplaySteps
     runConfigStep config
 
 runConfigStep :: Config -> Eval WHNF
@@ -462,11 +465,22 @@ nfDirectiveWith disp withSteps (MkEvalDirective r traced assertKind expr env) = 
     -- under is in force for the row and restored after it whether the force
     -- returned or raised; 'tryEval' turns the raise into a value here, so
     -- the restore is unconditional.
+    --
+    -- Each row has its own step budget, 'maximumDisplaySteps' (LED, ruled
+    -- 2026-10-24: showing the ledger must not change whether a run ends).
+    -- A recorded value the program never forced may not terminate, and the
+    -- directive's own verdict is already in hand; a row whose value takes
+    -- more steps than the budget prints the budget wording in its value
+    -- column and the run goes on to the next row. The budget is a separate
+    -- counter from the directive's unknown-step counter (C4), which this
+    -- pass does not touch.
     showEvent :: LedgerEvent -> Eval (LedgerEvent' ShownValue)
     showEvent (Assign path v prov) = do
       ambient <- getTemporalContext
       putTemporalContext prov.writeCtx
+      startDisplayBudget
       shown <- either Unshown Shown <$> tryEval (nf v)
+      stopDisplayBudget
       putTemporalContext ambient
       pure (Assign path shown prov)
 
@@ -723,6 +737,12 @@ prettyShownValue :: ShownValue -> Text
 prettyShownValue = \ case
   Shown v                        -> prettyLayout v
   Unshown (RefusalException ref) -> "<refused: " <> ref.message <> ">"
+  -- The row's own budget ran out (LED): say so in the row's own words, so
+  -- a reader can tell a value that could not be shown from one that could
+  -- not be computed.
+  Unshown (UserEvalException DisplayBudgetExhausted) ->
+    "<could not be evaluated: showing this value took more than "
+      <> Text.pack (show maximumDisplaySteps) <> " steps>"
   Unshown exc                    ->
     "<could not be evaluated: " <> Text.unwords (map Text.strip (prettyEvalException exc)) <> ">"
 
@@ -1015,13 +1035,15 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   -- UNKNOWN-EVALUATION-SPEC §4.5: stopped until a directive's first term
   unknownSteps   <- newIORef (-1)
   unknownReached <- newIORef []
+  -- LED: the display pass's own budget, stopped until it forces a row
+  displaySteps   <- newIORef (-1)
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
-    , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog
+    , reofferedEvents, notes, unknownSteps, displaySteps, unknownReached, deonticLog
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
