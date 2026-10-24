@@ -184,10 +184,10 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- Combine mixfix registry from imports with this module's local definitions
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
-                exportErrs = Export.validateExportInputs rprog
+                exportErrs = Export.validateExportInputs s'.substitution env.entityInfo rprog
             in MkCheckResult
               { program = rprog
-              , errors = substErrs ++ moreErrs ++ exportErrs
+              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -197,6 +197,73 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , descMap = s'.descMap
               , mixfixRegistry = combinedMixfixRegistry
               }
+
+-- | Drop diagnostics that are pure fallout from a name-resolution failure that
+-- has already been reported (issue #920).
+--
+-- When 'resolveType' \/ 'resolveTerm'' cannot pick a binding, they report the
+-- real error ('OutOfScopeError', 'AmbiguousTermError', 'AmbiguousTypeError')
+-- and hand back an 'OutOfScope' sentinel so that checking can continue. Any
+-- type built on such a sentinel is poisoned: it unifies with nothing, so every
+-- 'expect' against it fails and emits a 'TypeMismatch' that tells the user
+-- nothing they were not already told — classically rendered as the useless
+-- "must match ... namely Verdict but is here of type Verdict".
+--
+-- Why filter here, at the boundary, instead of not raising the error in
+-- 'expect'? Because @addError@ is what makes a candidate of the backtracking
+-- 'Check' monad a failure. Silencing 'expect' would turn failing overload
+-- candidates into successes, and a set of poisoned candidates that all succeed
+-- is reported as 'InternalAmbiguityError' — trading one internal-error-grade
+-- message for another. Filtering the finished list leaves resolution, pruning
+-- and overload selection bit-for-bit unchanged and only removes the message.
+--
+-- Two properties keep this from hiding genuine errors:
+--
+-- * We only drop a 'TypeMismatch' that a sentinel /accounts for/: one whose two
+--   sides agree everywhere except at or under a sentinel
+--   ('sameModuloOutOfScope'). Merely /mentioning/ a sentinel is not enough, and
+--   deliberately so. @GIVEN xs IS A LIST OF Typo@ \/ @GIVETH A NUMBER@ \/
+--   @h MEANS xs@ mismatches NUMBER against @LIST OF ⊥@; both heads are
+--   resolved, they genuinely differ, and that error survives verbatim once
+--   @Typo@ is declared — so it is news, and it stays. Likewise
+--   @FUNCTION FROM ⊥ TO BOOLEAN@ against @FUNCTION FROM ⊥ TO NUMBER@: the
+--   poisoned argument matches, the BOOLEAN\/NUMBER return does not, and the
+--   mismatch is reported. What we drop is only the contentless kind: @⊥@
+--   against anything, @LIST OF ⊥@ against @LIST OF NUMBER@.
+--
+-- * We only drop it when every sentinel in it is one whose failure is reported
+--   in this very list. A sentinel is identified by the 'Name' at which
+--   resolution failed, which is also the 'Name' in the error that reported it
+--   (see 'outOfScopeHeads'). A module that imports a module whose type failed
+--   to resolve inherits the poisoned type without having reported anything
+--   about it, so its mismatches against that type are the only message it has
+--   for the problem and stay — whatever else the importer reports, so an
+--   unrelated unknown name of its own makes no difference. Resolution failures
+--   themselves are never dropped, so the error list can never be emptied by this
+--   function: a file that failed to check still fails to check, and still says
+--   why.
+suppressResolutionCascade :: [CheckErrorWithContext] -> [CheckErrorWithContext]
+suppressResolutionCascade errs = filter (not . isCascade . (.kind)) errs
+  where
+    -- The 'Name' of every resolution failure reported in this list.
+    reported :: Set.Set Name
+    reported = Set.fromList (mapMaybe (failedName . (.kind)) errs)
+
+    failedName :: CheckError -> Maybe Name
+    failedName = \ case
+      OutOfScopeError    n _ -> Just n
+      AmbiguousTermError n _ -> Just n
+      AmbiguousTypeError n _ -> Just n
+      _                      -> Nothing
+
+    isCascade :: CheckError -> Bool
+    isCascade = \ case
+      TypeMismatch _ec expected given ->
+        let sentinels = outOfScopeHeads expected ++ outOfScopeHeads given
+        in not (null sentinels)
+             && all ((`Set.member` reported) . getActual) sentinels
+             && sameModuloOutOfScope expected given
+      _ -> False
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
@@ -1867,7 +1934,11 @@ inferType g = softprune $ do
     Type ann -> pure (Type ann)
     TyApp ann n ts -> do
       (rn, kind) <- resolveType n
-      checkKind kind ts
+      -- A name that failed to resolve has no kind to count the arguments
+      -- against: 'resolveType' hands back kind 0 for it so that checking can
+      -- go on, and comparing the arguments with that would report "expected 0
+      -- arguments" for a type that takes two. The failure has been reported.
+      unless (isOutOfScope rn) $ checkKind kind ts
       rts <- traverse inferType ts
       pure (TyApp ann rn rts)
     Fun ann onts t -> do
@@ -4119,8 +4190,14 @@ scanFunSigAssume a@(MkAssume _ tysig appForm mt) = do
   let tysig' = mergeResultTypeInto tysig mt
   errorContext (WhileCheckingAssume (getName appForm)) do
     (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm tysig'
-    (ce, rt, result, extendsAppForm) <- inferTermAppForm rappForm rtysig
+    (ce0, rt, result, extendsAppForm) <- inferTermAppForm rappForm rtysig
     aty <- setAnnResolvedType rt (Just Assumed) a
+    -- The term an ASSUME declares is told apart from one that has a definition
+    -- in the entity info, which is how a check that runs in a module that
+    -- imports it can still tell the two apart.
+    let ce = case ce0 of
+          KnownTerm t _ -> KnownTerm t AssumedTerm
+          other         -> other
     name <- withQualified (appFormHeads rappForm) ce
     -- Extract mixfix pattern info by comparing AppForm against GIVEN parameters
     let mMixfix = extractMixfixInfo tysig' appForm
@@ -4609,6 +4686,20 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
       <> quotedName (getActual paramName)
       <> " has a function type."
   ]
+prettyCheckError (ExportEventTypeInput _fnName paramName) =
+  [ "EVENT inputs are not supported for @export."
+  , "The input "
+      <> quotedName (getActual paramName)
+      <> " has a type that contains an EVENT, and a request has no JSON form for an event."
+  , "Give the rule the party, the action and the time as separate inputs, and build the event inside it."
+  ]
+prettyCheckError (ExportDeonticTypeInput _fnName paramName) =
+  [ "DEONTIC inputs are not supported for @export."
+  , "The input "
+      <> quotedName (getActual paramName)
+      <> " has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+  , "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+  ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.
 prettyMixfixMatchError :: Name -> MixfixMatchError -> [Text]
@@ -4841,17 +4932,19 @@ prettyTypeMismatch ExpectAsStringArgumentContext _expected given =
 prettyTypeMismatch ExpectConsArgument2Context expected given =
   standardTypeMismatch [ "The second argument of FOLLOWED BY is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectClauseInputContext h i declared) expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ if declared
       then "The " <> prettyOrdinal i <> " input of " <> quotedName (MkName emptyAnno h) <> " is declared to be of type"
       else "From looking at the context, I have inferred that the " <> prettyOrdinal i <> " input of " <> quotedName (MkName emptyAnno h) <> " is of type"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but the pattern written for it here is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "A pattern in a WHEN-clause of a CONSIDER construct is expected to have the type of the expression being matched."
   , "The expression being matched here is"
   , ""
@@ -4859,41 +4952,44 @@ prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
   , ""
   , "of type"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but the type of this pattern is"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectIfBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "Both the THEN and the ELSE branch of an IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs must have the same type."
   , "From looking at the context, if have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectConsiderBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All branches in a CONSIDER construct must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectHomogeneousListContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All elements in a LIST literal must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this element is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch (ExpectDecideSignatureContext Nothing) expected given =
   standardTypeMismatch [ "From looking at the context, I have inferred that the type of this definition must be" ] expected given
@@ -4966,14 +5062,56 @@ prettyOrdinal n = Text.pack (show n) <> "th"
 
 standardTypeMismatch :: [Text] -> Type' Resolved -> Type' Resolved -> [Text]
 standardTypeMismatch prefix expected given =
-  prefix ++
-  [ ""
-  , "  " <> prettyLayout expected
-  , ""
-  , "but is here of type"
-  , ""
-  , "  " <> prettyLayout given
-  ]
+  let (e, g) = prettyMismatchedTypes expected given
+  in prefix ++
+     [ ""
+     , "  " <> e
+     , ""
+     , "but is here of type"
+     , ""
+     , "  " <> g
+     ]
+
+-- | Render the two sides of a type mismatch so that they can be told apart.
+--
+-- 'prettyLayout' prints a type from its surface names only — 'Unique's are
+-- never part of any rendering — so two distinct types that happen to be spelled
+-- the same (two @DECLARE Verdict@s whose constructors are used without ever
+-- naming the type, say) produced the famously unhelpful
+--
+-- > must match ... namely
+-- >   Verdict
+-- > but is here of type
+-- >   Verdict
+--
+-- When the two renderings collide we therefore append, to each side, where the
+-- user-defined names it is built from were declared. Predefined names carry no
+-- range and are skipped, so @LIST OF Verdict@ is annotated with @Verdict@ only;
+-- if nothing can be said we fall back to the plain rendering rather than emit
+-- an empty parenthesis. Sentinels from failed resolution are skipped too: their
+-- 'getOriginal' is the *reference* site, so labelling it "defined at" would lie
+-- (those mismatches are normally suppressed by 'suppressResolutionCascade'
+-- anyway).
+prettyMismatchedTypes :: Type' Resolved -> Type' Resolved -> (Text, Text)
+prettyMismatchedTypes expected given
+  | e /= g    = (e, g)
+  | otherwise = (annotate expected e, annotate given g)
+  where
+    e = prettyLayout expected
+    g = prettyLayout given
+
+    annotate :: Type' Resolved -> Text -> Text
+    annotate t rendered =
+      case mapMaybe describeHead (nubOrdOn getUnique (typeHeads t)) of
+        []          -> rendered
+        descriptions -> rendered <> " (" <> Text.intercalate ", " descriptions <> ")"
+
+    describeHead :: Resolved -> Maybe Text
+    describeHead r
+      | isOutOfScope r = Nothing
+      | otherwise      = do
+          range <- rangeOf (getOriginal r)
+          pure (prettyLayout r <> " defined at " <> prettySrcRange range)
 
 prettyOptionallyNamedType :: OptionallyNamedType Resolved -> Text
 prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =

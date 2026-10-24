@@ -2,15 +2,22 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 module ExportValidationSpec (spec) where
 
+import Control.Exception (evaluate)
+import Control.Monad (forM_)
 import Test.Hspec
+import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import System.Timeout (timeout)
 
-import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.API (l4Check)
+import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportedFunction(..), getExportedFunctions, enrichReturnTypes)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Print (prettyTypeForDisplay)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
+import L4.Syntax (getActual, nameToText)
+import L4.TypeCheck (prettyCheckErrorWithContext, severity)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), Severity(..))
 
 -- | Run typecheck on a source snippet and return the list of
 -- 'ExportFunctionTypeInput' errors that fired (or 'Left' on fatal failure).
@@ -22,6 +29,101 @@ exportFnErrors source =
       [ e
       | e@MkCheckErrorWithContext{kind = ExportFunctionTypeInput _ _} <- r.tcdErrors
       ]
+
+-- | Run typecheck on a source snippet and return the 'ExportEventTypeInput'
+-- errors that fired, as (function name, input name) pairs, together with the
+-- error text a user sees for the first of them. The snippet can import the
+-- modules of the given VFS.
+exportEventErrors :: VFS -> Text -> Either [Text] ([(Text, Text)], [Text])
+exportEventErrors vfs source =
+  case checkWithImports vfs source of
+    Left errs -> Left errs
+    Right r ->
+      let hits =
+            [ e
+            | e@MkCheckErrorWithContext{kind = ExportEventTypeInput _ _} <- r.tcdErrors
+            ]
+      in Right
+        ( [ (nameToText (getActual fn), nameToText (getActual p))
+          | MkCheckErrorWithContext{kind = ExportEventTypeInput fn p} <- hits
+          ]
+        , concatMap prettyCheckErrorWithContext (take 1 hits)
+        )
+
+-- | 'exportEventErrors' on a snippet with no imports, under a watchdog: the
+-- walk over a type's fields once took a time that doubled with every level
+-- of nesting, so a regression is reported as a failure and not as a hung
+-- suite. The pairs only: (function, input).
+refusedWithinWatchdog :: Text -> IO [(Text, Text)]
+refusedWithinWatchdog src = do
+  mb <- timeout (30 * 1000000) $ case exportEventErrors emptyVFS src of
+    Left errs -> fail ("Fatal: " ++ show errs)
+    Right (hits, _) -> evaluate (length hits) >> pure hits
+  maybe (fail "the export check did not finish within 30s") pure mb
+
+-- | The @export errors that say a DEONTIC cannot be an input, as (function,
+-- input) pairs, together with the error text a user sees for the first of
+-- them. They are told apart by that text, which is what an author reads, so
+-- the examples below pin the wording as well as the refusal. The snippet can
+-- import the modules of the given VFS.
+exportDeonticErrors :: VFS -> Text -> Either [Text] ([(Text, Text)], [Text])
+exportDeonticErrors vfs source =
+  case checkWithImports vfs source of
+    Left errs -> Left errs
+    Right r ->
+      let hits =
+            [ shown
+            | e <- r.tcdErrors
+            , let shown = prettyCheckErrorWithContext e
+            , any ((== "DEONTIC inputs are not supported for @export.") . Text.strip) shown
+            ]
+          -- the name between the first pair of backticks of the first line
+          -- that holds the marker: the function in "...the definition of `f`:",
+          -- the input in "The input `x` has a type ..."
+          quoted marker ls = case filter (Text.isInfixOf marker) ls of
+            (l : _) -> Text.takeWhile (/= '`') (Text.drop 1 (Text.dropWhile (/= '`') l))
+            []      -> ""
+      in Right
+        ( [ (quoted "the definition of" shown, quoted "The input" shown) | shown <- hits ]
+        , concat (take 1 hits)
+        )
+
+-- | 'exportDeonticErrors' on a snippet with no imports, under the same
+-- watchdog as 'refusedWithinWatchdog'. The pairs only: (function, input).
+deonticWithinWatchdog :: Text -> IO [(Text, Text)]
+deonticWithinWatchdog src = do
+  mb <- timeout (30 * 1000000) $ case exportDeonticErrors emptyVFS src of
+    Left errs -> fail ("Fatal: " ++ show errs)
+    Right (hits, _) -> evaluate (length hits) >> pure hits
+  maybe (fail "the export check did not finish within 30s") pure mb
+
+-- | The (function, input) pairs refused as an EVENT, then those refused as a
+-- DEONTIC, for one source that can import the modules of the given VFS.
+unsendableRefusals :: VFS -> Text -> IO ([(Text, Text)], [(Text, Text)])
+unsendableRefusals vfs src = do
+  events <- either (fail . ("Fatal: " <>) . show) (pure . fst) (exportEventErrors vfs src)
+  duties <- either (fail . ("Fatal: " <>) . show) (pure . fst) (exportDeonticErrors vfs src)
+  pure (events, duties)
+
+-- | Whether the check of a source succeeded, and each refusal of an input that a
+-- request has no JSON form for, as (what the input holds, function, input,
+-- severity), in the order the checker reports them. The severity is the
+-- checker's own ('severity'): only an 'SError' blocks a deploy, so a refusal
+-- reported as anything less would pass every test that reads the text alone. The snippet can import the modules of the given VFS.
+exportBlocks :: VFS -> Text -> IO (Bool, [(Text, Text, Text, Severity)])
+exportBlocks vfs src =
+  case checkWithImports vfs src of
+    Left errs -> fail ("Fatal: " ++ show errs)
+    Right r -> pure
+      ( r.tcdSuccess
+      , [ (what, nameToText (getActual fn), nameToText (getActual p), severity e)
+        | e@(MkCheckErrorWithContext kind _) <- r.tcdErrors
+        , (what, fn, p) <- case kind of
+            ExportEventTypeInput f i   -> [("EVENT", f, i)]
+            ExportDeonticTypeInput f i -> [("DEONTIC", f, i)]
+            _                          -> []
+        ]
+      )
 
 -- | Run typecheck on a source snippet and return the exported function
 -- names (or 'Left' on fatal failure).
@@ -167,6 +269,1620 @@ spec = do
       case exportFnErrors src of
         Left errs -> fail $ "Fatal: " ++ show errs
         Right fns -> length fns `shouldBe` 1
+
+  -- An EVENT has no JSON form: the service's input decoder reads an object
+  -- only into a declared record, the builtin EVENT type has none, and so an
+  -- exported rule that takes one publishes a bare @object@ schema that no
+  -- request can satisfy. The check refuses it where it refuses a function-typed
+  -- input, so that `l4 check`, `l4 batch`, `jl4-schema` and the service's
+  -- deploy all stop at the same error.
+  describe "EVENT-typed inputs of an @export" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        -- the pairs only: (function, input)
+        refused vfs src = case exportEventErrors vfs src of
+          Left errs -> fail $ "Fatal: " ++ show errs
+          Right (hits, _) -> pure hits
+
+    it "rejects a GIVEN of type EVENT, naming the function and the input" $ do
+      let src = parties <> Text.unlines
+            [ "@export When it happened"
+            , "GIVEN `the reported event` IS AN EVENT Person Action"
+            , "GIVETH A NUMBER"
+            , "`when it happened` `the reported event` MEANS"
+            , "  CONSIDER `the reported event`"
+            , "  WHEN EVENT party action time THEN time"
+            ]
+      refused emptyVFS src `shouldReturn` [("when it happened", "the reported event")]
+
+    it "says what is wrong and what to do instead" $ do
+      let src = parties <> Text.unlines
+            [ "@export When it happened"
+            , "GIVEN e IS AN EVENT Person Action"
+            , "GIVETH A NUMBER"
+            , "`when it happened` e MEANS 1"
+            ]
+      case exportEventErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `when it happened`:"
+            , "  EVENT inputs are not supported for @export."
+            , "  The input `e` has a type that contains an EVENT, and a request has no JSON form for an event."
+            , "  Give the rule the party, the action and the time as separate inputs, and build the event inside it."
+            ]
+
+    it "rejects a LIST OF EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "@export Any events"
+            , "GIVEN es IS A LIST OF EVENT Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`any events` es MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("any events", "es")]
+
+    it "rejects a MAYBE EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "@export Maybe an event"
+            , "GIVEN me IS A MAYBE (EVENT Person Action)"
+            , "GIVETH A BOOLEAN"
+            , "`maybe an event` me MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("maybe an event", "me")]
+
+    it "rejects an EVENT under a FOR ALL" $ do
+      -- `FOR ALL` is how a type that holds type variables is written out; the
+      -- check looks through it, and the EVENT is no less an EVENT for it.
+      let src = parties <> Text.unlines
+            [ "@export Quantified"
+            , "GIVEN q IS FOR ALL a (EVENT Person Action)"
+            , "GIVETH A BOOLEAN"
+            , "`quantified` q MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("quantified", "q")]
+
+    it "accepts a FOR ALL that holds no EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "@export Quantified"
+            , "GIVEN q IS FOR ALL a LIST OF a"
+            , "GIVETH A BOOLEAN"
+            , "`quantified` q MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "rejects an EVENT reached through a type synonym" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Occurrence IS AN EVENT Person Action"
+            , ""
+            , "@export Via synonym"
+            , "GIVEN o IS AN Occurrence"
+            , "GIVETH A BOOLEAN"
+            , "`via synonym` o MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("via synonym", "o")]
+
+    it "rejects an EVENT in a field of a record" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Report HAS reported IS AN EVENT Person Action"
+            , "                   note IS A STRING"
+            , ""
+            , "@export Report note"
+            , "GIVEN r IS A Report"
+            , "GIVETH A STRING"
+            , "`report note` r MEANS r's note"
+            ]
+      refused emptyVFS src `shouldReturn` [("report note", "r")]
+
+    it "rejects an EVENT in a field of a constructor of a sum type" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Entry IS ONE OF"
+            , "  unrecorded"
+            , "  recorded HAS what IS AN EVENT Person Action"
+            , ""
+            , "@export Entry kind"
+            , "GIVEN x IS AN Entry"
+            , "GIVETH A BOOLEAN"
+            , "`entry kind` x MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("entry kind", "x")]
+
+    it "rejects an EVENT that sits behind a record of an imported module" $ do
+      let lib = parties <> Text.unlines
+            [ "DECLARE Report HAS reported IS AN EVENT Person Action"
+            , ""
+            , "DECLARE Occurrence IS AN EVENT Person Action"
+            ]
+          src = Text.unlines
+            [ "IMPORT lib"
+            , ""
+            , "@export Report"
+            , "GIVEN r IS A Report"
+            , "GIVETH A BOOLEAN"
+            , "`report` r MEANS TRUE"
+            , ""
+            , "@export Occurrence"
+            , "GIVEN o IS AN Occurrence"
+            , "GIVETH A BOOLEAN"
+            , "`occurrence` o MEANS TRUE"
+            ]
+      refused (vfsFromList [("lib", lib)]) src
+        `shouldReturn` [("report", "r"), ("occurrence", "o")]
+
+    it "rejects an @export that uses an ASSUME of type EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed event` IS AN EVENT Person Action"
+            , ""
+            , "@export Assumed"
+            , "GIVETH A BOOLEAN"
+            , "`assumed` MEANS"
+            , "  CONSIDER `assumed event`"
+            , "  WHEN EVENT party action time THEN TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("assumed", "assumed event")]
+
+    it "ignores an ASSUME of type EVENT that no export uses" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed event` IS AN EVENT Person Action"
+            , ""
+            , "@export Plain"
+            , "GIVETH A BOOLEAN"
+            , "`plain` MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "reports each offending input, once" $ do
+      let src = parties <> Text.unlines
+            [ "@export Two events"
+            , "GIVEN a IS AN EVENT Person Action"
+            , "      b IS AN EVENT Person Action"
+            , "      n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`two events` a b n MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("two events", "a"), ("two events", "b")]
+
+    it "accepts a rule that takes an EVENT when it is not an @export" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN e IS AN EVENT Person Action"
+            , "GIVETH A NUMBER"
+            , "`when it happened` e MEANS"
+            , "  CONSIDER e"
+            , "  WHEN EVENT party action time THEN time"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts an @export that builds the event from its parts" $ do
+      let src = parties <> Text.unlines
+            [ "@export When it happened"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      `at time` IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`when it happened` who what `at time` MEANS"
+            , "  CONSIDER EVENT who what `at time`"
+            , "  WHEN EVENT party action time THEN time"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts an @export whose inputs are records, lists and maybes without an EVENT" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Report HAS who IS A Person"
+            , "                   note IS A STRING"
+            , "                   others IS A LIST OF Report"
+            , ""
+            , "@export Report note"
+            , "GIVEN r IS A Report"
+            , "      m IS A MAYBE NUMBER"
+            , "GIVETH A STRING"
+            , "`report note` r m MEANS r's note"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "terminates on a record that contains itself" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Tree HAS label IS A STRING"
+            , "                 children IS A LIST OF Tree"
+            , ""
+            , "@export Label"
+            , "GIVEN t IS A Tree"
+            , "GIVETH A STRING"
+            , "`label` t MEANS t's label"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "terminates on records that contain each other" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Ping HAS pong IS A MAYBE Pong"
+            , "                 note IS A STRING"
+            , "DECLARE Pong HAS ping IS A MAYBE Ping"
+            , ""
+            , "@export Note"
+            , "GIVEN p IS A Ping"
+            , "GIVETH A STRING"
+            , "`note` p MEANS p's note"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "finds an EVENT in a record that is part of a cycle" $ do
+      -- Both are asked for, from either end of the cycle: the EVENT is in a
+      -- field of the type that the walk was already inside when it came back
+      -- to it.
+      let types = parties <> Text.unlines
+            [ "DECLARE Ping HAS pong IS A MAYBE Pong"
+            , "                 seen IS AN EVENT Person Action"
+            , "DECLARE Pong HAS ping IS A MAYBE Ping"
+            , ""
+            ]
+          export name input = Text.unlines
+            [ "@export " <> name
+            , "GIVEN x IS A " <> input
+            , "GIVETH A BOOLEAN"
+            , "`" <> name <> "` x MEANS TRUE"
+            ]
+      refused emptyVFS (types <> export "from ping" "Ping")
+        `shouldReturn` [("from ping", "x")]
+      refused emptyVFS (types <> export "from pong" "Pong")
+        `shouldReturn` [("from pong", "x")]
+
+    it "terminates on synonyms that name each other" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE SA IS A SB"
+            , "DECLARE SB IS A SA"
+            , ""
+            , "@export Get"
+            , "GIVEN t IS AN SA"
+            , "GIVETH A NUMBER"
+            , "`get` t MEANS 1"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "rejects an EVENT in any constructor of a sum type, the first included" $ do
+      -- The constructors of a type are gathered into one list of field types.
+      -- An EVENT in the first of them must count as much as one in the last.
+      let sumType eventFirst = parties <> Text.unlines
+            ( [ "DECLARE Entry IS ONE OF" ]
+              <> (if eventFirst
+                    then [ "  recorded HAS what IS AN EVENT Person Action"
+                         , "  plain HAS n IS A NUMBER"
+                         ]
+                    else [ "  plain HAS n IS A NUMBER"
+                         , "  recorded HAS what IS AN EVENT Person Action"
+                         ]
+                 )
+              <> [ "  unrecorded"
+                 , ""
+                 , "@export Entry kind"
+                 , "GIVEN x IS AN Entry"
+                 , "GIVETH A BOOLEAN"
+                 , "`entry kind` x MEANS TRUE"
+                 ]
+            )
+      refused emptyVFS (sumType True) `shouldReturn` [("entry kind", "x")]
+      refused emptyVFS (sumType False) `shouldReturn` [("entry kind", "x")]
+
+    -- A chain of records in which each has TWO fields of the next one has
+    -- 2^n paths from the first record to the last, though only n + 1 types.
+    -- The check has to look at each type once, whichever way it got there.
+    describe "a chain of records that doubles at every level" $ do
+      let depth = 40 :: Int
+          typeName i = "T" <> Text.pack (show i)
+          chain leafField = Text.unlines $
+            [ Text.unlines
+                [ "DECLARE " <> typeName i <> " HAS"
+                , "  f0 IS A " <> typeName (i + 1)
+                , "  f1 IS A " <> typeName (i + 1)
+                ]
+            | i <- [0 .. depth - 1]
+            ]
+            <> [ "DECLARE " <> typeName depth <> " HAS " <> leafField ]
+          exportFirst = Text.unlines
+            [ "@export Chain"
+            , "GIVEN t IS A T0"
+            , "GIVETH A BOOLEAN"
+            , "`chain` t MEANS TRUE"
+            ]
+
+      it "is checked in a moment when it holds no EVENT" $ do
+        let src = parties <> chain "leaf IS A NUMBER" <> exportFirst
+        refusedWithinWatchdog src `shouldReturn` []
+
+      it "is refused when only the last record holds an EVENT" $ do
+        let src = parties <> chain "leaf IS AN EVENT Person Action" <> exportFirst
+        refusedWithinWatchdog src `shouldReturn` [("chain", "t")]
+
+      it "still finds an EVENT in a later field once the chain has been walked" $ do
+        -- The chain holds none. The EVENT is in a field that comes after the
+        -- field that leads into it, so the walk has been all through the
+        -- chain before it gets there.
+        let src = parties <> chain "leaf IS A NUMBER" <> Text.unlines
+              [ "DECLARE Root HAS"
+              , "  first IS A T0"
+              , "  second IS A Side"
+              , ""
+              , "DECLARE Side HAS later IS AN EVENT Person Action"
+              , ""
+              , "@export Root"
+              , "GIVEN r IS A Root"
+              , "GIVETH A BOOLEAN"
+              , "`root` r MEANS TRUE"
+              ]
+        refusedWithinWatchdog src `shouldReturn` [("root", "r")]
+
+  -- A DEONTIC has no JSON form either: a request can say a number, a string, a
+  -- list or a record of the right shape, and none of them is a duty. An
+  -- exported rule that takes one is refused where an EVENT input is, with its
+  -- own words, so that `l4 check`, the editors, `jl4-schema` and the service's
+  -- deploy all stop at the same error.
+  describe "DEONTIC-typed inputs of an @export" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        -- the pairs only: (function, input)
+        refused vfs src = case exportDeonticErrors vfs src of
+          Left errs -> fail $ "Fatal: " ++ show errs
+          Right (hits, _) -> pure hits
+        -- one exported rule with one input `x` of the given type, that reads nothing
+        export name input = Text.unlines
+          [ "@export " <> name
+          , "GIVEN x IS " <> input
+          , "GIVETH A BOOLEAN"
+          , "`" <> name <> "` x MEANS TRUE"
+          ]
+
+    it "rejects a GIVEN of type DEONTIC, naming the function and the input" $ do
+      let src = parties <> Text.unlines
+            [ "@export Is a duty already fulfilled"
+            , "GIVEN `the duty` IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` `the duty` MEANS"
+            , "  CONSIDER `the duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refused emptyVFS src `shouldReturn` [("already fulfilled", "the duty")]
+
+    it "says what is wrong and what to do instead" $ do
+      let src = parties <> Text.unlines
+            [ "@export Is a duty already fulfilled"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` d MEANS TRUE"
+            ]
+      case exportDeonticErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `already fulfilled`:"
+            , "  DEONTIC inputs are not supported for @export."
+            , "  The input `d` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+            , "  Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+            ]
+
+    it "rejects the older spelling PROVISION, which names the same type" $ do
+      refused emptyVFS (parties <> export "old spelling" "A PROVISION Person Action")
+        `shouldReturn` [("old spelling", "x")]
+
+    it "rejects a LIST OF DEONTIC" $ do
+      refused emptyVFS (parties <> export "any duties" "A LIST OF DEONTIC Person Action")
+        `shouldReturn` [("any duties", "x")]
+
+    it "rejects a MAYBE DEONTIC" $ do
+      refused emptyVFS (parties <> export "maybe a duty" "A MAYBE (DEONTIC Person Action)")
+        `shouldReturn` [("maybe a duty", "x")]
+
+    it "rejects a DEONTIC under a FOR ALL" $ do
+      refused emptyVFS (parties <> export "quantified" "FOR ALL a (DEONTIC Person Action)")
+        `shouldReturn` [("quantified", "x")]
+
+    it "rejects a DEONTIC reached through a type synonym" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Duty IS A DEONTIC Person Action"
+            , ""
+            ] <> export "via synonym" "A Duty"
+      refused emptyVFS src `shouldReturn` [("via synonym", "x")]
+
+    it "rejects a DEONTIC in a field of a record, whichever field it is" $ do
+      let record fields = parties <> Text.unlines
+            ( [ "DECLARE Agreement HAS" ]
+              <> map ("  " <>) fields
+              <> [ "" ]
+            ) <> export "agreement title" "AN Agreement"
+          title = "title IS A STRING"
+          terms = "terms IS A DEONTIC Person Action"
+          signed = "signed IS A BOOLEAN"
+      refused emptyVFS (record [terms, title]) `shouldReturn` [("agreement title", "x")]
+      refused emptyVFS (record [title, terms, signed]) `shouldReturn` [("agreement title", "x")]
+      refused emptyVFS (record [title, terms]) `shouldReturn` [("agreement title", "x")]
+
+    it "rejects a DEONTIC in any constructor of a sum type, the first included" $ do
+      let sumType dutyFirst = parties <> Text.unlines
+            ( [ "DECLARE Entry IS ONE OF" ]
+              <> (if dutyFirst
+                    then [ "  promised HAS what IS A DEONTIC Person Action"
+                         , "  plain HAS n IS A NUMBER"
+                         ]
+                    else [ "  plain HAS n IS A NUMBER"
+                         , "  promised HAS what IS A DEONTIC Person Action"
+                         ]
+                 )
+              <> [ "  unrecorded"
+                 , ""
+                 ]
+            ) <> export "entry kind" "AN Entry"
+      refused emptyVFS (sumType True) `shouldReturn` [("entry kind", "x")]
+      refused emptyVFS (sumType False) `shouldReturn` [("entry kind", "x")]
+
+    it "rejects a DEONTIC that sits behind a record or a synonym of an imported module" $ do
+      let lib = parties <> Text.unlines
+            [ "DECLARE Agreement HAS terms IS A DEONTIC Person Action"
+            , ""
+            , "DECLARE Duty IS A DEONTIC Person Action"
+            ]
+          src = Text.unlines
+            [ "IMPORT lib"
+            , ""
+            , "@export Agreement"
+            , "GIVEN a IS AN Agreement"
+            , "GIVETH A BOOLEAN"
+            , "`agreement` a MEANS TRUE"
+            , ""
+            , "@export Duty"
+            , "GIVEN d IS A Duty"
+            , "GIVETH A BOOLEAN"
+            , "`duty` d MEANS TRUE"
+            ]
+      refused (vfsFromList [("lib", lib)]) src
+        `shouldReturn` [("agreement", "a"), ("duty", "d")]
+
+    it "rejects an @export that uses an ASSUME of type DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed duty` IS A DEONTIC Person Action"
+            , ""
+            , "@export Assumed"
+            , "GIVETH A BOOLEAN"
+            , "`assumed` MEANS"
+            , "  CONSIDER `assumed duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refused emptyVFS src `shouldReturn` [("assumed", "assumed duty")]
+
+    it "ignores an ASSUME of type DEONTIC that no export uses" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed duty` IS A DEONTIC Person Action"
+            , ""
+            , "@export Plain"
+            , "GIVETH A BOOLEAN"
+            , "`plain` MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "reports each offending input, once" $ do
+      let src = parties <> Text.unlines
+            [ "@export Two duties"
+            , "GIVEN a IS A DEONTIC Person Action"
+            , "      b IS A DEONTIC Person Action"
+            , "      n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`two duties` a b n MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("two duties", "a"), ("two duties", "b")]
+
+    it "refuses an EVENT input and a DEONTIC input of one rule, each with its own words" $ do
+      let src = parties <> Text.unlines
+            [ "@export Duty and event"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "      e IS AN EVENT Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`duty and event` d e MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("duty and event", "d")]
+      case exportEventErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (hits, _) -> hits `shouldBe` [("duty and event", "e")]
+
+    it "gives one refusal to an input that holds both an EVENT and a DEONTIC, for the first it meets" $ do
+      -- A record's fields are read in the order they are written.
+      let record dutyFirst = parties <> Text.unlines
+            ( [ "DECLARE Case HAS" ]
+              <> (if dutyFirst
+                    then [ "  terms IS A DEONTIC Person Action"
+                         , "  happened IS AN EVENT Person Action"
+                         ]
+                    else [ "  happened IS AN EVENT Person Action"
+                         , "  terms IS A DEONTIC Person Action"
+                         ]
+                 )
+              <> [ "" ]
+            ) <> export "the case" "A Case"
+          counts src = do
+            deontic <- either (fail . show) (pure . fst) (exportDeonticErrors emptyVFS src)
+            event <- either (fail . show) (pure . fst) (exportEventErrors emptyVFS src)
+            pure (length deontic, length event)
+      counts (record True) `shouldReturn` (1, 0)
+      counts (record False) `shouldReturn` (0, 1)
+
+    it "accepts a rule that gives a DEONTIC as its answer, from plain inputs" $ do
+      let src = parties <> Text.unlines
+            [ "@export The duty of a party"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      deadline IS A NUMBER"
+            , "GIVETH A DEONTIC Person Action"
+            , "`the duty` who what deadline MEANS"
+            , "  PARTY who"
+            , "  MUST EXACTLY what"
+            , "  WITHIN deadline"
+            , "  HENCE FULFILLED"
+            , "  LEST BREACH"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts a rule that takes a DEONTIC when it is not an @export" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` d MEANS"
+            , "  CONSIDER d"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts an @export whose inputs are records, lists and maybes without a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Report HAS who IS A Person"
+            , "                   note IS A STRING"
+            , "                   others IS A LIST OF Report"
+            , ""
+            , "@export Report note"
+            , "GIVEN r IS A Report"
+            , "      m IS A MAYBE NUMBER"
+            , "GIVETH A STRING"
+            , "`report note` r m MEANS r's note"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts the shape the DEONTIC page recommends: exported rules from plain facts, a helper that takes the DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN duty IS A DEONTIC Person Action"
+            , "      events IS A LIST OF EVENT Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`is fulfilled by` duty events MEANS"
+            , "  CONSIDER EVALTRACE duty 0 events"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            , "@export Is the duty fulfilled when the party takes the action on a given day"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      deadline IS A NUMBER"
+            , "      `day taken` IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`duty fulfilled on day` who what deadline `day taken` MEANS"
+            , "  `is fulfilled by` (`the duty` who what deadline) (LIST EVENT who what `day taken`)"
+            , ""
+            , "@export The duty of a party to take an action by a deadline"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      deadline IS A NUMBER"
+            , "GIVETH A DEONTIC Person Action"
+            , "`the duty` who what deadline MEANS"
+            , "  PARTY who"
+            , "  MUST EXACTLY what"
+            , "  WITHIN deadline"
+            , "  HENCE FULFILLED"
+            , "  LEST BREACH"
+            ]
+      refused emptyVFS src `shouldReturn` []
+      case exportEventErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (hits, _) -> hits `shouldBe` []
+
+    it "accepts an input of a record the author declared, though its name suggests a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Duty HAS who IS A Person"
+            , "                 what IS AN Action"
+            , ""
+            ] <> export "a duty" "A Duty"
+      refused emptyVFS src `shouldReturn` []
+
+    it "terminates on records that contain each other, and finds a DEONTIC in the cycle" $ do
+      let types holdDuty = parties <> Text.unlines
+            [ "DECLARE Ping HAS pong IS A MAYBE Pong"
+            , "                 " <> (if holdDuty then "seen IS A DEONTIC Person Action" else "note IS A STRING")
+            , "DECLARE Pong HAS ping IS A MAYBE Ping"
+            , ""
+            ]
+      refused emptyVFS (types False <> export "from ping" "A Ping") `shouldReturn` []
+      refused emptyVFS (types True <> export "from ping" "A Ping")
+        `shouldReturn` [("from ping", "x")]
+      refused emptyVFS (types True <> export "from pong" "A Pong")
+        `shouldReturn` [("from pong", "x")]
+
+    -- The same walk as for an EVENT, so the same chain: 40 records that each
+    -- have two fields of the next one, 2^40 paths, 41 types.
+    describe "a chain of records that doubles at every level" $ do
+      let depth = 40 :: Int
+          typeName i = "T" <> Text.pack (show i)
+          chain leafField = Text.unlines $
+            [ Text.unlines
+                [ "DECLARE " <> typeName i <> " HAS"
+                , "  f0 IS A " <> typeName (i + 1)
+                , "  f1 IS A " <> typeName (i + 1)
+                ]
+            | i <- [0 .. depth - 1]
+            ]
+            <> [ "DECLARE " <> typeName depth <> " HAS " <> leafField ]
+          exportFirst = export "chain" "A T0"
+
+      it "is checked in a moment when it holds no DEONTIC" $ do
+        let src = parties <> chain "leaf IS A NUMBER" <> exportFirst
+        deonticWithinWatchdog src `shouldReturn` []
+
+      it "is refused when only the last record holds a DEONTIC" $ do
+        let src = parties <> chain "leaf IS A DEONTIC Person Action" <> exportFirst
+        deonticWithinWatchdog src `shouldReturn` [("chain", "x")]
+
+  -- An input needs no written type: `GIVEN x` leaves it to the checker, which
+  -- infers the type from how the rule uses x. A rule that passes x to a helper
+  -- that takes a DEONTIC, or looks into it with CONSIDER, has an input of type
+  -- DEONTIC all the same, and a request has no JSON form for it. The check
+  -- takes the type of such an input from the type that the checker inferred for
+  -- the rule.
+  describe "an input of an @export that has no written type" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        dutyHelper = Text.unlines
+          [ "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`already fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+        refusals = unsendableRefusals emptyVFS
+
+    it "rejects an input that is passed to a helper that takes a DEONTIC" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Is a duty already fulfilled"
+            , "GIVEN `the duty`"
+            , "GIVETH A BOOLEAN"
+            , "`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`"
+            ]
+      refusals src `shouldReturn` ([], [("is it fulfilled", "the duty")])
+
+    it "rejects an input that the rule's own body takes apart as a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "@export Is a duty already fulfilled"
+            , "GIVEN `the duty`"
+            , "GIVETH A BOOLEAN"
+            , "`is it fulfilled` `the duty` MEANS"
+            , "  CONSIDER `the duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refusals src `shouldReturn` ([], [("is it fulfilled", "the duty")])
+
+    it "rejects an input that is passed to a helper that takes an EVENT" $ do
+      let src = parties <> eventHelper <> Text.unlines
+            [ "@export When it happened"
+            , "GIVEN `the event`"
+            , "GIVETH A NUMBER"
+            , "`when` `the event` MEANS `time of` `the event`"
+            ]
+      refusals src `shouldReturn` ([("when", "the event")], [])
+
+    it "rejects an input whose inferred type holds a DEONTIC in a list" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN ds IS A LIST OF DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`any duty` ds MEANS TRUE"
+            , ""
+            , "@export Any of the duties"
+            , "GIVEN `the duties`"
+            , "GIVETH A BOOLEAN"
+            , "`any of them` `the duties` MEANS `any duty` `the duties`"
+            ]
+      refusals src `shouldReturn` ([], [("any of them", "the duties")])
+
+    it "names the input and says what to do, in the words of a written type" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Is a duty already fulfilled"
+            , "GIVEN `the duty`"
+            , "GIVETH A BOOLEAN"
+            , "`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`"
+            ]
+      case exportDeonticErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `is it fulfilled`:"
+            , "  DEONTIC inputs are not supported for @export."
+            , "  The input `the duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+            , "  Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+            ]
+
+    it "refuses each such input once, beside inputs that have a written type" $ do
+      let src = parties <> dutyHelper <> eventHelper <> Text.unlines
+            [ "@export Three inputs"
+            , "GIVEN d"
+            , "      n IS A NUMBER"
+            , "      e"
+            , "GIVETH A BOOLEAN"
+            , "`three inputs` d n e MEANS"
+            , "  `already fulfilled` d AND `time of` e EQUALS n"
+            ]
+      refusals src `shouldReturn` ([("three inputs", "e")], [("three inputs", "d")])
+
+    it "finds the input of a rule that also takes a type parameter" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export With a type parameter"
+            , "GIVEN a IS A TYPE"
+            , "      `the duty`"
+            , "      x IS AN a"
+            , "GIVETH A BOOLEAN"
+            , "`with a parameter` `the duty` x MEANS `already fulfilled` `the duty`"
+            ]
+      refusals src `shouldReturn` ([], [("with a parameter", "the duty")])
+
+    it "accepts an input that is inferred to be a NUMBER" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Plus one"
+            , "GIVEN n"
+            , "GIVETH A NUMBER"
+            , "`plus one` n MEANS n + 1"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "accepts an input whose type is left open" $ do
+      let src = Text.unlines
+            [ "@export Ignores its input"
+            , "GIVEN x"
+            , "GIVETH A BOOLEAN"
+            , "`ignores` x MEANS TRUE"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "accepts an input that is inferred to be a record that holds neither" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Report HAS who IS A Person"
+            , "                   note IS A STRING"
+            , ""
+            , "GIVEN r IS A Report"
+            , "GIVETH A STRING"
+            , "`the note` r MEANS r's note"
+            , ""
+            , "@export Report note"
+            , "GIVEN r"
+            , "GIVETH A STRING"
+            , "`report note` r MEANS `the note` r"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "accepts a rule that is not an @export" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "GIVEN d"
+            , "GIVETH A BOOLEAN"
+            , "`internal` d MEANS `already fulfilled` d"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "leaves the refusal of a function-typed input to written types, as before" $ do
+      -- An input that the rule uses as a function, with no written type, is
+      -- not refused as a function-typed input: only a written type is.
+      let src = Text.unlines
+            [ "@export Apply the predicate"
+            , "GIVEN p"
+            , "GIVETH A BOOLEAN"
+            , "`apply` p MEANS p OF TRUE"
+            ]
+      exportFnErrors src `shouldBe` Right []
+
+  -- A request cannot set an ASSUME that another module declares: the service
+  -- publishes the ASSUMEs of the module itself as inputs, and no others. A rule
+  -- that reads an ASSUME of type DEONTIC or EVENT from an imported module has
+  -- no value for it, and answers as if it had a default. The check refuses it,
+  -- as it refuses the same ASSUME declared in the module itself, whether the
+  -- module imports the one that declares it, or imports one that imports it.
+  describe "an @export that reads an ASSUME of an imported module" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        facts = parties <> Text.unlines
+          [ "DECLARE Agreement HAS terms IS A DEONTIC Person Action"
+          , ""
+          , "ASSUME `imported duty` IS A DEONTIC Person Action"
+          , "ASSUME `imported event` IS AN EVENT Person Action"
+          , "ASSUME `imported agreement` IS AN Agreement"
+          , "ASSUME `imported number` IS A NUMBER"
+          , ""
+          , "`standing duty` MEANS"
+          , "  PARTY Seller"
+          , "  MUST EXACTLY delivery"
+          , "  WITHIN 10"
+          , "  HENCE FULFILLED"
+          , "  LEST BREACH"
+          ]
+        refusalsWith modules src =
+          unsendableRefusals (vfsFromList modules) src
+        refusals = refusalsWith [("facts", facts)]
+        user body = Text.unlines (["IMPORT facts", ""] <> body)
+
+    it "rejects an ASSUME of type DEONTIC that the body reads" $ do
+      let src = user
+            [ "@export Uses an imported assume"
+            , "GIVETH A BOOLEAN"
+            , "`uses imported assume` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refusals src `shouldReturn` ([], [("uses imported assume", "imported duty")])
+
+    it "says what is wrong and what to do instead" $ do
+      let src = user
+            [ "@export Uses an imported assume"
+            , "GIVETH A BOOLEAN"
+            , "`uses imported assume` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      case exportDeonticErrors (vfsFromList [("facts", facts)]) src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `uses imported assume`:"
+            , "  DEONTIC inputs are not supported for @export."
+            , "  The input `imported duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+            , "  Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+            ]
+
+    it "rejects an ASSUME of type EVENT that the body reads, in a local binding or as the answer" $ do
+      let src = user
+            [ "@export Reads an imported event"
+            , "GIVETH A NUMBER"
+            , "`reads imported event` MEANS 1"
+            , "  WHERE e MEANS `imported event`"
+            , ""
+            , "@export Gives an imported event"
+            , "GIVETH AN EVENT Person Action"
+            , "`gives imported event` MEANS `imported event`"
+            ]
+      refusals src
+        `shouldReturn`
+          ( [("reads imported event", "imported event"), ("gives imported event", "imported event")]
+          , []
+          )
+
+    it "rejects an ASSUME of a record type that holds a DEONTIC" $ do
+      let src = user
+            [ "@export Reads an imported agreement"
+            , "GIVETH A BOOLEAN"
+            , "`reads imported agreement` MEANS"
+            , "  CONSIDER `imported agreement`'s terms"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refusals src `shouldReturn` ([], [("reads imported agreement", "imported agreement")])
+
+    it "rejects an ASSUME that is imported through a module that imports it" $ do
+      let middle = "IMPORT facts\n\nDECLARE Marker IS ONE OF one, two\n"
+          src = Text.unlines
+            [ "IMPORT middle"
+            , ""
+            , "@export Uses a chained assume"
+            , "GIVETH A BOOLEAN"
+            , "`uses chained assume` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refusalsWith [("facts", facts), ("middle", middle)] src
+        `shouldReturn` ([], [("uses chained assume", "imported duty")])
+
+    it "refuses an ASSUME that the body reads in two places once" $ do
+      let src = user
+            [ "@export Reads it twice"
+            , "GIVETH A BOOLEAN"
+            , "`reads it twice` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN"
+            , "    CONSIDER `imported duty`"
+            , "    WHEN FULFILLED THEN TRUE"
+            , "    OTHERWISE FALSE"
+            , "  OTHERWISE FALSE"
+            ]
+      refusals src `shouldReturn` ([], [("reads it twice", "imported duty")])
+
+    it "refuses the input with a written type and the ASSUME that it reads, each once" $ do
+      let src = user
+            [ "@export Both"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A NUMBER"
+            , "`both` d MEANS"
+            , "  CONSIDER `imported event`"
+            , "  WHEN EVENT party action time THEN time"
+            ]
+      refusals src
+        `shouldReturn` ([("both", "imported event")], [("both", "d")])
+
+    it "accepts an ASSUME of type DEONTIC or EVENT that no export reads" $ do
+      let src = user
+            [ "@export Plain"
+            , "GIVETH A BOOLEAN"
+            , "`plain` MEANS TRUE"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "accepts a rule that reads such an ASSUME when it is not an @export" $ do
+      let src = user
+            [ "`internal` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "accepts an ASSUME of type NUMBER that the body reads" $ do
+      let src = user
+            [ "@export Uses an imported number"
+            , "GIVETH A NUMBER"
+            , "`uses imported number` MEANS `imported number` + 1"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "accepts an ASSUME of a function type that the body calls, as the function-type check does" $ do
+      -- No request can serve this rule: the ASSUME is a function that has no
+      -- definition. The function-type check reads the written types and the
+      -- ASSUMEs of the module itself, and the check for an EVENT or a DEONTIC
+      -- goes by the type of the ASSUME and not by the type of a call of it, so
+      -- neither refuses the rule. The documentation says so.
+      let lib = parties <> Text.unlines
+            [ "ASSUME `imported maker` IS A FUNCTION FROM NUMBER TO DEONTIC Person Action"
+            ]
+          src = Text.unlines
+            [ "IMPORT lib"
+            , ""
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`fulfilled` d MEANS"
+            , "  CONSIDER d"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            , "@export Reads the maker"
+            , "GIVETH A BOOLEAN"
+            , "`reads the maker` MEANS `fulfilled` (`imported maker` 3)"
+            ]
+      exportBlocks (vfsFromList [("lib", lib)]) src `shouldReturn` (True, [])
+
+    it "accepts a DEONTIC that the module declares as a value, not as an ASSUME" $ do
+      -- `standing duty` has a definition, so it is not an input of anything.
+      let src = user
+            [ "@export Is the standing duty fulfilled"
+            , "GIVETH A BOOLEAN"
+            , "`standing duty fulfilled` MEANS"
+            , "  CONSIDER `standing duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refusals src `shouldReturn` ([], [])
+
+    it "accepts a DEONTIC that the same module declares as a value" $ do
+      let src = parties <> Text.unlines
+            [ "`standing duty` MEANS"
+            , "  PARTY Seller"
+            , "  MUST EXACTLY delivery"
+            , "  WITHIN 10"
+            , "  HENCE FULFILLED"
+            , "  LEST BREACH"
+            , ""
+            , "@export Is the standing duty fulfilled"
+            , "GIVETH A BOOLEAN"
+            , "`standing duty fulfilled` MEANS"
+            , "  CONSIDER `standing duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      unsendableRefusals emptyVFS src `shouldReturn` ([], [])
+
+  -- An ASSUME needs no written type either: `ASSUME x` leaves the type to the
+  -- checker, which works it out from how the file reads it. A rule that reads
+  -- one as a DEONTIC or an EVENT has an input that a request cannot supply, as
+  -- one with a written type has. Each example reads the whole answer of the
+  -- check: whether it succeeded, and the severity of each refusal.
+  describe "an @export that reads an ASSUME that has no written type" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+
+    it "blocks an ASSUME that the body takes apart as a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `untyped assume`"
+            , ""
+            , "@export Reads untyped assume"
+            , "GIVETH A BOOLEAN"
+            , "`reads untyped assume` MEANS"
+            , "  CONSIDER `untyped assume`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      exportBlocks emptyVFS src `shouldReturn`
+        (False, [("DEONTIC", "reads untyped assume", "untyped assume", SError)])
+
+    it "blocks an ASSUME that the body hands to a helper that takes an EVENT" $ do
+      let src = parties <> eventHelper <> Text.unlines
+            [ "ASSUME `untyped event`"
+            , ""
+            , "@export Reads untyped event"
+            , "GIVETH A NUMBER"
+            , "`reads untyped event` MEANS `time of` `untyped event`"
+            ]
+      exportBlocks emptyVFS src `shouldReturn`
+        (False, [("EVENT", "reads untyped event", "untyped event", SError)])
+
+    it "blocks an ASSUME that an imported module declares with no written type" $ do
+      let facts = parties <> Text.unlines
+            [ "ASSUME `imported untyped`"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`facts read it` MEANS"
+            , "  CONSIDER `imported untyped`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+          src = Text.unlines
+            [ "IMPORT facts"
+            , ""
+            , "@export Reads imported untyped"
+            , "GIVETH A BOOLEAN"
+            , "`reads imported untyped` MEANS"
+            , "  CONSIDER `imported untyped`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      exportBlocks (vfsFromList [("facts", facts)]) src `shouldReturn`
+        (False, [("DEONTIC", "reads imported untyped", "imported untyped", SError)])
+
+    it "accepts an ASSUME that the body reads as a NUMBER" $ do
+      let src = Text.unlines
+            [ "ASSUME `untyped number`"
+            , ""
+            , "@export Reads untyped number"
+            , "GIVETH A NUMBER"
+            , "`reads untyped number` MEANS `untyped number` + 1"
+            ]
+      exportBlocks emptyVFS src `shouldReturn` (True, [])
+
+    it "accepts an ASSUME that is read as a DEONTIC only by a rule that is not an @export" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `untyped assume`"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`internal` MEANS"
+            , "  CONSIDER `untyped assume`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            , "@export Plain"
+            , "GIVETH A BOOLEAN"
+            , "`plain` MEANS TRUE"
+            ]
+      exportBlocks emptyVFS src `shouldReturn` (True, [])
+
+  -- A polymorphic ASSUME, `GIVEN a IS A TYPE GIVETH AN a ASSUME x`, has a
+  -- declared type that holds neither a DEONTIC nor an EVENT: it holds one only
+  -- where a rule reads it as one, and each read gives it a type of its own. The
+  -- prelude's TBD is one. The check goes by the type at the read, so a read as a
+  -- DEONTIC or an EVENT is refused, and a read as anything else is not.
+  describe "an @export that reads a polymorphic ASSUME as a DEONTIC or an EVENT" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        dutyHelper = Text.unlines
+          [ "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+        placeholder = Text.unlines
+          [ "GIVEN a IS A TYPE"
+          , "GIVETH AN a"
+          , "ASSUME `local placeholder`"
+          , ""
+          ]
+        withPrelude body = "IMPORT prelude\n" <> body
+        blocks = exportBlocks emptyVFS
+
+    it "blocks the prelude's TBD when the body hands it to a helper that takes a DEONTIC" $ do
+      let src = withPrelude (parties <> dutyHelper <> Text.unlines
+            [ "@export Reads tbd"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd` MEANS `fulfilled` TBD"
+            ])
+      blocks src `shouldReturn` (False, [("DEONTIC", "reads tbd", "TBD", SError)])
+
+    it "blocks the prelude's TBD when the body takes it apart as a DEONTIC" $ do
+      let src = withPrelude (parties <> Text.unlines
+            [ "@export Reads tbd in a consider"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd in a consider` MEANS"
+            , "  CONSIDER TBD"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ])
+      blocks src `shouldReturn` (False, [("DEONTIC", "reads tbd in a consider", "TBD", SError)])
+
+    it "blocks the prelude's TBD when the body hands it to a helper that takes an EVENT" $ do
+      let src = withPrelude (parties <> eventHelper <> Text.unlines
+            [ "@export Reads tbd as an event"
+            , "GIVETH A NUMBER"
+            , "`reads tbd as an event` MEANS `time of` TBD"
+            ])
+      blocks src `shouldReturn` (False, [("EVENT", "reads tbd as an event", "TBD", SError)])
+
+    it "blocks a polymorphic ASSUME of the module itself, as a DEONTIC and as an EVENT" $ do
+      let duty = parties <> dutyHelper <> placeholder <> Text.unlines
+            [ "@export Reads local placeholder"
+            , "GIVETH A BOOLEAN"
+            , "`reads local placeholder` MEANS `fulfilled` `local placeholder`"
+            ]
+          event = parties <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads local placeholder as an event"
+            , "GIVETH A NUMBER"
+            , "`reads local placeholder as an event` MEANS `time of` `local placeholder`"
+            ]
+      blocks duty `shouldReturn`
+        (False, [("DEONTIC", "reads local placeholder", "local placeholder", SError)])
+      blocks event `shouldReturn`
+        (False, [("EVENT", "reads local placeholder as an event", "local placeholder", SError)])
+
+    it "blocks a polymorphic ASSUME that the body reads as a list of duties" $ do
+      let src = parties <> placeholder <> Text.unlines
+            [ "GIVEN ds IS A LIST OF DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`any duty` ds MEANS TRUE"
+            , ""
+            , "@export Reads local placeholder as a list"
+            , "GIVETH A BOOLEAN"
+            , "`reads local placeholder as a list` MEANS `any duty` `local placeholder`"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads local placeholder as a list", "local placeholder", SError)])
+
+    it "refuses it once, however many times the body reads it" $ do
+      let src = withPrelude (parties <> dutyHelper <> Text.unlines
+            [ "@export Reads tbd twice"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd twice` MEANS `fulfilled` TBD AND `fulfilled` TBD"
+            ])
+      blocks src `shouldReturn` (False, [("DEONTIC", "reads tbd twice", "TBD", SError)])
+
+    it "accepts the prelude's TBD when the body reads it as a NUMBER" $ do
+      let src = withPrelude (Text.unlines
+            [ "@export Reads tbd as a number"
+            , "GIVETH A NUMBER"
+            , "`reads tbd as a number` MEANS TBD + 1"
+            ])
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a polymorphic ASSUME that the body reads as a NUMBER, whatever another rule reads it as" $ do
+      -- Each read gives the ASSUME a type of its own, and the check looks at
+      -- the reads in the body of the export only.
+      let src = parties <> dutyHelper <> placeholder <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`internal` MEANS `fulfilled` `local placeholder`"
+            , ""
+            , "@export Reads local placeholder as a number"
+            , "GIVETH A NUMBER"
+            , "`reads local placeholder as a number` MEANS `local placeholder` + 1"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a polymorphic ASSUME whose type at the read is left open" $ do
+      let src = withPrelude (Text.unlines
+            [ "@export Reads tbd and ignores it"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd and ignores it` MEANS TRUE OR (TBD EQUALS TBD)"
+            ])
+      blocks src `shouldReturn` (True, [])
+
+    it "refuses a polymorphic ASSUME that the body reads first as a NUMBER and then as a DEONTIC" $ do
+      -- The reads are looked at one by one: the first is harmless, the second is not.
+      let src = parties <> dutyHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  IF `local placeholder` + 1 > 0 THEN `fulfilled` `local placeholder` ELSE FALSE"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads in two ways", "local placeholder", SError)])
+
+    it "names the EVENT when the body reads a polymorphic ASSUME first as an EVENT and then as a DEONTIC" $ do
+      let src = parties <> dutyHelper <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  IF `time of` `local placeholder` > 0 THEN `fulfilled` `local placeholder` ELSE FALSE"
+            ]
+      blocks src `shouldReturn`
+        (False, [("EVENT", "reads in two ways", "local placeholder", SError)])
+
+    it "names the DEONTIC when the body reads a polymorphic ASSUME first as a DEONTIC and then as an EVENT" $ do
+      let src = parties <> dutyHelper <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  IF `fulfilled` `local placeholder` THEN `time of` `local placeholder` > 0 ELSE FALSE"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads in two ways", "local placeholder", SError)])
+
+    it "accepts a rule that is not an @export" $ do
+      let src = withPrelude (parties <> dutyHelper <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`internal` MEANS `fulfilled` TBD"
+            ])
+      blocks src `shouldReturn` (True, [])
+
+  -- An ASSUME can also be declared inside a rule, under WHERE. The checker's
+  -- table of what a module declares holds the top-level and the imported
+  -- ASSUMEs and not these, so the check finds them in the body, takes their
+  -- declared type from the declaration, and goes by the type at each read as
+  -- for any other ASSUME.
+  describe "an @export that reads an ASSUME that its own WHERE declares" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        dutyHelper = Text.unlines
+          [ "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+        blocks = exportBlocks emptyVFS
+
+    it "blocks an ASSUME of type DEONTIC" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads local duty"
+            , "GIVETH A BOOLEAN"
+            , "`reads local duty` MEANS `fulfilled` `local duty`"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads local duty", "local duty", SError)])
+
+    it "blocks an ASSUME of type EVENT" $ do
+      let src = parties <> eventHelper <> Text.unlines
+            [ "@export Reads local event"
+            , "GIVETH A NUMBER"
+            , "`reads local event` MEANS `time of` `local event`"
+            , "  WHERE"
+            , "    ASSUME `local event` IS AN EVENT Person Action"
+            ]
+      blocks src `shouldReturn`
+        (False, [("EVENT", "reads local event", "local event", SError)])
+
+    it "blocks an ASSUME that has no written type, as a DEONTIC and as an EVENT" $ do
+      let duty = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads local bare"
+            , "GIVETH A BOOLEAN"
+            , "`reads local bare` MEANS `fulfilled` `local bare`"
+            , "  WHERE"
+            , "    ASSUME `local bare`"
+            ]
+          event = parties <> eventHelper <> Text.unlines
+            [ "@export Reads local bare event"
+            , "GIVETH A NUMBER"
+            , "`reads local bare event` MEANS `time of` `local bare`"
+            , "  WHERE"
+            , "    ASSUME `local bare`"
+            ]
+      blocks duty `shouldReturn`
+        (False, [("DEONTIC", "reads local bare", "local bare", SError)])
+      blocks event `shouldReturn`
+        (False, [("EVENT", "reads local bare event", "local bare", SError)])
+
+    it "blocks a polymorphic ASSUME that the body reads as a DEONTIC" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads local placeholder"
+            , "GIVETH A BOOLEAN"
+            , "`reads local placeholder` MEANS `fulfilled` `local placeholder`"
+            , "  WHERE"
+            , "    GIVEN a IS A TYPE"
+            , "    GIVETH AN a"
+            , "    ASSUME `local placeholder`"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads local placeholder", "local placeholder", SError)])
+
+    it "blocks an ASSUME that a helper of the body declares in its own WHERE" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "@export Reads inner duty"
+            , "GIVETH A BOOLEAN"
+            , "`reads inner duty` MEANS helper"
+            , "  WHERE"
+            , "    helper MEANS `fulfilled` `inner duty`"
+            , "      WHERE"
+            , "        ASSUME `inner duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads inner duty", "inner duty", SError)])
+
+    it "refuses an ASSUME that the body reads twice once, and one error for each of two ASSUMEs" $ do
+      let src = parties <> dutyHelper <> eventHelper <> Text.unlines
+            [ "ASSUME `top duty` IS A DEONTIC Person Action"
+            , ""
+            , "@export Reads three"
+            , "GIVETH A BOOLEAN"
+            , "`reads three` MEANS"
+            , "  `fulfilled` `local duty` AND `fulfilled` `local duty`"
+            , "    AND `fulfilled` `top duty` AND `time of` `local event` > 0"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            , "    ASSUME `local event` IS AN EVENT Person Action"
+            ]
+      (ok, errs) <- blocks src
+      ok `shouldBe` False
+      all (\(_, _, _, sev) -> sev == SError) errs `shouldBe` True
+      sort [ (what, fn, p) | (what, fn, p, _) <- errs ] `shouldBe`
+        [ ("DEONTIC", "reads three", "local duty")
+        , ("DEONTIC", "reads three", "top duty")
+        , ("EVENT", "reads three", "local event")
+        ]
+
+    it "accepts an ASSUME of type NUMBER" $ do
+      let src = Text.unlines
+            [ "@export Reads local number"
+            , "GIVETH A NUMBER"
+            , "`reads local number` MEANS `local n` + 1"
+            , "  WHERE"
+            , "    ASSUME `local n` IS A NUMBER"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a polymorphic ASSUME that the body reads as a NUMBER" $ do
+      let src = Text.unlines
+            [ "@export Reads local placeholder as a number"
+            , "GIVETH A NUMBER"
+            , "`reads local placeholder as a number` MEANS `local placeholder` + 1"
+            , "  WHERE"
+            , "    GIVEN a IS A TYPE"
+            , "    GIVETH AN a"
+            , "    ASSUME `local placeholder`"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts an ASSUME of type DEONTIC that the body does not read" $ do
+      let src = parties <> Text.unlines
+            [ "@export Ignores local duty"
+            , "GIVETH A BOOLEAN"
+            , "`ignores local duty` MEANS TRUE"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a rule that is not an @export" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`internal` MEANS `fulfilled` `local duty`"
+            , "  WHERE"
+            , "    ASSUME `local duty` IS A DEONTIC Person Action"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "goes by the ASSUME that the body reads, when a local one has the name of a top-level one" $ do
+      -- A name in a WHERE does not hide a top-level one: each read resolves by
+      -- its type, so the four ways of declaring the pair differ in which of the
+      -- two `shared` the body reads. The check goes by that one.
+      let wherePair top local readIt result = parties <> dutyHelper <> Text.unlines
+            [ "ASSUME `shared` IS " <> top
+            , ""
+            , "@export Reads shared"
+            , "GIVETH A " <> result
+            , "`reads shared` MEANS " <> readIt
+            , "  WHERE"
+            , "    ASSUME `shared` IS " <> local
+            ]
+          number = "A NUMBER"
+          duty = "A DEONTIC Person Action"
+          refusedFor = (False, [("DEONTIC", "reads shared", "shared", SError)])
+      -- the body reads the local DEONTIC
+      blocks (wherePair number duty "`fulfilled` `shared`" "BOOLEAN") `shouldReturn` refusedFor
+      -- the body reads the top-level NUMBER, and the local DEONTIC beside it is not read
+      blocks (wherePair number duty "`shared` + 1" "NUMBER") `shouldReturn` (True, [])
+      -- the body reads the local NUMBER
+      blocks (wherePair duty number "`shared` + 1" "NUMBER") `shouldReturn` (True, [])
+      -- the body reads the top-level DEONTIC, and the local NUMBER beside it is not read
+      blocks (wherePair duty number "`fulfilled` `shared`" "BOOLEAN") `shouldReturn` refusedFor
+
+  -- The check looks at every definition that is marked as an export, whichever
+  -- way it is marked and wherever it stands.
+  describe "which definitions are checked as exports" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        marked mark = parties <> Text.unlines
+          [ mark <> " the rule"
+          , "GIVEN d IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`marked` d MEANS TRUE"
+          ]
+        refused src = snd <$> unsendableRefusals emptyVFS src
+
+    it "refuses an @export default, an @desc export and an @desc default alike" $ do
+      forM_ ["@export", "@export default", "@desc export", "@desc default", "@desc DEFAULT"] $ \mark ->
+        refused (marked mark) `shouldReturn` [("marked", "d")]
+
+    it "does not check a definition whose @desc says nothing about exporting" $ do
+      refused (marked "@desc") `shouldReturn` []
+
+    it "refuses an export that stands in a nested section" $ do
+      let src = parties <> Text.unlines
+            [ "§ Outer"
+            , "§§ Inner"
+            , "@export nested"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`nested` d MEANS TRUE"
+            ]
+      refused src `shouldReturn` [("nested", "d")]
+
+    it "refuses an export that follows an export that is accepted" $ do
+      let src = parties <> Text.unlines
+            [ "@export default Fine"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`fine` n MEANS n"
+            , ""
+            , "§ Later"
+            , "@export default Not fine"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`not fine` d MEANS TRUE"
+            ]
+      refused src `shouldReturn` [("not fine", "d")]
+
+  -- An input that holds both an EVENT and a DEONTIC is refused for the one that
+  -- the walk meets first: the arguments of its type before the fields of the
+  -- record, and the fields and constructors in the order they are written.
+  describe "which of an EVENT and a DEONTIC an input is refused for, when it holds both" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        export input = Text.unlines
+          [ "@export The rule"
+          , "GIVEN x IS " <> input
+          , "GIVETH A BOOLEAN"
+          , "`the rule` x MEANS TRUE"
+          ]
+        refusals src = unsendableRefusals emptyVFS src
+        both = [("the rule", "x")]
+
+    it "reads a type argument before the fields of the record it is an argument of" $ do
+      let box fieldType = parties <> Text.unlines
+            [ "DECLARE Box a HAS"
+            , "  content IS AN a"
+            , "  other IS " <> fieldType
+            , ""
+            ]
+      refusals (box "A DEONTIC Person Action" <> export "A Box OF (EVENT Person Action)")
+        `shouldReturn` (both, [])
+      refusals (box "AN EVENT Person Action" <> export "A Box OF (DEONTIC Person Action)")
+        `shouldReturn` ([], both)
+
+    it "reads the constructors of a sum type in the order they are written" $ do
+      let entry eventFirst = parties <> Text.unlines
+            ( [ "DECLARE Entry IS ONE OF" ]
+              <> (if eventFirst
+                    then [ "  happened HAS e IS AN EVENT Person Action"
+                         , "  promised HAS what IS A DEONTIC Person Action"
+                         ]
+                    else [ "  promised HAS what IS A DEONTIC Person Action"
+                         , "  happened HAS e IS AN EVENT Person Action"
+                         ]
+                 )
+              <> [ "" ]
+            ) <> export "AN Entry"
+      refusals (entry True) `shouldReturn` (both, [])
+      refusals (entry False) `shouldReturn` ([], both)
+
+    it "reads the fields of one constructor in the order they are written" $ do
+      let entry eventFirst = parties <> Text.unlines
+            ( [ "DECLARE Entry IS ONE OF" ]
+              <> (if eventFirst
+                    then [ "  both HAS e IS AN EVENT Person Action"
+                         , "           what IS A DEONTIC Person Action"
+                         ]
+                    else [ "  both HAS what IS A DEONTIC Person Action"
+                         , "           e IS AN EVENT Person Action"
+                         ]
+                 )
+              <> [ "  neither" , "" ]
+            ) <> export "AN Entry"
+      refusals (entry True) `shouldReturn` (both, [])
+      refusals (entry False) `shouldReturn` ([], both)
+
+  -- The web editor runs the same checker and shows its error list: 'l4Check' is
+  -- what the WASM language server answers with, an error being severity 1.
+  describe "the web editor's check (l4Check) of a DEONTIC input" $ do
+    it "reports an error, with the words `l4 check` prints" $ do
+      let diagnostics = l4Check $ Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF delivery, payment"
+            , ""
+            , "@export Is a duty already fulfilled"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` d MEANS TRUE"
+            ]
+      diagnostics `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export."
+      diagnostics `shouldSatisfy` Text.isInfixOf "\"severity\":1"
+      -- one diagnostic, and none that is not an error
+      Text.count "\"severity\"" diagnostics `shouldBe` 1
 
   describe "exported return type display" $ do
     -- A concrete inferred return type renders normally.

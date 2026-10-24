@@ -203,6 +203,7 @@ test-suite jl4-core-test
     NlgAttachmentSpec
     NlgSilentReadingSpec
     ImportErrorRangeSpec
+    ResolutionCascadeSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

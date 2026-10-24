@@ -7,6 +7,7 @@ An event records that a party did an action at a time. A list of events is what 
 ```text
 PARTY party DOES action AT time        -- in a #TRACE
 EVENT party action time                -- as a value, for EVALTRACE
+GIVEN e IS AN EVENT party action       -- as a type, for an input
 ```
 
 | Part     | Type            | Meaning                      |
@@ -71,7 +72,68 @@ GIVETH A DEONTIC Person Action
 
 This gives a breach: the deadline at 3 passed with no delivery.
 
-`EVENT` is both the name of the events' type and the function that makes one. Use it to make events; it cannot be written as the type of a `GIVEN` input.
+## EVENT as a type
+
+`EVENT` is both the function that makes an event and the name of the events' type.
+As a type it takes the party type and the action type, so a rule can take an event as an input and read it with `CONSIDER`, and another rule can make an event and pass it on.
+The time of an event is always a `NUMBER`:
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  delivery
+  payment HAS amount IS A NUMBER
+
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`when it happened` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+GIVEN who IS A Person
+GIVETH A NUMBER
+`when it was delivered` who MEANS `when it happened` (EVENT who delivery 2)
+
+#EVAL `when it was delivered` Seller
+```
+
+This gives `2`.
+
+### An exported rule cannot take an event
+
+A rule marked `@export` cannot take an event as an input, nor an input that holds one: a `LIST OF EVENT Person Action`, a `MAYBE (EVENT Person Action)`, a record with an event in one of its fields, a `GIVEN` with no written type that the file uses as an event, or an `ASSUME` that the rule's own body reads as an event, whether the `ASSUME` has a written type or not, and whether the file, a file that it imports, or the rule's own `WHERE` declares it.
+A request to an exported rule is JSON, and JSON has no form for an event.
+`l4 check` reports `EVENT inputs are not supported for @export` and names the input.
+`l4 batch` and `jl4-schema` check the file first and stop with the same error, and `jl4-service` refuses to deploy it.
+See [An @export that takes an EVENT or a DEONTIC](../errors/README.md#an-export-that-takes-an-event-or-a-deontic).
+
+To publish such a rule, take the party, the action and the time as three inputs, and build the event inside the rule:
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+@export The time of an event
+GIVEN who IS A Person
+      what IS AN Action
+      `at time` IS A NUMBER
+GIVETH A NUMBER
+`when it happened` who what `at time` MEANS
+  CONSIDER EVENT who what `at time`
+  WHEN EVENT party action time THEN time
+
+#EVAL `when it happened` Seller delivery 2
+```
+
+This gives `2`.
+A request gives `who` and `what` by the name of the value, and `at time` as a number.
+Each of the three inputs needs a type that a request can carry, such as an enumeration or a `NUMBER`.
+
+A `DEONTIC` input of an exported rule is refused in the same way, with an error of its own, because no request can supply a value for it.
+**A `DEONTIC` input is for use inside L4 only.**
+**Never give a rule marked `@export` a `DEONTIC` input.**
+**It may give a `DEONTIC` value as its answer.**
+See [An exported rule cannot take a DEONTIC input](DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).
 
 ## Related pages
 

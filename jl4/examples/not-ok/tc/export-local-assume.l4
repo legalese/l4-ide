@@ -1,0 +1,70 @@
+-- An ASSUME can be declared inside a rule, under WHERE. A request has no JSON
+-- form for a DEONTIC or an EVENT, so an exported rule whose own body reads such
+-- an ASSUME as one of them is refused as a written type is, naming the ASSUME:
+-- whether the ASSUME has a written type or not, and whether it is polymorphic.
+-- The rules are exported on purpose: the same rules without @export check.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`already fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`time of` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+-- Refused: a local ASSUME of type DEONTIC.
+@export Is the local duty fulfilled
+GIVETH A BOOLEAN
+`local duty fulfilled` MEANS `already fulfilled` `local duty`
+  WHERE
+    ASSUME `local duty` IS A DEONTIC Person Action
+
+-- Refused: a local ASSUME of type EVENT.
+@export When did the local event happen
+GIVETH A NUMBER
+`local event time` MEANS `time of` `local event`
+  WHERE
+    ASSUME `local event` IS AN EVENT Person Action
+
+-- Refused: a local ASSUME with no written type, which the body reads as a DEONTIC.
+@export Is the bare local duty fulfilled
+GIVETH A BOOLEAN
+`bare local duty fulfilled` MEANS `already fulfilled` `bare local duty`
+  WHERE
+    ASSUME `bare local duty`
+
+-- Refused: a polymorphic local ASSUME, which the body reads as a DEONTIC.
+@export Is the local placeholder a fulfilled duty
+GIVETH A BOOLEAN
+`placeholder fulfilled` MEANS `already fulfilled` `local placeholder`
+  WHERE
+    GIVEN a IS A TYPE
+    GIVETH AN a
+    ASSUME `local placeholder`
+
+-- Not exported: reading a local ASSUME as a DEONTIC is fine here, and is not reported.
+GIVETH A BOOLEAN
+`internal` MEANS `already fulfilled` `internal duty`
+  WHERE
+    ASSUME `internal duty` IS A DEONTIC Person Action
+
+-- Accepted: the local ASSUME is a NUMBER.
+@export One more than the local number
+GIVETH A NUMBER
+`one more` MEANS `local number` + 1
+  WHERE
+    ASSUME `local number` IS A NUMBER
+
+-- Accepted: the local ASSUME of type DEONTIC is not read.
+@export Ignores the local duty
+GIVETH A BOOLEAN
+`ignores` MEANS TRUE
+  WHERE
+    ASSUME `unread duty` IS A DEONTIC Person Action

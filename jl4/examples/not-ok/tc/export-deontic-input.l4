@@ -1,0 +1,95 @@
+-- A DEONTIC has no JSON form, so an @export cannot take one as an input: a
+-- request can say a number, a string, a list or a record, and none of them is a
+-- duty. Each rule below is refused with the same error, naming the input; the
+-- rules are exported on purpose, because the same rule without @export checks.
+--
+-- The input may be a DEONTIC, hold one in a list or a MAYBE, reach one through
+-- a synonym, hold one in a field of a record or of a constructor of a sum type,
+-- or be an ASSUME of such a type that the rule reads.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+DECLARE Duty IS A DEONTIC Person Action
+
+DECLARE Agreement HAS terms IS A DEONTIC Person Action
+                      title IS A STRING
+
+DECLARE Entry IS ONE OF
+  unrecorded
+  promised HAS what IS A DEONTIC Person Action
+
+ASSUME `the assumed duty` IS A DEONTIC Person Action
+
+@export Is a duty already fulfilled
+GIVEN `the duty` IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`already fulfilled` `the duty` MEANS
+  CONSIDER `the duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+@export Duties in a list
+GIVEN duties IS A LIST OF DEONTIC Person Action
+GIVETH A BOOLEAN
+`any duties` duties MEANS TRUE
+
+@export A duty that may be missing
+GIVEN `maybe a duty` IS A MAYBE (DEONTIC Person Action)
+GIVETH A BOOLEAN
+`has a duty` `maybe a duty` MEANS TRUE
+
+@export A duty behind a synonym
+GIVEN d IS A Duty
+GIVETH A BOOLEAN
+`is a duty` d MEANS TRUE
+
+@export A record with a duty in a field
+GIVEN a IS AN Agreement
+GIVETH A STRING
+`agreement title` a MEANS a's title
+
+@export A sum type with a duty in a constructor
+GIVEN e IS AN Entry
+GIVETH A BOOLEAN
+`entry kind` e MEANS TRUE
+
+@export An assumed duty that the rule reads
+GIVETH A BOOLEAN
+`assumed duty is fulfilled` MEANS
+  CONSIDER `the assumed duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Not exported: a DEONTIC input is fine here, and is not reported.
+GIVEN d IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`internal fulfilled` d MEANS
+  CONSIDER d
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Exported with the plain facts as inputs, and the DEONTIC built inside:
+-- accepted.
+@export Is the duty fulfilled when the party takes the action on a given day
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+      `day taken` IS A NUMBER
+GIVETH A BOOLEAN
+`duty fulfilled on day` who what deadline `day taken` MEANS
+  CONSIDER EVALTRACE (`the duty` who what deadline) 0 (LIST EVENT who what `day taken`)
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Exported, and giving a DEONTIC as its answer from plain inputs: accepted.
+@export The duty of a party to take an action by a deadline
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+GIVETH A DEONTIC Person Action
+`the duty` who what deadline MEANS
+  PARTY who
+  MUST EXACTLY what
+  WITHIN deadline
+  HENCE FULFILLED
+  LEST BREACH

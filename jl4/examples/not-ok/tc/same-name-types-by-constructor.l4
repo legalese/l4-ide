@@ -1,0 +1,30 @@
+-- Regression fixture for issue #920, second half.
+--
+-- Two DIFFERENT types both spelled `Verdict`. Nothing here names the type, so
+-- nothing is ambiguous: the constructors `yes` and `maybe` are distinct names,
+-- and each pins down its own `Verdict`. The mismatches below are therefore
+-- genuine, and must be reported -- once for the branches of an IF, once for the
+-- patterns of a clause group, which is rendered by a different message.
+--
+-- What was broken is only how they READ. `prettyLayout` renders a type from its
+-- surface names and never shows uniques, so a message came out as
+--
+--   From looking at the context, I have inferred that the type of this
+--   definition must be
+--     Verdict
+--   but is here of type
+--     Verdict
+--
+-- which tells the reader nothing at all. The golden must now show each side
+-- qualified by where its `Verdict` was declared.
+
+DECLARE Verdict IS ONE OF yes, no
+
+DECLARE Verdict IS ONE OF maybe, perhaps
+
+GIVEN x IS A BOOLEAN
+`pick` MEANS IF x THEN yes ELSE maybe
+
+GIVETH A NUMBER
+`score` yes MEANS 1
+`score` maybe MEANS 2

@@ -23,6 +23,7 @@ Things that will trip up a general-purpose LLM because they are not in any other
 - [`AKA` aliases](#aka-aliases)
 - [`LET … IN` vs `WHERE`](#let--in-vs-where)
 - [`@export` placement](#export-placement)
+- [An exported rule that takes a `DEONTIC` is refused](#an-exported-rule-that-takes-a-deontic-is-refused)
 - [Annotation fence](#annotation-fence)
 - [`@nlg` placement and language](#nlg-placement-and-language)
 - [NLG and reference annotations](#nlg-and-reference-annotations)
@@ -277,6 +278,38 @@ GIVEN x IS A NUMBER
 GIVETH A NUMBER
 squared x MEANS x TIMES x
 ```
+
+---
+
+## An exported rule that takes a `DEONTIC` is refused
+
+**A `DEONTIC` input is for use inside L4 only.**
+**Never give a rule marked `@export` a `DEONTIC` input.**
+**It may give a `DEONTIC` value as its answer.**
+
+No request can supply the value, so the typechecker refuses the rule: `l4 check` fails with `DEONTIC inputs are not supported for @export`, naming the input, the editor shows it as an error, and the deploy is refused.
+The same holds for a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as a `DEONTIC`, and an `ASSUME` that the rule's own body reads as a `DEONTIC`, whether the `ASSUME` has a written type or not, and whether the file, a file it imports, or the rule's own `WHERE` declares it.
+The message ends with what to do: give the rule the plain facts that the `DEONTIC` is made from as inputs, and build the `DEONTIC` inside it.
+
+```l4
+-- ✘ Wrong — `l4 check` refuses it, because no request can supply `duty`
+@export Is a duty already fulfilled
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`already fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+```
+
+Take the plain facts as inputs and build the duty inside the rule; the full pattern is in [SKILL.md](../SKILL.md#inputs-no-request-can-supply-event-and-deontic).
+An `EVENT` input is refused in the same way, with `EVENT inputs are not supported for @export`.
+
+The check does not look inside a rule that an exported rule calls.
+A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.
+If the helper's `CONSIDER` ends in `OTHERWISE`, every request then gets that branch's answer with no error, which is the quiet failure; if it has no `OTHERWISE`, every request fails with HTTP 422.
+A polymorphic helper in the rule's own `WHERE` that reads a polymorphic `ASSUME` at a type that stays open is the same quiet failure, because no read of the `ASSUME` in the exported rule's own body has a `DEONTIC` or an `EVENT` for its type.
+Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
 
 ---
 

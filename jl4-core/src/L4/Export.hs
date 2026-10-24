@@ -32,8 +32,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import L4.Annotation (getAnno)
 import L4.Syntax
-import L4.TypeCheck.Environment (maybeUnique)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
+import L4.TypeCheck.Environment (contractUnique, eventUnique, maybeUnique)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, Substitution, optionallyNamedTypeType, substituteInfVars)
 import Optics
 
 type TypeDescMap = Map.Map Unique Text
@@ -292,10 +292,41 @@ isFunctionTypeExpanded synonyms = go Set.empty
 -- ASSUMEs), so semantic specialization happens at the filter step rather
 -- than in the collector itself.
 collectReferencedUniques :: Expr Resolved -> Set.Set Unique
-collectReferencedUniques =
+collectReferencedUniques = Set.fromList . map getUnique . collectReferencedResolveds
+
+-- | The identifier of every reference that 'collectReferencedUniques' counts,
+-- as the 'Resolved' that the expression holds, once for each time it is read.
+collectReferencedResolveds :: Expr Resolved -> [Resolved]
+collectReferencedResolveds =
   foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \case
-    App _ (Ref _ uniq _) _ -> Set.singleton uniq
-    _ -> Set.empty
+    App _ ref@(Ref _ _ _) _ -> [ref]
+    _ -> []
+
+-- | Every read of an identifier that is given no arguments (@App ann ref []@),
+-- with the type that the checker recorded on the expression that reads it, in
+-- the order the reads come. That type is the one the read has, which for a
+-- polymorphic identifier is not the declared one: each read of the ASSUME in
+-- @GIVEN a IS A TYPE GIVETH AN a ASSUME x@ is given a type of its own. It can
+-- still hold inference variables, until the substitution that the check ended
+-- with is applied to it, which the caller does. A read that is given arguments
+-- has the type of the call, not of the identifier, and is not in the answer, nor
+-- is a read that has no recorded type.
+collectReadTypes :: Expr Resolved -> [(Resolved, Type' Resolved)]
+collectReadTypes =
+  foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+    App ann ref@(Ref _ _ _) [] | Just (TypeInfo ty _) <- ann ^. annInfo -> [(ref, ty)]
+    _ -> []
+
+-- | The ASSUMEs that a @WHERE@ in the expression declares, wherever in the
+-- expression the @WHERE@ stands, also inside a local definition. The parser
+-- accepts an ASSUME among local declarations under @WHERE@ and nowhere else: a
+-- @LET@ holds definitions only. The checker's table of what a module declares
+-- does not hold these, since they are in scope for the expression alone.
+collectLocalAssumes :: Expr Resolved -> [Assume Resolved]
+collectLocalAssumes =
+  foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+    Where _ _ decls -> [ assume | LocalAssume _ assume <- decls ]
+    _ -> []
 
 -- | Extract ASSUME declarations that are referenced by a DECIDE body.
 -- Returns ExportedParams for each ASSUME that the function depends on.
@@ -413,16 +444,75 @@ extractImplicitAssumeParams errors =
     isFunctionType Fun{} = True
     isFunctionType _ = False
 
--- | Validate that no @export-decorated DECIDE has a function-typed input —
--- either a GIVEN parameter, or a module-level ASSUME the body calls.
+-- | Validate that no @export-decorated DECIDE has an input that a request
+-- cannot carry: a function-typed input, or an input of a type that contains
+-- an EVENT or a DEONTIC. The input is either a GIVEN parameter, or an ASSUME
+-- that the body uses.
+--
 -- Function-typed inputs can't be evaluated end-to-end: GIVENs can't be
 -- passed over JSON, and function-typed ASSUMEs stay 'ValAssumed' at
 -- runtime, causing a stuck "assumed term" error when the body invokes them.
-validateExportInputs :: Module Resolved -> [CheckErrorWithContext]
-validateExportInputs mod' =
+-- That refusal looks at the types that are written, and at the ASSUMEs of
+-- this module: a GIVEN that has no written type, and an ASSUME of an imported
+-- module, are not looked at for it.
+--
+-- An EVENT and a DEONTIC have no JSON form either. The service's input decoder
+-- reads a JSON object only into a declared record, and both types are builtin
+-- and have no declaration, so a request cannot supply either one. Without this
+-- check, the published schema of such a rule would be a bare @object@, every
+-- evaluation of a rule that takes an EVENT would answer 422, and a rule that
+-- takes a DEONTIC would give a wrong answer without a word when the request
+-- sent a string or a number for it. That refusal looks at every input, however
+-- its type is known:
+--
+-- * a GIVEN with a written type;
+--
+-- * a GIVEN with no written type, whose type is the one that the checker
+--   inferred for it ('inferredGivenTypes'), once the substitution that the
+--   check ended with is applied to it. One whose type is still open holds
+--   neither, and is accepted;
+--
+-- * an ASSUME that the body reads, wherever it is declared, in this module or
+--   in an imported one: 'AssumedTerm' is what marks it in the 'EntityInfo',
+--   and a definition that has a value, such as a DEONTIC that a MEANS gives, is
+--   not marked and is not an input. It is looked at for the type it is declared
+--   with, and for the type at each read of it in the body, which is where a
+--   polymorphic ASSUME (@GIVEN a IS A TYPE GIVETH AN a ASSUME x@) holds a
+--   DEONTIC or an EVENT ('collectReadTypes'). A call of an ASSUME that is given
+--   arguments has the type of its result and is not looked at;
+--
+-- * an ASSUME that the body declares itself, in a @WHERE@, and reads: the
+--   'EntityInfo' does not hold it, so it is found in the body
+--   ('collectLocalAssumes') and its declared type is the one that the checker
+--   recorded on the declaration. The reads of it are looked at as for any other.
+--
+-- The walk covers the rule's own inputs and the ASSUMEs that its own body
+-- reads. It does not look inside a rule that the exported rule calls.
+--
+-- One input is refused once, however many such types it holds: for the EVENT or
+-- the DEONTIC that the walk meets first ('carriedUnsendable').
+validateExportInputs :: Substitution -> EntityInfo -> Module Resolved -> [CheckErrorWithContext]
+validateExportInputs subst ei mod' =
   let synonyms = collectTypeSynonyms mod'
       assumes  = allAssumesFromModule mod'
-  in concatMap (checkOneExport synonyms assumes) (collectExportedDecides mod')
+      carried  = carriedUnsendable ei
+      -- one pass per kind of input a request cannot carry, each with the inputs it looks at
+      functionTypes, unsendables :: Decide Resolved -> [CheckErrorWithContext]
+      functionTypes decide =
+        checkOneExport
+          (\ty -> if isFunctionTypeExpanded synonyms ty then Just mkExportFunErr else Nothing)
+          decide
+          (writtenInputs assumes decide)
+      unsendables decide =
+        checkOneExport
+          (\ty -> mkExportUnsendableErr <$> carried ty)
+          decide
+          (inferredInputs subst ei decide)
+  in [ err
+     | decide <- collectExportedDecides mod'
+     , pass <- [functionTypes, unsendables]
+     , err <- pass decide
+     ]
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
@@ -456,39 +546,113 @@ allAssumesFromModule (MkModule _ _ section) =
     Section _ sub -> collectSection sub
     _ -> []
 
-checkOneExport
-  :: Map.Map Unique (Type' Resolved)
-  -> Map.Map Unique (Assume Resolved)
-  -> Decide Resolved
-  -> [CheckErrorWithContext]
-checkOneExport synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
-  checkGivenFunctionInputs synonyms fnName tySig
-  ++ checkAssumeFunctionInputs synonyms assumes fnName decide
+-- | The decision about one input type: not refused, or refused with the error
+-- that names the function and the input.
+type ExportRefusal = Type' Resolved -> Maybe (Resolved -> Resolved -> CheckErrorWithContext)
 
-checkGivenFunctionInputs
-  :: Map.Map Unique (Type' Resolved)
-  -> Resolved
-  -> TypeSig Resolved
+-- | An input of an exported rule: the identifier that an error names, and the
+-- types that it is looked at for, in order. The first of them that is refused
+-- gives the error, so an input is refused once, however many of its types are.
+type ExportInput = (Resolved, [Type' Resolved])
+
+checkOneExport
+  :: ExportRefusal
+  -> Decide Resolved
+  -> [ExportInput]
   -> [CheckErrorWithContext]
-checkGivenFunctionInputs synonyms fnName (MkTypeSig _ (MkGivenSig _ names) _) =
-  [ mkExportFunErr fnName paramName
-  | MkOptionallyTypedName _ paramName (Just ty) <- names
-  , isFunctionTypeExpanded synonyms ty
+checkOneExport refusal (MkDecide _ _ (MkAppForm _ fnName _ _) _) inputs =
+  [ mkErr fnName paramName
+  | (paramName, tys) <- inputs
+  , Just mkErr <- [listToMaybe (mapMaybe refusal tys)]
   ]
 
-checkAssumeFunctionInputs
-  :: Map.Map Unique (Type' Resolved)
-  -> Map.Map Unique (Assume Resolved)
-  -> Resolved
+-- | The inputs whose type is written: the GIVENs that have one, then the
+-- ASSUMEs of this module that the body reads (those that 'assumes' holds).
+writtenInputs
+  :: Map.Map Unique (Assume Resolved)
   -> Decide Resolved
-  -> [CheckErrorWithContext]
-checkAssumeFunctionInputs synonyms assumes fnName (MkDecide _ _ _ body) =
+  -> [ExportInput]
+writtenInputs assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) _ body) =
   let referencedUniques = collectReferencedUniques body
-  in [ mkExportFunErr fnName paramName
+  in [ (paramName, [ty])
+     | MkOptionallyTypedName _ paramName (Just ty) <- names
+     ]
+     ++
+     [ (paramName, [ty])
      | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
      , Set.member uniq referencedUniques
-     , isFunctionTypeExpanded synonyms ty
      ]
+
+-- | Every input that the checker knows a type for: the GIVENs, with the
+-- inferred type of one that has no written type, then every ASSUME that the
+-- body reads, whichever module declares it, or the body itself in a WHERE. An
+-- ASSUME is looked at for the type it is declared with, and then for the type
+-- that the checker recorded at each read of it in the body
+-- ('collectReadTypes'): the two differ for a polymorphic ASSUME, which is
+-- declared with a type variable and read at a type of its own.
+inferredInputs
+  :: Substitution
+  -> EntityInfo
+  -> Decide Resolved
+  -> [ExportInput]
+inferredInputs subst ei (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) body) =
+  [ (paramName, [substituteInfVars subst ty])
+  | MkOptionallyTypedName _ paramName mType <- names
+  , Just ty <- [mType <|> Map.lookup (getUnique paramName) inferredTypes]
+  ]
+  ++
+  [ (ref, substituteInfVars subst <$> declared ++ Map.findWithDefault [] uniq readAs)
+  | (uniq, (ref, declared)) <- Map.toList assumedTerms
+  ]
+ where
+  inferredTypes = inferredGivenTypes ei fnName
+
+  -- the ASSUMEs that the body reads, by identifier, one for each, with the
+  -- types that they are declared with: those of the module and its imports,
+  -- from the entity table, and those that the body declares in a WHERE, from
+  -- the type that the checker recorded on the declaration
+  assumedTerms :: Map.Map Unique (Resolved, [Type' Resolved])
+  assumedTerms =
+    Map.fromList $
+      [ (getUnique ref, (ref, [ty]))
+      | ref <- collectReferencedResolveds body
+      , Just (_, KnownTerm ty AssumedTerm) <- [Map.lookup (getUnique ref) ei]
+      ]
+      ++
+      [ (getUnique name, (name, [ ty | Just (TypeInfo ty _) <- [getAnno assume ^. annInfo] ]))
+      | assume@(MkAssume _ _ (MkAppForm _ name _ _) _) <- collectLocalAssumes body
+      , Set.member (getUnique name) readUniques
+      ]
+
+  readUniques = collectReferencedUniques body
+
+  -- the types recorded at the reads of each identifier, in the order read
+  readAs :: Map.Map Unique [Type' Resolved]
+  readAs =
+    Map.fromListWith (flip (<>))
+      [ (getUnique ref, [ty]) | (ref, ty) <- collectReadTypes body ]
+
+-- | The type that the checker inferred for each GIVEN of a function, by the
+-- identifier of the GIVEN, read from the function's own type in the 'EntityInfo'.
+-- A type that has no written form is an inference variable until the
+-- substitution that the check ended with is applied to it, which the caller does.
+-- A GIVEN that is a type parameter (@GIVEN a IS A TYPE@) is not an argument of
+-- the function type and is not in the answer, which is why the GIVENs are found
+-- by identifier and not by position.
+inferredGivenTypes :: EntityInfo -> Resolved -> Map.Map Unique (Type' Resolved)
+inferredGivenTypes ei fnName =
+  case Map.lookup (getUnique fnName) ei of
+    Just (_, KnownTerm funType _) ->
+      Map.fromList
+        [ (getUnique paramName, ty)
+        | MkOptionallyNamedType _ (Just paramName) ty <- argumentTypes funType
+        ]
+    _ -> Map.empty
+ where
+  argumentTypes = \case
+    Forall _ _ inner -> argumentTypes inner
+    Fun _ onts _     -> onts
+    _                -> []
 
 mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
 mkExportFunErr fnName paramName =
@@ -496,3 +660,116 @@ mkExportFunErr fnName paramName =
     { kind    = ExportFunctionTypeInput fnName paramName
     , context = WhileCheckingDecide (getActual fnName) None
     }
+
+mkExportEventErr :: Resolved -> Resolved -> CheckErrorWithContext
+mkExportEventErr fnName paramName =
+  MkCheckErrorWithContext
+    { kind    = ExportEventTypeInput fnName paramName
+    , context = WhileCheckingDecide (getActual fnName) None
+    }
+
+mkExportDeonticErr :: Resolved -> Resolved -> CheckErrorWithContext
+mkExportDeonticErr fnName paramName =
+  MkCheckErrorWithContext
+    { kind    = ExportDeonticTypeInput fnName paramName
+    , context = WhileCheckingDecide (getActual fnName) None
+    }
+
+mkExportUnsendableErr :: Unsendable -> Resolved -> Resolved -> CheckErrorWithContext
+mkExportUnsendableErr = \case
+  HoldsEvent   -> mkExportEventErr
+  HoldsDeontic -> mkExportDeonticErr
+
+-- | A builtin type that has no JSON form, and that a value of some type holds.
+data Unsendable
+  = HoldsEvent
+  | HoldsDeontic
+
+-- | Does a value of this type contain an EVENT or a DEONTIC, and which of them
+-- does the walk meet first? Both are builtin types. The answer is the builtin
+-- type itself, a type that holds one anywhere: as a type argument
+-- (@LIST OF EVENT …@, @MAYBE (DEONTIC …)@), behind a synonym, or in a field of a
+-- declared record or of a constructor of a declared sum type — also when the
+-- synonym or the record is declared in an imported module, because it is read
+-- from the checker's 'EntityInfo' and not from this module's declarations.
+-- @PROVISION@, the older spelling of @DEONTIC@, names the same type.
+--
+-- The walk goes in this order, and an input that holds both an EVENT and a
+-- DEONTIC is refused for the first of them that it reaches: the type arguments
+-- of a type, then what its synonym stands for, then the fields of the record, or
+-- of the constructors of the sum type, that it names. The fields of a record
+-- are looked into in the order they are written, and so are the constructors
+-- of a sum type, the fields of each constructor before the next constructor.
+-- Neither builtin type is looked into any further: what its own type arguments
+-- are does not matter once it has been found.
+--
+-- A function type is not looked into, whether it is the input's own type, a
+-- type argument, or what a synonym stands for. Whether the input is refused as
+-- a function type is a separate check, and it reads only the types that are
+-- written and the synonyms of this module: a function type that sits in a field
+-- of a record, or behind a synonym of an imported module, is neither refused as
+-- a function type nor looked into here.
+--
+-- The 'EntityInfo' records which type a constructor builds but not the
+-- converse, so the fields of every type are gathered by one pass over the
+-- constructors, shared by all the calls of the returned predicate.
+--
+-- Each type is looked into once per call, however many fields lead to it: the
+-- set of types already looked into is kept for the whole walk and not for one
+-- path of it. A type that is met again is either finished, and then it held
+-- neither builtin type or the walk would have ended there, or it is still being
+-- looked into higher up, and whatever it holds is found there. Without that, a
+-- chain of records that each have two fields of the next one is walked once per
+-- path, which takes twice as long for every record added.
+carriedUnsendable :: EntityInfo -> Type' Resolved -> Maybe Unsendable
+carriedUnsendable ei = \ty -> evalState (go ty) Set.empty
+ where
+  fieldsByType :: Map.Map Unique [Type' Resolved]
+  fieldsByType =
+    Map.fromListWith (flip (<>))
+      [ (getUnique builtType, fieldTypes conType)
+      | (_, KnownTerm conType Constructor) <- Map.elems ei
+      , Just builtType <- [resultTypeName conType]
+      ]
+
+  resultTypeName = \case
+    Forall _ _ inner -> resultTypeName inner
+    Fun _ _ result   -> resultTypeName result
+    TyApp _ name _   -> Just name
+    _                -> Nothing
+
+  fieldTypes = \case
+    Forall _ _ inner -> fieldTypes inner
+    Fun _ onts _     -> map optionallyNamedTypeType onts
+    _                -> []
+
+  -- The state is the set of types already looked into.
+  go :: Type' Resolved -> State (Set.Set Unique) (Maybe Unsendable)
+  go = \case
+    TyApp _ name args
+      | u == eventUnique    -> pure (Just HoldsEvent)
+      | u == contractUnique -> pure (Just HoldsDeontic)
+      | otherwise -> do
+          inArgs <- firstHit go args
+          seen <- get
+          case inArgs of
+            Just hit -> pure (Just hit)
+            Nothing
+              | u `Set.member` seen -> pure Nothing
+              | otherwise -> do
+                  put (Set.insert u seen)
+                  behindSynonym <- case Map.lookup u ei of
+                    Just (_, KnownType _ _ (Just body)) -> go body
+                    _                                   -> pure Nothing
+                  case behindSynonym of
+                    Just hit -> pure (Just hit)
+                    Nothing  -> firstHit go (Map.findWithDefault [] u fieldsByType)
+      where
+        u = getUnique name
+    Forall _ _ inner -> go inner
+    _                -> pure Nothing
+
+  -- Stops at the first hit: the rest of the list is not looked into.
+  firstHit :: (a -> State (Set.Set Unique) (Maybe b)) -> [a] -> State (Set.Set Unique) (Maybe b)
+  firstHit _ []       = pure Nothing
+  firstHit f (x : xs) = f x >>= maybe (firstHit f xs) (pure . Just)

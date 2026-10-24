@@ -1,0 +1,20 @@
+-- A type of your own named EVENT, with two parameters, is ambiguous with the
+-- builtin EVENT type, which also takes two: naming it has two candidates and
+-- the checker asks which is meant. This is how every builtin type name behaves
+-- (a `DECLARE MAYBE a` is ambiguous with the builtin MAYBE in the same way).
+--
+-- Before the builtin EVENT type could be named, such a declaration was the only
+-- EVENT of two parameters in scope, so this file checked. A declaration of EVENT
+-- with no parameters is not ambiguous, because the number of parameters rules
+-- the builtin out; this file is about the two-parameter one.
+--
+-- The golden holds the ambiguity, with both candidates, and no other error:
+-- the checker does not count the arguments of a name it could not resolve.
+
+DECLARE EVENT party action
+  HAS who IS A party
+      what IS AN action
+
+GIVEN e IS AN EVENT STRING NUMBER
+GIVETH A STRING
+f e MEANS e's who

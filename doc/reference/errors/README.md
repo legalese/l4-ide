@@ -25,6 +25,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Branch type mismatch](#branch-type-mismatch)
 - [Wrong number of arguments](#wrong-number-of-arguments)
 - [Argument of the wrong type](#argument-of-the-wrong-type)
+- [Two types with the same name](#two-types-with-the-same-name)
 - [Several definitions with the same name](#several-definitions-with-the-same-name)
 
 **Names and imports**
@@ -56,6 +57,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Export**
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
+- [An @export that takes an EVENT or a DEONTIC](#an-export-that-takes-an-event-or-a-deontic)
 
 ---
 
@@ -353,6 +355,31 @@ DECIDE `the same greeting` IS CONCAT "hello", " world"
 
 ---
 
+### Two types with the same name
+
+**Error:** a type mismatch whose two types are spelled the same, each followed by where it was declared, such as `Verdict (Verdict defined at verdicts.l4:1:9-16)` against `Verdict (Verdict defined at verdicts.l4:3:9-16)`
+
+```l4
+DECLARE Verdict IS ONE OF yes, no
+
+DECLARE Verdict IS ONE OF maybe, perhaps
+
+GIVEN x IS A BOOLEAN
+`pick` MEANS IF x THEN yes ELSE maybe
+```
+
+The file declares two different types called `Verdict`.
+`yes` belongs to the first and `maybe` to the second, so the two branches of the IF have different types, even though both types are called `Verdict`.
+When the two types in a mismatch are spelled the same, L4 adds where each was declared, so that you can tell them apart.
+The numbers after the file name are the line, then the columns.
+
+Naming such a type, for example in a `GIVETH`, gives a different message: [several definitions with the same name](#several-definitions-with-the-same-name), because L4 cannot tell which of the two you mean.
+
+**How to fix it:** Declare each name once.
+Rename one of the two types, or delete the `DECLARE` that repeats the other.
+
+---
+
 ### Several definitions with the same name
 
 **Error:** `There are multiple definitions for the identifier Date and I do not have sufficient information to make a choice between them.`, followed by the candidates and their types
@@ -366,6 +393,12 @@ IMPORT daydate
 
 #EVAL (Date 10 1 2024) `is before` (Date 11 1 2024)
 ```
+
+A type you declare yourself is ambiguous in the same way when it has the name and the number of parameters of a built-in type.
+`DECLARE EVENT party action HAS ...` is one: every use of `EVENT` with two arguments then has two candidates, yours and the built-in one, and so is `DECLARE MAYBE a HAS ...` for `MAYBE`.
+Each such use is reported once, as the multiple-definitions error with both candidates, yours and the built-in one.
+Give your type another name.
+A type called `EVENT` with no parameters is not affected, because the built-in `EVENT` takes two.
 
 ---
 
@@ -382,6 +415,7 @@ L4 met a name that nothing in scope defines. The usual causes:
 - **The wrong case.** Keywords and built-in values are upper case: `TRUE` and `FALSE`, not `True` or `true`; `NOTHING`, `JUST`, `LEFT`, `RIGHT`.
 - **An `IMPORT` below a section heading.** `IMPORT` lines count only before the first `§`; one placed after it is ignored, so the names it should bring in are not defined. Move it to the top of the file.
 - **A name defined somewhere it cannot be seen.** A name defined in the `WHERE` or `LET` of one definition exists only inside that definition.
+- **A type that was never declared**, such as `Money` in `GIVEN amount IS A Money`. L4 reports the type at every place it is written, each at its own position: a `Money` in two `GIVEN`s and in a `GIVETH` is three errors.
 
 **How to fix it:** Correct the spelling, or add the `IMPORT`:
 
@@ -946,3 +980,110 @@ DECIDE size Blue  n IS 0
 
 The rule is then published with the inputs `c` and `n`.
 Or remove the `@export`, if the rule is not meant to be published.
+
+---
+
+### An @export that takes an EVENT or a DEONTIC
+
+**Error:**
+
+```
+EVENT inputs are not supported for @export.
+The input `the reported event` has a type that contains an EVENT, and a request has no JSON form for an event.
+Give the rule the party, the action and the time as separate inputs, and build the event inside it.
+```
+
+or
+
+```
+DEONTIC inputs are not supported for @export.
+The input `the duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+```
+
+**What you wrote:**
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+@export The time of the reported event
+GIVEN `the reported event` IS AN EVENT Person Action
+GIVETH A NUMBER
+`when it happened` `the reported event` MEANS
+  CONSIDER `the reported event`
+  WHEN EVENT party action time THEN time
+```
+
+or
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+@export Is the duty fulfilled
+GIVEN `the duty` IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`duty is fulfilled` `the duty` MEANS
+  CONSIDER `the duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it is JSON.
+JSON has no form for an event, and none for a `DEONTIC` value, which is a duty, a permission or a prohibition, or the outcome of one; so no request could supply this input.
+The same holds for an input that holds one of them: a `LIST OF EVENT Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with an event or a `DEONTIC` in one of its fields, a `GIVEN` with no written type that the file uses as one (L4 works the type out from how the file uses the input), or an `ASSUME` that the rule's own body reads as one, whether the `ASSUME` has a written type or not, and whether the file, a file that it imports, or the rule's own `WHERE` declares it.
+So an `@export` of such a rule is an error, reported at the rule's name, and it names the input.
+An input that holds both gets one error, for the first of them that L4 finds.
+The error stops the whole file from checking: `l4 batch` and `jl4-schema` refuse the file, the editor shows it as an error, and jl4-service will not deploy it, until you change the input or remove the `@export`.
+`l4 deploy` refuses the file too, and the **Deploy** button in the VS Code sidebar stays off.
+Without `@export`, a rule can take an event or a `DEONTIC` value as an input.
+A rule marked `@export` may give a `DEONTIC` value as its answer.
+
+**How to fix it:** For an event, take the party, the action and the time as separate inputs, and build the event inside the rule with `EVENT`:
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+@export The time of an event
+GIVEN who IS A Person
+      what IS AN Action
+      `at time` IS A NUMBER
+GIVETH A NUMBER
+`when it happened` who what `at time` MEANS
+  CONSIDER EVENT who what `at time`
+  WHEN EVENT party action time THEN time
+```
+
+For a `DEONTIC`, take the plain facts that the duty is made from as inputs, build the duty in a rule of its own, and run it against the events with `EVALTRACE` inside the exported rule:
+
+```l4
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+GIVETH A DEONTIC Person Action
+`the duty` who what deadline MEANS
+  PARTY who
+  MUST EXACTLY what
+  WITHIN deadline
+  HENCE FULFILLED
+  LEST BREACH
+
+@export Is the duty fulfilled when the party takes the action on a given day
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+      `day taken` IS A NUMBER
+GIVETH A BOOLEAN
+`duty fulfilled on day` who what deadline `day taken` MEANS
+  CONSIDER EVALTRACE (`the duty` who what deadline) 0 (LIST EVENT who what `day taken`)
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+```
+
+Each plain input needs a type that a request can carry, such as an enumeration or a `NUMBER`.
+See [EVENT](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event) and [DEONTIC](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).

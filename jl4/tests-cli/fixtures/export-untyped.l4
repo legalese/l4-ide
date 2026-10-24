@@ -1,0 +1,17 @@
+-- An exported rule whose input has no written type. The checker infers it from
+-- how the rule uses it: handed to a helper that takes a DEONTIC, it is a DEONTIC,
+-- and a request has no JSON form for one, so `l4 check` and `l4 batch` refuse it.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`already fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+@export Is a duty already fulfilled
+GIVEN `the duty`
+GIVETH A BOOLEAN
+`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`

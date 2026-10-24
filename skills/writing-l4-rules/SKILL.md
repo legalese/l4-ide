@@ -319,6 +319,79 @@ ASSUMEs stay uninterpreted at runtime (any call fails with a stuck
 "assumed term" error). The typechecker and `jl4-service` deploy both reject
 such bundles with `Function type inputs are not supported for @export`.
 
+### Inputs no request can supply: `EVENT` and `DEONTIC`
+
+**No request can supply an `EVENT` or a `DEONTIC` input.**
+The typechecker refuses an `EVENT` input with `EVENT inputs are not supported for @export`, and a `DEONTIC` input with `DEONTIC inputs are not supported for @export`.
+Both errors name the input.
+`l4 check` fails, the editor shows an error, `l4 deploy` and `jl4-service` refuse the file, and the sidebar's **Deploy** button stays off.
+
+**A `DEONTIC` input is for use inside L4 only.**
+**Never give a rule marked `@export` a `DEONTIC` input.**
+**It may give a `DEONTIC` value as its answer.**
+
+The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as one (the check goes by the type that L4 works out for it from the whole file), or an `ASSUME` that an exported rule's own body reads as one, whether it has a written type or not, and whether the file, a file it imports, or the rule's own `WHERE` declares it.
+A polymorphic `ASSUME` (`GIVEN a IS A TYPE`, `GIVETH AN a`, as the prelude's `TBD` is, in a file that has `IMPORT prelude`) is checked by the type at the place where the body reads it.
+Without `IMPORT prelude`, `TBD` is an unknown name: `l4 check` fails, and the service deploys the rule all the same, with `TBD` as a required input and answers every request with HTTP 422.
+An `ASSUME` of the file itself with a written type becomes a required input; one that an imported file declares becomes none, so no request could set it, and it is refused all the same.
+`EVENT` and `DEONTIC` are both refused in each of these places.
+The function endpoint (`GET /deployments/<id>/functions/<fn>`) lists an `ASSUME` of the file itself that has no written type, one written with its signature before it, and a polymorphic one as a required input of type `object`, and then ignores the value sent: every request that needs it answers HTTP 422, with "needed to know the value of … it is an assumed term".
+An `ASSUME` that the rule declares under its own `WHERE` is not listed, and a request that needs its value gets the same 422.
+
+The check does not look inside a rule that an exported rule calls.
+A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.
+If the helper's `CONSIDER` ends in `OTHERWISE`, every request then gets that branch's answer with no error, which is the quiet failure; if it has no `OTHERWISE`, every request fails with HTTP 422.
+A polymorphic helper in the rule's own `WHERE` that reads a polymorphic `ASSUME` at a type that stays open is the same quiet failure, because no read of the `ASSUME` in the exported rule's own body has a `DEONTIC` or an `EVENT` for its type.
+Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
+The test for a function-typed input goes by written types and by the `ASSUME`s of the file itself, so a `GIVEN` with no written type that the rule calls as a function, and a function-typed `ASSUME` that an imported file declares or that is written with its signature before it, also pass `l4 check`; every request to such a rule fails with HTTP 422.
+
+Take the plain facts as inputs, build the duty and the events inside the rule, and keep any helper that takes a `DEONTIC` or an `EVENT` without `@export`:
+
+```l4
+-- ✔ Plain facts in, the duty built inside
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+-- Not exported, so it may take a DEONTIC and a list of EVENTs
+GIVEN duty IS A DEONTIC Person Action
+      events IS A LIST OF EVENT Person Action
+GIVETH A BOOLEAN
+`is fulfilled by` duty events MEANS
+  CONSIDER EVALTRACE duty 0 events
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Gives a DEONTIC; mark it @export too if callers should get the duty itself
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+GIVETH A DEONTIC Person Action
+`the duty` who what deadline MEANS
+  PARTY who
+  MUST EXACTLY what
+  WITHIN deadline
+  HENCE FULFILLED
+  LEST BREACH BY who BECAUSE "the deadline passed without the action"
+
+@export Is the duty fulfilled when the party takes the action on a given day
+GIVEN who IS A Person @desc The party who must act
+      what IS AN Action @desc The action the party must take
+      deadline IS A NUMBER @desc The deadline, in days from the start
+      `day taken` IS A NUMBER @desc The day, in days from the start, on which the party acted
+GIVETH A BOOLEAN
+`duty fulfilled on day` who what deadline `day taken` MEANS
+  `is fulfilled by` (`the duty` who what deadline) (LIST EVENT who what `day taken`)
+
+#EVAL `duty fulfilled on day` Seller `deliver goods` 14 10
+#EVAL `duty fulfilled on day` Seller `deliver goods` 14 20
+```
+
+An exported rule that gives a `DEONTIC`, such as `the duty` above once you mark it `@export`, needs two more fields in the request, `startTime` and `events`.
+The service answers HTTP 400 without either, and `"events": []` asks before anything has happened.
+The answer to `"events": []` holds the names of the inputs where the values should be (`"party": "who"`).
+With events that do not settle the duty, a waiting duty keeps `action` as `EXACTLY what` and gives `deadline` as the time left after the last event, so prefer a yes-or-no rule such as `duty fulfilled on day`.
+`EVALTRACE duty startTime events` runs a duty against events; see [references/regulative.md](references/regulative.md).
+
 ### `@desc` — document parameters
 
 Put an inline `@desc` on **every** `GIVEN` parameter an API caller has to supply. These descriptions flow into the OpenAPI parameter docs and the MCP tool's `inputSchema`, and they are what LLMs read when deciding **how to construct a valid call**.

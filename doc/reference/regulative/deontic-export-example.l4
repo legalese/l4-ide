@@ -1,0 +1,44 @@
+-- A DEONTIC input is for use inside L4 only.
+-- Never give a rule marked @export a DEONTIC input.
+-- It may give a DEONTIC value as its answer.
+
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+-- Not exported: an exported rule cannot take a DEONTIC value or a list of events as an input.
+-- EVALTRACE runs the duty against the events, counting from the start time 0.
+GIVEN duty IS A DEONTIC Person Action
+      events IS A LIST OF EVENT Person Action
+GIVETH A BOOLEAN
+`is fulfilled by` duty events MEANS
+  CONSIDER EVALTRACE duty 0 events
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Exported: plain facts in, a yes-or-no answer out.
+-- The duty and the event are built inside, and handed to `is fulfilled by`.
+@export Is the duty fulfilled when the party takes the action on a given day
+GIVEN who IS A Person @desc The party who must act
+      what IS AN Action @desc The action the party must take
+      deadline IS A NUMBER @desc The deadline, in days from the start
+      `day taken` IS A NUMBER @desc The day, in days from the start, on which the party took the action
+GIVETH A BOOLEAN
+`duty fulfilled on day` who what deadline `day taken` MEANS
+  `is fulfilled by` (`the duty` who what deadline) (LIST EVENT who what `day taken`)
+
+-- Exported: it gives the duty itself as its answer.
+-- The caller adds a start time and the events to the request.
+@export The duty of a party to take an action by a deadline
+GIVEN who IS A Person @desc The party who must act
+      what IS AN Action @desc The action the party must take
+      deadline IS A NUMBER @desc The deadline, in days from the start
+GIVETH A DEONTIC Person Action
+`the duty` who what deadline MEANS
+  PARTY who
+  MUST EXACTLY what
+  WITHIN deadline
+  HENCE FULFILLED
+  LEST BREACH BY who BECAUSE "the deadline passed without the action"
+
+#EVAL `duty fulfilled on day` Seller `deliver goods` 14 10
+#EVAL `duty fulfilled on day` Seller `deliver goods` 14 20

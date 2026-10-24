@@ -14,7 +14,7 @@ import BundleStore (initStore)
 import Compiler (compileBundle, computeVersion)
 import qualified DeploymentLoader
 import qualified Version
-import ControlPlane (DeploymentStatusResponse (..))
+import ControlPlane (DeploymentStatusResponse (..), UpdateStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
 import Types
@@ -2690,6 +2690,363 @@ spec = describe "integration" do
           expectationFailure $
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
+    -- A type name nothing declares is reported as an out-of-scope error whose
+    -- type is TYPE, and the deploy must refuse it with that error. The deploy
+    -- tolerates out-of-scope errors for names that an @export reads without
+    -- declaring them (they become implicit inputs), and that tolerance must
+    -- not reach a type name: an undeclared result type was once refused only
+    -- because the checker went on to report a second, internal error about it.
+    it "rejects an @export whose result type was never declared" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badreturn.l4" $ Text.unlines
+        [ "@export Double a number"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Numbr"
+        , "`double it` MEANS n * 2"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input type was never declared, even if the body never uses it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badinput.l4" $ Text.unlines
+        [ "@export Add one"
+        , "GIVEN n IS A Numbr"
+        , "GIVETH A NUMBER"
+        , "`add one` MEANS 1"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "still publishes an input the module never declared as a name, not as a type" do
+      -- The same out-of-scope error, raised for a name an expression reads:
+      -- the deploy turns it into an input (here `flag`), as it always did.
+      logger <- newLogger False
+      result <- compileBundle logger "test" (Map.singleton "flag.l4" implicitFlagJL4)
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+            `shouldBe` [["flag", "threshold"]]
+    -- An EVENT has no JSON form: the input decoder reads an object only into a
+    -- declared record, and the builtin EVENT type has no declaration. A rule
+    -- that took one used to be published with the input schema `{"type":
+    -- "object"}` and then answered every evaluation with 422. The deploy
+    -- refuses it, as it refuses a function-typed input.
+    it "rejects an @export whose input is an EVENT, and says what to do" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventin.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF delivery, payment"
+        , ""
+        , "@export When did the reported event happen"
+        , "GIVEN `the reported event` IS AN EVENT Person Action"
+        , "GIVETH A NUMBER"
+        , "`when it happened` `the reported event` MEANS"
+        , "  CONSIDER `the reported event`"
+        , "  WHEN EVENT party action time THEN time"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "EVENT inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the reported event"
+          err `shouldSatisfy` Text.isInfixOf "separate inputs"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input holds an EVENT in a list or a record" do
+      logger <- newLogger False
+      let bundle inputs = Map.singleton "eventin.l4" $ Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF delivery, payment"
+            , "DECLARE Report HAS reported IS AN EVENT Person Action"
+            , ""
+            , "@export Count"
+            , "GIVEN x IS A " <> inputs
+            , "GIVETH A BOOLEAN"
+            , "`count` x MEANS TRUE"
+            ]
+      forM_ ["LIST OF EVENT Person Action", "Report"] \inputs -> do
+        result <- compileBundle logger "test" (bundle inputs)
+        case result of
+          Left err -> err `shouldSatisfy` Text.isInfixOf "EVENT inputs are not supported for @export"
+          Right _ -> expectationFailure ("Expected rejection of an input of type " <> Text.unpack inputs)
+
+    it "still publishes an @export that builds its event from separate inputs" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventparts.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF delivery, payment"
+        , ""
+        , "@export When did the event happen"
+        , "GIVEN who IS A Person"
+        , "      what IS AN Action"
+        , "      `at time` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`when it happened` who what `at time` MEANS"
+        , "  CONSIDER EVENT who what `at time`"
+        , "  WHEN EVENT party action time THEN time"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+            `shouldBe` [["at time", "what", "who"]]
+    -- A DEONTIC has no JSON form either: a request can say a number, a string,
+    -- a list or a record, and none of them is a duty. The deploy refuses a
+    -- rule that takes one, as it refuses an EVENT input, and says what to do.
+    it "rejects an @export whose input is a DEONTIC, and says what to do" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "deonticin.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "@export Is a duty already fulfilled"
+        , "GIVEN `the duty` IS A DEONTIC Person Action"
+        , "GIVETH A BOOLEAN"
+        , "`already fulfilled` `the duty` MEANS"
+        , "  CONSIDER `the duty`"
+        , "  WHEN FULFILLED THEN TRUE"
+        , "  OTHERWISE FALSE"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the duty"
+          err `shouldSatisfy` Text.isInfixOf "build the DEONTIC inside it"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input holds a DEONTIC in a list, a MAYBE or a record" do
+      logger <- newLogger False
+      let bundle inputs = Map.singleton "deonticin.l4" $ Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+            , "DECLARE Agreement HAS terms IS A DEONTIC Person Action"
+            , ""
+            , "@export Count"
+            , "GIVEN x IS A " <> inputs
+            , "GIVETH A BOOLEAN"
+            , "`count` x MEANS TRUE"
+            ]
+      forM_ ["LIST OF DEONTIC Person Action", "MAYBE (DEONTIC Person Action)", "Agreement"] \inputs -> do
+        result <- compileBundle logger "test" (bundle inputs)
+        case result of
+          Left err -> err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          Right _ -> expectationFailure ("Expected rejection of an input of type " <> Text.unpack inputs)
+
+    it "still publishes the exported rules that build their DEONTIC from plain inputs" do
+      -- The shape the DEONTIC reference page recommends: the helper that takes a
+      -- DEONTIC and a list of events is not exported, one exported rule asks a
+      -- yes-or-no question from plain facts, and one gives the duty itself (so
+      -- it also takes the start time and the events, which a request carries).
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "deonticparts.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "GIVEN duty IS A DEONTIC Person Action"
+        , "      events IS A LIST OF EVENT Person Action"
+        , "GIVETH A BOOLEAN"
+        , "`is fulfilled by` duty events MEANS"
+        , "  CONSIDER EVALTRACE duty 0 events"
+        , "  WHEN FULFILLED THEN TRUE"
+        , "  OTHERWISE FALSE"
+        , ""
+        , "@export Is the duty fulfilled when the party takes the action on a given day"
+        , "GIVEN who IS A Person"
+        , "      what IS AN Action"
+        , "      deadline IS A NUMBER"
+        , "      `day taken` IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "`duty fulfilled on day` who what deadline `day taken` MEANS"
+        , "  `is fulfilled by` (`the duty` who what deadline) (LIST EVENT who what `day taken`)"
+        , ""
+        , "@export The duty of a party to take an action by a deadline"
+        , "GIVEN who IS A Person"
+        , "      what IS AN Action"
+        , "      deadline IS A NUMBER"
+        , "GIVETH A DEONTIC Person Action"
+        , "`the duty` who what deadline MEANS"
+        , "  PARTY who"
+        , "  MUST EXACTLY what"
+        , "  WITHIN deadline"
+        , "  HENCE FULFILLED"
+        , "  LEST BREACH"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          List.sort [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions]
+            `shouldBe`
+              [ ("duty fulfilled on day", ["day taken", "deadline", "what", "who"])
+              , ("the duty", ["deadline", "events", "startTime", "what", "who"])
+              ]
+
+    -- An input needs no written type: the checker infers it. An input that the
+    -- rule hands to a helper that takes a DEONTIC is a DEONTIC all the same, and
+    -- the deploy refuses it as it refuses a written one.
+    it "rejects an @export whose input has no written type but is used as a DEONTIC" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "untyped.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "GIVEN duty IS A DEONTIC Person Action"
+        , "GIVETH A BOOLEAN"
+        , "`already fulfilled` duty MEANS"
+        , "  CONSIDER duty"
+        , "  WHEN FULFILLED THEN TRUE"
+        , "  OTHERWISE FALSE"
+        , ""
+        , "@export Is a duty already fulfilled"
+        , "GIVEN `the duty`"
+        , "GIVETH A BOOLEAN"
+        , "`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the duty"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input has no written type but is used as an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "untyped.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "GIVEN e IS AN EVENT Person Action"
+        , "GIVETH A NUMBER"
+        , "`time of` e MEANS"
+        , "  CONSIDER e"
+        , "  WHEN EVENT p a t THEN t"
+        , ""
+        , "@export When did it happen"
+        , "GIVEN `the event`"
+        , "GIVETH A NUMBER"
+        , "`when` `the event` MEANS `time of` `the event`"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "EVENT inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the event"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "still publishes an input that has no written type but is used as a NUMBER" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "untyped.l4" $ Text.unlines
+        [ "@export One more"
+        , "GIVEN n"
+        , "GIVETH A NUMBER"
+        , "`plus one` n MEANS n + 1"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          List.sort [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions]
+            `shouldBe` [("plus one", ["n"])]
+
+    -- The service publishes the ASSUMEs of the module itself as inputs, and no
+    -- others, so an ASSUME of another module that an exported rule reads has no
+    -- value in a request. For a DEONTIC the rule answers as if it had a default.
+    it "rejects an @export that reads an ASSUME of type DEONTIC from an imported module" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.fromList
+        [ ( "facts.l4", Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+            , ""
+            , "ASSUME `imported duty` IS A DEONTIC Person Action"
+            ] )
+        , ( "user.l4", Text.unlines
+            [ "IMPORT facts"
+            , ""
+            , "@export Uses an imported assume"
+            , "GIVETH A BOOLEAN"
+            , "`uses imported assume` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ] )
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "imported duty"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    -- An ASSUME that the rule declares itself, under its own WHERE, is in scope
+    -- for that rule alone, and the service lists no input for it. A DEONTIC one
+    -- that the rule reads is refused as an imported one is.
+    it "rejects an @export that reads an ASSUME of type DEONTIC that its own WHERE declares" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "localduty.l4" localDutyJL4
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "local duty"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "stores no deployment of an @export that reads an ASSUME of type DEONTIC that its own WHERE declares" do
+      withEmptyService \baseUrl mgr -> do
+        -- the control: the same rule with a NUMBER ASSUME deploys, so that a
+        -- missing deployment below is the refusal and not a failure to deploy
+        okReq <- buildMultipartRequest (baseUrl <> "/deployments") "local-number" (createZipBundle [("localnumber.l4", localNumberJL4)])
+        okResp <- httpLbs okReq mgr
+        statusCode' okResp `shouldBe` 202
+        pollUntilReady baseUrl mgr "local-number" 60
+        -- the DEONTIC one is accepted for compiling, and the job is rejected
+        postReq <- buildMultipartRequest (baseUrl <> "/deployments") "local-duty" (createZipBundle [("localduty.l4", localDutyJL4)])
+        postResp <- httpLbs postReq mgr
+        statusCode' postResp `shouldBe` 202
+        jobId <- case Aeson.decode (responseBody postResp) :: Maybe DeploymentStatusResponse of
+          Just status | Just updateId <- status.dsUpdateId -> pure (Text.unpack updateId)
+          _ -> expectationFailure "the deploy named no update to poll" >> pure ""
+        job <- pollUpdateDone baseUrl mgr "local-duty" jobId 60
+        job.usStatus `shouldBe` "rejected"
+        job.usError `shouldSatisfy` maybe False (Text.isInfixOf "DEONTIC inputs are not supported for @export")
+        -- and nothing is stored: neither the deployment nor its function is found
+        getReq <- parseRequest (baseUrl <> "/deployments/local-duty")
+        getResp <- httpLbs getReq mgr
+        statusCode' getResp `shouldBe` 404
+        fnReq <- parseRequest (baseUrl <> "/deployments/local-duty/functions/r")
+        fnResp <- httpLbs fnReq mgr
+        statusCode' fnResp `shouldBe` 404
+
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed
@@ -3262,6 +3619,36 @@ beforeAndAfterRestart deployId sources probe = do
   restarted <- withServiceRestarted restartedId sources \baseUrl mgr -> probe baseUrl mgr restartedId
   pure (fresh, restarted)
 
+-- | An exported rule that reads a DEONTIC that its own WHERE declares as an ASSUME.
+localDutyJL4 :: Text
+localDutyJL4 = Text.unlines
+  [ "DECLARE Person IS ONE OF Seller, Buyer"
+  , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+  , ""
+  , "GIVEN duty IS A DEONTIC Person Action"
+  , "GIVETH A BOOLEAN"
+  , "`already fulfilled` duty MEANS"
+  , "  CONSIDER duty"
+  , "  WHEN FULFILLED THEN TRUE"
+  , "  OTHERWISE FALSE"
+  , ""
+  , "@export Is the local duty fulfilled"
+  , "GIVETH A BOOLEAN"
+  , "`r` MEANS `already fulfilled` `local duty`"
+  , "  WHERE"
+  , "    ASSUME `local duty` IS A DEONTIC Person Action"
+  ]
+
+-- | The same shape with a NUMBER: it is not refused.
+localNumberJL4 :: Text
+localNumberJL4 = Text.unlines
+  [ "@export One more than the local number"
+  , "GIVETH A NUMBER"
+  , "`r` MEANS `local number` + 1"
+  , "  WHERE"
+  , "    ASSUME `local number` IS A NUMBER"
+  ]
+
 -- | Start a service with an empty deployment registry.
 withEmptyService :: (String -> Manager -> IO a) -> IO a
 withEmptyService act = do
@@ -3324,6 +3711,18 @@ pollUntilReady baseUrl mgr deployId timeoutSec = go timeoutSec
       _ -> do
         threadDelay 500_000  -- 0.5 seconds
         go (remaining - 1)
+
+-- | Poll a deploy job until it is no longer compiling, with a timeout in seconds.
+pollUpdateDone :: String -> Manager -> String -> String -> Int -> IO UpdateStatusResponse
+pollUpdateDone baseUrl mgr deployId jobId timeoutSec = go timeoutSec
+ where
+  go 0 = fail ("Update " <> jobId <> " of " <> deployId <> " did not finish within timeout")
+  go remaining = do
+    req <- parseRequest (baseUrl <> "/deployments/" <> deployId <> "/updates/" <> jobId)
+    resp <- httpLbs req mgr
+    case Aeson.decode (responseBody resp) :: Maybe UpdateStatusResponse of
+      Just u | u.usStatus /= "compiling" -> pure u
+      _ -> threadDelay 500_000 >> go (remaining - 1)  -- 0.5 seconds
 
 -- | Create a zip archive from a list of (filename, content) pairs.
 createZipBundle :: [(FilePath, Text)] -> LBS.ByteString

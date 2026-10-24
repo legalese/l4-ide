@@ -272,6 +272,7 @@ instance ToSemTokens () PosToken Resolved where
               case termKind of
                 Just Computable -> highlightFunction ty
                 Just Assumed -> withTokenType identIsAssume
+                Just AssumedTerm -> highlightFunction ty
                 Just Local -> highlightFunction ty
                 Just Constructor -> withTokenType identIsCon
                 Just Selector -> withTokenType identIsSelector

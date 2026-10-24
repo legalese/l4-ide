@@ -1,0 +1,11 @@
+-- An exported rule that reads an ASSUME of type DEONTIC that another module
+-- declares. A request has no value for it, and no JSON form for a DEONTIC, so
+-- `l4 check` and `l4 deploy` refuse the rule.
+IMPORT facts
+
+@export Is the imported duty fulfilled
+GIVETH A BOOLEAN
+`imported duty fulfilled` MEANS
+  CONSIDER `imported duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
