@@ -60,7 +60,7 @@ runOptionsParser = RunOptions
 runCmd :: RunOptions -> IO ()
 runCmd opts = do
   evalConfig <- makeEvalConfig opts.runFixedNow
-  (errs, (mTc, mEval)) <- runOneshot evalConfig opts.runFile \nfp -> do
+  (errs, diags, (mTc, mEval)) <- runOneshotWithDiagnostics evalConfig opts.runFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     mtc   <- Shake.use Rules.SuccessfulTypeCheck uri
@@ -88,7 +88,14 @@ runCmd opts = do
           Assertion (Left _) -> False
           _                  -> True)
         evalResults
-      overallOk = typecheckOk && evalOk
+      -- A module the file imports can be broken while the file's own typecheck
+      -- still reports success (an import cycle's error attaches to an imported
+      -- file), so also require that no blocking Error diagnostic was published
+      -- anywhere in the import closure. 'hasBlockingError' leaves out the
+      -- evaluator's own diagnostics (source "eval"), so a failed #ASSERT, which
+      -- is published as one at Error severity, still exits 0; a directive that
+      -- crashed is what 'evalOk' is for.
+      overallOk = typecheckOk && evalOk && not (hasBlockingError diags)
 
   if opts.runJsonOut
     then do

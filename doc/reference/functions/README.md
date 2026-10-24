@@ -37,6 +37,21 @@ mom and dad `have a baby named` kid MEANS
 - A word of the name can be a quoted identifier with spaces, such as `` `is entitled to` ``, so the words can be legal phrases.
 - The words that are not inputs act as keywords of that function. When a call mixes inputs and words, L4 finds the function by those words.
 
+An infix function can also be a later operand of a built-in operator such as `AND`, `OR`, `PLUS` or `EQUALS`:
+
+```l4
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A BOOLEAN
+a `exceeds by at least` b MEANS a AT LEAST b
+
+#EVAL TRUE AND 5 `exceeds by at least` 3
+```
+
+- The call needs no parentheses, because it binds tighter than the infix operators in the precedence table. See [Precedence](../operators/README.md#precedence).
+- All the words of the call must be on the operand's own line.
+- To spread a call over several lines, put it in parentheses and start a new line after the opening parenthesis.
+
 A mixfix function cannot be written as [several clauses](DECIDE.md#several-clauses); use `CONSIDER` in its body.
 
 When to use mixfix, with worked examples: [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md).

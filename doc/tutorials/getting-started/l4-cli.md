@@ -149,7 +149,11 @@ Result:
   50
 ```
 
-Each `Evaluation[n]` block corresponds to one `#EVAL` directive, in file order, with the source range it came from. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch, or an `#ASSERT` whose expression raises) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
+Each `Evaluation[n]` block shows the result of one `#EVAL`, in file order. Results go to standard output; errors and warnings go to standard error.
+
+`l4 run` fails when the file, or a file it imports, has an error, or when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero. The other directives still show their results. Warnings, and an `#ASSERT` that comes out false, don't make it fail.
+
+If a `FETCH` or `POST` can't reach its server, `l4 run` fails and shows no results for any directive in the file. To see the other results, move the directives that make requests to a file of their own.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -195,7 +199,10 @@ l4 check late-fee.l4
 Check succeeded.
 ```
 
-Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics). `--json` and `--fixed-now` work here too.
+Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
+`--json` and `--fixed-now` work here too.
+`l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files. Other commands, such as `l4 render` and `l4 nlg`, don't stop on an error in an imported file.
+Files can't import each other in a ring; [Import cycle](../../reference/errors/README.md#import-cycle) says how to fix one.
 
 ---
 
@@ -474,7 +481,7 @@ Deployed 'late-fee' (version 1.0.0) with 1 function:
 API: https://api.legalese.cloud/acme/late-fee
 ```
 
-The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
+The deployment is named after the file unless you pass `--name`. `l4` runs the same check as `l4 check` on the file first; if it finds an error, nothing is uploaded. Otherwise it uploads the file with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
 
 | Command            | What it does                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -8,6 +8,11 @@ Built-in functions for calling web APIs and for turning L4 values into JSON and 
 
 `FETCH` and `POST` make a real request every time they are evaluated, and only when their result is needed. They accept `https://` addresses only. Where L4 runs in safe mode, as it does in the browser, both give an error instead of making a request.
 
+## When a request fails
+
+In `l4 run`, a request that fails, for example because the server can't be reached, hides the results of every directive in the file, not only that one.
+[Evaluate a file with `l4 run`](../../tutorials/getting-started/l4-cli.md#step-3-l4-run--evaluate-a-file) says what to do.
+
 ## FETCH
 
 `FETCH url` sends a GET request and gives the response body as a STRING.

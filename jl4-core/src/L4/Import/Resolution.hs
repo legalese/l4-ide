@@ -48,6 +48,7 @@ module L4.Import.Resolution
   , ImportResolutionError(..)
     -- * Type Checking with Dependencies
   , typecheckWithDependencies
+  , typecheckWithDependenciesLocated
   , TypeCheckWithDepsResult(..)
   ) where
 
@@ -56,7 +57,8 @@ import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
-import L4.Annotation (emptyAnno)
+import L4.Annotation (emptyAnno, rangeOf)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
@@ -292,25 +294,44 @@ typecheckWithDependencies
   -> NormalizedUri      -- ^ URI of the main module
   -> Text               -- ^ Source code of the main module
   -> m (Either [Text] TypeCheckWithDepsResult)
-typecheckWithDependencies lookupModule uri source = do
+typecheckWithDependencies lookupModule uri source =
+  either (Left . snd) Right <$> typecheckWithDependenciesLocated lookupModule uri source
+
+-- | 'typecheckWithDependencies', where an import error also carries the range
+-- of the main module's @IMPORT@ it belongs to, when that is known: the
+-- @IMPORT@ of the module the error names, or for a cycle, of a module in it.
+typecheckWithDependenciesLocated
+  :: forall m. Monad m
+  => ModuleLookup m     -- ^ How to find module sources
+  -> NormalizedUri      -- ^ URI of the main module
+  -> Text               -- ^ Source code of the main module
+  -> m (Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult)
+typecheckWithDependenciesLocated lookupModule uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
-      pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
+      pure $ Left (Nothing, map (\(PError msg _ _) -> msg) (toList parseErrors))
     
     Right (parsed, _hints, annotationWarnings) -> do
       -- Extract and resolve imports
       let importNames = extractImportNames parsed
+          importRanges = foldTopDecls importRange parsed
+          importRange = \case
+            Import _ (MkImport a n _) -> [(rawNameToText (rawName n), rangeOf a)]
+            _ -> []
+          rangeOfImportOf names = case [ r | (n, Just r) <- importRanges, n `elem` names ] of
+            r : _ -> Just r
+            [] -> Nothing
       
       importResult <- resolveImports lookupModule Set.empty Map.empty importNames
       
       case importResult of
         Left (ModuleNotFound modName searched) ->
-          pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
+          pure $ Left (rangeOfImportOf [modName], ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"])
         Left (ParseError modName errs) ->
-          pure $ Left $ ("Parse error in " <> modName <> ":") : errs
+          pure $ Left (rangeOfImportOf [modName], ("Parse error in " <> modName <> ":") : errs)
         Left (CyclicImport cycleModules) ->
-          pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
+          pure $ Left (rangeOfImportOf cycleModules, ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules])
         
         Right resolvedImports -> do
           -- Combine environments from imports

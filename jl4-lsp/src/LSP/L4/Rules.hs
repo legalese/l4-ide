@@ -96,12 +96,23 @@ data GetImports = GetImports
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The modules a file imports, each with the range of its @IMPORT@, from a
+-- first parse that needs no mixfix hints. Unlike 'GetImports', whose full parse
+-- needs the hints of every imported module, this has an answer for a file in an
+-- import cycle. An @IMPORT@ that resolves to no module is left out.
+type instance RuleResult GetImportEdges = [(Maybe SrcRange, NormalizedUri)]
+data GetImportEdges = GetImportEdges
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
 type instance RuleResult GetMixfixRegistry = Parser.MixfixHintRegistry
 data GetMixfixRegistry = GetMixfixRegistry
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
-type instance RuleResult GetTypeCheckDependencies = [(ImportResult, TypeCheckResult)]
+-- | Each import with its typecheck, 'Nothing' when it has none (it does not
+-- parse, or it is in an import cycle).
+type instance RuleResult GetTypeCheckDependencies = [(ImportResult, Maybe TypeCheckResult)]
 data GetTypeCheckDependencies = GetTypeCheckDependencies
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
@@ -132,6 +143,10 @@ data TypeCheckResult = TypeCheckResult
   , infos :: [TypeCheck.CheckErrorWithContext]  -- ^ Non-fatal diagnostics ('SInfo' and 'SWarn'); don't block 'success'
   , errors :: [TypeCheck.CheckErrorWithContext]  -- ^ Actual errors ('SError' only, e.g. OutOfScopeError) for implicit ASSUME extraction
   , dependencies :: [TypeCheckResult]
+  , importsOk :: Bool
+  -- ^ Every module this one imports, transitively, was found and typechecks.
+  -- 'success' doesn't depend on it: a module checks against what its imports
+  -- did provide.
   , mixfixRegistry :: TypeCheck.MixfixRegistry
   }
   deriving stock (Generic)
@@ -146,6 +161,7 @@ instance NFData TypeCheckResult where
     `seq` scopeMap
     `seq` descMap
     `seq` rnf success
+    `seq` rnf importsOk
     `seq` rnf environment
     `seq` rnf entityInfo
     `seq` rnf infos
@@ -445,6 +461,21 @@ renderEmbedStatus = \ case
     , "  from `cabal install`, check that jl4-core.cabal's `data-files` field still"
     , "  precedes every section (`cabal check` reports it if not) and rebuild."
     ]
+
+-- | The first ring of imports reachable from a module, as the files around it
+-- with the first repeated at the end (@[a, b, a]@), following 'GetImportEdges'.
+firstImportCycleFrom :: NormalizedUri -> Action (Maybe [NormalizedUri])
+firstImportCycleFrom start = snd <$> go Set.empty [] start
+  where
+    go done path u
+      | u `elem` path = pure (done, Just (dropWhile (/= u) (reverse path) <> [u]))
+      | u `Set.member` done = pure (done, Nothing)
+      | otherwise = do
+          targets <- maybe [] (map snd) <$> use GetImportEdges u
+          let step (d, found@(Just _)) _ = pure (d, found)
+              step (d, Nothing) t = go d (u : path) t
+          (done', found) <- foldM step (done, Nothing) targets
+          pure (Set.insert u done', found)
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -747,6 +778,30 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         let combinedHints = localHints <> importedHints
         pure ([], Just combinedHints)
 
+  define shakeRecorder $ \GetImportEdges uri -> do
+    (tokens, contents) <- use_ GetLexTokens uri
+    case Parser.execProgramParserForTokens uri contents tokens of
+      Left _errs -> pure ([], Just [])
+      Right (firstProg, _) -> do
+        let extractImport :: TopDecl Name -> [(Maybe SrcRange, Name)]
+            extractImport = \case
+              Import _ (MkImport a n _) -> [(rangeOf a, n)]
+              _ -> []
+            resolveEdge (range, n) = do
+              let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+              outcome <- resolveImport uri modName
+              pure (fmap (\u -> (range, u)) outcome.importUri)
+        edges <- catMaybes <$> traverse resolveEdge (foldTopDecls extractImport firstProg)
+        -- Reported here because this rule needs no full parse: a file that
+        -- imports itself never gets one.
+        let selfImportDiags =
+              [ mkSimpleFileDiagnostic uri
+                  (mkSimpleDiagnostic "import" "This IMPORT names the file it is in. A file cannot import itself." (fromSrcRange <$> range))
+              | (range, target) <- edges
+              , target == uri
+              ]
+        pure (selfImportDiags, Just edges)
+
   define shakeRecorder $ \GetParsedAst uri -> do
     (tokens, contents) <- use_ GetLexTokens uri
     -- Get combined mixfix hints (local + all imports)
@@ -806,12 +861,67 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
 
   defineWithCallStack shakeRecorder $ \GetTypeCheckDependencies cs uri -> do
     imports <- use_  GetImports uri
-    ress    <- fmap catMaybes $ zipWith (\res mres -> (res,) <$> mres) imports <$> uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) imports)
+    -- An import that resolves to this file is either one that finds no module
+    -- ('GetImports' resolves those here, and reports them) or the file
+    -- importing itself ('GetImportEdges' reports that). Typechecking it would
+    -- only add the engine's "depends on itself" on top.
+    let others = filter ((/= uri) . (.moduleUri)) imports
+    results <- uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) others)
+    let byUri = Map.fromList (zip (map (.moduleUri) others) results)
+        ress = [ (i, join (Map.lookup i.moduleUri byUri)) | i <- imports ]
     pure ([], Just ress)
 
   defineWithCallStack shakeRecorder $ \TypeCheckNoCallstack cs uri -> do
+    -- Before the parse, which fails for a file that imports itself: this
+    -- publishes the error that says so.
+    _            <- use GetImportEdges uri
     parsed       <- use_ GetParsedAst uri
-    (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+    importResults <- use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+    -- An import with no typecheck is usually in a ring of imports. Find it, so
+    -- the message can name the files instead of the engine's rule names.
+    rings <- traverse
+      (\(imp, mTc) -> case mTc of
+          Nothing | imp.moduleUri /= uri -> firstImportCycleFrom imp.moduleUri
+          _ -> pure Nothing)
+      importResults
+    let (imported, dependencies) = unzip [ (i, tc) | (i, Just tc) <- importResults ]
+        fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
+        arrows = Text.intercalate " -> " . map fileName
+        -- What is wrong with an imported module, if anything. The error itself
+        -- is reported in that module; this points at it from the IMPORT.
+        importProblem :: ImportResult -> Maybe [NormalizedUri] -> Maybe TypeCheckResult -> Maybe Text
+        importProblem imp ring = \case
+          Nothing -> Just $ case ring of
+            Just r
+              | uri `elem` r ->
+                  "This IMPORT makes a ring of imports: " <> arrows (startingAt uri r)
+                    <> ". Files cannot import each other in a ring."
+              | otherwise ->
+                  "The imported module " <> modName <> " is in a ring of imports: " <> arrows r
+                    <> ". Files cannot import each other in a ring."
+            Nothing -> "The imported module " <> modName <> " could not be checked; see the errors in it."
+          Just tc
+            | e : _ <- tc.errors ->
+                Just $ "The imported module " <> modName <> " has errors"
+                  <> maybe "" (\r -> " (line " <> Text.pack (show r.start.line) <> ": " <> firstLine e <> ")") (rangeOf e)
+            | not tc.success -> Just $ "The imported module " <> modName <> " has errors."
+            | not tc.importsOk -> Just $ "The imported module " <> modName <> " imports a module with errors."
+            | otherwise -> Nothing
+          where
+            modName = rawNameToText (rawName imp.importName)
+            -- The same ring, read from @u@: [b, a, b] from a is [a, b, a].
+            startingAt u r = case break (== u) (List.init r) of
+              (before, after) -> after <> before <> take 1 after
+            firstLine e = Text.strip $ Maybe.fromMaybe "" $ Maybe.listToMaybe $ concatMap Text.lines $ TypeCheck.prettyCheckError e.kind
+        importDiags =
+          [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "import" msg (fromSrcRange <$> imp.importRange))
+          | ((imp, mTc), ring) <- zip importResults rings
+          -- An IMPORT that finds no module resolves to its own file, and
+          -- 'GetImports' already reports it on that IMPORT.
+          , imp.moduleUri /= uri
+          , Just msg <- [importProblem imp ring mTc]
+          ]
+
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
 
@@ -840,7 +950,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- of this partition — it decides which go to 'infos' and which to 'errors'.
         (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
     pure
-      ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
+      ( importDiags <> fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
       , Just TypeCheckResult
         { module' = result.program
         , substitution = result.substitution
@@ -858,6 +968,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , scopeMap = result.scopeMap
         , descMap = result.descMap
         , dependencies = dependencies <> foldMap (.dependencies) dependencies
+        , importsOk = all (\(_, mTc) -> maybe False (\tc -> tc.success && tc.importsOk) mTc) importResults
         , mixfixRegistry = result.mixfixRegistry
         }
       )
