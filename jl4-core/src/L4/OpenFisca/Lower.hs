@@ -405,6 +405,7 @@ constructorName = \case
   -- Explicit, ABOVE the wildcard: without this a refusal is rejected as a
   -- nameless "expression" and the author cannot tell what was refused.
   Refuse{}     -> "REFUSE (a refusal has no OpenFisca form: a variable always returns a value)"
+  Lifecycle{}  -> "THE JOIN / THE DEADLINE / THE ARMING (a position in an obligation's life, which OpenFisca does not model)"
   _            -> "expression"
 
 -- ---------------------------------------------------------------------------

@@ -301,6 +301,12 @@ data CheckError =
     -- since 2026-09-16, §5.1.2) written where the position it names does
     -- not exist. Carries the edge's keyword (for the wording), the anchor
     -- for its source range and the reason (see 'AnchorRefusal').
+  | LifecycleUnavailable LifecyclePoint (Expr Name) AnchorRefusal
+    -- ^ A lifecycle VALUE (@THE JOIN@ \/ @THE DEADLINE@ as an expression,
+    -- §2.6 card B1, built 2026-10-24) written where the position it names
+    -- does not exist: the same refusals as 'AnchorUnavailable', worded for
+    -- a value rather than an @OF@. Carries the point, the expression for
+    -- its source range, and the reason.
   | AnchorNotAnInstant EdgeWord (Expr Name) (Type' Resolved)
     -- ^ The expression after @OF@ in a @WITHIN@ or an @AFTER@ (R-Q7C) is
     -- neither a NUMBER (an instant on the trace's own clock) nor a DATE.
@@ -446,6 +452,17 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
+  | LifecycleNounHidesName LifecyclePoint (Maybe SrcRange) [Name]
+    -- ^ @THE JOIN@, @THE DEADLINE@ or @THE ARMING@ written where the program
+    -- has its own value spelled @JOIN@, @DEADLINE@ or @ARMING@ in scope
+    -- ('L4.TypeCheck.checkLifecycle'). Since the nouns became values (§2.6
+    -- card B1, 2026-10-24), @THE@ before one of them is always the lifecycle
+    -- position: before, @WITH start IS THE DEADLINE@ passed the program's own
+    -- @DEADLINE@ (the article was optional). Under a @HENCE@ that change is
+    -- silent — a different number, no error — so this says so. A warning,
+    -- never an error: dropping the @THE@ reaches the program's value, and
+    -- renaming it silences the warning. Carries the point, the range of the
+    -- @THE …@ written, and the program's bindings of that spelling.
   | OpenedFieldShadowsDefinition OpenedFieldShadow
     -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read that an opened field
     -- won over a 0-ary constructor or top-level definition of the same name.
@@ -875,6 +892,7 @@ instance HasSrcRange CheckError where
   rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (AnchorUnavailable _ a _)         = rangeOf a
+  rangeOf (LifecycleUnavailable _ e _)      = rangeOf e
   rangeOf (AnchorNotAnInstant _ e _)        = rangeOf e
   rangeOf (OpeningNotAnInstant e _)         = rangeOf e
   rangeOf (AbsoluteEdgeAnchored a)          = rangeOf a
@@ -884,6 +902,7 @@ instance HasSrcRange CheckError where
   rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
+  rangeOf (CheckWarning (LifecycleNounHidesName _ mr _)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
@@ -1125,6 +1144,12 @@ data CheckEnv =
     -- the lifecycle anchors of an anchored @WITHIN@ refer to (R-Q7B). Set
     -- via 'local' in 'L4.TypeCheck.checkDeontonBody'; @Nothing@ at the top
     -- level and, like 'inNonexhaustiveDecide', never carried across imports.
+    , onJoinLine           :: !Bool
+    -- ^ Are we checking a join line's own @WITHIN@ (its duration or its
+    -- anchor)? There a lifecycle VALUE (@THE JOIN@ \/ @THE DEADLINE@,
+    -- 'L4.TypeCheck.checkLifecycle') is refused as the bare anchor is
+    -- (refusal 3, §5.1.1.1): that @WITHIN@ is what defines both. Set via
+    -- 'local' in 'L4.TypeCheck.checkDeadline'; never carried across imports.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
     , localBindings        :: !(Set Unique)
@@ -1219,6 +1244,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
     , enclosingObligation = Nothing
+    , onJoinLine = False
     , errorContext = None
     , sectionStack = []
     , localBindings = Set.empty
@@ -2717,6 +2743,7 @@ extendEnv cis env =
     , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , enclosingObligation = e.enclosingObligation
+    , onJoinLine = e.onJoinLine
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     , actionPatternPos = e.actionPatternPos

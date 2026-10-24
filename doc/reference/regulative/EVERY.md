@@ -387,6 +387,10 @@ Either `WITHIN` may be anchored with `OF`, as described under [WITHIN](consequen
 
 **On a join line's `WITHIN`**, only two anchors make sense, and only two are accepted: `THE ARMING` — the `EVERY`'s own arming, which is also what it counts from unanchored — and an instant, `OF closingDate` or `OF (YMD 2026 6 30)`. `THE JOIN` and `THE DEADLINE` are refused, because the join line's `WITHIN` _is_ the group's deadline and its join has not fired when it is read.
 
+The anchor words are also [values](consequences.md#the-anchor-words-as-values), and the join line reads them the same way: `ONCE ALL HAVE WITHIN 0 OF (THE ARMING PLUS 14)` is the same deadline as `WITHIN 14 OF THE ARMING`, the `EVERY`'s own arming however deeply it is nested (`jl4/examples/ok/every/run-lifecycle-values.l4` §10), and `THE JOIN` or `THE DEADLINE` written anywhere in that `WITHIN` is refused (`jl4/examples/not-ok/tc/lifecycle-value-on-join-line.l4`).
+A `WHERE` name for `THE ARMING` written in the enclosing `HENCE` is not on the join line: it is the arming of the obligation that `HENCE` belongs to (§10 of the same file).
+In a barrier's `HENCE`, `THE JOIN PLUS 3` is three after the last member acted (the same file, §6).
+
 Note that the same words mean different instants on the two lines of a **nested** `EVERY`. On the act line, `WITHIN 14 OF THE ARMING` counts from the arming of the obligation the `EVERY` sits under, which is _earlier_ than the `EVERY`'s own arming — so naming the anchor there moves the deadline earlier than leaving it off; on the join line, `ONCE ALL HAVE WITHIN 14 OF THE ARMING` counts from the `EVERY`'s own arming, exactly as it would unanchored. Leave the act line unanchored if the `EVERY`'s arming is what you mean. A join line's `OF expression` is read when the join fires, after the last member has acted, not when the `EVERY` is armed; when the join line's `WITHIN` also serves as each member's deadline (no act `WITHIN`), each member reads it again at that member's first event.
 
 ```l4

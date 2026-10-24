@@ -238,6 +238,7 @@ nlgExpr = \ case
       pure $ Breach ann mParty' mReason'
     Refuse ann msg -> Refuse ann <$> nlgExpr msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
+    Lifecycle ann p -> pure $ Lifecycle ann p
 
 nlgPattern :: Pattern Resolved -> Check (Pattern Resolved)
 nlgPattern = \ case

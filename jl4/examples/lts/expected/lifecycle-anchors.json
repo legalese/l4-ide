@@ -1,0 +1,422 @@
+[
+  {
+    "advancing": [],
+    "breaching": [
+      {
+        "breach": {
+          "anchor": 0,
+          "due": 13,
+          "missed": "MUST Deliver alice",
+          "names": [
+            {
+              "due": 13,
+              "missed": "MUST Deliver alice",
+              "party": "Tenant OF \"Alice\""
+            }
+          ],
+          "party": "Tenant OF \"Alice\"",
+          "reason": "revealed when the clock ran on with nothing happening",
+          "seenAt": 14
+        },
+        "event": {
+          "at": 14,
+          "deadline": 13,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "Deliver alice",
+              "modal": "MUST",
+              "party": "alice"
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 8,
+    "contract": "`noun anchor`",
+    "deadlineNotKnown": [],
+    "discharging": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "at": 8,
+        "kind": "act",
+        "party": "alice"
+      }
+    ],
+    "events": [
+      "PARTY alice DOES Sign OF alice AT 8"
+    ],
+    "format": 1,
+    "line": 44,
+    "nextDeadline": {
+      "at": 13,
+      "whose": [
+        {
+          "action": "Deliver OF (Tenant OF \"Alice\")",
+          "modal": "MUST",
+          "party": "alice"
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "dueAnchor": "THE JOIN",
+        "dueBy": 13,
+        "dueWithin": "5",
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "alice"
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "inProgress"
+    },
+    "steps": [
+      {
+        "clock": 8,
+        "event": {
+          "action": "Sign OF …",
+          "at": 8,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Tenant OF \"Alice\""
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 8,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": null,
+          "partyAsWritten": "alice"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [
+      {
+        "breach": {
+          "anchor": 0,
+          "due": 13,
+          "missed": "MUST Deliver alice",
+          "names": [
+            {
+              "due": 13,
+              "missed": "MUST Deliver alice",
+              "party": "Tenant OF \"Alice\""
+            }
+          ],
+          "party": "Tenant OF \"Alice\"",
+          "reason": "revealed when the clock ran on with nothing happening",
+          "seenAt": 14
+        },
+        "event": {
+          "at": 14,
+          "deadline": 13,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "Deliver alice",
+              "modal": "MUST",
+              "party": "alice"
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 8,
+    "contract": "`bracketed noun`",
+    "deadlineNotKnown": [],
+    "discharging": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "at": 8,
+        "kind": "act",
+        "party": "alice"
+      }
+    ],
+    "events": [
+      "PARTY alice DOES Sign OF alice AT 8"
+    ],
+    "format": 1,
+    "line": 47,
+    "nextDeadline": {
+      "at": 13,
+      "whose": [
+        {
+          "action": "Deliver OF (Tenant OF \"Alice\")",
+          "modal": "MUST",
+          "party": "alice"
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "dueAnchor": "(THE JOIN)",
+        "dueBy": 13,
+        "dueWithin": "5",
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "alice"
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "inProgress"
+    },
+    "steps": [
+      {
+        "clock": 8,
+        "event": {
+          "action": "Sign OF …",
+          "at": 8,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Tenant OF \"Alice\""
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 8,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": null,
+          "partyAsWritten": "alice"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [
+      {
+        "breach": {
+          "anchor": 0,
+          "due": 13,
+          "missed": "MUST Deliver alice",
+          "names": [
+            {
+              "due": 13,
+              "missed": "MUST Deliver alice",
+              "party": "Tenant OF \"Alice\""
+            }
+          ],
+          "party": "Tenant OF \"Alice\"",
+          "reason": "revealed when the clock ran on with nothing happening",
+          "seenAt": 14
+        },
+        "event": {
+          "at": 14,
+          "deadline": 13,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "Deliver alice",
+              "modal": "MUST",
+              "party": "alice"
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 8,
+    "contract": "`bracketed arming`",
+    "deadlineNotKnown": [],
+    "discharging": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "at": 8,
+        "kind": "act",
+        "party": "alice"
+      }
+    ],
+    "events": [
+      "PARTY alice DOES Sign OF alice AT 8"
+    ],
+    "format": 1,
+    "line": 50,
+    "nextDeadline": {
+      "at": 13,
+      "whose": [
+        {
+          "action": "Deliver OF (Tenant OF \"Alice\")",
+          "modal": "MUST",
+          "party": "alice"
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "dueAnchor": "(THE ARMING)",
+        "dueBy": 13,
+        "dueWithin": "10",
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "alice"
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "inProgress"
+    },
+    "steps": [
+      {
+        "clock": 8,
+        "event": {
+          "action": "Sign OF …",
+          "at": 8,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Tenant OF \"Alice\""
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 8,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": null,
+          "partyAsWritten": "alice"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 8,
+    "contract": "`arithmetic on the noun`",
+    "deadlineNotKnown": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "modal": "MUST",
+        "party": "alice"
+      }
+    ],
+    "discharging": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "at": 8,
+        "kind": "act",
+        "party": "alice"
+      }
+    ],
+    "events": [
+      "PARTY alice DOES Sign OF alice AT 8"
+    ],
+    "format": 1,
+    "line": 53,
+    "nextDeadline": null,
+    "owed": [
+      {
+        "action": "Deliver OF (Tenant OF \"Alice\")",
+        "dueAnchor": "(THE JOIN PLUS 5)",
+        "dueWithin": "0",
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "alice"
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "inProgress"
+    },
+    "steps": [
+      {
+        "clock": 8,
+        "event": {
+          "action": "Sign OF …",
+          "at": 8,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Tenant OF \"Alice\""
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 8,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": null,
+          "partyAsWritten": "alice"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": [
+      {
+        "event": {
+          "kind": "noTick",
+          "whose": [
+            {
+              "action": "Deliver alice",
+              "modal": "MUST",
+              "party": "alice"
+            }
+          ]
+        },
+        "why": "the anchor of the WITHIN is not a literal, so its deadline is not known here"
+      }
+    ]
+  }
+]

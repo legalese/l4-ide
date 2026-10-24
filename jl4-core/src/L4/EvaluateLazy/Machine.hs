@@ -1881,6 +1881,16 @@ forwardExpr env = \ case
       InertCtxAnd  -> continueBackward (ValBool True)
       InertCtxOr   -> continueBackward (ValBool False)
       InertCtxNone -> continueBackward (ValBool True)  -- Default to True for compatibility
+  -- THE JOIN / THE DEADLINE / THE ARMING as a value (§2.6 card B1): the
+  -- binding the nearest hand-off made in this environment ('bindLifecycle'),
+  -- or this obligation's own arming ('withOwnArming'). Absent, the noun
+  -- names a position that does not exist where it ran — which the checker
+  -- refuses where it can see it ('L4.TypeCheck.checkLifecycle') — and the
+  -- run refuses it by name rather than as a scope error.
+  Lifecycle _ann p ->
+    case Map.lookup (lifecyclePointUnique p) env of
+      Just r  -> continueRef r
+      Nothing -> userException (UserError (lifecycleValueRefusal p))
 
 backward :: WHNF -> Machine Config
 backward val = withPoppedFrameKeepingUpdate $ \ case
@@ -1975,7 +1985,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- name in this obligation's continuation (R-Q7B), so keep it —
         -- 'time' itself advances with every scrutinised event; no event has
         -- been taken from the stream yet
-        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, seen = 0, ..}))
+        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, seen = 0, env = withOwnArming time env, ..}))
         continueRef events
       ValQuantified env deonton -> do
         -- EVERY meets its event stream: this is the arming point, so the roll
@@ -3154,7 +3164,7 @@ backwardContractFrame val = \ case
     -- instant an OF-expression names. OF THE JOIN and OF THE DEADLINE are
     -- refused on a join line by the checker ('L4.TypeCheck.checkAnchor').
     case joinStateDue ctx of
-      Just (MkDeadline _ _ (Just (AnchorAt _ e))) -> continueExpr ctx.env e
+      Just (MkDeadline _ _ (Just (AnchorAt _ e))) -> continueExpr (joinLineEnv ctx) e
       Just (MkDeadline _ _ (Just a@AnchorJoin{}))     -> unreachableAnchor a
       Just (MkDeadline _ _ (Just a@AnchorDeadline{})) -> unreachableAnchor a
       Just MkBefore{} -> beforeOnJoinLine
@@ -3725,6 +3735,24 @@ memberEnv ctx mdue mref =
       DemotedJoinDue _ -> Map.insert lifecycleArmingUnique ctx.time
       _                -> id
 
+-- | The environment a join line's own @WITHIN@ (its duration, and an
+-- anchor written as an expression) is evaluated in: the EVERY's, with THE
+-- ARMING bound to the EVERY's own arming — what a bare @OF THE ARMING@ on
+-- that line already means ('Barrier3', 'memberEnv') — so that
+-- @OF (THE ARMING PLUS 2)@ and @OF THE ARMING@ name the same instant
+-- however deep the EVERY is nested. THE JOIN and THE DEADLINE are deleted:
+-- that @WITHIN@ is what defines both, so an outer obligation's must not
+-- show through (refusal 3; the checker refuses a noun WRITTEN there,
+-- 'L4.TypeCheck.checkLifecycle'). A value built elsewhere keeps the
+-- environment it closed over. Overriding an outer arming here, rather
+-- than binding it only where absent, is assumed, not ruled (2026-10-24).
+joinLineEnv :: QuantCtx -> Environment
+joinLineEnv ctx =
+  Map.insert lifecycleArmingUnique ctx.time
+    . Map.delete lifecycleJoinUnique
+    . Map.delete lifecycleDeadlineUnique
+    $ ctx.env
+
 -- | Does this expression name the quantifier's member variable anywhere?
 mentionsVar :: Resolved -> Expr Resolved -> Bool
 mentionsVar v = any (sameResolved v)
@@ -4034,7 +4062,7 @@ barrierJoined ctx t evs dueLatest = case joinStateDue ctx of
   Just (MkDeadline _ duration _) -> do
     pushFrame (ContractFrame
       (Barrier3 BarrierStateDueFrame {ctx, joinTime = t, joinEvents = evs}))
-    continueExpr ctx.env duration
+    continueExpr (joinLineEnv ctx) duration
   Just MkBefore{} -> beforeOnJoinLine
 
 -- | A @BEFORE@ on a join line is refused by the checker
@@ -4275,6 +4303,28 @@ operandHandoff env = \ case
   Left _  -> for_ (lifecycleOf env) (pushFrame . ContractFrame . Handoff)
   Right _ -> pure ()
 
+-- | The unique a lifecycle VALUE reads ('Lifecycle', §2.6 card B1): the
+-- same three the anchors read.
+lifecyclePointUnique :: LifecyclePoint -> Unique
+lifecyclePointUnique = \ case
+  LifecycleJoin     -> lifecycleJoinUnique
+  LifecycleDeadline -> lifecycleDeadlineUnique
+  LifecycleArming   -> lifecycleArmingUnique
+
+-- | An obligation's environment as it is armed: THE ARMING bound to the
+-- arming instant ONLY where no hand-off bound one (§2.6 card B1, "THE
+-- ARMING bound only where absent"). Under a HENCE or LEST the hand-off's
+-- binding stands — THE ARMING there is when the obligation this one
+-- continues was entered, as a bare @OF THE ARMING@ says ('resolveAnchor'
+-- falls back to 'armed' exactly where this binds it). At the top level it
+-- is this obligation's own arming, so @WITHIN 5 OF (THE ARMING)@ and
+-- @WITHIN 5 OF THE ARMING@ agree there too. What it cannot reach is a
+-- value that never reaches an obligation: a top-level
+-- @WHERE t MEANS THE ARMING@ is a thunk over the rule's environment, which
+-- no arming touched, and is refused by name when forced.
+withOwnArming :: Reference -> Environment -> Environment
+withOwnArming armedAt = Map.alter (Just . fromMaybe armedAt) lifecycleArmingUnique
+
 -- | Resolve a lifecycle anchor: the binding, or the fallback (THE ARMING with
 -- no enclosing obligation is the obligation's own arming), or — for an
 -- anchor the checker should have refused — a named refusal rather than a
@@ -4305,6 +4355,24 @@ lifecycleRefusal a = Text.unwords
   , "WITHIN (THE DEADLINE); or it is running with no enclosing obligation at"
   , "all. Anchor it to THE ARMING or to an instant, give the enclosing"
   , "obligation the WITHIN, or guard an EVERY that may range over nobody."
+  ]
+
+-- | What the machine says when a lifecycle VALUE ('Lifecycle') is forced
+-- where the position it names does not exist: the value's counterpart of
+-- 'lifecycleRefusal', worded for an expression rather than an @OF@.
+lifecycleValueRefusal :: LifecyclePoint -> Text
+lifecycleValueRefusal p = Text.unwords
+  [ lifecyclePointWords p <> " was read where it names nothing: it is the"
+  , Text.toLower (Text.drop 4 (lifecyclePointWords p)) <> " of the obligation an expression"
+  , "sits in the HENCE or LEST of, and this one was evaluated where no"
+  , "obligation had that position. One of: it was defined at the top level"
+  , "(a top-level rule's WHERE, or a function's body) and used there, where no"
+  , "obligation has been entered; it was passed in a value attached under a"
+  , "LEST, whose join never fired (THE JOIN), or under an obligation with no"
+  , "WITHIN (THE DEADLINE); or this is the HENCE of a barrier whose cast was"
+  , "EMPTY, so nobody had a deadline (THE DEADLINE). Read it inside the HENCE"
+  , "or LEST whose position it means, and pass it to a function as an"
+  , "argument from there."
   ]
 
 -- | An anchor's instant on the trace's clock (R-Q7C): a NUMBER as it is, a
@@ -7591,7 +7659,8 @@ armedAfterDeadlineNote modal actPat due entered deadline = Text.unwords $
       DMay     -> [ "so it could never be exercised in time: it lapses at " <> prettyRatio entered <> ", when it was entered." ]
       _        -> [ "so it could never be met in time: it fails at " <> prettyRatio entered <> ", when it was entered." ]
     cause = case due of
-      Left (Just (MkDeadline _ _ (Just AnchorArming{}))) ->
+      Left (Just (MkDeadline _ _ (Just a)))
+        | lifecyclePointOfAnchor a == Just LifecycleArming ->
         [ "Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when"
         , "the obligation it continues was entered, not when this one was." ]
       Left (Just (MkDeadline _ _ (Just anchor))) ->
@@ -7688,11 +7757,8 @@ emptyWindowNote (MkOpening _ _ moa) closing openAbsolute anchorIsClock open clos
       , "Drop the anchor from the WITHIN to count it from the instant the window"
       , "opens, or make the closing offset at least the opening one —" ]
     words' a = Text.strip (prettyLayout a)
-    sameNoun a b = case (a, b) of
-      (AnchorJoin{},     AnchorJoin{})     -> True
-      (AnchorDeadline{}, AnchorDeadline{}) -> True
-      (AnchorArming{},   AnchorArming{})   -> True
-      _                                    -> False
+    -- bare or bracketed, @OF THE JOIN@ and @OF (THE JOIN)@ are one noun
+    sameNoun a b = isJust (lifecyclePointOfAnchor a) && lifecyclePointOfAnchor a == lifecyclePointOfAnchor b
     demoted = \ case
       AnchorArming a -> isEmptyAnno a
       _              -> False
