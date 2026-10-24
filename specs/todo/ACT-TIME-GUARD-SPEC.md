@@ -179,6 +179,7 @@ Measured: the fixture's §1 "Wed 4 Nov is late" trace turns FULFILLED when on-or
 
 **Not built, on purpose:** the ACTUS, ISDA and FpML compatibility libraries that Meng's note proposes.
 They are to be discussed first; this library does not wire up actus-core's `Business Day Convention` either.
+Placement ruled: such standards libraries live in `legalese/commons`, not in `jl4-core/libraries`. Meng, in chat 2026-10-25: "I’d rather put the standards in commons tbh. Wanna keep the core library small." Building them is not yet ruled.
 The first thing such a library would have to settle is the mismatch recorded in §2: actus-core's five codes are not ACTUS's nine.
 
 Still assumed, not ruled: the calendar as a positive `NUMBER`-to-`BOOLEAN` function; the refusal below day number 365; the 366-day search bound; `business days between` excluding the first day; reading (a) deferred until two encodings need it.
