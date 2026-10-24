@@ -1491,6 +1491,19 @@ obligation's slot), so the definition site decides, not the use site, and the ch
 carries `enclosingObligation` and `inSlot`; the refusal would be "`THE ARMING` with no enclosing
 obligation and not inside a deonton's own slots" — but it would be a fifth refusal, which B1 did not rule: open, for a ruling.
 
+**Business-day clauses: reading (a) deferred, 2026-10-24 (assumed, not ruled; the library is proposed, not ruled).**
+A clause that mentions business days or public holidays is either (a) a condition on the act ("service may not be effected on a Sunday") or (b) arithmetic on the deadline ("if the fifth day falls on a Saturday, the next business day").
+B6 already puts (b) in a library, and `jl4-core/libraries/calendar.l4` now is that library (its function names are option A of the open question in `ACT-TIME-GUARD-SPEC.md` §7; Meng has not ruled them).
+Reading (a) is writable today as an act-carried day under `PROVIDED`, which is already house style; no act-time noun or binder is built.
+Evidence: `EVERY-EACH-WINDOW-CORPUS-EVIDENCE-2026-09-16.md` §5 counts "weekend / holiday / period rollover" at 22 (contracts) and 16 (legislation) of 1,520 sampled hits per register, and business-, working-, trading- or banking-day units at 242 and 83.
+Two single-labeller re-reads of the 3,040 sampled contexts found no case of reading (a) (reported by the design panel, not re-run here).
+The limit is the instrument's: it samples deadline phrases, so it cannot see a stand-alone prohibition such as "no service on a Sunday", and reading (a) is unmeasured, not absent.
+**Trigger for revisiting:** build an act-time noun or binder when two independent encodings need reading (a) and the act-carried day is unacceptable for them, and rule its spelling on a bench.
+**Precondition for any `AT name` binder:** `Parser.hs:825-832` parses `#CONTRACT expr [STARTING] AT expr WITH`, so an `AT name` suffix on an action inside a contract expression is ambiguous with the directive's own `AT`; the directive head must be guarded first.
+**Open, for a ruling:** should an act passed over by a false `PROVIDED` leave a run-time note?
+Today it is silent in `l4 run` (measured 2026-10-24, `jl4/examples/ok/calendar-rollover.l4`) and `l4 lts --steps` lists it as "passed over", while an early act under `AFTER` gets a note (R-X6).
+Detail, the fixtures and what was measured: `ACT-TIME-GUARD-SPEC.md`.
+
 **B3 settled by SEESAW.** Meng, 2026-09-21: _"the RAND and ROR operators ought to be commutative,
 don't you think?"_; 2026-09-22: _"do we need to break a tie? i thought we switched blame from
 singular to NonEmtpy List"_; 2026-10-09, firing SEESAW: _"re N3, surely we should warn/error
