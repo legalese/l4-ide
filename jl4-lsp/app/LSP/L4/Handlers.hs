@@ -837,7 +837,7 @@ handlers evalConfig recorder =
                   [ Inspector.BlockingError
                       { uri = getUri (fromNormalizedUri c.importer)
                       , line = Maybe.fromMaybe 1 c.line
-                      , message = "Import cycle: " <> Text.intercalate " → " (map fileName c.cycle)
+                      , message = "Import cycle: " <> Text.intercalate " -> " (map fileName c.cycle)
                       }
                   | c <- cycles
                   ]

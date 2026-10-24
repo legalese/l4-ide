@@ -462,6 +462,21 @@ renderEmbedStatus = \ case
     , "  precedes every section (`cabal check` reports it if not) and rebuild."
     ]
 
+-- | The first ring of imports reachable from a module, as the files around it
+-- with the first repeated at the end (@[a, b, a]@), following 'GetImportEdges'.
+firstImportCycleFrom :: NormalizedUri -> Action (Maybe [NormalizedUri])
+firstImportCycleFrom start = snd <$> go Set.empty [] start
+  where
+    go done path u
+      | u `elem` path = pure (done, Just (dropWhile (/= u) (reverse path) <> [u]))
+      | u `Set.member` done = pure (done, Nothing)
+      | otherwise = do
+          targets <- maybe [] (map snd) <$> use GetImportEdges u
+          let step (d, found@(Just _)) _ = pure (d, found)
+              step (d, Nothing) t = go d (u : path) t
+          (done', found) <- foldM step (done, Nothing) targets
+          pure (Set.insert u done', found)
+
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
 -- (typecheck-dependency resolution), so the two rules can never load different
@@ -777,7 +792,15 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
               outcome <- resolveImport uri modName
               pure (fmap (\u -> (range, u)) outcome.importUri)
         edges <- catMaybes <$> traverse resolveEdge (foldTopDecls extractImport firstProg)
-        pure ([], Just edges)
+        -- Reported here because this rule needs no full parse: a file that
+        -- imports itself never gets one.
+        let selfImportDiags =
+              [ mkSimpleFileDiagnostic uri
+                  (mkSimpleDiagnostic "import" "This IMPORT names the file it is in. A file cannot import itself." (fromSrcRange <$> range))
+              | (range, target) <- edges
+              , target == uri
+              ]
+        pure (selfImportDiags, Just edges)
 
   define shakeRecorder $ \GetParsedAst uri -> do
     (tokens, contents) <- use_ GetLexTokens uri
@@ -838,18 +861,45 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
 
   defineWithCallStack shakeRecorder $ \GetTypeCheckDependencies cs uri -> do
     imports <- use_  GetImports uri
-    ress    <- zip imports <$> uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) imports)
+    -- An import that resolves to this file is either one that finds no module
+    -- ('GetImports' resolves those here, and reports them) or the file
+    -- importing itself ('GetImportEdges' reports that). Typechecking it would
+    -- only add the engine's "depends on itself" on top.
+    let others = filter ((/= uri) . (.moduleUri)) imports
+    results <- uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) others)
+    let byUri = Map.fromList (zip (map (.moduleUri) others) results)
+        ress = [ (i, join (Map.lookup i.moduleUri byUri)) | i <- imports ]
     pure ([], Just ress)
 
   defineWithCallStack shakeRecorder $ \TypeCheckNoCallstack cs uri -> do
+    -- Before the parse, which fails for a file that imports itself: this
+    -- publishes the error that says so.
+    _            <- use GetImportEdges uri
     parsed       <- use_ GetParsedAst uri
     importResults <- use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+    -- An import with no typecheck is usually in a ring of imports. Find it, so
+    -- the message can name the files instead of the engine's rule names.
+    rings <- traverse
+      (\(imp, mTc) -> case mTc of
+          Nothing | imp.moduleUri /= uri -> firstImportCycleFrom imp.moduleUri
+          _ -> pure Nothing)
+      importResults
     let (imported, dependencies) = unzip [ (i, tc) | (i, Just tc) <- importResults ]
+        fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
+        arrows = Text.intercalate " -> " . map fileName
         -- What is wrong with an imported module, if anything. The error itself
         -- is reported in that module; this points at it from the IMPORT.
-        importProblem :: ImportResult -> Maybe TypeCheckResult -> Maybe Text
-        importProblem imp = \case
-          Nothing -> Just $ "The imported module " <> modName <> " could not be checked: it does not parse, or its imports form a cycle."
+        importProblem :: ImportResult -> Maybe [NormalizedUri] -> Maybe TypeCheckResult -> Maybe Text
+        importProblem imp ring = \case
+          Nothing -> Just $ case ring of
+            Just r
+              | uri `elem` r ->
+                  "This IMPORT makes a ring of imports: " <> arrows (startingAt uri r)
+                    <> ". Files cannot import each other in a ring."
+              | otherwise ->
+                  "The imported module " <> modName <> " is in a ring of imports: " <> arrows r
+                    <> ". Files cannot import each other in a ring."
+            Nothing -> "The imported module " <> modName <> " could not be checked; see the errors in it."
           Just tc
             | e : _ <- tc.errors ->
                 Just $ "The imported module " <> modName <> " has errors"
@@ -859,15 +909,19 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
             | otherwise -> Nothing
           where
             modName = rawNameToText (rawName imp.importName)
+            -- The same ring, read from @u@: [b, a, b] from a is [a, b, a].
+            startingAt u r = case break (== u) (List.init r) of
+              (before, after) -> after <> before <> take 1 after
             firstLine e = Text.strip $ Maybe.fromMaybe "" $ Maybe.listToMaybe $ concatMap Text.lines $ TypeCheck.prettyCheckError e.kind
         importDiags =
           [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "import" msg (fromSrcRange <$> imp.importRange))
-          | (imp, mTc) <- importResults
+          | ((imp, mTc), ring) <- zip importResults rings
           -- An IMPORT that finds no module resolves to its own file, and
           -- 'GetImports' already reports it on that IMPORT.
           , imp.moduleUri /= uri
-          , Just msg <- [importProblem imp mTc]
+          , Just msg <- [importProblem imp ring mTc]
           ]
+
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
 

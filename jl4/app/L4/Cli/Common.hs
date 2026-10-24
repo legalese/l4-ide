@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 -- | Shared helpers for the l4 CLI subcommands.
 --
 -- Everything here is neutral to a specific command so individual
@@ -55,6 +53,7 @@ import System.IO (hPutStrLn, stderr)
 import Control.Applicative ((<|>))
 
 import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
+import LSP.L4.BlockingErrors (hasBlockingError)
 import LSP.L4.Oneshot (oneshotL4Action)
 import qualified LSP.L4.Oneshot as Oneshot
 import LSP.Logger
@@ -66,7 +65,7 @@ import LSP.Logger
   , makeRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
+import Language.LSP.Protocol.Types (NormalizedFilePath)
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -269,24 +268,13 @@ runOneshotWithDiagnostics evalConfig fp act = do
   rawErrs <- getLog
   pure (filter (not . isProgressChatter) rawErrs, diags, res)
 
--- | Does the diagnostics set hold an error that should make a CLI command exit
--- non-zero?
---
--- An Error-severity diagnostic from any source /except/ @\"eval\"@ counts:
--- parse errors, type errors, an @IMPORT@ that resolves to nothing, and the raw
--- engine exception for an import cycle.
---
--- The evaluator publishes every @#EVAL@ and @#ASSERT@ outcome with source
--- @\"eval\"@, and a failed assertion is one of them, at Error severity. They
--- are left out so that a clean verdict of FALSE does not make the file a
--- failure, which keeps @l4 run@ at exit 0 for it. A directive that CRASHES
--- does fail the run, but @l4 run@ decides that from the directive results, not
--- from here.
-hasBlockingError :: [FileDiagnostic] -> Bool
-hasBlockingError = any isBlocking
-  where
-    isBlocking FileDiagnostic{fdLspDiagnostic = Diagnostic{_severity, _source}} =
-      _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
+-- 'hasBlockingError' (re-exported) is the rule for whether a diagnostics set
+-- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
+-- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
+-- It leaves out the evaluator's diagnostics (source @\"eval\"@): a failed
+-- @#ASSERT@ is one, at Error severity, and keeps @l4 run@ at exit 0. A
+-- directive that CRASHES does fail the run, but @l4 run@ decides that from the
+-- directive results, not from here.
 
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather
