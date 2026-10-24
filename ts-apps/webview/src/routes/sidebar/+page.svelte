@@ -983,10 +983,6 @@
     return undefined
   }
 
-  function blockingErrorLocation(e: BlockingErrorInfo): string {
-    return `${displayFileName(e.uri)}:${e.line}`
-  }
-
   function fetchExportedFunctions(uri: string, version: number) {
     messenger
       ?.sendRequest(GetSidebarExportedFunctions, HOST_EXTENSION, {
@@ -2464,37 +2460,7 @@
             </div>
           {:else}
             <!-- Normal preview -->
-            {#if blockingErrors.length > 0}
-              <div class="blocking-errors">
-                <div class="warning-header">
-                  &#9888; Fix these errors before deploying
-                </div>
-                <ul class="blocking-list">
-                  {#each blockingErrors.slice(0, 5) as err}
-                    <li>
-                      <button
-                        class="blocking-location"
-                        onclick={() =>
-                          messenger?.sendNotification(
-                            RequestRevealLocation,
-                            HOST_EXTENSION,
-                            { uri: err.uri, line: err.line }
-                          )}>{blockingErrorLocation(err)}</button
-                      >
-                      <span class="blocking-message"
-                        >{err.message.split('\n')[0]}</span
-                      >
-                    </li>
-                  {/each}
-                </ul>
-                {#if blockingErrors.length > 5}
-                  <p class="blocking-more">
-                    and {blockingErrors.length - 5} more in the Problems panel
-                  </p>
-                {/if}
-              </div>
-            {/if}
-            {#if functions.length === 0 && blockingErrors.length === 0}
+            {#if functions.length === 0}
               <div class="empty-state">
                 <p class="hint">
                   Open an L4 file containing valid rules marked with @export
@@ -3796,42 +3762,6 @@
   .warning-desc {
     margin: 0 0 10px 0;
     color: var(--vscode-foreground);
-  }
-
-  .blocking-errors {
-    margin-bottom: 12px;
-  }
-
-  .blocking-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    color: var(--vscode-foreground);
-  }
-
-  .blocking-list li {
-    margin-bottom: 8px;
-    overflow-wrap: anywhere;
-  }
-
-  .blocking-location {
-    background: none;
-    border: none;
-    padding: 0;
-    margin-right: 6px;
-    cursor: pointer;
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 0.92em;
-    color: var(--vscode-textLink-foreground);
-  }
-
-  .blocking-location:hover {
-    text-decoration: underline;
-  }
-
-  .blocking-more {
-    margin: 0;
-    color: var(--vscode-descriptionForeground);
   }
 
   .breaking-list {
