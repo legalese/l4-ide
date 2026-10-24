@@ -1,0 +1,52 @@
+-- A polymorphic ASSUME has a declared type that holds neither a DEONTIC nor an
+-- EVENT: it holds one only where a rule reads it as one, and each read gives it
+-- a type of its own. A request has no JSON form for a DEONTIC or an EVENT, so
+-- an exported rule that reads the ASSUME as one of them is refused as a written
+-- type is, naming the ASSUME. A read as a NUMBER is not refused. The rules are
+-- exported on purpose: the same rules without @export check.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`already fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`time of` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+GIVEN a IS A TYPE
+GIVETH AN a
+ASSUME `a placeholder`
+
+-- Refused: the body hands the ASSUME to a helper that takes a DEONTIC.
+@export Is the placeholder a fulfilled duty
+GIVETH A BOOLEAN
+`placeholder fulfilled` MEANS `already fulfilled` `a placeholder`
+
+-- Refused: the body takes the ASSUME apart as a DEONTIC.
+@export Is the placeholder a fulfilled duty, by its own body
+GIVETH A BOOLEAN
+`placeholder fulfilled by its body` MEANS
+  CONSIDER `a placeholder`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Refused: the body hands the ASSUME to a helper that takes an EVENT.
+@export When did the placeholder happen
+GIVETH A NUMBER
+`placeholder time` MEANS `time of` `a placeholder`
+
+-- Not exported: reading the ASSUME as a DEONTIC is fine here, and is not reported.
+GIVETH A BOOLEAN
+`internal fulfilled` MEANS `already fulfilled` `a placeholder`
+
+-- Accepted: this read gives the ASSUME the type NUMBER, whatever the other rules read it as.
+@export One more than the placeholder
+GIVETH A NUMBER
+`one more` MEANS `a placeholder` + 1

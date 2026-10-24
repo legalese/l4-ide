@@ -1251,6 +1251,31 @@ spec = do
             ]
       refusals src `shouldReturn` ([], [])
 
+    it "accepts an ASSUME of a function type that the body calls, as the function-type check does" $ do
+      -- No request can serve this rule: the ASSUME is a function that has no
+      -- definition. The function-type check reads the written types and the
+      -- ASSUMEs of the module itself, and the check for an EVENT or a DEONTIC
+      -- goes by the type of the ASSUME and not by the type of a call of it, so
+      -- neither refuses the rule. The documentation says so.
+      let lib = parties <> Text.unlines
+            [ "ASSUME `imported maker` IS A FUNCTION FROM NUMBER TO DEONTIC Person Action"
+            ]
+          src = Text.unlines
+            [ "IMPORT lib"
+            , ""
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`fulfilled` d MEANS"
+            , "  CONSIDER d"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            , "@export Reads the maker"
+            , "GIVETH A BOOLEAN"
+            , "`reads the maker` MEANS `fulfilled` (`imported maker` 3)"
+            ]
+      exportBlocks (vfsFromList [("lib", lib)]) src `shouldReturn` (True, [])
+
     it "accepts a DEONTIC that the module declares as a value, not as an ASSUME" $ do
       -- `standing duty` has a definition, so it is not an input of anything.
       let src = user
@@ -1374,6 +1399,143 @@ spec = do
             , "`plain` MEANS TRUE"
             ]
       exportBlocks emptyVFS src `shouldReturn` (True, [])
+
+  -- A polymorphic ASSUME, `GIVEN a IS A TYPE GIVETH AN a ASSUME x`, has a
+  -- declared type that holds neither a DEONTIC nor an EVENT: it holds one only
+  -- where a rule reads it as one, and each read gives it a type of its own. The
+  -- prelude's TBD is one. The check goes by the type at the read, so a read as a
+  -- DEONTIC or an EVENT is refused, and a read as anything else is not.
+  describe "an @export that reads a polymorphic ASSUME as a DEONTIC or an EVENT" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        dutyHelper = Text.unlines
+          [ "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+        placeholder = Text.unlines
+          [ "GIVEN a IS A TYPE"
+          , "GIVETH AN a"
+          , "ASSUME `local placeholder`"
+          , ""
+          ]
+        withPrelude body = "IMPORT prelude\n" <> body
+        blocks = exportBlocks emptyVFS
+
+    it "blocks the prelude's TBD when the body hands it to a helper that takes a DEONTIC" $ do
+      let src = withPrelude (parties <> dutyHelper <> Text.unlines
+            [ "@export Reads tbd"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd` MEANS `fulfilled` TBD"
+            ])
+      blocks src `shouldReturn` (False, [("DEONTIC", "reads tbd", "TBD", SError)])
+
+    it "blocks the prelude's TBD when the body takes it apart as a DEONTIC" $ do
+      let src = withPrelude (parties <> Text.unlines
+            [ "@export Reads tbd in a consider"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd in a consider` MEANS"
+            , "  CONSIDER TBD"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ])
+      blocks src `shouldReturn` (False, [("DEONTIC", "reads tbd in a consider", "TBD", SError)])
+
+    it "blocks the prelude's TBD when the body hands it to a helper that takes an EVENT" $ do
+      let src = withPrelude (parties <> eventHelper <> Text.unlines
+            [ "@export Reads tbd as an event"
+            , "GIVETH A NUMBER"
+            , "`reads tbd as an event` MEANS `time of` TBD"
+            ])
+      blocks src `shouldReturn` (False, [("EVENT", "reads tbd as an event", "TBD", SError)])
+
+    it "blocks a polymorphic ASSUME of the module itself, as a DEONTIC and as an EVENT" $ do
+      let duty = parties <> dutyHelper <> placeholder <> Text.unlines
+            [ "@export Reads local placeholder"
+            , "GIVETH A BOOLEAN"
+            , "`reads local placeholder` MEANS `fulfilled` `local placeholder`"
+            ]
+          event = parties <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads local placeholder as an event"
+            , "GIVETH A NUMBER"
+            , "`reads local placeholder as an event` MEANS `time of` `local placeholder`"
+            ]
+      blocks duty `shouldReturn`
+        (False, [("DEONTIC", "reads local placeholder", "local placeholder", SError)])
+      blocks event `shouldReturn`
+        (False, [("EVENT", "reads local placeholder as an event", "local placeholder", SError)])
+
+    it "blocks a polymorphic ASSUME that the body reads as a list of duties" $ do
+      let src = parties <> placeholder <> Text.unlines
+            [ "GIVEN ds IS A LIST OF DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`any duty` ds MEANS TRUE"
+            , ""
+            , "@export Reads local placeholder as a list"
+            , "GIVETH A BOOLEAN"
+            , "`reads local placeholder as a list` MEANS `any duty` `local placeholder`"
+            ]
+      blocks src `shouldReturn`
+        (False, [("DEONTIC", "reads local placeholder as a list", "local placeholder", SError)])
+
+    it "refuses it once, however many times the body reads it" $ do
+      let src = withPrelude (parties <> dutyHelper <> Text.unlines
+            [ "@export Reads tbd twice"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd twice` MEANS `fulfilled` TBD AND `fulfilled` TBD"
+            ])
+      blocks src `shouldReturn` (False, [("DEONTIC", "reads tbd twice", "TBD", SError)])
+
+    it "accepts the prelude's TBD when the body reads it as a NUMBER" $ do
+      let src = withPrelude (Text.unlines
+            [ "@export Reads tbd as a number"
+            , "GIVETH A NUMBER"
+            , "`reads tbd as a number` MEANS TBD + 1"
+            ])
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a polymorphic ASSUME that the body reads as a NUMBER, whatever another rule reads it as" $ do
+      -- Each read gives the ASSUME a type of its own, and the check looks at
+      -- the reads in the body of the export only.
+      let src = parties <> dutyHelper <> placeholder <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`internal` MEANS `fulfilled` `local placeholder`"
+            , ""
+            , "@export Reads local placeholder as a number"
+            , "GIVETH A NUMBER"
+            , "`reads local placeholder as a number` MEANS `local placeholder` + 1"
+            ]
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a polymorphic ASSUME whose type at the read is left open" $ do
+      let src = withPrelude (Text.unlines
+            [ "@export Reads tbd and ignores it"
+            , "GIVETH A BOOLEAN"
+            , "`reads tbd and ignores it` MEANS TRUE OR (TBD EQUALS TBD)"
+            ])
+      blocks src `shouldReturn` (True, [])
+
+    it "accepts a rule that is not an @export" $ do
+      let src = withPrelude (parties <> dutyHelper <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`internal` MEANS `fulfilled` TBD"
+            ])
+      blocks src `shouldReturn` (True, [])
 
   -- The check looks at every definition that is marked as an export, whichever
   -- way it is marked and wherever it stands.

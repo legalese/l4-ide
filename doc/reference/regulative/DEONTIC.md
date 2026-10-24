@@ -262,6 +262,9 @@ With ``ASSUME `the assumed duty` IS A DEONTIC Person Action`` in a file called `
 The service publishes the `ASSUME`s of the file that holds the rule and no others, so a request could not set an imported one in any case.
 An `ASSUME` needs no written type either.
 One called `the assumed duty`, with nothing after the name, is refused in the same way when the rule's own body reads it as a duty: by taking it apart with `CONSIDER` and a `WHEN FULFILLED` branch, or by handing it to a rule that takes a `DEONTIC`.
+A polymorphic `ASSUME` is declared with a type variable, as with `GIVEN a IS A TYPE` and `GIVETH AN a`, and the prelude's `TBD` is one.
+Its declared type holds no `DEONTIC`, and each place that reads it gives it a type of its own, so the check goes by the type at the place where the exported rule's own body reads it.
+Handing `TBD` to a rule that takes a `DEONTIC` is refused in the same way, with `TBD` in the error, and reading it as a `NUMBER`, as `TBD + 1` does, is not.
 A duty that a rule defines, with `MEANS` and a body, is not an `ASSUME` and not an input, and an exported rule may read it.
 
 ### The one shape the check does not catch

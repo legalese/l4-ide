@@ -302,6 +302,21 @@ collectReferencedResolveds =
     App _ ref@(Ref _ _ _) _ -> [ref]
     _ -> []
 
+-- | Every read of an identifier that is given no arguments (@App ann ref []@),
+-- with the type that the checker recorded on the expression that reads it, in
+-- the order the reads come. That type is the one the read has, which for a
+-- polymorphic identifier is not the declared one: each read of the ASSUME in
+-- @GIVEN a IS A TYPE GIVETH AN a ASSUME x@ is given a type of its own. It can
+-- still hold inference variables, until the substitution that the check ended
+-- with is applied to it, which the caller does. A read that is given arguments
+-- has the type of the call, not of the identifier, and is not in the answer, nor
+-- is a read that has no recorded type.
+collectReadTypes :: Expr Resolved -> [(Resolved, Type' Resolved)]
+collectReadTypes =
+  foldMapOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+    App ann ref@(Ref _ _ _) [] | Just (TypeInfo ty _) <- ann ^. annInfo -> [(ref, ty)]
+    _ -> []
+
 -- | Extract ASSUME declarations that are referenced by a DECIDE body.
 -- Returns ExportedParams for each ASSUME that the function depends on.
 extractAssumedDependencies
@@ -449,7 +464,11 @@ extractImplicitAssumeParams errors =
 -- * an ASSUME that the body reads, wherever it is declared, in this module or
 --   in an imported one: 'AssumedTerm' is what marks it in the 'EntityInfo',
 --   and a definition that has a value, such as a DEONTIC that a MEANS gives, is
---   not marked and is not an input.
+--   not marked and is not an input. It is looked at for the type it is declared
+--   with, and for the type at each read of it in the body, which is where a
+--   polymorphic ASSUME (@GIVEN a IS A TYPE GIVETH AN a ASSUME x@) holds a
+--   DEONTIC or an EVENT ('collectReadTypes'). A call of an ASSUME that is given
+--   arguments has the type of its result and is not looked at.
 --
 -- The walk covers the rule's own inputs and the ASSUMEs that its own body
 -- reads. It does not look inside a rule that the exported rule calls.
@@ -516,8 +535,9 @@ allAssumesFromModule (MkModule _ _ section) =
 type ExportRefusal = Type' Resolved -> Maybe (Resolved -> Resolved -> CheckErrorWithContext)
 
 -- | An input of an exported rule: the identifier that an error names, and the
--- type that is refused or not.
-type ExportInput = (Resolved, Type' Resolved)
+-- types that it is looked at for, in order. The first of them that is refused
+-- gives the error, so an input is refused once, however many of its types are.
+type ExportInput = (Resolved, [Type' Resolved])
 
 checkOneExport
   :: ExportRefusal
@@ -526,8 +546,8 @@ checkOneExport
   -> [CheckErrorWithContext]
 checkOneExport refusal (MkDecide _ _ (MkAppForm _ fnName _ _) _) inputs =
   [ mkErr fnName paramName
-  | (paramName, ty) <- inputs
-  , Just mkErr <- [refusal ty]
+  | (paramName, tys) <- inputs
+  , Just mkErr <- [listToMaybe (mapMaybe refusal tys)]
   ]
 
 -- | The inputs whose type is written: the GIVENs that have one, then the
@@ -538,31 +558,34 @@ writtenInputs
   -> [ExportInput]
 writtenInputs assumes (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) _ body) =
   let referencedUniques = collectReferencedUniques body
-  in [ (paramName, ty)
+  in [ (paramName, [ty])
      | MkOptionallyTypedName _ paramName (Just ty) <- names
      ]
      ++
-     [ (paramName, ty)
+     [ (paramName, [ty])
      | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
      , Set.member uniq referencedUniques
      ]
 
 -- | Every input that the checker knows a type for: the GIVENs, with the
 -- inferred type of one that has no written type, then every ASSUME that the
--- body reads, whichever module declares it.
+-- body reads, whichever module declares it. An ASSUME is looked at for the type
+-- it is declared with, and then for the type that the checker recorded at each
+-- read of it in the body ('collectReadTypes'): the two differ for a polymorphic
+-- ASSUME, which is declared with a type variable and read at a type of its own.
 inferredInputs
   :: Substitution
   -> EntityInfo
   -> Decide Resolved
   -> [ExportInput]
 inferredInputs subst ei (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) body) =
-  [ (paramName, substituteInfVars subst ty)
+  [ (paramName, [substituteInfVars subst ty])
   | MkOptionallyTypedName _ paramName mType <- names
   , Just ty <- [mType <|> Map.lookup (getUnique paramName) inferredTypes]
   ]
   ++
-  [ (ref, substituteInfVars subst ty)
-  | (_, (ref, ty)) <- Map.toList assumedTerms
+  [ (ref, substituteInfVars subst <$> declared : Map.findWithDefault [] uniq readAs)
+  | (uniq, (ref, declared)) <- Map.toList assumedTerms
   ]
  where
   inferredTypes = inferredGivenTypes ei fnName
@@ -575,6 +598,12 @@ inferredInputs subst ei (MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) (MkAppF
       | ref <- collectReferencedResolveds body
       , Just (_, KnownTerm ty AssumedTerm) <- [Map.lookup (getUnique ref) ei]
       ]
+
+  -- the types recorded at the reads of each identifier, in the order read
+  readAs :: Map.Map Unique [Type' Resolved]
+  readAs =
+    Map.fromListWith (flip (<>))
+      [ (getUnique ref, [ty]) | (ref, ty) <- collectReadTypes body ]
 
 -- | The type that the checker inferred for each GIVEN of a function, by the
 -- identifier of the GIVEN, read from the function's own type in the 'EntityInfo'.
