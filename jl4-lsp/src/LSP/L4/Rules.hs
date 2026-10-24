@@ -96,6 +96,15 @@ data GetImports = GetImports
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The modules a file imports, each with the range of its @IMPORT@, from a
+-- first parse that needs no mixfix hints. Unlike 'GetImports', whose full parse
+-- needs the hints of every imported module, this has an answer for a file in an
+-- import cycle. An @IMPORT@ that resolves to no module is left out.
+type instance RuleResult GetImportEdges = [(Maybe SrcRange, NormalizedUri)]
+data GetImportEdges = GetImportEdges
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
 type instance RuleResult GetMixfixRegistry = Parser.MixfixHintRegistry
 data GetMixfixRegistry = GetMixfixRegistry
   deriving stock (Generic, Show, Eq)
@@ -746,6 +755,22 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- Combine local + imported hints
         let combinedHints = localHints <> importedHints
         pure ([], Just combinedHints)
+
+  define shakeRecorder $ \GetImportEdges uri -> do
+    (tokens, contents) <- use_ GetLexTokens uri
+    case Parser.execProgramParserForTokens uri contents tokens of
+      Left _errs -> pure ([], Just [])
+      Right (firstProg, _) -> do
+        let extractImport :: TopDecl Name -> [(Maybe SrcRange, Name)]
+            extractImport = \case
+              Import _ (MkImport a n _) -> [(rangeOf a, n)]
+              _ -> []
+            resolveEdge (range, n) = do
+              let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+              outcome <- resolveImport uri modName
+              pure (fmap (\u -> (range, u)) outcome.importUri)
+        edges <- catMaybes <$> traverse resolveEdge (foldTopDecls extractImport firstProg)
+        pure ([], Just edges)
 
   define shakeRecorder $ \GetParsedAst uri -> do
     (tokens, contents) <- use_ GetLexTokens uri
