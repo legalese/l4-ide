@@ -4383,15 +4383,20 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
   -- axis is read through the instrumented reader per the READER CONTRACT;
   -- the enclosing force is write-poisoned by 'tellEventRouted' anyway, so
   -- the observation can never install a context-fingerprint cache entry.
+  -- The whole context is stamped on the row as well ('writeCtx'), raw: it
+  -- affects no value here, only where the row's value is later forced for
+  -- display, and that force runs under it (see 'Provenance').
   evalNow <- getEvalTime
   mVt     <- readTcValidTime
+  ctx     <- getTemporalContext
   mParty  <- getCurrentParty
   let prov = MkProvenance
-        { party  = fromMaybe "" mParty
-        , source = if isOfficial then "COMMIT"
-                   else maybe "RECORD" (const "NOTIFY") mRecipientKey
-        , txTime = evalNow
-        , vtFrom = mVt
+        { party    = fromMaybe "" mParty
+        , source   = if isOfficial then "COMMIT"
+                     else maybe "RECORD" (const "NOTIFY") mRecipientKey
+        , txTime   = evalNow
+        , vtFrom   = mVt
+        , writeCtx = ctx
         }
       -- NOTIFY v1: a recipient-qualified RECORD routes the write to the named
       -- recipient's own ledger ('RouteNotify recipientKey'); a bare RECORD routes

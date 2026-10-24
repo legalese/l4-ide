@@ -1,0 +1,43 @@
+IMPORT prelude
+-- A ledger row is forced for display under the temporal context its write
+-- was made in, not under the directive's root context.
+--
+-- `snap` is written under EVAL UNDER VALID TIME 2023-06-01 and holds a
+-- RECALL of `rate`, still unevaluated at the write. As of that day `rate`
+-- is 7 (the 9 is only valid from 2024). The #EVAL's own result forces the
+-- RECALL under the clause and says 7. Before the fix the "Ledger:" block
+-- forced the same RECALL at the root, where no valid time is pinned, and
+-- printed 9 on a row stamped vt=2023-06-01 — the row and the result
+-- disagreed, with no diagnostic. Now the row says what the result says.
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+TIMEZONE IS "Etc/UTC"
+
+DECLARE Box
+  HAS v IS A MAYBE NUMBER
+
+DECLARE Out
+  HAS a IS A NUMBER
+      b IS A NUMBER
+      c IS A Box
+
+-- Result: Out OF 7, 9, (Box OF (JUST OF 7)); the `snap` row: Box OF (JUST OF 7).
+#EVAL Out
+        (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2023) (RECORD `rate` IS 7))
+        (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2024) (RECORD `rate` IS 9))
+        (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2023) (RECORD `snap` IS (Box (RECALL `rate`))))
+
+-- The whole context is restored for the row, not only the valid time: a
+-- row written under RULES EFFECTIVE AT 2023-06-01 shows that date, which
+-- is what a bare #EVAL of `RULES EFFECTIVE DATE` under the same clause
+-- returns. Forced at the root it fell back to the clock, 2025-01-31.
+--
+-- The Result's own field still reads 2025-01-31: the clause's deep pin does
+-- not reach a nullary reader nested as a constructor field. That is so on
+-- the binary before this fixture too, and is not what this fixture guards.
+DECLARE Dated
+  HAS on IS A DATE
+
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (DATE_FROM_DMY 1 6 2023)
+        (RECORD `when` IS (Dated `RULES EFFECTIVE DATE`))

@@ -423,15 +423,37 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- (a RECORD nested in a recorded value), and none of that may reach the
   -- directive's result. The appended row would land in the live store, not
   -- in the snapshot traversed here, and the store is discarded on exit.
-  shownLedger <- traverse showForLedger directiveLedger
+  --
+  -- Each row is forced under the temporal context its write was made in
+  -- ('Provenance.writeCtx'), not the directive's root context: a part of the
+  -- value that reads the context (a @RECALL@ of a dated cell, a @TODAY@)
+  -- was written to mean what it means there. Forced at the root, a row
+  -- written under @EVAL UNDER VALID TIME d@ showed a @RECALL@ as of today
+  -- while the same @#EVAL@ returned the value as of @d@ — a quiet wrong
+  -- answer, measured on @ok/ledger/record-temporal-context.l4@.
+  shownLedger <- showStore directiveLedger
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed shownLedger, steps)
   where
-    -- Per value, so that one field that cannot be evaluated hides its own
+    showStore :: LedgerStore -> Eval (LedgerStore' ShownValue)
+    showStore store =
+      MkLedgerStore
+        <$> traverse (traverse showEvent) store.ownLedgers
+        <*> traverse showEvent store.officialLedger
+
+    -- Per row, so that one field that cannot be evaluated hides its own
     -- row's value and nothing else. The catch is at the directive boundary,
     -- after the verdict is fixed: nothing resumes evaluation with a value in
-    -- a refusal's place (see 'refuseWith').
-    showForLedger :: WHNF -> Eval ShownValue
-    showForLedger v = either Unshown Shown <$> tryEval (nf v)
+    -- a refusal's place (see 'refuseWith'). The context the row was written
+    -- under is in force for the row and restored after it whether the force
+    -- returned or raised; 'tryEval' turns the raise into a value here, so
+    -- the restore is unconditional.
+    showEvent :: LedgerEvent -> Eval (LedgerEvent' ShownValue)
+    showEvent (Assign path v prov) = do
+      ambient <- getTemporalContext
+      putTemporalContext prov.writeCtx
+      shown <- either Unshown Shown <$> tryEval (nf v)
+      putTemporalContext ambient
+      pure (Assign path shown prov)
 
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
     captureSteps
@@ -527,9 +549,10 @@ data EvalDirectiveResult =
     , shownLedger :: !(LedgerStore' ShownValue)
       -- ^ 'ledger' as the reader sees it: the same rows, each value forced to
       -- normal form (or the reason it could not be) while the directive's
-      -- heap was still alive. This is what every printer renders; a 'WHNF'
-      -- prints its fields as @&n\@file@ references, which is what the reader
-      -- used to see for any RECORD of a record or a list.
+      -- heap was still alive, under the temporal context of its own write.
+      -- This is what every printer renders; a 'WHNF' prints its fields as
+      -- @&n\@file@ references, which is what the reader used to see for any
+      -- RECORD of a record or a list.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData

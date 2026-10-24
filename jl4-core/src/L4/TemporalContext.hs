@@ -56,6 +56,7 @@ data TemporalContext = TemporalContext
     -- @readTcDocumentTimezone@ (see READER CONTRACT).
   }
   deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
 
 -- | Clauses supported by the runtime EVAL construct.
 data EvalClause

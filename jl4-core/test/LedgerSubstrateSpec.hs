@@ -17,6 +17,7 @@ import L4.Evaluate.Ledger
   , snapshot
   )
 import L4.Evaluate.ValueLazy (Value (..), WHNF)
+import L4.TemporalContext (initialTemporalContext)
 import L4.EvaluateLazy
   ( Eval
   , currentLedger
@@ -34,7 +35,7 @@ fixedNow :: UTCTime
 fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
 
 prov :: Provenance
-prov = MkProvenance { party = "tester", source = "LedgerSubstrateSpec", txTime = fixedNow, vtFrom = Nothing }
+prov = MkProvenance { party = "tester", source = "LedgerSubstrateSpec", txTime = fixedNow, vtFrom = Nothing, writeCtx = initialTemporalContext fixedNow }
 
 -- 273.15 K = 0 degrees Celsius. 'ValNumber' needs no 'Reference', so it is a
 -- valid 'WHNF' (= 'Value Reference') for any element type.

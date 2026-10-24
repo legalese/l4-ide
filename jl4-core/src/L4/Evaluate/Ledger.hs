@@ -62,6 +62,7 @@ import qualified Base.Map as Map
 import Data.Time (Day, UTCTime, utctDay)
 
 import L4.Evaluate.ValueLazy (WHNF)
+import L4.TemporalContext (TemporalContext)
 
 -- | The address of a cell in the ledger. A list of path segments, e.g.
 -- @["account", "balance"]@. Kept structural (rather than a single 'Text')
@@ -89,6 +90,14 @@ data Provenance =
       -- @EVAL UNDER VALID TIME@) — a backdated\/dated assertion; 'Nothing'
       -- for a contemporaneous write, whose effective valid-from defaults to
       -- the 'txTime' day (see 'effectiveVt').
+    , writeCtx :: !TemporalContext
+      -- ^ the whole temporal context in force at the write: every axis an
+      -- enclosing @EVAL UNDER \/ AS OF@ clause had pinned, 'vtFrom' among
+      -- them. A stored value is a 'WHNF' whose parts are still unevaluated
+      -- at the write, and a part that reads the context (a @RECALL@, a
+      -- @TODAY@) must be forced under the context the write was made in to
+      -- mean what the writer's @#EVAL@ meant; the display pass in
+      -- 'L4.EvaluateLazy.nfDirectiveWith' forces each row under this.
     }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
