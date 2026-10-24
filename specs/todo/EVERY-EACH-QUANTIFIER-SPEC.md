@@ -1486,7 +1486,8 @@ tests under "THE before a noun the program also defines" in `IntegrationSpec.hs`
 `OF (THE JOIN)` are two trees with one meaning — every consumer that asks which noun an anchor
 names now asks `lifecyclePointOfAnchor`, which reads through the bracket, so the empty-window
 refusal of §5.1.2.2 covers `OF (THE JOIN)` as well (`not-ok/tc/after-empty-window-value.l4`;
-review of 2026-10-24) — and that is all of what is not built.
+review of 2026-10-24). That is all of what is not built.
+
 `THE ARMING` written where the machine would not bind it is refused at check time, RULED 2026-10-24 (B1c below), as refusal 8 of §5.1.1.1 (`ArmingUnavailable`).
 Such a module used to check and refuse on every input (the review of 2026-10-24 also reported deploying one to a local `jl4-service`; not re-run here).
 The definition site decides, not the use site: outside every obligation a `NUMBER` is evaluated in the environment it was defined in, a top-level function's body in its closure's even when it is called from inside an obligation's slot.
