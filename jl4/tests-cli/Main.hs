@@ -311,6 +311,57 @@ objField :: Value -> String -> Maybe Value
 objField (Object km) k = KeyMap.lookup (Key.fromString k) km
 objField _ _ = Nothing
 
+-- | The text of the @Evaluation[n]@ block in the output of @l4 run@: from its
+-- header up to the next block's header, or to the end. Empty when there is no
+-- such block. Written against text whose carriage returns are already gone.
+evalBlock :: Int -> String -> T.Text
+evalBlock n out =
+  let marker = T.pack ("Evaluation[" <> show n <> "]")
+      (_, fromHere) = T.breakOn marker (T.pack out)
+  in fst (T.breakOn "Evaluation[" (T.drop (T.length marker) fromHere))
+
+-- | The diagnostic that @l4 run@ printed on standard error against a range
+-- starting at column 1 of the given line: from its @Range:@ row to the next
+-- @File:@ row. Empty when none starts there.
+diagnosticAtLine :: Int -> String -> T.Text
+diagnosticAtLine line err =
+  fst $ T.breakOn "File:" $ T.drop 1 $
+    snd $ T.breakOn (T.pack ("Range:    " <> show line <> ":1-")) (T.pack err)
+
+-- | @l4 run FILE@ on a three-directive file whose middle directive, on the given
+-- line, cannot be evaluated: the run fails, and the other two directives still
+-- print their results (2 and 4). The middle one's message is in its own
+-- @Evaluation[2]@ block and is also printed on standard error against its line,
+-- as an error.
+expectMiddleLostInText :: FilePath -> FilePath -> Int -> [String] -> IO ()
+expectMiddleLostInText bin fixture midLine messages = do
+  Output code sout0 serr0 <- runL4 bin ["run", fixture]
+  let sout = filter (/= '\r') sout0
+      serr = filter (/= '\r') serr0
+  code `shouldBe` ExitFailure 1
+  evalBlock 1 sout `shouldSatisfy` T.isInfixOf "Result:\n  2\n"
+  evalBlock 3 sout `shouldSatisfy` T.isInfixOf "Result:\n  4\n"
+  forM_ messages \m -> do
+    evalBlock 2 sout `shouldSatisfy` T.isInfixOf (T.pack m)
+    diagnosticAtLine midLine serr `shouldSatisfy` T.isInfixOf "DiagnosticSeverity_Error"
+    diagnosticAtLine midLine serr `shouldSatisfy` T.isInfixOf (T.pack m)
+
+-- | The same file with @--json@: @ok@ is false, there are three results, and the
+-- two outer ones are 2 and 4. The middle one carries the message, as its @value@
+-- or, for an @#ASSERT@, its @error@.
+expectMiddleLostInJson :: FilePath -> FilePath -> [String] -> IO ()
+expectMiddleLostInJson bin fixture messages = do
+  expectExit1 bin ["run", "--json", fixture]
+  env <- jsonEnvelope bin ["run", "--json", fixture]
+  objField env "ok" `shouldBe` Just (Bool False)
+  case [ r | Array rs <- maybe [] pure (objField env "results"), r <- toList rs ] of
+    [first, middle, final] -> do
+      objField first "value" `shouldBe` Just (String "2")
+      objField final "value" `shouldBe` Just (String "4")
+      let said = T.concat [ s | k <- ["value", "error"], Just (String s) <- [objField middle k] ]
+      forM_ messages \m -> said `shouldSatisfy` T.isInfixOf (T.pack m)
+    other -> expectationFailure ("Expected three results, got " ++ show (length other))
+
 ----------------------------------------------------------------------------
 -- Fixtures
 ----------------------------------------------------------------------------
@@ -1074,6 +1125,92 @@ spec bin = do
       sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
       sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
       sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+  -- A directive that cannot be evaluated is not always the same failure. A
+  -- CONSIDER with no matching branch, a division by zero and an #ASSERT whose
+  -- expression raises are caught for that one directive: the run fails, but the
+  -- other directives still print. A POST or FETCH that fails throws an HTTP
+  -- exception that nothing catches there, so the whole file loses its results.
+  -- doc/tutorials/getting-started/l4-cli.md and
+  -- doc/reference/builtins/http-json.md say both. The same file used to exit 0
+  -- and print "Checking succeeded." after a failed request.
+  --
+  -- The failing address is 127.0.0.1: it is an address, so nothing is looked
+  -- up, and nothing is expected to listen on its https port. Nothing below
+  -- depends on the operating system's wording of why the connection failed.
+  describe "l4 run on a directive that cannot be evaluated" $ do
+    forM_ [ ("POST", "request-post-fails.l4"), ("FETCH", "request-fetch-fails.l4") ] \(verb, file) -> do
+      let fixture = fixtureDir </> file
+
+      it ("fails the run and prints no result for any directive when a " <> verb <> " cannot connect") $ do
+        Output code sout serr0 <- runL4 bin ["run", fixture]
+        let serr = filter (/= '\r') serr0
+        code `shouldBe` ExitFailure 1
+        sout `shouldNotSatisfy` ("Evaluation[" `isInfixOf`)
+        sout `shouldNotSatisfy` ("Result:" `isInfixOf`)
+        sout `shouldNotSatisfy` ("Checking succeeded." `isInfixOf`)
+        -- one message, which names the host and is against the first line of
+        -- the file, not against the directive (line 6) that made the request
+        T.count "VanillaHttpException" (T.pack serr) `shouldBe` 1
+        serr `shouldSatisfy` ("\"127.0.0.1\"" `isInfixOf`)
+        diagnosticAtLine 1 serr `shouldSatisfy` T.isInfixOf "DiagnosticSeverity_Error"
+        diagnosticAtLine 1 serr `shouldSatisfy` T.isInfixOf "VanillaHttpException"
+        diagnosticAtLine 6 serr `shouldBe` ""
+
+      it ("reports ok=false, no results and one diagnostic in JSON when a " <> verb <> " cannot connect") $ do
+        expectExit1 bin ["run", "--json", fixture]
+        env <- jsonEnvelope bin ["run", "--json", fixture]
+        objField env "ok" `shouldBe` Just (Bool False)
+        objField env "results" `shouldBe` Just (Array mempty)
+        case objField env "diagnostics" of
+          Just (Array ds) -> do
+            length ds `shouldBe` 1
+            T.concat [ s | String s <- toList ds ] `shouldSatisfy` T.isInfixOf "VanillaHttpException"
+          other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+      -- `l4 check` does not evaluate, so it makes no request.
+      it ("does not make the " <> verb <> " under l4 check") $
+        expectOk bin ["check", fixture] "Check succeeded."
+
+    -- The control: take the request out and both results print.
+    it "prints both results and exits 0 for the same file without the request" $ do
+      Output code sout _ <- runL4 bin ["run", fixtureDir </> "request-none.l4"]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      evalBlock 1 out `shouldSatisfy` T.isInfixOf "Result:\n  2\n"
+      evalBlock 2 out `shouldSatisfy` T.isInfixOf "Result:\n  4\n"
+
+    it "reports ok=true and both results in JSON for the same file without the request" $ do
+      env <- jsonEnvelope bin ["run", "--json", fixtureDir </> "request-none.l4"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 2
+        other          -> expectationFailure ("Expected a results array, got " ++ show other)
+
+    -- These fail the run too, but only for the one directive.
+    forM_ [ ("a CONSIDER with no matching branch", "eval-consider-mid.l4", 14, ["reached a CONSIDER that has no branch for it"])
+          , ("a division by zero",                 "eval-div0-mid.l4",     5, ["Division by zero"])
+          , ("an #ASSERT whose expression raises", "assert-raises-mid.l4", 5, ["assertion could not be evaluated", "Division by zero"])
+          ] \(what, file, midLine, messages) -> do
+      let fixture = fixtureDir </> file
+
+      it ("fails the run but keeps the other directives' results for " <> what) $
+        expectMiddleLostInText bin fixture midLine messages
+
+      it ("reports ok=false and all three results in JSON for " <> what) $
+        expectMiddleLostInJson bin fixture messages
+
+    -- An address that does not start with https:// is not a failed request: the
+    -- evaluator reports it for that directive, and the others keep their results.
+    forM_ [ ("POST", "request-post-http.l4"), ("FETCH", "request-fetch-http.l4") ] \(verb, file) -> do
+      let fixture = fixtureDir </> file
+          messages = ["Internal error", verb <> " only supports https"]
+
+      it ("fails the run but keeps the other directives' results for a " <> verb <> " to an address that is not https") $
+        expectMiddleLostInText bin fixture 6 messages
+
+      it ("reports ok=false and all three results in JSON for a " <> verb <> " to an address that is not https") $
+        expectMiddleLostInJson bin fixture messages
 
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
