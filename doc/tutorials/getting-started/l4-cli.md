@@ -149,26 +149,11 @@ Result:
   50
 ```
 
-Each `Evaluation[n]` block corresponds to one `#EVAL` directive, in file order, with the source range it came from. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks and every directive evaluates without crashing; type errors and runtime evaluation errors (such as a `CONSIDER` with no matching branch, or an `#ASSERT` whose expression raises) exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
-An error in a file that it imports counts too, and so does an `IMPORT` that finds no file and an `IMPORT` cycle (`a.l4` imports `b.l4`, which imports `a.l4`).
-Whether a directive makes `l4 run` fail depends on whether it can be evaluated at all.
-An `#EVAL` that gives a result exits `0`, and so does an `#ASSERT` that comes out false (it prints `assertion failed`).
-An `#EVAL` or `#ASSERT` that cannot be evaluated exits non-zero, and the other directives in the file print their results as usual.
-Examples are a `CONSIDER` with no matching branch, a division by zero, and an `#ASSERT` whose expression raises.
-The message is in that directive's own `Evaluation[n]` block, and is also printed on standard error against that directive's lines.
-With `--json`, the other results are in `"results"`.
+Each `Evaluation[n]` block shows the result of one `#EVAL`, in file order. Results go to standard output; errors and warnings go to standard error.
 
-A request that fails is different, and loses more.
-It happens when a `POST` or `FETCH` cannot connect, when the host cannot be found, or when the server answers with an error status such as 404.
-`l4 run` then prints no `Evaluation[n]` block for any directive in the file, including the directives that made no request.
-It exits non-zero, and `--json` gives `"ok": false` and `"results": []`.
-There is one message, on standard error (in `"diagnostics"` with `--json`), and it begins `VanillaHttpException` and names the host.
-It points at the first line of the file, not at the directive that made the request.
-When you see it, look for `POST` and `FETCH` in the file and in the rules your directives use.
-To see the other results, take the directives that make requests out of the file, or move them to a file of their own.
-An address that does not start with `https://` is not a failed request.
-That directive's `Evaluation[n]` block holds an `Internal error` message that says `POST only supports https` (or `FETCH only supports https`), `l4 run` exits non-zero, and the other directives keep their results.
-Use an `https://` address.
+`l4 run` fails when the file, or a file it imports, has an error, or when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero. The other directives still show their results. Warnings, and an `#ASSERT` that comes out false, don't make it fail.
+
+If a `FETCH` or `POST` can't reach its server, `l4 run` fails and shows no results for any directive in the file. To see the other results, move the directives that make requests to a file of their own.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -216,33 +201,8 @@ Check succeeded.
 
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
 `--json` and `--fixed-now` work here too.
-The check covers the files it imports too: an error in an imported file, an `IMPORT` that finds no file, or an `IMPORT` cycle is a non-zero exit as well.
-An import cycle is reported in terms of the checker's internals, not as a cycle.
-`l4 check a.l4` prints a diagnostic whose `File:` line names one of the files in the ring, whose `Source:` is `compiler`, and whose message begins like this:
-
-```
-GraphException: SuccessfulTypeCheck; file:///…/a.l4
-GetMixfixRegistry; file:///…/b.l4
-GetMixfixRegistry; file:///…/a.l4
-```
-
-It never says `IMPORT` or "cycle".
-The files it names include the ones in the ring, so look for two or more files that `IMPORT` each other, directly or through a third.
-[Import cycle](../../reference/errors/README.md#import-cycle) says what to change.
-
-Only `l4 check`, `l4 run`, `l4 deploy` and `l4 redeploy` look at errors in the files a file imports.
-`l4 render`, `l4 nlg` and `l4 trace` print the error on standard error and exit `0` when a file they read imports a broken one.
-`l4 state-graph` exits `0` and prints its graph, and prints no error at all.
-`l4 format`, `l4 ast` and `l4 batch` exit `0` as well.
-Use `l4 check` as the CI gate for a project of several files.
-
-`l4 deploy` and `l4 redeploy` refuse a file that `l4 check` refuses, before they send anything.
-They print the diagnostics `l4 check` prints, then ``FILE doesn't typecheck; fix it before deploying (see `l4 check`).``, and exit `1`.
-That covers an error in the file you name, an error in a file it imports, an `IMPORT` that finds no file and an `IMPORT` cycle.
-A warning does not stop a deploy.
-A file that passes `l4 check` goes on to the upload.
-One limit follows from this: an `l4` older than the service cannot deploy a file that imports a standard-library module that only the newer service has, because `l4 check` fails on that file too.
-Use an `l4` at least as new as the service you deploy to.
+`l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files. Other commands, such as `l4 render` and `l4 nlg`, don't stop on an error in an imported file.
+Files can't import each other in a ring; [Import cycle](../../reference/errors/README.md#import-cycle) says how to fix one.
 
 ---
 
@@ -355,7 +315,6 @@ not the invoice is late with 5
 ```
 
 `l4 nlg` prints nothing and exits non-zero if the file does not typecheck, rather than writing prose about a module that does not hold together.
-It does not look into the files that file imports: if one of them is broken, `l4 nlg` writes the prose, prints the error on standard error, and exits `0`.
 Options: `-o/--output FILE` writes to a file instead of standard output, and `--lang SUBTAG` uses the `@nlg:SUBTAG` wordings for the rules that have them (and the module's default wording for those that do not).
 See [one encoding, several languages](../natural-language-functions/optimising-natural-language-generation.md#one-encoding-several-languages).
 
@@ -522,7 +481,7 @@ Deployed 'late-fee' (version 1.0.0) with 1 function:
 API: https://api.legalese.cloud/acme/late-fee
 ```
 
-The deployment is named after the file unless you pass `--name`. `l4` runs the same check as `l4 check` on the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
+The deployment is named after the file unless you pass `--name`. `l4` runs the same check as `l4 check` on the file first; if it finds an error, nothing is uploaded. Otherwise it uploads the file with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
 
 | Command            | What it does                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

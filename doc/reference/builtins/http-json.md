@@ -10,9 +10,8 @@ Built-in functions for calling web APIs and for turning L4 values into JSON and 
 
 ## When a request fails
 
-In `l4 run`, a request that fails loses the results of every directive in the file, not only the one that made the request, and its error points at the first line of the file.
-A request fails when it cannot connect, when the host cannot be found, or when the server answers with an error status such as 404.
-[Evaluate a file with `l4 run`](../../tutorials/getting-started/l4-cli.md#step-3-l4-run--evaluate-a-file) says how to find the directive and what to do.
+In `l4 run`, a request that fails, for example because the server can't be reached, hides the results of every directive in the file, not only that one.
+[Evaluate a file with `l4 run`](../../tutorials/getting-started/l4-cli.md#step-3-l4-run--evaluate-a-file) says what to do.
 
 ## FETCH
 

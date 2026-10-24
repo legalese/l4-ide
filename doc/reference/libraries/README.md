@@ -54,10 +54,7 @@ IMPORT `legal-persons`
 
 ### Files cannot import each other in a ring
 
-If `a.l4` imports `b.l4`, then `b.l4`, and every file `b.l4` imports in turn, cannot import `a.l4`.
-A file cannot import itself.
-`l4 check` and `l4 run` exit non-zero on a ring and print the message described under [Import cycle](../errors/README.md#import-cycle).
-`l4 deploy` and `l4 redeploy` refuse a file with a ring in its imports.
+A file can't import itself, and files can't import each other in a ring: if `a.l4` imports `b.l4`, then `b.l4`, and anything it imports, can't import `a.l4`. See [Import cycle](../errors/README.md#import-cycle) for how to fix it.
 
 ### What an import gives you
 
