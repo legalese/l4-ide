@@ -2,7 +2,7 @@
 
 **Status: draft (2026-10-24).**
 The function names are ruled (card CAL, 2026-10-24, §7).
-What is built is a library (`jl4-core/libraries/calendar.l4`), two fixtures, a doc page and this spec, on branch `lang/act-time-guard`, stacked on `lang/lifecycle-values`, local, not pushed.
+What is built is a library (`jl4-core/libraries/calendar.l4`), two fixtures, a doc page and this spec, on branch `lang/act-time-guard`, draft PR legalese/l4-ide#744, stacked on `lang/lifecycle-values` (#743).
 No Haskell changed.
 Everything marked "assumed, not ruled" is a build decision that can be reverted alone.
 
