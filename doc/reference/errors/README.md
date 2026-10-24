@@ -31,6 +31,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [I could not find a definition for the identifier](#i-could-not-find-a-definition-for-the-identifier)
 - [Module not found](#module-not-found)
+- [Import cycle](#import-cycle)
 
 **Definitions and clauses**
 
@@ -398,6 +399,7 @@ DECIDE `is ready` IS TRUE
 **Error:** `I could not find a module with this name: helpers`, then `I have tried the following locations:` and the places that were tried. The list ends with the standard library built into `l4`, for example `the stdlib embedded in this binary (20 modules, not among them)`, or `the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)` when that variable is set. On the command line, `l4` also prints `Warning | [Import Resolution] Module not found: helpers`.
 
 An `IMPORT` names a module that is neither a standard library nor a file `helpers.l4` in your project's root folder or beside the importing file.
+This stops `l4 check`, `l4 run` and deploying, even if nothing from the module is used.
 
 **How to fix it:**
 
@@ -406,6 +408,16 @@ An `IMPORT` names a module that is neither a standard library nor a file `helper
 - If `JL4_LIBRARY_PATH` is set, the built-in standard library is not used at all, so that folder must hold every library you import, `prelude.l4` included.
 
 [IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
+
+---
+
+### Import cycle
+
+**Error:** `This IMPORT makes a ring of imports: a.l4 -> b.l4 -> a.l4.` or `A file cannot import itself.`
+
+Files import each other in a ring, directly or through other files. L4 checks the files a file imports before the file itself, so a ring can never be checked. The error is on the `IMPORT` that closes the ring. Files that import a file in the ring get an error on that `IMPORT` too.
+
+**How to fix it:** move what both files need into a new file that both import, or remove an `IMPORT` the file doesn't use.
 
 ---
 

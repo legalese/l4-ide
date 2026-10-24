@@ -348,6 +348,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
+  /** Re-fetch the active file's exported functions and blocking errors,
+   *  without resetting the Deploy tab's form the way a file switch does. */
+  refreshExportedFunctions() {
+    if (!this.view) return
+    this.view.webview.postMessage({
+      type: 'l4-sidebar-refresh-exports',
+    })
+  }
+
   clearActiveFile() {
     if (!this.view) return
     this.view.webview.postMessage({
@@ -784,6 +793,17 @@ export function initializeSidebarMessenger(
         GetExportedFunctionsRequestType,
         { verDocId: { uri: params.fileUri, version: doc.version } }
       )
+      // The sidebar disables Deploy for such a file; this catches a click
+      // that raced an edit which broke it.
+      const blocking = lspResponse.blockingErrors ?? []
+      if (blocking.length > 0) {
+        const first = blocking[0]
+        const where = `${path.basename(vscode.Uri.parse(first.uri).fsPath)}:${first.line}`
+        return {
+          success: false,
+          error: `Fix the errors before deploying (${where}: ${first.message.split('\n')[0]})`,
+        }
+      }
       const importUris = lspResponse.importedFiles ?? []
 
       // Collect the main file and all its LSP-resolved imports

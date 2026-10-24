@@ -17,7 +17,9 @@ module L4.Cli.Common
 
     -- * Running the LSP pipeline
   , runOneshot
+  , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , hasBlockingError
   , transitiveDeps
   , dedupModules
 
@@ -50,6 +52,8 @@ import qualified Options.Applicative as Options
 import System.IO (hPutStrLn, stderr)
 import Control.Applicative ((<|>))
 
+import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
+import LSP.L4.BlockingErrors (hasBlockingError)
 import LSP.L4.Oneshot (oneshotL4Action)
 import qualified LSP.L4.Oneshot as Oneshot
 import LSP.Logger
@@ -241,6 +245,36 @@ runOneshot evalConfig fp act = do
   rawErrs <- getLog
   -- Post-filter: drop lines matching known progress-chatter prefixes.
   pure (filter (not . isProgressChatter) rawErrs, res)
+
+-- | Like 'runOneshot', but additionally returns the structured diagnostics
+-- published to the Shake store during the run, across every file in the import
+-- closure and not just the entry file.
+--
+-- The rendered @[Text]@ is still returned for display; the @[FileDiagnostic]@
+-- is what a caller consults for a verdict that knows severity. An import cycle
+-- is the case that needs it: the engine attaches its error to a module that is
+-- imported, so the entry file's own typecheck result can look successful.
+runOneshotWithDiagnostics
+  :: EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+runOneshotWithDiagnostics evalConfig fp act = do
+  (getLog, refRecorder) <- makeRefRecorder
+  let prettyRecorder = cmapWithPrio pretty refRecorder
+      keep wp = wp.priority /= Debug
+      filteredRec = cfilter keep prettyRecorder
+  (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
+  rawErrs <- getLog
+  pure (filter (not . isProgressChatter) rawErrs, diags, res)
+
+-- 'hasBlockingError' (re-exported) is the rule for whether a diagnostics set
+-- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
+-- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
+-- It leaves out the evaluator's diagnostics (source @\"eval\"@): a failed
+-- @#ASSERT@ is one, at Error severity, and keeps @l4 run@ at exit 0. A
+-- directive that CRASHES does fail the run, but @l4 run@ decides that from the
+-- directive results, not from here.
 
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather
