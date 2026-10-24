@@ -331,7 +331,8 @@ Both errors name the input.
 **It may give a `DEONTIC` value as its answer.**
 
 The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as one (the check goes by the type that L4 works out for it from the whole file), or an `ASSUME` that an exported rule's own body reads as one, whether it has a written type or not, and whether the file, a file it imports, or the rule's own `WHERE` declares it.
-A polymorphic `ASSUME` (`GIVEN a IS A TYPE`, `GIVETH AN a`, as the prelude's `TBD` is) is checked by the type at the place where the body reads it.
+A polymorphic `ASSUME` (`GIVEN a IS A TYPE`, `GIVETH AN a`, as the prelude's `TBD` is, in a file that has `IMPORT prelude`) is checked by the type at the place where the body reads it.
+Without `IMPORT prelude`, `TBD` is an unknown name: `l4 check` fails, and the service deploys the rule all the same, with `TBD` as a required input and answers every request with HTTP 422.
 An `ASSUME` of the file itself with a written type becomes a required input; one that an imported file declares becomes none, so no request could set it, and it is refused all the same.
 `EVENT` and `DEONTIC` are both refused in each of these places.
 The function endpoint (`GET /deployments/<id>/functions/<fn>`) lists an `ASSUME` of the file itself that has no written type, one written with its signature before it, and a polymorphic one as a required input of type `object`, and then ignores the value sent: every request that needs it answers HTTP 422, with "needed to know the value of … it is an assumed term".

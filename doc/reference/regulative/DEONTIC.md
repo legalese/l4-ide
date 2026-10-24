@@ -264,14 +264,17 @@ With ``ASSUME `the assumed duty` IS A DEONTIC Person Action`` in a file called `
 The service publishes the `ASSUME`s of the file that holds the rule and no others, so a request could not set an imported one in any case.
 An `ASSUME` needs no written type either.
 One called `the assumed duty`, with nothing after the name, is refused in the same way when the rule's own body reads it as a duty: by taking it apart with `CONSIDER` and a `WHEN FULFILLED` branch, or by handing it to a rule that takes a `DEONTIC`.
-A polymorphic `ASSUME` is declared with a type variable, as with `GIVEN a IS A TYPE` and `GIVETH AN a`, and the prelude's `TBD` is one.
+A polymorphic `ASSUME` is declared with a type variable, as with `GIVEN a IS A TYPE` and `GIVETH AN a`, and the prelude's `TBD` is one, in a file that has `IMPORT prelude`.
 Its declared type holds no `DEONTIC`, and each place that reads it gives it a type of its own, so the check goes by the type at the place where the exported rule's own body reads it.
 Handing `TBD` to a rule that takes a `DEONTIC` is refused in the same way, with `TBD` in the error, and reading it as a `NUMBER`, as `TBD + 1` does, is not.
+Without `IMPORT prelude`, `TBD` is an unknown name, and `l4 check` fails with "I could not find a definition for the identifier".
+The service deploys such a rule all the same, lists `TBD` as a required input, and answers every request with HTTP 422 and a message that begins `Internal error:` and says that `TBD` is not in scope.
 An `ASSUME` that the rule declares itself, under its own `WHERE`, counts in the same way.
-With ``ASSUME `local duty` IS A DEONTIC Person Action`` under the `WHERE` of an exported rule that reads `local duty`, `l4 check` reports the error above, with `local duty` in it.
+With ``ASSUME `local duty` IS A DEONTIC Person Action`` under the `WHERE` of an exported rule whose body reads `local duty`, `l4 check` reports the error above, with `local duty` in it.
+A read anywhere in the rule's body counts, its `WHERE` included, whether or not a local helper that makes the read is ever called.
 So does an `ASSUME` declared under the `WHERE` of a helper that sits inside the rule's `WHERE`, one with no written type that the body reads as a duty or as an event, and a polymorphic one that the body reads as one.
-An `ASSUME` under a `WHERE` that the rule never reads, one that the rule reads as a `NUMBER`, and one under the `WHERE` of a rule that is not exported are not refused.
-A name that a `WHERE` gives to an `ASSUME` stands for that `ASSUME` and not for a top-level one with the same name, and the check takes the type of the one that is read.
+An `ASSUME` under a `WHERE` that nothing in the rule's body reads, its `WHERE` included, one that the rule reads as a `NUMBER`, and one under the `WHERE` of a rule that is not exported are not refused.
+A name in a `WHERE` does not hide a top-level one: each read is resolved by its type, two that both fit are reported as [multiple definitions](../errors/README.md#several-definitions-with-the-same-name), and the check goes by the one that the read resolves to.
 A duty that a rule defines, with `MEANS` and a body, is not an `ASSUME` and not an input, and an exported rule may read it.
 
 ### What the check does not catch
