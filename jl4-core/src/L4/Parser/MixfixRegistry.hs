@@ -14,6 +14,7 @@ import Base
 import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Base.Text as Text
+import qualified Data.List as List
 import L4.Mixfix
 import L4.Syntax
 
@@ -24,10 +25,19 @@ data MixfixHintRegistry = MkMixfixHintRegistry
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData)
 
+-- | Entries are merged with 'List.union', which drops a later copy equal to an
+-- earlier one. A module's registry includes its imports' registries, so
+-- merging with '<>' kept one copy of each hint per import PATH
+-- (smucclaw\/l4-ide#1008). A 'MixfixInfo' is its pattern, keywords and arity,
+-- and nothing else about the definition, so a copy that is equal is a copy
+-- that no reader can tell apart: 'mixfixRulesWrittenAs' lists the rules a run
+-- of tokens is written like, and its callers take the first or ask whether
+-- every one of them satisfies a test of the rule's value; the other readers
+-- ask only 'keywordUniverse'.
 instance Semigroup MixfixHintRegistry where
   MkMixfixHintRegistry m1 s1 <> MkMixfixHintRegistry m2 s2 =
     MkMixfixHintRegistry
-      (Map.unionWith (<>) m1 m2)
+      (Map.unionWith List.union m1 m2)
       (Set.union s1 s2)
 
 instance Monoid MixfixHintRegistry where

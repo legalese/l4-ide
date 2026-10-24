@@ -179,6 +179,7 @@ test-suite jl4-core-test
     ImportResolutionSpec
     UnifySpec
     MixfixParserSpec
+    MixfixRegistryMergeSpec
     PatternMatchParserSpec
     PatternClausesMissingSpec
     EventExactPrintSpec
