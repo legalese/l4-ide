@@ -1,0 +1,266 @@
+-- Business days, public holidays and deadlines that roll (calendar library).
+--
+-- STATUS: proposed, not ruled (2026-10-24). specs/todo/ACT-TIME-GUARD-SPEC.md.
+-- The library's function names are option A of that spec's open question.
+--
+-- A business-day clause can mean one of two things, and they are written
+-- differently:
+--
+--   (a) the ACT must happen on a business day: "service may not be effected
+--       on a Sunday or a public holiday". That is a condition on the act, a
+--       PROVIDED. Today the act has to carry its own day for the PROVIDED to
+--       read (§2-§5): no PROVIDED can read the time the act is stamped AT.
+--
+--   (b) the DEADLINE moves to a business day: "if the fifth day falls on a
+--       Saturday, Sunday or public holiday, the next business day". That is a
+--       computed anchor, `WITHIN 0 OF <the rolled day>` (§1, §6, §7).
+--
+-- They compose: §3 rolls the deadline AND guards the act.
+--
+-- Every trace here is stamped in date serials (`DATE_SERIAL`), the scale the
+-- calendar library works on. In October and November 2026: Mon 26 Oct,
+-- Fri 30 Oct, Sat 31 Oct, Mon 2 Nov, Tue 3 Nov, Thu 5 Nov, Fri 6 Nov.
+
+IMPORT prelude
+IMPORT daydate
+IMPORT calendar
+
+DECLARE Party IS ONE OF Seller, Buyer, Landlord, Tenant
+
+DECLARE Action IS ONE OF
+    notify        HAS day IS A NUMBER
+    pay
+    serve         HAS day IS A NUMBER
+    deliver       HAS day IS A NUMBER
+    lodge         HAS day IS A NUMBER
+    `send notice` HAS day IS A NUMBER
+    reply
+
+GIVETH A NUMBER
+`Wed 21 Oct` MEANS DATE_SERIAL (YMD 2026 10 21)
+
+GIVETH A NUMBER
+`Mon 26 Oct` MEANS DATE_SERIAL (YMD 2026 10 26)
+
+GIVETH A NUMBER
+`Thu 29 Oct` MEANS DATE_SERIAL (YMD 2026 10 29)
+
+GIVETH A NUMBER
+`Fri 30 Oct` MEANS DATE_SERIAL (YMD 2026 10 30)
+
+GIVETH A NUMBER
+`Sat 31 Oct` MEANS DATE_SERIAL (YMD 2026 10 31)
+
+GIVETH A NUMBER
+`Mon 2 Nov` MEANS DATE_SERIAL (YMD 2026 11 2)
+
+GIVETH A NUMBER
+`Tue 3 Nov` MEANS DATE_SERIAL (YMD 2026 11 3)
+
+GIVETH A NUMBER
+`Wed 4 Nov` MEANS DATE_SERIAL (YMD 2026 11 4)
+
+GIVETH A NUMBER
+`Thu 5 Nov` MEANS DATE_SERIAL (YMD 2026 11 5)
+
+GIVETH A NUMBER
+`Fri 6 Nov` MEANS DATE_SERIAL (YMD 2026 11 6)
+
+GIVETH A NUMBER
+`Mon 9 Nov` MEANS DATE_SERIAL (YMD 2026 11 9)
+
+GIVETH A NUMBER
+`Mon 16 Nov` MEANS DATE_SERIAL (YMD 2026 11 16)
+
+#ASSERT `Weekday of` `Sat 31 Oct` EQUALS Saturday
+
+
+-- §1 Reading (b): the deadline rolls. "The buyer shall pay within five days
+-- of the notice; if the fifth day is not a business day, by the next business
+-- day." Notice on Mon 26 Oct: the fifth day is Sat 31 Oct, which rolls to
+-- Mon 2 Nov. Notice on Thu 29 Oct: the fifth day is Tue 3 Nov, a business
+-- day, and nothing moves.
+
+GIVETH A DEONTIC Party Action
+`pay within five days of notice, rolled` MEANS
+    PARTY Seller MUST notify d WITHIN 10
+    HENCE PARTY Buyer MUST pay WITHIN 0 OF (`next business day on or after` `weekdays only` (d PLUS 5))
+
+-- rolled to Monday: paying on the Monday is in time
+#TRACE `pay within five days of notice, rolled` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify `Mon 26 Oct` AT `Mon 26 Oct`
+  PARTY Buyer DOES pay AT `Mon 2 Nov`
+
+-- and the Tuesday is late
+#TRACE `pay within five days of notice, rolled` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify `Mon 26 Oct` AT `Mon 26 Oct`
+  PARTY Buyer DOES pay AT `Tue 3 Nov`
+
+-- no roll: the fifth day is already a business day, so Tue 3 Nov is in time
+#TRACE `pay within five days of notice, rolled` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify `Thu 29 Oct` AT `Thu 29 Oct`
+  PARTY Buyer DOES pay AT `Tue 3 Nov`
+
+-- and Wed 4 Nov is late: a business-day deadline is not pushed further
+#TRACE `pay within five days of notice, rolled` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify `Thu 29 Oct` AT `Thu 29 Oct`
+  PARTY Buyer DOES pay AT `Wed 4 Nov`
+
+
+-- §2 Reading (a): the act must fall on a business day. "Service shall be
+-- effected on a business day, within ten days." A PROVIDED that is FALSE
+-- makes the act not count, and the next event is tried. The act carries its
+-- own day, `d`, because no PROVIDED can read the act's AT stamp.
+
+GIVETH A DEONTIC Party Action
+`serve on a business day within ten days` MEANS
+    PARTY Landlord MUST serve d PROVIDED `is a business day` `weekdays only` d
+    WITHIN 10
+
+-- Saturday service does not count; Monday service, before Thu 5 Nov, does
+#TRACE `serve on a business day within ten days` AT `Mon 26 Oct` WITH
+  PARTY Landlord DOES serve `Sat 31 Oct` AT `Sat 31 Oct`
+  PARTY Landlord DOES serve `Mon 2 Nov` AT `Mon 2 Nov`
+
+-- Saturday service alone: the obligation is breached at its deadline
+#TRACE `serve on a business day within ten days` AT `Mon 26 Oct` WITH
+  PARTY Landlord DOES serve `Sat 31 Oct` AT `Sat 31 Oct`
+  (`WAIT UNTIL` `Fri 6 Nov`)
+
+-- THE GUARD DOES NOT MOVE THE DEADLINE. Started on Wed 21 Oct, ten days end
+-- on Sat 31 Oct. The Saturday act is refused by the guard, and Monday is
+-- after the deadline: breached. A business-day guard on the act and a
+-- business-day roll of the deadline are two clauses, not one.
+#TRACE `serve on a business day within ten days` AT `Wed 21 Oct` WITH
+  PARTY Landlord DOES serve `Sat 31 Oct` AT `Sat 31 Oct`
+  PARTY Landlord DOES serve `Mon 2 Nov` AT `Mon 2 Nov`
+
+
+-- §3 (a) and (b) together: guard the act AND roll the deadline, so that the
+-- last day of the window is a day on which the act can be done. The start is
+-- passed in, because a top-level rule has no earlier act to count from.
+
+GIVEN start IS A NUMBER
+GIVETH A DEONTIC Party Action
+`serve on a business day within ten days, rolled` start MEANS
+    PARTY Landlord MUST serve d PROVIDED `is a business day` `weekdays only` d
+    WITHIN 0 OF (`next business day on or after` `weekdays only` (start PLUS 10))
+
+-- the same Saturday and Monday as the last trace of §2: now in time
+#TRACE (`serve on a business day within ten days, rolled` `Wed 21 Oct`) AT `Wed 21 Oct` WITH
+  PARTY Landlord DOES serve `Sat 31 Oct` AT `Sat 31 Oct`
+  PARTY Landlord DOES serve `Mon 2 Nov` AT `Mon 2 Nov`
+
+
+-- §4 A KNOWN SILENT WRONG ANSWER, pinned so that a fix shows up here. The day
+-- in the act is what the guard reads, and nothing checks it against the AT
+-- stamp. Service stamped on Saturday but carrying Monday's day counts.
+-- Only an act-time noun or binder would close this (spec §5, deferred).
+#TRACE `serve on a business day within ten days` AT `Mon 26 Oct` WITH
+  PARTY Landlord DOES serve `Mon 2 Nov` AT `Sat 31 Oct`
+
+
+-- §5 A prohibition that applies only off business days: "no deliveries on a
+-- Saturday, Sunday or public holiday". Friday delivery is not a violation;
+-- Saturday delivery is.
+
+GIVETH A DEONTIC Party Action
+`no deliveries off a business day` MEANS
+    PARTY Seller SHANT deliver d PROVIDED NOT (`is a business day` `weekdays only` d)
+    WITHIN 14
+
+#TRACE `no deliveries off a business day` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES deliver `Fri 30 Oct` AT `Fri 30 Oct`
+  (`WAIT UNTIL` `Mon 16 Nov`)
+
+#TRACE `no deliveries off a business day` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES deliver `Sat 31 Oct` AT `Sat 31 Oct`
+
+
+-- §6 "Provided it is not a public holiday", with the public holidays given as
+-- a list of dates. This guard says nothing about weekends: a Saturday counts.
+-- The list is an input of the rule, supplied where the rule is used.
+
+GIVEN holidays IS A LIST OF DATE
+      d        IS A NUMBER
+GIVETH A BOOLEAN
+`is one of the public holidays` holidays d MEANS
+    elem (FLOOR d) (map Day holidays)
+
+GIVEN holidays IS A LIST OF DATE
+GIVETH A DEONTIC Party Action
+`lodge on a day that is not a public holiday` holidays MEANS
+    PARTY Seller MUST lodge d PROVIDED NOT `is one of the public holidays` holidays d
+    WITHIN 14
+
+-- Mon 2 Nov is a public holiday: lodging then does not count, Tuesday does
+#TRACE (`lodge on a day that is not a public holiday` (LIST YMD 2026 11 2)) AT `Mon 26 Oct` WITH
+  PARTY Seller DOES lodge `Mon 2 Nov` AT `Mon 2 Nov`
+  PARTY Seller DOES lodge `Tue 3 Nov` AT `Tue 3 Nov`
+
+-- Mon 2 Nov alone: breached when the fourteen days run out
+#TRACE (`lodge on a day that is not a public holiday` (LIST YMD 2026 11 2)) AT `Mon 26 Oct` WITH
+  PARTY Seller DOES lodge `Mon 2 Nov` AT `Mon 2 Nov`
+  (`WAIT UNTIL` `Mon 16 Nov`)
+
+-- with no holidays listed, the same Monday counts
+#TRACE (`lodge on a day that is not a public holiday` (EMPTY)) AT `Mon 26 Oct` WITH
+  PARTY Seller DOES lodge `Mon 2 Nov` AT `Mon 2 Nov`
+
+-- and a Saturday counts too, because it is not a public holiday
+#TRACE (`lodge on a day that is not a public holiday` (LIST YMD 2026 11 2)) AT `Mon 26 Oct` WITH
+  PARTY Seller DOES lodge `Sat 31 Oct` AT `Sat 31 Oct`
+
+
+-- §7 A deadline that rolls over a weekend AND a public holiday to the next
+-- business day. Notice on Mon 26 Oct; the fifth day, Sat 31 Oct, rolls past
+-- the weekend and past the holiday on Mon 2 Nov to Tue 3 Nov.
+
+GIVEN holidays IS A LIST OF DATE
+GIVETH A DEONTIC Party Action
+`pay within five days of notice, rolled past holidays` holidays MEANS
+    PARTY Seller MUST notify d WITHIN 10
+    HENCE PARTY Buyer MUST pay
+          WITHIN 0 OF (`next business day on or after` (`weekdays except the dates` holidays) (d PLUS 5))
+
+-- with Mon 2 Nov a holiday, Tuesday is in time
+#TRACE (`pay within five days of notice, rolled past holidays` (LIST YMD 2026 11 2)) AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify `Mon 26 Oct` AT `Mon 26 Oct`
+  PARTY Buyer DOES pay AT `Tue 3 Nov`
+
+-- with no holiday listed, the same Tuesday is late
+#TRACE (`pay within five days of notice, rolled past holidays` (EMPTY)) AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify `Mon 26 Oct` AT `Mon 26 Oct`
+  PARTY Buyer DOES pay AT `Tue 3 Nov`
+
+
+-- §8 Deemed receipt: "a notice is deemed given on the business day after it
+-- is sent; the landlord shall reply within three business days of receipt".
+-- `next business day after` is strictly after, so a notice sent on a business
+-- day is deemed given on the next one, not the same day.
+
+GIVETH A DEONTIC Party Action
+`reply within three business days of deemed receipt` MEANS
+    PARTY Tenant MUST `send notice` d WITHIN 30
+    HENCE PARTY Landlord MUST reply
+          WITHIN 0 OF (`add business days` `weekdays only` 3 (`next business day after` `weekdays only` d))
+
+-- sent Fri 30 Oct, deemed given Mon 2 Nov, reply due Thu 5 Nov
+#TRACE `reply within three business days of deemed receipt` AT `Mon 26 Oct` WITH
+  PARTY Tenant DOES `send notice` `Fri 30 Oct` AT `Fri 30 Oct`
+  PARTY Landlord DOES reply AT `Thu 5 Nov`
+
+#TRACE `reply within three business days of deemed receipt` AT `Mon 26 Oct` WITH
+  PARTY Tenant DOES `send notice` `Fri 30 Oct` AT `Fri 30 Oct`
+  PARTY Landlord DOES reply AT `Fri 6 Nov`
+
+-- sent Mon 2 Nov, a business day: deemed given Tue 3 Nov, reply due Fri 6 Nov
+#TRACE `reply within three business days of deemed receipt` AT `Mon 26 Oct` WITH
+  PARTY Tenant DOES `send notice` `Mon 2 Nov` AT `Mon 2 Nov`
+  PARTY Landlord DOES reply AT `Fri 6 Nov`
+
+
+-- §9 The B1 spelling, `THE JOIN PLUS 5` in place of the day the act carries,
+-- is in calendar-rollover-join.l4: it needs B1 (THE JOIN as a value), built
+-- in part on lang/lifecycle-values (2026-10-24) and not merged to unstable,
+-- so it is kept out of this file.
