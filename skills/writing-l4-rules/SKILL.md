@@ -319,6 +319,66 @@ ASSUMEs stay uninterpreted at runtime (any call fails with a stuck
 "assumed term" error). The typechecker and `jl4-service` deploy both reject
 such bundles with `Function type inputs are not supported for @export`.
 
+### Inputs no request can supply: `EVENT` and `DEONTIC`
+
+**No request can supply an `EVENT` or a `DEONTIC` input.**
+The typechecker refuses an `EVENT` input with `EVENT inputs are not supported for @export`.
+It does not refuse a `DEONTIC` input: `l4 check` and the deploy accept it, and the published schema calls the input a bare `object`, so the deployment looks fine and cannot work.
+A JSON object for it is refused (HTTP 422), and text or a number is accepted and the rule works on it as text or a number, so the answer is wrong with no warning.
+
+**A `DEONTIC` input is for use inside L4 only.**
+**Never give a rule marked `@export` a `DEONTIC` input.**
+**It may give a `DEONTIC` value as its answer.**
+
+The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, or a module-level `ASSUME` of such a type that an exported rule uses (it becomes a required input, and its schema is a bare `object`).
+`EVENT` is refused in all four places.
+Take the plain facts as inputs, build the duty and the events inside the rule, and keep any helper that takes a `DEONTIC` or an `EVENT` without `@export`:
+
+```l4
+-- ✔ Plain facts in, the duty built inside
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+-- Not exported, so it may take a DEONTIC and a list of EVENTs
+GIVEN duty IS A DEONTIC Person Action
+      events IS A LIST OF EVENT Person Action
+GIVETH A BOOLEAN
+`is fulfilled by` duty events MEANS
+  CONSIDER EVALTRACE duty 0 events
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Gives a DEONTIC; mark it @export too if callers should get the duty itself
+GIVEN who IS A Person
+      what IS AN Action
+      deadline IS A NUMBER
+GIVETH A DEONTIC Person Action
+`the duty` who what deadline MEANS
+  PARTY who
+  MUST EXACTLY what
+  WITHIN deadline
+  HENCE FULFILLED
+  LEST BREACH BY who BECAUSE "the deadline passed without the action"
+
+@export Is the duty fulfilled when the party takes the action on a given day
+GIVEN who IS A Person @desc The party who must act
+      what IS AN Action @desc The action the party must take
+      deadline IS A NUMBER @desc The deadline, in days from the start
+      `day taken` IS A NUMBER @desc The day, in days from the start, on which the party acted
+GIVETH A BOOLEAN
+`duty fulfilled on day` who what deadline `day taken` MEANS
+  `is fulfilled by` (`the duty` who what deadline) (LIST EVENT who what `day taken`)
+
+#EVAL `duty fulfilled on day` Seller `deliver goods` 14 10
+#EVAL `duty fulfilled on day` Seller `deliver goods` 14 20
+```
+
+An exported rule that gives a `DEONTIC`, such as `the duty` above once you mark it `@export`, needs two more fields in the request, `startTime` and `events`.
+The service answers HTTP 400 without either, and `"events": []` asks before anything has happened.
+The answer to `"events": []` holds the names of the inputs where the values should be (`"party": "who"`).
+With events that do not settle the duty, a waiting duty keeps `action` as `EXACTLY what` and gives `deadline` as the time left after the last event, so prefer a yes-or-no rule such as `duty fulfilled on day`.
+`EVALTRACE duty startTime events` runs a duty against events; see [references/regulative.md](references/regulative.md).
+
 ### `@desc` — document parameters
 
 Put an inline `@desc` on **every** `GIVEN` parameter an API caller has to supply. These descriptions flow into the OpenAPI parameter docs and the MCP tool's `inputSchema`, and they are what LLMs read when deciding **how to construct a valid call**.

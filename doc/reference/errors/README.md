@@ -57,6 +57,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
 - [An @export that takes an EVENT](#an-export-that-takes-an-event)
+- [An @export that takes a DEONTIC (no error)](#an-export-that-takes-a-deontic-no-error)
 
 ---
 
@@ -1020,3 +1021,13 @@ GIVETH A NUMBER
 
 Each of the three inputs needs a type that a request can carry, such as an enumeration or a `NUMBER`.
 See [EVENT](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event).
+
+---
+
+### An @export that takes a DEONTIC (no error)
+
+`l4 check` and a deploy accept an `@export` rule that takes a `DEONTIC` input, though no request can supply a value for it.
+**A `DEONTIC` input is for use inside L4 only.**
+**Never give a rule marked `@export` a `DEONTIC` input.**
+**It may give a `DEONTIC` value as its answer.**
+See [An exported rule cannot take a DEONTIC input](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input) for the reason, for what happens if you do it anyway, and for what to write instead.

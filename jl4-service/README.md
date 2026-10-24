@@ -254,6 +254,13 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 - `startTime` — start time for contract simulation (required for DEONTIC)
 - `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
 
+A `DEONTIC` value cannot be supplied as an input of an exported function: a request has no form for one.
+The schema calls such an input an `object`, a JSON object for it is refused with HTTP 422, and text or a number is accepted but reaches the function as text or a number.
+**A `DEONTIC` input is for use inside L4 only.**
+**Never give a rule marked `@export` a `DEONTIC` input.**
+**It may give a `DEONTIC` value as its answer.**
+Take the plain facts as inputs and build the `DEONTIC` value inside the function; see [An exported rule cannot take a DEONTIC input](../doc/reference/regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).
+
 In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
 An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
 A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligationAction` (the obligation that was missed), and, for a breach the rule states with `BREACH BY`, in `party`.

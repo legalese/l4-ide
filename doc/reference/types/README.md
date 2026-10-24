@@ -48,9 +48,12 @@ These built-in types take the type of the parties and the type of the actions as
 | `DEONTIC party action` | a regulative rule: an obligation, permission or prohibition, or `FULFILLED` or `BREACH`; see [DEONTIC](../regulative/DEONTIC.md) |
 | `EVENT party action`   | that a party did an action at a time (a `NUMBER`): `EVENT Seller delivery 2`; see [EVENT](../regulative/EVENT.md)                |
 
-A rule marked `@export` cannot take a `DEONTIC` value as an input, because a request has no JSON form for one.
-`l4 check` and a deploy accept such a rule, and the published schema describes the input as a bare `object`.
-A request that gives a JSON object for it is refused with HTTP 422; a string or a number is accepted, but reaches the rule as a string or a number and not as a `DEONTIC` value.
+**A `DEONTIC` input is for use inside L4 only.**
+**Never give a rule marked `@export` a `DEONTIC` input.**
+**It may give a `DEONTIC` value as its answer.**
+A request cannot carry a `DEONTIC` value, and `l4 check` and a deploy accept the rule all the same, so it looks fine and cannot work.
+See [An exported rule cannot take a DEONTIC input](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input) for the reason and for what to write instead.
+An `EVENT` input is refused with an error; see [An exported rule cannot take an event](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event).
 
 ## Records and enumerations
 
