@@ -42,6 +42,7 @@ module L4.EvaluateLazy
 , tracePostprocessFailed
 , prettyLedger
 , ShownValue (..)
+, LedgerDisplay (..)
   -- * Ledger substrate (M0). Exposed for the test suite; not part of the
   -- stable public API.
 , Eval
@@ -131,7 +132,19 @@ data EvalConfig = EvalConfig
     -- module as a Shake rule) must say so here, because GHC's allocation
     -- counter belongs to a thread and the rule runs on another one than the
     -- caller's: a limit set on the caller never sees it.
+  , ledgerDisplay :: !LedgerDisplay
+    -- ^ Whether each directive's ledger is also forced for display
+    -- ('EvalDirectiveResult.shownLedger'). 'ShowLedger' by default. A
+    -- surface that never prints the ledger (jl4-service, the WASM API) says
+    -- 'LedgerNotShown' and spares itself the forcing, which can be as
+    -- expensive as the recorded value is deep.
   }
+
+-- | Whether a directive's ledger is forced to normal form for display.
+-- Which surfaces skip it is assumed, not ruled: the ones that never print
+-- a ledger row.
+data LedgerDisplay = ShowLedger | LedgerNotShown
+  deriving stock (Eq, Show, Generic)
 
 -- | A cap, in bytes, on what an evaluation may allocate.
 -- Exceeding it raises 'AllocationLimitExceeded' out of the evaluation, and
@@ -148,7 +161,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing ShowLedger)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -289,16 +302,16 @@ runConfigStep = \ case
 
 -- | Evaluate an EVAL directive. For this, we evaluate to normal form,
 -- not just WHNF.
-nfDirective :: EvalDirective -> Eval EvalDirectiveResult
-nfDirective d = fst <$> nfDirectiveWith False d
+nfDirective :: LedgerDisplay -> EvalDirective -> Eval EvalDirectiveResult
+nfDirective disp d = fst <$> nfDirectiveWith disp False d
 
 -- | 'nfDirective', optionally with the deontic step log captured for the
 -- directive (P2b). The log is switched on around the evaluation only — the
 -- normal-form pass runs inside it too, because forcing the residual can run
 -- nothing regulative — and it is off again before the ledger is snapshotted.
 -- With the flag off this IS 'nfDirective': the same code path, an empty list.
-nfDirectiveWith :: Bool -> EvalDirective -> Eval (EvalDirectiveResult, [DeonticStep])
-nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ do
+nfDirectiveWith :: LedgerDisplay -> Bool -> EvalDirective -> Eval (EvalDirectiveResult, [DeonticStep])
+nfDirectiveWith disp withSteps (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ do
   -- T6: open a fresh, directive-local context-read span. (Exceptional
   -- unwinding closes spans as it pops UpdateThunk frames — see
   -- 'unwindFrame' — but a successful directive legitimately leaves its own
@@ -431,7 +444,9 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- written under @EVAL UNDER VALID TIME d@ showed a @RECALL@ as of today
   -- while the same @#EVAL@ returned the value as of @d@ — a quiet wrong
   -- answer, measured on @ok/ledger/record-temporal-context.l4@.
-  shownLedger <- showStore directiveLedger
+  shownLedger <- case disp of
+    LedgerNotShown -> pure Nothing
+    ShowLedger     -> Just <$> showStore directiveLedger
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed shownLedger, steps)
   where
     showStore :: LedgerStore -> Eval (LedgerStore' ShownValue)
@@ -546,13 +561,15 @@ data EvalDirectiveResult =
       -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). Not rendered by the
       -- printers here; @l4 batch@ and @jl4-service@ turn it into their
       -- @presumed@ list.
-    , shownLedger :: !(LedgerStore' ShownValue)
+    , shownLedger :: !(Maybe (LedgerStore' ShownValue))
       -- ^ 'ledger' as the reader sees it: the same rows, each value forced to
       -- normal form (or the reason it could not be) while the directive's
       -- heap was still alive, under the temporal context of its own write.
       -- This is what every printer renders; a 'WHNF' prints its fields as
       -- @&n\@file@ references, which is what the reader used to see for any
-      -- RECORD of a record or a list.
+      -- RECORD of a record or a list. 'Nothing' when the run was told not to
+      -- force it ('EvalConfig.ledgerDisplay'), on a surface that prints no
+      -- ledger; the printers here then print none.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -736,7 +753,7 @@ prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
 prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace _ledger ns _presumed shown) =
    prettyEvalDirectiveValue res
    <> prettyNotes ns
-   <> prettyLedger shown
+   <> foldMap prettyLedger shown
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -747,7 +764,7 @@ prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveRes
 prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace _ledger ns _presumed shown) =
    prettyEvalDirectiveValueWithFields fields res
    <> prettyNotes ns
-   <> prettyLedger shown
+   <> foldMap prettyLedger shown
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -914,7 +931,7 @@ evalAndNF d r = do
 -- the results of the (L)EVAL directives in this module.
 --
 execEvalModuleWithEnv :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
-execEvalModuleWithEnv = execEvalModuleWith nfDirective
+execEvalModuleWithEnv evalConfig = execEvalModuleWith (nfDirective evalConfig.ledgerDisplay) evalConfig
 
 -- | LTS-VISUALISER §4.3 (P2b): 'execEvalModuleWithEnv' with the deontic step
 -- log switched on for every directive, returning each directive's steps
@@ -926,7 +943,7 @@ execEvalModuleWithEnv = execEvalModuleWith nfDirective
 -- This is the library seam P2c (the marking and the enabled set) and P2a′
 -- (the list) build on; it is deliberately not a CLI.
 execEvalModuleWithDeonticLog :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [(EvalDirectiveResult, [DeonticStep])])
-execEvalModuleWithDeonticLog = execEvalModuleWith (nfDirectiveWith True)
+execEvalModuleWithDeonticLog evalConfig = execEvalModuleWith (nfDirectiveWith evalConfig.ledgerDisplay True) evalConfig
 
 execEvalModuleWith :: (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
 execEvalModuleWith = execEvalModuleWithDefaults noRootFills []
@@ -938,7 +955,7 @@ execEvalModuleWith = execEvalModuleWithDefaults noRootFills []
 -- their inputs this way.
 execEvalModuleWithEnvAndImports :: EvalConfig -> EntityInfo -> Environment -> [Declare Resolved] -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
 execEvalModuleWithEnvAndImports evalConfig entityInfo env imported =
-  execEvalModuleWithDefaults noRootFills imported nfDirective evalConfig entityInfo env
+  execEvalModuleWithDefaults noRootFills imported (nfDirective evalConfig.ledgerDisplay) evalConfig entityInfo env
 
 -- | Definitions a caller filled with a @TYPICALLY@ default at the root, keyed
 -- by the 'Unique' of the 0-ary definition holding the default. Forcing one
@@ -1196,8 +1213,8 @@ forEachDirectiveFreshHeap prepare runDirective baseEnv m n =
 -- JSON keys are matched to ASSUME'd L4 variables by name.
 -- The approach: first evaluate the module normally (which pre-allocates References),
 -- then write JSON values into the References for ASSUME'd variables.
-evalModuleAndDirectivesWithJSON :: Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
-evalModuleAndDirectivesWithJSON json env m = do
+evalModuleAndDirectivesWithJSON :: LedgerDisplay -> Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
+evalModuleAndDirectivesWithJSON disp json env m = do
   ienv <- initialEnvironment
   let baseEnv = env <> ienv
   -- First pass: get moduleEnv (exports) and the directive count for the return value.
@@ -1206,7 +1223,7 @@ evalModuleAndDirectivesWithJSON json env m = do
   -- 'prepare' hook re-applies the JSON ASSUME bindings to EACH fresh heap's
   -- combined environment — otherwise the freshly re-thunked References would lack
   -- the JSON-provided values.
-  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) nfDirective baseEnv m (length dirs0)
+  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) (nfDirective disp) baseEnv m (length dirs0)
   pure (moduleEnv, results)
 
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
@@ -1218,7 +1235,7 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
   let st = withDefaultsKnown evalConfig noRootFills m0 [] st0
-  r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
+  r <- try (runEval st (evalModuleAndDirectivesWithJSON evalConfig.ledgerDisplay json emptyEnvironment m))
   case r of
     Left exc -> do
       hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -1251,7 +1268,7 @@ execEvalExprInContextOfModuleWith evalConfig entityInfo rootFills imported expr 
     -- because making the import requires a Resolved.
     -- Filter directives recursively (including in nested sections)
     moduleWithoutDirectives = filterDirectivesFromModule m
-  (_, res) <- execEvalModuleWithDefaults rootFills imported nfDirective evalConfig entityInfo env (evalExprDirective `prependToModule` moduleWithoutDirectives)
+  (_, res) <- execEvalModuleWithDefaults rootFills imported (nfDirective evalConfig.ledgerDisplay) evalConfig entityInfo env (evalExprDirective `prependToModule` moduleWithoutDirectives)
   case res of
     [result] -> pure (Just result)
     _        -> pure Nothing

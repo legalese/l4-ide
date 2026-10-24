@@ -416,7 +416,7 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
     -- RECORD/COMMIT/ATTEST writes). 'prettyLedger' returns empty for a directive
     -- that wrote nothing, so we drop the section in that case.
     ledgerSection =
-      let body = prettyLedger led
+      let body = foldMap prettyLedger led
       in if Text.null body then Nothing else Just (Text.dropWhile (== '\n') body)
     traceSection = case traceMode of
       TraceTextNone -> Nothing

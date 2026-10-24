@@ -859,6 +859,9 @@ requestEvalConfig policy presumption viaWrapper = do
     { Eval.presumeDefaults = presumption == PresumeSoft
     , Eval.requestRecord   = if viaWrapper then Just requestRecordName else Nothing
     , Eval.allocationLimit = limit
+      -- The service never prints a ledger row (its JSON drops the ledger),
+      -- so it does not force the rows for display. Assumed, not ruled.
+    , Eval.ledgerDisplay   = Eval.LedgerNotShown
     }
 
 -- | Evaluate using precompiled module (fast path) - direct AST evaluation
