@@ -176,7 +176,13 @@ GIVETH A DEONTIC Actor Action
 
 A name in the act is required the same way a literal is, whether it names a defined figure, a rule's own input, or the whole act at once — there is no longer a spelling that works for one and not the other. The blank can equally be read inside a next obligation written directly under `HENCE`; the rule above is preferred because it can be used from more than one place.
 
-The time of an event is not something an obligation can read: there is no blank for it. That is why a rule that pays a debt in instalments cannot carry a single deadline down through the instalments (Question 5).
+The time of an event is not yet something an obligation can read as a value: there is no blank for it.
+The language does know it, as `THE JOIN`, but today that name may appear only where a deadline is counted from, after `WITHIN … OF` or `AFTER … OF` ([Anchoring a deadline with OF](../../reference/regulative/consequences.md#anchoring-a-deadline-with-of)).
+Making it an ordinary value that a next obligation can compute with is decided but not built.
+Until then, a rule that needs the time of an act has the act carry it as one of its details, and nothing checks that detail against the event's own time.
+
+A deadline that is already known can be carried down a chain: give it to the rule as an input and write `WITHIN 0 OF due`, and every instalment is due by the same day.
+What cannot be written yet is a deadline worked out from when an act happened, such as "thirty days after the first payment, for all the rest".
 
 **Built:** all of this.
 
