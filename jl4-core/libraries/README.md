@@ -13,6 +13,7 @@ This directory contains the standard libraries for L4, providing common function
 - **datetime.l4** - Points in time with a time zone
 - **timezone.l4** - IANA time zone constants
 - **excel-date.l4** - Excel-compatible date functions
+- **calendar.l4** - Business-day calendars and roll conventions (proposed, not ruled)
 - **currency.l4** - Currency types and operations
 - **holdings.l4** - Financial holdings and ownership structures
 - **actus.l4** - ACTUS financial contract types (with its `actus-*.l4` modules)
