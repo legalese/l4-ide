@@ -1,7 +1,7 @@
 -- Business days, public holidays and deadlines that roll (calendar library).
 --
--- STATUS: proposed, not ruled (2026-10-24). specs/todo/ACT-TIME-GUARD-SPEC.md.
--- The library's function names are option A of that spec's open question.
+-- STATUS: draft (2026-10-24). specs/todo/ACT-TIME-GUARD-SPEC.md.
+-- The library's function names were ruled on 2026-10-24 (card CAL).
 --
 -- A business-day clause can mean one of two things, and they are written
 -- differently:
@@ -236,14 +236,14 @@ GIVETH A DEONTIC Party Action
 
 -- §8 Deemed receipt: "a notice is deemed given on the business day after it
 -- is sent; the landlord shall reply within three business days of receipt".
--- `next business day after` is strictly after, so a notice sent on a business
+-- `add business days` by one is strictly after, so a notice sent on a business
 -- day is deemed given on the next one, not the same day.
 
 GIVETH A DEONTIC Party Action
 `reply within three business days of deemed receipt` MEANS
     PARTY Tenant MUST `send notice` d WITHIN 30
     HENCE PARTY Landlord MUST reply
-          WITHIN 0 OF (`add business days` `weekdays only` 3 (`next business day after` `weekdays only` d))
+          WITHIN 0 OF (`add business days` `weekdays only` 3 (`add business days` `weekdays only` 1 d))
 
 -- sent Fri 30 Oct, deemed given Mon 2 Nov, reply due Thu 5 Nov
 #TRACE `reply within three business days of deemed receipt` AT `Mon 26 Oct` WITH

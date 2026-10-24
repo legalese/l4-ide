@@ -20,8 +20,8 @@ DECIDE `this year's calendar` IS `weekdays except the dates` (LIST YMD 2026 11 2
 #ASSERT `next business day on or after` `weekdays only` `Mon 2 Nov` EQUALS `Mon 2 Nov`
 #ASSERT `next business day on or after` `this year's calendar` `Sat 31 Oct` EQUALS `Tue 3 Nov`
 
--- Strictly after, even from a business day
-#ASSERT `next business day after` `weekdays only` `Fri 30 Oct` EQUALS `Mon 2 Nov`
+-- Strictly after, even from a business day: one business day later
+#ASSERT `add business days` `weekdays only` 1 `Fri 30 Oct` EQUALS `Mon 2 Nov`
 
 -- Back to the Friday
 #ASSERT `previous business day on or before` `weekdays only` `Sat 31 Oct` EQUALS `Fri 30 Oct`

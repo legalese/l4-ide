@@ -1,6 +1,6 @@
 -- Business-day rolls counted from THE JOIN and THE ARMING (calendar library).
 --
--- STATUS: proposed, not ruled (2026-10-24). specs/todo/ACT-TIME-GUARD-SPEC.md.
+-- STATUS: draft (2026-10-24). specs/todo/ACT-TIME-GUARD-SPEC.md.
 --
 -- The companion of calendar-rollover.l4, written with the lifecycle nouns as
 -- values instead of a day the act carries. That needs ruling B1

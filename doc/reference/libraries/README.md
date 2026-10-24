@@ -20,7 +20,7 @@ Functions built into the language, such as `TOSTRING`, `CONCAT` or `FETCH`, need
 - [datetime](datetime.md): a date, a time and a time zone together, compared across time zones.
 - [timezone](timezone.md): constants such as `SGT` and `EST` for IANA time zone names.
 - [excel-date](excel-date.md): Excel date serials and `DATEDIF`, `DAYS360`, `YEARFRAC`, `EDATE`, `EOMONTH`, `WORKDAY` and `NETWORKDAYS`.
-- [calendar](calendar.md): business days, public-holiday lists, and the conventions that move a deadline off a weekend or holiday. Proposed, not ruled.
+- [calendar](calendar.md): business days, public-holiday lists, and the conventions that move a deadline off a weekend or holiday. A draft; the names were ruled on 24 October 2026.
 
 ### Money and finance
 

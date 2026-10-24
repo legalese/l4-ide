@@ -80,7 +80,6 @@ Holidays are data with their own source, and they change; a jurisdiction's holid
 | ------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `is a business day` calendar day                  | BOOLEAN | `TRUE` when the day is a business day on the calendar                                                                         |
 | `next business day on or after` calendar day      | day     | The day itself if it is a business day, otherwise the next one. This is the "Following" convention.                           |
-| `next business day after` calendar day            | day     | The first business day strictly after the day, even when the day itself is a business day                                     |
 | `previous business day on or before` calendar day | day     | The day itself if it is a business day, otherwise the last one before it. This is the "Preceding" convention.                 |
 | `modified following business day` calendar day    | day     | "Modified Following": as `next business day on or after`, unless that leaves the month, and then the last business day before |
 | `add business days` calendar n day                | day     | The n-th business day after the day. The day itself is not counted. With n = 0 the day comes back unchanged.                  |
@@ -89,12 +88,12 @@ Holidays are data with their own source, and they change; a jurisdiction's holid
 **"Following" is not "the following business day".**
 In ordinary English, "the following business day" is the day after: a notice sent on a Monday is received on "the following business day", Tuesday.
 The "Following" convention leaves a Monday where it is.
-That is why the two are named `next business day after` and `next business day on or after`.
+That is why the convention is named `next business day on or after`, and why there is no function called "following".
+For the English sense, count one business day: `add business days` `weekdays only` 1 d gives the first business day strictly after d, whether or not d is itself a business day.
 Choose by asking whether the day itself can be the answer.
 
-**The names are assumed, not ruled (24 October 2026).**
-This page uses option A, plain English that says whether the day itself counts.
-Option B is the ISDA vocabulary (`following business day`, `modified following business day`, `preceding business day`, `modified preceding business day`), which matches how banks draft; the choice is set out in `specs/todo/ACT-TIME-GUARD-SPEC.md`, section 7.
+**The names were chosen on 24 October 2026** (ruling CAL, recorded in `specs/todo/ACT-TIME-GUARD-SPEC.md`, section 7): plain English that says whether the day itself counts.
+The finance vocabulary of the ISDA definitions (`following business day`, `modified following business day`, `preceding business day`, `modified preceding business day`) matches how banks draft, and is not used here; there are no aliases for it.
 ACTUS, in [actus](actus.md), declares the same four conventions as codes (`SCRF`, `SCRMF`, `SCRP`, `SCRMP`) and does not compute them; this library does not wire them up either.
 
 `business days between` counts the way `WITHIN` does: the day you count from is not counted, and the last day is.
@@ -107,7 +106,7 @@ Excel's `NETWORKDAYS` (in [excel-date](excel-date.md)) counts both ends, and so 
 | ------------------------------------------------ | ----------------------------------------------------------------------- |
 | (1) the deadline moves to a business day         | `next business day on or after` in the `OF` anchor of `WITHIN`          |
 | (2) the act must happen on a business day        | `is a business day` in a `PROVIDED` (or `NOT` of it, for a prohibition) |
-| (3) a day is deemed, or counted in business days | `next business day after`, `add business days`, `business days between` |
+| (3) a day is deemed, or counted in business days | `add business days`, `business days between`                            |
 
 **(1) The deadline moves.** "Within five days; if the fifth day is not a business day, the next business day."
 Roll the day and anchor on it:
@@ -149,7 +148,7 @@ A prohibition works the same way: ``SHANT deliver d PROVIDED NOT (`is a business
 ```l4
 PARTY Tenant MUST `send notice` d WITHIN 30
 HENCE PARTY Landlord MUST reply
-      WITHIN 0 OF (`add business days` `weekdays only` 3 (`next business day after` `weekdays only` d))
+      WITHIN 0 OF (`add business days` `weekdays only` 3 (`add business days` `weekdays only` 1 d))
 ```
 
 ### Counting from the act itself, without carrying a day

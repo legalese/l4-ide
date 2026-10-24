@@ -2,9 +2,9 @@
 `Weekday of` with `Day` with 2, 11 and 2026 is equal to `Monday`
 `next business day on or after` with `weekdays only` and `Day` with 31, 10 and 2026 is equal to `Day` with 2, 11 and 2026
 `next business day on or after` with `weekdays only` and `Day` with 2, 11 and 2026 is equal to `Day` with 2, 11 and 2026
-`next business day after` with `weekdays only` and `Day` with 2, 11 and 2026 is equal to `Day` with 3, 11 and 2026
-`next business day after` with `weekdays only` and `Day` with 31, 10 and 2026 is equal to `Day` with 2, 11 and 2026
-`next business day after` with `weekdays only` and `Day` with 30, 10 and 2026 is equal to `Day` with 2, 11 and 2026
+`add business days` with `weekdays only`, 1 and `Day` with 2, 11 and 2026 is equal to `Day` with 3, 11 and 2026
+`add business days` with `weekdays only`, 1 and `Day` with 31, 10 and 2026 is equal to `Day` with 2, 11 and 2026
+`add business days` with `weekdays only`, 1 and `Day` with 30, 10 and 2026 is equal to `Day` with 2, 11 and 2026
 `previous business day on or before` with `weekdays only` and `Day` with 31, 10 and 2026 is equal to `Day` with 30, 10 and 2026
 `previous business day on or before` with `weekdays only` and `Day` with 30, 10 and 2026 is equal to `Day` with 30, 10 and 2026
 `modified following business day` with `weekdays only` and `Day` with 31, 10 and 2026 is equal to `Day` with 30, 10 and 2026
@@ -26,7 +26,7 @@ not `is a business day` with `weekdays except the dates` with list of 2 November
 `next business day on or after` with `weekdays only` and the sum of `Day` with 2, 11 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
 `next business day on or after` with `weekdays only` and the sum of `Day` with 2, 11 and 2026 and 0.9 is equal to `Day` with 2, 11 and 2026
 `next business day on or after` with `weekdays only` and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
-`next business day after` with `weekdays only` and the sum of `Day` with 30, 10 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
+`add business days` with `weekdays only`, 1 and the sum of `Day` with 30, 10 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
 `previous business day on or before` with `weekdays only` and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 30, 10 and 2026
 `modified following business day` with `weekdays only` and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 30, 10 and 2026
 `add business days` with `weekdays only`, 0 and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 31, 10 and 2026
@@ -37,7 +37,7 @@ not `is a business day` with `weekdays except the dates` with list of 2 November
 `is a business day` with given `d` then `d` is equal to `Day` with 2, 11 and 2026 and the sum of `Day` with 2, 11 and 2026 and 0.5
 `next business day on or after` with `weekdays only` and 31 October 2026 is equal to 2 November 2026
 `next business day on or after` with `weekdays only` and 2 November 2026 is equal to 2 November 2026
-`next business day after` with `weekdays only` and 30 October 2026 is equal to 2 November 2026
+`add business days` with `weekdays only`, 1 and 30 October 2026 is equal to 2 November 2026
 `previous business day on or before` with `weekdays only` and 31 October 2026 is equal to 30 October 2026
 `previous business day on or before` with `weekdays only` and 30 October 2026 is equal to 30 October 2026
 `modified following business day` with `weekdays only` and 31 October 2026 is equal to 30 October 2026
@@ -47,7 +47,7 @@ not `is a business day` with `weekdays except the dates` with list of 2 November
 `is a business day` with `weekdays only` and 30 October 2026
 not `is a business day` with `weekdays only` and 31 October 2026
 the following must refuse: `next business day on or after` with `weekdays only` and 5
-the following must refuse: `next business day after` with `weekdays only` and 5
+the following must refuse: `add business days` with `weekdays only`, 1 and 5
 the following must refuse: `previous business day on or before` with `weekdays only` and 5
 the following must refuse: `modified following business day` with `weekdays only` and 5
 the following must refuse: `add business days` with `weekdays only`, 0 and 5
@@ -66,8 +66,8 @@ the following must refuse: `next business day on or after` with given `d` then `
 the following must refuse: `previous business day on or before` with given `d` then `FALSE` and `Day` with 30, 10 and 2026
 `next business day on or after` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 365 and `Day` with 30, 10 and 2026 is equal to the sum of `Day` with 30, 10 and 2026 and 365
 the following must refuse: `next business day on or after` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 366 and `Day` with 30, 10 and 2026
-`next business day after` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 366 and `Day` with 30, 10 and 2026 is equal to the sum of `Day` with 30, 10 and 2026 and 366
-the following must refuse: `next business day after` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 367 and `Day` with 30, 10 and 2026
+`add business days` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 366, 1 and `Day` with 30, 10 and 2026 is equal to the sum of `Day` with 30, 10 and 2026 and 366
+the following must refuse: `add business days` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 367, 1 and `Day` with 30, 10 and 2026
 `previous business day on or before` with given `d` then `d` is equal to the difference between 365 and `Day` with 30, 10 and 2026 and `Day` with 30, 10 and 2026 is equal to the difference between 365 and `Day` with 30, 10 and 2026
 the following must refuse: `previous business day on or before` with given `d` then `d` is equal to the difference between 366 and `Day` with 30, 10 and 2026 and `Day` with 30, 10 and 2026
 `modified following business day` with given `d` then `d` is equal to `Day` with 14, 1 and 2026 or `d` is equal to `Day` with 15, 1 and 2027 and `Day` with 15, 1 and 2026 is equal to `Day` with 14, 1 and 2026

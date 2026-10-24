@@ -1491,9 +1491,9 @@ obligation's slot), so the definition site decides, not the use site, and the ch
 carries `enclosingObligation` and `inSlot`; the refusal would be "`THE ARMING` with no enclosing
 obligation and not inside a deonton's own slots" — but it would be a fifth refusal, which B1 did not rule: open, for a ruling.
 
-**Business-day clauses: reading (a) deferred, 2026-10-24 (assumed, not ruled; the library is proposed, not ruled).**
+**Business-day clauses: reading (a) deferred, 2026-10-24 (assumed, not ruled; the library is a draft, its function names ruled).**
 A clause that mentions business days or public holidays is either (a) a condition on the act ("service may not be effected on a Sunday") or (b) arithmetic on the deadline ("if the fifth day falls on a Saturday, the next business day").
-B6 already puts (b) in a library, and `jl4-core/libraries/calendar.l4` now is that library (its function names are option A of the open question in `ACT-TIME-GUARD-SPEC.md` §7; Meng has not ruled them).
+B6 already puts (b) in a library, and `jl4-core/libraries/calendar.l4` now is that library (its function names were ruled on 2026-10-24, card CAL, option A as revised; `ACT-TIME-GUARD-SPEC.md` §7).
 Reading (a) is writable today as an act-carried day under `PROVIDED`, which is already house style; no act-time noun or binder is built.
 Evidence: `EVERY-EACH-WINDOW-CORPUS-EVIDENCE-2026-09-16.md` §5 counts "weekend / holiday / period rollover" at 22 (contracts) and 16 (legislation) of 1,520 sampled hits per register, and business-, working-, trading- or banking-day units at 242 and 83.
 Two single-labeller re-reads of the 3,040 sampled contexts found no case of reading (a) (reported by the design panel, not re-run here).
