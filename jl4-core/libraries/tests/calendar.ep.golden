@@ -59,9 +59,14 @@ IMPORT daydate
 --
 -- The ISDA convention names cited below (Following, Modified Following,
 -- Preceding; 2006 ISDA Definitions s 4.12) are cited from memory, not
--- re-read. ACTUS declares the same conventions (actus-core.l4,
--- `Business Day Convention`: SCRF, SCRP, SCRMF, SCRMP) and does not implement
--- them; this file does not wire them up either.
+-- re-read. The ACTUS data dictionary (actusfrf/actus-dictionary, version 1.4,
+-- term businessDayConvention, read 2026-10-25) names nine conventions: NOS,
+-- SCF, SCMF, CSF, CSMF, SCP, SCMP, CSP and CSMP, which keep "shift, then
+-- calculate" apart from "calculate, then shift". (It prints SCMP a second time
+-- for the last one, Calculate-Shift Modified-Preceding.) L4's actus-core.l4
+-- does not match them: its `Business Day Convention` declares SCR, SCRF, SCRP,
+-- SCRMF and SCRMP, computes none of them, and this file does not wire them up
+-- either.
 
 
 §§ `Refusals`

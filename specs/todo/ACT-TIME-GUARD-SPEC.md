@@ -51,7 +51,8 @@ So the `MUST` case ("does not count") and the `SHANT` case ("forbidden only off 
 **There was no library to do (b), and a shipped encoding shows the cost.** `jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:350` defines `` `five business days` MEANS 5 ``, and `jl4/examples/canon/us/regcf/regcf-wizard.l4:576` says, in a string, that "where a weekend or a holiday falls inside the window, the true business-day deadline is later than the count used here".
 `regcf-denovo.l4:444` writes its own weekend-only `business days after`.
 `jl4-core/libraries/excel-date.l4` has `ExcelWorkday` and `ExcelNetworkDays` (weekends plus a holiday list, no roll conventions, no calendar argument); measured 2026-10-24, `ExcelNetworkDays` counts both ends (Monday to Monday is 1) and `ExcelWorkday` with 0 days returns a Saturday unchanged.
-`jl4-core/libraries/actus-core.l4` declares the ISDA conventions as `Business Day Convention` (`SCRF`, `SCRP`, `SCRMF`, `SCRMP`) and implements none of them.
+`jl4-core/libraries/actus-core.l4:185` declares a `Business Day Convention` of its own (`SCR`, `SCRF`, `SCRP`, `SCRMF`, `SCRMP`) and implements none of it.
+Those are not the ACTUS codes: checked 2026-10-25 against `actusfrf/actus-dictionary` version 1.4 (term `businessDayConvention`), ACTUS names nine conventions (`NOS`, `SCF`, `SCMF`, `CSF`, `CSMF`, `SCP`, `SCMP`, `CSP`, `CSMP`), keeping shift-then-calculate apart from calculate-then-shift, and the dictionary prints `SCMP` twice (the second is Calculate-Shift Modified-Preceding).
 
 ## 3. Design
 
@@ -156,7 +157,7 @@ The fixtures cover: a deadline rolling to the next business day (§1, and over a
 The upstream issues for p9 and p5 (§4 point 2).
 The Reg CF `` `five business days` MEANS 5 `` fix, which lands in `legalese/commons` first and then `etc/sync-canon.mjs --bump`; this library deliberately does not reuse the name `` `business days after` `` that `regcf-denovo.l4:444` defines.
 Jurisdiction holiday modules.
-Wiring ACTUS's `Business Day Convention` to these functions.
+Wiring actus-core's `Business Day Convention` to these functions.
 
 ## 7. The names: ruled
 
@@ -169,7 +170,7 @@ Every encoding that uses the roll functions carries their names, and the bare En
   `next business day on or after` (= ISDA Following), `previous business day on or before` (= Preceding), `modified following business day` kept as the one term of art, plus `add business days` and `business days between`.
   The first draft also had a separate function for "strictly after"; the ruling dropped it, because `add business days` by one is exactly that.
 - **(B) ISDA/FpML vocabulary:** `following business day`, `modified following business day`, `preceding business day`, `modified preceding business day`, plus `add business days`.
-  It matches finance drafting and ACTUS `SCRF`/`SCRMF`, but a reader who takes "the following business day" in its English sense gets an answer one business day off on every day that is already a business day, with exit 0.
+  It matches finance drafting and the vocabulary of ACTUS's own conventions (`SCF`, `CSF`, `SCMF`, `CSMF`), but a reader who takes "the following business day" in its English sense gets an answer one business day off on every day that is already a business day, with exit 0.
   The corpus's own offset clauses use the English sense ("not later than the following Business Day", 7 hits in the competing design's count).
 
 No aliases in either option: two names for one function doubles what a reader has to learn.
@@ -177,7 +178,8 @@ The recommendation was A.
 Measured: the fixture's §1 "Wed 4 Nov is late" trace turns FULFILLED when on-or-after is made strict, which is exactly the misreading B invites.
 
 **Not built, on purpose:** the ACTUS, ISDA and FpML compatibility libraries that Meng's note proposes.
-They are to be discussed first; this library does not wire up ACTUS's `Business Day Convention` either.
+They are to be discussed first; this library does not wire up actus-core's `Business Day Convention` either.
+The first thing such a library would have to settle is the mismatch recorded in §2: actus-core's five codes are not ACTUS's nine.
 
 Still assumed, not ruled: the calendar as a positive `NUMBER`-to-`BOOLEAN` function; the refusal below day number 365; the 366-day search bound; `business days between` excluding the first day; reading (a) deferred until two encodings need it.
 

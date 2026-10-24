@@ -94,7 +94,11 @@ Choose by asking whether the day itself can be the answer.
 
 **The names were chosen on 24 October 2026** (ruling CAL, recorded in `specs/todo/ACT-TIME-GUARD-SPEC.md`, section 7): plain English that says whether the day itself counts.
 The finance vocabulary of the ISDA definitions (`following business day`, `modified following business day`, `preceding business day`, `modified preceding business day`) matches how banks draft, and is not used here; there are no aliases for it.
-ACTUS, in [actus](actus.md), declares the same four conventions as codes (`SCRF`, `SCRMF`, `SCRP`, `SCRMP`) and does not compute them; this library does not wire them up either.
+The ACTUS data dictionary (version 1.4, term `businessDayConvention`, read on 25 October 2026) names nine conventions: `NOS`, `SCF`, `SCMF`, `CSF`, `CSMF`, `SCP`, `SCMP`, `CSP` and `CSMP`.
+It keeps "shift the date, then calculate" apart from "calculate, then shift the date".
+(The dictionary prints `SCMP` a second time for the last one, Calculate-Shift Modified-Preceding; this page writes `CSMP` for it, following its name.)
+L4's [actus](actus.md) library does not match these.
+It declares codes of its own (`SCR`, `SCRF`, `SCRP`, `SCRMF`, `SCRMP`) and computes none of them; this library does not wire them up either.
 
 `business days between` counts the way `WITHIN` does: the day you count from is not counted, and the last day is.
 So `business days between` cal d (`add business days` cal n d) is n.
