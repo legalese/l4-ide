@@ -3,8 +3,9 @@ IMPORT prelude
 IMPORT daydate
 IMPORT calendar
 
--- Days are date serials. Sat 31 Oct 2026 is a Saturday; Mon 2 Nov 2026 is
--- treated as a public holiday below.
+-- A day is a number: the count of days from 1 January 0000, which
+-- DATE_SERIAL (YMD ...) works out. Sat 31 Oct 2026 is a Saturday; Mon 2 Nov
+-- 2026 is treated as a public holiday below.
 DECIDE `Mon 26 Oct` IS DATE_SERIAL (YMD 2026 10 26)
 DECIDE `Fri 30 Oct` IS DATE_SERIAL (YMD 2026 10 30)
 DECIDE `Sat 31 Oct` IS DATE_SERIAL (YMD 2026 10 31)
@@ -33,6 +34,16 @@ DECIDE `this year's calendar` IS `weekdays except the dates` (LIST YMD 2026 11 2
 
 -- The DATE forms give back a DATE
 #EVAL `next business day on or after` `weekdays only` (YMD 2026 10 31)
+
+-- `weekdays only` takes Saturday and Sunday as the weekend. For a country
+-- whose weekend is Friday and Saturday, write the calendar out:
+GIVEN d IS A NUMBER
+GIVETH A BOOLEAN
+`Sunday to Thursday` d MEANS
+    NOT (`Weekday of` d EQUALS Friday OR `Weekday of` d EQUALS Saturday)
+
+-- Fri 30 Oct is not a business day there; Sun 1 Nov is
+#ASSERT `next business day on or after` `Sunday to Thursday` `Fri 30 Oct` EQUALS DATE_SERIAL (YMD 2026 11 1)
 
 -- A deadline that rolls: pay five days after the notice, or on the next
 -- business day if the fifth day is not one
