@@ -153,8 +153,22 @@ Each `Evaluation[n]` block corresponds to one `#EVAL` directive, in file order, 
 An error in a file that it imports counts too, and so does an `IMPORT` that finds no file and an `IMPORT` cycle (`a.l4` imports `b.l4`, which imports `a.l4`).
 Whether a directive makes `l4 run` fail depends on whether it can be evaluated at all.
 An `#EVAL` that gives a result exits `0`, and so does an `#ASSERT` that comes out false (it prints `assertion failed`).
-An `#EVAL` or `#ASSERT` that cannot be evaluated exits non-zero: a `CONSIDER` with no matching branch, a division by zero, or a `POST` that cannot connect.
-A `POST` that cannot connect prints the HTTP library's error on standard error, which begins `VanillaHttpException`, and no `Evaluation[n]` block for that directive.
+An `#EVAL` or `#ASSERT` that cannot be evaluated exits non-zero, and the other directives in the file print their results as usual.
+Examples are a `CONSIDER` with no matching branch, a division by zero, and an `#ASSERT` whose expression raises.
+The message is in that directive's own `Evaluation[n]` block, and is also printed on standard error against that directive's lines.
+With `--json`, the other results are in `"results"`.
+
+A request that fails is different, and loses more.
+It happens when a `POST` or `FETCH` cannot connect, when the host cannot be found, or when the server answers with an error status such as 404.
+`l4 run` then prints no `Evaluation[n]` block for any directive in the file, including the directives that made no request.
+It exits non-zero, and `--json` gives `"ok": false` and `"results": []`.
+There is one message, on standard error (in `"diagnostics"` with `--json`), and it begins `VanillaHttpException` and names the host.
+It points at the first line of the file, not at the directive that made the request.
+When you see it, look for `POST` and `FETCH` in the file and in the rules your directives use.
+To see the other results, take the directives that make requests out of the file, or move them to a file of their own.
+An address that does not start with `https://` is not a failed request.
+That directive's `Evaluation[n]` block holds an `Internal error` message that says `POST only supports https` (or `FETCH only supports https`), `l4 run` exits non-zero, and the other directives keep their results.
+Use an `https://` address.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
