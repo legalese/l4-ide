@@ -15,7 +15,7 @@ import System.Directory (createDirectoryIfMissing, getTemporaryDirectory, remove
 import System.FilePath ((</>))
 
 import Data.Text (Text)
-import Language.LSP.Protocol.Types (Diagnostic (..), NormalizedUri, Position (..), Range (..), normalizedFilePathToUri, toNormalizedFilePath)
+import Language.LSP.Protocol.Types (Diagnostic (..), DiagnosticSeverity (..), NormalizedUri, Position (..), Range (..), normalizedFilePathToUri, toNormalizedFilePath)
 
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
@@ -91,6 +91,57 @@ spec = describe "LSP.L4.BlockingErrors" do
     o <- checkProject "own-error"
       [ ("main", "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\nDECIDE bad x IS x\n") ]
     o.blocking `shouldSatisfy` (not . null)
+
+  -- The sidebar's Deploy button stays off while the file has a blocking error.
+  -- The refusal of an @export that takes a DEONTIC is an ordinary checker error
+  -- (source "check", severity Error), so it counts, and so do the editors'
+  -- squiggle and `l4 deploy`. The rule built from plain facts is the guard.
+  it "refuses a file whose @export takes a DEONTIC, with a checker error" do
+    let parties =
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+          , ""
+          ]
+    o <- checkProject "export-deontic"
+      [ ("main", T.unlines $ parties <>
+          [ "@export Is a duty already fulfilled"
+          , "GIVEN `the duty` IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`already fulfilled` `the duty` MEANS"
+          , "  CONSIDER `the duty`"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          ])
+      ]
+    let diags = [ fd.fdLspDiagnostic | fd <- o.blocking ]
+    length diags `shouldBe` 1
+    [ d._severity | d <- diags ] `shouldBe` [Just DiagnosticSeverity_Error]
+    [ d._source | d <- diags ] `shouldBe` [Just "check"]
+    [ d._message | d <- diags ] `shouldSatisfy` \case
+      [msg] -> "DEONTIC inputs are not supported for @export." `T.isInfixOf` msg
+                 && "`the duty`" `T.isInfixOf` msg
+      _ -> False
+
+  it "lets a file through whose @export builds its DEONTIC from plain facts" do
+    o <- checkProject "export-deontic-plain"
+      [ ("main", T.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+          , ""
+          , "@export The duty of a party"
+          , "GIVEN who IS A Person"
+          , "      what IS AN Action"
+          , "      deadline IS A NUMBER"
+          , "GIVETH A DEONTIC Person Action"
+          , "`the duty` who what deadline MEANS"
+          , "  PARTY who"
+          , "  MUST EXACTLY what"
+          , "  WITHIN deadline"
+          , "  HENCE FULFILLED"
+          , "  LEST BREACH"
+          ])
+      ]
+    o.blocking `shouldSatisfy` null
 
   it "refuses a file whose import has a type error" do
     o <- checkProject "imported-error"

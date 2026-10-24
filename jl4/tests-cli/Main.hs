@@ -585,6 +585,12 @@ cycle3OutsideEntry = fixtureDir </> "cycle3"     </> "outside.l4"
 cycle2Entry        = fixtureDir </> "cycle2"     </> "dua.l4"
 selfImportEntry    = fixtureDir </> "selfimport" </> "solo.l4"
 
+-- An exported rule with a DEONTIC input, which a request cannot supply; and the
+-- reference page's example of what to write instead, which `l4 check` accepts.
+exportDeonticFixture, deonticExportExample :: FilePath
+exportDeonticFixture = fixtureDir </> "export-deontic.l4"
+deonticExportExample = "../doc/reference/regulative/deontic-export-example.l4"
+
 -- Multi-file imports that are not rings: a clean one, one whose imported module
 -- only warns, and four that cannot be loaded cleanly: an imported module with a
 -- type error, with a syntax error, and with a string that is never closed, and an
@@ -619,6 +625,7 @@ main = do
        , batchClausesDittoHead, batchClausesTabs, batchClausesString
        , batchClausesColours, batchClausesBooleans, batchClausesB
        , multiClauseRenderFixture
+       , exportDeonticFixture, deonticExportExample
        , cycle3Entry, cycle3OutsideEntry, cycle2Entry, selfImportEntry
        , cleanImportEntry, warningImportEntry, brokenImportEntry
        , syntaxImportEntry, lexImportEntry, missingImportEntry
@@ -772,6 +779,36 @@ spec bin = do
       serr `shouldSatisfy` ("does not cover all cases" `isInfixOf`)
       serr `shouldSatisfy` ("DECIDE `price` Blue IS" `isInfixOf`)
 
+  -- A DEONTIC has no JSON form, so an exported rule that takes one is refused
+  -- at check time, as one that takes an EVENT is. The guard is the example that
+  -- the DEONTIC reference page recommends instead: a helper that takes a
+  -- DEONTIC and a list of events, and exported rules that take plain facts.
+  describe "l4 check: an @export with a DEONTIC input" $ do
+    it "fails and says what is wrong and what to do" $ do
+      Output code sout serr0 <- runL4 bin ["check", exportDeonticFixture]
+      let serr = filter (/= '\r') serr0
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` (not . isInfixOf "Check succeeded.")
+      serr `shouldSatisfy` isInfixOf "Severity: DiagnosticSeverity_Error"
+      serr `shouldSatisfy` isInfixOf "DEONTIC inputs are not supported for @export."
+      serr `shouldSatisfy` isInfixOf
+        "The input `the duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+      serr `shouldSatisfy` isInfixOf
+        "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+
+    it "returns ok=false in JSON" $ do
+      env <- jsonEnvelope bin ["check", exportDeonticFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+
+    it "accepts the page's example of what to write instead, and its two #EVALs still answer TRUE and FALSE" $ do
+      expectOk bin ["check", deonticExportExample] "Check succeeded."
+      Output code sout _ <- runL4 bin ["run", deonticExportExample]
+      code `shouldBe` ExitSuccess
+      let outLines = lines (filter (/= '\r') sout)
+          results = [ trim l | (prev, l) <- zip outLines (drop 1 outLines), prev == "Result:" ]
+          trim = reverse . dropWhile (== ' ') . reverse . dropWhile (== ' ')
+      results `shouldBe` ["TRUE", "FALSE"]
+
   -- An import ring used to pass `l4 check` and `l4 run` with exit 0 and "Check
   -- succeeded." printed under the cycle's own error. The engine reports the
   -- cycle as an Error on a module that is IMPORTED, not on the file named on the
@@ -867,6 +904,7 @@ spec bin = do
           , ("a file that imports a ring without being in it", cycle3OutsideEntry)
           , ("a 2-module import ring", cycle2Entry)
           , ("a self-import", selfImportEntry)
+          , ("an @export with a DEONTIC input", exportDeonticFixture)
           ] \(what, entry) ->
       forM_ ["deploy", "redeploy"] \cmd ->
         it ("refuses " <> cmd <> " of " <> what <> ", with the diagnostics, before the network") $ do

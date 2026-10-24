@@ -2808,6 +2808,100 @@ spec = describe "integration" do
         Right (_fns, meta) ->
           [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
             `shouldBe` [["at time", "what", "who"]]
+    -- A DEONTIC has no JSON form either: a request can say a number, a string,
+    -- a list or a record, and none of them is a duty. The deploy refuses a
+    -- rule that takes one, as it refuses an EVENT input, and says what to do.
+    it "rejects an @export whose input is a DEONTIC, and says what to do" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "deonticin.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "@export Is a duty already fulfilled"
+        , "GIVEN `the duty` IS A DEONTIC Person Action"
+        , "GIVETH A BOOLEAN"
+        , "`already fulfilled` `the duty` MEANS"
+        , "  CONSIDER `the duty`"
+        , "  WHEN FULFILLED THEN TRUE"
+        , "  OTHERWISE FALSE"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the duty"
+          err `shouldSatisfy` Text.isInfixOf "build the DEONTIC inside it"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input holds a DEONTIC in a list, a MAYBE or a record" do
+      logger <- newLogger False
+      let bundle inputs = Map.singleton "deonticin.l4" $ Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+            , "DECLARE Agreement HAS terms IS A DEONTIC Person Action"
+            , ""
+            , "@export Count"
+            , "GIVEN x IS A " <> inputs
+            , "GIVETH A BOOLEAN"
+            , "`count` x MEANS TRUE"
+            ]
+      forM_ ["LIST OF DEONTIC Person Action", "MAYBE (DEONTIC Person Action)", "Agreement"] \inputs -> do
+        result <- compileBundle logger "test" (bundle inputs)
+        case result of
+          Left err -> err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          Right _ -> expectationFailure ("Expected rejection of an input of type " <> Text.unpack inputs)
+
+    it "still publishes the exported rules that build their DEONTIC from plain inputs" do
+      -- The shape the DEONTIC reference page recommends: the helper that takes a
+      -- DEONTIC and a list of events is not exported, one exported rule asks a
+      -- yes-or-no question from plain facts, and one gives the duty itself (so
+      -- it also takes the start time and the events, which a request carries).
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "deonticparts.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "GIVEN duty IS A DEONTIC Person Action"
+        , "      events IS A LIST OF EVENT Person Action"
+        , "GIVETH A BOOLEAN"
+        , "`is fulfilled by` duty events MEANS"
+        , "  CONSIDER EVALTRACE duty 0 events"
+        , "  WHEN FULFILLED THEN TRUE"
+        , "  OTHERWISE FALSE"
+        , ""
+        , "@export Is the duty fulfilled when the party takes the action on a given day"
+        , "GIVEN who IS A Person"
+        , "      what IS AN Action"
+        , "      deadline IS A NUMBER"
+        , "      `day taken` IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "`duty fulfilled on day` who what deadline `day taken` MEANS"
+        , "  `is fulfilled by` (`the duty` who what deadline) (LIST EVENT who what `day taken`)"
+        , ""
+        , "@export The duty of a party to take an action by a deadline"
+        , "GIVEN who IS A Person"
+        , "      what IS AN Action"
+        , "      deadline IS A NUMBER"
+        , "GIVETH A DEONTIC Person Action"
+        , "`the duty` who what deadline MEANS"
+        , "  PARTY who"
+        , "  MUST EXACTLY what"
+        , "  WITHIN deadline"
+        , "  HENCE FULFILLED"
+        , "  LEST BREACH"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          List.sort [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions]
+            `shouldBe`
+              [ ("duty fulfilled on day", ["day taken", "deadline", "what", "who"])
+              , ("the duty", ["deadline", "events", "startTime", "what", "who"])
+              ]
+
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed

@@ -8,6 +8,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Timeout (timeout)
 
+import L4.API (l4Check)
 import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportedFunction(..), getExportedFunctions, enrichReturnTypes)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
@@ -54,6 +55,42 @@ exportEventErrors vfs source =
 refusedWithinWatchdog :: Text -> IO [(Text, Text)]
 refusedWithinWatchdog src = do
   mb <- timeout (30 * 1000000) $ case exportEventErrors emptyVFS src of
+    Left errs -> fail ("Fatal: " ++ show errs)
+    Right (hits, _) -> evaluate (length hits) >> pure hits
+  maybe (fail "the export check did not finish within 30s") pure mb
+
+-- | The @export errors that say a DEONTIC cannot be an input, as (function,
+-- input) pairs, together with the error text a user sees for the first of
+-- them. They are told apart by that text, which is what an author reads, so
+-- the examples below pin the wording as well as the refusal. The snippet can
+-- import the modules of the given VFS.
+exportDeonticErrors :: VFS -> Text -> Either [Text] ([(Text, Text)], [Text])
+exportDeonticErrors vfs source =
+  case checkWithImports vfs source of
+    Left errs -> Left errs
+    Right r ->
+      let hits =
+            [ shown
+            | e <- r.tcdErrors
+            , let shown = prettyCheckErrorWithContext e
+            , any ((== "DEONTIC inputs are not supported for @export.") . Text.strip) shown
+            ]
+          -- the name between the first pair of backticks of the first line
+          -- that holds the marker: the function in "...the definition of `f`:",
+          -- the input in "The input `x` has a type ..."
+          quoted marker ls = case filter (Text.isInfixOf marker) ls of
+            (l : _) -> Text.takeWhile (/= '`') (Text.drop 1 (Text.dropWhile (/= '`') l))
+            []      -> ""
+      in Right
+        ( [ (quoted "the definition of" shown, quoted "The input" shown) | shown <- hits ]
+        , concat (take 1 hits)
+        )
+
+-- | 'exportDeonticErrors' on a snippet with no imports, under the same
+-- watchdog as 'refusedWithinWatchdog'. The pairs only: (function, input).
+deonticWithinWatchdog :: Text -> IO [(Text, Text)]
+deonticWithinWatchdog src = do
+  mb <- timeout (30 * 1000000) $ case exportDeonticErrors emptyVFS src of
     Left errs -> fail ("Fatal: " ++ show errs)
     Right (hits, _) -> evaluate (length hits) >> pure hits
   maybe (fail "the export check did not finish within 30s") pure mb
@@ -543,6 +580,342 @@ spec = do
               , "`root` r MEANS TRUE"
               ]
         refusedWithinWatchdog src `shouldReturn` [("root", "r")]
+
+  -- A DEONTIC has no JSON form either: a request can say a number, a string, a
+  -- list or a record of the right shape, and none of them is a duty. An
+  -- exported rule that takes one is refused where an EVENT input is, with its
+  -- own words, so that `l4 check`, the editors, `jl4-schema` and the service's
+  -- deploy all stop at the same error.
+  describe "DEONTIC-typed inputs of an @export" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        -- the pairs only: (function, input)
+        refused vfs src = case exportDeonticErrors vfs src of
+          Left errs -> fail $ "Fatal: " ++ show errs
+          Right (hits, _) -> pure hits
+        -- one exported rule with one input `x` of the given type, that reads nothing
+        export name input = Text.unlines
+          [ "@export " <> name
+          , "GIVEN x IS " <> input
+          , "GIVETH A BOOLEAN"
+          , "`" <> name <> "` x MEANS TRUE"
+          ]
+
+    it "rejects a GIVEN of type DEONTIC, naming the function and the input" $ do
+      let src = parties <> Text.unlines
+            [ "@export Is a duty already fulfilled"
+            , "GIVEN `the duty` IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` `the duty` MEANS"
+            , "  CONSIDER `the duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refused emptyVFS src `shouldReturn` [("already fulfilled", "the duty")]
+
+    it "says what is wrong and what to do instead" $ do
+      let src = parties <> Text.unlines
+            [ "@export Is a duty already fulfilled"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` d MEANS TRUE"
+            ]
+      case exportDeonticErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `already fulfilled`:"
+            , "  DEONTIC inputs are not supported for @export."
+            , "  The input `d` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+            , "  Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+            ]
+
+    it "rejects the older spelling PROVISION, which names the same type" $ do
+      refused emptyVFS (parties <> export "old spelling" "A PROVISION Person Action")
+        `shouldReturn` [("old spelling", "x")]
+
+    it "rejects a LIST OF DEONTIC" $ do
+      refused emptyVFS (parties <> export "any duties" "A LIST OF DEONTIC Person Action")
+        `shouldReturn` [("any duties", "x")]
+
+    it "rejects a MAYBE DEONTIC" $ do
+      refused emptyVFS (parties <> export "maybe a duty" "A MAYBE (DEONTIC Person Action)")
+        `shouldReturn` [("maybe a duty", "x")]
+
+    it "rejects a DEONTIC under a FOR ALL" $ do
+      refused emptyVFS (parties <> export "quantified" "FOR ALL a (DEONTIC Person Action)")
+        `shouldReturn` [("quantified", "x")]
+
+    it "rejects a DEONTIC reached through a type synonym" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Duty IS A DEONTIC Person Action"
+            , ""
+            ] <> export "via synonym" "A Duty"
+      refused emptyVFS src `shouldReturn` [("via synonym", "x")]
+
+    it "rejects a DEONTIC in a field of a record, whichever field it is" $ do
+      let record fields = parties <> Text.unlines
+            ( [ "DECLARE Agreement HAS" ]
+              <> map ("  " <>) fields
+              <> [ "" ]
+            ) <> export "agreement title" "AN Agreement"
+          title = "title IS A STRING"
+          terms = "terms IS A DEONTIC Person Action"
+          signed = "signed IS A BOOLEAN"
+      refused emptyVFS (record [terms, title]) `shouldReturn` [("agreement title", "x")]
+      refused emptyVFS (record [title, terms, signed]) `shouldReturn` [("agreement title", "x")]
+      refused emptyVFS (record [title, terms]) `shouldReturn` [("agreement title", "x")]
+
+    it "rejects a DEONTIC in any constructor of a sum type, the first included" $ do
+      let sumType dutyFirst = parties <> Text.unlines
+            ( [ "DECLARE Entry IS ONE OF" ]
+              <> (if dutyFirst
+                    then [ "  promised HAS what IS A DEONTIC Person Action"
+                         , "  plain HAS n IS A NUMBER"
+                         ]
+                    else [ "  plain HAS n IS A NUMBER"
+                         , "  promised HAS what IS A DEONTIC Person Action"
+                         ]
+                 )
+              <> [ "  unrecorded"
+                 , ""
+                 ]
+            ) <> export "entry kind" "AN Entry"
+      refused emptyVFS (sumType True) `shouldReturn` [("entry kind", "x")]
+      refused emptyVFS (sumType False) `shouldReturn` [("entry kind", "x")]
+
+    it "rejects a DEONTIC that sits behind a record or a synonym of an imported module" $ do
+      let lib = parties <> Text.unlines
+            [ "DECLARE Agreement HAS terms IS A DEONTIC Person Action"
+            , ""
+            , "DECLARE Duty IS A DEONTIC Person Action"
+            ]
+          src = Text.unlines
+            [ "IMPORT lib"
+            , ""
+            , "@export Agreement"
+            , "GIVEN a IS AN Agreement"
+            , "GIVETH A BOOLEAN"
+            , "`agreement` a MEANS TRUE"
+            , ""
+            , "@export Duty"
+            , "GIVEN d IS A Duty"
+            , "GIVETH A BOOLEAN"
+            , "`duty` d MEANS TRUE"
+            ]
+      refused (vfsFromList [("lib", lib)]) src
+        `shouldReturn` [("agreement", "a"), ("duty", "d")]
+
+    it "rejects an @export that uses an ASSUME of type DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed duty` IS A DEONTIC Person Action"
+            , ""
+            , "@export Assumed"
+            , "GIVETH A BOOLEAN"
+            , "`assumed` MEANS"
+            , "  CONSIDER `assumed duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refused emptyVFS src `shouldReturn` [("assumed", "assumed duty")]
+
+    it "ignores an ASSUME of type DEONTIC that no export uses" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `assumed duty` IS A DEONTIC Person Action"
+            , ""
+            , "@export Plain"
+            , "GIVETH A BOOLEAN"
+            , "`plain` MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "reports each offending input, once" $ do
+      let src = parties <> Text.unlines
+            [ "@export Two duties"
+            , "GIVEN a IS A DEONTIC Person Action"
+            , "      b IS A DEONTIC Person Action"
+            , "      n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`two duties` a b n MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("two duties", "a"), ("two duties", "b")]
+
+    it "refuses an EVENT input and a DEONTIC input of one rule, each with its own words" $ do
+      let src = parties <> Text.unlines
+            [ "@export Duty and event"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "      e IS AN EVENT Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`duty and event` d e MEANS TRUE"
+            ]
+      refused emptyVFS src `shouldReturn` [("duty and event", "d")]
+      case exportEventErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (hits, _) -> hits `shouldBe` [("duty and event", "e")]
+
+    it "gives one refusal to an input that holds both an EVENT and a DEONTIC, for the first it meets" $ do
+      -- A record's fields are read in the order they are written.
+      let record dutyFirst = parties <> Text.unlines
+            ( [ "DECLARE Case HAS" ]
+              <> (if dutyFirst
+                    then [ "  terms IS A DEONTIC Person Action"
+                         , "  happened IS AN EVENT Person Action"
+                         ]
+                    else [ "  happened IS AN EVENT Person Action"
+                         , "  terms IS A DEONTIC Person Action"
+                         ]
+                 )
+              <> [ "" ]
+            ) <> export "the case" "A Case"
+          counts src = do
+            deontic <- either (fail . show) (pure . fst) (exportDeonticErrors emptyVFS src)
+            event <- either (fail . show) (pure . fst) (exportEventErrors emptyVFS src)
+            pure (length deontic, length event)
+      counts (record True) `shouldReturn` (1, 0)
+      counts (record False) `shouldReturn` (0, 1)
+
+    it "accepts a rule that gives a DEONTIC as its answer, from plain inputs" $ do
+      let src = parties <> Text.unlines
+            [ "@export The duty of a party"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      deadline IS A NUMBER"
+            , "GIVETH A DEONTIC Person Action"
+            , "`the duty` who what deadline MEANS"
+            , "  PARTY who"
+            , "  MUST EXACTLY what"
+            , "  WITHIN deadline"
+            , "  HENCE FULFILLED"
+            , "  LEST BREACH"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts a rule that takes a DEONTIC when it is not an @export" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` d MEANS"
+            , "  CONSIDER d"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts an @export whose inputs are records, lists and maybes without a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Report HAS who IS A Person"
+            , "                   note IS A STRING"
+            , "                   others IS A LIST OF Report"
+            , ""
+            , "@export Report note"
+            , "GIVEN r IS A Report"
+            , "      m IS A MAYBE NUMBER"
+            , "GIVETH A STRING"
+            , "`report note` r m MEANS r's note"
+            ]
+      refused emptyVFS src `shouldReturn` []
+
+    it "accepts the shape the DEONTIC page recommends: exported rules from plain facts, a helper that takes the DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN duty IS A DEONTIC Person Action"
+            , "      events IS A LIST OF EVENT Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`is fulfilled by` duty events MEANS"
+            , "  CONSIDER EVALTRACE duty 0 events"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            , "@export Is the duty fulfilled when the party takes the action on a given day"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      deadline IS A NUMBER"
+            , "      `day taken` IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`duty fulfilled on day` who what deadline `day taken` MEANS"
+            , "  `is fulfilled by` (`the duty` who what deadline) (LIST EVENT who what `day taken`)"
+            , ""
+            , "@export The duty of a party to take an action by a deadline"
+            , "GIVEN who IS A Person"
+            , "      what IS AN Action"
+            , "      deadline IS A NUMBER"
+            , "GIVETH A DEONTIC Person Action"
+            , "`the duty` who what deadline MEANS"
+            , "  PARTY who"
+            , "  MUST EXACTLY what"
+            , "  WITHIN deadline"
+            , "  HENCE FULFILLED"
+            , "  LEST BREACH"
+            ]
+      refused emptyVFS src `shouldReturn` []
+      case exportEventErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (hits, _) -> hits `shouldBe` []
+
+    it "accepts an input of a record the author declared, though its name suggests a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Duty HAS who IS A Person"
+            , "                 what IS AN Action"
+            , ""
+            ] <> export "a duty" "A Duty"
+      refused emptyVFS src `shouldReturn` []
+
+    it "terminates on records that contain each other, and finds a DEONTIC in the cycle" $ do
+      let types holdDuty = parties <> Text.unlines
+            [ "DECLARE Ping HAS pong IS A MAYBE Pong"
+            , "                 " <> (if holdDuty then "seen IS A DEONTIC Person Action" else "note IS A STRING")
+            , "DECLARE Pong HAS ping IS A MAYBE Ping"
+            , ""
+            ]
+      refused emptyVFS (types False <> export "from ping" "A Ping") `shouldReturn` []
+      refused emptyVFS (types True <> export "from ping" "A Ping")
+        `shouldReturn` [("from ping", "x")]
+      refused emptyVFS (types True <> export "from pong" "A Pong")
+        `shouldReturn` [("from pong", "x")]
+
+    -- The same walk as for an EVENT, so the same chain: 40 records that each
+    -- have two fields of the next one, 2^40 paths, 41 types.
+    describe "a chain of records that doubles at every level" $ do
+      let depth = 40 :: Int
+          typeName i = "T" <> Text.pack (show i)
+          chain leafField = Text.unlines $
+            [ Text.unlines
+                [ "DECLARE " <> typeName i <> " HAS"
+                , "  f0 IS A " <> typeName (i + 1)
+                , "  f1 IS A " <> typeName (i + 1)
+                ]
+            | i <- [0 .. depth - 1]
+            ]
+            <> [ "DECLARE " <> typeName depth <> " HAS " <> leafField ]
+          exportFirst = export "chain" "A T0"
+
+      it "is checked in a moment when it holds no DEONTIC" $ do
+        let src = parties <> chain "leaf IS A NUMBER" <> exportFirst
+        deonticWithinWatchdog src `shouldReturn` []
+
+      it "is refused when only the last record holds a DEONTIC" $ do
+        let src = parties <> chain "leaf IS A DEONTIC Person Action" <> exportFirst
+        deonticWithinWatchdog src `shouldReturn` [("chain", "x")]
+
+  -- The web editor runs the same checker and shows its error list: 'l4Check' is
+  -- what the WASM language server answers with, an error being severity 1.
+  describe "the web editor's check (l4Check) of a DEONTIC input" $ do
+    it "reports an error, with the words `l4 check` prints" $ do
+      let diagnostics = l4Check $ Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF delivery, payment"
+            , ""
+            , "@export Is a duty already fulfilled"
+            , "GIVEN d IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`already fulfilled` d MEANS TRUE"
+            ]
+      diagnostics `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export."
+      diagnostics `shouldSatisfy` Text.isInfixOf "\"severity\":1"
+      -- one diagnostic, and none that is not an error
+      Text.count "\"severity\"" diagnostics `shouldBe` 1
 
   describe "exported return type display" $ do
     -- A concrete inferred return type renders normally.

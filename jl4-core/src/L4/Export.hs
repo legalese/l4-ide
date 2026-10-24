@@ -32,7 +32,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import L4.Annotation (getAnno)
 import L4.Syntax
-import L4.TypeCheck.Environment (eventUnique, maybeUnique)
+import L4.TypeCheck.Environment (contractUnique, eventUnique, maybeUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, optionallyNamedTypeType)
 import Optics
 
@@ -415,30 +415,39 @@ extractImplicitAssumeParams errors =
 
 -- | Validate that no @export-decorated DECIDE has an input that a request
 -- cannot carry: a function-typed input, or an input of a type that contains
--- an EVENT. The input is either a GIVEN parameter, or a module-level ASSUME
--- the body uses.
+-- an EVENT or a DEONTIC. The input is either a GIVEN parameter, or a
+-- module-level ASSUME the body uses.
 --
 -- Function-typed inputs can't be evaluated end-to-end: GIVENs can't be
 -- passed over JSON, and function-typed ASSUMEs stay 'ValAssumed' at
 -- runtime, causing a stuck "assumed term" error when the body invokes them.
 --
--- An EVENT has no JSON form either. The service's input decoder reads a JSON
--- object only into a declared record, and the EVENT type is builtin and has
--- no declaration, so every evaluation answers 422; the published schema is a
--- bare @object@; and @l4 batch@ decodes the row to NOTHING.
+-- An EVENT and a DEONTIC have no JSON form either. The service's input decoder
+-- reads a JSON object only into a declared record, and both types are builtin
+-- and have no declaration, so the published schema is a bare @object@ that no
+-- request can satisfy. Every evaluation of a rule that takes an EVENT answers
+-- 422, and @l4 batch@ decodes the row to NOTHING. A request for a rule that
+-- takes a DEONTIC is refused with 422 when the value is an object, and
+-- accepted when it is a string or a number, which then reaches the rule as one
+-- and gives a wrong answer without a word.
+--
+-- One input is refused once, however many such types it holds: for the EVENT or
+-- the DEONTIC that the walk meets first ('carriedUnsendable').
 validateExportInputs :: EntityInfo -> Module Resolved -> [CheckErrorWithContext]
 validateExportInputs ei mod' =
   let synonyms = collectTypeSynonyms mod'
       assumes  = allAssumesFromModule mod'
+      carried  = carriedUnsendable ei
       -- one pass per kind of input a request cannot carry
+      refusals :: [ExportRefusal]
       refusals =
-        [ (isFunctionTypeExpanded synonyms, mkExportFunErr)
-        , (typeCarriesEvent ei, mkExportEventErr)
+        [ \ty -> if isFunctionTypeExpanded synonyms ty then Just mkExportFunErr else Nothing
+        , \ty -> mkExportUnsendableErr <$> carried ty
         ]
   in [ err
      | decide <- collectExportedDecides mod'
-     , (refused, mkErr) <- refusals
-     , err <- checkOneExport refused mkErr assumes decide
+     , refusal <- refusals
+     , err <- checkOneExport refusal assumes decide
      ]
 
 -- | Collect every DECIDE whose description carries the @export flag.
@@ -473,41 +482,42 @@ allAssumesFromModule (MkModule _ _ section) =
     Section _ sub -> collectSection sub
     _ -> []
 
+-- | The decision about one input type: not refused, or refused with the error
+-- that names the function and the input.
+type ExportRefusal = Type' Resolved -> Maybe (Resolved -> Resolved -> CheckErrorWithContext)
+
 checkOneExport
-  :: (Type' Resolved -> Bool)
-  -> (Resolved -> Resolved -> CheckErrorWithContext)
+  :: ExportRefusal
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [CheckErrorWithContext]
-checkOneExport refused mkErr assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
-  checkGivenInputs refused mkErr fnName tySig
-  ++ checkAssumeInputs refused mkErr assumes fnName decide
+checkOneExport refusal assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
+  checkGivenInputs refusal fnName tySig
+  ++ checkAssumeInputs refusal assumes fnName decide
 
 checkGivenInputs
-  :: (Type' Resolved -> Bool)
-  -> (Resolved -> Resolved -> CheckErrorWithContext)
+  :: ExportRefusal
   -> Resolved
   -> TypeSig Resolved
   -> [CheckErrorWithContext]
-checkGivenInputs refused mkErr fnName (MkTypeSig _ (MkGivenSig _ names) _) =
+checkGivenInputs refusal fnName (MkTypeSig _ (MkGivenSig _ names) _) =
   [ mkErr fnName paramName
   | MkOptionallyTypedName _ paramName (Just ty) <- names
-  , refused ty
+  , Just mkErr <- [refusal ty]
   ]
 
 checkAssumeInputs
-  :: (Type' Resolved -> Bool)
-  -> (Resolved -> Resolved -> CheckErrorWithContext)
+  :: ExportRefusal
   -> Map.Map Unique (Assume Resolved)
   -> Resolved
   -> Decide Resolved
   -> [CheckErrorWithContext]
-checkAssumeInputs refused mkErr assumes fnName (MkDecide _ _ _ body) =
+checkAssumeInputs refusal assumes fnName (MkDecide _ _ _ body) =
   let referencedUniques = collectReferencedUniques body
   in [ mkErr fnName paramName
      | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
      , Set.member uniq referencedUniques
-     , refused ty
+     , Just mkErr <- [refusal ty]
      ]
 
 mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
@@ -524,12 +534,37 @@ mkExportEventErr fnName paramName =
     , context = WhileCheckingDecide (getActual fnName) None
     }
 
--- | Does a value of this type contain an EVENT? True for the builtin @EVENT@
--- type itself, and for a type that holds one anywhere: as a type argument
--- (@LIST OF EVENT …@, @MAYBE (EVENT …)@), behind a synonym, or in a field of a
+mkExportDeonticErr :: Resolved -> Resolved -> CheckErrorWithContext
+mkExportDeonticErr fnName paramName =
+  MkCheckErrorWithContext
+    { kind    = ExportDeonticTypeInput fnName paramName
+    , context = WhileCheckingDecide (getActual fnName) None
+    }
+
+mkExportUnsendableErr :: Unsendable -> Resolved -> Resolved -> CheckErrorWithContext
+mkExportUnsendableErr = \case
+  HoldsEvent   -> mkExportEventErr
+  HoldsDeontic -> mkExportDeonticErr
+
+-- | A builtin type that has no JSON form, and that a value of some type holds.
+data Unsendable
+  = HoldsEvent
+  | HoldsDeontic
+
+-- | Does a value of this type contain an EVENT or a DEONTIC, and which of them
+-- does the walk meet first? Both are builtin types. The answer is the builtin
+-- type itself, a type that holds one anywhere: as a type argument
+-- (@LIST OF EVENT …@, @MAYBE (DEONTIC …)@), behind a synonym, or in a field of a
 -- declared record or of a constructor of a declared sum type — also when the
 -- synonym or the record is declared in an imported module, because it is read
 -- from the checker's 'EntityInfo' and not from this module's declarations.
+-- @PROVISION@, the older spelling of @DEONTIC@, names the same type.
+--
+-- A record's fields are looked into in the order they are written, and a type
+-- argument before the fields of the type that it is an argument of, so an input
+-- that holds both is refused for the first of them that the walk reaches.
+-- Neither builtin type is looked into any further: what its own type arguments
+-- are does not matter once it has been found.
 --
 -- A function type is not looked into: an input of that type is refused as a
 -- function type already, and one refusal per input is enough.
@@ -540,13 +575,13 @@ mkExportEventErr fnName paramName =
 --
 -- Each type is looked into once per call, however many fields lead to it: the
 -- set of types already looked into is kept for the whole walk and not for one
--- path of it. A type that is met again is either finished, and then it held no
--- EVENT or the walk would have ended there, or it is still being looked into
--- higher up, and whatever it holds is found there. Without that, a chain of
--- records that each have two fields of the next one is walked once per path,
--- which takes twice as long for every record added.
-typeCarriesEvent :: EntityInfo -> Type' Resolved -> Bool
-typeCarriesEvent ei = \ty -> evalState (go ty) Set.empty
+-- path of it. A type that is met again is either finished, and then it held
+-- neither builtin type or the walk would have ended there, or it is still being
+-- looked into higher up, and whatever it holds is found there. Without that, a
+-- chain of records that each have two fields of the next one is walked once per
+-- path, which takes twice as long for every record added.
+carriedUnsendable :: EntityInfo -> Type' Resolved -> Maybe Unsendable
+carriedUnsendable ei = \ty -> evalState (go ty) Set.empty
  where
   fieldsByType :: Map.Map Unique [Type' Resolved]
   fieldsByType =
@@ -568,28 +603,32 @@ typeCarriesEvent ei = \ty -> evalState (go ty) Set.empty
     _                -> []
 
   -- The state is the set of types already looked into.
-  go :: Type' Resolved -> State (Set.Set Unique) Bool
+  go :: Type' Resolved -> State (Set.Set Unique) (Maybe Unsendable)
   go = \case
     TyApp _ name args
-      | u == eventUnique -> pure True
+      | u == eventUnique    -> pure (Just HoldsEvent)
+      | u == contractUnique -> pure (Just HoldsDeontic)
       | otherwise -> do
-          inArgs <- anyHit go args
+          inArgs <- firstHit go args
           seen <- get
-          if inArgs then pure True
-          else if u `Set.member` seen then pure False
-          else do
-            put (Set.insert u seen)
-            behindSynonym <- case Map.lookup u ei of
-              Just (_, KnownType _ _ (Just body)) -> go body
-              _                                   -> pure False
-            if behindSynonym then pure True
-            else anyHit go (Map.findWithDefault [] u fieldsByType)
+          case inArgs of
+            Just hit -> pure (Just hit)
+            Nothing
+              | u `Set.member` seen -> pure Nothing
+              | otherwise -> do
+                  put (Set.insert u seen)
+                  behindSynonym <- case Map.lookup u ei of
+                    Just (_, KnownType _ _ (Just body)) -> go body
+                    _                                   -> pure Nothing
+                  case behindSynonym of
+                    Just hit -> pure (Just hit)
+                    Nothing  -> firstHit go (Map.findWithDefault [] u fieldsByType)
       where
         u = getUnique name
     Forall _ _ inner -> go inner
-    _                -> pure False
+    _                -> pure Nothing
 
   -- Stops at the first hit: the rest of the list is not looked into.
-  anyHit :: (a -> State (Set.Set Unique) Bool) -> [a] -> State (Set.Set Unique) Bool
-  anyHit _ []       = pure False
-  anyHit f (x : xs) = f x >>= \hit -> if hit then pure True else anyHit f xs
+  firstHit :: (a -> State (Set.Set Unique) (Maybe b)) -> [a] -> State (Set.Set Unique) (Maybe b)
+  firstHit _ []       = pure Nothing
+  firstHit f (x : xs) = f x >>= maybe (firstHit f xs) (pure . Just)

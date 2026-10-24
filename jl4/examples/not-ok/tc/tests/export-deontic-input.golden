@@ -1,0 +1,79 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: export-deontic-input.l4
+  Hidden: no
+  Range: 26:1-26:20
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-deontic-input.l4
+  Hidden: no
+  Range: 34:1-34:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `duties` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-deontic-input.l4
+  Hidden: no
+  Range: 39:1-39:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `maybe a duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-deontic-input.l4
+  Hidden: no
+  Range: 44:1-44:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `d` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-deontic-input.l4
+  Hidden: no
+  Range: 49:1-49:18
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `a` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-deontic-input.l4
+  Hidden: no
+  Range: 54:1-54:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `e` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-deontic-input.l4
+  Hidden: no
+  Range: 58:1-58:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.

@@ -4687,6 +4687,13 @@ prettyCheckError (ExportEventTypeInput _fnName paramName) =
       <> " has a type that contains an EVENT, and a request has no JSON form for an event."
   , "Give the rule the party, the action and the time as separate inputs, and build the event inside it."
   ]
+prettyCheckError (ExportDeonticTypeInput _fnName paramName) =
+  [ "DEONTIC inputs are not supported for @export."
+  , "The input "
+      <> quotedName (getActual paramName)
+      <> " has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+  , "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+  ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.
 prettyMixfixMatchError :: Name -> MixfixMatchError -> [Text]
