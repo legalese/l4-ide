@@ -45,6 +45,11 @@ DECIDE `the applicant is an adult` IF `the applicant's age` >= 18
 
 Here `` `the applicant's age` `` is an input of `` `the applicant is an adult` ``; `` `an unused fact` `` is not.
 
+The function endpoint of the service, `GET /deployments/<id>/functions/<fn>`, lists an `ASSUME` with a written type by that type.
+It lists an `ASSUME` with no written type, one written with its signature before it, and a polymorphic one of the file itself as a required input of type `object`, and then ignores the value sent: every request that needs it answers HTTP 422, with "I could not continue evaluating, because I needed to know the value of … but it is an assumed term."
+An `ASSUME` that an imported file declares is not listed.
+An `ASSUME` that the rule declares itself, under its own `WHERE`, is not listed either, and a request that needs its value gets the same answer.
+
 ### Function-typed inputs are not supported for `@export`
 
 An exported function cannot take an input of function type, whether it is a `GIVEN` input or an `ASSUME` it uses:

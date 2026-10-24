@@ -112,7 +112,7 @@ The service turns each part of a request into the value the input asks for, but 
 >
 > **It may give a `DEONTIC` value as its answer.**
 >
-> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the rule uses as a duty, or an `ASSUME` that the rule's own body reads as a duty, whether the `ASSUME` has a written type or not, and whether the file or a file that it imports declares it.
+> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the rule uses as a duty, or an `ASSUME` that the rule's own body reads as a duty, whether the `ASSUME` has a written type or not, and whether the file, a file that it imports, or the rule's own `WHERE` declares it.
 
 The command `l4 check`, which checks a file for errors, refuses such a rule; [What happens if you do it anyway](#what-happens-if-you-do-it-anyway) shows the error.
 An `EVENT` input is refused in the same way; see [An exported rule cannot take an event](EVENT.md#an-exported-rule-cannot-take-an-event).
@@ -267,6 +267,11 @@ One called `the assumed duty`, with nothing after the name, is refused in the sa
 A polymorphic `ASSUME` is declared with a type variable, as with `GIVEN a IS A TYPE` and `GIVETH AN a`, and the prelude's `TBD` is one.
 Its declared type holds no `DEONTIC`, and each place that reads it gives it a type of its own, so the check goes by the type at the place where the exported rule's own body reads it.
 Handing `TBD` to a rule that takes a `DEONTIC` is refused in the same way, with `TBD` in the error, and reading it as a `NUMBER`, as `TBD + 1` does, is not.
+An `ASSUME` that the rule declares itself, under its own `WHERE`, counts in the same way.
+With ``ASSUME `local duty` IS A DEONTIC Person Action`` under the `WHERE` of an exported rule that reads `local duty`, `l4 check` reports the error above, with `local duty` in it.
+So does an `ASSUME` declared under the `WHERE` of a helper that sits inside the rule's `WHERE`, one with no written type that the body reads as a duty or as an event, and a polymorphic one that the body reads as one.
+An `ASSUME` under a `WHERE` that the rule never reads, one that the rule reads as a `NUMBER`, and one under the `WHERE` of a rule that is not exported are not refused.
+A name that a `WHERE` gives to an `ASSUME` stands for that `ASSUME` and not for a top-level one with the same name, and the check takes the type of the one that is read.
 A duty that a rule defines, with `MEANS` and a body, is not an `ASSUME` and not an input, and an exported rule may read it.
 
 ### What the check does not catch
@@ -304,11 +309,46 @@ Never let a rule that an exported rule calls read an `ASSUME` of type `DEONTIC`.
 Give it the `DEONTIC` as an input, as `is fulfilled by` does above.
 The same holds for an `ASSUME` of type `EVENT`.
 
+The same happens when the `ASSUME` is polymorphic and the rule reaches it through a helper that is polymorphic too and is declared in the rule's own `WHERE`.
+The helper reads the `ASSUME` at a type that stays open, so no read of it in the exported rule's own body has a `DEONTIC` for its type, and the check finds none.
+Only the call `fetch 1` gets the type `DEONTIC`, and that is a call of the helper.
+`l4 check` passes.
+The function endpoint of the service, `GET /deployments/<id>/functions/<fn>`, lists `the placeholder` as a required input of type `object`, and every request gets `false`, with or without a value sent for it:
+
+```l4
+-- ✘ Do not write this: `l4 check` passes, and every request gets `false`
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN a IS A TYPE
+GIVETH AN a
+ASSUME `the placeholder`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`duty fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+@export Is the duty fulfilled, as the local helper reads it
+GIVETH A BOOLEAN
+`via local helper` MEANS `duty fulfilled` (fetch 1)
+  WHERE
+    GIVEN a IS A TYPE
+          n IS A NUMBER
+    GIVETH AN a
+    fetch n MEANS `the placeholder`
+```
+
+Do not use a polymorphic `ASSUME` as a stand-in for a duty: take the plain facts as inputs and build the `DEONTIC` inside the rule.
+
 **Loudly: every request is refused with HTTP 422.**
 
 - The same helper, when its `CONSIDER` has no `OTHERWISE`: the message says the value `reached a CONSIDER that has no branch for it`.
-- A `GIVEN` with no written type that the rule uses as a function, such as `f` in a rule with `GIVEN f` and the body `f 3 + 1`. The service lists no inputs for the rule. A request that leaves out `f` gets `Parameter 'f': missing required parameter`. A request that sends a value for `f` gets a message that begins `Internal error:`, says `expected a function but found: 3`, and asks for a bug report.
+- A `GIVEN` with no written type that the rule uses as a function, such as `f` in a rule with `GIVEN f` and the body `f 3 + 1`. The function endpoint of the service, `GET /deployments/<id>/functions/<fn>`, lists `f` as a required input of type `object`. A request that leaves out `f` gets `Parameter 'f': missing required parameter`. A request that sends a value for `f` gets a message that begins `Internal error:`, says `expected a function but found: 3`, and asks for a bug report.
 - An `ASSUME` of function type that the rule calls, when an imported file declares it, or when it is written with its signature before it, as in `GIVEN n IS A NUMBER`, `GIVETH A NUMBER`, `ASSUME bump`. The message says that the service `needed to know the value of` the `ASSUME`, but `it is an assumed term`.
+- An `ASSUME` that the rule declares under its own `WHERE` and reads as a `NUMBER`, or calls as a function. `l4 check` passes, the function endpoint lists no input for it, and every request gets the same message about an assumed term, with or without a value sent.
 
 A request cannot carry a function either, so give such a rule inputs that a request can carry.
 

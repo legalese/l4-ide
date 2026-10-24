@@ -245,7 +245,7 @@ Where it lives:
 
 - `jl4-core/src/L4/TypeCheck.hs`: `refuseExportedClausesWithoutGiven` (`:823`), called from `inferTopDecl` (`:637`); the message (`:4409`).
 - `jl4-core/src/L4/TypeCheck/Types.hs:82`: the error `ExportedClausesWithoutGiven`, whose range (`:307`) is the `@export` annotation's.
-- `jl4-core/src/L4/Export.hs:514`: `isExportedDecide`, now polymorphic in the pass, so the checker can ask it before resolution.
+- `jl4-core/src/L4/Export.hs:530`: `isExportedDecide`, now polymorphic in the pass, so the checker can ask it before resolution.
 
 Behaviour:
 

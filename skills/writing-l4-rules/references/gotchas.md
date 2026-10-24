@@ -288,7 +288,7 @@ squared x MEANS x TIMES x
 **It may give a `DEONTIC` value as its answer.**
 
 No request can supply the value, so the typechecker refuses the rule: `l4 check` fails with `DEONTIC inputs are not supported for @export`, naming the input, the editor shows it as an error, and the deploy is refused.
-The same holds for a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as a `DEONTIC`, and an `ASSUME` that the rule's own body reads as a `DEONTIC`, whether the `ASSUME` has a written type or not, and whether the file or a file it imports declares it.
+The same holds for a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as a `DEONTIC`, and an `ASSUME` that the rule's own body reads as a `DEONTIC`, whether the `ASSUME` has a written type or not, and whether the file, a file it imports, or the rule's own `WHERE` declares it.
 The message ends with what to do: give the rule the plain facts that the `DEONTIC` is made from as inputs, and build the `DEONTIC` inside it.
 
 ```l4
@@ -308,6 +308,7 @@ An `EVENT` input is refused in the same way, with `EVENT inputs are not supporte
 The check does not look inside a rule that an exported rule calls.
 A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.
 If the helper's `CONSIDER` ends in `OTHERWISE`, every request then gets that branch's answer with no error, which is the quiet failure; if it has no `OTHERWISE`, every request fails with HTTP 422.
+A polymorphic helper in the rule's own `WHERE` that reads a polymorphic `ASSUME` at a type that stays open is the same quiet failure, because no read of the `ASSUME` in the exported rule's own body has a `DEONTIC` or an `EVENT` for its type.
 Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
 
 ---
