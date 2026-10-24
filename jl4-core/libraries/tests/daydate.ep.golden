@@ -80,6 +80,32 @@ GIVEN dt IS A DATETIME
 GIVETH A DATE
 `Date` AKA `Days to date` MEANS DATETIME_DATE dt
 
+-- YMD year month day  -> the date, with the arguments in ISO 8601 order.
+-- Unlike `Date`, which rolls a part that does not exist forward, YMD stops
+-- evaluation when the month or day does not exist in that year:
+-- `YMD 2023 2 29` and `YMD 2026 28 7` are refused. The year is not checked.
+-- `Year month day` is another name for YMD.
+--
+-- The refusal is a stand-in until the language has one that carries a reason.
+-- It is declared here, and the prelude is not imported, because importing the
+-- prelude would put every prelude name in scope in every file that imports
+-- daydate.
+GIVETH FUNCTION FROM STRING TO DATE
+ASSUME `YMD refusal`
+
+GIVEN year  IS A NUMBER
+      month IS A NUMBER
+      day   IS A NUMBER
+GIVETH A DATE
+`YMD` AKA `Year month day` MEANS
+    IF      DATE_YEAR  candidate EQUALS year
+        AND DATE_MONTH candidate EQUALS month
+        AND DATE_DAY   candidate EQUALS day
+    THEN candidate
+    ELSE `YMD refusal` "YMD refused an out-of-range month or day"
+    WHERE
+        candidate MEANS Date day month year
+
 
 
 §§ `Datestamp Constructors`
