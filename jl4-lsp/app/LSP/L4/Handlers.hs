@@ -847,9 +847,17 @@ handlers evalConfig recorder =
                       , line = fromIntegral fd.fdLspDiagnostic._range._start._line + 1
                       , message = Text.strip fd.fdLspDiagnostic._message
                       }
-                  | fd <- BlockingErrors.blockingErrorsIn closure diags
+                  -- The engine's own errors (a raw exception, or "depends on
+                  -- itself", which an IMPORT that finds no module also
+                  -- causes) say less than the parser's and the typechecker's,
+                  -- so they go last.
+                  | fd <- uncurry (<>) $ List.partition
+                      (\fd -> fd.fdLspDiagnostic._source `notElem` [Just "jl4", Just "compiler"])
+                      (BlockingErrors.blockingErrorsIn closure diags)
                   ]
-                blockingErrors = cycleErrors <> diagErrors
+                -- A diagnostic is stored once per rule that published it, and
+                -- a typecheck runs once per import path that reaches it.
+                blockingErrors = List.nub (cycleErrors <> diagErrors)
 
             case mTcResult of
               -- The file does not parse: nothing to export, and the parse
