@@ -515,6 +515,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
     Assert ann e -> do
       e' <- addNlg e
       pure $ Assert ann e'
+    AssertRefused ann e mmsg -> do
+      e' <- addNlg e
+      mmsg' <- traverse addNlg mmsg
+      pure $ AssertRefused ann e' mmsg'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Event n) where
   addNlg a@(MkEvent ann party act timestamp atFirst) = extendNlgA a do
@@ -1272,6 +1276,7 @@ instance HasDesc (Directive n) where
     Check ann e -> Check ann <$> addDesc e
     Contract ann e t evs -> Contract ann <$> addDesc e <*> addDesc t <*> traverse addDesc evs
     Assert ann e -> Assert ann <$> addDesc e
+    AssertRefused ann e mmsg -> AssertRefused ann <$> addDesc e <*> traverse addDesc mmsg
 
 instance HasDesc (Import n) where
   addDesc a = pure a
@@ -1736,6 +1741,8 @@ instance (HasSrcRange n, HasRef n) => HasRef (Directive n) where
     Contract ann e t evs -> attachRef a ann >>= \ann' ->
       Contract ann' <$> addRef e <*> addRef t <*> traverse addRef evs
     Assert ann e -> attachRef a ann >>= \ann' -> Assert ann' <$> addRef e
+    AssertRefused ann e mmsg -> attachRef a ann >>= \ann' ->
+      AssertRefused ann' <$> addRef e <*> traverse addRef mmsg
 
 instance (HasSrcRange n, HasRef n) => HasRef (Event n) where
   addRef a@(MkEvent ann party act timestamp atFirst) = do

@@ -32,6 +32,8 @@ spec =
     roundtrips "a REFUSE inside AND, OR and PLUS, unbracketed" ["(REFUSE \"left\" AND b) OR REFUSE \"right\"", "1 PLUS REFUSE \"sum\""] refuseOperandSrc
     roundtrips "a REFUSE as a function's argument, unbracketed" ["double OF REFUSE \"argument\""] refuseArgumentSrc
     roundtrips "a REFUSE projected with 's" ["(REFUSE \"no record\")'s amount"] refuseProjectionSrc
+    roundtrips "an #ASSERT REFUSED, with and without a reason" ["#ASSERT REFUSED r BECAUSE \"not modelled\"", "#ASSERT REFUSED r\n"] assertRefusedSrc
+    roundtrips "an #ASSERT REFUSED of a BREACH with a BECAUSE of its own" ["#ASSERT REFUSED (BREACH BECAUSE \"b\") BECAUSE \"a\"", "#ASSERT REFUSED (BREACH BECAUSE \"b\")\n"] assertRefusedBreachSrc
 
 -- | Assert that @src@ parses, its 'prettyLayout' contains every @mustContain@
 -- fragment, and that printed output parses again. A pure re-parse check catches
@@ -151,4 +153,27 @@ refuseProjectionSrc = T.unlines
   , ""
   , "GIVETH A NUMBER"
   , "DECIDE a IS (REFUSE \"no record\")'s amount"
+  ]
+
+-- | The directive that asserts a refusal prints as written, its reason
+-- included: a printer that dropped the BECAUSE would leave an assertion that
+-- holds for any reason.
+assertRefusedSrc :: T.Text
+assertRefusedSrc = T.unlines
+  [ "GIVETH A NUMBER"
+  , "DECIDE r IS REFUSE \"not modelled\""
+  , ""
+  , "#ASSERT REFUSED r"
+  , "#ASSERT REFUSED r BECAUSE \"not modelled\""
+  ]
+
+-- | A BECAUSE that a BREACH in the expression takes is outside every bracket
+-- only when the printer leaves it there, and the parser rejects one there.
+-- So the printer brackets an expression with an open tail, and the printed
+-- directive parses as written.
+assertRefusedBreachSrc :: T.Text
+assertRefusedBreachSrc = T.unlines
+  [ "#ASSERT REFUSED (BREACH BECAUSE \"b\")"
+  , "#ASSERT REFUSED (IF TRUE THEN REFUSE \"a\" ELSE BREACH) BECAUSE \"a\""
+  , "#ASSERT REFUSED (BREACH BECAUSE \"b\") BECAUSE \"a\""
   ]

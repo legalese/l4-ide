@@ -408,6 +408,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       map printWithLayout stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
+    -- An expression with an open tail is bracketed, so that a BECAUSE in it,
+    -- a BREACH's, is inside the brackets, where the parser reads it as the
+    -- BREACH's and not as the directive's.
+    AssertRefused _ e mmsg ->
+      "#ASSERT REFUSED" <+> parensIfOpenTailed e <>
+        maybe mempty (\m -> " BECAUSE" <+> printWithLayout m) mmsg
 
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
   printWithLayout = \ case

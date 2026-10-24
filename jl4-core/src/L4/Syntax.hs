@@ -214,6 +214,12 @@ data Directive n =
   | Check Anno (Expr n)
   | Contract Anno (Expr n) (Expr n) [Expr n]
   | Assert Anno (Expr n)
+  | AssertRefused Anno (Expr n) (Maybe (Expr n))
+    -- ^ @#ASSERT REFUSED e [BECAUSE "message"]@ — @e@ must refuse, and when the
+    -- optional @BECAUSE@ clause is present the refusal's reason must equal it.
+    -- A separate constructor rather than a flag on 'Assert', so that every total
+    -- match over 'Directive' is a compile error until it decides what a refusal
+    -- assertion means on its surface.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 

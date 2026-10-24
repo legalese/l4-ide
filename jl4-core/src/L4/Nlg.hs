@@ -726,6 +726,7 @@ instance Linearize (Directive Resolved) where
       [ "executing contract", lin e, "at", lin t, "with the following events:" ]
       <> map lin es
     Assert _ e -> linearize e
+    AssertRefused _ e _mmsg -> hcat [ "the following must refuse:", lin e ]
 
 
 instance Linearize (NamedExpr Resolved) where

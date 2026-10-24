@@ -317,14 +317,21 @@ l4EvalDirective source line col directiveType =
             [ "directiveType" .= directiveType
             , "prettyText" .= prettyEvalResult conFields res
             , "success" .= case res of
-                EL.Assertion (Right b) -> Aeson.toJSON b
-                EL.Assertion (Left _)  -> Aeson.toJSON False
+                EL.Assertion EL.Holds            -> Aeson.toJSON True
+                EL.Assertion EL.Fails            -> Aeson.toJSON False
+                EL.Assertion (EL.FailsBecause _) -> Aeson.toJSON False
+                EL.Assertion (EL.Refused _)      -> Aeson.toJSON False
+                EL.Assertion (EL.Errored _)      -> Aeson.toJSON False
                 EL.Reduction _ -> Aeson.Null
             , "structuredValue" .= case res of
-                EL.Assertion (Right b) -> Aeson.toJSON b
-                EL.Assertion (Left _)  -> Aeson.Null
-                EL.Reduction (Left _) -> Aeson.Null
-                EL.Reduction (Right nf) -> Aeson.toJSON (prettyLayoutNF conFields nf)
+                EL.Assertion EL.Holds               -> Aeson.toJSON True
+                EL.Assertion EL.Fails               -> Aeson.toJSON False
+                EL.Assertion (EL.FailsBecause _)    -> Aeson.toJSON False
+                EL.Assertion (EL.Refused _)         -> Aeson.Null
+                EL.Assertion (EL.Errored _)         -> Aeson.Null
+                EL.Reduction (EL.ReducedErrored _)  -> Aeson.Null
+                EL.Reduction (EL.ReducedRefused _)  -> Aeson.Null
+                EL.Reduction (EL.Reduced nf)        -> Aeson.toJSON (prettyLayoutNF conFields nf)
             , "range" .= rangeJson
             ]
 
@@ -561,16 +568,21 @@ evalResultToJson fields edr = Aeson.object $
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
   where
-    isSuccess (EL.Assertion (Right b)) = b
-    isSuccess (EL.Assertion (Left _)) = False
-    isSuccess (EL.Reduction (Right _)) = True
-    isSuccess (EL.Reduction (Left _)) = False
+    isSuccess (EL.Assertion EL.Holds) = True
+    isSuccess (EL.Assertion EL.Fails) = False
+    isSuccess (EL.Assertion (EL.FailsBecause _)) = False
+    isSuccess (EL.Assertion (EL.Refused _)) = False
+    isSuccess (EL.Assertion (EL.Errored _)) = False
+    isSuccess (EL.Reduction (EL.Reduced _)) = True
+    isSuccess (EL.Reduction (EL.ReducedRefused _)) = False
+    isSuccess (EL.Reduction (EL.ReducedErrored _)) = False
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text
-prettyEvalResult _fields (EL.Assertion a)          = EL.prettyAssertionOutcome a
-prettyEvalResult _fields (EL.Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
-prettyEvalResult fields  (EL.Reduction (Right v))  = prettyLayoutNF fields v
+prettyEvalResult _fields (EL.Assertion a)                       = EL.prettyAssertionOutcome a
+prettyEvalResult _fields (EL.Reduction (EL.ReducedErrored exc)) = Text.unlines (prettyEvalException exc)
+prettyEvalResult _fields (EL.Reduction (EL.ReducedRefused r))   = Text.unlines (EL.prettyRefusal r)
+prettyEvalResult fields  (EL.Reduction (EL.Reduced v))          = prettyLayoutNF fields v
 
 -- | Generate ladder diagram visualization data for a specific DECIDE rule by name.
 --
@@ -677,6 +689,7 @@ l4CodeLenses source uriText version =
       Check{}         -> "#CHECK"
       Contract{}      -> "#CHECK"
       Assert{}        -> "#ASSERT"
+      AssertRefused{} -> "#ASSERT REFUSED"
 
     directiveToCodeLens :: Text -> Int -> TopDecl Resolved -> [Aeson.Value]
     directiveToCodeLens uriTxt ver = \case

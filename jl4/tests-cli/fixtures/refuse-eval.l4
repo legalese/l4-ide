@@ -1,5 +1,8 @@
--- Typechecks cleanly. Its one directive asks for a named refusal.
+-- Typechecks cleanly. Its #EVAL asks for a named refusal, and its
+-- #ASSERT REFUSED holds. The REPL removes that #ASSERT REFUSED from the module
+-- before it answers a query, so each reply is the query's alone.
 GIVETH A NUMBER
 `not modelled` MEANS REFUSE "not modelled"
 
 #EVAL `not modelled` PLUS 1
+#ASSERT REFUSED `not modelled`

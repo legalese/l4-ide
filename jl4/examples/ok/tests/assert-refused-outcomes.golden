@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+assert-refused-outcomes.l4:28:1-31:
+  assertion satisfied
+assert-refused-outcomes.l4:29:1-67:
+  assertion satisfied
+assert-refused-outcomes.l4:30:1-99:
+  assertion satisfied
+assert-refused-outcomes.l4:33:1-27:
+  assertion failed: expected a refusal, but the expression produced a value
+assert-refused-outcomes.l4:34:1-45:
+  assertion failed: expected a refusal, but the expression produced a value
+assert-refused-outcomes.l4:37:1-59:
+  assertion failed: expected the refusal "some other reason", got "this case is not modelled"
+assert-refused-outcomes.l4:40:1-33:
+  assertion could not be evaluated:
+  Division by zero in the operation:
+  DIVIDED BY
+assert-refused-outcomes.l4:41:1-69:
+  assertion could not be evaluated:
+  Division by zero in the operation:
+  DIVIDED BY
+assert-refused-outcomes.l4:44:1-42:
+  assertion satisfied
+assert-refused-outcomes.l4:45:1-41:
+  assertion satisfied
+assert-refused-outcomes.l4:49:1-50:30:
+  assertion failed: expected the refusal "some other reason", got "this case is not modelled"

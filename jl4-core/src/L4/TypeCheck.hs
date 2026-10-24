@@ -468,7 +468,7 @@ applyFinalSubstitution subst moduleUri t =
 -- forking consumers are all pruned: the scan phases prune per declaration
 -- ('scanTyDeclDeclare', 'inferTyDeclDeclare', 'scanFunSigDecide'),
 -- 'inferTopDecl' prunes Declare/Decide/Assume/Timezone, and 'inferDirective'
--- prunes LazyEval/LazyEvalTrace/Check/Contract/Assert; Import/Section name
+-- prunes LazyEval/LazyEvalTrace/Check/Contract/Assert/AssertRefused; Import/Section name
 -- handling is deterministic ('def'/'ref'). The other two callers of this
 -- function only run 'applySubst', which never forks.
 --
@@ -593,6 +593,14 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   rt <- prune $ checkExpr ExpectRegulativeTimestampContext t number
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
   pure (Contract ann re rt revs)
+inferDirective (AssertRefused ann e mmsg) = errorContext (WhileCheckingExpression e) do
+  -- NOT checked against BOOLEAN: the asserted expression is expected to refuse,
+  -- and a refusal is at any type, so the expression may have any type at all.
+  -- The 'prune' is load-bearing, as in the sibling cases: an ambiguous expression
+  -- must surface as an 'AmbiguousTermError' and not reach 'runCheckUnique'.
+  (e', _) <- prune $ inferExpr e
+  mmsg' <- traverse (\m -> prune $ checkExpr ExpectAssertRefusedBecauseContext m string) mmsg
+  pure (AssertRefused ann e' mmsg')
 inferDirective (Assert ann e) = errorContext (WhileCheckingExpression e) do
   -- The 'prune' is load-bearing: like the sibling directive cases above, we must
   -- collapse candidate results here, so that an ambiguous-but-well-typed expression
@@ -4975,6 +4983,8 @@ prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRefuseMessageContext expected given =
   standardTypeMismatch [ "The message of a REFUSE is expected to be a string literal, of type" ] expected given
+prettyTypeMismatch ExpectAssertRefusedBecauseContext expected given =
+  standardTypeMismatch [ "The BECAUSE clause of an #ASSERT REFUSED is expected to be a string literal, of type" ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text

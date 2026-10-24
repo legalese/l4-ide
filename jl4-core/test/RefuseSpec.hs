@@ -19,14 +19,19 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import L4.API (l4VisualizeByName)
+import Base (Uri (..), toNormalizedUri)
+import L4.API (l4Eval, l4EvalDirective, l4VisualizeByName)
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), checkWithImports, emptyVFS)
+import L4.DirectiveFilter (filterIdeDirectives)
 import qualified L4.EvaluateLazy as EL
+import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Export.Document (buildDocument, defaultExportConfig)
 import qualified L4.Lexer as Lexer
+import L4.Lint.AndOrDepth (checkAndOrDepth)
+import L4.Parser (execProgramParser)
 import L4.Print (prettyLayout)
 import qualified L4.StateGraph as SG
-import L4.TracePolicy (apiDefaultPolicy)
+import L4.TracePolicy (TraceDestination (..), TraceFormat (..), TracePolicy, apiDefaultPolicy, traceAll)
 import qualified L4.TypeCheck as TC
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), Severity (..))
 
@@ -41,14 +46,24 @@ frontEnd src = case checkWithImports emptyVFS src of
 
 -- | Every directive's result, printed the way the golden suite prints it.
 evalAll :: Text -> IO [Text]
-evalAll src = case frontEnd src of
+evalAll = evalAllWith apiDefaultPolicy
+
+-- | Every directive's result under the given trace policy, printed the way the
+-- golden suite prints it, with its trace below it when the policy keeps one.
+evalAllWith :: TracePolicy -> Text -> IO [Text]
+evalAllWith policy src = case frontEnd src of
   Left msg -> do
     expectationFailure ("the module did not check:\n" <> Text.unpack msg)
     pure []
   Right r -> do
-    cfg <- EL.resolveEvalConfigWithSafeMode Nothing apiDefaultPolicy True
+    cfg <- EL.resolveEvalConfigWithSafeMode Nothing policy True
     (_, results) <- EL.execEvalModuleWithEnv cfg r.tcdEntityInfo mempty r.tcdModule
     pure (map EL.prettyEvalDirectiveResult results)
+
+-- | The last line of a directive's printed result: the root of its trace,
+-- when it has one.
+rootOf :: Text -> Text
+rootOf out = Text.strip (last ("" : Text.lines (Text.strip out)))
 
 -- | The result of a module's one directive.
 evalOne :: Text -> IO Text
@@ -132,6 +147,9 @@ spec = describe "REFUSE" $ do
     it "is still usable as a name in backticks (a control for the case above)" $ do
       out <- evalOne "GIVETH A NUMBER\n`REFUSE` MEANS 1\n\n#EVAL `REFUSE`\n"
       Text.strip out `shouldBe` "1"
+
+    it "REFUSED, the word of #ASSERT REFUSED, is in the lexer's keyword table too" $
+      Map.member "REFUSED" Lexer.keywords `shouldBe` True
 
   describe "the grammar and the type rule" $ do
     it "rejects a computed message at the parser, naming what it expects" $
@@ -293,11 +311,11 @@ spec = describe "REFUSE" $ do
       length outs `shouldBe` 3
       for_ outs (refusesWith "twice")
 
-    -- An #ASSERT whose expression refuses is decided neither way: it reports
-    -- the refusal under "assertion could not be evaluated:", in either
-    -- polarity. 'refusesWith' rejects the word "assertion", so this case has
-    -- its own matcher.
-    it "leaves an #ASSERT that refuses undecided, in either polarity, with the reason" $ do
+    -- An #ASSERT whose expression refuses is decided neither way, and it is
+    -- not an error either: it reports the refusal under "assertion refused:",
+    -- in either polarity. 'refusesWith' rejects the word "assertion", so this
+    -- case has its own matcher.
+    it "reports an #ASSERT that refuses as refused, in either polarity, with the reason" $ do
       outs <- evalAll $ Text.unlines
         [ "GIVETH A BOOLEAN"
         , "`not modelled` MEANS REFUSE \"not modelled\""
@@ -307,10 +325,10 @@ spec = describe "REFUSE" $ do
         ]
       length outs `shouldBe` 2
       for_ outs $ \out -> do
-        out `shouldSatisfy` Text.isInfixOf "assertion could not be evaluated:"
+        out `shouldSatisfy` Text.isPrefixOf "assertion refused:"
         out `shouldSatisfy` Text.isInfixOf "The model refuses to answer:"
         out `shouldSatisfy` Text.isInfixOf "not modelled"
-        for_ ["assertion satisfied", "assertion failed"] $ \verdict ->
+        for_ ["assertion satisfied", "assertion failed", "could not be evaluated"] $ \verdict ->
           out `shouldNotSatisfy` Text.isInfixOf verdict
 
     -- A directive reads its answer to a depth of 200 (the evaluator's
@@ -351,6 +369,287 @@ spec = describe "REFUSE" $ do
     it "is named in an evaluation trace, with its reason" $ do
       out <- evalOne "#EVALTRACE 1 PLUS REFUSE \"traced\"\n"
       out `shouldSatisfy` Text.isInfixOf "↯ refused: traced"
+
+    -- The root of a trace carries the directive's outcome. The trace records
+    -- the reduction to weak head normal form, and a refusal inside a JUST or
+    -- at the end of a list is met only after it, while the answer is read in
+    -- full; the root names it all the same, and an error met there likewise.
+    -- The root's line is the trace's last.
+    it "is named at the root of an evaluation trace when it is met below the answer's head" $ do
+      outs <- evalAll $ Text.unlines
+        [ "GIVETH A NUMBER"
+        , "`deep` MEANS REFUSE \"deep\""
+        , ""
+        , "GIVETH A NUMBER"
+        , "`broken` MEANS 1 DIVIDED BY 0"
+        , ""
+        , "#EVALTRACE JUST `deep`"
+        , "#EVALTRACE LIST 1, 2, REFUSE \"deep\""
+        , "#EVALTRACE JUST `broken`"
+        ]
+      case outs of
+        [inJust, inList, errored] -> do
+          for_ [inJust, inList] $ \out -> do
+            refusesWith "deep" (fst (Text.breakOn "─────" out))
+            rootOf out `shouldSatisfy` Text.isSuffixOf "↯ refused: deep"
+          rootOf errored `shouldSatisfy` Text.isInfixOf "↯ "
+          rootOf errored `shouldNotSatisfy` Text.isInfixOf "refused"
+          rootOf errored `shouldNotSatisfy` Text.isInfixOf "JUST"
+        _ -> expectationFailure ("expected three directive results, got " <> show (length outs))
+
+    -- An assertion's trace, kept when the policy traces every directive, has
+    -- the same root: an #ASSERT REFUSED that holds because the answer refuses
+    -- below its head has that refusal at the root of its trace.
+    it "is named at the root of an assertion's trace when it is met below the answer's head" $ do
+      outs <- evalAllWith (traceAll TextTrace ApiResponse defaultGraphVizOptions) $ Text.unlines
+        [ "GIVETH A NUMBER"
+        , "`deep` MEANS REFUSE \"deep\""
+        , ""
+        , "#ASSERT REFUSED JUST `deep`"
+        , "#ASSERT REFUSED LIST 1, 2, REFUSE \"deep\""
+        ]
+      case outs of
+        [inJust, inList] -> for_ [inJust, inList] $ \out -> do
+          Text.strip (fst (Text.breakOn "─────" out)) `shouldBe` "assertion satisfied"
+          rootOf out `shouldSatisfy` Text.isSuffixOf "↯ refused: deep"
+        _ -> expectationFailure ("expected two directive results, got " <> show (length outs))
+
+  -- #ASSERT REFUSED e [BECAUSE "reason"] holds when e refuses and, when a
+  -- reason is named, when e refuses with exactly that reason. Otherwise it
+  -- fails and says why; and an e that raises is reported as a plain #ASSERT
+  -- reports one, because an error is not a refusal.
+  describe "#ASSERT REFUSED" $ do
+    let beside directives = Text.unlines $
+          [ "GIVETH A NUMBER"
+          , "`not modelled` MEANS REFUSE \"not modelled\""
+          , ""
+          ] <> directives
+        outcomes directives = map Text.strip <$> evalAll (beside directives)
+        notDecided out = do
+          out `shouldSatisfy` Text.isPrefixOf "assertion could not be evaluated:"
+          for_ ["assertion satisfied", "assertion failed", "assertion refused", "The model refuses"] $ \word ->
+            out `shouldNotSatisfy` Text.isInfixOf word
+        -- The column of the parse error's caret: the megaparsec excerpt puts
+        -- one space after the gutter's bar, then one per column before it.
+        caretColumn msg = case [ l | l <- Text.lines msg, "|" `Text.isInfixOf` l, "^" `Text.isInfixOf` l ] of
+          l : _ -> Just (Text.length (fst (Text.breakOn "^" l)) - Text.length (fst (Text.breakOn "|" l)) - 1)
+          [] -> Nothing
+
+    it "holds for a refusal, with no reason named and with its own reason named" $ do
+      outs <- outcomes
+        [ "#ASSERT REFUSED `not modelled`"
+        , "#ASSERT REFUSED `not modelled` BECAUSE \"not modelled\""
+        ]
+      outs `shouldBe` ["assertion satisfied", "assertion satisfied"]
+
+    it "fails, saying why, for an expression that answers, a refusal it never demands included" $ do
+      outs <- outcomes
+        [ "#ASSERT REFUSED 1 PLUS 1"
+        , "#ASSERT REFUSED FALSE AND REFUSE \"never demanded\""
+        ]
+      outs `shouldBe` replicate 2 "assertion failed: expected a refusal, but the expression produced a value"
+
+    it "fails, naming both reasons, for a refusal with another reason" $ do
+      outs <- outcomes [ "#ASSERT REFUSED `not modelled` BECAUSE \"some other reason\"" ]
+      outs `shouldBe` ["assertion failed: expected the refusal \"some other reason\", got \"not modelled\""]
+
+    it "compares the reasons exactly, so one trailing space makes another reason" $ do
+      outs <- outcomes [ "#ASSERT REFUSED `not modelled` BECAUSE \"not modelled \"" ]
+      outs `shouldBe` ["assertion failed: expected the refusal \"not modelled \", got \"not modelled\""]
+
+    -- Each reason is quoted as it is written, a quotation mark or a letter
+    -- outside ASCII included, and nothing in it is escaped.
+    it "names both reasons as they are written, with no escaping" $ do
+      outs <- map Text.strip <$> evalAll (Text.unlines
+        [ "GIVETH A NUMBER"
+        , "`not modelled` MEANS REFUSE \"café, \\\"quoted\\\"\""
+        , ""
+        , "#ASSERT REFUSED `not modelled` BECAUSE \"naïve\""
+        ])
+      outs `shouldBe` ["assertion failed: expected the refusal \"naïve\", got \"café, \"quoted\"\""]
+
+    it "is not satisfied by an error, with or without a reason named" $ do
+      outs <- outcomes
+        [ "#ASSERT REFUSED (1 DIVIDED BY 0)"
+        , "#ASSERT REFUSED (1 DIVIDED BY 0) BECAUSE \"not modelled\""
+        ]
+      length outs `shouldBe` 2
+      for_ outs notDecided
+
+    it "is not satisfied by an assumed term, which is undecided, as a plain #ASSERT reports one" $ do
+      outs <- evalAll "ASSUME `the rate` IS A NUMBER\n\n#ASSERT REFUSED `the rate`\n"
+      length outs `shouldBe` 1
+      for_ (map Text.strip outs) notDecided
+
+    it "takes an expression of any type, because a refusal is at any type" $ do
+      outs <- outcomes
+        [ "#ASSERT REFUSED (`not modelled` EQUALS 1)"
+        , "#ASSERT REFUSED (LIST 2, `not modelled`)"
+        , "#ASSERT REFUSED \"an answer\""
+        ]
+      outs `shouldBe`
+        [ "assertion satisfied"
+        , "assertion satisfied"
+        , "assertion failed: expected a refusal, but the expression produced a value"
+        ]
+
+    it "rejects a computed reason at the parser, at the reason, naming what it expects" $ do
+      let directive = "#ASSERT REFUSED `not modelled` BECAUSE `the reason`"
+          src = beside ["GIVETH A STRING", "`the reason` MEANS \"not modelled\"", "", directive]
+      case checkWithImports emptyVFS src of
+        Left errs -> do
+          let msg = Text.unlines errs
+          msg `shouldSatisfy` Text.isInfixOf "expecting String Literal or space token"
+          caretColumn msg `shouldBe` Just (1 + Text.length (fst (Text.breakOn "`the reason`" directive)))
+        Right _ -> expectationFailure "an #ASSERT REFUSED with a computed reason parsed"
+
+    it "rejects a reason that is a literal but not a STRING, at the type checker" $
+      case frontEnd (beside ["#ASSERT REFUSED `not modelled` BECAUSE 42"]) of
+        Left msg -> msg `shouldSatisfy` Text.isInfixOf "The BECAUSE clause of an #ASSERT REFUSED is expected to be a string literal"
+        Right _ -> expectationFailure "an #ASSERT REFUSED with the reason 42 type-checked"
+
+    -- A BECAUSE may start a line of its own when it is indented further than
+    -- the #ASSERT, and it is then the directive's reason, compared as one on
+    -- the directive's line is.
+    it "takes a BECAUSE on a line of its own, indented further than the #ASSERT" $ do
+      outs <- outcomes
+        [ "#ASSERT REFUSED `not modelled`"
+        , "  BECAUSE \"not modelled\""
+        , "#ASSERT REFUSED `not modelled`"
+        , "  BECAUSE \"some other reason\""
+        ]
+      outs `shouldBe`
+        [ "assertion satisfied"
+        , "assertion failed: expected the refusal \"some other reason\", got \"not modelled\""
+        ]
+
+    -- A BECAUSE further left is an error at the BECAUSE. The service's text
+    -- filter ends a directive at the first line that is neither blank nor
+    -- indented further than it, so a reason there would be cut from the
+    -- directive.
+    it "rejects a BECAUSE that starts a line no further right than the #ASSERT, at the BECAUSE" $ do
+      let src = beside ["#ASSERT REFUSED `not modelled`", "BECAUSE \"not modelled\""]
+      case checkWithImports emptyVFS src of
+        Left errs -> do
+          let msg = Text.unlines errs
+          msg `shouldSatisfy` Text.isInfixOf "only when it is indented further than the #ASSERT"
+          msg `shouldSatisfy` Text.isInfixOf "5 | BECAUSE"
+          caretColumn msg `shouldBe` Just 1
+        Right _ -> expectationFailure "an #ASSERT REFUSED with its BECAUSE at the left margin parsed"
+
+    -- In a section the #ASSERT is indented, and a BECAUSE on a line of its own
+    -- is measured against the #ASSERT's column, not the margin's. Columns are
+    -- counted as everywhere in L4's layout: a tab goes on to the next multiple
+    -- of eight, so one tab is further right than four spaces.
+    it "measures a BECAUSE on a line of its own against the #ASSERT's column, in a section" $ do
+      let section directives = Text.unlines $
+            [ "§ `Fees`"
+            , "    GIVETH A NUMBER"
+            , "    `not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            ] <> directives
+      case checkWithImports emptyVFS (section ["    #ASSERT REFUSED `not modelled`", "    BECAUSE \"not modelled\""]) of
+        Left errs -> do
+          let msg = Text.unlines errs
+          msg `shouldSatisfy` Text.isInfixOf "only when it is indented further than the #ASSERT"
+          msg `shouldSatisfy` Text.isInfixOf "6 |     BECAUSE"
+          caretColumn msg `shouldBe` Just 5
+        Right _ -> expectationFailure "an #ASSERT REFUSED with its BECAUSE level with it, in a section, parsed"
+      outs <- map Text.strip <$> evalAll (section
+        [ "    #ASSERT REFUSED `not modelled`"
+        , "      BECAUSE \"not modelled\""
+        , "    #ASSERT REFUSED `not modelled`"
+        , "\tBECAUSE \"some other reason\""
+        ])
+      outs `shouldBe`
+        [ "assertion satisfied"
+        , "assertion failed: expected the refusal \"some other reason\", got \"not modelled\""
+        ]
+      -- and an #ASSERT indented by a tab is at column nine, right of two spaces
+      case checkWithImports emptyVFS "\t#ASSERT REFUSED REFUSE \"x\"\n  BECAUSE \"x\"\n" of
+        Left errs -> do
+          let msg = Text.unlines errs
+          msg `shouldSatisfy` Text.isInfixOf "only when it is indented further than the #ASSERT"
+          msg `shouldSatisfy` Text.isInfixOf "2 |   BECAUSE"
+        Right _ -> expectationFailure "a BECAUSE two spaces in, below an #ASSERT a tab in, parsed"
+
+    -- A BREACH takes a BECAUSE of its own, so outside parentheses it can take
+    -- one written for the directive, which would then name no reason and hold
+    -- for a refusal with any reason. So a BECAUSE in the expression and outside
+    -- parentheses is an error, at that BECAUSE, whatever follows it.
+    it "rejects a BECAUSE that a BREACH in the expression takes outside parentheses, at that BECAUSE" $
+      for_
+        [ "#ASSERT REFUSED BREACH BECAUSE \"not modelled\""
+        , "#ASSERT REFUSED IF TRUE THEN REFUSE \"wrong\" ELSE BREACH BECAUSE \"right\""
+        , "#ASSERT REFUSED IF TRUE THEN REFUSE \"wrong\" ELSE BREACH BECAUSE `a reason`"
+          -- parentheses that close before the BECAUSE leave it outside them
+        , "#ASSERT REFUSED IF (TRUE) THEN REFUSE \"wrong\" ELSE BREACH BECAUSE \"right\""
+        , "#ASSERT REFUSED (1 EQUALS 1) AND BREACH BECAUSE \"right\""
+          -- and a BECAUSE in the middle of the expression, with more after it
+        , "#ASSERT REFUSED IF FALSE THEN BREACH BECAUSE \"b\" ELSE REFUSE \"a\""
+        ] $ \directive -> do
+          let src = beside ["GIVETH A STRING", "`a reason` MEANS \"right\"", "", directive]
+          case checkWithImports emptyVFS src of
+            Left errs -> do
+              let msg = Text.unlines errs
+              msg `shouldSatisfy` Text.isInfixOf "This BECAUSE belongs to the BREACH before it"
+              caretColumn msg `shouldBe` Just (1 + Text.length (fst (Text.breakOn "BECAUSE" directive)))
+            Right _ -> expectationFailure ("parsed: " <> Text.unpack directive)
+
+    it "takes a BREACH and its BECAUSE in parentheses, and a BECAUSE after them as the directive's" $ do
+      outs <- outcomes
+        [ "#ASSERT REFUSED (IF TRUE THEN REFUSE \"wrong\" ELSE BREACH BECAUSE \"right\")"
+        , "#ASSERT REFUSED (IF TRUE THEN REFUSE \"wrong\" ELSE BREACH) BECAUSE \"right\""
+        ]
+      outs `shouldBe`
+        [ "assertion satisfied"
+        , "assertion failed: expected the refusal \"right\", got \"wrong\""
+        ]
+
+    -- The browser editor and the Inspector call 'l4Eval' and
+    -- 'l4EvalDirective'. A failed #ASSERT REFUSED is a false assertion there,
+    -- as a clean FALSE #ASSERT is, and one that holds is a true one.
+    it "is a false assertion to the editor's API when it fails, and a true one when it holds" $ do
+      let src = beside
+            [ "#ASSERT REFUSED 1"
+            , "#ASSERT REFUSED `not modelled` BECAUSE \"some other reason\""
+            , "#ASSERT REFUSED `not modelled`"
+            ]
+      out <- l4Eval src
+      -- one "success" for the whole call, and one for each result
+      Text.count "\"success\":false" out `shouldBe` 2
+      Text.count "\"success\":true" out `shouldBe` 2
+      for_ [4, 5] $ \line -> do
+        one <- l4EvalDirective src line 1 "assert"
+        one `shouldSatisfy` Text.isInfixOf "assertion failed: expected"
+        one `shouldSatisfy` Text.isInfixOf "\"success\":false"
+        one `shouldSatisfy` Text.isInfixOf "\"structuredValue\":false"
+      held <- l4EvalDirective src 6 1 "assert"
+      held `shouldSatisfy` Text.isInfixOf "\"success\":true"
+      held `shouldSatisfy` Text.isInfixOf "\"structuredValue\":true"
+
+    -- l4 batch and the REPL remove the IDE directives from a module, print
+    -- it and run it again. An #ASSERT REFUSED is one of those directives.
+    it "is removed with the other IDE directives from a module that is run again" $
+      case frontEnd (beside ["#ASSERT REFUSED `not modelled`", "#ASSERT REFUSED `not modelled` BECAUSE \"not modelled\""]) of
+        Left msg -> expectationFailure ("the module did not check:\n" <> Text.unpack msg)
+        Right r -> do
+          prettyLayout r.tcdModule `shouldSatisfy` Text.isInfixOf "#ASSERT REFUSED"
+          let filtered = prettyLayout (filterIdeDirectives r.tcdModule)
+          filtered `shouldNotSatisfy` Text.isInfixOf "#ASSERT"
+          filtered `shouldSatisfy` Text.isInfixOf "REFUSE \"not modelled\""
+
+    -- The editor's AND/OR lint reads the expression of an #ASSERT REFUSED as
+    -- it reads a plain #ASSERT's: an AND and an OR at one column, on lines of
+    -- their own, are warned about at the same places.
+    it "is read by the AND/OR lint as a plain #ASSERT is" $ do
+      let lintOf directive =
+            fmap (checkAndOrDepth . fst) $
+              execProgramParser (toNormalizedUri (Uri "file:///refuse-spec-lint")) (beside directive)
+          plain = lintOf ["#ASSERT `not modelled` EQUALS 1", "# AND TRUE", "# OR FALSE"]
+          refused = lintOf ["#ASSERT REFUSED `not modelled` EQUALS 1", "# AND TRUE", "# OR FALSE", "  BECAUSE \"not modelled\""]
+      fmap length plain `shouldBe` Right 2
+      refused `shouldBe` plain
 
   describe "readers of the program" $ do
     it "the exported document reads a refusal as one, with its reason" $

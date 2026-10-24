@@ -19,5 +19,6 @@ GIVETH A NUMBER
 GIVETH A BOOLEAN
 `is eligible` MEANS TRUE AND `this rule has not been written yet`
 
-#EVAL `the amount`
-#EVAL `is eligible`
+#ASSERT REFUSED `the amount`
+#ASSERT REFUSED `is eligible`
+#ASSERT REFUSED `the amount` BECAUSE "this rule has not been written yet"

@@ -25,13 +25,13 @@ GIVETH A NUMBER
       WHEN NOTHING THEN 0
       WHEN JUST n  THEN n
 
-#EVAL `consider over a refusing maybe`
+#ASSERT REFUSED `consider over a refusing maybe`
 
 -- Boolean connectives, in the order that forces the refusal.
-#EVAL (TRUE AND `not modelled (boolean)`)
-#EVAL (`not modelled (boolean)` AND FALSE)
-#EVAL (FALSE OR `not modelled (boolean)`)
-#EVAL (NOT `not modelled (boolean)`)
+#ASSERT REFUSED (TRUE AND `not modelled (boolean)`)
+#ASSERT REFUSED (`not modelled (boolean)` AND FALSE)
+#ASSERT REFUSED (FALSE OR `not modelled (boolean)`)
+#ASSERT REFUSED (NOT `not modelled (boolean)`)
 
 -- ...and the order that does not. These are ordinary verdicts, and pinning
 -- them here is what makes the order-dependence a stated property rather
@@ -45,7 +45,7 @@ GIVETH A NUMBER
     LET x MEANS `not modelled (number)`
     IN x PLUS 1
 
-#EVAL `let over a refusal`
+#ASSERT REFUSED `let over a refusal`
 
 GIVETH A NUMBER
 `where over a refusal` MEANS
@@ -53,9 +53,10 @@ GIVETH A NUMBER
     WHERE
         y MEANS `not modelled (number)`
 
-#EVAL `where over a refusal`
+#ASSERT REFUSED `where over a refusal`
 
--- An #ASSERT that refuses is not decided, in either polarity: it reports the
--- refusal, never "assertion satisfied" and never "assertion failed".
+-- A plain #ASSERT that refuses is not decided, in either polarity: it reports
+-- "assertion refused" and the reason, never "assertion satisfied" and never
+-- "assertion failed".
 #ASSERT `not modelled (boolean)`
 #ASSERT NOT `not modelled (boolean)`

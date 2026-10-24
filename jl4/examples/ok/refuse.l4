@@ -21,13 +21,19 @@ GIVETH A NUMBER
 -- Inside the encoded range the decision answers normally.
 #ASSERT `the fee in year` 2001 EQUALS 100
 
--- Outside it, the decision REFUSES, and #EVAL says so, with the reason.
-#EVAL `the fee in year` 1999
+-- Outside it, the decision REFUSES. Both spellings of the directive hold.
+#ASSERT REFUSED `the fee in year` 1999
+#ASSERT REFUSED `the fee in year` 1999 BECAUSE "this schedule is not encoded for years before 2000"
 
--- Negation cannot turn a refusal into a verdict: NOT forces its operand, so
--- the comparison refuses whichever way round it is written.
-#EVAL `the fee in year` 1999 EQUALS 100
-#EVAL NOT (`the fee in year` 1999 EQUALS 100)
+-- A plain #ASSERT over a refusing expression reports "refused", in BOTH
+-- polarities: NOT forces its operand, so negation cannot turn a refusal into
+-- a verdict.
+#ASSERT `the fee in year` 1999 EQUALS 100
+#ASSERT NOT (`the fee in year` 1999 EQUALS 100)
 
 -- A refusal written in place, with no name, reads the same way.
 #EVAL REFUSE "a reason written in place"
+
+-- The BECAUSE may start a line of its own, indented further than the #ASSERT.
+#ASSERT REFUSED `the fee in year` 1999
+  BECAUSE "this schedule is not encoded for years before 2000"

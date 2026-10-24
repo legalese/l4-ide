@@ -1,0 +1,20 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: assert-refused-breach-because.l4
+  Hidden: no
+  Range: 9:57-9:57
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+      |
+    9 | #ASSERT REFUSED IF TRUE THEN REFUSE "wrong" ELSE BREACH BECAUSE "right"
+      |                                                         ^
+    This BECAUSE belongs to the BREACH before it, and not to the #ASSERT REFUSED.
+    Inside an #ASSERT REFUSED, write a BREACH that has a BECAUSE in parentheses:
+
+      #ASSERT REFUSED (... BREACH BECAUSE "...")
+
+    To name the reason the refusal must give, put the expression in parentheses, and the BECAUSE after them:
+
+      #ASSERT REFUSED (... BREACH) BECAUSE "..."
+

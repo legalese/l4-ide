@@ -25,6 +25,7 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
 import Control.Exception (bracket, finally, try)
 import System.Timeout (timeout)
+import Data.Char (isSpace)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
@@ -779,6 +780,170 @@ spec = describe "integration" do
         statusCode' single `shouldBe` 422
         wireAt single ["contents", "tag"] `shouldBe` Right (Aeson.String "InterpreterError")
         wireAt single ["contents", "contents"] `shouldBe` Right (Aeson.String refusal)
+
+  -- The wrapper path evaluates a module with its directives taken out line by
+  -- line, and a directive's lines end at the first line that is neither blank
+  -- nor indented further than the directive. A BECAUSE of an #ASSERT REFUSED
+  -- on a line of its own is indented further (the parser rejects one that is
+  -- not), so it is taken out with its directive, and the function answers on
+  -- both paths. Both measure indentation in columns, a tab reaching the next
+  -- multiple of eight, so they agree on a line indented by a tab as well.
+  -- A {} for a MAYBE input takes the wrapper, and a null stays direct.
+  describe "a module whose #ASSERT REFUSED has its BECAUSE on a line of its own" do
+    it "answers on the direct path and on the wrapper path" do
+      let src = Text.unlines
+            [ "GIVETH A NUMBER"
+            , "`not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "@export default the fee"
+            , "GIVEN y IS A NUMBER"
+            , "      pad IS A MAYBE NUMBER"
+            , "GIVETH A NUMBER"
+            , "fee y pad MEANS"
+            , "    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "#ASSERT REFUSED fee 1999 NOTHING"
+            , "  BECAUSE \"not modelled\""
+            , ""
+            , "#ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "because-line" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "because-line" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    it "answers on both paths in a section, for a BECAUSE indented by a tab and by spaces" do
+      let src = Text.unlines
+            [ "§ `Fees`"
+            , "    GIVETH A NUMBER"
+            , "    `not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "    @export default the fee"
+            , "    GIVEN y IS A NUMBER"
+            , "          pad IS A MAYBE NUMBER"
+            , "    GIVETH A NUMBER"
+            , "    fee y pad MEANS"
+            , "        IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "    #ASSERT REFUSED fee 1999 NOTHING"
+            , "\tBECAUSE \"not modelled\""
+            , ""
+            , "    #ASSERT REFUSED fee 1999 NOTHING"
+            , "      BECAUSE \"not modelled\""
+            , ""
+            , "    #ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "because-tab" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "because-tab" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    -- A line the filter keeps must not be read as a directive's continuation
+    -- either. Here the section's items stand at column 9, eight spaces in or
+    -- two spaces and a tab in, which the parser reads as the same column; the
+    -- function after the #ASSERT REFUSED is indented the second way, and the
+    -- filter keeps it, so the wrapper path finds the function.
+    it "answers on both paths in a section whose items are indented by spaces, and by spaces and a tab" do
+      let src = Text.unlines
+            [ "§ `Fees`"
+            , "        GIVETH A NUMBER"
+            , "        `not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "        #ASSERT REFUSED `not modelled` BECAUSE \"not modelled\""
+            , ""
+            , "  \t@export default the fee"
+            , "  \tGIVEN y IS A NUMBER"
+            , "  \t      pad IS A MAYBE NUMBER"
+            , "  \tGIVETH A NUMBER"
+            , "  \tfee y pad MEANS"
+            , "  \t    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "  \t#ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "items-tab" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "items-tab" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    -- The lexer takes every character that Data.Char.isSpace accepts as
+    -- whitespace, and a line of whitespace alone carries no token. So a
+    -- BECAUSE indented by two of any of them is indented further than the
+    -- #ASSERT, and the "\r" that is all a blank line of a CRLF file holds
+    -- makes a blank line; the filter reads both so, and both paths answer.
+    -- At the margin a "\r" line is indented further than the #ASSERT as
+    -- well, so the CRLF case runs in a section too, where only its being
+    -- blank keeps it in the directive, and so does a line of each other
+    -- whitespace character alone. A section indented by one tab, with a
+    -- BECAUSE indented by two, asks that a tab after a tab count to the next
+    -- multiple of eight as well.
+    let (feeHead, feeTail) =
+          ( [ "GIVETH A NUMBER"
+            , "`not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "@export default the fee"
+            , "GIVEN y IS A NUMBER"
+            , "      pad IS A MAYBE NUMBER"
+            , "GIVETH A NUMBER"
+            , "fee y pad MEANS"
+            , "    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "#ASSERT REFUSED fee 1999 NOTHING"
+            ]
+          , [ ""
+            , "#ASSERT fee 2001 NOTHING EQUALS 100"
+            ] )
+        feeModule becauseLines = feeHead <> becauseLines <> feeTail
+        -- the same module as a section whose items are indented by
+        -- @indent@; the BECAUSE lines are given as they stand
+        sectionFeeModule indent becauseLines =
+          let indented l = if Text.null l then l else indent <> l
+          in "§ `Fees`" : map indented feeHead <> becauseLines <> map indented feeTail
+        -- the direct path's outcome, then the wrapper path's
+        bothPaths deployId src = withServiceFromSources deployId [("fee.l4", src)] \baseUrl mgr ->
+          forM [Aeson.Null, Aeson.object []] \pad -> do
+            resp <- evalFunction baseUrl mgr deployId "fee"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+            pure (statusCode' resp, wireAt resp ["contents", "result", "value"])
+        answersOnBoth = replicate 2 (200, Right (Aeson.Number 100))
+
+    it "answers on both paths for a BECAUSE indented by two of any whitespace character but a newline" do
+      let whitespace = [ c | c <- [minBound .. maxBound], isSpace c, c /= '\n' ]
+      whitespace `shouldSatisfy` \cs -> all (`elem` cs) ("\t\v\f\r \x00A0\x2003\x3000" :: String)
+      outcomes <- forM whitespace \c ->
+        (,) c <$> bothPaths ("because-ws-" <> Text.pack (show (fromEnum c)))
+          (Text.unlines (feeModule [Text.pack [c, c] <> "BECAUSE \"not modelled\""]))
+      [ (c, outcome) | (c, outcome) <- outcomes, outcome /= answersOnBoth ] `shouldBe` []
+
+    it "answers on both paths for a BECAUSE after a blank line, in a file whose lines end in CRLF" do
+      outcome <- bothPaths "because-crlf"
+        (Text.concat [ l <> "\r\n" | l <- feeModule ["", "  BECAUSE \"not modelled\""] ])
+      outcome `shouldBe` answersOnBoth
+
+    it "answers on both paths in a section, for a BECAUSE after a blank line, in a file whose lines end in CRLF" do
+      outcome <- bothPaths "because-crlf-section"
+        (Text.concat [ l <> "\r\n" | l <- sectionFeeModule "    " ["", "      BECAUSE \"not modelled\""] ])
+      outcome `shouldBe` answersOnBoth
+
+    it "answers on both paths in a section, for a BECAUSE after a line of any one whitespace character but a newline" do
+      let whitespace = [ c | c <- [minBound .. maxBound], isSpace c, c /= '\n' ]
+      outcomes <- forM whitespace \c ->
+        (,) c <$> bothPaths ("blank-ws-" <> Text.pack (show (fromEnum c)))
+          (Text.unlines (sectionFeeModule "    " [Text.singleton c, "      BECAUSE \"not modelled\""]))
+      [ (c, outcome) | (c, outcome) <- outcomes, outcome /= answersOnBoth ] `shouldBe` []
+
+    it "answers on both paths in a section indented by a tab, for a BECAUSE indented by two" do
+      outcome <- bothPaths "because-tabs-section"
+        (Text.unlines (sectionFeeModule "\t" ["\t\tBECAUSE \"not modelled\""]))
+      outcome `shouldBe` answersOnBoth
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do

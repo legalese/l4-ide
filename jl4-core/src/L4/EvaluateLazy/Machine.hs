@@ -33,6 +33,7 @@ module L4.EvaluateLazy.Machine
 , matchPattern
 , backward
 , EvalDirective (..)
+, AssertKind (..)
 , evalModule
 , initialEnvironment
 , evalRef
@@ -2345,13 +2346,13 @@ evalDirective env (LazyEval ann expr) = do
   let shouldTrace = case tracePolicy.evalDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace False expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace NotAnAssert expr env]
 evalDirective env (LazyEvalTrace ann expr) = do
   tracePolicy <- getTracePolicy
   let shouldTrace = case tracePolicy.evaltraceDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace False expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace NotAnAssert expr env]
 evalDirective _env (Check _ann _expr) =
   pure []
 evalDirective env (Contract ann expr t evs) =
@@ -2361,7 +2362,29 @@ evalDirective env (Assert ann expr) = do
   let shouldTrace = case tracePolicy.evalDirectiveTrace of
         TracePolicy.NoTrace -> False
         TracePolicy.CollectTrace _ -> True
-  pure [MkEvalDirective (rangeOf ann) shouldTrace True expr env]
+  pure [MkEvalDirective (rangeOf ann) shouldTrace AssertHolds expr env]
+evalDirective env (AssertRefused ann expr mmsg) = do
+  tracePolicy <- getTracePolicy
+  let shouldTrace = case tracePolicy.evalDirectiveTrace of
+        TracePolicy.NoTrace -> False
+        TracePolicy.CollectTrace _ -> True
+  -- The BECAUSE message is a literal, so the comparison the directive asks for
+  -- is decided statically here rather than evaluated.
+  --
+  -- 'Nothing' here means "the directive imposes no constraint on the reason",
+  -- so it MUST be unreachable for a reason the author wrote: a reason we
+  -- cannot read, or one that never reaches the directive, would otherwise
+  -- become an assertion that holds for every refusal reason. Three upstream
+  -- checks make it so -- 'Parser.directive' accepts only a 'lit' after
+  -- BECAUSE, 'Parser.assertRefusedSubject' rejects a BECAUSE that a BREACH in
+  -- the expression would take as its own, and 'TypeCheck.inferDirective'
+  -- requires the literal to be a STRING -- which leaves the wildcard reachable
+  -- only for a module that never type-checked. If you widen any of those,
+  -- decide what an unreadable reason means before you land it.
+  let wanted = case mmsg of
+        Just (Lit _ (StringLit _ t)) -> Just t
+        _                            -> Nothing
+  pure [MkEvalDirective (rangeOf ann) shouldTrace (AssertRefuses wanted) expr env]
 
 contractToEvalDirective :: Expr Resolved -> Expr Resolved -> [Expr Resolved] -> Machine (Expr Resolved)
 contractToEvalDirective contract t evs = do
@@ -2517,11 +2540,25 @@ eventCVal = ValUnappliedConstructor TypeCheck.eventCRef
 emptyEnvironment :: Environment
 emptyEnvironment = Map.empty
 
+-- | What kind of assertion (if any) a directive is.
+--
+-- A sum rather than a Boolean, so that every consumer decides what
+-- @#ASSERT REFUSED@ means rather than inheriting the plain assertion's answer.
+data AssertKind
+  = NotAnAssert
+    -- ^ @#EVAL@ \/ @#EVALTRACE@ \/ @#TRACE@: reduce and report the value.
+  | AssertHolds
+    -- ^ @#ASSERT e@: @e@ must evaluate to TRUE.
+  | AssertRefuses !(Maybe Text)
+    -- ^ @#ASSERT REFUSED e [BECAUSE m]@: @e@ must refuse, and when @m@ is
+    -- present the refusal's reason must equal it.
+  deriving stock (Generic, Show)
+
 data EvalDirective =
   MkEvalDirective
     { range    :: Maybe SrcRange -- ^ of the (L)EVAL directive
     , trace    :: !Bool -- ^ whether a trace is wanted
-    , isAssert :: !Bool -- ^ whether it is to be treated as an assertion
+    , assertKind :: !AssertKind -- ^ whether, and how, it is to be treated as an assertion
     , expr     :: !(Expr Resolved) -- ^ expression to evaluate
     , env      :: !Environment -- ^ environment to evaluate the expression in
     }

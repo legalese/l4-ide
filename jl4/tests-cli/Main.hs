@@ -13,7 +13,7 @@ module Main where
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (IOException, finally, throwIO, try)
-import Control.Monad (forM_, unless, void, when)
+import Control.Monad (forM, forM_, unless, void, when)
 import qualified Data.Char as Char
 import Data.Foldable (toList)
 import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
@@ -1212,27 +1212,267 @@ spec bin = do
         expectMiddleLostInJson bin fixture messages
 
   -- A REFUSE that a directive reaches stops that directive, which reports the
-  -- refusal and its reason as a diagnostic of Error severity, and the run
-  -- fails.
+  -- refusal and its reason. A refusal is an answer the program gives, not a
+  -- failure of the run, so the run exits 0, as it does for a failed #ASSERT;
+  -- an #ASSERT that RAISES still exits 1, and the two must not be conflated.
   describe "l4 run on a directive that refuses" $ do
     let refuseEvalFixture = fixtureDir </> "refuse-eval.l4"
         refuseAssertFixture = fixtureDir </> "refuse-assert.l4"
+        refuseRunFixture = fixtureDir </> "refuse-run.l4"
 
-    it "reports an #EVAL that refuses with its reason, at Error severity, and exits 1" $ do
-      Output code sout serr <- runL4 bin ["run", refuseEvalFixture]
-      code `shouldBe` ExitFailure 1
+    it "reports an #EVAL that refuses with its reason, and exits 0" $ do
+      Output code sout _ <- runL4 bin ["run", refuseEvalFixture]
+      code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("The model refuses to answer:" `isInfixOf`)
       sout `shouldSatisfy` ("not modelled" `isInfixOf`)
-      serr `shouldSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+      sout `shouldNotSatisfy` ("evaluation exception" `isInfixOf`)
 
-    it "reports an #ASSERT that refuses as unevaluable in either polarity, with the refusal, and exits 1" $ do
-      Output code sout serr <- runL4 bin ["run", refuseAssertFixture]
-      code `shouldBe` ExitFailure 1
-      T.count "assertion could not be evaluated:" (T.pack sout) `shouldBe` 2
+    it "reports an #ASSERT that refuses as refused in either polarity, with the refusal, and exits 0" $ do
+      Output code sout _ <- runL4 bin ["run", refuseAssertFixture]
+      code `shouldBe` ExitSuccess
+      T.count "assertion refused:" (T.pack sout) `shouldBe` 2
       T.count "The model refuses to answer:" (T.pack sout) `shouldBe` 2
       sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
       sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
-      serr `shouldSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+    -- --json gives a refusing #EVAL its own kind, and a refused #ASSERT its
+    -- reason under "refused" rather than "error". A consumer that reads every
+    -- non-boolean assertion out of "error" would otherwise report a designed
+    -- outcome as a defect.
+    it "emits kind \"refused\" for a refusing #EVAL and a refused field for a refused #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> case foldr (:) [] v of
+          [ev, assertRefused, assertPlain] -> do
+            objField ev "kind"   `shouldBe` Just (String "refused")
+            objField ev "value"  `shouldBe` Just Null
+            objField ev "reason" `shouldBe` Just (String "this case is not modelled")
+            -- #ASSERT REFUSED holds: it is an ordinary satisfied assertion.
+            objField assertRefused "kind"  `shouldBe` Just (String "assertion")
+            objField assertRefused "value" `shouldBe` Just (Bool True)
+            -- A PLAIN #ASSERT whose expression refuses is neither true nor
+            -- false, and its reason is NOT under "error".
+            objField assertPlain "kind"  `shouldBe` Just (String "assertion")
+            objField assertPlain "value" `shouldBe` Just Null
+            objField assertPlain "error" `shouldBe` Nothing
+            case objField assertPlain "refused" of
+              Just r  -> objField r "reason" `shouldBe` Just (String "this case is not modelled")
+              other   -> expectationFailure ("Expected a refused object, got " ++ show other)
+          other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- #ASSERT REFUSED has three ways to come out other than satisfied, and
+    -- --json keeps them apart: an answer where a refusal was expected, and a
+    -- refusal for a different reason, are both a false assertion that says
+    -- why; an expression that raises is an assertion that could not be decided.
+    it "reports a failed #ASSERT REFUSED as false with its reason, and a raising one as undecided" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-refused-outcomes.l4", "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case foldr (:) [] v of
+          [answered, wrongReason, raised] -> do
+            objField answered "kind"  `shouldBe` Just (String "assertion")
+            objField answered "value" `shouldBe` Just (Bool False)
+            objField answered "error" `shouldBe`
+              Just (String "assertion failed: expected a refusal, but the expression produced a value")
+            objField wrongReason "kind"  `shouldBe` Just (String "assertion")
+            objField wrongReason "value" `shouldBe` Just (Bool False)
+            objField wrongReason "error" `shouldBe`
+              Just (String "assertion failed: expected the refusal \"some other reason\", got \"this case is not modelled\"")
+            objField raised "kind"  `shouldBe` Just (String "assertion")
+            objField raised "value" `shouldBe` Just Null
+            case objField raised "error" of
+              Just (String t) -> t `shouldSatisfy` T.isPrefixOf "assertion could not be evaluated:"
+              other           -> expectationFailure ("Expected an error text, got " ++ show other)
+          other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The editor's squiggles come from these diagnostics: a failed #ASSERT
+    -- REFUSED is an Error that says what failed, as a clean FALSE #ASSERT is.
+    it "publishes a failed #ASSERT REFUSED as an Error diagnostic that says why" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-refused-fails.l4", "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s | String s <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("expected a refusal, but the expression produced a value" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("expected the refusal \"some other reason\"" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+    -- A failed #ASSERT REFUSED is a verdict, as a clean FALSE #ASSERT is.
+    it "leaves a failed #ASSERT REFUSED at exit 0, with what failed and why" $ do
+      Output code sout _ <- runL4 bin ["run", fixtureDir </> "assert-refused-fails.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("assertion failed: expected a refusal, but the expression produced a value" `isInfixOf`)
+      sout `shouldSatisfy`
+        ("assertion failed: expected the refusal \"some other reason\", got \"this case is not modelled\"" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+  -- A refusing batch row has status "refused" and carries the reason under
+  -- its result. Unlike an erroring row it does NOT stop the batch (the row
+  -- after it is still processed, with no -c) and does not make the command
+  -- fail.
+  describe "l4 batch on a row that refuses" $
+    it "gives a refusing batch row the status refused, its reason under its result, and still processes the next row" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", fixtureDir </> "refuse-batch.l4", "--inputs", fixtureDir </> "refuse-batch.json"]
+      code `shouldBe` ExitSuccess
+      case filter (not . null) (lines sout) of
+        [refusedRow, answeredRow] -> do
+          refusedRow `shouldSatisfy` ("\"status\":\"refused\"" `isInfixOf`)
+          refusedRow `shouldSatisfy`
+            ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
+          -- the reason is also in the diagnostics, as an erroring row's message is
+          refusedRow `shouldSatisfy`
+            ("\"diagnostics\":[\"The model refuses to answer:\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"diagnostics\":[]" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"result\":100" `isInfixOf`)
+          -- the module's #ASSERT REFUSED directives are not run with a row
+          forM_ [refusedRow, answeredRow] $ \row ->
+            case eitherDecode (BSL8.pack row) :: Either String Value of
+              Right v | Just (Array outs) <- objField v "output" -> length outs `shouldBe` 1
+              other -> expectationFailure ("Expected a row with a list of outputs, got " ++ show other)
+        other -> expectationFailure ("Expected 2 rows, got " ++ show (length other))
+
+  -- The REPL says a refusal is one, with its reason, where it would say
+  -- "Error:" for an evaluation that raised: for an expression, for the same
+  -- expression traced, and for an #ASSERT. Its fixture carries an
+  -- #ASSERT REFUSED, which the REPL removes before it answers, so each exact
+  -- reply below is the query's alone.
+  describe "the REPL on an expression that refuses" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let refuseFile = fixtureDir </> "refuse-eval.l4"
+        -- one reply per query, loading the file first, in a directory of its own
+        -- because the REPL keeps a history file in the one it is in
+        replReplies repl queries = withSystemTempDirectory "l4-repl-refuse" \work ->
+          replRepliesIn work repl queries
+        replRepliesIn work repl queries = do
+          absFile <- makeAbsolute refuseFile
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          hPutStr hin (unlines (queries <> [":quit"]))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        withRepl act = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> act repl
+
+    it "answers Refused: and the reason, for an expression and an #ASSERT, plain and traced" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ "`not modelled` PLUS 1"
+        , ":traceascii `not modelled` PLUS 1"
+        , "#ASSERT `not modelled` EQUALS 1"
+        , ":traceascii #ASSERT `not modelled` EQUALS 1"
+        ]
+      case replies of
+        [plain, traced, asserted, tracedAsserted] -> do
+          plain `shouldBe` "Refused: not modelled"
+          traced `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          asserted `shouldBe` "Refused: not modelled"
+          tracedAsserted `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          forM_ replies $ \reply -> reply `shouldNotSatisfy` T.isInfixOf "Error"
+        other -> expectationFailure ("Expected 4 replies, got " ++ show other)
+
+    -- A reason that runs over several lines stands each later line under its
+    -- first, for an expression and an #ASSERT, plain and traced.
+    it "stands every line of a reason over several lines under the first" $ withRepl \repl -> do
+      let refusal = "REFUSE \"line one\\nline two\"" :: String
+      replies <- replReplies repl
+        [ refusal
+        , ":traceascii " <> refusal
+        , "#ASSERT " <> refusal
+        , ":traceascii #ASSERT " <> refusal
+        ]
+      -- the first two lines of each reply; :traceascii adds the trace below them
+      map (take 2 . T.lines) replies `shouldBe`
+        replicate 4 ["Refused: line one", "         line two"]
+
+    it "lists #ASSERT REFUSED in its :help" $ withRepl \repl -> do
+      replies <- replReplies repl [":help"]
+      map (T.isInfixOf "#ASSERT REFUSED <expr> [BECAUSE \"reason\"]") replies `shouldBe` [True]
+
+    -- A failed #ASSERT REFUSED is a false assertion that says why, plain and
+    -- under :traceascii, for an answer and for a refusal with another reason.
+    it "answers False and says why, for a failed #ASSERT REFUSED" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ "#ASSERT REFUSED 1"
+        , ":traceascii #ASSERT REFUSED 1"
+        , "#ASSERT REFUSED `not modelled` BECAUSE \"some other reason\""
+        ]
+      -- the first line of each reply; :traceascii adds the trace below it
+      map (T.takeWhile (/= '\n')) replies `shouldBe`
+        [ "False (assertion failed: expected a refusal, but the expression produced a value)"
+        , "Result: False (assertion failed: expected a refusal, but the expression produced a value)"
+        , "False (assertion failed: expected the refusal \"some other reason\", got \"not modelled\")"
+        ]
+
+    -- The root of a trace carries the directive's outcome, so a refusal met
+    -- only while the answer is read in full, below its head, is at the root,
+    -- in the text trace and in the graph, for an expression and for an
+    -- #ASSERT REFUSED that it satisfies.
+    it "puts a refusal met below the answer's head at the root of the trace" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ ":traceascii JUST `not modelled`"
+        , ":trace JUST `not modelled`"
+        , ":traceascii #ASSERT REFUSED JUST `not modelled`"
+        ]
+      case replies of
+        [ascii, dot, asserted] -> do
+          ascii `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          last (T.lines ascii) `shouldSatisfy` T.isSuffixOf "↯ refused: not modelled"
+          asserted `shouldSatisfy` T.isPrefixOf "Result: True (assertion passed)\n"
+          last (T.lines asserted) `shouldSatisfy` T.isSuffixOf "↯ refused: not modelled"
+          let root = fst (T.breakOn "style=filled" (snd (T.breakOn "0 [label=" dot)))
+          root `shouldSatisfy` T.isInfixOf "↯ refused: not modelled"
+          root `shouldSatisfy` T.isInfixOf "#ffcccc"
+        other -> expectationFailure ("Expected 3 replies, got " ++ show other)
+
+    -- A trace saved with :tracefile names its result in its header: a
+    -- refusal as one, not as an error, for an expression and for an #ASSERT,
+    -- and a failed #ASSERT REFUSED as a false assertion that says why.
+    it "names a refusal as one in the header of a trace saved with :tracefile" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-refuse" \work -> do
+        replies <- replRepliesIn work repl
+          [ ":tracefile " <> (work </> "trace")
+          , ":trace `not modelled` PLUS 1"
+          , ":trace #ASSERT `not modelled` EQUALS 1"
+          , ":trace #ASSERT REFUSED 1"
+          ]
+        length replies `shouldBe` 4
+        headers <- forM ["trace-01.dot", "trace-02.dot", "trace-03.dot"] \name -> do
+          saved <- TE.decodeUtf8Lenient <$> BS.readFile (work </> name)
+          pure [ l | l <- T.lines saved, "// Result: " `T.isPrefixOf` l ]
+        case headers of
+          [[expr], [asserted], [failed]] -> do
+            forM_ [expr, asserted] \resultLine -> do
+              resultLine `shouldSatisfy` T.isPrefixOf "// Result: Refused"
+              resultLine `shouldSatisfy` T.isInfixOf "not modelled"
+              resultLine `shouldNotSatisfy` T.isInfixOf "Error"
+            failed `shouldBe`
+              "// Result: False (assertion failed: expected a refusal, but the expression produced a value)"
+          other -> expectationFailure ("Expected one Result line in each of three traces, got " ++ show other)
 
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
@@ -1794,6 +2034,36 @@ spec bin = do
       -- it just produces no output but still exits 0.
       Output code _ _ <- runL4 bin ["trace", evalFixture]
       code `shouldBe` ExitSuccess
+
+    -- The graph says a refusal is one, with its reason, as the text trace
+    -- does, and does not label it as an error.
+    it "labels a refusal in the DOT graph with its reason, not as an error" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `isInfixOf`)
+      sout `shouldSatisfy` ("↯ refused: not modelled" `isInfixOf`)
+      sout `shouldNotSatisfy` ("<error>" `isInfixOf`)
+
+    -- The root of each graph carries the directive's outcome. A refusal met
+    -- only while the answer is read in full, below its head (inside a JUST,
+    -- or at the end of a list), is the directive's outcome, so the root is
+    -- labelled and filled as a refusal, and not as the answer's head.
+    it "labels and fills the root as a refusal when it is met below the answer's head" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace-deep.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      let roots = [ fst (T.breakOn "style=filled" (snd (T.breakOn "0 [label=" g)))
+                  | g <- drop 1 (T.splitOn "digraph {" (T.pack sout)) ]
+      length roots `shouldBe` 2
+      forM_ roots $ \root -> do
+        root `shouldSatisfy` T.isInfixOf "↯ refused: not modelled"
+        root `shouldSatisfy` T.isInfixOf "#ffcccc"
+
+    -- A reason is printed whole in the graph, every line of it, as it is in
+    -- the text form of the trace.
+    it "labels a refusal with every line of its reason" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace-lines.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("↯ refused: not modelled\\nfor this year" `isInfixOf`)
 
   describe "l4 state-graph" $ do
     it "fails on a file without regulative rules" $ do

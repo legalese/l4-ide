@@ -215,6 +215,7 @@ data TKeywords
   | TKShant
   | TKBreach
   | TKRefuse
+  | TKRefused
   | TKBecause
   | TKProvided
   | TKWithin
@@ -300,6 +301,7 @@ keywords = Map.fromList
   , ("SHANT"      , TKShant      )
   , ("BREACH"     , TKBreach     )
   , ("REFUSE"     , TKRefuse     )
+  , ("REFUSED"    , TKRefused    )
   , ("BECAUSE"    , TKBecause    )
   , ("PROVIDED"   , TKProvided   )
   , ("WITHIN"     , TKWithin     )

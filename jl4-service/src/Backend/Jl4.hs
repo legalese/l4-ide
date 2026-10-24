@@ -31,6 +31,7 @@ import Optics ((^.), (%))
 
 import Language.LSP.Protocol.Types (Diagnostic (..), DiagnosticSeverity (..), normalizedFilePathToUri, toNormalizedFilePath)
 import System.FilePath ((<.>), takeExtension, takeFileName)
+import Data.Char (isSpace)
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -805,8 +806,9 @@ handleEvalResultDirect
   -> ExceptT EvaluatorError IO ResponseWithReason
 handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule = case result of
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
-  Eval.Reduction (Left evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
-  Eval.Reduction (Right val) -> do
+  Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
+  Eval.Reduction (Eval.ReducedRefused r) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyRefusal r)
+  Eval.Reduction (Eval.Reduced val) -> do
     r <- nfToFnLiteral ei val
     pure $ ResponseWithReason
       { fnResult = Map.singleton "value" r
@@ -933,12 +935,19 @@ filterIdeDirectivesText = Text.unlines . filterLines . Text.lines
       | lineIndentation line > baseIndent = True  -- More indented = continuation
       | otherwise = False
 
-    -- Get the indentation (number of leading spaces/tabs) of a line
+    -- The width of a line's indentation, in columns, counted as the lexer and
+    -- the parser count them. Whitespace is every character 'isSpace' accepts,
+    -- as it is to the lexer: a non-breaking space and a form feed are
+    -- whitespace, and so a line that holds nothing else, the "\r" of a blank
+    -- line in a CRLF file among them, is blank. A tab brings the width to the
+    -- next multiple of eight, and every other whitespace character adds one
+    -- column. So this filter and the parser agree on whether a line is
+    -- indented further than a directive.
     lineIndentation :: Text -> Int
-    lineIndentation = Text.length . Text.takeWhile isSpace
-
-    isSpace :: Char -> Bool
-    isSpace c = c == ' ' || c == '\t'
+    lineIndentation = Text.foldl' advance 0 . Text.takeWhile isSpace
+      where
+        advance width '\t' = width + 8 - width `mod` 8
+        advance width _    = width + 1
 
 -- | Convert FnLiteral parameters to Aeson.Value
 -- Missing parameters (Nothing) become FnUnknown -> Aeson.Null for partial evaluation
@@ -977,7 +986,8 @@ fnLiteralToJson = \case
 -- 'FnUnknown' at the top level is now @NOTHING@ or @JUST NOTHING@, which are
 -- answers: refusing it here would refuse on this path an answer the direct
 -- path gives. "Could not compute" does not arrive as @null@ on either path:
--- an evaluation that fails is a @Reduction (Left _)@ and is refused. Nor can
+-- an evaluation that raises or refuses is a 'Eval.ReducedErrored' or a
+-- 'Eval.ReducedRefused' reduction, and is answered with an error. Nor can
 -- the top-level value be the evaluator's 'Eval.Omitted' truncation marker:
 -- 'Eval.nf' starts at depth 'maximumStackSize' (200) and marks 'Eval.Omitted'
 -- only below depth 0, so the direct path's answer is read at depth 200 and
@@ -997,8 +1007,8 @@ handleEvalResult
   -> ExceptT EvaluatorError IO ResponseWithReason
 handleEvalResult ei result trace fnName genCode params traceLevel includeGraphViz mModule = do
   answer <- case (genCode.answerShape, result) of
-    (WrappedInJust, Eval.Reduction (Right envelope)) ->
-      Eval.Reduction . Right <$> openEnvelope envelope
+    (WrappedInJust, Eval.Reduction (Eval.Reduced envelope)) ->
+      Eval.Reduction . Eval.Reduced <$> openEnvelope envelope
     _ -> pure result
   handleEvalResultDirect ei answer trace traceLevel includeGraphViz mModule
   where

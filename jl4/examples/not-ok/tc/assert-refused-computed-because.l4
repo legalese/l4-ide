@@ -1,0 +1,18 @@
+-- The BECAUSE payload of `#ASSERT REFUSED` is a LITERAL, not an expression --
+-- exactly as REFUSE's own message is (see `refuse-computed-message.l4`). The
+-- grammar admits only a literal there, so a computed message is a PARSE error.
+--
+-- That is deliberate, and it is not merely a simplification. The directive
+-- exists to PIN a refusal's reason, and the comparison is decided statically,
+-- without evaluating the payload. A payload the evaluator could not read
+-- statically would degrade to "this directive constrains nothing" -- an
+-- assertion that reports `satisfied` for ANY refusal reason, which is the one
+-- outcome a message-pinning directive must never produce.
+
+GIVETH A NUMBER
+`nope` MEANS REFUSE "the real reason"
+
+GIVETH A STRING
+`wrong reason` MEANS "a totally different reason"
+
+#ASSERT REFUSED `nope` BECAUSE `wrong reason`
