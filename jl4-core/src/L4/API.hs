@@ -57,7 +57,7 @@ import L4.FindDefinition (findDefinition)
 import L4.FindReferences (findReferences)
 
 -- Import resolution (VFS + embedded libs)
-import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult(..), ResolvedImport(..))
+import L4.API.VirtualFS (checkWithImports, checkWithImportsLocated, emptyVFS, TypeCheckWithDepsResult(..), ResolvedImport(..))
 import qualified L4.Evaluate.ValueLazy as ValLazy
 
 
@@ -92,10 +92,10 @@ import GHC.Wasm.Prim (JSString(..), fromJSString, toJSString)
 l4Check :: Text -> Text
 l4Check source =
   -- Use checkWithImports for full import resolution support
-  case checkWithImports emptyVFS source of
-    Left errors ->
+  case checkWithImportsLocated emptyVFS source of
+    Left (mRange, errors) ->
       -- Import/parse errors
-      encodeJson $ Vector.fromList $ map importErrorToDiagnostic errors
+      encodeJson $ Vector.fromList $ map (importErrorToDiagnostic mRange) errors
     Right result ->
       -- Type check errors (if any), and the parser's annotation warnings, which
       -- the language server reports too: without them a wording that L4 reads
@@ -226,12 +226,12 @@ l4SemanticTokens source =
 -- If there are parse or type errors, returns diagnostics instead.
 l4Eval :: Text -> IO Text
 l4Eval source =
-  case checkWithImports emptyVFS source of
-    Left errors ->
+  case checkWithImportsLocated emptyVFS source of
+    Left (mRange, errors) ->
       -- Return import/parse errors as diagnostics
       pure $ encodeJson $ Aeson.object
         [ "success" .= False
-        , "diagnostics" .= Vector.fromList (map importErrorToDiagnostic errors)
+        , "diagnostics" .= Vector.fromList (map (importErrorToDiagnostic mRange) errors)
         ]
     Right result ->
       -- Only fail on actual errors: SInfo items (e.g. #CHECK type annotations)
@@ -436,11 +436,12 @@ js_l4_references source line col = pure $ toJSString $ Text.unpack $
 encodeJson :: Aeson.ToJSON a => a -> Text
 encodeJson = LazyText.toStrict . LazyText.decodeUtf8 . Aeson.encode
 
--- | Convert an import/resolution error to an LSP diagnostic.
-importErrorToDiagnostic :: Text -> Aeson.Value
-importErrorToDiagnostic errMsg =
+-- | Convert an import/resolution error to an LSP diagnostic, on the @IMPORT@ it
+-- belongs to when that is known, else at the start of the file.
+importErrorToDiagnostic :: Maybe SrcRange -> Text -> Aeson.Value
+importErrorToDiagnostic mRange errMsg =
   Aeson.object
-    [ "range" .= defaultRangeJson
+    [ "range" .= maybe defaultRangeJson rangeToJson mRange
     , "severity" .= (1 :: Int)  -- Error
     , "message" .= errMsg
     , "source" .= ("l4" :: Text)

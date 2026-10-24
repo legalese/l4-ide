@@ -34,10 +34,13 @@ import LSP.L4.Rules (GetImportEdges (..))
 -- The evaluator publishes every @#EVAL@ and @#ASSERT@ outcome with source
 -- @\"eval\"@, a failed assertion at Error severity. Those are left out: a rule
 -- whose test verdict is FALSE is still a rule that can be deployed.
+--
+-- The error on an @IMPORT@ of a module with errors (source @\"import\"@) is
+-- left out too: it points at an error in that module, which is counted there.
 isBlockingDiagnostic :: FileDiagnostic -> Bool
 isBlockingDiagnostic fd =
   fd.fdLspDiagnostic._severity == Just DiagnosticSeverity_Error
-    && fd.fdLspDiagnostic._source /= Just "eval"
+    && fd.fdLspDiagnostic._source `notElem` [Just "eval", Just "import"]
 
 hasBlockingError :: [FileDiagnostic] -> Bool
 hasBlockingError = any isBlockingDiagnostic

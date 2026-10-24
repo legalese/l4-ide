@@ -14,7 +14,8 @@ import qualified Data.Text.IO as T
 import System.Directory (createDirectoryIfMissing, getTemporaryDirectory, removePathForcibly)
 import System.FilePath ((</>))
 
-import Language.LSP.Protocol.Types (NormalizedUri, normalizedFilePathToUri, toNormalizedFilePath)
+import Data.Text (Text)
+import Language.LSP.Protocol.Types (Diagnostic (..), NormalizedUri, Position (..), Range (..), normalizedFilePathToUri, toNormalizedFilePath)
 
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
@@ -32,6 +33,8 @@ data Outcome = Outcome
   , closure :: [NormalizedUri]
   , blocking :: [FileDiagnostic]
   , cycles :: [ImportCycle]
+  , mainImportErrors :: [(Int, Text)]
+  -- ^ The errors on @main@'s own IMPORT lines (0-based line, message)
   }
 
 -- | Write @files@ (name without extension, source) to a fresh directory and
@@ -58,6 +61,13 @@ checkProject name files = do
     , closure = uris
     , blocking = blockingErrorsIn uris diags
     , cycles = cs
+    , mainImportErrors =
+        [ (fromIntegral d._range._start._line, d._message)
+        | fd <- diags
+        , fd.fdFilePath == normalizedFilePathToUri (toNormalizedFilePath entry)
+        , let d = fd.fdLspDiagnostic
+        , d._source == Just "import"
+        ]
     }
 
 uriOf :: String -> String -> IO NormalizedUri
@@ -75,6 +85,7 @@ spec = describe "LSP.L4.BlockingErrors" do
       ]
     o.blocking `shouldSatisfy` null
     length o.closure `shouldBe` 2
+    o.mainImportErrors `shouldBe` []
 
   it "refuses a file with a type error" do
     o <- checkProject "own-error"
@@ -88,6 +99,19 @@ spec = describe "LSP.L4.BlockingErrors" do
       ]
     broken <- uriOf "imported-error" "broken"
     map (.fdFilePath) o.blocking `shouldSatisfy` (broken `elem`)
+    -- The IMPORT is marked too, but not counted again.
+    map fst o.mainImportErrors `shouldBe` [0]
+    main <- uriOf "imported-error" "main"
+    map (.fdFilePath) o.blocking `shouldNotSatisfy` (main `elem`)
+
+  it "marks the IMPORT of a module whose own import is broken" do
+    o <- checkProject "transitive"
+      [ ("main", "-- top\nIMPORT middle\n\nfine MEANS 1\n")
+      , ("middle", "IMPORT broken\n\nm MEANS 1\n")
+      , ("broken", "GIVEN x IS A NUMBER\nGIVETH A BOOLEAN\nDECIDE bad x IS x\n")
+      ]
+    o.rootTypechecks `shouldBe` True
+    map fst o.mainImportErrors `shouldBe` [1]
 
   it "refuses a file whose import does not parse, though the file itself typechecks" do
     o <- checkProject "imported-syntax"
