@@ -1,0 +1,4 @@
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+ASSUME `imported duty` IS A DEONTIC Person Action

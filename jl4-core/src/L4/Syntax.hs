@@ -736,11 +736,12 @@ setPmSynthetic m a = a & annPmSynthetic ?~ m
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)
-  | Assumed
+  | Assumed -- ^ recorded on the node of an ASSUME declaration itself; the term that it declares is 'AssumedTerm'
   | Local -- ^ a local variable (introduced by a lambda or pattern)
   | Constructor
   | Selector
   | ComputedSelector -- ^ a computed field (MEANS clause), behaves like a selector but is derived
+  | AssumedTerm -- ^ a term that an ASSUME declares: it has no definition, and its value comes from outside. Last, so that the encoding of the kinds before it is unchanged.
   deriving stock (Eq, Ord, Generic, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 

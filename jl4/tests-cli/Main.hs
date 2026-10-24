@@ -591,6 +591,14 @@ exportDeonticFixture, deonticExportExample :: FilePath
 exportDeonticFixture = fixtureDir </> "export-deontic.l4"
 deonticExportExample = "../doc/reference/regulative/deontic-export-example.l4"
 
+-- An exported rule whose DEONTIC input has no written type, and one that reads
+-- an ASSUME of type DEONTIC that an imported module declares: a request cannot
+-- supply either.
+exportUntypedFixture, exportUntypedInputs, exportAssumeImportedFixture :: FilePath
+exportUntypedFixture         = fixtureDir </> "export-untyped.l4"
+exportUntypedInputs          = fixtureDir </> "export-untyped-input.json"
+exportAssumeImportedFixture  = fixtureDir </> "export-assume-imported" </> "main.l4"
+
 -- Multi-file imports that are not rings: a clean one, one whose imported module
 -- only warns, and four that cannot be loaded cleanly: an imported module with a
 -- type error, with a syntax error, and with a string that is never closed, and an
@@ -626,6 +634,7 @@ main = do
        , batchClausesColours, batchClausesBooleans, batchClausesB
        , multiClauseRenderFixture
        , exportDeonticFixture, deonticExportExample
+       , exportUntypedFixture, exportUntypedInputs, exportAssumeImportedFixture
        , cycle3Entry, cycle3OutsideEntry, cycle2Entry, selfImportEntry
        , cleanImportEntry, warningImportEntry, brokenImportEntry
        , syntaxImportEntry, lexImportEntry, missingImportEntry
@@ -809,6 +818,31 @@ spec bin = do
           trim = reverse . dropWhile (== ' ') . reverse . dropWhile (== ' ')
       results `shouldBe` ["TRUE", "FALSE"]
 
+  -- An input needs no written type, and an ASSUME can be declared in another
+  -- module: neither is a way round the refusal. The input that the checker
+  -- infers to be a DEONTIC is refused, and so is the imported ASSUME that the
+  -- rule reads, by `l4 check`, and by `l4 batch` before it runs a row.
+  describe "l4 check: an @export with a DEONTIC that it takes without a written type, or reads from an import" $ do
+    forM_ [ ("an input with no written type", exportUntypedFixture, "the duty")
+          , ("an ASSUME of an imported module", exportAssumeImportedFixture, "imported duty")
+          ] \(what, fixture, input) ->
+      it ("fails on " <> what <> ", naming it") $ do
+        Output code sout serr0 <- runL4 bin ["check", fixture]
+        let serr = filter (/= '\r') serr0
+        code `shouldBe` ExitFailure 1
+        sout `shouldSatisfy` (not . isInfixOf "Check succeeded.")
+        serr `shouldSatisfy` isInfixOf "DEONTIC inputs are not supported for @export."
+        serr `shouldSatisfy` isInfixOf
+          ("The input `" <> input <> "` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC.")
+
+    it "makes l4 batch refuse the file before it runs a row, as it refuses a written type" $ do
+      Output code sout serr0 <- runL4 bin ["batch", exportUntypedFixture, "--inputs", exportUntypedInputs]
+      let out = filter (/= '\r') (sout <> serr0)
+      code `shouldBe` ExitFailure 1
+      out `shouldSatisfy` isInfixOf "DEONTIC inputs are not supported for @export."
+      out `shouldSatisfy` isInfixOf "The input `the duty` has a type that contains a DEONTIC"
+      out `shouldNotSatisfy` isInfixOf "\"status\""
+
   -- An import ring used to pass `l4 check` and `l4 run` with exit 0 and "Check
   -- succeeded." printed under the cycle's own error. The engine reports the
   -- cycle as an Error on a module that is IMPORTED, not on the file named on the
@@ -905,6 +939,8 @@ spec bin = do
           , ("a 2-module import ring", cycle2Entry)
           , ("a self-import", selfImportEntry)
           , ("an @export with a DEONTIC input", exportDeonticFixture)
+          , ("an @export with a DEONTIC input that has no written type", exportUntypedFixture)
+          , ("an @export that reads a DEONTIC ASSUME of an imported module", exportAssumeImportedFixture)
           ] \(what, entry) ->
       forM_ ["deploy", "redeploy"] \cmd ->
         it ("refuses " <> cmd <> " of " <> what <> ", with the diagnostics, before the network") $ do

@@ -184,7 +184,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- Combine mixfix registry from imports with this module's local definitions
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
-                exportErrs = Export.validateExportInputs env.entityInfo rprog
+                exportErrs = Export.validateExportInputs s'.substitution env.entityInfo rprog
             in MkCheckResult
               { program = rprog
               , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs)
@@ -4190,8 +4190,14 @@ scanFunSigAssume a@(MkAssume _ tysig appForm mt) = do
   let tysig' = mergeResultTypeInto tysig mt
   errorContext (WhileCheckingAssume (getName appForm)) do
     (rappForm, rtysig, extendsTySig) <- checkTermAppFormTypeSigConsistency appForm tysig'
-    (ce, rt, result, extendsAppForm) <- inferTermAppForm rappForm rtysig
+    (ce0, rt, result, extendsAppForm) <- inferTermAppForm rappForm rtysig
     aty <- setAnnResolvedType rt (Just Assumed) a
+    -- The term an ASSUME declares is told apart from one that has a definition
+    -- in the entity info, which is how a check that runs in a module that
+    -- imports it can still tell the two apart.
+    let ce = case ce0 of
+          KnownTerm t _ -> KnownTerm t AssumedTerm
+          other         -> other
     name <- withQualified (appFormHeads rappForm) ce
     -- Extract mixfix pattern info by comparing AppForm against GIVEN parameters
     let mMixfix = extractMixfixInfo tysig' appForm

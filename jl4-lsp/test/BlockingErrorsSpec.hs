@@ -143,6 +143,56 @@ spec = describe "LSP.L4.BlockingErrors" do
       ]
     o.blocking `shouldSatisfy` null
 
+  -- The editor reaches the checker through its own import path, and an input
+  -- needs no written type: neither is a way round the refusal.
+  it "refuses a file whose @export reads a DEONTIC ASSUME of an imported module" do
+    o <- checkProject "export-deontic-imported-assume"
+      [ ("facts", T.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+          , ""
+          , "ASSUME `imported duty` IS A DEONTIC Person Action"
+          ])
+      , ("main", T.unlines
+          [ "IMPORT facts"
+          , ""
+          , "@export Is the imported duty fulfilled"
+          , "GIVETH A BOOLEAN"
+          , "`imported duty fulfilled` MEANS"
+          , "  CONSIDER `imported duty`"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          ])
+      ]
+    [ d._message | fd <- o.blocking, let d = fd.fdLspDiagnostic ] `shouldSatisfy` \case
+      [msg] -> "DEONTIC inputs are not supported for @export." `T.isInfixOf` msg
+                 && "`imported duty`" `T.isInfixOf` msg
+      _ -> False
+
+  it "refuses a file whose @export takes a DEONTIC that it gives no written type" do
+    o <- checkProject "export-deontic-untyped"
+      [ ("main", T.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+          , ""
+          , "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`already fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          , "@export Is a duty already fulfilled"
+          , "GIVEN `the duty`"
+          , "GIVETH A BOOLEAN"
+          , "`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`"
+          ])
+      ]
+    [ d._message | fd <- o.blocking, let d = fd.fdLspDiagnostic ] `shouldSatisfy` \case
+      [msg] -> "DEONTIC inputs are not supported for @export." `T.isInfixOf` msg
+                 && "`the duty`" `T.isInfixOf` msg
+      _ -> False
+
   it "refuses a file whose import has a type error" do
     o <- checkProject "imported-error"
       [ ("main", "IMPORT broken\n\nfine MEANS 1\n")

@@ -2902,6 +2902,109 @@ spec = describe "integration" do
               , ("the duty", ["deadline", "events", "startTime", "what", "who"])
               ]
 
+    -- An input needs no written type: the checker infers it. An input that the
+    -- rule hands to a helper that takes a DEONTIC is a DEONTIC all the same, and
+    -- the deploy refuses it as it refuses a written one.
+    it "rejects an @export whose input has no written type but is used as a DEONTIC" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "untyped.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "GIVEN duty IS A DEONTIC Person Action"
+        , "GIVETH A BOOLEAN"
+        , "`already fulfilled` duty MEANS"
+        , "  CONSIDER duty"
+        , "  WHEN FULFILLED THEN TRUE"
+        , "  OTHERWISE FALSE"
+        , ""
+        , "@export Is a duty already fulfilled"
+        , "GIVEN `the duty`"
+        , "GIVETH A BOOLEAN"
+        , "`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the duty"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input has no written type but is used as an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "untyped.l4" $ Text.unlines
+        [ "DECLARE Person IS ONE OF Seller, Buyer"
+        , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+        , ""
+        , "GIVEN e IS AN EVENT Person Action"
+        , "GIVETH A NUMBER"
+        , "`time of` e MEANS"
+        , "  CONSIDER e"
+        , "  WHEN EVENT p a t THEN t"
+        , ""
+        , "@export When did it happen"
+        , "GIVEN `the event`"
+        , "GIVETH A NUMBER"
+        , "`when` `the event` MEANS `time of` `the event`"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "EVENT inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "the event"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "still publishes an input that has no written type but is used as a NUMBER" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "untyped.l4" $ Text.unlines
+        [ "@export One more"
+        , "GIVEN n"
+        , "GIVETH A NUMBER"
+        , "`plus one` n MEANS n + 1"
+        ]
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          List.sort [(fs.fsName, Map.keys fs.fsParameters.parameterMap) | fs <- meta.metaFunctions]
+            `shouldBe` [("plus one", ["n"])]
+
+    -- The service publishes the ASSUMEs of the module itself as inputs, and no
+    -- others, so an ASSUME of another module that an exported rule reads has no
+    -- value in a request. For a DEONTIC the rule answers as if it had a default.
+    it "rejects an @export that reads an ASSUME of type DEONTIC from an imported module" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.fromList
+        [ ( "facts.l4", Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+            , ""
+            , "ASSUME `imported duty` IS A DEONTIC Person Action"
+            ] )
+        , ( "user.l4", Text.unlines
+            [ "IMPORT facts"
+            , ""
+            , "@export Uses an imported assume"
+            , "GIVETH A BOOLEAN"
+            , "`uses imported assume` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            ] )
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "imported duty"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed

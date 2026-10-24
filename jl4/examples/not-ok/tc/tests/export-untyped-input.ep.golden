@@ -1,0 +1,58 @@
+-- An input needs no written type: `GIVEN x` leaves it to the checker, which
+-- infers the type from how the rule uses x. A request has no JSON form for a
+-- DEONTIC or an EVENT, and an input that the checker infers to be one of them
+-- is refused as a written type is, naming the input. The rules are exported on
+-- purpose: the same rules without @export check.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`already fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`time of` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+-- Refused: the input is handed to a helper that takes a DEONTIC.
+@export Is a duty already fulfilled
+GIVEN `the duty`
+GIVETH A BOOLEAN
+`is it fulfilled` `the duty` MEANS `already fulfilled` `the duty`
+
+-- Refused: the rule's own body takes the input apart as a DEONTIC.
+@export Is a duty fulfilled, by its own body
+GIVEN `the other duty`
+GIVETH A BOOLEAN
+`is the other fulfilled` `the other duty` MEANS
+  CONSIDER `the other duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Refused: the input is handed to a helper that takes an EVENT.
+@export When did it happen
+GIVEN `the event`
+GIVETH A NUMBER
+`when` `the event` MEANS `time of` `the event`
+
+-- Not exported: an input that is a DEONTIC is fine here, and is not reported.
+GIVEN d
+GIVETH A BOOLEAN
+`internal fulfilled` d MEANS `already fulfilled` d
+
+-- Accepted: the checker infers a NUMBER.
+@export One more
+GIVEN n
+GIVETH A NUMBER
+`plus one` n MEANS n + 1
+
+-- Accepted: nothing fixes the type of the input.
+@export Ignores its input
+GIVEN x
+GIVETH A BOOLEAN
+`ignores` x MEANS TRUE
