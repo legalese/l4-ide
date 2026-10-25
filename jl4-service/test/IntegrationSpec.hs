@@ -5219,6 +5219,8 @@ testOptions = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   , maxLadderNodes = 10000
+  , checkStore = Nothing
+  , checkJson = False
   }
 
 -- | A JSON answer without the numbers the visualizer gave its nodes: the

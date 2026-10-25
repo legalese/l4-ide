@@ -9,7 +9,8 @@ import FileBrowser (FileBrowseApi, fileBrowseHandler)
 import McpServer (mcpHandler, reapExpiredTasks, supportedProtocolVersions, defaultProtocolVersion, tasksExtensionKey)
 import DeploymentLoader (loadAllAndRegister)
 import Logging (Logger, logInfo, logDebug, logError, logWarn, newLogger)
-import Options (Options (..), buildOpts)
+import CheckStore (runCheckStore)
+import Options (Options (..), buildOpts, parseOptions)
 import OpenApiDoc (buildOpenApiDoc)
 import Shared (collectDeploymentMetadata)
 import Types
@@ -26,7 +27,7 @@ import Control.Monad (forever)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
 import Control.Exception (SomeException, finally, displayException)
 import Control.Monad (forM_)
-import System.Environment (lookupEnv)
+import System.Environment (getArgs, lookupEnv)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ReaderT (..), ask)
 import Data.IORef (newIORef, readIORef, atomicModifyIORef')
@@ -41,7 +42,7 @@ import Data.ByteString.Builder (toLazyByteString)
 import Network.Wai.Handler.Warp (defaultSettings, runSettings, setHost, setPort, setOnException, setOnExceptionResponse)
 import Network.Wai.Handler.Warp (defaultShouldDisplayException)
 import Network.Wai.Middleware.Cors (cors, simpleCorsResourcePolicy, corsMethods, corsRequestHeaders)
-import Options.Applicative (execParser)
+import System.Exit (exitWith)
 import Servant
 
 import ExplorerPage (renderExplorerPageBS)
@@ -85,7 +86,12 @@ type McpScopedLongApi = "deployments" :> Capture "deploymentId" Text :> ".mcp" :
 defaultMain :: IO ()
 defaultMain = do
   optsInfo <- buildOpts
-  options@Options{port, storePath, lazyLoad, debug} <- execParser optsInfo
+  options@Options{port, storePath, lazyLoad, debug} <- parseOptions optsInfo =<< getArgs
+
+  -- --check-store DIR compiles what is stored in DIR, reports, and exits; it
+  -- serves nothing and writes nothing (see "CheckStore").
+  forM_ options.checkStore $ \dir ->
+    runCheckStore options dir >>= exitWith
 
   logger <- newLogger debug
 

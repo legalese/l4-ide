@@ -1,13 +1,19 @@
 module Options (
   Options (..),
   buildOpts,
+  parseOptions,
+  parseOptionsPure,
 ) where
 
 import Data.Char (toLower)
+import Data.List (isPrefixOf)
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Options.Applicative
-import System.Environment (lookupEnv)
+import System.Environment (getProgName, lookupEnv)
+import System.Exit (ExitCode (..), exitSuccess, exitWith)
+import System.IO (hPutStrLn, stderr)
 import Text.Read (readMaybe)
 
 data Options = Options
@@ -42,6 +48,14 @@ data Options = Options
   -- (a few hundred nodes is already a wall of boxes) and far below the
   -- pathological cases, so a legitimate model should never meet it. Raise it if
   -- one does.
+  , checkStore            :: !(Maybe FilePath)
+  -- ^ With a directory here the service does not serve. It compiles every
+  -- deployment stored in the directory, the way a restart does and under the
+  -- same limits, reports one line for each, and exits ('CheckStore'). It starts
+  -- no server and writes nothing to the directory, so an operator can run a new
+  -- binary over a store before a rollout switches to it.
+  , checkJson             :: !Bool
+  -- ^ With 'checkStore': print the report as one JSON document.
   }
 
 -- | Build the CLI parser with environment variable defaults.
@@ -174,6 +188,21 @@ buildOpts = do
                        "Maximum ladder-diagram size, in IR nodes, that query-plan and ladder \
                        \will build or serve (env: JL4_MAX_LADDER_NODES)"
               )
+        <*> optional
+              ( strOption
+                  ( long "check-store"
+                      <> metavar "DIR"
+                      <> help
+                           "Compile every deployment stored in DIR the way a restart does, under \
+                           \--compile-timeout and --max-compile-memory-mb, print one line for each, \
+                           \and exit. Starts no server and writes nothing to DIR. Exit status: 0 if \
+                           \every deployment compiles, 1 if any does not, 2 for a usage or I/O error"
+                  )
+              )
+        <*> switch
+              ( long "json"
+                  <> help "With --check-store, print the report as one JSON document"
+              )
 
   pure $ info
     (parser <**> helper)
@@ -181,6 +210,49 @@ buildOpts = do
         <> progDesc "Multi-tenant decision service for L4 rule bundles"
         <> header "jl4-service — persistent, multi-tenant L4 decision service"
     )
+
+-- | Parse the command line, and exit as 'parseOptionsPure' says if it does not
+-- parse.
+parseOptions :: ParserInfo Options -> [String] -> IO Options
+parseOptions parserInfo args = do
+  progName <- getProgName
+  case parseOptionsPure progName parserInfo args of
+    Right options -> pure options
+    Left (Left completion) -> do
+      completions <- execCompletion completion progName
+      putStr completions
+      exitSuccess
+    Left (Right (message, code)) -> do
+      case code of
+        ExitSuccess -> putStrLn message
+        ExitFailure _ -> hPutStrLn stderr message
+      exitWith code
+
+-- | The parse of a command line, or why it is not one: the message to print
+-- and the exit status to give it (@--help@ is a success, with the help as its
+-- message).
+--
+-- A command line that does not parse is a usage error. optparse-applicative
+-- gives it status 1; with @--check-store@ that is the status for "a deployment
+-- failed", so a usage error there is 2 and a script can tell the two apart. The
+-- server's own status for a usage error is unchanged.
+parseOptionsPure
+  :: String
+  -> ParserInfo Options
+  -> [String]
+  -> Either (Either CompletionResult (String, ExitCode)) Options
+parseOptionsPure progName parserInfo args = case execParserPure defaultPrefs parserInfo args of
+  Success options
+    | options.checkJson && isNothing options.checkStore ->
+        Left (Right ("--json goes with --check-store, which was not given", ExitFailure 2))
+    | otherwise -> Right options
+  CompletionInvoked completion -> Left (Left completion)
+  Failure failure ->
+    let (message, code) = renderFailure failure progName
+        code' = case code of
+          ExitFailure 1 | any ("--check-store" `isPrefixOf`) args -> ExitFailure 2
+          _ -> code
+    in Left (Right (message, code'))
 
 -- | Read an optional integer from an environment variable.
 readEnvInt :: String -> IO (Maybe Int)
