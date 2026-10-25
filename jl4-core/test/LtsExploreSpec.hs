@@ -266,6 +266,10 @@ lateSrc onGo = Text.unlines
   , "GIVETH A BOOLEAN"
   , "`no inputs` MEANS TRUE"
   , ""
+  , "GIVEN missed IS A LIST OF BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`a list of misses` MEANS TRUE"
+  , ""
   , "GIVEN m IS A Move"
   , "GIVETH A BOOLEAN"
   , "`a move` MEANS TRUE"
@@ -282,6 +286,42 @@ lateSrc onGo = Text.unlines
   , "    HENCE " <> onGo
   , "    LEST  COMMIT `missed` IS TRUE HENCE FULFILLED"
   ]
+
+-- 6. As 'lateSrc', with no rule that RECALLs `missed`.
+lateNoRecall :: Text.Text
+lateNoRecall = Text.unlines
+  [ "DECLARE Who IS ONE OF W"
+  , "DECLARE Move IS ONE OF go"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`nothing missed` MEANS"
+  , "    CONSIDER missed"
+  , "    WHEN NOTHING THEN TRUE"
+  , "    WHEN JUST b THEN FALSE"
+  , ""
+  , "GIVETH A DEONTIC Who Move"
+  , "`late` MEANS"
+  , "    PARTY W"
+  , "    MUST  go"
+  , "    WITHIN 10"
+  , "    HENCE FULFILLED"
+  , "    LEST  COMMIT `missed` IS TRUE HENCE FULFILLED"
+  ]
+
+-- | Explore `late` keeping only what the module's own RECALLs read, NOT the
+-- property's cells, and check one always-property on it: what a caller of
+-- the library that skipped 'propertyCells' gets.
+uncheckedSrc :: Text.Text -> Text.Text -> IO (Graph, [CheckResult])
+uncheckedSrc src name = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  r <- either (fail . show) pure (checkWithImports (vfsFromList []) src)
+  let rig = MkRig {rigConfig = cfg, rigEntityInfo = r.tcdEntityInfo, rigEnv = emptyEnvironment, rigModule = r.tcdModule}
+  p <- either (fail . Text.unpack) pure (resolveProperty r.tcdEntityInfo [r.tcdModule] (ask Always name))
+  start <- either (fail . Text.unpack) pure (startNamed r.tcdModule "late" 0)
+  g <- explore defaultExploreOptions (readSitesOf r.tcdModule []) rig start >>= either (fail . Text.unpack) pure
+  (rs, _) <- checkGraph defaultExploreOptions rig Nothing g [p]
+  pure (g, rs)
 
 spec :: Spec
 spec = describe "l4 explore" do
@@ -416,6 +456,22 @@ spec = describe "l4 explore" do
       [r] <- pure rs
       verdicts rs `shouldBe` ["unknown"]
       reasonOf r `shouldSatisfy` Text.isInfixOf "is in more than one ledger across the states explored (W's, OFFICIAL's)"
+
+    it "a state explored without the property's cell kept is not labelled: unknown, never a guess from the first position" do
+      -- nothing RECALLs `missed` and nothing keeps it: `go` (nothing missed)
+      -- and the tick (missed) reach one FULFILLED state, first by `go`, so
+      -- labelled from that position the property would hold
+      (g, rs) <- uncheckedSrc lateNoRecall "nothing missed"
+      counts g `shouldBe` (2, 3)
+      [res] <- pure rs
+      verdicts rs `shouldBe` ["unknown"]
+      reasonOf res `shouldSatisfy` Text.isInfixOf "the cell `missed` was not kept in the state, so positions merged"
+
+    it "nor when the cell was kept as its latest entry and the input reads its whole history" do
+      (_, rs) <- uncheckedSrc late "a list of misses"
+      [res] <- pure rs
+      verdicts rs `shouldBe` ["unknown"]
+      reasonOf res `shouldSatisfy` Text.isInfixOf "the cell `missed` was not kept in the state whole, only its latest entry"
 
     it "refuses, by name, a property that could not mean the same at every state" do
       let refusal rq = resolveIn late rq >>= either pure (const (fail "not refused"))

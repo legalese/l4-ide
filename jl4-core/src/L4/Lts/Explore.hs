@@ -314,6 +314,11 @@ data Graph = MkGraph
     -- ^ the event each act or tick edge was first taken by, with its
     -- instant, keyed as the edge is: a step's counterexample is the path to
     -- its source and then this event ("L4.Lts.Explore.Check")
+  , gKept        :: !(Map Text Bool)
+    -- ^ every cell the state keeps, in every ledger: 'True' for its whole
+    -- history, 'False' for its latest entry. A cell not here was dropped
+    -- wherever it was written, so positions that differ in it may be one
+    -- state ("L4.Lts.Explore.Check" labels nothing by such a cell)
   , gCoverage    :: !Coverage
   }
 
@@ -1029,6 +1034,7 @@ finish ex acc = MkGraph
   , gStates = reverse acc.acNodes
   , gTransitions = reverse acc.acEdgeList
   , gEdgeEvents = acc.acEdgeEvents
+  , gKept = Map.map (|| ex.exSites.rsTimeScoped) ex.exSites.rsCells
   , gCoverage = MkCoverage
       { cvStates = Map.size acc.acSeen
       , cvTransitions = Set.size acc.acEdges

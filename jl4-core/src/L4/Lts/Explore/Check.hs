@@ -34,7 +34,11 @@
 -- Every cell a property reads is kept in the state ('propertyCells', which
 -- the caller passes to 'keepCells' before exploring), so a label is a
 -- function of the state, not of whichever position happened to reach it
--- first. The decision is evaluated by the evaluator: one @#EVAL@ per
+-- first. When a cell the property reads was not kept ('gKept'), or was
+-- kept as its latest entry where the input reads its whole history, no
+-- state is labelled: two positions that differ there may have been merged
+-- into one, and labelling it from the first would be the silent
+-- faithfulness failure of §4.1. The decision is evaluated by the evaluator: one @#EVAL@ per
 -- distinct input, all in one run of the module, on the values the state's
 -- ledgers hold, spelled back as literals.
 --
@@ -358,7 +362,7 @@ labelGraph rig props g = do
   let calls = nubOrdOn fst
         [ (callKey d as, App emptyAnno d.dcRef as) | (d, args) <- perState, (_, Right as) <- args ]
   answers <- Map.fromList . zip (map fst calls) <$> evalBooleans rig (map snd calls)
-  let label d a = case (ambiguousCells d, a) of
+  let label d a = case (ambiguousCells d <> unkeptCells d, a) of
         (why : _, _)  -> Left why
         (_, Left why) -> Left why
         (_, Right as) -> fromMaybe (Left "no answer was returned") (Map.lookup (callKey d as) answers)
@@ -366,6 +370,20 @@ labelGraph rig props g = do
     [ (d.dcName, Map.fromList [ (i, label d a) | (i, a) <- args ]) | (d, args) <- perState ]
   where
     callKey d as = d.dcName <> " " <> Text.unwords (map prettyLayout as)
+    -- a label is read off the position that first reached the state, so it
+    -- is the state's only when every cell it reads is in the state's key,
+    -- kept as the input reads it; a cell left out may differ between the
+    -- positions merged into a state, and the label would be a guess. The
+    -- CLI keeps the cells ('propertyCells'); a caller that did not is told,
+    -- in every state, since which states merged positions is not recorded
+    unkeptCells d =
+      [ "the cell `" <> i.inCell <> "` was not kept in the state"
+          <> (if isJust (Map.lookup i.inCell g.gKept) then " whole, only its latest entry" else "")
+          <> ", so positions merged into one state may differ in it: explore with the properties' cells kept ('propertyCells' to 'keepCells', as the CLI does)"
+      | i <- d.dcInputs
+      , case Map.lookup i.inCell g.gKept of
+          Nothing    -> True
+          Just whole -> i.inWhole && not whole ]
     -- a cell found in one ledger in one state and another in another is
     -- named by its input ambiguously across the graph, even where each
     -- state alone holds it in one
