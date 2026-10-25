@@ -24,7 +24,7 @@ module Ledger.Store.Config
   , describeResolved
   , OpenedStore (..)
   , openLedgerStore
-  , nonDurableNotice
+  , nonDurableWarning
   ) where
 
 import Data.Char (toLower)
@@ -107,8 +107,8 @@ data OpenedStore = MkOpenedStore
   }
 
 -- | The sentence the in-memory store's replies carry.
-nonDurableNotice :: Text
-nonDurableNotice = "This ledger store is in memory and is not durable: every instance is lost when the service restarts. It is for tests only."
+nonDurableWarning :: Text
+nonDurableWarning = "This ledger store is in memory and is not durable: every instance is lost when the service restarts. It is for tests only."
 
 openLedgerStore :: ResolvedStore -> IO (Either Text OpenedStore)
 openLedgerStore = \ case
@@ -120,4 +120,4 @@ openLedgerStore = \ case
     Right (s, close') -> pure (Right MkOpenedStore {store = s, backend = "postgres", nonDurable = Nothing, close = close'})
   MemoryForTests -> do
     s <- newMemoryStore
-    pure (Right MkOpenedStore {store = s, backend = "memory", nonDurable = Just nonDurableNotice, close = pure ()})
+    pure (Right MkOpenedStore {store = s, backend = "memory", nonDurable = Just nonDurableWarning, close = pure ()})

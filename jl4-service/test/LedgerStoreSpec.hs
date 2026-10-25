@@ -532,7 +532,7 @@ configSpec = describe "choosing the ledger's store (Ledger.Store.Config)" do
 
   it "opens the in-memory store with the sentence every reply from it carries, and sqlite with none" do
     openLedgerStore MemoryForTests >>= \ case
-      Right o -> (o.backend, o.nonDurable) `shouldBe` ("memory", Just nonDurableNotice)
+      Right o -> (o.backend, o.nonDurable) `shouldBe` ("memory", Just nonDurableWarning)
       Left why -> expectationFailure (Text.unpack why)
     withStoreDir "ledger-config" \ dir -> openLedgerStore (SqliteAt dir) >>= \ case
       Right o -> do
