@@ -719,6 +719,10 @@ instance Linearize (Expr Resolved) where
     -- author's reason.
     Refuse _ msg -> hcat [ "the model refuses to answer:", lin msg ]
     Inert _ txt _ctx -> text txt
+    Lifecycle _ p -> case p of
+      LifecycleJoin     -> "the join"
+      LifecycleDeadline -> "the deadline"
+      LifecycleArming   -> "the arming"
 
 instance Linearize (Event Resolved) where
   linearize (MkEvent _ p a t _) = hcat

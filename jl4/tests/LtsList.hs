@@ -77,6 +77,13 @@ cases =
   , MkCase "every-run-example" (\ d -> repoRoot d </> "doc" </> "reference" </> "regulative" </> "every-run-example.l4") []
   , MkCase "tenancy" (\ d -> d </> "examples" </> "bpmn" </> "tenancy.l4") ["the tenancy", "receipts"]
   , MkCase "after-example" (\ d -> repoRoot d </> "doc" </> "reference" </> "regulative" </> "after-example.l4") []
+    -- EVERY-EACH-QUANTIFIER-SPEC §2.6 B1: a lifecycle noun written as a
+    -- value that is the whole anchor, @OF (THE JOIN)@, is the bare noun's
+    -- anchor ('L4.Syntax.lifecyclePointOfAnchor'), and the list must date
+    -- it as it dates @OF THE JOIN@. Added 2026-10-24: no golden had the
+    -- bracketed spelling, so the arms in 'L4.Lts.WhatIf' that read it could
+    -- be deleted with nothing failing.
+  , MkCase "lifecycle-anchors" (\ d -> d </> "examples" </> "lts" </> "lifecycle-anchors.l4") []
   ]
 
 -- | The repository root, from the @jl4@ data dir: one level up. `cabal
@@ -214,6 +221,17 @@ spec = do
           barrierOk `shouldSatisfy` Text.isInfixOf "everyone has acted; the shared next step begins"
           forkOk `shouldSatisfy` Text.isInfixOf "(member 1 of 3: their own next step begins)"
           forkOk `shouldNotSatisfy` Text.isInfixOf "shared next step"
+        other -> expectationFailure ("expected four reports, got " <> show (length other))
+
+  describe "lifecycle-anchors: a bracketed noun is the noun's anchor" $ do
+    it "OF (THE JOIN) and OF (THE ARMING) are dated as OF THE JOIN is; arithmetic on a noun is not worked out" $ do
+      reports <- reportsOf (cases !! 4)
+      case map (renderReport False) reports of
+        [bare, bracketed, arming, arithmetic] -> do
+          bare `shouldSatisfy` Text.isInfixOf "Next deadline: 13"
+          bracketed `shouldSatisfy` Text.isInfixOf "Next deadline: 13"
+          arming `shouldSatisfy` Text.isInfixOf "Next deadline: 13"
+          arithmetic `shouldSatisfy` Text.isInfixOf "not known here"
         other -> expectationFailure ("expected four reports, got " <> show (length other))
 
   describe "contracts: a live position" $ do

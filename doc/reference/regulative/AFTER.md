@@ -28,6 +28,7 @@ WITHIN 30 OF THE JOIN        -- [delivery+3, delivery+30]
 ```
 
 `OF THE JOIN` is the anchor vocabulary of [WITHIN](consequences.md#within): the instant the enclosing obligation's `HENCE` fired — here, the delivery. Any anchor `WITHIN` accepts works on the closing edge, and on the opening edge too: `AFTER 3 OF THE JOIN WITHIN 30` opens three after the delivery and, with the `WITHIN` bare, still re-anchors ([13, 43]); `AFTER 3 OF THE ARMING WITHIN 30 OF THE JOIN` measures the two edges from two different instants.
+The nouns are also [values](consequences.md#the-anchor-words-as-values), so either edge can take arithmetic on them: `AFTER 0 OF (THE JOIN PLUS 3)` is the same opening as `AFTER 3 OF THE JOIN`.
 
 A two-offset window can close before it opens. `AFTER 30 WITHIN 5 OF THE JOIN` is refused by the type checker when both offsets are literals; when they are computed, the run reports it beside the result and the obligation runs as written — every act is early or late, and an early act's note says the window closes before it opens, since it never will be open.
 

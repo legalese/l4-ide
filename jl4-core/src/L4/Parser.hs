@@ -2618,6 +2618,7 @@ baseExpr' =
   <|> try namedApp -- This is not nice
   <|> app
   <|> lit
+  <|> lifecycleExpr
   <|> try bulletBlock   -- offside '•' bullet list (guarded; 0-cost on miss)
   <|> list
   <|> letInExpr
@@ -2651,6 +2652,7 @@ atomicExpr' :: Parser (Expr Name)
 atomicExpr' =
       lit
   <|> nameAsApp App
+  <|> lifecycleExpr
   <|> parenExpr
 
 nameAsApp :: (HasField "range" (AnnoToken b) SrcRange, HasAnno b, HasSrcRange a) => (Anno -> Name -> [a] -> b) -> Parser b
@@ -2886,8 +2888,12 @@ namedExpr current =
     MkNamedExpr emptyAnno
       <$> annoHole   name
       <*  annoLexeme separator
-      <*  optional article
+      <*  optional (tryParser (article <* wrapAnnoParser (WithAnno [] <$> notFollowedBy lifecycleNoun)))
       <*> annoHole   (indentedExpr current)
+  where
+    -- @WITH x IS THE JOIN@ passes the lifecycle value (§2.6 B1, 2026-10-24),
+    -- so the optional article must not eat its @THE@
+    lifecycleNoun = choice (map (spacedToken_ . TIdentifiers . TIdentifier) ["JOIN", "DEADLINE", "ARMING"])
 
 fetchExpr :: Parser (Expr Name)
 fetchExpr = do
@@ -3455,26 +3461,82 @@ deadline current = annoHole $ attachAnno $
 -- > OF THE JOIN | OF THE DEADLINE | OF THE ARMING     -- R-Q7B, the lifecycle anchors
 -- > OF e                                              -- R-Q7C, a NUMBER or DATE expression
 --
--- @THE@ is a keyword ('TKThe', otherwise used only in type position); the
--- three nouns are NOT keywords and are matched as the identifier tokens so
--- spelled — the device 'uponEach' uses for @EACH@ — so a program may still
--- name a value @DEADLINE@. The alternatives are disjoint on their first
--- token, because no expression begins with @THE@.
+-- @THE@ is a keyword ('TKThe'; as an article in type position and in a
+-- named argument, and as the head of a lifecycle value); the three nouns
+-- are NOT keywords and are matched as the identifier tokens so spelled
+-- ('lifecycleWords') — so a program may still name a value @DEADLINE@.
+-- Until 2026-10-24 the alternatives were disjoint on their first token,
+-- because no expression began with @THE@; now one can ('lifecycleExpr'),
+-- so the noun alternative is tried first and backtracks when arithmetic
+-- follows it (below).
 --
 -- The expression form is parsed as an ordinary expression ('inExprSlot'):
 -- inside the anchor @OF@ is application again.
+--
+-- Since the nouns are also values ('lifecycleExpr', §2.6 card B1, built
+-- 2026-10-24), an anchor that STARTS with a noun and goes on to arithmetic
+-- is the expression form: a bare noun followed by @PLUS@, @MINUS@,
+-- @TIMES@, @DIVIDED BY@, @MODULO@ or their symbols is not taken as the noun
+-- anchor, and the whole of @THE JOIN PLUS 5@ is parsed as the expression,
+-- the operator on the noun's line or, indented as any continuation is, on
+-- the next. Only arithmetic: a @RAND@ or an @AND@ after the anchor, on that
+-- line or the next, belongs to the enclosing expression exactly as it did
+-- before the nouns were values. An arithmetic operator right after a bare
+-- noun anchor used to apply to the whole obligation, which no operator
+-- accepts (the only @__PLUS__@ readings are NUMBER's and the prelude's
+-- SET's), so no program that checked then reads differently now. Until
+-- 2026-10-24 (review of @lang/lifecycle-values@) the rule was same-line
+-- only, and @OF THE JOIN@ with @PLUS 5@ on the next line failed with an
+-- ambiguity about @__PLUS__@ that named nothing a drafter would recognise.
 anchor :: Pos -> AnnoParser (Anchor Name)
 anchor current = annoHole $ attachAnno $
   annoLexeme (spacedKeyword_ TKOf) *>
-    (   annoLexeme (spacedKeyword_ TKThe) *>
-          (   AnchorJoin emptyAnno     <$ annoLexeme (spelled "JOIN")
-          <|> AnchorDeadline emptyAnno <$ annoLexeme (spelled "DEADLINE")
-          <|> AnchorArming emptyAnno   <$ annoLexeme (spelled "ARMING")
-          )
+    (   tryParser bareNoun
     <|> AnchorAt emptyAnno <$> annoHole (inExprSlot (indentedExpr current))
     )
   where
+    bareNoun = do
+      (_, p) <- lifecycleWords
+      wrapAnnoParser (WithAnno [] <$> notFollowedBy followingArithmetic)
+      pure $ case p of
+        LifecycleJoin     -> AnchorJoin emptyAnno
+        LifecycleDeadline -> AnchorDeadline emptyAnno
+        LifecycleArming   -> AnchorArming emptyAnno
+    followingArithmetic :: Parser ()
+    followingArithmetic = do
+      next <- anySingle
+      guard (isArithmetic next.payload)
+    isArithmetic = \ case
+      TKeywords k  -> k `elem` [TKPlus, TKMinus, TKTimes, TKDivided, TKModulo]
+      TOperators o -> o `elem` [TPlus, TMinus, TTimes, TDividedBy]
+      _            -> False
+
+-- | @THE@ and one of the three lifecycle nouns, matched by SPELLING — the
+-- nouns are identifier tokens and not reserved, the device 'uponEach' uses
+-- for @EACH@ — as tokens of the caller's node; returns the noun's own token
+-- for its position. Shared by the anchor ('anchor') and the value
+-- ('lifecycleExpr').
+lifecycleWords :: AnnoParser (PosToken, LifecyclePoint)
+lifecycleWords =
+  annoLexeme (spacedKeyword_ TKThe) *>
+    (   (\ t -> (t, LifecycleJoin))     <$> annoLexeme (spelled "JOIN")
+    <|> (\ t -> (t, LifecycleDeadline)) <$> annoLexeme (spelled "DEADLINE")
+    <|> (\ t -> (t, LifecycleArming))   <$> annoLexeme (spelled "ARMING")
+    )
+  where
     spelled = spacedToken_ . TIdentifiers . TIdentifier
+
+-- | @THE JOIN@, @THE DEADLINE@, @THE ARMING@ as a VALUE (EVERY-EACH-QUANTIFIER-SPEC
+-- §2.6 card B1; built 2026-10-24): an atom, admitted wherever an expression
+-- or a juxtaposed argument is ('baseExpr'', 'atomicExpr''), so
+-- @fromMaybe THE ARMING (RECALL x)@ and @`checking out` THE JOIN cart@ parse.
+-- No expression began with @THE@ before this, so the alternative is disjoint
+-- from every other on its first token. The point is a placeholder hole
+-- ('L4.Syntax.LifecyclePoint' has no tokens of its own).
+lifecycleExpr :: Parser (Expr Name)
+lifecycleExpr = attachAnno $ do
+  (_, p) <- lifecycleWords
+  Lifecycle emptyAnno <$> annoHole (pure p)
 
 hence :: Pos -> AnnoParser (Expr Name)
 hence current =

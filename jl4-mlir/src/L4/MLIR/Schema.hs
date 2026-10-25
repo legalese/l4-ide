@@ -1595,6 +1595,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       -- A refusal has no trace children: it stops evaluation.
       Refuse{}               -> (a, r, n)
       Inert{}                -> (a, r, n)
+      Lifecycle{}            -> (a, r, n)
 
     -- M5 — force-trace a CONSIDER branch body when it's a 'Lit' or
     -- a bare @Var@ ('App' with no args). The Lit case gives the

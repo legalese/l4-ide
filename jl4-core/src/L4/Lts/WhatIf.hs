@@ -442,6 +442,11 @@ deadlineOf clock raw = case raw.roDue of
       AnchorDeadline _ -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
       AnchorArming _   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
       AnchorAt _ e     -> case e of
+        -- @OF (THE JOIN)@, a lifecycle value as the whole anchor (§2.6 B1),
+        -- names what the bare noun does
+        Lifecycle _ LifecycleJoin     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
+        Lifecycle _ LifecycleDeadline -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
+        Lifecycle _ LifecycleArming   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
         Var _ r | Just rf <- Map.lookup (getUnique r) raw.roEnv -> instantOf "the anchor" rf
         _ -> reifyExpr raw.roEnv e >>= pure . \ case
           Lit _ (NumericLit _ r) -> Right r

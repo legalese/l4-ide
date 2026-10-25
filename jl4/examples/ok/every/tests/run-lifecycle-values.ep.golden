@@ -1,0 +1,383 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC §2.6 card B1 (RULED 2026-09-21, built in part
+-- 2026-10-24): THE JOIN, THE DEADLINE and THE ARMING are VALUES — NUMBERs on
+-- the trace's clock — wherever an expression goes, not only after OF.
+--
+-- What a noun names is the instant that position had in the life of the
+-- obligation whose HENCE or LEST the noun is WRITTEN in (THE ARMING at the
+-- top level: the obligation's own arming) — with one exception. Inside an
+-- obligation that is handed on as a VALUE (a WHERE local, a GIVEN, a
+-- function's result), a noun is read where that obligation RUNS, under the
+-- obligation it is attached to, as its anchors are: obligation values are
+-- re-anchored at hand-off, NUMBER aliases are fixed where they are written
+-- (dossier B1, EVERY-EACH-ANCHOR-SLOT-BENCH-2026-09-15.md). §3 is the
+-- NUMBER alias; §12 is the obligation value, and shows that moving the same
+-- expression between the two moves the deadline. The refusals are the
+-- anchor's (run-anchors.l4); not-ok/tc/lifecycle-value-*.l4 pins them.
+--
+-- Every trace pins one value to a number, and the number a breach reports
+-- is the deadline that value produced.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+    Refund  HAS who    IS AN Actor
+    Pay     HAS amount IS A NUMBER
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+tenants     MEANS LIST alice, bob
+
+
+§ `1. arithmetic on THE JOIN`
+
+-- Alice signs at 8; the landlord must deliver by THE JOIN PLUS 5 = 13. The
+-- anchor is an expression, so the WITHIN counts zero days from it. Written
+-- bare after OF, with the arithmetic on the same line, it is the same
+-- expression (the second rule): delivery at 13 is timely, at 14 the breach
+-- reports 13.
+GIVETH A DEONTIC Actor Action
+`join plus five` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 0 OF (THE JOIN PLUS 5))
+    LEST  BREACH
+
+#TRACE `join plus five` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+
+#TRACE `join plus five` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 14
+
+GIVETH A DEONTIC Actor Action
+`join plus five, unbracketed` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 0 OF THE JOIN PLUS 5)
+    LEST  BREACH
+
+#TRACE `join plus five, unbracketed` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 14
+
+-- The operator may start the next line, indented as a continuation: the
+-- same expression, the same 13. (Until the review of 2026-10-24 only the
+-- noun's own line counted, and this was an ambiguity about __PLUS__.)
+GIVETH A DEONTIC Actor Action
+`join plus five, operator on the next line` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 0 OF THE JOIN
+             PLUS 5)
+    LEST  BREACH
+
+#TRACE `join plus five, operator on the next line` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 14
+
+
+§ `2. a continuation defined elsewhere receives the instant by argument`
+
+-- B1's ruling: a continuation handed on as a value receives an outer
+-- position by ARGUMENT. `refund within 30 of` is a top-level rule, where
+-- THE JOIN names nothing; the HENCE passes it the join it means, Alice's
+-- signature at 4, so the landlord's deadline is 4 + 30 = 34. The second
+-- rule passes it by name (WITH … IS THE JOIN), which is the same call.
+GIVEN start IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`refund within 30 of` MEANS
+    PARTY theLandlord MUST Refund theLandlord WITHIN 30 OF start
+
+GIVETH A DEONTIC Actor Action
+`passed by argument` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE `refund within 30 of` THE JOIN
+
+#TRACE `passed by argument` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Refund theLandlord AT 34
+
+#TRACE `passed by argument` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Refund theLandlord AT 35
+
+GIVETH A DEONTIC Actor Action
+`passed by name` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE `refund within 30 of` WITH start IS THE JOIN
+
+#TRACE `passed by name` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Refund theLandlord AT 35
+
+
+§ `3. a WHERE alias keeps the instant it was written under`
+
+-- "Acknowledge within 5, and resolve within 30 of RECEIPT." Receipt is
+-- Alice's signature, at 8. The alias `receipt` is written in the HENCE of
+-- her obligation, so it is THAT join, and it keeps it when the refund
+-- obligation is two hand-offs down: the refund falls due at 8 + 30 = 38,
+-- not at 10 + 30 = 40 (the acknowledgement's join, which a bare THE JOIN
+-- in the refund's WITHIN would name). Refund at 38 is timely; at 39 the
+-- breach reports 38.
+GIVETH A DEONTIC Actor Action
+`resolve within 30 of receipt` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (    PARTY theLandlord MUST Deliver theLandlord WITHIN 5
+               HENCE (PARTY theLandlord MUST Refund theLandlord WITHIN 30 OF receipt)
+           WHERE receipt MEANS THE JOIN)
+
+#TRACE `resolve within 30 of receipt` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 10
+  PARTY theLandlord DOES Refund theLandlord AT 38
+
+#TRACE `resolve within 30 of receipt` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 10
+  PARTY theLandlord DOES Refund theLandlord AT 39
+
+
+§ `4. a default for an anchor that may be missing (card B4)`
+
+-- The slot takes an instant, never a MAYBE (B4, frozen): a fact that may
+-- not have been recorded gets its default from the drafter, here THE
+-- ARMING — the arming of the obligation this one continues, Alice's, at 0.
+-- No notice was ever recorded, so the landlord's five days run from 0.
+GIVETH A DEONTIC Actor Action
+`five days of notice, or of the arming` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF (fromMaybe THE ARMING (RECALL `notice served`)))
+
+#TRACE `five days of notice, or of the arming` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+
+#TRACE `five days of notice, or of the arming` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY theLandlord DOES Deliver theLandlord AT 6
+
+
+§ `5. THE DEADLINE under LEST, plus a grace period`
+
+-- Alice misses day 10; the cure runs to THE DEADLINE PLUS 5 = 15, whatever
+-- day the miss came to light (her signature at 14 is re-offered to the LEST
+-- and discharges it; at 16 the breach reports 15).
+GIVETH A DEONTIC Actor Action
+`cure to the deadline plus five` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign alice WITHIN 0 OF (THE DEADLINE PLUS 5))
+
+#TRACE `cure to the deadline plus five` AT 0 WITH
+  PARTY alice DOES Sign alice AT 14
+
+#TRACE `cure to the deadline plus five` AT 0 WITH
+  PARTY alice DOES Sign alice AT 16
+
+
+§ `6. a barrier's HENCE reads the group's join`
+
+-- Both tenants sign (the last at 7), the group's join fires at 7, and the
+-- landlord's deadline is THE JOIN PLUS 3 = 10.
+GIVETH A DEONTIC Actor Action
+`after everyone signs` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign t
+        WITHIN 20
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 0 OF (THE JOIN PLUS 3))
+
+#TRACE `after everyone signs` AT 0 WITH
+  PARTY alice DOES Sign alice AT 2
+  PARTY bob   DOES Sign bob   AT 7
+  PARTY theLandlord DOES Deliver theLandlord AT 11
+
+
+§ `7. THE JOIN in the NEXT obligation's PROVIDED is the PREVIOUS act's time`
+
+-- Lexical, so read with care: in Bob's PROVIDED, which is written in the
+-- HENCE of Alice's obligation, THE JOIN is Alice's signature (at 6) — not
+-- the time of the payment being tested. Bob must pay an amount of at least
+-- that number: 6 is accepted; 5 is not his act, so his obligation is
+-- still waiting when the trace ends (the residual prints THE JOIN as
+-- written).
+GIVETH A DEONTIC Actor Action
+`pay at least the join` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (PARTY bob MUST Pay n PROVIDED n AT LEAST THE JOIN WITHIN 10)
+
+#TRACE `pay at least the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 6
+  PARTY bob   DOES Pay 6 AT 9
+
+#TRACE `pay at least the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 6
+  PARTY bob   DOES Pay 5 AT 9
+
+
+§ `8. RECORD a lifecycle value, RECALL it later`
+
+-- The ledger stores the number, so a fact recorded at the join can anchor a
+-- deadline much later: the join is at 4, the landlord's 30 days run to 34.
+GIVETH A DEONTIC Actor Action
+`record the receipt` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE RECORD `receipt` IS THE JOIN
+    HENCE (PARTY theLandlord MUST Refund theLandlord WITHIN 30 OF (fromMaybe 0 (RECALL `receipt`)))
+
+#TRACE `record the receipt` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Refund theLandlord AT 35
+
+
+§ `9. THE ARMING at the top level is the obligation's own arming`
+
+-- With no enclosing obligation THE ARMING is the obligation's own arming,
+-- whether written bare after OF, as a value alone in the slot, or as a
+-- value in arithmetic: all three deadlines are 10 + 5, so a signature at
+-- 15 is in time and one at 16 is a breach reporting 15.
+GIVETH A DEONTIC Actor Action
+`own arming, as a value` MEANS
+    PARTY alice MUST Sign alice WITHIN 0 OF (THE ARMING PLUS 5)
+
+#TRACE `own arming, as a value` AT 10 WITH
+  PARTY alice DOES Sign alice AT 15
+
+#TRACE `own arming, as a value` AT 10 WITH
+  PARTY alice DOES Sign alice AT 16
+
+GIVETH A DEONTIC Actor Action
+`own arming, bare` MEANS
+    PARTY alice MUST Sign alice WITHIN 5 OF THE ARMING
+
+#TRACE `own arming, bare` AT 10 WITH
+  PARTY alice DOES Sign alice AT 16
+
+GIVETH A DEONTIC Actor Action
+`own arming, alone in brackets` MEANS
+    PARTY alice MUST Sign alice WITHIN 5 OF (THE ARMING)
+
+#TRACE `own arming, alone in brackets` AT 10 WITH
+  PARTY alice DOES Sign alice AT 15
+
+#TRACE `own arming, alone in brackets` AT 10 WITH
+  PARTY alice DOES Sign alice AT 16
+
+
+§ `10. on a join line, THE ARMING is the EVERY's own arming however deep it sits`
+
+-- The EVERY is armed when the landlord delivers, at 5. On its join line
+-- THE ARMING means that arming, as a bare OF THE ARMING there does (not the
+-- landlord's, at 0): the group must finish by 5 + 10 = 15. Bob's signature
+-- at 15 is in time; at 16 the group misses its deadline of 15.
+GIVETH A DEONTIC Actor Action
+`join line of the arming, nested` MEANS
+    PARTY theLandlord MUST Deliver theLandlord WITHIN 10
+    HENCE (EVERY Tenant t IN tenants
+               MUST   Sign t
+               WITHIN 20
+               ONCE   ALL HAVE
+               WITHIN 0 OF (THE ARMING PLUS 10))
+
+#TRACE `join line of the arming, nested` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+  PARTY alice DOES Sign alice AT 6
+  PARTY bob   DOES Sign bob   AT 15
+
+#TRACE `join line of the arming, nested` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+  PARTY alice DOES Sign alice AT 6
+  PARTY bob   DOES Sign bob   AT 16
+
+-- That is the noun written ON the join line. A WHERE name for the same
+-- expression, written in the landlord's HENCE, is a NUMBER fixed there,
+-- where THE ARMING is the landlord's own, at 0: the group must finish by
+-- 0 + 10 = 10, and Bob's signature at 15 misses it.
+GIVETH A DEONTIC Actor Action
+`join line of an alias, nested` MEANS
+    PARTY theLandlord MUST Deliver theLandlord WITHIN 10
+    HENCE (EVERY Tenant t IN tenants
+               MUST   Sign t
+               WITHIN 20
+               ONCE   ALL HAVE
+               WITHIN 0 OF w
+           WHERE w MEANS THE ARMING PLUS 10)
+
+#TRACE `join line of an alias, nested` AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 5
+  PARTY alice DOES Sign alice AT 6
+  PARTY bob   DOES Sign bob   AT 15
+
+
+§ `11. a top-level WHERE reaches no obligation (moved)`
+
+-- This section ran `WHERE t MEANS THE ARMING` on a top-level rule and
+-- pinned the run's refusal. The checker now refuses it where it is written
+-- (refusal 8, card B1c), so it lives in
+-- not-ok/tc/lifecycle-arming-outside-obligation.l4. The number is kept so
+-- that citations of the sections after it stay right.
+
+
+§ `12. inside an obligation handed on as a value, a noun is read where it runs`
+
+-- Alice signs at 4 and the landlord delivers at 10. `k` is an OBLIGATION
+-- defined in the WHERE of Alice's HENCE and attached under the landlord's
+-- HENCE, so it runs there: its THE JOIN is the delivery, at 10, the same
+-- as an anchor in it would be, and the refund is due at 10 + 5 = 15 (a
+-- refund at 16 reports 15).
+GIVETH A DEONTIC Actor Action
+`a value inside a handed-on obligation` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (    PARTY theLandlord MUST Deliver theLandlord WITHIN 30
+               HENCE k
+           WHERE k MEANS PARTY theLandlord MUST Refund theLandlord WITHIN 0 OF (THE JOIN PLUS 5))
+
+#TRACE `a value inside a handed-on obligation` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 10
+  PARTY theLandlord DOES Refund theLandlord AT 16
+
+-- The same deadline written through a WHERE name inside `k`'s definition:
+-- `t` is a NUMBER, fixed where `k` is defined, in Alice's HENCE, where THE
+-- JOIN is her signature at 4. So the refund is due at 4 + 5 = 9, before
+-- `k` is even entered at 10, and it fails there. Moving the expression
+-- into a WHERE moved the deadline from 15 to 9, and nothing said so but
+-- the run's note.
+GIVETH A DEONTIC Actor Action
+`a WHERE name inside a handed-on obligation` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (    PARTY theLandlord MUST Deliver theLandlord WITHIN 30
+               HENCE k
+           WHERE k MEANS PARTY theLandlord MUST Refund theLandlord WITHIN 0 OF t
+                     WHERE t MEANS THE JOIN PLUS 5)
+
+#TRACE `a WHERE name inside a handed-on obligation` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 10
+  PARTY theLandlord DOES Refund theLandlord AT 16
+
+-- A PROVIDED inside `k` reads the same way: n EQUALS THE JOIN is tested
+-- against the delivery's 10, not Alice's 4 where it is written. A payment
+-- of 4 does not match and the obligation stays open; a payment of 10 is
+-- FULFILLED.
+GIVETH A DEONTIC Actor Action
+`a PROVIDED inside a handed-on obligation` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (    PARTY theLandlord MUST Deliver theLandlord WITHIN 30
+               HENCE k
+           WHERE k MEANS PARTY bob MUST Pay n PROVIDED n EQUALS THE JOIN WITHIN 50)
+
+#TRACE `a PROVIDED inside a handed-on obligation` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 10
+  PARTY bob DOES Pay 4 AT 12
+
+#TRACE `a PROVIDED inside a handed-on obligation` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 10
+  PARTY bob DOES Pay 10 AT 12

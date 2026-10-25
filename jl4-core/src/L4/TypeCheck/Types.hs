@@ -301,6 +301,21 @@ data CheckError =
     -- since 2026-09-16, §5.1.2) written where the position it names does
     -- not exist. Carries the edge's keyword (for the wording), the anchor
     -- for its source range and the reason (see 'AnchorRefusal').
+  | LifecycleUnavailable LifecyclePoint (Expr Name) AnchorRefusal
+    -- ^ A lifecycle VALUE (@THE JOIN@ \/ @THE DEADLINE@ as an expression,
+    -- §2.6 card B1, built 2026-10-24) written where the position it names
+    -- does not exist: the same refusals as 'AnchorUnavailable', worded for
+    -- a value rather than an @OF@. Carries the point, the expression for
+    -- its source range, and the reason.
+  | ArmingUnavailable (Expr Name)
+    -- ^ @THE ARMING@ as a VALUE written where the machine never binds it
+    -- (refusal 8 of EVERY-EACH-QUANTIFIER-SPEC §5.1.1.1; card B1c, RULED
+    -- 2026-10-24): outside every deonton's own slots ('inOwnSlots') and
+    -- outside every @HENCE@ or @LEST@ ('enclosingObligation') — at the top
+    -- level, in a top-level rule's @WHERE@, in a function's body, in an
+    -- @EVERY@'s @IN@ roll or @WHO@\/@WHOSE@ filter. Before B1c the module
+    -- checked and the run refused it on every input. Carries the
+    -- expression for its source range.
   | AnchorNotAnInstant EdgeWord (Expr Name) (Type' Resolved)
     -- ^ The expression after @OF@ in a @WITHIN@ or an @AFTER@ (R-Q7C) is
     -- neither a NUMBER (an instant on the trace's own clock) nor a DATE.
@@ -446,6 +461,22 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
+  | LifecycleNounHidesName LifecyclePoint (Maybe SrcRange) [Name] [Name]
+    -- ^ @THE JOIN@, @THE DEADLINE@ or @THE ARMING@ written where the program
+    -- has its own value spelled @JOIN@, @DEADLINE@ or @ARMING@ in scope
+    -- ('L4.TypeCheck.checkLifecycle'). Since the nouns became values (§2.6
+    -- card B1, 2026-10-24), @THE@ before one of them is always the lifecycle
+    -- position: before, @WITH start IS THE DEADLINE@ passed the program's own
+    -- @DEADLINE@ (the article was optional). Under a @HENCE@ that change is
+    -- silent — a different number, no error — so this says so (B1a, ruled
+    -- 2026-10-24). A warning in the editor and in @l4 check@, and a REFUSAL
+    -- in jl4-service, which will not publish a module whose meaning moved
+    -- silently. Dropping the @THE@ reaches the program's value; renaming it
+    -- silences the warning, which is offered only when every such binding
+    -- is defined in this module, since an importer may not own the module
+    -- that defines the other. Carries the point, the range of the @THE …@
+    -- written, and the program's bindings of that spelling: those defined
+    -- in this module, then those imported.
   | OpenedFieldShadowsDefinition OpenedFieldShadow
     -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read that an opened field
     -- won over a 0-ary constructor or top-level definition of the same name.
@@ -875,6 +906,8 @@ instance HasSrcRange CheckError where
   rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (AnchorUnavailable _ a _)         = rangeOf a
+  rangeOf (LifecycleUnavailable _ e _)      = rangeOf e
+  rangeOf (ArmingUnavailable e)             = rangeOf e
   rangeOf (AnchorNotAnInstant _ e _)        = rangeOf e
   rangeOf (OpeningNotAnInstant e _)         = rangeOf e
   rangeOf (AbsoluteEdgeAnchored a)          = rangeOf a
@@ -884,6 +917,7 @@ instance HasSrcRange CheckError where
   rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
+  rangeOf (CheckWarning (LifecycleNounHidesName _ mr _ _)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
@@ -1125,6 +1159,26 @@ data CheckEnv =
     -- the lifecycle anchors of an anchored @WITHIN@ refer to (R-Q7B). Set
     -- via 'local' in 'L4.TypeCheck.checkDeontonBody'; @Nothing@ at the top
     -- level and, like 'inNonexhaustiveDecide', never carried across imports.
+    , onJoinLine           :: !Bool
+    -- ^ Are we checking a join line's own @WITHIN@ (its duration or its
+    -- anchor)? There a lifecycle VALUE (@THE JOIN@ \/ @THE DEADLINE@,
+    -- 'L4.TypeCheck.checkLifecycle') is refused as the bare anchor is
+    -- (refusal 3, §5.1.1.1): that @WITHIN@ is what defines both. Set via
+    -- 'local' in 'L4.TypeCheck.checkDeadline'; never carried across imports.
+    , inOwnSlots           :: !Bool
+    -- ^ Are we checking one of a deonton's own slots — its party, its action
+    -- and @PROVIDED@, its @AFTER@ and @WITHIN@, an @EVERY@'s join line? The
+    -- machine evaluates those in the obligation's environment as it is
+    -- armed, where @THE ARMING@ is bound ('L4.EvaluateLazy.Machine.withOwnArming';
+    -- on a join line 'L4.EvaluateLazy.Machine.joinLineEnv'). With
+    -- 'enclosingObligation' (a @HENCE@ or @LEST@, where the hand-off binds
+    -- it), this is exactly where @THE ARMING@ as a value may be read
+    -- (refusal 8, §5.1.1.1; card B1c). An @EVERY@'s @IN@ roll and
+    -- @WHO@\/@WHOSE@ filter are NOT among the slots: the roll call reads
+    -- them in the @EVERY@'s environment, before any member is armed. Set via
+    -- 'local' in 'L4.TypeCheck.checkDeonton' and
+    -- 'L4.TypeCheck.checkDeontonBody', inherited by everything checked
+    -- inside, and never carried across imports.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
     , localBindings        :: !(Set Unique)
@@ -1219,6 +1273,8 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
     , enclosingObligation = Nothing
+    , onJoinLine = False
+    , inOwnSlots = False
     , errorContext = None
     , sectionStack = []
     , localBindings = Set.empty
@@ -2717,6 +2773,8 @@ extendEnv cis env =
     , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , enclosingObligation = e.enclosingObligation
+    , onJoinLine = e.onJoinLine
+    , inOwnSlots = e.inOwnSlots
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     , actionPatternPos = e.actionPatternPos

@@ -1432,7 +1432,7 @@ true. Nothing below describes a planned state as present.
 | A8   | a negative `AFTER` offset is accepted silently                                                       | refuse a literal negative offset at check time, on both edges; report a computed negative one as a run-time note                                                                                                                                                  | **ruled, not built**: one checker rule, one `not-ok` fixture, one note                                                                                                                                                                    | §5.1.2.0           |
 | A9   | a `RECORD` inside a `LEST` continuation is stamped with the root evaluation clock                    | keep: `at=` is transaction time; contract time, if wanted, is a value the rule records                                                                                                                                                                            | **ratified**                                                                                                                                                                                                                              | §5.2.1             |
 | B    | may an empty cast be silent? (a barrier over nobody creates a duty on a vacuous join)                | a run-time note through the notes channel, for the barrier; the fork stays silent                                                                                                                                                                                 | **ruled, not built**: one note at `barrierJoined`'s empty-cast branch; the three `nobody` witnesses gain a `NOTE` line. §10.3's static warning is NOT what was ruled                                                                      | §10.3              |
-| B1   | are `THE JOIN`/`THE DEADLINE`/`THE ARMING` values, or syntax reachable only after `OF`?              | values, lexically scoped; a continuation handed on as a value is re-anchored at hand-off (built) and receives outer points by argument; refusals 1, 3 and 4 of §5.1.1.1 ratified                                                                                  | **ruled, not built** (large): a `Lifecycle` expression constructor; `Anchor` collapses to `Maybe Expr`; `THE ARMING` bound only where absent                                                                                              | §5.1.3, dossier B1 |
+| B1   | are `THE JOIN`/`THE DEADLINE`/`THE ARMING` values, or syntax reachable only after `OF`?              | values, lexically scoped; a continuation handed on as a value is re-anchored at hand-off (built) and receives outer points by argument; refusals 1, 3 and 4 of §5.1.1.1 ratified                                                                                  | **built in part** 2026-10-24 (`lang/lifecycle-values`): the `Lifecycle` expression; `Anchor` collapse to `Maybe Expr` pending                                                                                                             | §5.1.3, dossier B1 |
 | B3   | measuring a deadline from ANOTHER rule's point: ledger idiom, by-name syntax, or neither now?        | **SEESAW, RULED 2026-10-09**: a compound is breached at its operands' EFFECTIVE instants, combined along the operand tree (earliest for `RAND`, latest for `ROR`), and the failures that fix that instant are its decisive entries — no tie is broken by position | **built** 2026-10-09 (§6.1.2); B3's own question — measuring from another rule's point — stays (c), neither now                                                                                                                           | below              |
 | B4   | when is the `OF` expression evaluated, and what if it has no value?                                  | freeze for binders and every anchor B3 leaves in scope; `MAYBE` in the slot stays refused; the language supplies no default; "pending" recorded as the general slot's semantics                                                                                   | **ratified** for the freeze and refusal 5; **sequenced behind B1**, see below                                                                                                                                                             | §5.1.3, dossier B4 |
 | B5   | when a referenced rule fires more than once, which occurrence does a reference denote?               | per instance for binders (built); a look-up carries a mandatory selector, scoped to occurrences at or after the referring obligation's arming                                                                                                                     | **ratified** for binders — witness `ok/every/run-anchor-instances.l4`; the look-up half has no channel to apply to until B3 is settled                                                                                                    | dossier B5         |
@@ -1451,6 +1451,53 @@ syntax that only follows `OF` until B1 is built, so the only default writable to
 an ordinary expression (`fromMaybe 0 (RECALL …)`, where `0` is the epoch, not "now"). Meng's mark:
 B4 recorded now, and the anchor-slot doc page waits for B1 rather than teach the literal-`0`
 workaround.
+
+**B1 built in part, 2026-10-24 (`lang/lifecycle-values`, a draft PR into `unstable`, not merged).** The doc page waited
+for B1 and is now written: `doc/reference/regulative/consequences.md`, "The anchor words as
+values", teaches the `fromMaybe THE ARMING (RECALL …)` default together with the freeze's silent
+failure (a fact recorded after the obligation's first scrutinised event does not move the deadline,
+and nothing says so). Measured on that branch: the witness above parses and runs (5 is in time, 6
+is a breach, `jl4/examples/ok/every/run-lifecycle-values.l4` §4), `(THE ARMING)` alone in the slot
+is the obligation's own arming (§9, beside its bare twin `OF THE ARMING`), and
+`OF THE ARMING PLUS 3` — a bare noun followed by arithmetic, on its own line or indented on the
+next (§1) — is now the expression form (on the base binary it is a type error on `__PLUS__`; on
+this branch, at 10 with an act at 13, FULFILLED). What is built:
+`Lifecycle Anno LifecyclePoint` on `Expr`, admitted as an atom and a juxtaposed argument; the
+refusals of §5.1.1.1 applied where the value is written (`LifecycleUnavailable`; four
+`not-ok/tc/lifecycle-value-*.l4`); THE ARMING bound at an obligation's arming only where no
+hand-off bound it; the dossier's split, unchanged, now for the value form too: a noun inside an
+obligation handed on as a value is read where that obligation runs, since the obligation's env is
+rebound at hand-off (`rebindLifecycle`), while a `NUMBER` bound by `WHERE` is fixed where it is
+written — so moving `THE JOIN PLUS 5` from an obligation's `WITHIN` into that obligation's own
+`WHERE` moves its deadline, 15 to 9 in §12, and `consequences.md` now says so; and on a join line, THE ARMING as a value is the EVERY's own arming, THE JOIN
+and THE DEADLINE deleted from that environment (assumed, not ruled: it overrides rather than binds
+"only where absent", so that `OF (THE ARMING)` and `OF THE ARMING` agree there; it holds for the
+noun written on the join line only, and a `WHERE` name for `THE ARMING PLUS 10` written in the
+enclosing `HENCE` is that `HENCE`'s arming, §10). One reading, RULED 2026-10-24 (B1a below),
+changes a spelling that was valid before: `THE` before `JOIN`, `DEADLINE` or `ARMING` is never an
+article any more, so `WITH start IS THE DEADLINE` passes the lifecycle position even where the
+program defines its own `DEADLINE` — silently under a `HENCE` — and the checker now warns at every
+such site (`LifecycleNounHidesName`, `not-ok/tc/lifecycle-value-hides-name.l4`), naming the hidden
+value and saying to drop `THE`; it offers renaming only when this module defines every such
+value, since an imported one may live in a file the importer does not own. `jl4-service` refuses
+to deploy a module that draws the warning (`hidesNameRefusal`, `jl4-service/src/Compiler.hs`;
+tests under "THE before a noun the program also defines" in `IntegrationSpec.hs`). What is not built:
+`Anchor` still has its three noun constructors beside `AnchorAt`, so `OF THE JOIN` and
+`OF (THE JOIN)` are two trees with one meaning — every consumer that asks which noun an anchor
+names now asks `lifecyclePointOfAnchor`, which reads through the bracket, so the empty-window
+refusal of §5.1.2.2 covers `OF (THE JOIN)` as well (`not-ok/tc/after-empty-window-value.l4`;
+review of 2026-10-24). That is all of what is not built.
+
+`THE ARMING` written where the machine would not bind it is refused at check time, RULED 2026-10-24 (B1c below), as refusal 8 of §5.1.1.1 (`ArmingUnavailable`).
+Such a module used to check and refuse on every input (the review of 2026-10-24 also reported deploying one to a local `jl4-service`; not re-run here).
+The definition site decides, not the use site: outside every obligation a `NUMBER` is evaluated in the environment it was defined in, a top-level function's body in its closure's even when it is called from inside an obligation's slot.
+So the checker carries `inOwnSlots`, set exactly where the machine's `withOwnArming` applies, beside `enclosingObligation`, and refuses `THE ARMING` where neither holds: a top-level rule's `WHERE` or body, a top-level function's body, an `@export`ed decision, and an `EVERY`'s `IN` roll and `WHO` or `WHOSE` filter not under any `HENCE` or `LEST`, which the roll call reads before any member is armed.
+Witnesses: `not-ok/tc/lifecycle-arming-outside-obligation.l4` (which took over §11 of `run-lifecycle-values.l4`, the run-time witness) and `not-ok/tc/lifecycle-arming-in-every-roll.l4`.
+
+Rulings on the build, recorded 2026-10-25:
+
+- B1a: option A plus a jl4-service deploy refusal for LifecycleNounHidesName (names the hidden name, says to drop THE), warning reworded (no history claim; drop THE for imported names). Meng's note: "I feel like some other languages would have stricter rules around punctuation in types vs terms vs reserved words. Here we have an all caps builtin. If we were as strict we might not see this problem arising in the first place. Just a thought, not design guidance." Ruled 2026-10-24, bench https://claude.ai/artifact/PgiYUak5fBxjUJ1dd3FZ2F (collection l4-event-time-1024).
+- B1c: accepted (THE ARMING refused at check time wherever the machine would not bind it, including an EVERY's IN and WHO/WHOSE; fresh refusal number and own message; fixture §11 moved to not-ok). Ruled 2026-10-24, bench https://claude.ai/artifact/PgiYUak5fBxjUJ1dd3FZ2F (collection l4-event-time-1024).
 
 **B3 settled by SEESAW.** Meng, 2026-09-21: _"the RAND and ROR operators ought to be commutative,
 don't you think?"_; 2026-09-22: _"do we need to break a tie? i thought we switched blame from
@@ -2105,6 +2152,14 @@ Two more are RUN-TIME refusals (`lifecycleRefusal`, `Machine.hs:2655`), because 
    the value is one operand of a compound. The checker accepted the anchor where it was written;
    the run refuses it where it is used (witnesses: `handed under a LEST`, `handed under a LEST,
 in a compound`, `handed to no WITHIN`).
+
+One more is a check-time refusal again, RULED 2026-10-24 by card B1c and added with the value form of B1:
+
+8. `THE ARMING` as a value written where the machine would not bind it — refused (`ArmingUnavailable`, its own message).
+   The machine binds it in a deonton's own slots as it arms the obligation (`withOwnArming`), on a join line, and at every `HENCE` or `LEST` hand-off.
+   The checker admits it inside a deonton's own slots (`inOwnSlots`: the party, the action and `PROVIDED`, the `AFTER` and `WITHIN`, an `EVERY`'s join line) or under a `HENCE` or `LEST` (`enclosingObligation`), and refuses it everywhere else: a top-level rule's `WHERE` or body, a top-level function's body, an `@export`ed decision, and an `EVERY`'s `IN` roll and `WHO` or `WHOSE` filter not under any `HENCE` or `LEST`.
+   Witnesses: `not-ok/tc/lifecycle-arming-outside-obligation.l4`, `not-ok/tc/lifecycle-arming-in-every-roll.l4`.
+   The run's refusal (`lifecycleValueRefusal`) stays as the backstop.
 
 **Printers and exporters.** `prettyLayout` prints `d [OF anchor]` with the duration bracketed
 exactly as before (`Print.hs:959`, `:968`), so every unanchored deadline prints byte-for-byte as it

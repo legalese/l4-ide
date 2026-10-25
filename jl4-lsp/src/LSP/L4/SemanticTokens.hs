@@ -206,7 +206,13 @@ instance ToSemTokens Context PosToken (Event Name) where
 
 
 
+-- A lifecycle value's words (THE JOIN, §2.6 B1) live in its own Anno, and
+-- the noun is an identifier token shown as the keyword it acts as, exactly
+-- as in the anchor ('Anchor' below).
 instance ToSemTokens Context PosToken (Expr Name) where
+  toSemTokens e = case e of
+    Lifecycle{} -> withTokenType identIsKeyword $ genericToSemTokens e
+    _           -> genericToSemTokens e
 instance ToSemTokens Context PosToken (GuardedExpr Name) where
 instance ToSemTokens Context PosToken (Deonton Name) where
 instance ToSemTokens Context PosToken (Subject Name) where
@@ -237,6 +243,10 @@ instance ToSemTokens Context PosToken DeonticModal where
   toSemTokens _ = pure []
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens Context PosToken InertContext where
+  toSemTokens _ = pure []
+-- LifecyclePoint has no tokens to highlight (THE and the noun are in the
+-- Lifecycle node's Anno)
+instance ToSemTokens Context PosToken LifecyclePoint where
   toSemTokens _ = pure []
 -- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
 instance ToSemTokens Context PosToken RecallMode where
@@ -370,6 +380,9 @@ instance ToSemTokens () PosToken DeonticModal where
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens () PosToken InertContext where
   toSemTokens _ = pure []
+-- LifecyclePoint has no tokens to highlight (see the Name-phase instance)
+instance ToSemTokens () PosToken LifecyclePoint where
+  toSemTokens _ = pure []
 -- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
 instance ToSemTokens () PosToken RecallMode where
   toSemTokens _ = pure []
@@ -377,7 +390,11 @@ instance ToSemTokens () PosToken (RAction Resolved) where
 instance ToSemTokens () PosToken (Event Resolved) where
   toSemTokens (MkEvent ann p a t atFirst) = traverseCsnWithHoles ann $ map toSemTokens
     if atFirst then [t, p, a] else [p, a, t]
+-- See the Name-phase instance above.
 instance ToSemTokens () PosToken (Expr Resolved) where
+  toSemTokens e = case e of
+    Lifecycle{} -> withTokenType identIsKeyword $ genericToSemTokens e
+    _           -> genericToSemTokens e
 instance ToSemTokens () PosToken (GuardedExpr Resolved) where
 instance ToSemTokens () PosToken (LocalDecl Resolved) where
 instance ToSemTokens () PosToken (Assume Resolved) where

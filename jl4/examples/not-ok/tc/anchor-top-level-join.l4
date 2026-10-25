@@ -1,8 +1,11 @@
 -- WITHIN d OF THE JOIN names the instant the ENCLOSING obligation's join
 -- fired (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B). A rule that is not inside
 -- any HENCE or LEST has no enclosing obligation, so there is no join to name.
--- THE DEADLINE is refused for the same reason; THE ARMING is not, because at
--- the top level it is the obligation's own arming — the default.
+-- THE DEADLINE is refused for the same reason; the anchor OF THE ARMING is
+-- not, because in a top-level obligation's own WITHIN it is that
+-- obligation's own arming — the default. (THE ARMING as a value written
+-- outside an obligation's own lines is refused: refusal 8,
+-- lifecycle-arming-outside-obligation.l4.)
 
 DECLARE Actor IS ONE OF
     Buyer
