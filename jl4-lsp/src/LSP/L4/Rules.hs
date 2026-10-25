@@ -2,7 +2,10 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module LSP.L4.Rules where
+-- 'PathResolution' is defined with the pure resolver, which says the same words
+-- for the browser build; it is re-exported so a caller that asks the rules about a
+-- path import need not know where the type lives.
+module LSP.L4.Rules (module LSP.L4.Rules, PathResolution (..)) where
 
 import Base hiding (use)
 import L4.Annotation
@@ -11,7 +14,7 @@ import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
-import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), classifyImport, collapsePath, pathImportFile)
+import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), PathResolution (..), classifyImport, collapsePath, pathImportFile, pathResolutionMessage)
 import L4.Lexer (PError, PosToken)
 import L4.Nlg (promoteHeadInputNlg)
 import Optics (gplate, toListOf, (%), (^.))
@@ -947,21 +950,6 @@ writtenImportName n = case classifyImport written of
   where
     written = rawNameToText (rawName n)
 
--- | What resolving one path import came to. See 'resolveRelativeImport'.
-data PathResolution
-  = PathFound !NormalizedUri
-  | PathNotFound !FilePath !FilePath
-    -- ^ the importing file, and the collapsed path that was looked for
-  | PathEscapesRoot !FilePath !FilePath
-    -- ^ the importing file, and the collapsed path, which leaves the root of a
-    -- confined runtime
-  | PathNoImportingDirectory
-    -- ^ the importer is not a file with a directory: an embedded library, or a
-    -- browser document
-  | PathRootRefused
-    -- ^ a leading @\/@, which is reserved
-  deriving stock (Eq, Show)
-
 -- | What resolving one written @IMPORT@ came to: a bare name goes through the
 -- ladder ('resolveImportShared') unchanged, a path through
 -- 'resolveRelativeImport'.
@@ -1077,28 +1065,12 @@ relativeFrom base path
 -- | The diagnostic text for a path import that did not resolve, or 'Nothing' for
 -- one that did. The first line of each is stable text a test can match
 -- (RELATIVE-IMPORTS-SPEC §4.5).
+--
+-- The text is 'pathResolutionMessage', which the browser build's resolver says
+-- too; this only names the importing file by its URI.
 pathFailureMessage :: NormalizedUri -> Text -> PathResolution -> Maybe Text
-pathFailureMessage importerUri written = \ case
-  PathFound _ -> Nothing
-  PathNotFound importer collapsed -> Just $ Text.unlines
-    [ "I could not find a module at this path: " <> written
-    , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
-    , "Relative to " <> Text.pack importer <> " that is " <> Text.pack collapsed <> ", which does not exist."
-    ]
-  PathEscapesRoot importer collapsed -> Just $ Text.unlines
-    [ "This import leaves the root of this deployment: " <> written
-    , "Relative to " <> Text.pack importer <> " that would be " <> Text.pack collapsed
-        <> ", which is outside the root of this deployment."
-    , "A relative import may reach any file inside the deployment and nothing outside it."
-    ]
-  PathNoImportingDirectory -> Just $ Text.unlines
-    [ "This import is relative, but " <> (fromNormalizedUri importerUri).getUri <> " has no directory to be relative to."
-    , "Write a bare module name, or open the file from disk so that it has a folder to start from."
-    ]
-  PathRootRefused -> Just $ Text.unlines
-    [ "This import leaves the root of this deployment: " <> written
-    , "A path import is written relative to the file that imports it. A leading / is reserved for a root-relative form that does not exist yet."
-    ]
+pathFailureMessage importerUri =
+  pathResolutionMessage (fromNormalizedUri importerUri).getUri
 
 -- | The warning for a bare import whose written name is not the module it
 -- resolves: a dot or an extension in a name is dropped, so @IMPORT a.b@ is

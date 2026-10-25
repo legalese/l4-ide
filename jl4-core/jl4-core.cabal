@@ -230,6 +230,8 @@ test-suite jl4-core-test
   other-modules:
     Paths_jl4_core
     ImportResolutionSpec
+    PathImportFixtures
+    PathImportVfsSpec
     RelativeImportSpec
     TemporalContextSpec
     UnifySpec
