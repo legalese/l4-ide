@@ -67,6 +67,7 @@ executable l4
     L4.Cli.Cloud
     L4.Cli.Common
     L4.Cli.Deploy
+    L4.Cli.DeployPlan
     L4.Cli.Docassemble
     L4.Cli.Export
     L4.Cli.Format
@@ -158,11 +159,14 @@ test-suite jl4-test
     lsp-types,
     text,
 
+-- It shares `app` for the one module that is pure (no LSP, no network), the way
+-- m3-measure shares L4.Cli.Common: L4.Cli.DeployPlan, which decides what
+-- `l4 deploy` uploads and under what names.
 test-suite l4-cli-test
   import: defaults
   ghc-options: -threaded -rtsopts
   type: exitcode-stdio-1.0
-  hs-source-dirs: tests-cli
+  hs-source-dirs: tests-cli app
   main-is: Main.hs
   other-modules:
     CliTest.Blawx
@@ -170,10 +174,12 @@ test-suite l4-cli-test
     CliTest.BuildVersion
     CliTest.Catala
     CliTest.Common
+    CliTest.Deploy
     CliTest.DmnBpmn
     CliTest.Docassemble
     CliTest.OpenFisca
     CliTest.Yscript
+    L4.Cli.DeployPlan
     Paths_jl4
   autogen-modules:
     Paths_jl4
@@ -188,6 +194,8 @@ test-suite l4-cli-test
     filepath,
     hspec,
     jl4-core,
+    network,
     process,
     temporary,
     text,
+    zip-archive,

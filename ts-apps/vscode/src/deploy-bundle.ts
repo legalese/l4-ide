@@ -33,6 +33,18 @@
  * language server to return the lines, which is a change to that protocol and
  * is not made.
  *
+ * A service built before the commit that makes the bundle root the top of the
+ * upload (`bundleRoot` in jl4-service's Backend/Jl4.hs) looks a bare IMPORT up
+ * from the folder of the first file of the upload in alphabetical order, not at
+ * the top, when it compiles the bundle and answers a call on the direct path (a
+ * call on the wrapper path, a request with a `{}` in an input, looks from the
+ * folder of the function's own file instead; see jl4-service's
+ * test/BundleRootSpec.hs), so a main file in a folder with its library at the
+ * top is uploaded here, such a service says "ready", and every call fails; this
+ * deploy does not
+ * check the version of the service, and whether the service has to be released
+ * first is not decided.
+ *
  * Lives in its own module with no `vscode` import so `node --test` can exercise
  * it (see `unit-tests/deploy-bundle.test.ts`). The zip writer that packs the
  * collected files is here too, for the same reason (`unit-tests/create-zip.test.ts`).

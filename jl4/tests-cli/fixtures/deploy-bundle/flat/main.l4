@@ -1,0 +1,7 @@
+-- A project whose files all sit in one folder, for the test of what l4 deploy
+-- uploads: main.l4 and helper.l4, and not prelude, which l4 carries inside itself.
+IMPORT prelude
+IMPORT helper
+
+GIVEN n IS A NUMBER
+`double it` MEANS n * 2

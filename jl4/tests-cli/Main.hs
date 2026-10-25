@@ -57,6 +57,7 @@ import qualified CliTest.Blawx as Blawx
 import qualified CliTest.BuildIdentity as BuildIdentity
 import qualified CliTest.BuildVersion as BuildVersion
 import qualified CliTest.Catala as Catala
+import qualified CliTest.Deploy as Deploy
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Docassemble as Docassemble
 import qualified CliTest.OpenFisca as OpenFisca
@@ -560,6 +561,7 @@ main = do
          , Yscript.fixtures
          , Blawx.fixtures
          , Docassemble.fixtures
+         , Deploy.fixtures
          , Catala.fixtures
          , BuildIdentity.fixtures
          ]) \fp -> do
@@ -3930,6 +3932,7 @@ spec bin = do
   Blawx.spec bin
   Docassemble.spec bin
   Catala.spec bin
+  Deploy.spec bin
   BuildVersion.spec bin
   BuildIdentity.spec
   where
