@@ -52,6 +52,7 @@ import L4.Cli.Deploy
   , undeployOptionsParser
   )
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
+import L4.Cli.Explore (ExploreCliOptions, exploreCmd, exploreOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
@@ -85,6 +86,7 @@ data Command
   | CmdDocassemble DocassembleOptions
   | CmdNlg        NlgOptions
   | CmdLts        LtsOptions
+  | CmdExplore    ExploreCliOptions
   | CmdVerify     VerifyOptions
   | CmdYscript    YscriptOptions
   | CmdDeploy     DeployOptions
@@ -135,6 +137,11 @@ commandParser =
       <> command "lts"
            (info (helper <*> (CmdLts <$> ltsOptionsParser))
              (progDesc "List, for every #TRACE, what is owed now, what would discharge it, what would breach it, and the next deadline"))
+      <> command "explore"
+           (info (helper <*> (CmdExplore <$> exploreOptionsParser))
+             ( progDesc "Every position a contract can reach, as an explicit labelled transition system, ending in a coverage line"
+             <> footer "Exit status: 0 complete; 1 the file or an option failed; 2 an act was refused (a variable whose type has no finite set of values) or a candidate could not be tried; 3 the depth or state bound stopped it. No sample is ever tried in a refused act's place."
+             ))
       -- `helper` here, and not on the older subcommands, is deliberate rather
       -- than inconsistent-by-accident: `l4 <cmd> --help` answers
       -- `Invalid option '--help'` for every subcommand that predates these two,
@@ -279,6 +286,7 @@ main = do
     CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
     CmdLts        opts -> ltsCmd        opts
+    CmdExplore    opts -> exploreCmd    opts
     CmdVerify     opts -> verifyCmd     opts
     CmdYscript    opts -> yscriptCmd    opts
     CmdDeploy     opts -> deployCmd     opts

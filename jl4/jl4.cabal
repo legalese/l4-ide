@@ -68,6 +68,7 @@ executable l4
     L4.Cli.Common
     L4.Cli.Deploy
     L4.Cli.Docassemble
+    L4.Cli.Explore
     L4.Cli.Export
     L4.Cli.Format
     L4.Cli.Install
