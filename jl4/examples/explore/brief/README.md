@@ -112,7 +112,7 @@ It knew nothing of the brief: the graph it found is the evaluator's.
 
 Each graph of `d1`, `d2` and `d3`, written with the labels above, is strongly and branching bisimilar to its reference (`ltscompare -ebisim` and `-ebranching-bisim` print `true`; D1's graph against D2's reference prints `false`).
 The properties were evaluated by `#EVAL` of the decisions in `properties.l4` on every state's ledgers.
-P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and were not checked.
+P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and were not checked, by that explorer or since.
 That throwaway explorer was not a test in the tree.
 `l4 explore` (WP1) now reproduces its state, transition and pass-over counts for all five rows, and `jl4/tests/LtsExplore.hs` asserts them as numbers; the bisimulation against the references is still WP4's harness.
 The run that reproduces the table bounds the clock at closing and keeps the cells `properties.l4` reads, which no `RECALL` in a contract names (`--keep` for a cell a property reads whole, `--keep-latest` for one it reads as a `MAYBE`):
@@ -125,6 +125,20 @@ l4 explore d1-naive.l4 --until 75600 \
 
 Without the kept cells `d1-naive.l4` gives 10 states and 18 transitions, and its coverage line names `dinners bought` and `open at acceptance` as write-only cells it dropped: the bad purchase of Sequence A and the good one of Sequence B are then one state.
 Without `--until`, each state's tick past closing reaches a `FULFILLED` twin, so `d1-naive.l4` gives 24 states and 45 transitions.
+
+The P1 to P4 columns are reproduced by `l4 explore`'s own checks (WP2), which keep the cells the properties read without being told, so the graph is the same 12 states and 21 transitions:
+
+```sh
+l4 explore d1-naive.l4 --until 75600 \
+  --always 'every dinner was accepted while open' --always 'at most one dinner is bought' \
+  --reachable "Alice's belief is stale" --stays 'one dinner is bought'
+```
+
+Each violated property prints its counterexample as a `#TRACE` that `l4 run` reproduces when it is pasted into the file, and each reached one its witness; every one is run as printed before it is reported.
+The events of a printed trace are all at 18:00 (64800), because the explorer fires an act first at the instant of the last event: the order is Sequence A's, the clock times are not, and the fixtures' guards do not read the clock.
+The exit status is 4 when a property is violated, so the D1 and D2 runs exit 4 by design.
+`--eventually` labels the states for P5, P6 (`--eventually 'one dinner is bought' --if-always 'the ledger is open'`) and the non-vacuity control, and answers each `unknown (liveness: run the emitted model)`; a run with nothing else wrong then exits 5.
+`jl4/tests/LtsExplore.hs` asserts every verdict and counterexample path on all five rows, and pins the checks' text under `../expected/*.check.txt`.
 
 ## What the explorer must know
 

@@ -19,6 +19,16 @@
 -- @RECALL@ of its own for the explorer to find (spec §4.1; 'keepCells').
 -- One case runs without the kept cells and one without the clock bound, so
 -- that what each of those choices does is pinned too.
+--
+-- The in-process checker (spec §5, WP2) is pinned on the same fixtures:
+-- the verdict of every property of @properties.l4@ on every design, the
+-- counterexamples as the paths BRIEF.md's table predicts (D1: check, Bob's
+-- purchase, buy; D2: check, re-read, Bob's purchase, buy; the mutants: only
+-- P4, by the cancel, and only P2, by the double record), P3 reachable in all
+-- five, and the checks' text byte for byte. Every counterexample and
+-- witness is run as printed, as source, through 'sourceReplay' — the
+-- fixture's text with the @#TRACE@ appended, type-checked again with its
+-- import — before the checker reports it, as the CLI does.
 module LtsExplore (spec) where
 
 import Base
@@ -31,10 +41,14 @@ import Test.Hspec
 import Test.Hspec.Golden
 
 import L4.API.VirtualFS (checkWithImports, vfsFromList, TypeCheckWithDepsResult (..))
-import L4.EvaluateLazy (resolveEvalConfig)
+import L4.EvaluateLazy (EvalDirectiveResult (..), execEvalModuleWithDeonticLog, resolveEvalConfig)
 import L4.Import.Resolution (ResolvedImport (..))
 import L4.Lts.Explore
+import L4.Lts.Explore.Check hiding (CheckResult, propertyCells)
+import qualified L4.Lts.Explore.Check as Check
 import L4.Lts.WhatIf (Rig (..))
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
+import L4.Print (prettyLayout)
 import L4.TracePolicy (apiDefaultPolicy)
 import L4.TypeCheck (CheckResult (..))
 
@@ -80,6 +94,108 @@ exploreFixture rel keep until' = do
   case startsOf r.tcdModule of
     [start] -> explore opts sites rig start >>= either (fail . ((rel <> ": ") <>) . Text.unpack) pure
     other -> fail (rel <> ": expected one contract to explore, found " <> show (length other))
+
+-- | The properties of @properties.l4@, as the brief classes them, and the
+-- non-vacuity control (spec §6.3), which is a liveness property here too.
+properties :: [Request]
+properties =
+  [ MkRequest Always "every dinner was accepted while open" Nothing            -- P1
+  , MkRequest Always "at most one dinner is bought" Nothing                    -- P2
+  , MkRequest Reachable "Alice's belief is stale" Nothing                      -- P3
+  , MkRequest Stays "one dinner is bought" Nothing                             -- P4
+  , MkRequest Eventually "Alice has bought or stopped" Nothing                 -- P5
+  , MkRequest Eventually "one dinner is bought" (Just "the ledger is open")    -- P6
+  , MkRequest Eventually "Bob has bought" Nothing                              -- the control
+  ]
+
+-- | Explore one fixture with the properties' cells kept (and no others),
+-- the clock bound at closing, and check the properties, every path run as
+-- printed before it is reported.
+checkFixture :: FilePath -> IO (Graph, [Check.CheckResult])
+checkFixture rel = do
+  dataDir <- Paths_jl4.getDataDir
+  let brief = dataDir </> "examples" </> "explore" </> "brief"
+  src <- Text.readFile (brief </> rel)
+  props <- Text.readFile (brief </> "properties.l4")
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  let typecheck text = either (fail . ((rel <> ": typecheck failed: ") <>) . show) pure
+        (checkWithImports (vfsFromList [("properties", props)]) text)
+  r <- typecheck src
+  env <- importsEnv cfg r.tcdResolvedImports
+  let rig = MkRig {rigConfig = cfg, rigEntityInfo = r.tcdEntityInfo, rigEnv = env, rigModule = r.tcdModule}
+      modules = r.tcdModule : [ ri.riTypeChecked.program | ri <- r.tcdResolvedImports ]
+      opts = defaultExploreOptions {eoUntil = Just closing}
+  ps <- either (fail . Text.unpack) pure (traverse (resolveProperty r.tcdEntityInfo modules) properties)
+  let sites = keepCells (Check.propertyCells ps) (readSitesOf r.tcdModule [ ri.riTypeChecked.program | ri <- r.tcdResolvedImports ])
+      -- the #TRACE as printed, appended to the fixture, type-checked and run
+      -- again; the trace's ledgers are those of the one directive below the
+      -- fixture's own lines
+      sourceReplay printed = do
+        r' <- typecheck (src <> "\n" <> printed)
+        env' <- importsEnv cfg r'.tcdResolvedImports
+        (_, results) <- execEvalModuleWithDeonticLog cfg r'.tcdEntityInfo env' r'.tcdModule
+        let ownLines = length (Text.lines src)
+        pure case [ l | (MkEvalDirectiveResult {range = Just MkSrcRange {start = MkSrcPos {line = n}}, ledger = l}, _) <- results, n > ownLines ] of
+          [l] -> Right l
+          ls -> Left ("gave " <> Text.pack (show (length ls)) <> " results below the fixture")
+  start <- case startsOf r.tcdModule of
+    [s] -> pure s
+    other -> fail (rel <> ": expected one contract to explore, found " <> show (length other))
+  g <- explore opts sites rig start >>= either (fail . ((rel <> ": ") <>) . Text.unpack) pure
+  (rs, _) <- checkGraph opts rig (Just sourceReplay) g ps
+  pure (g, rs)
+
+-- | A fixture, and what each property must come to: the verdict word, and
+-- for a violated or reached one the acts of its path, in order.
+data Expect = MkExpect
+  { exFile     :: FilePath
+  , exVerdicts :: [(Text, Maybe [Text])]
+  }
+
+liveness :: [(Text, Maybe [Text])]
+liveness = replicate 3 ("unknown", Nothing)
+
+check, bob, buy, reread, buyAnswered, cancel :: Text
+check = "`Alice checks whether dinner is bought`"
+bob = "`ledger records Bob's purchase`"
+buy = "`Alice buys dinner`"
+reread = "`Alice reads the ledger again` OF TRUE"
+buyAnswered = "`Alice buys dinner` OF TRUE"
+cancel = "`Alice cancels the dinner`"
+
+-- | P3's witness is the same two acts in every design: Alice checks while
+-- open, then Bob's purchase is recorded.
+stale :: (Text, Maybe [Text])
+stale = ("holds", Just [check, bob])
+
+expectations :: [Expect]
+expectations =
+  [ MkExpect "d1-naive.l4" $
+      [ ("violated", Just [check, bob, buy]), ("holds", Nothing), stale, ("holds", Nothing) ] <> liveness
+  , MkExpect "d2-reread.l4" $
+      [ ("violated", Just [check, reread, bob, buy]), ("holds", Nothing), stale, ("holds", Nothing) ] <> liveness
+  , MkExpect "d3-atomic.l4" $
+      [ ("holds", Nothing), ("holds", Nothing), stale, ("holds", Nothing) ] <> liveness
+  , MkExpect "mutants/d3-cancel.l4" $
+      [ ("holds", Nothing), ("holds", Nothing), stale, ("violated", Just [check, buyAnswered, cancel]) ] <> liveness
+  , MkExpect "mutants/d3-double.l4" $
+      [ ("holds", Nothing), ("violated", Just [check, buyAnswered]), stale, ("holds", Nothing) ] <> liveness
+  ]
+
+-- | The act of an event, without its party and instant: @PARTY World DOES
+-- `x` AT 64800@ is @`x`@.
+actOf :: Text -> Text
+actOf e = fst (Text.breakOn " AT " (fromMaybe e (Text.stripPrefix "PARTY World DOES " e)))
+
+outcome :: Check.CheckResult -> (Text, Maybe [Text])
+outcome r = (verdictWord r.crVerdict, map (actOf . oneLine . prettyLayout) . (.ptEvents) <$> pathOf r.crVerdict)
+  where
+    oneLine = Text.unwords . Text.words
+    pathOf = \ case
+      Violated _ mp -> mp
+      Reached p -> Just p
+      Unknown _ mp -> mp
+      Holds _ -> Nothing
 
 goldenOf :: String -> String -> Text -> IO (Golden Text)
 goldenOf stem ext output = do
@@ -198,6 +314,22 @@ spec = do
       -- resolved, or the outset would list its tick as untried
       [ t.tnLabel | t <- g.gTransitions, t.tnFrom == 0, t.tnKind == EdgeTick ]
         `shouldBe` ["time passes the deadline 75600 (WAIT UNTIL 75601)"]
+
+  describe "the checker's verdicts (WP2): P1 to P4 as BRIEF.md predicts, P5, P6 and the control unknown" $ forM_ expectations \ e ->
+    it e.exFile $ do
+      (g, rs) <- checkFixture e.exFile
+      map outcome rs `shouldBe` e.exVerdicts
+      -- liveness is never guessed
+      [ why | Check.MkCheckResult {crVerdict = Unknown why _} <- rs ] `shouldBe` replicate 3 livenessUnknown
+      -- the properties' cells are the ones the README's acceptance run keeps,
+      -- so the graph is the one WP1 pins
+      Just (g.gCoverage.cvStates, g.gCoverage.cvTransitions)
+        `shouldBe` lookup e.exFile [ (c.csFile, (c.csStates, c.csTransitions)) | c <- designs ]
+
+  describe "the checks' text (WP2)" $ forM_ designs \ c ->
+    it (c.csFile <> " checks to stable text") $ do
+      (g, rs) <- checkFixture c.csFile
+      goldenOf (stemOf c.csFile) ".check.txt" (Text.unlines (renderChecks g rs))
 
   describe "the text names no constructor" $ forM_ designs \ c ->
     it c.csFile $ do
