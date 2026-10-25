@@ -140,7 +140,7 @@ commandParser =
       <> command "explore"
            (info (helper <*> (CmdExplore <$> exploreOptionsParser))
              ( progDesc "Every position a contract can reach, as an explicit labelled transition system, ending in a coverage line"
-             <> footer "Exit status: 0 complete; 1 the file or an option failed; 2 an act was refused (a variable whose type has no finite set of values) or a candidate could not be tried; 3 the depth or state bound stopped it. No sample is ever tried in a refused act's place."
+             <> footer "Exit status: 0 complete, and every property named holds; 1 the file or an option failed, or an emitted file could not be written; 2 an act was refused (a variable whose type has no finite set of values) or a candidate could not be tried; 3 the depth or state bound stopped it; 4 a property is violated; 5 a property's verdict is unknown (every liveness property: run the emitted model). No sample is ever tried in a refused act's place."
              ))
       -- `helper` here, and not on the older subcommands, is deliberate rather
       -- than inconsistent-by-accident: `l4 <cmd> --help` answers

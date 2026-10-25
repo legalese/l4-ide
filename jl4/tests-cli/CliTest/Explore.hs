@@ -5,11 +5,14 @@
 -- incomplete exploration, a violated property and an unanswered one do not
 -- exit 0 (§4.2: "a CI job cannot read a refused run as green"), and that a
 -- printed counterexample, pasted into the file, is reproduced by @l4 run@
--- (§5.4).
+-- (§5.4); and that @--emit@ (§6.1, WP3) writes its files without changing
+-- the status, gives fairness only to the actor @--fair@ names, makes the
+-- relation total where a bound left a state with no edge, and refuses a
+-- @--fair@ that names nothing.
 module CliTest.Explore (spec, fixtures) where
 
-import Data.List (isInfixOf, isPrefixOf)
-import System.Directory (copyFile)
+import Data.List (isInfixOf, isPrefixOf, sort)
+import System.Directory (copyFile, listDirectory)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
@@ -157,3 +160,61 @@ spec bin = describe "l4 explore" $ do
       Output code' _ serr' <- runL4 bin ["explore", brief </> "d1-naive.l4", "--if-always", "the ledger is open"]
       code' `shouldBe` ExitFailure 1
       serr' `shouldSatisfy` ("must come straight after one" `isInfixOf`)
+
+  describe "--emit and --fair (WP3)" $ do
+    it "writes D3's thirteen files, gives Alice's two moving acts weak fairness, and exits as it would without --emit" $
+      withSystemTempDirectory "l4-explore-emit" \ dir -> do
+        Output code _ serr <- runL4 bin (["explore", brief </> "d3-atomic.l4"] <> safety <> liveness <> ["--emit", dir, "--fair", "Alice"])
+        -- a liveness property is unknown in process, so 5, as without --emit
+        code `shouldBe` ExitFailure 5
+        serr `shouldSatisfy` ("Emitted to " `isInfixOf`)
+        files <- listDirectory dir
+        sort files `shouldBe` sort
+          ( [ "d3_atomic.aut", "d3_atomic.tla", "d3_atomic.cfg", "d3_atomic.smv", "d3_atomic.dot", "d3_atomic.pnml" ]
+            <> [ "d3_atomic." <> p <> ".cfg"
+               | p <- [ "Always_every_dinner_was_accepted_while_open", "Always_at_most_one_dinner_is_bought"
+                      , "Never_Alice_s_belief_is_stale", "Stays_one_dinner_is_bought"
+                      , "Eventually_Alice_has_bought_or_stopped"
+                      , "Eventually_one_dinner_is_bought_if_always_the_ledger_is_open", "Eventually_Bob_has_bought" ] ] )
+        tla <- readFile (dir </> "d3_atomic.tla")
+        tla `shouldSatisfy` ("FairSpec == Spec /\\ WF_vars(World_Alice_checks_whether_dinner_is_bought) /\\ WF_vars(World_Alice_buys_dinner_OF_TRUE)\n" `isInfixOf`)
+        smv <- readFile (dir </> "d3_atomic.smv")
+        length [ () | l <- lines smv, "JUSTICE " `isPrefixOf` l ] `shouldBe` 2
+        aut <- readFile (dir </> "d3_atomic.aut")
+        take 1 (lines aut) `shouldBe` ["des (0,21,10)"]
+
+    it "with no --fair, makes no action fair, and says so in the model" $
+      withSystemTempDirectory "l4-explore-emit" \ dir -> do
+        Output code _ _ <- runL4 bin ["explore", brief </> "d3-atomic.l4", "--until", "75600", "--emit", dir]
+        code `shouldBe` ExitSuccess
+        tla <- readFile (dir </> "d3_atomic.tla")
+        tla `shouldSatisfy` ("none was named, so no action is fair" `isInfixOf`)
+        tla `shouldSatisfy` ("FairSpec == Spec\n" `isInfixOf`)
+        smv <- readFile (dir </> "d3_atomic.smv")
+        smv `shouldSatisfy` (not . ("JUSTICE " `isInfixOf`))
+
+    it "gives a state the depth bound left with no edge an unexplored self-loop in the .tla and .smv, and none in the .aut" $
+      withSystemTempDirectory "l4-explore-emit" \ dir -> do
+        Output code _ _ <- runL4 bin ["explore", brief </> "d3-atomic.l4", "--until", "75600", "--max-depth", "1", "--emit", dir]
+        code `shouldBe` ExitFailure 3
+        tla <- readFile (dir </> "d3_atomic.tla")
+        tla `shouldSatisfy` ("INCOMPLETE: " `isInfixOf`)
+        tla `shouldSatisfy` ("lastAct' = \"unexplored\"" `isInfixOf`)
+        smv <- readFile (dir </> "d3_atomic.smv")
+        smv `shouldSatisfy` ("next(act) = unexplored" `isInfixOf`)
+        aut <- readFile (dir </> "d3_atomic.aut")
+        aut `shouldSatisfy` (not . ("unexplored" `isInfixOf`))
+
+    it "exits 1 on a --fair that names no act, and on --fair without --emit" $
+      withSystemTempDirectory "l4-explore-emit" \ dir -> do
+        Output code _ serr <- runL4 bin ["explore", brief </> "d3-atomic.l4", "--until", "75600", "--emit", dir, "--fair", "Bobby"]
+        code `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` ("--fair Bobby: names no party" `isInfixOf`)
+        Output code' _ serr' <- runL4 bin ["explore", brief </> "d3-atomic.l4", "--fair", "Alice"]
+        code' `shouldBe` ExitFailure 1
+        serr' `shouldSatisfy` ("needs --emit" `isInfixOf`)
+  where
+    liveness =
+      [ "--eventually", "Alice has bought or stopped"
+      , "--eventually", "one dinner is bought", "--if-always", "the ledger is open"
+      , "--eventually", "Bob has bought" ]

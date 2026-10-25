@@ -1,15 +1,29 @@
 -- | @l4 explore FILE [--contract NAME [--at T]] [--until T] [--json | --dot]
--- [--always P] [--reachable P] [--stays P] [--eventually P [--if-always Q]]@
+-- [--always P] [--reachable P] [--stays P] [--eventually P [--if-always Q]]
+-- [--emit DIR [--fair NAME]…]@
 -- — every position a contract can reach, as an explicit labelled
 -- transition system: the states, the events between them, and a coverage
 -- line that says how much of the contract that is; and, when properties are
--- named, whether each holds on it.
+-- named, whether each holds on it; and, with @--emit@, the graph written
+-- for mCRL2, TLC, NuSMV, GraphViz and a Petri net tool.
 --
--- This is work packages WP1 and WP2 of
--- @specs/proposals/REGULATIVE-LOWERING-SPEC.md@ (§4, §5): the graph is
+-- This is work packages WP1, WP2 and WP3 of
+-- @specs/proposals/REGULATIVE-LOWERING-SPEC.md@ (§4, §5, §6.1): the graph is
 -- "L4.Lts.Explore" iterating "L4.Lts.WhatIf"'s replay, so every edge is the
--- evaluator's own answer; the checks are "L4.Lts.Explore.Check", and this
--- module only loads the file and prints.
+-- evaluator's own answer; the checks are "L4.Lts.Explore.Check", the
+-- emitted files "L4.Lts.Explore.Emit", and this module only loads the file,
+-- prints and writes.
+--
+-- @--emit DIR@ writes, per contract explored, @<base>.aut@, @<base>.tla@
+-- with @<base>.cfg@ and one @<base>.<property>.cfg@ per property,
+-- @<base>.smv@, @<base>.dot@ and @<base>.pnml@ into @DIR@, where @<base>@
+-- is the file's stem as an identifier (@d1-naive.l4@ gives @d1_naive@). The
+-- properties named are emitted as the predicates and properties of the
+-- TLA+ and NuSMV models. @--fair NAME@ names an actor whose acts that move
+-- are given weak fairness in them; no other act is, so a liveness property
+-- that needs fairness fails, loudly, until the agent is named (see
+-- "L4.Lts.Explore.Emit.Model" for why the default is none). A @--fair@ that
+-- names no act of any graph explored is an option that names nothing.
 --
 -- A property is a boolean decision of the file or a file it imports, named
 -- by a flag that says its class (the spec's @--check@: L4 has no syntax for
@@ -30,6 +44,9 @@
 -- (every liveness property; a state that could not be labelled). A tick
 -- past @--until@ is outside the exploration asked for, not a failure of
 -- it: it is counted on the coverage line and does not change the status.
+-- With @--emit@, a file that could not be written, or could not be written
+-- faithfully (an @.aut@ label mCRL2 would merge with another), makes the
+-- status 1; the other files are written all the same.
 module L4.Cli.Explore
   ( ExploreCliOptions (..)
   , exploreOptionsParser
@@ -38,6 +55,7 @@ module L4.Cli.Explore
 
 import Base (catMaybes, for, for_, unless, when)
 import Data.Char (isDigit)
+import Data.Either (lefts, rights)
 import qualified Base.Set as Set
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
@@ -45,7 +63,9 @@ import qualified Data.Aeson.Encode.Pretty as AesonPretty
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text.IO as TIO
 import Options.Applicative
+import System.Directory (createDirectoryIfMissing)
 import System.Exit (ExitCode (..), exitWith)
+import System.FilePath ((</>), takeBaseName, takeFileName)
 import System.IO (hPutStrLn, stderr)
 
 import Development.IDE.Graph (Action)
@@ -55,6 +75,7 @@ import Language.LSP.Protocol.Types (NormalizedUri, normalizedFilePathToUri)
 
 import L4.Lts.Explore
 import L4.Lts.Explore.Check
+import L4.Lts.Explore.Emit
 import L4.EvaluateLazy (EvalConfig, EvalDirectiveResult (..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Lts.WhatIf (Rig (..))
@@ -80,6 +101,8 @@ data ExploreCliOptions = ExploreCliOptions
   , exProperties :: [PropertyFlag]
   , exJson      :: Bool
   , exDot       :: Bool
+  , exEmit      :: Maybe FilePath
+  , exFair      :: [Text.Text]
   , exFixedNow  :: FixedNowOpt
   }
 
@@ -160,6 +183,16 @@ exploreOptionsParser = ExploreCliOptions
         ])
   <*> switch (long "json" <> help "Print the graph as JSON, one object per contract explored")
   <*> switch (long "dot" <> help "Print the graph in GraphViz's DOT language")
+  <*> optional (strOption
+        ( long "emit"
+        <> metavar "DIR"
+        <> help "Write the graph into DIR for other tools: <base>.aut (mCRL2), <base>.tla with <base>.cfg and one cfg per property (TLC), <base>.smv (NuSMV), <base>.dot, <base>.pnml; the properties named become the models' predicates and properties"
+        ))
+  <*> many (strOption
+        ( long "fair"
+        <> metavar "NAME"
+        <> help "With --emit: give weak fairness, in the TLA+ and NuSMV models, to every act of this actor that moves (a party, an act's constructor, or the first words of a constructor's name, as Alice in `Alice buys dinner`). No other act is fair; repeatable"
+        ))
   <*> fixedNowParser
 
 -- | A number as a @#TRACE@ writes one: digits, an optional fraction.
@@ -181,6 +214,11 @@ exploreCmd opts = do
   when (opts.exJson && opts.exDot) do
     hPutStrLn stderr "--json and --dot are two renderings of one graph: choose one"
     exitWith (ExitFailure 1)
+  case opts.exEmit of
+    Nothing | not (null opts.exFair) -> do
+      hPutStrLn stderr "--fair says which acts the emitted models assume fair, so it needs --emit DIR"
+      exitWith (ExitFailure 1)
+    _ -> pure ()
   evalConfig <- makeEvalConfig opts.exFixedNow
   (errs, mLoaded) <- runOneshot evalConfig opts.exFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
@@ -247,6 +285,14 @@ exploreCmd opts = do
           original <- TIO.readFile opts.exFile
           (rs, labels) <- checkGraph options rig (Just (sourceReplay evalConfig opts.exFile original)) g props
           pure (g, rs, labels)
+      -- a --fair that names no act is a typo, and a typo here would leave
+      -- the agent unfair without a word
+      case [ n | n <- opts.exFair, not (any (\ (g, _, _) -> fairMatches g n) checked) ] of
+        [] -> pure ()
+        bad -> do
+          for_ bad \ n -> hPutStrLn stderr ("--fair " <> Text.unpack n
+            <> ": names no party, no act's constructor, and no first words of a constructor's name, of any act in the graph explored")
+          exitWith (ExitFailure 1)
       if opts.exJson
         then BL.putStrLn (AesonPretty.encodePretty' jsonConfig (Aeson.toJSON
                [ if null props then graphJson g else checksJson g rs labels (graphJson g) | (g, rs, labels) <- checked ]))
@@ -260,7 +306,32 @@ exploreCmd opts = do
         for_ checked \ (g, rs, _) -> do
           unless (null rs) $ TIO.hPutStrLn stderr (checksSummary rs)
           TIO.hPutStrLn stderr (coverageLine g.gCoverage)
-      exitWith (statusOf (length graphs < length starts) [ (g.gCoverage, map (.crVerdict) rs) | (g, rs, _) <- checked ])
+      emitted <- maybe (pure True) (\ dir -> emitAll dir opts props checked) opts.exEmit
+      exitWith if emitted
+        then statusOf (length graphs < length starts) [ (g.gCoverage, map (.crVerdict) rs) | (g, rs, _) <- checked ]
+        else ExitFailure 1
+
+-- | Write every emitted file of every graph into the directory, and say on
+-- stderr what was written and what was not. 'False' when a file was not.
+emitAll :: FilePath -> ExploreCliOptions -> [Property] -> [(Graph, [CheckResult], Labels)] -> IO Bool
+emitAll dir opts props checked = do
+  createDirectoryIfMissing True dir
+  let stem = Text.pack (takeBaseName opts.exFile)
+  results <- for (zip [1 ..] checked) \ (k, (g, _, labels)) -> do
+    let files = emitFiles MkEmitInput
+          { eiBase = emitBase stem (length checked) k
+          , eiSource = Text.pack (takeFileName opts.exFile)
+          , eiGraph = g
+          , eiProperties = props
+          , eiLabels = labels
+          , eiFair = opts.exFair
+          }
+    for_ (rights files) \ (name, text) -> TIO.writeFile (dir </> Text.unpack name) text
+    for_ (lefts files) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
+    unless (null (rights files)) $
+      TIO.hPutStrLn stderr ("Emitted to " <> Text.pack dir <> ": " <> Text.intercalate ", " (map fst (rights files)))
+    pure (null (lefts files))
+  pure (and results)
 
 -- | Run a @#TRACE@, given as source, appended to the file explored: a
 -- virtual file beside it, so that its imports resolve as the file's own do,

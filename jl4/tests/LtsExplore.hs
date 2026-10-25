@@ -29,6 +29,13 @@
 -- witness is run as printed, as source, through 'sourceReplay' — the
 -- fixture's text with the @#TRACE@ appended, type-checked again with its
 -- import — before the checker reports it, as the CLI does.
+--
+-- The emitters (spec §6.1, WP3) are pinned on the three designs: which
+-- actions get weak fairness under @--fair Alice@, asserted as names (spec
+-- §4.6's list, derived from the graph); the files and their order; the
+-- @.aut@'s counts; and every file's text, under @expected/*.emit.txt@. That
+-- TLC, NuSMV and mCRL2 load the files and what they answer is not a test
+-- here, since none of them is installed in CI; it is WP4's harness.
 module LtsExplore (spec) where
 
 import Base
@@ -46,6 +53,8 @@ import L4.Import.Resolution (ResolvedImport (..))
 import L4.Lts.Explore
 import L4.Lts.Explore.Check hiding (CheckResult, propertyCells)
 import qualified L4.Lts.Explore.Check as Check
+import L4.Lts.Explore.Emit (EmitInput (..), emitBase, emitFiles)
+import L4.Lts.Explore.Emit.Model (EmAction (..), Fairness (..), Model (..), buildModel)
 import L4.Lts.WhatIf (Rig (..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Print (prettyLayout)
@@ -112,7 +121,12 @@ properties =
 -- the clock bound at closing, and check the properties, every path run as
 -- printed before it is reported.
 checkFixture :: FilePath -> IO (Graph, [Check.CheckResult])
-checkFixture rel = do
+checkFixture rel = (\ (g, rs, _, _) -> (g, rs)) <$> checkFixture' rel
+
+-- | 'checkFixture', with the labels and the resolved properties too, which
+-- the emitters read.
+checkFixture' :: FilePath -> IO (Graph, [Check.CheckResult], Labels, [Property])
+checkFixture' rel = do
   dataDir <- Paths_jl4.getDataDir
   let brief = dataDir </> "examples" </> "explore" </> "brief"
   src <- Text.readFile (brief </> rel)
@@ -142,8 +156,48 @@ checkFixture rel = do
     [s] -> pure s
     other -> fail (rel <> ": expected one contract to explore, found " <> show (length other))
   g <- explore opts sites rig start >>= either (fail . ((rel <> ": ") <>) . Text.unpack) pure
-  (rs, _) <- checkGraph opts rig (Just sourceReplay) g ps
-  pure (g, rs)
+  (rs, labels) <- checkGraph opts rig (Just sourceReplay) g ps
+  pure (g, rs, labels, ps)
+
+-- | What the emitters are given for a fixture, as the CLI gives it with
+-- @--emit DIR --fair Alice@.
+emitInputOf :: FilePath -> IO EmitInput
+emitInputOf rel = do
+  (g, _, labels, ps) <- checkFixture' rel
+  pure MkEmitInput
+    { eiBase = emitBase (Text.pack (stemOf rel)) 1 1
+    , eiSource = Text.pack (takeFileName rel)
+    , eiGraph = g
+    , eiProperties = ps
+    , eiLabels = labels
+    , eiFair = ["Alice"]
+    }
+
+-- | A design, and what WP3 must emit for it: the actions given weak
+-- fairness, derived from the graph and @--fair Alice@ (spec §4.6: Alice's
+-- acts that move, and the ledger answering her, which in these fixtures is
+-- inside her act; never Bob's purchase or the message, never a pause).
+data EmitCase = MkEmitCase
+  { ecFile :: FilePath
+  , ecFair :: [Text]
+  }
+
+emitCases :: [EmitCase]
+emitCases =
+  [ MkEmitCase "d1-naive.l4"
+      [ "World_Alice_checks_whether_dinner_is_bought", "World_Alice_buys_dinner", "World_Alice_gives_up" ]
+  , MkEmitCase "d2-reread.l4"
+      [ "World_Alice_checks_whether_dinner_is_bought", "World_Alice_reads_the_ledger_again_OF_TRUE"
+      , "World_Alice_buys_dinner", "World_Alice_gives_up" ]
+  , MkEmitCase "d3-atomic.l4"
+      [ "World_Alice_checks_whether_dinner_is_bought", "World_Alice_buys_dinner_OF_TRUE" ]
+  ]
+
+-- | Every emitted file, each under a @==> name <==@ line, as one text.
+emittedText :: [Either Text (Text, Text)] -> Text
+emittedText files = Text.concat
+  [ either (\ why -> "==> NOT WRITTEN <==\n" <> why <> "\n") (\ (name, body) -> "==> " <> name <> " <==\n" <> body) f <> "\n"
+  | f <- files ]
 
 -- | A fixture, and what each property must come to: the verdict word, and
 -- for a violated or reached one the acts of its path, in order.
@@ -336,5 +390,44 @@ spec = do
       g <- exploreFixture c.csFile propertyCells (Just closing)
       let txt = renderGraph g
       [ n | n <- constructorNames, n `Text.isInfixOf` txt ] `shouldBe` []
+
+  describe "the emitted models (WP3): fairness per labelled action, derived from the graph and --fair Alice" $ forM_ emitCases \ e ->
+    it (e.ecFile <> ": " <> show (length e.ecFair) <> " fair actions, the rest named and why, every state with an edge") $ do
+      ei <- emitInputOf e.ecFile
+      let m = buildModel ei
+      [ a.eaIdent | a <- m.mdActions, a.eaFairness == Fair ] `shouldBe` e.ecFair
+      -- the environment's acts and the pauses are never fair, and say why
+      [ a.eaIdent | a <- m.mdActions, a.eaFairness /= Fair ] `shouldSatisfy` all (\ i ->
+        i `elem` [ "World_ledger_records_Bob_s_purchase", "World_Messages_delivers_the_message", "World_Alice_is_done"
+                 , "World_Alice_buys_dinner_OF_FALSE", "World_Alice_reads_the_ledger_again_OF_FALSE" ])
+      -- the brief's graphs are total, so no unexplored self-loop is added
+      m.mdUnexplored `shouldBe` []
+      -- every property of properties.l4 is emitted, none refused
+      length m.mdProps `shouldBe` length properties
+      m.mdNotEmitted `shouldBe` []
+
+  describe "the emitted files (WP3)" $ forM_ designs \ c -> when (c.csFile `elem` map (.ecFile) emitCases) $
+    it (c.csFile <> ": the .aut is the graph, edge for edge; one cfg per property; all thirteen files, in the order of section 6.1") $ do
+      ei <- emitInputOf c.csFile
+      let files = emitFiles ei
+          base = Text.pack (map (\ ch -> if ch == '-' then '_' else ch) (stemOf c.csFile))
+          named = [ n | Right (n, _) <- files ]
+      [ why | Left why <- files ] `shouldBe` []
+      named `shouldBe`
+        [ base <> ".aut", base <> ".tla", base <> ".cfg" ]
+        <> [ base <> "." <> p <> ".cfg"
+           | p <- [ "Always_every_dinner_was_accepted_while_open", "Always_at_most_one_dinner_is_bought"
+                  , "Never_Alice_s_belief_is_stale", "Stays_one_dinner_is_bought"
+                  , "Eventually_Alice_has_bought_or_stopped"
+                  , "Eventually_one_dinner_is_bought_if_always_the_ledger_is_open"
+                  , "Eventually_Bob_has_bought" ] ]
+        <> [ base <> ".smv", base <> ".dot", base <> ".pnml" ]
+      case [ body | Right (n, body) <- files, n == base <> ".aut" ] of
+        [aut] -> do
+          take 1 (Text.lines aut) `shouldBe` ["des (0," <> tshow c.csTransitions <> "," <> tshow c.csStates <> ")"]
+          length (Text.lines aut) `shouldBe` c.csTransitions + 1
+        other -> expectationFailure ("expected one .aut, got " <> show (length other))
+      goldenOf (stemOf c.csFile) ".emit.txt" (emittedText files)
   where
+    tshow = Text.pack . show
     lastMaybe xs = if null xs then Nothing else Just (last xs)
