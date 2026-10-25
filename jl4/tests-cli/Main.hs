@@ -3001,11 +3001,12 @@ spec bin = do
       expectOk bin ["check", relRowsEntry] "Check succeeded."
 
     it "evaluates a value defined in a module reached by `../b/mod`" $ do
-      -- modmarker is 6 (sum of 1, 2, 3) and helpmarker is 30; only a module
-      -- that was really loaded can make `answer` 36.
+      -- modmarker is 1006 (the sum of 1, 2, 3, plus neighbourmarker from the
+      -- bare `IMPORT neighbour` that mod.l4 writes beside itself) and helpmarker
+      -- is 30; only modules that were really loaded can make `answer` 1036.
       out <- runL4 bin ["run", relRowsEntry]
       exitOf out `shouldBe` ExitSuccess
-      combined out `shouldSatisfy` ("36" `isInfixOf`)
+      combined out `shouldSatisfy` ("1036" `isInfixOf`)
 
     it "gives the same answer when the entry file is named bare, from its own folder" $ do
       -- `l4 check main.l4` run inside rows/a makes the importing directory ".",
@@ -3013,7 +3014,7 @@ spec bin = do
       absDir <- makeAbsolute relRowsDir
       out <- runL4In (Just absDir) Nothing bin ["run", "main.l4"]
       exitOf out `shouldBe` ExitSuccess
-      combined out `shouldSatisfy` ("36" `isInfixOf`)
+      combined out `shouldSatisfy` ("1036" `isInfixOf`)
 
     for_ ["check", "run"] \cmd ->
       it ("reports a type error in a module two path imports share once, under " <> cmd) $ do

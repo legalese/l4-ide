@@ -1,0 +1,11 @@
+-- A rule file that imports a shared file from the folder beside its own.
+-- The path starts from THIS file's folder: `..` is the folder above (the example
+-- folder), then `shared`, then the file's name without `.l4`.
+IMPORT `../shared/definitions`
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is an adult` age IF age AT LEAST `age of majority`
+
+#EVAL `is an adult` 21
+#EVAL `is an adult` 17

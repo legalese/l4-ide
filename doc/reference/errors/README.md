@@ -34,6 +34,10 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [I could not find a definition for the identifier](#i-could-not-find-a-definition-for-the-identifier)
 - [Module not found](#module-not-found)
+- [I could not find a module at this path](#i-could-not-find-a-module-at-this-path)
+- [This import leaves the root of this deployment](#this-import-leaves-the-root-of-this-deployment)
+- [This import is relative, but has no directory to be relative to](#this-import-is-relative-but-has-no-directory-to-be-relative-to)
+- [IMPORT resolved to a module with a shorter name](#import-resolved-to-a-module-with-a-shorter-name)
 
 **Definitions and clauses**
 
@@ -555,11 +559,67 @@ An `IMPORT` names a module that is neither a standard library nor a file `helper
 
 **How to fix it:**
 
-- Check the name. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output. A name with a hyphen needs backticks: ``IMPORT `legal-persons` ``. `IMPORT` takes a module name, not a path: a folder in front of the name is ignored.
+- Check the name. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output. A name with a hyphen needs backticks: ``IMPORT `legal-persons` ``. To import a file from another folder, write its path in backticks, with a slash: ``IMPORT `../shared/helpers` ``; that is a different error, [I could not find a module at this path](#i-could-not-find-a-module-at-this-path).
 - Put your own module in the project's root folder or beside the file that imports it.
 - If `JL4_LIBRARY_PATH` is set, the built-in standard library is not used at all, so that folder must hold every library you import, `prelude.l4` included.
 
 [IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
+
+---
+
+### I could not find a module at this path
+
+**Error:** `I could not find a module at this path: ../shared/helpers`, then `Nothing it defines is in scope here; names you expected from it are reported as undefined.`, then `Relative to <the importing file> that is <the path that was looked for>, which does not exist.`
+
+Like [Module not found](#module-not-found), this is an error, not a warning, and it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module.
+
+An `IMPORT` with a slash in its name names one file, relative to the file that writes the `IMPORT`. The third line shows where that came out once `.` and `..` were worked through, which is the place to look.
+
+**How to fix it:**
+
+- Compare the third line with where the file really is. The path starts from the folder of the file that writes the `IMPORT`, not from the folder you ran `l4` in.
+- Leave off `.l4`, or keep it; both name the same file. Use `/` and not `\`.
+- In a deployment, the file must be among the files uploaded: a path import cannot reach a file that was not deployed with the rest.
+
+[Importing a file from another folder](../libraries/README.md#importing-a-file-from-another-folder) describes path imports; [Path imports](../libraries/resolution.md#path-imports) says exactly how one is resolved.
+
+---
+
+### This import leaves the root of this deployment
+
+**Error:** `This import leaves the root of this deployment: ../../x`. Two forms of it:
+
+- A path that climbs out of the files that were uploaded, in `jl4-service` or Legalese Cloud. The second line shows where the path would have landed.
+- A path that starts with `/`, on any machine. A leading slash is reserved for a form L4 does not have yet, and is refused rather than guessed at.
+
+A service that runs files somebody else uploaded does not read its own disk for them, so a path import there can reach other uploaded files and nothing else. On your own machine, `l4` lets a path leave the folder you started in.
+
+**How to fix it:**
+
+- Deploy the file the path points at together with the rest, and write the path so that it stays inside the deployed files.
+- If the path starts with `/`, write it relative to the importing file instead: ``IMPORT `../shared/helpers` ``.
+
+---
+
+### This import is relative, but has no directory to be relative to
+
+**Error:** `This import is relative, but <the document> has no directory to be relative to.`, then `Write a bare module name, or supply the file through the editor's project files.`
+
+A path import starts from the folder of the file that writes it. A document that does not live in a folder, such as one typed into the browser editor, has none to start from.
+
+**How to fix it:** write a bare module name, which is looked up by the [usual order](../libraries/resolution.md#the-resolution-order), or open the file from disk so that it has a folder.
+
+---
+
+### IMPORT resolved to a module with a shorter name
+
+**Warning:** ``IMPORT `a.b` resolved to module `a`; write `IMPORT a` `` (and the same for ``IMPORT `foo.l4` ``, which resolves to `foo`).
+
+A module is named by its file name without `.l4`, and a name with a dot or an extension is cut at its last dot. So ``IMPORT `a.b` `` has always loaded `a.l4`, not a file called `a.b`, and ``IMPORT `v1.2-rates` `` has always loaded `v1.l4`. This was silent; now it is a warning, and nothing about which module is loaded has changed. It does not fail `l4 check`.
+
+The same cut explains a [Module not found](#module-not-found) for a name shorter than the one you wrote: ``IMPORT `v1.2-rates` `` that fails with `I could not find a module with this name: v1` was looking for `v1.l4`.
+
+**How to fix it:** write the name the warning suggests. If the file's real name has a dot in it, import it by path, which keeps the dot: ``IMPORT `./v1.2-rates` `` loads `v1.2-rates.l4` from the importing file's own folder. If you meant a file in another folder, write its path: ``IMPORT `sub/a` ``.
 
 ---
 

@@ -52,8 +52,44 @@ IMPORT `legal-persons`
 
 - A module is named by its file name without `.l4`: `IMPORT daydate` loads `daydate.l4`.
 - A name with a hyphen goes in backticks: ``IMPORT `excel-date` ``, ``IMPORT `legal-persons` ``, ``IMPORT `date-compat` ``. Without them, `IMPORT excel-date` is a parse error ("unexpected -").
-- `IMPORT` takes a module name, not a path or a quoted string. `IMPORT "helpers.l4"` is a parse error, and a folder in front of the name is ignored: ``IMPORT `rules/helpers` `` looks for `helpers.l4`.
+- A module name is a name, not a quoted string: `IMPORT "helpers.l4"` is a parse error. To import a file from another folder, write its path in backticks, with a slash: ``IMPORT `../shared/helpers` ``. See [Importing a file from another folder](#importing-a-file-from-another-folder).
+- A name with a dot or an extension, such as ``IMPORT `helpers.l4` `` or `IMPORT helpers.v2`, is still read as a bare module name, cut at its last dot, so both mean `IMPORT helpers`. The import works as it always did, and `l4 check` now warns that the name written is not the module found. Write `IMPORT helpers` and the warning goes away.
 - A basename with spaces or non-ASCII letters goes in backticks too: ``IMPORT `my helpers` `` and ``IMPORT `hvac-law-he` ``. On a build older than the fix for [smucclaw/l4-ide#971](https://github.com/smucclaw/l4-ide/issues/971) these resolved to nothing, and said nothing about it; see [Module names that are not plain ASCII](resolution.md#module-names-that-are-not-plain-ascii).
+
+### Importing a file from another folder
+
+A module in another folder is imported by its path, written in backticks with a slash:
+
+```l4
+IMPORT `../shared/definitions`
+IMPORT `./helpers`
+IMPORT `rules/section-3`
+```
+
+**Example:** [rules/main.l4](path-import-example/rules/main.l4) imports [shared/definitions.l4](path-import-example/shared/definitions.l4) from the folder beside its own.
+
+- **The path starts from the file that writes the `IMPORT`**, not from the folder you run `l4` in. `..` is the folder above and `.` is this one. The same file means the same thing whoever runs it, and from wherever they run it.
+- **Leave off `.l4`.** ``IMPORT `../shared/definitions.l4` `` names the same file.
+- **Always write `/`**, on every system. A backslash is an ordinary letter in a name.
+- **The backticks are required.** ``IMPORT `../shared/definitions` `` works; `IMPORT ../shared/definitions` is a parse error.
+- **A path names one file.** L4 looks for that file and no other: the standard library, `JL4_LIBRARY_PATH`, the project root and the per-user store are not searched, so nothing can stand in for it. If it is not there, the error says which path was tried: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path).
+- **Two files with one name in different folders are two modules.** ``IMPORT `a/rates` `` and ``IMPORT `b/rates` `` can both appear in one program, and neither replaces the other. If both define a name you then use, L4 asks which you meant, as it does for any two imports that define the same name.
+- **One file is one module, however it was reached.** `sub/../core` and `core` are the same file, so a definition in it is not "defined twice".
+- **A path cannot start with `/`.** A leading slash is reserved and refused: [This import leaves the root of this deployment](../errors/README.md#this-import-leaves-the-root-of-this-deployment).
+
+#### Where path imports work, and where they do not
+
+| where you run the file                                         | what a path import does                                                                                                                                                                             |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `l4` on your machine, the REPL, the VS Code editor             | Works. The path may leave the folder of the file you started from: `cases/main.l4` can import `../domain`. Whatever your account can read, a path can reach.                                        |
+| a deployment on `jl4-service` or Legalese Cloud                | Works **inside the files you deployed**. A path that would climb above them is refused, and the service never looks at its own disk. See [what a deployment contains](#what-a-deployment-contains). |
+| the browser editor, and anything else built on the WASM module | **Not yet.** A browser document has no folder to be relative to, so a path import there does not work.                                                                                              |
+
+An imported module's own bare-name imports are not affected: inside `mod.l4`, `IMPORT prelude` still finds the standard library, and `IMPORT helper` still finds `helper.l4` beside `mod.l4`.
+
+##### What a deployment contains
+
+A deployment is the set of files that were uploaded, and a path import can only name a file in that set, relative to the importing file's folder. Upload `rows/a/main.l4` and `rows/b/mod.l4` together and ``IMPORT `../b/mod` `` works; upload only the first and it is reported missing.
 
 ### What an import gives you
 

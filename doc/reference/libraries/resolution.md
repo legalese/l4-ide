@@ -8,6 +8,7 @@ compiled into the binary, one in each git worktree, one in a machine-global
 store, one shipped inside the VSCode extension. This page explains, in order:
 
 1. [the resolution order and why each tier exists](#the-resolution-order)
+   (and [path imports](#path-imports), which skip it)
 2. [the dev/prod playbook — what to set in each situation](#the-devprod-playbook)
 3. [how to read the resolver's logs and warnings](#reading-the-resolvers-output)
 4. [what happens when nothing resolves](#when-nothing-resolves), and which
@@ -95,6 +96,40 @@ This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
 `jl4/tests-cli/Main.hs` (black-box CLI), and, for the service's shorter ladder,
 `jl4-service/test/StdlibResolutionSpec.hs` and
 `jl4-service/test/UnresolvedImportSpec.hs`.
+
+---
+
+## Path imports
+
+A backticked name with a slash, such as ``IMPORT `../shared/definitions` ``, is a **path import**. It does not use the ladder above. [How to write one](README.md#importing-a-file-from-another-folder) is in the `IMPORT` reference; this section is how it is resolved.
+
+A name is a path import if, and only if, it contains a `/`. Every other name is resolved by the ladder above, exactly as before. That includes a name with a dot or an extension (`IMPORT foo.l4`, `IMPORT a.b`), which the ladder still reduces to `foo` and `a`; a warning now says so.
+
+To resolve a path import from the file `F`:
+
+1. Take the path as written, drop one trailing `.l4` if there is one, and append `.l4`.
+2. Join it to the folder that holds `F`.
+3. Collapse every `.` and every `x/..` in the result, without touching the disk. `sub/../core.l4` becomes `core.l4`. Two spellings of one file therefore become one module, and a shared module reached from two places is checked once.
+4. If the runtime is **confined** (below) and the collapsed path still starts with `..`, stop: [the import leaves the root](../errors/README.md#this-import-leaves-the-root-of-this-deployment).
+5. Look for that one file among the files the editor or the service holds in memory. If the runtime is not confined, then look on disk.
+6. Found: that is the module. Not found: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path), naming the collapsed path.
+
+No other tier is consulted: not `$JL4_LIBRARY_PATH`, not the project root, not the embedded standard library, not the per-user store, not the extension's bundle. A path import names one file, and the point of writing one is that no ladder decides it. It follows that `JL4_LIBRARY_PATH` has no effect on a path import, and that a file called `prelude.l4` in a folder is never mistaken for the standard library by ``IMPORT `sub/prelude` ``.
+
+**Confined and not confined.** The runtime's library scope decides, the same one that gives `jl4-service` its shorter ladder:
+
+| runtime                                                   | step 4, a path that climbs above where it started | step 5, the disk |
+| --------------------------------------------------------- | ------------------------------------------------- | ---------------- |
+| `l4` (every command), the REPL, MLIR, the language server | allowed                                           | looked at        |
+| `jl4-service`                                             | refused, before anything is looked up             | never looked at  |
+
+On your own machine a `..` may leave the folder you started from, because the commons rows that keep their cases in a sub-folder need exactly that. A service that runs files somebody else uploaded must not read its own disk for them, so it resolves a path against the uploaded files only, and refuses one that would leave them. Tests plant a real file where such a path would land and check that it is not taken.
+
+**A leading `/`** is refused everywhere, with the same message as a path that leaves the root. It is reserved for a form that does not exist yet.
+
+**Only the written name changes.** A module reached by a path import is an ordinary module. Its own `IMPORT prelude` and `IMPORT helper` are resolved by the ladder from its own folder, as they would be anywhere.
+
+**What a path import cannot do yet.** Two things are outside this page's scope and are limits, not oversights: the browser editor has no folder to start from, so a path import there does not work; and the editor's "find all references" on a module only looks in the project root and the importing file's own folder, so an importer in another folder is not listed.
 
 ---
 
