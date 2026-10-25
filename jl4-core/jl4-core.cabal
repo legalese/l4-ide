@@ -150,6 +150,10 @@ library
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
+    L4.Ledger.Append
+    L4.Ledger.Replay
+    L4.Ledger.Row
+    L4.Ledger.Store
     L4.Lts.List
     L4.Lts.Marking
     L4.Lts.WhatIf
@@ -290,6 +294,7 @@ test-suite jl4-core-test
     LtsListSpec
     LtsMarkingSpec
     LtsWhatIfSpec
+    LedgerSpec
     DominatorsSpec
     RelationalSpec
     BlawxAssumeSpec
@@ -310,10 +315,13 @@ test-suite jl4-core-test
     bytestring,
     containers,
     deepseq,
+    directory,
+    filepath,
     hspec,
     jl4-core,
     megaparsec,
     optics,
+    QuickCheck,
     text,
     time,
     vector
