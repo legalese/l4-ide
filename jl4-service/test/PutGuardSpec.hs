@@ -18,6 +18,7 @@ import BundleStore (initStore)
 import ControlPlane (DeploymentStatusResponse (..), UpdateStatusResponse (..))
 import Logging (newLogger)
 import Options (Options (..))
+import Ledger.Store.Config (defaultLedgerStoreConfig)
 import Types
 
 import Control.Concurrent (threadDelay)
@@ -202,6 +203,7 @@ testOpts = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   , maxLadderNodes = 10000
+  , ledgerStore = defaultLedgerStoreConfig
   }
 
 withService :: (String -> Manager -> IO a) -> IO a

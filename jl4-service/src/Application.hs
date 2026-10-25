@@ -9,6 +9,7 @@ import FileBrowser (FileBrowseApi, fileBrowseHandler)
 import McpServer (mcpHandler, reapExpiredTasks, supportedProtocolVersions, defaultProtocolVersion, tasksExtensionKey)
 import DeploymentLoader (loadAllAndRegister)
 import Logging (Logger, logInfo, logDebug, logError, logWarn, newLogger)
+import Ledger.Store.Config (ResolvedStore (..), describeResolved, resolveStoreConfig)
 import Options (Options (..), buildOpts)
 import OpenApiDoc (buildOpenApiDoc)
 import Shared (collectDeploymentMetadata)
@@ -27,6 +28,7 @@ import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVa
 import Control.Exception (SomeException, finally, displayException)
 import Control.Monad (forM_)
 import System.Environment (lookupEnv)
+import System.Exit (exitFailure)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ReaderT (..), ask)
 import Data.IORef (newIORef, readIORef, atomicModifyIORef')
@@ -118,6 +120,20 @@ defaultMain = do
     [("path", toJSON storePath)]
   store <- BundleStore.initStore storePath
   BundleStore.cleanupStore logger store
+
+  -- The instance ledger's store (OPERATIONAL-LOWERING-SPEC §3.7) is chosen
+  -- here, so a misconfiguration stops the service at start. It is not opened
+  -- yet: nothing reads it until the ledger's routes land (WPO3), and opening
+  -- the sqlite default here would put a database file under every store
+  -- path, a hosted one on a network filesystem included, before anything
+  -- used it.
+  case resolveStoreConfig storePath options.ledgerStore of
+    Left why -> do
+      logError logger "Ledger store misconfigured" [("error", toJSON why)]
+      exitFailure
+    Right resolved ->
+      (if resolved == MemoryForTests then logWarn else logInfo) logger "Ledger store selected"
+        [("store", toJSON (describeResolved resolved))]
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty

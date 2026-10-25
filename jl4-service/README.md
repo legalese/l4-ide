@@ -668,6 +668,9 @@ All options can also be set via environment variables. CLI arguments take preced
 | `--eval-timeout`            | `JL4_EVAL_TIMEOUT`            | Evaluation timeout in seconds                                                                                                                                                            | `60`             |
 | `--compile-timeout`         | `JL4_COMPILE_TIMEOUT`         | Compilation timeout in seconds                                                                                                                                                           | `60`             |
 | `--max-ladder-nodes`        | `JL4_MAX_LADDER_NODES`        | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                         | `10000`          |
+| `--ledger-store`            | `JL4_LEDGER_STORE`            | Instance-ledger store: `sqlite` (`ledger.sqlite3` under the store path, one process), `postgres` (several processes), `memory` (tests only). Checked at startup; no route reads it yet   | `sqlite`         |
+| `--ledger-postgres-url`     | `JL4_LEDGER_POSTGRES_URL`     | Connection string for `--ledger-store postgres`; needs a binary built with `cabal build -f postgres jl4-service`, and libpq                                                              | -                |
+| `--ledger-allow-nondurable` | `JL4_LEDGER_ALLOW_NONDURABLE` | Allow `--ledger-store memory`, which loses every instance on restart                                                                                                                     | `false`          |
 
 Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
 

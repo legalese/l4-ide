@@ -17,6 +17,7 @@ import qualified Version
 import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
+import Ledger.Store.Config (defaultLedgerStoreConfig)
 import Types
 import L4.FunctionSchema (Parameters (..))
 
@@ -5219,6 +5220,7 @@ testOptions = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   , maxLadderNodes = 10000
+  , ledgerStore = defaultLedgerStoreConfig
   }
 
 -- | A JSON answer without the numbers the visualizer gave its nodes: the

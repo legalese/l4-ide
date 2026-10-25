@@ -10,6 +10,8 @@ import Options.Applicative
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
 
+import Ledger.Store.Config (LedgerStoreConfig (..), StoreChoice (..), parseStoreChoice)
+
 data Options = Options
   { port                  :: !Int
   , storePath             :: !FilePath
@@ -42,6 +44,9 @@ data Options = Options
   -- (a few hundred nodes is already a wall of boxes) and far below the
   -- pathological cases, so a legitimate model should never meet it. Raise it if
   -- one does.
+  , ledgerStore           :: !LedgerStoreConfig
+  -- ^ Which store the instance ledger keeps its rows in
+  -- (OPERATIONAL-LOWERING-SPEC §3.7): sqlite under 'storePath' by default.
   }
 
 -- | Build the CLI parser with environment variable defaults.
@@ -63,6 +68,10 @@ buildOpts = do
   envEvalTO     <- readEnvInt "JL4_EVAL_TIMEOUT"
   envCompTO     <- readEnvInt "JL4_COMPILE_TIMEOUT"
   envMaxLadder  <- readEnvInt "JL4_MAX_LADDER_NODES"
+  envLedgerStore <- lookupEnv "JL4_LEDGER_STORE" >>= traverse \raw ->
+    either (\err -> fail ("JL4_LEDGER_STORE: " <> err)) pure (parseStoreChoice raw)
+  envLedgerPg   <- lookupEnv "JL4_LEDGER_POSTGRES_URL"
+  envLedgerNonDurable <- readEnvBool "JL4_LEDGER_ALLOW_NONDURABLE"
 
   let parser = Options
         <$> option auto
@@ -174,6 +183,34 @@ buildOpts = do
                        "Maximum ladder-diagram size, in IR nodes, that query-plan and ladder \
                        \will build or serve (env: JL4_MAX_LADDER_NODES)"
               )
+        <*> ( MkLedgerStoreConfig
+                <$> option (eitherReader parseStoreChoice)
+                      ( long "ledger-store"
+                          <> metavar "sqlite|postgres|memory"
+                          <> value (maybe ChooseSqlite id envLedgerStore)
+                          <> showDefaultWith (\case ChooseSqlite -> "sqlite"; ChoosePostgres -> "postgres"; ChooseMemory -> "memory")
+                          <> help
+                               "Where the instance ledger keeps its rows: sqlite, a file under the \
+                               \store path; postgres, for more than one process; memory, for tests \
+                               \only (env: JL4_LEDGER_STORE)"
+                      )
+                <*> optional
+                      ( strOption
+                          ( long "ledger-postgres-url"
+                              <> metavar "URL"
+                              <> maybe mempty (value . Text.pack) envLedgerPg
+                              <> help "Connection string for --ledger-store postgres (env: JL4_LEDGER_POSTGRES_URL)"
+                          )
+                      )
+                <*> ( flag' True
+                        ( long "ledger-allow-nondurable"
+                            <> help
+                                 "Allow --ledger-store memory, which loses every instance on restart; \
+                                 \for tests only (env: JL4_LEDGER_ALLOW_NONDURABLE)"
+                        )
+                      <|> pure (maybe False id envLedgerNonDurable)
+                    )
+            )
 
   pure $ info
     (parser <**> helper)
