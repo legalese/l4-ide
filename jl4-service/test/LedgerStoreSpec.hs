@@ -287,15 +287,26 @@ sqlStoreContract = describe "the SQL stores' backstops" do
 -- Each round opens an instance at 18:00, Alice checks at 18:05, and then
 -- the two proposals (and sometimes a third act) go in from their own
 -- threads with the clock fixed at 18:06:40, so the same-second tie is
--- decided by arrival, as R-O1 rules. A third of the rounds start Bob
--- first, a third Alice first, and a third both at once, so both outcomes
--- happen and the race is real; that both did, and that some append lost
+-- decided by arrival, as R-O1 rules. In a third of the rounds Bob's
+-- proposal goes first and Alice's waits until his row is in the store,
+-- in a third the other way round, and in a third both start at once, so
+-- both outcomes happen whatever the machine's speed, and the last third
+-- races: an append takes two replays, so both read the head before
+-- either appends. That both outcomes happened, and that some append lost
 -- its race and re-ran, is checked too, or the property would hold of a
 -- test that never raced.
 concurrencyItem :: Int -> Deployment -> SpecWith LedgerStore
 concurrencyItem rounds dep = it ("concurrency (§8), " <> show rounds <> " rounds: Bob's purchase and Alice's buy proposed at once never commit a dinner after Bob's purchase, nor more than one") \ st -> withCapabilities 4 do
   lost <- newIORef 0
   env <- newLedger (counting lost st)
+  -- wait until the instance holds the row with this idempotency key, or a
+  -- minute has passed
+  let waitForKey inst key = go (6000 :: Int)
+        where
+          go 0 = expectationFailure ("the first racer's row, " <> show key <> ", never arrived")
+          go k = do
+            rows <- st.readRows (instanceKey inst)
+            if any (\ r -> r.idempotencyKey == Just key) rows then pure () else threadDelay 10000 >> go (k - 1)
   outcomes <- forM [1 .. rounds] \ i -> do
     let inst = MkInstance dep ("round " <> Text.pack (show i))
         tag t = Text.pack (show i) <> "-" <> t
@@ -305,14 +316,15 @@ concurrencyItem rounds dep = it ("concurrency (§8), " <> show rounds <> " round
     j0 <- generate (chooseInt (0, 2000))
     j1 <- generate (chooseInt (0, 2000))
     j2 <- generate (chooseInt (0, 2000))
-    let (bobDelay, aliceDelay) = case i `mod` 3 of
-          0 -> (0, 150000)
-          1 -> (150000, 0)
-          _ -> (j0, j1)
-        racers = [(bobDelay, tag "bob", bobBuys), (aliceDelay, tag "alice", buy)]
-              <> [ (j2, key, a) | (key, a) <- extra ]
+    let jitter d = threadDelay d
+        (bobStart, aliceStart) = case i `mod` 3 of
+          0 -> (jitter 0, waitForKey inst (tag "bob"))
+          1 -> (waitForKey inst (tag "alice"), jitter 0)
+          _ -> (jitter j0, jitter j1)
+        racers = [(bobStart, tag "bob", bobBuys), (aliceStart, tag "alice", buy)]
+              <> [ (jitter j2, key, a) | (key, a) <- extra ]
     writeIORef env.clockRef 65200
-    results <- mapConcurrently (\ (d, key, a) -> threadDelay d >> appendIf env.ledger inst (proposal key a)) racers
+    results <- mapConcurrently (\ (start, key, a) -> start >> appendIf env.ledger inst (proposal key a)) racers
     rs <- mapM appended results
     rows <- st.readRows (instanceKey inst)
     -- every reply names the row the store holds, and no two share one
