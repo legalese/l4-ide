@@ -114,7 +114,7 @@ Each graph of `d1`, `d2` and `d3`, written with the labels above, is strongly an
 The properties were evaluated by `#EVAL` of the decisions in `properties.l4` on every state's ledgers.
 P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and that explorer did not check them; TLC and NuSMV did, on the models `l4 explore --emit` writes (below).
 That throwaway explorer was not a test in the tree.
-`l4 explore` (WP1) now reproduces its state, transition and pass-over counts for all five rows, and `jl4/tests/LtsExplore.hs` asserts them as numbers; the bisimulation against the references is still WP4's harness.
+`l4 explore` (WP1) now reproduces its state, transition and pass-over counts for all five rows, and `jl4/tests/LtsExplore.hs` asserts them as numbers; the bisimulation against the references is run by the harness in [`../harness/`](../harness/README.md) (WP4).
 The run that reproduces the table bounds the clock at closing and keeps the cells `properties.l4` reads, which no `RECALL` in a contract names (`--keep` for a cell a property reads whole, `--keep-latest` for one it reads as a `MAYBE`):
 
 ```sh
@@ -179,7 +179,7 @@ With `--fair World`, every act that moves is fair, Bob's purchase included, and 
 The control being violated is what shows P6 was checked on something.
 
 Each `.aut`, relabelled by the table of acts above, is strongly and branching bisimilar to its reference in `reference/` (`ltscompare` prints `true`, and D1's against D3's reference prints `false`), and TAPAAL's `verifypn` 4.4.2 reads each `.pnml` as a net of 12, 15 and 10 reachable markings.
-None of these tools runs in CI: the emitted text is pinned under `../expected/*.emit.txt`, and a harness that runs the tools and compares their verdicts is WP4, not yet built.
+None of these tools runs in CI: the emitted text is pinned under `../expected/*.emit.txt`, and the harness in [`../harness/`](../harness/README.md) (WP4) runs the tools where they are installed and compares their verdicts, which no CI job does yet.
 
 ## What the explorer must know
 
@@ -193,7 +193,7 @@ Three things these fixtures need from `l4 explore` (WP1) and its harness (WP4), 
 2. **The closing deadline is not in the brief.**
    Every state has a live deadline, closing, so every state has a tick to just past it as a candidate.
    From each of the 12, 15 and 10 states that tick reaches a distinct `FULFILLED` state with the same ledgers.
-   An explorer that offers the tick finds those states beside the brief's; the harness has to bound the clock below closing, or remove the tick edges, before it compares counts or graphs.
+   An explorer that offers the tick finds those states beside the brief's; the harness bounds the clock at closing (`--until 75600`, in `../harness/fixtures.tsv`) before it compares counts or graphs.
    With the anchor named, the residual prints the same at every clock (`WITHIN 0 OF closing`), so the clock need not be in the state.
 3. **Passed over is no edge; a fired act that changes nothing is a self-loop.**
    `Alice is done` and the unanswered requests are self-loops, and they are what makes 21, 30 and 21 transitions.

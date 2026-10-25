@@ -38,7 +38,7 @@ Three checks, run on 2026-10-26, show that the relabelling preserved the model:
 3. **Bisimulation.** `ltscompare -ebisim` and `ltscompare -ebranching-bisim` of each renamed original against the `.aut` here print `true`; as a control, `ltscompare -ebisim d1.aut d3.aut` prints `false`.
 
 Check 2 is the strongest of the three: byte identity is isomorphism with the states numbered the same, which no equivalence of `ltscompare` states directly (in 202607.0 its `--help` lists none for isomorphism).
-Check 3 is the comparison the harness of spec §6.2 will make, run here once so that its command is known to answer both ways.
+Check 3 is the comparison the harness in [`../../harness/`](../../harness/README.md) makes (spec §6.2), run here once so that its command is known to answer both ways.
 
 ## Hashes
 
