@@ -112,7 +112,7 @@ It knew nothing of the brief: the graph it found is the evaluator's.
 
 Each graph of `d1`, `d2` and `d3`, written with the labels above, is strongly and branching bisimilar to its reference (`ltscompare -ebisim` and `-ebranching-bisim` print `true`; D1's graph against D2's reference prints `false`).
 The properties were evaluated by `#EVAL` of the decisions in `properties.l4` on every state's ledgers.
-P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and were not checked, by that explorer or since.
+P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and that explorer did not check them; TLC and NuSMV did, on the models `l4 explore --emit` writes (below).
 That throwaway explorer was not a test in the tree.
 `l4 explore` (WP1) now reproduces its state, transition and pass-over counts for all five rows, and `jl4/tests/LtsExplore.hs` asserts them as numbers; the bisimulation against the references is still WP4's harness.
 The run that reproduces the table bounds the clock at closing and keeps the cells `properties.l4` reads, which no `RECALL` in a contract names (`--keep` for a cell a property reads whole, `--keep-latest` for one it reads as a `MAYBE`):
@@ -139,6 +139,47 @@ The events of a printed trace are all at 18:00 (64800), because the explorer fir
 The exit status is 4 when a property is violated, so the D1 and D2 runs exit 4 by design.
 `--eventually` labels the states for P5, P6 (`--eventually 'one dinner is bought' --if-always 'the ledger is open'`) and the non-vacuity control, and answers each `unknown (liveness: run the emitted model)`; a run with nothing else wrong then exits 5.
 `jl4/tests/LtsExplore.hs` asserts every verdict and counterexample path on all five rows, and pins the checks' text under `../expected/*.check.txt`.
+
+### The emitted models (WP3)
+
+`--emit DIR` writes each design for other tools: `<base>.aut` for mCRL2, `<base>.tla` with `<base>.cfg` and one `.cfg` per property for TLC, `<base>.smv` for NuSMV, `<base>.dot`, and `<base>.pnml` (spec §6.1).
+`--fair Alice` names the actor whose acts are assumed fair:
+
+```sh
+l4 explore d3-atomic.l4 --until 75600 \
+  --always 'every dinner was accepted while open' --always 'at most one dinner is bought' \
+  --reachable "Alice's belief is stale" --stays 'one dinner is bought' \
+  --eventually 'Alice has bought or stopped' \
+  --eventually 'one dinner is bought' --if-always 'the ledger is open' \
+  --eventually 'Bob has bought' \
+  --emit out --fair Alice
+```
+
+Weak fairness then goes to each of Alice's acts that moves, and to nothing else: in D3 her check and her answered purchase; never Bob's purchase or the message, which are the environment's; never a pause such as the unanswered purchase or `Alice is done`.
+The ledger answering her is inside her act in these fixtures, so it is fair with it.
+
+On 2026-10-26, with the files loaded unedited by mCRL2 202607.0 (`ltsinfo`, `ltsconvert`), TLC 2.19 on JDK 21 (one run per property configuration) and NuSMV 2.7.0, the verdicts were:
+
+| property                                      | D1                                   | D2                                            | D3        |
+| --------------------------------------------- | ------------------------------------ | --------------------------------------------- | --------- |
+| P1, always                                    | violated: check, Bob's purchase, buy | violated: check, re-read, Bob's purchase, buy | holds     |
+| P2, always                                    | holds                                | holds                                         | holds     |
+| P3, reachable                                 | reachable                            | reachable                                     | reachable |
+| P4, stays                                     | holds                                | holds                                         | holds     |
+| P5, eventually, under `--fair Alice`          | holds                                | holds                                         | holds     |
+| P6, eventually if always open, `--fair Alice` | holds                                | holds                                         | holds     |
+| control, eventually `Bob has bought`, same    | violated                             | violated                                      | violated  |
+
+TLC and NuSMV agreed on every cell, and both agree with the in-process checker on P1 to P4 and on the two counterexample paths.
+TLC reports P3 as its invariant `Never_…` violated, which is how it finds a state: the configuration says so.
+
+Two controls show that the fairness is doing the work.
+With no `--fair`, nothing is fair: P5 and P6 hold on D1, which has no pause, and fail on D2 and D3 by a run that pauses forever, in both tools, which is the probes' table without fairness.
+With `--fair World`, every act that moves is fair, Bob's purchase included, and the control then holds on all three designs in both tools: the runs in which Bob never buys are gone, so P6 would pass on none of them.
+The control being violated is what shows P6 was checked on something.
+
+Each `.aut`, relabelled by the table of acts above, is strongly and branching bisimilar to its reference in `reference/` (`ltscompare` prints `true`, and D1's against D3's reference prints `false`), and TAPAAL's `verifypn` 4.4.2 reads each `.pnml` as a net of 12, 15 and 10 reachable markings.
+None of these tools runs in CI: the emitted text is pinned under `../expected/*.emit.txt`, and a harness that runs the tools and compares their verdicts is WP4, not yet built.
 
 ## What the explorer must know
 
