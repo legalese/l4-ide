@@ -143,4 +143,4 @@ Silent failures, which a green run does not rule out:
 
 - **No CI job runs this yet.** The spec's WP4 row names one; it needs mCRL2, TLC and NuSMV installed on the runner with pinned archives and SHA-256 (NuSMV is in neither Homebrew nor conda), and none of those pins has been measured for a Linux runner.
 - Apalache, Spin, TAPAAL and the `.pnml` and `.dot` outputs are not checked; `refused-number.l4` is the explorer's test (WP1), not this harness's.
-- The user documentation of `l4 explore`, `doc/reference/regulative/explore.md`, is WP5.
+- The user documentation of `l4 explore` is not here: it is [`doc/reference/regulative/explore.md`](../../../../doc/reference/regulative/explore.md) (WP5).
