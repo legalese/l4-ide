@@ -2,6 +2,7 @@
   "at": "64800",
   "contract": "`the arrangement`",
   "coverage": {
+    "answersComparedByPrintedForm": [],
     "comparedByNameOnly": [],
     "complete": true,
     "frontierExhausted": true,

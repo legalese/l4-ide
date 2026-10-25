@@ -182,13 +182,6 @@ data Position = MkPosition
     -- listed. A local an obligation closed over — a pattern-bound or
     -- @GIVEN@-bound name — is not among them, which is how 'openLocals'
     -- tells the two apart without a second resolver.
-  , posTopLevel :: !Environment
-    -- ^ the module's own top-level heap as this replay built it, whose keys
-    -- are the module's half of 'posReplayScope'. Kept so that a reader can
-    -- ask what a top-level rule with no inputs was forced to during THIS
-    -- run: the evaluator keeps such a rule's first answer, so when it reads
-    -- a ledger that answer is part of where the run stands ("L4.Lts.Explore"
-    -- puts it in the state for exactly that reason).
   }
 
 -- | Replay the trace as written.
@@ -215,7 +208,6 @@ positionFrom rig tr extra (topLevel, mres) = flip fmap mres \ (res, steps) ->
       , posMarking  = maybe [] (markingOf ctx) residual
       , posClock    = maximum (0 : literalStamps <> loggedClocks)
       , posReplayScope = Map.keysSet topLevel <> Map.keysSet rig.rigEnv
-      , posTopLevel = topLevel
       }
 
 -- | The stamp an authored event carries, when it is a literal: the @AT@ of

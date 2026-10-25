@@ -19,7 +19,11 @@
 --   4. a cell read only by @RECALL@ keeps its latest entry, one read by
 --      @RECALL ALL@ its whole history (which here never closes, so the depth
 --      bound stops it, and says so); a cell nothing reads is dropped and
---      named; a cell kept by request ('keepCells') splits states it did not.
+--      named; a cell kept by request ('keepCells') splits states it did not;
+--   5. a top-level rule with no inputs that reads a ledger keeps its first
+--      answer for the rest of the run, so two positions with the same
+--      residual and ledger but different first answers behave differently,
+--      and are two states.
 module LtsExploreSpec (spec) where
 
 import qualified Data.Text as Text
@@ -115,6 +119,42 @@ switchSrc recall inputType = Text.unlines
   , "          WHEN flop THEN RECORD `light` IS FALSE HENCE `switch`"
   ]
 
+-- 5. `noted` is asked by peek's guard only. Asked before note's COMMIT it
+--    answers NOTHING for the rest of the run and peek stays allowed; asked
+--    after, it answers JUST TRUE and peek is passed over. note then peek,
+--    and peek then note, reach the same residual and the same ledger.
+cachedSrc :: Text.Text
+cachedSrc = Text.unlines
+  [ "DECLARE Who IS ONE OF W"
+  , "DECLARE Move IS ONE OF note, peek"
+  , ""
+  , "`noted` MEANS RECALL OFFICIAL's `x`"
+  , ""
+  , "GIVEN m IS A Move"
+  , "      n IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`allowed` MEANS"
+  , "    CONSIDER m"
+  , "    WHEN note THEN TRUE"
+  , "    WHEN peek THEN `unnoted` n"
+  , ""
+  , "GIVEN n IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`unnoted` MEANS"
+  , "    CONSIDER n"
+  , "    WHEN NOTHING THEN TRUE"
+  , "    WHEN JUST b THEN FALSE"
+  , ""
+  , "GIVETH A DEONTIC Who Move"
+  , "`c` MEANS"
+  , "    PARTY W"
+  , "    MAY   act PROVIDED `allowed` act `noted`"
+  , "    WITHIN 0 OF 10"
+  , "    HENCE CONSIDER act"
+  , "          WHEN note THEN COMMIT `x` IS TRUE HENCE `c`"
+  , "          WHEN peek THEN `c`"
+  ]
+
 spec :: Spec
 spec = describe "l4 explore" do
   describe "1. a whole-action variable is enumerated; a NUMBER constructor is refused by name" do
@@ -189,3 +229,13 @@ spec = describe "l4 explore" do
       g <- exploreSrc (switchSrc "RECALL" "A MAYBE BOOLEAN") "switch" defaultExploreOptions [("log", False)]
       counts g `shouldBe` (8, 16)
       g.gCoverage.cvDropped `shouldBe` []
+
+  describe "5. a ledger-reading rule with no inputs keeps its first answer, and the state keeps it too" do
+    it "note-then-peek and peek-then-note reach one residual and one ledger, and are two states" do
+      g <- exploreSrc cachedSrc "c" defaultExploreOptions {eoUntil = Just 10} []
+      -- s0 the outset; s1 note (never asked); s2 peek (NOTHING); s3 peek
+      -- then note (NOTHING). From s1 peek is passed over, from s3 it is
+      -- taken: merged, they would be one state with two behaviours
+      counts g `shouldBe` (4, 7)
+      g.gCoverage.cvPassedOver `shouldBe` 1
+      length [ () | s <- g.gStates, [ c.lcValues | c <- s.snLedger ] == [["TRUE"]] ] `shouldBe` 2

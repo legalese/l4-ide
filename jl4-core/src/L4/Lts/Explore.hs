@@ -38,7 +38,14 @@
 -- * the answer each top-level rule with no inputs that reads a ledger was
 --   forced to in this run, if it was: the evaluator keeps a rule's first
 --   answer, so such a rule's answer is part of where the run stands even
---   though the ledger has moved on (the fixtures' README, "Traps");
+--   though the ledger has moved on (the fixtures' README, "Traps"). It is
+--   read through the environment of an obligation in force, because the
+--   evaluator gives each directive a fresh top-level heap and returns only
+--   the first pass's, which no directive forces
+--   (@forEachDirectiveFreshHeap@, measured 2026-10-26: read from the
+--   returned heap, the answer was never there). A position with no
+--   obligation in force has no future for a stale answer to change, so
+--   there the answer is left out;
 -- * the clock, DROPPED under the region scheme of §4.5: what is kept is,
 --   for each live deadline whose instant is known, whether the clock has
 --   already passed it. Positions that agree on all of that and differ only
@@ -361,6 +368,9 @@ data Coverage = MkCoverage
     -- ^ unforced locals a residual held, compared by name
   , cvUnspellable  :: !Int
     -- ^ ledger values with no literal form, compared by their printed form
+  , cvAnswersByForm :: ![Text]
+    -- ^ ledger-reading rules with no inputs whose answer has no literal
+    -- form, compared by its printed form
   }
 
 data Stop
@@ -541,9 +551,12 @@ data ClockKey
 
 -- | What the state key leaves out, for the coverage.
 data KeyNotes = MkKeyNotes
-  { knMergedByName :: ![Text]
-  , knDropped      :: ![(Text, Text)]
-  , knUnspellable  :: !Int
+  { knMergedByName  :: ![Text]
+  , knDropped       :: ![(Text, Text)]
+  , knUnspellable   :: !Int
+  , knAnswersByForm :: ![Text]
+    -- ^ ledger-reading rules with no inputs whose answer has no literal
+    -- form (a function, say), compared by its printed form
   }
 
 -- | Everything one exploration shares.
@@ -584,18 +597,34 @@ stateKey ex pos = do
     Just v  -> canonResidual pos.posReplayScope v
     Nothing -> pure (standingText pos.posResult, [])
   (cells, dropped, unspellable) <- projectLedger ex.exSites pos.posResult.ledger
-  cafs <- for (Map.toList ex.exSites.rsLedgerCafs) \ (u, name) -> (name,) <$> case Map.lookup u pos.posTopLevel of
-    Nothing -> pure ("not in this run's heap", True)
+  -- the heap this directive forced, as the obligations in force closed over it
+  let heaps = [ raw.roEnv | raw <- maybe [] liveObligations pos.posResidual ]
+  cafs <- for (Map.toList ex.exSites.rsLedgerCafs) \ (u, name) -> (name,) <$> case listToMaybe (mapMaybe (Map.lookup u) heaps) of
+    Nothing -> pure ("no obligation in force reads it", True)
     Just rf -> readIORef rf.pointer >>= \ case
       Unevaluated{} -> pure ("not yet asked", True)
-      WHNF v -> valueText v
-      WHNFWhen _ v _ _ -> valueText v
+      WHNF v -> answerText v
+      WHNFWhen _ v _ _ -> answerText v
   deadlines <- liveDeadlines ex pos
   let clock = case ex.exOptions.eoTime of
         Regions -> ClockDropped [ pos.posClock > d | (_, Just (Right d)) <- deadlines ]
         Grid _  -> ClockKept pos.posClock
   pure ( MkStateKey {skResidual = residual, skLedger = cells, skCafs = map (second fst) cafs, skClock = clock}
-       , MkKeyNotes {knMergedByName = merged, knDropped = dropped, knUnspellable = unspellable + length [ () | (_, (_, False)) <- cafs ]} )
+       , MkKeyNotes
+           { knMergedByName = merged
+           , knDropped = dropped
+           , knUnspellable = unspellable
+           , knAnswersByForm = [ name | (name, (_, False)) <- cafs ] } )
+  where
+    -- A rule whose answer is a contract is keyed by the contract's printed
+    -- source form: its own RECALLs run under events, not when it is forced,
+    -- and a rule that chose one contract or another by a RECALL prints
+    -- whichever it chose. Any other answer is read back as a value.
+    answerText v = case v of
+      ValObligation{} -> pure (prettyLayout v, True)
+      ValROp{}        -> pure (prettyLayout v, True)
+      ValQuantified{} -> pure (prettyLayout v, True)
+      _               -> valueText v
 
 -- | What a result that is not a residual says, for a state key.
 standingText :: EvalDirectiveResult -> Text
@@ -817,6 +846,7 @@ data Accum = MkAccum
   , acDropped    :: !(Set (Text, Text))
   , acMerged     :: !(Set Text)
   , acUnspell    :: !Int
+  , acByForm     :: !(Set Text)
   }
 
 -- | Explore a contract from its outset. 'Left' when the outset itself
@@ -857,6 +887,7 @@ explore opts sites rig0 start = do
               , acDropped = Set.empty
               , acMerged = Set.empty
               , acUnspell = 0
+              , acByForm = Set.empty
               }
         acc <- loop ex acc0
         pure (Right (finish ex acc))
@@ -943,6 +974,7 @@ noteKey n acc = acc
   { acDropped = acc.acDropped <> Set.fromList n.knDropped
   , acMerged = acc.acMerged <> Set.fromList n.knMergedByName
   , acUnspell = acc.acUnspell + n.knUnspellable
+  , acByForm = acc.acByForm <> Set.fromList n.knAnswersByForm
   }
 
 stateNode :: Int -> Int -> [Expr Resolved] -> StateKey -> Position -> StateNode
@@ -974,6 +1006,7 @@ finish ex acc = MkGraph
       , cvBeyondClock = acc.acBeyond
       , cvMergedByName = Set.toList acc.acMerged
       , cvUnspellable = acc.acUnspell
+      , cvAnswersByForm = Set.toList acc.acByForm
       }
   }
 
@@ -1099,9 +1132,16 @@ actsOf ex pos raw cand = case cand.cdBound of
       if not (null refusedWhole)
         then Right ([], refusedWhole <> refusedNested)
         else do
-          let choices = traverse (\ (v, d) -> map (v,) (either (const []) (.dmValues) d)) perBinder
-          actions <- traverse (closedAction pos.posReplayScope raw.roEnv . (`fillBinders` shape)) choices
-          Right (actions, refusedNested)
+          let domains = [ (v, either (const []) (.dmValues) d) | (v, d) <- perBinder ]
+              size = product (map (length . snd) domains)
+          if size > ex.exOptions.eoMaxActs
+            then Right ([], refusedNested <>
+              [ (Text.intercalate " and " (map (nameText . fst) domains), Text.intercalate ", " [ t | (v, _) <- domains, Just ty <- [Map.lookup (getUnique v) types], let t = prettyLayout ty ], False, actionConstructor
+                , "they name " <> Text.pack (show size) <> " acts, more than the bound of " <> Text.pack (show ex.exOptions.eoMaxActs)) ])
+            else do
+              let choices = traverse (\ (v, vals) -> map (v,) vals) domains
+              actions <- traverse (closedAction pos.posReplayScope raw.roEnv . (`fillBinders` shape)) choices
+              Right (actions, refusedNested)
   where
     info = ex.exRig.rigEntityInfo
     actionConstructor = case raw.roAction.action of
@@ -1215,6 +1255,7 @@ coverageLine cv = "Coverage: " <> Text.intercalate "; " (filter (not . Text.null
       ds -> "write-only cells dropped: " <> Text.intercalate ", " [ l <> "'s `" <> c <> "`" | (l, c) <- ds ]
   , if null cv.cvMergedByName then "" else "compared by name only: " <> Text.intercalate ", " (map (\ n -> "`" <> n <> "`") cv.cvMergedByName)
   , if cv.cvUnspellable > 0 then count cv.cvUnspellable "ledger value" <> " compared by printed form" else ""
+  , if null cv.cvAnswersByForm then "" else "answers compared by printed form: " <> Text.intercalate ", " (map (\ n -> "`" <> n <> "`") cv.cvAnswersByForm)
   , cv.cvTime
   ])
   where
@@ -1271,6 +1312,7 @@ coverageJson cv = Aeson.object
   , "writeOnlyCellsDropped" .= [ Aeson.object ["ledger" .= l, "cell" .= c] | (l, c) <- cv.cvDropped ]
   , "comparedByNameOnly" .= cv.cvMergedByName
   , "ledgerValuesComparedByPrintedForm" .= cv.cvUnspellable
+  , "answersComparedByPrintedForm" .= cv.cvAnswersByForm
   , "time" .= cv.cvTime
   , "line" .= coverageLine cv
   ]
