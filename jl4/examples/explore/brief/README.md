@@ -7,7 +7,7 @@
 Alice and Bob each mean to buy dinner tonight, and neither wants to buy it if the other already has.
 Each checks whether dinner has been bought, finds it has not, and buys; if their checks and purchases interleave, two dinners are bought.
 That is a classic race condition, and these files are how L4 states it, gets it wrong twice, and gets it right.
-They are the fixtures of [REGULATIVE-LOWERING-SPEC.md](../../../../specs/proposals/REGULATIVE-LOWERING-SPEC.md) §7, work package WP0: the test material for an explorer (`l4 explore`, not built yet) that turns an L4 contract into an explicit transition system.
+They are the fixtures of [REGULATIVE-LOWERING-SPEC.md](../../../../specs/proposals/REGULATIVE-LOWERING-SPEC.md) §7, work package WP0: the test material for an explorer, `l4 explore` (WP1, built 2026-10-26), that turns an L4 contract into an explicit transition system.
 
 The model checks one side, Alice's.
 Bob's purchase is the environment's act, recorded by the dinner ledger, and the message "I bought it" from Bob reaches Alice some time after it.
@@ -27,7 +27,7 @@ Bob's side is the same model with the names swapped.
 | `reference/*.aut`      | the probes' hand models as labelled transition systems, relabelled to these names | the oracle for bisimulation; see `reference/PROVENANCE.md`     |
 
 Every `.l4` file here runs with `l4 run <file>` on the installed `l4` of 2026-10-21, and exits 0.
-`jl4/examples/explore/` is in no golden glob, so nothing here has goldens.
+`jl4/examples/explore/` is in no corpus golden glob, so no `.l4` here has the corpus's four goldens; the explorer's own goldens over these files are in `../expected/`, written by `jl4/tests/LtsExplore.hs`.
 
 ## How the brief becomes L4
 
@@ -113,7 +113,18 @@ It knew nothing of the brief: the graph it found is the evaluator's.
 Each graph of `d1`, `d2` and `d3`, written with the labels above, is strongly and branching bisimilar to its reference (`ltscompare -ebisim` and `-ebranching-bisim` print `true`; D1's graph against D2's reference prints `false`).
 The properties were evaluated by `#EVAL` of the decisions in `properties.l4` on every state's ledgers.
 P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and were not checked.
-None of this is a test in the tree; WP1's explorer and WP4's harness are what make it one.
+That throwaway explorer was not a test in the tree.
+`l4 explore` (WP1) now reproduces its state, transition and pass-over counts for all five rows, and `jl4/tests/LtsExplore.hs` asserts them as numbers; the bisimulation against the references is still WP4's harness.
+The run that reproduces the table bounds the clock at closing and keeps the cells `properties.l4` reads, which no `RECALL` in a contract names (`--keep` for a cell a property reads whole, `--keep-latest` for one it reads as a `MAYBE`):
+
+```sh
+l4 explore d1-naive.l4 --until 75600 \
+  --keep 'open at acceptance' --keep 'dinners bought' --keep 'dinners cancelled' \
+  --keep 'dinner status record' --keep-latest belief --keep-latest plan
+```
+
+Without the kept cells `d1-naive.l4` gives 10 states and 18 transitions, and its coverage line names `dinners bought` and `open at acceptance` as write-only cells it dropped: the bad purchase of Sequence A and the good one of Sequence B are then one state.
+Without `--until`, each state's tick past closing reaches a `FULFILLED` twin, so `d1-naive.l4` gives 24 states and 45 transitions.
 
 ## What the explorer must know
 

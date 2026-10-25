@@ -413,13 +413,19 @@ instance Semigroup Domain where
 instance Monoid Domain where
   mempty = MkDomain [] []
 
--- | A constructor whose acts were not listed, and why: the path of fields
--- that leads to the offending one, with that field's type.
+-- | A constructor whose acts were not listed, and why: the field that
+-- offends, its type, and, when the constructor sits inside a field of
+-- another one, where.
 data Refused = MkRefused
   { rdConstructor :: !Text
-  , rdPath        :: ![Text]
+    -- ^ the constructor refused: the innermost one with the offending field
+  , rdField       :: !Text
   , rdFieldType   :: !Text
   , rdWhy         :: !Text
+  , rdWithin      :: ![(Text, Text)]
+    -- ^ the constructors and fields it sits in, outermost first: a
+    -- refused @custom@ inside the @size@ of an @Order@ is @[(Order, size)]@,
+    -- and the @Order@s whose size is not @custom@ are still listed
   }
   deriving stock (Eq, Show)
 
@@ -460,11 +466,11 @@ enumerateType info = go Set.empty
         let perField = [ (fname, fty, go seen fty) | (fname, fty) <- fields ]
         in case [ (fname, fty, why) | (fname, fty, Left why) <- perField ] of
           ((fname, fty, why) : _) ->
-            MkDomain [] [MkRefused {rdConstructor = nameText con, rdPath = [fname], rdFieldType = prettyLayout fty, rdWhy = why}]
+            MkDomain [] [MkRefused {rdConstructor = nameText con, rdField = fname, rdFieldType = prettyLayout fty, rdWhy = why, rdWithin = []}]
           [] ->
             let doms = [ (fname, d) | (fname, _, Right d) <- perField ]
                 nested =
-                  [ r {rdConstructor = nameText con, rdPath = fname : r.rdConstructor : r.rdPath}
+                  [ r {rdWithin = (nameText con, fname) : r.rdWithin}
                   | (fname, d) <- doms, r <- d.dmRefused ]
             in MkDomain [ App emptyAnno con args | args <- traverse ((.dmValues) . snd) doms ] nested
 
@@ -859,14 +865,21 @@ loop :: Explorer -> Accum -> IO Accum
 loop ex acc = case acc.acQueue of
   Empty -> pure acc
   node :<| rest
-    | node.ndDepth >= ex.exOptions.eoMaxDepth ->
-        loop ex acc {acQueue = rest, acDepthCut = acc.acDepthCut + 1}
+    | node.ndDepth >= ex.exOptions.eoMaxDepth -> do
+        -- a state at the bound with no candidate at all (FULFILLED, say)
+        -- has nothing the bound kept from it: it is terminal, not cut.
+        -- Listing the candidates replays nothing, so asking costs nothing.
+        let (rig, tr) = rigFor ex node.ndEvents
+        cands <- candidatesOf rig tr node.ndPos
+        loop ex if null cands
+          then terminal node acc {acQueue = rest}
+          else acc {acQueue = rest, acDepthCut = acc.acDepthCut + 1}
     | otherwise -> do
         tried <- expand ex node
         acc' <- foldM (record ex node) acc {acQueue = rest} tried
         let fired = not (null [ () | TriedEdge {} <- tried ])
             blocked = not (null [ () | t <- tried, isBlocked t ])
-            acc'' = if fired || blocked then acc' else addEdge acc' (MkTransition node.ndId "terminal" node.ndId EdgeTerminal)
+            acc'' = if fired || blocked then acc' else terminal node acc'
             -- a pass-over counts once per state and act, and only if no
             -- instant took the act
             firedLabels = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
@@ -877,7 +890,6 @@ loop ex acc = case acc.acQueue of
           { acPassed = acc''.acPassed + Set.size passed
           , acUntried = foldl' (\ m k -> Map.insertWith (+) k 1 m) acc''.acUntried (Set.toList untriedHere)
           , acRefused = foldl' mergeRefusal acc''.acRefused (nubOrdOn refusalKey [ r | TriedRefused r <- tried ])
-          , acNodes = if fired || blocked then acc''.acNodes else markTerminal node.ndId acc''.acNodes
           }
   where
     isBlocked = \ case
@@ -885,7 +897,9 @@ loop ex acc = case acc.acQueue of
       TriedBeyond     -> True
       TriedRefused {} -> True
       _               -> False
-    markTerminal i = map \ s -> if s.snId == i then s {snTerminal = True} else s
+    -- the one self-loop of §4.6, and the mark on the state
+    terminal node a = (addEdge a (MkTransition node.ndId "terminal" node.ndId EdgeTerminal))
+      { acNodes = map (\ s -> if s.snId == node.ndId then s {snTerminal = True} else s) a.acNodes }
 
 refusalKey :: Refusal -> (Text, Text, Maybe Text, Text)
 refusalKey r = (r.rfVariable, r.rfObligation, r.rfConstructor, r.rfReason)
@@ -1099,11 +1113,15 @@ actsOf ex pos raw cand = case cand.cdBound of
             "it names " <> Text.pack (show (length values)) <> " acts, more than the bound of " <> Text.pack (show ex.exOptions.eoMaxActs))])
       | otherwise = Right (values, refusals)
 
--- | @`recorded at`, a NUMBER (a NUMBER has no finite set of values)@
+-- | @its field `recorded at` is a NUMBER, and a NUMBER has no finite set of
+-- values@, with where the constructor sits when it is inside another.
 refusedText :: Refused -> Text
-refusedText r =
-  "its field " <> Text.intercalate " of " (map (\ f -> "`" <> f <> "`") (reverse (filter (not . Text.null) r.rdPath)))
-  <> " is " <> article r.rdFieldType <> " " <> r.rdFieldType <> ", and " <> r.rdWhy
+refusedText r = Text.concat
+  [ case r.rdWithin of
+      [] -> ""
+      w  -> "it sits in " <> Text.intercalate " in " [ "`" <> f <> "` of `" <> c <> "`" | (c, f) <- reverse w ] <> ", and "
+  , "its field `", r.rdField, "` is ", article r.rdFieldType, " ", r.rdFieldType, ", and ", r.rdWhy
+  ]
   where
     article t = if maybe False (`elem` ("AEIOU" :: String)) (fst <$> Text.uncons t) then "an" else "a"
 

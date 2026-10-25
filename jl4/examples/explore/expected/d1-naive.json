@@ -1,0 +1,713 @@
+{
+  "at": "64800",
+  "contract": "`the arrangement`",
+  "coverage": {
+    "comparedByNameOnly": [],
+    "complete": true,
+    "frontierExhausted": true,
+    "ledgerValuesComparedByPrintedForm": 0,
+    "line": "Coverage: 12 states, 21 transitions; frontier exhausted; nothing refused; nothing untried; 51 acts passed over; 12 ticks past the clock bound not taken; no write-only cell dropped; time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state), clock bounded at 75600",
+    "passedOver": 51,
+    "refused": [],
+    "states": 12,
+    "stops": [],
+    "ticksPastClockBound": 12,
+    "time": "time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state), clock bounded at 75600",
+    "transitions": 21,
+    "untried": [],
+    "writeOnlyCellsDropped": []
+  },
+  "states": [
+    {
+      "depth": 0,
+      "id": 0,
+      "ledger": [
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened"
+          ]
+        }
+      ],
+      "path": [],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 1,
+      "id": 1,
+      "ledger": [
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "`in transit`"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 1,
+      "id": 2,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "opened"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "checked"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 2,
+      "id": 3,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "taken"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "stopped"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "delivered"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800",
+        "PARTY World DOES `Messages delivers the message` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 2,
+      "id": 4,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "taken"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "checked"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "`in transit`"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800",
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 2,
+      "id": 5,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "opened"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "checked"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "`in transit`"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800",
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 2,
+      "id": 6,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "opened"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "bought"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened"
+          ]
+        },
+        {
+          "cell": "dinners bought",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "`dinner for two`"
+          ]
+        },
+        {
+          "cell": "open at acceptance",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "TRUE"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800",
+        "PARTY World DOES `Alice buys dinner` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 3,
+      "id": 7,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "taken"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "stopped"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "`in transit`"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800",
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800",
+        "PARTY World DOES `Alice gives up` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 3,
+      "id": 8,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "opened"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "bought"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "`in transit`"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        },
+        {
+          "cell": "dinners bought",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "`dinner for two`"
+          ]
+        },
+        {
+          "cell": "open at acceptance",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "FALSE"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800",
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800",
+        "PARTY World DOES `Alice buys dinner` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 3,
+      "id": 9,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "opened"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "bought"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "`in transit`"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        },
+        {
+          "cell": "dinners bought",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "`dinner for two`"
+          ]
+        },
+        {
+          "cell": "open at acceptance",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "TRUE"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800",
+        "PARTY World DOES `Alice buys dinner` AT 64800",
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 4,
+      "id": 10,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "taken"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "bought"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "delivered"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        },
+        {
+          "cell": "dinners bought",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "`dinner for two`"
+          ]
+        },
+        {
+          "cell": "open at acceptance",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "FALSE"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800",
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800",
+        "PARTY World DOES `Alice buys dinner` AT 64800",
+        "PARTY World DOES `Messages delivers the message` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    },
+    {
+      "depth": 4,
+      "id": 11,
+      "ledger": [
+        {
+          "cell": "belief",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "taken"
+          ]
+        },
+        {
+          "cell": "plan",
+          "kept": "latest",
+          "ledger": "Alice",
+          "values": [
+            "bought"
+          ]
+        },
+        {
+          "cell": "message",
+          "kept": "latest",
+          "ledger": "Messages",
+          "values": [
+            "delivered"
+          ]
+        },
+        {
+          "cell": "dinner status record",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "opened",
+            "taken"
+          ]
+        },
+        {
+          "cell": "dinners bought",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "`dinner for two`"
+          ]
+        },
+        {
+          "cell": "open at acceptance",
+          "kept": "all",
+          "ledger": "OFFICIAL",
+          "values": [
+            "TRUE"
+          ]
+        }
+      ],
+      "path": [
+        "PARTY World DOES `Alice checks whether dinner is bought` AT 64800",
+        "PARTY World DOES `Alice buys dinner` AT 64800",
+        "PARTY World DOES `ledger records Bob's purchase` AT 64800",
+        "PARTY World DOES `Messages delivers the message` AT 64800"
+      ],
+      "residual": "PARTY World\n  MAY act PROVIDED (`the brief allows` OF act)\n  WITHIN 0 OF closing\n  HENCE (CONSIDER act\n           WHEN `ledger records Bob's purchase` THEN COMMIT \"dinner status record\" IS taken HENCE RECORD Messages's \"message\" IS `in transit` HENCE `the evening`\n           WHEN `Messages delivers the message` THEN RECORD Messages's \"message\" IS delivered HENCE RECORD Alice's \"belief\" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's \"plan\")\n           WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's \"belief\" IS `the ledger's status` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS checked HENCE `the evening`\n           WHEN `Alice is done` THEN `the evening`\n           WHEN `Alice buys dinner` THEN COMMIT \"dinners bought\" IS `dinner for two` HENCE COMMIT \"open at acceptance\" IS `the ledger is open` OF (RECALL ALL OFFICIAL's \"dinner status record\") HENCE RECORD Alice's \"plan\" IS bought HENCE `the evening`\n           WHEN `Alice gives up` THEN RECORD Alice's \"plan\" IS stopped HENCE `the evening`)\n  LEST FULFILLED",
+      "terminal": false
+    }
+  ],
+  "transitions": [
+    {
+      "from": 0,
+      "kind": "act",
+      "label": "PARTY World DOES `ledger records Bob's purchase`",
+      "to": 1
+    },
+    {
+      "from": 0,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice checks whether dinner is bought`",
+      "to": 2
+    },
+    {
+      "from": 1,
+      "kind": "act",
+      "label": "PARTY World DOES `Messages delivers the message`",
+      "to": 3
+    },
+    {
+      "from": 1,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice checks whether dinner is bought`",
+      "to": 4
+    },
+    {
+      "from": 2,
+      "kind": "act",
+      "label": "PARTY World DOES `ledger records Bob's purchase`",
+      "to": 5
+    },
+    {
+      "from": 2,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice buys dinner`",
+      "to": 6
+    },
+    {
+      "from": 3,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice is done`",
+      "to": 3
+    },
+    {
+      "from": 4,
+      "kind": "act",
+      "label": "PARTY World DOES `Messages delivers the message`",
+      "to": 3
+    },
+    {
+      "from": 4,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice gives up`",
+      "to": 7
+    },
+    {
+      "from": 5,
+      "kind": "act",
+      "label": "PARTY World DOES `Messages delivers the message`",
+      "to": 3
+    },
+    {
+      "from": 5,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice buys dinner`",
+      "to": 8
+    },
+    {
+      "from": 6,
+      "kind": "act",
+      "label": "PARTY World DOES `ledger records Bob's purchase`",
+      "to": 9
+    },
+    {
+      "from": 6,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice is done`",
+      "to": 6
+    },
+    {
+      "from": 7,
+      "kind": "act",
+      "label": "PARTY World DOES `Messages delivers the message`",
+      "to": 3
+    },
+    {
+      "from": 7,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice is done`",
+      "to": 7
+    },
+    {
+      "from": 8,
+      "kind": "act",
+      "label": "PARTY World DOES `Messages delivers the message`",
+      "to": 10
+    },
+    {
+      "from": 8,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice is done`",
+      "to": 8
+    },
+    {
+      "from": 9,
+      "kind": "act",
+      "label": "PARTY World DOES `Messages delivers the message`",
+      "to": 11
+    },
+    {
+      "from": 9,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice is done`",
+      "to": 9
+    },
+    {
+      "from": 10,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice is done`",
+      "to": 10
+    },
+    {
+      "from": 11,
+      "kind": "act",
+      "label": "PARTY World DOES `Alice is done`",
+      "to": 11
+    }
+  ]
+}

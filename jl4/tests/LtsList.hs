@@ -29,7 +29,7 @@
 -- constructor. The reader §1.1a has in mind does not know what a
 -- @ValObligation@ is, and the golden alone would not notice if one crept
 -- in.
-module LtsList (spec) where
+module LtsList (spec, importsEnv) where
 
 import Base
 import qualified Base.Map as Map
