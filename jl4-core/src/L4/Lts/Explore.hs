@@ -102,6 +102,9 @@ module L4.Lts.Explore
   , UntriedNote (..)
   , explore
   , coverageComplete
+  , replayPath
+  , withoutDirectives
+  , decidesOf
     -- * Rendering
   , renderGraph
   , coverageLine
@@ -307,6 +310,10 @@ data Graph = MkGraph
   { gStart       :: !Start
   , gStates      :: ![StateNode]
   , gTransitions :: ![Transition]
+  , gEdgeEvents  :: !(Map (Int, Text, Int) (Expr Resolved))
+    -- ^ the event each act or tick edge was first taken by, with its
+    -- instant, keyed as the edge is: a step's counterexample is the path to
+    -- its source and then this event ("L4.Lts.Explore.Check")
   , gCoverage    :: !Coverage
   }
 
@@ -315,6 +322,13 @@ data StateNode = MkStateNode
   , snDepth    :: !Int
   , snEvents   :: ![Text]
     -- ^ the path that first reached it, as the events of a @#TRACE@
+  , snPath     :: ![Expr Resolved]
+    -- ^ the same path, as the events the replay appended
+  , snStore    :: !LedgerStore
+    -- ^ the ledgers of the position that first reached it, whole: what a
+    -- property is evaluated on ("L4.Lts.Explore.Check"). Only the cells the
+    -- state keeps ('snLedger') are the same in every position merged into
+    -- it, so a property may read only those
   , snResidual :: !Text
     -- ^ the canonical residual ('StateKey')
   , snLedger   :: ![LedgerCell]
@@ -836,6 +850,7 @@ data Accum = MkAccum
   , acEdges      :: !(Set (Int, Text, Int))
   , acEdgeList   :: ![Transition]
     -- ^ newest first
+  , acEdgeEvents :: !(Map (Int, Text, Int) (Expr Resolved))
   , acQueue      :: !(Seq Node)
   , acPassed     :: !Int
   , acBeyond     :: !Int
@@ -877,6 +892,7 @@ explore opts sites rig0 start = do
               , acNext = 1
               , acEdges = Set.empty
               , acEdgeList = []
+              , acEdgeEvents = Map.empty
               , acQueue = Seq.singleton node0
               , acPassed = 0
               , acBeyond = 0
@@ -891,6 +907,18 @@ explore opts sites rig0 start = do
               }
         acc <- loop ex acc0
         pure (Right (finish ex acc))
+
+-- | Replay a path of events from a start, afresh, with nothing the
+-- exploration computed: what a counterexample is held to before it is
+-- printed ("L4.Lts.Explore.Check"; spec §6.3, "replay every counterexample
+-- on the evaluator before printing it"). The events are those of a
+-- 'StateNode''s 'snPath', or that path and one edge's event after it.
+replayPath :: Rig -> Start -> [Expr Resolved] -> IO (Maybe Position)
+replayPath rig start events = do
+  let directive = Contract emptyAnno start.stContract start.stAt events
+      MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
+      rig' = rig {rigModule = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))}
+  position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = start.stAt, trEvents = events}
 
 loop :: Explorer -> Accum -> IO Accum
 loop ex acc = case acc.acQueue of
@@ -929,7 +957,7 @@ loop ex acc = case acc.acQueue of
       TriedRefused {} -> True
       _               -> False
     -- the one self-loop of §4.6, and the mark on the state
-    terminal node a = (addEdge a (MkTransition node.ndId "terminal" node.ndId EdgeTerminal))
+    terminal node a = (addEdge a Nothing (MkTransition node.ndId "terminal" node.ndId EdgeTerminal))
       { acNodes = map (\ s -> if s.snId == node.ndId then s {snTerminal = True} else s) a.acNodes }
 
 refusalKey :: Refusal -> (Text, Text, Maybe Text, Text)
@@ -946,7 +974,7 @@ record ex node acc = \ case
   TriedEdge label kind event pos' -> do
     (key, notes) <- stateKey ex pos'
     case Map.lookup key acc.acSeen of
-      Just j -> pure (addEdge acc (MkTransition node.ndId label j kind))
+      Just j -> pure (addEdge acc (Just event) (MkTransition node.ndId label j kind))
       Nothing
         | Map.size acc.acSeen >= ex.exOptions.eoMaxStates ->
             pure acc {acStatesCut = acc.acStatesCut + 1}
@@ -959,14 +987,19 @@ record ex node acc = \ case
               , acNodes = stateNode j (node.ndDepth + 1) events key pos' : acc.acNodes
               , acNext = j + 1
               , acQueue = acc.acQueue :|> new
-              }) (MkTransition node.ndId label j kind)
+              }) (Just event) (MkTransition node.ndId label j kind)
   TriedBeyond -> pure acc {acBeyond = acc.acBeyond + 1}
   _ -> pure acc
 
-addEdge :: Accum -> Transition -> Accum
-addEdge acc t
+-- | An edge, once; the event it was first taken by is kept beside it.
+addEdge :: Accum -> Maybe (Expr Resolved) -> Transition -> Accum
+addEdge acc mevent t
   | Set.member k acc.acEdges = acc
-  | otherwise = acc {acEdges = Set.insert k acc.acEdges, acEdgeList = t : acc.acEdgeList}
+  | otherwise = acc
+      { acEdges = Set.insert k acc.acEdges
+      , acEdgeList = t : acc.acEdgeList
+      , acEdgeEvents = maybe acc.acEdgeEvents (\ e -> Map.insert k e acc.acEdgeEvents) mevent
+      }
   where k = (t.tnFrom, t.tnLabel, t.tnTo)
 
 noteKey :: KeyNotes -> Accum -> Accum
@@ -982,6 +1015,8 @@ stateNode i depth events key pos = MkStateNode
   { snId = i
   , snDepth = depth
   , snEvents = map (oneLine . prettyLayout) events
+  , snPath = events
+  , snStore = pos.posResult.ledger
   , snResidual = key.skResidual
   , snLedger = key.skLedger
   , snClock = pos.posClock
@@ -993,6 +1028,7 @@ finish ex acc = MkGraph
   { gStart = ex.exStart
   , gStates = reverse acc.acNodes
   , gTransitions = reverse acc.acEdgeList
+  , gEdgeEvents = acc.acEdgeEvents
   , gCoverage = MkCoverage
       { cvStates = Map.size acc.acSeen
       , cvTransitions = Set.size acc.acEdges

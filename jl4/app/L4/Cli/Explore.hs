@@ -1,29 +1,42 @@
--- | @l4 explore FILE [--contract NAME [--at T]] [--until T] [--json | --dot]@
+-- | @l4 explore FILE [--contract NAME [--at T]] [--until T] [--json | --dot]
+-- [--always P] [--reachable P] [--stays P] [--eventually P [--if-always Q]]@
 -- — every position a contract can reach, as an explicit labelled
 -- transition system: the states, the events between them, and a coverage
--- line that says how much of the contract that is.
+-- line that says how much of the contract that is; and, when properties are
+-- named, whether each holds on it.
 --
--- This is work package WP1 of
--- @specs/proposals/REGULATIVE-LOWERING-SPEC.md@ (§4): the graph is
+-- This is work packages WP1 and WP2 of
+-- @specs/proposals/REGULATIVE-LOWERING-SPEC.md@ (§4, §5): the graph is
 -- "L4.Lts.Explore" iterating "L4.Lts.WhatIf"'s replay, so every edge is the
--- evaluator's own answer, and this module only loads the file and prints.
+-- evaluator's own answer; the checks are "L4.Lts.Explore.Check", and this
+-- module only loads the file and prints.
 --
--- Exit status, so that a CI job cannot read an incomplete run as green
--- (§4.2): 0 when the frontier was exhausted with nothing refused and
--- nothing untried; 1 when the file does not type-check, an option names
--- nothing, or a contract cannot be run at its outset; 2 when an act was
--- refused (a variable of a type with no finite set of values) or a
--- candidate could not be tried; 3 when nothing was refused or untried but
--- the depth or state bound stopped the exploration. A tick past @--until@
--- is outside the exploration asked for, not a failure of it: it is counted
--- on the coverage line and does not change the status.
+-- A property is a boolean decision of the file or a file it imports, named
+-- by a flag that says its class (the spec's @--check@: L4 has no syntax for
+-- the class, so the flag carries it). The cells the properties read are
+-- kept in the state whether or not a @RECALL@ in the file reads them, as
+-- @--keep@ and @--keep-latest@ would keep them.
+--
+-- Exit status, so that a CI job cannot read an incomplete run, or an
+-- unanswered check, as green (§4.2): 0 when the frontier was exhausted with
+-- nothing refused and nothing untried, and every property named holds; 1
+-- when the file does not type-check, an option names nothing (a property
+-- among them), or a contract cannot be run at its outset; 4 when a property
+-- is violated (its counterexample is printed, and is real whatever else the
+-- run did); 2 when an act was refused (a variable of a type with no finite
+-- set of values) or a candidate could not be tried; 3 when nothing was
+-- refused or untried but the depth or state bound stopped the exploration;
+-- 5 when the exploration was complete but a property's verdict is unknown
+-- (every liveness property; a state that could not be labelled). A tick
+-- past @--until@ is outside the exploration asked for, not a failure of
+-- it: it is counted on the coverage line and does not change the status.
 module L4.Cli.Explore
   ( ExploreCliOptions (..)
   , exploreOptionsParser
   , exploreCmd
   ) where
 
-import Base (catMaybes, for, when)
+import Base (catMaybes, for, for_, unless, when)
 import Data.Char (isDigit)
 import qualified Base.Set as Set
 import qualified Base.Text as Text
@@ -41,6 +54,9 @@ import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (NormalizedUri, normalizedFilePathToUri)
 
 import L4.Lts.Explore
+import L4.Lts.Explore.Check
+import L4.EvaluateLazy (EvalConfig, EvalDirectiveResult (..))
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Lts.WhatIf (Rig (..))
 import L4.Syntax (Module, Resolved)
 
@@ -61,10 +77,17 @@ data ExploreCliOptions = ExploreCliOptions
   , exGrid      :: Maybe Rational
   , exKeep      :: [Text.Text]
   , exKeepLatest :: [Text.Text]
+  , exProperties :: [PropertyFlag]
   , exJson      :: Bool
   , exDot       :: Bool
   , exFixedNow  :: FixedNowOpt
   }
+
+-- | One property flag, in the order given: an @--if-always@ is the premise
+-- of the @--eventually@ before it.
+data PropertyFlag
+  = FlagProperty PropertyKind Text.Text
+  | FlagIfAlways Text.Text
 
 exploreOptionsParser :: Parser ExploreCliOptions
 exploreOptionsParser = ExploreCliOptions
@@ -118,6 +141,23 @@ exploreOptionsParser = ExploreCliOptions
         <> metavar "CELL"
         <> help "Keep this ledger cell's latest entry in the state although no RECALL in the file reads it (a cell a property reads as a MAYBE); repeatable"
         ))
+  <*> many (asum
+        [ FlagProperty Always <$> strOption
+            ( long "always" <> metavar "P"
+            <> help "Check that the boolean decision P is TRUE in every reachable state (safety); a counterexample is printed as a #TRACE. Repeatable, as are the three below")
+        , FlagProperty Reachable <$> strOption
+            ( long "reachable" <> metavar "P"
+            <> help "Check that P is TRUE in some reachable state; the witness is printed as a #TRACE")
+        , FlagProperty Stays <$> strOption
+            ( long "stays" <> metavar "P"
+            <> help "Check that no step goes from a state where P is TRUE to one where it is FALSE (once true, always true)")
+        , FlagProperty Eventually <$> strOption
+            ( long "eventually" <> metavar "P"
+            <> help "Label the states with P, a liveness property; its verdict is unknown here, for a model checker to decide")
+        , FlagIfAlways <$> strOption
+            ( long "if-always" <> metavar "Q"
+            <> help "After --eventually P: the property is that if Q is always TRUE, P is eventually TRUE")
+        ])
   <*> switch (long "json" <> help "Print the graph as JSON, one object per contract explored")
   <*> switch (long "dot" <> help "Print the graph in GraphViz's DOT language")
   <*> fixedNowParser
@@ -180,7 +220,14 @@ exploreCmd opts = do
       when (null starts) do
         TIO.putStrLn "Nothing to explore: the file has no #TRACE directive. Add one (`#TRACE c AT 0 WITH`) or name a rule with --contract."
         exitWith ExitSuccess
-      let sites = keepCells ([ (c, True) | c <- opts.exKeep ] <> [ (c, False) | c <- opts.exKeepLatest ]) (readSitesOf rig.rigModule imported)
+      requests <- either (\ why -> hPutStrLn stderr why >> exitWith (ExitFailure 1)) pure (requestsOf opts.exProperties)
+      props <- for requests \ rq -> case resolveProperty rig.rigEntityInfo (rig.rigModule : imported) rq of
+        Left why -> do
+          hPutStrLn stderr ("--" <> Text.unpack (kindWord rq.rqKind) <> " " <> Text.unpack rq.rqName <> ": " <> Text.unpack why)
+          exitWith (ExitFailure 1)
+        Right p -> pure p
+      let sites = keepCells ([ (c, True) | c <- opts.exKeep ] <> [ (c, False) | c <- opts.exKeepLatest ] <> propertyCells props)
+                    (readSitesOf rig.rigModule imported)
           options = defaultExploreOptions
             { eoMaxDepth = opts.exMaxDepth
             , eoMaxStates = opts.exMaxStates
@@ -194,25 +241,78 @@ exploreCmd opts = do
           hPutStrLn stderr (Text.unpack s.stName <> ": " <> Text.unpack why)
           pure Nothing
         Right g -> pure (Just g)
+      checked <- for graphs \ g -> if null props
+        then pure (g, [], mempty)
+        else do
+          original <- TIO.readFile opts.exFile
+          (rs, labels) <- checkGraph options rig (Just (sourceReplay evalConfig opts.exFile original)) g props
+          pure (g, rs, labels)
       if opts.exJson
-        then BL.putStrLn (AesonPretty.encodePretty' jsonConfig (Aeson.toJSON (map graphJson graphs)))
+        then BL.putStrLn (AesonPretty.encodePretty' jsonConfig (Aeson.toJSON
+               [ if null props then graphJson g else checksJson g rs labels (graphJson g) | (g, rs, labels) <- checked ]))
         else if opts.exDot
           then TIO.putStr (Text.intercalate "\n" (map graphDot graphs))
-          else TIO.putStr (Text.intercalate "\n" (map renderGraph graphs))
+          else TIO.putStr (Text.intercalate "\n" [ if null props then renderGraph g else checkedText g rs | (g, rs, _) <- checked ])
       -- JSON and DOT carry the coverage inside them; the line goes to
       -- stderr as well, so a run piped into a checker still says, where a
-      -- person will see it, how much it covered
+      -- person will see it, how much it covered, and what the checks found
       when (opts.exJson || opts.exDot) $
-        mapM_ (\ g -> TIO.hPutStrLn stderr (coverageLine g.gCoverage)) graphs
-      exitWith (statusOf (length graphs < length starts) (map (.gCoverage) graphs))
+        for_ checked \ (g, rs, _) -> do
+          unless (null rs) $ TIO.hPutStrLn stderr (checksSummary rs)
+          TIO.hPutStrLn stderr (coverageLine g.gCoverage)
+      exitWith (statusOf (length graphs < length starts) [ (g.gCoverage, map (.crVerdict) rs) | (g, rs, _) <- checked ])
+
+-- | Run a @#TRACE@, given as source, appended to the file explored: a
+-- virtual file beside it, so that its imports resolve as the file's own do,
+-- and with the file's own directives in it, run too and set aside. The
+-- trace's result is the one whose directive starts below the file's last
+-- line. This is how a counterexample is run as what it is printed as
+-- ("L4.Lts.Explore.Check", 'SourceReplay').
+sourceReplay :: EvalConfig -> FilePath -> Text.Text -> SourceReplay
+sourceReplay evalConfig path original trace = do
+  let src = original <> (if "\n" `Text.isSuffixOf` original then "" else "\n") <> "\n" <> trace
+      below = length (Text.lines original)
+  (errs, mres) <- runOneshot evalConfig (path <> ".explore-replay.l4") \ nfp -> do
+    _ <- Shake.addVirtualFile nfp src
+    Shake.use Rules.EvaluateLazy (normalizedFilePathToUri nfp)
+  pure case mres of
+    Nothing -> Left ("did not type-check: " <> Text.intercalate "; " (take 3 errs))
+    Just results -> case [ l | MkEvalDirectiveResult {range = Just MkSrcRange {start = MkSrcPos {line = n}}, ledger = l} <- results, n > below ] of
+      [l] -> Right l
+      ls -> Left ("gave " <> Text.pack (show (length ls)) <> " results below the file's own text, not one")
+
+-- | With properties named, the text is the graph's heading, the checks,
+-- and the coverage line last; the states and transitions are what a run
+-- without them prints.
+checkedText :: Graph -> [CheckResult] -> Text.Text
+checkedText g rs = Text.unlines $
+  take 1 (Text.lines (renderGraph g))
+  <> [""] <> renderChecks g rs
+  <> ["", coverageLine g.gCoverage]
+
+-- | The flags, paired: each @--if-always@ with the @--eventually@ before it.
+requestsOf :: [PropertyFlag] -> Either String [Request]
+requestsOf = go
+  where
+    go = \ case
+      [] -> Right []
+      FlagProperty Eventually p : FlagIfAlways q : rest -> (MkRequest Eventually p (Just q) :) <$> go rest
+      FlagProperty k p : rest -> (MkRequest k p Nothing :) <$> go rest
+      FlagIfAlways q : _ -> Left ("--if-always " <> Text.unpack q <> ": it is the premise of an --eventually, and must come straight after one")
+
 
 -- | The exit status of the whole run (see the module header).
-statusOf :: Bool -> [Coverage] -> ExitCode
-statusOf startFailed cvs
+statusOf :: Bool -> [(Coverage, [Verdict])] -> ExitCode
+statusOf startFailed runs
   | startFailed = ExitFailure 1
+  | any (any ((== "violated") . verdictWord)) verdicts = ExitFailure 4
   | any (\ cv -> not (null cv.cvRefused) || not (null cv.cvUntried)) cvs = ExitFailure 2
   | any (\ cv -> not (null cv.cvStops)) cvs = ExitFailure 3
+  | any (any ((== "unknown") . verdictWord)) verdicts = ExitFailure 5
   | otherwise = ExitSuccess
+  where
+    cvs = map fst runs
+    verdicts = map snd runs
 
 -- | The resolved modules of every import, transitively, each once.
 importedModules :: Set.Set NormalizedUri -> [NormalizedUri] -> Action [Module Resolved]

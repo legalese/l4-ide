@@ -151,6 +151,7 @@ library
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
     L4.Lts.Explore
+    L4.Lts.Explore.Check
     L4.Lts.List
     L4.Lts.Marking
     L4.Lts.WhatIf

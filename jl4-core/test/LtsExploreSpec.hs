@@ -23,21 +23,32 @@
 --   5. a top-level rule with no inputs that reads a ledger keeps its first
 --      answer for the rest of the run, so two positions with the same
 --      residual and ledger but different first answers behave differently,
---      and are two states.
+--      and are two states;
+--   6. the in-process checker (WP2, "L4.Lts.Explore.Check"): the verdicts
+--      of each class on a contract whose only way wrong is a missed
+--      deadline, so the counterexample is a tick; the printed #TRACE run
+--      as source; a source replay that disagrees caught; unknown when the
+--      exploration is incomplete or a cell is in two ledgers; and the
+--      properties refused by name.
 module LtsExploreSpec (spec) where
 
 import qualified Data.Text as Text
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
-import L4.EvaluateLazy (resolveEvalConfig)
+import L4.Evaluate.Ledger (emptyStore)
+import L4.EvaluateLazy (EvalDirectiveResult (..), execEvalModuleWithDeonticLog, resolveEvalConfig)
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Lts.Explore
+import L4.Lts.Explore.Check
 import L4.Lts.WhatIf (Rig (..))
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import Test.Hspec
+
+import L4.Print (prettyLayout)
 
 fixedNow :: UTCTime
 fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
@@ -53,6 +64,63 @@ exploreSrc src name opts keep = do
       sites = keepCells keep (readSitesOf r.tcdModule [])
   start <- either (fail . Text.unpack) pure (startNamed r.tcdModule name 0)
   explore opts sites rig start >>= either (fail . Text.unpack) pure
+
+-- | Explore the named rule from 0 and check these properties on it, the
+-- cells they read kept; with a source replay, or none.
+checkSrc :: Text.Text -> Text.Text -> ExploreOptions -> Maybe SourceReplay -> [Request] -> IO (Graph, [CheckResult])
+checkSrc src name opts msource requests = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  r <- case checkWithImports (vfsFromList []) src of
+    Left errs -> fail ("typecheck failed: " <> show errs)
+    Right r -> pure r
+  let rig = MkRig {rigConfig = cfg, rigEntityInfo = r.tcdEntityInfo, rigEnv = emptyEnvironment, rigModule = r.tcdModule}
+  props <- either (fail . Text.unpack) pure (traverse (resolveProperty r.tcdEntityInfo [r.tcdModule]) requests)
+  let sites = keepCells (propertyCells props) (readSitesOf r.tcdModule [])
+  start <- either (fail . Text.unpack) pure (startNamed r.tcdModule name 0)
+  g <- explore opts sites rig start >>= either (fail . Text.unpack) pure
+  (rs, _) <- checkGraph opts rig msource g props
+  pure (g, rs)
+
+-- | Resolve one property against a source, for the refusals.
+resolveIn :: Text.Text -> Request -> IO (Either Text.Text ())
+resolveIn src rq = case checkWithImports (vfsFromList []) src of
+  Left errs -> fail ("typecheck failed: " <> show errs)
+  Right r -> pure (() <$ resolveProperty r.tcdEntityInfo [r.tcdModule] rq)
+
+-- | The source replay the CLI does, done here with no files: the trace
+-- text appended to the source, the whole run, and the ledger of the one
+-- directive below the source's own lines.
+sourceReplayOf :: Text.Text -> SourceReplay
+sourceReplayOf src trace = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  case checkWithImports (vfsFromList []) (src <> "\n" <> trace) of
+    Left errs -> pure (Left ("did not type-check: " <> Text.pack (show errs)))
+    Right r -> do
+      (_, results) <- execEvalModuleWithDeonticLog cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+      let below = length (Text.lines src)
+      pure case [ l | (MkEvalDirectiveResult {range = Just MkSrcRange {start = MkSrcPos {line = n}}, ledger = l}, _) <- results, n > below ] of
+        [l] -> Right l
+        ls -> Left ("gave " <> Text.pack (show (length ls)) <> " results below the source")
+
+verdicts :: [CheckResult] -> [Text.Text]
+verdicts = map (verdictWord . (.crVerdict))
+
+pathOf :: CheckResult -> Maybe Path
+pathOf r = case r.crVerdict of
+  Violated _ mp -> mp
+  Reached p -> Just p
+  Unknown _ mp -> mp
+  Holds _ -> Nothing
+
+reasonOf :: CheckResult -> Text.Text
+reasonOf r = case r.crVerdict of
+  Violated why _ -> why
+  Unknown why _ -> why
+  Holds why -> why
+  Reached _ -> "reached"
+
+ask :: PropertyKind -> Text.Text -> Request
+ask k n = MkRequest k n Nothing
 
 counts :: Graph -> (Int, Int)
 counts g = (g.gCoverage.cvStates, g.gCoverage.cvTransitions)
@@ -155,6 +223,66 @@ cachedSrc = Text.unlines
   , "          WHEN peek THEN `c`"
   ]
 
+-- 6. `go` is owed by 10; missing it COMMITs `missed`. The properties read
+--    `missed` as its latest entry.
+lateSrc :: Text.Text -> Text.Text
+lateSrc onGo = Text.unlines
+  [ "DECLARE Who IS ONE OF W"
+  , "DECLARE Move IS ONE OF go"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`nothing missed` MEANS"
+  , "    CONSIDER missed"
+  , "    WHEN NOTHING THEN TRUE"
+  , "    WHEN JUST b THEN FALSE"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`something missed` MEANS NOT (`nothing missed` missed)"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`missed falsely` MEANS"
+  , "    CONSIDER missed"
+  , "    WHEN NOTHING THEN FALSE"
+  , "    WHEN JUST b THEN NOT b"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`never missed falsely` MEANS NOT (`missed falsely` missed)"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`reads itself` MEANS"
+  , "    CONSIDER (RECALL OFFICIAL's `missed`)"
+  , "    WHEN NOTHING THEN TRUE"
+  , "    WHEN JUST b THEN FALSE"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`reads through another` MEANS `reads itself` missed"
+  , ""
+  , "GIVETH A BOOLEAN"
+  , "`no inputs` MEANS TRUE"
+  , ""
+  , "GIVEN m IS A Move"
+  , "GIVETH A BOOLEAN"
+  , "`a move` MEANS TRUE"
+  , ""
+  , "GIVEN missed IS A MAYBE BOOLEAN"
+  , "GIVETH A NUMBER"
+  , "`a number` MEANS 1"
+  , ""
+  , "GIVETH A DEONTIC Who Move"
+  , "`late` MEANS"
+  , "    PARTY W"
+  , "    MUST  go"
+  , "    WITHIN 10"
+  , "    HENCE " <> onGo
+  , "    LEST  COMMIT `missed` IS TRUE HENCE FULFILLED"
+  ]
+
 spec :: Spec
 spec = describe "l4 explore" do
   describe "1. a whole-action variable is enumerated; a NUMBER constructor is refused by name" do
@@ -239,3 +367,68 @@ spec = describe "l4 explore" do
       counts g `shouldBe` (4, 7)
       g.gCoverage.cvPassedOver `shouldBe` 1
       length [ () | s <- g.gStates, [ c.lcValues | c <- s.snLedger ] == [["TRUE"]] ] `shouldBe` 2
+
+  describe "6. the in-process checker" do
+    let late = lateSrc "FULFILLED"
+    it "answers each class: the counterexample is the tick past the deadline, printed as a runnable #TRACE" do
+      (g, rs) <- checkSrc late "late" defaultExploreOptions (Just (sourceReplayOf late))
+        [ ask Always "nothing missed", ask Reachable "something missed", ask Reachable "missed falsely"
+        , ask Stays "nothing missed", ask Always "never missed falsely", ask Eventually "something missed" ]
+      counts g `shouldBe` (3, 4)
+      verdicts rs `shouldBe` ["violated", "holds", "violated", "violated", "holds", "unknown"]
+      [always, _, unreachable, stays, _, liveness] <- pure rs
+      reasonOf unreachable `shouldBe` "no state of the 3 states explored satisfies it"
+      reasonOf liveness `shouldBe` livenessUnknown
+      case pathOf always of
+        Nothing -> expectationFailure "no counterexample"
+        Just p -> traceText g.gStart "c" p.ptEvents `shouldBe` Text.unlines
+          [ "-- c", "#TRACE late AT 0 WITH", "    (`WAIT UNTIL` OF 11)" ]
+      -- the step leaves the outset: its path is the tick alone
+      fmap (\ p -> (p.ptState, p.ptStep, length p.ptEvents)) (pathOf stays) `shouldBe` Just (0, True, 1)
+      reasonOf stays `shouldSatisfy` Text.isInfixOf "it holds at the outset, and the first event takes it away"
+
+    it "the printed #TRACE, run as source, leaves `missed` as the replay did" do
+      (g, rs) <- checkSrc late "late" defaultExploreOptions Nothing [ask Always "nothing missed"]
+      [r] <- pure rs
+      p <- maybe (fail "no counterexample") pure (pathOf r)
+      sourceReplayOf late (traceText g.gStart "c" p.ptEvents) >>= \ case
+        Left why -> expectationFailure (Text.unpack why)
+        Right store -> decisionArgsText store `shouldReturn` ["JUST OF TRUE"]
+
+    it "a source replay that disagrees with the in-process one is caught: unknown, the path kept, not printed as a counterexample" do
+      (_, rs) <- checkSrc late "late" defaultExploreOptions (Just (\ _ -> pure (Right emptyStore))) [ask Always "nothing missed"]
+      [r] <- pure rs
+      verdicts rs `shouldBe` ["unknown"]
+      reasonOf r `shouldSatisfy` Text.isInfixOf "the printed #TRACE, run as source, gives the property NOTHING where the replay gives it JUST OF TRUE"
+      fmap (length . (.ptEvents)) (pathOf r) `shouldBe` Just 1
+
+    it "holds becomes unknown when the exploration is incomplete; a violation found is still one, here at the outset" do
+      (_, rs) <- checkSrc late "late" defaultExploreOptions {eoMaxDepth = 0} (Just (sourceReplayOf late))
+        [ask Always "nothing missed", ask Reachable "something missed", ask Always "something missed"]
+      verdicts rs `shouldBe` ["unknown", "unknown", "violated"]
+      [incomplete, _, outset] <- pure rs
+      reasonOf incomplete `shouldSatisfy` Text.isInfixOf "the exploration was not complete"
+      fmap (length . (.ptEvents)) (pathOf outset) `shouldBe` Just 0
+
+    it "a cell found in two ledgers across the states is not guessed between: unknown" do
+      let twoLedgers = lateSrc "RECORD `missed` IS FALSE HENCE FULFILLED"
+      (_, rs) <- checkSrc twoLedgers "late" defaultExploreOptions Nothing [ask Always "nothing missed"]
+      [r] <- pure rs
+      verdicts rs `shouldBe` ["unknown"]
+      reasonOf r `shouldSatisfy` Text.isInfixOf "is in more than one ledger across the states explored (W's, OFFICIAL's)"
+
+    it "refuses, by name, a property that could not mean the same at every state" do
+      let refusal rq = resolveIn late rq >>= either pure (const (fail "not refused"))
+      refusal (ask Always "reads itself") >>= (`shouldSatisfy` Text.isInfixOf "reads a ledger itself")
+      refusal (ask Always "reads through another") >>= (`shouldSatisfy` Text.isInfixOf "reads a ledger itself")
+      refusal (ask Always "no inputs") >>= (`shouldSatisfy` Text.isInfixOf "takes no inputs")
+      refusal (ask Always "a move") >>= (`shouldSatisfy` Text.isInfixOf "the input `m` of `a move` is a Move")
+      refusal (ask Always "a number") >>= (`shouldSatisfy` Text.isInfixOf "gives a NUMBER, not a BOOLEAN")
+      refusal (ask Always "no such rule") >>= (`shouldSatisfy` Text.isInfixOf "no rule named `no such rule`")
+      refusal (MkRequest Always "nothing missed" (Just "something missed")) >>= (`shouldSatisfy` Text.isInfixOf "is for an eventually property")
+      resolveIn late (ask Always "`nothing missed`") `shouldReturn` Right ()
+  where
+    decisionArgsText store = do
+      r <- either (fail . show) pure (checkWithImports (vfsFromList []) (lateSrc "FULFILLED"))
+      d <- either (fail . Text.unpack) (pure . (.prDecision)) (resolveProperty r.tcdEntityInfo [r.tcdModule] (ask Always "nothing missed"))
+      either (fail . Text.unpack) (pure . map prettyLayout) =<< decisionArgs d store
