@@ -2,7 +2,7 @@
 
 **Status (2026-10-26):** Stage 1 is **built**, in legalese/l4-ide#748, a draft PR into `unstable`; Stages 2 and 3 are **proposed, not landed**. Sections §0 and §1 describe the tree as it was on 2026-10-10 against l4-ide `539cad5fd` (merge of #605) and the installed `l4` of that date; where Stage 1 or #649 has since changed a fact, the list below says so and the section is left as it was written, because code and tests cite its numbers.
 
-**Stage 3, first commit (2026-10-26): built on branch `feat/relative-imports-root-form`, stacked on Stage 1; PROPOSED, FOR MENG, not ruled.** The root-relative form (§4.7 choices C1 to C5, C7, and the persistence half of C8) is implemented as §4.7 recommends, and every choice a rule author would see is listed there with its alternatives. The aliases (C6) are not built. The PR stays a draft until Meng rules. Where that changes the text below: a leading `/` is no longer refused on that branch (the §4.2 rule 1 text, the bullet on §4.5 below and the §7 test line describe Stage 1, as merged in #748).
+**Stage 3 (2026-10-26): built on branch `feat/relative-imports-root-form`, stacked on Stage 1, in two commits; PROPOSED, FOR MENG, not ruled.** The first commit is the root-relative form (§4.7 choices C1 to C5, C7, and the persistence half of C8). The second is the aliases (C6, and the half of C8 that the first could not show): `IMPORT \`@alias/path\``, with the aliases read from `l4-project.json`. Both are implemented as §4.7 recommends, the second reverts alone, and every choice a rule author would see is listed in §4.7 with its alternatives. The PR stays a draft until Meng rules. Where that changes the text below: a leading `/` is no longer refused on that branch (the §4.2 rule 1 text, the bullet on §4.5 below and the §7 test line describe Stage 1, as merged in #748).
 
 **What Stage 1 built** (the §4 design, as written): a backticked `IMPORT` name containing `/` is a path import, resolved against the importing file and never by the ladder; a leading `/` is refused (until the Stage 3 branch above); a bare name resolves as before, with the §4.2(3) warning. Core pure helpers (`classifyImport`, `pathImportFile`, `collapsePath`) are in `jl4-core/src/L4/Import/Resolution.hs`; the resolution is in `jl4-lsp/src/LSP/L4/Rules.hs` (`resolveRelativeImport`, `pathFailureMessage`), which serves the CLI, LSP, MLIR, REPL and service. Tests: `jl4-core/test/RelativeImportSpec.hs`, `jl4-lsp/test/RelativeImportSpec.hs`, `jl4-service/test/RelativeImportSpec.hs`, and the `l4 relative imports` group of `jl4/tests-cli/Main.hs` over `jl4/tests-cli/fixtures/relative-import/`.
 
@@ -170,12 +170,12 @@ All four are errors at the `IMPORT` line, in the style of the existing not-found
 ### 4.7 Stage 3: the root-relative form and aliases (proposed, not ruled)
 
 **Status (2026-10-26): proposed, for Meng; nothing in this section is ruled.**
-C1 to C5, C7 and the persistence half of C8 are built on branch `feat/relative-imports-root-form`, stacked on Stage 1, as the recommendations below say.
-C6 (aliases) is not built.
+C1 to C8 are built on branch `feat/relative-imports-root-form`, stacked on Stage 1, as the recommendations below say: C1 to C5, C7 and the persistence half of C8 in the first commit, and C6 in the second, which reverts alone.
 Each choice below is one a rule author would see: the spelling they write, the file they add to a project, what they are told when something is missing.
 Each says what was built (the recommendation) and what else could be.
 The PR stays a draft until Meng rules.
 A ruling that picks an alternative changes `classifyImport` and `findProjectRoot` and the message texts, and nothing in the resolution of a relative path.
+A ruling on C6 changes `splitAlias`, `L4.Import.ProjectManifest`, `resolveAliasImport` and the message texts, and nothing in the resolution of a root-relative path.
 
 #### 4.7.1 The choices
 
@@ -189,7 +189,7 @@ That Stage 1 reserved it does not separate it from `//x`, which Stage 1 also ref
 
 **C2, the project root and the file that marks it.**
 Recommendation (built): the root of a root-relative import is the folder of the nearest file named `l4-project.json`, looking in the folder of the importing file and then in each folder above it, and stopping at the first folder that holds one.
-The file marks the root and may contain just `{}`; in this commit its content is not read, only its presence.
+The file marks the root and may contain just `{}`; a root-relative import reads only its presence, and the content is read only by an alias import (C6).
 The nearest marker wins, so a project inside a project has its own root.
 A copy of the file that the session holds in memory counts before the disk is asked, as it does for every other file the resolver probes (the file is read through the rules, `GetFileContents`, and not by an untracked read).
 No host hands one in today: the VS Code extension forwards only L4 documents to the language server (`l4DocumentSelector`, `ts-apps/vscode/src/embedded-library.ts`; read, not run), so there a marker counts once it is saved, and the service does not look for one (C3).
@@ -263,12 +263,41 @@ Stage 1's relative-path line is left alone.
 Cost: the pins for these two messages in `jl4-lsp/test/RelativeImportSpec.hs` and `jl4/tests-cli/Main.hs` move, and so do the heading and anchor of the errors-page entry and its inbound links (CLAUDE.md §7: whoever changes a diagnostic owns every page that quotes it).
 The refusal is a lexical rule that makes the form agree with the service; on a person's machine it is only as good as the ruling on C2 and C2b and the symbolic-link limit.
 
-**C6, aliases (commit 2; not built).**
-Recommendation: the manifest is JSON, `{"aliases": {"vn10": "subjects/vn/nd67"}}`, each value a folder relative to the manifest's folder that stays inside the root, used as ``IMPORT `@vn10/nouns` ``.
-An unknown alias is an error that lists the known ones; an alias cannot refer to another alias; a manifest that does not parse is an error naming the file and the position; unknown top-level keys are ignored.
-Alternatives to the `@` spelling: `vn10:nouns` (a colon does not contain a `/`, so it would not be a path import by §4.2 and needs its own class); a plain `vn10/nouns` is impossible, since it is already a relative path.
-Because this commit does not read the manifest, a manifest that is not JSON still marks a root here; commit 2 would start refusing it.
+**C6, aliases.**
+Recommendation (built, in the second commit): the manifest is JSON, `{"aliases": {"vn10": "subjects/vn/nd67"}}`, each value a folder relative to the manifest's folder (which is the project root) that stays inside the root, used as ``IMPORT `@vn10/nouns` ``.
+The sub-choices, each one a rule author would see:
 
+- **C6a, the spelling.** `@alias/path`: a name that starts with `@` and has a `/`.
+  It is tested before the relative path, so a relative path through a folder whose own name starts with `@` must now be written `./@folder/mod`.
+  Stage 1 is a draft PR that no release carries.
+  §0 #16 found no name with a `/` in five trees on 2026-10-10.
+  A recursive grep of the `.l4` files under `~/src/legalese` on 2026-10-26, for an `IMPORT` of a backticked name that starts with `@` and has a `/` after it, found no file (it ran for 21 seconds and exited 1, which is no match; the worktrees under `/Volumes/transcend/src/l4wt`, which hold this change's own fixtures, are outside it).
+  So no file that exists changes meaning.
+  A name with an `@` and no `/` stays a bare name.
+  Alternatives: `vn10:nouns` (a colon does not contain a `/`, so it would not be a path import by §4.2 and needs its own class; a colon is also a Windows drive letter and a URL scheme, which a reader may take it for); a plain `vn10/nouns` is impossible, since it is already a relative path.
+- **C6b, the file format.** JSON, with one key, `aliases`, an object from alias to folder.
+  Keys it does not know are ignored, so a later version can add some.
+  The top level must be an object and each folder must be text.
+  Alternatives: a line-based file (`vn10 = subjects/vn/nd67`), which has no room for structure; TOML or YAML, which the toolchain does not otherwise read.
+- **C6c, one file, the nearest.** The aliases are those of the file that marks the root (C2), and of that file alone: a project inside a project has its own aliases and none of the outer one's.
+  Alternative: merge the aliases of every marker above the importing file, inner ones winning (an inner project then inherits, and moving it changes what it means).
+  In a deployment the file is the one at the top of the bundle (C6f), so a project inside a project has the outer file's aliases there: the open question under C3 covers aliases as well as the root.
+- **C6d, the errors.** An alias the file does not define is an error that lists the ones it does.
+  An alias cannot stand for another alias: a folder that starts with `@` is refused.
+  A file that is not JSON is an error that names the file and the line and column where it stops being JSON.
+  An alias whose folder leaves the root is an error.
+  The first line of the **leaves the root** message says "this deployment", which is false of a person's machine for an alias that climbs, as it is for a root-relative path; C5 lists a different first line for the CLI as an alternative, and the alias case is more evidence for it (not built: the first line is pinned by a test).
+  This is checked on the written folder, as C5 is on the written path: a symbolic link inside the root can lead out, for the alias folder and for a path under the alias alike (measured 2026-10-26: ``IMPORT `@out/planted` `` with `"out": "esc"` and `esc` a link to the folder above the root loaded the planted file; the service is not affected).
+  Alternatives: fall back to a relative path when the alias is unknown (then a typo in an alias is a silent second meaning, and the failure shows up as a missing module); allow an alias to build on another (then the file needs an order and a cycle check).
+- **C6e, when the file is read.** Only by an alias import.
+  A root-relative import looks for the file and never opens it, so on a person's machine a manifest that does not parse breaks the imports that use an alias and nothing else.
+  In a deployment it can reject the whole deployment, because the service lexes every uploaded file as L4 (§4.7.5).
+  Alternative: parse it whenever the root is found, so that a file that is not JSON fails every root-relative import under it too (a project that marked its root with an empty file, which is not JSON, would then fail).
+  The first commit's text of this paragraph said "commit 2 would start refusing" a manifest that is not JSON; this is the decision it left open.
+- **C6f, a deployment.** The manifest is the `l4-project.json` at the top of the uploaded files and no other, per C3; an alias used in a bundle that has none is an error.
+  Alternatives: search the bundle for the nearest one (two roots in one bundle, so one source could mean two things).
+
+After the bench review (2026-10-26; not built): a duplicated alias should be an error and not the first one kept, because the JSON of other readers keeps the last; no project that needs an alias is named (the request reached this work through GM's relay of 2026-10-26, which was not checked against Meng), so commit 2 does not leave draft until a deploy tool uploads the manifest end to end; and the editor does not re-read an edited manifest until the importing file changes (C6e).
 
 **C7, module identity.**
 Recommendation (built): a root-relative target is keyed with the same `canonicalPathKey` as every other path import, so one file is one module however it was reached: ``IMPORT `/identity/core` ``, ``IMPORT `./core` `` and ``IMPORT `../identity/core` `` from `identity/top.l4` are one module (§4.4).
@@ -278,11 +307,13 @@ This is the §4.4 invariant applied to a new way in, and is listed because a rul
 Recommendation (built): `BundleStore.loadBundle` reloads a file named `l4-project.json`, in any folder, beside the `.l4` files, because `saveBundle` already writes it (it writes every file of the upload) and `loadBundle` dropped it, so a restart would have lost a manifest and the aliases with it.
 Nothing else about what the service stores changes: any other file that is not a `.l4` is still not reloaded.
 Alternatives: reload every file `saveBundle` wrote (a larger change to what a restart serves, outside this proposal); keep the manifest in `metadata.json` (a second place for the same bytes).
-A visible consequence: the version a deployment reports is a hash of every file the store reloads, so a bundle of `.l4` files and a manifest reports the same version before and after a restart (it moved by the manifest before this change).
+A visible consequence: the version a deployment reports is a hash of the files it was compiled from, every file of the upload at a deploy and the files the store reloads after a restart, so a bundle of `.l4` files and a manifest reports the same version before and after a restart (it moved by the manifest before this change).
+A bundle that holds any other file does not (§4.7.7).
+With aliases (C6) the loss shows in the call itself: a bundle whose imports use an alias answers 200 before a restart, and without the reload the same call answers 422 after it (measured, §4.7.6).
 
 **What the bench review changed (2026-10-26).**
 Each card of the bench "Relative Imports Rulings" went to its own skeptic.
-The recommendations above that changed are C2b (a git ceiling instead of a warning), C3 ((b) instead of (a)) and C5 (a runtime-neutral first line); C1, C2 and C4 keep theirs with conditions added in place.
+The recommendations above that changed are C2b (a git ceiling instead of a warning), C3 ((b) instead of (a)) and C5 (a runtime-neutral first line); C1, C2, C4 and C6 keep theirs with conditions added in place.
 Nothing here is built beyond what 4.7.2 lists.
 
 #### 4.7.2 What was built
@@ -291,6 +322,14 @@ Nothing here is built beyond what 4.7.2 lists.
 - `LSP.L4.Rules`: `resolveRelativeImport` branches on the form; `findProjectRoot` walks up from the importing file's folder; the lookup that follows (memory, then disk when the scope allows) is shared with the relative path; three new `PathResolution` constructors carry the new failures.
 - `Compiler.logUnresolvedImports` says "under the root of the bundle" for a name that starts with `/`, since "relative to the importing file" would be false of it.
 - `BundleStore.loadSourcesRecursive` admits `l4-project.json`.
+
+The second commit (aliases, C6), which reverts alone:
+
+- `L4.Import.Resolution`: `ImportForm` has `AliasImport`, tested before `PathImport` in `classifyImport`; `splitAlias` cuts `@vn10/nouns` into the alias and the path under it.
+- `L4.Import.ProjectManifest` (new, pure, no file system): `parseProjectManifest` reads the text of an `l4-project.json` into its aliases, or says where it is not JSON (a line and column) or what shape is wrong (a JSON path); `aliasFolder` turns an alias's folder into a collapsed path inside the root, or refuses it; `renderManifestProblem` words the problem for the message.
+- `LSP.L4.Rules`: `resolveRelativeImport` sends an alias import to `resolveAliasImport`; `markerSource` is the one place that says where an `l4-project.json` is held (memory, disk, nowhere), shared by `findProjectRoot`, which only needs its presence, and `readProjectFile`, which reads it; five new `PathResolution` constructors and their texts in `pathFailureMessage`.
+- `Compiler.logUnresolvedImports` says what is true of an alias for a name that starts with `@` and has a `/`.
+- The documentation: the `IMPORT` reference, `resolution.md`, four entries on the errors page, and a checked example under `doc/reference/libraries/alias-example/`.
 
 #### 4.7.3 Resolution, as ordered steps
 
@@ -303,6 +342,22 @@ Given importer URI `u` and written text `t` with a leading `/`:
 4. Join the root and the collapsed path, and key the result with `canonicalPathKey` (§4.4).
 5. Probe memory, then the disk unless confined (§4.3 step 6); a miss is the **not found** message naming the root.
 
+For an alias import (C6), given importer URI `u` and written text `t` that starts with `@` and has a `/`:
+
+1. If `u` has no directory, fail with the **no importing directory** message, as above.
+2. Split `t` at its first `/` into the alias (between the `@` and the slash, possibly empty) and the path under it (possibly empty).
+3. Find the root as in step 3 above.
+   Not found on a person's machine is the alias form of **no project root**.
+4. Read the project file at the root, `l4-project.json`: through the rules (`GetFileContents`) when the session holds a copy, so an open buffer or an uploaded file wins over the disk, and from the disk otherwise, in bytes, unless confined.
+   No file at all (a deployment with none at its top) is the alias form of **no project root**.
+   A file that is not UTF-8 text, is not JSON, or has the wrong shape is **cannot read the project file**.
+5. Look the alias up.
+   Missing is **unknown alias**.
+6. Work its folder through (`aliasFolder`): one that starts with `@` is **refers to another alias**, and one that still starts with `..` is **alias leaves the root**.
+7. Join the folder and the path under the alias (one trailing `.l4` stripped, `.l4` appended) and collapse them.
+   If that still starts with `..`, fail with the **leaves the root** message of C5, in every runtime.
+8. Join the root and the result, key it with `canonicalPathKey` (§4.4), and probe memory, then the disk unless confined; a miss is the alias form of **not found**.
+
 #### 4.7.4 Messages
 
 First lines are stable text a test can match; lines after them are proposed.
@@ -310,6 +365,20 @@ First lines are stable text a test can match; lines after them are proposed.
 - **no project root**: the two lines of C4.
 - **leaves the root** (root-relative): the first line of §4.5, then the two lines of C5.
 - **not found** (root-relative): `I could not find a module at this path: /subjects/vn/nouns` then the second line of §4.5 kept verbatim, then `Relative to the project root <root> that is <path>, which does not exist.` In a deployment the third line says `the root of this deployment` where it says `the project root <root>`.
+
+The alias messages (second commit; first lines are stable, the rest is proposed):
+
+- **no project root, for an alias**: `This import uses the alias @vn10, but no project root was found above <importer>`, then `An alias is defined in the file l4-project.json at the top of your project, like {"aliases": {"vn10": "subjects/vn"}}.`
+  In a deployment the first line ends `but this deployment has no l4-project.json at its top` and the second says `at the top of the uploaded files`.
+  It is not the root-relative message because that one's second line ("it may contain just {}") would be false of an alias.
+- **cannot read the project file**: `I could not read the project file <path>, which this import needs: @vn10/nouns`, then one line of what is wrong (``It is not valid JSON: line 4, column 3, unexpected `}`.``; `... the file ends before the JSON is complete (line 2, column 1).`; `It is valid JSON, but aliases.vn10 must be the folder the alias stands for, written as text.`; `It could not be read: <why>.`), then `A project file that defines an alias looks like {"aliases": {"vn10": "subjects/vn"}}.`
+- **unknown alias**: `This import uses an alias that is not defined: @vn11`, then `The aliases defined in <path> are: @vn10, @common.` or `<path> defines no aliases.`
+- **refers to another alias**: `The alias @a in <path> refers to another alias: @b/x`, then two lines saying an alias is a folder of the project, and how to name a folder that starts with `@` (`./@b/x`).
+- **alias leaves the root**: `The alias @a in <path> leaves the root of the project`, then `Worked through, the folder it stands for is ../x, which is above the project root.` and a line saying what an alias may name.
+- **not found, for an alias**: `I could not find a module at this path: @vn10/nouns`, the second line of §4.5 kept verbatim, then `The alias @vn10 stands for <folder> (in <path>); relative to the project root <root> that is <path>, which does not exist.` (`the root of this deployment` in a deployment).
+- A path under an alias that climbs above the root uses the **leaves the root** message of C5, with the written name in its first line.
+  Its second and third lines are the alias's own: `Worked through from the folder that the alias @a stands for, that path is <path>, which is above the project root.` and `An alias import may reach any file inside the project root and nothing outside it.`
+  C5's third line names a root-relative import, which is false of an alias, and a reviewer found that an alias that climbs, run on a person's machine, was told so (2026-10-26).
 
 #### 4.7.5 Choices that C1 to C8 do not settle (assumed, not ruled)
 
@@ -323,6 +392,29 @@ Each is invisible to nearly every rule author.
 - How far the walk up goes is not an assumption made here: a stray marker in a parent folder is seen by rule authors (measured 2026-10-26), and the choice is open under C2.
 - A root-relative import whose importer has no directory (an embedded library, a browser document) gets the existing "no directory" message, whose wording says "relative" without saying to what; read from the code, not run, because no file-based session reaches it.
 
+Made in the second commit (aliases), each reverting with it:
+
+- `@` and nothing else, `IMPORT \`@vn10\``, stays a bare name and fails as one (no `/`, so §4.2 calls it bare).
+- An empty alias (`@/x`) is an alias like another and is not defined, so it gets the unknown-alias message; an empty path (`@vn10/`) looks for a file called `.l4` in the alias's folder and says it does not exist.
+- The folder an alias stands for drops empty segments, so a leading `/` does nothing and `""` and `"."` both stand for the root; it takes no `.l4`.
+- The path under an alias may use `..` and is held to the project root, not to the alias's folder: `@vn10/../shared/core` is a file of the project.
+- An alias written twice in one file keeps whichever copy the JSON reader keeps (the first, on the aeson measured, 2.2.3.0) and is not an error.
+  Pinned since the review of 2026-10-26: `jl4-core-test` asserts that the first is kept, and the IMPORT reference says so in one sentence.
+  A reader of the file elsewhere (`JSON.parse` in a TypeScript deploy tool or editor) keeps the last; making a duplicate an error would remove the disagreement and is not ruled.
+- A leading byte-order mark is ignored; any other text before the `{` is not JSON.
+- The line and column of a file that is not JSON are found by asking the JSON reader about prefixes of the text and keying on its wording, "Unexpected end-of-input", for a prefix that could still grow into JSON, because the reader reports what it did not expect but not where.
+  This is a failure that would be silent: a reader that words that differently would still refuse the file, and put the position at the first character.
+  `jl4-core-test` pins six positions, so an upgrade that changes the wording fails there first.
+- The project file is read in bytes from the disk and decoded as UTF-8, so a file that is not UTF-8 is an error about the file and not an exception; a copy held in memory is already text.
+- `markerSource` replaces the inline presence check of `findProjectRoot` and is the same check (memory, then disk unless confined); no behaviour of the first commit changes.
+- The service registers every file of an upload, `l4-project.json` among them, and asks for a type check of each (`Backend/Jl4.hs`, `typecheckAndEvalBundle`), so the manifest is lexed as L4, and the result is not dropped: a line of it that L4 reads as an annotation rejects the whole deployment.
+  Corrected 2026-10-26 after review; the first text said the result was dropped, read from the code and not measured.
+  Measured on the built service: an `l4-project.json` with `@exprot foo` as its second line was rejected (`l4-project.json:2:1: Unknown annotation`), a bare `@lang` as `Malformed annotation`, and a `README.md` with `@exprot maintainers` the same (`README.md:2:1`), which predates this change.
+  Valid JSON was accepted in every file tried: `{}`, a note containing `see @exprot`, an escaped quote and `@nlg team` as a value, because an `@` inside a JSON string is part of the string.
+  The cause is in `typecheckAndEvalBundle`, which registers and type-checks every bundle file and collects the ignored annotations for every registered path, and in `compileBundle`, which turns each into a refusal.
+  Not changed: filtering the files that are type-checked to `.l4` would remove the effect, for a manifest and for a `README.md` alike; it changes the service, so it needs its own commit and is not ruled.
+- `BundleStore.listSourceFiles`, which the MCP file listing uses, still lists `.l4` files only, so the manifest is not shown there; it is also not an L4 source.
+
 #### 4.7.6 Tests
 
 - `jl4-core-test` (`RelativeImportSpec`): the classification of a leading slash, the file a root-relative name names, `projectMarkerFile`.
@@ -331,7 +423,53 @@ Each is invisible to nearly every rule author.
   The no-marker case is copied to a temporary folder before it is run, so that a marker added above this repository cannot change what it measures.
 - `jl4-service-test`: `RelativeImportSpec` (resolution from the bundle root, a decoy in the importer's folder, one module however spelled, a planted file that is not taken, the host's disk that is not read); `BundleStoreSpec` (the manifest round-trips, other files still do not); `IntegrationSpec` (the same call and the same version before and after a restart).
 
-**Measured 2026-10-26, each test against the code without the change** (the library and the `l4` binary of the Stage 1 parent, with the new tests):
+The second commit (aliases) adds 78 examples:
+
+- `jl4-core-test` (`RelativeImportSpec`, 26): the classification of an `@` with and without a slash and with a `./` or `/` before it; `splitAlias`; `parseProjectManifest` (the smallest file, the aliases, unknown keys, a byte-order mark, the three shapes that are wrong, and the position of seven files that are not JSON: a trailing comma on a later line, a missing colon, text after a complete value, a column counted in characters, a file that ends too soon twice, and an empty file); `aliasFolder`.
+- `jl4-lsp-test` (`RelativeImportSpec`, 35): both library scopes over the same files.
+  Under `AmbientLibraries`: a folder several levels down; the manifest the session holds in memory against a decoy on disk, whose folder defines a BOOLEAN where the held one's defines a NUMBER, and an alias only the held copy has; the nearest manifest only; the unknown alias listing the known ones, and a manifest with none; no manifest above the importer; a path that finds nothing; a manifest that is not JSON, one whose folder is not text, and a root-relative import that is not stopped by either; an alias that stands for an alias; a folder written `./@b`; an alias folder and a path under the alias that leave the root, each beside a path that stays inside and a relative-path positive control that finds the planted file; one file written three ways, with a relative and an absolute entry.
+  Under `EmbeddedStdlibOnly`: the manifest at the top of the files it was handed, a decoy manifest in the importer's folder that must not be used, the manifest on the host's disk that must not be read, an alias that is not defined, a manifest that is not JSON, a climbing path refused though the planted file was handed over, the host's disk not read for the target, one module however written.
+  And the text of each of the seven new messages.
+- `l4-cli-test` (`l4 relative imports`, 9): the fixtures `alias/` (two aliases, one used from inside another folder, and three spellings of one file), `alias-nested/`, `alias-unknown/`, `alias-chain/` and `alias-escape/` with `alias-escape-planted.l4` beside it.
+  The manifest that is not JSON, and the tree with no manifest, are written into a temporary folder by the test, so that no fixture on disk is JSON that does not parse (prettier would refuse it) and no marker above this repository can change what the no-manifest test measures.
+- `jl4-service-test` (7 in `RelativeImportSpec`, 1 in `IntegrationSpec`): an alias through the manifest at the top of a bundle, from a folder; the top manifest and no other, with a decoy in the importer's folder; one module however written; an undefined alias, and an alias with no manifest at the top, each logged as resolving to nothing with text that is true of an alias; a planted file that a path under an alias would reach and must not; a manifest on the host's disk that must not be read; and the same call and the same version before and after a restart.
+
+**Measured 2026-10-26, the second commit's tests against the code without it** (the first commit's library and `l4` binary; the service and CLI tests compile against it and the core and lsp tests do not, because they name `AliasImport`, `splitAlias`, `L4.Import.ProjectManifest` and five new constructors):
+
+- All 9 new alias tests in `l4 relative imports` fail.
+- 4 of the 39 selected `jl4-service-test` items fail: the alias restart test, the alias through the top manifest, the top manifest and no other, and the log text of an alias that is not defined.
+  The other new service tests pass against the code without aliases, because that code resolves nothing from an alias either; they guard what the new code could do wrongly, and the faults below were put against them.
+
+Each of the new tests was put against a deliberate fault in the new code, to see whether it can fail.
+Five faults were applied together and attributed by what each failed test asserts (12 of the 66 selected `jl4-lsp-test` items, 3 of 38 service items, 2 of 32 CLI items and 1 of 48 `jl4-core-test` items failed); a sixth, the host's disk, was applied with them and was hidden by the fifth, and three more were applied alone:
+
+- A manifest the session holds, read from the disk instead: failed the two `jl4-lsp-test` tests of a held manifest.
+- `aliasFolder` letting a folder that climbs through: failed the `jl4-core-test` test and the `jl4-lsp-test` test of an alias folder above the root. The check of the path under the alias still refused the import, with another message, so it was the message tests that caught this.
+- Skipping the check of the path under the alias: failed both `jl4-lsp-test` tests of a climbing path, in both scopes, and the CLI test.
+- Reading the manifest for a root-relative import as well: failed the `jl4-lsp-test` test and the CLI test that a manifest that is not JSON stops only the alias imports.
+- Looking for the manifest in the importer's folder under confinement: failed the `jl4-lsp-test` items that resolve from the top of the files it was handed, that a decoy manifest in the importer's folder is not used, and that name the aliases that are defined, and the service tests of the alias through the top manifest and of the top manifest and no other.
+- Not reloading the manifest in the store (alone): the alias restart test fails, with the call answering 200 and 105 before the restart and 422 `modmarker is not in scope` after it, and so does the first commit's version test (`b339a91b…` before, `ea48901f…` after, the same hashes as in the first commit's measurement). This is the call-level evidence of the loss that the first commit could not give.
+- Reading the host's disk for the manifest when confined (alone): failed the `jl4-lsp-test` test that the host's disk is not read. The first service test written for this did not fail, because the folder the alias leads to was not in the bundle, so the import was unresolved whether the manifest was read or not; it was rewritten with the target file in the bundle and the manifest only on the host, and then failed (1 of 16 selected).
+- Skipping `canonicalPathKey` in the shared lookup (alone): failed the `jl4-lsp-test` and CLI tests of one module however written, the alias ones among them (4 CLI failures: two Stage 1 tests, the first commit's root-relative one, and the alias one), and not the service ones, as in the first commit.
+- The two service tests of one module however written (`reaches one file as one module however it is written` and its alias counterpart) have not been shown to catch a fault: under confinement `canonicalPathKey` is the identity.
+
+**Added after review (2026-10-26), five examples and the faults put against them.**
+`jl4-core-test` (1): the first of an alias written twice is kept.
+`jl4-lsp-test` (3): the alias's own lines for a path that climbs above the root, through the whole check on a person's machine; the same three lines built from the constructor; and the three lines of the root-relative message, so that the alias change cannot alter them.
+The climbing-path test under `EmbeddedStdlibOnly` also asserts the alias's third line.
+`jl4-service-test` (1): an alias whose folder is above the bundle is not resolved, with a file planted on the host where it would lead and another handed to the compile under the key the climbing path collapses to.
+`BundleStoreSpec` also asserts that `loadSingleFile` returns the manifest.
+Each fault below was applied, the selected examples run, and the file restored byte for byte (`cmp` and `git diff` clean):
+
+- `resolveAliasImport` returning the root-relative constructor again, as before review: failed 2 of the 39 `jl4-lsp-test` examples that match `alias`, the two that read the text of the diagnostic.
+  The example that builds the constructor itself passes, which is why the others are end to end.
+- The alias folder's own escape check (`aliasFolder`) alone: failed 1 of 7 selected `jl4-core-test` examples and 1 of 39 selected `jl4-lsp-test` examples, and did not fail the new service example (9 selected, 0 failures).
+  The check of the path under the alias refuses the same import, and the service sees only that the import resolved to nothing, not which check refused it, so the example guards the invariant and has not been shown to catch the fault of one check alone.
+- Both escape checks together (`aliasFolder`, and the test of `underRoot.cpEscaped` in `resolveAliasImport`): failed the new service example (`expected the import to be reported as resolving to nothing, got 0 lines`; 1 of 9 selected) and 4 of 39 selected `jl4-lsp-test` examples.
+
+**The whole of each suite, on the code of this commit:** `jl4-core-test` 1600 examples, 0 failures, 13 pending; `jl4-lsp-test` 297, 0 failures; `jl4-service-test` 681, 0 failures; `l4-cli-test` 653, 0 failures, 83 pending; `doc/test-docs.sh` with the worktree's `l4` first on `PATH`: 1780 links, 122 `.l4` files and 260 files linked, no errors (before review: 1599, 294, 680, 653 and 1772 links).
+
+**Measured 2026-10-26, each test of the first commit against the code without the change** (the library and the `l4` binary of the Stage 1 parent, with the new tests):
 
 - All 7 new `l4 relative imports` tests fail; the 16 Stage 1 tests pass.
 - 13 of the 27 `jl4-lsp-test` items fail. The 14 that pass are Stage 1 tests, the new positive control, and two refusals of a path that climbs, which Stage 1 already gave by refusing every leading slash; the refusals are paired with tests of a path that stays inside, and those fail.
@@ -348,10 +486,16 @@ Four tests passed against the old code, because it refuses or fails to resolve a
 
 #### 4.7.7 Limits, stated in the docs
 
-- The language server does not watch `l4-project.json`: a file that is open keeps the root it found until a new check of that file reads it afresh.
+- The language server does not watch `l4-project.json`: a file that is open keeps the root it found, and the aliases it read, until its own text changes.
+  Measured with a scripted client against the built language server on 2026-10-26 (VS Code itself was not tried).
+  After the marker was added or removed, a save of the importing file, closing and reopening it, a file-watch notice for the marker and a typed change in another open file each left the old answer, and a typed change in the importing file found the change.
+  After the manifest changed on disk so that an alias stood for another folder, a save of the importing file, closing and reopening it and a typed change in another open file each left the old folder, and a typed change in the importing file found the new one.
+  Restarting the language server was not tried.
+- A deployment that cannot resolve an alias import is accepted, as for any import that finds nothing (§0 #12 and the #649 ruling), and the only trace is the warning in the service's log; the names the missing file should have supplied then become implicit inputs of the deployed function.
 - A deployed project's zip must have the project root at its top, and `l4 deploy` and the VS Code deploy action cannot yet build such a zip (the deploy tools are a separate PR, §0 #12).
 - Both deploy tools upload only the entry file and the files it imports (`bundle` in `jl4/app/L4/Cli/Deploy.hs`, which collects the entry file and the modules of its type check; `collectL4Sources` in `ts-apps/vscode/src/sidebar-provider.ts`, which collects the main file and its resolved imports), so keeping folders in the zip is not enough: neither would upload an `l4-project.json`.
   **Requirement for the deploy-tools change** (the branch `fix/deploy-keeps-paths`, at `1d426fc9b` on 2026-10-26, which does not meet it: `git grep l4-project` over its `jl4/app` and `ts-apps/vscode/src` finds nothing): a deploy tool that supports root-relative projects has to find the project root, the folder of the nearest `l4-project.json` above the entry file, and make that folder the top of the zip.
+  For alias projects the requirement has one more part: the tool has to add the nearest `l4-project.json` to the upload itself, because no file imports it and both tools collect imports only.
 - A project inside a project is read by `l4` with its nearest `l4-project.json` and by the service with the one at the top of the bundle, so the same files can mean two things, and nothing refuses or warns of it (measured 2026-10-26, C3).
   It is not fixed: which side should change is the open question in C3, and no code was changed for it.
 - Confinement is checked on the written path, not on the file it reaches: a symbolic link inside the project root that points outside it lets a root-relative path reach a file above the root, on a person's machine (measured 2026-10-26: ``IMPORT `/esc/planted` `` with `esc` a link to the folder above the root loaded the planted file).

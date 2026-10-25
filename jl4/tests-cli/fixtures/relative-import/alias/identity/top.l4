@@ -1,0 +1,7 @@
+IMPORT `@common/core`
+IMPORT `/shared/core`
+IMPORT `../shared/core`
+
+twice MEANS coremarker + coremarker
+
+#EVAL twice

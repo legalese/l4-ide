@@ -9,9 +9,18 @@
 -- below are built with 'joinPath' where a separator matters.
 module RelativeImportSpec (spec) where
 
+import qualified Data.Map.Strict as Map
 import System.FilePath (joinPath)
 import Test.Hspec
 
+import L4.Import.ProjectManifest
+  ( AliasProblem (..)
+  , ManifestProblem (..)
+  , ProjectManifest (..)
+  , aliasFolder
+  , parseProjectManifest
+  , renderManifestProblem
+  )
 import L4.Import.Resolution
   ( CollapsedPath (..)
   , ImportForm (..)
@@ -19,6 +28,7 @@ import L4.Import.Resolution
   , collapsePath
   , pathImportFile
   , projectMarkerFile
+  , splitAlias
   )
 
 collapsed :: FilePath -> Bool -> CollapsedPath
@@ -51,6 +61,33 @@ spec = describe "Relative imports (pure helpers)" $ do
 
     it "does not take a backslash for a separator" $
       classifyImport "sub\\core" `shouldBe` BareImport
+
+    -- Aliases (§4.7 C6, PROPOSED, FOR MENG, not ruled).
+    it "treats an @ and a slash as an alias import, tested before the relative path" $ do
+      classifyImport "@vn10/nouns" `shouldBe` AliasImport
+      classifyImport "@vn10/a/b" `shouldBe` AliasImport
+      classifyImport "@/x" `shouldBe` AliasImport
+
+    it "keeps an @ without a slash a bare name, as it is today" $
+      classifyImport "@vn10" `shouldBe` BareImport
+
+    it "does not take an @ that is not leading for an alias" $ do
+      classifyImport "./@vn10/nouns" `shouldBe` PathImport
+      classifyImport "sub/@vn10/nouns" `shouldBe` PathImport
+      classifyImport "/@vn10/nouns" `shouldBe` RootRelativeImport
+
+  describe "splitAlias" $ do
+    it "splits the alias from the path under it at the first slash" $ do
+      splitAlias "@vn10/nouns" `shouldBe` Just ("vn10", "nouns")
+      splitAlias "@vn10/a/b" `shouldBe` Just ("vn10", "a/b")
+
+    it "keeps an empty alias and an empty path, which then fail where they are looked up" $ do
+      splitAlias "@/x" `shouldBe` Just ("", "x")
+      splitAlias "@vn10/" `shouldBe` Just ("vn10", "")
+
+    it "is Nothing for a name that is not an alias" $ do
+      splitAlias "vn10/x" `shouldBe` Nothing
+      splitAlias "@vn10" `shouldBe` Nothing
 
   describe "pathImportFile" $ do
     it "appends .l4" $
@@ -111,3 +148,88 @@ spec = describe "Relative imports (pure helpers)" $ do
 
     it "returns . for a path that collapses to nothing" $
       collapsePath (joinPath ["a", ".."]) `shouldBe` collapsed "." False
+
+  -- The project file (§4.7 C6, PROPOSED, FOR MENG, not ruled).
+  describe "parseProjectManifest" $ do
+    let aliasesOf = fmap (.aliases) . parseProjectManifest
+
+    it "reads the smallest file, {}, as a project with no aliases" $
+      aliasesOf "{}" `shouldBe` Right Map.empty
+
+    it "reads the aliases of a project" $
+      aliasesOf "{\"aliases\": {\"vn10\": \"subjects/vn/nd67\", \"sg\": \"subjects/sg\"}}"
+        `shouldBe` Right (Map.fromList [("vn10", "subjects/vn/nd67"), ("sg", "subjects/sg")])
+
+    it "ignores keys it does not know, at the top and beside the aliases" $
+      aliasesOf "{\"name\": \"vn\", \"aliases\": {\"a\": \"x\"}, \"later\": [1, 2]}"
+        `shouldBe` Right (Map.fromList [("a", "x")])
+
+    -- Another reader of the same file (a deploy tool or an editor written in
+    -- TypeScript) would keep the last, as JSON.parse does; the docs say so.
+    it "keeps the first of an alias written twice" $
+      aliasesOf "{\"aliases\": {\"a\": \"first\", \"a\": \"second\"}}"
+        `shouldBe` Right (Map.fromList [("a", "first")])
+
+    it "ignores a byte-order mark" $
+      aliasesOf "\xFEFF{}" `shouldBe` Right Map.empty
+
+    describe "a file that is not JSON" $ do
+      let notJson t = either (Just . renderManifestProblem) (const Nothing) (parseProjectManifest t)
+
+      it "names the line and column of the first character that cannot be there: a trailing comma" $
+        notJson "{\n  \"aliases\": {\n    \"vn10\": \"subjects/vn\",\n  }\n}\n"
+          `shouldBe` Just "It is not valid JSON: line 4, column 3, unexpected `}`."
+
+      it "names it for a missing colon" $
+        parseProjectManifest "{\"aliases\": {\"a\" \"x\"}}"
+          `shouldBe` Left (ManifestNotJson 1 18 (Just '"'))
+
+      it "names the text after a complete value" $
+        parseProjectManifest "{} x" `shouldBe` Left (ManifestNotJson 1 4 (Just 'x'))
+
+      it "counts a column in characters, not bytes" $
+        parseProjectManifest "{\"caf\233\": }" `shouldBe` Left (ManifestNotJson 1 10 (Just '}'))
+
+      it "says the file ends too soon, at the end of the file, when nothing is wrong until then" $ do
+        parseProjectManifest "{\"aliases\": {\"a\": \"x\"" `shouldBe` Left (ManifestNotJson 1 22 Nothing)
+        notJson "{\n" `shouldBe` Just "It is not valid JSON: the file ends before the JSON is complete (line 2, column 1)."
+
+      it "does not take an empty file for {}" $
+        parseProjectManifest "" `shouldBe` Left (ManifestNotJson 1 1 Nothing)
+
+    describe "a file that is JSON but not a project file" $ do
+      it "wants an object at the top" $
+        parseProjectManifest "[]" `shouldBe` Left (ManifestShape "the top level" "must be an object, like {}")
+
+      it "wants the aliases to be an object" $
+        fmap renderManifestProblem (either Just (const Nothing) (parseProjectManifest "{\"aliases\": [\"a\"]}"))
+          `shouldBe` Just "It is valid JSON, but aliases must be an object that gives each alias a folder, like {\"vn10\": \"subjects/vn\"}."
+
+      it "wants each folder to be text, and names the alias" $
+        parseProjectManifest "{\"aliases\": {\"vn10\": 4}}"
+          `shouldBe` Left (ManifestShape "aliases.vn10" "must be the folder the alias stands for, written as text")
+
+  describe "aliasFolder" $ do
+    it "is the folder, with its . and x/.. worked through" $ do
+      aliasFolder "subjects/vn/nd67" `shouldBe` Right (joinPath ["subjects", "vn", "nd67"])
+      aliasFolder "./subjects/../shared" `shouldBe` Right "shared"
+
+    it "takes a leading slash and doubled slashes as nothing, as every path import does" $ do
+      aliasFolder "/subjects//vn" `shouldBe` Right (joinPath ["subjects", "vn"])
+
+    it "lets the empty folder and . stand for the root itself" $ do
+      aliasFolder "" `shouldBe` Right "."
+      aliasFolder "." `shouldBe` Right "."
+
+    it "refuses a folder that climbs above the root, and says where it came out" $ do
+      aliasFolder "../x" `shouldBe` Left (AliasLeavesRoot (joinPath ["..", "x"]))
+      aliasFolder "a/../../x" `shouldBe` Left (AliasLeavesRoot (joinPath ["..", "x"]))
+
+    it "refuses a folder that starts with @, because that would be another alias" $
+      aliasFolder "@other/x" `shouldBe` Left (AliasIsAlias "@other/x")
+
+    it "reads ./@x as the folder called @x" $
+      aliasFolder "./@x" `shouldBe` Right "@x"
+
+    it "names the alias problem before the escape" $
+      aliasFolder "@../" `shouldBe` Left (AliasIsAlias "@../")

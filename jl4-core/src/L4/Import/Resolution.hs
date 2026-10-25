@@ -43,6 +43,7 @@ module L4.Import.Resolution
     -- * Written import names: bare or path
   , ImportForm(..)
   , classifyImport
+  , splitAlias
   , projectMarkerFile
   , pathImportFile
   , CollapsedPath(..)
@@ -136,9 +137,9 @@ moduleNameToCandidateUris mBaseUri mRoot modName =
 -- | How the text of a written @IMPORT@ name is resolved
 -- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.2).
 --
--- The class is decided by the text alone, and only by whether it contains a
--- @\/@: a name without one is resolved by the bare-name ladder, exactly as it
--- was before path imports existed.
+-- The class is decided by the text alone. A name without a @\/@ is resolved by
+-- the bare-name ladder, exactly as it was before path imports existed; one with
+-- a @\/@ is a path, and how it starts says what it is counted from.
 data ImportForm
   = BareImport
     -- ^ No @\/@: @IMPORT prelude@, @IMPORT \`sg-succession-domain\`@, and also
@@ -150,6 +151,10 @@ data ImportForm
     -- ^ A path with a leading @\/@: @IMPORT \`\/subjects\/vn\/nouns\`@, counted from
     -- the project root and not from the importing file
     -- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.7, proposed and not ruled).
+  | AliasImport
+    -- ^ A name that starts with @\@@ and has a @\/@: @IMPORT \`\@vn10\/nouns\`@, a
+    -- folder named in the project's @l4-project.json@ and a path under it
+    -- (§4.7 C6, proposed and not ruled).
   deriving stock (Eq, Show)
 
 -- | Classify the text of a written import name. A backslash is not a path
@@ -158,7 +163,18 @@ classifyImport :: Text -> ImportForm
 classifyImport t
   | not (Text.isInfixOf "/" t) = BareImport
   | Text.isPrefixOf "/" t      = RootRelativeImport
+  | Text.isPrefixOf "@" t      = AliasImport
   | otherwise                  = PathImport
+
+-- | The alias and the path under it, in a name that 'classifyImport' calls an
+-- 'AliasImport': @\@vn10\/nouns@ is the alias @vn10@ and the path @nouns@. The
+-- alias is what lies between the @\@@ and the first @\/@, and may be empty.
+splitAlias :: Text -> Maybe (Text, Text)
+splitAlias t = do
+  afterAt <- Text.stripPrefix "@" t
+  let (alias, slashAndPath) = Text.breakOn "/" afterAt
+  (_slash, path) <- Text.uncons slashAndPath
+  pure (alias, path)
 
 -- | The file whose presence marks the root of a project: the root of a
 -- root-relative import is the folder of the nearest one at or above the

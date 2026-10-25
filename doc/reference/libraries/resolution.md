@@ -132,7 +132,7 @@ No other tier is consulted: not `$JL4_LIBRARY_PATH`, not the session root, not t
 
 On your own machine a `..` may leave the folder you started from, because the commons rows that keep their cases in a sub-folder need exactly that. A service that runs files somebody else uploaded must not read its own disk for them, so it resolves a path against the uploaded files only, and refuses one that would leave them. Tests plant a real file where such a path would land and check that it is not taken.
 
-**A leading `/`** makes the path root-relative, which is resolved differently; see [Root-relative imports](#root-relative-imports) below.
+**A leading `/`** makes the path root-relative, and **a leading `@`** makes it an alias import. Both are resolved differently; see [Root-relative imports](#root-relative-imports) and [Alias imports](#alias-imports) below.
 
 ### Root-relative imports
 
@@ -144,7 +144,7 @@ To resolve a root-relative import from the file `F`:
 2. Collapse every `.` and every `x/..` in that path on its own, without touching the disk. If it still starts with `..`, stop, in every runtime: [the import leaves the root](../errors/README.md#this-import-leaves-the-root-of-this-deployment). The check is made on the path alone, so it does not depend on where the root turned out to be.
 3. Find the project root.
    - In `l4`, the REPL, MLIR and the language server, it is the folder of the nearest file named `l4-project.json`, looking in the folder of `F` first and then in each folder above it. If the session holds a copy of the file in memory, that counts; otherwise the disk is asked. The VS Code extension shows the language server only L4 files, so there an `l4-project.json` counts once it is saved to disk. What is inside the file is not read. If there is none, stop: [this import is relative to the project root, but no project root was found](../errors/README.md#this-import-is-relative-to-the-project-root-but-no-project-root-was-found). There is no fall back to the folder of `F`, the folder you ran `l4` in, or the folder of the file you started from, because the answer would then depend on where you ran it.
-   - In `jl4-service`, it is the top of the uploaded files, and no `l4-project.json` is looked for. A bundle may carry one; the service keeps it with the sources, across a restart, but does not use it to find the root.
+   - In `jl4-service`, it is the top of the uploaded files, and no `l4-project.json` is looked for. A bundle may carry one; the service keeps it with the sources, across a restart, but does not use it to find the root; an [alias import](#alias-imports) is what reads it.
 4. Join the root and the path, and look for that one file among the files the editor or the service holds in memory, and then, if the runtime is not confined, on disk.
 5. Found: that is the module. Not found: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path), naming the project root and the path that was looked for.
 
@@ -190,14 +190,65 @@ Whether restarting the language server makes it look again was not tried.
 
 **Only the written name changes.** A module reached by a path import is an ordinary module. Its own `IMPORT prelude` and `IMPORT helper` are resolved by the ladder from its own folder, as they would be anywhere.
 
+### Alias imports
+
+A path import that starts with `@` and has a `/` after the alias, such as ``IMPORT `@vn10/nouns` ``, names a folder of the project by a short name and a path under it. [How to write one](README.md#importing-by-alias) is in the `IMPORT` reference; this section is how it is resolved. The folder an alias stands for is written in the project's `l4-project.json`, and the lookup after that is the one every path import uses.
+
+To resolve an alias import from the file `F`:
+
+1. Split the name at its first `/`: the alias is what lies between the `@` and that `/`, and the path is the rest.
+   The alias may be empty and the path may be empty; each then fails where it is looked up, below.
+2. Find the project root, as a root-relative import does ([step 3 above](#root-relative-imports)).
+   In `l4`, the REPL, MLIR and the language server that is the folder of the nearest `l4-project.json`, and if there is none, stop: [this import uses an alias, but there is no project file to read it from](../errors/README.md#this-import-uses-an-alias-but-there-is-no-project-file-to-read-it-from).
+   In `jl4-service` it is the top of the uploaded files, and the file is the `l4-project.json` at that top, and no other.
+3. Read that file.
+   A copy the session holds in memory counts before the disk is asked; in `jl4-service` only the uploaded copy is read, and the host's disk never is.
+   If there is none (a deployment with no `l4-project.json` at its top), stop with the same error.
+   If the file is not JSON, or its `aliases` is not an object whose values are text, stop: [I could not read the project file](../errors/README.md#i-could-not-read-the-project-file), naming the file and, for a file that is not JSON, the line and column.
+   Keys other than `aliases` are ignored.
+4. Look the alias up in `aliases`.
+   If it is not there, stop: [This import uses an alias that is not defined](../errors/README.md#this-import-uses-an-alias-that-is-not-defined), which lists the aliases that are.
+5. Work the folder the alias stands for through: empty segments are dropped, so a leading `/` does nothing, and `""` and `"."` both stand for the project root itself.
+   If it starts with `@`, stop, because an alias cannot be built from another alias.
+   If it still starts with `..` once every `.` and `x/..` is collapsed, stop, because an alias cannot lead out of the project.
+   Both are [An alias in l4-project.json cannot be used](../errors/README.md#an-alias-in-l4-projectjson-cannot-be-used).
+6. Take the path without a trailing `.l4`, append `.l4`, join it to the folder, and collapse every `.` and every `x/..` in the result.
+   If it still starts with `..`, stop, in every runtime: [the import leaves the root](../errors/README.md#this-import-leaves-the-root-of-this-deployment).
+   The path may use `..` to reach another folder of the project, so it is held to the project and not to the alias's folder.
+7. Join the project root and that path, and look for that one file as any path import does: among the files the editor or the service holds in memory, and then, if the runtime is not confined, on disk.
+   Found: that is the module.
+   Not found: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path), naming the alias, the folder it stands for, and the project root.
+
+The file is read at step 3, by an alias import and by nothing else: a root-relative import looks for the file and never opens it.
+That is how `l4` and the language server treat it.
+`jl4-service` also reads the file as L4 source, like every file of an upload, so a line of it that L4 takes for an annotation, such as `@exprot foo`, rejects the whole deployment; see the limits below.
+The module is known by the same key as any other path import of that file, so `@common/core`, `/shared/core` and `../shared/core` are one module when they name one file.
+As with any path import, no other tier is consulted: not `$JL4_LIBRARY_PATH`, not the embedded standard library, not the per-user store, not the extension's bundle.
+
+**Only the nearest file counts.**
+A project inside a project has the aliases of its own `l4-project.json` and none of the outer one's, as it has its own root.
+That is `l4`.
+`jl4-service` reads the `l4-project.json` at the top of the uploaded files and no other, so a project inside a project has the outer file's aliases in a deployment; this is the same difference as for the project root, described under [root-relative imports](#root-relative-imports).
+
+**An alias is held to the project on the written path, as a root-relative path is.**
+The check in steps 5 and 6 is lexical, so a symbolic link inside the project that points outside it leads out, and `l4` follows it.
+A reviewer measured it on 2026-10-26: with `esc` a link to the folder above the project and `"out": "esc"` in `l4-project.json`, ``IMPORT `@out/planted` `` loaded a file above the project root (`val MEANS 666`).
+`jl4-service` is not affected, for the reason given under [root-relative imports](#root-relative-imports); the limit is not changed here.
+
+**A name with an `@` but no `/` is not an alias import.**
+``IMPORT `@vn10` `` is a bare module name, as it always was.
+A relative path through a folder whose own name starts with `@` is written with the `./`, ``IMPORT `./@vn10/nouns` ``, because without it the name is an alias import.
+
 **What a path import cannot do yet.** These are limits, not oversights:
 
 - The browser editor has no folder to start from, so a path import there does not work.
 - The browser editor has neither form until the browser build has its own path resolver as well; a root-relative import there does not work either.
-- The language server does not watch `l4-project.json`. A file that is open keeps the project root it found until a new check of that file reads it afresh.
+- `jl4-service` reads every file of an upload as L4 source, `l4-project.json` among them, so a manifest that is not JSON can reject the deployment: with `@exprot foo` as its second line it was rejected as `l4-project.json:2:1: Unknown annotation`, and a bare `@lang` as `Malformed annotation` (measured 2026-10-26; a `README.md` does the same, which predates this change). Valid JSON was accepted, because an `@` inside a JSON string is part of the string. On your own machine only the imports that use an alias are affected.
+- The language server does not watch `l4-project.json`, and looks for it and reads it when the importing file changes and at no other time. A file that is open keeps the project root it found, and the aliases it read, until its own text changes. That was measured with a scripted client on 2026-10-26, not in VS Code itself: for the project root in [the paragraph above](#root-relative-imports), and for a changed alias, where saving the importing file, closing and reopening it and a typed change in another open file left the old folder in place, and a typed change in the importing file found the new one.
 - A deployed project that uses the root-relative form has to be uploaded with its project root at the top of the upload. `l4 deploy` and the VS Code deploy action cannot do that today (the next item), and nothing checks that the top of a zip is the folder that holds `l4-project.json`.
 - `l4 deploy` and the VS Code deploy action upload every file at the top level, so a project that uses path imports fails after it is deployed that way ([what a deployment contains](README.md#what-a-deployment-contains)).
 - `l4 deploy` and the VS Code deploy action upload only the entry file and the files it imports, so neither uploads an `l4-project.json`. A deploy tool that supports root-relative projects has to find the project root, the folder of the nearest `l4-project.json` above the entry file, and make that folder the top of the zip.
+- For a project that uses aliases the deploy tool has one more part to play: `l4-project.json` is imported by no file, so a tool that collects the entry file and its imports never collects it, and has to add the nearest one to the upload itself.
 - A deployed bundle that cannot resolve a path import is accepted, and the only trace is a warning in the service's log.
 - The service does not find a file at the top of an upload whose own name has a space or a non-ASCII letter, nor a file inside a top-level folder whose name has a space, a non-ASCII letter or punctuation such as `#` `'` `+` `(` `%` (a deployment says `ready` and every call then answers 422, and the service's log says the import resolves to nothing). This was measured for a bare import; a path import into such a folder was seen to fail the same way in review. A file inside a plain top-level folder is found whatever its own name or deeper folders are called. `l4` on your machine is not affected.
 - The REPL looks every import up from the folder it was started in, not from the loaded file's.

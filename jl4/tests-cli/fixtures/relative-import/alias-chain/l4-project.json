@@ -1,0 +1,1 @@
+{ "aliases": { "first": "@second/x", "second": "shared" } }

@@ -81,7 +81,7 @@ The service logs three `WARN` lines about this:
 
 - `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
 - `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
-- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422. The text after the colon says what was looked for: for a name with a slash, `no bundle file is at this path relative to the importing file, or the path leaves the bundle`; for a name that starts with `/`, `no bundle file is at this path under the root of the bundle, or the path leaves the bundle`.
+- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422. The text after the colon says what was looked for: for a name with a slash, `no bundle file is at this path relative to the importing file, or the path leaves the bundle`; for a name that starts with `/`, `no bundle file is at this path under the root of the bundle, or the path leaves the bundle`; for a name that starts with `@` and has a `/`, `the alias is not defined by the l4-project.json at the top of the bundle, or the file it leads to is not in the bundle, or the path leaves the bundle`.
 
 [Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
 
@@ -749,6 +749,7 @@ Deployments are stored on disk at `{store-path}/{deployment-id}/`:
 `sources/` keeps every file of the upload at the path it was uploaded under.
 A restart reads the `.l4` files again, and an `l4-project.json` wherever it sits, and no other file.
 A project that uses root-relative imports may carry an `l4-project.json`, and it is therefore still there after a restart.
+An alias import reads the one at the top of the bundle, so a restart that had not brought it back would have left every alias undefined (a call that answers 200 before the restart answered 422 after it, without the reload; measured 2026-10-26 and pinned by `IntegrationSpec`).
 Any other file of the upload, a `README.md` for one, stays on disk and is not read again, so the version the deployment reports, a hash of the files it was compiled from, is another one after a restart.
 That was measured on 2026-10-26 with a bundle that held a `README.md`, and it predates `l4-project.json`; it is not changed here.
 An operator cannot read the `l4-project.json` back over HTTP: `GET /deployments/{id}/files/l4-project.json` answered 404 where the same call for a `.l4` file of that deployment answered 200, because the route serves only paths with a segment that ends in `.l4`.
