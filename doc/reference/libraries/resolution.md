@@ -29,15 +29,22 @@ analysis in `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md`.
 
 For a bare module name `<mod>`, resolution tries, **first match wins**:
 
-| #   | Tier                  | Location                                                       | Who it serves                                            |
-| --- | --------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
-| 0   | VFS                   | in-memory files (`project:/<mod>.l4`, importer-relative, root) | web IDE / Monaco / unsaved editor buffers                |
-| 1   | **env override**      | `$JL4_LIBRARY_PATH/<mod>.l4`                                   | operators and stdlib developers taking explicit control  |
-| 2   | **project root**      | `<root>/<mod>.l4`                                              | a project that ships its own copy of a library           |
-| 3   | **importer-relative** | `<dir of importing file>/<mod>.l4`                             | multi-file projects; local overrides beside the code     |
-| 4   | **embedded**          | compiled into the binary at build time                         | everyone else — this is the default stdlib               |
-| 5   | XDG store             | `~/.local/share/jl4/libraries/<mod>.l4`                        | machine-global _extra_ libraries the embed doesn't carry |
-| 6   | VSCode bundle         | `<exeDir>/../../libraries/<mod>.l4`                            | the packaged extension, for non-embedded extras          |
+| #   | Tier                  | Location                                                               | Who it serves                                            |
+| --- | --------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------- |
+| 0   | VFS                   | in-memory files (`project:/<mod>.l4`, importer-relative, session root) | web IDE / Monaco / unsaved editor buffers                |
+| 1   | **env override**      | `$JL4_LIBRARY_PATH/<mod>.l4`                                           | operators and stdlib developers taking explicit control  |
+| 2   | **session root**      | `<session root>/<mod>.l4`                                              | a project that ships its own copy of a library           |
+| 3   | **importer-relative** | `<dir of importing file>/<mod>.l4`                                     | multi-file projects; local overrides beside the code     |
+| 4   | **embedded**          | compiled into the binary at build time                                 | everyone else — this is the default stdlib               |
+| 5   | XDG store             | `~/.local/share/jl4/libraries/<mod>.l4`                                | machine-global _extra_ libraries the embed doesn't carry |
+| 6   | VSCode bundle         | `<exeDir>/../../libraries/<mod>.l4`                                    | the packaged extension, for non-embedded extras          |
+
+**Two folders are called a root on this page, and they are different folders.**
+The **session root** is the folder the session started from, and it is what tier 2 of the table looks in.
+For `l4` it is the folder of the file you name on the command line, so `l4 check rows/a/main.l4` has the session root `rows/a`; for the language server it is the folder it was started in (`--cwd`, or its working directory); for the REPL it is the working directory.
+The **project root** is the folder of the nearest `l4-project.json`, and it is what a [root-relative import](#root-relative-imports) is counted from.
+`l4-project.json` does not move the session root: with `l4-project.json` and `defs.l4` in `br`, a bare `IMPORT defs` in `br/sub/m.l4` looks in `br/sub` and not in `br`, and finds nothing (measured 2026-10-26).
+The resolver's own log lines and warnings call the session root `project root`; they are quoted below as they are printed.
 
 The XDG store is the `jl4/libraries` folder of the user's data directory.
 It is `$XDG_DATA_HOME/jl4/libraries/` when that variable is set to an absolute path.
@@ -46,7 +53,7 @@ Every other mention of `~/.local/share/jl4/libraries/` on this page means this f
 
 Three rules of thumb fall out of the table:
 
-- **Project-scoped beats embedded.** If you put a `prelude.l4` in your project
+- **Project-scoped beats embedded.** If you put a `prelude.l4` in your session
   root or beside the importing file, you get it. Overriding the stdlib is a
   conscious, visible act — the file is _in your project_.
 - **Embedded beats ambient.** A machine-global file (XDG, bundle) can never
@@ -109,12 +116,12 @@ To resolve a path import from the file `F`:
 
 1. Take the path as written, drop one trailing `.l4` if there is one, and append `.l4`.
 2. Join it to the folder that holds `F`.
-3. Collapse every `.` and every `x/..` in the result, without touching the disk. `sub/../core.l4` becomes `core.l4`. Two spellings of one path therefore become one module, and a shared module reached from two places is checked once. This is done on the words of the path alone: a symbolic link, or a different capitalisation on a system that ignores capitals, still reaches one file as two modules, as it does for a bare name.
+3. Collapse every `.` and every `x/..` in the result, without touching the disk. `sub/../core.l4` becomes `core.l4`. Two spellings of one path therefore become one module, and a shared module reached from two places is checked once. This is done on the words of the path alone: a symbolic link, or a different capitalisation on a system that ignores capitals, still reaches one file as two modules, as it does for a bare name. So does another Unicode spelling of the same letters in a folder name, such as `ü` as one character (NFC) and as `u` followed by a combining diaeresis (NFD): a reviewer measured on 2026-10-26, for a root-relative path and for a relative path, that both spellings in one file gave "There are multiple definitions for the identifier".
 4. If the runtime is **confined** (below) and the collapsed path still starts with `..`, stop: [the import leaves the root](../errors/README.md#this-import-leaves-the-root-of-this-deployment).
 5. Look for that one file among the files the editor or the service holds in memory. If the runtime is not confined, then look on disk.
 6. Found: that is the module. Not found: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path), naming the collapsed path.
 
-No other tier is consulted: not `$JL4_LIBRARY_PATH`, not the project root, not the embedded standard library, not the per-user store, not the extension's bundle. A path import names one file, and the point of writing one is that no ladder decides it. It follows that `JL4_LIBRARY_PATH` has no effect on a path import, and that a file called `prelude.l4` in a folder is never mistaken for the standard library by ``IMPORT `sub/prelude` ``.
+No other tier is consulted: not `$JL4_LIBRARY_PATH`, not the session root, not the embedded standard library, not the per-user store, not the extension's bundle. A path import names one file, and the point of writing one is that no ladder decides it. It follows that `JL4_LIBRARY_PATH` has no effect on a path import, and that a file called `prelude.l4` in a folder is never mistaken for the standard library by ``IMPORT `sub/prelude` ``.
 
 **Confined and not confined.** The runtime's library scope decides, the same one that gives `jl4-service` its shorter ladder:
 
@@ -125,18 +132,76 @@ No other tier is consulted: not `$JL4_LIBRARY_PATH`, not the project root, not t
 
 On your own machine a `..` may leave the folder you started from, because the commons rows that keep their cases in a sub-folder need exactly that. A service that runs files somebody else uploaded must not read its own disk for them, so it resolves a path against the uploaded files only, and refuses one that would leave them. Tests plant a real file where such a path would land and check that it is not taken.
 
-**A leading `/`** is refused everywhere, with the same message as a path that leaves the root. It is reserved for a form that does not exist yet.
+**A leading `/`** makes the path root-relative, which is resolved differently; see [Root-relative imports](#root-relative-imports) below.
+
+### Root-relative imports
+
+A path import that starts with `/`, such as ``IMPORT `/shared/definitions` ``, is counted from the **project root** and not from the importing file. [How to write one](README.md#importing-from-the-root-of-a-project) is in the `IMPORT` reference; this section is how it is resolved. It uses the same ladder-free lookup as any path import, and differs in where the path starts and in one more way it can fail.
+
+To resolve a root-relative import from the file `F`:
+
+1. Take the path as written without its leading `/`, drop one trailing `.l4` if there is one, and append `.l4`.
+2. Collapse every `.` and every `x/..` in that path on its own, without touching the disk. If it still starts with `..`, stop, in every runtime: [the import leaves the root](../errors/README.md#this-import-leaves-the-root-of-this-deployment). The check is made on the path alone, so it does not depend on where the root turned out to be.
+3. Find the project root.
+   - In `l4`, the REPL, MLIR and the language server, it is the folder of the nearest file named `l4-project.json`, looking in the folder of `F` first and then in each folder above it. If the session holds a copy of the file in memory, that counts; otherwise the disk is asked. The VS Code extension shows the language server only L4 files, so there an `l4-project.json` counts once it is saved to disk. What is inside the file is not read. If there is none, stop: [this import is relative to the project root, but no project root was found](../errors/README.md#this-import-is-relative-to-the-project-root-but-no-project-root-was-found). There is no fall back to the folder of `F`, the folder you ran `l4` in, or the folder of the file you started from, because the answer would then depend on where you ran it.
+   - In `jl4-service`, it is the top of the uploaded files, and no `l4-project.json` is looked for. A bundle may carry one; the service keeps it with the sources, across a restart, but does not use it to find the root.
+4. Join the root and the path, and look for that one file among the files the editor or the service holds in memory, and then, if the runtime is not confined, on disk.
+5. Found: that is the module. Not found: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path), naming the project root and the path that was looked for.
+
+The module is known by the same key as any other path import of that file, so `/identity/core`, `./core` and `../identity/core` are one module when they name one file. As with any path import, no other tier is consulted: not `$JL4_LIBRARY_PATH`, not the embedded standard library, not the per-user store, not the extension's bundle.
+
+**Confinement is stricter than for a relative path.** A relative path may leave the folder `l4` was started in on your own machine, because the commons rows that keep their cases in a sub-folder need exactly that. A root-relative path may not leave the project root anywhere, `l4` included: the point of a root is that nothing above it is reachable by name. Tests plant a real file above the root and check that it is not taken, and that a relative path can take it.
+
+**But the check is made on the written path, not on the file it reaches.**
+A symbolic link inside the project that points outside it leads out, and `l4` follows it, because the lookup asks the disk about the path it was given.
+A reviewer measured it on 2026-10-26: with `proj/l4-project.json` and `proj/esc`, a link to the folder above `proj`, and a file `planted.l4` (`val MEANS 666`) beside `proj`, ``IMPORT `/esc/planted` `` gave 666.
+The path stays inside the root on paper, so the lexical check passes it.
+The identity rule above takes the same stance: a link is not looked through for identity, and it is not looked through for confinement either.
+`jl4-service` is not affected, because it looks for the file among the uploaded files only and never asks its disk.
+This is a limit and is not changed here: looking through links to check confinement would contradict that stance.
+
+**A project inside a project is not the same in `l4` and in a deployment.**
+`l4` takes the nearest `l4-project.json`, so a file below a folder that holds its own is counted from that folder.
+`jl4-service` takes the top of the uploaded files and looks for no other `l4-project.json`, so the same files, uploaded with the inner file among them, are counted from the top.
+A reviewer measured it on 2026-10-26, with the built `l4` and `jl4-service`.
+The bundle had `l4-project.json` and `x.l4` (`val MEANS 1`) at its top, and the same two files again in `sub/` (`val MEANS 2`), and `sub/main.l4` did ``IMPORT `/x` `` and exported `addmark x = x + val`.
+`l4 run sub/main.l4` with `#EVAL addmark 5` gave 7, the inner `x.l4`.
+The same files, zipped and deployed, answered 6 to `addmark {x: 5}`, the outer one, with the status `ready` and no line in the service's log.
+Nothing in the service refuses or warns of this.
+Which of the two should change is not decided; choice C3 of `specs/proposals/RELATIVE-IMPORTS-SPEC.md` lists the options.
+
+**The search up has no stop.**
+Step 3 climbs to the top of the file system and takes the first `l4-project.json` it meets.
+It does not stop at the folder the editor opened, at the home folder or at the root of a git repository.
+A reviewer measured the effect on 2026-10-26 with a scripted client.
+`home/me/l4-project.json` (`{}`) and `home/me/shared/definitions.l4` (`definitionmarker MEANS 999`) were above a workspace, `home/me/work/proj`, that had its own `shared/definitions.l4` (100) and no project file.
+Opening `proj/rules/main.l4`, which does ``IMPORT `/shared/definitions` `` and evaluates `definitionmarker + 5`, gave 1004 with no diagnostic, and go-to-definition went to `home/me/shared/definitions.l4`, outside the workspace.
+Whether the search should stop somewhere is not decided; choice C2 of `specs/proposals/RELATIVE-IMPORTS-SPEC.md` lists the options.
+
+**The language server looks for the project file when the importing file changes, and at no other time.**
+It does not watch `l4-project.json`, and the VS Code extension shows it only L4 files.
+This was measured on 2026-10-26 with a scripted client against the built language server; VS Code itself was not tried.
+The client opened `rules/main.l4`, which does ``IMPORT `/shared/definitions` `` with no project file above it, and the error was "no project root was found".
+Adding the file on disk changed nothing, and neither did saving `main.l4`, closing and reopening it with the same text, a notice that the file had been created, or a typed change in another open file.
+Typing a change in `main.l4` made it find the root.
+Deleting the file on disk again changed nothing, not even with a typed change in another open file, and a typed change in `main.l4` then brought the error back.
+`l4 check` starts a session each time, so it always looks afresh.
+Whether restarting the language server makes it look again was not tried.
 
 **Only the written name changes.** A module reached by a path import is an ordinary module. Its own `IMPORT prelude` and `IMPORT helper` are resolved by the ladder from its own folder, as they would be anywhere.
 
 **What a path import cannot do yet.** These are limits, not oversights:
 
 - The browser editor has no folder to start from, so a path import there does not work.
+- The browser editor has neither form until the browser build has its own path resolver as well; a root-relative import there does not work either.
+- The language server does not watch `l4-project.json`. A file that is open keeps the project root it found until a new check of that file reads it afresh.
+- A deployed project that uses the root-relative form has to be uploaded with its project root at the top of the upload. `l4 deploy` and the VS Code deploy action cannot do that today (the next item), and nothing checks that the top of a zip is the folder that holds `l4-project.json`.
 - `l4 deploy` and the VS Code deploy action upload every file at the top level, so a project that uses path imports fails after it is deployed that way ([what a deployment contains](README.md#what-a-deployment-contains)).
+- `l4 deploy` and the VS Code deploy action upload only the entry file and the files it imports, so neither uploads an `l4-project.json`. A deploy tool that supports root-relative projects has to find the project root, the folder of the nearest `l4-project.json` above the entry file, and make that folder the top of the zip.
 - A deployed bundle that cannot resolve a path import is accepted, and the only trace is a warning in the service's log.
 - The service does not find a file at the top of an upload whose own name has a space or a non-ASCII letter, nor a file inside a top-level folder whose name has a space, a non-ASCII letter or punctuation such as `#` `'` `+` `(` `%` (a deployment says `ready` and every call then answers 422, and the service's log says the import resolves to nothing). This was measured for a bare import; a path import into such a folder was seen to fail the same way in review. A file inside a plain top-level folder is found whatever its own name or deeper folders are called. `l4` on your machine is not affected.
 - The REPL looks every import up from the folder it was started in, not from the loaded file's.
-- The editor's "find all references" on a module only searches the project root and the folder of the module being searched, so a file that imports it by path from another folder is not listed.
+- The editor's "find all references" on a module only searches the session root and the folder of the module being searched, so a file that imports it by path from another folder is not listed.
 - `l4 export dmn` finds the files that call a decision by looking for `IMPORT <name>` among the files in the same folder; a file that imports by path is not recognised, and a decision it calls may be left out.
 - `l4 render` (HTML and Akoma Ntoso) numbers the definitions of an imported module by the module's file name, so two modules with one file name in different folders can produce duplicate anchors.
 
@@ -233,7 +298,7 @@ Info | [Import Resolution] Found on filesystem (candidate 1 of 5): /work/prelude
 ```
 
 (The first when nothing in the project shadows the stdlib, the second when the
-project root holds its own `prelude.l4`.)
+session root holds its own `prelude.l4`.)
 
 **The full candidate table**, at Debug priority:
 
@@ -263,8 +328,8 @@ shadow warning there too.
 
 An `IMPORT` that resolves to nothing is an error, not a shadow warning: see [When nothing resolves](#when-nothing-resolves).
 
-When two tiers name the same file — the CLI sets the project root to the
-importing file's own directory, so the root tier and the importer-relative tier
+When two tiers name the same file — the CLI sets the session root to the
+entry file's own directory, so the session-root tier and the importer-relative tier
 probe one path — the shadow warning lists that file once, not as both
 `[chosen]` and `[shadowed]`.
 
@@ -299,7 +364,7 @@ the stdlib embedded in this binary (22 modules, not among them),
 The error is also listed with the other messages under [Module not found](../errors/README.md#module-not-found).
 
 The list is every candidate from [the table above](#the-resolution-order), in that same tier order, so a typo shows up as a name you do not recognise and a mis-set store shows up as a path you do not recognise.
-Each location is listed **once**, however many tiers name it — the in-memory tier keys a file by URI and the filesystem tiers key it by path, so for a project whose root is the importing file's own directory (which is what the CLI uses) the same file arrives twice — and it is printed as the plain path, at the rank of the tier that spells it that way.
+Each location is listed **once**, however many tiers name it — the in-memory tier keys a file by URI and the filesystem tiers key it by path, so for a session whose root is the importing file's own directory (which is what the CLI uses) the same file arrives twice — and it is printed as the plain path, at the rank of the tier that spells it that way.
 The embedded stdlib sits at its own rank too — tier 4 in the table above — rather than at the end, which is where it used to be printed whatever its rank.
 
 The same mistake is also announced once, at Warning priority, as `Module not found: myhelpers`: once for each importing file, however many of the toolchain's rules go looking for the import. (`l4 ast`, which never typechecks, prints that one line on stderr and exits 0.)

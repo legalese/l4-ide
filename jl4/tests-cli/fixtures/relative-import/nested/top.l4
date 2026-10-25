@@ -1,0 +1,3 @@
+IMPORT `/shared/value`
+
+#EVAL valuemarker

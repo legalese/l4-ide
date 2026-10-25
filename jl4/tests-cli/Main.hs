@@ -24,6 +24,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
   ( canonicalizePath
+  , copyFile
   , createDirectoryIfMissing
   , doesFileExist
   , emptyPermissions
@@ -39,7 +40,7 @@ import System.Directory
   )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath ((</>), isAbsolute, normalise, takeFileName)
+import System.FilePath ((</>), isAbsolute, normalise, takeDirectory, takeFileName)
 import System.IO (hClose, hPutStr, hSetBinaryMode)
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process
@@ -405,7 +406,7 @@ relImportDir :: FilePath
 relImportDir = fixtureDir </> "relative-import"
 
 relRowsEntry, relRowsDir, relDiamondEntry, relIdentityEntry, relNotFoundEntry,
-  relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry,
+  relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry,
   relParentEntry, relShortenedHyphenEntry :: FilePath
 relShortenedHyphenEntry = relImportDir </> "shortened" </> "hyphen.l4"
 relBackDir, relHebrewDir :: FilePath
@@ -419,7 +420,23 @@ relNotFoundEntry       = relImportDir </> "not-found" </> "main.l4"
 relShortenedExtEntry   = relImportDir </> "shortened" </> "ext.l4"
 relShortenedDottedEntry = relImportDir </> "shortened" </> "dotted.l4"
 relCycleEntry          = relImportDir </> "cycle" </> "a" </> "x.l4"
-relRootedEntry         = relImportDir </> "rooted" </> "main.l4"
+
+-- The root-relative form (a leading slash): a project with an l4-project.json at
+-- its top, a project inside a project, a path that leaves its project beside a
+-- planted file to find it by, and a tree with no marker (run from a copy).
+relProjectDir, relProjectEntry, relNestedInnerEntry, relNestedOuterEntry,
+  relNoMarkerEntry, relNoMarkerTarget, relClimbEntry, relClimbControlEntry,
+  relClimbInsideEntry, relClimbPlanted :: FilePath
+relProjectDir          = relImportDir </> "project"
+relProjectEntry        = relProjectDir </> "rules" </> "main.l4"
+relNestedInnerEntry    = relImportDir </> "nested" </> "inner" </> "main.l4"
+relNestedOuterEntry    = relImportDir </> "nested" </> "top.l4"
+relNoMarkerEntry       = relImportDir </> "nomarker" </> "main.l4"
+relNoMarkerTarget      = relImportDir </> "nomarker" </> "shared" </> "definitions.l4"
+relClimbEntry          = relImportDir </> "climb" </> "main.l4"
+relClimbControlEntry   = relImportDir </> "climb" </> "control.l4"
+relClimbInsideEntry    = relImportDir </> "climb" </> "inside.l4"
+relClimbPlanted        = relImportDir </> "climb-planted.l4"
 relParentEntry         = relImportDir </> "parent" </> "cases" </> "main.l4"
 
 -- Diamond whose bottom module (d.l4) has a type error: top imports a, b and d;
@@ -626,8 +643,10 @@ coreFixtures =
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , relRowsEntry, relDiamondEntry, relIdentityEntry, relNotFoundEntry
-  , relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry
+  , relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry
   , relParentEntry
+  , relProjectEntry, relProjectDir </> "l4-project.json", relNestedInnerEntry, relNestedOuterEntry
+  , relNoMarkerEntry, relNoMarkerTarget, relClimbEntry, relClimbControlEntry, relClimbInsideEntry, relClimbPlanted
   , relBackDir </> "main.l4", relHebrewDir </> "main.l4", relShortenedHyphenEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
@@ -3102,11 +3121,91 @@ spec bin = do
     it "fails a cycle that runs through path imports" $
       expectFail bin ["check", relCycleEntry]
 
-    it "refuses a leading slash" $ do
-      out <- runL4 bin ["check", relRootedEntry]
-      exitOf out `shouldNotBe` ExitSuccess
-      combined out `shouldSatisfy`
-        ("This import leaves the root of this deployment: /abs/mod" `isInfixOf`)
+    -- The root-relative form (RELATIVE-IMPORTS-SPEC §4.7, PROPOSED, FOR MENG, not
+    -- ruled): a leading slash names a file from the project root, the folder of
+    -- the nearest `l4-project.json` at or above the importing file. Fixtures:
+    -- `project/` (marker at its top, rules in two folders), `nested/` (a project
+    -- inside a project), `climb/` (a path that leaves its project, with a planted
+    -- file to find it by), `nomarker/` (copied elsewhere before it is run, so no
+    -- marker added above this repository can change what it measures).
+    describe "a root-relative import (a leading slash)" $ do
+      it "checks a project whose rules in two folders import each other from the root" $
+        expectOk bin ["check", relProjectEntry] "Check succeeded."
+
+      it "evaluates through them" $ do
+        -- definitionmarker is unitmarker * 2 = 42 (shared/definitions imports
+        -- /shared/units), helpmarker is 30 (rules/helper): only modules that were
+        -- really loaded can make `answer` 72.
+        out <- runL4 bin ["run", relProjectEntry]
+        exitOf out `shouldBe` ExitSuccess
+        combined out `shouldSatisfy` ("72" `isInfixOf`)
+
+      it "gives the same answer from the entry's own folder, from above, and by an absolute path" $ do
+        projectDir <- makeAbsolute relProjectDir
+        own <- runL4In (Just (projectDir </> "rules")) Nothing bin ["run", "main.l4"]
+        exitOf own `shouldBe` ExitSuccess
+        combined own `shouldSatisfy` ("72" `isInfixOf`)
+        fromAbove <- runL4In (Just (takeDirectory projectDir)) Nothing bin ["run", "project" </> "rules" </> "main.l4"]
+        exitOf fromAbove `shouldBe` ExitSuccess
+        combined fromAbove `shouldSatisfy` ("72" `isInfixOf`)
+        absolute <- runL4 bin ["run", projectDir </> "rules" </> "main.l4"]
+        exitOf absolute `shouldBe` ExitSuccess
+        combined absolute `shouldSatisfy` ("72" `isInfixOf`)
+
+      it "treats one file reached by `/identity/core`, `./core` and `../identity/core` as one module" $ do
+        -- Without a shared key these are three modules and the typechecker
+        -- would say coremarker is defined three times.
+        projectDir <- makeAbsolute relProjectDir
+        let entry = "identity" </> "top.l4"
+        relative <- runL4In (Just projectDir) Nothing bin ["run", entry]
+        exitOf relative `shouldBe` ExitSuccess
+        combined relative `shouldSatisfy` ("42" `isInfixOf`)
+        combined relative `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+        absolute <- runL4 bin ["run", projectDir </> entry]
+        exitOf absolute `shouldBe` ExitSuccess
+        combined absolute `shouldSatisfy` ("42" `isInfixOf`)
+        combined absolute `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
+      it "uses the nearest l4-project.json, so an inner project's root is its own" $ do
+        -- Both projects have shared/value.l4, and they define valuemarker as 111
+        -- (outer) and 222 (inner), so the answer says which marker was used.
+        inner <- runL4 bin ["run", relNestedInnerEntry]
+        exitOf inner `shouldBe` ExitSuccess
+        combined inner `shouldSatisfy` ("222" `isInfixOf`)
+        combined inner `shouldSatisfy` (not . ("111" `isInfixOf`))
+        outer <- runL4 bin ["run", relNestedOuterEntry]
+        exitOf outer `shouldBe` ExitSuccess
+        combined outer `shouldSatisfy` ("111" `isInfixOf`)
+        combined outer `shouldSatisfy` (not . ("222" `isInfixOf`))
+
+      it "is an error, not a fallback, when no l4-project.json is above the importer" $
+        -- The file the import names IS there, beside the importer and in the
+        -- working directory, so a fallback to either would succeed.
+        withSystemTempDirectory "l4-no-marker" \dir -> do
+          createDirectoryIfMissing True (dir </> "shared")
+          copyFile relNoMarkerEntry (dir </> "main.l4")
+          copyFile (takeDirectory relNoMarkerEntry </> "shared" </> "definitions.l4") (dir </> "shared" </> "definitions.l4")
+          out <- runL4In (Just dir) Nothing bin ["check", "main.l4"]
+          exitOf out `shouldNotBe` ExitSuccess
+          combined out `shouldSatisfy`
+            ("This import is relative to the project root, but no project root was found above" `isInfixOf`)
+          combined out `shouldSatisfy`
+            ("Add a file named l4-project.json at the top of your project; it may contain just {}." `isInfixOf`)
+
+      it "is refused when it climbs above the project root, though the file is there" $ do
+        -- The plant is reachable: `control.l4` finds it by a relative path. A
+        -- root-relative path that stays inside the project is found, so it is
+        -- the climb that is refused.
+        control <- runL4 bin ["run", relClimbControlEntry]
+        exitOf control `shouldBe` ExitSuccess
+        combined control `shouldSatisfy` ("99" `isInfixOf`)
+        inside <- runL4 bin ["run", relClimbInsideEntry]
+        exitOf inside `shouldBe` ExitSuccess
+        combined inside `shouldSatisfy` ("555" `isInfixOf`)
+        out <- runL4 bin ["check", relClimbEntry]
+        exitOf out `shouldNotBe` ExitSuccess
+        combined out `shouldSatisfy`
+          ("This import leaves the root of this deployment: /../climb-planted" `isInfixOf`)
 
     it "lets the CLI climb out of the entry file's folder (it is not confined)" $ do
       -- The commons `cases/` rows: the entry file sits in a folder below the

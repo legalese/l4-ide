@@ -43,6 +43,7 @@ module L4.Import.Resolution
     -- * Written import names: bare or path
   , ImportForm(..)
   , classifyImport
+  , projectMarkerFile
   , pathImportFile
   , CollapsedPath(..)
   , collapsePath
@@ -145,9 +146,10 @@ data ImportForm
     -- @foo@ and @a@.
   | PathImport
     -- ^ A relative path with at least one @\/@: @IMPORT \`..\/other-row\/mod\`@.
-  | RootedImport
-    -- ^ A path with a leading @\/@. Reserved for a root-relative form that is
-    -- not specified yet, and refused until it is.
+  | RootRelativeImport
+    -- ^ A path with a leading @\/@: @IMPORT \`\/subjects\/vn\/nouns\`@, counted from
+    -- the project root and not from the importing file
+    -- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.7, proposed and not ruled).
   deriving stock (Eq, Show)
 
 -- | Classify the text of a written import name. A backslash is not a path
@@ -155,12 +157,22 @@ data ImportForm
 classifyImport :: Text -> ImportForm
 classifyImport t
   | not (Text.isInfixOf "/" t) = BareImport
-  | Text.isPrefixOf "/" t      = RootedImport
+  | Text.isPrefixOf "/" t      = RootRelativeImport
   | otherwise                  = PathImport
 
--- | The file a path import names, relative to the importing file's directory:
--- one trailing @.l4@ is dropped if present and @.l4@ appended, so
--- @..\/b\/mod@ and @..\/b\/mod.l4@ name the same file.
+-- | The file whose presence marks the root of a project: the root of a
+-- root-relative import is the folder of the nearest one at or above the
+-- importing file (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.7, C2). It is
+-- named here because the resolver looks for it and the service must keep it
+-- across a restart.
+projectMarkerFile :: FilePath
+projectMarkerFile = "l4-project.json"
+
+-- | The file a path import names, relative to the importing file's directory
+-- (or, for a root-relative name, to the project root): one trailing @.l4@ is
+-- dropped if present and @.l4@ appended, so @..\/b\/mod@ and @..\/b\/mod.l4@
+-- name the same file. Empty segments are dropped, which is also what turns the
+-- leading @\/@ of a root-relative name into a relative path.
 pathImportFile :: Text -> FilePath
 pathImportFile t =
   joinPath (filter (not . null) (map Text.unpack (Text.splitOn "/" bare)))

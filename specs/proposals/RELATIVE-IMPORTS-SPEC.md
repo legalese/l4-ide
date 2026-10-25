@@ -2,17 +2,19 @@
 
 **Status (2026-10-26):** Stage 1 is **built**, in legalese/l4-ide#748, a draft PR into `unstable`; Stages 2 and 3 are **proposed, not landed**. Sections §0 and §1 describe the tree as it was on 2026-10-10 against l4-ide `539cad5fd` (merge of #605) and the installed `l4` of that date; where Stage 1 or #649 has since changed a fact, the list below says so and the section is left as it was written, because code and tests cite its numbers.
 
-**What Stage 1 built** (the §4 design, as written): a backticked `IMPORT` name containing `/` is a path import, resolved against the importing file and never by the ladder; a leading `/` is refused; a bare name resolves as before, with the §4.2(3) warning. Core pure helpers (`classifyImport`, `pathImportFile`, `collapsePath`) are in `jl4-core/src/L4/Import/Resolution.hs`; the resolution is in `jl4-lsp/src/LSP/L4/Rules.hs` (`resolveRelativeImport`, `pathFailureMessage`), which serves the CLI, LSP, MLIR, REPL and service. Tests: `jl4-core/test/RelativeImportSpec.hs`, `jl4-lsp/test/RelativeImportSpec.hs`, `jl4-service/test/RelativeImportSpec.hs`, and the `l4 relative imports` group of `jl4/tests-cli/Main.hs` over `jl4/tests-cli/fixtures/relative-import/`.
+**Stage 3, first commit (2026-10-26): built on branch `feat/relative-imports-root-form`, stacked on Stage 1; PROPOSED, FOR MENG, not ruled.** The root-relative form (§4.7 choices C1 to C5, C7, and the persistence half of C8) is implemented as §4.7 recommends, and every choice a rule author would see is listed there with its alternatives. The aliases (C6) are not built. The PR stays a draft until Meng rules. Where that changes the text below: a leading `/` is no longer refused on that branch (the §4.2 rule 1 text, the bullet on §4.5 below and the §7 test line describe Stage 1, as merged in #748).
+
+**What Stage 1 built** (the §4 design, as written): a backticked `IMPORT` name containing `/` is a path import, resolved against the importing file and never by the ladder; a leading `/` is refused (until the Stage 3 branch above); a bare name resolves as before, with the §4.2(3) warning. Core pure helpers (`classifyImport`, `pathImportFile`, `collapsePath`) are in `jl4-core/src/L4/Import/Resolution.hs`; the resolution is in `jl4-lsp/src/LSP/L4/Rules.hs` (`resolveRelativeImport`, `pathFailureMessage`), which serves the CLI, LSP, MLIR, REPL and service. Tests: `jl4-core/test/RelativeImportSpec.hs`, `jl4-lsp/test/RelativeImportSpec.hs`, `jl4-service/test/RelativeImportSpec.hs`, and the `l4 relative imports` group of `jl4/tests-cli/Main.hs` over `jl4/tests-cli/fixtures/relative-import/`.
 
 **Where Stage 1 differs from this text, or found this text out of date** (each measured on 2026-10-26 against `unstable` `977691b36` plus this change):
 
 - **§0 #3 and §8: the reduction was at three sites, not two.** `takeBaseName` of the written name was at `Rules.hs:958` (`unresolvedImports`, added by #649), `:1051` (`GetMixfixRegistry`) and `:1084` (`GetImports`). All three now call one function, `writtenImportName`: a bare name is still reduced, a path import is known by the text as written. The three must agree, or the service would report a resolved path import as unresolved.
 - **§6, §8 and §9 Q1: `confined` already existed, as `LibraryScope`.** #649 (`main` 2026-10-15, reaching `unstable` 2026-10-18) added `AmbientLibraries | EmbeddedStdlibOnly` and the service already passes `EmbeddedStdlibOnly` at all four `oneshotL4Action…In bundleScope` sites (`jl4-service/src/Backend/Jl4.hs:158`). Stage 1 reads confinement off that scope (`confined = scope == EmbeddedStdlibOnly`) and adds no parallel flag. **Assumed, not ruled:** the derivation; no rule author can see it, and it reverts alone. The "service flag, about 40 lines" of §8 is therefore a comment on an existing type, and `jl4-service/src` is unchanged; the service gets tests only.
 - **§9 Q1 is answered by #649, for bare names:** a deployment resolves its own files and the built-in stdlib, nothing from the host (`resolveLibrary EmbeddedStdlibOnly`, `Rules.hs:461`).
-- **§4.5 messages, as built** (first lines pinned by `jl4-lsp/test/RelativeImportSpec.hs`): `I could not find a module at this path: <name>`; `This import leaves the root of this deployment: <name>`; `This import is relative, but <importer> has no directory to be relative to.`; and the §4.2(3) warning ``IMPORT `<written>` resolved to module `<resolved>`; <advice>``. The advice is ``write `IMPORT <resolved>` `` for a plain name, ``write IMPORT `<resolved>` `` for one that needs backticks (a hyphen, a space, a non-ASCII letter), and, for a module whose own name still has a dot, the path form ``IMPORT `./<resolved>` ``, because no bare spelling can reach it. A first version of the advice was always the plain form, which for a hyphenated name is a parse error. A leading `/` uses the "leaves the root" message in every runtime, as §4.2 rule 1 says; §4.5's "only a confined runtime emits it" holds for the climbing-out form only. The second line of the "no directory" message no longer promises "the editor's project files", which do not exist before Stage 2.
+- **§4.5 messages, as built** (first lines pinned by `jl4-lsp/test/RelativeImportSpec.hs`): `I could not find a module at this path: <name>`; `This import leaves the root of this deployment: <name>`; `This import is relative, but <importer> has no directory to be relative to.`; and the §4.2(3) warning ``IMPORT `<written>` resolved to module `<resolved>`; <advice>``. The advice is ``write `IMPORT <resolved>` `` for a plain name, ``write IMPORT `<resolved>` `` for one that needs backticks (a hyphen, a space, a non-ASCII letter), and, for a module whose own name still has a dot, the path form ``IMPORT `./<resolved>` ``, because no bare spelling can reach it. A first version of the advice was always the plain form, which for a hyphenated name is a parse error. In Stage 1 as merged, a leading `/` uses the "leaves the root" message in every runtime, as §4.2 rule 1 says (on the Stage 3 branch it is the root-relative form of §4.7); §4.5's "only a confined runtime emits it" holds for the climbing-out form only. The second line of the "no directory" message no longer promises "the editor's project files", which do not exist before Stage 2.
 - **§4.2(3), where the warning is raised:** by `GetImports` only, and only for a bare import that resolved. `GetMixfixRegistry` asks about the same `IMPORT` and would say it twice. A bare import that does not resolve gets the existing not-found error, byte for byte, with the shortened name in it, as before.
 - **§4.6: qualified names.** The claim that a module's definitions are reachable as ``<module>.`name` `` did not reproduce: with `rates.l4` imported by path (one module, no `§` heading), ``rates.`ratemark` `` is "I could not find a definition". Qualification here goes by section headings (see `doc/reference/libraries/README.md`, "When an imported name clashes"), so the open question of §9 Q5 does not arise for a module with no heading, and two same-named modules that define the same name clash as any two imports do ("multiple definitions"). Not checked: a module whose top heading equals its file name.
-- **§4.4: module identity needed one more step than "collapse".** A lexical collapse cannot tell that `../a/helper` (written in `b/mod.l4`) and `./helper` (written in `a/main.l4`) are one file when `a/` is the folder `l4` was started in, because it does not know that folder's name: the file was loaded twice (reproduced; "multiple definitions", or an error printed twice), and the same split appeared whenever a module's own name could not round-trip through a relative `file:` URI (#971: a Hebrew letter, a space, a percent sign), which keys it absolutely. Fixed by `canonicalPathKey` in `Rules.hs`: outside the service, a path import's target is collapsed once more against the working directory and written relative to it, whenever the session started from a relative root; an absolute root (the editor) already keys absolutely. Two tests fail without it (`l4 relative imports` in `jl4/tests-cli/Main.hs`). Still open, and the same for a bare name: a symbolic link, and a letter-case difference on a case-insensitive volume, reach one file as two modules; and an entry path that itself contains `..` can key a bare import and a path import of one file differently. §4.4's "Symlinks are not dereferenced for identity" stands.
+- **§4.4: module identity needed one more step than "collapse".** A lexical collapse cannot tell that `../a/helper` (written in `b/mod.l4`) and `./helper` (written in `a/main.l4`) are one file when `a/` is the folder `l4` was started in, because it does not know that folder's name: the file was loaded twice (reproduced; "multiple definitions", or an error printed twice), and the same split appeared whenever a module's own name could not round-trip through a relative `file:` URI (#971: a Hebrew letter, a space, a percent sign), which keys it absolutely. Fixed by `canonicalPathKey` in `Rules.hs`: outside the service, a path import's target is collapsed once more against the working directory and written relative to it, whenever the session started from a relative root; an absolute root (the editor) already keys absolutely. Two tests fail without it (`l4 relative imports` in `jl4/tests-cli/Main.hs`). Still open, and the same for a bare name: a symbolic link, and a letter-case difference on a case-insensitive volume, reach one file as two modules (and so does a Unicode normalisation difference in a folder name, NFC against NFD, measured 2026-10-26 for a relative and a root-relative path); and an entry path that itself contains `..` can key a bare import and a path import of one file differently. §4.4's "Symlinks are not dereferenced for identity" stands.
 - **§6 and §7, "refused" in the service means the resolution is refused, not the deployment.** A path import that climbs out of the bundle, or names a file that was not uploaded, produces the "leaves the root" or "not found at this path" diagnostic inside the compile, but `compileBundle` reads a session's errors only for a file that has no check result, so the deploy is accepted and the operator sees only the warning `Bundle IMPORT resolves to nothing` (its text now says "path" for a name with a slash; it said the standard library had been consulted). That is the #649 ruling for any unresolved import (a refusal needs its own ruling), and the §7 service test asserts the log line, not the message. The names the missing file should have supplied then become out-of-scope, which the compiler can turn into implicit inputs of the deployed function; that already happened for a bare name.
 - **§0 #12, §6 and §9 Q3, the deploy tools and the bundle root.** The spec says nothing about how a deployment zip is built, and that is where path imports break first: `l4 deploy` (`jl4/app/L4/Cli/Deploy.hs`) and the VS Code deploy action (`ts-apps/vscode/src/sidebar-provider.ts`) both name every zip entry by file name alone, so ``IMPORT `../b/mod` `` passes locally, deploys, and fails in the deployed copy. Keeping folders in the zip makes the service's choice of session root for BARE names (the directory of the alphabetically smallest file, `Backend/Jl4.hs`) reachable: measured 2026-10-26 on the built service, the flat zip `{x.l4, zdefs.l4}` (x bare-imports zdefs) answers 200 with the right value, and the nested `{a/x.l4, zdefs.l4}` is accepted and then answers 422 "not in scope". These are separate changes: a draft PR is to carry the two deploy tools and, as its own commit, the root fix, and is to wait for a ruling on both (proposed, not landed when this was written). Until then the limit is stated on `doc/reference/libraries/README.md`.
 - **§9 Q4, answered by reading:** the web IDE creates its editor with `monaco.editor.create(el, { value, language })` and no model or URI (`ts-apps/jl4-web/src/routes/+page.svelte`), the same in websocket and WASM mode, so a browser document has Monaco's generated URI, which is not a `file:` URI and has no directory: a path import there gets the "no directory" message in websocket mode (the server's rules) and the generic module-not-found in WASM mode (the pure resolver, unchanged). Not run.
@@ -114,7 +116,7 @@ The unquoted form stays as it is:`IMPORT sub/core`is a parse error today ("unexp
 
 Let `t` be the written name's text (`rawNameToText (rawName n)`, `Syntax.hs:94-97`).
 
-1. If `t` contains `/`, it is a **path import**: `t` must be relative (not start with `/`); a leading `/` is reserved and refused with the "escapes the root" message until a root-relative form is specified.
+1. If `t` contains `/`, it is a **path import**: `t` must be relative (not start with `/`); a leading `/` is reserved and refused with the "escapes the root" message until a root-relative form is specified. (Stage 1 text. On the Stage 3 branch a leading `/` is the root-relative form of §4.7 and is not refused.)
 2. Otherwise it is a **bare import**, resolved exactly as today, including the `takeBaseName` reduction, so `IMPORT foo.l4` and `IMPORT a.b` keep resolving `foo` and `a` (§0 #3; §5 row 5).
 3. A bare import whose `t` differs from `takeBaseName t` (that is, it carries an extension or a dot) gets a new **warning**, "IMPORT `a.b` resolved to module `a`; write `IMPORT a`", so the silent reduction becomes visible without changing a result.
 4. A path import is spelled with `/` only; `\` is not a separator on any platform (a backslash in a backticked name is an ordinary character today and stays one).
@@ -164,6 +166,208 @@ All four are errors at the `IMPORT` line, in the style of the existing not-found
 - The vintage axis (`RULES EFFECTIVE DATE`, `EVAL UNDER RULES EFFECTIVE AT`): none; imports are resolved before typechecking and do not read the clock.
 - `@ref` annotations: `ResolveReferenceAnnotations` reads only `@ref-map` tokens today (`Rules.hs:1176-1186`, read); nothing to do.
 - Exporters: Catala decides "library module" by basename against the embedded names (`Catala/Lower.hs:2367-2368`, read), so a path-imported module named `prelude.l4` in a subdirectory would be treated as the stdlib; this is a pre-existing basename assumption, noted in §9.
+
+### 4.7 Stage 3: the root-relative form and aliases (proposed, not ruled)
+
+**Status (2026-10-26): proposed, for Meng; nothing in this section is ruled.**
+C1 to C5, C7 and the persistence half of C8 are built on branch `feat/relative-imports-root-form`, stacked on Stage 1, as the recommendations below say.
+C6 (aliases) is not built.
+Each choice below is one a rule author would see: the spelling they write, the file they add to a project, what they are told when something is missing.
+Each says what was built (the recommendation) and what else could be.
+The PR stays a draft until Meng rules.
+A ruling that picks an alternative changes `classifyImport` and `findProjectRoot` and the message texts, and nothing in the resolution of a relative path.
+
+#### 4.7.1 The choices
+
+**C1, the spelling.**
+Recommendation (built): a leading slash, ``IMPORT `/subjects/vn/nouns` ``.
+Stage 1 already reserved it (§4.2 rule 1) and refused it, so no `.l4` file that parses and resolves today changes meaning (§0 #16 found no name with a `/` anywhere).
+Alternatives: ``IMPORT `~/subjects/vn/nouns` `` (a `~` reads as a home directory, which a project root is not, and `~/x` is today a legal path import of a folder called `~`); ``IMPORT `//subjects/vn/nouns` `` (easy to misread as `/`; as built, `//x` is read as `/x`, see §4.7.5).
+Two costs the bench review added (2026-10-26): ``IMPORT `./helper` `` and ``IMPORT `/helper` `` differ by one character and both resolve, so a dropped dot picks the file at the root without any message when both files exist, which Stage 1's refusal of a leading slash used to catch; and a stored bundle that holds a leading-slash import changes from refused to resolving another file (`jl4-service --check-store`, #747, compiles stored bundles as a restart would and would show it).
+The reason for the leading slash is taste: it matches the root-relative `/x` of URLs and HTML and is the shortest to type.
+That Stage 1 reserved it does not separate it from `//x`, which Stage 1 also refuses, and Stage 1 is a draft that nothing binds.
+
+**C2, the project root and the file that marks it.**
+Recommendation (built): the root of a root-relative import is the folder of the nearest file named `l4-project.json`, looking in the folder of the importing file and then in each folder above it, and stopping at the first folder that holds one.
+The file marks the root and may contain just `{}`; in this commit its content is not read, only its presence.
+The nearest marker wins, so a project inside a project has its own root.
+A copy of the file that the session holds in memory counts before the disk is asked, as it does for every other file the resolver probes (the file is read through the rules, `GetFileContents`, and not by an untracked read).
+No host hands one in today: the VS Code extension forwards only L4 documents to the language server (`l4DocumentSelector`, `ts-apps/vscode/src/embedded-library.ts`; read, not run), so there a marker counts once it is saved, and the service does not look for one (C3).
+The in-memory read is built and tested through a virtual file in `jl4-lsp-test`, and is reachable in production only by a client that sends a JSON document.
+Alternatives: an empty marker `.l4root` (a dotfile is hidden from the people who must add it, and it has no room for aliases later); the git root (a zip has none, and a nested repository or a submodule has two); the workspace folder (the language server knows it and `l4` does not, so one file would mean two things); the entry file's directory (the same module, imported from two entry files, would resolve different files, which breaks the principle that the same source means the same thing; §2 need (c), "the same source unchanged across runtimes", is about runtimes and neighbours it); and the outermost marker instead of the nearest (a monorepo root would then override a sub-project's, so moving a sub-project would change its meaning).
+
+**Open for Meng, C2: the walk up has no stop.**
+As built, the search for the marker climbs to the top of the file system, and does not stop at the workspace folder, at the home folder or at the root of a git repository.
+A stray `l4-project.json` in any folder above becomes the project root of every project below it that has none of its own, and a root-relative import there reads files from outside the workspace with no message.
+A reviewer measured it on 2026-10-26 with a scripted client: `home/me/l4-project.json` and `home/me/shared/definitions.l4` (`definitionmarker MEANS 999`) above a workspace, `home/me/work/proj`, that had its own `shared/definitions.l4` (100) and no marker.
+Opening `rules/main.l4` (``IMPORT `/shared/definitions` `` and `definitionmarker + 5`) evaluated to 1004 with no diagnostic, and go-to-definition went to `home/me/shared/definitions.l4`.
+That defeats C4 for any project with a marker anywhere above it: the error for a missing marker is never given.
+Options, none built:
+
+- (a) stop at the workspace folder the editor opened (the language server knows it and `l4` does not, so one file would mean two things on the two, as the alternatives above say);
+- (b) stop at the root of a git repository, or at the home folder;
+- (c) warn when the root found is outside the workspace folder, or above the home folder;
+- (d) leave it, as the docs now say: a marker in any folder above counts.
+
+Recommendation (changed after the bench review, 2026-10-26; not built): (b) with a git ceiling: stop at the first folder that holds a `.git` (a file or a directory); a marker in that folder still counts, and a stray one above it does not.
+(a) is not recommended, because the language server knows the workspace folder and `l4` does not.
+(c) is not recommended either: it cannot tell a stray marker from a correct one (a workspace opened at a subfolder of the project is "outside the workspace" and right), and in `l4` "above the home folder" means an ancestor of the home folder, so the measured case, a marker in the home folder itself, gets no warning and `l4 run` stays silent; "cannot be silent" is false of it.
+Cost of (b): from inside a submodule a superproject's marker is not seen, and a project outside any git repository still climbs to the top of the disk; the error for a missing marker (C4) should say where the search stopped.
+If the deploy tools later find the project by this climb, a stray marker would decide what they upload, which is a reason to settle the stop now.
+
+**C3, runtimes with no file system of their own.**
+Recommendation (built): in `jl4-service` the project root is the root of the bundle, `.`, and no marker is searched for; a bundle may carry `l4-project.json` at its top for aliases (C6) but does not need one for the root-relative form.
+Consequence, stated in the docs: a deployed project's zip must have the project root at its top, or `/shared/x` is looked up under the wrong folder.
+Alternatives: search the bundle for the nearest marker, as `l4` does; require the marker at the top of every bundle (a deployment would need a file that nothing in it reads).
+The cost this paragraph first gave for searching the bundle, that a bundle would then have two roots and the same source would mean two things, is the cost of the choice as built: a bundle that holds an `l4-project.json` below its top has two roots, the nearest for `l4` and the top for the service (the open question below).
+What searching would cost the service has not been measured.
+`findProjectRoot` answers `.` under confinement and climbs from the working directory otherwise, so a climb over a bundle's files would be new code, though that lookup already counts a marker that the session holds in memory (C2).
+WASM, the other runtime without a file system, is Stage 2's, and gets these forms when Stage 2 and this commit have both landed.
+
+**Open for Meng, C3: a bundle that holds an `l4-project.json` below its top.**
+As built, the same source can mean two things, and a rule author sees it.
+A reviewer measured it on 2026-10-26: a bundle with `l4-project.json` and a different `x.l4` both at its top and in `sub/`, where `sub/main.l4` does ``IMPORT `/x` `` and exports `addmark x = x + val`.
+`l4 run sub/main.l4` with `#EVAL addmark 5` evaluates the inner `x.l4` and gives 7; the same files zipped and deployed answer 6 from the outer one, with the deployment `ready` and no line in the service's log.
+That is the kind of difference between surfaces Meng said on 2026-10-24 there should not be (a remark in a session, not yet recorded as a ruling in an owning document).
+Options, none built:
+
+- (a) the service refuses the deployment, or warns at deploy, when the bundle holds an `l4-project.json` anywhere below its top, so that the difference can never be silent;
+- (b) the service runs the same nearest-marker climb over the bundle's files, with `.` as the fallback, so that the two agree;
+- (c) leave it, as the docs now say.
+
+Recommendation (changed after the bench review, 2026-10-26; not built): (b), the same nearest-marker climb in the service over the bundle's files, with `.` as the fallback.
+By reading the code it replaces the one guard in `findProjectRoot` (`scope == EmbeddedStdlibOnly = pure (Just ".")`) with a climb over the bundle's relative folders, using the climb and the in-memory read that already exist; a dozen lines or so, not measured.
+It is the only choice that keeps `l4` and the service in agreement, as Meng said on 2026-10-24 (a remark, not recorded as a ruling).
+(a) is two actions: a refusal would be the service's first deploy-time refusal over resolution, which R5 left for a later ruling (`specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md:446-451`: a warning now, a refusal only by a later ruling), and a warning is a log line the deployer does not see.
+Cost of (b): it flips the tests that pin the top-only behaviour (the service test with a decoy manifest, the `EmbeddedStdlibOnly` lsp tests).
+What (b) leaves open: a bundle with no marker resolves `/x` from `.` where `l4` stops with the C4 error, and a zip cut from a subfolder of a marked project resolves from the zip's top.
+No deploy tool uploads an `l4-project.json` today, so a nested marker can come only from a hand-built zip.
+
+**C4, no marker above the importer.**
+Recommendation (built): an error, with a new message, and no fallback.
+First line (stable text a test matches): `This import is relative to the project root, but no project root was found above <importer>`.
+Second line: `Add a file named l4-project.json at the top of your project; it may contain just {}.`
+Alternatives: fall back to the entry file's directory, or to the working directory; both make a file mean different things depending on where it is run from, which is the failure the form exists to end.
+After the bench review (2026-10-26; not built): the first line should name the file and not call the marker's folder "the project root", because the resolver already uses that phrase for the session root (the candidate table in `Rules.hs` and the shadow warning), and a person who follows that warning into the `l4-project.json` folder gets no effect and no message; for example `No l4-project.json was found above <importer>`.
+The tests in `jl4-lsp-test` and `l4-cli-test` that match the first line move with it.
+A is chosen to make the new form independent of where `l4` is started; bare names stay dependent on it (the CLI's session root is the entry file's folder, the language server's is its working directory).
+
+**C5, confinement.**
+Recommendation (built): a root-relative path that climbs above the root is refused in every runtime, the CLI included, with the existing first line `This import leaves the root of this deployment: <name>`.
+A relative path may still leave the folder `l4` was started in on a person's machine (§6); the root-relative form never may, with one limit: the check is made on the written path, so a symbolic link inside the root that points outside it leads out (measured 2026-10-26; the service is not affected, since it never asks its disk).
+The second and third lines are new text and are proposed with this commit: `Worked through, that path is <path>, which is above the project root.` and `A root-relative import may reach any file inside the project root and nothing outside it.`
+Alternatives: let the CLI leave the root as a relative path may (then the form leaves the project on a person's machine, and the service, which cannot leave its bundle, refuses what `l4` runs); and a different first line for the CLI, because "this deployment" is not what a person who runs `l4` on their own project calls it (the first line is reused because the proposal this commit builds specified it, and a test pins it).
+Recommendation after the bench review (2026-10-26; not built): keep the refusal in every runtime, and give the new root-relative and alias escapes one runtime-neutral first line, `This import leaves the root of this project: <name>`.
+The service never shows the first line (a deploy returns only the log line, `Compiler.hs`), so "deployment" is read only in `l4` and the editor, where it is false.
+Stage 1's relative-path line is left alone.
+Cost: the pins for these two messages in `jl4-lsp/test/RelativeImportSpec.hs` and `jl4/tests-cli/Main.hs` move, and so do the heading and anchor of the errors-page entry and its inbound links (CLAUDE.md §7: whoever changes a diagnostic owns every page that quotes it).
+The refusal is a lexical rule that makes the form agree with the service; on a person's machine it is only as good as the ruling on C2 and C2b and the symbolic-link limit.
+
+**C6, aliases (commit 2; not built).**
+Recommendation: the manifest is JSON, `{"aliases": {"vn10": "subjects/vn/nd67"}}`, each value a folder relative to the manifest's folder that stays inside the root, used as ``IMPORT `@vn10/nouns` ``.
+An unknown alias is an error that lists the known ones; an alias cannot refer to another alias; a manifest that does not parse is an error naming the file and the position; unknown top-level keys are ignored.
+Alternatives to the `@` spelling: `vn10:nouns` (a colon does not contain a `/`, so it would not be a path import by §4.2 and needs its own class); a plain `vn10/nouns` is impossible, since it is already a relative path.
+Because this commit does not read the manifest, a manifest that is not JSON still marks a root here; commit 2 would start refusing it.
+
+
+**C7, module identity.**
+Recommendation (built): a root-relative target is keyed with the same `canonicalPathKey` as every other path import, so one file is one module however it was reached: ``IMPORT `/identity/core` ``, ``IMPORT `./core` `` and ``IMPORT `../identity/core` `` from `identity/top.l4` are one module (§4.4).
+This is the §4.4 invariant applied to a new way in, and is listed because a rule author would see the "defined twice" error if it failed.
+
+**C8, what the service stores.**
+Recommendation (built): `BundleStore.loadBundle` reloads a file named `l4-project.json`, in any folder, beside the `.l4` files, because `saveBundle` already writes it (it writes every file of the upload) and `loadBundle` dropped it, so a restart would have lost a manifest and the aliases with it.
+Nothing else about what the service stores changes: any other file that is not a `.l4` is still not reloaded.
+Alternatives: reload every file `saveBundle` wrote (a larger change to what a restart serves, outside this proposal); keep the manifest in `metadata.json` (a second place for the same bytes).
+A visible consequence: the version a deployment reports is a hash of every file the store reloads, so a bundle of `.l4` files and a manifest reports the same version before and after a restart (it moved by the manifest before this change).
+
+**What the bench review changed (2026-10-26).**
+Each card of the bench "Relative Imports Rulings" went to its own skeptic.
+The recommendations above that changed are C2b (a git ceiling instead of a warning), C3 ((b) instead of (a)) and C5 (a runtime-neutral first line); C1, C2 and C4 keep theirs with conditions added in place.
+Nothing here is built beyond what 4.7.2 lists.
+
+#### 4.7.2 What was built
+
+- `L4.Import.Resolution`: `ImportForm` has `RootRelativeImport` where Stage 1 had `RootedImport`, and `projectMarkerFile` names `l4-project.json` for the resolver and the store.
+- `LSP.L4.Rules`: `resolveRelativeImport` branches on the form; `findProjectRoot` walks up from the importing file's folder; the lookup that follows (memory, then disk when the scope allows) is shared with the relative path; three new `PathResolution` constructors carry the new failures.
+- `Compiler.logUnresolvedImports` says "under the root of the bundle" for a name that starts with `/`, since "relative to the importing file" would be false of it.
+- `BundleStore.loadSourcesRecursive` admits `l4-project.json`.
+
+#### 4.7.3 Resolution, as ordered steps
+
+Given importer URI `u` and written text `t` with a leading `/`:
+
+1. If `u` has no directory, fail with the **no importing directory** message (§4.5), as for a relative path.
+2. Take `t` without its leading slash, strip one trailing `.l4`, append `.l4`, and collapse `.` and `x/..` of that path alone (§4.3 step 4).
+   If it escaped, fail with the **leaves the root** message, in every runtime, before looking for a root: a path that climbs out is wrong whatever the root is.
+3. Find the root. Confined (the service): `.`. Otherwise: the nearest ancestor, from the importing file's folder up, that holds `l4-project.json` (in memory first, then on disk); none is the **no project root** error.
+4. Join the root and the collapsed path, and key the result with `canonicalPathKey` (§4.4).
+5. Probe memory, then the disk unless confined (§4.3 step 6); a miss is the **not found** message naming the root.
+
+#### 4.7.4 Messages
+
+First lines are stable text a test can match; lines after them are proposed.
+
+- **no project root**: the two lines of C4.
+- **leaves the root** (root-relative): the first line of §4.5, then the two lines of C5.
+- **not found** (root-relative): `I could not find a module at this path: /subjects/vn/nouns` then the second line of §4.5 kept verbatim, then `Relative to the project root <root> that is <path>, which does not exist.` In a deployment the third line says `the root of this deployment` where it says `the project root <root>`.
+
+#### 4.7.5 Choices that C1 to C8 do not settle (assumed, not ruled)
+
+These are made in this commit so that it is complete, and each reverts alone.
+Each is invisible to nearly every rule author.
+
+- A path that both climbs above the root and has no marker above the importer says **leaves the root**, not **no project root**, because the escape is a property of the written path and is checked first.
+- `//x` is read as `/x`: empty segments are dropped in every path import (`a//b` is `a/b` in Stage 1), and the root form follows it.
+- The marker is looked up through the rules, so a copy the session holds in memory wins over the disk, but no host hands one in today (C2), so in practice only a marker saved to disk counts.
+- A marker that is a directory, not a file, does not count on disk (`doesFileExist` is `False` for a directory; checked with `ghc -e`, not tested in the suite).
+- How far the walk up goes is not an assumption made here: a stray marker in a parent folder is seen by rule authors (measured 2026-10-26), and the choice is open under C2.
+- A root-relative import whose importer has no directory (an embedded library, a browser document) gets the existing "no directory" message, whose wording says "relative" without saying to what; read from the code, not run, because no file-based session reaches it.
+
+#### 4.7.6 Tests
+
+- `jl4-core-test` (`RelativeImportSpec`): the classification of a leading slash, the file a root-relative name names, `projectMarkerFile`.
+- `jl4-lsp-test` (`RelativeImportSpec`): both library scopes over the same files; a planted file above the root, with a relative path as the positive control and a path that stays inside the project beside it; a marker held in memory; no marker, with the file there for a fallback to find; the nearest marker, with decoy files of different types so that the wrong pick is a type error; a relative and an absolute entry path; one file written three ways; the text of each new message.
+- `l4-cli-test` (`l4 relative imports`): the fixtures `project/`, `nested/`, `climb/` and `nomarker/` under `jl4/tests-cli/fixtures/relative-import/`.
+  The no-marker case is copied to a temporary folder before it is run, so that a marker added above this repository cannot change what it measures.
+- `jl4-service-test`: `RelativeImportSpec` (resolution from the bundle root, a decoy in the importer's folder, one module however spelled, a planted file that is not taken, the host's disk that is not read); `BundleStoreSpec` (the manifest round-trips, other files still do not); `IntegrationSpec` (the same call and the same version before and after a restart).
+
+**Measured 2026-10-26, each test against the code without the change** (the library and the `l4` binary of the Stage 1 parent, with the new tests):
+
+- All 7 new `l4 relative imports` tests fail; the 16 Stage 1 tests pass.
+- 13 of the 27 `jl4-lsp-test` items fail. The 14 that pass are Stage 1 tests, the new positive control, and two refusals of a path that climbs, which Stage 1 already gave by refusing every leading slash; the refusals are paired with tests of a path that stays inside, and those fail.
+- In `jl4-service-test`, 6 of 21 fail: the three that resolve from the root, the planted file (a log line that must not say "importing file"), the manifest round trip and the restart.
+- `jl4-core-test` was not run against the old code: its new tests name `RootRelativeImport` and `projectMarkerFile`, which the old code does not define.
+- With the resolution in place and the store unchanged, exactly 2 of those 21 fail, the manifest round trip and the restart: the call answers 105 before and after, and the version differs (`b339a91b…` before, `ea48901f…` after). The call alone cannot show the loss, because the service does not read the manifest.
+
+Four tests passed against the old code, because it refuses or fails to resolve a leading slash whatever follows. Each was put against a deliberate fault in the new code, three at once, to see whether it can fail:
+
+- Reading the disk when confined failed the lsp and service tests that the filesystem is not read (the service one is `does not read the host's disk`), and a Stage 1 test beside them.
+- Skipping the escape check failed both lsp refusals, the CLI test and the service planted-file test.
+- Skipping `canonicalPathKey` failed the lsp and CLI tests of one module however written, and two Stage 1 CLI tests.
+- The service test of one module however written (`reaches one file as one module however it is written`, in `RelativeImportSpec` of `jl4-service-test`) did not fail under any of the three: under confinement `canonicalPathKey` is the identity, so it guards the invariant and has not been shown to catch a fault.
+
+#### 4.7.7 Limits, stated in the docs
+
+- The language server does not watch `l4-project.json`: a file that is open keeps the root it found until a new check of that file reads it afresh.
+- A deployed project's zip must have the project root at its top, and `l4 deploy` and the VS Code deploy action cannot yet build such a zip (the deploy tools are a separate PR, §0 #12).
+- Both deploy tools upload only the entry file and the files it imports (`bundle` in `jl4/app/L4/Cli/Deploy.hs`, which collects the entry file and the modules of its type check; `collectL4Sources` in `ts-apps/vscode/src/sidebar-provider.ts`, which collects the main file and its resolved imports), so keeping folders in the zip is not enough: neither would upload an `l4-project.json`.
+  **Requirement for the deploy-tools change** (the branch `fix/deploy-keeps-paths`, at `1d426fc9b` on 2026-10-26, which does not meet it: `git grep l4-project` over its `jl4/app` and `ts-apps/vscode/src` finds nothing): a deploy tool that supports root-relative projects has to find the project root, the folder of the nearest `l4-project.json` above the entry file, and make that folder the top of the zip.
+- A project inside a project is read by `l4` with its nearest `l4-project.json` and by the service with the one at the top of the bundle, so the same files can mean two things, and nothing refuses or warns of it (measured 2026-10-26, C3).
+  It is not fixed: which side should change is the open question in C3, and no code was changed for it.
+- Confinement is checked on the written path, not on the file it reaches: a symbolic link inside the project root that points outside it lets a root-relative path reach a file above the root, on a person's machine (measured 2026-10-26: ``IMPORT `/esc/planted` `` with `esc` a link to the folder above the root loaded the planted file).
+  The service is not affected.
+  Not changed: dereferencing links would contradict §4.4, which does not dereference them for identity.
+- A deployment compiles every file of an upload as L4 source, `l4-project.json` among them, so a line of it that L4 reads as an annotation, such as `@exprot foo`, rejects the whole deployment.
+  Valid JSON is not affected (measured 2026-10-26 on the built service; the same holds for a `README.md`, which predates this change).
+  The service was not changed.
+- The version a deployment reports moves on a restart for a bundle that holds any file that is neither a `.l4` nor an `l4-project.json`; a `README.md` does it (measured 2026-10-26).
+  That predates this change, C8 fixes only the manifest, and the rest is not fixed here.
+- WASM and the browser build get these forms when Stage 2 and this commit have both landed.
+
+**Open for Meng, found in review (2026-10-26).**
+Two choices that a rule author would see were found open after the first round: how far the walk up for the marker goes (C2), and a bundle that holds an `l4-project.json` below its top (C3).
+Each has its options and a recommendation in its own paragraph above.
+Nothing is built for either, and no code was changed for the limits listed here.
 
 ---
 
@@ -221,7 +425,7 @@ New fixtures under `jl4/tests-cli/fixtures/relative-import/`:
 - negative, not found: `main.l4` importing `../nowhere/mod`; exit 1, the message's first line and the collapsed path;
 - negative, extension and dot: `main.l4` importing `foo.l4` resolves `foo` and prints the §4.2(3) warning; `IMPORT a.b` likewise;
 - negative, cycle through a path import: `a/x.l4` importing `../b/y`, `b/y.l4` importing `../a/x`; exit 1 as `cycle2`;
-- negative, leading slash: `IMPORT \`/abs/mod\`` refused;
+- negative, leading slash: `IMPORT \`/abs/mod\`` refused; (Stage 1; superseded on the Stage 3 branch by the tests of §4.7.6);
 - unchanged: every existing import fixture and golden listed in §5 rows 8 to 10 stays green, and the `LibraryResolutionSpec` ladder test is not edited.
 
 Multi-runtime conformance, one fixture through four doors:
@@ -250,7 +454,7 @@ Back-compat guards already in the tree, to be kept green unchanged: `jl4/tests-c
 **Staging.** Stage 1 is core plus the LSP rules plus the service flag, landed together: the CLI, LSP, MLIR and REPL get the feature through the shared rules, and the service is touched only to set the flag.
 Landing the rules without the flag is **not** safe, because the service compiles through the same `GetImports` rule and would otherwise resolve a path import against the host filesystem at step 6; the flag is forty lines and belongs in the first PR.
 Stage 2 is wasm and the web IDE, which share none of the Stage 1 code except `L4.Import.Resolution`'s pure helpers, and can land whenever the editor is ready to send files.
-Stage 3, optional, is the root-relative form reserved in §4.2 and any alias manifest (option B).
+Stage 3, optional, is the root-relative form reserved in §4.2 and any alias manifest (option B). Its proposed design, with the alternatives, is §4.7.
 
 ---
 

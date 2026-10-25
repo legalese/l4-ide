@@ -26,6 +26,7 @@ import qualified Data.Text.IO as Text.IO
 import qualified Data.UUID as UUID
 import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
+import L4.Import.Resolution (projectMarkerFile)
 import Data.List (isSuffixOf)
 import Logging (Logger, logInfo, logWarn)
 import System.Directory
@@ -170,7 +171,15 @@ loadBundle (BundleStore root) deployId = do
 
   pure (sources, meta)
 
--- | Recursively load all .l4 files from a directory.
+-- | Recursively load all .l4 files from a directory, and the 'projectMarkerFile'
+-- of a project, wherever it is. 'saveBundle' writes every file of an upload, so a
+-- manifest was on disk and was not brought back: a restart lost the marker, and
+-- the version a deployment reports, a hash of the files it was compiled from
+-- ('Compiler.computeVersion'), moved with it
+-- (RELATIVE-IMPORTS-SPEC §4.7, C8; proposed and not ruled). No other file that
+-- is not a .l4 is reloaded, as before, so a bundle that holds one (a README.md,
+-- say) still reports another version after a restart than it did at the deploy:
+-- measured 2026-10-26, it predates the manifest and is not changed here.
 loadSourcesRecursive :: FilePath -> FilePath -> IO (Map FilePath Text)
 loadSourcesRecursive baseDir dir = do
   exists <- doesDirectoryExist dir
@@ -183,7 +192,7 @@ loadSourcesRecursive baseDir dir = do
         isDir <- doesDirectoryExist fullPath
         if isDir
           then loadSourcesRecursive baseDir fullPath
-          else if takeExtension entry == ".l4"
+          else if takeExtension entry == ".l4" || entry == projectMarkerFile
             then do
               content <- Text.IO.readFile fullPath
               let relPath = makeRelative baseDir fullPath

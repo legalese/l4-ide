@@ -18,6 +18,7 @@ import L4.Import.Resolution
   , classifyImport
   , collapsePath
   , pathImportFile
+  , projectMarkerFile
   )
 
 collapsed :: FilePath -> Bool -> CollapsedPath
@@ -40,8 +41,13 @@ spec = describe "Relative imports (pure helpers)" $ do
       classifyImport "./helper/x" `shouldBe` PathImport
       classifyImport "sub/core" `shouldBe` PathImport
 
-    it "refuses a leading slash as the reserved root-relative form" $
-      classifyImport "/abs/mod" `shouldBe` RootedImport
+    it "treats a leading slash as a root-relative import" $ do
+      classifyImport "/subjects/vn/nouns" `shouldBe` RootRelativeImport
+      classifyImport "/x" `shouldBe` RootRelativeImport
+      classifyImport "//x" `shouldBe` RootRelativeImport
+
+    it "does not take a slash that is not leading for a root" $
+      classifyImport "a/b/" `shouldBe` PathImport
 
     it "does not take a backslash for a separator" $
       classifyImport "sub\\core" `shouldBe` BareImport
@@ -55,6 +61,20 @@ spec = describe "Relative imports (pure helpers)" $ do
 
     it "drops empty segments" $
       pathImportFile "a//b" `shouldBe` joinPath ["a", "b.l4"]
+
+    it "reads a root-relative name from the root, without its leading slash" $
+      pathImportFile "/subjects/vn/nouns" `shouldBe` joinPath ["subjects", "vn", "nouns.l4"]
+
+    it "reads //x as /x, since empty segments are dropped" $
+      pathImportFile "//subjects/nouns.l4" `shouldBe` pathImportFile "/subjects/nouns"
+
+    it "keeps a climbing root-relative name visible to collapsePath" $
+      collapsePath (pathImportFile "/../planted")
+        `shouldBe` collapsed (joinPath ["..", "planted.l4"]) True
+
+  describe "projectMarkerFile" $
+    it "is the file name that marks a project root" $
+      projectMarkerFile `shouldBe` "l4-project.json"
 
   describe "collapsePath" $ do
     it "removes . segments" $

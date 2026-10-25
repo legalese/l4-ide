@@ -2559,6 +2559,37 @@ spec = describe "integration" do
   -- one question of one deployment, once on the freshly compiled functions and
   -- once on a service that came back from the store, and wants the same answer.
   describe "after a restart" do
+    -- A project that uses the root-relative form (RELATIVE-IMPORTS-SPEC §4.7,
+    -- PROPOSED, FOR MENG) carries an l4-project.json. The store used to keep only
+    -- the .l4 files of a bundle, so a restart dropped the marker and the version
+    -- the deployment reports (a hash of every file it holds) moved with it. This
+    -- change does not read the file in the service, so what a call answers cannot
+    -- show the loss; the version does.
+    it "answers a call through a root-relative import, and reports the same version, as it did before the restart" do
+      let sources =
+            [ ("l4-project.json", "{}\n")
+            , ( "rows/a/main.l4"
+              , Text.unlines
+                  [ "IMPORT `/shared/mod`"
+                  , ""
+                  , "@export Add the marker"
+                  , "GIVEN x IS A NUMBER"
+                  , "GIVETH A NUMBER"
+                  , "DECIDE addmark x IS x PLUS modmarker"
+                  ]
+              )
+            , ("shared/mod.l4", "modmarker MEANS 100\n")
+            ]
+          probe baseUrl mgr deployId = do
+            resp <- evalFunction baseUrl mgr deployId "addmark"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["x" Aeson..= (5 :: Int)]])
+            status <- deploymentStatus baseUrl mgr deployId
+            pure (answerOf baseUrl deployId resp, fmap (.metaVersion) (status >>= (.dsMetadata)))
+      (fresh, restarted) <- beforeAndAfterRestart "root-relative-restart" sources probe
+      fst (fst fresh) `shouldBe` 200
+      snd fresh `shouldSatisfy` Maybe.isJust
+      restarted `shouldBe` fresh
+
     it "answers query-plan for a boolean rule as it did before the restart" do
       let asks =
             [ Aeson.object ["arguments" Aeson..= Aeson.object []]

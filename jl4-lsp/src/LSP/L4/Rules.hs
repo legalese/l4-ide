@@ -11,7 +11,7 @@ import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
-import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), classifyImport, collapsePath, pathImportFile)
+import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), classifyImport, collapsePath, pathImportFile, projectMarkerFile)
 import L4.Lexer (PError, PosToken)
 import L4.Nlg (promoteHeadInputNlg)
 import Optics (gplate, toListOf, (%), (^.))
@@ -958,8 +958,16 @@ data PathResolution
   | PathNoImportingDirectory
     -- ^ the importer is not a file with a directory: an embedded library, or a
     -- browser document
-  | PathRootRefused
-    -- ^ a leading @\/@, which is reserved
+  | PathRootNotFound !(Maybe FilePath) !FilePath
+    -- ^ a root-relative path (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.7)
+    -- that found no file: the project root, or 'Nothing' in a confined runtime,
+    -- where the root is the deployment itself, and the path that was looked for
+  | PathEscapesProjectRoot !FilePath
+    -- ^ a root-relative path that climbs above its root, in any runtime: the
+    -- path once @.@ and @..@ were worked through
+  | PathNoProjectRoot !FilePath
+    -- ^ a root-relative path with no 'projectMarkerFile' at or above the
+    -- importing file: the importing file
   deriving stock (Eq, Show)
 
 -- | What resolving one written @IMPORT@ came to: a bare name goes through the
@@ -984,6 +992,12 @@ writtenOutcomeUri = \ case
 -- bundle. A path import names one file, and the point of writing one is that no
 -- ladder decides it.
 --
+-- A name with a leading @\/@ is joined to the project root instead
+-- ('findProjectRoot'; §4.7, proposed and not ruled). Its confinement is not the
+-- scope's: a root-relative path that climbs above the root is refused whatever
+-- the scope, and it is checked on the written path alone, before the root is
+-- looked for, so that it cannot depend on where the root turned out to be.
+--
 -- __Confinement__ is read off the 'LibraryScope': 'EmbeddedStdlibOnly' is a host
 -- that serves bundles somebody else uploaded (jl4-service), and there a
 -- collapsed path that climbs above the bundle is refused before anything is
@@ -1004,33 +1018,122 @@ resolveRelativeImport
 resolveRelativeImport recorder scope rootDirectory importerUri written = do
   logWith recorder Info $ LogImportResolution $
     "Resolving path import: " <> written <> " from " <> (fromNormalizedUri importerUri).getUri
-  case classifyImport written of
-    RootedImport -> pure PathRootRefused
-    _ -> case uriToNormalizedFilePath importerUri of
-      Nothing -> pure PathNoImportingDirectory
-      Just nfp -> do
-        let importer = fromNormalizedFilePath nfp
-            target = collapsePath (takeDirectory importer </> pathImportFile written)
-            confined = scope == EmbeddedStdlibOnly
-        if confined && target.cpEscaped
-          then pure (PathEscapesRoot importer target.cpPath)
-          else do
-            key <- liftIO $ canonicalPathKey scope rootDirectory target.cpPath
-            candidateUri <- liftIO $ roundTrippingFileUri key
-            mContent <- use GetFileContents candidateUri
-            let inVfs = case mContent of
-                  Just (_, Just _rope) -> True
-                  _                    -> False
-            onDisk <-
-              if inVfs || confined
-                then pure False
-                else liftIO $ doesFileExist key
-            if inVfs || onDisk
-              then do
-                logWith recorder Info $ LogImportResolution $
-                  "Found path import: " <> Text.pack key
-                pure (PathFound candidateUri)
-              else pure (PathNotFound importer key)
+  case uriToNormalizedFilePath importerUri of
+    Nothing -> pure PathNoImportingDirectory
+    Just nfp -> do
+      let importer = fromNormalizedFilePath nfp
+          confined = scope == EmbeddedStdlibOnly
+      case classifyImport written of
+        RootRelativeImport -> do
+          let underRoot = collapsePath (pathImportFile written)
+          if underRoot.cpEscaped
+            then pure (PathEscapesProjectRoot underRoot.cpPath)
+            else do
+              mRoot <- findProjectRoot recorder scope rootDirectory importer
+              case mRoot of
+                Nothing -> pure (PathNoProjectRoot importer)
+                Just root -> do
+                  let target = (collapsePath (root </> underRoot.cpPath)).cpPath
+                  probed <- probePathImport recorder scope rootDirectory target
+                  pure $ case probed of
+                    Right uri -> PathFound uri
+                    Left key  -> PathRootNotFound (if confined then Nothing else Just root) key
+        _ -> do
+          let target = collapsePath (takeDirectory importer </> pathImportFile written)
+          if confined && target.cpEscaped
+            then pure (PathEscapesRoot importer target.cpPath)
+            else do
+              probed <- probePathImport recorder scope rootDirectory target.cpPath
+              pure $ case probed of
+                Right uri -> PathFound uri
+                Left key  -> PathNotFound importer key
+
+-- | Look for the one file a path import names: among the files the session
+-- holds in memory (an open editor buffer, a bundle's file), and then, unless the
+-- scope is confined, on disk. 'Left' is the key it was looked for under.
+probePathImport
+  :: Recorder (WithPriority Log)
+  -> LibraryScope
+  -> FilePath          -- ^ root directory the session was started with
+  -> FilePath          -- ^ the collapsed path
+  -> Action (Either FilePath NormalizedUri)
+probePathImport recorder scope rootDirectory target = do
+  key <- liftIO $ canonicalPathKey scope rootDirectory target
+  candidateUri <- liftIO $ roundTrippingFileUri key
+  inVfs <- holdsInMemory candidateUri
+  onDisk <-
+    if inVfs || scope == EmbeddedStdlibOnly
+      then pure False
+      else liftIO $ doesFileExist key
+  if inVfs || onDisk
+    then do
+      logWith recorder Info $ LogImportResolution $
+        "Found path import: " <> Text.pack key
+      pure (Right candidateUri)
+    else pure (Left key)
+
+-- | Does the session hold content for this file, as an open editor buffer or a
+-- bundle's virtual file does? Asked through the rule, so that what is held wins
+-- over the disk and a change to it is a change the rules depend on.
+holdsInMemory :: NormalizedUri -> Action Bool
+holdsInMemory uri = do
+  mContent <- use GetFileContents uri
+  pure $ case mContent of
+    Just (_, Just _rope) -> True
+    _                    -> False
+
+-- | The project root a root-relative import is counted from
+-- (RELATIVE-IMPORTS-SPEC §4.7, C2 and C3; proposed and not ruled).
+--
+-- A confined runtime has no file system of its own to search, so its root is the
+-- root of the files it was handed, @.@, and no 'projectMarkerFile' is looked
+-- for. Anywhere else it is the folder of the nearest 'projectMarkerFile',
+-- looking in the importing file's folder first and then in each folder above it.
+-- A marker the session holds in memory counts before the disk is asked, as every
+-- other file does ('holdsInMemory'); what is inside it is not read. The folder
+-- is absolute, so a relative importing path (@l4 check rows\/a\/main.l4@) can be
+-- followed above the folder it was started in, and 'canonicalPathKey' writes a
+-- file under it as it writes any other.
+--
+-- Not covered: a marker added or removed while the language server has the
+-- importer open is noticed when the importer's text next changes, and not when
+-- the marker does, because nothing watches the disk for it. Measured with a
+-- scripted client on 2026-10-26: writing the marker, saving the importer,
+-- closing and reopening it, a file-watch notice for the marker and an edit to
+-- another open file each left the old answer in place, and a typed change in
+-- the importer found the marker.
+findProjectRoot
+  :: Recorder (WithPriority Log)
+  -> LibraryScope
+  -> FilePath          -- ^ root directory the session was started with
+  -> FilePath          -- ^ the importing file
+  -> Action (Maybe FilePath)
+findProjectRoot recorder scope rootDirectory importer
+  | scope == EmbeddedStdlibOnly = pure (Just ".")
+  | otherwise = do
+      cwd <- liftIO getCurrentDirectory
+      let start = (collapsePath (cwd </> takeDirectory importer)).cpPath
+      climb (ancestors start)
+  where
+    ancestors dir = dir : case takeDirectory dir of
+      parent | parent /= dir -> ancestors parent
+      _                      -> []
+
+    climb = \ case
+      [] -> pure Nothing
+      dir : above -> do
+        marked <- hasMarker (dir </> projectMarkerFile)
+        if marked
+          then do
+            logWith recorder Info $ LogImportResolution $
+              "Found project root: " <> Text.pack dir
+            pure (Just dir)
+          else climb above
+
+    hasMarker marker = do
+      key <- liftIO $ canonicalPathKey scope rootDirectory marker
+      inVfs <- holdsInMemory =<< liftIO (roundTrippingFileUri key)
+      if inVfs then pure True else liftIO (doesFileExist marker)
 
 -- | The one spelling a path import's file is keyed under, so that one file is
 -- one module however it was reached (RELATIVE-IMPORTS-SPEC §4.4).
@@ -1095,9 +1198,20 @@ pathFailureMessage importerUri written = \ case
     [ "This import is relative, but " <> (fromNormalizedUri importerUri).getUri <> " has no directory to be relative to."
     , "Write a bare module name, or open the file from disk so that it has a folder to start from."
     ]
-  PathRootRefused -> Just $ Text.unlines
+  PathRootNotFound mRoot key -> Just $ Text.unlines
+    [ "I could not find a module at this path: " <> written
+    , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+    , "Relative to " <> maybe "the root of this deployment" (\r -> "the project root " <> Text.pack r) mRoot
+        <> " that is " <> Text.pack key <> ", which does not exist."
+    ]
+  PathEscapesProjectRoot collapsed -> Just $ Text.unlines
     [ "This import leaves the root of this deployment: " <> written
-    , "A path import is written relative to the file that imports it. A leading / is reserved for a root-relative form that does not exist yet."
+    , "Worked through, that path is " <> Text.pack collapsed <> ", which is above the project root."
+    , "A root-relative import may reach any file inside the project root and nothing outside it."
+    ]
+  PathNoProjectRoot importer -> Just $ Text.unlines
+    [ "This import is relative to the project root, but no project root was found above " <> Text.pack importer
+    , "Add a file named l4-project.json at the top of your project; it may contain just {}."
     ]
 
 -- | The warning for a bare import whose written name is not the module it

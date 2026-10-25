@@ -102,3 +102,104 @@ spec = describe "path imports in a deployed bundle" do
           other -> expectationFailure
             ("expected the import to be reported as resolving to nothing, got " <> show (length other) <> " lines"))
       `finally` removePathForcibly root
+
+  -- The root-relative form (RELATIVE-IMPORTS-SPEC §4.7, PROPOSED, FOR MENG, not
+  -- ruled): a leading slash names a file from the root of the bundle. A service
+  -- has no folder of its own to search for an l4-project.json in, so the root is
+  -- the root of the files it was handed, whatever folder the importer is in.
+  describe "a root-relative import in a deployed bundle" do
+
+    it "resolves `/shared/mod` from the bundle root, whatever folder the importer is in" do
+      withServiceFromSources "rel-import-root"
+        [ ("rows/a/main.l4", adding "/shared/mod" "modmarker")
+        , ("shared/mod.l4", constant "modmarker" 100)
+        ] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "rel-import-root" "addmark" (addmark 5)
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 105)
+
+    it "needs no l4-project.json, and a bundle that carries one still deploys" do
+      -- The marker is the CLI's way of finding a root; here the root is known.
+      -- The file travels with the bundle, and this change does not read it.
+      withServiceFromSources "rel-import-root-marker"
+        [ ("l4-project.json", "{}\n")
+        , ("rows/a/main.l4", adding "/shared/mod" "modmarker")
+        , ("shared/mod.l4", constant "modmarker" 100)
+        ] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "rel-import-root-marker" "addmark" (addmark 5)
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 105)
+
+    it "does not take the importer's folder for the root" do
+      -- rows/a/shared/mod.l4 is a decoy with a different value: a root taken
+      -- from the importer's folder would add 1 and not 100.
+      withServiceFromSources "rel-import-root-decoy"
+        [ ("rows/a/main.l4", adding "/shared/mod" "modmarker")
+        , ("rows/a/shared/mod.l4", constant "modmarker" 1)
+        , ("shared/mod.l4", constant "modmarker" 100)
+        ] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "rel-import-root-decoy" "addmark" (addmark 5)
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 105)
+
+    it "reaches one file as one module however it is written" do
+      -- Three spellings of rows/b/mod.l4 from rows/a/main.l4. Two modules would
+      -- define modmarker twice and the call would not compile.
+      let main = Text.unlines
+            [ "IMPORT `/rows/b/mod`"
+            , "IMPORT `../b/mod`"
+            , "IMPORT `./../b/./mod`"
+            , ""
+            , "@export Add the marker"
+            , "GIVEN x IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE addmark x IS x PLUS modmarker"
+            ]
+      withServiceFromSources "rel-import-root-identity"
+        [ ("rows/a/main.l4", main)
+        , ("rows/b/mod.l4", constant "modmarker" 100)
+        ] \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr "rel-import-root-identity" "addmark" (addmark 5)
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 105)
+
+    it "does not take a file planted where a path climbing out of the bundle would reach" do
+      -- The plant is reachable by an unconfined run (jl4-lsp-test's
+      -- RelativeImportSpec runs the same files under both scopes); here it must
+      -- not be, and the log must say the path leaves the bundle, in words that
+      -- are true of a path from the root.
+      tmp <- getCanonicalTemporaryDirectory
+      root <- createTempDirectory tmp "jl4-service-root-relative-import-spec"
+      (do
+          createDirectoryIfMissing True (root </> "work")
+          writeFile (root </> "planted.l4") "plantedmarker MEANS 99\n"
+          (compiled, logLines) <- withCurrentDirectory (root </> "work") $
+            withLog \logger ->
+              compileBundle logger "spec" (Map.singleton "main.l4" (adding "/../planted" "1"))
+          (() <$ compiled) `shouldBe` Right ()
+          case unresolvedLines logLines of
+            [line] -> do
+              line `shouldSatisfy` hasField "file" "main.l4"
+              line `shouldSatisfy` hasField "module" "/../planted"
+              line `shouldSatisfy` (not . BS8.isInfixOf "standard library")
+              line `shouldSatisfy` (not . BS8.isInfixOf "importing file")
+              line `shouldSatisfy` BS8.isInfixOf "leaves the bundle"
+            other -> expectationFailure
+              ("expected the import to be reported as resolving to nothing, got " <> show (length other) <> " lines"))
+        `finally` removePathForcibly root
+
+    it "does not read the host's disk for a root-relative path inside the bundle either" do
+      tmp <- getCanonicalTemporaryDirectory
+      root <- createTempDirectory tmp "jl4-service-root-relative-disk-spec"
+      (do
+          createDirectoryIfMissing True (root </> "shared")
+          writeFile (root </> "shared" </> "mod.l4") "modmarker MEANS 99\n"
+          (compiled, logLines) <- withCurrentDirectory root $
+            withLog \logger ->
+              compileBundle logger "spec" (Map.singleton "main.l4" (adding "/shared/mod" "1"))
+          (() <$ compiled) `shouldBe` Right ()
+          case unresolvedLines logLines of
+            [line] -> line `shouldSatisfy` hasField "module" "/shared/mod"
+            other -> expectationFailure
+              ("expected the import to be reported as resolving to nothing, got " <> show (length other) <> " lines"))
+        `finally` removePathForcibly root
