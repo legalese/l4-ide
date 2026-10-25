@@ -1,0 +1,3 @@
+IMPORT prelude
+
+helpmarker MEANS sum (LIST 10, 20)

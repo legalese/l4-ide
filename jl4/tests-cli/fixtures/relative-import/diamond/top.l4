@@ -1,0 +1,6 @@
+IMPORT `a/x`
+IMPORT `b/y`
+
+topvalue MEANS xvalue + yvalue
+
+#EVAL topvalue
