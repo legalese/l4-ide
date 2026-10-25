@@ -49,12 +49,16 @@ Tests: `jl4-core/test/PathImportVfsSpec.hs` (the resolver and the VFS), `jl4-cor
   A file at the top of the files gets the URI that the bare name of its file gets, which is what makes ``IMPORT `sub/../core` `` and `IMPORT core` one module (tested in both orders).
   The other side of that is one case the spec did not foresee: a file at the top of the files with the name of an embedded library (`prelude.l4`), imported by path, has the URI of the library module.
   If a program reaches both, the resolver refuses it (`ConflictingModules`, "Two different modules are both called prelude") instead of merging them; a program that reaches only one is fine.
+  With the supplied file first for a bare name (proposed, in the bullet on bare names below), a bare `prelude` finds that file too, so a program reaches one module and is fine; the refusal is left for a key that a bare name cannot see, such as `./prelude.l4`.
   A file in a folder cannot collide, and ``IMPORT `lib/prelude` `` beside `IMPORT prelude` is tested to give two modules.
 - **§8 core row: `moduleNameToCandidateUris` was left as the stubs it was.**
   The pure resolver does not call it, and nothing in this repository does.
   The VFS is still a map from text to text; keys are collapsed when a path is looked up, not when they are inserted, so `vfsKeys` returns the keys as they were given.
-- **A bare name works as it did, and that has two consequences the CLI does not share.**
-  The embedded library still wins over a supplied file of the same name (smucclaw/l4-ide#989, kept as it is in this change and said so in `doc/reference/libraries/resolution.md`).
+- **A bare name works as it did, with one proposed change and one consequence the CLI does not share.**
+  **Proposed, not ruled (smucclaw/l4-ide#989):** a supplied file wins over the embedded library of the same name, as it does on the CLI and in the editor.
+  The first version of Stage 2 kept the order the pure resolver always had, the embedded library first; the proposal is its own commit and reverts alone, with the tests and the sentence in `doc/reference/libraries/resolution.md` that state the order.
+  It changes a browser answer only once a host supplies a file with the name of an embedded library, and no host does yet.
+  The `searched:` list of the not-found message names the same two places in the same words as before; it is not the order they are tried in.
   And a bare name written inside a supplied file is looked up by name at the top of the files, not beside the file that writes it: the CLI finds `neighbour` beside `rows/b/mod.l4`, the pure resolver needs `neighbour.l4` at the top (the `rows` test supplies it there).
   The unmodified resolver already found a supplied file for a written name that contained a slash when a key was spelt exactly like it (`lib/defs`), because the VFS lookup compares keys with the written text; it found nothing for `sub/../core`, refused nothing, and gave `../x` a file keyed `../x.l4`.
 - **A defect that Stage 2 found, in the evaluation and not in the resolution: `L4.API.evaluateImports` evaluated every imported module in an empty environment.**

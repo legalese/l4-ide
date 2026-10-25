@@ -253,8 +253,8 @@ export class L4WasmBridge {
    *
    * Only these files are reachable, and a path that climbs above the start of
    * them is refused: there is no file system behind the module. A bare name
-   * (`IMPORT prelude`) is still looked up by name, first among the standard
-   * library and then at the top of these files.
+   * (`IMPORT prelude`) is still looked up by name, first at the top of these
+   * files and then among the standard library.
    *
    * Takes effect from the next analysis call.
    */

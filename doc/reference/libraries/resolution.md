@@ -171,22 +171,24 @@ How it differs from `l4` on your machine:
   Write a module's name without an extension.
 - **A path never finds the standard library.**
   ``IMPORT `lib/prelude` `` is the page's `lib/prelude.l4` or nothing, and `IMPORT prelude` in the same program is still the library.
-- **A bare name works as it did before path imports.**
-  It is looked up by name, in the standard library first and then among the files at the top.
+- **A bare name is looked up by name, among the files at the top first and then in the standard library.**
+  That is the order `l4` uses, where a project's file comes before the standard library.
+  An earlier browser module tried the standard library first ([smucclaw/l4-ide#989](https://github.com/smucclaw/l4-ide/issues/989)).
   Two things follow that you may not expect:
-  - A file of the page's called `prelude.l4` does not stand in for `IMPORT prelude`: the standard library wins.
-    Import your own copy by path, ``IMPORT `./prelude` ``.
-    This is the order the WASM module has always had, and it is not the order `l4` uses.
-    It is tracked as [smucclaw/l4-ide#989](https://github.com/smucclaw/l4-ide/issues/989).
+  - A file of the page's called `prelude.l4` stands in for `IMPORT prelude`, and for the `IMPORT prelude` inside each library that has one, such as `hierarchy`.
+    A library is then checked against your file, and one that uses something your file does not define stops checking, as it does under `l4`.
+    Such a file cannot import the library's own `prelude` in turn: `IMPORT prelude` inside it finds itself, and the program is refused as a cycle.
+    Unlike `l4`, the browser does not warn that a file stands in for a library, and does not show the library's errors.
+    To leave the library alone, put your file in a folder, where only a path finds it, or give it another name.
   - A bare name inside one of the page's files is looked up among the files at the top, not beside the file that writes it.
     In `rows/b/mod.l4`, `IMPORT neighbour` needs `neighbour.l4` at the top of the files, and `rows/b/neighbour.l4` is not found by it.
     `l4` finds the second.
     Write ``IMPORT `./neighbour` `` to mean the file beside.
 - **One address, two files.**
-  A page's file at the top of the files that has the name of a standard library module, such as `prelude.l4`, can be imported by path.
-  It cannot be imported in a program that also reaches the library module of that name, directly or through another library.
-  The two would be one module, so the program is refused: `Two different modules are both called prelude`.
-  Put the file in a folder, or give it another name.
+  A page's file at the top of the files that has the name of a standard library module, such as `prelude.l4`, is the module of that name, however it is reached: ``IMPORT `./prelude` `` and `IMPORT prelude` load it once.
+  One spelling of the key is the exception, because a bare name takes the key as the page wrote it: a file keyed `./prelude.l4` is found by ``IMPORT `./prelude` `` and not by `IMPORT prelude`.
+  A program that reaches that file and the library module of the same name, directly or through another library, is refused, because the two would be one module: `Two different modules are both called prelude`.
+  Key the file `prelude.l4`, put it in a folder, or give it another name.
 - **An error inside an imported file is not shown.**
   The browser reports the open document's errors only, whichever way a file was imported.
   Two things reach you anyway.

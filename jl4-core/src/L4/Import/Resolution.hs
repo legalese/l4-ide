@@ -358,9 +358,10 @@ renderImportError = \ case
     [Text.stripEnd (fromMaybe "" (pathResolutionMessage importer written why))]
   ConflictingModules name | Just _ <- lookupEmbeddedLibrary name ->
     [ "Two different modules are both called " <> name <> ", so one would stand in for the other. "
-        <> "A file at the top of the files that has the name of a standard library module "
+        <> "A file at the top of the files that has the name of a standard library module, "
+        <> "but is keyed so that a bare name does not find it (such as ./" <> name <> ".l4), "
         <> "cannot be imported by path in a program that also uses the library module. "
-        <> "Put the file in a folder, or give it another name."
+        <> "Key it by its module name, put it in a folder, or give it another name."
     ]
   ConflictingModules name ->
     [ "Two different modules are both called " <> name <> ", so one would stand in for the other. "
@@ -393,6 +394,7 @@ locate lookups importer written = case classifyImport written of
   BareImport -> do
     found <- lookups.ilBare written
     pure $ case found of
+      -- the two places, in the words the message always had; not the order tried
       Nothing -> Left (ModuleNotFound written ["embedded libraries", "project VFS"])
       Just hit ->
         let uri = moduleNameToProjectUri written

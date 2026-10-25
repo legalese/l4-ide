@@ -230,15 +230,15 @@ The WASM module supports L4's `IMPORT` statement with the following capabilities
   The bridge hands both to the module before the next analysis.
   `WasmLspHandler` has `setProjectFiles` and `setDocumentPath`, which also check the open documents again.
   **The editor itself calls none of these:** it holds one document and has no way to add a second file, so in the browser editor only the embedded libraries can be imported.
-- **Resolution Order**: A bare name is looked up in the embedded libraries first, then among the files at the top of the VFS.
+- **Resolution Order**: A bare name is looked up among the files at the top of the VFS first, then in the embedded libraries, so a supplied `prelude.l4` stands in for the standard library, as under `l4`.
   A path import is looked up among the files only, from the folder of the document, and a path that leaves the files is refused.
   See [How IMPORT finds libraries](../../../../../doc/reference/libraries/resolution.md#in-the-browser).
 
 Example usage in L4:
 
 ```l4
-IMPORT prelude              -- Uses embedded library
-IMPORT math                 -- Uses embedded library
+IMPORT prelude              -- Uses embedded library, unless the VFS has a prelude.l4
+IMPORT math                 -- Uses embedded library, unless the VFS has a math.l4
 IMPORT helper               -- Looks in the VFS, at the top, by name
 IMPORT `../shared/helper`   -- Looks in the VFS, from the document's folder
 ```

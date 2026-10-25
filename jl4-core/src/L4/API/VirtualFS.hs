@@ -6,10 +6,12 @@
 -- * Embedded core libraries (bundled at compile time from @libraries/*.l4@)
 -- * VFS (Virtual File System) provided by the caller
 --
--- A bare name (@IMPORT helper@) is resolved embedded libraries first, then the
--- VFS, by name. A path import (@IMPORT \`..\/b\/mod\`@) is resolved among the VFS's
--- files only, from the folder of the importing document, and never finds an
--- embedded library (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md, §6 "wasm").
+-- A bare name (@IMPORT helper@) is resolved by name among the VFS's files first,
+-- then among the embedded libraries, as the command line and the editor rank a
+-- project's file above the standard library (smucclaw\/l4-ide#989). A path import
+-- (@IMPORT \`..\/b\/mod\`@) is resolved among the VFS's files only, from the folder
+-- of the importing document, and never finds an embedded library
+-- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md, §6 "wasm").
 --
 -- == Usage
 --
@@ -153,15 +155,17 @@ vfsKeys (VFS m) = Map.keys m
 
 -- | Create the lookup the API resolves imports with.
 --
--- A bare name checks embedded libraries first, then the VFS; one that is found in
--- the VFS is at the top of the files, so its own path imports start there. A path
--- is looked for in the VFS alone: it is a file the caller supplied, and an
--- embedded library of the same name is not it.
+-- A bare name checks the VFS first, then the embedded libraries, so a file the
+-- caller supplied beats a library of the same name, for the libraries' own
+-- imports as much as for the document's. One that is found in the VFS is at the
+-- top of the files, so its own path imports start there. A path is looked for in
+-- the VFS alone: it is a file the caller supplied, and an embedded library of the
+-- same name is not it.
 apiImportLookup :: VFS -> ImportLookup Identity
 apiImportLookup vfs = ImportLookup
   { ilBare = \modName -> Identity $
-      fmap (\src -> BareHit { bhSource = src, bhDirectory = Nothing }) (lookupEmbeddedLibrary modName)
-      `mplus` fmap (\src -> BareHit { bhSource = src, bhDirectory = Just "." }) (vfsLookup modName vfs)
+      fmap (\src -> BareHit { bhSource = src, bhDirectory = Just "." }) (vfsLookup modName vfs)
+      `mplus` fmap (\src -> BareHit { bhSource = src, bhDirectory = Nothing }) (lookupEmbeddedLibrary modName)
   , ilPath = \path -> Identity (vfsLookupPath path vfs)
   }
 

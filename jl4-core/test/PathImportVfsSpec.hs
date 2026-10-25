@@ -167,10 +167,24 @@ spec = describe "Path imports in the pure resolver (browser build)" $ do
 
     it "says so when two different sources claim one address" $ do
       -- A file at the top of the map is at the address of the library module of
-      -- its name. Reaching both in one program is refused, not merged.
-      let vfs = vfsFromList [("prelude.l4", "mine MEANS 1\n")]
+      -- its name. Reaching both in one program is refused, not merged. A bare name
+      -- takes the key as written, so only a key it cannot see gets here: the path
+      -- ``./prelude`` finds "./prelude.l4", and the `IMPORT prelude` inside `math`
+      -- does not, and finds the library.
+      let vfs = vfsFromList [("./prelude.l4", "mine MEANS 1\n")]
       msg <- refusal (checkWithImports vfs "IMPORT `./prelude`\nIMPORT math\n\nprobe MEANS mine\n")
       msg `shouldSatisfy` Text.isPrefixOf "Two different modules are both called prelude"
+      -- and the advice names the key it is about, not one that is accepted now
+      msg `shouldSatisfy` Text.isInfixOf "(such as ./prelude.l4)"
+
+    it "is one module when the bare name finds the same file as the path" $ do
+      -- Here the key is the module's name, so the `IMPORT prelude` inside `math`
+      -- finds the supplied file before the library, as the path does.
+      let vfs = vfsFromList [("prelude.l4", "mine MEANS 1\n")]
+      r <- resolved (checkWithImports vfs "IMPORT `./prelude`\nIMPORT math\n\nprobe MEANS mine\n")
+      moduleNames r `shouldMatchList` ["prelude", "math"]
+      [ ri.riSource | ri <- r.tcdResolvedImports, ri.riModuleName == "prelude" ]
+        `shouldBe` ["mine MEANS 1\n"]
 
     it "serves such a file when the library module of its name is not reached" $ do
       let vfs = vfsFromList [("prelude.l4", "mine MEANS 1\n")]
@@ -213,14 +227,29 @@ spec = describe "Path imports in the pure resolver (browser build)" $ do
       msg <- refusal (checkWithImports emptyVFS "IMPORT `lib/prelude`\n\nprobe MEANS 1\n")
       firstLine msg `shouldBe` "I could not find a module at this path: lib/prelude"
 
-  describe "a bare name resolves as it always did" $ do
-    it "prefers the embedded library over a supplied file of the same name (smucclaw/l4-ide#989)" $ do
-      -- Kept as it is in this change, and said so in the documentation.
-      let vfs = vfsFromList [("prelude.l4", "bogusmarker MEANS 1\n")]
-      r <- resolved (checkWithImports vfs "IMPORT prelude\n\nprobe MEANS sum (LIST 1, 2)\n")
-      r.tcdSuccess `shouldBe` True
-      map (.riSource) r.tcdResolvedImports `shouldBe` [maybe "" id (lookupEmbeddedLibrary "prelude")]
+  describe "a bare name: a supplied file comes before the embedded library (smucclaw/l4-ide#989)" $ do
+    it "prefers a supplied file over the embedded library of the same name" $
+      forM_ ["prelude.l4", "prelude"] \key -> do
+        let vfs = vfsFromList [(key, "bogusmarker MEANS 1\n")]
+        r <- resolved (checkWithImports vfs "IMPORT prelude\n\nprobe MEANS bogusmarker\n")
+        r.tcdSuccess `shouldBe` True
+        map (.riSource) r.tcdResolvedImports `shouldBe` ["bogusmarker MEANS 1\n"]
 
+    it "gives the embedded library when no supplied file has the name" $
+      forM_ [emptyVFS, vfsFromList [("helper.l4", "helpmarker MEANS 3\n")]] \vfs -> do
+        r <- resolved (checkWithImports vfs "IMPORT prelude\n\nprobe MEANS sum (LIST 1, 2)\n")
+        r.tcdSuccess `shouldBe` True
+        map (.riSource) r.tcdResolvedImports `shouldBe` [maybe "" id (lookupEmbeddedLibrary "prelude")]
+
+    it "gives the supplied file to an embedded library that imports it, as the CLI does" $ do
+      -- math.l4 begins `IMPORT prelude`, which now finds the page's prelude.l4.
+      let vfs = vfsFromList [("prelude.l4", "mine MEANS 1\n")]
+      r <- resolved (checkWithImports vfs "IMPORT math\n\nprobe MEANS mine\n")
+      moduleNames r `shouldMatchList` ["prelude", "math"]
+      [ ri.riSource | ri <- r.tcdResolvedImports, ri.riModuleName == "prelude" ]
+        `shouldBe` ["mine MEANS 1\n"]
+
+  describe "a bare name resolves by name" $ do
     it "finds a supplied file by its bare key, with or without the extension" $
       forM_ ["helper", "helper.l4"] \key -> do
         let vfs = vfsFromList [(key, "helpmarker MEANS 3\n")]
