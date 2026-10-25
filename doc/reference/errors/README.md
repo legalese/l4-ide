@@ -605,7 +605,8 @@ A service that runs files somebody else uploaded does not read its own disk for 
 
 **Error:** `This import is relative, but <the document> has no directory to be relative to.`, then `Write a bare module name, or open the file from disk so that it has a folder to start from.`
 
-A path import starts from the folder of the file that writes it. A document that does not live in a folder, such as one typed into the browser editor, has none to start from.
+A path import starts from the folder of the file that writes it. A document that does not live in a folder, such as one typed into the browser editor while it talks to a language server, has none to start from.
+(The browser editor's WASM mode puts the document at the top of the files it was given, so there it has a folder: [In the browser](../libraries/resolution.md#in-the-browser).)
 
 **How to fix it:** write a bare module name, which is looked up by the [usual order](../libraries/resolution.md#the-resolution-order), or open the file from disk so that it has a folder.
 

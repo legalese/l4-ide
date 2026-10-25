@@ -198,7 +198,7 @@ See https://ghc.gitlab.haskell.org/ghc/doc/users_guide/wasm.html for GHC WASM do
 | Evaluation        | ✅     | #EVAL results shown as blue squiggly with hover |
 | Visualization     | ✅     | Ladder diagram generation with code lenses      |
 | Code Lenses       | ✅     | "Visualize" / "Simplify and visualize" actions  |
-| IMPORT resolution | ✅     | Core libraries embedded; VFS for user files     |
+| IMPORT resolution | ✅     | Core libraries embedded; files supplied by page |
 | Go-to-definition  | ✅     | Single-file only (same as find references)      |
 | Find references   | ✅     | Single-file only                                |
 
@@ -224,16 +224,23 @@ The WASM module supports L4's `IMPORT` statement with the following capabilities
 - **Embedded Core Libraries**: The standard library (`prelude`), `math`, `jurisdiction`,
   `currency`, and other core modules are bundled into the WASM binary at compile time.
   No network requests are needed to use these.
-- **Virtual File System (VFS)**: User files can be provided via VFS for multi-file
-  projects. The TypeScript bridge supports adding files to the VFS before type-checking.
-- **Resolution Order**: Embedded libraries are checked first, then VFS.
+- **Virtual File System (VFS)**: User files can be provided for multi-file projects.
+  `L4WasmBridge.setFiles({ 'rows/b/mod.l4': source })` replaces the files.
+  `setDocumentPath('rows/a/main.l4')` says where the document lives among them.
+  The bridge hands both to the module before the next analysis.
+  `WasmLspHandler` has `setProjectFiles` and `setDocumentPath`, which also check the open documents again.
+  **The editor itself calls none of these:** it holds one document and has no way to add a second file, so in the browser editor only the embedded libraries can be imported.
+- **Resolution Order**: A bare name is looked up in the embedded libraries first, then among the files at the top of the VFS.
+  A path import is looked up among the files only, from the folder of the document, and a path that leaves the files is refused.
+  See [How IMPORT finds libraries](../../../../../doc/reference/libraries/resolution.md#in-the-browser).
 
 Example usage in L4:
 
 ```l4
-IMPORT prelude     -- Uses embedded library
-IMPORT math        -- Uses embedded library
-IMPORT helper      -- Would look in VFS
+IMPORT prelude              -- Uses embedded library
+IMPORT math                 -- Uses embedded library
+IMPORT helper               -- Looks in the VFS, at the top, by name
+IMPORT `../shared/helper`   -- Looks in the VFS, from the document's folder
 ```
 
 ✅ = Implemented

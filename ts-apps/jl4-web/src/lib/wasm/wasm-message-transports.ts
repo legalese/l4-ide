@@ -23,6 +23,7 @@ import type {
   L4WasmBridge,
   Diagnostic,
   EvalDirectiveResult,
+  ProjectFiles,
 } from './wasm-bridge'
 
 /** LSP message types */
@@ -167,7 +168,7 @@ export class WasmLspHandler {
         }
         this.documentContents.set(p.textDocument.uri, p.textDocument.text)
         this.documentVersions.set(p.textDocument.uri, p.textDocument.version)
-        this.checkAndPublishDiagnostics(
+        this.checkInBackground(
           p.textDocument.uri,
           p.textDocument.text,
           p.textDocument.version
@@ -194,7 +195,7 @@ export class WasmLspHandler {
           const version = p.textDocument.version
           const timer = setTimeout(() => {
             this.debounceTimers.delete(uri)
-            this.checkAndPublishDiagnostics(uri, newContent, version)
+            this.checkInBackground(uri, newContent, version)
           }, 500)
           this.debounceTimers.set(p.textDocument.uri, timer)
         }
@@ -733,6 +734,54 @@ export class WasmLspHandler {
    */
   clearVisualization(): void {
     this.currentVisualization = null
+  }
+
+  /**
+   * Supply the files an open document can import by path
+   * (`{ 'rows/b/mod.l4': source }`), and check the open documents again
+   * against them. Replaces any files supplied before. Nothing in the editor
+   * supplies a second file yet; this is where one would.
+   */
+  setProjectFiles(files: ProjectFiles): void {
+    this.bridge.setFiles(files)
+    this.recheckOpenDocuments()
+  }
+
+  /**
+   * Say where the document lives among the project files, so that a path import
+   * in it starts from its folder (`rows/a/main.l4`). `null` puts it back at the
+   * top of the files. The module analyses one document at a time, so this names
+   * the document that is open: every open document is checked under this one
+   * path, and a check that is already running finishes under the path set after
+   * it.
+   */
+  setDocumentPath(path: string | null): void {
+    this.bridge.setDocumentPath(path)
+    this.recheckOpenDocuments()
+  }
+
+  /** Check every open document again, as after an edit. */
+  private recheckOpenDocuments(): void {
+    for (const [uri, content] of this.documentContents) {
+      this.evalResultCache.delete(uri)
+      this.checkInfoCache.delete(uri)
+      this.checkInBackground(uri, content, this.documentVersions.get(uri))
+    }
+  }
+
+  /**
+   * Check a document without waiting for it. A failure is reported in the
+   * console: left alone it would be an unhandled rejection, and nothing would
+   * say that diagnostics had stopped being published.
+   */
+  private checkInBackground(
+    uri: string,
+    content: string,
+    version?: number
+  ): void {
+    this.checkAndPublishDiagnostics(uri, content, version).catch((error) => {
+      console.error(`[WASM] could not check ${uri}:`, error)
+    })
   }
 
   private async checkAndPublishDiagnostics(

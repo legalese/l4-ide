@@ -122,6 +122,12 @@ spec = describe "Path imports in the pure resolver (browser build)" $ do
       -- helper, mod, and the prelude that both of them import, and neighbour
       moduleNames r `shouldMatchList` ["rows/b/mod", "rows/a/helper", "prelude", "neighbour"]
 
+    it "reads the document's path like a written one: a leading slash, a missing .l4 and a . do not matter" $
+      forM_ ["rows/a/main.l4", "/rows/a/main.l4", "rows/a/main", "rows/./a/main.l4"] \path -> do
+        r <- resolved (checkWithImportsAt rowsFiles path rowsMain)
+        r.tcdSuccess `shouldBe` True
+        moduleNames r `shouldMatchList` ["rows/b/mod", "rows/a/helper", "prelude", "neighbour"]
+
     it "lets a module that was reached by name import by path, from the top of the map" $ do
       let vfs = vfsFromList
             [ ("top.l4", "IMPORT `sub/x`\n\ntopmarker MEANS xmarker + 1\n")

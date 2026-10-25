@@ -25,12 +25,31 @@ module L4.API
   , l4EvalDirective
   , l4Definition
   , l4References
+    -- * In a given import context
+    -- | The same functions, for a document that can import the files of an
+    -- 'ImportContext': a path import in it starts from the document's own path.
+    -- The plain names above are these in 'defaultImportContext'.
+  , l4CheckIn
+  , l4HoverIn
+  , l4EvalIn
+  , l4VisualizeByNameIn
+  , l4StateGraphByNameIn
+  , l4CodeLensesIn
+  , l4EvalDirectiveIn
+  , l4DefinitionIn
+  , l4ReferencesIn
+    -- * Setting the import context
+    -- | What the foreign exports @l4_set_files@ and @l4_set_document_path@ call.
+  , l4SetFiles
+  , l4SetDocumentPath
   ) where
 
 import Base
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
+import qualified Data.Map.Strict as Map
+import qualified Data.Text.Encoding as TextEncoding
 import qualified Data.Text.Lazy as LazyText
 import qualified Data.Text.Lazy.Encoding as LazyText
 import qualified Data.List as List
@@ -57,7 +76,11 @@ import L4.FindDefinition (findDefinition)
 import L4.FindReferences (findReferences)
 
 -- Import resolution (VFS + embedded libs)
-import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult(..), ResolvedImport(..))
+import L4.API.ImportContext
+  ( ImportContext(..), checkInContext, currentImportContext, defaultImportContext
+  , setImportDocumentPath, setImportFiles )
+import L4.API.VirtualFS (TypeCheckWithDepsResult(..), ResolvedImport(..), vfsFromList, vfsKeyPath)
+import L4.Import.Resolution (dependenciesFirst)
 import qualified L4.Evaluate.ValueLazy as ValLazy
 
 
@@ -88,17 +111,24 @@ import GHC.Wasm.Prim (JSString(..), fromJSString, toJSString)
 --
 -- This uses the shared import resolution from 'L4.Import.Resolution':
 -- - Embedded core libraries (prelude, math, etc.) are available
--- - User-provided files can be added via VFS (future enhancement)
+-- - User-provided files are the 'ImportContext' (see 'l4SetFiles')
 l4Check :: Text -> Text
-l4Check source =
-  -- Use checkWithImports for full import resolution support
-  case checkWithImports emptyVFS source of
+l4Check = l4CheckIn defaultImportContext
+
+-- | 'l4Check' for a document that can import the files of a context.
+l4CheckIn :: ImportContext -> Text -> Text
+l4CheckIn ctx source =
+  -- Use checkInContext for full import resolution support
+  case checkInContext ctx source of
     Left errors ->
       -- Import/parse errors
       encodeJson $ Vector.fromList $ map importErrorToDiagnostic errors
     Right result ->
-      -- Type check errors (if any)
-      let diagnostics = map checkErrorToDiagnostic result.tcdErrors
+      -- Type check errors (if any), and one for each imported module that has
+      -- errors of its own, which this document cannot show
+      let diagnostics =
+            map checkErrorToDiagnostic result.tcdErrors
+              <> map (importErrorToDiagnostic . brokenImportMessage) (importsWithErrors result)
       in encodeJson $ Vector.fromList diagnostics
 
 -- | Get hover information at a position.
@@ -112,9 +142,13 @@ l4Check source =
 -- }
 -- @
 l4Hover :: Text -> Int -> Int -> Text
-l4Hover source line col =
+l4Hover = l4HoverIn defaultImportContext
+
+-- | 'l4Hover' for a document that can import the files of a context.
+l4HoverIn :: ImportContext -> Text -> Int -> Int -> Text
+l4HoverIn ctx source line col =
   let pos = MkSrcPos { line = line + 1, column = col + 1 }  -- Convert 0-indexed to 1-indexed
-  in case checkWithImports emptyVFS source of
+  in case checkInContext ctx source of
     Left _errors ->
       "null"
     Right result ->
@@ -223,8 +257,12 @@ l4SemanticTokens source =
 --
 -- If there are parse or type errors, returns diagnostics instead.
 l4Eval :: Text -> IO Text
-l4Eval source =
-  case checkWithImports emptyVFS source of
+l4Eval = l4EvalIn defaultImportContext
+
+-- | 'l4Eval' for a document that can import the files of a context.
+l4EvalIn :: ImportContext -> Text -> IO Text
+l4EvalIn ctx source =
+  case checkInContext ctx source of
     Left errors ->
       -- Return import/parse errors as diagnostics
       pure $ encodeJson $ Aeson.object
@@ -244,6 +282,15 @@ l4Eval source =
           pure $ encodeJson $ Aeson.object
             [ "success" .= False
             , "diagnostics" .= Vector.fromList (map checkErrorToDiagnostic actualErrors)
+            ]
+        else if not (null (importsWithErrors result))
+        then
+          -- A module that did not type-check is not evaluated, and the document
+          -- that imports it is not either: say which module, as l4Check does
+          pure $ encodeJson $ Aeson.object
+            [ "success" .= False
+            , "diagnostics" .= Vector.fromList
+                (map (importErrorToDiagnostic . brokenImportMessage) (importsWithErrors result))
             ]
         else do
           -- First, evaluate all imported modules to build up the evaluation environment
@@ -278,11 +325,18 @@ l4Eval source =
 -- { "error": "No directive result found at the given position" }
 -- @
 l4EvalDirective :: Text -> Int -> Int -> Text -> IO Text
-l4EvalDirective source line col directiveType =
-  case checkWithImports emptyVFS source of
+l4EvalDirective = l4EvalDirectiveIn defaultImportContext
+
+-- | 'l4EvalDirective' for a document that can import the files of a context.
+l4EvalDirectiveIn :: ImportContext -> Text -> Int -> Int -> Text -> IO Text
+l4EvalDirectiveIn ctx source line col directiveType =
+  case checkInContext ctx source of
     Left _errors ->
       pure $ encodeJson $ Aeson.object
         [ "error" .= ("Parse/import errors prevent evaluation" :: Text) ]
+    Right result | broken@(_ : _) <- importsWithErrors result ->
+      pure $ encodeJson $ Aeson.object
+        [ "error" .= Text.unwords (map brokenImportMessage broken) ]
     Right result -> do
       evalConfig <- EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True
       importEnv <- evaluateImports evalConfig result.tcdResolvedImports
@@ -343,19 +397,113 @@ l4EvalDirective source line col directiveType =
             -- §4.7.4), only for one, so every other object is unchanged
             <> [ "undetermined" .= u | Just u <- [EL.undeterminedJson res] ]
 
+-- | The imported modules whose own type check found an error.
+--
+-- 'tcdErrors' is the document's errors only. A module that did not type-check
+-- is not evaluated: evaluating one answers with an internal error at the first
+-- use of what is wrong in it, which asks the person to report a bug.
+importsWithErrors :: TypeCheckWithDepsResult -> [ResolvedImport]
+importsWithErrors result =
+  [ ri
+  | ri <- result.tcdResolvedImports
+  , any (\e -> severity e == SError) ri.riTypeChecked.errors
+  ]
+
+-- | What is said about such a module. The browser shows the open document's
+-- errors and no other file's, so the message says that the module has them, and
+-- not what they are.
+brokenImportMessage :: ResolvedImport -> Text
+brokenImportMessage ri =
+  "The imported module " <> ri.riModuleName <> " has errors, so this document is not evaluated. "
+    <> "The browser shows the errors of the open document only; check "
+    <> ri.riModuleName <> " as the document on its own to read them."
+
 -- | Evaluate a list of resolved imports and combine their environments.
 -- Returns the combined evaluation environment.
+--
+-- A module is evaluated in the environment of the modules it imports, so it
+-- comes after them ('dependenciesFirst'). Evaluated alone, a module whose
+-- definitions use what it imports reports that name as "not in scope".
 evaluateImports :: EL.EvalConfig -> [ResolvedImport] -> IO ValLazy.Environment
 evaluateImports _evalConfig [] = pure mempty
-evaluateImports evalConfig imports = do
-  -- Evaluate each import and collect environments
-  envs <- forM imports $ \ri -> do
-    let tcResult = ri.riTypeChecked
-    -- Evaluate this imported module (without any #EVAL directives of its own)
-    (env, _) <- EL.execEvalModuleWithEnv evalConfig tcResult.entityInfo mempty tcResult.program
-    pure env
-  -- Combine all environments (left-biased - later imports override earlier)
-  pure $ mconcat envs
+evaluateImports evalConfig imports =
+  foldM evaluateOne mempty (dependenciesFirst imports)
+  where
+    evaluateOne acc ri = do
+      let tcResult = ri.riTypeChecked
+      -- Evaluate this imported module (without any #EVAL directives of its own)
+      (env, _) <- EL.execEvalModuleWithEnv evalConfig tcResult.entityInfo acc tcResult.program
+      -- Each module's names are its own (a 'Unique' holds its module), so this
+      -- only collects them.
+      pure (env <> acc)
+
+-- ----------------------------------------------------------------------------
+-- The files a document can import
+-- ----------------------------------------------------------------------------
+
+-- | Supply the files a document can import, as a JSON object from path to
+-- source: @{"rows\/b\/mod.l4": "..."}@. Replaces the files supplied before, and
+-- keeps the document's path.
+--
+-- Every analysis call that follows resolves @IMPORT@s among the standard library
+-- and these files, until they are replaced. A key may be a module's name (@helper@,
+-- found by @IMPORT helper@) or a path (@rows\/b\/mod.l4@, found by a path import);
+-- see "L4.API.VirtualFS". The files are not checked until something imports them.
+--
+-- Returns @{"files": n}@, or @{"error": "..."}@ and changes nothing when the text
+-- is not a JSON object whose values are all strings, or when a key is refused
+-- ('refuseFileKeys'). A key that appears twice in the text is taken once, with the
+-- value of the first (measured with the aeson this tree pins; @JSON.stringify@
+-- never writes one).
+--
+-- It is separate from the analysis calls, and not an argument of each, because
+-- the files change when the project does and the document changes at every
+-- keystroke: the host sends the one it has at the time, and the module keeps it.
+l4SetFiles :: Text -> IO Text
+l4SetFiles filesJson =
+  case Aeson.eitherDecodeStrict' (TextEncoding.encodeUtf8 filesJson) of
+    Left err -> pure $ encodeJson $ Aeson.object
+      [ "error" .= ("the files must be a JSON object from path to source text: " <> Text.pack err) ]
+    Right (files :: Map Text Text) -> case refuseFileKeys (Map.keys files) of
+      Just why -> pure $ encodeJson $ Aeson.object [ "error" .= why ]
+      Nothing -> do
+        setImportFiles (vfsFromList (Map.toList files))
+        pure $ encodeJson $ Aeson.object [ "files" .= Map.size files ]
+
+-- | Why a table of files cannot be taken, or 'Nothing' if it can.
+--
+-- A key is a path from the top of the files, so it has no leading @\/@: no import
+-- finds one that has, and saying that the file does not exist when it is in the
+-- table would send the host looking in the wrong place. Two keys that are one path
+-- ('vfsKeyPath': @core.l4@ and @.\/core.l4@, or @core@ and @core.l4@) would be
+-- resolved by their order, so neither is taken. Each refusal names the keys.
+refuseFileKeys :: [Text] -> Maybe Text
+refuseFileKeys keys = listToMaybe (rooted <> clashing)
+  where
+    rooted =
+      [ "the key " <> quoted key <> " starts with /. A key is a path from the top of the files, "
+          <> "with no leading /: write " <> quoted (Text.dropWhile (== '/') key) <> "."
+      | key <- keys, "/" `Text.isPrefixOf` key
+      ]
+    clashing =
+      [ "the keys " <> Text.intercalate ", " (map quoted sameFile) <> " are one path, "
+          <> "so one of them would stand in for the other. Keep one."
+      | sameFile <- Map.elems byPath, length sameFile > 1
+      ]
+    byPath :: Map FilePath [Text]
+    byPath = Map.fromListWith (flip (<>)) [ (path, [key]) | key <- keys, Just path <- [vfsKeyPath key] ]
+    quoted key = "\"" <> key <> "\""
+
+-- | Say where the document being analysed lives among the files, such as
+-- @rows\/a\/main.l4@, so that a path import in it starts from its folder. The
+-- empty text is the document's path before anything was set: the top of the files.
+--
+-- Returns @{"documentPath": "..."}@, the path in force.
+l4SetDocumentPath :: Text -> IO Text
+l4SetDocumentPath path = do
+  setImportDocumentPath path
+  ctx <- currentImportContext
+  pure $ encodeJson $ Aeson.object [ "documentPath" .= ctx.icDocumentPath ]
 
 -- ----------------------------------------------------------------------------
 -- JavaScript FFI Exports (WASM backend only)
@@ -368,14 +516,18 @@ foreign export javascript "l4_check"
   js_l4_check :: JSString -> IO JSString
 
 js_l4_check :: JSString -> IO JSString
-js_l4_check source = pure $ toJSString $ Text.unpack $ l4Check $ Text.pack $ fromJSString source
+js_l4_check source = do
+  ctx <- currentImportContext
+  pure $ toJSString $ Text.unpack $ l4CheckIn ctx $ Text.pack $ fromJSString source
 
 -- | Get hover information at a position.
 foreign export javascript "l4_hover"
   js_l4_hover :: JSString -> Int -> Int -> IO JSString
 
 js_l4_hover :: JSString -> Int -> Int -> IO JSString
-js_l4_hover source line col = pure $ toJSString $ Text.unpack $ l4Hover (Text.pack $ fromJSString source) line col
+js_l4_hover source line col = do
+  ctx <- currentImportContext
+  pure $ toJSString $ Text.unpack $ l4HoverIn ctx (Text.pack $ fromJSString source) line col
 
 -- | Get completion suggestions at a position.
 foreign export javascript "l4_completions"
@@ -397,7 +549,8 @@ foreign export javascript "l4_eval"
 
 js_l4_eval :: JSString -> IO JSString
 js_l4_eval source = do
-  result <- l4Eval $ Text.pack $ fromJSString source
+  ctx <- currentImportContext
+  result <- l4EvalIn ctx $ Text.pack $ fromJSString source
   pure $ toJSString $ Text.unpack result
 
 -- | Evaluate a specific directive at a position.
@@ -406,7 +559,8 @@ foreign export javascript "l4_eval_directive"
 
 js_l4_eval_directive :: JSString -> Int -> Int -> JSString -> IO JSString
 js_l4_eval_directive source line col directiveType = do
-  result <- l4EvalDirective (Text.pack $ fromJSString source) line col (Text.pack $ fromJSString directiveType)
+  ctx <- currentImportContext
+  result <- l4EvalDirectiveIn ctx (Text.pack $ fromJSString source) line col (Text.pack $ fromJSString directiveType)
   pure $ toJSString $ Text.unpack result
 
 -- | Generate ladder diagram visualization for a specific function by name.
@@ -414,40 +568,68 @@ foreign export javascript "l4_visualize_by_name"
   js_l4_visualize_by_name :: JSString -> JSString -> Int -> JSString -> Bool -> IO JSString
 
 js_l4_visualize_by_name :: JSString -> JSString -> Int -> JSString -> Bool -> IO JSString
-js_l4_visualize_by_name source uri version functionName simplify = pure $ toJSString $ Text.unpack $
-  l4VisualizeByName (Text.pack $ fromJSString source) (Text.pack $ fromJSString uri) version (Text.pack $ fromJSString functionName) simplify
+js_l4_visualize_by_name source uri version functionName simplify = do
+  ctx <- currentImportContext
+  pure $ toJSString $ Text.unpack $
+    l4VisualizeByNameIn ctx (Text.pack $ fromJSString source) (Text.pack $ fromJSString uri) version (Text.pack $ fromJSString functionName) simplify
 
 -- | Render the state graph of a specific regulative rule by name, as DOT.
 foreign export javascript "l4_state_graph_by_name"
   js_l4_state_graph_by_name :: JSString -> JSString -> IO JSString
 
 js_l4_state_graph_by_name :: JSString -> JSString -> IO JSString
-js_l4_state_graph_by_name source functionName = pure $ toJSString $ Text.unpack $
-  l4StateGraphByName (Text.pack $ fromJSString source) (Text.pack $ fromJSString functionName)
+js_l4_state_graph_by_name source functionName = do
+  ctx <- currentImportContext
+  pure $ toJSString $ Text.unpack $
+    l4StateGraphByNameIn ctx (Text.pack $ fromJSString source) (Text.pack $ fromJSString functionName)
 
 -- | Get code lenses for all visualizable DECIDE rules.
 foreign export javascript "l4_code_lenses"
   js_l4_code_lenses :: JSString -> JSString -> Int -> IO JSString
 
 js_l4_code_lenses :: JSString -> JSString -> Int -> IO JSString
-js_l4_code_lenses source uri version = pure $ toJSString $ Text.unpack $
-  l4CodeLenses (Text.pack $ fromJSString source) (Text.pack $ fromJSString uri) version
+js_l4_code_lenses source uri version = do
+  ctx <- currentImportContext
+  pure $ toJSString $ Text.unpack $
+    l4CodeLensesIn ctx (Text.pack $ fromJSString source) (Text.pack $ fromJSString uri) version
 
 -- | Go to definition at a position.
 foreign export javascript "l4_definition"
   js_l4_definition :: JSString -> Int -> Int -> IO JSString
 
 js_l4_definition :: JSString -> Int -> Int -> IO JSString
-js_l4_definition source line col = pure $ toJSString $ Text.unpack $
-  l4Definition (Text.pack $ fromJSString source) line col
+js_l4_definition source line col = do
+  ctx <- currentImportContext
+  pure $ toJSString $ Text.unpack $
+    l4DefinitionIn ctx (Text.pack $ fromJSString source) line col
 
 -- | Find all references at a position.
 foreign export javascript "l4_references"
   js_l4_references :: JSString -> Int -> Int -> IO JSString
 
 js_l4_references :: JSString -> Int -> Int -> IO JSString
-js_l4_references source line col = pure $ toJSString $ Text.unpack $
-  l4References (Text.pack $ fromJSString source) line col
+js_l4_references source line col = do
+  ctx <- currentImportContext
+  pure $ toJSString $ Text.unpack $
+    l4ReferencesIn ctx (Text.pack $ fromJSString source) line col
+
+-- | Supply the files a document can import, as a JSON object from path to source.
+foreign export javascript "l4_set_files"
+  js_l4_set_files :: JSString -> IO JSString
+
+js_l4_set_files :: JSString -> IO JSString
+js_l4_set_files filesJson = do
+  result <- l4SetFiles $ Text.pack $ fromJSString filesJson
+  pure $ toJSString $ Text.unpack result
+
+-- | Say where the document being analysed lives among those files.
+foreign export javascript "l4_set_document_path"
+  js_l4_set_document_path :: JSString -> IO JSString
+
+js_l4_set_document_path :: JSString -> IO JSString
+js_l4_set_document_path path = do
+  result <- l4SetDocumentPath $ Text.pack $ fromJSString path
+  pure $ toJSString $ Text.unpack result
 
 #endif
 
@@ -625,8 +807,12 @@ prettyEvalResult fields  (EL.Reduction (EL.Reduced v))        = prettyLayoutNF f
 -- }
 -- @
 l4VisualizeByName :: Text -> Text -> Int -> Text -> Bool -> Text
-l4VisualizeByName source uriText version functionName simplify =
-  case checkWithImports emptyVFS source of
+l4VisualizeByName = l4VisualizeByNameIn defaultImportContext
+
+-- | 'l4VisualizeByName' for a document that can import the files of a context.
+l4VisualizeByNameIn :: ImportContext -> Text -> Text -> Int -> Text -> Bool -> Text
+l4VisualizeByNameIn ctx source uriText version functionName simplify =
+  case checkInContext ctx source of
     Left errors ->
       encodeJson $ Aeson.object
         [ "error" .= Text.intercalate "; " errors
@@ -671,8 +857,12 @@ l4VisualizeByName source uriText version functionName simplify =
 -- in the module: the graph is extracted from the resolved syntax, and a rule
 -- that resolved is drawable whatever its neighbours did.
 l4StateGraphByName :: Text -> Text -> Text
-l4StateGraphByName source functionName =
-  case checkWithImports emptyVFS source of
+l4StateGraphByName = l4StateGraphByNameIn defaultImportContext
+
+-- | 'l4StateGraphByName' for a document that can import the files of a context.
+l4StateGraphByNameIn :: ImportContext -> Text -> Text -> Text
+l4StateGraphByNameIn ctx source functionName =
+  case checkInContext ctx source of
     Left errors ->
       encodeJson $ Aeson.object
         [ "error" .= Text.intercalate "; " errors
@@ -708,8 +898,12 @@ l4StateGraphByName source functionName =
 -- ]
 -- @
 l4CodeLenses :: Text -> Text -> Int -> Text
-l4CodeLenses source uriText version =
-  case checkWithImports emptyVFS source of
+l4CodeLenses = l4CodeLensesIn defaultImportContext
+
+-- | 'l4CodeLenses' for a document that can import the files of a context.
+l4CodeLensesIn :: ImportContext -> Text -> Text -> Int -> Text
+l4CodeLensesIn ctx source uriText version =
+  case checkInContext ctx source of
     Left _errors ->
       -- Parse/import errors - return empty array (diagnostics shown separately)
       encodeJson ([] :: [Aeson.Value])
@@ -829,9 +1023,13 @@ l4CodeLenses source uriText version =
 -- null
 -- @
 l4Definition :: Text -> Int -> Int -> Text
-l4Definition source line col =
+l4Definition = l4DefinitionIn defaultImportContext
+
+-- | 'l4Definition' for a document that can import the files of a context.
+l4DefinitionIn :: ImportContext -> Text -> Int -> Int -> Text
+l4DefinitionIn ctx source line col =
   let pos = MkSrcPos line col
-  in case checkWithImports emptyVFS source of
+  in case checkInContext ctx source of
     Left _errors -> "null"
     Right result ->
       case findDefinition pos result.tcdModule of
@@ -853,9 +1051,13 @@ l4Definition source line col =
 -- ]
 -- @
 l4References :: Text -> Int -> Int -> Text
-l4References source line col =
+l4References = l4ReferencesIn defaultImportContext
+
+-- | 'l4References' for a document that can import the files of a context.
+l4ReferencesIn :: ImportContext -> Text -> Int -> Int -> Text
+l4ReferencesIn ctx source line col =
   let pos = MkSrcPos line col
-  in case checkWithImports emptyVFS source of
+  in case checkInContext ctx source of
     Left _errors -> encodeJson ([] :: [Aeson.Value])
     Right result ->
       let ranges = findReferences pos result.tcdModule

@@ -6,7 +6,7 @@
 --
 -- This module bridges jl4-core's visualization pipeline with jl4-query-plan
 -- to provide query planning in the browser.
-module QueryPlanWasm (l4QueryPlan) where
+module QueryPlanWasm (l4QueryPlan, l4QueryPlanIn) where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
@@ -20,7 +20,8 @@ import qualified Data.Text.Lazy as LazyText
 import qualified Data.Text.Lazy.Encoding as LazyText
 import Data.Text.Encoding (encodeUtf8)
 
-import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult(..))
+import L4.API.ImportContext (ImportContext, checkInContext, defaultImportContext)
+import L4.API.VirtualFS (TypeCheckWithDepsResult(..))
 import L4.TypeCheck (severity)
 import L4.TypeCheck.Types (Severity (..))
 import qualified L4.Viz.Ladder as Ladder
@@ -31,14 +32,20 @@ import L4.Decision.QueryPlan (CachedDecisionQuery(..))
 
 #if defined(wasm32_HOST_ARCH)
 import GHC.Wasm.Prim (JSString(..), fromJSString, toJSString)
+import L4.API.ImportContext (currentImportContext)
 #endif
 
 -- | Compute a query plan given L4 source, function name, and boolean bindings (as JSON).
 --
 -- Returns JSON-encoded QueryPlanResponse, or a JSON error object.
 l4QueryPlan :: Text.Text -> Text.Text -> Text.Text -> Text.Text -> Text.Text
-l4QueryPlan source uriText functionName bindingsJson =
-  case checkWithImports emptyVFS source of
+l4QueryPlan = l4QueryPlanIn defaultImportContext
+
+-- | 'l4QueryPlan' for a document that can import the files of a context, so that
+-- the query plan sees the same files the check and the evaluation do.
+l4QueryPlanIn :: ImportContext -> Text.Text -> Text.Text -> Text.Text -> Text.Text -> Text.Text
+l4QueryPlanIn ctx source uriText functionName bindingsJson =
+  case checkInContext ctx source of
     Left errors ->
       encodeJson $ Aeson.object ["error" Aeson..= Text.intercalate "; " errors]
     Right result ->
@@ -145,9 +152,11 @@ foreign export javascript "l4_query_plan"
   js_l4_query_plan :: JSString -> JSString -> JSString -> JSString -> IO JSString
 
 js_l4_query_plan :: JSString -> JSString -> JSString -> JSString -> IO JSString
-js_l4_query_plan source uri functionName bindingsJson =
+js_l4_query_plan source uri functionName bindingsJson = do
+  ctx <- currentImportContext
   pure $ toJSString $ Text.unpack $
-    l4QueryPlan
+    l4QueryPlanIn
+      ctx
       (Text.pack $ fromJSString source)
       (Text.pack $ fromJSString uri)
       (Text.pack $ fromJSString functionName)
