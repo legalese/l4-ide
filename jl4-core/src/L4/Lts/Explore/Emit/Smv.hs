@@ -3,8 +3,12 @@
 -- @JUSTICE@).
 --
 -- @s@ is the state and @act@ the action of the step that reached it (the
--- @lastAct@ of the TLA+ module), a state variable so that a fairness
--- constraint can name it: NuSMV has no stuttering, so every edge,
+-- @lastAct@ of the TLA+ module): the step's label is what weak fairness of
+-- an action needs that @s@ does not give. It is a state variable, not an
+-- @IVAR@, so that each fairness constraint is a predicate on states and
+-- reads plainly on a path (NuSMV 2.7.0 does parse an @IVAR@ in a @JUSTICE@,
+-- measured 2026-10-26; what it then means was not measured, so it is not
+-- relied on). NuSMV has no stuttering, so every edge,
 -- self-loops included, is a step of @TRANS@ and needs no @beat@. Weak
 -- fairness of an action @A@, enabled in the states @E@, is
 -- @JUSTICE !(s in E) | act = A@: infinitely often it is not enabled or was
