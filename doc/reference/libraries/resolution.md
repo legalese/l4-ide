@@ -109,7 +109,7 @@ To resolve a path import from the file `F`:
 
 1. Take the path as written, drop one trailing `.l4` if there is one, and append `.l4`.
 2. Join it to the folder that holds `F`.
-3. Collapse every `.` and every `x/..` in the result, without touching the disk. `sub/../core.l4` becomes `core.l4`. Two spellings of one file therefore become one module, and a shared module reached from two places is checked once.
+3. Collapse every `.` and every `x/..` in the result, without touching the disk. `sub/../core.l4` becomes `core.l4`. Two spellings of one path therefore become one module, and a shared module reached from two places is checked once. This is done on the words of the path alone: a symbolic link, or a different capitalisation on a system that ignores capitals, still reaches one file as two modules, as it does for a bare name.
 4. If the runtime is **confined** (below) and the collapsed path still starts with `..`, stop: [the import leaves the root](../errors/README.md#this-import-leaves-the-root-of-this-deployment).
 5. Look for that one file among the files the editor or the service holds in memory. If the runtime is not confined, then look on disk.
 6. Found: that is the module. Not found: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path), naming the collapsed path.
@@ -129,7 +129,16 @@ On your own machine a `..` may leave the folder you started from, because the co
 
 **Only the written name changes.** A module reached by a path import is an ordinary module. Its own `IMPORT prelude` and `IMPORT helper` are resolved by the ladder from its own folder, as they would be anywhere.
 
-**What a path import cannot do yet.** Two things are outside this page's scope and are limits, not oversights: the browser editor has no folder to start from, so a path import there does not work; and the editor's "find all references" on a module only looks in the project root and the importing file's own folder, so an importer in another folder is not listed.
+**What a path import cannot do yet.** These are limits, not oversights:
+
+- The browser editor has no folder to start from, so a path import there does not work.
+- `l4 deploy` and the VS Code deploy action upload every file at the top level, so a project that uses path imports fails after it is deployed that way ([what a deployment contains](README.md#what-a-deployment-contains)).
+- A deployed bundle that cannot resolve a path import is accepted, and the only trace is a warning in the service's log.
+- The service resolves an import into a folder or a file whose name has a space or a non-ASCII letter badly, bare or path (a deployment says `ready` and every call then answers 422). `l4` on your machine is not affected.
+- The REPL looks every import up from the folder it was started in, not from the loaded file's.
+- The editor's "find all references" on a module only searches the project root and the folder of the module being searched, so a file that imports it by path from another folder is not listed.
+- `l4 export dmn` finds the files that call a decision by looking for `IMPORT <name>` among the files in the same folder; a file that imports by path is not recognised, and a decision it calls may be left out.
+- `l4 render` (HTML and Akoma Ntoso) numbers the definitions of an imported module by the module's file name, so two modules with one file name in different folders can produce duplicate anchors.
 
 ---
 

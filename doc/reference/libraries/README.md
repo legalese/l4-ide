@@ -70,26 +70,31 @@ IMPORT `rules/section-3`
 
 - **The path starts from the file that writes the `IMPORT`**, not from the folder you run `l4` in. `..` is the folder above and `.` is this one. The same file means the same thing whoever runs it, and from wherever they run it.
 - **Leave off `.l4`.** ``IMPORT `../shared/definitions.l4` `` names the same file.
-- **Always write `/`**, on every system. A backslash is an ordinary letter in a name.
+- **Always write `/`**, on every system, and never `\`. A name without a `/` is a bare module name, whatever else is in it.
 - **The backticks are required.** ``IMPORT `../shared/definitions` `` works; `IMPORT ../shared/definitions` is a parse error.
 - **A path names one file.** L4 looks for that file and no other: the standard library, `JL4_LIBRARY_PATH`, the project root and the per-user store are not searched, so nothing can stand in for it. If it is not there, the error says which path was tried: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path).
 - **Two files with one name in different folders are two modules.** ``IMPORT `a/rates` `` and ``IMPORT `b/rates` `` can both appear in one program, and neither replaces the other. If both define a name you then use, L4 asks which you meant, as it does for any two imports that define the same name.
-- **One file is one module, however it was reached.** `sub/../core` and `core` are the same file, so a definition in it is not "defined twice".
+- **Two spellings of one path are one module.** `sub/../core`, `./core` and `core` all name the same file, so a definition in it is not "defined twice". L4 works this out from the words of the path, not by looking at the disk, so a symbolic link, or a different capitalisation on a system that ignores capitals, still reaches one file as two modules.
 - **A path cannot start with `/`.** A leading slash is reserved and refused: [This import leaves the root of this deployment](../errors/README.md#this-import-leaves-the-root-of-this-deployment).
 
 #### Where path imports work, and where they do not
 
-| where you run the file                                         | what a path import does                                                                                                                                                                             |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `l4` on your machine, the REPL, the VS Code editor             | Works. The path may leave the folder of the file you started from: `cases/main.l4` can import `../domain`. Whatever your account can read, a path can reach.                                        |
-| a deployment on `jl4-service` or Legalese Cloud                | Works **inside the files you deployed**. A path that would climb above them is refused, and the service never looks at its own disk. See [what a deployment contains](#what-a-deployment-contains). |
-| the browser editor, and anything else built on the WASM module | **Not yet.** A browser document has no folder to be relative to, so a path import there does not work.                                                                                              |
+| where you run the file                                         | what a path import does                                                                                                                                                                                         |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `l4` on your machine, MLIR, the VS Code editor                 | Works. The path may leave the folder of the file you started from: `cases/main.l4` can import `../domain`. Whatever your account can read, a path can reach.                                                    |
+| the REPL (`jl4-repl`)                                          | Works only when the REPL is started in the loaded file's own folder. It evaluates through a copy kept in the folder it was started in, so every import in a loaded file, bare or path, is looked up from there. |
+| a deployment on `jl4-service` or Legalese Cloud                | Works **inside the files you deployed**. A path that would climb above them is refused, and the service never reads its own disk for it. See [what a deployment contains](#what-a-deployment-contains).         |
+| the browser editor, and anything else built on the WASM module | **Not yet.** A browser document has no folder to be relative to, so a path import there does not work.                                                                                                          |
 
 An imported module's own bare-name imports are not affected: inside `mod.l4`, `IMPORT prelude` still finds the standard library, and `IMPORT helper` still finds `helper.l4` beside `mod.l4`.
 
 ##### What a deployment contains
 
-A deployment is the set of files that were uploaded, and a path import can only name a file in that set, relative to the importing file's folder. Upload `rows/a/main.l4` and `rows/b/mod.l4` together and ``IMPORT `../b/mod` `` works; upload only the first and it is reported missing.
+A deployment is the set of files that were uploaded, and a path import can only name a file in that set, relative to the importing file's folder. Upload `rows/a/main.l4` and `rows/b/mod.l4` together and ``IMPORT `../b/mod` `` works; upload only the first and the import finds nothing.
+
+**Today the two deploy tools do not upload folders.** `l4 deploy` and the VS Code deploy action put every file at the top of the upload, named by file name alone. A project that imports by path therefore checks and runs on your machine, deploys without complaint, and then fails in the deployed copy: the service cannot find `../b/mod` among files that are all at the top. Until those tools keep the folder structure, deploy such a project by uploading a zip that does (`POST /deployments` on `jl4-service`).
+
+**The deploy does not tell you.** When a path import finds nothing in a deployment, whether it names a file that was not uploaded or climbs out of the upload, the service accepts the deployment and writes a warning to its log (`Bundle IMPORT resolves to nothing`, naming the file and the import). The names the missing file should have supplied are then reported as undefined, which the compiler may turn into extra inputs of the deployed function. This is how an `IMPORT` of a bare name that finds nothing already behaved.
 
 ### What an import gives you
 

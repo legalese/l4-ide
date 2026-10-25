@@ -573,11 +573,11 @@ An `IMPORT` names a module that is neither a standard library nor a file `helper
 
 Like [Module not found](#module-not-found), this is an error, not a warning, and it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module.
 
-An `IMPORT` with a slash in its name names one file, relative to the file that writes the `IMPORT`. The third line shows where that came out once `.` and `..` were worked through, which is the place to look.
+An `IMPORT` with a slash in its name names one file, relative to the file that writes the `IMPORT`. The third line shows where that came out once `.` and `..` were worked through; the path is written as seen from the folder you ran `l4` in, so it may start with `..`.
 
 **How to fix it:**
 
-- Compare the third line with where the file really is. The path starts from the folder of the file that writes the `IMPORT`, not from the folder you ran `l4` in.
+- Compare the third line with where the file really is. The search started in the folder of the file that writes the `IMPORT`, not in the folder you ran `l4` in; only the way the answer is printed is relative to where you ran it.
 - Leave off `.l4`, or keep it; both name the same file. Use `/` and not `\`.
 - In a deployment, the file must be among the files uploaded: a path import cannot reach a file that was not deployed with the rest.
 
@@ -589,7 +589,7 @@ An `IMPORT` with a slash in its name names one file, relative to the file that w
 
 **Error:** `This import leaves the root of this deployment: ../../x`. Two forms of it:
 
-- A path that climbs out of the files that were uploaded, in `jl4-service` or Legalese Cloud. The second line shows where the path would have landed.
+- A path that climbs out of the files that were uploaded, in `jl4-service` or Legalese Cloud. The second line shows where the path would have landed. The deploy does not return this message: the service accepts the deployment and logs a warning, `Bundle IMPORT resolves to nothing`, naming the file and the import. Look there.
 - A path that starts with `/`, on any machine. A leading slash is reserved for a form L4 does not have yet, and is refused rather than guessed at.
 
 A service that runs files somebody else uploaded does not read its own disk for them, so a path import there can reach other uploaded files and nothing else. On your own machine, `l4` lets a path leave the folder you started in.
@@ -603,7 +603,7 @@ A service that runs files somebody else uploaded does not read its own disk for 
 
 ### This import is relative, but has no directory to be relative to
 
-**Error:** `This import is relative, but <the document> has no directory to be relative to.`, then `Write a bare module name, or supply the file through the editor's project files.`
+**Error:** `This import is relative, but <the document> has no directory to be relative to.`, then `Write a bare module name, or open the file from disk so that it has a folder to start from.`
 
 A path import starts from the folder of the file that writes it. A document that does not live in a folder, such as one typed into the browser editor, has none to start from.
 
@@ -613,7 +613,7 @@ A path import starts from the folder of the file that writes it. A document that
 
 ### IMPORT resolved to a module with a shorter name
 
-**Warning:** ``IMPORT `a.b` resolved to module `a`; write `IMPORT a` `` (and the same for ``IMPORT `foo.l4` ``, which resolves to `foo`).
+**Warning:** ``IMPORT `a.b` resolved to module `a`; write `IMPORT a` `` (and the same for ``IMPORT `foo.l4` ``, which resolves to `foo`). When the module's name needs backticks the advice carries them: ``IMPORT `my-helpers.l4` `` is advised to become ``IMPORT `my-helpers` ``.
 
 A module is named by its file name without `.l4`, and a name with a dot or an extension is cut at its last dot. So ``IMPORT `a.b` `` has always loaded `a.l4`, not a file called `a.b`, and ``IMPORT `v1.2-rates` `` has always loaded `v1.l4`. This was silent; now it is a warning, and nothing about which module is loaded has changed. It does not fail `l4 check`.
 
