@@ -24,6 +24,7 @@ import IntegrationSpec (assertSuccess, evalFunction, withServiceFromSources)
 import UnresolvedImportSpec (hasField, unresolvedLines, withLog)
 
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Char8 as BS8
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
@@ -94,6 +95,10 @@ spec = describe "path imports in a deployed bundle" do
           [line] -> do
             line `shouldSatisfy` hasField "file" "main.l4"
             line `shouldSatisfy` hasField "module" "../planted"
+            -- the text for a bare name ("no built-in standard library module has
+            -- this name") would be false of a path, which never consults it
+            line `shouldSatisfy` (not . BS8.isInfixOf "standard library")
+            line `shouldSatisfy` BS8.isInfixOf "leaves the bundle"
           other -> expectationFailure
             ("expected the import to be reported as resolving to nothing, got " <> show (length other) <> " lines"))
       `finally` removePathForcibly root

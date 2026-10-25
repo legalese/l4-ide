@@ -74,11 +74,22 @@ logStdlibStandIns logger deployId l4Files =
 logUnresolvedImports :: Logger -> Text -> [(FilePath, Text)] -> IO ()
 logUnresolvedImports logger deployId unresolved =
   forM_ unresolved $ \(path, modName) ->
-    logWarn logger "Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name"
+    logWarn logger (message modName)
       [ ("deploymentId", toJSON deployId)
       , ("file", toJSON path)
       , ("module", toJSON modName)
       ]
+  where
+    -- A name with a slash is a path import (a backticked @../b/mod@), which is
+    -- resolved against the importing file's folder inside the bundle and never
+    -- against the standard library; the text for a bare name would be false of it.
+    -- The two ways it can find nothing are told apart in the compile's own
+    -- diagnostics, which the deploy does not return; the log says both.
+    message modName
+      | Text.any (== '/') modName =
+          "Bundle IMPORT resolves to nothing: no bundle file is at this path relative to the importing file, or the path leaves the bundle"
+      | otherwise =
+          "Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name"
 
 -- | Compile an in-memory source map into a deployment-ready function registry.
 --

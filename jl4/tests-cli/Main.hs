@@ -406,7 +406,11 @@ relImportDir = fixtureDir </> "relative-import"
 
 relRowsEntry, relRowsDir, relDiamondEntry, relIdentityEntry, relNotFoundEntry,
   relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry,
-  relParentEntry :: FilePath
+  relParentEntry, relShortenedHyphenEntry :: FilePath
+relShortenedHyphenEntry = relImportDir </> "shortened" </> "hyphen.l4"
+relBackDir, relHebrewDir :: FilePath
+relBackDir             = relImportDir </> "back" </> "a"
+relHebrewDir           = relImportDir </> "hebrew"
 relRowsDir             = relImportDir </> "rows" </> "a"
 relRowsEntry           = relRowsDir </> "main.l4"
 relDiamondEntry        = relImportDir </> "diamond" </> "top.l4"
@@ -624,6 +628,7 @@ coreFixtures =
   , relRowsEntry, relDiamondEntry, relIdentityEntry, relNotFoundEntry
   , relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry
   , relParentEntry
+  , relBackDir </> "main.l4", relHebrewDir </> "main.l4", relShortenedHyphenEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
@@ -3030,6 +3035,37 @@ spec bin = do
       combined out `shouldSatisfy` ("42" `isInfixOf`)
       combined out `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
 
+    -- One file is one module however it was reached. `./helper` never leaves
+    -- the folder; `../a/helper`, written in b/mod.l4, climbs out of it and comes
+    -- back in. A lexical collapse cannot tell that those meet, so before the
+    -- canonical key the file was loaded twice and its names were "defined twice".
+    it "treats a file reached by climbing out and back in as the one already loaded" $ do
+      absDir <- makeAbsolute relBackDir
+      out <- runL4In (Just absDir) Nothing bin ["run", "main.l4"]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("21" `isInfixOf`)
+      combined out `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
+    it "gives the same answer to that layout from the folder above, and with an absolute entry" $ do
+      absDir <- makeAbsolute relBackDir
+      above <- makeAbsolute (relImportDir </> "back")
+      fromAbove <- runL4In (Just above) Nothing bin ["run", "a" </> "main.l4"]
+      exitOf fromAbove `shouldBe` ExitSuccess
+      combined fromAbove `shouldSatisfy` ("21" `isInfixOf`)
+      absolute <- runL4 bin ["run", absDir </> "main.l4"]
+      exitOf absolute `shouldBe` ExitSuccess
+      combined absolute `shouldSatisfy` ("21" `isInfixOf`)
+
+    it "keeps one module when a Hebrew-named module path-imports a sibling the entry also imports" $ do
+      -- A name that does not round-trip through a relative file: URI (a Hebrew
+      -- letter, a space) is keyed by an absolute URI (#971); its own path imports
+      -- used to be keyed absolute too, so `core` was loaded twice.
+      absDir <- makeAbsolute relHebrewDir
+      out <- runL4In (Just absDir) Nothing bin ["run", "main.l4"]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("83" `isInfixOf`)
+      combined out `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
     it "fails, naming the path, when a path import finds no file" $ do
       out <- runL4 bin ["check", relNotFoundEntry]
       exitOf out `shouldNotBe` ExitSuccess
@@ -3049,6 +3085,15 @@ spec bin = do
       combined out `shouldSatisfy` ("42" `isInfixOf`)
       combined out `shouldSatisfy`
         ("IMPORT `a.b` resolved to module `a`; write `IMPORT a`" `isInfixOf`)
+
+    it "suggests something that parses: a hyphenated module name keeps its backticks" $ do
+      -- `IMPORT my-helpers.l4` resolves my-helpers; the bare suggestion
+      -- `IMPORT my-helpers` would be a parse error, so the advice carries the
+      -- backticks. (A name with a dot left in it is advised to use the path form.)
+      out <- runL4 bin ["check", relShortenedHyphenEntry]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy`
+        ("IMPORT `my-helpers.l4` resolved to module `my-helpers`; write IMPORT `my-helpers`" `isInfixOf`)
 
     it "does not warn about a bare name that is already a module name" $ do
       out <- runL4 bin ["check", relRowsEntry]

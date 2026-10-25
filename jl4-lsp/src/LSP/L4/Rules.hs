@@ -28,6 +28,7 @@ import qualified L4.TypeCheck as TypeCheck
 import qualified L4.Lint.AndOrDepth as Lint
 
 import Control.Applicative
+import Data.Char (isAlpha, isAlphaNum, isAscii)
 import Control.Monad.Trans.Maybe
 import Data.Hashable (Hashable)
 import Data.Monoid (Ap (..))
@@ -990,15 +991,17 @@ writtenOutcomeUri = \ case
 -- own machine, where @..@ may leave the entry file's directory on purpose: the
 -- commons rows that import their parent's module need it.
 --
--- The module's URI is the collapsed path, spelled relative when the importer's
--- was, which is the regime 'roundTrippingFileUri' applies to a bare name.
+-- The module's URI is the collapsed path, spelled relative when the session's
+-- keys are ('canonicalPathKey'), which is the regime 'roundTrippingFileUri'
+-- applies to a bare name.
 resolveRelativeImport
   :: Recorder (WithPriority Log)
   -> LibraryScope
+  -> FilePath          -- ^ root directory the session was started with
   -> NormalizedUri     -- ^ importing module
   -> Text              -- ^ the name as written
   -> Action PathResolution
-resolveRelativeImport recorder scope importerUri written = do
+resolveRelativeImport recorder scope rootDirectory importerUri written = do
   logWith recorder Info $ LogImportResolution $
     "Resolving path import: " <> written <> " from " <> (fromNormalizedUri importerUri).getUri
   case classifyImport written of
@@ -1012,7 +1015,8 @@ resolveRelativeImport recorder scope importerUri written = do
         if confined && target.cpEscaped
           then pure (PathEscapesRoot importer target.cpPath)
           else do
-            candidateUri <- liftIO $ roundTrippingFileUri target.cpPath
+            key <- liftIO $ canonicalPathKey scope rootDirectory target.cpPath
+            candidateUri <- liftIO $ roundTrippingFileUri key
             mContent <- use GetFileContents candidateUri
             let inVfs = case mContent of
                   Just (_, Just _rope) -> True
@@ -1020,13 +1024,55 @@ resolveRelativeImport recorder scope importerUri written = do
             onDisk <-
               if inVfs || confined
                 then pure False
-                else liftIO $ doesFileExist target.cpPath
+                else liftIO $ doesFileExist key
             if inVfs || onDisk
               then do
                 logWith recorder Info $ LogImportResolution $
-                  "Found path import: " <> Text.pack target.cpPath
+                  "Found path import: " <> Text.pack key
                 pure (PathFound candidateUri)
-              else pure (PathNotFound importer target.cpPath)
+              else pure (PathNotFound importer key)
+
+-- | The one spelling a path import's file is keyed under, so that one file is
+-- one module however it was reached (RELATIVE-IMPORTS-SPEC §4.4).
+--
+-- Under 'EmbeddedStdlibOnly' there is nothing to do: a path that leaves the
+-- bundle is refused, so every target stays inside it, and the bundle's files are
+-- registered under exactly the collapsed spelling.
+--
+-- Elsewhere a session keys its modules in one of two regimes, told apart by the
+-- root directory it was started with. An absolute root means every key is
+-- absolute and the collapsed target already is. A relative root (the CLI on a
+-- relative entry path) means keys are written relative to the working directory,
+-- and then one file can be reached by a path that climbs out of that directory
+-- and comes back into it (@..\/a\/helper@, from a module at @..\/b\/mod@, when @a@
+-- is the working directory) as well as by one that never leaves it
+-- (@.\/helper@). A lexical collapse cannot see that these meet, because it does
+-- not know the name of the directory it started in. So the target is collapsed
+-- once more against the working directory and written relative to it, which
+-- gives the second spelling the first one. This reads the working directory and
+-- touches nothing else.
+--
+-- Not covered: a symbolic link, and a letter-case difference on a case-insensitive
+-- volume, still reach one file as two modules, as they do for a bare import.
+canonicalPathKey :: LibraryScope -> FilePath -> FilePath -> IO FilePath
+canonicalPathKey EmbeddedStdlibOnly _ target = pure target
+canonicalPathKey AmbientLibraries rootDirectory target
+  | isAbsolute rootDirectory = pure target
+  | otherwise = do
+      cwd <- getCurrentDirectory
+      pure (relativeFrom cwd (collapsePath (cwd </> target)).cpPath)
+
+-- | @relativeFrom base path@ writes the absolute @path@ relative to the absolute
+-- directory @base@, with @..@ where it has to climb. A path that shares no root
+-- with @base@ (another drive) is returned as it is.
+relativeFrom :: FilePath -> FilePath -> FilePath
+relativeFrom base path
+  | common == 0 = path
+  | otherwise   = joinPath (replicate (length b - common) ".." <> drop common p)
+  where
+    b = splitDirectories base
+    p = splitDirectories path
+    common = length (takeWhile id (zipWith (==) b p))
 
 -- | The diagnostic text for a path import that did not resolve, or 'Nothing' for
 -- one that did. The first line of each is stable text a test can match
@@ -1047,7 +1093,7 @@ pathFailureMessage importerUri written = \ case
     ]
   PathNoImportingDirectory -> Just $ Text.unlines
     [ "This import is relative, but " <> (fromNormalizedUri importerUri).getUri <> " has no directory to be relative to."
-    , "Write a bare module name, or supply the file through the editor's project files."
+    , "Write a bare module name, or open the file from disk so that it has a folder to start from."
     ]
   PathRootRefused -> Just $ Text.unlines
     [ "This import leaves the root of this deployment: " <> written
@@ -1058,11 +1104,26 @@ pathFailureMessage importerUri written = \ case
 -- resolves: a dot or an extension in a name is dropped, so @IMPORT a.b@ is
 -- @IMPORT a@ and @IMPORT foo.l4@ is @IMPORT foo@. The result is not changed;
 -- it is only no longer silent (RELATIVE-IMPORTS-SPEC §4.2 rule 3).
+--
+-- The advice has to be something that parses and that means what it says. A
+-- module name with a hyphen, a space or a non-ASCII letter needs its backticks.
+-- And a module whose own name still has a dot cannot be written as a bare name
+-- at all, because the dot is cut again; the one spelling that reaches its file
+-- is the path form, which does not cut.
 shortenedImportWarning :: Text -> Text -> Text
 shortenedImportWarning written resolved = Text.unlines
-  [ "IMPORT `" <> written <> "` resolved to module `" <> resolved <> "`; write `IMPORT " <> resolved <> "`"
+  [ "IMPORT `" <> written <> "` resolved to module `" <> resolved <> "`; " <> advice
   , "A module name is read up to its last dot. To import a module from another folder, write its path in backticks, with a slash."
   ]
+  where
+    advice
+      | Text.any (== '.') resolved =
+          "a module whose file name has a dot is imported by path: write IMPORT `./" <> resolved <> "`"
+      | plain = "write `IMPORT " <> resolved <> "`"
+      | otherwise = "write IMPORT `" <> resolved <> "`"
+    plain = case Text.uncons resolved of
+      Just (c, rest) -> (isAscii c && isAlpha c || c == '_') && Text.all (\x -> isAscii x && (isAlphaNum x || x == '_')) rest
+      Nothing -> False
 
 -- | The modules a file imports that resolved to nothing, by 'writtenImportName',
 -- in the order they are written, each once.
@@ -1119,7 +1180,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
       resolveWritten importerUri n =
         case classifyImport (rawNameToText (rawName n)) of
           BareImport -> BareOutcome <$> resolveImport importerUri (Text.unpack (writtenImportName n))
-          _          -> PathOutcome <$> resolveRelativeImport recorder scope importerUri (rawNameToText (rawName n))
+          _          -> PathOutcome <$> resolveRelativeImport recorder scope rootDirectory importerUri (rawNameToText (rawName n))
 
   define shakeRecorder $ \GetLexTokens uri -> do
     mRope <- runMaybeT $
