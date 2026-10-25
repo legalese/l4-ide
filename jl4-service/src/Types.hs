@@ -675,10 +675,11 @@ data AppEnv = MkAppEnv
   , batchSlots         :: BatchSlots
   -- ^ How many batch cases may run at once, across every batch in flight.
   , ledger             :: Maybe LedgerService
-  -- ^ The instance ledger (OPERATIONAL-LOWERING-SPEC §9 WPO3), read and
-  -- written only by its own routes ("Ledger"). 'Nothing' when the service
-  -- runs without one, as most tests do: the decision routes and the
-  -- decision tools never read it.
+  -- ^ The instance ledger (OPERATIONAL-LOWERING-SPEC §9 WPO3), written
+  -- only by its own routes ("Ledger") and read besides only by its own MCP
+  -- tool ("Ledger.Mcp"). 'Nothing' when the service runs without one, as
+  -- most tests do: the decision routes and the decision tools never read
+  -- it.
   }
 
 -- | The batch slots: one per capability ('newBatchSlots'), shared by every

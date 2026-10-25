@@ -73,6 +73,7 @@ library
     FileBrowser
     ExplorerPage
     Ledger
+    Ledger.Mcp
     Ledger.Service
     Ledger.Store.Config
     Ledger.Store.Postgres
@@ -161,6 +162,7 @@ test-suite jl4-service-test
     DecisionQueryCacheKeySpec
     DeploymentIdSpec
     IntegrationSpec
+    LedgerMcpSpec
     LedgerRoutesSpec
     LedgerStoreSpec
     LoggingSpec

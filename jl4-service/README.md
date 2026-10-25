@@ -557,6 +557,11 @@ The service exposes an [MCP](https://modelcontextprotocol.io/) JSON-RPC 2.0 endp
 
 The org-wide endpoint (`/.mcp`) exposes tools from all deployments. The scoped endpoints (`/{id}/.mcp`) restrict tool visibility to a single deployment.
 
+Beside the decision tools, every endpoint lists one tool of the [instance ledger](#instance-ledger), `what-may-I-do-now`, to callers that may evaluate.
+Given an `instance` (and on the org-wide endpoint its `deployment`), it answers with the instance's position, the same answer as `GET .../position`, and, given a `party` and an `action`, what the ledger would do with that act were it proposed now.
+It never appends: to act, an agent proposes the act on the instance's events route, naming the head the tool reported as `decidedAgainst`, and the ledger decides there against the head current when the act arrives.
+The tool is registered in front of the MCP handler, so the decision tools are answered as before, and still answered when the ledger's store cannot be opened.
+
 #### Field Name Sanitization
 
 L4 uses backtick identifiers with spaces (e.g., `` `function or purpose` ``), but JSON schema property names and URL path segments work better with hyphens. The service automatically sanitizes field names:
@@ -810,6 +815,7 @@ jl4-service/
     DataPlane.hs            -- /deployments/{id}/functions/... evaluation handlers + short routes
     DeploymentLoader.hs     -- Shared compilation logic (eager startup, lazy compile-on-access)
     Ledger.hs               -- Instance-ledger routes: /deployments/{id}/instances/...
+    Ledger/Mcp.hs           -- The ledger's MCP tool, what-may-I-do-now, registered in front of McpServer
     Ledger/Service.hs       -- The ledger as the service holds it: store opened on first use, clock, limits, slots
     Ledger/Store/           -- The ledger's stores: sqlite (the default), Postgres, in-memory (tests)
     ExplorerPage.hs         -- Landing page HTML (deployment explorer, API docs)

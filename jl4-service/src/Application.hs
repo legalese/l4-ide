@@ -9,6 +9,7 @@ import FileBrowser (FileBrowseApi, fileBrowseHandler)
 import McpServer (mcpHandler, reapExpiredTasks, supportedProtocolVersions, defaultProtocolVersion, tasksExtensionKey)
 import DeploymentLoader (loadAllAndRegister)
 import Logging (Logger, logInfo, logDebug, logError, logWarn, newLogger)
+import Ledger.Mcp (withLedgerTool)
 import Ledger.Service (newLedgerService, posixClock)
 import Ledger.Store.Config (ResolvedStore (..), describeResolved, resolveStoreConfig)
 import Options (Options (..), buildOpts)
@@ -125,10 +126,11 @@ defaultMain = do
 
   -- The instance ledger's store (OPERATIONAL-LOWERING-SPEC §3.7) is chosen
   -- here, so a misconfiguration stops the service at start. It is opened by
-  -- the first request to the ledger's routes ("Ledger.Service"), not here:
-  -- opening the sqlite default creates a database file under the store
-  -- path, a hosted one on a network filesystem included, and a service no
-  -- one asks for an instance needs none.
+  -- the first request to the ledger's routes or its MCP tool
+  -- ("Ledger.Service"), not here: opening the sqlite default creates a
+  -- database file under the store path, a hosted one on a network
+  -- filesystem included, and a service no one asks for an instance needs
+  -- none.
   resolvedLedger <- case resolveStoreConfig storePath options.ledgerStore of
     Left why -> do
       logError logger "Ledger store misconfigured" [("error", toJSON why)]
@@ -392,18 +394,24 @@ mcpManifestHandler = do
     , "endpoints" .= Aeson.object [ "mcp" .= ("/.mcp" :: Text) ]
     ]
 
+-- | The MCP handler every endpoint serves: 'mcpHandler', with the instance
+-- ledger's own tool registered in front of it ("Ledger.Mcp"), so that the
+-- decision tools' dispatch and the code it calls stay as they were.
+mcp :: Visibility -> Maybe Text -> Aeson.Value -> AppM Aeson.Value
+mcp = withLedgerTool mcpHandler
+
 -- | POST /.mcp — org-wide MCP JSON-RPC endpoint (no deployment scope).
 -- GET /.mcp returns 405 per MCP Streamable HTTP spec (POST-only).
 mcpRootHandler :: Visibility -> ServerT McpApi AppM
-mcpRootHandler vis = mcpHandler vis Nothing :<|> throwError err405
+mcpRootHandler vis = mcp vis Nothing :<|> throwError err405
 
 -- | POST /{deploymentId}/.mcp — deployment-scoped MCP JSON-RPC endpoint.
 mcpScopedHandler :: Visibility -> ServerT McpScopedApi AppM
-mcpScopedHandler vis deployIdText = mcpHandler vis (Just deployIdText) :<|> throwError err405
+mcpScopedHandler vis deployIdText = mcp vis (Just deployIdText) :<|> throwError err405
 
 -- | POST /deployments/{deploymentId}/.mcp — deployment-scoped MCP JSON-RPC endpoint (long route).
 mcpScopedLongHandler :: Visibility -> ServerT McpScopedLongApi AppM
-mcpScopedLongHandler vis deployIdText = mcpHandler vis (Just deployIdText) :<|> throwError err405
+mcpScopedLongHandler vis deployIdText = mcp vis (Just deployIdText) :<|> throwError err405
 
 -- | Middleware: serve raw .l4 files for paths like /{id}/path/to/file.l4
 -- or /deployments/{id}/path/to/file.l4. Responds with plain text.

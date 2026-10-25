@@ -42,10 +42,12 @@ module Ledger
     -- * The contract a deployment runs (exported for tests)
   , ledgerDeployment
   , validInstanceId
-    -- * Replies
+    -- * Shared with the MCP tool ("Ledger.Mcp")
   , LedgerReply (..)
   , resolveDeployment
+  , instanceFor
   , ledgerOf
+  , ledgerOver
   , runLimited
   , rowJson
   , resultReply
@@ -207,7 +209,7 @@ positionHandler deployIdText instanceIdText = do
     positionReply inst now <$> positionOf (ledgerOf ldg o) inst
   answer reply
 
--- | The position, as the route says it: advisory,
+-- | The position, as the route and the MCP tool both say it: advisory,
 -- stamped with its head (§3.3).
 positionReply :: Instance -> Rational -> Either Result LedgerPosition -> LedgerReply
 positionReply inst now = \ case
@@ -308,8 +310,14 @@ ledgerDeployment deployIdText version sources = do
 
 -- | The ledger over an opened store.
 ledgerOf :: LedgerService -> OpenedStore -> Ledger
-ledgerOf ldg o = MkLedger
-  { store = o.store
+ledgerOf ldg o = ledgerOver ldg o.store
+
+-- | The ledger over any store: the service's clock, configuration and
+-- limits with these rows. The MCP tool's preview runs it over a scratch
+-- copy of an instance's rows ("Ledger.Mcp").
+ledgerOver :: LedgerService -> LedgerStore -> Ledger
+ledgerOver ldg st = MkLedger
+  { store = st
   , clock = ldg.clock
   , evalConfig = ldg.evalConfig
   , timeBound = ldg.timeoutSec * 1_000_000

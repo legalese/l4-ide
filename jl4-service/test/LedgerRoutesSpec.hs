@@ -9,7 +9,31 @@
 -- dinner fixture's clock) are not the service's own clock, whole seconds
 -- since the Unix epoch, and what one unit of a contract's time is, and
 -- where its start sits against wall time, is D-O8 and open.
-module LedgerRoutesSpec (spec) where
+module LedgerRoutesSpec
+  ( spec
+    -- * For the MCP tool's spec
+  , Service (..)
+  , LedgerChoice (..)
+  , withService
+  , withServiceUsing
+  , loadDinnerBundle
+  , at
+  , request
+  , requestWith
+  , create
+  , propose
+  , proposeWith
+  , position
+  , field
+  , texts
+  , int
+  , str
+  , check
+  , bobBuys
+  , buy
+  , commitsDinner
+  , dinnersAtHead
+  ) where
 
 import Control.Concurrent.MVar (readMVar)
 import Control.Concurrent.STM (newTVarIO)
@@ -29,7 +53,7 @@ import qualified Data.Text.Encoding as Text.Encoding
 import qualified Data.Text.IO as Text.IO
 import Network.HTTP.Client
 import Network.HTTP.Client.MultipartFormData (formDataBody, partBS, partFileRequestBody)
-import Network.HTTP.Types (statusCode)
+import Network.HTTP.Types (Header, statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import Options.Applicative (defaultPrefs, execParserPure, getParseResult)
 import System.Directory (doesFileExist, getCurrentDirectory)
@@ -41,7 +65,7 @@ import qualified BundleStore
 import Compiler (compileBundle, computeVersion)
 import Ledger (ledgerDeployment, validInstanceId)
 import Ledger.Service
-import Ledger.Store.Config (OpenedStore (..), resolveStoreConfig)
+import Ledger.Store.Config (OpenedStore (..), ResolvedStore, resolveStoreConfig)
 import Ledger.Store.Sqlite (ledgerFileName)
 import Logging (newLogger)
 import Options (Options (..), buildOpts)
@@ -92,9 +116,16 @@ data Service = MkService
 withService :: FilePath -> IORef Rational -> [(Text, Map FilePath Text)] -> (Service -> IO a) -> IO a
 withService = withServiceArgs []
 
+-- | Which ledger the service runs: the one its options choose, none, or
+-- one over a store of the test's choosing.
+data LedgerChoice = DefaultLedger | NoLedger | LedgerAt ResolvedStore
+
 -- | 'withService' with more options than the store path.
 withServiceArgs :: [String] -> FilePath -> IORef Rational -> [(Text, Map FilePath Text)] -> (Service -> IO a) -> IO a
-withServiceArgs args dir clockRef deployments act = do
+withServiceArgs = withServiceUsing DefaultLedger
+
+withServiceUsing :: LedgerChoice -> [String] -> FilePath -> IORef Rational -> [(Text, Map FilePath Text)] -> (Service -> IO a) -> IO a
+withServiceUsing choice args dir clockRef deployments act = do
   info <- buildOpts
   opts <- maybe (fail "the options did not parse") pure
     (getParseResult (execParserPure defaultPrefs info (["--store-path", dir] <> args)))
@@ -105,13 +136,17 @@ withServiceArgs args dir clockRef deployments act = do
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  resolved <- either (fail . Text.unpack) pure (resolveStoreConfig opts.storePath opts.ledgerStore)
-  ldg <- newLedgerService opts resolved (readIORef clockRef)
-  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots (Just ldg)
+  mLedger <- case choice of
+    NoLedger -> pure Nothing
+    LedgerAt resolved -> Just <$> newLedgerService opts resolved (readIORef clockRef)
+    DefaultLedger -> do
+      resolved <- either (fail . Text.unpack) pure (resolveStoreConfig opts.storePath opts.ledgerStore)
+      Just <$> newLedgerService opts resolved (readIORef clockRef)
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots mLedger
   mgr <- newManager defaultManagerSettings {managerResponseTimeout = responseTimeoutMicro 300_000_000}
   r <- testWithApplication (pure (app env)) \ port ->
     act MkService {baseUrl = "http://localhost:" <> show port, manager = mgr, options = opts, clockRef = clockRef}
-  readMVar ldg.opened >>= traverse_' (.close)
+  for_ mLedger \ ldg -> readMVar ldg.opened >>= traverse_' (.close)
   pure r
   where
     traverse_' f = maybe (pure ()) f
@@ -135,12 +170,16 @@ at s t act = writeIORef s.clockRef t >> act
 
 -- | A JSON request, and the status and JSON body of its reply.
 request :: Service -> String -> String -> Maybe Aeson.Value -> IO (Int, Aeson.Value)
-request s verb path mbody = do
+request s = requestWith s []
+
+-- | 'request' with more headers.
+requestWith :: Service -> [Header] -> String -> String -> Maybe Aeson.Value -> IO (Int, Aeson.Value)
+requestWith s headers verb path mbody = do
   req0 <- parseRequest (s.baseUrl <> path)
   let req = req0
         { method = Text.Encoding.encodeUtf8 (Text.pack verb)
         , requestBody = maybe mempty (RequestBodyLBS . Aeson.encode) mbody
-        , requestHeaders = [("Content-Type", "application/json")]
+        , requestHeaders = ("Content-Type", "application/json") : headers
         }
   resp <- httpLbs req s.manager
   pure (statusCode (responseStatus resp), maybe Aeson.Null id (Aeson.decode (responseBody resp)))
