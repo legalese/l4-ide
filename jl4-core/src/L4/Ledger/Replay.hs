@@ -19,7 +19,7 @@
 --
 -- The classification is "L4.Lts.WhatIf"'s, not a second one: 'classify' on
 -- the replay's result, the act's own steps found by 'afterCommonPrefix',
--- pass-over by 'confirmProposed'. What this
+-- pass-over by 'confirmProposed', a tick held to 'confirmTick'. What this
 -- module does NOT do is 'tryCandidate': that replays a candidate's own
 -- hypothetical, with the engine's witness for a binder and the last
 -- event's stamp, where the ledger must replay the act as sent, at the
@@ -164,14 +164,15 @@ replay cfg bound dep rows mextra =
         case rowVerdictOf headVerdict of
           Left why -> pure (Left (Undecided why))
           Right headRowVerdict -> do
-            mout <- for mextra \ _ -> position c.rigFull c.fullTrace >>= \ case
+            mout <- for mextra \ (ev, t) -> position c.rigFull c.fullTrace >>= \ case
               Nothing -> pure (Left (Undecided "the replay with the event produced no result"))
               Just after -> do
                 let caused = afterCommonPrefix pos.posSteps after.posSteps
                     raw = classify (contextOf after.posSteps) after.posResult
-                    judged
-                      | terminal && not (eventTaken caused) = PassedOver NoTaker
-                      | otherwise = confirmProposed caused raw
+                    judged = case ev of
+                      TickEvent -> confirmTick (TickPast (tickDeadline deadlines t) []) (Tick t) caused raw
+                      _ | terminal && not (eventTaken caused) -> PassedOver NoTaker
+                        | otherwise -> confirmProposed caused raw
                 pure case rowVerdictOf judged of
                   Left why -> Left (Undecided why)
                   Right v -> Right MkEventOutcome
@@ -192,6 +193,8 @@ replay cfg bound dep rows mextra =
                 , headDeadlines = deadlines
                 , outcome = out
                 })
+    -- the deadline a tick at t passes: the latest one below it
+    tickDeadline ds t = maybe t fst (listToMaybe (reverse [ x | x@(d, _) <- ds, d < t ]))
 
 -- | The enabled set at the rows' head: the what-may-I-do-now answer of
 -- §3.3, which is "L4.Lts.WhatIf"'s 'enabledSet' over the rows. Advisory:

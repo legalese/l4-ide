@@ -1,6 +1,6 @@
--- | The instance ledger of OPERATIONAL-LOWERING-SPEC, work package WPO0:
--- the pure ledger (rows, the store interface and its in-memory store,
--- 'appendIf', the position query).
+-- | The instance ledger of OPERATIONAL-LOWERING-SPEC, work packages WPO0
+-- (the pure ledger: rows, the store interface and its in-memory store,
+-- 'appendIf', the position query) and WPO1 (time: the clock, ticks).
 --
 -- The conformance fixture is the brief's own
 -- @jl4/examples/explore/brief/d3-atomic.l4@, read from the tree, and the
@@ -29,12 +29,15 @@ import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck hiding (Result, replay)
 
 import L4.EvaluateLazy (resolveEvalConfig)
+import L4.EvaluateLazy.DeonticStep (DeonticStep (..), StepOutcome (..))
 import L4.Ledger.Append
 import L4.Ledger.Replay
 import L4.Ledger.Row
 import L4.Ledger.Store
-import L4.Lts.WhatIf (Candidate (..), CandidateKind (..), Outcome (..), discharging)
+import L4.Lts.WhatIf (Candidate (..), CandidateKind (..), Hypothetical (..), Outcome (..), discharging, hypotheticalExpr)
+import L4.Syntax (Expr (..), Lit (..), getUnique)
 import L4.TracePolicy (apiDefaultPolicy)
+import qualified L4.TypeCheck as TypeCheck
 
 spec :: Spec
 spec = do
@@ -44,6 +47,7 @@ spec = do
   dinnerSpec deps
   strictSpec deps
   positionSpec deps
+  timeSpec deps
 
 ----------------------------------------------------------------------------
 -- Fixtures
@@ -326,7 +330,7 @@ dinnerSpec deps = describe "appendIf on d3-atomic.l4" do
     pos <- positionNow env inst
     officialCount "dinners bought" pos.ledgerAtHead `shouldBe` 0
 
-  it "Sequence B (§6): the buy is row 3 and commits the dinner, and Bob's purchase is row 4" do
+  it "Sequence B (§6): the buy is row 3 and commits the dinner, Bob's purchase is row 4, and the evening closes FULFILLED with one dinner" do
     env <- newEnv
     let inst = MkInstance deps.dinner "B"
     rs <- history env inst
@@ -341,8 +345,17 @@ dinnerSpec deps = describe "appendIf on d3-atomic.l4" do
         recordsTaken r4 `shouldBe` True
         commitsDinner r4 `shouldBe` False
       _ -> expectationFailure "three appends"
+    ticked <- atClock env 75700 (appendDueTicks env.ledgerOf inst)
+    case ticked of
+      Right [t] -> do
+        t.seqNo `shouldBe` 5
+        t.event `shouldBe` TickEvent
+        t.at `shouldBe` 75601
+        t.txTime `shouldBe` 75700
+        t.verdict `shouldBe` VDischarging
+      other -> expectationFailure ("one tick, got " <> show other)
     pos <- positionNow env inst
-    pos.terminal `shouldBe` False
+    pos.terminal `shouldBe` True
     officialCount "dinners bought" pos.ledgerAtHead `shouldBe` 1
 
   it "is bitemporal (§3.4, R-O1): a reported act's claimed time is clamped, a committing act takes txTime, and txTime never decreases" do
@@ -501,3 +514,57 @@ positionSpec deps = describe "the position query" do
     pos.nextDeadline `shouldBe` Just 75600
     pos.terminal `shouldBe` False
     [ () | o <- discharging pos.enabled, TickPast 75600 _ <- [o.ocCandidate.cdKind] ] `shouldBe` [()]
+
+----------------------------------------------------------------------------
+-- Time: ticks from the marking's next deadline (WPO1)
+----------------------------------------------------------------------------
+
+timeSpec :: Deps -> Spec
+timeSpec deps = describe "ticks (WPO1)" do
+  it "a deadline that expires with no act yields a tick row, and the replay shows Expired" do
+    env <- newEnv
+    let inst = MkInstance deps.dinner "tick"
+        l = env.ledgerOf
+    _ <- history env inst [(65100, proposal "t2" check)]
+    -- nothing is due while the clock is short of the deadline, or on it
+    atClock env 75600 (appendDueTicks l inst) >>= \ r -> either (const []) (map (.seqNo)) r `shouldBe` []
+    ticked <- atClock env 75700 (appendDueTicks l inst)
+    case ticked of
+      Right [t] -> (t.seqNo, t.at, t.verdict) `shouldBe` (3, 75601, VDischarging)
+      other -> expectationFailure ("one tick, got " <> show other)
+    rows <- rowsOf env inst
+    rep <- replay l.evalConfig l.timeBound deps.dinner rows Nothing
+    case rep of
+      Right r -> any (\ s -> case s.dsOutcome of Expired _ _ -> True; _ -> False) r.headSteps `shouldBe` True
+      Left f -> expectationFailure (show f)
+    -- the instance is FULFILLED, so no deadline is left and nothing more is due
+    atClock env 75800 (appendDueTicks l inst) >>= \ r -> either (const [-1]) (map (.seqNo)) r `shouldBe` []
+
+  it "a tick row lifts to the WAIT UNTIL that the what-if builds for a tick (D-O3)" do
+    eventLine TickEvent 75601 `shouldBe` Right "(`WAIT UNTIL` 75601)"
+    case liftEvents deps.dinner [(OpeningEvent "`the arrangement`", 64800), (ActEvent "World" check, 65100), (TickEvent, 75601)] of
+      Right [_, lifted] -> sameTick lifted (hypotheticalExpr (Tick 75601)) `shouldBe` True
+      other -> expectationFailure ("two events, got " <> either show (show . length) other)
+
+  it "appends a due tick before the act proposed after it; the act on a FULFILLED instance is passed over" do
+    env <- newEnv
+    let inst = MkInstance deps.dinner "late act"
+    _ <- history env inst [(65100, proposal "t2" check)]
+    r <- atClock env 75700 (appendIf env.ledgerOf inst (proposal "t4" done)) >>= appended
+    map (\ t -> (t.seqNo, t.at, t.verdict)) r.ticks `shouldBe` [(3, 75601, VDischarging)]
+    (r.row.seqNo, r.row.at, r.row.verdict) `shouldBe` (4, 75700, VPassedOver "no obligation in force took it")
+
+  it "offers no tick on a fresh instance, whose deadline's anchor no act has forced yet (measured); the late act reveals the expiry itself" do
+    env <- newEnv
+    let inst = MkInstance deps.dinner "fresh"
+    _ <- history env inst []
+    atClock env 75700 (appendDueTicks env.ledgerOf inst) >>= \ r -> either (const [-1]) (map (.seqNo)) r `shouldBe` []
+    r <- atClock env 75700 (appendIf env.ledgerOf inst (proposal "f2" check)) >>= appended
+    (r.row.seqNo, r.row.at, r.row.verdict) `shouldBe` (2, 75700, VDischarging)
+    any (\ s -> case s.dsOutcome of Expired _ _ -> True; _ -> False) r.steps `shouldBe` True
+
+  where
+    sameTick a b = case (a, b) of
+      (App _ f [Lit _ (NumericLit _ x)], App _ g [Lit _ (NumericLit _ y)]) ->
+        getUnique f == TypeCheck.waitUntilUnique && getUnique g == TypeCheck.waitUntilUnique && x == y
+      _ -> False
