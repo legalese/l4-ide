@@ -28,13 +28,16 @@ module Ledger.Store.Config
   ) where
 
 import Data.Char (toLower)
+import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.FilePath ((</>))
 
-import L4.Ledger.Store (LedgerStore, newMemoryStore)
+import L4.Ledger.Row (InstanceKey (..))
+import L4.Ledger.Store (LedgerStore (..), newMemoryStore)
 import Ledger.Store.Postgres (openPostgresStore, postgresBuilt)
-import Ledger.Store.Sqlite (ledgerFileName, openSqliteStore)
+import Ledger.Store.Sqlite (ledgerFileName, openSqliteLedger)
 
 data StoreChoice
   = ChooseSqlite
@@ -98,12 +101,16 @@ describeResolved = \ case
 
 -- | An open store, and what a reply from the ledger must say about it.
 data OpenedStore = MkOpenedStore
-  { store      :: !LedgerStore
-  , backend    :: !Text
-  , nonDurable :: !(Maybe Text)
+  { store       :: !LedgerStore
+  , backend     :: !Text
+  , nonDurable  :: !(Maybe Text)
     -- ^ 'Just' the sentence every reply from this store carries; 'Nothing'
     -- for a durable store
-  , close      :: !(IO ())
+  , instancesOf :: !(Text -> IO [Text])
+    -- ^ the names of the instances the store holds for a deployment. Not a
+    -- third operation of the store: an append never asks it. The service
+    -- asks it before deleting or overwriting a deployment (R-O5)
+  , close       :: !(IO ())
   }
 
 -- | The sentence the in-memory store's replies carry.
@@ -113,11 +120,21 @@ nonDurableWarning = "This ledger store is in memory and is not durable: every in
 openLedgerStore :: ResolvedStore -> IO (Either Text OpenedStore)
 openLedgerStore = \ case
   SqliteAt dir -> do
-    (s, close') <- openSqliteStore dir
-    pure (Right MkOpenedStore {store = s, backend = "sqlite", nonDurable = Nothing, close = close'})
+    (s, names, close') <- openSqliteLedger dir
+    pure (Right MkOpenedStore {store = s, backend = "sqlite", nonDurable = Nothing, instancesOf = names, close = close'})
   PostgresAt url -> openPostgresStore url >>= \ case
     Left why -> pure (Left why)
-    Right (s, close') -> pure (Right MkOpenedStore {store = s, backend = "postgres", nonDurable = Nothing, close = close'})
+    Right (s, names, close') -> pure (Right MkOpenedStore {store = s, backend = "postgres", nonDurable = Nothing, instancesOf = names, close = close'})
   MemoryForTests -> do
     s <- newMemoryStore
-    pure (Right MkOpenedStore {store = s, backend = "memory", nonDurable = Just nonDurableWarning, close = pure ()})
+    -- the in-memory store cannot list what it holds, so the keys it has
+    -- appended to are kept beside it
+    held <- newIORef (Set.empty :: Set.Set InstanceKey)
+    let s' = MkLedgerStore
+          { readRows = s.readRows
+          , appendRow = \ k n row -> s.appendRow k n row >>= \ case
+              Right () -> atomicModifyIORef' held (\ ks -> (Set.insert k ks, Right ()))
+              Left current -> pure (Left current)
+          }
+        names d = (\ ks -> [ k.instanceName | k <- Set.toAscList ks, k.deployment == d ]) <$> readIORef held
+    pure (Right MkOpenedStore {store = s', backend = "memory", nonDurable = Just nonDurableWarning, instancesOf = names, close = pure ()})

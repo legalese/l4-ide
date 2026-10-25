@@ -9,6 +9,7 @@ import FileBrowser (FileBrowseApi, fileBrowseHandler)
 import McpServer (mcpHandler, reapExpiredTasks, supportedProtocolVersions, defaultProtocolVersion, tasksExtensionKey)
 import DeploymentLoader (loadAllAndRegister)
 import Logging (Logger, logInfo, logDebug, logError, logWarn, newLogger)
+import Ledger.Service (newLedgerService, posixClock)
 import Ledger.Store.Config (ResolvedStore (..), describeResolved, resolveStoreConfig)
 import Options (Options (..), buildOpts)
 import OpenApiDoc (buildOpenApiDoc)
@@ -105,6 +106,7 @@ defaultMain = do
     , ("maxCompileMemoryMb", toJSON options.maxCompileMemoryMb)
     , ("evalTimeout", toJSON options.evalTimeout)
     , ("compileTimeout", toJSON options.compileTimeout)
+    , ("ledgerMaxEvalMemoryMb", toJSON options.ledgerMaxEvalMemoryMb)
     ]
 
   -- A deployment's IMPORTs resolve against its own files and the stdlib built
@@ -122,18 +124,20 @@ defaultMain = do
   BundleStore.cleanupStore logger store
 
   -- The instance ledger's store (OPERATIONAL-LOWERING-SPEC §3.7) is chosen
-  -- here, so a misconfiguration stops the service at start. It is not opened
-  -- yet: nothing reads it until the ledger's routes land (WPO3), and opening
-  -- the sqlite default here would put a database file under every store
-  -- path, a hosted one on a network filesystem included, before anything
-  -- used it.
-  case resolveStoreConfig storePath options.ledgerStore of
+  -- here, so a misconfiguration stops the service at start. It is opened by
+  -- the first request to the ledger's routes ("Ledger.Service"), not here:
+  -- opening the sqlite default creates a database file under the store
+  -- path, a hosted one on a network filesystem included, and a service no
+  -- one asks for an instance needs none.
+  resolvedLedger <- case resolveStoreConfig storePath options.ledgerStore of
     Left why -> do
       logError logger "Ledger store misconfigured" [("error", toJSON why)]
       exitFailure
-    Right resolved ->
+    Right resolved -> do
       (if resolved == MemoryForTests then logWarn else logInfo) logger "Ledger store selected"
         [("store", toJSON (describeResolved resolved))]
+      pure resolved
+  ledgerService <- newLedgerService options resolvedLedger posixClock
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
@@ -141,7 +145,7 @@ defaultMain = do
   let effectiveServerName = case options.serverName of
         Just s  -> Just s
         Nothing -> Just ("http://localhost:" <> Text.pack (show options.port))
-      env = MkAppEnv registry pendingUpd store effectiveServerName logger options tasksReg slots
+      env = MkAppEnv registry pendingUpd store effectiveServerName logger options tasksReg slots (Just ledgerService)
 
   -- Fork a background sweeper that drops MCP tasks past their TTL.
   -- 30s tick is fine: tasks are 1h TTL by default.
@@ -259,7 +263,7 @@ app env req sendResp = do
       -- Override serverName with X-L4-Origin header if present (set by auth proxy).
       -- This allows the OpenAPI spec to reflect the org's external URL.
       reqEnv = case lookup "X-L4-Origin" (requestHeaders req) of
-        Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks env.batchSlots
+        Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks env.batchSlots env.ledger
         Nothing     -> env
   serve (Proxy @ServiceApi) (serverT reqEnv vis) req sendResp
 

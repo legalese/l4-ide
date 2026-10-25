@@ -72,6 +72,8 @@ library
     EvalLimits
     FileBrowser
     ExplorerPage
+    Ledger
+    Ledger.Service
     Ledger.Store.Config
     Ledger.Store.Postgres
     Ledger.Store.Sql
@@ -159,6 +161,7 @@ test-suite jl4-service-test
     DecisionQueryCacheKeySpec
     DeploymentIdSpec
     IntegrationSpec
+    LedgerRoutesSpec
     LedgerStoreSpec
     LoggingSpec
     MaybeLiftSpec

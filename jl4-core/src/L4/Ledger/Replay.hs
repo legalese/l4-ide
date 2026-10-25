@@ -54,6 +54,7 @@ import L4.EvaluateLazy (EvalConfig, EvalDirectiveResult (..), execEvalModuleWith
 import L4.EvaluateLazy.DeonticStep (DeonticStep)
 import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..), extractImportNames)
 import L4.Ledger.Row
+import L4.Lts.List (TraceReport, reportFrom)
 import L4.Lts.Marking (Blame (..), contextOf)
 import L4.Lts.WhatIf
 import L4.Print (prettyLayout)
@@ -199,7 +200,11 @@ replay cfg bound dep rows mextra =
 -- | The enabled set at the rows' head: the what-may-I-do-now answer of
 -- §3.3, which is "L4.Lts.WhatIf"'s 'enabledSet' over the rows. Advisory:
 -- it is computed outside any critical section.
-positionAt :: EvalConfig -> Int -> Deployment -> [Row] -> IO (Either Failure EnabledSet)
+--
+-- With it, the same answer as "L4.Lts.List" words it for @l4 lts@
+-- ('reportFrom' on the rows' own @#TRACE@), so that a caller that shows
+-- the position to a reader does not write a third renderer of it.
+positionAt :: EvalConfig -> Int -> Deployment -> [Row] -> IO (Either Failure (EnabledSet, TraceReport))
 positionAt cfg bound dep rows =
   boundedLazy bound case check cfg dep (map rowEventAt rows) Nothing of
     Left f -> pure (Left f)
@@ -207,7 +212,7 @@ positionAt cfg bound dep rows =
       Left f -> pure (Left f)
       Right c -> enabledSet c.rigRows c.rowsTrace >>= \ case
         Nothing -> pure (Left (Undecided "the replay of the rows produced no result"))
-        Just es -> pure (Right es)
+        Just es -> pure (Right (es, reportFrom c.rowsTrace es))
 
 -- | The rows' events as the type checker resolved them: the @#TRACE@'s
 -- event expressions, in order (the opening is the directive itself, not an

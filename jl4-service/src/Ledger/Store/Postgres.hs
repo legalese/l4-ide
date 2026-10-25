@@ -92,9 +92,10 @@ postgresBuilt = True
 postgresBuilt = False
 #endif
 
--- | Connect, create the table if absent, and give the store and how to
--- close it; or say why not.
-openPostgresStore :: Text -> IO (Either Text (LedgerStore, IO ()))
+-- | Connect, create the table if absent, and give the store, the
+-- deployment's instances ('sqlInstances') and how to close it; or say why
+-- not.
+openPostgresStore :: Text -> IO (Either Text (LedgerStore, Text -> IO [Text], IO ()))
 #ifdef LEDGER_POSTGRES
 openPostgresStore url = classified (PG.connectPostgreSQL (Text.Encoding.encodeUtf8 url)) >>= \ case
   Left f -> pure (Left ("could not connect to the ledger's Postgres: " <> failureText f))
@@ -121,6 +122,7 @@ openPostgresStore url = classified (PG.connectPostgreSQL (Text.Encoding.encodeUt
       mapM_ (\ statement -> retryTransient "create the ledger table" (session.execute statement [])) postgresDdl
       pure
         ( sqlStore session
+        , sqlInstances session
         , modifyMVar_ lock \ case
             Nothing -> pure Nothing
             Just c -> PG.close c >> pure Nothing

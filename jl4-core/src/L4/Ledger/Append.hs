@@ -44,6 +44,7 @@ import L4.EvaluateLazy.DeonticStep (DeonticStep)
 import L4.Ledger.Replay
 import L4.Ledger.Row
 import L4.Ledger.Store
+import L4.Lts.List (TraceReport)
 import L4.Lts.WhatIf (EnabledSet)
 
 -- | The ledger: a store, the clock it stamps rows by, and the evaluator's
@@ -321,6 +322,8 @@ dueTicks l inst rows0 now = go (16 :: Int) rows0 []
 data LedgerPosition = MkLedgerPosition
   { headSeq      :: !SeqNo
   , enabled      :: !EnabledSet
+  , report       :: !TraceReport
+    -- ^ the same position in the words @l4 lts@ prints ("L4.Lts.List")
   , nextDeadline :: !(Maybe Rational)
   , terminal     :: !Bool
   , ledgerAtHead :: ![Text]
@@ -337,9 +340,10 @@ positionOf l inst = l.store.readRows (instanceKey inst) >>= \ case
     pure case (rep, es) of
       (Left f, _) -> Left (Unknown (failureText f))
       (_, Left f) -> Left (Unknown (failureText f))
-      (Right r, Right e) -> Right MkLedgerPosition
+      (Right r, Right (e, rp)) -> Right MkLedgerPosition
         { headSeq = length rows
         , enabled = e
+        , report = rp
         , nextDeadline = fst <$> listToMaybe r.headDeadlines
         , terminal = r.headTerminal
         , ledgerAtHead = r.headLedger

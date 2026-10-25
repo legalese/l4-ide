@@ -124,6 +124,10 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 
 `POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. Terminal jobs are retained for 10 minutes, then pruned.
 
+While the [instance ledger](#instance-ledger) holds instances of a deployment, `DELETE` and an overwriting `POST` are refused with `409`, naming the instances, and with `503` when the ledger's store cannot say whether it holds any.
+A `POST` of the same bytes is no overwrite and is still answered `ready`.
+`PUT` is not refused: it changes the rule the instances replay against, which is open (OPERATIONAL-LOWERING-SPEC D-O9).
+
 **An annotation line the compiler ignores is a compile failure here.** `l4 check` and the editor lex an `@name` that is none of the annotations L4 knows as a comment and warn about it, so that a file written for a newer L4 still opens. A deployment is what this service publishes, and a misspelt `@export` is a rule that silently is not, so a deploy (`POST` or `PUT`) of a bundle that holds one is `rejected`, with the file, the line and the column, and the warning's own text, which names the annotation and suggests the known one. The same goes for a known annotation without the form it needs, such as a bare `@lang`. A service older than the file it is given therefore refuses an annotation it cannot honour, and names it. This is what the service always did with such a line, as a lexer error, now with a better message; nothing already stored can hold one, so a restart refuses nothing it accepted before. Each ignored line is also logged at warn level (`Ignored annotation`, with the deployment and the file).
 
 A name that merely begins with a known annotation's is not an ignored line: `@exports` is `@export` followed by the text `s`, and `@descr` is `@desc` followed by `r`, as they always were. The service accepts them, as it did, and does not warn about them; an `@exports` does not publish a function (a bundle whose only `@export` is spelt that way is `applied` with `functions: []`). `l4 check` does not warn about them either.
@@ -159,6 +163,25 @@ Evaluate functions within a deployment. All routes are available in both short f
 | `GET`  | `/deployments/{id}/files/{path}.l4`                    | `/{id}/{path}.l4`                |
 
 Function names with spaces can use hyphens or URL-encoding in the path (e.g., `check-person` or `check%20person` for `check person`).
+
+### Instance Ledger
+
+A deployment whose contract is a regulative rule can run instances of it: an instance is the event history of one `#TRACE` of the contract, kept in the instance ledger's store, and acts are proposed to it one at a time (`specs/proposals/OPERATIONAL-LOWERING-SPEC.md`).
+Long routes only.
+
+| Method | Endpoint                                          | Body                                                                                             | Answer                                                                         |
+| ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `POST` | `/deployments/{id}/instances`                     | `instance`, `contract`                                                                           | `201` and row 1; `409` if the instance exists                                  |
+| `POST` | `/deployments/{id}/instances/{instance}/events`   | `party`, `action`, `idempotencyKey`; optionally `decidedAgainst`, `strict`, `cells`, `claimedAt` | `200` and the row; `409` for a strict proposal whose cell moved; `422` refused |
+| `GET`  | `/deployments/{id}/instances/{instance}/position` |                                                                                                  | `200`: the head, the enabled set in the words of `l4 lts`, the next deadline   |
+
+Every reply is JSON and says whether it `applied` anything.
+`404` is an instance the ledger does not hold: an append or a read never creates one.
+`503` applied nothing: the evaluator could not decide, a limit stopped the request, every one of the ledger's slots was taken, or the store could not be opened.
+A retry with the same `idempotencyKey` is always safe; if the row was written before the reply was lost, the retry reads it back.
+The contract's source is the one `.l4` file of the deployment that no other `.l4` file imports, and a deployment with two such files is refused with `422`.
+The ledger clock is whole seconds since the Unix epoch, and what one unit of a contract's time is against wall time is not decided (D-O8), so a contract written against another unit or epoch runs with every deadline shifted, and nothing says so.
+Each request runs under `--eval-timeout` and the ledger's own allocation limit, `--ledger-max-eval-memory-mb`.
 
 ### File Browsing
 
@@ -653,24 +676,25 @@ The proxy injects these headers to control what jl4-service includes in response
 
 All options can also be set via environment variables. CLI arguments take precedence over environment variables.
 
-| Option                      | Env Var                       | Description                                                                                                                                                                              | Default          |
-| --------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `--port`, `-p`              | `JL4_PORT`                    | HTTP port                                                                                                                                                                                | `8080`           |
-| `--store-path`              | `JL4_STORE_PATH`              | Directory for persisting deployment bundles                                                                                                                                              | `/tmp/jl4-store` |
-| `--server-name`, `-s`       | `JL4_SERVER_NAME`             | Server URL for OpenAPI metadata                                                                                                                                                          | -                |
-| `--lazy-load`               | `JL4_LAZY_LOAD`               | Register deployments as pending on startup; compile on first evaluation/function access (optimistic 2s timeout, returns 202 if still compiling). File browsing always works immediately. | `false`          |
-| `--debug`                   | `JL4_DEBUG`                   | Enable debug mode (verbose errors, debug-level logs)                                                                                                                                     | `false`          |
-| `--max-zip-size`            | `JL4_MAX_ZIP_SIZE`            | Maximum zip upload size in bytes                                                                                                                                                         | `2097152` (2 MB) |
-| `--max-file-count`          | `JL4_MAX_FILE_COUNT`          | Maximum number of files per zip upload                                                                                                                                                   | `5096`           |
-| `--max-deployments`         | `JL4_MAX_DEPLOYMENTS`         | Maximum number of concurrent deployments                                                                                                                                                 | `1024`           |
-| `--max-concurrent-requests` | `JL4_MAX_CONCURRENT_REQUESTS` | Maximum concurrent requests (503 when exceeded)                                                                                                                                          | `20`             |
-| `--max-eval-memory-mb`      | `JL4_MAX_EVAL_MEMORY_MB`      | Per-evaluation allocation limit in MB                                                                                                                                                    | `256`            |
-| `--eval-timeout`            | `JL4_EVAL_TIMEOUT`            | Evaluation timeout in seconds                                                                                                                                                            | `60`             |
-| `--compile-timeout`         | `JL4_COMPILE_TIMEOUT`         | Compilation timeout in seconds                                                                                                                                                           | `60`             |
-| `--max-ladder-nodes`        | `JL4_MAX_LADDER_NODES`        | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                         | `10000`          |
-| `--ledger-store`            | `JL4_LEDGER_STORE`            | Instance-ledger store: `sqlite` (`ledger.sqlite3` under the store path, one process), `postgres` (several processes), `memory` (tests only). Checked at startup; no route reads it yet   | `sqlite`         |
-| `--ledger-postgres-url`     | `JL4_LEDGER_POSTGRES_URL`     | Connection string for `--ledger-store postgres`; needs a binary built with `cabal build -f postgres jl4-service`, and libpq                                                              | -                |
-| `--ledger-allow-nondurable` | `JL4_LEDGER_ALLOW_NONDURABLE` | Allow `--ledger-store memory`, which loses every instance on restart                                                                                                                     | `false`          |
+| Option                        | Env Var                         | Description                                                                                                                                                                              | Default          |
+| ----------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `--port`, `-p`                | `JL4_PORT`                      | HTTP port                                                                                                                                                                                | `8080`           |
+| `--store-path`                | `JL4_STORE_PATH`                | Directory for persisting deployment bundles                                                                                                                                              | `/tmp/jl4-store` |
+| `--server-name`, `-s`         | `JL4_SERVER_NAME`               | Server URL for OpenAPI metadata                                                                                                                                                          | -                |
+| `--lazy-load`                 | `JL4_LAZY_LOAD`                 | Register deployments as pending on startup; compile on first evaluation/function access (optimistic 2s timeout, returns 202 if still compiling). File browsing always works immediately. | `false`          |
+| `--debug`                     | `JL4_DEBUG`                     | Enable debug mode (verbose errors, debug-level logs)                                                                                                                                     | `false`          |
+| `--max-zip-size`              | `JL4_MAX_ZIP_SIZE`              | Maximum zip upload size in bytes                                                                                                                                                         | `2097152` (2 MB) |
+| `--max-file-count`            | `JL4_MAX_FILE_COUNT`            | Maximum number of files per zip upload                                                                                                                                                   | `5096`           |
+| `--max-deployments`           | `JL4_MAX_DEPLOYMENTS`           | Maximum number of concurrent deployments                                                                                                                                                 | `1024`           |
+| `--max-concurrent-requests`   | `JL4_MAX_CONCURRENT_REQUESTS`   | Maximum concurrent requests (503 when exceeded)                                                                                                                                          | `20`             |
+| `--max-eval-memory-mb`        | `JL4_MAX_EVAL_MEMORY_MB`        | Per-evaluation allocation limit in MB                                                                                                                                                    | `256`            |
+| `--eval-timeout`              | `JL4_EVAL_TIMEOUT`              | Evaluation timeout in seconds                                                                                                                                                            | `60`             |
+| `--compile-timeout`           | `JL4_COMPILE_TIMEOUT`           | Compilation timeout in seconds                                                                                                                                                           | `60`             |
+| `--max-ladder-nodes`          | `JL4_MAX_LADDER_NODES`          | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                         | `10000`          |
+| `--ledger-store`              | `JL4_LEDGER_STORE`              | Instance-ledger store: `sqlite` (`ledger.sqlite3` under the store path, one process), `postgres` (several processes), `memory` (tests only). Checked at startup; opened on first use     | `sqlite`         |
+| `--ledger-postgres-url`       | `JL4_LEDGER_POSTGRES_URL`       | Connection string for `--ledger-store postgres`; needs a binary built with `cabal build -f postgres jl4-service`, and libpq                                                              | -                |
+| `--ledger-allow-nondurable`   | `JL4_LEDGER_ALLOW_NONDURABLE`   | Allow `--ledger-store memory`, which loses every instance on restart                                                                                                                     | `false`          |
+| `--ledger-max-eval-memory-mb` | `JL4_LEDGER_MAX_EVAL_MEMORY_MB` | Allocation limit in MB of one instance-ledger request, in place of `--max-eval-memory-mb`: one append re-typechecks its contract and allocated about 2.1 GB on the dinner fixture        | `8192`           |
 
 Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
 
@@ -785,6 +809,9 @@ jl4-service/
     ControlPlane.hs         -- POST/GET/PUT/DELETE /deployments + async deploy/update jobs
     DataPlane.hs            -- /deployments/{id}/functions/... evaluation handlers + short routes
     DeploymentLoader.hs     -- Shared compilation logic (eager startup, lazy compile-on-access)
+    Ledger.hs               -- Instance-ledger routes: /deployments/{id}/instances/...
+    Ledger/Service.hs       -- The ledger as the service holds it: store opened on first use, clock, limits, slots
+    Ledger/Store/           -- The ledger's stores: sqlite (the default), Postgres, in-memory (tests)
     ExplorerPage.hs         -- Landing page HTML (deployment explorer, API docs)
     McpServer.hs            -- MCP JSON-RPC 2.0 handler (tools/list, tools/call)
     Schema.hs               -- OpenAPI spec generation

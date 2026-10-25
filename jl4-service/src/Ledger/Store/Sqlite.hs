@@ -16,6 +16,7 @@ module Ledger.Store.Sqlite
   , sqliteDdl
   , openSqliteSession
   , openSqliteStore
+  , openSqliteLedger
   ) where
 
 import Control.Concurrent.MVar (newMVar, withMVar, modifyMVar_)
@@ -67,10 +68,15 @@ sqliteDdl =
 -- | The store in the given directory (the service's store path), created
 -- with its table if absent, and how to close it.
 openSqliteStore :: FilePath -> IO (LedgerStore, IO ())
-openSqliteStore dir = do
+openSqliteStore dir = (\ (st, _, close) -> (st, close)) <$> openSqliteLedger dir
+
+-- | 'openSqliteStore', with the deployment's instances as well
+-- ('sqlInstances'), on the same connection.
+openSqliteLedger :: FilePath -> IO (LedgerStore, Text -> IO [Text], IO ())
+openSqliteLedger dir = do
   createDirectoryIfMissing True dir
   (session, close) <- openSqliteSession sqliteDdl (dir </> ledgerFileName)
-  pure (sqlStore session, close)
+  pure (sqlStore session, sqlInstances session, close)
 
 -- | A session on one connection to a sqlite file, with the given DDL run
 -- first. The connection is used by one statement at a time, so a

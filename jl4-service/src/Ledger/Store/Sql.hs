@@ -31,6 +31,7 @@ module Ledger.Store.Sql
   , LedgerStoreError (..)
     -- * The store
   , sqlStore
+  , sqlInstances
   , retryTransient
     -- * The statements
   , tableName
@@ -38,6 +39,7 @@ module Ledger.Store.Sql
   , insertIfHeadSql
   , selectRowsSql
   , selectHeadSql
+  , selectInstancesSql
     -- * The row's columns
   , rowValues
   , rowFromValues
@@ -173,6 +175,25 @@ selectRowsSql = Text.unlines
 -- | The instance's head, 0 if it has no rows. Parameters: the key.
 selectHeadSql :: Text
 selectHeadSql = "SELECT COALESCE(MAX(seq), 0) FROM " <> tableName <> " WHERE deployment = ? AND instance = ?"
+
+-- | The names of a deployment's instances, in order. Parameters: the
+-- deployment.
+selectInstancesSql :: Text
+selectInstancesSql = "SELECT DISTINCT instance FROM " <> tableName <> " WHERE deployment = ? ORDER BY instance"
+
+-- | The instances the table holds for a deployment.
+--
+-- This is not part of the store: 'LedgerStore' is the two functions an
+-- append needs and nothing else (§3.7). It is what the service asks before
+-- it deletes or overwrites a deployment (R-O5: a deployment with live
+-- instances refuses a silent delete or overwrite), and a read like any
+-- other, so it takes no lock and holds none.
+sqlInstances :: SqlSession -> Text -> IO [Text]
+sqlInstances s deployment =
+  retryTransient "list the instances" (s.query selectInstancesSql [SqlText deployment]) >>=
+    traverse \ case
+      [SqlText name] -> pure name
+      other -> throwIO (LedgerStoreError ("an instance name read as " <> showT other))
 
 keyValues :: InstanceKey -> [SqlValue]
 keyValues k = [SqlText k.deployment, SqlText k.instanceName]

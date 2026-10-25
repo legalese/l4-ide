@@ -204,6 +204,7 @@ testOpts = Options
   , instanceToken = Nothing
   , maxLadderNodes = 10000
   , ledgerStore = defaultLedgerStoreConfig
+  , ledgerMaxEvalMemoryMb = 8192
   }
 
 withService :: (String -> Manager -> IO a) -> IO a
@@ -214,7 +215,7 @@ withService act = withStoreDir "putguard" \tmpPath -> do
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOpts tasksReg slots Nothing
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) $ \prt -> do
     let baseUrl = "http://localhost:" <> show prt

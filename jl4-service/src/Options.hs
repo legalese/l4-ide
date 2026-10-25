@@ -47,6 +47,15 @@ data Options = Options
   , ledgerStore           :: !LedgerStoreConfig
   -- ^ Which store the instance ledger keeps its rows in
   -- (OPERATIONAL-LOWERING-SPEC §3.7): sqlite under 'storePath' by default.
+  , ledgerMaxEvalMemoryMb :: !Int
+  -- ^ The allocation limit one ledger request evaluates under, in MB, in
+  -- place of 'maxEvalMemoryMb' ('EvalLimits.withThreadLimits' says why it is
+  -- not published). Like that one it counts bytes allocated,
+  -- not memory held. One append to the dinner fixture re-typechecks the
+  -- contract with its imports, twice, and allocated about 2.1 GB (measured
+  -- 2026-10-26), so the 256 MB a decision gets would refuse every append.
+  -- The default is that measurement with room for a longer history and a
+  -- larger contract (D-O10: sized by the first deployment).
   }
 
 -- | Build the CLI parser with environment variable defaults.
@@ -72,6 +81,7 @@ buildOpts = do
     either (\err -> fail ("JL4_LEDGER_STORE: " <> err)) pure (parseStoreChoice raw)
   envLedgerPg   <- lookupEnv "JL4_LEDGER_POSTGRES_URL"
   envLedgerNonDurable <- readEnvBool "JL4_LEDGER_ALLOW_NONDURABLE"
+  envLedgerMem  <- readEnvInt "JL4_LEDGER_MAX_EVAL_MEMORY_MB"
 
   let parser = Options
         <$> option auto
@@ -211,6 +221,15 @@ buildOpts = do
                       <|> pure (maybe False id envLedgerNonDurable)
                     )
             )
+        <*> option auto
+              ( long "ledger-max-eval-memory-mb"
+                  <> metavar "MB"
+                  <> value (maybe 8192 id envLedgerMem)
+                  <> showDefault
+                  <> help
+                       "Maximum memory allocation per instance-ledger request in MB; one append \
+                       \re-typechecks its contract (env: JL4_LEDGER_MAX_EVAL_MEMORY_MB)"
+              )
 
   pure $ info
     (parser <**> helper)
