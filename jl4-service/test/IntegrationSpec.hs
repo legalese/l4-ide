@@ -62,7 +62,7 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -3503,6 +3503,29 @@ spec = describe "integration" do
               Right r -> (what :: String, surface :: String, verdict (Map.lookup "value" r)) `shouldBe` (what, surface, True)
           (what :: String, expected :: String, viaMcp) `shouldBe` (what, expected, viaRest)
           (what, expected, viaBatch) `shouldBe` (what, expected, viaRest)
+
+    -- A party or an action that is a record has fields whose names tools/list
+    -- advertises sanitized (a space becomes a hyphen). The inputs were read back
+    -- under the rule's names; the trace was not, so a client that followed the
+    -- schema sent a record the rule has no field for.
+    it "reads the record fields of a trace under the names the rule has, on MCP" do
+      let spacedId = "deontic-spaced"
+          spacedFn = "Seatbelt Requirement" :: Text
+          happening who what time = Aeson.object ["party" Aeson..= who, "action" Aeson..= (what :: Text), "at" Aeson..= (time :: Int)]
+          alice key = Aeson.object [key Aeson..= ("Alice" :: Text)]
+          traceOf key = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= [happening (alice key) "wear seatbelt" 2, happening (alice key) "drive" 3]] :: [Pair]
+      withServiceFromSources spacedId [("seatbelt.l4", deonticSpacedPartyJL4)] \baseUrl mgr -> do
+        -- the schema is the one the client follows: sanitized, with no space
+        schema <- mcpToolInputSchema baseUrl mgr spacedId spacedFn
+        let advertised = maybe "" (Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode) schema
+        (("full-name" `Text.isInfixOf` advertised), ("full name" `Text.isInfixOf` advertised)) `shouldBe` (True, False)
+        viaRest <- askRest baseUrl mgr spacedId spacedFn ["driver" Aeson..= alice "full name"] (traceOf "full name")
+        viaMcp <- askMcp baseUrl mgr spacedId spacedFn ["driver" Aeson..= alice "full-name"] (traceOf "full-name")
+        viaMcpOwn <- askMcp baseUrl mgr spacedId spacedFn ["driver" Aeson..= alice "full-name"] (traceOf "full name")
+        viaRest `shouldSatisfy` (either (const False) (isFulfilled . Map.lookup "value"))
+        viaMcp `shouldBe` viaRest
+        -- a client that sends the rule's own names is read as well
+        viaMcpOwn `shouldBe` viaRest
 
     -- One case's exception is that case's error. The only way to raise one in a
     -- case now that decimals are read is to make the evaluator do it, so the

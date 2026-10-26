@@ -18,6 +18,7 @@ module TestData (
   deonticShapesJL4,
   deonticLineBreakJL4,
   deonticRecordPartyJL4,
+  deonticSpacedPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
   assumeHelperJL4,
@@ -795,6 +796,31 @@ GIVETH A PROVISION OF Driver, `Driver Action`
                 MAY `drive`
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | 'deonticRecordPartyJL4' with a party whose one field has a space in its
+-- name, which @tools/list@ advertises as @full-name@.
+deonticSpacedPartyJL4 :: Text
+deonticSpacedPartyJL4 =
+  [i|
+DECLARE Driver HAS
+    `full name` IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A DEONTIC Driver `Driver Action`
+`Seatbelt Requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 5
+    HENCE
+        PARTY driver
+        MAY `drive`
+    LEST BREACH
 |]
 
 -- | Three BOOLEAN inputs, one of which the rule never reads. A @{}@ on any of
