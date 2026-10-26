@@ -51,7 +51,6 @@ import qualified Data.UUID as UUID
 import GHC.Generics (Generic)
 import Servant
 import Servant.Multipart
-import System.FilePath (splitDirectories)
 import Control.Exception (SomeException, catch, displayException)
 import Data.Int (Int64)
 import GHC.Conc (setAllocationCounter, enableAllocationLimit)
@@ -581,14 +580,14 @@ validateDeploymentId deployId = do
     throwError err400 { errBody = jsonError "Deployment ID exceeds maximum length of 36 characters" }
   when (Text.isInfixOf ".." deployId) $
     throwError err400 { errBody = jsonError "Deployment ID contains invalid sequence" }
-  when (not $ Text.all isValidIdChar deployId) $
+  when (not (BundleStore.isSafeDeploymentId deployId && Text.all isValidIdChar deployId)) $
     throwError err400 { errBody = jsonError "Deployment ID contains invalid characters (allowed: a-z, A-Z, 0-9, -, _)" }
  where
   isValidIdChar c = isAlphaNum c || c == '-' || c == '_'
 
--- | Check if a zip entry path is safe (no path traversal).
+-- | Check if a zip entry path is safe: relative, and staying inside the bundle.
 isPathSafe :: FilePath -> Bool
-isPathSafe path = ".." `notElem` splitDirectories path
+isPathSafe = BundleStore.isSafeRelativePath
 
 -- | Maximum stored length of the operator-supplied deployment description.
 -- Bounds the downstream system-prompt token budget and the
@@ -660,9 +659,9 @@ extractSourcesFromMultipart multipart = do
             ]
           unsafePaths = [Zip.eRelativePath entry | entry <- entries, not (isPathSafe (Zip.eRelativePath entry))]
 
-      -- Reject if any paths contain ".."
+      -- Reject any entry that is not a safe relative path
       when (not (null unsafePaths)) $
-        throwError $ err400 { errBody = jsonError "Zip entry contains path traversal" }
+        throwError $ err400 { errBody = jsonError "Zip entry path must be relative and stay inside the archive" }
 
       if null l4Entries
         then throwError $ err400 { errBody = jsonError "Zip archive contains no files" }
