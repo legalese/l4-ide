@@ -186,11 +186,14 @@ instance FromJSON FunctionSummary where
     returnType   <- o .: "returnType"  <|> o .: "fsReturnType"
     returnSchema <- o .:? "returnSchema"
     section      <- o .:? "section"    <|> o .:? "fsSection"
-    -- isDeontic is now persisted in the metadata cache. For caches written
-    -- before this field existed, fall back to deriving it from the return
-    -- type (the same signal McpServer uses) so older deployments are still
-    -- correct without waiting for a recompile.
-    isDeontic    <- o .:? "isDeontic" .!= ("DEONTIC" `Text.isPrefixOf` returnType)
+    -- isDeontic is persisted in the metadata cache, from the function's type.
+    -- For caches written before this field existed, fall back to reading it
+    -- from the display name of the return type, so older deployments are
+    -- still right without waiting for a recompile: DEONTIC, or its deprecated
+    -- alias PROVISION OF, which is the same type. A recompile replaces the
+    -- guess with the type's own answer.
+    isDeontic    <- o .:? "isDeontic" .!=
+      (any (`Text.isPrefixOf` returnType) ["DEONTIC", "PROVISION OF"])
     sourceFile   <- o .:? "sourceFile" <|> o .:? "fsSourceFile"
     pure FunctionSummary
       { fsName         = name

@@ -272,6 +272,9 @@ A call or a case with no `startTime`, or no `events`, is refused with the messag
 Over MCP the refusal is an error result (`isError`) whose text is the body of `/evaluation`'s 400, `{"error": "..."}`; in a batch it is an `@error` on that case, and the cases beside it are still answered.
 That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
 The field names inside an event's party or action are used as sent, on all three: unlike an input's, they are not mapped back from the sanitized spelling.
+A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list` and the explorer show it as one.
+Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.
+A function that is not `DEONTIC` and has inputs called `startTime` or `events` reads them as inputs; `/evaluation` used to take such a function for a `DEONTIC` one, because the compiler gives a `DEONTIC` function parameters of those names, and asked it for a trace.
 
 ### Batch Evaluation
 

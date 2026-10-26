@@ -15,7 +15,8 @@ import qualified BundleStore
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
-import DeonticTrace (isDeonticFunction, runDeonticLimited, traceFromJSON)
+import L4.FunctionSchema (Parameters)
+import DeonticTrace (isDeonticFunction, isStrayTraceField, runDeonticLimited, traceFromJSON)
 import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
 import Types
 
@@ -286,7 +287,7 @@ buildToolList vis mScope = do
 
 mcpToolSchema :: FunctionSummary -> Aeson.Value
 mcpToolSchema fn
-  | "DEONTIC" `Text.isPrefixOf` fn.fsReturnType =
+  | fn.fsIsDeontic =
       Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
@@ -455,7 +456,7 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
   env <- ask
   entries <- collectMetadataEntries mScope
   let toolMap = Map.fromList
-        [ (tn, (deployId, fn.fsName, fn.fsParameters, "DEONTIC" `Text.isPrefixOf` fn.fsReturnType))
+        [ (tn, (deployId, fn.fsName, fn.fsParameters, fn.fsIsDeontic))
         | (tn, deployId, fn) <- buildToolNames entries
         ]
 
@@ -472,7 +473,7 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
         , ("tasksRequested", Aeson.toJSON tasksRequested)
         ]
       let reverseMap = buildPropertyReverseMap params
-      let call = buildMcpCall reverseMap isDeontic arguments
+      let call = buildMcpCall reverseMap params isDeontic arguments
 
       let did = DeploymentId deployId
       compResult <- tryCompileWithTimeout did 2_000_000
@@ -502,8 +503,7 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
 --
 -- The trace fields are kept as the client sent them. Whether they are read
 -- depends on the function ('isDeonticFunction'), which a call to a deployment
--- that is still compiling does not have yet, and a call to any other function
--- is answered as it always was, with the fields it carries ignored.
+-- that is still compiling does not have yet.
 data McpCall = McpCall
   { inputs    :: [(Text, Maybe FnLiteral)]
   , startTime :: Maybe Aeson.Value
@@ -512,7 +512,9 @@ data McpCall = McpCall
 
 -- | Split a tools/call invocation into a 'McpCall'.
 -- Splits deontic vs non-deontic arg layout and applies the reverse-mapping
--- from sanitized JSON keys to original L4 identifiers.
+-- from sanitized JSON keys to original L4 identifiers. The flag and the
+-- function's parameters are the ones its tool was listed with
+-- ('FunctionSummary.fsIsDeontic', 'FunctionSummary.fsParameters').
 --
 -- For a DEONTIC tool, @tools/list@ advertises @startTime@ and @events@ twice:
 -- beside @arguments@, and inside it (the function's parameters, which carry
@@ -520,19 +522,19 @@ data McpCall = McpCall
 -- shape the README documents and @/evaluation@ takes, where @startTime@ and
 -- @events@ are siblings of @arguments@; a @null@ is a field left out, so it
 -- does not shadow the other place. Whichever place they came from, they are
--- not inputs, and are not passed on as such.
+-- not inputs, and are not passed on as such. A DEONTIC call with no
+-- @arguments@ object at all is read flat, the inputs and the trace side by
+-- side, which is how a call written for a flat tool arrives.
 --
 -- The trace is not mapped through the reverse map: @/evaluation@ does not map
 -- an event's names, and the three surfaces read a party that is a record alike.
 --
--- Which layout a tool has is decided by its return type's display name
--- ('mcpToolSchema' tests it for the prefix @DEONTIC@), and a function whose
--- return type is written @PROVISION OF …@ does not have it: its tool is flat,
--- the inputs, @startTime@ and @events@ side by side, and so is the call that
--- reads it. Such a function is still replayed against its trace, since that is
--- decided from the function ('isDeonticFunction').
-buildMcpCall :: Map Text Text -> Bool -> Aeson.Value -> McpCall
-buildMcpCall reverseMap isDeontic arguments = case arguments of
+-- A tool that is not DEONTIC is flat, and a @startTime@ or @events@ on it is
+-- a trace unless the function declares an input of that name ('isStrayTraceField'),
+-- in which case it is an input as any other. A stray one is not an input, and is
+-- dropped, as it always was.
+buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> McpCall
+buildMcpCall reverseMap params isDeontic arguments = case arguments of
   Aeson.Object obj
     | isDeontic
     , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->
@@ -541,11 +543,18 @@ buildMcpCall reverseMap isDeontic arguments = case arguments of
           , startTime = present "startTime" obj argsObj
           , events = present "events" obj argsObj
           }
-    | otherwise ->
+    | isDeontic ->
         McpCall
           { inputs = pairs (without ("arguments" : traceKeys) obj)
           , startTime = present "startTime" obj Aeson.KeyMap.empty
           , events = present "events" obj Aeson.KeyMap.empty
+          }
+    | otherwise ->
+        let strays = filter (isStrayTraceField params) traceKeys
+        in McpCall
+          { inputs = pairs (without ("arguments" : strays) obj)
+          , startTime = Nothing
+          , events = Nothing
           }
   _ -> McpCall { inputs = [], startTime = Nothing, events = Nothing }
  where

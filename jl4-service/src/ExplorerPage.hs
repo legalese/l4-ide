@@ -279,7 +279,7 @@ renderExplorerPageBS registry = LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "              h+='<table><thead><tr><th>Name</th><th>Return</th><th>Description</th></tr></thead><tbody>';"
   , "              fns.forEach(function(fn){"
   , "                var rt=(fn.returnType||'').toUpperCase();"
-  , "                var cls=rt==='BOOLEAN'?'tag-bool':rt==='NUMBER'?'tag-num':rt==='STRING'?'tag-str':rt==='DEONTIC'?'tag-deontic':'tag-other';"
+  , "                var cls=fn.isDeontic?'tag-deontic':rt==='BOOLEAN'?'tag-bool':rt==='NUMBER'?'tag-num':rt==='STRING'?'tag-str':'tag-other';"
   , "                h+='<tr><td>'+escH(fn.name)+'</td><td><span class=\\\"tag '+cls+'\\\">'+escH(rt)+'</span></td><td>'+escH(fn.description||'')+'</td></tr>';"
   , "              });"
   , "              h+='</tbody></table>';"
@@ -414,7 +414,7 @@ renderMetaTables meta =
 renderFunctionRow :: FunctionSummary -> Text
 renderFunctionRow fs =
   "          <tr><td>" <> esc fs.fsName
-  <> "</td><td><span class=\"tag " <> tagClass rt <> "\">" <> esc rt <> "</span></td><td>"
+  <> "</td><td><span class=\"tag " <> tagClass fs <> "\">" <> esc rt <> "</span></td><td>"
   <> esc fs.fsDescription <> "</td></tr>"
   where
     rt = Text.toUpper fs.fsReturnType
@@ -426,14 +426,18 @@ renderFileRow fe =
   <> esc (Text.intercalate ", " fe.feExports)
   <> "</td></tr>"
 
--- | Map return type to CSS class.
-tagClass :: Text -> Text
-tagClass rt
+-- | Map a rule's return type to a CSS class. A rule that returns a DEONTIC is
+-- told by its type ('fsIsDeontic'), not by the name its return type is shown
+-- under, which is @PROVISION OF …@ when that is how the rule was written.
+tagClass :: FunctionSummary -> Text
+tagClass fs
+  | fs.fsIsDeontic  = "tag-deontic"
   | rt == "BOOLEAN" = "tag-bool"
   | rt == "NUMBER"  = "tag-num"
   | rt == "STRING"  = "tag-str"
-  | rt == "DEONTIC" = "tag-deontic"
   | otherwise       = "tag-other"
+  where
+    rt = Text.toUpper fs.fsReturnType
 
 -- | HTML-escape text.
 esc :: Text -> Text

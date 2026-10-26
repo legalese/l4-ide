@@ -693,6 +693,36 @@ The existing `timeoutAction` wrapper (configurable `--eval-timeout` and `--max-e
 
 Not in Phase 1. The `/evaluation/batch` endpoint evaluates the same function across multiple input cases. Adding events would mean each batch case could have different event lists, which significantly complicates the request schema. If needed, this can be added later.
 
+**Since 2026-10-26 the service does take a trace per batch case** (`jl4-service/src/DataPlane.hs`, `runDeonticBatchCase`), and MCP `tools/call` and its task path take one too; all three call `DeonticTrace.runDeonticLimited`, the path `/evaluation` takes.
+A case carries its own `startTime` and `events` among its attributes.
+Before this, a batch case and an MCP call to a `DEONTIC` function dropped both fields without an error and answered the contract's initial obligation.
+**Assumed, not ruled:** a case or a call with no `startTime`, or no `events`, is refused with the message `/evaluation` gives, instead of being answered with the initial obligation.
+
+Q6, on the schema the service publishes for the answer of a `DEONTIC` function, was ruled on `unstable` (legalese/l4-ide#756) and reaches this branch with it.
+
+### Q7: Is a function whose return type is written `PROVISION OF` a `DEONTIC` function?
+
+**ANSWERED 2026-10-26 (Meng, in conversation).**
+
+Meng, verbatim: "i'd be in favour of fixing the PROVISION synonym as well. should be easy, right? We can look at the AST?"
+
+**What was true before** (read from the code on `unstable` at `65adfc2de` and on `main` at `e4f2553e0`; the tests added with this ruling run it):
+
+- The compiler tells a `DEONTIC` function by its type: `isDeonticType` (`jl4-service/src/Backend/CodeGen.hs`) compares the type constructor's unique, and `PROVISION` resolves to the same unique (`jl4-core/src/L4/TypeCheck/Environment.hs`, "Deprecated alias for DEONTIC").
+  So a `PROVISION OF` function already got `startTime` and `events` parameters, and `/evaluation` replayed it.
+- Three other tests of "is this `DEONTIC`" disagreed with that.
+  MCP `tools/list` and `tools/call` tested the display name of the return type for the prefix `DEONTIC`, so a `PROVISION OF` function was listed as an ordinary tool with a flat schema.
+  The explorer tested the display name for equality with `DEONTIC`, on the page and in its script.
+  `DeonticTrace.isDeonticFunction` tested for parameters named `startTime` and `events`.
+
+**Ruled:**
+
+1. Every surface asks the type-based flag (`Function.isDeontic`, and `fsIsDeontic` on the summary the metadata cache holds): `/evaluation`, `tools/list`, `tools/call`, the MCP task path, batch and the explorer.
+2. A function that is not `DEONTIC` and has inputs named `startTime` and `events` is an ordinary function.
+   This is a behaviour change: `/evaluation` used to take it for a `DEONTIC` one, because it read the parameter names, and asked it for a trace.
+
+**Assumed, not ruled:** a metadata-cache entry written before the cache held `isDeontic` reads the flag from the display name of the return type, `DEONTIC` or `PROVISION OF`; a recompile replaces that with the type's own answer.
+
 ---
 
 ## Example: Full API Walkthrough

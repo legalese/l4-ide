@@ -12,6 +12,7 @@ import Backend.Api
 import qualified BundleStore
 import BundleStore (initStore)
 import Compiler (compileBundle, computeVersion)
+import ExplorerPage (renderExplorerPageBS)
 import qualified DeploymentLoader
 import qualified Version
 import ControlPlane (DeploymentStatusResponse (..))
@@ -2026,10 +2027,9 @@ spec = describe "integration" do
 
     -- the fixture the REST tests use for a party that is a record: the rule has
     -- inputs of its own, and its function is spelled with a space. It returns
-    -- `PROVISION OF …`, which tools/list does not list as a DEONTIC (it tests the
-    -- return type's display name for that prefix), so its MCP tool is flat, with
-    -- the inputs, startTime and events side by side, and that is the call made
-    -- here.
+    -- `PROVISION OF …`, the deprecated alias of DEONTIC, so its MCP tool has the
+    -- DEONTIC shape (the inputs inside "arguments", the trace beside it); a call
+    -- written flat, the inputs and the trace side by side, is read too.
     it "replays a trace of record-typed parties, for a rule with inputs, on REST, on MCP and in a batch" do
       let recDeploy = "deontic-surfaces-rec"
           recFn = "Seatbelt Requirement" :: Text
@@ -2038,14 +2038,14 @@ spec = describe "integration" do
           alice = Aeson.object ["name" Aeson..= ("Alice" :: Text)]
           act what time = Aeson.object ["party" Aeson..= alice, "action" Aeson..= (what :: Text), "at" Aeson..= (time :: Int)]
       withServiceFromSources recDeploy [("seatbelt.l4", deonticRecordPartyJL4)] \baseUrl mgr -> do
-        let surfacesOfFlatTool pairs = (,,)
+        let surfacesOfTool pairs = (,,)
               <$> askRest baseUrl mgr recDeploy recFn inputs pairs
-              <*> askMcpWith baseUrl mgr recDeploy recFn (Aeson.object (inputs <> pairs))
+              <*> askMcp baseUrl mgr recDeploy recFn inputs pairs
               <*> askBatch baseUrl mgr recDeploy recFn inputs pairs
         (fulfilledRest, fulfilledMcp, fulfilledBatch) <-
-          surfacesOfFlatTool (trace [act "wear seatbelt" 1, act "drive" 2])
+          surfacesOfTool (trace [act "wear seatbelt" 1, act "drive" 2])
         (owingRest, owingMcp, owingBatch) <-
-          surfacesOfFlatTool (trace [act "drive" 1])
+          surfacesOfTool (trace [act "drive" 1])
         for_ [("REST", fulfilledRest), ("MCP", fulfilledMcp), ("batch", fulfilledBatch)] \(surface, answer) ->
           (surface :: String, fmap (Map.lookup "value") answer) `shouldBe` (surface, Right (Just (FnLitString "FULFILLED")))
         for_ [("REST", owingRest), ("MCP", owingMcp), ("batch", owingBatch)] \(surface, answer) ->
@@ -2055,6 +2055,8 @@ spec = describe "integration" do
             other -> expectationFailure (surface <> " did not answer an OBLIGATION: " <> show other)
         owingMcp `shouldBe` owingRest
         owingBatch `shouldBe` owingRest
+        flatMcp <- askMcpWith baseUrl mgr recDeploy recFn (Aeson.object (inputs <> trace [act "drive" 1]))
+        flatMcp `shouldBe` owingRest
 
     -- tools/list advertises startTime and events twice: beside "arguments", and
     -- inside it, where they are among the function's parameters
@@ -2085,67 +2087,116 @@ spec = describe "integration" do
     -- A call made while the deployment is still compiling is answered by a
     -- task, which evaluates once the deployment is ready.
     describe "an MCP task" do
-      let taskCall baseUrl mgr toolArguments = do
-            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
-              [ "jsonrpc" Aeson..= ("2.0" :: Text)
-              , "id" Aeson..= (1 :: Int)
-              , "method" Aeson..= ("tools/call" :: Text)
-              , "params" Aeson..= Aeson.object
-                  [ "name" Aeson..= Text.replace " " "-" fn
-                  , "arguments" Aeson..= toolArguments
-                  , "_meta" Aeson..= Aeson.object [ "io.modelcontextprotocol/tasks" Aeson..= Aeson.object [] ]
-                  ]
-              ]
-            httpLbs req mgr
-          taskIdOf body = do
-            Aeson.Object o <- Aeson.decode body
-            Aeson.Object r <- Aeson.KeyMap.lookup "result" o
-            Aeson.String t <- Aeson.KeyMap.lookup "taskId" r
-            pure t
-          -- poll tasks/get until the task is no longer pending or working
-          finished baseUrl mgr taskId = go (40 :: Int)
-           where
-            go 0 = pure Nothing
-            go n = do
-              req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
-                [ "jsonrpc" Aeson..= ("2.0" :: Text)
-                , "id" Aeson..= (2 :: Int)
-                , "method" Aeson..= ("tasks/get" :: Text)
-                , "params" Aeson..= Aeson.object [ "taskId" Aeson..= (taskId :: Text) ]
-                ]
-              resp <- httpLbs req mgr
-              let status = do
-                    Aeson.Object o <- Aeson.decode (responseBody resp)
-                    Aeson.Object r <- Aeson.KeyMap.lookup "result" o
-                    Aeson.String st <- Aeson.KeyMap.lookup "status" r
-                    pure (st, r)
-              case status of
-                Just (st, r) | st `notElem` ["pending", "working"] -> pure (Just r)
-                _ -> threadDelay 250_000 >> go (n - 1)
-          -- the answer a finished task carries, read as a call's is
-          taskAnswer = \case
-            Just r | Just result <- Aeson.KeyMap.lookup "result" r ->
-              mcpAnswer (Aeson.encode (Aeson.object ["result" Aeson..= result]))
-            other -> Left ("no finished task: " <> Text.pack (show other))
-          -- call while the deployment compiles, then let it finish
-          viaTask baseUrl mgr compiling ready toolArguments = do
-            _ <- compiling
-            handle <- taskCall baseUrl mgr toolArguments
-            taskId <- maybe (expectationFailure "no task handle" >> pure "") pure (taskIdOf (responseBody handle))
-            _ <- ready
-            taskAnswer <$> finished baseUrl mgr taskId
-
       it "replays the trace it was called with" do
         withCompilingService deployId saleSource \compiling ready baseUrl mgr -> do
-          answer <- viaTask baseUrl mgr compiling ready (Aeson.object (noInputs : late))
+          answer <- askMcpTask baseUrl mgr deployId fn compiling ready (Aeson.object (noInputs : late))
           viaRest <- askRest baseUrl mgr deployId fn [] late
           answer `shouldBe` viaRest
           either (const False) (isBreach . Map.lookup "value") answer `shouldBe` True
 
       it "refuses a call that carries no trace" do
         withCompilingService deployId saleSource \compiling ready baseUrl mgr -> do
-          answer <- viaTask baseUrl mgr compiling ready (Aeson.object [noInputs])
+          answer <- askMcpTask baseUrl mgr deployId fn compiling ready (Aeson.object [noInputs])
           answer `shouldBe` Left noStartTime
+
+    -- Meng, 2026-10-26, on the PROVISION synonym: "i'd be in favour of fixing
+    -- the PROVISION synonym as well. should be easy, right? We can look at the
+    -- AST?" PROVISION is the deprecated alias of DEONTIC and the same type, so a
+    -- function that returns it is a DEONTIC on every surface. MCP's tools/list
+    -- and the explorer used to decide that from the name the return type is
+    -- displayed under, and listed it as an ordinary function.
+    describe "a function whose return type is written PROVISION OF" do
+      let provisionId = "deontic-provision"
+          provisionSource = [("contract.l4", Text.replace "GIVETH A DEONTIC Party `Contract Action`" "GIVETH A PROVISION OF Party, `Contract Action`" deonticExportJL4)]
+          withProvision = withServiceFromSources provisionId provisionSource
+          shape = fmap schemaProperties
+          deonticShape = Just ["arguments", "events", "startTime"]
+
+      it "is the sale contract written with the alias, and nothing else" do
+        let written = Text.concat (map snd provisionSource)
+        written `shouldNotBe` deonticExportJL4
+        ("PROVISION OF" `Text.isInfixOf` written, "DEONTIC" `Text.isInfixOf` written) `shouldBe` (True, False)
+
+      it "is listed as a tool with the DEONTIC shape, the one its DEONTIC twin has" do
+        twin <- withSale \baseUrl mgr -> mcpToolInputSchema baseUrl mgr deployId fn
+        provision <- withProvision \baseUrl mgr -> mcpToolInputSchema baseUrl mgr provisionId fn
+        (shape twin, shape provision) `shouldBe` (deonticShape, deonticShape)
+        provision `shouldBe` twin
+
+      it "is tagged as a DEONTIC on the explorer page" do
+        logger <- newLogger False
+        compiled <- compileBundle logger "test" (Map.fromList provisionSource)
+        (fns, meta) <- either (fail . Text.unpack) pure compiled
+        let page = Text.Encoding.decodeUtf8 $ LBS.toStrict $ renderExplorerPageBS $
+              Map.singleton (DeploymentId provisionId) (DeploymentReady fns meta)
+        ("tag tag-deontic" `Text.isInfixOf` page, "tag tag-other" `Text.isInfixOf` page) `shouldBe` (True, False)
+
+      it "answers a trace as its DEONTIC twin does, on REST, on MCP and in a batch" do
+        withSale \baseUrl twinMgr -> withProvision \provisionUrl provisionMgr ->
+          forM_ [(late, isBreach), (payable, owesPayment), (performed, isFulfilled)] \(pairs, verdict) -> do
+            twin <- surfaces baseUrl twinMgr pairs
+            provision <- surfacesFor provisionUrl provisionMgr provisionId fn [] pairs
+            provision `shouldBe` twin
+            let (viaRest, _, _) = provision
+            either (const False) (verdict . Map.lookup "value") viaRest `shouldBe` True
+
+      -- the flag is part of what the metadata cache holds, so a deployment that
+      -- is listed from the cache, and one that comes back after a restart, are
+      -- still a DEONTIC
+      it "is still a DEONTIC after the service restarts" do
+        let probe baseUrl mgr did = (,)
+              <$> mcpToolInputSchema baseUrl mgr did fn
+              <*> surfacesFor baseUrl mgr did fn [] late
+        (fresh, restarted) <- beforeAndAfterRestart "deontic-provision-restart" provisionSource probe
+        restarted `shouldBe` fresh
+        let (schema, (viaRest, viaMcp, viaBatch)) = restarted
+        shape schema `shouldBe` deonticShape
+        for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+          (surface :: String, either (const False) (isBreach . Map.lookup "value") answer) `shouldBe` (surface, True)
+
+      it "is listed as a DEONTIC from the metadata cache while its deployment compiles" do
+        withCompilingService provisionId provisionSource \compiling _ready baseUrl mgr -> do
+          compiling
+          schema <- mcpToolInputSchema baseUrl mgr provisionId fn
+          shape schema `shouldBe` deonticShape
+
+      it "is replayed against its trace by a task started while it compiles" do
+        withCompilingService provisionId provisionSource \compiling ready baseUrl mgr -> do
+          answer <- askMcpTask baseUrl mgr provisionId fn compiling ready (Aeson.object (noInputs : late))
+          viaRest <- askRest baseUrl mgr provisionId fn [] late
+          answer `shouldBe` viaRest
+          either (const False) (isBreach . Map.lookup "value") answer `shouldBe` True
+
+    -- The other half of reading the type and not the parameters' names: a
+    -- function that does not return a DEONTIC, with inputs that happen to be
+    -- called startTime and events. /evaluation used to take it for a DEONTIC,
+    -- because the compiler adds parameters of those names to a DEONTIC, and
+    -- asked it for a trace. Behaviour change, 2026-10-26.
+    describe "a rule that is not a DEONTIC, with inputs called startTime and events" do
+      let elapsedId = "deontic-elapsed"
+          elapsedFn = "elapsed" :: Text
+          elapsedSource = [("elapsed.l4", Text.unlines
+            [ "@export default elapsed time"
+            , "GIVEN startTime IS A NUMBER"
+            , "      events IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE `elapsed` IS events MINUS startTime"
+            ])]
+          inputs = ["startTime" Aeson..= (3 :: Int), "events" Aeson..= (10 :: Int)] :: [Pair]
+          seven = Right (Just (FnLitInt 7))
+
+      it "is an ordinary rule: the two are inputs, on REST, on MCP and in a batch" do
+        withServiceFromSources elapsedId elapsedSource \baseUrl mgr -> do
+          viaRest <- askRest baseUrl mgr elapsedId elapsedFn inputs []
+          viaMcp <- askMcpWith baseUrl mgr elapsedId elapsedFn (Aeson.object inputs)
+          viaBatch <- askBatch baseUrl mgr elapsedId elapsedFn inputs []
+          for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+            (surface :: String, fmap (Map.lookup "value") answer) `shouldBe` (surface, seven)
+
+      it "is listed as a flat tool, with startTime and events among its inputs" do
+        withServiceFromSources elapsedId elapsedSource \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr elapsedId elapsedFn
+          fmap schemaProperties schema `shouldBe` Just ["events", "startTime"]
 
   -- One party and one action were spelled two ways in the same answer. A
   -- BREACH's `eventParty` and `eventAction` are a constructor's name, plain,
@@ -3804,6 +3855,75 @@ askBatchCases baseUrl mgr deployId fn cases = do
       | c <- batch.cases
       ]
     _ -> replicate (length cases) (Left (errorMessageOf (responseBody resp)))
+
+-- | An MCP @tools/call@ made while the deployment compiles, by a client that
+-- asked for a task, and the answer once the deployment is ready and the task
+-- done. The two actions put the deployment in each state.
+askMcpTask :: String -> Manager -> Text -> Text -> IO () -> IO () -> Aeson.Value -> IO SurfaceAnswer
+askMcpTask baseUrl mgr deployId fn compiling ready toolArguments = do
+  compiling
+  handle <- mcpRequest 1 "tools/call" $ Aeson.object
+    [ "name" Aeson..= Text.replace " " "-" fn
+    , "arguments" Aeson..= toolArguments
+    , "_meta" Aeson..= Aeson.object [ "io.modelcontextprotocol/tasks" Aeson..= Aeson.object [] ]
+    ]
+  taskId <- case taskIdOf (responseBody handle) of
+    Just t -> pure t
+    Nothing -> expectationFailure "no task handle" >> pure ""
+  ready
+  taskAnswer <$> finished taskId (40 :: Int)
+ where
+  mcpRequest :: Int -> Text -> Aeson.Value -> IO (Response LBS.ByteString)
+  mcpRequest rid method params = do
+    req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+      [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= rid, "method" Aeson..= method, "params" Aeson..= params ]
+    httpLbs req mgr
+  taskIdOf body = do
+    Aeson.Object o <- Aeson.decode body
+    Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+    Aeson.String t <- Aeson.KeyMap.lookup "taskId" r
+    pure t
+  -- poll tasks/get until the task is no longer pending or working
+  finished _ 0 = pure Nothing
+  finished taskId n = do
+    resp <- mcpRequest 2 "tasks/get" (Aeson.object [ "taskId" Aeson..= (taskId :: Text) ])
+    let status = do
+          Aeson.Object o <- Aeson.decode (responseBody resp)
+          Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+          Aeson.String st <- Aeson.KeyMap.lookup "status" r
+          pure (st, r)
+    case status of
+      Just (st, r) | st `notElem` ["pending", "working"] -> pure (Just r)
+      _ -> threadDelay 250_000 >> finished taskId (n - 1 :: Int)
+  -- the answer a finished task carries, read as a call's is
+  taskAnswer = \case
+    Just r | Just result <- Aeson.KeyMap.lookup "result" r ->
+      mcpAnswer (Aeson.encode (Aeson.object ["result" Aeson..= result]))
+    other -> Left ("no finished task: " <> Text.pack (show other))
+
+-- | The @inputSchema@ of one tool, as @tools/list@ gives it.
+mcpToolInputSchema :: String -> Manager -> Text -> Text -> IO (Maybe Aeson.Value)
+mcpToolInputSchema baseUrl mgr deployId fn = do
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+    [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int), "method" Aeson..= ("tools/list" :: Text) ]
+  resp <- httpLbs req mgr
+  pure $ do
+    Aeson.Object o <- Aeson.decode (responseBody resp)
+    Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+    Aeson.Array tools <- Aeson.KeyMap.lookup "tools" r
+    Maybe.listToMaybe
+      [ schema
+      | Aeson.Object t <- toList tools
+      , Aeson.KeyMap.lookup "name" t == Just (Aeson.String (Text.replace " " "-" fn))
+      , Just schema <- [Aeson.KeyMap.lookup "inputSchema" t]
+      ]
+
+-- | The names of the properties of an @inputSchema@, in order.
+schemaProperties :: Aeson.Value -> [Text]
+schemaProperties = \case
+  Aeson.Object o | Just (Aeson.Object props) <- Aeson.KeyMap.lookup "properties" o ->
+    List.sort (map Aeson.Key.toText (Aeson.KeyMap.keys props))
+  _ -> []
 
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
