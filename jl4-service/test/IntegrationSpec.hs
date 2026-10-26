@@ -13,6 +13,7 @@ import qualified BundleStore
 import BundleStore (initStore)
 import Compiler (compileBundle, computeVersion)
 import ExplorerPage (renderExplorerPageBS)
+import WebMCPPage (RawJs (..), renderOrgWebMCPScript)
 import qualified DeploymentLoader
 import qualified Version
 import ControlPlane (DeploymentStatusResponse (..))
@@ -3577,6 +3578,14 @@ spec = describe "integration" do
         let page = Text.Encoding.decodeUtf8 $ LBS.toStrict $ renderExplorerPageBS $
               Map.singleton (DeploymentId provisionId) (DeploymentReady fns meta)
         ("tag tag-deontic" `Text.isInfixOf` page, "tag tag-other" `Text.isInfixOf` page) `shouldBe` (True, False)
+
+      -- the page is a script in a string: this reads it, it does not run it
+      it "is a DEONTIC to the WebMCP page, which reads the flag and not the display name" do
+        let RawJs js = renderOrgWebMCPScript
+            script = Text.Encoding.decodeUtf8 (LBS.toStrict js)
+            has needle = needle `Text.isInfixOf` script
+        (has "startsWith('DEONTIC')", has "isDeontic: fn.isDeontic === true", has "fn.isDeontic ?")
+          `shouldBe` (False, True, True)
 
       it "answers a trace as its DEONTIC twin does, on REST, on MCP and in a batch" do
         withSale \baseUrl twinMgr -> withProvision \provisionUrl provisionMgr ->
