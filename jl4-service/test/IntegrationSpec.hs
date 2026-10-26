@@ -1913,6 +1913,23 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp)
         lookupKey "error" body `shouldSatisfy` Maybe.isJust
 
+    -- a name in an event that L4 cannot write inside quotes is refused as an
+    -- ordinary evaluation error, and nothing is evaluated
+    it "refuses an event name that L4 cannot quote" do
+      withServiceFromSources "deontic-bad-name" [("contract.l4", deonticExportJL4)] \baseUrl mgr ->
+        forM_ ["the `seller", "", "two\nlines"] \name -> do
+          resp <- evalFunction baseUrl mgr "deontic-bad-name" "the sale contract"
+            (Aeson.object
+              [ "arguments" Aeson..= Aeson.object []
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..=
+                  [ Aeson.object ["party" Aeson..= (name :: Text), "action" Aeson..= ("deliver the goods" :: Text), "at" Aeson..= (5 :: Int)] ]
+              ])
+          statusCode' resp `shouldBe` 422
+          case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+            Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf "cannot write"
+            other -> expectationFailure ("Expected the name to be refused, got: " <> show other)
+
     it "includes startTime and events in function schema for deontic function" do
       withServiceFromSources "deontic-schema" [("contract.l4", deonticExportJL4)] \baseUrl mgr -> do
         req <- parseRequest (baseUrl <> "/deployments/deontic-schema/functions/the%20sale%20contract")
@@ -2100,6 +2117,43 @@ spec = describe "integration" do
               Map.lookup "modal" fieldMap `shouldBe` Just (FnLitString "MUST")
             other ->
               expectationFailure ("Expected OBLIGATION, got: " <> show other)
+
+    -- a record string is written so that it reads back as the text it was given:
+    -- the party in the events is the driver in the arguments, quote and backslash included
+    it "reads a record string with a quote and a backslash as the same text as the argument" do
+      withServiceFromSources "deontic-rec-str" [("seatbelt.l4", deonticRecordPartyJL4)] \baseUrl mgr -> do
+        let name = "A\"l\\ice" :: Text
+        resp <- evalFunction baseUrl mgr "deontic-rec-str" "Seatbelt Requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "car" Aeson..= Aeson.object ["number of wheels" Aeson..= (4 :: Int)]
+                , "driver" Aeson..= Aeson.object ["name" Aeson..= name]
+                ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..=
+                [ Aeson.object ["party" Aeson..= Aeson.object ["name" Aeson..= name], "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (1 :: Int)]
+                , Aeson.object ["party" Aeson..= Aeson.object ["name" Aeson..= name], "action" Aeson..= ("drive" :: Text), "at" Aeson..= (2 :: Int)]
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitString "FULFILLED")
+
+    it "refuses a record key in an event that L4 cannot quote" do
+      withServiceFromSources "deontic-rec-key" [("seatbelt.l4", deonticRecordPartyJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "deontic-rec-key" "Seatbelt Requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "car" Aeson..= Aeson.object ["number of wheels" Aeson..= (4 :: Int)]
+                , "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+                ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..=
+                [ Aeson.object ["party" Aeson..= Aeson.object ["na`me" Aeson..= ("Alice" :: Text)], "action" Aeson..= ("drive" :: Text), "at" Aeson..= (1 :: Int)] ]
+            ])
+        statusCode' resp `shouldBe` 422
+        case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+          Just (SimpleError (InterpreterError msg)) -> msg `shouldSatisfy` Text.isInfixOf "cannot write"
+          other -> expectationFailure ("Expected the key to be refused, got: " <> show other)
 
     it "evaluates 3-wheeled car to FULFILLED without seatbelt" do
       withServiceFromSources "deontic-rec-3w" [("seatbelt.l4", deonticRecordPartyJL4)] \baseUrl mgr -> do
