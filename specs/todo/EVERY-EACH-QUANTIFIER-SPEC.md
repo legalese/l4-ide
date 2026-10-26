@@ -1452,16 +1452,17 @@ an ordinary expression (`fromMaybe 0 (RECALL …)`, where `0` is the epoch, not 
 B4 recorded now, and the anchor-slot doc page waits for B1 rather than teach the literal-`0`
 workaround.
 
-**B1 built in part, 2026-10-24 (`lang/lifecycle-values`, a draft PR into `unstable`, not merged).** The doc page waited
+**B1 built in part, 2026-10-24 (`lang/lifecycle-values`, PR #743, merged into `unstable` 2026-10-25 as `047311f36`).** The doc page waited
 for B1 and is now written: `doc/reference/regulative/consequences.md`, "The anchor words as
 values", teaches the `fromMaybe THE ARMING (RECALL …)` default together with the freeze's silent
 failure (a fact recorded after the obligation's first scrutinised event does not move the deadline,
 and nothing says so). Measured on that branch: the witness above parses and runs (5 is in time, 6
 is a breach, `jl4/examples/ok/every/run-lifecycle-values.l4` §4), `(THE ARMING)` alone in the slot
 is the obligation's own arming (§9, beside its bare twin `OF THE ARMING`), and
-`OF THE ARMING PLUS 3` — a bare noun followed by arithmetic, on its own line or indented on the
-next (§1) — is now the expression form (on the base binary it is a type error on `__PLUS__`; on
-this branch, at 10 with an act at 13, FULFILLED). What is built:
+`OF THE ARMING PLUS 3` — a bare noun followed by arithmetic, on its own line (§9, armed at 10: an
+act at 13 is FULFILLED, at 14 a breach reporting 13; that twin was added 2026-10-26, after review)
+or indented on the next (§1, with `THE JOIN PLUS 5`) — is now the expression form (on the base
+binary it is a type error on `__PLUS__`). What is built:
 `Lifecycle Anno LifecyclePoint` on `Expr`, admitted as an atom and a juxtaposed argument; the
 refusals of §5.1.1.1 applied where the value is written (`LifecycleUnavailable`; four
 `not-ok/tc/lifecycle-value-*.l4`); THE ARMING bound at an obligation's arming only where no

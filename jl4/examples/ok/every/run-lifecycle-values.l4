@@ -268,6 +268,19 @@ GIVETH A DEONTIC Actor Action
 #TRACE `own arming, alone in brackets` AT 10 WITH
   PARTY alice DOES Sign alice AT 16
 
+-- Bare after OF with the arithmetic on the same line, as in §1: one
+-- expression, so the deadline is 10 + 3 = 13 and a signature at 13 is in
+-- time, at 14 a breach reporting 13.
+GIVETH A DEONTIC Actor Action
+`own arming plus three, unbracketed` MEANS
+    PARTY alice MUST Sign alice WITHIN 0 OF THE ARMING PLUS 3
+
+#TRACE `own arming plus three, unbracketed` AT 10 WITH
+  PARTY alice DOES Sign alice AT 13
+
+#TRACE `own arming plus three, unbracketed` AT 10 WITH
+  PARTY alice DOES Sign alice AT 14
+
 
 § `10. on a join line, THE ARMING is the EVERY's own arming however deep it sits`
 
@@ -381,3 +394,159 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Deliver theLandlord AT 10
   PARTY bob DOES Pay 10 AT 12
+
+
+§ `13. THE ARMING in an EVERY's roll and filter, and on a top-level EVERY's own lines`
+
+-- An EVERY's IN roll and its WHO filter are read where the EVERY is
+-- written, before any member is armed, so under a HENCE THE ARMING there is
+-- the arming of the obligation whose HENCE holds the EVERY: the landlord's,
+-- entered when Alice signs. (At the top level the same roll and filter are
+-- refused: not-ok/tc/lifecycle-arming-in-every-roll.l4.) Here the roll is
+-- Alice alone when the landlord's obligation was entered after day 10, and
+-- both tenants otherwise. The group then countersigns within 10 of the
+-- delivery at 13. Alice signs at 12, so only she is called, and her
+-- countersignature at 14 completes the group; signing at 4 calls Bob as
+-- well, and he misses 13 + 10 = 23.
+GIVEN n IS A NUMBER
+GIVETH A LIST OF Actor
+`tenants from` MEANS IF n GREATER THAN 10 THEN LIST alice ELSE tenants
+
+GIVETH A DEONTIC Actor Action
+`a roll read from the arming` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 30
+           HENCE (EVERY Tenant t IN (`tenants from` THE ARMING)
+                      MUST   Sign t
+                      WITHIN 10
+                      ONCE   ALL HAVE
+                      HENCE  FULFILLED))
+
+#TRACE `a roll read from the arming` AT 0 WITH
+  PARTY alice DOES Sign alice AT 12
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+  PARTY alice DOES Sign alice AT 14
+  (`WAIT UNTIL` 30)
+
+#TRACE `a roll read from the arming` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+  PARTY alice DOES Sign alice AT 14
+  (`WAIT UNTIL` 30)
+
+-- The same choice made by a WHO filter over both tenants: the same answers.
+GIVETH A DEONTIC Actor Action
+`a filter read from the arming` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 30
+           HENCE (EVERY Tenant t IN tenants
+                      WHO    (t EQUALS alice) OR (THE ARMING AT MOST 10)
+                      MUST   Sign t
+                      WITHIN 10
+                      ONCE   ALL HAVE
+                      HENCE  FULFILLED))
+
+#TRACE `a filter read from the arming` AT 0 WITH
+  PARTY alice DOES Sign alice AT 12
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+  PARTY alice DOES Sign alice AT 14
+  (`WAIT UNTIL` 30)
+
+#TRACE `a filter read from the arming` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 13
+  PARTY alice DOES Sign alice AT 14
+  (`WAIT UNTIL` 30)
+
+-- On a top-level EVERY's act line and join line, THE ARMING is the EVERY's
+-- own arming, here 5. On the act line: each tenant must sign by 5 + 10 =
+-- 15, and Bob's signature at 16 is a breach reporting 15. On the join line:
+-- with each tenant given to 5 + 20 = 25, the group must be complete by
+-- 5 + 10 = 15, so Bob's signature at 15 is in time and at 16 the group
+-- misses 15, though his own deadline is still open.
+GIVETH A DEONTIC Actor Action
+`act line of a top-level group` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign t
+        WITHIN 0 OF (THE ARMING PLUS 10)
+
+#TRACE `act line of a top-level group` AT 5 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY bob   DOES Sign bob   AT 16
+
+GIVETH A DEONTIC Actor Action
+`own lines of a top-level group` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign t
+        WITHIN 0 OF (THE ARMING PLUS 20)
+        ONCE   ALL HAVE
+        WITHIN 0 OF (THE ARMING PLUS 10)
+        HENCE  FULFILLED
+
+#TRACE `own lines of a top-level group` AT 5 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY bob   DOES Sign bob   AT 15
+
+#TRACE `own lines of a top-level group` AT 5 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY bob   DOES Sign bob   AT 16
+
+
+§ `14. THE JOIN under a SHANT's LEST is the act that broke it`
+
+-- Under a prohibition's LEST, THE JOIN is the stamp of the violating act
+-- (breach-clocks.l4 §9 writes it as an anchor), and it is a value there
+-- like anywhere else. Bob may not sign in the first 10 days; he signs at 3,
+-- so the refund is due at THE JOIN PLUS 2 = 5. A refund at 5 discharges
+-- it; at 6 the breach reports 5.
+GIVETH A DEONTIC Actor Action
+`a broken prohibition, cured by a value` MEANS
+    PARTY bob SHANT Sign bob WITHIN 10
+    LEST  (PARTY bob MUST Refund bob WITHIN 0 OF (THE JOIN PLUS 2))
+
+#TRACE `a broken prohibition, cured by a value` AT 0 WITH
+  PARTY bob DOES Sign bob AT 3
+  PARTY bob DOES Refund bob AT 5
+
+#TRACE `a broken prohibition, cured by a value` AT 0 WITH
+  PARTY bob DOES Sign bob AT 3
+  PARTY bob DOES Refund bob AT 6
+
+
+§ `15. a lifecycle value opens an AFTER window`
+
+-- AFTER takes the nouns as values too: AFTER 0 OF (THE JOIN PLUS 3) opens
+-- at the same instant as AFTER 3 OF THE JOIN (doc/reference/regulative/AFTER.md).
+-- Alice signs at 4, so the delivery window opens at 7 and, with the WITHIN
+-- bare, stays open 10 after that, to 17. A delivery at 6 is early, a
+-- nullity the run notes; one at 7 is in time. With no delivery after the
+-- early one, the breach reports 17. Both spellings give both answers.
+GIVETH A DEONTIC Actor Action
+`a window opened by a value` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord AFTER 0 OF (THE JOIN PLUS 3) WITHIN 10)
+
+#TRACE `a window opened by a value` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 6
+  PARTY theLandlord DOES Deliver theLandlord AT 7
+
+#TRACE `a window opened by a value` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 6
+  (`WAIT UNTIL` 20)
+
+GIVETH A DEONTIC Actor Action
+`a window opened by the anchor` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord AFTER 3 OF THE JOIN WITHIN 10)
+
+#TRACE `a window opened by the anchor` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 6
+  PARTY theLandlord DOES Deliver theLandlord AT 7
+
+#TRACE `a window opened by the anchor` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Deliver theLandlord AT 6
+  (`WAIT UNTIL` 20)

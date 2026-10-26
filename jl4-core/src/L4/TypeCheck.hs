@@ -3161,7 +3161,10 @@ checkLifecycle p e = do
   -- @THE <noun>@ reaches (LifecycleNounHidesName): say so where it is written.
   -- Which of those this module defines decides the remedy the warning
   -- offers: an imported one may live in a file the importer does not own.
-  hidden <- lookupRawNameInEnvironment (NormalName (lifecyclePointNoun p))
+  -- Only a value counts: a type of that spelling is not what a bare noun in
+  -- an expression reaches, and the warning's remedy (drop THE) would fail.
+  spelled <- lookupRawNameInEnvironment (NormalName (lifecyclePointNoun p))
+  let hidden = [ c | c@(_, _, KnownTerm{}) <- spelled ]
   curUri <- asks (.moduleUri)
   unless (null hidden) $
     addWarning $ LifecycleNounHidesName p (rangeOf e)
