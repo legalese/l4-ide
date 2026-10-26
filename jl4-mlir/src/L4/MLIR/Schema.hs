@@ -81,7 +81,7 @@ import L4.StateGraph.Dot (stateGraphToDot, defaultStateGraphOptions)
 import L4.FunctionSchema
   ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter
   )
-import L4.TypeCheck.Environment (andUnique, contractUnique, falseUnique, impliesUnique, notUnique, orUnique, trueUnique)
+import L4.TypeCheck.Environment (andUnique, falseUnique, impliesUnique, isContractType, notUnique, orUnique, trueUnique)
 
 -- ---------------------------------------------------------------------------
 -- Bundle types
@@ -1978,8 +1978,7 @@ emptyParam t = Parameter
 
 -- | Is this a DEONTIC (contract) return type?
 isDeonticType :: Type' Resolved -> Bool
-isDeonticType (TyApp _ name [_, _]) = getUnique name == contractUnique
-isDeonticType _ = False
+isDeonticType = isContractType
 
 -- | For DEONTIC-returning functions, the HTTP API injects two extra
 -- parameters: @startTime@ (number) and @events@ (array of
