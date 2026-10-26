@@ -38,6 +38,7 @@
     type SidebarDeploymentInfo,
     type SidebarImportedFile,
     type RemoteFunctionSchema,
+    isDeonticFunction,
     type AiChatAttachment,
     type Harness,
   } from 'jl4-client-rpc'
@@ -1180,9 +1181,7 @@
       // the LSP-derived local schema does not. Strip them on both sides
       // before diffing so the envelope's presence/absence doesn't show up
       // as a spurious "parameter removed" breaking change.
-      const isDeontic =
-        (remote.returnType ?? '').startsWith('DEONTIC') ||
-        (local.returnType ?? '').startsWith('DEONTIC')
+      const isDeontic = isDeonticFunction(remote) || isDeonticFunction(local)
       const remoteParams = stripDeonticEnvelope(
         remote.parameters as unknown as SchemaNode,
         isDeontic
