@@ -16,11 +16,10 @@ import FileBrowser (ShortFileBrowseApi, shortFileBrowseHandler)
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import Servant.Multipart
 import Backend.DecisionQueryPlan (CachedDecisionQuery, buildDecisionQueryCacheFromCompiled, queryPlan, QueryPlanResponse)
-import L4.FunctionSchema (Parameter, Parameters(..))
 import Shared (AnnotatedFunctionSummary (..), buildPropertyReverseMap, remapArguments, sanitizePropertyName)
-import Backend.Jl4 (CompiledModule (..), evaluateWithCompiledDeontic)
+import Backend.Jl4 (CompiledModule (..))
+import DeonticTrace (isDeonticFunction, noDeonticModule, requireTrace, runDeonticLimited, traceFromJSON)
 import qualified L4.StateGraph as StateGraph
-import Compiler (toDecl)
 import Logging (logInfo)
 import Options (Options (..))
 import Shared (jsonError)
@@ -34,6 +33,7 @@ import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
 import Control.Exception (catch, evaluate)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
@@ -44,11 +44,9 @@ import qualified Data.Maybe as Maybe
 import Data.Scientific (Scientific)
 import qualified Data.Set as Set
 import Data.Text (Text)
-import qualified Data.Text as Text
 import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Servant
-import System.FilePath ((<.>))
 import System.Timeout (timeout)
 
 -- | The data plane API — per-deployment function evaluation.
@@ -233,9 +231,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
   vf <- requireFunction fns fnName
 
   -- Check if this function has deontic parameters (indicating DEONTIC return type)
-  let paramMap = vf.fnImpl.parameters.parameterMap :: Map Text Parameter
-      isDeontic = Map.member "startTime" paramMap
-                  && Map.member "events" paramMap
+  let isDeontic = isDeonticFunction vf
 
   -- Build reverse mapping so REST API accepts both hyphenated and spaced field names
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
@@ -251,16 +247,12 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
     -- Non-deontic function: existing path
     (False, Nothing, Nothing) ->
       runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz
-    -- Deontic function: require both startTime and events
-    (True, Nothing, _) ->
-      throwError err400 { errBody = jsonError "startTime is required for functions returning DEONTIC" }
-    (True, _, Nothing) ->
-      throwError err400 { errBody = jsonError "events is required for functions returning DEONTIC" }
-    -- Deontic function with both params: use deontic evaluator
-    (True, Just st, Just evts) ->
-      runDeonticEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs st evts
-        vf.fnImpl.deonticPartyType vf.fnImpl.deonticActionType
-        mTraceHeader mTraceParam mGraphViz
+    -- Deontic function: require both startTime and events, then replay them
+    (True, mStart, mEvents) -> case requireTrace mStart mEvents of
+      Left msg -> throwError err400 { errBody = jsonError msg }
+      Right (st, evts) ->
+        runDeonticEvaluatorFor vf remappedArgs st evts
+          mTraceHeader mTraceParam mGraphViz
   case result of
     SimpleError _ -> throwEvalError allocBytes result
     _ -> pure $ addHeader allocBytes result
@@ -294,7 +286,10 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- Evaluate all cases in parallel, collecting alloc bytes per case
   evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase -> do
     let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-    r <- runAppM env (runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz)
+    r <- runAppM env $
+      if isDeonticFunction vf
+        then runDeonticBatchCase vf reverseMap inputCase.attributes traceLevel includeGraphViz
+        else runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz
     pure (inputCase.id, r)
 
   -- Check for fatal errors and propagate
@@ -519,51 +514,66 @@ runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz = d
         Left err -> pure (SimpleError err, allocBytes)
         Right r -> pure (SimpleResponse r, allocBytes)
 
--- | Run deontic evaluation with EVALTRACE.
+-- | Run deontic evaluation with EVALTRACE: @/evaluation@'s half of the shared
+-- path ('runDeonticLimited').
 runDeonticEvaluatorFor
   :: ValidatedFunction
-  -> Maybe EvalBackend
   -> [(Text, Maybe FnLiteral)]
   -> Scientific       -- ^ Start time
   -> [TraceEvent]     -- ^ Events
-  -> Maybe Text       -- ^ Party type name
-  -> Maybe Text       -- ^ Action type name
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
   -> AppM (SimpleResponse, Int64)
-runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType mTraceHeader mTraceParam mGraphViz = do
+runDeonticEvaluatorFor vf args startTime events mTraceHeader mTraceParam mGraphViz = do
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
+  runDeonticEvaluatorForDirect vf args startTime events traceLevel includeGraphViz
 
-  compiled <- case vf.fnCompiled of
-    Nothing -> throwError err500 { errBody = jsonError "No compiled module available for deontic evaluation" }
-    Just c -> pure c
+-- | 'runDeonticEvaluatorFor' with the trace level settled, as
+-- 'runEvaluatorForDirect' is to 'runEvaluatorFor'. Hitting a limit fails the
+-- request with a 500, and a batch with it, as for every other case of a batch.
+runDeonticEvaluatorForDirect
+  :: ValidatedFunction
+  -> [(Text, Maybe FnLiteral)]
+  -> Scientific
+  -> [TraceEvent]
+  -> TraceLevel
+  -> Bool
+  -> AppM (SimpleResponse, Int64)
+runDeonticEvaluatorForDirect vf args startTime events traceLevel includeGraphViz = do
+  when (Maybe.isNothing vf.fnCompiled) $
+    throwError err500 { errBody = jsonError noDeonticModule }
 
-  let fnDecl = toDecl vf.fnImpl
-      filepath = Text.unpack vf.fnImpl.name <.> "l4"
+  cfg <- asks (.options)
+  limited <- liftIO $ runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz
+  case limited of
+    Nothing -> throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
+    Just (Left err, allocBytes) -> pure (SimpleError err, allocBytes)
+    Just (Right r, allocBytes) -> pure (SimpleResponse r, allocBytes)
 
-  (evaluationResult, allocBytes) <-
-    timeoutAction $
-      runExceptT
-        ( evaluateWithCompiledDeontic
-            filepath
-            fnDecl
-            compiled
-            vf.fnSourceText
-            vf.fnModuleContext
-            args
-            startTime
-            events
-            mPartyType
-            mActionType
-            traceLevel
-            includeGraphViz
-        )
-
-  case evaluationResult of
-    Left err -> pure (SimpleError err, allocBytes)
-    Right r -> pure (SimpleResponse r, allocBytes)
+-- | One case of a batch for a DEONTIC function: the case carries its own
+-- @startTime@ and @events@ among its attributes, and the rest are the inputs.
+-- A case without them is an errored case, with the refusal @/evaluation@ gives.
+--
+-- The trace is read from the attributes as the case arrived, before the inputs'
+-- names are mapped back to the rule's: @/evaluation@ does not map the events'
+-- names either, so a party that is a record reads the same in both.
+runDeonticBatchCase
+  :: ValidatedFunction
+  -> Map Text Text
+  -> Map Text FnLiteral
+  -> TraceLevel
+  -> Bool
+  -> AppM (SimpleResponse, Int64)
+runDeonticBatchCase vf reverseMap attributes traceLevel includeGraphViz =
+  case traceFromJSON (Aeson.toJSON <$> Map.lookup "startTime" attributes) (Aeson.toJSON <$> Map.lookup "events" attributes) of
+    Left msg -> pure (SimpleError (InterpreterError msg), 0)
+    Right (startTime, events) ->
+      runDeonticEvaluatorForDirect vf inputs startTime events traceLevel includeGraphViz
+ where
+  inputs = remapArguments reverseMap
+    [ (k, Just v) | (k, v) <- Map.toList attributes, k `notElem` ["startTime", "events"] ]
 
 -- | Run an AppM action in IO with a given environment.
 runAppM :: AppEnv -> AppM a -> IO (Either ServerError a)

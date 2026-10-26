@@ -264,6 +264,15 @@ A name that exists only inside the rule cannot be sent back: a party that is a `
 Name the value instead: the value you gave for the input, or a declared action.
 Rule source stays L4, backticks included: an action that carries a value, such as `say "pay now"`, and the reasoning tree and the graphviz source of a trace.
 
+The same trace goes to a `DEONTIC` function over MCP and in a batch, and the answer is the same as `/evaluation`'s.
+Over MCP, `startTime` and `events` go beside `arguments`, as above (see [MCP Schema Design](#mcp-schema-design)).
+`tools/list` also lists them inside `arguments`, among the function's parameters, so a call may put them there; when both places have one, the one beside `arguments` is used, and a `null` is a field left out.
+In a batch, each case carries its own `startTime` and `events` among its attributes, beside the function's inputs: `{"@id": 1, "startTime": 0, "events": [...], "<input>": ...}`.
+A call or a case with no `startTime`, or no `events`, is refused with the message `/evaluation` gives: `startTime is required for functions returning DEONTIC`, or `events is required for functions returning DEONTIC`.
+Over MCP the refusal is an error result (`isError`) whose text is the body of `/evaluation`'s 400, `{"error": "..."}`; in a batch it is an `@error` on that case, and the cases beside it are still answered.
+That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
+The field names inside an event's party or action are used as sent, on all three: unlike an input's, they are not mapped back from the sanitized spelling.
+
 ### Batch Evaluation
 
 Evaluate a function across many input cases in parallel:
@@ -303,6 +312,7 @@ The response has one entry per case, in the order the cases were sent, each unde
 
 An answered case carries the function's result under `value`.
 A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
+A case for a `DEONTIC` function carries its own `startTime` and `events`, and its `value` is the contract after them; a case without them is an `@error` (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
 That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is refused in a batch and answered as text in a single request.
 A case that runs past `--eval-timeout` or `--max-eval-memory-mb` is not returned this way: it fails the whole batch with `500`, and no case comes back.
 Every case of a batch starts at once on one core, so each case's clock also counts the other cases' work, and a large batch of quick cases can fail this way: measured 2026-10-07 with `--eval-timeout 3`, 10 cases of a rule that answers a single request in about 0.12 s all answer, and 40 fail the batch.
@@ -395,7 +405,7 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
 - **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
-- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`.
+- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 
