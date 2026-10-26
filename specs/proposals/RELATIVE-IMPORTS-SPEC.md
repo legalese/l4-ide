@@ -4,6 +4,8 @@
 
 **Stage 3 (2026-10-26): built on branch `feat/relative-imports-root-form`, stacked on Stage 1, in two commits; PROPOSED, FOR MENG, not ruled.** The first commit is the root-relative form (§4.7 choices C1 to C5, C7, and the persistence half of C8). The second is the aliases (C6, and the half of C8 that the first could not show): `IMPORT \`@alias/path\``, with the aliases read from `l4-project.json`. Both are implemented as §4.7 recommends, the second reverts alone, and every choice a rule author would see is listed in §4.7 with its alternatives. The PR stays a draft until Meng rules. Where that changes the text below: a leading `/` is no longer refused on that branch (the §4.2 rule 1 text, the bullet on §4.5 below and the §7 test line describe Stage 1, as merged in #748).
 
+**Module identity survey (2026-10-26): proposed, not landed, nothing ruled.** Section 10 summarises [MODULE-IDENTITY-SURVEY.md](MODULE-IDENTITY-SURVEY.md), a survey of how twelve systems decide a module's identity, a measurement of L4's two basename traps and of the accent and Hebrew folder failure, and an evaluation of a `MODULE` declaration. It changes nothing in §0 to §9 except one sentence under C7, which says what "one module" covers.
+
 **What Stage 1 built** (the §4 design, as written): a backticked `IMPORT` name containing `/` is a path import, resolved against the importing file and never by the ladder; a leading `/` is refused (until the Stage 3 branch above); a bare name resolves as before, with the §4.2(3) warning. Core pure helpers (`classifyImport`, `pathImportFile`, `collapsePath`) are in `jl4-core/src/L4/Import/Resolution.hs`; the resolution is in `jl4-lsp/src/LSP/L4/Rules.hs` (`resolveRelativeImport`, `pathFailureMessage`), which serves the CLI, LSP, MLIR, REPL and service. Tests: `jl4-core/test/RelativeImportSpec.hs`, `jl4-lsp/test/RelativeImportSpec.hs`, `jl4-service/test/RelativeImportSpec.hs`, and the `l4 relative imports` group of `jl4/tests-cli/Main.hs` over `jl4/tests-cli/fixtures/relative-import/`.
 
 **Where Stage 1 differs from this text, or found this text out of date** (each measured on 2026-10-26 against `unstable` `977691b36` plus this change):
@@ -25,7 +27,7 @@
 
 **Author:** the Fable advisor, at Meng Weng Wong's request.
 **Date:** 2026-10-10
-**Related:** [LIBRARY-RESOLUTION-SHADOW-SPEC.md](../todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md) (the bare-name ladder this spec leaves intact), [MODULE-BOUNDARY-SPEC.md](../todo/MODULE-BOUNDARY-SPEC.md) (qualified spellings cross an import), [VFS-IMPORT-NOISE-BUG.md](../done/VFS-IMPORT-NOISE-BUG.md), [WASM-LSP-SPEC.md](../done/WASM-LSP-SPEC.md) §"Virtual file system", l4-ide #573, #575, #904, #906, #971, #1008.
+**Related:** [MODULE-IDENTITY-SURVEY.md](MODULE-IDENTITY-SURVEY.md) (section 10 summarises it), [LIBRARY-RESOLUTION-SHADOW-SPEC.md](../todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md) (the bare-name ladder this spec leaves intact), [MODULE-BOUNDARY-SPEC.md](../todo/MODULE-BOUNDARY-SPEC.md) (qualified spellings cross an import), [VFS-IMPORT-NOISE-BUG.md](../done/VFS-IMPORT-NOISE-BUG.md), [WASM-LSP-SPEC.md](../done/WASM-LSP-SPEC.md) §"Virtual file system", l4-ide #573, #575, #904, #906, #971, #1008.
 
 **Evidence legend.** _read_ = read out of the named file at the named line; _tested_ = run in the scratchpad (`import-spec/exp1` to `exp3`, and `ontology/exp4` for the symlink case) on the installed binary; _not checked_ = said so, and nothing in the design rests on it.
 
@@ -302,6 +304,7 @@ After the bench review (2026-10-26; not built): a duplicated alias should be an 
 **C7, module identity.**
 Recommendation (built): a root-relative target is keyed with the same `canonicalPathKey` as every other path import, so one file is one module however it was reached: ``IMPORT `/identity/core` ``, ``IMPORT `./core` `` and ``IMPORT `../identity/core` `` from `identity/top.l4` are one module (§4.4).
 This is the §4.4 invariant applied to a new way in, and is listed because a rule author would see the "defined twice" error if it failed.
+What "one module" covers: the key is a lexical collapse relative to the working directory, so `.` and `x/..` meet; a symbolic link, a letter-case difference on a case-insensitive volume and an NFC or NFD difference between two spellings of a folder still reach one file as two modules, measured on APFS in [MODULE-IDENTITY-SURVEY.md](MODULE-IDENTITY-SURVEY.md) 10.4 and 10.5.3.
 
 **C8, what the service stores.**
 Recommendation (built): `BundleStore.loadBundle` reloads a file named `l4-project.json`, in any folder, beside the `.l4` files, because `saveBundle` already writes it (it writes every file of the upload) and `loadBundle` dropped it, so a restart would have lost a manifest and the aliases with it.
@@ -617,3 +620,44 @@ Stage 3, optional, is the root-relative form reserved in §4.2 and any alias man
 8. **Windows path spellings.** `roundTrippingFileUri` and the goldens are POSIX-shaped (`ImportDiagnosticSpec.hs` header); a path import on Windows collapses the same way lexically, but I did not test any Windows behaviour, and `l4-cli-test` is the only suite in the Windows CI job per that header.
 9. **The `project:/` tier's origin.** `Rules.hs:681` calls it the Monaco VFS tier; no TypeScript in `ts-apps` or `ts-shared` produces a `project:` URI (grepped), so I could not confirm who sends them today.
 10. **Whether any out-of-tree consumer parses the not-found message text.** The goldens do; `opm2l4` is mentioned in `VFS-IMPORT-NOISE-BUG.md` as filtering stderr; the new messages are additional lines, not changes to existing ones.
+
+## 10. Module identity: a summary of the survey of 2026-10-26 (proposed, not landed)
+
+**Status.** A survey and a design analysis. Nothing in this section is ruled and nothing is built.
+The full text, with its sources, its measurements and two adversarial reviews, is [MODULE-IDENTITY-SURVEY.md](MODULE-IDENTITY-SURVEY.md).
+The subsection numbers below (10.1 to 10.7) are that file's.
+
+**The question.**
+Meng, 2026-10-26: would a Haskell-style `MODULE` declaration, giving a file a fully qualified name, solve the collision problem, and what does it do about paths on different operating systems?
+Later the same day: let the existing `IMPORT` keep its meaning through a sensible fallback, and let the new style work beside it.
+So the default design is a fallback, and every option has to leave a bare `IMPORT` alone for files that do not opt in, be told apart from the path form by syntax, make two spellings of one file one module, and change bare-name behaviour only where today's answer is a crash or silently wrong (10.5).
+
+**What was measured on L4** (10.4, 10.4b; macOS only, nothing was run on Windows).
+
+- An unquoted dotted `IMPORT` is cut at the last dot, not the first: `IMPORT Legalese.Commons.Penal` looks for the module `Legalese.Commons`, and `IMPORT l4.prelude` looks for `l4`.
+- A file that imports its own name ends in an unreadable `GraphException` on `unstable`, #748 and #751, in the command line and in the service.
+- A local `math.l4` beats the built-in `math`: the command line and the language server print a warning, the service writes a log line only, and WASM and runs with `JL4_LIBRARY_PATH` set say nothing.
+  No spelling reaches the built-in `math` from beside a local `math.l4`; only where the files are placed does.
+- NFC against NFD does not explain the accent and Hebrew folder failure of the service.
+  The names that fail are the ones whose characters need percent-escaping (a space, `#`, `+`, `%`, `'` and `(` fail too), and only in the first path segment.
+- Stage 1's slash rule meets requirements (1) and (2) for paths.
+  It does nothing to tell a new slash-free spelling from the bare name that Stage 1 keeps cutting.
+- The corpus: 953 `IMPORT` lines in 563 of 1,443 `.l4` files, none with a dot or a slash.
+  The fallback touches four files, none of whose meaning changes in a golden glob, and forces no edit; 694 of the lines name one of the 22 standard libraries.
+
+**Recommendation** (10.6; proposed, not ruled).
+
+1. The fallback, with no keyword: a file never resolves to itself (R3), and the shadow warning that the command line prints is printed in the editor too (R4).
+2. A reserved spelling for the standard library, the backticked ``IMPORT `l4:prelude` ``, so that a file beside a local `math.l4` can ask for the library.
+   Precedent for a prefix of this kind is Node's `node:` and the TC39 `js:` proposal; the first draft chose an unquoted dotted name, and the research on other systems changed that (10.2, 10.7).
+3. Option A for project files: a module's name is its path under the project root, written with dots.
+4. Then an optional `MODULE` line that must match the derived name, parse-and-check first.
+5. Options B (an authoritative declared name) and C (a project name in `l4-project.json`) wait for the triggers named in 10.6.
+
+**What it does not do.**
+Step 2 protects an importer's own import of a library, not the libraries' imports of each other: a library's own `IMPORT prelude` still reads a local `prelude.l4` (10.4b, 10.5.3 R3).
+R4 does not reach the service response, WASM or pinned runs.
+No option fixes the service's failure on a first path segment that needs escaping.
+Making a `MODULE` header mandatory would be a different edit, one line in each of 1,505 files here and 3,973 in `legalese/commons`, and it cannot be mechanical.
+
+**Rulings this needs from Meng** (10.6, Conditions): the spelling of the reserved library prefix before step 2; the meaning of an unquoted dotted `IMPORT` before step 3; whether R4 stays a warning; whether the libraries' own imports should read the library tiers only.
