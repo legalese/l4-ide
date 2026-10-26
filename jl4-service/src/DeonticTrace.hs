@@ -17,6 +17,7 @@ module DeonticTrace (
   isDeonticFunction,
   requireTrace,
   traceFromJSON,
+  isStrayTraceField,
   noDeonticModule,
   presentDeonticAnswer,
   runDeonticLimited,
@@ -50,16 +51,20 @@ import System.FilePath ((<.>))
 -- | Whether a function is evaluated against a trace: the one test, for every
 -- surface.
 --
--- It reads the function's parameters, as @/evaluation@ always has: the compiler
--- adds @startTime@ and @events@ to the parameters of a function that returns a
--- DEONTIC (@Compiler.exportToFunction@). A function that is not DEONTIC and has
--- inputs of both those names is taken for one, here as it always was on
--- @/evaluation@.
+-- It reads the function's type, as the compiler did when it exported it
+-- (@Compiler.exportToFunction@, from @isDeonticType@, which compares the type
+-- constructor's unique, so @PROVISION@, the deprecated alias of @DEONTIC@, is
+-- the same type and answers the same). The compiler adds @startTime@ and
+-- @events@ to the parameters of exactly the functions it flags, but the
+-- parameters are not the test: a function that is not DEONTIC and has inputs of
+-- both those names is an ordinary function. @/evaluation@ used to take it for a
+-- DEONTIC one, because it read the parameter names; since 2026-10-26 it does
+-- not.
+--
+-- The summary side of the same flag is 'FunctionSummary.fsIsDeontic', which the
+-- metadata cache holds for a deployment that is not compiled yet.
 isDeonticFunction :: ValidatedFunction -> Bool
-isDeonticFunction vf =
-  Map.member "startTime" paramMap && Map.member "events" paramMap
- where
-  paramMap = vf.fnImpl.parameters.parameterMap
+isDeonticFunction vf = vf.fnImpl.isDeontic
 
 -- | What a request to a DEONTIC function must carry. Both fields are required,
 -- and the refusal names the first that is missing, as @/evaluation@ has always
@@ -87,6 +92,16 @@ traceFromJSON mStart mEvents = do
   field name (Just v) = case Aeson.fromJSON v of
     Aeson.Success a -> Right (Just a)
     Aeson.Error err -> Left (name <> ": " <> Text.pack err)
+
+-- | Whether a field of a request to a function that is not DEONTIC is a trace
+-- the function has no use for: a field named @startTime@ or @events@ that is
+-- not one of the function's inputs. A function that is not DEONTIC may declare
+-- inputs of those names, and then they are inputs. MCP and a batch case put a
+-- function's inputs and its trace on one level, so this is how they tell them
+-- apart; @/evaluation@ has the trace as its own fields and does not need it.
+isStrayTraceField :: Parameters -> Text -> Bool
+isStrayTraceField params field =
+  field `elem` ["startTime", "events"] && Map.notMember field params.parameterMap
 
 -- | What a DEONTIC function that has no compiled module reports. The compiler
 -- falls back to a per-file session for a function whose module did not

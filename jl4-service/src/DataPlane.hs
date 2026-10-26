@@ -244,7 +244,7 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
   (fns, _meta) <- requireDeploymentReady deployId
   vf <- requireFunction fns fnName
 
-  -- Check if this function has deontic parameters (indicating DEONTIC return type)
+  -- Does this function return a DEONTIC? (its type, not its parameters' names)
   let isDeontic = isDeonticFunction vf
 
   -- Build reverse mapping so REST API accepts both hyphenated and spaced field names
