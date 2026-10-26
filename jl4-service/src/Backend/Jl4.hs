@@ -30,7 +30,7 @@ import GHC.IO.Exception (AllocationLimitExceeded (..))
 import LSP.Core.Types.Diagnostics (FileDiagnostic (..), messageOfL, prettyDiagnostic)
 import qualified L4.IgnoredAnnotation as IA
 import Data.Functor.Const (Const (..))
-import LSP.L4.Oneshot (oneshotL4ActionAndDiagnosticsIn, oneshotL4ActionAndErrorsIn)
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnosticsInRoot, oneshotL4ActionAndErrorsInRoot)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
 
@@ -157,6 +157,26 @@ buildCompiledFromShared shared funName = runExceptT $ do
 bundleScope :: Rules.LibraryScope
 bundleScope = Rules.EmbeddedStdlibOnly
 
+-- | The directory every bundle file is registered under (@./<path>@), and so
+-- the root of every session the service opens: the place a bare @IMPORT@ looks
+-- for a module after the importing file's own folder.
+--
+-- A session used to take as its root the folder of the file it was started on:
+-- of the alphabetically first file for the whole bundle, of the function's own
+-- file for a call. A flat bundle has all its files in @.@ whichever that is, so
+-- it showed nothing; a bundle with folders found a module at its top only when
+-- the first file happened to be there, and a call that went through the
+-- wrapper looked in its own folder and nowhere else (the deploy said "ready"
+-- and the call answered @zmark is not in scope@). The root is a fact about the
+-- bundle, not about whichever file a session starts on.
+--
+-- This names the bundle's virtual files, not a directory of the host: the
+-- sessions run under 'bundleScope', which takes no module from the host, and a
+-- bundle module is found only among the virtual files (see
+-- "StdlibResolutionSpec" and "BundleRootSpec").
+bundleRoot :: FilePath
+bundleRoot = "."
+
 -- | Typecheck and evaluate all files in a bundle in a SINGLE Shake session.
 -- This avoids creating N independent IDE sessions that redundantly re-parse
 -- and re-typecheck overlapping imports. Shake caches intermediate results
@@ -222,12 +242,14 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         , not ((Text.unpack name <.> "l4") `Set.member` bundleBasenames)
         ]
 
-  -- Use the first file's directory as the session root (arbitrary but required)
+  -- The session needs a file to start on, but nothing here uses it: the files
+  -- are registered below, and the root is the bundle's ('bundleRoot'), not the
+  -- start file's folder.
   let allFiles = StrictMap.toList moduleContext
   case allFiles of
     [] -> pure ([], StrictMap.empty, StrictMap.empty, [], [])
     ((firstPath, _) : _) -> do
-      (_log, diags, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndDiagnosticsIn bundleScope evalConfig firstPath $ \_nfp -> do
+      (_log, diags, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndDiagnosticsInRoot bundleScope bundleRoot evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
         -- Use the full path from the bundle (not just the basename) to avoid
         -- collisions when multiple files share the same filename in different dirs.
@@ -1607,7 +1629,7 @@ buildImportEnvironment filepath source moduleContext _entityInfo = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  result <- oneshotL4ActionAndErrorsIn bundleScope evalConfig filepath $ \nfp -> do
+  result <- oneshotL4ActionAndErrorsInRoot bundleScope bundleRoot evalConfig filepath $ \nfp -> do
     let uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
     -- Note: embedded libraries are resolved by the import resolver's embedded
@@ -1995,7 +2017,7 @@ typecheckModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text]
 typecheckModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsInRoot bundleScope bundleRoot evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
@@ -2014,7 +2036,7 @@ typecheckModule file input moduleContext = do
 evaluateModule :: (MonadIO m) => Presumption -> FilePath -> Text -> ModuleContext -> m ([Text], Maybe [Eval.EvalDirectiveResult])
 evaluateModule presumption file input moduleContext = do
   evalConfig <- liftIO $ requestEvalConfig apiDefaultPolicy presumption True
-  result <- liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
+  result <- liftIO $ oneshotL4ActionAndErrorsInRoot bundleScope bundleRoot evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution

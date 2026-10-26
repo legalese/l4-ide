@@ -8,7 +8,7 @@ import type { VSCodeL4LanguageClient } from './vscode-l4-language-client.js'
 import { type AuthManager, LEGALESE_CLOUD_DOMAIN } from './auth.js'
 import type { ServiceClient } from './service-client.js'
 import { installDeploymentSkill } from './deployment-install.js'
-import { isEmbeddedLibraryUri } from './embedded-library.js'
+import { collectBundle, createZip } from './deploy-bundle.js'
 import { installMarketplaceToHarness } from './harness-config.js'
 import { getWebviewContent } from './webview-panel.js'
 import {
@@ -1238,7 +1238,8 @@ export function initializeSidebarMessenger(
 }
 
 /**
- * Collect the main L4 file and all its transitive imports.
+ * Collect the main L4 file and all its transitive imports, named by their
+ * folder structure (see `deploy-bundle.ts`).
  * Import URIs are provided by the LSP via l4/getExportedFunctions.
  */
 async function collectL4Sources(
@@ -1246,191 +1247,20 @@ async function collectL4Sources(
   importUris: string[],
   outputChannel: vscode.OutputChannel
 ): Promise<{ name: string; content: Uint8Array }[]> {
-  const encoder = new TextEncoder()
-  const collected = new Map<string, { name: string; content: Uint8Array }>()
-
-  // Read a single file URI into the collection
-  async function collectFile(uri: string) {
-    if (collected.has(uri)) return
-    try {
-      const docUri = vscode.Uri.parse(uri)
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(
+    vscode.Uri.parse(fileUri)
+  )
+  return collectBundle(fileUri, importUris, {
+    rootUri: workspaceFolder?.uri.toString(),
+    readText: async (uri) => {
       const existing = vscode.workspace.textDocuments.find(
         (d) => d.uri.toString() === uri
       )
-      const doc = existing ?? (await vscode.workspace.openTextDocument(docUri))
-      const text = doc.getText()
-      const fileName = decodeURIComponent(
-        docUri.path.split('/').pop() ?? 'main.l4'
-      )
-      collected.set(uri, { name: fileName, content: encoder.encode(text) })
-      outputChannel.appendLine(`[sidebar] Collected: ${fileName}`)
-    } catch (err) {
-      outputChannel.appendLine(
-        `[sidebar] Could not read import: ${uri} — ${err instanceof Error ? err.message : String(err)}`
-      )
-    }
-  }
-
-  // Collect main file first, then all imports
-  await collectFile(fileUri)
-  for (const importUri of importUris) {
-    // The stdlib jl4-lsp carries inside its binary. A deployment runs on the
-    // service's own built-in stdlib unless the bundle ships a same-named file
-    // (`bundleScope` in jl4-service's Backend/Jl4.hs), so zipping this
-    // machine's would pin it over the service's. Ruled 2026-10-12: deployments
-    // run on the service's built-in stdlib, and this skip stands; a later,
-    // non-blocking change is to warn at deploy time when this machine's stdlib
-    // differs from the service's.
-    if (isEmbeddedLibraryUri(importUri)) continue
-    await collectFile(importUri)
-  }
-
-  return Array.from(collected.values())
-}
-
-// ---------------------------------------------------------------------------
-// Minimal ZIP builder (store, no compression)
-// ---------------------------------------------------------------------------
-
-const crcTable = new Uint32Array(256)
-for (let i = 0; i < 256; i++) {
-  let c = i
-  for (let j = 0; j < 8; j++) {
-    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-  }
-  crcTable[i] = c
-}
-
-function crc32(data: Uint8Array): number {
-  let crc = 0xffffffff
-  for (let i = 0; i < data.length; i++) {
-    crc = crcTable[(crc ^ data[i]) & 0xff] ^ (crc >>> 8)
-  }
-  return (crc ^ 0xffffffff) >>> 0
-}
-
-function createZip(files: { name: string; content: Uint8Array }[]): Uint8Array {
-  const encoder = new TextEncoder()
-
-  // Pre-compute sizes
-  type Entry = {
-    nameBytes: Uint8Array
-    content: Uint8Array
-    crc: number
-    localOffset: number
-  }
-  const entries: Entry[] = []
-  let localSize = 0
-  for (const file of files) {
-    const nameBytes = encoder.encode(file.name)
-    const crc = crc32(file.content)
-    entries.push({
-      nameBytes,
-      content: file.content,
-      crc,
-      localOffset: localSize,
-    })
-    localSize += 30 + nameBytes.length + file.content.length
-  }
-
-  let centralSize = 0
-  for (const e of entries) centralSize += 46 + e.nameBytes.length
-  const endSize = 22
-  const totalSize = localSize + centralSize + endSize
-
-  const buf = new ArrayBuffer(totalSize)
-  const view = new DataView(buf)
-  const bytes = new Uint8Array(buf)
-  let offset = 0
-
-  // Local file headers + data
-  for (const e of entries) {
-    view.setUint32(offset, 0x04034b50, true)
-    offset += 4
-    view.setUint16(offset, 20, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint32(offset, e.crc, true)
-    offset += 4
-    view.setUint32(offset, e.content.length, true)
-    offset += 4
-    view.setUint32(offset, e.content.length, true)
-    offset += 4
-    view.setUint16(offset, e.nameBytes.length, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    bytes.set(e.nameBytes, offset)
-    offset += e.nameBytes.length
-    bytes.set(e.content, offset)
-    offset += e.content.length
-  }
-
-  const centralOffset = offset
-
-  // Central directory headers
-  for (const e of entries) {
-    view.setUint32(offset, 0x02014b50, true)
-    offset += 4
-    view.setUint16(offset, 20, true)
-    offset += 2
-    view.setUint16(offset, 20, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint32(offset, e.crc, true)
-    offset += 4
-    view.setUint32(offset, e.content.length, true)
-    offset += 4
-    view.setUint32(offset, e.content.length, true)
-    offset += 4
-    view.setUint16(offset, e.nameBytes.length, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint16(offset, 0, true)
-    offset += 2
-    view.setUint32(offset, 0, true)
-    offset += 4
-    view.setUint32(offset, e.localOffset, true)
-    offset += 4
-    bytes.set(e.nameBytes, offset)
-    offset += e.nameBytes.length
-  }
-
-  // End of central directory
-  view.setUint32(offset, 0x06054b50, true)
-  offset += 4
-  view.setUint16(offset, 0, true)
-  offset += 2
-  view.setUint16(offset, 0, true)
-  offset += 2
-  view.setUint16(offset, entries.length, true)
-  offset += 2
-  view.setUint16(offset, entries.length, true)
-  offset += 2
-  view.setUint32(offset, centralSize, true)
-  offset += 4
-  view.setUint32(offset, centralOffset, true)
-  offset += 4
-  view.setUint16(offset, 0, true)
-
-  return new Uint8Array(buf)
+      const doc =
+        existing ??
+        (await vscode.workspace.openTextDocument(vscode.Uri.parse(uri)))
+      return doc.getText()
+    },
+    log: (line) => outputChannel.appendLine(`[sidebar] ${line}`),
+  })
 }

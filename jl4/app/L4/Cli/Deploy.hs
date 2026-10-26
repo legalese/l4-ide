@@ -8,11 +8,18 @@
 -- would break existing integrations; @redeploy --force@ overwrites past
 -- it (@POST@), as the extension does once you confirm the breaking change.
 --
--- The upload is the file plus its transitive imports, flat by file name,
--- typechecked locally first. It does not include the standard libraries the
--- file imports (prelude, daydate, …): a deployment resolves its IMPORTs
--- against its own files and the standard library built into the service, as
--- the extension's upload does.
+-- The upload is the file plus its transitive imports, typechecked locally
+-- first, and it keeps their folder structure: each file is named by its path
+-- below the folder every one of them shares (see "L4.Cli.DeployPlan"), as the
+-- extension's upload does. A file outside the project folder stops the deploy,
+-- and so does a library that would be uploaded where the service does not look
+-- for it (it looks beside the importing file and at the top of the upload), and
+-- so does an imported file in a folder whose name the service cannot look into.
+-- The upload does not include the standard libraries the file imports
+-- (prelude, daydate, …): a deployment resolves its IMPORTs against its own
+-- files and the standard library built into the service. A file that @l4@ read
+-- from disk and that is exactly the built-in copy of its module is left out
+-- too, and named on stderr.
 module L4.Cli.Deploy
   ( DeployOptions(..)
   , deployOptionsParser
@@ -32,16 +39,17 @@ import qualified Base.Text as Text
 import qualified Codec.Archive.Zip as Zip
 import Control.Concurrent (threadDelay)
 import Control.Exception (IOException, try)
-import Control.Monad (forM, unless, when)
+import Control.Monad (unless, when)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.Char (isAscii, isAlphaNum)
 import Data.List (sortOn)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as TE
 import qualified Data.Vector as Vector
@@ -49,23 +57,28 @@ import Data.Time.Clock.POSIX (getPOSIXTime)
 import Network.HTTP.Client (RequestBody(..), method)
 import Network.HTTP.Client.MultipartFormData (formDataBody, partBS, partContentType, partFileRequestBody)
 import Options.Applicative
-import System.Directory (doesFileExist, makeAbsolute)
+import System.Directory (canonicalizePath, doesFileExist, getCurrentDirectory, makeAbsolute)
+import System.Environment (lookupEnv)
 import System.Exit (exitFailure)
-import System.FilePath (dropExtension, isAbsolute, takeFileName)
+import System.FilePath (dropExtension, isAbsolute, takeDirectory, takeFileName, (</>))
 import System.IO (hFlush, hIsTerminalDevice, stderr, stdin)
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
   ( NormalizedUri
+  , Uri(..)
   , fromNormalizedFilePath
+  , fromNormalizedUri
   , normalizedFilePathToUri
   , uriToNormalizedFilePath
   )
-import L4.Syntax (Module(..))
+import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
+import L4.Syntax (Import(..), Module(..), TopDecl(..), foldTopDecls, getActual, rawName, rawNameToText)
 
 import L4.Cli.Cloud
 import L4.Cli.Common (FixedNowOpt(..), makeEvalConfig, putDiagnostics, runOneshot)
+import L4.Cli.DeployPlan
 
 ----------------------------------------------------------------------------
 -- Options
@@ -273,7 +286,8 @@ deploymentName fp explicit
     validChar c = isAscii c && (isAlphaNum c || c == '-' || c == '_')
 
 -- | Typecheck the file and collect it plus its transitive imports as
--- (name in the zip, contents), root first.
+-- (name in the zip, contents), root first. The names keep the folders: see
+-- "L4.Cli.DeployPlan".
 bundle :: FilePath -> IO [(FilePath, BSL.ByteString)]
 bundle fp = do
   absFp <- makeAbsolute fp
@@ -289,26 +303,57 @@ bundle fp = do
       putDiagnostics errs
       die (Text.pack fp <> " doesn't typecheck; fix it before deploying (see `l4 check`).")
 
-  let paths = absFp : mapMaybe moduleFile (drop 1 (flatten tc))
+  -- The working folder comes from the operating system with links followed,
+  -- while an import's path may be spelled through one (a JL4_LIBRARY_PATH typed
+  -- as /tmp/proj/lib on a Mac, where /tmp is a link): the plan compares paths
+  -- by their letters, so they are spelled alike first.
+  cwd <- getCurrentDirectory >>= canonicalizePath
+  entry <- canonical absFp
   -- A standard library the typechecker took from the copies built into l4 has
   -- no file on disk and a URI that is not a file's ('moduleFile' is Nothing),
-  -- so it is not in 'paths' and is not uploaded.
-  files <- fmap concat $ forM (dedupe paths) \p ->
-    if isAbsolute p
-      then pure . (p,) <$> BSL.readFile p
-      else [] <$ note ("Skipping " <> Text.pack p <> ": not found")
-
-  let byName = Map.fromListWith (flip (<>)) [ (takeFileName p, [p]) | (p, _) <- files ]
-  case [ (n, ps) | (n, ps@(_ : _ : _)) <- Map.toList byName ] of
-    [] -> pure ()
-    clashes -> die $ Text.unlines $
-      "These imported files share a name, but the upload is flat (as from VS Code). Rename one of each:"
-        : [ "  " <> Text.pack n <> ": " <> Text.intercalate ", " (map Text.pack ps) | (n, ps) <- clashes ]
-  pure [ (takeFileName p, c) | (p, c) <- files ]
+  -- so the plan leaves it out and it is not uploaded.
+  fromTypechecker <- sequence
+    [ (moduleLabel r,) <$> traverse canonical (moduleFile r) | r <- drop 1 (flatten tc) ]
+  -- A standard library file that l4 read from disk (found through
+  -- JL4_LIBRARY_PATH, or a copy in the project) and that is exactly the copy
+  -- built into the service adds nothing to the upload, so it is left out.
+  -- A file that differs is a project file like any other.
+  readable <- fmap (Map.fromList . concat) $ sequence
+    [ either (\(_ :: IOException) -> []) (\c -> [(p, c)]) <$> try (BS.readFile p)
+    | (_, Just p) <- fromTypechecker ]
+  let (imports, builtIn) = leaveOutBuiltIn
+        (fmap TE.encodeUtf8 . EmbeddedLibraries.lookupEmbeddedLibrary)
+        (`Map.lookup` readable)
+        fromTypechecker
+  -- Each IMPORT line of each collected file, with the file it resolved to:
+  -- the plan checks that the service will find that file from the line.
+  edges <- fmap concat $ sequence
+    [ do importerFile <- traverse canonical (moduleFile r)
+         sequence
+           [ ImportEdge importer name <$> canonical file
+           | Just importer <- [importerFile]
+           , (name, uri) <- importLines r
+           , Just file <- [fromNormalizedFilePath <$> uriToNormalizedFilePath uri]
+           ]
+    | r <- flatten tc ]
+  entries <- case planBundle (projectRoot cwd entry) entry imports edges of
+    Right es -> pure es
+    Left err -> do
+      libraryPath <- lookupEnv "JL4_LIBRARY_PATH"
+      die $ renderPlanError (Hints { libraryPathSet = isJust libraryPath }) err
+  mapM_ (\m -> note ("Not uploaded, the deployed service has it built in: " <> m)) builtIn
+  readBundle entries >>= either die pure
   where
     moduleUri :: Rules.TypeCheckResult -> NormalizedUri
     moduleUri r = case r.module' of MkModule _ u _ -> u
+    moduleLabel r = (fromNormalizedUri (moduleUri r)).getUri
     moduleFile r = fromNormalizedFilePath <$> uriToNormalizedFilePath (moduleUri r)
+    -- The IMPORT lines of a module as it wrote them, each with the module it
+    -- resolved to; a line that resolved to nothing has no URI and is left out.
+    importLines :: Rules.TypeCheckResult -> [(Text, NormalizedUri)]
+    importLines r = foldTopDecls (\case
+      Import _ (MkImport _ n (Just uri)) -> [(rawNameToText (rawName (getActual n)), uri)]
+      _ -> []) r.module'
     -- The dependency tree visits a module once per import path; keep the
     -- first (pre-order), as the LSP's l4/getExportedFunctions does.
     flatten root = snd (go Set.empty root)
@@ -319,12 +364,15 @@ bundle fp = do
               let step (s, acc) d = let (s', xs) = go s d in (s', acc <> xs)
                   (seenN, deps) = foldl step (Set.insert (moduleUri r) seen, []) r.dependencies
               in (seenN, r : deps)
-    dedupe = go Set.empty
-      where
-        go _ [] = []
-        go s (x : xs)
-          | x `Set.member` s = go s xs
-          | otherwise = x : go (Set.insert x s) xs
+
+-- | A path with its folder spelled as the disk has it (links followed, @.@ and
+-- @..@ resolved) and its file name as given: a link to a module keeps the name
+-- its importer used, which is the name the service will look for. A path that is
+-- not absolute is left alone, for the plan to refuse.
+canonical :: FilePath -> IO FilePath
+canonical p
+  | isAbsolute p = (</> takeFileName p) <$> canonicalizePath (takeDirectory p)
+  | otherwise = pure p
 
 -- | The deployment's status (without functions), or Nothing if there's
 -- no such deployment.

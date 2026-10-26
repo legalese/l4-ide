@@ -74,7 +74,10 @@ DECIDE compute_qualifies IF walks AND eats AND drinks
 
 A deployment resolves an `IMPORT` against the files of its own bundle and the standard library built into the service, and against nothing else.
 The service does not read `JL4_LIBRARY_PATH`, its working directory or the per-user library folder.
-A library that is not part of the standard library has to be in the bundle, beside the file that imports it.
+A library that is not part of the standard library has to be in the bundle, beside the file that imports it or at the top of the bundle, the folder that holds the bundle's folders.
+A bare `IMPORT` looks in those two places and nowhere else in the bundle: a file in any other folder is not found by its bare name, and which file sorts first makes no difference.
+A file beside its importer is not found when the first folder of its path in the bundle has a space, a letter outside A to Z, or one of `# ' + ( ) % , = @ & ! $ ; [ ]` in its name, and the deployment is still reported as ready; `l4 deploy` and the extension's Deploy button refuse such a folder, and a few more names that the service finds, such as `a~b`.
+This is a residual of the fix for smucclaw/l4-ide#971, which is closed, and no issue tracks it yet.
 A bundle file named like a standard library module, such as `prelude.l4`, is used for the bundle's own imports in place of the built-in one.
 
 The service logs three `WARN` lines about this:
