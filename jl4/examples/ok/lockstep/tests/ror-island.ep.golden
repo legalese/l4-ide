@@ -1,0 +1,18 @@
+-- NORM-LOG N10 goal A: an ROR below a RAND is an island: it runs as before, so nothing commits (skeptic-design S3, S4, S5).
+-- Pass: the answers before A, FULFILLED for sibling, doomed and violate.
+IMPORT prelude
+DECLARE Person IS ONE OF pa, pb, pc, pr
+DECLARE Action IS ONE OF x, y, z, go, stop
+-- (1) a doomed alternative: the RAND inside the left alternative is already
+-- lost at 5, but b's act at 6 is a consumption by that alternative
+GIVETH DEONTIC Person Action
+doomed MEANS ((PARTY pa MUST x WITHIN 3) RAND (PARTY pb MAY y WITHIN 10)) ROR (PARTY pc MAY z WITHIN 10)
+#TRACE doomed AT 0 WITH (`WAIT UNTIL` 5)   PARTY pb DOES y AT 6   PARTY pc DOES z AT 7
+-- (2) a consumption by a SIBLING of the ROR, not by either alternative
+GIVETH DEONTIC Person Action
+sibling MEANS (PARTY pa MAY x WITHIN 10) RAND ((PARTY pb MAY x WITHIN 10) ROR (PARTY pc MAY z WITHIN 10))
+#TRACE sibling AT 0 WITH PARTY pa DOES x AT 1   PARTY pc DOES z AT 2
+-- (3) a violation versus an exercise, at one event
+GIVETH DEONTIC Person Action
+violate MEANS (PARTY pr SHANT go WITHIN 10 LEST BREACH) ROR (PARTY pr MAY go WITHIN 10)
+#TRACE violate AT 0 WITH PARTY pr DOES go AT 1

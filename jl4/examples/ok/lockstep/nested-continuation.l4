@@ -1,0 +1,18 @@
+-- NORM-LOG N10 goal A: a compound armed inside a continuation joins the lockstep (it is flattened into the
+-- outermost driver). Pass: FULFILLED, and the official record in time order: b (2), d (3), c (4).
+-- Before A it was b, c, d: the left operand, with the compound its HENCE arms, ran over the whole trace first.
+IMPORT prelude
+DECLARE Who IS ONE OF P, Q, R, S
+DECLARE Act IS ONE OF a, b, c, d
+
+GIVETH DEONTIC Who Act
+inner MEANS
+       (PARTY Q MUST b WITHIN 10 HENCE COMMIT `seen` IS "b" HENCE FULFILLED)
+  RAND (PARTY R MUST c WITHIN 10 HENCE COMMIT `seen` IS "c" HENCE FULFILLED)
+
+GIVETH DEONTIC Who Act
+outer MEANS
+       (PARTY P MUST a WITHIN 5 HENCE inner)
+  RAND (PARTY S MUST d WITHIN 20 HENCE COMMIT `seen` IS "d" HENCE FULFILLED)
+
+#TRACE outer AT 0 WITH PARTY P DOES a AT 1  PARTY Q DOES b AT 2  PARTY S DOES d AT 3  PARTY R DOES c AT 4

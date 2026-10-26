@@ -1,0 +1,16 @@
+-- NORM-LOG N10 goal A: NORM-LOG §7 T4, with the party-qualified read.
+-- Pass: in both orders the borrow at 20 is blocked (the MAY stays waiting) because the return was due at 14
+-- and settling writes overdue before the borrow is matched. Before A only loan RAND borrowing blocked it.
+IMPORT prelude
+DECLARE Person IS ONE OF patron
+DECLARE Action IS ONE OF giveBack, payFine, borrow
+GIVETH DEONTIC Person Action
+loan MEANS
+  PARTY patron MUST giveBack WITHIN 14
+  HENCE FULFILLED
+  LEST  RECORD `overdue` IS TRUE HENCE (PARTY patron MUST payFine WITHIN 7)
+GIVETH DEONTIC Person Action
+borrowing MEANS
+  PARTY patron MAY borrow PROVIDED RECALL patron's `overdue` EQUALS NOTHING WITHIN 100
+#TRACE loan RAND borrowing AT 0 WITH PARTY patron DOES borrow AT 20
+#TRACE borrowing RAND loan AT 0 WITH PARTY patron DOES borrow AT 20

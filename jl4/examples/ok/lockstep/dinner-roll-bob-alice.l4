@@ -1,0 +1,81 @@
+-- NORM-LOG N10 goal A, lockstep operands: acceptance test (GM's dinner race, 2026-10-26).
+-- Pass: the same table as dinner-roll-alice-bob.l4. Before A this roll gave X1 [2] (a read seeing a
+-- purchase stamped after it), X2 [2,2] and X4 Bob [1,1].
+IMPORT prelude
+
+DECLARE Party IS ONE OF Alice, Bob
+DECLARE Status IS ONE OF
+    opened
+    taken
+DECLARE Act IS ONE OF
+    `reads the ledger`
+    `buys dinner`
+
+diners MEANS LIST Bob, Alice
+closing MEANS 75600
+
+-- What an act does, then back to that diner's own chain.
+GIVEN d IS A Party
+      act IS AN Act
+GIVETH A DEONTIC Party Act
+`after` MEANS
+    CONSIDER act
+    WHEN `reads the ledger` THEN
+        RECORD d's `entries read` IS count (RECALL ALL OFFICIAL's `dinner status record`)
+        RECORD d's `taken seen`   IS elem taken (RECALL ALL OFFICIAL's `dinner status record`)
+        `evening of` d
+    WHEN `buys dinner` THEN
+        COMMIT `dinner status record` IS taken
+        `evening of` d
+
+-- One chain per diner, recursing into itself only.
+GIVEN d IS A Party
+GIVETH A DEONTIC Party Act
+`evening of` MEANS
+    PARTY d
+    MAY    act
+    WITHIN 0 OF closing
+    HENCE  `after` d act
+
+-- The same rule for both diners; each diner's FIRST act enters that diner's chain.
+GIVETH A DEONTIC Party Act
+`the evening` MEANS
+    EVERY d IN diners
+        MAY    act
+        WITHIN 0 OF closing
+        UPON   EACH
+        HENCE  `after` d act
+
+GIVETH A DEONTIC Party Act
+`the arrangement` MEANS
+    COMMIT `dinner status record` IS opened
+    HENCE `the evening`
+
+-- Main trace: Alice reads 65100, Bob buys 65160, Alice reads 65220.
+-- X0 (control, no purchase by anyone): Alice reads at 65100 and 65220
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY Alice DOES `reads the ledger` AT 65100
+    PARTY Alice DOES `reads the ledger` AT 65220
+
+-- X1 (future purchase): Alice reads at 65100; Bob buys LATER, at 70000
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY Alice DOES `reads the ledger` AT 65100
+    PARTY Bob   DOES `buys dinner`      AT 70000
+
+-- X2 (the requested timeline): read 65100, Bob buys 65160, read 65220
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY Alice DOES `reads the ledger` AT 65100
+    PARTY Bob   DOES `buys dinner`      AT 65160
+    PARTY Alice DOES `reads the ledger` AT 65220
+
+-- X3 (same-branch control): Alice reads 65100, Alice buys 65160, Alice reads 65220
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY Alice DOES `reads the ledger` AT 65100
+    PARTY Alice DOES `buys dinner`      AT 65160
+    PARTY Alice DOES `reads the ledger` AT 65220
+
+-- X4 (mirror): Bob reads 65100, Alice buys 65160, Bob reads 65220
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY Bob   DOES `reads the ledger` AT 65100
+    PARTY Alice DOES `buys dinner`      AT 65160
+    PARTY Bob   DOES `reads the ledger` AT 65220

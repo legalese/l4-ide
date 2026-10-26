@@ -1,0 +1,12 @@
+-- NORM-LOG N10 goal A: a RAND keeps feeding its other operand after one side breaches (R-T3).
+-- Pass: bobSigned is recorded in the first two traces, and every trace is BREACHED naming alice.
+IMPORT prelude
+DECLARE Actor IS ONE OF alice, bob
+DECLARE Action IS ONE OF Sign HAS who IS AN Actor
+GIVETH A DEONTIC Actor Action
+c MEANS (PARTY alice MUST Sign alice WITHIN 3) RAND (PARTY bob MUST Sign bob WITHIN 9 HENCE RECORD `bobSigned` IS TRUE HENCE FULFILLED)
+GIVETH A DEONTIC Actor Action
+d MEANS (PARTY bob MUST Sign bob WITHIN 9 HENCE RECORD `bobSigned` IS TRUE HENCE FULFILLED) RAND (PARTY alice MUST Sign alice WITHIN 3)
+#TRACE c AT 0 WITH (`WAIT UNTIL` 5)   PARTY bob DOES Sign bob AT 6   (`WAIT UNTIL` 20)
+#TRACE d AT 0 WITH (`WAIT UNTIL` 5)   PARTY bob DOES Sign bob AT 6   (`WAIT UNTIL` 20)
+#TRACE c AT 0 WITH (`WAIT UNTIL` 5)   (`WAIT UNTIL` 20)

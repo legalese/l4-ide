@@ -202,10 +202,15 @@ withFreshLedger m = do
   freshParty <- liftIO (newIORef Nothing)
   freshNotes <- liftIO (newIORef mempty)
   freshPresumed <- liftIO (newIORef emptyPresumedLog)
+  freshLockstep <- liftIO newLockstepState
   -- the run's notes ('tellNote') are per directive for the same reason the
   -- ledger is: a note belongs to the directive whose value it qualifies; so
-  -- does a default it forced ('EvalState.presumed')
-  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes, presumed = freshPresumed }) m
+  -- does a default it forced ('EvalState.presumed'). The lockstep driver's
+  -- side tables (N10 goal A) are per directive for symmetry: a 'parked' or
+  -- 'resume' slot is read before anything else is evaluated after its
+  -- write, so it cannot go stale, and a stale 'probeMin' would cost one
+  -- round only
+  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes, presumed = freshPresumed, lockstep = freshLockstep }) m
 
 -- | Apply runtime EVAL clauses for the duration of an action,
 -- restoring the previous temporal context afterwards.
@@ -915,6 +920,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   ctxReads <- newIORef noReads
   let evalTrace = Nothing
   reofferedEvents <- newIORef mempty
+  lockstep <- newLockstepState
   envLedger    <- newIORef emptyStore
   currentParty <- newIORef Nothing
   notes        <- newIORef mempty
@@ -929,7 +935,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
-    , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog
+    , reofferedEvents, lockstep, notes, unknownSteps, unknownReached, deonticLog
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run

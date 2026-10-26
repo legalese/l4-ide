@@ -1,0 +1,3 @@
+executing contract `c` at 0 with the following events: party `patron` did `giveBack` at 1 party `patron` did `borrow` at 2
+executing contract `c` and `other` at 0 with the following events: party `patron` did `giveBack` at 1 party `patron` did `borrow` at 2
+executing contract `other` and `c` at 0 with the following events: party `patron` did `giveBack` at 1 party `patron` did `borrow` at 2

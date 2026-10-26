@@ -1,0 +1,3 @@
+executing contract `c` at 0 with the following events: `WAIT UNTIL` with 5 party `bob` did `Sign` with `bob` at 6 `WAIT UNTIL` with 20
+executing contract `d` at 0 with the following events: `WAIT UNTIL` with 5 party `bob` did `Sign` with `bob` at 6 `WAIT UNTIL` with 20
+executing contract `c` at 0 with the following events: `WAIT UNTIL` with 5 `WAIT UNTIL` with 20

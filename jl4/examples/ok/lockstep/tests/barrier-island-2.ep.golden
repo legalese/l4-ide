@@ -1,0 +1,18 @@
+-- NORM-LOG N10 goal A: a barrier below a RAND, the shape EVERY.md promises, is an island (skeptic-design L2).
+-- Pass: the answers before A (FULFILLED for the three-event trace).
+IMPORT prelude
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+theLandlord MEANS Landlord OF "L"
+alice MEANS Tenant OF "Alice"
+bob MEANS Tenant OF "Bob"
+tenants MEANS LIST alice, bob
+GIVETH A DEONTIC Actor Action
+both MEANS (EVERY Tenant t IN tenants MUST Sign t WITHIN 14 ONCE ALL HAVE HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 5) LEST BREACH)
+           RAND (PARTY theLandlord MUST Deliver theLandlord WITHIN 30)
+#TRACE both AT 0 WITH PARTY alice DOES Sign alice AT 1   PARTY bob DOES Sign bob AT 2   PARTY theLandlord DOES Deliver theLandlord AT 6
+#TRACE both AT 0 WITH

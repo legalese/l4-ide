@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+library-t4.l4:15:1-68:
+  PARTY patron MUST payFine WITHIN 1 HENCE FULFILLED AND PARTY patron MAY borrow PROVIDED ((RECALL patron's "overdue") EQUALS NOTHING) WITHIN 80 HENCE FULFILLED
+  Ledger (patron):
+    RECORD `overdue` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]
+library-t4.l4:16:1-68:
+  PARTY patron MAY borrow PROVIDED ((RECALL patron's "overdue") EQUALS NOTHING) WITHIN 80 HENCE FULFILLED AND PARTY patron MUST payFine WITHIN 1 HENCE FULFILLED
+  Ledger (patron):
+    RECORD `overdue` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]

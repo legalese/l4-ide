@@ -1,0 +1,3 @@
+executing contract `own` at 0 with the following events: party `patron` did `go` at 5 party `patron` did `later` at 6
+executing contract `own` and `other` at 0 with the following events: party `patron` did `go` at 5 party `patron` did `later` at 6
+executing contract `other` and `own` at 0 with the following events: party `patron` did `go` at 5 party `patron` did `later` at 6

@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+menu-fork.l4:35:1-112:
+  FULFILLED
+  Official record:
+    COMMIT `seen` IS 1   [party=I, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS 2   [party=P, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS 1   [party=I, source=COMMIT, at=2025-01-31T15:45:30Z]
+menu-fork.l4:36:1-90:
+  FULFILLED
+  Official record:
+    COMMIT `seen` IS 2   [party=P, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS 1   [party=I, source=COMMIT, at=2025-01-31T15:45:30Z]
+menu-fork.l4:37:1-133:
+  FULFILLED
+  Official record:
+    COMMIT `seen` IS 1   [party=I, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS 2   [party=P, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS 1   [party=I, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS 2   [party=P, source=COMMIT, at=2025-01-31T15:45:30Z]

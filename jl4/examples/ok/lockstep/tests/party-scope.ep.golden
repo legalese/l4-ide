@@ -1,0 +1,19 @@
+-- NORM-LOG N10 goal A: a continuation's guard reads the ledger of the party whose hand-off armed it,
+-- also when the continuation is resumed event by event inside a compound (skeptic-design S1).
+-- Pass: all three traces FULFILLED (the borrow is allowed), as before A.
+IMPORT prelude
+DECLARE Person IS ONE OF patron, clerk
+DECLARE Action IS ONE OF giveBack, borrow, stamp
+GIVETH DEONTIC Person Action
+c MEANS
+  PARTY patron MUST giveBack WITHIN 14
+  HENCE RECORD `returned` IS TRUE
+  HENCE (PARTY patron MAY borrow PROVIDED RECALL `returned` EQUALS JUST TRUE WITHIN 100)
+GIVETH DEONTIC Person Action
+other MEANS PARTY clerk MAY stamp WITHIN 100
+-- bare RECALL in the continuation's guard reads the ledger of the party whose
+-- hand-off is still in scope (patron), because today the continuation scans
+-- the rest of the stream inside that scope
+#TRACE c AT 0 WITH PARTY patron DOES giveBack AT 1   PARTY patron DOES borrow AT 2
+#TRACE c RAND other AT 0 WITH PARTY patron DOES giveBack AT 1   PARTY patron DOES borrow AT 2
+#TRACE other RAND c AT 0 WITH PARTY patron DOES giveBack AT 1   PARTY patron DOES borrow AT 2

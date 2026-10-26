@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+barrier-island-2.l4:15:113-124:
+  I found a problem while checking the definition of `both`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at barrier-island-2.l4:10:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+barrier-island-2.l4:16:49-60:
+  I found a problem while checking the definition of `both`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at barrier-island-2.l4:10:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+barrier-island-2.l4:17:1-136:
+  FULFILLED
+barrier-island-2.l4:18:1-22:
+  PARTY Tenant OF "Alice" MUST Sign t WITHIN 14 HENCE `the join` LEST `the join fails` AND PARTY Tenant OF "Bob" MUST Sign t WITHIN 14 HENCE `the join` LEST `the join fails` AND PARTY theLandlord MUST Deliver theLandlord WITHIN 30 HENCE FULFILLED
