@@ -25,8 +25,9 @@ import L4.FunctionSchema (Parameters (..))
 
 import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.STM (atomically, modifyTVar', newTVarIO)
-import Control.Exception (bracket, finally, try)
+import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO)
+import Control.Exception (bracket, finally, throwIO, try)
+import Control.Monad.IO.Class (liftIO)
 import System.Timeout (timeout)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -2056,6 +2057,31 @@ spec = describe "integration" do
           (what :: String, expected :: String, viaMcp) `shouldBe` (what, expected, viaRest)
           (what, expected, viaBatch) `shouldBe` (what, expected, viaRest)
 
+    -- One case's exception is that case's error. The only way to raise one in a
+    -- case now that decimals are read is to make the evaluator do it, so the
+    -- test replaces the evaluator of an ordinary function with one that throws on
+    -- an input that is the string "boom", and runs a batch of three.
+    it "errors a batch case whose evaluation raised an exception and answers the cases beside it" do
+      let raisesOnBoom vf = vf { fnEvaluator = Map.map wrapped vf.fnEvaluator }
+          wrapped (RunFunction run) = RunFunction \args filt level gv ->
+            if lookup "drinks" args == Just (Just (FnLitString "boom"))
+              then liftIO (throwIO (userError "boom: internal detail"))
+              else run args filt level gv
+          caseOf i drinks = Aeson.object
+            [ "@id" Aeson..= (i :: Int), "walks" Aeson..= True, "eats" Aeson..= True, "drinks" Aeson..= (drinks :: Aeson.Value) ]
+      withServiceFromSourcesWith testOptions "batch-raises" [("qualifies.l4", qualifiesJL4)] \registry baseUrl mgr -> do
+        atomically $ modifyTVar' registry $ Map.map \case
+          DeploymentReady fns meta -> DeploymentReady (Map.map raisesOnBoom fns) meta
+          other -> other
+        answers <- askBatchCases baseUrl mgr "batch-raises" "compute_qualifies"
+          [caseOf 1 (Aeson.Bool True), caseOf 2 (Aeson.String "boom"), caseOf 3 (Aeson.Bool False)]
+        case answers of
+          [Right first, Left raised, Right third] -> do
+            (Map.lookup "value" first, Map.lookup "value" third) `shouldBe` (Just (FnLitBool True), Just (FnLitBool False))
+            -- it says that the case failed, and none of what the exception said
+            ("could not be evaluated" `Text.isInfixOf` raised, "boom" `Text.isInfixOf` raised) `shouldBe` (True, False)
+          other -> expectationFailure ("expected an answer, an error and an answer, got " <> show other)
+
     -- the fixture the REST tests use for a party that is a record: the rule has
     -- inputs of its own, and its function is spelled with a space. It returns
     -- `PROVISION OF …`, the deprecated alias of DEONTIC, so its MCP tool has the
@@ -3618,6 +3644,56 @@ withServiceFromSources' deployId sources act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result' <- act baseUrl mgr
+    cleanDir tmpPath
+    pure result'
+
+-- | 'withServiceFromSources' under caller-chosen 'Options', with the deployment
+-- registry itself handed to the test, for a test that has to change what a
+-- function is (its evaluator, its compiled module) or has to move a limit:
+-- the suite otherwise runs on 'testOptions', whose limits never fire.
+withServiceFromSourcesWith
+  :: Options
+  -> Text
+  -> [(FilePath, Text)]
+  -> (TVar (Map DeploymentId DeploymentState) -> String -> Manager -> IO a)
+  -> IO a
+withServiceFromSourcesWith opts deployId sources act = do
+  resOrExc <- try (withServiceFromSourcesWith' opts deployId sources act)
+  case resOrExc of
+    Left ioe ->
+      if isPermissionError ioe
+        then pendingWith ("Skipping integration test (cannot bind sockets): " <> show ioe) >> pure undefined
+        else do
+          expectationFailure (show ioe)
+          pure undefined
+    Right result -> pure result
+
+withServiceFromSourcesWith'
+  :: Options
+  -> Text
+  -> [(FilePath, Text)]
+  -> (TVar (Map DeploymentId DeploymentState) -> String -> Manager -> IO a)
+  -> IO a
+withServiceFromSourcesWith' opts deployId sources act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+  cleanDir tmpPath
+  store <- initStore tmpPath
+  logger <- newLogger False
+
+  result <- compileBundle logger "test" (Map.fromList sources)
+  (fns, meta) <- case result of
+    Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
+    Right (f, m) -> pure (f, m)
+
+  registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentReady fns meta)
+  pendingUpd <- newTVarIO Map.empty
+  tasksReg <- newTVarIO Map.empty
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg
+
+  mgr <- newManager defaultManagerSettings
+  testWithApplication (pure $ app env) \port -> do
+    let baseUrl = "http://localhost:" <> show port
+    result' <- act registry baseUrl mgr
     cleanDir tmpPath
     pure result'
 

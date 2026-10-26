@@ -20,9 +20,9 @@ import Shared (AnnotatedFunctionSummary (..), buildPropertyReverseMap, remapArgu
 import Backend.Jl4 (CompiledModule (..))
 import DeonticTrace (isDeonticFunction, isStrayTraceField, noDeonticModule, noTraceForOtherFunctions, requireTrace, runDeonticLimited, traceFromJSON)
 import qualified L4.StateGraph as StateGraph
-import Logging (logInfo)
+import Logging (logError, logInfo)
 import Options (Options (..))
-import Shared (jsonError)
+import Shared (jsonError, trySynchronous)
 import Types
 
 import qualified Data.Aeson as Aeson
@@ -32,7 +32,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch, evaluate)
+import Control.Exception (catch, displayException, evaluate)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
@@ -286,13 +286,22 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- Evaluate all cases in parallel, collecting alloc bytes per case
   evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase -> do
     let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-    r <- runAppM env $
+    -- An exception the case raises by itself is that case's error. It must not
+    -- escape 'forConcurrently', which would fail the whole batch.
+    r <- trySynchronous $ runAppM env $
       if isDeonticFunction vf
         then runDeonticBatchCase vf reverseMap inputCase.attributes traceLevel includeGraphViz
         else case strayTraceOfCase vf inputCase.attributes of
           Just refusal -> pure (SimpleError (InterpreterError refusal), 0)
           Nothing -> runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz
-    pure (inputCase.id, r)
+    case r of
+      Left e -> do
+        logError env.logger "Batch case raised an exception"
+          [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
+          , ("functionName", Aeson.toJSON fnName)
+          , ("error", Aeson.toJSON (displayException e)) ]
+        pure (inputCase.id, Right (SimpleError (InterpreterError batchCaseFailed), 0))
+      Right done -> pure (inputCase.id, done)
 
   -- Check for fatal errors and propagate
   case [err | (_, Left err) <- evalResults] of
@@ -576,6 +585,11 @@ runDeonticBatchCase vf reverseMap attributes traceLevel includeGraphViz =
  where
   inputs = remapArguments reverseMap
     [ (k, Just v) | (k, v) <- Map.toList attributes, k `notElem` ["startTime", "events"] ]
+
+-- | What a batch case says when evaluating it raised an exception of its own.
+-- The exception is in the service log; it is not the client's to read.
+batchCaseFailed :: Text
+batchCaseFailed = "This case could not be evaluated: the service failed on it. The other cases are answered."
 
 -- | A batch case for a function that is not DEONTIC, with a trace among its
 -- attributes: a @startTime@ or @events@ that is not one of the function's
