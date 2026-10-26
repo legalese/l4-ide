@@ -1,0 +1,112 @@
+-- A polymorphic helper (GIVEN a IS A TYPE) that reads a polymorphic ASSUME at
+-- its own type variable reads it at the type that each call of the helper gives
+-- that variable. A request has no JSON form for a DEONTIC or an EVENT, so an
+-- exported rule that calls such a helper at a type that holds one is refused,
+-- naming the ASSUME, whether the helper stands under the rule's own WHERE or is
+-- a rule of the file. A call at a type that holds neither is not refused. The
+-- rules are exported on purpose: the same rules without @export check.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN a IS A TYPE
+GIVETH AN a
+ASSUME `the placeholder`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`duty fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+GIVEN e IS AN EVENT Person Action
+GIVETH A NUMBER
+`time of` e MEANS
+  CONSIDER e
+  WHEN EVENT party action time THEN time
+
+GIVETH A DEONTIC Person Action
+`the standard duty` MEANS PARTY Seller MUST `deliver goods` WITHIN 10
+
+-- Refused: the call `fetch 1` gives the helper's type variable the type DEONTIC.
+@export Is the duty fulfilled, as the local helper reads it
+GIVETH A BOOLEAN
+`via local helper` MEANS `duty fulfilled` (fetch 1)
+  WHERE
+    GIVEN a IS A TYPE
+          n IS A NUMBER
+    GIVETH AN a
+    fetch n MEANS `the placeholder`
+
+GIVEN a IS A TYPE
+      n IS A NUMBER
+GIVETH AN a
+`top fetch` n MEANS `the placeholder`
+
+-- Refused: the helper is a rule of the file.
+@export Is the duty fulfilled, as the polymorphic rule reads it
+GIVETH A BOOLEAN
+`via top helper` MEANS `duty fulfilled` (`top fetch` 1)
+
+-- Refused for the EVENT: the call gives the variable the type EVENT.
+@export When did the placeholder happen, as the polymorphic rule reads it
+GIVETH A NUMBER
+`via event helper` MEANS `time of` (`top fetch` 2)
+
+GIVEN b IS A TYPE
+      n IS A NUMBER
+GIVETH A b
+`relay` n MEANS `top fetch` n
+
+-- Refused: one polymorphic rule hands its own type variable on to another.
+@export Is the duty fulfilled, through two polymorphic rules
+GIVETH A BOOLEAN
+`via relay` MEANS `duty fulfilled` (`relay` 3)
+
+GIVEN a IS A TYPE
+      x IS AN a
+GIVETH A LIST OF a
+`with placeholder` x MEANS LIST x, `the placeholder`
+
+-- Refused: the input of the helper, not its answer, gives the variable the type DEONTIC.
+@export The standard duty and the placeholder
+GIVETH A LIST OF DEONTIC Person Action
+`via input of helper` MEANS `with placeholder` `the standard duty`
+
+GIVEN a IS A TYPE
+      n IS A NUMBER
+GIVETH AN a
+countdown n MEANS
+  IF n <= 0
+  THEN `the placeholder`
+  ELSE countdown (n - 1)
+
+-- Refused: the polymorphic helper calls itself.
+@export Is the duty fulfilled, as a helper that calls itself reads it
+GIVETH A BOOLEAN
+`via recursion` MEANS `duty fulfilled` (countdown 3)
+
+-- Accepted: the call gives the variable the type NUMBER.
+@export One more than the placeholder, as the local helper reads it
+GIVETH A NUMBER
+`via number helper` MEANS fetch 1 + 1
+  WHERE
+    GIVEN a IS A TYPE
+          n IS A NUMBER
+    GIVETH AN a
+    fetch n MEANS `the placeholder`
+
+GIVEN a IS A TYPE
+      duty IS A DEONTIC Person Action
+GIVETH AN a
+`beside the duty` duty MEANS `the placeholder`
+
+-- Accepted: the helper takes a DEONTIC, but reads the placeholder at its type
+-- variable, which this call makes a NUMBER.
+@export One more than the placeholder beside the standard duty
+GIVETH A NUMBER
+`via helper that takes a duty` MEANS `beside the duty` `the standard duty` + 1
+
+-- Not exported: a call at the type DEONTIC is not checked, and is not reported.
+GIVETH A BOOLEAN
+`internal only` MEANS `duty fulfilled` (`top fetch` 4)

@@ -1,0 +1,123 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 26:1-26:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 37:1-37:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    EVENT inputs are not supported for @export.
+    The input `the assumed event` is an ASSUME that `assumed event time` reads as a value whose type contains an EVENT, and this rule calls `assumed event time`, directly or through other rules. A request has no JSON form for an event, so give `assumed event time` the event as an input.
+    Give the rule the party, the action and the time as separate inputs, and build the event inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 48:1-48:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 66:1-66:16
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` is an ASSUME that `ping` reads as a value whose type contains a DEONTIC, and this rule calls `ping`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `ping` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 77:1-77:18
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duties` is an ASSUME that `any duty assumed` reads as a value whose type contains a DEONTIC, and this rule calls `any duty assumed`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `any duty assumed` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 88:1-88:21
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the untyped duty` is an ASSUME that `untyped duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `untyped duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `untyped duty fulfilled` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 94:1-94:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 114:1-114:20
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` is an ASSUME that `nested reader` reads as a value whose type contains a DEONTIC, and this rule calls `nested reader`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `nested reader` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 127:1-127:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `local duty` is an ASSUME that `local duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `local duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `local duty fulfilled` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 140:1-140:15
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` is an ASSUME that `assumed duty fulfilled at` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled at`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled at` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+
+File: export-assume-through-callee.l4
+  Hidden: no
+  Range: 150:1-150:21
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    DEONTIC inputs are not supported for @export.
+    The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled` the DEONTIC as an input.
+    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.

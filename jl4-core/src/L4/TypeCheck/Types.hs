@@ -115,14 +115,17 @@ data CheckError =
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
-  | ExportEventTypeInput Resolved Resolved
+  | ExportEventTypeInput Resolved Resolved (Maybe Resolved)
     -- ^ An @export-decorated DECIDE has an input whose type contains an EVENT
     -- (GIVEN or referenced ASSUME). Arguments: exported-function name,
-    -- offending parameter/assume name.
-  | ExportDeonticTypeInput Resolved Resolved
+    -- offending parameter/assume name, and the rule of the module that reads
+    -- the ASSUME when that is not the exported rule but a rule that it calls
+    -- (see 'L4.Export.validateExportInputs').
+  | ExportDeonticTypeInput Resolved Resolved (Maybe Resolved)
     -- ^ An @export-decorated DECIDE has an input whose type contains a DEONTIC
     -- (GIVEN or referenced ASSUME). Arguments: exported-function name,
-    -- offending parameter/assume name.
+    -- offending parameter/assume name, and the rule of the module that reads
+    -- the ASSUME when that is not the exported rule but a rule that it calls.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 

@@ -11,6 +11,7 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Optics (cosmosOf, foldMapOf, gplate, over, toListOf, (^.))
+import System.Mem (getAllocationCounter)
 import System.Timeout (timeout)
 
 import L4.API (l4Check)
@@ -19,7 +20,7 @@ import L4.Annotation (getAnno)
 import L4.Export (BodyReads(..), ExportedFunction(..), bodyReads, getExportedFunctions, enrichReturnTypes, isExportedDecide, validateExportInputs)
 import L4.Import.Resolution (ResolvedImport(..), TypeCheckWithDepsResult(..))
 import L4.Print (prettyTypeForDisplay)
-import L4.Syntax (AppForm(MkAppForm), Assume, Decide(MkDecide), Expr(App, List, Where), Info(TypeInfo), LocalDecl(LocalAssume), Module, Resolved(Ref), TermKind(Constructor), Type', Unique(MkUnique), annInfo, getActual, nameToText)
+import L4.Syntax (AppForm(MkAppForm), Assume, Decide(MkDecide), Expr(App, List, Proj, Where), Info(TypeInfo), LocalDecl(LocalAssume), Module, Resolved(Ref), TermKind(Constructor), Type', Unique(MkUnique), annInfo, getActual, nameToText)
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import L4.TypeCheck.Types (CheckEntity(KnownTerm), CheckErrorWithContext(..), CheckError(..), CheckResult(..), Severity(..))
 
@@ -45,11 +46,11 @@ exportEventErrors vfs source =
     Right r ->
       let hits =
             [ e
-            | e@MkCheckErrorWithContext{kind = ExportEventTypeInput _ _} <- r.tcdErrors
+            | e@MkCheckErrorWithContext{kind = ExportEventTypeInput _ _ _} <- r.tcdErrors
             ]
       in Right
         ( [ (nameToText (getActual fn), nameToText (getActual p))
-          | MkCheckErrorWithContext{kind = ExportEventTypeInput fn p} <- hits
+          | MkCheckErrorWithContext{kind = ExportEventTypeInput fn p _} <- hits
           ]
         , concatMap prettyCheckErrorWithContext (take 1 hits)
         )
@@ -123,11 +124,53 @@ exportBlocks vfs src =
       , [ (what, nameToText (getActual fn), nameToText (getActual p), severity e)
         | e@(MkCheckErrorWithContext kind _) <- r.tcdErrors
         , (what, fn, p) <- case kind of
-            ExportEventTypeInput f i   -> [("EVENT", f, i)]
-            ExportDeonticTypeInput f i -> [("DEONTIC", f, i)]
+            ExportEventTypeInput f i _   -> [("EVENT", f, i)]
+            ExportDeonticTypeInput f i _ -> [("DEONTIC", f, i)]
             _                          -> []
         ]
       )
+
+-- | Whether the check of a source succeeded, and each refusal of an input that
+-- a request has no JSON form for, as (what the input holds, function, input,
+-- the rule that reads the input, severity), in the order the checker reports
+-- them. The rule that reads the input is named when it is a rule that the
+-- exported rule calls, and is empty when the exported rule reads the input
+-- itself. All but the severity are read from the text that an author sees.
+exportReaders :: Text -> IO (Bool, [(Text, Text, Text, Text, Severity)])
+exportReaders = exportReadersWith emptyVFS
+
+-- | 'exportReaders' of a snippet that can import the modules of the given VFS.
+exportReadersWith :: VFS -> Text -> IO (Bool, [(Text, Text, Text, Text, Severity)])
+exportReadersWith vfs src =
+  case checkWithImports vfs src of
+    Left errs -> fail ("Fatal: " ++ show errs)
+    Right r -> pure
+      ( r.tcdSuccess
+      , [ (what, quotedAfter "the definition of" shown, quotedAfter "The input" shown, quotedAfter "is an ASSUME that" shown, severity e)
+        | e <- r.tcdErrors
+        , let shown = prettyCheckErrorWithContext e
+        , (what, marker) <- [("EVENT", "EVENT inputs are not supported for @export."), ("DEONTIC", "DEONTIC inputs are not supported for @export.")]
+        , any ((== marker) . Text.strip) shown
+        ]
+      )
+
+-- | 'exportReaders' under the same watchdog as 'refusedWithinWatchdog', for a
+-- source that the check must finish: one with rules that call each other, or
+-- that many paths of calls reach. The refusals only, without the severity.
+readersWithinWatchdog :: Text -> IO [(Text, Text, Text, Text)]
+readersWithinWatchdog src = do
+  mb <- timeout (30 * 1000000) $ do
+    (_, hits) <- exportReaders src
+    _ <- evaluate (force (map (\(what, fn, input, reader, _) -> (what, fn, input, reader)) hits))
+    pure [ (what, fn, input, reader) | (what, fn, input, reader, _) <- hits ]
+  maybe (fail "the export check did not finish within 30s") pure mb
+
+-- | The name between the first pair of backticks that follows the marker, on
+-- the first line that holds the marker, or nothing when no line holds it.
+quotedAfter :: Text -> [Text] -> Text
+quotedAfter marker ls = case filter (Text.isInfixOf marker) ls of
+  (l : _) -> Text.takeWhile (/= '`') (Text.drop 1 (Text.dropWhile (/= '`') (snd (Text.breakOn marker l))))
+  []      -> ""
 
 -- | Run typecheck on a source snippet and return the exported function
 -- names (or 'Left' on fatal failure).
@@ -331,6 +374,7 @@ genericBodyReads body =
   everyExpr = cosmosOf (gplate @(Expr Resolved))
   reference = \case
     App _ ref@Ref{} _ -> [ref]
+    Proj _ _ ref@Ref{} -> [ref]
     _ -> []
   readType = \case
     App ann ref@Ref{} [] | Just (TypeInfo ty _) <- ann ^. annInfo -> [(ref, ty)]
@@ -429,6 +473,20 @@ spec = do
             , "@export Apply assumed predicate"
             , "GIVETH A BOOLEAN"
             , "DECIDE `fn_assume_test` IF `pred` OF TRUE"
+            ]
+      case exportFnErrors src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right fns -> length fns `shouldBe` 1
+
+    -- `n's f` is a call of f with n as its one input, as `f n` is.
+    it "rejects @export that calls a function-typed ASSUME with 's after its input" $ do
+      let src = Text.unlines
+            [ "ASSUME bump IS A FUNCTION FROM NUMBER TO NUMBER"
+            , ""
+            , "@export Bump a number, by a call written with 's"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`bumped by genitive` n MEANS n's bump"
             ]
       case exportFnErrors src of
         Left errs -> fail $ "Fatal: " ++ show errs
@@ -2091,6 +2149,741 @@ spec = do
       blocks (wherePair duty number "`shared` + 1" "NUMBER") `shouldReturn` (True, [])
       -- the body reads the top-level DEONTIC, and the local NUMBER beside it is not read
       blocks (wherePair duty number "`fulfilled` `shared`" "BOOLEAN") `shouldReturn` refusedFor
+
+  -- A rule that the exported rule calls, directly or through other rules of the
+  -- module, can read an ASSUME too. The service lists only the ASSUMEs that the
+  -- exported rule reads itself, so a DEONTIC or an EVENT that a helper reads
+  -- would be no input at all: the check refuses it as it refuses one that the
+  -- exported rule reads, and names the rule that reads it.
+  describe "an @export that reaches an ASSUME through a rule that it calls" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          , "ASSUME `the duty` IS A DEONTIC Person Action"
+          , "ASSUME `the event` IS AN EVENT Person Action"
+          , "ASSUME `the rate` IS A NUMBER"
+          , ""
+          ]
+        dutyReader name = Text.unlines
+          [ "GIVETH A BOOLEAN"
+          , name <> " MEANS"
+          , "  CONSIDER `the duty`"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          ]
+        exported name body = Text.unlines
+          [ "@export " <> name
+          , "GIVETH A BOOLEAN"
+          , name <> " MEANS " <> body
+          ]
+
+    it "blocks an ASSUME of type DEONTIC that a helper reads, names the helper, and says what to do" $ do
+      let src = parties <> dutyReader "`duty fulfilled`" <> exported "`via helper`" "`duty fulfilled`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via helper", "the duty", "duty fulfilled", SError)])
+      case exportDeonticErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `via helper`:"
+            , "  DEONTIC inputs are not supported for @export."
+            , "  The input `the duty` is an ASSUME that `duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `duty fulfilled` the DEONTIC as an input."
+            , "  Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+            ]
+
+    it "blocks an ASSUME of type EVENT that a helper reads, names the helper, and says what to do" $ do
+      let src = parties <> Text.unlines
+            [ "GIVETH A NUMBER"
+            , "`event time` MEANS"
+            , "  CONSIDER `the event`"
+            , "  WHEN EVENT p a t THEN t"
+            , "  OTHERWISE 0"
+            , ""
+            , "@export When"
+            , "GIVETH A NUMBER"
+            , "`via event helper` MEANS `event time`"
+            ]
+      exportReaders src `shouldReturn` (False, [("EVENT", "via event helper", "the event", "event time", SError)])
+      case exportEventErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `via event helper`:"
+            , "  EVENT inputs are not supported for @export."
+            , "  The input `the event` is an ASSUME that `event time` reads as a value whose type contains an EVENT, and this rule calls `event time`, directly or through other rules. A request has no JSON form for an event, so give `event time` the event as an input."
+            , "  Give the rule the party, the action and the time as separate inputs, and build the event inside it."
+            ]
+
+    it "follows a chain of rules, and names the one that reads the ASSUME" $ do
+      let src = parties <> dutyReader "`duty fulfilled`" <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`first link` MEANS `second link`"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`second link` MEANS `duty fulfilled`"
+            , ""
+            ] <> exported "`via chain`" "`first link`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via chain", "the duty", "duty fulfilled", SError)])
+
+    it "follows rules that call each other, and finishes" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "ping n MEANS"
+            , "  IF n <= 0"
+            , "  THEN CONSIDER `the duty`"
+            , "       WHEN FULFILLED THEN TRUE"
+            , "       OTHERWISE FALSE"
+            , "  ELSE pong (n - 1)"
+            , ""
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "pong n MEANS ping (n - 1)"
+            , ""
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "loop n MEANS loop n"
+            , ""
+            ] <> exported "`via recursion`" "pong 3 AND loop 1"
+      readersWithinWatchdog src `shouldReturn` [("DEONTIC", "via recursion", "the duty", "ping")]
+
+    it "follows a rule that many paths reach once, and finishes" $ do
+      -- every level calls the next one twice, so the paths from the exported
+      -- rule to the last level double at every level
+      let levels = 60 :: Int
+          level :: Int -> Text
+          level k = "`level " <> Text.pack (show k) <> "`"
+          src = parties <> Text.unlines (concat
+            [ [ "GIVETH A BOOLEAN"
+              , level k <> " MEANS " <> level (k + 1) <> " AND " <> level (k + 1)
+              , ""
+              ]
+            | k <- [1 .. levels - 1]
+            ]) <> dutyReader (level levels) <> exported "`via levels`" (level 1)
+      readersWithinWatchdog src `shouldReturn` [("DEONTIC", "via levels", "the duty", "level 60")]
+
+    it "blocks an ASSUME that holds a DEONTIC in a LIST, that a helper reads" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `the duties` IS A LIST OF DEONTIC Person Action"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`any duty` MEANS"
+            , "  CONSIDER `the duties`"
+            , "  WHEN EMPTY THEN FALSE"
+            , "  OTHERWISE TRUE"
+            , ""
+            ] <> exported "`via list helper`" "`any duty`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via list helper", "the duties", "any duty", SError)])
+
+    it "blocks an ASSUME with no written type that a helper reads as a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "ASSUME `the untyped duty`"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`untyped fulfilled` MEANS"
+            , "  CONSIDER `the untyped duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            ] <> exported "`via untyped helper`" "`untyped fulfilled`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via untyped helper", "the untyped duty", "untyped fulfilled", SError)])
+
+    it "blocks an ASSUME of type DEONTIC that the helper's own WHERE declares" $ do
+      let src = parties <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`own duty fulfilled` MEANS"
+            , "  CONSIDER `own duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , "  WHERE"
+            , "    ASSUME `own duty` IS A DEONTIC Person Action"
+            , ""
+            ] <> exported "`via own duty`" "`own duty fulfilled`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via own duty", "own duty", "own duty fulfilled", SError)])
+
+    it "follows a call under the WHERE of a definition under the rule's own WHERE, and a read there in the helper" $ do
+      let nested body = Text.unlines
+            [ "  WHERE"
+            , "    outer MEANS inner"
+            , "      WHERE"
+            , "        inner MEANS " <> body
+            ]
+          callIt = parties <> dutyReader "`duty fulfilled`" <> exported "`via nested call`" "outer" <> nested "`duty fulfilled`"
+          readIt = parties <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`nested reader` MEANS outer"
+            ] <> nested "`the duty` EQUALS `the duty`" <> "\n" <> exported "`via nested read`" "`nested reader`"
+      exportReaders callIt `shouldReturn` (False, [("DEONTIC", "via nested call", "the duty", "duty fulfilled", SError)])
+      exportReaders readIt `shouldReturn` (False, [("DEONTIC", "via nested read", "the duty", "nested reader", SError)])
+
+    it "counts a read in a definition under the helper's WHERE that the helper never calls, as for the exported rule's own WHERE" $ do
+      let src = parties <> Text.unlines
+            [ "GIVETH A NUMBER"
+            , "`helper with unused part` MEANS 1"
+            , "  WHERE"
+            , "    unused MEANS `the duty` EQUALS `the duty`"
+            , ""
+            , "@export One more"
+            , "GIVETH A NUMBER"
+            , "`via unused part` MEANS `helper with unused part` + 1"
+            ]
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via unused part", "the duty", "helper with unused part", SError)])
+
+    it "follows a rule that the body hands on as a value, as to map" $ do
+      let src = "IMPORT prelude\n" <> parties <> Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`check one` n MEANS `the duty` EQUALS `the duty`"
+            , ""
+            , "@export Checks"
+            , "GIVETH A LIST OF BOOLEAN"
+            , "`via map` MEANS map `check one` (LIST 1, 2)"
+            ]
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via map", "the duty", "check one", SError)])
+
+    it "follows a rule that stands in a section" $ do
+      let src = parties <> "§ `Part one`\n" <> dutyReader "`sectioned`" <> "§ `Part two`\n" <> exported "`via section`" "`sectioned`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via section", "the duty", "sectioned", SError)])
+
+    -- `n's f` is a call of the rule f with n as its one input, and a computed
+    -- field of a record is a rule whose one input is the record.
+    it "follows a call written with 's, a computed field of a record, and such a call one rule away" $ do
+      let atReader = Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`duty fulfilled at` n MEANS"
+            , "  CONSIDER `the duty`"
+            , "  WHEN FULFILLED THEN n > 0"
+            , "  OTHERWISE FALSE"
+            , ""
+            ]
+          viaGenitive = parties <> atReader <> Text.unlines
+            [ "@export Is the duty fulfilled, by a call written with 's"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`via genitive` n MEANS n's `duty fulfilled at`"
+            ]
+          viaField = parties <> Text.unlines
+            [ "DECLARE Case HAS"
+            , "    `case number` IS A NUMBER"
+            , "    `duty met` IS A BOOLEAN MEANS `the duty` EQUALS `the duty`"
+            , ""
+            , "@export Is the duty met, by a computed field"
+            , "GIVEN c IS A Case"
+            , "GIVETH A BOOLEAN"
+            , "`via computed field` c MEANS c's `duty met`"
+            ]
+          viaMiddle = parties <> atReader <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`genitive middle` MEANS 3's `duty fulfilled at`"
+            , ""
+            ] <> exported "`via genitive middle`" "`genitive middle`"
+      exportReaders viaGenitive `shouldReturn` (False, [("DEONTIC", "via genitive", "the duty", "duty fulfilled at", SError)])
+      exportReaders viaField `shouldReturn` (False, [("DEONTIC", "via computed field", "the duty", "duty met", SError)])
+      exportReaders viaMiddle `shouldReturn` (False, [("DEONTIC", "via genitive middle", "the duty", "duty fulfilled at", SError)])
+
+    it "follows a rule that reads an ASSUME of an imported module" $ do
+      let facts = Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF delivery, payment"
+            , ""
+            , "ASSUME `imported duty` IS A DEONTIC Person Action"
+            ]
+          src = Text.unlines
+            [ "IMPORT facts"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "`imported duty fulfilled` MEANS"
+            , "  CONSIDER `imported duty`"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            ] <> exported "`via imported reader`" "`imported duty fulfilled`"
+      exportReadersWith (vfsFromList [("facts", facts)]) src
+        `shouldReturn` (False, [("DEONTIC", "via imported reader", "imported duty", "imported duty fulfilled", SError)])
+
+    it "refuses an ASSUME once, however many rules read it, and as the exported rule's own read when it reads it too" $ do
+      let twoReaders = parties <> dutyReader "`first reader`" <> dutyReader "`second reader`"
+          both = twoReaders <> exported "`via two readers`" "`first reader` AND `second reader`"
+          ownToo = twoReaders <> exported "`reads it too`" "`first reader` AND (`the duty` EQUALS `the duty`)"
+      (fmap (map (\(what, fn, input, _, sev) -> (what, fn, input, sev))) <$> exportReaders both)
+        `shouldReturn` (False, [("DEONTIC", "via two readers", "the duty", SError)])
+      exportReaders ownToo `shouldReturn` (False, [("DEONTIC", "reads it too", "the duty", "", SError)])
+
+    it "accepts a helper that reads an ASSUME of type NUMBER" $ do
+      let src = parties <> Text.unlines
+            [ "GIVETH A NUMBER"
+            , "`rate plus one` MEANS `the rate` + 1"
+            , ""
+            , "@export One more"
+            , "GIVETH A NUMBER"
+            , "`via number helper` MEANS `rate plus one`"
+            ]
+      exportReaders src `shouldReturn` (True, [])
+
+    it "does not look at a helper that no exported rule reaches" $ do
+      let src = parties <> dutyReader "`duty fulfilled`" <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`internal only` MEANS `duty fulfilled`"
+            , ""
+            , "@export Unrelated"
+            , "GIVETH A NUMBER"
+            , "`unrelated` MEANS `the rate` + 1"
+            ]
+      exportReaders src `shouldReturn` (True, [])
+
+    it "accepts a helper that takes the DEONTIC as an input from a rule that builds it" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN duty IS A DEONTIC Person Action"
+            , "GIVETH A BOOLEAN"
+            , "`is fulfilled` duty MEANS"
+            , "  CONSIDER duty"
+            , "  WHEN FULFILLED THEN TRUE"
+            , "  OTHERWISE FALSE"
+            , ""
+            , "@export Is the duty to deliver fulfilled"
+            , "GIVEN deadline IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`via input` deadline MEANS `is fulfilled` (PARTY Seller MUST delivery WITHIN deadline)"
+            ]
+      exportReaders src `shouldReturn` (True, [])
+
+    -- Following the calls keeps a fact that a rule reaches a read of a DEONTIC
+    -- once for each ASSUME, read by the top-level rule that the rule stands in
+    -- or by another, and not once for each rule that reads it. Every link of
+    -- this chain reads the ASSUME of type DEONTIC and calls the next link, so a
+    -- fact for each reader would make the work grow with the square of the
+    -- length of the chain. As for the chain of polymorphic readers in the next
+    -- group, the test counts what the input check allocates: a chain four times
+    -- as long must allocate less than eight times as much.
+    it "does not keep a fact for each rule that reads the ASSUME, in a chain of rules that each read a DEONTIC" $ do
+      let link :: Int -> Text
+          link k = "`link " <> Text.pack (show k) <> "`"
+          next links k = if k < links then link (k + 1) <> " (n - 1)" else "FALSE"
+          chain links = parties <> Text.unlines (concat
+            [ [ "GIVEN n IS A NUMBER"
+              , "GIVETH A BOOLEAN"
+              , link k <> " n MEANS"
+              , "  IF n <= 0"
+              , "  THEN CONSIDER `the duty`"
+              , "       WHEN FULFILLED THEN TRUE"
+              , "       OTHERWISE FALSE"
+              , "  ELSE " <> next links k
+              , ""
+              ]
+            | k <- [1 .. links]
+            ]) <> Text.unlines
+            [ "@export The top rule"
+            , "GIVEN x IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`top` x MEANS " <> link 1 <> " x"
+            ]
+          allocatedFor links = do
+            r <- either (fail . ("Fatal: " <>) . show) pure (checkWithImports emptyVFS (chain links))
+            length [ () | e <- r.tcdErrors, severity e == SError ] `shouldBe` 1
+            _ <- evaluate (force r.tcdModule)
+            _ <- evaluate (force r.tcdEntityInfo)
+            counterBefore <- getAllocationCounter
+            refused <- evaluate (length (validateExportInputs r.tcdSubstitution r.tcdEntityInfo r.tcdModule))
+            counterAfter <- getAllocationCounter
+            refused `shouldBe` 1
+            pure (counterBefore - counterAfter)
+      short <- allocatedFor 200
+      long <- allocatedFor 800
+      (long, short) `shouldSatisfy` (\(longer, shorter) -> longer < 8 * shorter)
+
+  -- A polymorphic helper (GIVEN a IS A TYPE) that reads a polymorphic ASSUME at
+  -- its own type variable reads it at whatever type each call gives the
+  -- variable, so the type at the read holds no DEONTIC even when the call makes
+  -- the value one. The check works out what each call gives each variable, from
+  -- the types at the call, and goes by that.
+  describe "an @export whose polymorphic helper reads a polymorphic ASSUME" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          , "GIVEN a IS A TYPE"
+          , "GIVETH AN a"
+          , "ASSUME `the placeholder`"
+          , ""
+          , "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          , "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          , "GIVETH A DEONTIC Person Action"
+          , "`the standard duty` MEANS PARTY Seller MUST delivery WITHIN 10"
+          , ""
+          , "GIVEN a IS A TYPE"
+          , "      n IS A NUMBER"
+          , "GIVETH AN a"
+          , "`top fetch` n MEANS `the placeholder`"
+          , ""
+          ]
+        localFetch = Text.unlines
+          [ "  WHERE"
+          , "    GIVEN a IS A TYPE"
+          , "          n IS A NUMBER"
+          , "    GIVETH AN a"
+          , "    fetch n MEANS `the placeholder`"
+          ]
+        exported name giveth body = Text.unlines
+          [ "@export " <> name
+          , "GIVETH " <> giveth
+          , name <> " MEANS " <> body
+          ]
+
+    it "blocks a helper under the rule's own WHERE that the call makes read the ASSUME as a DEONTIC" $ do
+      let src = parties <> exported "`via local helper`" "A BOOLEAN" "`fulfilled` (fetch 1)" <> localFetch
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via local helper", "the placeholder", "", SError)])
+      case exportDeonticErrors emptyVFS src of
+        Left errs -> fail $ "Fatal: " ++ show errs
+        Right (_, msg) ->
+          Text.unlines msg `shouldBe` Text.unlines
+            [ "I found a problem while checking the definition of `via local helper`:"
+            , "  DEONTIC inputs are not supported for @export."
+            , "  The input `the placeholder` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+            , "  Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+            ]
+
+    it "blocks a polymorphic rule of the module that the call makes read the ASSUME as a DEONTIC or an EVENT, and names it" $ do
+      exportReaders (parties <> exported "`via top helper`" "A BOOLEAN" "`fulfilled` (`top fetch` 1)")
+        `shouldReturn` (False, [("DEONTIC", "via top helper", "the placeholder", "top fetch", SError)])
+      exportReaders (parties <> exported "`via event helper`" "A NUMBER" "`time of` (`top fetch` 1)")
+        `shouldReturn` (False, [("EVENT", "via event helper", "the placeholder", "top fetch", SError)])
+
+    it "blocks a call that names the helper's inputs (WITH)" $ do
+      exportReaders (parties <> exported "`via named call`" "A BOOLEAN" "`fulfilled` (`top fetch` WITH n IS 1)")
+        `shouldReturn` (False, [("DEONTIC", "via named call", "the placeholder", "top fetch", SError)])
+
+    it "goes by the inputs that a call names (WITH), in another order than the GIVEN" $ do
+      let helpers = parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      x IS AN a"
+            , "GIVETH A NUMBER"
+            , "`count beside` x MEANS"
+            , "  CONSIDER LIST x, `the placeholder`"
+            , "  WHEN EMPTY THEN 0"
+            , "  OTHERWISE 1"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "      x IS AN a"
+            , "GIVETH A NUMBER"
+            , "`count beside two` n x MEANS"
+            , "  CONSIDER LIST x, `the placeholder`"
+            , "  WHEN EMPTY THEN n"
+            , "  OTHERWISE 1"
+            , ""
+            ]
+      -- the helper answers a NUMBER: only the named input gives the variable a type
+      exportReaders (helpers <> exported "`via named input`" "A NUMBER" "`count beside` WITH x IS `the standard duty`")
+        `shouldReturn` (False, [("DEONTIC", "via named input", "the placeholder", "count beside", SError)])
+      exportReaders (helpers <> exported "`via named two`" "A NUMBER" "`count beside two` WITH x IS `the standard duty`, n IS 1")
+        `shouldReturn` (False, [("DEONTIC", "via named two", "the placeholder", "count beside two", SError)])
+      exportReaders (helpers <> exported "`via named numbers`" "A NUMBER" "`count beside two` WITH x IS 3, n IS 1")
+        `shouldReturn` (True, [])
+
+    it "goes by the type of a polymorphic rule that the body hands on as a value, as to map" $ do
+      let src = "IMPORT prelude\n" <> parties <> Text.unlines
+            [ "GIVEN xs IS A LIST OF DEONTIC Person Action"
+            , "GIVETH A NUMBER"
+            , "`count list` xs MEANS"
+            , "  CONSIDER xs"
+            , "  WHEN EMPTY THEN 0"
+            , "  OTHERWISE 1"
+            , ""
+            ] <> exported "`via map fetch`" "A NUMBER" "`count list` (map `top fetch` (LIST 1, 2))"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via map fetch", "the placeholder", "top fetch", SError)])
+
+    it "blocks a polymorphic helper that reads the prelude's TBD at a DEONTIC" $ do
+      let src = "IMPORT prelude\n" <> parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH AN a"
+            , "`tbd fetch` n MEANS TBD"
+            , ""
+            ] <> exported "`via tbd fetch`" "A BOOLEAN" "`fulfilled` (`tbd fetch` 1)"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via tbd fetch", "TBD", "tbd fetch", SError)])
+
+    -- `n's f` is a call of the rule f with n as its one input, and a computed
+    -- field of a record is a rule whose one input is the record.
+    it "goes by a call written with 's, and by a computed field of a polymorphic record" $ do
+      exportReaders (parties <> exported "`via genitive fetch`" "A BOOLEAN" "`fulfilled` (1's `top fetch`)")
+        `shouldReturn` (False, [("DEONTIC", "via genitive fetch", "the placeholder", "top fetch", SError)])
+      let holder = parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "DECLARE Holder a HAS"
+            , "    `holder number` IS A NUMBER"
+            , "    `held` IS AN a MEANS `the placeholder`"
+            , ""
+            ]
+      exportReaders (holder <> exported "`via computed held`" "A BOOLEAN" "`fulfilled` ((Holder 1)'s `held`)")
+        `shouldReturn` (False, [("DEONTIC", "via computed held", "the placeholder", "held", SError)])
+      exportReaders (holder <> exported "`via computed number`" "A NUMBER" "(Holder 1)'s `held` + 1")
+        `shouldReturn` (True, [])
+
+    it "follows a polymorphic rule that hands its own type variable on to another" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN b IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH A b"
+            , "relay n MEANS `top fetch` n"
+            , ""
+            ] <> exported "`via relay`" "A BOOLEAN" "`fulfilled` (relay 3)"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via relay", "the placeholder", "top fetch", SError)])
+
+    it "goes by the input of the helper as well as by its answer" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      x IS AN a"
+            , "GIVETH A LIST OF a"
+            , "`with placeholder` x MEANS LIST x, `the placeholder`"
+            , ""
+            ] <> exported "`via input of helper`" "A LIST OF DEONTIC Person Action" "`with placeholder` `the standard duty`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via input of helper", "the placeholder", "with placeholder", SError)])
+      -- a helper that answers a NUMBER: only its input gives the variable a type
+      let inputOnly = parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      x IS AN a"
+            , "GIVETH A NUMBER"
+            , "`count beside` x MEANS"
+            , "  CONSIDER LIST x, `the placeholder`"
+            , "  WHEN EMPTY THEN 0"
+            , "  OTHERWISE 1"
+            , ""
+            ]
+      exportReaders (inputOnly <> exported "`via input only`" "A NUMBER" "`count beside` `the standard duty`")
+        `shouldReturn` (False, [("DEONTIC", "via input only", "the placeholder", "count beside", SError)])
+      exportReaders (inputOnly <> exported "`number input`" "A NUMBER" "`count beside` 3")
+        `shouldReturn` (True, [])
+
+    it "expands a synonym on either side of the call" $ do
+      let synonyms = Text.unlines
+            [ "DECLARE Cargo a IS A LIST OF a"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      xs IS A Cargo a"
+            , "GIVETH A NUMBER"
+            , "`count with placeholder` xs MEANS"
+            , "  CONSIDER `the placeholder` FOLLOWED BY xs"
+            , "  WHEN EMPTY THEN 0"
+            , "  OTHERWISE 1"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      xs IS A LIST OF a"
+            , "GIVETH A NUMBER"
+            , "`count beside placeholder` xs MEANS"
+            , "  CONSIDER `the placeholder` FOLLOWED BY xs"
+            , "  WHEN EMPTY THEN 0"
+            , "  OTHERWISE 1"
+            , ""
+            , "GIVETH A Cargo (DEONTIC Person Action)"
+            , "`the cargo` MEANS LIST `the standard duty`"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH A LIST OF a"
+            , "`listed` n MEANS LIST `the placeholder`"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH A Cargo a"
+            , "`carried` n MEANS LIST `the placeholder`"
+            , ""
+            , "GIVEN xs IS A Cargo (DEONTIC Person Action)"
+            , "GIVETH A NUMBER"
+            , "`count cargo` xs MEANS"
+            , "  CONSIDER xs"
+            , "  WHEN EMPTY THEN 0"
+            , "  OTHERWISE 1"
+            , ""
+            , "GIVEN xs IS A LIST OF (DEONTIC Person Action)"
+            , "GIVETH A NUMBER"
+            , "`count list` xs MEANS"
+            , "  CONSIDER xs"
+            , "  WHEN EMPTY THEN 0"
+            , "  OTHERWISE 1"
+            , ""
+            ]
+      -- the helper declares a synonym, and the call gives it a LIST
+      exportReaders (parties <> synonyms <> exported "`via declared synonym`" "A NUMBER" "`count with placeholder` (LIST `the standard duty`)")
+        `shouldReturn` (False, [("DEONTIC", "via declared synonym", "the placeholder", "count with placeholder", SError)])
+      -- the helper declares a LIST, and the call gives it a synonym
+      exportReaders (parties <> synonyms <> exported "`via given synonym`" "A NUMBER" "`count beside placeholder` `the cargo`")
+        `shouldReturn` (False, [("DEONTIC", "via given synonym", "the placeholder", "count beside placeholder", SError)])
+      -- the helper answers a LIST where the call stands for a synonym: the type
+      -- recorded at the call is the synonym, and the helper declares a LIST
+      exportReaders (parties <> synonyms <> exported "`via answer synonym`" "A NUMBER" "`count cargo` (`listed` 1)")
+        `shouldReturn` (False, [("DEONTIC", "via answer synonym", "the placeholder", "listed", SError)])
+      -- the helper answers a synonym where the call stands for a LIST
+      exportReaders (parties <> synonyms <> exported "`via declared answer synonym`" "A NUMBER" "`count list` (`carried` 1)")
+        `shouldReturn` (False, [("DEONTIC", "via declared answer synonym", "the placeholder", "carried", SError)])
+
+    it "follows a polymorphic helper that calls itself" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH AN a"
+            , "countdown n MEANS"
+            , "  IF n <= 0"
+            , "  THEN `the placeholder`"
+            , "  ELSE countdown (n - 1)"
+            , ""
+            ] <> exported "`via recursion`" "A BOOLEAN" "`fulfilled` (countdown 3)"
+      readersWithinWatchdog src `shouldReturn` [("DEONTIC", "via recursion", "the placeholder", "countdown")]
+
+    it "follows a rule whose type variable the checker makes up, with no GIVEN a IS A TYPE" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "`implicit fetch` n MEANS `the placeholder`"
+            , ""
+            ] <> exported "`via implicit`" "A BOOLEAN" "`fulfilled` (`implicit fetch` 1)"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via implicit", "the placeholder", "implicit fetch", SError)])
+
+    it "goes by a type variable that stands inside a record type" $ do
+      let src = parties <> Text.unlines
+            [ "DECLARE Box a HAS content IS AN a"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH A Box a"
+            , "`boxed` n MEANS Box `the placeholder`"
+            , ""
+            ] <> exported "`via box`" "A BOOLEAN" "`fulfilled` ((`boxed` 1)'s content)"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via box", "the placeholder", "boxed", SError)])
+
+    it "goes by a type variable of a rule that a definition under its WHERE reads the ASSUME at" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH AN a"
+            , "`outer fetch` n MEANS inner"
+            , "  WHERE"
+            , "    inner MEANS `the placeholder`"
+            , ""
+            ] <> exported "`via outer`" "A BOOLEAN" "`fulfilled` (`outer fetch` 1)"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via outer", "the placeholder", "outer fetch", SError)])
+
+    it "follows a polymorphic rule through a rule that is not exported" $ do
+      let src = parties <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`middle` MEANS `fulfilled` (`top fetch` 1)"
+            , ""
+            ] <> exported "`via middle`" "A BOOLEAN" "`middle`"
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via middle", "the placeholder", "top fetch", SError)])
+
+    it "names no reader when a definition under the rule's own WHERE and a rule of the module both read the ASSUME" $ do
+      let src = parties <> exported "`via both`" "A BOOLEAN" "`fulfilled` (`top fetch` 2) AND `fulfilled` (fetch 1)" <> localFetch
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via both", "the placeholder", "", SError)])
+
+    -- A definition under the exported rule's WHERE reads the ASSUME at its own
+    -- variable and also calls a rule of the module that reads it, so the two
+    -- reads meet in the definition before they cross the call that makes them a
+    -- DEONTIC. The read that stands in the exported rule must not give way to
+    -- the other one there, whichever of the two rules is written first.
+    it "names no reader when a definition under the rule's own WHERE reads the ASSUME and calls a rule of the module that reads it" $ do
+      let src = parties <> exported "`via local both`" "A BOOLEAN" "`fulfilled` (fetch 1)" <> Text.unlines
+            [ "  WHERE"
+            , "    GIVEN a IS A TYPE"
+            , "          n IS A NUMBER"
+            , "    GIVETH AN a"
+            , "    fetch n MEANS IF n > 0 THEN `top fetch` n ELSE `the placeholder`"
+            ]
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via local both", "the placeholder", "", SError)])
+
+    it "names no reader when a definition under the rule's own WHERE reads the ASSUME and calls a rule of the module that reads it, written after the exported rule" $ do
+      let src = parties <> exported "`via local late`" "A BOOLEAN" "`fulfilled` (fetch 1)" <> Text.unlines
+            [ "  WHERE"
+            , "    GIVEN a IS A TYPE"
+            , "          n IS A NUMBER"
+            , "    GIVETH AN a"
+            , "    fetch n MEANS IF n > 0 THEN `late fetch` n ELSE `the placeholder`"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH AN a"
+            , "`late fetch` n MEANS `the placeholder`"
+            ]
+      exportReaders src `shouldReturn` (False, [("DEONTIC", "via local late", "the placeholder", "", SError)])
+
+    it "accepts a call that gives the variable the type NUMBER" $ do
+      exportReaders (parties <> exported "`via local number`" "A NUMBER" "fetch 1 + 1" <> localFetch)
+        `shouldReturn` (True, [])
+      exportReaders (parties <> exported "`via top number`" "A NUMBER" "`top fetch` 1 + 1")
+        `shouldReturn` (True, [])
+
+    it "accepts a call at NUMBER when only a rule that is not exported calls the same helper at a DEONTIC" $ do
+      let src = parties <> Text.unlines
+            [ "GIVETH A BOOLEAN"
+            , "`not exported` MEANS `fulfilled` (`top fetch` 1)"
+            , ""
+            ] <> exported "`via shared helper`" "A NUMBER" "`top fetch` 1 + 1"
+      exportReaders src `shouldReturn` (True, [])
+
+    it "accepts a helper that takes a DEONTIC but reads the ASSUME at its variable, which the call makes a NUMBER" $ do
+      let src = parties <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      duty IS A DEONTIC Person Action"
+            , "GIVETH AN a"
+            , "`beside the duty` duty MEANS `the placeholder`"
+            , ""
+            ] <> exported "`via helper that takes a duty`" "A NUMBER" "`beside the duty` `the standard duty` + 1"
+      exportReaders src `shouldReturn` (True, [])
+
+    -- Following the calls keeps a fact for a rule once for each ASSUME and each
+    -- variable, read by the top-level rule that the rule stands in or by
+    -- another, and not once for each rule that reads the ASSUME. Every link of
+    -- this chain reads the ASSUME at its own variable and calls the next link,
+    -- so a fact for each reader would make the work grow with the square of the
+    -- length of the chain. The test counts what the input check allocates,
+    -- which does not depend on the load of the machine: a chain four times as
+    -- long must allocate less than eight times as much, which a fact for each
+    -- reader does not.
+    it "does not keep a fact for each rule that reads the ASSUME, in a chain of polymorphic readers" $ do
+      let link :: Int -> Text
+          link k = "`link " <> Text.pack (show k) <> "`"
+          chain links = parties <> Text.unlines (concat
+            [ [ "GIVEN a IS A TYPE"
+              , "      n IS A NUMBER"
+              , "GIVETH AN a"
+              , link k <> " n MEANS IF n <= 0 THEN `the placeholder` ELSE " <> link (k + 1) <> " (n - 1)"
+              , ""
+              ]
+            | k <- [1 .. links - 1]
+            ]) <> Text.unlines
+            [ "GIVEN a IS A TYPE"
+            , "      n IS A NUMBER"
+            , "GIVETH AN a"
+            , link links <> " n MEANS `the placeholder`"
+            , ""
+            , "@export The top rule"
+            , "GIVEN x IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`top` x MEANS " <> link 1 <> " x + 1"
+            ]
+          allocatedFor links = do
+            r <- either (fail . ("Fatal: " <>) . show) pure (checkWithImports emptyVFS (chain links))
+            map prettyCheckErrorWithContext [ e | e <- r.tcdErrors, severity e == SError ] `shouldBe` []
+            _ <- evaluate (force r.tcdModule)
+            _ <- evaluate (force r.tcdEntityInfo)
+            counterBefore <- getAllocationCounter
+            refused <- evaluate (length (validateExportInputs r.tcdSubstitution r.tcdEntityInfo r.tcdModule))
+            counterAfter <- getAllocationCounter
+            refused `shouldBe` 0
+            pure (counterBefore - counterAfter)
+      short <- allocatedFor 200
+      long <- allocatedFor 800
+      (long, short) `shouldSatisfy` (\(longer, shorter) -> longer < 8 * shorter)
 
   -- The check looks at every definition that is marked as an export, whichever
   -- way it is marked and wherever it stands.

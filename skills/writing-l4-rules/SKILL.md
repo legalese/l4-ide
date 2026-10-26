@@ -338,10 +338,9 @@ An `ASSUME` of the file itself with a written type becomes a required input; one
 The function endpoint (`GET /deployments/<id>/functions/<fn>`) lists an `ASSUME` of the file itself that has no written type, one written with its signature before it, and a polymorphic one as a required input of type `object`, and then ignores the value sent: every request that needs it answers HTTP 422, with "needed to know the value of … it is an assumed term".
 An `ASSUME` that the rule declares under its own `WHERE` is not listed, and a request that needs its value gets the same 422.
 
-The check does not look inside a rule that an exported rule calls.
-A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.
-If the helper's `CONSIDER` ends in `OTHERWISE`, every request then gets that branch's answer with no error, which is the quiet failure; if it has no `OTHERWISE`, every request fails with HTTP 422.
-A polymorphic helper in the rule's own `WHERE` that reads a polymorphic `ASSUME` at a type that stays open is the same quiet failure, because no read of the `ASSUME` in the exported rule's own body has a `DEONTIC` or an `EVENT` for its type.
+The check also follows the rules of the same file that an exported rule calls, directly or through other rules: a helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) makes the exported rule that calls it refused, and the error names the helper.
+A polymorphic helper reads a polymorphic `ASSUME` at the type that each call gives it, so handing what it answers to a rule that takes a `DEONTIC` is refused too.
+The check does not look inside a rule of another file: an exported rule that calls an imported helper that reads such an `ASSUME` passes `l4 check`.
 Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
 The test for a function-typed input goes by written types and by the `ASSUME`s of the file itself, so a `GIVEN` with no written type that the rule calls as a function, and a function-typed `ASSUME` that an imported file declares or that is written with its signature before it, also pass `l4 check`; every request to such a rule fails with HTTP 422.
 

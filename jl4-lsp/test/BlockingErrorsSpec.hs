@@ -169,6 +169,65 @@ spec = describe "LSP.L4.BlockingErrors" do
                  && "`imported duty`" `T.isInfixOf` msg
       _ -> False
 
+  -- Nor is a rule that the exported rule calls: the ASSUME that it reads is
+  -- refused, whether it reads it at a DEONTIC or at the type that the call
+  -- gives a polymorphic helper.
+  it "refuses a file whose @export calls a helper that reads a DEONTIC ASSUME" do
+    o <- checkProject "export-deontic-helper"
+      [ ("main", T.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+          , ""
+          , "ASSUME `the assumed duty` IS A DEONTIC Person Action"
+          , ""
+          , "GIVETH A BOOLEAN"
+          , "`assumed duty fulfilled` MEANS"
+          , "  CONSIDER `the assumed duty`"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          , "@export Is the duty fulfilled, as the helper reads it"
+          , "GIVETH A BOOLEAN"
+          , "`via helper` MEANS `assumed duty fulfilled`"
+          ])
+      ]
+    [ d._message | fd <- o.blocking, let d = fd.fdLspDiagnostic ] `shouldSatisfy` \case
+      [msg] -> "DEONTIC inputs are not supported for @export." `T.isInfixOf` msg
+                 && "is an ASSUME that `assumed duty fulfilled` reads" `T.isInfixOf` msg
+      _ -> False
+
+  it "refuses a file whose @export hands on what a polymorphic local helper reads, at a DEONTIC" do
+    o <- checkProject "export-deontic-local-helper"
+      [ ("main", T.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+          , ""
+          , "GIVEN a IS A TYPE"
+          , "GIVETH AN a"
+          , "ASSUME `the placeholder`"
+          , ""
+          , "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`duty fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          , "@export Is the duty fulfilled, as the local helper reads it"
+          , "GIVETH A BOOLEAN"
+          , "`via local helper` MEANS `duty fulfilled` (fetch 1)"
+          , "  WHERE"
+          , "    GIVEN a IS A TYPE"
+          , "          n IS A NUMBER"
+          , "    GIVETH AN a"
+          , "    fetch n MEANS `the placeholder`"
+          ])
+      ]
+    [ d._message | fd <- o.blocking, let d = fd.fdLspDiagnostic ] `shouldSatisfy` \case
+      [msg] -> "DEONTIC inputs are not supported for @export." `T.isInfixOf` msg
+                 && "`the placeholder`" `T.isInfixOf` msg
+      _ -> False
+
   it "refuses a file whose @export takes a DEONTIC that it gives no written type" do
     o <- checkProject "export-deontic-untyped"
       [ ("main", T.unlines

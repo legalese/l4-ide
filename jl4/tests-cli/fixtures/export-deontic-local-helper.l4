@@ -1,0 +1,25 @@
+-- An exported rule whose local helper reads a polymorphic ASSUME at its own type
+-- variable, which the call `fetch 1` makes a DEONTIC: a request has no JSON form
+-- for one, so `l4 check` refuses the rule.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+GIVEN a IS A TYPE
+GIVETH AN a
+ASSUME `the placeholder`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`duty fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+@export Is the duty fulfilled, as the local helper reads it
+GIVETH A BOOLEAN
+`via local helper` MEANS `duty fulfilled` (fetch 1)
+  WHERE
+    GIVEN a IS A TYPE
+          n IS A NUMBER
+    GIVETH AN a
+    fetch n MEANS `the placeholder`

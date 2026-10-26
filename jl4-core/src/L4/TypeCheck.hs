@@ -4686,18 +4686,42 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
       <> quotedName (getActual paramName)
       <> " has a function type."
   ]
-prettyCheckError (ExportEventTypeInput _fnName paramName) =
+prettyCheckError (ExportEventTypeInput _fnName paramName readBy) =
   [ "EVENT inputs are not supported for @export."
-  , "The input "
-      <> quotedName (getActual paramName)
-      <> " has a type that contains an EVENT, and a request has no JSON form for an event."
+  , case readBy of
+      Nothing ->
+        "The input "
+          <> quotedName (getActual paramName)
+          <> " has a type that contains an EVENT, and a request has no JSON form for an event."
+      Just r ->
+        "The input "
+          <> quotedName (getActual paramName)
+          <> " is an ASSUME that "
+          <> quotedName (getActual r)
+          <> " reads as a value whose type contains an EVENT, and this rule calls "
+          <> quotedName (getActual r)
+          <> ", directly or through other rules. A request has no JSON form for an event, so give "
+          <> quotedName (getActual r)
+          <> " the event as an input."
   , "Give the rule the party, the action and the time as separate inputs, and build the event inside it."
   ]
-prettyCheckError (ExportDeonticTypeInput _fnName paramName) =
+prettyCheckError (ExportDeonticTypeInput _fnName paramName readBy) =
   [ "DEONTIC inputs are not supported for @export."
-  , "The input "
-      <> quotedName (getActual paramName)
-      <> " has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+  , case readBy of
+      Nothing ->
+        "The input "
+          <> quotedName (getActual paramName)
+          <> " has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+      Just r ->
+        "The input "
+          <> quotedName (getActual paramName)
+          <> " is an ASSUME that "
+          <> quotedName (getActual r)
+          <> " reads as a value whose type contains a DEONTIC, and this rule calls "
+          <> quotedName (getActual r)
+          <> ", directly or through other rules. A request has no JSON form for a DEONTIC, so give "
+          <> quotedName (getActual r)
+          <> " the DEONTIC as an input."
   , "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
   ]
 

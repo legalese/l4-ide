@@ -305,10 +305,9 @@ GIVETH A BOOLEAN
 Take the plain facts as inputs and build the duty inside the rule; the full pattern is in [SKILL.md](../SKILL.md#inputs-no-request-can-supply-event-and-deontic).
 An `EVENT` input is refused in the same way, with `EVENT inputs are not supported for @export`.
 
-The check does not look inside a rule that an exported rule calls.
-A helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) passes `l4 check` and deploys, and the exported rule is published without that input.
-If the helper's `CONSIDER` ends in `OTHERWISE`, every request then gets that branch's answer with no error, which is the quiet failure; if it has no `OTHERWISE`, every request fails with HTTP 422.
-A polymorphic helper in the rule's own `WHERE` that reads a polymorphic `ASSUME` at a type that stays open is the same quiet failure, because no read of the `ASSUME` in the exported rule's own body has a `DEONTIC` or an `EVENT` for its type.
+The check also follows the rules of the same file that an exported rule calls, directly or through other rules: a helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) makes the exported rule that calls it refused, and the error names the helper.
+A polymorphic helper reads a polymorphic `ASSUME` at the type that each call gives it, so handing what it answers to a rule that takes a `DEONTIC` is refused too.
+The check does not look inside a rule of another file: an exported rule that calls an imported helper that reads such an `ASSUME` passes `l4 check`.
 Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
 
 ---

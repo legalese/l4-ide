@@ -1,0 +1,177 @@
+-- A request has no JSON form for a DEONTIC or an EVENT, so an ASSUME of such a
+-- type that an exported rule needs cannot be supplied. The rule needs one when
+-- its own body reads it, and also when a rule that it calls reads it, directly
+-- or through other rules. Each exported rule below reaches such an ASSUME only
+-- through another rule of this file, and is refused, naming the ASSUME and the
+-- rule that reads it. The rules are exported on purpose: the same rules without
+-- @export check.
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
+
+ASSUME `the assumed duty` IS A DEONTIC Person Action
+ASSUME `the assumed event` IS AN EVENT Person Action
+ASSUME `the assumed duties` IS A LIST OF DEONTIC Person Action
+ASSUME `the untyped duty`
+ASSUME `the rate` IS A NUMBER
+
+GIVETH A BOOLEAN
+`assumed duty fulfilled` MEANS
+  CONSIDER `the assumed duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Refused: the helper reads the ASSUME of type DEONTIC.
+@export Is the duty fulfilled, as the helper reads it
+GIVETH A BOOLEAN
+`via helper` MEANS `assumed duty fulfilled`
+
+GIVETH A NUMBER
+`assumed event time` MEANS
+  CONSIDER `the assumed event`
+  WHEN EVENT party action time THEN time
+  OTHERWISE 0
+
+-- Refused for the EVENT: the helper reads the ASSUME of type EVENT.
+@export When did the event happen, as the helper reads it
+GIVETH A NUMBER
+`via event helper` MEANS `assumed event time`
+
+GIVETH A BOOLEAN
+`first link` MEANS `second link`
+
+GIVETH A BOOLEAN
+`second link` MEANS `assumed duty fulfilled`
+
+-- Refused: the ASSUME is read two calls away.
+@export Is the duty fulfilled, two calls away
+GIVETH A BOOLEAN
+`via chain` MEANS `first link`
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+ping n MEANS
+  IF n <= 0
+  THEN CONSIDER `the assumed duty`
+       WHEN FULFILLED THEN TRUE
+       OTHERWISE FALSE
+  ELSE pong (n - 1)
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+pong n MEANS ping (n - 1)
+
+-- Refused: two rules that call each other, one of which reads the ASSUME.
+@export Is the duty fulfilled, through two rules that call each other
+GIVETH A BOOLEAN
+`via recursion` MEANS pong 3
+
+GIVETH A BOOLEAN
+`any duty assumed` MEANS
+  CONSIDER `the assumed duties`
+  WHEN EMPTY THEN FALSE
+  OTHERWISE TRUE
+
+-- Refused: the helper reads an ASSUME that holds a DEONTIC in a list.
+@export Is any duty assumed
+GIVETH A BOOLEAN
+`via list helper` MEANS `any duty assumed`
+
+GIVETH A BOOLEAN
+`untyped duty fulfilled` MEANS
+  CONSIDER `the untyped duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Refused: the ASSUME has no written type, and the helper reads it as a DEONTIC.
+@export Is the untyped duty fulfilled, as the helper reads it
+GIVETH A BOOLEAN
+`via untyped helper` MEANS `untyped duty fulfilled`
+
+-- Refused: the call of the helper stands under the WHERE of a definition under
+-- the rule's own WHERE.
+@export Is the duty fulfilled, as a nested definition reads it
+GIVETH A BOOLEAN
+`via nested where` MEANS outer
+  WHERE
+    outer MEANS inner
+      WHERE
+        inner MEANS `assumed duty fulfilled`
+
+GIVETH A BOOLEAN
+`nested reader` MEANS outer
+  WHERE
+    outer MEANS inner
+      WHERE
+        inner MEANS
+          CONSIDER `the assumed duty`
+          WHEN FULFILLED THEN TRUE
+          OTHERWISE FALSE
+
+-- Refused: the helper reads the ASSUME under the WHERE of a definition under
+-- its own WHERE.
+@export Is the duty fulfilled, as a helper reads it in a nested definition
+GIVETH A BOOLEAN
+`via nested reader` MEANS `nested reader`
+
+GIVETH A BOOLEAN
+`local duty fulfilled` MEANS
+  CONSIDER `local duty`
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+  WHERE
+    ASSUME `local duty` IS A DEONTIC Person Action
+
+-- Refused: the helper reads an ASSUME of type DEONTIC that its own WHERE declares.
+@export Is the helper's own duty fulfilled
+GIVETH A BOOLEAN
+`via local assume` MEANS `local duty fulfilled`
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`assumed duty fulfilled at` n MEANS
+  CONSIDER `the assumed duty`
+  WHEN FULFILLED THEN n > 0
+  OTHERWISE FALSE
+
+-- Refused: the helper is called with 's after its one input.
+@export Is the duty fulfilled, as a helper called with 's reads it
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`via genitive` n MEANS n's `assumed duty fulfilled at`
+
+DECLARE Case HAS
+  `case number` IS A NUMBER
+  `duty met` IS A BOOLEAN MEANS `assumed duty fulfilled`
+
+-- Refused: the computed field of the record calls the helper.
+@export Is the duty met, as a computed field of the case reads it
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`via computed field` c MEANS c's `duty met`
+
+-- Not exported: a rule that calls the helper is not checked, and is not reported.
+GIVETH A BOOLEAN
+`internal only` MEANS `assumed duty fulfilled`
+
+GIVETH A NUMBER
+`rate plus one` MEANS `the rate` + 1
+
+-- Accepted: the helper reads an ASSUME of type NUMBER.
+@export One more than the rate, as the helper reads it
+GIVETH A NUMBER
+`via number helper` MEANS `rate plus one`
+
+GIVEN duty IS A DEONTIC Person Action
+GIVETH A BOOLEAN
+`is fulfilled` duty MEANS
+  CONSIDER duty
+  WHEN FULFILLED THEN TRUE
+  OTHERWISE FALSE
+
+-- Accepted: the helper takes the DEONTIC as an input, and the exported rule
+-- builds it from plain facts.
+@export Is the duty to deliver by a deadline fulfilled
+GIVEN deadline IS A NUMBER
+GIVETH A BOOLEAN
+`via input` deadline MEANS
+  `is fulfilled` (PARTY Seller MUST `deliver goods` WITHIN deadline)

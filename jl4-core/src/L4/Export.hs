@@ -31,11 +31,13 @@ import qualified Base.Text as Text
 import Data.Char (isSpace)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Map.Lazy as LazyMap
 import qualified Data.Set as Set
 import L4.Annotation (getAnno)
 import L4.Syntax
 import L4.TypeCheck.Environment (contractUnique, eventUnique, maybeUnique)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, Substitution, optionallyNamedTypeType, substituteInfVars)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo, Substitution, optionallyNamedTypeType, substituteInfVars, substituteType)
+import L4.TypeCheck.Unify (synonymExpansionFuel)
 import Optics
 
 type TypeDescMap = Map.Map Unique Text
@@ -310,8 +312,9 @@ referencedIdentifiers found = Set.fromList (map getUnique found.references)
 data BodyReads = MkBodyReads
   { references :: [Resolved]
     -- ^ The identifier of every reference (@App _ ref args@, where @ref@ is a
-    -- 'Ref'), whether it is given arguments or not, as the 'Resolved' that the
-    -- expression holds, once for each time it is made.
+    -- 'Ref'), whether it is given arguments or not, and of the name after @'s@
+    -- in a genitive (@Proj _ x ref@), as the 'Resolved' that the expression
+    -- holds, once for each time it is made.
   , readTypes :: [(Resolved, Type' Resolved)]
     -- ^ Every read of an identifier that is given no arguments (@App ann ref []@),
     -- with the type that the checker recorded on the expression that reads it.
@@ -331,38 +334,69 @@ data BodyReads = MkBodyReads
     -- alone.
   }
 
--- | One thing that 'bodyReads' finds, at the expression where it finds it.
+-- | One thing that the walk of a body ('walkBody') finds, at the expression
+-- where it finds it.
 data BodyRead
-  = Referenced Resolved
-  | ReadAt Resolved (Type' Resolved)
+  = Applies Resolved Call
+    -- ^ An application whose head is a reference (a 'Ref'), with its arguments.
+    -- An identifier that is read is an application that is given no arguments.
+    -- A genitive @x's f@ is an application of @f@ to @x@: the checker resolves
+    -- it to a call of the rule @f@ with @x@ as its one input, also when @f@ is a
+    -- computed field of a record, which 'L4.Desugar.desugarComputedFields' turns
+    -- into a top-level rule whose one input is the record.
   | DeclaredHere (Assume Resolved)
+    -- ^ An ASSUME that a @WHERE@ declares.
+  | Opens (Decide Resolved)
+    -- ^ The body of a definition under a @WHERE@ or a @LET@ starts here. What
+    -- the walk finds up to the matching 'Closes' stands in that body.
+  | Closes
+    -- ^ The body that the last 'Opens' without its 'Closes' started ends here.
 
--- | Walk the expression once, and sort what the walk finds into 'BodyReads'.
+-- | The arguments of an application as the expression holds them, after the
+-- annotation of the application, which holds the type that the checker
+-- recorded for the whole application: the type of what it gives back.
+data Call
+  = Positional Anno [Expr Resolved]
+    -- ^ @App _ ref args@: the arguments in the order of the inputs.
+  | Named Anno [NamedExpr Resolved] (Maybe [Int])
+    -- ^ @AppNamed _ ref args order@ (@f WITH x IS 1@): the arguments by name,
+    -- and the position of the input that each of them gives, which the checker
+    -- records.
+
+-- | What the input check of an exported rule reads from the rule's body, in
+-- the order of 'walkBody'. Only an application that gives its arguments in
+-- order ('Positional') is a reference here: the check of the rule's own inputs
+-- does not read the head of one that gives them by name.
+bodyReads :: Expr Resolved -> BodyReads
+bodyReads = readsOf . walkBody
+
+readsOf :: [BodyRead] -> BodyReads
+readsOf found =
+  MkBodyReads
+    { references   = [ ref | Applies ref (Positional _ _) <- found ]
+    , readTypes    = [ (ref, ty) | Applies ref (Positional ann []) <- found, Just (TypeInfo ty _) <- [ann ^. annInfo] ]
+    , localAssumes = [ assume | DeclaredHere assume <- found ]
+    }
+
+-- | Walk the expression once, and list what the walk finds.
 --
 -- The walk meets every expression of the body: each subexpression of an
 -- expression, and each expression that one of its other parts holds — the
 -- arguments of a named application, the guards of a multi-way IF, the patterns
 -- and branches of a CONSIDER (an @EXACTLY@ pattern holds an expression), the
 -- parts of a duty and of an event, and the bodies of the local definitions of a
--- @WHERE@ or a @LET@. It does not look into an annotation, an identifier, a type,
--- a literal, or the signature of a local definition or of a lambda, since none
--- of those holds an expression. Every case below names every field, so a field
--- or a constructor added to one of these types does not compile until the walk
--- says what to do with it.
+-- @WHERE@ or a @LET@, each between an 'Opens' and its 'Closes'. It does not look
+-- into an annotation, an identifier, a type, a literal, or the signature of a
+-- local definition or of a lambda, since none of those holds an expression.
+-- Every case below names every field, so a field or a constructor added to one
+-- of these types does not compile until the walk says what to do with it.
 --
 -- Each step puts what it finds in front of the list of what the rest of the walk
--- finds, so the walk builds each answer without appending one list to another:
+-- finds, so the walk builds its answer without appending one list to another:
 -- the time it takes grows with the size of the body and not with its depth.
-bodyReads :: Expr Resolved -> BodyReads
-bodyReads body =
-  MkBodyReads
-    { references   = [ ref | Referenced ref <- found ]
-    , readTypes    = [ (ref, ty) | ReadAt ref ty <- found ]
-    , localAssumes = [ assume | DeclaredHere assume <- found ]
-    }
+walkBody :: Expr Resolved -> [BodyRead]
+walkBody body = walkExpr body []
  where
-  found = walkExpr body []
-
   walkExpr :: Expr Resolved -> [BodyRead] -> [BodyRead]
   walkExpr e rest = case e of
     And        _ l r       -> walkExpr l (walkExpr r rest)
@@ -382,10 +416,11 @@ bodyReads body =
     Geq        _ l r       -> walkExpr l (walkExpr r rest)
     Lt         _ l r       -> walkExpr l (walkExpr r rest)
     Gt         _ l r       -> walkExpr l (walkExpr r rest)
-    Proj       _ x _       -> walkExpr x rest
+    Proj     ann x f       -> atReference f (Positional ann [x]) (walkExpr x rest)
     Lam        _ _ x       -> walkExpr x rest
-    App ann ref args       -> atReference ann ref args (walkExprs args rest)
-    AppNamed   _ _ nes _   -> foldr walkNamed rest nes
+    App ann ref args       -> atReference ref (Positional ann args) (walkExprs args rest)
+    AppNamed ann ref nes order ->
+                              atReference ref (Named ann nes order) (foldr walkNamed rest nes)
     IfThenElse _ c t f     -> walkExpr c (walkExpr t (walkExpr f rest))
     MultiWayIf _ gs other  -> foldr walkGuarded (walkExpr other rest) gs
     Regulative _ d         -> walkDeonton d rest
@@ -411,12 +446,9 @@ bodyReads body =
   walkMaybe :: Maybe (Expr Resolved) -> [BodyRead] -> [BodyRead]
   walkMaybe mx rest = maybe rest (`walkExpr` rest) mx
 
-  atReference :: Anno -> Resolved -> [Expr Resolved] -> [BodyRead] -> [BodyRead]
-  atReference ann ref args rest = case ref of
-    Ref _ _ _ ->
-      Referenced ref
-        : [ ReadAt ref ty | null args, Just (TypeInfo ty _) <- [ann ^. annInfo] ]
-        ++ rest
+  atReference :: Resolved -> Call -> [BodyRead] -> [BodyRead]
+  atReference ref call rest = case ref of
+    Ref _ _ _      -> Applies ref call : rest
     Def _ _        -> rest
     OutOfScope _ _ -> rest
 
@@ -452,8 +484,8 @@ bodyReads body =
 
   walkLocalDecl :: LocalDecl Resolved -> [BodyRead] -> [BodyRead]
   walkLocalDecl decl rest = case decl of
-    LocalDecide _ (MkDecide _ _ _ x) -> walkExpr x rest
-    LocalAssume _ _                  -> rest
+    LocalDecide _ d@(MkDecide _ _ _ x) -> Opens d : walkExpr x (Closes : rest)
+    LocalAssume _ _                    -> rest
 
 -- | Extract ASSUME declarations that are referenced by a DECIDE body.
 -- Returns ExportedParams for each ASSUME that the function depends on.
@@ -611,37 +643,437 @@ extractImplicitAssumeParams errors =
 -- * an ASSUME that the body declares itself, in a @WHERE@, and reads: the
 --   'EntityInfo' does not hold it, so it is found in the body
 --   ('localAssumes') and its declared type is the one that the checker
---   recorded on the declaration. The reads of it are looked at as for any other.
+--   recorded on the declaration. The reads of it are looked at as for any other;
 --
--- The walk covers the rule's own inputs and the ASSUMEs that its own body
--- reads. It does not look inside a rule that the exported rule calls.
+-- * an ASSUME that a rule of this module reads, when the exported rule calls
+--   that rule, directly or through other rules of this module, and the read is
+--   at a type that holds an EVENT or a DEONTIC under the calls that lead to it
+--   ('reachedThroughCalls'). That covers a polymorphic rule, under the
+--   exported rule's own @WHERE@ or not, that reads a polymorphic ASSUME at its
+--   own type variable, when a call gives the variable such a type. The error
+--   names the rule that reads the ASSUME, unless that is the exported rule
+--   itself. A rule of an imported module is not followed: the checker's view of
+--   an import holds the types of its rules and not their bodies.
 --
 -- One input is refused once, however many such types it holds: for the EVENT or
--- the DEONTIC that the walk meets first ('carriedUnsendable').
+-- the DEONTIC that the walk meets first ('carriedUnsendable'). An ASSUME that
+-- the exported rule's own body is refused for is not refused again for a rule
+-- that it calls.
 validateExportInputs :: Substitution -> EntityInfo -> Module Resolved -> [CheckErrorWithContext]
 validateExportInputs subst ei mod' =
   let synonyms = collectTypeSynonyms mod'
       assumes  = allAssumesFromModule mod'
       carried  = carriedUnsendable ei
+      exported = collectExportedDecides mod'
+      -- every top-level rule, walked when the check first needs it, at most
+      -- once: an exported rule for its own inputs and for the rules it calls,
+      -- and every other rule only if an exported rule reaches it by calls
+      walked   = walkTopLevel mod'
+      reached  = reachedThroughCalls subst ei carried walked exported
+      found decide@(MkDecide _ _ _ body) =
+        case LazyMap.lookup (decideUnique decide) walked of
+          Just [w] -> w.bodyFound
+          _        -> bodyReads body
       -- one pass per kind of input a request cannot carry, each with the inputs
       -- it looks at; both read the one walk of the body
       functionTypes, unsendables :: Decide Resolved -> BodyReads -> [CheckErrorWithContext]
-      functionTypes decide found =
+      functionTypes decide bodyFound =
         checkOneExport
           (\ty -> if isFunctionTypeExpanded synonyms ty then Just mkExportFunErr else Nothing)
           decide
-          (writtenInputs assumes decide found)
-      unsendables decide found =
-        checkOneExport
-          (\ty -> mkExportUnsendableErr <$> carried ty)
-          decide
-          (inferredInputs subst ei decide found)
+          (writtenInputs assumes decide bodyFound)
+      unsendables decide@(MkDecide _ _ (MkAppForm _ fnName _ _) _) bodyFound =
+        let direct =
+              [ (input, holds)
+              | (input, tys) <- inferredInputs subst ei decide bodyFound
+              , Just holds <- [listToMaybe (mapMaybe carried tys)]
+              ]
+            refusedHere = Set.fromList [ getUnique input | (input, _) <- direct ]
+        in [ mkExportUnsendableErr holds fnName input Nothing | (input, holds) <- direct ]
+           ++
+           [ mkExportUnsendableErr holds fnName assume readerNamed
+           | (assume, holds, readBy) <- Map.findWithDefault [] (getUnique fnName) reached
+           , not (getUnique assume `Set.member` refusedHere)
+           , let readerNamed = if getUnique readBy == getUnique fnName then Nothing else Just readBy
+           ]
   in [ err
-     | decide@(MkDecide _ _ _ body) <- collectExportedDecides mod'
-     , let found = bodyReads body
+     | decide <- exported
+     , let bodyFound = found decide
      , pass <- [functionTypes, unsendables]
-     , err <- pass decide found
+     , err <- pass decide bodyFound
      ]
+
+-- | A top-level rule of the module, walked: what its own input check reads
+-- ('bodyReads'), and the rules that the walk finds in it ('rulesOf').
+data Walked = MkWalked
+  { bodyFound :: BodyReads
+  , rulesIn   :: [Rule]
+  }
+
+-- | Every top-level DECIDE of the module, also in a section, by its identifier,
+-- walked once when it is first looked up and not before.
+walkTopLevel :: Module Resolved -> LazyMap.Map Unique [Walked]
+walkTopLevel (MkModule _ _ section) =
+  LazyMap.fromListWith (flip (<>)) [ (decideUnique d, [walkDecide d]) | d <- goSection section ]
+ where
+  goSection (MkSection _ _ _ decls) = decls >>= goDecl
+  goDecl = \case
+    Decide _ d    -> [d]
+    Section _ sub -> goSection sub
+    _             -> []
+
+walkDecide :: Decide Resolved -> Walked
+walkDecide d@(MkDecide _ _ _ body) =
+  let events = walkBody body
+  in MkWalked { bodyFound = readsOf events, rulesIn = rulesOf d events }
+
+-- | A definition whose body the check follows: a top-level DECIDE, or one under
+-- a @WHERE@ or a @LET@ of one, with what its own body holds. A definition under
+-- it has a 'Rule' of its own, and is in 'within'.
+data Rule = MkRule
+  { ruleName :: Resolved
+  , topRule  :: Resolved
+    -- ^ The top-level DECIDE that it stands in, which is itself for a top-level one.
+  , declared :: Maybe (Type' Resolved)
+    -- ^ Its type, as the checker recorded it on the definition.
+  , own      :: Set.Set Unique
+    -- ^ The type variables that its type quantifies (@GIVEN a IS A TYPE@).
+  , scope    :: Set.Set Unique
+    -- ^ Those and the type variables of the definitions that it stands in,
+    -- which are the type variables that a type in its body can name.
+  , applies  :: [(Resolved, Call)]
+    -- ^ The applications in its body and not in the body of a definition under it.
+  , within   :: [Resolved]
+    -- ^ The definitions directly under it.
+  }
+
+-- | The rules in the body of a top-level DECIDE, from the walk of its body,
+-- the DECIDE itself among them.
+rulesOf :: Decide Resolved -> [BodyRead] -> [Rule]
+rulesOf topDecide = go [open Set.empty topDecide] []
+ where
+  topName = decideName topDecide
+  -- a rule whose body the walk is in: the definition, the type variables in
+  -- scope, and what the walk has found in it so far, the last first
+  open outer d = (d, outer `Set.union` quantifiedBy d, [], [])
+  close (d, inScope, apps, kids) =
+    MkRule
+      { ruleName = decideName d
+      , topRule  = topName
+      , declared = decideType d
+      , own      = quantifiedBy d
+      , scope    = inScope
+      , applies  = reverse apps
+      , within   = reverse kids
+      }
+  go stack done events = case (stack, events) of
+    ((d, inScope, apps, kids) : outer, Applies ref call : rest) ->
+      go ((d, inScope, (ref, call) : apps, kids) : outer) done rest
+    ((_, inScope, _, _) : _, Opens d : rest) ->
+      go (open inScope d : stack) done rest
+    (inner@(d, _, _, _) : (pd, pScope, pApps, pKids) : outer, Closes : rest) ->
+      go ((pd, pScope, pApps, decideName d : pKids) : outer) (close inner : done) rest
+    (_, _ : rest) -> go stack done rest
+    (_, [])       -> map close stack <> done
+
+decideName :: Decide Resolved -> Resolved
+decideName (MkDecide _ _ (MkAppForm _ name _ _) _) = name
+
+decideUnique :: Decide Resolved -> Unique
+decideUnique = getUnique . decideName
+
+decideType :: Decide Resolved -> Maybe (Type' Resolved)
+decideType (MkDecide ann _ _ _) = case ann ^. annInfo of
+  Just (TypeInfo ty _) -> Just ty
+  _                    -> Nothing
+
+quantifiedBy :: Decide Resolved -> Set.Set Unique
+quantifiedBy d = case decideType d of
+  Just (Forall _ vars _) -> Set.fromList (map getUnique vars)
+  _                      -> Set.empty
+
+-- | What a rule reaches: a read of an ASSUME, by a rule (the top-level DECIDE
+-- that the read stands in), at a type that holds an EVENT or a DEONTIC
+-- ('Holds'), or at a type that holds one when a type variable of the rule, or
+-- of a definition that it stands in, is given a type that holds one
+-- ('AtVariable').
+data Reach = MkReach
+  { at     :: Unique
+    -- ^ The rule that reaches the read.
+  , assume :: Resolved
+  , reader :: Resolved
+  , fact   :: Fact
+  }
+
+data Fact
+  = Holds Unsendable
+  | AtVariable Unique
+
+-- | How a rule gets to the rules whose reads it reaches.
+data Edge
+  = StandsIn
+    -- ^ The rule is a definition under the other one, which reaches what it
+    -- reads whether or not it calls it.
+  | CalledWith (Map.Map Unique [Type' Resolved])
+    -- ^ The other rule calls it, and the call gives each of its own type
+    -- variables these types ('callBindings'), worked out when first needed.
+
+-- | For each rule of the module that an exported rule reaches by calls, each
+-- ASSUME whose read it reaches at a type that holds an EVENT or a DEONTIC, once
+-- each, in the order of the identifiers of the ASSUMEs: the ASSUME, which of
+-- the two it holds, and the rule that reads it. That is the rule itself when it
+-- is one of the readers, and otherwise one of them, the same one on every run.
+--
+-- What is followed. The rules of the module that the exported rules call,
+-- through any number of calls, each with the definitions under its @WHERE@s and
+-- @LET@s. A rule that is passed on as a value without being called is followed
+-- as though it were called there. A read in a definition under a rule counts
+-- for that rule whether or not the definition is called, as it does for the
+-- exported rule's own input check.
+--
+-- How a polymorphic rule is followed. A read of an ASSUME has the type that
+-- the checker recorded at the read, which in a rule that quantifies a type
+-- variable can be the variable itself. The type of each call of the rule then
+-- says what the variable is at that call: matching the rule's declared type,
+-- its FORALL taken off, one way against the types that the checker recorded
+-- at the call — of each argument, and of the result — gives each variable the
+-- types that the call gives it ('callBindings'). 'carriedUnsendable' finds an
+-- EVENT or a DEONTIC in every type argument and nowhere inside a function type,
+-- which are the places 'typeNamesMet' lists, so a type made by putting types
+-- for its variables holds one exactly when the type does, or one of the
+-- variables at those places is given a type that holds one. That is what
+-- crosses a call: a read at a variable of the callee becomes, in the caller,
+-- a read at each type that the call gives the variable, which can itself be a
+-- variable of the caller, crossed in turn at the caller's own calls. A read at
+-- a variable of a definition that is not called does not cross 'StandsIn':
+-- nothing gives the variable a type there. A variable of a definition that the
+-- callee stands in crosses a call unchanged, since it names the same type in
+-- the caller, which stands in the same definition.
+--
+-- Why that misses no refusal of a program that type-checks. The checker gives
+-- each call of a polymorphic rule its declared type, its variables replaced by
+-- types, and makes that equal to the types at the call, up to synonyms, which
+-- the match expands on either side. So the match gives each variable that
+-- stands in the declared type outside a function type the type that the checker
+-- gave it at the call. A variable that the match leaves without a type — the
+-- two sides differ in shape, or the synonyms run deeper than
+-- 'synonymExpansionFuel' — is treated as given no type, and a read at it is
+-- accepted; so is a variable given a type that is still open, as an input whose
+-- type is still open is. A variable that stands nowhere in the declared type
+-- is not given a type by any call, and the rule's body can use a value of that
+-- type only as a value of the variable, never as an EVENT or a DEONTIC.
+--
+-- The time it takes. Each rule that an exported rule reaches is walked once,
+-- and what it reaches is worked out once for the module, not once per exported
+-- rule. A fact ('Reach') is kept for a rule once for each ASSUME and each
+-- variable, or for holding an EVENT or a DEONTIC, and for each of the two kinds
+-- of reader: the top-level rule that the rule stands in, and any other, of
+-- which only the first that arrives is kept. So the facts of a rule do not grow
+-- with the number of rules that read an ASSUME, and each is passed to each rule
+-- that calls it or that it stands in once. A rule that calls itself, or rules
+-- that call each other, stop when no new fact arrives. What a call gives the
+-- variables is worked out only when a read at a variable crosses it.
+reachedThroughCalls
+  :: Substitution
+  -> EntityInfo
+  -> (Type' Resolved -> Maybe Unsendable)
+  -> LazyMap.Map Unique [Walked]
+  -> [Decide Resolved]
+  -> Map.Map Unique [(Resolved, Unsendable, Resolved)]
+reachedThroughCalls subst ei carried walked exported =
+  Map.mapWithKey chooseReaders (settle Set.empty Map.empty (concatMap ownReaches (Map.elems rules)))
+ where
+  sub = substituteInfVars subst
+
+  -- the top-level rules that the exported rules reach by calls, themselves too
+  reachedTop :: Set.Set Unique
+  reachedTop = reach Set.empty (map decideUnique exported)
+   where
+    reach seen [] = seen
+    reach seen (u : us)
+      | u `Set.member` seen = reach seen us
+      | otherwise = case LazyMap.lookup u walked of
+          Nothing -> reach seen us
+          Just ws ->
+            reach (Set.insert u seen)
+              ([ c | w <- ws, r <- w.rulesIn, (ref, _) <- r.applies, let c = getUnique ref, LazyMap.member c walked ] <> us)
+
+  reachedWalks :: [Walked]
+  reachedWalks = [ w | u <- Set.toList reachedTop, w <- LazyMap.findWithDefault [] u walked ]
+
+  rules :: Map.Map Unique Rule
+  rules = Map.fromList [ (getUnique r.ruleName, r) | w <- reachedWalks, r <- w.rulesIn ]
+
+  -- the ASSUMEs that a WHERE in those rules declares, with the type that the
+  -- checker recorded on each declaration
+  localAssumeTypes :: Map.Map Unique [Type' Resolved]
+  localAssumeTypes =
+    Map.fromList
+      [ (getUnique name, [ ty | Just (TypeInfo ty _) <- [getAnno a ^. annInfo] ])
+      | w <- reachedWalks
+      , a@(MkAssume _ _ (MkAppForm _ name _ _) _) <- w.bodyFound.localAssumes
+      ]
+
+  assumeTypes :: Unique -> Maybe [Type' Resolved]
+  assumeTypes u = case Map.lookup u ei of
+    Just (_, KnownTerm ty AssumedTerm) -> Just [ty]
+    _                                  -> Map.lookup u localAssumeTypes
+
+  -- for each rule, the rules that call it or that it stands in
+  edgesInto :: Map.Map Unique [(Unique, Edge)]
+  edgesInto =
+    Map.fromListWith (<>) $
+      [ (getUnique ref, [(getUnique r.ruleName, CalledWith (callBindings ei sub callee call))])
+      | r <- Map.elems rules
+      , (ref, call) <- r.applies
+      , Just callee <- [Map.lookup (getUnique ref) rules]
+      ]
+      <>
+      [ (getUnique child, [(getUnique r.ruleName, StandsIn)])
+      | r <- Map.elems rules
+      , child <- r.within
+      ]
+
+  -- what a type at a read, or at a call in a rule with these type variables in
+  -- scope, comes to
+  factsAt :: Set.Set Unique -> Type' Resolved -> [Fact]
+  factsAt inScope ty = case carried ty of
+    Just holds -> [Holds holds]
+    Nothing
+      | Set.null inScope -> []
+      | otherwise ->
+          map AtVariable (Set.toList (Set.fromList (typeNamesMet ty) `Set.intersection` inScope))
+
+  -- the reads of ASSUMEs in a rule's own body: at the type each ASSUME is
+  -- declared with, and at the type recorded at the read, as the exported
+  -- rule's own input check looks at them
+  ownReaches :: Rule -> [Reach]
+  ownReaches r =
+    [ MkReach (getUnique r.ruleName) ref r.topRule f
+    | (ref, Positional ann args) <- r.applies
+    , Just declaredAs <- [assumeTypes (getUnique ref)]
+    , ty <- declaredAs <> [ readAs | null args, Just (TypeInfo readAs _) <- [ann ^. annInfo] ]
+    , f <- factsAt r.scope (sub ty)
+    ]
+
+  -- each fact once, by the rule, the ASSUME, whether the reader is the
+  -- top-level rule that the rule stands in, and the variable or that it holds
+  -- one; the facts that hold one, by rule
+  settle _ holding [] = holding
+  settle seen holding (x : xs)
+    | key `Set.member` seen = settle seen holding xs
+    | otherwise = settle (Set.insert key seen) holding' (onward x <> xs)
+   where
+    key = (x.at, getUnique x.assume, readByOwnTop x, case x.fact of { Holds _ -> Nothing; AtVariable v -> Just v })
+    holding' = case x.fact of
+      Holds holds  -> Map.insertWith (<>) x.at [(x.assume, holds, x.reader)] holding
+      AtVariable _ -> holding
+
+  -- whether the read of a fact stands in the top-level rule that the rule of
+  -- the fact stands in, that rule itself for a top-level rule
+  readByOwnTop :: Reach -> Bool
+  readByOwnTop x = case Map.lookup x.at rules of
+    Just r  -> getUnique x.reader == getUnique r.topRule
+    Nothing -> False
+
+  -- what a fact of a rule comes to in each rule that calls it or that it
+  -- stands in
+  onward :: Reach -> [Reach]
+  onward x =
+    [ MkReach caller x.assume x.reader f
+    | Just r <- [Map.lookup x.at rules]
+    , (caller, edge) <- Map.findWithDefault [] x.at edgesInto
+    , Just callerRule <- [Map.lookup caller rules]
+    , f <- case x.fact of
+        Holds _ -> [x.fact]
+        AtVariable v
+          | v `Set.member` r.own -> case edge of
+              StandsIn            -> []
+              CalledWith bindings -> concatMap (factsAt callerRule.scope) (Map.findWithDefault [] v bindings)
+          -- a variable of a definition that the rule stands in; a top-level
+          -- rule has none, since its scope is its own variables
+          | getUnique r.topRule == x.at -> []
+          | otherwise -> [x.fact]
+    ]
+
+  chooseReaders :: Unique -> [(Resolved, Unsendable, Resolved)] -> [(Resolved, Unsendable, Resolved)]
+  chooseReaders u holding =
+    Map.elems (Map.fromListWith preferred [ (getUnique a, hit) | hit@(a, _, _) <- holding ])
+   where
+    rank (_, _, readBy) = (getUnique readBy /= u, getUnique readBy)
+    preferred new old = if rank new < rank old then new else old
+
+-- | What a call of a rule gives each of the rule's own type variables, by a
+-- one-way match of the rule's declared type, its FORALL taken off, against the
+-- types that the checker recorded at the call: each argument against the input
+-- that it gives, and the whole call against the result. A rule that is named
+-- without arguments is matched as a whole. The types at the call have the
+-- substitution that the check ended with applied to them.
+callBindings :: EntityInfo -> (Type' Resolved -> Type' Resolved) -> Rule -> Call -> Map.Map Unique [Type' Resolved]
+callBindings ei sub callee call = case callee.declared of
+  Just ty | not (Set.null callee.own) ->
+    Map.fromListWith (flip (<>)) [ (v, [t]) | (v, t) <- bindings (sub (withoutForall ty)) ]
+  _ -> Map.empty
+ where
+  withoutForall = \case
+    Forall _ _ inner -> withoutForall inner
+    ty               -> ty
+
+  typeAt :: Anno -> Maybe (Type' Resolved)
+  typeAt ann = case ann ^. annInfo of
+    Just (TypeInfo ty _) -> Just (sub ty)
+    _                    -> Nothing
+
+  against p = maybe [] (matchTypes ei callee.own p)
+
+  bindings ty = case call of
+    Positional ann [] -> against ty (typeAt ann)
+    Positional ann args -> case ty of
+      Fun _ inputs result | length inputs == length args ->
+        concat (zipWith (\i a -> against (optionallyNamedTypeType i) (typeAt (getAnno a))) inputs args)
+          <> against result (typeAt ann)
+      _ -> []
+    Named ann args (Just order) -> case ty of
+      Fun _ inputs result ->
+        concat
+          [ against (optionallyNamedTypeType i) (typeAt (getAnno a))
+          | (pos, MkNamedExpr _ _ a) <- zip order args
+          , i : _ <- [drop pos inputs]
+          ]
+          <> against result (typeAt ann)
+      _ -> []
+    Named _ _ Nothing -> []
+
+-- | Match a type that names the given type variables against a type, one way:
+-- each variable, where it stands, against what stands there in the other type.
+-- A synonym on either side is expanded when the two sides differ there, as the
+-- checker does when it makes them equal, up to 'synonymExpansionFuel'
+-- expansions along one path. Where the two differ otherwise, nothing is given.
+matchTypes :: EntityInfo -> Set.Set Unique -> Type' Resolved -> Type' Resolved -> [(Unique, Type' Resolved)]
+matchTypes ei vars = go synonymExpansionFuel
+ where
+  go :: Int -> Type' Resolved -> Type' Resolved -> [(Unique, Type' Resolved)]
+  go fuel pat act = case (pat, act) of
+    (TyApp _ v [], _) | getUnique v `Set.member` vars -> [(getUnique v, act)]
+    (Forall _ _ inner, _) -> go fuel inner act
+    (_, Forall _ _ inner) -> go fuel pat inner
+    (TyApp _ n ps, TyApp _ m as)
+      | getUnique n == getUnique m, length ps == length as -> concat (zipWith (go fuel) ps as)
+    (Fun _ ps r, Fun _ as r')
+      | length ps == length as ->
+          concat (zipWith (go fuel) (map optionallyNamedTypeType ps) (map optionallyNamedTypeType as))
+            <> go fuel r r'
+    _ | fuel <= 0                -> []
+      | Just pat' <- expand pat -> go (fuel - 1) pat' act
+      | Just act' <- expand act -> go (fuel - 1) pat act'
+      | otherwise               -> []
+
+  expand = \case
+    TyApp _ n args
+      | Just (_, KnownType _ params (Just body)) <- Map.lookup (getUnique n) ei
+      , length params == length args ->
+          Just (substituteType (Map.fromList (zipWith (\p a -> (getUnique p, a)) params args)) body)
+    _ -> Nothing
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
@@ -799,21 +1231,25 @@ mkExportFunErr fnName paramName =
     , context = WhileCheckingDecide (getActual fnName) None
     }
 
-mkExportEventErr :: Resolved -> Resolved -> CheckErrorWithContext
-mkExportEventErr fnName paramName =
+-- | The error for an input of an exported rule that holds an EVENT: the
+-- exported rule, the input, and the rule that reads the input when that is a
+-- rule that the exported rule calls ('reachedThroughCalls').
+mkExportEventErr :: Resolved -> Resolved -> Maybe Resolved -> CheckErrorWithContext
+mkExportEventErr fnName paramName readBy =
   MkCheckErrorWithContext
-    { kind    = ExportEventTypeInput fnName paramName
+    { kind    = ExportEventTypeInput fnName paramName readBy
     , context = WhileCheckingDecide (getActual fnName) None
     }
 
-mkExportDeonticErr :: Resolved -> Resolved -> CheckErrorWithContext
-mkExportDeonticErr fnName paramName =
+-- | The same for an input that holds a DEONTIC.
+mkExportDeonticErr :: Resolved -> Resolved -> Maybe Resolved -> CheckErrorWithContext
+mkExportDeonticErr fnName paramName readBy =
   MkCheckErrorWithContext
-    { kind    = ExportDeonticTypeInput fnName paramName
+    { kind    = ExportDeonticTypeInput fnName paramName readBy
     , context = WhileCheckingDecide (getActual fnName) None
     }
 
-mkExportUnsendableErr :: Unsendable -> Resolved -> Resolved -> CheckErrorWithContext
+mkExportUnsendableErr :: Unsendable -> Resolved -> Resolved -> Maybe Resolved -> CheckErrorWithContext
 mkExportUnsendableErr = \case
   HoldsEvent   -> mkExportEventErr
   HoldsDeontic -> mkExportDeonticErr
@@ -920,21 +1356,12 @@ carriedUnsendable ei = \ty -> evalState (go ty) Set.empty
       [ (named, [owner])
       | (owner, tys) <- Map.toList (Map.unionWith (<>) synonymBodies fieldsByType)
       , ty <- tys
-      , named <- namesMet ty
+      , named <- typeNamesMet ty
       ]
 
   synonymBodies :: Map.Map Unique [Type' Resolved]
   synonymBodies =
     Map.fromList [ (u, [body]) | (u, (_, KnownType _ _ (Just body))) <- Map.toList ei ]
-
-  -- The names that 'go' meets in a type: the type that it applies and the
-  -- names in its type arguments, and those of the body of a forall. A function
-  -- type is not looked into.
-  namesMet :: Type' Resolved -> [Unique]
-  namesMet = \case
-    TyApp _ name args -> getUnique name : concatMap namesMet args
-    Forall _ _ inner  -> namesMet inner
-    _                 -> []
 
   -- The state is the set of types already looked into.
   go :: Type' Resolved -> State (Set.Set Unique) (Maybe Unsendable)
@@ -967,3 +1394,14 @@ carriedUnsendable ei = \ty -> evalState (go ty) Set.empty
   firstHit :: (a -> State (Set.Set Unique) (Maybe b)) -> [a] -> State (Set.Set Unique) (Maybe b)
   firstHit _ []       = pure Nothing
   firstHit f (x : xs) = f x >>= maybe (firstHit f xs) (pure . Just)
+
+-- | The names that 'carriedUnsendable' meets in a type, without looking behind
+-- a synonym or into the fields of a record: the type that it applies and the
+-- names in its type arguments, and those of the body of a forall. A function
+-- type is not looked into. A type variable is one of these names, and these
+-- are all the places where 'carriedUnsendable' meets one.
+typeNamesMet :: Type' Resolved -> [Unique]
+typeNamesMet = \case
+  TyApp _ name args -> getUnique name : concatMap typeNamesMet args
+  Forall _ _ inner  -> typeNamesMet inner
+  _                 -> []

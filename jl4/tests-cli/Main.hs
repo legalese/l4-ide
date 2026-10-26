@@ -599,6 +599,14 @@ exportUntypedFixture         = fixtureDir </> "export-untyped.l4"
 exportUntypedInputs          = fixtureDir </> "export-untyped-input.json"
 exportAssumeImportedFixture  = fixtureDir </> "export-assume-imported" </> "main.l4"
 
+-- An exported rule that reaches a DEONTIC that no request can supply only
+-- through a rule that it calls: a helper of the file that reads an ASSUME of
+-- type DEONTIC, and a polymorphic helper under its own WHERE that reads a
+-- polymorphic ASSUME at the type that the call gives it.
+exportDeonticHelperFixture, exportDeonticLocalHelperFixture :: FilePath
+exportDeonticHelperFixture      = fixtureDir </> "export-deontic-helper.l4"
+exportDeonticLocalHelperFixture = fixtureDir </> "export-deontic-local-helper.l4"
+
 -- Multi-file imports that are not rings: a clean one, one whose imported module
 -- only warns, and four that cannot be loaded cleanly: an imported module with a
 -- type error, with a syntax error, and with a string that is never closed, and an
@@ -635,6 +643,7 @@ main = do
        , multiClauseRenderFixture
        , exportDeonticFixture, deonticExportExample
        , exportUntypedFixture, exportUntypedInputs, exportAssumeImportedFixture
+       , exportDeonticHelperFixture, exportDeonticLocalHelperFixture
        , cycle3Entry, cycle3OutsideEntry, cycle2Entry, selfImportEntry
        , cleanImportEntry, warningImportEntry, brokenImportEntry
        , syntaxImportEntry, lexImportEntry, missingImportEntry
@@ -842,6 +851,30 @@ spec bin = do
       out `shouldSatisfy` isInfixOf "DEONTIC inputs are not supported for @export."
       out `shouldSatisfy` isInfixOf "The input `the duty` has a type that contains a DEONTIC"
       out `shouldNotSatisfy` isInfixOf "\"status\""
+
+  -- A rule that the exported rule calls is no way round the refusal either: the
+  -- ASSUME that it reads is refused as one that the exported rule reads itself,
+  -- and the error names the rule that reads it when that is not the exported one.
+  describe "l4 check: an @export that reaches a DEONTIC ASSUME through a rule that it calls" $ do
+    forM_ [ ( "a helper of the file that reads an ASSUME of type DEONTIC"
+            , exportDeonticHelperFixture
+            , "The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled` the DEONTIC as an input."
+            )
+          , ( "a polymorphic helper under its WHERE that the call makes read a polymorphic ASSUME as a DEONTIC"
+            , exportDeonticLocalHelperFixture
+            , "The input `the placeholder` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+            )
+          ] \(what, fixture, line) ->
+      it ("fails on " <> what <> ", and says what is wrong and what to do") $ do
+        Output code sout serr0 <- runL4 bin ["check", fixture]
+        let serr = filter (/= '\r') serr0
+        code `shouldBe` ExitFailure 1
+        sout `shouldSatisfy` (not . isInfixOf "Check succeeded.")
+        serr `shouldSatisfy` isInfixOf "Severity: DiagnosticSeverity_Error"
+        serr `shouldSatisfy` isInfixOf "DEONTIC inputs are not supported for @export."
+        serr `shouldSatisfy` isInfixOf line
+        serr `shouldSatisfy` isInfixOf
+          "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
 
   -- An import ring used to pass `l4 check` and `l4 run` with exit 0 and "Check
   -- succeeded." printed under the cycle's own error. The engine reports the

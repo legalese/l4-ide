@@ -3047,6 +3047,62 @@ spec = describe "integration" do
         fnResp <- httpLbs fnReq mgr
         statusCode' fnResp `shouldBe` 404
 
+    -- A rule that the exported rule calls can read an ASSUME too. The service
+    -- lists only the ASSUMEs that the exported rule reads itself, so a DEONTIC
+    -- one that a helper reads would be no input at all, and the deploy refuses
+    -- the rule as it refuses one that reads the ASSUME itself.
+    it "rejects an @export that calls a helper that reads an ASSUME of type DEONTIC" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "viahelper.l4" viaHelperJL4
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose polymorphic local helper the call makes read a polymorphic ASSUME as a DEONTIC" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "vialocalhelper.l4" viaLocalHelperJL4
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "DEONTIC inputs are not supported for @export"
+          err `shouldSatisfy` Text.isInfixOf "The input `the placeholder` has a type that contains a DEONTIC"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "stores no deployment of an @export that calls a helper that reads an ASSUME of type DEONTIC" do
+      withEmptyService \baseUrl mgr -> do
+        -- the control: the same shape with a NUMBER ASSUME deploys, so that a
+        -- missing deployment below is the refusal and not a failure to deploy
+        okReq <- buildMultipartRequest (baseUrl <> "/deployments") "helper-number" (createZipBundle [("helpernumber.l4", viaNumberHelperJL4)])
+        okResp <- httpLbs okReq mgr
+        statusCode' okResp `shouldBe` 202
+        pollUntilReady baseUrl mgr "helper-number" 60
+        -- the DEONTIC one is accepted for compiling, and the job is rejected
+        postReq <- buildMultipartRequest (baseUrl <> "/deployments") "helper-duty" (createZipBundle [("viahelper.l4", viaHelperJL4)])
+        postResp <- httpLbs postReq mgr
+        statusCode' postResp `shouldBe` 202
+        jobId <- case Aeson.decode (responseBody postResp) :: Maybe DeploymentStatusResponse of
+          Just status | Just updateId <- status.dsUpdateId -> pure (Text.unpack updateId)
+          _ -> expectationFailure "the deploy named no update to poll" >> pure ""
+        job <- pollUpdateDone baseUrl mgr "helper-duty" jobId 60
+        job.usStatus `shouldBe` "rejected"
+        job.usError `shouldSatisfy` maybe False (Text.isInfixOf "DEONTIC inputs are not supported for @export")
+        -- and nothing is stored: neither the deployment nor its function is found
+        getReq <- parseRequest (baseUrl <> "/deployments/helper-duty")
+        getResp <- httpLbs getReq mgr
+        statusCode' getResp `shouldBe` 404
+        fnReq <- parseRequest (baseUrl <> "/deployments/helper-duty/functions/via%20helper")
+        fnResp <- httpLbs fnReq mgr
+        statusCode' fnResp `shouldBe` 404
+
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed
@@ -3647,6 +3703,67 @@ localNumberJL4 = Text.unlines
   , "`r` MEANS `local number` + 1"
   , "  WHERE"
   , "    ASSUME `local number` IS A NUMBER"
+  ]
+
+-- | An exported rule that calls a helper, and the helper reads an ASSUME of
+-- type DEONTIC.
+viaHelperJL4 :: Text
+viaHelperJL4 = Text.unlines
+  [ "DECLARE Person IS ONE OF Seller, Buyer"
+  , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+  , ""
+  , "ASSUME `the assumed duty` IS A DEONTIC Person Action"
+  , ""
+  , "GIVETH A BOOLEAN"
+  , "`assumed duty fulfilled` MEANS"
+  , "  CONSIDER `the assumed duty`"
+  , "  WHEN FULFILLED THEN TRUE"
+  , "  OTHERWISE FALSE"
+  , ""
+  , "@export Is the duty fulfilled, as the helper reads it"
+  , "GIVETH A BOOLEAN"
+  , "`via helper` MEANS `assumed duty fulfilled`"
+  ]
+
+-- | The same shape with a NUMBER: it is not refused.
+viaNumberHelperJL4 :: Text
+viaNumberHelperJL4 = Text.unlines
+  [ "ASSUME `the rate` IS A NUMBER"
+  , ""
+  , "GIVETH A NUMBER"
+  , "`rate plus one` MEANS `the rate` + 1"
+  , ""
+  , "@export One more than the rate, as the helper reads it"
+  , "GIVETH A NUMBER"
+  , "`via helper` MEANS `rate plus one`"
+  ]
+
+-- | An exported rule whose polymorphic local helper reads a polymorphic ASSUME
+-- at its own type variable, which the call @fetch 1@ makes a DEONTIC.
+viaLocalHelperJL4 :: Text
+viaLocalHelperJL4 = Text.unlines
+  [ "DECLARE Person IS ONE OF Seller, Buyer"
+  , "DECLARE Action IS ONE OF `deliver goods`, `pay invoice`"
+  , ""
+  , "GIVEN a IS A TYPE"
+  , "GIVETH AN a"
+  , "ASSUME `the placeholder`"
+  , ""
+  , "GIVEN duty IS A DEONTIC Person Action"
+  , "GIVETH A BOOLEAN"
+  , "`duty fulfilled` duty MEANS"
+  , "  CONSIDER duty"
+  , "  WHEN FULFILLED THEN TRUE"
+  , "  OTHERWISE FALSE"
+  , ""
+  , "@export Is the duty fulfilled, as the local helper reads it"
+  , "GIVETH A BOOLEAN"
+  , "`via local helper` MEANS `duty fulfilled` (fetch 1)"
+  , "  WHERE"
+  , "    GIVEN a IS A TYPE"
+  , "          n IS A NUMBER"
+  , "    GIVETH AN a"
+  , "    fetch n MEANS `the placeholder`"
   ]
 
 -- | Start a service with an empty deployment registry.
