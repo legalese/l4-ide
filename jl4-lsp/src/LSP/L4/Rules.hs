@@ -11,6 +11,7 @@ import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
+import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), classifyImport, collapsePath, pathImportFile)
 import L4.Lexer (PError, PosToken)
 import L4.Nlg (promoteHeadInputNlg)
 import Optics (gplate, toListOf, (%), (^.))
@@ -27,6 +28,7 @@ import qualified L4.TypeCheck as TypeCheck
 import qualified L4.Lint.AndOrDepth as Lint
 
 import Control.Applicative
+import Data.Char (isAlpha, isAlphaNum, isAscii)
 import Control.Monad.Trans.Maybe
 import Data.Hashable (Hashable)
 import Data.Monoid (Ap (..))
@@ -924,8 +926,207 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
                    <> ".l4 in the project root or beside the importing file."
                  ]
 
--- | The modules a file imports that resolved to nothing, by bare name, in the
--- order they are written, each once.
+-- | The name an @IMPORT@ is known by wherever a module is named in text: the
+-- key 'GetMixfixRegistry' and 'GetImports' resolve it under, the log, and the
+-- list 'unresolvedImports' returns.
+--
+-- A bare import is known by 'takeBaseName' of what was written, which is how it
+-- has always been resolved, so @IMPORT foo.l4@ and @IMPORT a.b@ still mean
+-- @foo@ and @a@ ('GetImports' now says so in a warning). A path import is known
+-- by the text as written, so @..\/a\/mod@ and @..\/b\/mod@ stay two imports
+-- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.2).
+--
+-- One function for all three callers, because they have to agree about which
+-- module an @IMPORT@ names: a name one of them reduced and another did not would
+-- be reported as unresolved by 'unresolvedImports' after 'GetImports' had
+-- resolved it.
+writtenImportName :: Name -> Text
+writtenImportName n = case classifyImport written of
+  BareImport -> Text.pack (takeBaseName (Text.unpack written))
+  _          -> written
+  where
+    written = rawNameToText (rawName n)
+
+-- | What resolving one path import came to. See 'resolveRelativeImport'.
+data PathResolution
+  = PathFound !NormalizedUri
+  | PathNotFound !FilePath !FilePath
+    -- ^ the importing file, and the collapsed path that was looked for
+  | PathEscapesRoot !FilePath !FilePath
+    -- ^ the importing file, and the collapsed path, which leaves the root of a
+    -- confined runtime
+  | PathNoImportingDirectory
+    -- ^ the importer is not a file with a directory: an embedded library, or a
+    -- browser document
+  | PathRootRefused
+    -- ^ a leading @\/@, which is reserved
+  deriving stock (Eq, Show)
+
+-- | What resolving one written @IMPORT@ came to: a bare name goes through the
+-- ladder ('resolveImportShared') unchanged, a path through
+-- 'resolveRelativeImport'.
+data WrittenOutcome
+  = BareOutcome !ImportOutcome
+  | PathOutcome !PathResolution
+
+writtenOutcomeUri :: WrittenOutcome -> Maybe NormalizedUri
+writtenOutcomeUri = \ case
+  BareOutcome o            -> o.importUri
+  PathOutcome (PathFound u) -> Just u
+  PathOutcome _            -> Nothing
+
+-- | Resolve a path import (RELATIVE-IMPORTS-SPEC §4.3).
+--
+-- The written name is joined to the importing file's directory, collapsed
+-- lexically, and probed in the VFS tier and then, if the scope allows, on the
+-- filesystem. No other tier is consulted: not @$JL4_LIBRARY_PATH@, not the
+-- project root, not the embedded stdlib, not the XDG store, not the extension's
+-- bundle. A path import names one file, and the point of writing one is that no
+-- ladder decides it.
+--
+-- __Confinement__ is read off the 'LibraryScope': 'EmbeddedStdlibOnly' is a host
+-- that serves bundles somebody else uploaded (jl4-service), and there a
+-- collapsed path that climbs above the bundle is refused before anything is
+-- probed, and the filesystem is never asked. 'AmbientLibraries' is a person's
+-- own machine, where @..@ may leave the entry file's directory on purpose: the
+-- commons rows that import their parent's module need it.
+--
+-- The module's URI is the collapsed path, spelled relative when the session's
+-- keys are ('canonicalPathKey'), which is the regime 'roundTrippingFileUri'
+-- applies to a bare name.
+resolveRelativeImport
+  :: Recorder (WithPriority Log)
+  -> LibraryScope
+  -> FilePath          -- ^ root directory the session was started with
+  -> NormalizedUri     -- ^ importing module
+  -> Text              -- ^ the name as written
+  -> Action PathResolution
+resolveRelativeImport recorder scope rootDirectory importerUri written = do
+  logWith recorder Info $ LogImportResolution $
+    "Resolving path import: " <> written <> " from " <> (fromNormalizedUri importerUri).getUri
+  case classifyImport written of
+    RootedImport -> pure PathRootRefused
+    _ -> case uriToNormalizedFilePath importerUri of
+      Nothing -> pure PathNoImportingDirectory
+      Just nfp -> do
+        let importer = fromNormalizedFilePath nfp
+            target = collapsePath (takeDirectory importer </> pathImportFile written)
+            confined = scope == EmbeddedStdlibOnly
+        if confined && target.cpEscaped
+          then pure (PathEscapesRoot importer target.cpPath)
+          else do
+            key <- liftIO $ canonicalPathKey scope rootDirectory target.cpPath
+            candidateUri <- liftIO $ roundTrippingFileUri key
+            mContent <- use GetFileContents candidateUri
+            let inVfs = case mContent of
+                  Just (_, Just _rope) -> True
+                  _                    -> False
+            onDisk <-
+              if inVfs || confined
+                then pure False
+                else liftIO $ doesFileExist key
+            if inVfs || onDisk
+              then do
+                logWith recorder Info $ LogImportResolution $
+                  "Found path import: " <> Text.pack key
+                pure (PathFound candidateUri)
+              else pure (PathNotFound importer key)
+
+-- | The one spelling a path import's file is keyed under, so that one file is
+-- one module however it was reached (RELATIVE-IMPORTS-SPEC §4.4).
+--
+-- Under 'EmbeddedStdlibOnly' there is nothing to do: a path that leaves the
+-- bundle is refused, so every target stays inside it, and the bundle's files are
+-- registered under exactly the collapsed spelling.
+--
+-- Elsewhere a session keys its modules in one of two regimes, told apart by the
+-- root directory it was started with. An absolute root means every key is
+-- absolute and the collapsed target already is. A relative root (the CLI on a
+-- relative entry path) means keys are written relative to the working directory,
+-- and then one file can be reached by a path that climbs out of that directory
+-- and comes back into it (@..\/a\/helper@, from a module at @..\/b\/mod@, when @a@
+-- is the working directory) as well as by one that never leaves it
+-- (@.\/helper@). A lexical collapse cannot see that these meet, because it does
+-- not know the name of the directory it started in. So the target is collapsed
+-- once more against the working directory and written relative to it, which
+-- gives the second spelling the first one. This reads the working directory and
+-- touches nothing else.
+--
+-- Not covered: a symbolic link, and a letter-case difference on a case-insensitive
+-- volume, still reach one file as two modules, as they do for a bare import.
+canonicalPathKey :: LibraryScope -> FilePath -> FilePath -> IO FilePath
+canonicalPathKey EmbeddedStdlibOnly _ target = pure target
+canonicalPathKey AmbientLibraries rootDirectory target
+  | isAbsolute rootDirectory = pure target
+  | otherwise = do
+      cwd <- getCurrentDirectory
+      pure (relativeFrom cwd (collapsePath (cwd </> target)).cpPath)
+
+-- | @relativeFrom base path@ writes the absolute @path@ relative to the absolute
+-- directory @base@, with @..@ where it has to climb. A path that shares no root
+-- with @base@ (another drive) is returned as it is.
+relativeFrom :: FilePath -> FilePath -> FilePath
+relativeFrom base path
+  | common == 0 = path
+  | otherwise   = joinPath (replicate (length b - common) ".." <> drop common p)
+  where
+    b = splitDirectories base
+    p = splitDirectories path
+    common = length (takeWhile id (zipWith (==) b p))
+
+-- | The diagnostic text for a path import that did not resolve, or 'Nothing' for
+-- one that did. The first line of each is stable text a test can match
+-- (RELATIVE-IMPORTS-SPEC §4.5).
+pathFailureMessage :: NormalizedUri -> Text -> PathResolution -> Maybe Text
+pathFailureMessage importerUri written = \ case
+  PathFound _ -> Nothing
+  PathNotFound importer collapsed -> Just $ Text.unlines
+    [ "I could not find a module at this path: " <> written
+    , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+    , "Relative to " <> Text.pack importer <> " that is " <> Text.pack collapsed <> ", which does not exist."
+    ]
+  PathEscapesRoot importer collapsed -> Just $ Text.unlines
+    [ "This import leaves the root of this deployment: " <> written
+    , "Relative to " <> Text.pack importer <> " that would be " <> Text.pack collapsed
+        <> ", which is outside the root of this deployment."
+    , "A relative import may reach any file inside the deployment and nothing outside it."
+    ]
+  PathNoImportingDirectory -> Just $ Text.unlines
+    [ "This import is relative, but " <> (fromNormalizedUri importerUri).getUri <> " has no directory to be relative to."
+    , "Write a bare module name, or open the file from disk so that it has a folder to start from."
+    ]
+  PathRootRefused -> Just $ Text.unlines
+    [ "This import leaves the root of this deployment: " <> written
+    , "A path import is written relative to the file that imports it. A leading / is reserved for a root-relative form that does not exist yet."
+    ]
+
+-- | The warning for a bare import whose written name is not the module it
+-- resolves: a dot or an extension in a name is dropped, so @IMPORT a.b@ is
+-- @IMPORT a@ and @IMPORT foo.l4@ is @IMPORT foo@. The result is not changed;
+-- it is only no longer silent (RELATIVE-IMPORTS-SPEC §4.2 rule 3).
+--
+-- The advice has to be something that parses and that means what it says. A
+-- module name with a hyphen, a space or a non-ASCII letter needs its backticks.
+-- And a module whose own name still has a dot cannot be written as a bare name
+-- at all, because the dot is cut again; the one spelling that reaches its file
+-- is the path form, which does not cut.
+shortenedImportWarning :: Text -> Text -> Text
+shortenedImportWarning written resolved = Text.unlines
+  [ "IMPORT `" <> written <> "` resolved to module `" <> resolved <> "`; " <> advice
+  , "A module name is read up to its last dot. To import a module from another folder, write its path in backticks, with a slash."
+  ]
+  where
+    advice
+      | Text.any (== '.') resolved =
+          "a module whose file name has a dot is imported by path: write IMPORT `./" <> resolved <> "`"
+      | plain = "write `IMPORT " <> resolved <> "`"
+      | otherwise = "write IMPORT `" <> resolved <> "`"
+    plain = case Text.uncons resolved of
+      Just (c, rest) -> (isAscii c && isAlpha c || c == '_') && Text.all (\x -> isAscii x && (isAlphaNum x || x == '_')) rest
+      Nothing -> False
+
+-- | The modules a file imports that resolved to nothing, by 'writtenImportName',
+-- in the order they are written, each once.
 --
 -- 'GetImports' reports an unresolvable IMPORT as a diagnostic and leaves it out
 -- of its result, so what it did not resolve is what the file declares minus
@@ -942,7 +1143,7 @@ unresolvedImports uri = do
   mResolved <- use GetImports uri
   pure $ case (mProg, mResolved) of
     (Just prog, Just resolved) ->
-      let resolvedNames = Set.fromList (map (moduleBaseName . (.importName)) resolved)
+      let resolvedNames = Set.fromList (map (writtenImportName . (.importName)) resolved)
        in List.nub
             [ n
             | n <- foldTopDecls declaredImport prog
@@ -952,10 +1153,8 @@ unresolvedImports uri = do
   where
     declaredImport :: TopDecl Name -> [Text]
     declaredImport = \ case
-      Import _ (MkImport _ n _) -> [moduleBaseName n]
+      Import _ (MkImport _ n _) -> [writtenImportName n]
       _ -> []
-    moduleBaseName :: Name -> Text
-    moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
 
 -- | The rules of a session that may use every tier of the library ladder: the
 -- CLI, the REPL and the language server. See 'LibraryScope'.
@@ -971,6 +1170,17 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
   notFoundWarnedRef <- UnliftIO.newIORef Set.empty
   let resolveImport :: NormalizedUri -> String -> Action ImportOutcome
       resolveImport = resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory
+
+      -- The one place a written IMPORT is classified and sent to its resolver:
+      -- a name without a slash to the ladder above, exactly as before, a path
+      -- to 'resolveRelativeImport'. 'GetMixfixRegistry' and 'GetImports' both
+      -- come through here, so they can never load different sources for one
+      -- IMPORT (the single-resolution-path rule of RELATIVE-IMPORTS-SPEC §5).
+      resolveWritten :: NormalizedUri -> Name -> Action WrittenOutcome
+      resolveWritten importerUri n =
+        case classifyImport (rawNameToText (rawName n)) of
+          BareImport -> BareOutcome <$> resolveImport importerUri (Text.unpack (writtenImportName n))
+          _          -> PathOutcome <$> resolveRelativeImport recorder scope rootDirectory importerUri (rawNameToText (rawName n))
 
   define shakeRecorder $ \GetLexTokens uri -> do
     mRope <- runMaybeT $
@@ -1047,10 +1257,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- ('resolveImportShared'), so parser-hint resolution can never pick a
         -- different source than typecheck resolution (specs/as-built/import-resolution.md §3.3).
         let resolveImportUri :: Name -> Action (Maybe NormalizedUri)
-            resolveImportUri n = do
-              let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
-              outcome <- resolveImport uri modName
-              pure outcome.importUri
+            resolveImportUri n = writtenOutcomeUri <$> resolveWritten uri n
 
         -- Resolve all import URIs
         resolvedUris <- catMaybes <$> traverse resolveImportUri importNames
@@ -1078,12 +1285,13 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         pure (fmap (mkSimpleFileDiagnostic uri) allDiags, Just finalProg)
 
   define shakeRecorder $ \GetImports uri -> do
-    let -- NOTE: we curently don't allow any relative or absolute file paths, just bare module names
-        mkImportPath :: Import Name -> Action (Maybe SrcRange, String, ImportOutcome)
+    let -- A name without a slash is a bare module name and is resolved by the
+        -- ladder, as it always was; a backticked name with a slash is a path
+        -- relative to this file (specs/proposals/RELATIVE-IMPORTS-SPEC.md §4).
+        mkImportPath :: Import Name -> Action (Maybe SrcRange, Name, WrittenOutcome)
         mkImportPath (MkImport a n _mr) = do
-          let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
-          outcome <- resolveImport uri modName
-          pure (rangeOf a, modName, outcome)
+          outcome <- resolveWritten uri n
+          pure (rangeOf a, n, outcome)
 
         -- 'Nothing' for an import that did not resolve: it contributes its
         -- diagnostic and no 'ImportResult' at all. Until #971 this handed back
@@ -1093,34 +1301,59 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- often than the one that says what is actually wrong. Dropping the
         -- entry leaves the downstream rules with nothing to load, which is the
         -- truth; the error is already reported here.
-        mkImportUri (range, modName, outcome) = case outcome.importUri of
-          Just u ->
+        mkImportUri (range, name, outcome) = case outcome of
+          PathOutcome (PathFound u) ->
             pure ([], Just u)
-          Nothing -> do
-            -- One line per location, in probe order, deduped by the FILE rather
-            -- than by the spelling: see 'dedupeTriedLocations', which is where
-            -- both of those properties are argued and unit-tested. The embedded
-            -- tier is in 'libTried' at its own rank (tier 4 of the ladder), not
-            -- appended after everything else as it was until 2026-09-21: a list
-            -- that says it is in the order things were tried has to be.
-            allPaths <- liftIO $ triedLocations outcome
-            let diag = mkSimpleFileDiagnostic uri
+          PathOutcome res -> do
+            let msg = fromMaybe "" (pathFailureMessage uri (rawNameToText (rawName name)) res)
+                diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri
-                    (Text.unlines
-                      [ "I could not find a module with this name: " <> Text.pack modName
-                      , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
-                      , "I have tried the following locations:"
-                      , Text.intercalate ",\n" allPaths
-                      ])
+                    msg
                     (fromSrcRange <$> range)
             pure ([diag], Nothing)
+          BareOutcome o -> case o.importUri of
+            Just u -> do
+              -- The result is what it has always been. The warning only says
+              -- that the name written is not the module found (§4.2 rule 3);
+              -- it is raised here and not in 'GetMixfixRegistry', which asks
+              -- about the same IMPORT and would say it twice.
+              let written = rawNameToText (rawName name)
+                  resolved = writtenImportName name
+                  warnings =
+                    [ mkSimpleFileDiagnostic uri
+                        $ mkSimpleWarning
+                          (fromNormalizedUri uri).getUri
+                          (shortenedImportWarning written resolved)
+                          (fromSrcRange <$> range)
+                    | written /= resolved
+                    ]
+              pure (warnings, Just u)
+            Nothing -> do
+              -- One line per location, in probe order, deduped by the FILE rather
+              -- than by the spelling: see 'dedupeTriedLocations', which is where
+              -- both of those properties are argued and unit-tested. The embedded
+              -- tier is in 'libTried' at its own rank (tier 4 of the ladder), not
+              -- appended after everything else as it was until 2026-09-21: a list
+              -- that says it is in the order things were tried has to be.
+              allPaths <- liftIO $ triedLocations o
+              let diag = mkSimpleFileDiagnostic uri
+                    $ mkSimpleDiagnostic
+                      (fromNormalizedUri uri).getUri
+                      (Text.unlines
+                        [ "I could not find a module with this name: " <> writtenImportName name
+                        , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+                        , "I have tried the following locations:"
+                        , Text.intercalate ",\n" allPaths
+                        ])
+                      (fromSrcRange <$> range)
+              pure ([diag], Nothing)
 
         mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], Maybe ImportResult)]
         mkDiagsAndImports = \ case
           Import _a i@(MkImport _ n _) -> Ap do
-            (r, modName, outcome) <- mkImportPath i
-            (diag, mu) <- mkImportUri (r, modName, outcome)
+            (r, name, outcome) <- mkImportPath i
+            (diag, mu) <- mkImportUri (r, name, outcome)
             pure [(diag, MkImportResult n r <$> mu)]
           _ -> pure []
 
@@ -1416,6 +1649,22 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
       Diagnostic
         { _range = srcSpanToLspRange range
         , _severity = Just LSP.DiagnosticSeverity_Error
+        , _code = Nothing
+        , _codeDescription = Nothing
+        , _source = Just origin
+        , _message
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
+    -- | 'mkSimpleDiagnostic' at Warning severity: for a message that is true of
+    -- a file that still checks, such as an IMPORT name that was shortened.
+    mkSimpleWarning :: Text -> Text -> Maybe SrcSpan -> Diagnostic
+    mkSimpleWarning origin _message range =
+      Diagnostic
+        { _range = srcSpanToLspRange range
+        , _severity = Just LSP.DiagnosticSeverity_Warning
         , _code = Nothing
         , _codeDescription = Nothing
         , _source = Just origin

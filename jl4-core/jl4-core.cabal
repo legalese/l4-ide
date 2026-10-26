@@ -230,6 +230,7 @@ test-suite jl4-core-test
   other-modules:
     Paths_jl4_core
     ImportResolutionSpec
+    RelativeImportSpec
     TemporalContextSpec
     UnifySpec
     WarningViableForkSpec
@@ -310,6 +311,7 @@ test-suite jl4-core-test
     bytestring,
     containers,
     deepseq,
+    filepath,
     hspec,
     jl4-core,
     megaparsec,

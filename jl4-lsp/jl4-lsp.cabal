@@ -179,6 +179,7 @@ test-suite jl4-lsp-test
     LadderTermKeySpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
+    RelativeImportSpec
     SmartPunctuationActionsSpec
     StateGraphLensSpec
     UnknownAnnotationLspSpec

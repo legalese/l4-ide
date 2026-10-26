@@ -396,6 +396,29 @@ cycle2Entry      = fixtureDir </> "cycle2"     </> "dua.l4"
 selfImportEntry  = fixtureDir </> "selfimport" </> "solo.l4"
 cleanImportEntry = fixtureDir </> "imports-ok" </> "main.l4"
 
+-- Path imports (specs/proposals/RELATIVE-IMPORTS-SPEC.md): `IMPORT \`../b/mod\``.
+-- Each is a small tree under fixtures/relative-import/; the entry file is named.
+relImportDir :: FilePath
+relImportDir = fixtureDir </> "relative-import"
+
+relRowsEntry, relRowsDir, relDiamondEntry, relIdentityEntry, relNotFoundEntry,
+  relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry,
+  relParentEntry, relShortenedHyphenEntry :: FilePath
+relShortenedHyphenEntry = relImportDir </> "shortened" </> "hyphen.l4"
+relBackDir, relHebrewDir :: FilePath
+relBackDir             = relImportDir </> "back" </> "a"
+relHebrewDir           = relImportDir </> "hebrew"
+relRowsDir             = relImportDir </> "rows" </> "a"
+relRowsEntry           = relRowsDir </> "main.l4"
+relDiamondEntry        = relImportDir </> "diamond" </> "top.l4"
+relIdentityEntry       = relImportDir </> "identity" </> "top.l4"
+relNotFoundEntry       = relImportDir </> "not-found" </> "main.l4"
+relShortenedExtEntry   = relImportDir </> "shortened" </> "ext.l4"
+relShortenedDottedEntry = relImportDir </> "shortened" </> "dotted.l4"
+relCycleEntry          = relImportDir </> "cycle" </> "a" </> "x.l4"
+relRootedEntry         = relImportDir </> "rooted" </> "main.l4"
+relParentEntry         = relImportDir </> "parent" </> "cases" </> "main.l4"
+
 -- Diamond whose bottom module (d.l4) has a type error: top imports a, b and d;
 -- a and b import d. Regression fixture for smucclaw/l4-ide#1008.
 dupDiagDiamondEntry :: FilePath
@@ -599,6 +622,10 @@ coreFixtures =
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
+  , relRowsEntry, relDiamondEntry, relIdentityEntry, relNotFoundEntry
+  , relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry
+  , relParentEntry
+  , relBackDir </> "main.l4", relHebrewDir </> "main.l4", relShortenedHyphenEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
@@ -2944,6 +2971,129 @@ spec bin = do
       -- Guard: the broadened 'any non-eval Error diagnostic fails the run'
       -- rule must NOT over-fire on a legitimate clean import.
       expectOk bin ["check", cleanImportEntry] "Check succeeded."
+
+  -- Path imports (RELATIVE-IMPORTS-SPEC §4, §7). A backticked IMPORT name with a
+  -- slash is a path, resolved against the importing file's directory; a name
+  -- without one is a bare module name and resolves as it always did. The
+  -- assertions pin exit codes and the FIRST line of each message, not the
+  -- spelling of a collapsed path, which is platform-shaped.
+  describe "l4 relative imports" $ do
+    let combined (Output _ sout serr) = sout ++ "\n" ++ serr
+        exitOf (Output code _ _) = code
+
+    it "checks a row that imports a sibling folder's module and a ./ neighbour" $
+      expectOk bin ["check", relRowsEntry] "Check succeeded."
+
+    it "evaluates a value defined in a module reached by `../b/mod`" $ do
+      -- modmarker is 1006 (the sum of 1, 2, 3, plus neighbourmarker from the
+      -- bare `IMPORT neighbour` that mod.l4 writes beside itself) and helpmarker
+      -- is 30; only modules that were really loaded can make `answer` 1036.
+      out <- runL4 bin ["run", relRowsEntry]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("1036" `isInfixOf`)
+
+    it "gives the same answer when the entry file is named bare, from its own folder" $ do
+      -- `l4 check main.l4` run inside rows/a makes the importing directory ".",
+      -- so `./helper` and `../b/mod` collapse from a different starting point.
+      absDir <- makeAbsolute relRowsDir
+      out <- runL4In (Just absDir) Nothing bin ["run", "main.l4"]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("1036" `isInfixOf`)
+
+    for_ ["check", "run"] \cmd ->
+      it ("reports a type error in a module two path imports share once, under " <> cmd) $ do
+        out <- runL4 bin [cmd, relDiamondEntry]
+        exitOf out `shouldNotBe` ExitSuccess
+        countInfix "The second input of function" (combined out) `shouldBe` 1
+
+    it "treats `sub/../core` and the bare `core` as one module" $ do
+      -- Without a lexical collapse these are two modules, and the typechecker
+      -- would say a name from `core` is defined twice.
+      out <- runL4 bin ["run", relIdentityEntry]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("42" `isInfixOf`)
+      combined out `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
+    -- One file is one module however it was reached. `./helper` never leaves
+    -- the folder; `../a/helper`, written in b/mod.l4, climbs out of it and comes
+    -- back in. A lexical collapse cannot tell that those meet, so before the
+    -- canonical key the file was loaded twice and its names were "defined twice".
+    it "treats a file reached by climbing out and back in as the one already loaded" $ do
+      absDir <- makeAbsolute relBackDir
+      out <- runL4In (Just absDir) Nothing bin ["run", "main.l4"]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("21" `isInfixOf`)
+      combined out `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
+    it "gives the same answer to that layout from the folder above, and with an absolute entry" $ do
+      absDir <- makeAbsolute relBackDir
+      above <- makeAbsolute (relImportDir </> "back")
+      fromAbove <- runL4In (Just above) Nothing bin ["run", "a" </> "main.l4"]
+      exitOf fromAbove `shouldBe` ExitSuccess
+      combined fromAbove `shouldSatisfy` ("21" `isInfixOf`)
+      absolute <- runL4 bin ["run", absDir </> "main.l4"]
+      exitOf absolute `shouldBe` ExitSuccess
+      combined absolute `shouldSatisfy` ("21" `isInfixOf`)
+
+    it "keeps one module when a Hebrew-named module path-imports a sibling the entry also imports" $ do
+      -- A name that does not round-trip through a relative file: URI (a Hebrew
+      -- letter, a space) is keyed by an absolute URI (#971); its own path imports
+      -- used to be keyed absolute too, so `core` was loaded twice.
+      absDir <- makeAbsolute relHebrewDir
+      out <- runL4In (Just absDir) Nothing bin ["run", "main.l4"]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("83" `isInfixOf`)
+      combined out `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
+    it "fails, naming the path, when a path import finds no file" $ do
+      out <- runL4 bin ["check", relNotFoundEntry]
+      exitOf out `shouldNotBe` ExitSuccess
+      combined out `shouldSatisfy`
+        ("I could not find a module at this path: ../nowhere/mod" `isInfixOf`)
+
+    it "leaves a bare name alone: `foo.l4` still resolves foo, now with a warning" $ do
+      out <- runL4 bin ["run", relShortenedExtEntry]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("42" `isInfixOf`)
+      combined out `shouldSatisfy`
+        ("IMPORT `foo.l4` resolved to module `foo`; write `IMPORT foo`" `isInfixOf`)
+
+    it "leaves a dotted bare name alone: `a.b` still resolves a, now with a warning" $ do
+      out <- runL4 bin ["run", relShortenedDottedEntry]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("42" `isInfixOf`)
+      combined out `shouldSatisfy`
+        ("IMPORT `a.b` resolved to module `a`; write `IMPORT a`" `isInfixOf`)
+
+    it "suggests something that parses: a hyphenated module name keeps its backticks" $ do
+      -- `IMPORT my-helpers.l4` resolves my-helpers; the bare suggestion
+      -- `IMPORT my-helpers` would be a parse error, so the advice carries the
+      -- backticks. (A name with a dot left in it is advised to use the path form.)
+      out <- runL4 bin ["check", relShortenedHyphenEntry]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy`
+        ("IMPORT `my-helpers.l4` resolved to module `my-helpers`; write IMPORT `my-helpers`" `isInfixOf`)
+
+    it "does not warn about a bare name that is already a module name" $ do
+      out <- runL4 bin ["check", relRowsEntry]
+      combined out `shouldSatisfy` (not . ("resolved to module" `isInfixOf`))
+
+    it "fails a cycle that runs through path imports" $
+      expectFail bin ["check", relCycleEntry]
+
+    it "refuses a leading slash" $ do
+      out <- runL4 bin ["check", relRootedEntry]
+      exitOf out `shouldNotBe` ExitSuccess
+      combined out `shouldSatisfy`
+        ("This import leaves the root of this deployment: /abs/mod" `isInfixOf`)
+
+    it "lets the CLI climb out of the entry file's folder (it is not confined)" $ do
+      -- The commons `cases/` rows: the entry file sits in a folder below the
+      -- module it needs. Only the service and wasm refuse a path that leaves
+      -- the root.
+      out <- runL4 bin ["run", relParentEntry]
+      exitOf out `shouldBe` ExitSuccess
+      combined out `shouldSatisfy` ("42" `isInfixOf`)
 
   -- Regression test for smucclaw/l4-ide#1008: every module used to be checked
   -- (and evaluated) once per import PATH, so a type error in a module reached by

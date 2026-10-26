@@ -1,0 +1,4 @@
+IMPORT prelude
+IMPORT neighbour
+
+modmarker MEANS sum (LIST 1, 2, 3) + neighbourmarker
