@@ -144,6 +144,7 @@ library
     L4.Parser.SrcSpan
     L4.ParserCombinators
     L4.Print
+    L4.Refusal
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
@@ -197,6 +198,7 @@ test-suite jl4-core-test
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     RefAnnotationSpec
+    MayRefuseSpec
     RefusalReportSpec
     RefuseSpec
     NlgPercentSpec

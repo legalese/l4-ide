@@ -688,8 +688,12 @@ handlers evalConfig recorder =
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.QueryPlanMethodName) params ide $
           \(qpParams :: Ladder.QueryPlanRequestParams) _tcRes recentViz -> do
             let vizConfig = Ladder.getVizConfig recentViz.vizState
+            -- A rule that may refuse to answer gets no plan: the answer is the
+            -- decline decided when its decision graph was drawn.
             MkVizHandler $
-              case Ladder.doVisualize recentViz.decide vizConfig of
+              case recentViz.decline of
+               Just declined -> pure (Aeson.toJSON declined)
+               Nothing -> case Ladder.doVisualize recentViz.decide vizConfig of
                 Right (vizProgramInfo, vizState) ->
                   let paramsByUnique =
                         VizQueryPlan.buildParamsByUnique vizProgramInfo

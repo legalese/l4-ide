@@ -564,7 +564,10 @@ export class WasmLspHandler {
         uri,
         p.fnName,
         bindingsJson
-      )) as { error?: string } | null
+      )) as { error?: string; kind?: string } | null
+      // A rule that may refuse to answer is declined; the decline carries the
+      // sentence that says why, under `error`, and is the answer.
+      if (result?.kind === 'declined') return result
       if (!result || result.error) return null
       return result
     } catch {

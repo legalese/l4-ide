@@ -10,12 +10,13 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
+import Control.Applicative ((<|>))
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (IOException, finally, throwIO, try)
 import Control.Monad (forM, forM_, unless, void, when)
 import qualified Data.Char as Char
-import Data.Foldable (toList)
+import Data.Foldable (toList, traverse_)
 import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
@@ -65,6 +66,8 @@ import Data.Aeson (toJSON)
 import Data.Char (isDigit)
 import System.IO (hPutStr)
 import System.IO.Temp (withSystemTempDirectory)
+import Data.IORef (atomicModifyIORef', newIORef)
+import qualified Language.LSP.Protocol.Types as LSP
 
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
@@ -369,6 +372,10 @@ expectMiddleLostInJson bin fixture messages = do
 
 fixtureDir :: FilePath
 fixtureDir = "tests-cli/fixtures"
+
+-- | Rules for the query planners, one of which reads a helper it imports.
+queryPlanDeclineDir :: FilePath
+queryPlanDeclineDir = fixtureDir </> "refuse-queryplan"
 
 -- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
 -- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
@@ -1558,6 +1565,320 @@ spec bin = do
             failed `shouldBe`
               "// Result: False (assertion failed: expected a refusal, but the expression produced a value)"
           other -> expectationFailure ("Expected one Result line in each of three traces, got " ++ show other)
+
+  -- A rule that may refuse to answer gets no query plan, from the REPL or from
+  -- the language server: each says why in the one sentence core gives, which
+  -- names the rule and every reason it may refuse with, read from the rule and
+  -- from the definitions it calls, in a file it imports or in its own. A rule
+  -- beside it is planned. The REPL declines a rule over a number that may
+  -- refuse, where the ladder would draw nothing. The language server answers
+  -- l4/queryPlan for the rule whose decision graph it drew last, and decides
+  -- the decline when it draws the graph.
+  describe "the query planners on a rule that may refuse" $ do
+    mRepl <- runIO locateReplBinary
+    mLsp <- runIO locateLspBinary
+    let mainFile = queryPlanDeclineDir </> "main.l4"
+        coveredDeclined :: T.Text
+        coveredDeclined = "No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\"."
+        checkedDeclined :: T.Text
+        checkedDeclined = "No query plan for checked: it may refuse to answer, with the reason \"insurance is not modelled\" or \"minors are not modelled\"."
+        settledDeclined :: T.Text
+        settledDeclined = "No query plan for settled: it may refuse to answer, with the reason \"residence is not modelled\"."
+        withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+        withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
+        -- Draw a rule's decision graph in the language server, from its lens,
+        -- the last one at or above the line that names it, and give back the
+        -- version of the document the graph is drawn from.
+        drawRule :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> IO (Maybe Value)
+        drawRule request uri source name = drawRuleAt request uri source name 0
+        -- The same, for the rule on the nth line, from 0, that names it.
+        drawRuleAt :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> Int -> IO (Maybe Value)
+        drawRuleAt request uri source name nth =
+          lensArgsAt request uri source name nth >>= \case
+            Just args@(verDocId : _) -> do
+              drawn <- request "workspace/executeCommand"
+                (Aeson.object ["command" Aeson..= ("l4.visualize" :: T.Text), "arguments" Aeson..= args])
+              (drawn >>= (`objField` "result")) `shouldSatisfy` maybe False (/= Null)
+              pure (Just verDocId)
+            _ -> pure Nothing
+        -- The arguments of the decision graph lens of the rule on the nth
+        -- line, from 0, that names it: the last lens at or above that line.
+        lensArgsAt :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> Int -> IO (Maybe [Value])
+        lensArgsAt request uri source name nth = do
+          lenses <- request "textDocument/codeLens" (Aeson.object ["textDocument" Aeson..= Aeson.object ["uri" Aeson..= uri]])
+          let graphLenses =
+                [ (line, args)
+                | Just (Array ls) <- [lenses >>= (`objField` "result")]
+                , lens <- toList ls
+                , Just (String "Show decision graph") <- [lens `objField` "command" >>= (`objField` "title")]
+                , Just (Number line) <- [lens `objField` "range" >>= (`objField` "start") >>= (`objField` "line")]
+                , Just (Array args) <- [lens `objField` "command" >>= (`objField` "arguments")]
+                ]
+              decideLines = [i | (i, l) <- zip [0 :: Int ..] (T.lines source), ("DECIDE " <> name <> " ") `T.isPrefixOf` l]
+              decideLine = case drop nth decideLines of
+                l : _ -> l
+                [] -> length (T.lines source)
+          case reverse [args | (line, args) <- graphLenses, line <= fromIntegral decideLine] of
+            args : _ | not (null args) -> pure (Just (toList args))
+            _ -> do
+              expectationFailure ("no decision graph lens for " <> T.unpack name <> " in " <> show lenses)
+              pure Nothing
+        -- Ask the language server for the plan of a rule, with an answer for
+        -- each input given and no other, giving the version of the document
+        -- its graph is drawn from: the result, or the error.
+        askPlanWith :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> [(T.Text, Bool)] -> Value -> IO (Maybe Value)
+        askPlanWith request name bindings verDocId = do
+          answer <- request "l4/queryPlan" (Aeson.object
+            [ "fnName" Aeson..= name
+            , "bindings" Aeson..= Aeson.object [Key.fromText input Aeson..= known | (input, known) <- bindings]
+            , "verDocId" Aeson..= verDocId
+            ])
+          pure (answer >>= \a -> a `objField` "result" <|> a `objField` "error")
+        -- The same, with no input known.
+        askPlan :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> Value -> IO (Maybe Value)
+        askPlan request name = askPlanWith request name []
+        -- The language server with the fixture open, and a way to ask it for
+        -- the plan of a rule: draw the rule's decision graph, then ask
+        -- l4/queryPlan with an answer for each input given.
+        withLspPlanner :: FilePath -> ((T.Text -> [(T.Text, Bool)] -> IO (Maybe Value)) -> IO ()) -> IO ()
+        withLspPlanner lsp act = do
+          source <- TE.decodeUtf8 <$> BS.readFile mainFile
+          withOpenDocument lsp mainFile \uri _notify request ->
+            act \name bindings -> drawRule request uri source name >>= maybe (pure Nothing) (askPlanWith request name bindings)
+        -- The language server with a file of the given text open, in a
+        -- directory of its own.
+        withRuleFile :: FilePath -> T.Text -> (T.Text -> (T.Text -> Value -> IO ()) -> (T.Text -> Value -> IO (Maybe Value)) -> IO ()) -> IO ()
+        withRuleFile lsp source act =
+          withSystemTempDirectory "l4-lsp-queryplan" \scratch -> do
+            work <- canonicalizePath scratch
+            let file = work </> "rule.l4"
+            BS.writeFile file (TE.encodeUtf8 source)
+            withOpenDocument lsp file act
+        -- Draw a decision graph with the given arguments of l4.visualize.
+        visualize :: (T.Text -> Value -> IO (Maybe Value)) -> [Value] -> IO (Maybe Value)
+        visualize request args = request "workspace/executeCommand"
+          (Aeson.object ["command" Aeson..= ("l4.visualize" :: T.Text), "arguments" Aeson..= args])
+        -- The label of every atom of every input a plan asks for, in its
+        -- order.
+        asksOf :: Maybe Value -> [T.Text]
+        asksOf plan =
+          [ label
+          | Just (Array asks) <- [plan >>= (`objField` "asks")]
+          , ask <- toList asks
+          , Just (Array atoms) <- [ask `objField` "atoms"]
+          , atom <- toList atoms
+          , Just (String label) <- [atom `objField` "label"]
+          ]
+        -- The unique of every node of a drawn graph that names the
+        -- definition and can be inlined.
+        inlinableUniques :: T.Text -> Value -> [Value]
+        inlinableUniques label = \case
+          Object o ->
+            [ u
+            | KeyMap.lookup "canInline" o == Just (Bool True)
+            , Just n <- [KeyMap.lookup "name" o]
+            , n `objField` "label" == Just (String label)
+            , Just u <- [n `objField` "unique"]
+            ]
+              <> concatMap (inlinableUniques label) (KeyMap.elems o)
+          Array a -> concatMap (inlinableUniques label) (toList a)
+          _ -> []
+        declinedWith :: T.Text -> T.Text -> [T.Text] -> Value
+        declinedWith rule sentence reasons = Aeson.object
+          [ "error" Aeson..= sentence
+          , "kind" Aeson..= ("declined" :: T.Text)
+          , "rule" Aeson..= rule
+          , "reasons" Aeson..= reasons
+          ]
+        didChange :: (T.Text -> Value -> IO ()) -> T.Text -> Int -> T.Text -> IO ()
+        didChange notify uri version text = notify "textDocument/didChange" (Aeson.object
+          [ "textDocument" Aeson..= Aeson.object ["uri" Aeson..= uri, "version" Aeson..= version]
+          , "contentChanges" Aeson..= [Aeson.object ["text" Aeson..= text]]
+          ])
+
+    it "the REPL's :queryplan says why it declines, with an answer for an input or without, and plans a rule beside it" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile
+          [ ":queryplan covered"
+          , ":queryplan covered adult=false"
+          , ":queryplan checked"
+          , ":queryplan planned"
+          , ":queryplan planned adult=false"
+          ]
+      case replies of
+        [covered, coveredAnswered, checked, planned, plannedAnswered] -> do
+          covered `shouldBe` coveredDeclined
+          coveredAnswered `shouldBe` coveredDeclined
+          checked `shouldBe` checkedDeclined
+          planned `shouldSatisfy` T.isPrefixOf "determined: Unknown\n"
+          plannedAnswered `shouldSatisfy` T.isPrefixOf "determined: False\n"
+        other -> expectationFailure ("Expected 5 replies, got " ++ show other)
+
+    it "the REPL's :queryplan declines a rule that refuses through a definition in its own file" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile [":queryplan settled"]
+      replies `shouldBe` [settledDeclined]
+
+    it "the REPL's :queryplan declines a rule over a number that may refuse, where the ladder would draw nothing" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile [":queryplan fee", ":queryplan charge"]
+      replies `shouldBe`
+        [ "No query plan for fee: it may refuse to answer, with the reason \"a negative fee is not modelled\"."
+        , "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+        ]
+
+    it "the language server's l4/queryPlan declines a rule whose REFUSE is its own, on every path, with an answer for an input or without" $ withLsp \lsp -> do
+      let source = T.unlines
+            [ "GIVEN resident IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF IF resident THEN REFUSE \"one\" ELSE REFUSE \"two\""
+            ]
+          declined = Just (declinedWith "target"
+            "No query plan for target: it may refuse to answer, with the reason \"one\" or \"two\"."
+            ["one", "two"])
+      withRuleFile lsp source \uri _notify request -> do
+        drawnAt <- drawRule request uri source "target"
+        let planWith bindings = maybe (pure Nothing) (askPlanWith request "target" bindings) drawnAt
+        planWith [] >>= (`shouldBe` declined)
+        planWith [("resident", True)] >>= (`shouldBe` declined)
+        planWith [("resident", False)] >>= (`shouldBe` declined)
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition it imports" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf -> do
+        planOf "covered" [] >>= (`shouldBe` Just (declinedWith "covered" coveredDeclined ["insurance is not modelled"]))
+        planOf "checked" [] >>= (`shouldBe` Just (declinedWith "checked" checkedDeclined ["insurance is not modelled", "minors are not modelled"]))
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition it imports, once the graph is drawn again on a change to the document" $ withLsp \lsp -> do
+      source <- TE.decodeUtf8 <$> BS.readFile mainFile
+      withOpenDocument lsp mainFile \uri notify request -> do
+        _ <- drawRule request uri source "covered"
+        didChange notify uri 2 (source <> "\n")
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        maybe (pure Nothing) (askPlan request "covered") redrawnAt
+          >>= (`shouldBe` Just (declinedWith "covered" coveredDeclined ["insurance is not modelled"]))
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition in its own file" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf ->
+        planOf "settled" [] >>= (`shouldBe` Just (declinedWith "settled" settledDeclined ["residence is not modelled"]))
+
+    it "the language server's l4/queryPlan plans a rule that cannot refuse, with an answer for an input or without" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf -> do
+        planned <- planOf "planned" []
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        (planned >>= (`objField` "determined")) `shouldBe` Just Null
+        asksOf planned `shouldBe` ["adult", "resident"]
+        answered <- planOf "planned" [("adult", False)]
+        (answered >>= (`objField` "determined")) `shouldBe` Just (Bool False)
+        asksOf answered `shouldBe` []
+
+    it "the language server's l4/queryPlan answers, of two rules with one name, for the one whose decision graph it drew, the plan and the decline alike" $ withLsp \lsp -> do
+      -- The first rule named target may refuse, through the helper, and the
+      -- second cannot.
+      let overloads = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS REFUSE \"the helper is not modelled\""
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            , ""
+            , "GIVEN a IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a > 1"
+            ]
+      withRuleFile lsp overloads \uri _notify request -> do
+        let planOfNth nth = drawRuleAt request uri overloads "target" nth >>= maybe (pure Nothing) (askPlan request "target")
+        second <- planOfNth 1
+        (second >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf second `shouldBe` ["a GREATER THAN 1"]
+        planOfNth 0 >>= (`shouldBe` Just (declinedWith "target"
+          "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+          ["the helper is not modelled"]))
+        secondAgain <- planOfNth 1
+        (secondAgain >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf secondAgain `shouldBe` ["a GREATER THAN 1"]
+
+    -- A client draws the decision graph again on a change to the document,
+    -- naming the document and its version only, as the VS Code extension
+    -- does; or from the rule's lens.
+    it "the language server's l4/queryPlan answers for the document as changed once the graph is drawn again, after an edit that adds a REFUSE and one that takes it away" $ withLsp \lsp -> do
+      let answers = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS TRUE"
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            ]
+          refuses = T.replace "helper MEANS TRUE" "helper MEANS REFUSE \"the helper is not modelled\"" answers
+      withRuleFile lsp answers \uri notify request -> do
+        planned <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf planned `shouldBe` ["a", "helper"]
+        didChange notify uri 2 refuses
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        declined <- maybe (pure Nothing) (askPlan request "target") redrawnAt
+        declined `shouldBe` Just (declinedWith "target"
+          "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+          ["the helper is not modelled"])
+        didChange notify uri 3 answers
+        redrawnAgain <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (3 :: Int)]]
+        let redrawnAgainAt = redrawnAgain >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAgainAt >>= (`objField` "version")) `shouldBe` Just (Number 3)
+        plannedOnChange <- maybe (pure Nothing) (askPlan request "target") redrawnAgainAt
+        (plannedOnChange >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf plannedOnChange `shouldBe` ["a", "helper"]
+        plannedAgain <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (plannedAgain >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf plannedAgain `shouldBe` ["a", "helper"]
+
+    it "the language server's l4/queryPlan declines a rule after an edit that adds a REFUSE to its own body, once the graph is drawn again on the change" $ withLsp \lsp -> do
+      let answers = T.unlines
+            [ "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a"
+            ]
+          refuses = T.replace "DECIDE target IF a" "DECIDE target IF IF a THEN REFUSE \"the rule is not modelled\" ELSE FALSE" answers
+      withRuleFile lsp answers \uri notify request -> do
+        planned <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf planned `shouldBe` ["a"]
+        didChange notify uri 2 refuses
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        maybe (pure Nothing) (askPlan request "target") redrawnAt
+          >>= (`shouldBe` Just (declinedWith "target"
+                "No query plan for target: it may refuse to answer, with the reason \"the rule is not modelled\"."
+                ["the rule is not modelled"]))
+
+    -- l4/inlineExprs draws the graph again with a definition's body in place
+    -- of its name.
+    it "the language server's l4/queryPlan keeps the decline of a decision graph that l4/inlineExprs draws again" $ withLsp \lsp -> do
+      let source = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS REFUSE \"the helper is not modelled\""
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            ]
+      withRuleFile lsp source \uri _notify request ->
+        lensArgsAt request uri source "target" 0 >>= traverse_ \args -> do
+          drawn <- visualize request args
+          let drawnAt = fromMaybe Null (drawn >>= (`objField` "result") >>= (`objField` "verDocId"))
+          case inlinableUniques "helper" =<< toList (drawn >>= (`objField` "result")) of
+            [helper] -> do
+              inlined <- request "l4/inlineExprs" (Aeson.object ["uniques" Aeson..= [helper], "verDocId" Aeson..= drawnAt])
+              (inlined >>= (`objField` "result")) `shouldSatisfy` maybe False (null . inlinableUniques "helper")
+              askPlan request "target" drawnAt >>= (`shouldBe` Just (declinedWith "target"
+                "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+                ["the helper is not modelled"]))
+            other -> expectationFailure ("expected one node naming the helper that can be inlined, got " <> show other)
 
   -- A directive reads a list answer only so deep, so a REFUSE or a division by
   -- zero at the end of a long list stops it for a short list and not for a
@@ -3444,6 +3765,86 @@ locateLspBinary = do
       let path = reverse (dropWhile Char.isSpace (reverse (dropWhile Char.isSpace out)))
       ok <- if code == ExitSuccess then doesFileExist path else pure False
       if ok then Just <$> makeAbsolute path else pure Nothing
+
+-- | Find the @jl4-repl@ binary: @L4_REPL_BIN@, else the one Cabal built for
+-- this test suite.
+locateReplBinary :: IO (Maybe FilePath)
+locateReplBinary = do
+  fromEnv <- lookupEnv "L4_REPL_BIN"
+  case fromEnv of
+    Just p -> do
+      ok <- doesFileExist p
+      pure (if ok then Just p else Nothing)
+    Nothing -> do
+      (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+      let path = takeWhile (`notElem` ("\r\n" :: String)) out
+      ok <- doesFileExist path
+      pure (if code == ExitSuccess && ok then Just path else Nothing)
+
+-- | The REPL's reply to each query, with the file loaded, run in @work@
+-- because the REPL keeps a history file in the directory it is in.
+replRepliesFor :: FilePath -> FilePath -> FilePath -> [String] -> IO [T.Text]
+replRepliesFor work repl file queries = do
+  absFile <- makeAbsolute file
+  (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+    { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+  hPutStr hin (unlines (queries <> [":quit"]))
+  hClose hin
+  hSetBinaryMode hout True
+  hSetBinaryMode herr True
+  soutBytes <- BS.hGetContents hout
+  _ <- BS.hGetContents herr
+  _ <- waitForProcess ph
+  let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+  pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+
+-- | Start @jl4-lsp@, initialize it and open the file in it, then hand the
+-- action the file's URI, a way to send a notification, and a way to send a
+-- request and wait for its answer, which is 'Nothing' if none came within two
+-- minutes. A request from the server in the meantime is answered with @null@.
+withOpenDocument :: FilePath -> FilePath -> (T.Text -> (T.Text -> Value -> IO ()) -> (T.Text -> Value -> IO (Maybe Value)) -> IO a) -> IO a
+withOpenDocument lsp file act = do
+  absFile <- makeAbsolute file
+  source <- TE.decodeUtf8 <$> BS.readFile absFile
+  let uri = LSP.getUri (LSP.filePathToUri absFile)
+  (Just hin, Just hout, Just herr, ph) <-
+    createProcess (proc lsp []) {std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
+  mapM_ (`hSetBinaryMode` True) [hin, hout, herr]
+  _ <- forkIO (void (BS.hGetContents herr))
+  nextId <- newIORef (1 :: Int)
+  let send v = do
+        let body = BSL8.toStrict (Aeson.encode v)
+        BS.hPut hin (BS8.pack ("Content-Length: " ++ show (BS.length body) ++ "\r\n\r\n") <> body)
+        hFlush hin
+      notify :: T.Text -> Value -> IO ()
+      notify method params =
+        send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "method" Aeson..= method, "params" Aeson..= params])
+      request :: T.Text -> Value -> IO (Maybe Value)
+      request method params = do
+        n <- atomicModifyIORef' nextId (\k -> (k + 1, k))
+        send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "id" Aeson..= n, "method" Aeson..= method, "params" Aeson..= params])
+        let await = readLspMessage hout >>= \case
+              Nothing -> pure Nothing
+              Just msg -> case Aeson.decodeStrict msg of
+                Just v
+                  | Just _ <- v `objField` "method", Just rid <- v `objField` "id" -> do
+                      send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "id" Aeson..= rid, "result" Aeson..= Null])
+                      await
+                  | Just rid <- v `objField` "id", rid == toJSON n -> pure (Just v)
+                _ -> await
+        fromMaybe Nothing <$> timeout 120000000 await
+      stop = do
+        terminateProcess ph
+        void (waitForProcess ph)
+        void (try (hClose hin) :: IO (Either IOException ()))
+  flip finally stop $ do
+    _ <- request "initialize" (Aeson.object ["processId" Aeson..= Null, "rootUri" Aeson..= Null, "capabilities" Aeson..= Aeson.object []])
+    notify "initialized" (Aeson.object [])
+    notify "textDocument/didOpen" (Aeson.object
+      [ "textDocument" Aeson..= Aeson.object
+          [ "uri" Aeson..= uri, "languageId" Aeson..= ("l4" :: T.Text), "version" Aeson..= (1 :: Int), "text" Aeson..= source ]
+      ])
+    act uri notify request
 
 -- | One @Content-Length@-framed LSP message from a handle, or 'Nothing' at end
 -- of input.

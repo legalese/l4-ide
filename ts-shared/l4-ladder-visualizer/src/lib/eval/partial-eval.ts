@@ -47,6 +47,13 @@ export interface PartialEvalAnalysis {
 
   bddStats?: { nodes: number; support: number }
   usedBdd: boolean
+
+  /**
+   * Set when the query planner declines the rule, because it may refuse to
+   * answer: the sentence that says why. No input is then classed as needed
+   * or moot.
+   */
+  declined?: string
 }
 
 function isDeterminedValue(v: UBoolVal): boolean {

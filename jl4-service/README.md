@@ -328,8 +328,23 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 
 Returns which inputs are still needed, ranked by impact on the outcome.
 
-A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
-There are three such answers.
+A rule that may refuse to answer is not planned, whatever inputs the request gives.
+It is answered with `400` and a body that says why:
+
+```json
+{
+  "error": "No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\".",
+  "kind": "declined",
+  "reasons": ["insurance is not modelled"],
+  "rule": "covered"
+}
+```
+
+`error` is one sentence that names the rule and every reason it may refuse with, `rule` names the rule, and `reasons` lists those reasons.
+A rule may refuse when a `REFUSE` is written in it, or in a definition it uses directly or through others, in its own file or in a file it imports, whether or not any input reaches that `REFUSE`.
+This answer comes before any of the ones below, so a rule that may refuse and does not return a boolean gets it too.
+
+Any other rule that cannot be planned is answered with `400` and `{"error": "…"}` alone.
 A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
 A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
 A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".

@@ -245,6 +245,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
               , Jl4.sharedImportEnv = importEnv
               , Jl4.sharedSource = content
               , Jl4.sharedAllDeclares = Map.elems allDeclares
+              , Jl4.sharedDependencies = map (.module') (Rules.transitiveDependencies tcResult)
               }
 
         fns <- forM exports $ \export -> do

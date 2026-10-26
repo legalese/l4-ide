@@ -71,7 +71,8 @@ import L4.Annotation (HasSrcRange, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
 import qualified L4.Utils.IntervalMap as IV
-import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, mayReachRefuse)
+import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes)
+import L4.Refusal (refusalReasons)
 import qualified L4.Print as Print
 import L4.StateGraph
   ( extractStateGraphs, stateGraphToDot, defaultStateGraphOptions
@@ -407,9 +408,9 @@ bundleExports wasmPath version infoMap entInfo resolvedModule depModules =
   let declares = Map.unions (declaresFromModule resolvedModule
                             : map declaresFromModule depModules)
       exports  = enrichReturnTypes entInfo (getExportedFunctions resolvedModule)
-      -- Whether evaluating a body may reach a REFUSE, following the names
-      -- it calls through this module and every module it imports.
-      mayRefuse = mayReachRefuse (resolvedModule : depModules)
+      -- Whether evaluating a definition may reach a REFUSE, following the
+      -- names it calls through this module and every module it imports.
+      mayRefuse = not . Set.null . refusalReasons (resolvedModule : depModules)
       stateGraphs =
         [ StateGraphExport sg.sgName (stateGraphToDot defaultStateGraphOptions sg)
         | sg <- extractStateGraphs resolvedModule
@@ -733,7 +734,7 @@ decideWasmSymbol :: Decide Resolved -> Text
 decideWasmSymbol (MkDecide _ _ (MkAppForm _ headRes _ _) _) =
   sanitizeWasmSymbol (rawNameToText (rawName (getActual headRes)))
 
-buildExport :: (Expr Resolved -> Bool) -> InfoMap -> Map Text (Declare Resolved) -> Map Text (Type' Resolved) -> Set.Set Text -> ExportedFunction -> FunctionExport
+buildExport :: (Decide Resolved -> Bool) -> InfoMap -> Map Text (Declare Resolved) -> Map Text (Type' Resolved) -> Set.Set Text -> ExportedFunction -> FunctionExport
 buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
   let name        = ef.exportName
       isDeonticFn = case ef.exportReturnType of
@@ -786,8 +787,7 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
       -- runtime reads as FULFILLED or BREACH, PROVIDED is not carried, and
       -- WITHIN is carried as printed text, which the runtime reads as a
       -- number.
-      refuseInBody = case ef.exportDecide of
-        MkDecide _ _ _ body -> mayRefuse body
+      refuseInBody = mayRefuse ef.exportDecide
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name

@@ -62,6 +62,9 @@ data CompiledModule = CompiledModule
                                                      -- Consulted by 'buildModuleInfo' so a record parameter
                                                      -- whose type is defined in an IMPORT'd file resolves —
                                                      -- the entry module's own 'flattenDeclares' wouldn't see it.
+  , compiledDependencies :: ![Module Resolved]       -- ^ Every module the entry file imports, directly or not.
+                                                     -- Read with 'compiledModule' to decide whether a rule may
+                                                     -- refuse ('L4.Refusal'), which follows the names it calls.
   }
   deriving (Generic)
 
@@ -83,6 +86,9 @@ data SharedModuleContext = SharedModuleContext
     -- ^ DECLAREs from the entry file + every transitively-imported
     --   file. Carried through into 'CompiledModule.compiledAllDeclares'
     --   so direct-AST evaluation can resolve cross-file record types.
+  , sharedDependencies :: ![Module Resolved]
+    -- ^ Every module the entry file imports, directly or not. Carried
+    --   through into 'CompiledModule.compiledDependencies'.
   }
 
 -- | Build shared context from an already-typechecked module.
@@ -92,10 +98,12 @@ buildSharedContext
   -> Text
   -> ModuleContext
   -> Module Resolved
+  -> [Module Resolved]
+  -- ^ every module it imports, directly or not
   -> Environment
   -> EntityInfo
   -> IO SharedModuleContext
-buildSharedContext filepath source moduleContext resolvedModule env entityInfo = do
+buildSharedContext filepath source moduleContext resolvedModule dependencies env entityInfo = do
   importEnv <- buildImportEnvironment filepath source moduleContext entityInfo
   pure SharedModuleContext
     { sharedModule = resolvedModule
@@ -109,6 +117,7 @@ buildSharedContext filepath source moduleContext resolvedModule env entityInfo =
     -- path in Compiler.hs overrides this with the full cross-file set
     -- via 'buildSharedContextWithDeclares'.
     , sharedAllDeclares = moduleDeclaresOnly resolvedModule
+    , sharedDependencies = dependencies
     }
 
 -- | Build a CompiledModule for a single function, reusing shared context.
@@ -123,6 +132,7 @@ buildCompiledFromShared shared funName = runExceptT $ do
     , compiledDecide = decide
     , compiledImportEnv = shared.sharedImportEnv
     , compiledAllDeclares = shared.sharedAllDeclares
+    , compiledDependencies = shared.sharedDependencies
     }
  where
   evalErrorToText :: EvaluatorError -> Text
@@ -323,6 +333,7 @@ precompileModule filepath source moduleContext funName = runExceptT $ do
     , compiledDecide = decide
     , compiledImportEnv = importEnv
     , compiledAllDeclares = moduleDeclaresOnly tcRes.module'
+    , compiledDependencies = map (.module') (Rules.transitiveDependencies tcRes)
     }
  where
   evalErrorToText :: EvaluatorError -> Text

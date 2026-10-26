@@ -132,6 +132,7 @@ test-suite jl4-service-test
     MaybeLiftSpec
     PutGuardSpec
     QueryPlanSpec
+    QueryPlanWasmDeclineSpec
     SchemaSpec
     SanitizationSpec
     StdlibResolutionSpec
@@ -161,6 +162,7 @@ test-suite jl4-service-test
     QuickCheck,
     quickcheck-instances,
     servant >=0.20.2 && <0.21,
+    servant-server,
     stm,
     string-interpolate,
     temporary,

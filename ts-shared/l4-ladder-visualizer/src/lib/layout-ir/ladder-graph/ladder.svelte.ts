@@ -15,6 +15,7 @@ import {
   PartialEvalAnalyzer,
   type PartialEvalAnalysis,
 } from '$lib/eval/partial-eval.js'
+import { withElicitationOverride } from '$lib/eval/query-plan-override.js'
 import type { LirId, LirNode, LirNodeInfo } from '@repo/layout-ir'
 import { LirContext, DefaultLirNode } from '@repo/layout-ir'
 import type { Ord } from '@repo/type-utils'
@@ -265,6 +266,7 @@ abstract class BaseLadderGraphLirNode
     stillNeeded: Unique[]
     next?: Unique[]
     askByUnique?: PartialEvalAnalysis['askByUnique']
+    declined?: string
   } | null = null
 
   protected constructor(
@@ -409,7 +411,9 @@ abstract class BaseLadderGraphLirNode
     return this.#nonViableSubgraph.hasVertex(node.getId())
   }
 
+  /** No node is moot for a rule the planner declines, because it may refuse. */
   nodeIsInIrrelevantSubgraph(_context: LirContext, node: LadderLirNode) {
+    if (this.#elicitationOverride?.declined !== undefined) return false
     return this.#irrelevantSubgraph.hasVertex(node.getId())
   }
 
@@ -422,6 +426,7 @@ abstract class BaseLadderGraphLirNode
   }
 
   edgeIsInIrrelevantSubgraph(_context: LirContext, edge: LadderLirEdge) {
+    if (this.#elicitationOverride?.declined !== undefined) return false
     return this.#irrelevantSubgraph.hasEdge(edge.getU(), edge.getV())
   }
 
@@ -520,22 +525,21 @@ abstract class BaseLadderGraphLirNode
          Result
   **************************************/
 
-  getResult(_context: LirContext) {
+  /**
+   * The ladder's answer for the inputs given, or UNKNOWN for a rule the
+   * planner declines, because it may refuse to answer.
+   */
+  getResult(_context: LirContext): UBoolVal {
+    if (this.#elicitationOverride?.declined !== undefined) {
+      return new UnknownVal()
+    }
     return this.#evalResult.result
   }
 
   getPartialEvalAnalysis(_context: LirContext): PartialEvalAnalysis | null {
     const analysis = this.#partialEvalAnalysis
     if (!analysis) return null
-    if (!this.#elicitationOverride) return analysis
-    return {
-      ...analysis,
-      next: this.#elicitationOverride.next ?? analysis.next,
-      ranked: this.#elicitationOverride.ranked,
-      stillNeeded: this.#elicitationOverride.stillNeeded,
-      askByUnique:
-        this.#elicitationOverride.askByUnique ?? analysis.askByUnique,
-    }
+    return withElicitationOverride(analysis, this.#elicitationOverride)
   }
 
   getLabelForUnique(_context: LirContext, unique: Unique): string {
@@ -569,6 +573,7 @@ abstract class BaseLadderGraphLirNode
       stillNeeded: Unique[]
       next?: Unique[]
       askByUnique?: PartialEvalAnalysis['askByUnique']
+      declined?: string
     } | null
   ) {
     this.#elicitationOverride = override

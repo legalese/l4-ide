@@ -38,6 +38,7 @@ import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (replDefaultPolicy)
 import L4.DirectiveFilter (filterIdeDirectives)
+import L4.Refusal (declineMessage, planDecline)
 import qualified L4.Print as Print
 import L4.Syntax (Module (..), Resolved, RawName (..), Unique, rawName, rawNameToText, getActual, Name (..), Decide (..), TopDecl (..), Section (..), AppForm (..))
 import L4.Annotation (Anno_(..))
@@ -469,6 +470,12 @@ queryPlanCommand st fp argText = do
       case (selected, bindings) of
         (Left err, _) -> pure err
         (_, Left err) -> pure err
+        -- A rule that may refuse to answer gets no plan, whatever the inputs
+        -- given: the decline, read from what the rule and the definitions it
+        -- calls are written to do, through every module it imports, says why.
+        (Right (_, decide), Right _)
+          | Just declined <- planDecline (tc.module' : map (.module') (Rules.transitiveDependencies tc)) decide ->
+              pure (declineMessage declined)
         (Right (funName, decide), Right flattenedLabelBindings) -> do
           let contextUri = normalizedFilePathToUri (toNormalizedFilePath fp)
           let verDocId =

@@ -135,6 +135,7 @@ test-suite l4-cli-test
     directory,
     filepath,
     hspec,
+    lsp-types,
     process,
     temporary,
     text,

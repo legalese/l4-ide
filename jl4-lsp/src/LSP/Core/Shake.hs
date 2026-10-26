@@ -151,6 +151,7 @@ import UnliftIO (MonadUnliftIO (withRunInIO))
 import qualified "list-t" ListT
 import L4.Parser.SrcSpan
 import L4.Syntax
+import L4.Refusal (PlanDecline)
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import qualified Base.Text as Text
 import qualified Data.Text.Mixed.Rope as Rope
@@ -305,6 +306,12 @@ data RecentlyVisualised = RecentlyVisualised
   -}
   , type'     :: !(Type' Resolved)
   , vizState  :: !Ladder.VizState
+  , decline   :: !(Maybe PlanDecline)
+  {- ^ What the query planner answers for the rule in place of a plan, if it
+    may refuse to answer: decided when the graph is drawn, from the rule
+    drawn and the type check it is drawn from, with that type check's
+    imports.
+  -}
   }
   deriving stock (Show)
 

@@ -127,7 +127,8 @@ export interface L4WasmExports {
    * @param uri - document URI
    * @param functionName - the DECIDE function name
    * @param bindingsJson - JSON object of {label: boolean} bindings
-   * @returns JSON-encoded QueryPlanResponse or error object
+   * @returns JSON-encoded QueryPlanResponse, the decline for a rule that may
+   *   refuse to answer (QueryPlanDecline), or an error object
    */
   l4_query_plan(
     source: string,
@@ -543,7 +544,8 @@ export class L4WasmBridge {
    * @param uri - document URI
    * @param functionName - the DECIDE function name
    * @param bindingsJson - JSON object of {label: boolean} bindings
-   * @returns parsed QueryPlanResponse, or an error object
+   * @returns parsed QueryPlanResponse, the decline for a rule that may refuse
+   *   to answer (QueryPlanDecline), or an error object
    */
   async queryPlan(
     source: string,

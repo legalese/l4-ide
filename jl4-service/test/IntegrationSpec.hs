@@ -1331,6 +1331,41 @@ spec = describe "integration" do
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 404
 
+    -- A rule that may refuse to answer is not planned. The service answers 400
+    -- with the one value core gives for such a rule, which names the rule and
+    -- every reason it may refuse with, read from the rule as written and from
+    -- the definitions it calls, here in a file it imports.
+    describe "a rule that may refuse" do
+      let noArguments = Aeson.object ["arguments" Aeson..= Aeson.object []]
+          sources = [("helper.l4", mayRefuseHelperJL4), ("main.l4", mayRefuseMainJL4)]
+      it "is declined with a 400, also with an answer for every input, and a rule beside it is planned" do
+        withServiceFromSources "qp-may-refuse" sources \baseUrl mgr -> do
+          declined <- queryPlan' baseUrl mgr "qp-may-refuse" "covered" noArguments
+          statusCode' declined `shouldBe` 400
+          Aeson.decode (responseBody declined) `shouldBe` Just (Aeson.object
+            [ "error" Aeson..= ("No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\"." :: Text)
+            , "kind" Aeson..= ("declined" :: Text)
+            , "rule" Aeson..= ("covered" :: Text)
+            , "reasons" Aeson..= (["insurance is not modelled"] :: [Text])
+            ])
+          answered <- queryPlan' baseUrl mgr "qp-may-refuse" "covered"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["adult" Aeson..= False, "applicant" Aeson..= True]])
+          statusCode' answered `shouldBe` 400
+          responseBody answered `shouldBe` responseBody declined
+          planned <- queryPlan' baseUrl mgr "qp-may-refuse" "planned" noArguments
+          statusCode' planned `shouldBe` 200
+          lookupKey "determined" (decodeObject (responseBody planned)) `shouldBe` Just Aeson.Null
+      it "is declined with every reason it may refuse with, its own and a called definition's" do
+        withServiceFromSources "qp-may-refuse-both" sources \baseUrl mgr -> do
+          declined <- queryPlan' baseUrl mgr "qp-may-refuse-both" "checked" noArguments
+          statusCode' declined `shouldBe` 400
+          Aeson.decode (responseBody declined) `shouldBe` Just (Aeson.object
+            [ "error" Aeson..= ("No query plan for checked: it may refuse to answer, with the reason \"insurance is not modelled\" or \"minors are not modelled\"." :: Text)
+            , "kind" Aeson..= ("declined" :: Text)
+            , "rule" Aeson..= ("checked" :: Text)
+            , "reasons" Aeson..= (["insurance is not modelled", "minors are not modelled"] :: [Text])
+            ])
+
     -- A rule written as DECIDE clauses is the same rule as the CONSIDER it
     -- stands for, so its plan, with the ladder the plan carries, must be the
     -- same: the same inputs, the same questions, the same atoms. Compared
@@ -3283,6 +3318,45 @@ withNoLibraryOnTheHost act = bracket acquire release (\(_, _, empty) -> withCurr
 
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
+
+-- | A helper, in a file of its own, that refuses for a person who is not
+-- insured.
+mayRefuseHelperJL4 :: Text
+mayRefuseHelperJL4 = Text.unlines
+  [ "GIVEN person IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`the person is insured` person MEANS"
+  , "    IF person THEN TRUE"
+  , "    ELSE REFUSE \"insurance is not modelled\""
+  ]
+
+-- | Three published rules: one that may refuse through the imported helper,
+-- one that may also refuse with a reason of its own, and one that cannot
+-- refuse.
+mayRefuseMainJL4 :: Text
+mayRefuseMainJL4 = Text.unlines
+  [ "IMPORT helper"
+  , ""
+  , "@export Whether the applicant is covered"
+  , "GIVEN adult IS A BOOLEAN"
+  , "      applicant IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE covered IF adult AND `the person is insured` applicant"
+  , ""
+  , "@export Whether the applicant is checked"
+  , "GIVEN adult IS A BOOLEAN"
+  , "      applicant IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE checked IF"
+  , "    IF adult THEN `the person is insured` applicant"
+  , "    ELSE REFUSE \"minors are not modelled\""
+  , ""
+  , "@export Whether the applicant is planned for"
+  , "GIVEN adult IS A BOOLEAN"
+  , "      resident IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE planned IF adult AND resident"
+  ]
 -- | A clause group published with @export, under the given signature lines
 -- (none: no GIVEN at all).
 exportedSizeGroup :: [Text] -> Text

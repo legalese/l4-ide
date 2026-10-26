@@ -1,0 +1,7 @@
+-- A helper that refuses to answer for a person who is not insured.
+
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance is not modelled"
