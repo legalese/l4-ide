@@ -12,9 +12,11 @@ module BundleStore (
   loadMetadataCache,
   loadSingleFile,
   listSourceFiles,
+  isSafeRelativePath,
 ) where
 
 import Control.Exception (IOException, catch)
+import Control.Monad (unless)
 import Data.Aeson (FromJSON, ToJSON, eitherDecodeFileStrict', encodeFile, toJSON)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -24,6 +26,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import GHC.Generics (Generic)
+import Data.Char (isAlpha)
 import Data.List (isSuffixOf)
 import Logging (Logger, logInfo, logWarn)
 import System.Directory
@@ -36,7 +39,7 @@ import System.Directory
   , renameDirectory
   , renameFile
   )
-import System.FilePath ((</>), takeExtension, makeRelative, splitDirectories)
+import System.FilePath ((</>), takeExtension, makeRelative)
 
 -- | Handle to the on-disk bundle store.
 newtype BundleStore = BundleStore { storePath :: FilePath }
@@ -104,6 +107,12 @@ saveBundle (BundleStore root) deployId sources meta = do
   let did = Text.unpack deployId
       targetDir = root </> did
       tmpDir = root </> (did <> ".tmp")
+
+  -- Nothing is written, and nothing removed, for a bundle with a path that would
+  -- leave the sources directory. The upload refuses such a name already; this is
+  -- the second guard, at the one place that joins a name to a directory.
+  unless (all isSafeRelativePath (Map.keys sources)) $
+    ioError (userError "saveBundle: a source path is not a safe relative path")
 
   -- Write to a temp directory first
   createDirectoryIfMissing True (tmpDir </> "sources")
@@ -240,7 +249,7 @@ loadMetadataCache (BundleStore root) deployId = do
 -- Returns 'Nothing' if the file doesn't exist or the path is unsafe.
 loadSingleFile :: BundleStore -> Text -> FilePath -> IO (Maybe Text)
 loadSingleFile (BundleStore root) deployId relPath
-  | not (isPathSafe relPath) = pure Nothing
+  | not (isSafeRelativePath relPath) = pure Nothing
   | otherwise = do
       let fullPath = root </> Text.unpack deployId </> "sources" </> relPath
       exists <- doesFileExist fullPath
@@ -249,9 +258,30 @@ loadSingleFile (BundleStore root) deployId relPath
           `catch` \(_ :: IOException) -> pure Nothing
         else pure Nothing
 
--- | Check if a path is safe (no path traversal).
-isPathSafe :: FilePath -> Bool
-isPathSafe path = ".." `notElem` splitDirectories path
+-- | Is this a path that stays inside the directory it is joined to?
+--
+-- It is for a path that arrives from outside: a zip entry's name, a file name
+-- asked for over HTTP or MCP. 'System.FilePath.</>' discards its left side when
+-- the right side is absolute, so @sources </> "\/abs"@ is @"\/abs"@, and a check
+-- that only looked for @..@ let such a name through to the file system. So a
+-- path is safe only if it is non-empty, has no NUL, is not rooted (a leading
+-- @\/@ or @\\@, or a drive such as @C:@), and has no @..@ component, with the
+-- components cut at both kinds of separator because the host may be Windows.
+isSafeRelativePath :: FilePath -> Bool
+isSafeRelativePath path =
+  not (null path)
+    && '\0' `notElem` path
+    && not (rooted path)
+    && ".." `notElem` components path
+ where
+  rooted = \case
+    c : _ | isSeparator' c -> True
+    c : ':' : _ | isAlpha c -> True
+    _ -> False
+  isSeparator' c = c == '/' || c == '\\'
+  components p = case break isSeparator' p of
+    (a, []) -> [a]
+    (a, _ : rest) -> a : components rest
 
 -- | List all .l4 source files in a deployment.
 listSourceFiles :: BundleStore -> Text -> IO [FilePath]

@@ -5,8 +5,11 @@ module BundleStoreSpec (spec) where
 import Test.Hspec
 
 import BundleStore
+import Control.Exception (SomeException, finally, try)
 import qualified Data.Map.Strict as Map
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist)
+import System.Directory (removeDirectoryRecursive, doesDirectoryExist, doesFileExist, removePathForcibly)
+import System.FilePath ((</>))
+import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 
 spec :: Spec
 spec = describe "BundleStore" do
@@ -15,6 +18,41 @@ spec = describe "BundleStore" do
       it "creates the store directory" \store -> do
         exists <- doesDirectoryExist store.storePath
         exists `shouldBe` True
+
+    describe "isSafeRelativePath" do
+      it "accepts a plain or nested relative path" \_ -> do
+        mapM_ (\p -> (p, isSafeRelativePath p) `shouldBe` (p, True))
+          ["main.l4", "rules/main.l4", "a/b/c.l4", "./x.l4", "a.b/c..d.l4", "..a/b", "a../b"]
+
+      it "refuses a path that is rooted, whatever the separator" \_ -> do
+        mapM_ (\p -> (p, isSafeRelativePath p) `shouldBe` (p, False))
+          ["/abs.l4", "//abs.l4", "///abs.l4", "\\rooted.l4", "\\\\share\\x.l4", "C:/drive.l4", "c:\\drive.l4", "C:x.l4"]
+
+      it "refuses a path with a parent component, cut at either separator" \_ -> do
+        mapM_ (\p -> (p, isSafeRelativePath p) `shouldBe` (p, False))
+          ["..", "../x.l4", "a/../../x.l4", "a/..", "a\\..\\x.l4"]
+
+      it "refuses the empty path and a NUL" \_ -> do
+        mapM_ (\p -> (p, isSafeRelativePath p) `shouldBe` (p, False))
+          ["", "a\0b.l4"]
+
+    describe "saveBundle with a path that leaves the sources directory" do
+      it "refuses it, and writes and removes nothing" \store -> do
+        -- an absolute path in a directory this test owns, so that a write that was
+        -- not refused would land and be seen (a path under "/" would fail for want
+        -- of permission and make the test pass for the wrong reason)
+        tmp <- getCanonicalTemporaryDirectory
+        outside <- createTempDirectory tmp "jl4-bundle-store-spec-outside"
+        let target = outside </> "x.l4"
+            meta = StoredMetadata "v" "2025-01-01T00:00:00Z" Nothing Nothing Nothing
+        (do saveBundle store "keep" (Map.singleton "main.l4" "DECIDE f IS TRUE") meta
+            r <- try (saveBundle store "keep" (Map.singleton target "DECIDE f IS TRUE") meta) :: IO (Either SomeException ())
+            r `shouldSatisfy` either (const True) (const False)
+            -- the earlier bundle is untouched, and nothing was written outside
+            (kept, _) <- loadBundle store "keep"
+            Map.keys kept `shouldBe` ["main.l4"]
+            doesFileExist target `shouldReturn` False)
+          `finally` removePathForcibly outside
 
     describe "saveBundle and loadBundle" do
       it "round-trips sources and metadata" \store -> do

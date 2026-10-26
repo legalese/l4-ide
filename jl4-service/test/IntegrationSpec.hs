@@ -23,7 +23,7 @@ import L4.FunctionSchema (Parameters (..))
 import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
-import Control.Exception (bracket, try)
+import Control.Exception (bracket, finally, try)
 import System.Timeout (timeout)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -50,6 +50,7 @@ import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileE
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
+import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
@@ -760,6 +761,27 @@ spec = describe "integration" do
             status.dsStatus `shouldBe` "compiling"
 
         pollUntilReady baseUrl mgr "http-deploy" 60
+
+    it "accepts a zip entry in a sub-folder" do
+      withEmptyService \baseUrl mgr -> do
+        let zipBytes = createZipBundle [("rules/qualifies.l4", qualifiesJL4)]
+        postReq <- buildMultipartRequest (baseUrl <> "/deployments") "nested-entry" zipBytes
+        postResp <- httpLbs postReq mgr
+        statusCode' postResp `shouldBe` 202
+        pollUntilReady baseUrl mgr "nested-entry" 60
+
+    it "refuses a zip entry whose path is not relative, and writes nothing" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-zip-entry-spec"
+      (withEmptyService \baseUrl mgr -> do
+          let absolute = dir </> "outside.l4"
+          forM_ [absolute, "\\rooted.l4", "C:/drive.l4", "a/../../up.l4"] \name -> do
+            postReq <- buildMultipartRequest (baseUrl <> "/deployments") "bad-entry"
+              (createZipBundle [(name, qualifiesJL4)])
+            postResp <- httpLbs postReq mgr
+            statusCode' postResp `shouldBe` 400
+          doesFileExist absolute `shouldReturn` False)
+        `finally` removePathForcibly dir
 
     it "lists deployments" do
       withEmptyService \baseUrl mgr -> do
@@ -2542,6 +2564,39 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp)
         -- Should return a "File not found" result (path safety check rejects ../)
         lookupKey "result" body `shouldSatisfy` Maybe.isJust
+
+    it "MCP read_file does not read a file named by an absolute path" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-read-file-spec"
+      let planted = dir </> "planted.txt"
+      writeFile planted "PLANTED-CONTENT-FOR-THE-READ-FILE-SPEC\n"
+      (withPendingService "precomp-abs-read" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+          let readFileOf path = do
+                let rpcBody = Aeson.object
+                      [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                      , "id" Aeson..= (1 :: Int)
+                      , "method" Aeson..= ("tools/call" :: Text)
+                      , "params" Aeson..= Aeson.object
+                          [ "name" Aeson..= ("read_file" :: Text)
+                          , "arguments" Aeson..= Aeson.object
+                              [ "deployment" Aeson..= ("precomp-abs-read" :: Text)
+                              , "path" Aeson..= (Text.pack path :: Text)
+                              ]
+                          ]
+                      ]
+                req <- buildJsonPost (baseUrl <> "/.mcp") rpcBody
+                responseBody <$> httpLbs req mgr
+          -- the control: a file of the deployment is read
+          control <- readFileOf "qualifies.l4"
+          LBS.toStrict control `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
+          -- the planted file is reached by no spelling of its absolute path
+          -- (the route strips one leading slash, so two slashes used to be an
+          -- absolute path again)
+          forM_ [planted, "/" <> planted, "//" <> planted] \path -> do
+            body <- readFileOf path
+            LBS.toStrict body `shouldSatisfy` (not . BS.isInfixOf "PLANTED-CONTENT")
+            LBS.toStrict body `shouldSatisfy` BS.isInfixOf "File not found")
+        `finally` removePathForcibly dir
 
     it "GET /deployments/{id}/files rejects path traversal in file param" do
       withPendingService "precomp-traversal2" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
