@@ -732,7 +732,7 @@ runDeonticEvaluatorFor vf args startTime events mTraceHeader mTraceParam mGraphV
     throwError err500 { errBody = jsonError noDeonticModule }
 
   cfg <- asks (.options)
-  limited <- liftIO $ runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presumption
+  limited <- liftIO $ runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presumption True
   case limited of
     Left _ -> resourceLimitExceeded
     Right (Left err, allocBytes) -> pure (SimpleError err, allocBytes)
@@ -745,7 +745,8 @@ runDeonticEvaluatorFor vf args startTime events mTraceHeader mTraceParam mGraphV
 -- The trace is read from the attributes as the case arrived, before the inputs'
 -- names are mapped back to the rule's: @/evaluation@ does not map the events'
 -- names either, so a party that is a record reads the same in both.
--- Like any batch case, it does not write the reasoning tree.
+-- Like any batch case, it does not write the reasoning tree, and drops it before
+-- the limits force the outcome ('runDeonticLimited').
 runDeonticBatchCase
   :: ValidatedFunction
   -> Map Text Text
@@ -761,10 +762,10 @@ runDeonticBatchCase vf reverseMap attributes traceLevel includeGraphViz presumpt
       cfg <- asks (.options)
       let inputs = remapArguments reverseMap
             [ (k, Just v) | (k, v) <- Map.toList attributes, k `notElem` ["startTime", "events"] ]
-      limited <- liftIO $ runDeonticLimited cfg vf inputs startTime events traceLevel includeGraphViz presumption
+      limited <- liftIO $ runDeonticLimited cfg vf inputs startTime events traceLevel includeGraphViz presumption False
       pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
         Left err -> (SimpleError err, allocBytes)
-        Right r -> (SimpleResponse r { reasoning = emptyReasoning }, allocBytes)
+        Right r -> (SimpleResponse r, allocBytes)
 
 -- | What a batch case says when evaluating it raised an exception of its own.
 -- The exception is in the service log; it is not the client's to read.

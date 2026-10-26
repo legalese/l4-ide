@@ -642,7 +642,7 @@ runMcpEvaluationIO cfg vf call
       case traceFromJSON call.startTime call.events of
         Left refusal -> pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError refusal)))
         Right (startTime, events) ->
-          mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False PresumeSoft
+          mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False PresumeSoft True
   | Maybe.isJust call.startTime || Maybe.isJust call.events =
       pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError noTraceForOtherFunctions)))
   | otherwise =

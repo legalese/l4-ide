@@ -29,9 +29,10 @@ import Backend.Api
   , FnLiteral
   , LimitHit
   , Presumption
-  , ResponseWithReason
+  , ResponseWithReason (..)
   , TraceEvent
   , TraceLevel
+  , emptyReasoning
   )
 import Backend.Jl4 (evaluateWithCompiledDeontic)
 import Compiler (toDecl)
@@ -157,9 +158,10 @@ runDeonticLimited
   -> TraceLevel
   -> Bool             -- ^ include GraphViz output
   -> Presumption
+  -> Bool             -- ^ keep the reasoning tree; a batch case does not send it
   -> IO (Either (LimitHit, Int64) (Either EvaluatorError ResponseWithReason, Int64))
-runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presumption =
-  withEvalLimits cfg $ runExceptT $ fmap presentDeonticAnswer $ case vf.fnCompiled of
+runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presumption keepReasoning =
+  withEvalLimits cfg $ fmap dropReasoning $ runExceptT $ fmap presentDeonticAnswer $ case vf.fnCompiled of
     Nothing -> throwE (InterpreterError noDeonticModule)
     Just compiled ->
       evaluateWithCompiledDeontic
@@ -176,3 +178,11 @@ runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presum
         traceLevel
         includeGraphViz
         presumption
+
+ where
+  -- Dropped here, before 'withEvalLimits' forces the outcome, so that a traced
+  -- batch is not charged for a tree it never sends. After the seam, which sees
+  -- the whole outcome.
+  dropReasoning
+    | keepReasoning = id
+    | otherwise = fmap (\r -> r { reasoning = emptyReasoning })

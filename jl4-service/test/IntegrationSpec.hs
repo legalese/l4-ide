@@ -50,7 +50,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import Data.Time (diffUTCTime, getCurrentTime)
 import qualified Data.Text.Encoding as Text.Encoding
-import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
+import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, responseHeaders, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.FilePath (takeDirectory, (</>))
@@ -3443,6 +3443,26 @@ spec = describe "integration" do
           viaRest `shouldSatisfy` Either.isRight
           fmap Aeson.encode viaMcp `shouldBe` fmap Aeson.encode viaRest
           fmap Aeson.encode viaBatch `shouldBe` fmap Aeson.encode viaRest
+
+    -- A batch case does not send the reasoning tree, so it is not charged for
+    -- building it. The allocation header shows the charge: one case traced in
+    -- full cost 70.9 kB against 70.9 kB untraced when this was written, and
+    -- 269 kB when the tree was kept and forced inside the limits.
+    it "does not charge a traced batch case for the reasoning tree it does not send" do
+      withSale \baseUrl mgr -> do
+        let batchUrl query = baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/the%20sale%20contract/evaluation/batch" <> query
+            body = Aeson.object [ "outcomes" Aeson..= ([] :: [Text]), "cases" Aeson..= [Aeson.object ("@id" Aeson..= (1 :: Int) : performed)] ]
+            allocOf query = do
+              req <- buildJsonPost (batchUrl query) body
+              resp <- httpLbs req mgr
+              pure $ Maybe.listToMaybe
+                [ n | Just h <- [lookup "X-Eval-Alloc-Bytes" (responseHeaders resp)]
+                    , (n, "") <- reads (Text.unpack (Text.Encoding.decodeUtf8 h)) ] :: IO (Maybe Integer)
+        untraced <- allocOf ""
+        traced <- allocOf "?trace=full"
+        case (untraced, traced) of
+          (Just plain, Just full) -> (plain > 0, full < plain * 3 `div` 2) `shouldBe` (True, True)
+          other -> expectationFailure ("no allocation header: " <> show other)
 
     it "refuses a request that carries no trace, on REST, on MCP and in a batch" do
       withSale \baseUrl mgr ->
