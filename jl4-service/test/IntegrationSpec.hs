@@ -3473,6 +3473,36 @@ spec = describe "integration" do
         restPayable <- askRest baseUrl mgr deployId fn [] payable
         answers `shouldBe` [restLate, Left noStartTime, restPerformed, restPayable]
 
+    -- Times a client writes with a decimal point. 0.0, 2.00 and 20.0 reached the
+    -- wrapper's number formatter as a coefficient and a negative exponent that
+    -- were not normalised, and it threw "Negative exponent"; 0.05 and 12345678.5
+    -- were printed as the Double nearest to them, 5.0e-2 and 1.23456785e7, which
+    -- L4's lexer does not read.
+    it "reads times written with a decimal point, on REST, on MCP and in a batch" do
+      let num = Maybe.fromMaybe Aeson.Null . Aeson.decode :: LBS.ByteString -> Aeson.Value
+          happening who what time = Aeson.object ["party" Aeson..= (who :: Text), "action" Aeson..= (what :: Text), "at" Aeson..= (time :: Aeson.Value)]
+          traced start happenings = ["startTime" Aeson..= (start :: Aeson.Value), "events" Aeson..= (happenings :: [Aeson.Value])] :: [Pair]
+      withSale \baseUrl mgr ->
+        forM_ [ ( "a start of 0.0 and times of 2.00 and 20.0"
+                , traced (num "0.0") [happening seller delivery (num "2.00"), happening buyer payment (num "20.0")]
+                , isFulfilled, "FULFILLED" )
+              , ( "an event at 0.05"
+                , traced (num "0") [happening seller delivery (num "0.05")]
+                , owesPayment, "the buyer's obligation to pay" )
+              , ( "an event at 12345678.5"
+                , traced (num "0") [happening seller delivery (num "12345678.5")]
+                , isBreach, "BREACH" )
+              , ( "a start at 12345678.5"
+                , traced (num "12345678.5") [happening seller delivery (num "12345680.5")]
+                , owesPayment, "the buyer's obligation to pay" ) ] \(what, pairs, verdict, expected) -> do
+          (viaRest, viaMcp, viaBatch) <- surfaces baseUrl mgr pairs
+          for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+            case answer of
+              Left refusal -> expectationFailure (what <> ", " <> surface <> " refused: " <> Text.unpack refusal)
+              Right r -> (what :: String, surface :: String, verdict (Map.lookup "value" r)) `shouldBe` (what, surface, True)
+          (what :: String, expected :: String, viaMcp) `shouldBe` (what, expected, viaRest)
+          (what, expected, viaBatch) `shouldBe` (what, expected, viaRest)
+
     -- the fixture the REST tests use for a party that is a record: the rule has
     -- inputs of its own, and its function is spelled with a space. It returns
     -- `PROVISION OF …`, the deprecated alias of DEONTIC, so its MCP tool has the
@@ -3646,6 +3676,19 @@ spec = describe "integration" do
           viaRest <- askRest baseUrl mgr elapsedId elapsedFn inputs []
           viaMcp <- askMcpWith baseUrl mgr elapsedId elapsedFn (Aeson.object inputs)
           viaBatch <- askBatch baseUrl mgr elapsedId elapsedFn inputs []
+          for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+            (surface :: String, fmap (Map.lookup "value") answer) `shouldBe` (surface, seven)
+
+      -- Pre-existing, found with the decimal times: 3.0 arrives as a coefficient
+      -- and a negative exponent, and the parser multiplied by 10 to the exponent
+      -- without normalising it, which throws. Every numeric input, not a trace's.
+      it "reads inputs written 3.0 and 10.00 as the integers they are, on REST, on MCP and in a batch" do
+        withServiceFromSources elapsedId elapsedSource \baseUrl mgr -> do
+          let num = Maybe.fromMaybe Aeson.Null . Aeson.decode :: LBS.ByteString -> Aeson.Value
+              decimals = ["startTime" Aeson..= num "3.0", "events" Aeson..= num "10.00"] :: [Pair]
+          viaRest <- askRest baseUrl mgr elapsedId elapsedFn decimals []
+          viaMcp <- askMcpWith baseUrl mgr elapsedId elapsedFn (Aeson.object decimals)
+          viaBatch <- askBatch baseUrl mgr elapsedId elapsedFn decimals []
           for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
             (surface :: String, fmap (Map.lookup "value") answer) `shouldBe` (surface, seven)
 
