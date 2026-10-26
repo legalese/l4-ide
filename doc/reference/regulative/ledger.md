@@ -95,6 +95,39 @@ POST /deployments/dinner/instances/evening/events
 {"party": "World", "action": "`Alice buys dinner` TRUE", "idempotencyKey": "evening-4"}
 ```
 
+## Write tools over MCP
+
+An agent can append over MCP, on a service started with `--ledger-mcp-write` (environment `JL4_LEDGER_MCP_WRITE`).
+The flag is off by default, and it stays off until who the caller is (D-O2 of the operational spec) and who may call the ledger at all (D-O11) are decided.
+With it off, no write tool is listed and a call to one is an unknown tool; a test lists and calls with the flag off, and finds nothing listed and nothing appended.
+
+With it on, a deployment's own endpoint, `/deployments/{id}/.mcp`, lists one tool for each act the caller's party may perform.
+The org-wide endpoint lists none.
+The tool is called `act-` and the act's name with every character that is not a letter, digit, underscore or hyphen turned into a hyphen, so the act `Alice buys dinner` is `act-Alice-buys-dinner`.
+It takes the `instance`, an `idempotencyKey` that is required and has no default, optionally `decidedAgainst`, and one argument for each field of the act, named the same way (the field `ledger answered` is the argument `ledger-answered`).
+Only BOOLEAN, NUMBER and STRING fields are taken.
+Each call is the same function as the events route, `appendIf`, on the true head, and its reply is the events route's reply: `appended`, `refused`, `conflict` or `unknown`, with the row, the head and the ticks.
+The tool result carries `isError` unless the act was appended.
+Giving `decidedAgainst` makes the call strict against the whole head, so it is a `conflict` if anything has been appended since.
+
+The party is not an argument.
+It is the `X-L4-Party` request header, which a proxy or the client's own configuration sets beside `X-Include-Functions`.
+It is a claim and not an authentication, like the `party` of the events route.
+With no header there is no write tool, and a call to one is refused.
+
+Which acts a party may perform is read from the deployment's source, once for each version of the source.
+A clause that names its party and names an act, such as `PARTY Alice MUST` followed by the act `Alice quotes`, offers that act to Alice.
+A clause that names its party and takes any act of the contract (`PARTY World MAY act`) offers every act of the contract's action type to that party.
+A clause whose party is a variable (`EVERY`) offers nothing, because binding a party by a variable is the party binder, which is not built.
+On the dinner fixtures every clause is `PARTY World MAY act`, so a caller who is `World` is offered all five acts and a caller who is `Alice` is offered none; the scoping separates parties only on a contract whose clauses name their actors, which `jl4/examples/explore/ledger/two-party.l4` does for the tests.
+
+What the tests show, in `jl4-service-test` (`LedgerMcpSpec`), run in the ledger worktree before this branch was merged with the explorer:
+Sequence B over MCP is the buy as row 3 committing the dinner, Bob's purchase as row 4, and a retry under the same key reading back row 3 with `replayed` false.
+In Sequence A a strict buy decided against head 2 is a `conflict` with the head left at 3, and the same buy without `decidedAgainst` is row 4 and commits no dinner, as over HTTP.
+A caller that is not the act's party, and a caller that names no party, are refused and nothing is appended.
+A call with no key, a field of the wrong type, or an argument the tool does not take (a `party`, for one) is refused and nothing is appended.
+An act with a NUMBER and a STRING field is appended as the source `(`Alice quotes` 12.5 "hello")`, a negative number is written in parentheses, and a string holding a quote is refused.
+
 ## A walk through the dinner
 
 The service's tests drive the dinner contract with the ledger's clock set to the fixture's own times, where 18:00 is 64800.
@@ -260,6 +293,7 @@ The silent ones are the ones to build around.
   The ledger gave no answer because the evaluator could not decide, because the request ran past `--eval-timeout` (60 seconds by default) or the ledger's memory limit, because every one of the ledger's evaluation slots was in use, or because the store failed or could not be opened.
 - **A misconfigured store at start.** `memory` without `--ledger-allow-nondurable`, `postgres` on a binary built without the flag or with no connection string, and a name the service does not know, each stop the service before it listens (measured for the first two: exit status 1).
 - **A tool error.** The MCP tool answers with `isError` for a deployment or instance that is not there, or a store that cannot be opened.
+- **A refused write tool.** A write tool answers with `isError` and `applied` false when the connection names no party, when the act is not offered to its party, when an argument is missing, of the wrong type or not the tool's, or when the instance is not there; and the ledger's own `refused`, `conflict` and `unknown` come back as `isError` too.
 - **A guarded deployment.** `DELETE` on a deployment that has held an instance, and an overwriting `POST` to it, are `409`, naming the instances (measured), and `503` when the store cannot say whether it holds any.
 
 ### Silent
@@ -267,6 +301,7 @@ The silent ones are the ones to build around.
 - **An `appended` that is not a yes.** The ledger records every act that evaluates, so a blocked purchase, an act no obligation took (`passed over`), and a breach are all `200`.
   Read the verdict and the `wrote` list, not the status.
   The MCP tool says `would be appended` in the same way.
+  A write tool is the same: an act no live obligation takes is appended as `passed over`, with `isError` false.
   Measured: asked about `` `Alice buys dinner` TRUE `` on a finished instance, it said `would be appended`, with verdict `passed over` and nothing written.
 - **A proposer that ignores `unknown` and acts anyway.** The ledger answered `503` and appended nothing, and a proposer that reads that as permission and buys outside the ledger has built the race again.
   The right reading is the one the dinner rule already has: pause, and check again.
@@ -292,7 +327,10 @@ The silent ones are the ones to build around.
   It names the head it was computed at, so a proposer can see how far the instance has moved.
 - **The rule changing under a live instance.** `PUT` to a deployment that holds instances is not refused, and the rows replay against whatever is deployed.
   Each row records its `ruleVersion`, and nothing compares it with the version now live.
+- **An act with no write tool.** An act whose fields are not all BOOLEAN, NUMBER or STRING is missing from `tools/list`, with no word there.
+  The read tool names every such act under `writeTools.notOffered`, with the reason, and says so when the deployment's acts could not be read, in which case no write tool is listed at all.
 - **A party taken as sent.** The service checks no credentials, on these routes or any other.
+  The MCP write tools take the party from the `X-L4-Party` header, which is no stronger.
   The ledger checks that the party is one the contract has, not that the caller is that party, so anyone who can reach the routes can propose as any party.
   Where a deployment has access control, it sits in front of the service, and this page cannot say how a particular arrangement protects these routes.
 - **The wrong store for the job.** An in-memory ledger loses its instances at a restart while the deployments return, so an act the rule refused can be proposed again and accepted, and a retried key can be appended twice.
@@ -310,8 +348,8 @@ The silent ones are the ones to build around.
   A request that finds none free is answered at once with `503`, not queued.
 - No route removes an instance, so a deployment that has held one cannot be deleted through the service.
   The overwrite guard looks when the `POST` arrives; an instance created while the new bundle compiles is not looked for again.
-- Nothing is appended over MCP.
-  The tool tells an agent how to act, and the act itself goes through the events route.
+- The tool `what-may-I-do-now` appends nothing.
+  An agent appends through the events route or, on a service started with `--ledger-mcp-write`, through a write tool (see [Write tools over MCP](#write-tools-over-mcp)).
 - Two instances with two owners have no shared step, and no cross-instance transaction is offered.
 
 ## See also

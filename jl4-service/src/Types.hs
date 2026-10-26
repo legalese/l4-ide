@@ -234,6 +234,11 @@ data Visibility = Visibility
   { showFunctions :: !Bool
   , showFiles     :: !Bool
   , showEvaluate  :: !Bool
+  , callerParty   :: !(Maybe Text)
+  -- ^ The party the caller says it is, from the proxy-set header
+  -- @X-L4-Party@ (OPERATIONAL-LOWERING-SPEC D-O13). A claim and not an
+  -- authentication; it scopes the ledger's MCP write tools and nothing
+  -- else. 'Nothing' when the header is absent or empty.
   }
   deriving stock (Show, Eq)
 

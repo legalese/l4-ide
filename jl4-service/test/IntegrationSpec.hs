@@ -5298,6 +5298,7 @@ testOptions = Options
   , checkJson = False
   , ledgerStore = defaultLedgerStoreConfig
   , ledgerMaxEvalMemoryMb = 8192
+  , ledgerMcpWrite = False
   }
 
 -- | A JSON answer without the numbers the visualizer gave its nodes: the
