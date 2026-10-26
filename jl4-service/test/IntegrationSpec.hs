@@ -28,7 +28,8 @@ import Control.Concurrent.Async (concurrently, forConcurrently)
 import Control.Monad (forM, forM_, guard, replicateM, unless, when)
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
-import Control.Exception (bracket, try)
+import Control.Exception (bracket, throwIO, try)
+import Control.Monad.IO.Class (liftIO)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
@@ -3502,6 +3503,31 @@ spec = describe "integration" do
               Right r -> (what :: String, surface :: String, verdict (Map.lookup "value" r)) `shouldBe` (what, surface, True)
           (what :: String, expected :: String, viaMcp) `shouldBe` (what, expected, viaRest)
           (what, expected, viaBatch) `shouldBe` (what, expected, viaRest)
+
+    -- One case's exception is that case's error. The only way to raise one in a
+    -- case now that decimals are read is to make the evaluator do it, so the
+    -- test replaces the evaluator of an ordinary function with one that throws on
+    -- an input that is the string "boom", and runs a batch of three.
+    it "errors a batch case whose evaluation raised an exception and answers the cases beside it" do
+      let raisesOnBoom vf = vf { fnEvaluator = Map.map wrapped vf.fnEvaluator }
+          wrapped (RunFunction run) = RunFunction \args filt level gv presumption ->
+            if lookup "drinks" args == Just (Just (FnLitString "boom"))
+              then liftIO (throwIO (userError "boom: internal detail"))
+              else run args filt level gv presumption
+          caseOf i drinks = Aeson.object
+            [ "@id" Aeson..= (i :: Int), "walks" Aeson..= True, "eats" Aeson..= True, "drinks" Aeson..= (drinks :: Aeson.Value) ]
+      withServiceFromSourcesTVar "batch-raises" [("qualifies.l4", qualifiesJL4)] \registry baseUrl mgr -> do
+        atomically $ modifyTVar' registry $ Map.map \case
+          DeploymentReady fns meta -> DeploymentReady (Map.map raisesOnBoom fns) meta
+          other -> other
+        answers <- askBatchCases baseUrl mgr "batch-raises" "compute_qualifies"
+          [caseOf 1 (Aeson.Bool True), caseOf 2 (Aeson.String "boom"), caseOf 3 (Aeson.Bool False)]
+        case answers of
+          [Right first, Left raised, Right third] -> do
+            (Map.lookup "value" first, Map.lookup "value" third) `shouldBe` (Just (FnLitBool True), Just (FnLitBool False))
+            -- it says that the case failed, and none of what the exception said
+            ("could not be evaluated" `Text.isInfixOf` raised, "boom" `Text.isInfixOf` raised) `shouldBe` (True, False)
+          other -> expectationFailure ("expected an answer, an error and an answer, got " <> show other)
 
     -- the fixture the REST tests use for a party that is a record: the rule has
     -- inputs of its own, and its function is spelled with a space. It returns

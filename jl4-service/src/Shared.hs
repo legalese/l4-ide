@@ -8,6 +8,8 @@ module Shared (
   -- * Metadata collection
   collectMetadataEntries,
   collectDeploymentMetadata,
+  -- * Exceptions
+  trySynchronous,
   -- * JSON error encoding
   jsonError,
   -- * Property name sanitization and remapping
@@ -33,6 +35,7 @@ import qualified BundleStore
 import Types
 
 import Control.Concurrent.STM (readTVarIO)
+import Control.Exception (SomeAsyncException (..), SomeException, fromException, throwIO, try)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ask)
 import qualified Data.Aeson as Aeson
@@ -125,6 +128,14 @@ collectDeploymentMetadata mScope = do
            then []
            else [(did.unDeploymentId, meta { metaFunctions = filteredFns })]
     ) (Map.toList registry)
+
+-- | 'try' for what a computation raises by itself. An asynchronous exception
+-- (the limits' timeout and allocation counter, a cancelled request) is not the
+-- computation's own and passes through; anything else is returned.
+trySynchronous :: IO a -> IO (Either SomeException a)
+trySynchronous act = try act >>= \case
+  Left e | Just (SomeAsyncException _) <- fromException e -> throwIO e
+  r -> pure r
 
 -- | Encode an error message as a JSON object: @{\"error\": \"...\"}@
 jsonError :: Text -> LBS.ByteString
