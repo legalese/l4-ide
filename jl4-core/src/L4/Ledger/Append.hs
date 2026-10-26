@@ -15,10 +15,13 @@
 --   not of its action type, a party it does not know, a text that cannot
 --   stand in a @#TRACE@ line, no idempotency key) and 'Conflict' (a strict
 --   proposal whose versioned cell moved since the head it decided against).
---   Nothing is appended, and the caller is told.
+--   The act is not appended, and the caller is told.
 -- * __Silent, if ignored__: 'Unknown' (the evaluator could not decide, or
---   the time bound passed). Nothing is appended either, but a proposer
+--   the time bound passed). The act is not appended either, but a proposer
 --   that reads it as permission and acts anyway is design D1, unguarded.
+-- * __Silent, always__: the due ticks. They are appended before the act is
+--   looked at, so a 'Refused', 'Conflict' or 'Unknown' that follows them
+--   leaves them written, and those results do not list them.
 -- * 'Appended' covers every act that evaluates, breaching and passed-over
 --   ones included (R-O2): the verdict is on the row, and an act the rule
 --   blocked is auditable because it is there.

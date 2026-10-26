@@ -25,7 +25,9 @@
 --   (@Unknown@), a limit stopped the request, the ledger's slots are all
 --   taken, the store could not be reached. A 503 is "not applied", as the
 --   app-wide limiter's own 503 is (D-O10), and a retry with the same
---   idempotency key is always safe.
+--   idempotency key is always safe. "Not applied" means the act: tick rows
+--   that were due are appended first and survive a refusal, a conflict or
+--   an @Unknown@, and the reply does not list them.
 -- * __Silent, if the caller lets it be__: a 503 from a limit that fell
 --   after the row was written. The reply cannot tell, and says so; the
 --   retry with the same key then reads the row back, as done. A proposer

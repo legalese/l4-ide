@@ -131,7 +131,8 @@ The position's `ledger` list, which has every entry at the head, tells the same 
 
 ## Reading a reply
 
-Every reply from these routes is JavaScript Object Notation (JSON), and every one says `applied`: `true` if it wrote a row, `false` if it wrote none.
+Every reply from these routes is JavaScript Object Notation (JSON), and every one says `applied`: `true` if it appended the proposed act, `false` if it did not.
+A `false` can still follow tick rows that the same call appended; see "Due ticks survive a refusal" under [Silent](#silent).
 Every reply also says which store answered (`store`), and the in-memory store adds a `warning`.
 
 | HTTP status              | `result`                   | `applied` | What it means                                                                                                               |
@@ -154,7 +155,7 @@ The reply to an append also has `wrote`, the entries the act's own step added to
 
 ### Refused
 
-An append is refused, and nothing is written, when the act or the party is not one the contract has, when either text cannot stand as one line of a `#TRACE`, or when the proposal has no retry key.
+An append is refused, and the act is not written, when the act or the party is not one the contract has, when either text cannot stand as one line of a `#TRACE`, or when the proposal has no retry key.
 Creating an instance is refused in the same way when the contract expression is not one the deployment can run.
 Texts with a line break, a tab, `--`, `{-`, `-}`, a `^`, an unbalanced parenthesis or an unterminated name are in the second group, because each would make the generated line say something else than what was sent.
 A `strict` proposal is also refused if it names no head to decide against, or names one the instance never had.
@@ -172,7 +173,7 @@ If the first try wrote the row, the retry reads it back; if it did not, the retr
 By default the rule is the only guard: an act is appended if it evaluates, and `decidedAgainst` is kept as a record of what the proposer had seen.
 A proposer can also ask for a version check on top.
 Send `strict: true`, the head in `decidedAgainst`, and in `cells` the official-record cells whose version matters, such as `dinner status record`.
-If any of those cells has been written to since that head, the answer is `conflict` and nothing is appended.
+If any of those cells has been written to since that head, the answer is `conflict` and the act is not appended.
 With no `cells`, any new row at all is a conflict (measured: a strict proposal against head 1 on an instance at head 3 is `409`, "the head moved from 1 to 3").
 A cell's version is the number of entries recorded in it, not the number of different values, so a status that was recorded and then reversed has still moved.
 
@@ -250,9 +251,9 @@ The silent ones are the ones to build around.
 
 ### Loud
 
-- **`refused` (`422`) and `conflict` (`409`).** Nothing is appended, and the reply says why.
+- **`refused` (`422`) and `conflict` (`409`).** The act is not appended, and the reply says why.
 - **`not found` (`404`).** No instance is made up in its place.
-- **`unknown` and `not applied` (`503`).** Nothing was applied and the reply says so.
+- **`unknown` and `not applied` (`503`).** The act was not applied and the reply says so.
   The ledger gave no answer because the evaluator could not decide, because the request ran past `--eval-timeout` (60 seconds by default) or the ledger's memory limit, because every one of the ledger's evaluation slots was in use, or because the store failed or could not be opened.
 - **A misconfigured store at start.** `memory` without `--ledger-allow-nondurable`, `postgres` on a binary built without the flag or with no connection string, and a name the service does not know, each stop the service before it listens (measured for the first two: exit status 1).
 - **A tool error.** The MCP tool answers with `isError` for a deployment or instance that is not there, or a store that cannot be opened.
@@ -275,6 +276,11 @@ The silent ones are the ones to build around.
   The reply says as much in `retry`, and a retry under the same key then reads the row back.
 - **A deadline that passes unnoticed.** No tick row is written until the next proposal, so an instance whose deadline has passed still shows its obligations at its head.
   The position's `deadlinePassed` is the sign.
+- **Due ticks survive a refusal.** The ledger appends the tick rows that are due before it looks at the act, so a proposal that is then `refused`, `conflict` or `unknown` can leave them behind.
+  The reply says `applied` false and has no `ticks`, and the only sign is that `head` is higher than the head the proposer last read.
+  Measured on 2026-10-26 on the service built at `420bb6258`: an instance at head 2 whose deadline had passed answered a proposal for an act the contract does not have with `422` `refused` and `head` 3, and its position then read head 3 and terminal.
+  The `conflict` and `unknown` cases follow from the same code in `appendIf` and were not measured.
+  After any reply that was not `appended`, read the position before deciding again.
 - **An advisory answer that went stale.** It is not an error at all.
   It names the head it was computed at, so a proposer can see how far the instance has moved.
 - **The rule changing under a live instance.** `PUT` to a deployment that holds instances is not refused, and the rows replay against whatever is deployed.
