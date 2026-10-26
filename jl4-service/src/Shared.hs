@@ -19,6 +19,7 @@ module Shared (
   sanitizeParameters,
   buildPropertyReverseMap,
   remapFnLiteralKeys,
+  remapTraceKeys,
   remapArguments,
   -- * Render-meta annotation
   annotateSanitizedNames,
@@ -365,6 +366,30 @@ remapFnLiteralKeys reverseMap = go
   go (FnObject ps) = FnObject [(Map.findWithDefault k k reverseMap, go v) | (k, v) <- ps]
   go (FnArray vs) = FnArray (map go vs)
   go other = other
+
+-- | Remap the record keys inside a trace's events (the JSON a client sent as
+-- @events@) with the sanitized -> original reverse map. Only the values of an
+-- event's @party@ and @action@ are touched, at every depth: the event's own
+-- @party@, @action@ and @at@ are the trace's fields, not a record's, and a
+-- record field that happens to be spelled alike must not rename them. Anything
+-- that is not a list of objects is returned as it is, for the decoder to refuse.
+remapTraceKeys :: Map Text Text -> Aeson.Value -> Aeson.Value
+remapTraceKeys reverseMap = \case
+  Aeson.Array events -> Aeson.Array (fmap event events)
+  other -> other
+ where
+  event = \case
+    Aeson.Object o -> Aeson.Object (Aeson.KeyMap.mapWithKey (\k v -> if k `elem` ["party", "action"] then record v else v) o)
+    other -> other
+  record = \case
+    Aeson.Object o ->
+      Aeson.Object $ Aeson.KeyMap.fromList
+        [ (Aeson.Key.fromText (Map.findWithDefault k k reverseMap), record v)
+        | (key, v) <- Aeson.KeyMap.toList o
+        , let k = Aeson.Key.toText key
+        ]
+    Aeson.Array vs -> Aeson.Array (fmap record vs)
+    other -> other
 
 -- | Remap both top-level argument keys and nested FnLiteral object keys.
 remapArguments :: Map Text Text -> [(Text, Maybe FnLiteral)] -> [(Text, Maybe FnLiteral)]

@@ -271,7 +271,8 @@ In a batch, each case carries its own `startTime` and `events` among its attribu
 A call or a case with no `startTime`, or no `events`, is refused with the message `/evaluation` gives: `startTime is required for functions returning DEONTIC`, or `events is required for functions returning DEONTIC`.
 Over MCP the refusal is an error result (`isError`) whose text is the body of `/evaluation`'s 400, `{"error": "..."}`; in a batch it is an `@error` on that case, and the cases beside it are still answered.
 That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
-The field names inside an event's party or action are used as sent, on all three: unlike an input's, they are not mapped back from the sanitized spelling.
+The field names inside an event's party or action are read as sent on `/evaluation` and in a batch.
+Over MCP they are read as `tools/list` spells them, as an input's are: a field the rule calls `full name` is `full-name` in the schema, and is mapped back to the rule's name, and a name that is not a sanitized one is read as it was sent.
 A time is a number and may be written with a decimal point: `0.0`, `0.05` and `12345678.5` are read as written.
 A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list`, the explorer and the WebMCP page show it as one.
 Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.

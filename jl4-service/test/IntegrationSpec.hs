@@ -61,7 +61,7 @@ import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -2081,6 +2081,29 @@ spec = describe "integration" do
             -- it says that the case failed, and none of what the exception said
             ("could not be evaluated" `Text.isInfixOf` raised, "boom" `Text.isInfixOf` raised) `shouldBe` (True, False)
           other -> expectationFailure ("expected an answer, an error and an answer, got " <> show other)
+
+    -- A party or an action that is a record has fields whose names tools/list
+    -- advertises sanitized (a space becomes a hyphen). The inputs were read back
+    -- under the rule's names; the trace was not, so a client that followed the
+    -- schema sent a record the rule has no field for.
+    it "reads the record fields of a trace under the names the rule has, on MCP" do
+      let spacedId = "deontic-spaced"
+          spacedFn = "Seatbelt Requirement" :: Text
+          happening who what time = Aeson.object ["party" Aeson..= who, "action" Aeson..= (what :: Text), "at" Aeson..= (time :: Int)]
+          alice key = Aeson.object [key Aeson..= ("Alice" :: Text)]
+          traceOf key = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= [happening (alice key) "wear seatbelt" 2, happening (alice key) "drive" 3]] :: [Pair]
+      withServiceFromSources spacedId [("seatbelt.l4", deonticSpacedPartyJL4)] \baseUrl mgr -> do
+        -- the schema is the one the client follows: sanitized, with no space
+        schema <- mcpToolInputSchema baseUrl mgr spacedId spacedFn
+        let advertised = maybe "" (Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode) schema
+        (("full-name" `Text.isInfixOf` advertised), ("full name" `Text.isInfixOf` advertised)) `shouldBe` (True, False)
+        viaRest <- askRest baseUrl mgr spacedId spacedFn ["driver" Aeson..= alice "full name"] (traceOf "full name")
+        viaMcp <- askMcp baseUrl mgr spacedId spacedFn ["driver" Aeson..= alice "full-name"] (traceOf "full-name")
+        viaMcpOwn <- askMcp baseUrl mgr spacedId spacedFn ["driver" Aeson..= alice "full-name"] (traceOf "full name")
+        viaRest `shouldSatisfy` (either (const False) (isFulfilled . Map.lookup "value"))
+        viaMcp `shouldBe` viaRest
+        -- a client that sends the rule's own names is read as well
+        viaMcpOwn `shouldBe` viaRest
 
     -- the fixture the REST tests use for a party that is a record: the rule has
     -- inputs of its own, and its function is spelled with a space. It returns

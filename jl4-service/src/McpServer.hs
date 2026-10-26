@@ -17,7 +17,7 @@ import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
 import L4.FunctionSchema (Parameters)
 import DeonticTrace (isDeonticFunction, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
 import Types
 
 import Control.Monad.IO.Class (liftIO)
@@ -528,8 +528,14 @@ data McpCall = McpCall
 -- @arguments@ object at all is read flat, the inputs and the trace side by
 -- side, which is how a call written for a flat tool arrives.
 --
--- The trace is not mapped through the reverse map: @/evaluation@ does not map
--- an event's names, and the three surfaces read a party that is a record alike.
+-- The trace is mapped through the reverse map, as the inputs are: the schema
+-- @tools/list@ gives for @events@ is the function's own, so the record fields
+-- of a party or an action are advertised under their sanitized names, and the
+-- call is read back under the names the rule has ('remapTraceKeys'). A name
+-- that is not a sanitized one is left as it was sent, so a client that sends
+-- the rule's own names is read as well. @/evaluation@ and a batch read the
+-- names as sent.
+--
 --
 -- A tool that is not DEONTIC is flat, and a @startTime@ or @events@ on it is
 -- a trace unless the function declares an input of that name ('isStrayTraceField'),
@@ -543,13 +549,13 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
         McpCall
           { inputs = pairs (without traceKeys argsObj)
           , startTime = present "startTime" obj argsObj
-          , events = present "events" obj argsObj
+          , events = remapTraceKeys reverseMap <$> present "events" obj argsObj
           }
     | isDeontic ->
         McpCall
           { inputs = pairs (without ("arguments" : traceKeys) obj)
           , startTime = present "startTime" obj Aeson.KeyMap.empty
-          , events = present "events" obj Aeson.KeyMap.empty
+          , events = remapTraceKeys reverseMap <$> present "events" obj Aeson.KeyMap.empty
           }
     | otherwise ->
         let strays = filter (isStrayTraceField params) traceKeys
