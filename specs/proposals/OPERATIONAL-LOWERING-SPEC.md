@@ -1,6 +1,16 @@
 # Operational lowering: an L4 contract instance as an event ledger with conditional append
 
-Status: proposed, 2026-10-25. Nothing here is built, and nothing here has landed.
+Status: proposed, 2026-10-25. On this branch (`mengwong/lowering-ledger`) the work packages WPO0 to WPO5 of §9 are built and committed, and none of it has landed.
+The branch lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`047311f36`, fetched 2026-10-26) holds none of its files.
+Checked 2026-10-26 at `420bb6258`: `jl4-core-test` 1578 examples, 0 failures (13 pending); `l4-cli-test` 628 examples, 0 failures (83 pending); `jl4-service-test` 717 examples, 0 failures; `doc/test-docs.sh` 0 errors; and the nine fixtures under `jl4/examples/explore/` (`brief/` and `ledger/`) each exit 0 under `l4 run`.
+Also run, against the service built at that commit: an HTTP probe of create, append, position, restart and the refusal of a delete.
+Not run: the rest of `etc/verify-branch.sh` (the `jl4-test` goldens and the other suites), the Nix build and CI.
+The gate's prettier step fails on this branch's spec files, which are not formatted with prettier 3.4.2; the same step failed in CI on draft PR #746 on 2026-10-26.
+Not run: the Postgres adapter against a server (this machine has no `postgres` binary and no container runtime answering), and §8's item on the checkers' counterexamples, which needs the explorer's output and the explorer is on the other local branch, `mengwong/lowering-explore`.
+Not built: the Redis, Zookeeper and etcd adapters, which `jl4-service/src/Ledger/Store/Config.hs` refuses by name.
+The ledger has a silent failure, reproduced on the running service on 2026-10-26: a `refused`, `conflict` or `unknown` reply can follow tick rows that it does not list.
+The doc says so and the code is unchanged; §12 describes it.
+Merging this branch with `mengwong/lowering-explore` conflicts in `jl4-core/jl4-core.cabal`, `jl4/jl4.cabal` and `jl4/tests-cli/Main.hs` (`git merge-tree`, 2026-10-26); the merged tree has not been built.
 It becomes true when the work packages of §9 are merged and the acceptance items of §8 are green.
 Companion to `REGULATIVE-LOWERING-SPEC.md` (the verification lowering), which it depends on at one point (§4) and shares its fixtures with (§7).
 Written one sentence per line.
@@ -313,11 +323,14 @@ The text above each ruling is the proposal as it stood when marked, re-skinned a
 
 ## 12. What this spec does not claim
 
-- Nothing in it is built, and no line of it describes the tree in the present tense except §1.
+- On this branch WPO0 to WPO5 are built, and no line of the rest of it describes the tree in the present tense except §1.
+- A `Refused`, `Conflict` or `Unknown` reply can follow tick rows that the same call appended, and it does not list them.
+  `appendIf` appends every due tick (`dueTicks` in `jl4-core/src/L4/Ledger/Append.hs`) before it looks at the act, so when a deadline has passed and the proposal is then refused, the instance's head has moved and the reply says `applied` false and carries no `ticks`.
+  The proposer cannot tell from the reply that a row was written, except by the head number; `doc/reference/regulative/ledger.md` lists it under Silent, with the measurement of 2026-10-26.
 - It does not claim the ledger scales past one appender per instance, or that replay-per-append is fast; D-O4 holds the measurement.
 - It does not claim the MCP decision tools become transactional; the ledger routes beside them do, and only they touch the store (R-O5).
 - It does not claim the in-memory store is fit for anything but tests: it loses every instance on restart while deployments reload, and the table of §3.7 says so; it is no longer the default.
-- The §4.3 re-encoding this spec depends on, the companion's dinner brief fixtures, exists in no file of this branch yet: option A does not run on today's evaluator and option C has not been written (companion §1 finding 10), so WPO0 waits on the companion's WP0.
+- The §4.3 re-encoding this spec depends on, the companion's dinner brief fixtures, is committed in `jl4/examples/explore/brief/` of this branch as the companion's WP0: option C is written there, and option A does not run on today's evaluator (companion §1 finding 10).
 - Nine of this spec's claims were corrected on 2026-10-25 by the skeptics of the Lowering Rulings bench; each correction is marked where it lands (§1, §2, §3.1, §3.2, §3.4, §3.6, §3.8, §10, §11), and the first drafts are in the session record, not in this branch.
 - It does not claim the scenario's two sequences are enough: §8's two-oracle and concurrency items are the test, and the companion's explorer is where the other orderings come from.
 - The probes are cited by pull request and commit, not by path: they are in the private probes repository, draft PR legalese/solutions#1 (head `60d926c` when checked with `gh pr view` on 2026-10-25), and resolve for the team only.

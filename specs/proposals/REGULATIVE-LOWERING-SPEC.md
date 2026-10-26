@@ -1,7 +1,10 @@
 # Regulative Lowering: an explicit transition system from the evaluator, then the backends
 
-**Status:** Proposal, written 2026-10-25. **Nothing here is built.**
-No explorer, no emitter and no harness exists in the tree; `l4 explore` is named throughout as a thing to write.
+**Status:** Proposal, written 2026-10-25. **On this branch only WP0 of §8, the dinner fixtures, is built; none of it has landed.**
+The branch is `mengwong/lowering-ledger`, which lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`047311f36`, fetched 2026-10-26) holds none of its files.
+No explorer, no emitter and no harness is in this tree; WP1 to WP6 are built on the other local branch, `mengwong/lowering-explore`, which is not this one.
+Checked 2026-10-26 at `420bb6258`: the seven fixtures of `jl4/examples/explore/brief/` (`properties.l4`, the three designs, the two mutants and `refused-number.l4`) each exit 0 under `l4 run` with an `l4` built from this tree.
+Their state counts and property verdicts are checked only on the explore branch, by the harness of WP4.
 **Author:** Meng Wong, drafted by session pitch-Oct from the five verification probes of 2026-10-25.
 **Parent:** [VERIFICATION-BACKEND-LOWERING-SPEC.md](VERIFICATION-BACKEND-LOWERING-SPEC.md), whose Phase 0 and Phases 2 to 4 this document narrows to one fragment and one fixture.
 **Related:** [BOUNDED-DEONTICS-SPEC.md](../todo/BOUNDED-DEONTICS-SPEC.md) (object and assertion levels; contract time ruled discrete, T2, 2026-09-09), `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §2.4 (counterfactuals come from running the evaluator, never from a second semantics), `doc/reference/regulative/lts-list.md`, `doc/reference/regulative/STATE-GRAPH.md`.
@@ -419,7 +422,8 @@ These are visible to a rule author or a reader of the output, so they are Meng's
 
 ## 12. What this spec does not claim
 
-- Nothing is built, the dinner fixtures of §7 included; the state counts quoted are the probes' hand models, not an explorer's output.
+- On this branch only the dinner fixtures of §7 are built, and no explorer is in this tree, so the state counts quoted are the probes' hand models, not an explorer's output.
+  The explorer that reproduces them is on `mengwong/lowering-explore`, not here.
 - The probes ran on 10 to 25 untimed states; nothing here says the explicit route scales to a whole contract, and D-L1 exists because it may not.
 - The probes' models were written by Sonnet agents from one brief and spot-checked against their logs by the parent session; the bisimulation check of §6.2 is what would make them an oracle rather than a reference.
 - The probe reports cited here are in the private `legalese/solutions` repo, pushed 2026-10-25 as draft PR legalese/solutions#1 (commit `b0de111`), so they resolve for the team and for nobody else.
