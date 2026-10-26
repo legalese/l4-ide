@@ -274,6 +274,8 @@ That refusal is **assumed, not ruled**: MCP and batch used to answer such a call
 The field names inside an event's party or action are used as sent, on all three: unlike an input's, they are not mapped back from the sanitized spelling.
 A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list` and the explorer show it as one.
 Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.
+A `startTime` or `events` sent to a function that is not `DEONTIC` is refused on all three surfaces with `startTime and events are only valid for functions returning DEONTIC`: `/evaluation` answers `400`, MCP returns an error result, and a batch case is an `@error` while the cases beside it are answered.
+A `null` is a field left out.
 A function that is not `DEONTIC` and has inputs called `startTime` or `events` reads them as inputs; `/evaluation` used to take such a function for a `DEONTIC` one, because the compiler gives a `DEONTIC` function parameters of those names, and asked it for a trace.
 
 ### Batch Evaluation
@@ -407,7 +409,7 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
-- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
+- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result.
 - **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
