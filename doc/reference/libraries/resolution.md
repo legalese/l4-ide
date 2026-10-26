@@ -131,7 +131,7 @@ On your own machine a `..` may leave the folder you started from, because the co
 
 **What a path import cannot do yet.** These are limits, not oversights:
 
-- The browser editor has no folder to start from, so a path import there does not work.
+- The browser editor holds one document and has no way to add a second file, so a path import there still finds nothing. The WASM module underneath can resolve one once a page hands it files ([In the browser](#in-the-browser)); nothing in the editor does yet.
 - `l4 deploy` and the VS Code deploy action upload every file at the top level, so a project that uses path imports fails after it is deployed that way ([what a deployment contains](README.md#what-a-deployment-contains)).
 - A deployed bundle that cannot resolve a path import is accepted, and the only trace is a warning in the service's log.
 - The service does not find a file at the top of an upload whose own name has a space or a non-ASCII letter, nor a file inside a top-level folder whose name has a space, a non-ASCII letter or punctuation such as `#` `'` `+` `(` `%` (a deployment says `ready` and every call then answers 422, and the service's log says the import resolves to nothing). This was measured for a bare import; a path import into such a folder was seen to fail the same way in review. A file inside a plain top-level folder is found whatever its own name or deeper folders are called. `l4` on your machine is not affected.
@@ -139,6 +139,69 @@ On your own machine a `..` may leave the folder you started from, because the co
 - The editor's "find all references" on a module only searches the project root and the folder of the module being searched, so a file that imports it by path from another folder is not listed.
 - `l4 export dmn` finds the files that call a decision by looking for `IMPORT <name>` among the files in the same folder; a file that imports by path is not recognised, and a decision it calls may be left out.
 - `l4 render` (HTML and Akoma Ntoso) numbers the definitions of an imported module by the module's file name, so two modules with one file name in different folders can produce duplicate anchors.
+
+### In the browser
+
+L4 also runs in a web page, as a WebAssembly module (the browser editor's "WASM mode").
+It has no disk, so it resolves an `IMPORT` among two things only: the standard library built into the module, and the files the page hands it as a table from path to source text.
+A path import is **confined** in the sense of the table above.
+It can reach those files and nothing else, and a path that climbs above the start of them is refused before anything is looked up.
+Tests put a file where such a path would land and check that it is not taken.
+
+How it differs from `l4` on your machine:
+
+- **The page says where the document is.**
+  With the document's path set to `rows/a/main.l4`, ``IMPORT `../b/mod` `` looks for `rows/b/mod.l4`.
+  Until a path is set, the document is at the top of the files, so ``IMPORT `./helper` `` looks for `helper.l4` and a path that starts with `..` is refused.
+  The open document is the module at that path, whatever the files hold there.
+  A file that imports the document back makes a cycle (`Cyclic import detected: a/x -> b/y -> a/x`), as it does under `l4`, and a copy of the document among the files is never read in its place.
+  That holds for the default path too: with the document at the top of the files, a file that says `IMPORT main` imports the document, and the program is refused as a cycle even if the files hold a `main.l4`.
+- **A file is found by its path, with or without `.l4`**, however the page spelt it (`./rows/b/mod.l4`, `rows/a/../b/mod`).
+  Two spellings of one path are one module.
+  So are a path and a bare name that reach the same file at the top of the files: ``IMPORT `sub/../core` `` and `IMPORT core` load `core.l4` once.
+- **A key is a path from the top of the files, with no leading `/`.**
+  The module refuses a table that has a key like `/rows/b/mod.l4`, and the message names the key, because no import could find it.
+  It also refuses a table in which two keys are one path (`core.l4` and `./core.l4`, or `core` and `core.l4`) and names both, so that neither is taken in place of the other without a word.
+  A refused table changes nothing: the module keeps the files it had.
+  The document's path is the one place where a leading `/` is allowed, and it is ignored there.
+  A key that climbs above the top of the files, such as `../x.l4`, is accepted and never found.
+- **A bare name is not shortened at its last dot.**
+  Under `l4`, `IMPORT foo.l4` and `IMPORT a.b` are read as `foo` and `a`, with a warning.
+  In the browser they are looked up as written: `IMPORT a.b` looks for a module called `a.b` and does not find `a.l4`, and `IMPORT foo.l4` finds the file `foo.l4` as a module of its own, so that it and ``IMPORT `./foo` `` load one file twice and the program is refused with `There are multiple definitions`.
+  Write a module's name without an extension.
+- **A path never finds the standard library.**
+  ``IMPORT `lib/prelude` `` is the page's `lib/prelude.l4` or nothing, and `IMPORT prelude` in the same program is still the library.
+- **A bare name is looked up by name, among the files at the top first and then in the standard library.**
+  That is the order `l4` uses, where a project's file comes before the standard library.
+  An earlier browser module tried the standard library first ([smucclaw/l4-ide#989](https://github.com/smucclaw/l4-ide/issues/989)).
+  Two things follow that you may not expect:
+  - A file of the page's called `prelude.l4` stands in for `IMPORT prelude`, and for the `IMPORT prelude` inside each library that has one, such as `hierarchy`.
+    A library is then checked against your file, and one that uses something your file does not define stops checking, as it does under `l4`.
+    Such a file cannot import the library's own `prelude` in turn: `IMPORT prelude` inside it finds itself, and the program is refused as a cycle.
+    Unlike `l4`, the browser does not warn that a file stands in for a library, and does not show the library's errors.
+    To leave the library alone, put your file in a folder, where only a path finds it, or give it another name.
+  - A bare name inside one of the page's files is looked up among the files at the top, not beside the file that writes it.
+    In `rows/b/mod.l4`, `IMPORT neighbour` needs `neighbour.l4` at the top of the files, and `rows/b/neighbour.l4` is not found by it.
+    `l4` finds the second.
+    Write ``IMPORT `./neighbour` `` to mean the file beside.
+- **One address, two files.**
+  A page's file at the top of the files that has the name of a standard library module, such as `prelude.l4`, is the module of that name, however it is reached: ``IMPORT `./prelude` `` and `IMPORT prelude` load it once.
+  One spelling of the key is the exception, because a bare name takes the key as the page wrote it: a file keyed `./prelude.l4` is found by ``IMPORT `./prelude` `` and not by `IMPORT prelude`.
+  A program that reaches that file and the library module of the same name, directly or through another library, is refused, because the two would be one module: `Two different modules are both called prelude`.
+  Key the file `prelude.l4`, put it in a folder, or give it another name.
+- **An error inside an imported file is not shown.**
+  The browser reports the open document's errors only, whichever way a file was imported.
+  Two things reach you anyway.
+  A file that cannot be parsed stops the import, and the browser then shows the parser's message at the top of the document, headed `Parse error in` and the file's module name.
+  A file that parses and does not type-check leaves the document's own errors as they were, and the browser adds an error at the top of the document for each such module: `The imported module`, its name and `has errors`, without saying what they are.
+  A document with that error is not evaluated, whether or not it uses the part of the module that is wrong, and `l4` is more lenient: it prints the module's errors where they are and still evaluates the importing file.
+  To read the errors, check the imported file as the document on its own.
+
+The page hands over files with the bridge's `setFiles` (a table from path to source) and `setDocumentPath` (`ts-apps/jl4-web/src/lib/wasm/wasm-bridge.ts`), which call the module's `l4_set_files` and `l4_set_document_path`.
+The editor itself does not call them, because it has no second file to give.
+Until it does, a document in the browser editor can import the standard library and nothing else.
+When the module refuses a table, the bridge says so once in the browser console and goes on with the files the module had.
+The module analyses one document at a time under one path: let an analysis finish before you change the path, because a call that has been issued runs under the path that is set when it starts, and `WasmLspHandler` checks every open document under the one path.
 
 ---
 

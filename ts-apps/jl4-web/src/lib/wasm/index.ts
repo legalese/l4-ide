@@ -8,6 +8,7 @@
 export { L4WasmBridge } from './wasm-bridge'
 export type {
   L4WasmExports,
+  ProjectFiles,
   Diagnostic,
   Hover,
   CompletionItem,

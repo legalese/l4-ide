@@ -145,6 +145,27 @@ export interface L4WasmExports {
   ): Promise<string>
 
   /**
+   * Supply the files a document can import by path, as one JSON object from
+   * path to source: `{"rows/b/mod.l4": "..."}`. Replaces the files set before.
+   * Every later analysis call sees them, until they are replaced.
+   * A key is a path from the top of the files, with no leading `/`.
+   * @param filesJson - JSON object from path to source text
+   * @returns JSON `{"files": n}`, or `{"error": "..."}` when the argument is
+   *   not an object of strings, a key has a leading `/`, or two keys are one
+   *   path (`core.l4` and `./core.l4`); the files set before are then kept
+   */
+  l4_set_files(filesJson: string): Promise<string>
+
+  /**
+   * Say where the document being analysed lives among the files, so that
+   * `IMPORT \`../b/mod\`` starts from its folder. The empty string puts it back
+   * at the top of the files, where it was before anything was set.
+   * @param path - the document's path among the files, such as `rows/a/main.l4`
+   * @returns JSON `{"documentPath": "..."}`
+   */
+  l4_set_document_path(path: string): Promise<string>
+
+  /**
    * Initialize the WASI reactor (and Haskell RTS).
    * Must be called before any other exported functions.
    */
@@ -167,6 +188,9 @@ export interface L4WasmExports {
  */
 type JsFFIImportsGenerator = (exports: L4WasmExports) => Record<string, unknown>
 
+/** What a fresh module holds as its files, as `JSON.stringify` writes it. */
+const NO_FILES = JSON.stringify({})
+
 /**
  * L4 WASM Bridge
  *
@@ -175,6 +199,25 @@ type JsFFIImportsGenerator = (exports: L4WasmExports) => Record<string, unknown>
  */
 export class L4WasmBridge {
   private exports: L4WasmExports | null = null
+
+  /**
+   * The files a document can import by path, and the document's own path among
+   * them. They live here, and are handed to the module before an analysis that
+   * follows a change, because the module keeps them between calls. A fresh
+   * module starts with no files and the document at the top of them, which is
+   * what the `pushed` pair says it holds: until the host sets something, the
+   * module is not called to set anything.
+   */
+  private files: ProjectFiles = {}
+  private documentPath = ''
+  private pushedFiles = NO_FILES
+  private pushedDocumentPath = ''
+  /**
+   * The table the module refused last, as `JSON.stringify` wrote it. The module
+   * keeps the files it had when it refuses, so the table is not sent again
+   * until the host sets another, and the refusal is reported once.
+   */
+  private refusedFiles: string | null = null
 
   constructor(
     private wasmUrl: string,
@@ -191,6 +234,79 @@ export class L4WasmBridge {
     // Initialize the WASI reactor (and Haskell RTS)
     // This must be called before any other exported functions
     this.exports._initialize()
+
+    // A fresh module knows no files: whatever was set is handed over again
+    this.pushedFiles = NO_FILES
+    this.pushedDocumentPath = ''
+    this.refusedFiles = null
+  }
+
+  /**
+   * Supply the files a document can import by path, keyed by path among
+   * themselves: `{ 'rows/b/mod.l4': source }`. Replaces any files set before.
+   *
+   * A key is a path from the top of the files, with no leading `/`, with or
+   * without the `.l4`. The module refuses a table that has a key with a leading
+   * `/` or two keys that are one path (`core.l4` and `./core.l4`). It then keeps
+   * the files it had, and the bridge reports the refusal once, in the console,
+   * and goes on with those files.
+   *
+   * Only these files are reachable, and a path that climbs above the start of
+   * them is refused: there is no file system behind the module. A bare name
+   * (`IMPORT prelude`) is still looked up by name, first at the top of these
+   * files and then among the standard library.
+   *
+   * Takes effect from the next analysis call.
+   */
+  setFiles(files: ProjectFiles): void {
+    this.files = { ...files }
+  }
+
+  /**
+   * Say where the document lives among the files given to `setFiles`, such as
+   * `rows/a/main.l4`, so that a path import in it starts from its folder.
+   * `null` puts it back at the top of the files, which is where it is until
+   * this is called. The module analyses one document at a time, so this names
+   * the document that the next calls are about.
+   *
+   * Takes effect from the next analysis call. A call that has already been made
+   * runs under the path that is set when it starts, not the one that was set
+   * when it was made, so let an analysis finish before you set another path.
+   */
+  setDocumentPath(path: string | null): void {
+    this.documentPath = path ?? ''
+  }
+
+  /**
+   * The module to analyse with, after handing it whatever files and document
+   * path it does not have yet. Every analysis starts here.
+   */
+  private async analysisExports(): Promise<L4WasmExports> {
+    if (!this.exports) {
+      throw new Error('WASM not initialized')
+    }
+    const files = JSON.stringify(this.files)
+    if (files === this.pushedFiles) {
+      this.refusedFiles = null
+    } else if (files !== this.refusedFiles) {
+      const reply = JSON.parse(await this.exports.l4_set_files(files))
+      if (typeof reply.error === 'string') {
+        // The module kept the files it had. Say so once, and go on with them
+        // instead of failing every analysis that follows.
+        this.refusedFiles = files
+        console.error(
+          `[WASM] the project files were refused, and the files from before stay in force: ${reply.error}`
+        )
+      } else {
+        this.pushedFiles = files
+        this.refusedFiles = null
+      }
+    }
+    if (this.documentPath !== this.pushedDocumentPath) {
+      await this.exports.l4_set_document_path(this.documentPath)
+      this.pushedDocumentPath = this.documentPath
+    }
+    return this.exports
   }
 
   /**
@@ -383,10 +499,8 @@ export class L4WasmBridge {
    * Parse and type-check source code
    */
   async check(source: string): Promise<Diagnostic[]> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_check(source)
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_check(source)
     return JSON.parse(json)
   }
 
@@ -398,10 +512,8 @@ export class L4WasmBridge {
     line: number,
     character: number
   ): Promise<Hover | null> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_hover(source, line, character)
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_hover(source, line, character)
     return JSON.parse(json)
   }
 
@@ -435,10 +547,8 @@ export class L4WasmBridge {
    * Evaluate L4 source code
    */
   async evaluate(source: string): Promise<EvalResult> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_eval(source)
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_eval(source)
     return JSON.parse(json)
   }
 
@@ -455,10 +565,8 @@ export class L4WasmBridge {
     functionName: string,
     simplify: boolean
   ): Promise<VisualizeResult> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_visualize_by_name(
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_visualize_by_name(
       source,
       uri,
       version,
@@ -477,10 +585,8 @@ export class L4WasmBridge {
     source: string,
     functionName: string
   ): Promise<StateGraphResult> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_state_graph_by_name(source, functionName)
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_state_graph_by_name(source, functionName)
     return JSON.parse(json)
   }
 
@@ -493,10 +599,8 @@ export class L4WasmBridge {
     uri: string,
     version: number
   ): Promise<CodeLens[]> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_code_lenses(source, uri, version)
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_code_lenses(source, uri, version)
     return JSON.parse(json)
   }
 
@@ -510,15 +614,8 @@ export class L4WasmBridge {
     col: number,
     directiveType: string
   ): Promise<Record<string, unknown>> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_eval_directive(
-      source,
-      line,
-      col,
-      directiveType
-    )
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_eval_directive(source, line, col, directiveType)
     return JSON.parse(json)
   }
 
@@ -534,10 +631,8 @@ export class L4WasmBridge {
     line: number,
     col: number
   ): Promise<Location | null> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_definition(source, line, col)
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_definition(source, line, col)
     const result = JSON.parse(json)
     return result === null ? null : result
   }
@@ -554,10 +649,8 @@ export class L4WasmBridge {
     line: number,
     col: number
   ): Promise<Location[]> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_references(source, line, col)
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_references(source, line, col)
     return JSON.parse(json)
   }
 
@@ -575,10 +668,8 @@ export class L4WasmBridge {
     functionName: string,
     bindingsJson: string
   ): Promise<unknown> {
-    if (!this.exports) {
-      throw new Error('WASM not initialized')
-    }
-    const json = await this.exports.l4_query_plan(
+    const wasm = await this.analysisExports()
+    const json = await wasm.l4_query_plan(
       source,
       uri,
       functionName,
@@ -602,6 +693,12 @@ export class L4WasmBridge {
     this.exports = null
   }
 }
+
+/**
+ * The files a document can import by path: the path of each among the files
+ * (`rows/b/mod.l4`, with or without the `.l4`) to its source text.
+ */
+export type ProjectFiles = Record<string, string>
 
 // LSP-compatible types
 

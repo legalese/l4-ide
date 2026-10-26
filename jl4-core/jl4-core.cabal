@@ -218,6 +218,7 @@ library
     L4.Interchange.Fidelity
     L4.Instances.Serialise
     L4.API
+    L4.API.ImportContext
     L4.API.VirtualFS
     L4.API.EmbeddedLibraries
     L4.API.EmbeddedLibraries.TH
@@ -230,6 +231,9 @@ test-suite jl4-core-test
   other-modules:
     Paths_jl4_core
     ImportResolutionSpec
+    ApiImportContextSpec
+    PathImportFixtures
+    PathImportVfsSpec
     RelativeImportSpec
     TemporalContextSpec
     UnifySpec

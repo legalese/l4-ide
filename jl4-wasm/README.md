@@ -105,15 +105,43 @@ The `-Oz` level reduces the binary from 42 MB to ~10 MB. With HTTP compression (
 
 The following functions are exported via GHC's JavaScript FFI:
 
-| Function             | Signature                                                        | Description                                    |
-| -------------------- | ---------------------------------------------------------------- | ---------------------------------------------- |
-| `l4_check`           | `(source: string) => Promise<string>`                            | Parse and type-check, returns JSON diagnostics |
-| `l4_hover`           | `(source: string, line: number, col: number) => Promise<string>` | Get hover info at position                     |
-| `l4_completions`     | `(source: string, line: number, col: number) => Promise<string>` | Get completion suggestions                     |
-| `l4_semantic_tokens` | `(source: string) => Promise<string>`                            | Get semantic tokens for highlighting           |
-| `l4_eval`            | `(source: string) => Promise<string>`                            | Evaluate #EVAL directives                      |
+| Function               | Signature                                                        | Description                                    |
+| ---------------------- | ---------------------------------------------------------------- | ---------------------------------------------- |
+| `l4_check`             | `(source: string) => Promise<string>`                            | Parse and type-check, returns JSON diagnostics |
+| `l4_hover`             | `(source: string, line: number, col: number) => Promise<string>` | Get hover info at position                     |
+| `l4_completions`       | `(source: string, line: number, col: number) => Promise<string>` | Get completion suggestions                     |
+| `l4_semantic_tokens`   | `(source: string) => Promise<string>`                            | Get semantic tokens for highlighting           |
+| `l4_eval`              | `(source: string) => Promise<string>`                            | Evaluate #EVAL directives                      |
+| `l4_set_files`         | `(filesJson: string) => Promise<string>`                         | Supply the files a document can import         |
+| `l4_set_document_path` | `(path: string) => Promise<string>`                              | Say where the document lives among those files |
 
 All functions return JSON-encoded results as strings.
+
+The table is not the whole list: `l4_eval_directive`, `l4_visualize_by_name`, `l4_state_graph_by_name`, `l4_code_lenses`, `l4_definition`, `l4_references` and `l4_query_plan` are exported too.
+`ts-apps/jl4-web/src/lib/wasm/wasm-bridge.ts` types all of them.
+
+### Files a document can import
+
+`IMPORT` is resolved among the standard library built into the module and the files the host hands it:
+
+- `l4_set_files('{"rows/b/mod.l4": "..."}')` replaces the files, as one JSON object from path to source text.
+  It answers `{"files": n}`, or `{"error": "..."}` and changes nothing when the text is not an object of strings, or when a key is refused.
+  A key is a path from the top of the files (found by a path import such as ``IMPORT `../b/mod` ``) or a module name (found by `IMPORT mod`), with or without `.l4`, and it has no leading `/`.
+  A key with a leading `/`, such as `/rows/b/mod.l4`, is refused, because no import could find it; write `rows/b/mod.l4`.
+  A table in which two keys are one path (`core.l4` and `./core.l4`, or `core` and `core.l4`) is refused too, and the message names both keys.
+  A key that appears twice in the JSON text is taken once, with the value of the first (measured with the `aeson` this tree pins); `JSON.stringify` never writes one.
+- `l4_set_document_path('rows/a/main.l4')` says where the document being analysed lives among them, so that a path import in it starts from `rows/a`.
+  The empty string puts it back at the top of the files, where it is until this is called.
+  The path is read as written, with `/` as the only separator and a leading `/` ignored: `rows/a/` makes the document the file `rows/a.l4`, a `\` is part of a file's name and not a separator, a path that climbs above the top of the files is accepted and then every path import from the document is refused, and the reply repeats the text it was given and not the path it came to.
+
+Both are kept by the module until they are replaced, and every function that resolves imports reads them when it starts.
+The files change when the project does, and the source changes at every keystroke, so only the source is an argument.
+The module holds one context and analyses one document at a time: a call that has been issued runs under the path that is set when it starts, so a host must let an analysis finish before it changes the path, and sending the path again between two calls that are both in flight does not separate them.
+Before anything is set, the module has no files and the document at the top, as it had before these existed, and answers as it did, with two exceptions.
+An imported library that uses its own imports now evaluates, where `l4_eval` and `l4_eval_directive` said it was not in scope (measured on 193 corpus files with no files set: 10 differed, and every difference was of this kind).
+A document that imports a module with a type error now carries an error saying so, and is not evaluated.
+
+[How a path import is resolved in the browser](../doc/reference/libraries/resolution.md#in-the-browser) says what is reachable and what is refused.
 
 ## Usage from JavaScript
 

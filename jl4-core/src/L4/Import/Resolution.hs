@@ -3,7 +3,7 @@
 --
 -- This module provides the core import resolution algorithm that can be used
 -- by both the LSP (with Shake) and WASM (pure) backends. The resolution logic
--- is parameterized over a monad and a module lookup function, allowing different
+-- is parameterized over a monad and an 'ImportLookup', allowing different
 -- backends to provide their own implementations.
 --
 -- == Architecture
@@ -18,26 +18,33 @@
 --    (Shake + filesystem)            (VFS + embedded libs)
 -- @
 --
+-- The LSP backend resolves a path import itself, over the Shake rules, and uses
+-- from this module the pure helpers ('classifyImport', 'pathImportFile',
+-- 'collapsePath') and the one text of its refusals ('pathResolutionMessage').
+-- The pure backend resolves both kinds of name with 'resolveImports'.
+--
 -- == Usage
 --
--- Backends implement 'ModuleLookup' to specify how to find module sources:
+-- Backends implement 'ImportLookup' to specify how to find module sources:
 --
 -- @
 -- -- Pure implementation with VFS
--- pureResolver :: VFS -> ModuleLookup (Either [Text])
--- pureResolver vfs modName = pure $ vfsLookup modName vfs
---
--- -- Shake-based implementation  
--- shakeResolver :: ModuleLookup Action
--- shakeResolver modName = use GetFileContents (projectUri modName)
+-- pureResolver :: VFS -> ImportLookup Identity
+-- pureResolver vfs = ImportLookup
+--   { ilBare = \\name -> Identity (fmap (\\src -> BareHit src (Just ".")) (vfsLookup name vfs))
+--   , ilPath = \\path -> Identity (vfsLookupPath path vfs)
+--   }
 -- @
 --
 -- @since 0.1
 module L4.Import.Resolution
   ( -- * Module Lookup
-    ModuleLookup
+    ImportLookup(..)
+  , BareHit(..)
+  , Importer(..)
     -- * URI Generation
   , moduleNameToProjectUri
+  , pathModuleUri
   , moduleNameToCandidateUris
   , CandidateUri(..)
     -- * Written import names: bare or path
@@ -46,12 +53,17 @@ module L4.Import.Resolution
   , pathImportFile
   , CollapsedPath(..)
   , collapsePath
+    -- * Why a path import was refused
+  , PathResolution(..)
+  , pathResolutionMessage
     -- * Import Extraction
   , extractImportNames
     -- * Resolution
   , resolveImports
   , ResolvedImport(..)
   , ImportResolutionError(..)
+  , renderImportError
+  , dependenciesFirst
     -- * Type Checking with Dependencies
   , typecheckWithDependencies
   , TypeCheckWithDepsResult(..)
@@ -61,9 +73,9 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import System.FilePath (isAbsolute, joinPath, splitDirectories)
+import System.FilePath (isAbsolute, joinPath, splitDirectories, takeDirectory, (</>))
 
-import L4.Annotation (emptyAnno)
+import L4.API.EmbeddedLibraries (lookupEmbeddedLibrary)
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
@@ -77,11 +89,39 @@ import qualified L4.Utils.IntervalMap as IV
 -- Module Lookup Abstraction
 -- ----------------------------------------------------------------------------
 
--- | Function to look up a module's source code by name.
+-- | How a backend finds the source of a module that an @IMPORT@ names.
 --
--- Returns 'Nothing' if the module cannot be found.
--- The module name is without the .l4 extension (e.g., "prelude", "helper").
-type ModuleLookup m = Text -> m (Maybe Text)
+-- A bare name and a path are two questions, because they have two answers: a bare
+-- name may be an embedded library, and a path never is.
+data ImportLookup m = ImportLookup
+  { ilBare :: Text -> m (Maybe BareHit)
+    -- ^ By module name, without the @.l4@ (@"prelude"@, @"helper"@).
+  , ilPath :: FilePath -> m (Maybe Text)
+    -- ^ By path among the supplied files, already collapsed and with its @.l4@
+    -- (@"rows\/b\/mod.l4"@). Never asked for a path that leaves the files, or for
+    -- one that came from a leading @\/@.
+  }
+
+-- | A module found by name, and where it lives.
+data BareHit = BareHit
+  { bhSource :: Text
+  , bhDirectory :: Maybe FilePath
+    -- ^ The folder of the module among the supplied files, which its own path
+    -- imports start from. 'Nothing' for a module that is not one of them, such as
+    -- an embedded library: it has no folder, and cannot import by path.
+  }
+  deriving stock (Eq, Show)
+
+-- | The module that writes a list of @IMPORT@s, as far as resolving them goes.
+data Importer = Importer
+  { impLabel :: Text
+    -- ^ How a message names it: its path among the supplied files, or its URI when
+    -- it has none.
+  , impDirectory :: Maybe FilePath
+    -- ^ Its folder among the supplied files, which a path import starts from.
+    -- 'Nothing' if it has none.
+  }
+  deriving stock (Eq, Show)
 
 -- ----------------------------------------------------------------------------
 -- URI Generation
@@ -103,6 +143,20 @@ data CandidateUri = CandidateUri
 moduleNameToProjectUri :: Text -> NormalizedUri
 moduleNameToProjectUri modName =
   toNormalizedUri $ Uri $ "project:/" <> modName <> ".l4"
+
+-- | The @project:/@ URI of the file a collapsed path names.
+--
+-- A file at the top of the files gets the URI the module of its name gets
+-- ('moduleNameToProjectUri'), so ``IMPORT `sub/../core` `` and @IMPORT core@ are
+-- one module. A file in a folder has a URI no module name can have.
+--
+-- @
+-- pathModuleUri "core.l4"          == "project:/core.l4"
+-- pathModuleUri "rows/b/mod.l4"    == "project:/rows/b/mod.l4"
+-- @
+pathModuleUri :: FilePath -> NormalizedUri
+pathModuleUri collapsed =
+  toNormalizedUri $ Uri $ "project:/" <> Text.pack (dropWhile (== '/') collapsed)
 
 -- | Generate candidate URIs for a module name.
 --
@@ -207,6 +261,57 @@ collapsePath fp =
           | otherwise         -> (ks, True)
       seg  -> (seg : ks, esc)
 
+-- | What resolving one path import came to.
+--
+-- The backends differ in how they look for the file and agree on what can go
+-- wrong, so this is the one type for it, and 'pathResolutionMessage' the one
+-- text.
+data PathResolution
+  = PathFound !NormalizedUri
+  | PathNotFound !FilePath !FilePath
+    -- ^ the importing file, and the collapsed path that was looked for
+  | PathEscapesRoot !FilePath !FilePath
+    -- ^ the importing file, and the collapsed path, which leaves the root of a
+    -- confined runtime
+  | PathNoImportingDirectory
+    -- ^ the importer is not a file with a directory: an embedded library, or a
+    -- browser document
+  | PathRootRefused
+    -- ^ a leading @\/@, which is reserved
+  deriving stock (Eq, Show)
+
+-- | The diagnostic text for a path import that did not resolve, or 'Nothing' for
+-- one that did. The first line of each is stable text a test can match
+-- (RELATIVE-IMPORTS-SPEC §4.5).
+--
+-- The runtimes that resolve a path import (the Shake rules for the CLI, the
+-- language server and the service; 'resolveImports' for the browser build) all
+-- say it with this function, so a person gets the same words wherever the file
+-- is checked. The first argument is how the importing file is named in the one
+-- message that names it: its URI, or its path among the supplied files.
+pathResolutionMessage :: Text -> Text -> PathResolution -> Maybe Text
+pathResolutionMessage importerUri written = \ case
+  PathFound _ -> Nothing
+  PathNotFound importer collapsed -> Just $ Text.unlines
+    [ "I could not find a module at this path: " <> written
+    , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+    , "Relative to " <> Text.pack importer <> " that is " <> Text.pack collapsed <> ", which does not exist."
+    ]
+  PathEscapesRoot importer collapsed -> Just $ Text.unlines
+    [ "This import leaves the root of this deployment: " <> written
+    , "Relative to " <> Text.pack importer <> " that would be " <> Text.pack collapsed
+        <> ", which is outside the root of this deployment."
+    , "A relative import may reach any file inside the deployment and nothing outside it."
+    ]
+  PathNoImportingDirectory -> Just $ Text.unlines
+    [ "This import is relative, but " <> importerUri <> " has no directory to be relative to."
+    , "Write a bare module name, or open the file from disk so that it has a folder to start from."
+    ]
+  PathRootRefused -> Just $ Text.unlines
+    [ "This import leaves the root of this deployment: " <> written
+    , "A path import is written relative to the file that imports it. A leading / is reserved for a root-relative form that does not exist yet."
+    ]
+
 -- ----------------------------------------------------------------------------
 -- Import Extraction
 -- ----------------------------------------------------------------------------
@@ -226,9 +331,141 @@ extractImportNames = foldTopDecls extractImport
 -- Import Resolution
 -- ----------------------------------------------------------------------------
 
+-- | Errors that can occur during import resolution.
+data ImportResolutionError
+  = ModuleNotFound Text [Text]  -- ^ Module name, list of places searched
+  | ParseError Text [Text]      -- ^ Module name, parse error messages
+  | CyclicImport [Text]         -- ^ Cycle of module names
+  | PathImportFailed Text Text PathResolution
+    -- ^ A path import that could not be resolved: the name as written, the
+    -- importing file as a message names it, and why
+  | ConflictingModules Text
+    -- ^ Two different sources have one module address (a module name, or the
+    -- path of a file at the top of the files)
+  deriving stock (Eq, Show, Generic)
+
+-- | The messages for a failed resolution, as 'typecheckWithDependencies' returns
+-- them.
+renderImportError :: ImportResolutionError -> [Text]
+renderImportError = \ case
+  ModuleNotFound modName searched ->
+    ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
+  ParseError modName errs ->
+    ("Parse error in " <> modName <> ":") : errs
+  CyclicImport cycleModules ->
+    ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
+  PathImportFailed written importer why ->
+    [Text.stripEnd (fromMaybe "" (pathResolutionMessage importer written why))]
+  ConflictingModules name | Just _ <- lookupEmbeddedLibrary name ->
+    [ "Two different modules are both called " <> name <> ", so one would stand in for the other. "
+        <> "A file at the top of the files that has the name of a standard library module, "
+        <> "but is keyed so that a bare name does not find it (such as ./" <> name <> ".l4), "
+        <> "cannot be imported by path in a program that also uses the library module. "
+        <> "Key it by its module name, put it in a folder, or give it another name."
+    ]
+  ConflictingModules name ->
+    [ "Two different modules are both called " <> name <> ", so one would stand in for the other. "
+        <> "Two of the files you supplied have the address " <> name <> ".l4 and different contents. "
+        <> "Key each file once, under one spelling of its path."
+    ]
+
+-- | A module found for an @IMPORT@: what it is, and where its own imports start.
+data Located = Located
+  { locKey :: Text
+    -- ^ Its identity: the text of its URI. One module is one key, however it was
+    -- reached, and no two modules share one.
+  , locUri :: NormalizedUri
+  , locName :: Text
+    -- ^ What a message calls it: the module name, or its path without the @.l4@.
+  , locSource :: Text
+  , locImporter :: Importer
+  }
+
+-- | Find the module an @IMPORT@ names, as written in a module that is 'Importer'.
+--
+-- A bare name asks the lookup by name, exactly as it always did. A path import
+-- never asks by name: it is joined to the importer's folder, collapsed, refused
+-- if it leaves the supplied files or has no folder to start from, and only then
+-- looked up, by its collapsed path (RELATIVE-IMPORTS-SPEC §4.3).
+locate
+  :: forall m. Monad m
+  => ImportLookup m -> Importer -> Text -> m (Either ImportResolutionError Located)
+locate lookups importer written = case classifyImport written of
+  BareImport -> do
+    found <- lookups.ilBare written
+    pure $ case found of
+      -- the two places, in the words the message always had; not the order tried
+      Nothing -> Left (ModuleNotFound written ["embedded libraries", "project VFS"])
+      Just hit ->
+        let uri = moduleNameToProjectUri written
+         in Right Located
+              { locKey = uriKey uri
+              , locUri = uri
+              , locName = written
+              , locSource = hit.bhSource
+              , locImporter = Importer
+                  { impLabel = case hit.bhDirectory of
+                      Just _  -> written <> ".l4"
+                      Nothing -> (fromNormalizedUri uri).getUri
+                  , impDirectory = hit.bhDirectory
+                  }
+              }
+  RootedImport -> pure (refuse PathRootRefused)
+  PathImport -> case importer.impDirectory of
+    Nothing -> pure (refuse PathNoImportingDirectory)
+    Just dir ->
+      let target = collapsePath (dir </> pathImportFile written)
+       in if target.cpEscaped
+            then pure (refuse (PathEscapesRoot (Text.unpack importer.impLabel) target.cpPath))
+            else do
+              found <- lookups.ilPath target.cpPath
+              pure $ case found of
+                Nothing -> refuse (PathNotFound (Text.unpack importer.impLabel) target.cpPath)
+                Just source ->
+                  let uri = pathModuleUri target.cpPath
+                   in Right Located
+                        { locKey = uriKey uri
+                        , locUri = uri
+                        , locName = Text.pack (dropL4 target.cpPath)
+                        , locSource = source
+                        , locImporter = Importer
+                            { impLabel = Text.pack target.cpPath
+                            , impDirectory = Just (takeDirectory target.cpPath)
+                            }
+                        }
+  where
+    refuse :: PathResolution -> Either ImportResolutionError a
+    refuse = Left . PathImportFailed written importer.impLabel
+
+-- | The URI an @IMPORT@ resolves to, from the folder of the module that writes
+-- it. This is what 'resolveImports' found the module under, worked out again so
+-- that each @IMPORT@ of a module can be stamped with it.
+importTargetUri :: Maybe FilePath -> Text -> Maybe NormalizedUri
+importTargetUri dir written = case classifyImport written of
+  BareImport   -> Just (moduleNameToProjectUri written)
+  RootedImport -> Nothing
+  PathImport   -> do
+    d <- dir
+    let target = collapsePath (d </> pathImportFile written)
+    guard (not target.cpEscaped)
+    pure (pathModuleUri target.cpPath)
+
+uriKey :: NormalizedUri -> Text
+uriKey = (.getUri) . fromNormalizedUri
+
+-- | What a message calls the document: its path among the supplied files, without
+-- the @.l4@, as it calls a module reached by path.
+documentName :: Importer -> Text
+documentName importer = fromMaybe importer.impLabel (Text.stripSuffix ".l4" importer.impLabel)
+
+dropL4 :: FilePath -> FilePath
+dropL4 p = maybe p reverse (List.stripPrefix (reverse ".l4") (reverse p))
+
 -- | A successfully resolved import.
 data ResolvedImport = ResolvedImport
   { riModuleName :: Text
+    -- ^ The module name for a bare import, and for a path import the collapsed
+    -- path without its @.l4@ (@"rows\/b\/mod"@).
   , riUri :: NormalizedUri
   , riSource :: Text
   , riParsed :: Module Name
@@ -236,21 +473,17 @@ data ResolvedImport = ResolvedImport
   }
   deriving stock (Generic)
 
--- | Errors that can occur during import resolution.
-data ImportResolutionError
-  = ModuleNotFound Text [Text]  -- ^ Module name, list of places searched
-  | ParseError Text [Text]      -- ^ Module name, parse error messages
-  | CyclicImport [Text]         -- ^ Cycle of module names
-  deriving stock (Eq, Show, Generic)
-
 -- | Resolve all imports for a module, recursively.
 --
 -- This function:
--- 1. Extracts IMPORT statements from the parsed module
--- 2. Looks up each import using the provided lookup function
--- 3. Recursively resolves transitive imports
--- 4. Type-checks imports in dependency order
--- 5. Returns all resolved imports (including transitive)
+-- 1. Finds each import with the provided lookup ('locate'): by name for a bare
+--    import, by collapsed path for a path import
+-- 2. Recursively resolves transitive imports, each from its own module's folder
+-- 3. Type-checks imports in dependency order
+-- 4. Returns all resolved imports (including transitive)
+--
+-- Modules are known by their URI: a bare name and a path that name the same
+-- file are one module, and so are two spellings of one path.
 --
 -- Cycle detection prevents infinite loops. We track two collections:
 -- - @inProgress@: modules currently being resolved (detecting these = cycle)
@@ -262,76 +495,87 @@ data ImportResolutionError
 -- @A -> {B, C} -> D@, once B has resolved D, C must still receive D's exported
 -- environment. Returning @[]@ here (the old, name-set behaviour) type-checked C
 -- against an empty dependency environment, silently degrading the types and
--- entities of the second sibling that A then consumed. See smucclaw/l4-ide#904.
+-- entities of the second sibling that A then consumes. See smucclaw/l4-ide#904.
+--
+-- The document being checked is the module at its own address. An @IMPORT@ that
+-- reaches that address is the document, so it is a cycle, and the lookup is not
+-- asked for it: a file it holds there is a copy, and the live text is what is
+-- being checked.
 resolveImports
   :: forall m. Monad m
-  => ModuleLookup m                      -- ^ How to find module sources
-  -> Set.Set Text                        -- ^ Modules currently being resolved (for cycle detection)
+  => ImportLookup m                      -- ^ How to find module sources
+  -> Importer                            -- ^ The module that writes these imports
+  -> Maybe (Text, Text)                  -- ^ The document being checked: the key of its address, and what a message calls it
+  -> Map.Map Text Text                   -- ^ Modules currently being resolved, key to name (for cycle detection)
   -> Map.Map Text ResolvedImport         -- ^ Modules already fully resolved, keyed to their records
   -> [Text]                              -- ^ Import names to resolve
   -> m (Either ImportResolutionError [ResolvedImport])
-resolveImports _lookup _inProgress _resolved [] = pure $ Right []
-resolveImports lookupModule inProgress resolved (modName : rest)
-  -- Already resolved - reuse its record so *siblings* inherit its environment
-  | Just cached <- Map.lookup modName resolved =
-      (fmap . fmap) (cached :) $ resolveImports lookupModule inProgress resolved rest
-  -- Currently being resolved - cycle detected!
-  | modName `Set.member` inProgress = 
-      pure $ Left $ CyclicImport $ toList inProgress <> [modName]
-  | otherwise = do
-      -- Look up the module source
-      mSource <- lookupModule modName
-      case mSource of
-        Nothing -> 
-          pure $ Left $ ModuleNotFound modName ["embedded libraries", "project VFS"]
-        
-        Just source -> do
-          let uri = moduleNameToProjectUri modName
-          
+resolveImports _lookups _importer _document _inProgress _resolved [] = pure $ Right []
+resolveImports _lookups importer (Just (ownKey, ownName)) inProgress _resolved (written : _rest)
+  | (uriKey <$> importTargetUri importer.impDirectory written) == Just ownKey =
+      -- The cycle is the modules being resolved and the document they all hang
+      -- from; a cycle that does not come back to the document does not name it
+      pure $ Left $ CyclicImport $ Set.toList (Set.fromList (ownName : Map.elems inProgress)) <> [ownName]
+resolveImports lookups importer document inProgress resolved (written : rest) = do
+  located <- locate lookups importer written
+  case located of
+    Left err -> pure $ Left err
+    Right loc
+      -- Already resolved - reuse its record so *siblings* inherit its environment
+      | Just cached <- Map.lookup loc.locKey resolved ->
+          if cached.riSource == loc.locSource
+            then (fmap . fmap) (cached :) $ resolveImports lookups importer document inProgress resolved rest
+            else pure $ Left $ ConflictingModules loc.locName
+      -- Currently being resolved - cycle detected!
+      | loc.locKey `Map.member` inProgress ->
+          pure $ Left $ CyclicImport $ Set.toList (Set.fromList (Map.elems inProgress)) <> [loc.locName]
+      | otherwise -> do
+          let uri = loc.locUri
+
           -- Parse the module
-          case execProgramParserWithHintPass uri source of
+          case execProgramParserWithHintPass uri loc.locSource of
             Left parseErrors ->
-              pure $ Left $ ParseError modName $ map (\(PError msg _ _ _) -> msg) (toList parseErrors)
-            
+              pure $ Left $ ParseError loc.locName $ map (\(PError msg _ _ _) -> msg) (toList parseErrors)
+
             Right (parsed, _hints, _warnings) -> do
               -- Extract and resolve transitive imports first
               -- Add this module to inProgress while resolving its imports
               let transitiveImports = extractImportNames parsed
-                  newInProgress = Set.insert modName inProgress
-              
-              transitiveResult <- resolveImports lookupModule newInProgress resolved transitiveImports
-              
+                  newInProgress = Map.insert loc.locKey loc.locName inProgress
+
+              transitiveResult <- resolveImports lookups loc.locImporter document newInProgress resolved transitiveImports
+
               case transitiveResult of
                 Left err -> pure $ Left err
                 Right transitiveResolved -> do
                   -- Type-check this module with its dependencies
                   let (depState, depEnv) = combineResolvedImports uri transitiveResolved
-                      updatedParsed = updateModuleImports transitiveResolved parsed
+                      updatedParsed = stampImports loc.locImporter.impDirectory parsed
                       tcResult = doCheckProgramWithDependencies depState depEnv updatedParsed
-                  
+
                   let thisResolved = ResolvedImport
-                        { riModuleName = modName
+                        { riModuleName = loc.locName
                         , riUri = uri
-                        , riSource = source
+                        , riSource = loc.locSource
                         , riParsed = parsed
                         , riTypeChecked = tcResult
                         }
-                  
+
                   -- This module is now fully resolved.
                   -- Register this module and everything its subtree resolved,
                   -- keyed to their records, so that later siblings inherit the
                   -- records (not just the names) via the already-resolved branch.
-                  let transitiveCache = Map.fromList [ (ri.riModuleName, ri) | ri <- transitiveResolved ]
-                      newResolved = Map.insert modName thisResolved (Map.union resolved transitiveCache)
-                  
+                  let transitiveCache = Map.fromList [ (uriKey ri.riUri, ri) | ri <- transitiveResolved ]
+                      newResolved = Map.insert loc.locKey thisResolved (Map.union resolved transitiveCache)
+
                   -- Continue with remaining imports (back to original inProgress)
-                  restResult <- resolveImports lookupModule inProgress newResolved rest
-                  
+                  restResult <- resolveImports lookups importer document inProgress newResolved rest
+
                   case restResult of
                     Left err -> pure $ Left err
                     Right restResolved ->
                       -- Return this module + transitive + rest
-                      -- Deduplicate by module name (keep first occurrence)
+                      -- Deduplicate by module (keep first occurrence)
                       let allResolved = thisResolved : transitiveResolved <> restResolved
                           seen = Set.empty :: Set.Set Text
                           deduped = deduplicateResolved seen allResolved
@@ -340,8 +584,43 @@ resolveImports lookupModule inProgress resolved (modName : rest)
     deduplicateResolved :: Set.Set Text -> [ResolvedImport] -> [ResolvedImport]
     deduplicateResolved _ [] = []
     deduplicateResolved seen (ri : ris)
-      | ri.riModuleName `Set.member` seen = deduplicateResolved seen ris
-      | otherwise = ri : deduplicateResolved (Set.insert ri.riModuleName seen) ris
+      | uriKey ri.riUri `Set.member` seen = deduplicateResolved seen ris
+      | otherwise = ri : deduplicateResolved (Set.insert (uriKey ri.riUri) seen) ris
+
+-- | The resolved imports in an order in which every module comes after the modules
+-- it imports, so that a caller that evaluates them one by one can give each the
+-- environment of its own imports.
+--
+-- 'resolveImports' lists a module before what it imports, and lists a module
+-- reached twice where it was first reached, so its order is neither this one nor
+-- its reverse: in @A -> {B, C} -> D@ it is @B, D, C@, with @C@ before the @D@ it
+-- needs once reversed.
+dependenciesFirst :: [ResolvedImport] -> [ResolvedImport]
+dependenciesFirst imports = reverse (snd (List.foldl' visit (Set.empty, []) imports))
+  where
+    byKey :: Map.Map Text ResolvedImport
+    byKey = Map.fromList [ (uriKey ri.riUri, ri) | ri <- imports ]
+
+    visit :: (Set.Set Text, [ResolvedImport]) -> ResolvedImport -> (Set.Set Text, [ResolvedImport])
+    visit (seen, done) ri
+      | key `Set.member` seen = (seen, done)
+      | otherwise =
+          let (seen', done') = List.foldl' visit (Set.insert key seen, done) (importedBy ri)
+           in (seen', ri : done')
+      where
+        key = uriKey ri.riUri
+
+    -- The modules among 'imports' that this one imports, by the URI each of its
+    -- @IMPORT@s was stamped with.
+    importedBy :: ResolvedImport -> [ResolvedImport]
+    importedBy ri =
+      mapMaybe (\u -> Map.lookup (uriKey u) byKey)
+        (foldTopDecls importUri ri.riTypeChecked.program)
+
+    importUri :: TopDecl Resolved -> [NormalizedUri]
+    importUri = \ case
+      Import _ (MkImport _ _ (Just u)) -> [u]
+      _ -> []
 
 -- ----------------------------------------------------------------------------
 -- Type Checking with Dependencies
@@ -376,36 +655,36 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
 -- This is the main entry point for type-checking with import resolution.
 typecheckWithDependencies
   :: forall m. Monad m
-  => ModuleLookup m     -- ^ How to find module sources
+  => ImportLookup m     -- ^ How to find module sources
+  -> Importer           -- ^ The main module, as the imports it writes are resolved from it
   -> NormalizedUri      -- ^ URI of the main module
   -> Text               -- ^ Source code of the main module
   -> m (Either [Text] TypeCheckWithDepsResult)
-typecheckWithDependencies lookupModule uri source = do
+typecheckWithDependencies lookups importer uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
       pure $ Left $ map (\(PError msg _ _ _) -> msg) (toList parseErrors)
-    
+
     Right (parsed, _hints, _warnings) -> do
       -- Extract and resolve imports
       let importNames = extractImportNames parsed
-      
-      importResult <- resolveImports lookupModule Set.empty Map.empty importNames
-      
+
+      -- The document is the module at its own address while its imports are
+      -- resolved: an import that reaches that address is the document, and a file
+      -- the lookup holds there is never read in its place. That makes a file that
+      -- imports the document back a cycle, as it is under the Shake rules.
+      importResult <- resolveImports lookups importer (Just (uriKey uri, documentName importer)) Map.empty Map.empty importNames
+
       case importResult of
-        Left (ModuleNotFound modName searched) ->
-          pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
-        Left (ParseError modName errs) ->
-          pure $ Left $ ("Parse error in " <> modName <> ":") : errs
-        Left (CyclicImport cycleModules) ->
-          pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
-        
+        Left err -> pure $ Left (renderImportError err)
+
         Right resolvedImports -> do
           -- Combine environments from imports
           let (initState, initEnv) = combineResolvedImports uri resolvedImports
-              updatedParsed = updateModuleImports resolvedImports parsed
+              updatedParsed = stampImports importer.impDirectory parsed
               result = doCheckProgramWithDependencies initState initEnv updatedParsed
-          
+
           pure $ Right TypeCheckWithDepsResult
             { tcdModule = result.program
             , tcdErrors = result.errors
@@ -501,12 +780,17 @@ combineResolvedImports uri imports =
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
          )
 
--- | Update a module's import declarations with resolved URIs.
-updateModuleImports :: [ResolvedImport] -> Module Name -> Module Name
-updateModuleImports imports = overImports (updateImport importMapping)
+-- | Give each import declaration of a module the URI its import resolved to.
+--
+-- Each @IMPORT@ is looked at on its own, with the folder of the module that writes
+-- it, because the same written path names a different file in a different
+-- folder: matching the written name against the modules that were resolved, as
+-- this once did, cannot tell them apart.
+stampImports :: Maybe FilePath -> Module Name -> Module Name
+stampImports dir = overImports stamp
   where
-    importMapping :: [(Name, NormalizedUri)]
-    importMapping =
-      [ (MkName emptyAnno (NormalName ri.riModuleName), ri.riUri)
-      | ri <- imports
-      ]
+    stamp :: Import Name -> Import Name
+    stamp i@(MkImport ann n _) =
+      case importTargetUri dir (rawNameToText (rawName n)) of
+        Just u  -> MkImport ann n (Just u)
+        Nothing -> i
