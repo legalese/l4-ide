@@ -580,7 +580,7 @@ validateDeploymentId deployId = do
     throwError err400 { errBody = jsonError "Deployment ID exceeds maximum length of 36 characters" }
   when (Text.isInfixOf ".." deployId) $
     throwError err400 { errBody = jsonError "Deployment ID contains invalid sequence" }
-  when (not $ Text.all isValidIdChar deployId) $
+  when (not (BundleStore.isSafeDeploymentId deployId && Text.all isValidIdChar deployId)) $
     throwError err400 { errBody = jsonError "Deployment ID contains invalid characters (allowed: a-z, A-Z, 0-9, -, _)" }
  where
   isValidIdChar c = isAlphaNum c || c == '-' || c == '_'

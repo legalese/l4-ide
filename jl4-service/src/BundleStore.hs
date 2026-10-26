@@ -13,6 +13,7 @@ module BundleStore (
   loadSingleFile,
   listSourceFiles,
   isSafeRelativePath,
+  isSafeDeploymentId,
 ) where
 
 import Control.Exception (IOException, catch)
@@ -108,6 +109,11 @@ saveBundle (BundleStore root) deployId sources meta = do
       targetDir = root </> did
       tmpDir = root </> (did <> ".tmp")
 
+  -- An id that is not a plain name would put the directories below somewhere
+  -- other than directly under the store.
+  unless (isSafeDeploymentId deployId) $
+    ioError (userError "saveBundle: the deployment id is not a plain name")
+
   -- Nothing is written, and nothing removed, for a bundle with a path that would
   -- leave the sources directory. The upload refuses such a name already; this is
   -- the second guard, at the one place that joins a name to a directory.
@@ -141,6 +147,8 @@ saveBundle (BundleStore root) deployId sources meta = do
 -- backfilled deployment version — without rewriting the whole bundle.
 saveStoredMetadata :: BundleStore -> Text -> StoredMetadata -> IO ()
 saveStoredMetadata (BundleStore root) deployId meta = do
+  unless (isSafeDeploymentId deployId) $
+    ioError (userError "saveStoredMetadata: the deployment id is not a plain name")
   let targetDir = root </> Text.unpack deployId
       metaFile = targetDir </> "metadata.json"
       tmpFile = targetDir </> "metadata.json.tmp"
@@ -157,6 +165,11 @@ loadBundle (BundleStore root) deployId = do
       deployDir = root </> did
       sourcesDir = deployDir </> "sources"
       metaFile = deployDir </> "metadata.json"
+
+  -- An id that is not a plain name is no deployment; like a missing one, it has
+  -- no metadata to decode.
+  unless (isSafeDeploymentId deployId) $
+    fail $ "Failed to decode metadata for " <> did <> ": no such deployment"
 
   -- Load all .l4 files recursively
   sources <- loadSourcesRecursive sourcesDir sourcesDir
@@ -211,7 +224,8 @@ listDeployments (BundleStore root) = do
 deleteBundle :: BundleStore -> Text -> IO Bool
 deleteBundle (BundleStore root) deployId = do
   let deployDir = root </> Text.unpack deployId
-  exists <- doesDirectoryExist deployDir
+  -- an id that is not a plain name is no deployment, so there is nothing to delete
+  exists <- if isSafeDeploymentId deployId then doesDirectoryExist deployDir else pure False
   if exists
     then do
       removeDirectoryRecursive deployDir
@@ -223,6 +237,8 @@ deleteBundle (BundleStore root) deployId = do
 -- This allows serving metadata for pending/lazy-loaded deployments without recompilation.
 saveMetadataCache :: BundleStore -> Text -> LBS.ByteString -> IO ()
 saveMetadataCache (BundleStore root) deployId metaJson = do
+  unless (isSafeDeploymentId deployId) $
+    ioError (userError "saveMetadataCache: the deployment id is not a plain name")
   let cacheFile = root </> Text.unpack deployId </> "metadata-cache.json"
       tmpFile = cacheFile <> ".tmp"
   LBS.writeFile tmpFile metaJson
@@ -239,16 +255,17 @@ saveMetadataCache (BundleStore root) deployId metaJson = do
 loadMetadataCache :: BundleStore -> Text -> IO (Maybe LBS.ByteString)
 loadMetadataCache (BundleStore root) deployId = do
   let cacheFile = root </> Text.unpack deployId </> "metadata-cache.json"
-  exists <- doesFileExist cacheFile
+  exists <- if isSafeDeploymentId deployId then doesFileExist cacheFile else pure False
   if not exists
     then pure Nothing
     else (Just . LBS.fromStrict <$> BS.readFile cacheFile)
       `catch` \(_ :: IOException) -> pure Nothing
 
 -- | Load a single source file from a deployment.
--- Returns 'Nothing' if the file doesn't exist or the path is unsafe.
+-- Returns 'Nothing' if the file doesn't exist, or the path or the deployment id is unsafe.
 loadSingleFile :: BundleStore -> Text -> FilePath -> IO (Maybe Text)
 loadSingleFile (BundleStore root) deployId relPath
+  | not (isSafeDeploymentId deployId) = pure Nothing
   | not (isSafeRelativePath relPath) = pure Nothing
   | otherwise = do
       let fullPath = root </> Text.unpack deployId </> "sources" </> relPath
@@ -275,19 +292,36 @@ isSafeRelativePath path =
     && ".." `notElem` components path
  where
   rooted = \case
-    c : _ | isSeparator' c -> True
+    c : _ | isSeparatorChar c -> True
     c : ':' : _ | isAlpha c -> True
     _ -> False
-  isSeparator' c = c == '/' || c == '\\'
-  components p = case break isSeparator' p of
+  components p = case break isSeparatorChar p of
     (a, []) -> [a]
     (a, _ : rest) -> a : components rest
+
+-- | A separator on either kind of host.
+isSeparatorChar :: Char -> Bool
+isSeparatorChar c = c == '/' || c == '\\'
+
+-- | Is this a deployment id that names one directory directly under the store?
+--
+-- The id arrives from outside as well (a URL segment, the @deployment@ argument
+-- of an MCP tool) and is joined to the store root, so it has the hazard of a file
+-- name: a rooted id, or one with a separator or @..@ in it, names a directory
+-- somewhere else. A safe id is a single plain path component: safe as a relative
+-- path, with no separator at all, and not @.@. An id that is not safe names no
+-- deployment, and the functions here treat it as they treat one that is missing.
+isSafeDeploymentId :: Text -> Bool
+isSafeDeploymentId deployId =
+  isSafeRelativePath path && not (any isSeparatorChar path) && path /= "."
+ where
+  path = Text.unpack deployId
 
 -- | List all .l4 source files in a deployment.
 listSourceFiles :: BundleStore -> Text -> IO [FilePath]
 listSourceFiles (BundleStore root) deployId = do
   let sourcesDir = root </> Text.unpack deployId </> "sources"
-  exists <- doesDirectoryExist sourcesDir
+  exists <- if isSafeDeploymentId deployId then doesDirectoryExist sourcesDir else pure False
   if not exists
     then pure []
     else listL4FilesRecursive sourcesDir sourcesDir

@@ -2598,6 +2598,54 @@ spec = describe "integration" do
             LBS.toStrict body `shouldSatisfy` BS.isInfixOf "File not found")
         `finally` removePathForcibly dir
 
+    it "a deployment id that is not a plain name reaches nothing outside the store" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-deployment-id-spec"
+      -- a deployment of its own, in a store this test owns, apart from the service's
+      outsideStore <- initStore dir
+      BundleStore.saveBundle outsideStore "outside"
+        (Map.singleton "planted.l4" "PLANTED-CONTENT-FOR-THE-DEPLOYMENT-ID-SPEC\n")
+        (BundleStore.StoredMetadata "v" "2026-01-01T00:00:00Z" Nothing Nothing Nothing)
+      -- its absolute path, as the MCP argument that names it
+      let outsideId = dir </> "outside"
+      (withPendingService "precomp-idguard" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+          let toolCall name arguments = do
+                let rpcBody = Aeson.object
+                      [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                      , "id" Aeson..= (1 :: Int)
+                      , "method" Aeson..= ("tools/call" :: Text)
+                      , "params" Aeson..= Aeson.object
+                          [ "name" Aeson..= (name :: Text)
+                          , "arguments" Aeson..= Aeson.object arguments
+                          ]
+                      ]
+                req <- buildJsonPost (baseUrl <> "/.mcp") rpcBody
+                LBS.toStrict . responseBody <$> httpLbs req mgr
+              readFileOf deployment path = toolCall "read_file"
+                [ "deployment" Aeson..= (deployment :: Text)
+                , "path" Aeson..= (path :: Text) ]
+              listFilesOf deployment = toolCall "list_files"
+                [ "deployment" Aeson..= (deployment :: Text) ]
+          -- the controls: the deployment's own id works
+          control <- readFileOf "precomp-idguard" "qualifies.l4"
+          control `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
+          controlList <- listFilesOf "precomp-idguard"
+          controlList `shouldSatisfy` ("qualifies.l4" `BS.isInfixOf`)
+          -- the absolute path of the other deployment names nothing
+          readFileOf (Text.pack outsideId) "planted.l4" >>= \body -> do
+            body `shouldSatisfy` (not . BS.isInfixOf "PLANTED-CONTENT")
+            body `shouldSatisfy` BS.isInfixOf "File not found"
+          -- (Two routes are not tried here. The raw .l4 route is a middleware of
+          -- defaultMain, not of app, so this harness cannot reach it. For an id
+          -- that names nothing, the file browser fails inside its handler, and
+          -- testWithApplication rethrows that into the test, so it fails for a
+          -- refused id as for an unknown one. Both routes end in functions that
+          -- BundleStoreSpec covers: loadSingleFile, as read_file does, and
+          -- loadBundle.)
+          listFilesOf (Text.pack outsideId) >>= \body ->
+            body `shouldSatisfy` (not . BS.isInfixOf "planted.l4"))
+        `finally` removePathForcibly dir
+
     it "GET /deployments/{id}/files rejects path traversal in file param" do
       withPendingService "precomp-traversal2" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         req <- parseRequest (baseUrl <> "/deployments/precomp-traversal2/files?file=../metadata.json")
