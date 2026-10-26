@@ -56,6 +56,11 @@ data Options = Options
   -- 2026-10-26), so the 256 MB a decision gets would refuse every append.
   -- The default is that measurement with room for a longer history and a
   -- larger contract (D-O10: sized by the first deployment).
+  , ledgerMcpWrite        :: !Bool
+  -- ^ Whether the ledger's MCP write tools exist (OPERATIONAL-LOWERING-SPEC
+  -- §9 WPO6, D-O13): one per act the caller's party may perform. Off by
+  -- default until D-O2 (who the caller is) and D-O11 are decided. With it
+  -- off no write tool is listed, and a call to one is an unknown tool.
   }
 
 -- | Build the CLI parser with environment variable defaults.
@@ -82,6 +87,7 @@ buildOpts = do
   envLedgerPg   <- lookupEnv "JL4_LEDGER_POSTGRES_URL"
   envLedgerNonDurable <- readEnvBool "JL4_LEDGER_ALLOW_NONDURABLE"
   envLedgerMem  <- readEnvInt "JL4_LEDGER_MAX_EVAL_MEMORY_MB"
+  envLedgerMcpWrite <- readEnvBool "JL4_LEDGER_MCP_WRITE"
 
   let parser = Options
         <$> option auto
@@ -230,6 +236,15 @@ buildOpts = do
                        "Maximum memory allocation per instance-ledger request in MB; one append \
                        \re-typechecks its contract (env: JL4_LEDGER_MAX_EVAL_MEMORY_MB)"
               )
+        <*> ( flag' True
+                ( long "ledger-mcp-write"
+                    <> help
+                         "Let an agent append to an instance ledger over MCP: one write tool per \
+                         \act the caller's party (the X-L4-Party header) may perform. Off by \
+                         \default until who the caller is has been decided (env: JL4_LEDGER_MCP_WRITE)"
+                )
+              <|> pure (maybe False id envLedgerMcpWrite)
+            )
 
   pure $ info
     (parser <**> helper)

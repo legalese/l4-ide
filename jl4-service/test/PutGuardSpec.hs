@@ -205,6 +205,7 @@ testOpts = Options
   , maxLadderNodes = 10000
   , ledgerStore = defaultLedgerStoreConfig
   , ledgerMaxEvalMemoryMb = 8192
+  , ledgerMcpWrite = False
   }
 
 withService :: (String -> Manager -> IO a) -> IO a

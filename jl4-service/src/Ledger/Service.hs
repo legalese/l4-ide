@@ -18,13 +18,15 @@ module Ledger.Service
   , withOpenedStore
   , instancesHeld
   , withLedgerSlot
+  , offersOfDeployment
   ) where
 
 import Control.Concurrent (getNumCapabilities)
-import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar)
+import Control.Concurrent.MVar (MVar, modifyMVar, modifyMVar_, newMVar, readMVar)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVar, writeTVar)
 import Control.Exception (SomeAsyncException, SomeException, displayException, finally, fromException, mask, throwIO, try)
 import Data.Text (Text)
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import System.Directory (doesFileExist)
@@ -32,7 +34,10 @@ import System.FilePath ((</>))
 
 import qualified L4.EvaluateLazy as Eval
 import L4.EvaluateLazy (EvalConfig)
+import L4.Ledger.Offer (Offers, offersFor)
+import L4.Ledger.Replay (Deployment (..))
 import L4.TracePolicy (apiDefaultPolicy)
+import EvalLimits (LimitHit (..), withThreadLimits)
 import Ledger.Store.Config (OpenedStore (..), ResolvedStore (..), openLedgerStore)
 import Ledger.Store.Sqlite (ledgerFileName)
 import Options (Options (..))
@@ -57,6 +62,16 @@ data LedgerService = MkLedgerService
     -- ^ held while an instance is created, and while a deployment is
     -- checked for instances and deleted, so that neither can slip between
     -- the other's check and its act within this process
+  , offerCache   :: !(MVar (Map.Map Text OfferEntry))
+    -- ^ the acts each deployment's source offers (WPO6), by deployment; see
+    -- 'offersOfDeployment'
+  }
+
+-- | A deployment's offers, with the source they were worked out from.
+data OfferEntry = MkOfferEntry
+  { source  :: !Text
+  , imports :: ![(Text, Text)]
+  , offers  :: !(Either Text Offers)
   }
 
 -- | The ledger for a service with these options, its store resolved but not
@@ -70,6 +85,7 @@ newLedgerService opts store clk = do
   free <- newTVarIO slots
   openedVar <- newMVar Nothing
   lock <- newMVar ()
+  offerVar <- newMVar Map.empty
   pure MkLedgerService
     { resolved = store
     , opened = openedVar
@@ -81,6 +97,7 @@ newLedgerService opts store clk = do
     , slotCount = slots
     , slotsFree = free
     , creationLock = lock
+    , offerCache = offerVar
     }
 
 -- | How many ledger requests evaluate at once: one per capability, and
@@ -154,6 +171,29 @@ withLedgerSlot ldg act = mask \ restore -> do
   if got
     then (Just <$> restore act) `finally` atomically (modifyTVar' ldg.slotsFree (+ 1))
     else pure Nothing
+
+-- | The acts a deployment's source offers to each party (WPO6, D-O13).
+--
+-- Reading them type-checks the source, which is as dear as the type check
+-- of an append, so it is done once per source and kept, one entry per
+-- deployment, replaced when the deployment's files change (the entry holds
+-- the source it was read from and is compared with it, so a redeploy under
+-- the same version name cannot leave a stale one). It runs in one of the
+-- ledger's slots, under its time and allocation limits. A source that
+-- does not type-check is cached and is a 'Left'; a slot that is not free or
+-- a limit that was hit is a 'Left' that is not cached.
+offersOfDeployment :: LedgerService -> Deployment -> IO (Either Text Offers)
+offersOfDeployment ldg dep = do
+  cache <- readMVar ldg.offerCache
+  case Map.lookup dep.deploymentId cache of
+    Just e | e.source == dep.deploymentSource && e.imports == dep.deploymentImports -> pure e.offers
+    _ -> withLedgerSlot ldg (withThreadLimits ldg.timeoutSec ldg.memoryMb (pure (offersFor dep))) >>= \ case
+      Nothing -> pure (Left ("all " <> Text.pack (show ldg.slotCount) <> " of the ledger's evaluation slots are taken; ask again"))
+      Just (Left (TimeLimitHit, _)) -> pure (Left ("reading the deployment's acts did not finish within the ledger's time limit of " <> Text.pack (show ldg.timeoutSec) <> " s"))
+      Just (Left (AllocationLimitHit, _)) -> pure (Left ("reading the deployment's acts allocated more than the ledger's limit of " <> Text.pack (show ldg.memoryMb) <> " MB"))
+      Just (Right (r, _)) -> do
+        modifyMVar_ ldg.offerCache (pure . Map.insert dep.deploymentId (MkOfferEntry dep.deploymentSource dep.deploymentImports r))
+        pure r
 
 -- | 'try' for the exceptions an action raises itself: an asynchronous one,
 -- a time limit or a kill aimed at the thread, goes on up, so that catching

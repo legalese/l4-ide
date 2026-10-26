@@ -108,6 +108,7 @@ defaultMain = do
     , ("evalTimeout", toJSON options.evalTimeout)
     , ("compileTimeout", toJSON options.compileTimeout)
     , ("ledgerMaxEvalMemoryMb", toJSON options.ledgerMaxEvalMemoryMb)
+    , ("ledgerMcpWrite", toJSON options.ledgerMcpWrite)
     ]
 
   -- A deployment's IMPORTs resolve against its own files and the stdlib built
@@ -290,7 +291,10 @@ extractVisibility req =
       includeEvaluate = case lookup "X-Include-Evaluate" headers of
         Just "false" -> False
         _ -> True
-  in Visibility { showFunctions = includeFunctions, showFiles = includeFiles, showEvaluate = includeEvaluate }
+      party = case Text.strip . Text.Encoding.decodeUtf8Lenient <$> lookup "X-L4-Party" headers of
+        Just p | not (Text.null p) -> Just p
+        _ -> Nothing
+  in Visibility { showFunctions = includeFunctions, showFiles = includeFiles, showEvaluate = includeEvaluate, callerParty = party }
 
 -- | GET /health — health check handler.
 healthHandler :: ServerT HealthApi AppM

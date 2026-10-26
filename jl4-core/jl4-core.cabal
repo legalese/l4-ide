@@ -151,6 +151,7 @@ library
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
     L4.Ledger.Append
+    L4.Ledger.Offer
     L4.Ledger.Replay
     L4.Ledger.Row
     L4.Ledger.Store
