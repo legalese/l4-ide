@@ -1,7 +1,7 @@
 # Regulative Lowering: an explicit transition system from the evaluator, then the backends
 
 **Status:** Proposal, written 2026-10-25. **On this branch only WP0 of §8, the dinner fixtures, is built; none of it has landed.**
-The branch is `mengwong/lowering-ledger`, which lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`047311f36`, fetched 2026-10-26) holds none of its files.
+The branch is `mengwong/lowering-ledger`, which lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`63254397f`, fetched 2026-10-26) holds none of its files.
 No explorer, no emitter and no harness is in this tree; WP1 to WP6 are built on the other local branch, `mengwong/lowering-explore`, which is not this one.
 Checked 2026-10-26 at `420bb6258`: the seven fixtures of `jl4/examples/explore/brief/` (`properties.l4`, the three designs, the two mutants and `refused-number.l4`) each exit 0 under `l4 run` with an `l4` built from this tree.
 Their state counts and property verdicts are checked only on the explore branch, by the harness of WP4.

@@ -1,15 +1,16 @@
 # Operational lowering: an L4 contract instance as an event ledger with conditional append
 
 Status: proposed, 2026-10-25. On this branch (`mengwong/lowering-ledger`) the work packages WPO0 to WPO5 of §9 are built and committed, and none of it has landed.
-The branch lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`047311f36`, fetched 2026-10-26) holds none of its files.
+The branch lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`63254397f`, fetched 2026-10-26) holds none of its files.
 Checked 2026-10-26 at `420bb6258`: `jl4-core-test` 1578 examples, 0 failures (13 pending); `l4-cli-test` 628 examples, 0 failures (83 pending); `jl4-service-test` 717 examples, 0 failures; and the nine fixtures under `jl4/examples/explore/` (`brief/` and `ledger/`) each exit 0 under `l4 run`.
 Also run, against the service built at that commit: an HTTP probe of create, append, position, restart and the refusal of a delete.
 The code of `5af3d0d9b` differs from `420bb6258` only in two comments, which compile, so the suites were not run again; `doc/test-docs.sh` was run at `5af3d0d9b` and has 0 errors.
 The tick-listing change was checked on `fcd265faf` with the change applied, before it was committed (it is the next commit on this branch): `jl4-core-test` 1581 examples, 0 failures (13 pending); `jl4-service-test` 719 examples, 0 failures; `l4-cli-test` 628 examples, 0 failures (83 pending); and `doc/test-docs.sh` 0 errors.
 It adds five tests, and four of them (the refusal and lost-race tests in the library, the HTTP test and the MCP test) were each shown to fail when the code they test is made to drop the ticks again; the strict-conflict test was not.
 The HTTP probe above was not repeated after the change.
-Not run: the rest of `etc/verify-branch.sh` (the `jl4-test` goldens and the other suites), the Nix build and CI.
-The gate's prettier step fails on this branch's spec files, which are not formatted with prettier 3.4.2; the same step failed in CI on draft PR #746 on 2026-10-26.
+Not run: `jl4-test` (the goldens, about 12 minutes), the suites and harnesses that `etc/verify-branch.sh` does not run (`jl4-lsp-test`, `jl4-mlir-test`, `jl4-websessions-test`, `jl4-proleg-burden`, `jl4-proleg-roundtrip`, the DMN harnesses, the go selftest, WASM, TypeScript), the Nix build and CI on this branch.
+After merging the pushed formatting fix `d8cda38fa` (draft PR #746 passed CI at that commit, Repo-Wide Invariants and TypeScript Checks included, 2026-10-26), `etc/verify-branch.sh --quick` passed at `86b890407`: `cabal build all`, `l4-cli-test` 628 examples, `jl4-core-test` 1581, `jl4-service-test` 719, the service restart probe, the corpus-golden and canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 and the commit trailers.
+A pass of that script is not a green CI.
 Not run: the Postgres adapter against a server (this machine has no `postgres` binary and no container runtime answering), and §8's item on the checkers' counterexamples, which needs the explorer's output and the explorer is on the other local branch, `mengwong/lowering-explore`.
 Not built: the Redis, Zookeeper and etcd adapters, which `jl4-service/src/Ledger/Store/Config.hs` refuses by name.
 The ledger had a silent failure, reproduced on the running service on 2026-10-26: a `refused`, `conflict` or `unknown` reply could follow tick rows that it did not list.
