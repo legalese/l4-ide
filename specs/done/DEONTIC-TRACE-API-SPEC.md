@@ -717,7 +717,7 @@ Meng, verbatim: "i'd be in favour of fixing the PROVISION synonym as well. shoul
 
 **Ruled:**
 
-1. Every surface asks the type-based flag (`Function.isDeontic`, and `fsIsDeontic` on the summary the metadata cache holds): `/evaluation`, `tools/list`, `tools/call`, the MCP task path, batch and the explorer.
+1. Every surface asks the type-based flag (`Function.isDeontic`, and `fsIsDeontic` on the summary the metadata cache holds): `/evaluation`, `tools/list`, `tools/call`, the MCP task path, batch, the explorer and the WebMCP page.
 2. A function that is not `DEONTIC` and has inputs named `startTime` and `events` is an ordinary function.
    This is a behaviour change: `/evaluation` used to take it for a `DEONTIC` one, because it read the parameter names, and asked it for a trace.
 
