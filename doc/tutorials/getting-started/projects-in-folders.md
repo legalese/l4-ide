@@ -499,7 +499,7 @@ They are listed so that you find them here and not in a failed deployment.
 
 - **The editor does not notice a changed `l4-project.json`.**
   If you add, remove or edit the project file while a file that imports from the root or by alias is open, that file keeps the answer it found until you type a change in it, such as a new line at its end.
-  Saving the file, closing and reopening it, and editing a different file did not make the editor's checker (the language server) look again when this was measured with a scripted client on 2026-10-26; VS Code itself was not tried.
+  The reference records that saving the file, closing and reopening it, and editing a different file did not make the editor's checker (the language server) look again when this was measured with a scripted client on 2026-10-26; VS Code itself was not tried.
   `l4 check` on the command line always looks afresh.
 - **A project that uses `/` or `@` cannot be deployed through the deploy tools yet.**
   A deployed project is a bundle of files.
