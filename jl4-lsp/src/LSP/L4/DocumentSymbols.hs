@@ -221,10 +221,10 @@ localDeclToSymbol moduleNuri subst entInfo parentRange = \case
       Just rng ->
         let lspRange = srcRangeToLspRange (Just rng)
             selRange = nameSelRange n
-            -- entityInfo has no type for a rule local to another (measured on one
-            -- with a GIVEN and a GIVETH: no detail comes out), so in practice this
-            -- decides by the body alone. The question is the one asked above, and
-            -- it uses the type whenever entityInfo has one.
+            -- entityInfo gave no type to the one local rule measured, which had a
+            -- GIVEN and a GIVETH (no detail comes out), so for a local rule like
+            -- that this decides by the body alone. The question is the one asked
+            -- above, and it uses the type whenever entityInfo has one.
             retTy = inferredReturnTy moduleNuri subst entInfo n
             detail = prettyLayout <$> retTy
             kind = functionSymbolKind (isRegulativeBody localBody) retTy
