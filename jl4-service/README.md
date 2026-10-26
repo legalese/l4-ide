@@ -632,8 +632,8 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
-- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result.
-- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
+- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result. An `arguments` that is not one of the function's inputs is left out, and one that is, is read as an input.
+- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)). A function with an input of its own called `arguments` takes its inputs nested as the schema lists them, `{"arguments": {"arguments": ...}}`; a call that sends them flat loses that input (a known limit, read from the code and not run).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 
