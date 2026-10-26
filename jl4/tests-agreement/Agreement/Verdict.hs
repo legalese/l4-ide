@@ -11,8 +11,10 @@ module Agreement.Verdict
   , agrees
   , expectAgrees
   , refusalText
+  , refusalHeading
   , seenOfPretty
   , replReply
+  , replRefusalPrefix
   , PlanSeen (..)
   , firstLine
   , hasNull
@@ -153,11 +155,15 @@ hasNull = \case
 refusalText :: Int -> T.Text -> Maybe T.Text
 refusalText indent t = case T.lines t of
   h : rest
-    | T.strip h == "The model refuses to answer:" ->
+    | T.strip h == refusalHeading ->
         Just (T.intercalate "\n" (map (T.drop (indent + 2)) (dropTrailingBlank rest)))
   _ -> Nothing
  where
   dropTrailingBlank = reverse . dropWhile (T.null . T.strip) . reverse
+
+-- | The line above a refusal's reason, as core prints a refusal.
+refusalHeading :: T.Text
+refusalHeading = "The model refuses to answer:"
 
 -- | A directive's result as core prints it: a refusal, a holding assertion,
 -- an error (when the surface says the evaluation failed), or an answer.
@@ -185,9 +191,13 @@ data PlanSeen
 -- the answer's text.
 replReply :: T.Text -> Seen
 replReply t
-  | Just r <- T.stripPrefix "Refused: " t =
+  | Just r <- T.stripPrefix replRefusalPrefix t =
       SeenRefused (T.intercalate "\n" (case T.lines r of
-        l : ls -> l : map (T.drop (T.length "Refused: ")) ls
+        l : ls -> l : map (T.drop (T.length replRefusalPrefix)) ls
         [] -> []))
   | Just e <- T.stripPrefix "Error: " t = SeenRaised e
   | otherwise = SeenText t
+
+-- | What the REPL prints before a refusal's reason.
+replRefusalPrefix :: T.Text
+replRefusalPrefix = "Refused: "

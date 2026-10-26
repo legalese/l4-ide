@@ -29,7 +29,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
-import System.Directory (canonicalizePath, createDirectoryIfMissing, doesDirectoryExist)
+import System.Directory (canonicalizePath, createDirectoryIfMissing, doesDirectoryExist, doesFileExist)
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
@@ -37,6 +37,7 @@ import Test.Hspec
 import L4.Refusal (declineMessage)
 
 import Agreement.Corpus
+import Agreement.Page
 import Agreement.Process (locateBinary)
 import Agreement.Registry
 import Agreement.Runners
@@ -283,6 +284,55 @@ spec bins root helpers headerErrors preps = do
     it "lists, in each row that sends to another list, a list that the registry has" do
       let titles = map (.title) fams
       [t | fam <- fams, (_, Listed t) <- fam.table, t `notElem` titles] `shouldBe` []
+
+  -- The reference page for REFUSE says, in one table, what each surface
+  -- shows for a refusal. Each surface's row is named in Agreement.Page.
+  describe "the reference page for REFUSE" do
+    let readRoot p = do
+          let f = root </> p
+          found <- doesFileExist f
+          unless found (expectationFailure ("there is no " <> p))
+          TE.decodeUtf8 <$> BS.readFile f
+        pageRows = concat . pageTables <$> readRoot pagePath
+        rowsOf rows s = [r | r@(c : _) <- rows, c == pageRow s]
+        quotedIn rows s q = any (any (q `T.isInfixOf`)) (rowsOf rows s)
+
+    it "has one table, with a row for each surface and no row for anything else" do
+      tables <- pageTables <$> readRoot pagePath
+      length tables `shouldBe` 1
+      let firsts = [c | r <- concat tables, c : _ <- [r]]
+          named = Set.toList (Set.fromList (map pageRow allSurfaces))
+      (named \\ firsts, firsts \\ named) `shouldBe` ([], [])
+
+    it "reads, in every row, a refusal and its reason, and no error" do
+      rows <- pageRows
+      let says w r = w `T.isInfixOf` T.toLower (T.unwords r)
+      [r | r <- rows, not (says "refus" r) || not (says "reason" r) || says "error" r] `shouldBe` []
+
+    it "quotes, in the row of each surface that prints a refusal as text, the text this test reads it by" do
+      rows <- pageRows
+      [ (surfaceName s, q)
+        | s@(Eval _) <- allSurfaces
+        , Just q <- [pageQuote "" s]
+        , not (quotedIn rows s q)
+        ]
+        `shouldBe` []
+
+    it "quotes, in the row of the query plan, the decline core gives the example's rule" do
+      rows <- pageRows
+      exampleSource <- readRoot examplePath
+      core <- runCore [] "refuse-example" exampleSource
+      decline <- case core of
+        Left e -> fail ("core does not check the example: " <> show e)
+        Right c -> case Map.lookup exampleRule c.rulesByName >>= (.decline) of
+          Nothing -> fail ("core does not decline the example's rule " <> T.unpack exampleRule)
+          Just d -> pure (declineMessage d)
+      [ (surfaceName s, q)
+        | s@(Plan _) <- allSurfaces
+        , Just q <- [pageQuote decline s]
+        , not (quotedIn rows s q)
+        ]
+        `shouldBe` []
 
 needCore :: Prep -> IO CoreRun
 needCore p = either (\e -> fail ("core does not check the subject with its calls: " <> show e)) pure p.evalCore

@@ -217,6 +217,83 @@ spec = describe "REFUSE" $ do
       length outs `shouldBe` 2
       for_ outs (refusesWith "not written yet")
 
+    -- Under IMPORT daydate, PLUS adds numbers and dates, so the type checker
+    -- must know the type of a refusal given to it. A GIVETH A NUMBER on the
+    -- named refusal settles it, and so does one on a rule whose answer is the
+    -- sum, and what the sum is used for: TIMES, or a function whose input is a
+    -- NUMBER. Brackets do not, a refusal declared for any type does not
+    -- either, and the rule's GIVETH does not reach two such sums compared in
+    -- its IF's condition. The error is the operator's: a term ASSUMEd for any
+    -- type gets the same one.
+    describe "as an operand of PLUS under IMPORT daydate, which adds numbers and dates" $ do
+      let reason = "not written yet"
+          anyType =
+            [ "GIVEN a IS A TYPE"
+            , "GIVETH AN a"
+            , "`not written yet` MEANS REFUSE \"not written yet\""
+            ]
+          aNumber =
+            [ "GIVETH A NUMBER"
+            , "`not written yet` MEANS REFUSE \"not written yet\""
+            ]
+          assumed =
+            [ "GIVEN a IS A TYPE"
+            , "GIVETH AN a"
+            , "ASSUME `not written yet` IS AN a"
+            ]
+          bare = "1 PLUS REFUSE \"not written yet\""
+          bracketed = "1 PLUS (REFUSE \"not written yet\")"
+          named = "1 PLUS `not written yet`"
+          positive =
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`is positive` n MEANS n > 0"
+            ]
+          daydate decls giveth expr = Text.unlines $
+            ["IMPORT daydate", ""] <> decls <> [""] <> giveth <> ["`the deposit` MEANS " <> expr, "", "#EVAL `the deposit`"]
+          checksAndRefuses src = do
+            case frontEnd src of
+              Left msg -> expectationFailure ("the module did not check:\n" <> Text.unpack msg)
+              Right _ -> pure ()
+            out <- l4Eval src
+            out `shouldSatisfy` Text.isInfixOf "The model refuses to answer:"
+            out `shouldSatisfy` Text.isInfixOf reason
+          isAmbiguous src = case frontEnd src of
+            Left msg -> msg `shouldSatisfy` Text.isInfixOf "There are multiple definitions for the identifier"
+            Right _ -> expectationFailure "the module checked"
+      for_
+        [ ("a bare REFUSE", [], bare)
+        , ("a bracketed REFUSE", [], bracketed)
+        , ("a refusal declared for any type", anyType, named)
+        , ("a refusal declared for a NUMBER", aNumber, named)
+        ] $ \(what, decls, expr) ->
+        it ("takes " <> what <> " in a rule with GIVETH A NUMBER, and refuses") $
+          checksAndRefuses (daydate decls ["GIVETH A NUMBER"] expr)
+      it "takes a refusal declared for a NUMBER in a rule with no GIVETH, and refuses" $
+        checksAndRefuses (daydate aNumber [] named)
+      for_
+        [ ("a bare REFUSE", [], bare)
+        , ("a bracketed REFUSE", [], bracketed)
+        , ("a refusal declared for any type", anyType, named)
+        ] $ \(what, decls, expr) -> do
+        it ("takes " <> what <> " in a sum multiplied with TIMES, in a rule with no GIVETH, and refuses") $
+          checksAndRefuses (daydate decls [] ("(" <> expr <> ") TIMES 2"))
+        it ("takes " <> what <> " in a sum passed to a function whose input is a NUMBER, in a rule with no GIVETH, and refuses") $
+          checksAndRefuses (daydate (decls <> [""] <> positive) [] ("`is positive` (" <> expr <> ")"))
+      for_
+        [ ("a bare REFUSE", [], bare)
+        , ("a bracketed REFUSE", [], bracketed)
+        , ("a refusal declared for any type", anyType, named)
+        , ("a term ASSUMEd for any type", assumed, named)
+        ] $ \(what, decls, expr) ->
+        it ("reports multiple definitions for " <> what <> " in a rule with no GIVETH") $
+          isAmbiguous (daydate decls [] expr)
+      let compared expr = "IF (" <> expr <> ") EQUALS (" <> expr <> ") THEN 1 ELSE 2"
+      it "takes a refusal declared for a NUMBER in sums compared in an IF's condition, in a rule with GIVETH A NUMBER, and refuses" $
+        checksAndRefuses (daydate aNumber ["GIVETH A NUMBER"] (compared named))
+      it "reports multiple definitions for a bare REFUSE in sums compared in an IF's condition, in a rule with GIVETH A NUMBER" $
+        isAmbiguous (daydate [] ["GIVETH A NUMBER"] (compared bare))
+
     it "has any type: an IF branch and a CONSIDER arm" $ do
       branch <- evalOne (ruleOfType "A NUMBER" "IF TRUE THEN REFUSE \"branch\" ELSE 1")
       refusesWith "branch" branch

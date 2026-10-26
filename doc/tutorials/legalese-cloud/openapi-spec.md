@@ -60,12 +60,13 @@ What `value` holds depends on what the rule gives back:
 | one of a list of choices, such as `` `under review` `` | the name as a string, without backticks: `"under review"`                                                                   |
 | a record, such as a `Pair` of `left` and `right side`  | an object with one key, the record's name, holding its fields: `{"Pair": {"left": 5, "right side": 6}}`                     |
 
-Four things to know:
+Five things to know:
 
 - Field names inside an answer are spelled as the rule spells them, spaces included; they are not turned into hyphens.
 - A rule that gives back a `MAYBE` of a `MAYBE` answers `null` both for `NOTHING` and for `JUST NOTHING`, so the two cannot be told apart.
 - Each rule's description includes a `returnSchema` for its answer. It does not show the record's name around a record's fields, or that a `MAYBE` answer can be `null`; go by the table above for those two.
 - A long list can come back cut short. A list answer of around 200 items or more may end with two `null`s in place of the rest, still with status 200, so two `null`s at the end of a long list mean it was cut, not that items were empty.
+- A rule can decline to answer, with a reason its author wrote ([REFUSE](../../reference/control-flow/REFUSE.md)). The call then has no `value`: it answers with status 422 and `{"contents": {"kind": "refused", "reason": "…"}, "tag": "Error"}`. Tell it from an error by `"kind": "refused"`.
 
 ## Ask only the questions that matter
 
@@ -77,6 +78,8 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/ca
   -H "Content-Type: application/json" \
   -d '{"arguments": {"applicant": {"is-existing-customer": true}}}'
 ```
+
+A rule that may decline to answer has no query plan: the endpoint answers with status 400, `"kind": "declined"`, and the reasons the rule may decline with ([The query plan](../../reference/control-flow/REFUSE.md#the-query-plan)).
 
 ## Generate a client from the OpenAPI document
 

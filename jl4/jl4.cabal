@@ -150,6 +150,7 @@ test-suite l4-agreement-test
     Agreement.Cli
     Agreement.Corpus
     Agreement.Lsp
+    Agreement.Page
     Agreement.Process
     Agreement.Registry
     Agreement.Runners

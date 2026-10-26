@@ -5,6 +5,7 @@ module Agreement.Cli
   , runBatch
   , parseDotRoots
   , dotRoot
+  , traceRefusalPrefix
   , traceAsciiReply
   , lineOfLocation
   ) where
@@ -122,9 +123,13 @@ dotRoot label =
    in (call, seenOfOutcome outcome)
  where
   seenOfOutcome o
-    | Just r <- T.stripPrefix "↯ refused: " o = SeenRefused r
+    | Just r <- T.stripPrefix traceRefusalPrefix o = SeenRefused r
     | o == "<error>" = SeenRaised ""
     | otherwise = SeenText o
+
+-- | What a trace prints before a refusal's reason, at the step that refuses.
+traceRefusalPrefix :: T.Text
+traceRefusalPrefix = "↯ refused: "
 
 unescape :: T.Text -> T.Text
 unescape = T.pack . go . T.unpack

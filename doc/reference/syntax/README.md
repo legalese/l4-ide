@@ -466,19 +466,21 @@ How to deploy: [Deploy your rules](../../tutorials/deploying-rules/exporting-rul
 
 Directives are instructions to the tools, written at the top level of a file. `l4 run` and the editor carry them out; `l4 check` only type-checks them.
 
-| Directive    | What it does                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| `#EVAL`      | evaluates an expression and shows the result                                                      |
-| `#EVALTRACE` | evaluates an expression and also shows the steps that led to the result (`l4 trace` draws them)   |
-| `#CHECK`     | type-checks an expression and shows its type, without evaluating it                               |
-| `#ASSERT`    | evaluates an expression and reports whether it is TRUE ([what it reports](#what-assert-reports))  |
-| `#TRACE`     | runs a regulative rule against a list of events (see [Regulative rules](../regulative/README.md)) |
+| Directive         | What it does                                                                                                                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#EVAL`           | evaluates an expression and shows the result                                                                                                                                             |
+| `#EVALTRACE`      | evaluates an expression and also shows the steps that led to the result (`l4 trace` draws them)                                                                                          |
+| `#CHECK`          | type-checks an expression and shows its type, without evaluating it                                                                                                                      |
+| `#ASSERT`         | evaluates an expression and reports whether it is TRUE ([what it reports](#what-assert-reports))                                                                                         |
+| `#ASSERT REFUSED` | evaluates an expression and reports whether it refuses to answer, with the reason after `BECAUSE` if there is one ([REFUSE](../control-flow/REFUSE.md#testing-a-refusal-assert-refused)) |
+| `#TRACE`          | runs a regulative rule against a list of events (see [Regulative rules](../regulative/README.md))                                                                                        |
 
 ```text
 #EVAL expression
 #EVALTRACE expression
 #CHECK expression
 #ASSERT expression
+#ASSERT REFUSED expression BECAUSE "reason"
 #TRACE rule AT start-time WITH
   PARTY party DOES action AT time
 ```
@@ -515,6 +517,8 @@ An assertion that cannot be evaluated is not a verdict, so `#ASSERT P` and `#ASS
 [Testing your rules](../../tutorials/getting-started/testing-your-rules.md#what-an-error-looks-like) shows an example.
 
 A refused assertion is not a verdict either, and `l4 run` still exits `0`, so a CI job that looks for failures looks for `assertion refused` as well as `assertion failed`.
+
+To assert that an expression refuses, use `#ASSERT REFUSED`; [Testing a refusal](../control-flow/REFUSE.md#testing-a-refusal-assert-refused) lists what it reports.
 
 ## Sections
 
