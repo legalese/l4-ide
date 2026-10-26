@@ -2,85 +2,79 @@
 
 > _Status (2026-10-26): **proposed, not landed.**
 > This page describes what the `l4 deploy` command and the VS Code **Deploy** button do in draft pull request [legalese/l4-ide#749](https://github.com/legalese/l4-ide/pull/749).
-> That pull request is open and not merged.
-> It becomes true when #749 merges and a release carries it, and when the service you deploy to is a build that contains the service change in the same pull request (see [If the service is too old](#if-the-service-is-too-old)).
-> Until then, `l4 deploy` and the **Deploy** button send every file under its plain file name and keep no folders.
-> Every message from `l4` on this page was copied from a run of an `l4` whose code is the code of commit `8c6759479` of that pull request, on macOS.
+> A pull request is a proposed change to the program that people review before it is merged into the program; a draft one is not yet ready.
+> This one is open and not merged, and no release of `l4` or of the VS Code extension carries it.
+> This page calls an `l4` made from it **this build**.
+> Until a release carries the change, `l4 deploy` and the **Deploy** button send every file under its plain file name and keep no folders.
+> The page becomes true when #749 merges and a release carries it, and when the service you deploy to is a build that has the service change in the same pull request (see [If the service is too old](#if-the-service-is-too-old)).
+> Every message from `l4` below was copied from a run, on macOS, of an `l4` whose code is the code of commit `8c6759479` of that pull request, except where the text says it is from an older build.
 > Nothing was run on Windows, and the VS Code extension was not opened.
 > [How this page was checked](#how-this-page-was-checked) says what was run and what was only read.
 > When the draft pull requests #748 or #751 (see [What does not work yet](#what-does-not-work-yet)) land, that list and cases 2 and 4 below need rewriting._
 
 When you **deploy** a rule, you put a copy of it on a server, so that other programs and AI agents can ask it questions.
 `l4 deploy` and the VS Code **Deploy** button do this the same way.
-They pack files into one upload, a single file called a **zip file** (the kind you may have attached to an email), and send it.
+They pack the file you deploy and the files it imports, directly or through other files, into one upload, a single file called a **zip file** (the kind you may have attached to an email), and send it.
 The service on the server unpacks it, reads the rules, and starts answering.
-
-The upload holds the file you deploy and the files it imports, directly or through other files.
-It holds nothing else.
-Your other rules and your notes are not sent, and neither are the standard libraries (`prelude`, `daydate` and the others), which the service already has built in.
+Nothing else is sent: not your other rules, not your notes, and not the standard libraries (`prelude`, `daydate` and the others), which the service already has built in.
 
 This page is for the moment you split a project into folders.
 It answers three questions: which files are sent, what they are called in the upload, and what stops `l4` from sending them.
 
-In short:
-
-- The upload keeps your folders.
-  A file is named by its path below the folder that all the sent files share, with `/` between the parts, so files that all sit in one folder get plain names.
-- The service looks for an imported file in two places only: beside the file that imports it, and at the top of the upload.
-  Before it sends anything, `l4` checks that every imported file is in one of those two places, and refuses when one is not.
-- So a file that two rules in different folders both need goes in the top folder of the project, and not in a folder of its own.
-  A rule cannot import a file that sits in another rule's folder.
-- When `l4` refuses, nothing has been sent, so nothing has changed on the service.
-- `l4 deploy` takes one file.
-  A project with two rules to publish is two commands and two deployments, each with its own address.
-- The service has to be new enough.
-  If it is not, a deploy can say it worked and every call can then fail.
-
 ---
 
-## Before you start
+## Read this first
 
-Read this part before you build any folders.
-It collects what a first-time reader of this page most often gets wrong.
+In this build the upload keeps your folders: a file is named in it by its path below the folder that all the sent files share, with `/` between the parts.
+The service finds an imported file in two places only, beside the file that imports it and at the top of the upload, and `l4` refuses before it sends when a file would be somewhere else.
+`l4 deploy` takes one file, so two rules to publish are two commands and two deployments, each with its own address.
+The service has to be new enough too, or a deploy can say it worked and every call can then fail.
 
 ### What this build cannot do
 
-For each of these there is nothing to type: the feature is not in the build this page describes.
+For each of these there is nothing to type: the feature is not in this build.
 
 - **A file in one folder cannot import a file in another folder.**
-  The way round is to move the shared file to the top folder of the project, which both can reach.
-  [Step 2](#step-2-move-the-shared-figure-to-the-top) does that, and [When one rule needs a file from the other rule's folder](#when-one-rule-needs-a-file-from-the-other-rules-folder) shows what `l4` says if you try.
-- **An `IMPORT` cannot take a path** such as `` `../terms` ``, and **cannot start from the top folder** with a name such as `` `/terms` ``.
-  Two draft pull requests ([#748](https://github.com/legalese/l4-ide/pull/748) and [#751](https://github.com/legalese/l4-ide/pull/751)) propose them.
-  This build reads a name with a slash in it, written between backticks, as its last part alone, and says nothing: see [What does not work yet](#what-does-not-work-yet).
-- **There are no aliases.**
-  In the draft pull request that proposes them (#751), an alias is a short name for a folder.
+  Here, the `fees` rule cannot use a figure that sits in the `deadlines` folder, nor the other way round.
+  The way round is to move the figure to the top folder, which both can reach: [Step 2](#step-2-move-the-shared-figure-to-the-top) does that, and [case 2](#2-a-file-kept-in-a-folder-where-the-service-does-not-look) shows what `l4` says if you try.
+- **An `IMPORT` cannot take a path** such as `` `../terms` ``, cannot start from the top folder with a name such as `` `/terms` ``, and has no alias, which would be a short name for a folder.
+  Worse, a name with a slash in it, written between backticks, looks as if it worked: this build reads it as its last part alone and says nothing.
   `IMPORT rates AS r` is not an alias: this build stops at it with `unexpected AS`.
+  The draft pull requests [#748](https://github.com/legalese/l4-ide/pull/748) and [#751](https://github.com/legalese/l4-ide/pull/751) propose paths, the root form and aliases, and the page "Split a project into folders" in #751 (not in this documentation) teaches how they are written.
+- **If the file you deploy says `IMPORT prelude`, a file at the top is a problem.**
+  A file at the top is found only while the setting `JL4_LIBRARY_PATH` is on (Step 2 explains it), and while it is on, `l4` stops reading its built-in standard libraries, so `l4 deploy` stops at the `IMPORT prelude`.
+  Before you build folders, look in your files for an `IMPORT` of a standard library (`prelude`, `daydate` and the others; only `prelude` was tried), and read the second bullet of [What does not work yet](#what-does-not-work-yet), which has the one way round that was tried.
+- **There is no list of the names without sending.**
+  `l4` prints the list only when it is about to send; [Step 0](#step-0-practise-without-sending-anything) says what you can do instead.
 
-### Three rules for the folders
+### Do you have the change?
+
+`l4 --version` cannot tell you: this build and an older build made from `unstable` both print `dev`.
+Two things can, both in Step 2: the "Deploying" line, which shows the folders only on this build, and a one-command test that sends nothing.
+If the answer is no, keep each rule's files in one folder, as Step 1 does: an older build deployed that shape to an older service, and the rule answered 40 (run on 2026-10-26).
+No release carries the change, so an `l4` from a release, including the one the VS Code extension offers to put on your computer, does not have it.
+To get this build you build `l4` from the branch of pull request #749; [Using the l4 CLI](../getting-started/l4-cli.md#option-b-build-from-source) explains building from source, and this page can say no more.
+
+### Four rules for the folders
 
 1. **A file that two rules share goes in the top folder**, the folder that holds the rule folders.
-   Do not put it in a folder of its own, whatever you call that folder (`common`, `shared`, `lib`): the service does not look there, and [case 2](#2-a-shared-file-in-a-folder-where-the-service-does-not-look) is what `l4` says when you do.
+   Do not put it in a folder of its own, whatever you call that folder (`common`, `precedents`, `lib`): the service does not look there, and [case 2](#2-a-file-kept-in-a-folder-where-the-service-does-not-look) is what `l4` says when you do.
 2. **A file that only one rule uses goes beside that rule.**
    Giving each rule its own folder, as Alex does below, is a choice and not a requirement.
    The only requirement is where an imported file sits: beside the file that imports it, or in the top folder.
 3. **Name the folders that hold imported files with only the letters A to Z (no accents), digits, `.`, `-` and `_`.**
    A folder called `late fees`, with a space, or `Fristen (2024)`, with brackets, is refused ([case 3](#3-a-folder-name-the-service-cannot-read)).
    The name of the top folder itself is not judged: a project kept in a folder called `Smith v Jones (2024)` deployed without complaint.
+4. **Give every file a name of its own.**
+   In particular, do not put a second `rates.l4` at the top when another sits in `fees`: `l4` takes the one at the top and says nothing ([case 4](#4-two-files-with-one-name)).
 
-### Telling whether your tools have the change
+### Words this page uses for folders
 
-This page is about a change that has not landed, so the first thing to know is whether the `l4` on your computer has it.
-`l4 --version` cannot tell you: the build this page was checked with and an older build made from `unstable` both print `dev`.
-The "Deploying" line can.
-With the project of [Step 2](#step-2-move-the-shared-figure-to-the-top), an `l4` that has the change prints `fees/late-fee.l4, fees/rates.l4, terms.l4`, with the folder.
-An `l4` made from `unstable` before this pull request printed `late-fee.l4, rates.l4, terms.l4`, with no folder, when it was run with `JL4_LIBRARY_PATH` set, as in Step 2; without the setting it stops at `terms`, as Step 2 shows.
-The service you deploy to is a separate question, and [If the service is too old](#if-the-service-is-too-old) has a test that needs nobody's answer.
-
-### Windows
-
-Nothing on this page was run on Windows.
-[Windows](#windows) says what was only read, and [Step 2](#step-2-move-the-shared-figure-to-the-top) gives the PowerShell and Command Prompt lines for setting the one setting this page needs, marked as not tried with `l4`.
+- **The top folder** is the folder that holds the rule folders, here `folders-example`, and the folder you run `l4` from.
+  `l4`'s own messages call it "the project folder" ([case 1](#1-a-file-outside-the-project-folder) gives its exact meaning), and the VS Code messages call it "the project root", which there is the workspace folder that holds the file.
+- **The top of the upload** is the folder that all the sent files share, where the service looks for a file that is not beside its importer.
+  It is not always the top folder: in Step 1 it is `fees`, and from Step 2 on it is the top folder.
+- **A rule folder** is a folder with a rule in it and the files beside that rule, such as `fees`.
 
 ---
 
@@ -91,25 +85,30 @@ One works out the fee for a late invoice.
 The other works out the last day a customer can pay without a fee.
 Each rule has its own folder, with a helper file beside it.
 Both rules quote the same grace period, 14 days, so Alex also keeps a file at the top, `terms.l4`, for figures the rules share.
-Nothing imports it yet; Step 2 below makes use of it.
 
 ```
-folders-example/
-  terms.l4
-  fees/
-    late-fee.l4
-    rates.l4
-  deadlines/
-    payment-deadline.l4
-    grace.l4
+folders-example/          the top folder
+  terms.l4                a figure both rules use
+  fees/                   a rule folder
+    late-fee.l4           the file to deploy
+    rates.l4              its helper
+  deadlines/              a rule folder
+    payment-deadline.l4   the file to deploy
+    grace.l4              its helper
 ```
 
 The five files are printed in full below.
-To follow along, save each one under the name in its first line, in the folders shown above.
+To follow along, save each one under the name in its first line, in the folders shown above; a file name must end in `.l4`.
+The first line of each listing is a comment, a line that starts with `--`, which L4 skips; save it with the rest of the file.
 The same files are in the documentation source, in a folder called `folders-example` beside this page, one link each: [terms.l4](folders-example/terms.l4), [fees/late-fee.l4](folders-example/fees/late-fee.l4), [fees/rates.l4](folders-example/fees/rates.l4), [deadlines/payment-deadline.l4](folders-example/deadlines/payment-deadline.l4) and [deadlines/grace.l4](folders-example/deadlines/grace.l4).
+
+The figure `the grace period in days` is written in three files on purpose: `terms.l4`, `fees/rates.l4` and `deadlines/grace.l4`.
+Step 1 deploys with a copy in each folder, and nothing imports `terms.l4` yet.
+Step 2 replaces the two copies in the folders with an import of the one at the top.
 
 Here are the two files of the `fees` rule.
 `IMPORT rates` is how `late-fee.l4` says "also read `rates.l4`, which sits beside me"; you write the name without `.l4`.
+`@export` marks a rule to be published, and the sentence after `default` describes it for the people and programs that call it; [Deploy your rules](exporting-rules-for-deployment.md#step-1-mark-rules-with-export) explains both.
 
 ```l4
 -- late-fee.l4: the late fee on an overdue invoice (the file to deploy).
@@ -168,43 +167,71 @@ Last, the file at the top.
 
 ---
 
+## Step 0: Practise without sending anything
+
+Steps 1 and 2 send your files to a real service, which keeps them under the name `late-fee`.
+You can practise first in two ways.
+
+**Ask `l4` whether it would accept your files, without sending anything.**
+Open a terminal in the `folders-example` folder and give `--server` an address where nothing listens.
+`http://127.0.0.1:9` is one on most computers: your own machine, on a port that nothing normally uses.
+
+```bash
+l4 deploy fees/late-fee.l4 --server http://127.0.0.1:9
+```
+
+If `l4` would accept the files, it goes on to try that address and says it cannot reach it (the words after the address are those of macOS and may differ on your computer):
+
+```
+Could not reach http://127.0.0.1:9: ConnectionFailure Network.Socket.connect: <socket: 3>: does not exist (Connection refused)
+```
+
+That means no file was refused.
+If something is wrong with the files, you get one of the messages in [What stops a deploy](#what-stops-a-deploy) instead; the exit status is 1 either way.
+This check does not list the names, cannot tell you whether the service will find your files, and can pass while `l4 check` on the same files is red (see [What does not work yet](#what-does-not-work-yet)).
+
+**Send under a throwaway name, then remove it.**
+Give each rule its own throwaway name: add `--name late-fee-test` to each `l4 deploy` and `l4 redeploy` of the `fees` rule, and `--name payment-deadline-test` to those of the `deadlines` rule.
+At the end, run `l4 undeploy late-fee-test` and `l4 undeploy payment-deadline-test`; `l4` asks you to type the name to confirm.
+In the address of [Step 3](#step-3-call-each-rule-once), use the throwaway name in place of the first `late-fee` or `payment-deadline`; the second stays, because it is the name of the rule.
+
+---
+
 ## Step 1: Deploy a rule whose files sit in one folder
 
-Open a terminal in the `folders-example` folder and run:
+In the `folders-example` folder, run:
 
 ```bash
 l4 deploy fees/late-fee.l4
 ```
 
-(Sign in first if you have not; [Using the l4 CLI](../getting-started/l4-cli.md#sign-in) shows how.)
+By default `l4 deploy` sends to Legalese Cloud; `--server` names a service you run yourself.
+Sign in first if you have not: [Using the l4 CLI](../getting-started/l4-cli.md#sign-in) shows how, with `l4 install legalese` and then `legalese login`.
+That guide says `l4 install legalese` runs on macOS and Linux, and neither page says how to sign in from Windows.
 
 Just before it sends the files, `l4` prints one line that names everything it is about to send.
-This is that line, from a run against a stand-in server that only records what it is sent (see [How this page was checked](#how-this-page-was-checked)):
+This is what it printed, from a run against a `jl4-service` on the same computer (see [How this page was checked](#how-this-page-was-checked)):
 
 ```
-Deploying 'late-fee' to http://127.0.0.1:18765: late-fee.l4, rates.l4
+Deploying 'late-fee' to http://127.0.0.1:18880: late-fee.l4, rates.l4
+Compiling…
+Deployed 'late-fee' (version 0.0.0) with 1 function:
+  late fee
+API: http://127.0.0.1:18880/deployments/late-fee
 ```
 
-On Legalese Cloud, the words between `to` and the colon name your organization instead, as in [Using the l4 CLI](../getting-started/l4-cli.md#deploy-update-list-remove).
-The names after the colon are what matter here.
-
-Three things to read in that line.
+The words between `to` and the colon name the service; on Legalese Cloud they name your organization instead, as in [Using the l4 CLI](../getting-started/l4-cli.md#deploy-update-list-remove) (not run for this page).
+The names after the colon are what matter here, and there are three things to read in them.
 
 First, only two files were sent.
-`late-fee.l4` imports `rates.l4`, so both go.
-`terms.l4` and the whole `deadlines` folder stay behind, because nothing in this rule imports them.
+`late-fee.l4` imports `rates.l4`, so both go; `terms.l4` and the whole `deadlines` folder stay behind, because nothing in this rule imports them.
 
 Second, the names are plain: `late-fee.l4`, not `fees/late-fee.l4`.
-A file is named by its path below the folder that all the sent files share.
-Both files sit in `fees`, so `fees` is the shared folder and does not appear in the names.
-This page calls that shared folder **the top of the upload**.
-It is the folder the service looks in for a file that is not beside its importer.
+Both files sit in `fees`, so `fees` is the top of the upload and does not appear in the names.
 
-Third, you did not have to tell `l4` where `rates.l4` is.
-`l4` looks for an imported file beside the file that imports it, and here it is.
+Third, you did not have to tell `l4` where `rates.l4` is: it looks for an imported file beside the file that imports it, and here it is.
 
-Deploying the other rule the same way, with `l4 deploy deadlines/payment-deadline.l4`, sends `payment-deadline.l4` and `grace.l4`.
-That is a second command, and a second deployment with its own address: `l4 deploy` deploys one file, plus what it imports.
+Deploying the other rule the same way, with `l4 deploy deadlines/payment-deadline.l4`, sends `payment-deadline.l4` and `grace.l4`, as a second deployment with its own address.
 `l4 deploy deadlines`, with a folder in place of a file, is not accepted; `l4` says `No such file: deadlines`.
 
 ---
@@ -215,7 +242,7 @@ Alex notices that `the grace period in days` is written out twice, once in each 
 If it ever changes, it has to change in two places.
 So Alex keeps it in `terms.l4` at the top, and makes both helper files import it.
 
-Replace `fees/rates.l4` with:
+Replace the whole of `fees/rates.l4` with:
 
 ```l4
 -- rates.l4: what a late invoice costs, kept beside late-fee.l4.
@@ -225,7 +252,7 @@ IMPORT terms
 `the monthly late rate` MEANS 0.015
 ```
 
-Replace `deadlines/grace.l4` with:
+Replace the whole of `deadlines/grace.l4` with:
 
 ```l4
 -- grace.l4: how long a customer has to pay, kept beside payment-deadline.l4.
@@ -236,9 +263,10 @@ IMPORT terms
 
 `late-fee.l4` and `payment-deadline.l4` do not change.
 A name that `rates.l4` gets from `terms.l4` is also available in `late-fee.l4`, which imports `rates.l4`, so `late-fee.l4` does not need its own `IMPORT terms`.
-It may have one: with both `IMPORT rates` and `IMPORT terms`, the upload is the same.
+With both `IMPORT rates` and `IMPORT terms` there, the upload is the same.
 
-Now run the same command again:
+Now run the same command again.
+If you set `JL4_LIBRARY_PATH` earlier in this terminal window, close the window and open a new one first: this run needs it not to be set.
 
 ```bash
 l4 deploy fees/late-fee.l4
@@ -259,6 +287,7 @@ fees/late-fee.l4 doesn't typecheck; fix it before deploying (see `l4 check`).
 
 (The full message also lists every place `l4` looked.)
 That last line means `l4` could not check your rules, so it stopped before sending them.
+It does not mean you wrote something wrong in them: read the first message, not the last line.
 
 Step 1 worked without any help because `rates.l4` sat beside `late-fee.l4`.
 Now `terms.l4` does not sit beside `rates.l4`: it sits in the top folder.
@@ -291,51 +320,78 @@ In Command Prompt (no quotation marks, even when the path has spaces):
 set JL4_LIBRARY_PATH=C:\Users\you\folders-example
 ```
 
-Either setting lasts until you close that window.
+Where this page writes `JL4_LIBRARY_PATH=$PWD` in front of an `l4` command, on Windows type one of the setting lines above first, and then the `l4` command without the `JL4_LIBRARY_PATH=$PWD` in front of it (not tried).
+Each setting stays until you close that window (how those terminals work in general; not checked with `l4`), so close the window and open a new one before you work on other files.
+How to type the file name on Windows (`fees/late-fee.l4` or `fees\late-fee.l4`) was not tried either.
+
 **Do not set it in Windows' system settings, or in a startup file on macOS or Linux, so that it applies to everything.**
 While it is set, `l4` stops reading the standard libraries from the copy built into it, so `l4 check` and `l4 run` of any file that says `IMPORT prelude` fail with `I could not find a module with this name: prelude`.
 A setting made for the whole account would do that to every project you work on.
 `l4 deploy` has no option that does the same job: its options are `--name`, `--description`, `--no-wait`, `--json`, `--server` and `--api-key-file`.
-How to type the file name after it on Windows (`fees/late-fee.l4` or `fees\late-fee.l4`) was not tried either.
 
 Now the line that `l4` prints is:
 
 ```
-Deploying 'late-fee' to http://127.0.0.1:18765: fees/late-fee.l4, fees/rates.l4, terms.l4
+Deploying 'late-fee' to http://127.0.0.1:18880: fees/late-fee.l4, fees/rates.l4, terms.l4
 ```
 
-The files are now in two places: `fees`, and the top folder.
-So the folder they all share, the top of the upload, is the top folder `folders-example`, and `fees` appears in the names.
-The folder is kept.
+The files are now in two places, `fees` and the top folder, so the top of the upload is the top folder `folders-example`, and `fees` appears in the names: the folder is kept.
+That line means `l4` is sending; the lines after it say whether the service accepted the files.
 
 The other rule, `JL4_LIBRARY_PATH=$PWD l4 deploy deadlines/payment-deadline.l4`, prints:
 
 ```
-Deploying 'payment-deadline' to http://127.0.0.1:18765: deadlines/payment-deadline.l4, deadlines/grace.l4, terms.l4
+Deploying 'payment-deadline' to http://127.0.0.1:18880: deadlines/payment-deadline.l4, deadlines/grace.l4, terms.l4
 ```
 
 The two uploads share `terms.l4` and nothing else.
-The `deadlines` folder is not in the first upload, and the `fees` folder is not in the second.
 That is two deployments: you ran the command twice, so the service has two rules, `late-fee` and `payment-deadline`, with two addresses.
 
-Run these commands from the top folder, `folders-example`.
-You can also run them from the folder above it, writing `folders-example/fees/late-fee.l4`.
-The setting must then still name `folders-example`: `JL4_LIBRARY_PATH=$PWD/folders-example`.
-With `JL4_LIBRARY_PATH=$PWD` there, `$PWD` is the folder above, which does not hold `terms.l4`, and `l4` stops with `I could not find a module with this name: terms`.
-The other projects in the folder above are not sent, unless a file you deploy imports them.
-Running them from inside `fees` is refused (see [below](#1-a-file-outside-the-project-folder)).
+**If you sent Step 1 for real, the service already has `late-fee`**, and `l4 deploy` will not create it a second time.
+With the setting on, it prints this, exits with status 1, and sends nothing:
+
+```
+'late-fee' already exists in http://127.0.0.1:18880.
+Update it with `l4 redeploy fees/late-fee.l4`.
+```
+
+Do what it says: `JL4_LIBRARY_PATH=$PWD l4 redeploy fees/late-fee.l4`, and the same for `payment-deadline` if you deployed that one too.
+The line it prints then begins `Redeploying` and names the same three files, and on the service used here the version goes from 0.0.0 to 0.0.1.
+`l4 redeploy` refuses an update that would break callers, such as a removed rule or a changed input, unless you add `--force`; this update changes none.
+
+Run these commands from the top folder.
+From the folder above it, write `folders-example/fees/late-fee.l4` and keep the setting on `folders-example` (`JL4_LIBRARY_PATH=$PWD/folders-example`): with `JL4_LIBRARY_PATH=$PWD` there, `$PWD` is the folder above, which does not hold `terms.l4`, and `l4` stops with `I could not find a module with this name: terms`.
+From inside `fees` it is refused (see [below](#1-a-file-outside-the-project-folder)).
+
+**A test that sends nothing: does your `l4` have the change?**
+With the Step 2 files in place, run this from the top folder.
+The setting `.` is wrong on purpose ([case 6](#6-a-setting-that-is-not-a-full-path)):
+
+```bash
+JL4_LIBRARY_PATH=. l4 deploy fees/late-fee.l4 --server http://127.0.0.1:9
+```
+
+This build stops with:
+
+```
+Cannot upload file://terms.l4: its file path terms.l4 is not absolute.
+```
+
+An older build, made from `unstable` before the pull request, printed `Skipping terms.l4: not found` and then the `Could not reach` message of Step 0; if you see that, your `l4` does not have the change.
+A later build may word these lines differently.
+On Windows the same test would set the setting to `.` with the lines above; that was not tried.
 
 ---
 
 ## Step 3: Call each rule once
 
 Whatever the "Deployed" line says, call each rule once and read the answer.
-[Why that matters](#if-the-service-is-too-old) is further down: a deploy can say it worked and every call can then fail.
+A service that is too old can say "Deployed" and then fail every call; [If the service is too old](#if-the-service-is-too-old) shows it.
 
 A call is a request sent to the rule's address.
 `curl` is a program that sends a request to a web address and prints the answer.
 The part after `-d` is the rule's inputs, written in JavaScript Object Notation (JSON), a plain-text way of writing a list of named values.
-This is the call for the `fees` rule, in the form [Deploy your rules](exporting-rules-for-deployment.md#step-5-call-a-rule) shows for Legalese Cloud, where `{orgSlug}` is your organization and `sk_...` is your key:
+This is the call for the `fees` rule, in the form [Deploy your rules](exporting-rules-for-deployment.md#step-5-call-a-rule) shows for Legalese Cloud:
 
 ```bash
 curl -X POST https://api.legalese.cloud/{orgSlug}/late-fee/functions/late-fee/evaluation \
@@ -344,6 +400,11 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/late-fee/functions/late-fee/ev
   -d '{"arguments": {"invoice-amount": 1000, "days-overdue": 20}}'
 ```
 
+Replace `{orgSlug}`, braces included, with your organization's name, as `acme` is in `https://api.legalese.cloud/acme/late-fee` in the l4 guide, and `sk_...` with your key.
+Deploy your rules says you create the key in the Legalese Cloud console; neither page says whether a colleague should share your key or make one of their own.
+The backslashes at the ends of lines only tell a macOS or Linux terminal that the command goes on; type the command on one line if you are not sure.
+
+In the address, the first `late-fee` is the name of the deployment, which is the file name unless you gave `--name`, and the second is the name of the rule.
 In the address and the inputs, the spaces in a name become hyphens: the rule `late fee` is `late-fee`, and the input `invoice amount` is `invoice-amount`.
 The answer is the same as the `#EVAL` in `late-fee.l4` gives, 40:
 
@@ -355,129 +416,134 @@ The call for the `deadlines` rule has the address ending `/payment-deadline/func
 Its answer has the value 17, as its `#EVAL` gives.
 
 Both answers above came from a service run on the same computer, which asked for no key.
-For a service like that, the address is the `API:` line that `l4` printed with `/functions/late-fee/evaluation` added: `http://127.0.0.1:18880/deployments/late-fee/functions/late-fee/evaluation`, where `18880` is the port that service listened on.
-How to send such a call from a Windows terminal was not tried.
+For a service like that, the address is the `API:` line that `l4` printed with `/functions/late-fee/evaluation` added: `http://127.0.0.1:18880/deployments/late-fee/functions/late-fee/evaluation`.
+
+A colleague who is to call the rule needs its address and, on Legalese Cloud, a key.
+The call has four parts, the method `POST`, the address, the two headers, and the inputs after `-d`, and any program that can send a web request with those four parts will do.
+Sending the call with `curl` from a Windows terminal, or with another program, was not tried.
 
 ---
 
-## Check without sending
+## If the service is too old
 
-You may not want to touch a real service while you are still arranging folders.
-You can ask `l4` whether it would accept your files, without sending anything, by giving `--server` an address where nothing listens.
-`http://127.0.0.1:9` is such an address on most computers: it is your own machine, on a port that nothing normally uses.
+The change to the service is part of the same pull request.
+A service built before it looks up an imported file from the folder of the first file in the upload (in alphabetical order) when it compiles the deployment and answers an ordinary call, and, for a call with a `{}` in an input, from the folder of the rule's own file.
+Neither is the top of the upload, so such a service can miss a file that sits at the top (the code comments of this build say so; the outcomes below are what was run).
+`l4` and the **Deploy** button cannot tell you which service you are talking to: neither checks its version.
+
+Both outcomes turned up with the example project from Step 2, on two services run on the machine where this page was checked: one built before the service change (the "old" one) and one with it (the "new" one).
+
+**The old service rejected the `fees` rule at once.**
+It could not find `terms.l4`, and the rule then did not make sense without it:
+
+```
+Deploying 'late-fee' to http://127.0.0.1:18771: fees/late-fee.l4, fees/rates.l4, terms.l4
+Compiling…
+Update rejected: compilation failed: I found a problem while checking the definition of `late fee`:   There are multiple definitions for the identifier        `__LEQ__`      and I do not have sufficient information to make a choice between them.   The options are:        `__LEQ__` (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO BOOLEAN     `__LEQ__` (predefined) of type FUNCTION FROM STRING AND STRING TO BOOLEAN     `__LEQ__` (predefined) of type FUNCTION FROM BOOLEAN AND BOOLEAN TO BOOLEAN
+```
+
+That is the lucky outcome, because it is loud.
+
+**The old service accepted the `deadlines` rule, and every call to it failed.**
+
+```
+Deploying 'payment-deadline' to http://127.0.0.1:18771: deadlines/payment-deadline.l4, deadlines/grace.l4, terms.l4
+Compiling…
+Deployed 'payment-deadline' (version 0.0.0) with 1 function:
+  last free day
+API: http://127.0.0.1:18771/deployments/payment-deadline
+```
+
+Calling the rule answered with a failure, the status code 422, and this body.
+(HTTP, the protocol that programs use to talk to web services, puts a number like this on every answer; 200 means it worked.)
+
+```
+{"contents":{"contents":"Internal error:\n  `the grace period in days`\nis not in scope.\nPlease report this as a bug.\n","tag":"InterpreterError"},"report":"default","tag":"Error"}
+```
+
+The new service accepted both rules, and the calls answered 40 for the `fees` rule (1000 owed, 20 days overdue) and 17 for the `deadlines` rule (the customer asked for the extra days), with HTTP status 200.
+Why the old service coped with one rule and not the other was not worked out here.
+Do not count on the loud outcome.
+
+**A test you can run yourself.**
+The `deadlines` rule is the useful one, because the old service accepted it and then failed.
+Deploy it from the Step 2 project under a name you will delete, and call it as in [Step 3](#step-3-call-each-rule-once):
 
 ```bash
-JL4_LIBRARY_PATH=$PWD l4 deploy fees/late-fee.l4 --server http://127.0.0.1:9
+JL4_LIBRARY_PATH=$PWD l4 deploy deadlines/payment-deadline.l4 --name canary-test
 ```
 
-If `l4` would accept the files, it goes on to try that address and says it cannot reach it:
+Read the "Deploying" line first, because the answer means something only for an `l4` that has the change.
+Four combinations were run, each called with the inputs `{"asked-for-extra-days": true}`:
 
-```
-Could not reach http://127.0.0.1:9: ConnectionFailure Network.Socket.connect: <socket: 3>: does not exist (Connection refused)
-```
+| `l4`              | service | names on the "Deploying" line                                 | the call                    |
+| ----------------- | ------- | ------------------------------------------------------------- | --------------------------- |
+| this build        | new     | `deadlines/payment-deadline.l4, deadlines/grace.l4, terms.l4` | 17, status 200              |
+| this build        | old     | `deadlines/payment-deadline.l4, deadlines/grace.l4, terms.l4` | 422, `is not in scope`      |
+| older, no folders | old     | `payment-deadline.l4, grace.l4, terms.l4`                     | 17, status 200 (misleading) |
+| older, no folders | new     | `payment-deadline.l4, grace.l4, terms.l4`                     | 17, status 200 (misleading) |
 
-That message means no file was refused.
-(Those are the words after the address on macOS; they may differ on your computer.)
-If something is wrong with the files, you get one of the messages in the next section instead.
-The exit status is 1 either way.
-
-This check does not list the names.
-`l4` prints that list only when it is about to send, and it has no "dry run" switch yet.
-The check also cannot tell you whether the service will in fact find your files; the next sections explain what `l4` checks on that.
-And it can pass while `l4 check` on the same files is red: see [What does not work yet](#what-does-not-work-yet).
+So when the line shows the folder `deadlines/`, an answer of 17 means the service finds a file at the top of the upload, which is the change, and 422 with `is not in scope` means it does not.
+When the line shows plain names, your `l4` lacks the change and the test tells you nothing about the service: an older `l4` sends a flat upload, in which `terms.l4` sits beside every file, and even the old service passes.
+Then remove the test deployment with `l4 undeploy canary-test`, which asks you to type the name to confirm.
+This page cannot tell you whether Legalese Cloud, or the service your organization runs, is a build that has the change; the test above can.
+Whoever runs the service can also tell you: for Legalese Cloud that is Legalese, the company that runs it.
 
 ---
 
 ## Splitting a file of your own into folders
 
-This page cannot tell you which parts of your own file belong where, but it can tell you what is allowed to move.
+This page cannot tell you which parts of your own file belong where, because that depends on your rules.
+It can tell you what is allowed to move, and a way to sort:
+
+1. Keep your original file as it is, and work on a copy, running `l4 check` on the file you will deploy after each move (with the setting of Step 2 on once a file sits at the top).
+2. A figure or a kind of thing that two rules use goes to the top folder, in a file such as `terms.l4`.
+3. A figure that only one rule uses goes in a file beside that rule.
+4. The rule you publish stays in the file you deploy, with its `@export`, and the `#EVAL` lines that check it stay there too.
+
 Each point below was tried in a small test project made for the purpose and not shipped here (see [How this page was checked](#how-this-page-was-checked)).
 
 - **A named figure, a kind of thing and a rule with inputs can all live in an imported file.**
   A name defined with `MEANS`, a `DECLARE` (a new kind of thing, such as an `Invoice` with its fields) and a rule with a `GIVEN` input and a `DECIDE` were all usable from the file that imported `terms.l4`, with `l4 run`, and after a deploy, in a call.
 - **A `#EVAL` line in an imported file does not run.**
   Running the file that imports it printed one result, the importer's own.
-  Keep the `#EVAL` lines that check a rule in the file you run.
-- **An `@export` in an imported file is published too.**
-  When `terms.l4` had an `@export` on a rule, the deployment of the file that imported it said "with 2 functions", and the second rule answered a call.
-  Put `@export` only on rules you mean to publish, and think of an imported file with an `@export` as part of what you publish.
-- **Move one thing at a time.**
-  After each move, run `l4 check` on the file you will deploy.
-  A figure that two rules use goes to the top folder; a figure that one rule uses goes beside it.
+- **An imported file needs no `@export`; the helpers on this page have none.**
+  An `@export` in an imported file is published too: when `terms.l4` had an `@export` on a rule, the deployment of the file that imported it said "with 2 functions", and the second rule answered a call.
+  Put `@export` only on rules you mean to publish.
 - **Two files with the same name in different folders stay apart.**
   When a second `rates.l4`, with a flat fee of 99, also sat in the `deadlines` folder, `l4 deploy fees/late-fee.l4` used `fees/rates.l4`, left the other out of the upload, and the rule answered 40.
   A file with that name at the top is another matter: see [case 4](#4-two-files-with-one-name).
 - **Write the name in `IMPORT` with the capitals of the file's name.**
   `IMPORT Rates` also worked here, and the upload then held the file as `fees/Rates.l4`, because the disk of this Mac ignores capitals.
-  On a system that tells capitals apart, `l4` may report that it cannot find the module `Rates` and stop before sending; that was not tried.
-
----
-
-## When one rule needs a file from the other rule's folder
-
-Suppose `deadlines/payment-deadline.l4` needs `the flat fee` from `fees/rates.l4`, and says `IMPORT rates`.
-It cannot be done by importing across the folders.
-This was run in a small project of `fees/rates.l4`, `fees/late-fee.l4` and `deadlines/payment-deadline.l4`.
-
-With no setting, `l4` looks beside `payment-deadline.l4`, finds no `rates.l4`, and stops with:
-
-```
-I could not find a module with this name: rates
-```
-
-With `JL4_LIBRARY_PATH` set to the `fees` folder, `l4` does find it, and then stops before sending, because the service would not:
-
-```
-The deployed service would not find a library this file imports:
-  deadlines/payment-deadline.l4 imports rates, which would be uploaded as fees/rates.l4 (from …/fees/rates.l4), in the folder fees
-```
-
-That is [case 2](#2-a-shared-file-in-a-folder-where-the-service-does-not-look) below, and so is the fix: move `rates.l4` to the top folder, point `JL4_LIBRARY_PATH` at the top folder, and let both rules say `IMPORT rates`, as Step 2 does for `terms.l4`.
-
-Writing the path does not help.
-A slash in an `IMPORT` name without quotation marks is an error, `unexpected /`.
-With quotation marks it is not an error, and is not a folder either; see [What does not work yet](#what-does-not-work-yet).
-
----
-
-## How the service finds a file by name
-
-When a file says `IMPORT rates`, the service looks for `rates.l4` in two places, and only these two:
-
-1. beside the file that says it, which means the same folder in the upload;
-2. at the top of the upload.
-
-It does not look in any other folder, even one that is in the upload.
-It has the files you sent and the standard libraries built into it, and nothing from the machine it runs on.
-
-`l4` reads imports more widely.
-It also looks in `JL4_LIBRARY_PATH` and in the per-user library folder.
-A library found there is not on the service.
-That is why `l4` checks, before it sends, that every imported file will end up in one of the two places the service looks, and refuses when one will not.
-
-With imports written by name, as on this page, this has a consequence.
-An upload can hold the folder of the file you deploy and the top of the upload, and no other folder.
+  On a system that tells capitals apart, or on Windows, that was not tried.
 
 ---
 
 ## What stops a deploy
 
-Each of these stops `l4 deploy` before it sends anything.
-They were all run with `--server http://127.0.0.1:9`, as in the last section, so nothing could be sent.
+**How the service finds a file.**
+When a file says `IMPORT rates`, the service looks for `rates.l4` beside the file that says it (the same folder in the upload) and at the top of the upload, and nowhere else: it has the files you sent and the standard libraries built into it, and nothing from the machine it runs on.
+`l4` reads imports more widely, also in `JL4_LIBRARY_PATH` and in the per-user library folder, and a library found there is not on the service.
+That is why `l4` checks, before it sends, that every imported file will end up in one of the two places the service looks, and refuses when one will not ([What gets uploaded](../getting-started/l4-cli.md#what-gets-uploaded) in the l4 guide says the same in reference style).
+
+Cases 1, 2, 3, 5 and 6 below each stop `l4 deploy` before it sends anything.
+They were all run with `--server http://127.0.0.1:9`, as in Step 0, so nothing could be sent.
+Case 4 does not stop it: it sends the wrong file and says nothing.
 In the messages, the long name of the folder where the project lived during the check is shortened to `…`; `l4` prints the whole path.
 A `…` at the end of a line, or on a line of its own, marks a part of a long message that is left out here.
+Spaces at the ends of lines are not kept in the quoted messages.
 
 To find your message, look at its first line:
 
 - `This file lies outside the project folder …` is [case 1](#1-a-file-outside-the-project-folder).
-- `The deployed service would not find a library this file imports:` is [case 2](#2-a-shared-file-in-a-folder-where-the-service-does-not-look).
+- `The deployed service would not find a library this file imports:` is [case 2](#2-a-file-kept-in-a-folder-where-the-service-does-not-look).
 - `The deployed service may not find a file that is imported, because of the name of the folder it is in:` is [case 3](#3-a-folder-name-the-service-cannot-read).
 - `Cannot upload file://…: its file path … is not absolute.` is [case 6](#6-a-setting-that-is-not-a-full-path).
 - A file that cannot be read, with `permission denied` in a long message that ends `doesn't typecheck`, is [case 5](#5-a-file-that-cannot-be-read).
 - `I could not find a module with this name: …`, and a last line that ends `doesn't typecheck; fix it before deploying`, is not one of these refusals.
   `l4` could not check your rules, usually because `JL4_LIBRARY_PATH` is not set to the top folder or does not name it in full; Step 2 shows one.
   Read the first message in the long text above that last line.
-- `Could not reach …` means no file was refused; see [Check without sending](#check-without-sending).
+- `Could not reach …` means no file was refused; see [Step 0](#step-0-practise-without-sending-anything).
 - No message at all, and the wrong file in the upload, is [case 4](#4-two-files-with-one-name).
 
 ### 1. A file outside the project folder
@@ -516,27 +582,40 @@ The message is the same and names that file (`…/common/terms.l4`).
 Move it; do not copy it.
 `l4` reads `JL4_LIBRARY_PATH` first, so while the variable names the old folder, a copy inside the project is ignored.
 
-### 2. A shared file in a folder where the service does not look
+### 2. A file kept in a folder where the service does not look
 
-Suppose Alex tidies `terms.l4` into a folder called `shared`, and points `JL4_LIBRARY_PATH` at `shared`:
+Suppose Alex tidies `terms.l4` into a folder called `precedents`, as a firm keeps a folder of precedents, and points `JL4_LIBRARY_PATH` at `precedents`:
 
 ```bash
-JL4_LIBRARY_PATH=$PWD/shared l4 deploy fees/late-fee.l4 --server http://127.0.0.1:9
+JL4_LIBRARY_PATH=$PWD/precedents l4 deploy fees/late-fee.l4 --server http://127.0.0.1:9
 ```
 
 ```
 The deployed service would not find a library this file imports:
-  fees/rates.l4 imports terms, which would be uploaded as shared/terms.l4 (from …/folders-example/shared/terms.l4), in the folder shared
+  fees/rates.l4 imports terms, which would be uploaded as precedents/terms.l4 (from …/folders-example/precedents/terms.l4), in the folder precedents
 The deployed service looks an IMPORT up only beside the file that imports it and at the top of the upload (the folder that holds all the uploaded files).
 It looks nowhere else, so the deploy would say it is ready and every call would then fail.
 Put each library beside the file that imports it, and deploy again.
 …
 ```
 
-`shared` is neither the folder of `fees/rates.l4` nor the top, so the service would not find the file.
+`precedents` is neither the folder of `fees/rates.l4` nor the top, so the service would not find the file.
 **The fix:** move `terms.l4` to the top of the project and point `JL4_LIBRARY_PATH` at the top folder, as in Step 2.
 The message says "beside the file that imports it".
 For a file that two rules share, the top of the project is the place that works for both, and the service looks there too.
+
+The same refusal is what you get when one rule needs a file from another rule's folder.
+Suppose `deadlines/payment-deadline.l4` needs `the flat fee` and says `IMPORT rates`, while `rates.l4` sits in `fees` (run in a small project of `fees/rates.l4`, `fees/late-fee.l4` and `deadlines/payment-deadline.l4`).
+With no setting, `l4` looks beside `payment-deadline.l4`, finds no `rates.l4`, and stops with `I could not find a module with this name: rates`.
+With `JL4_LIBRARY_PATH` set to `fees`, `l4` finds it and then stops before sending, because the service would not:
+
+```
+The deployed service would not find a library this file imports:
+  deadlines/payment-deadline.l4 imports rates, which would be uploaded as fees/rates.l4 (from …/folders-example/fees/rates.l4), in the folder fees
+```
+
+The fix is the same: move `rates.l4` to the top folder, point `JL4_LIBRARY_PATH` at it, and let both rules say `IMPORT rates`.
+Writing a path does not help: a slash in an `IMPORT` name without quotation marks is an error, `unexpected /`, and with quotation marks it is not a folder either (see [What does not work yet](#what-does-not-work-yet)).
 
 ### 3. A folder name the service cannot read
 
@@ -557,7 +636,6 @@ Rename the folder to use only letters, digits, '.', '-' and '_', and deploy agai
 
 **The fix** is the last line of the message: rename the folder.
 A folder called `frais é`, with an accented letter, is refused in the same way.
-Safe folder names use only the letters A to Z (no accents), digits, `.`, `-` and `_`.
 
 Three things to know about this refusal:
 
@@ -594,17 +672,15 @@ JL4_LIBRARY_PATH=$PWD l4 deploy fees/late-fee.l4
 ```
 
 ```
-Deploying 'late-fee' to http://127.0.0.1:18765: fees/late-fee.l4, rates.l4, terms.l4
+Deploying 'late-fee' to http://127.0.0.1:18880: fees/late-fee.l4, rates.l4, terms.l4
 ```
 
 The upload holds the top `rates.l4`, not `fees/rates.l4`.
 Nothing says so.
-`JL4_LIBRARY_PATH=$PWD l4 run fees/late-fee.l4` agrees with the upload: the `#EVAL` in `late-fee.l4` answers 119 with the second file in place (50 plus 1000 times 0.069), and 40 without it.
+The deployed rule answered 119, and `JL4_LIBRARY_PATH=$PWD l4 run fees/late-fee.l4` agrees: the `#EVAL` in `late-fee.l4` answers 119 with the second file in place (50 plus 1000 times 0.069), and 40 without it.
 (Without the setting, `l4 run` of the file stops at `terms`, as in Step 2.)
 **The fix:** give each file its own name, or remove the copy you did not mean.
-
-The tool is ready for two files of one name in different folders: it names files by folder, so they would stay apart, and the tool's own tests check that with made-up paths.
-Nothing you can write today puts two such files into one upload.
+Two files of one name in different folders would stay apart, because the tool names files by folder, and its own tests check that with made-up paths; nothing you can write today puts two such files into one upload.
 
 ### 5. A file that cannot be read
 
@@ -647,9 +723,8 @@ A path that ends in `/`, or that goes through a symbolic link (a shortcut to a f
 
 ## The VS Code Deploy button
 
-The **Deploy** tab in the VS Code sidebar packs the same upload with the same names, and refuses in some of the same cases.
+In this build, the **Deploy** tab in the VS Code sidebar packs the same upload with the same names, and refuses in some of the same cases.
 It checks less.
-
 The checks below come from the compiled code behind the button, run from the command line, not from the extension inside VS Code.
 It was given the list of imported files by hand, as the language server would give it.
 With the example project's top folder as the workspace folder, it collects:
@@ -676,95 +751,31 @@ Those were read in the code and not run.
 
 What the button cannot do is check where a shared file sits.
 The editor's language server hands the extension the list of imported files, not the `IMPORT` lines, so the extension cannot tell whether a file is beside its importer or at the top.
-A shared file in a third folder, such as `shared` in case 2 above, is sent anyway.
+A shared file in a third folder, such as `precedents` in case 2 above, is sent anyway.
 The service then says "ready", and a call that needs the file fails.
 Until that is fixed, check the folders by hand, or run `l4 deploy` with `--server http://127.0.0.1:9` first.
 
-Not tested: how the tab displays these messages, and whether the editor's language server finds a `terms.l4` at the top of your workspace folder without help.
+Not tested: how the tab displays these messages, whether the editor's language server finds a `terms.l4` at the top of your workspace folder without help, and what the tab does with a name that already exists ([Deploy your rules](exporting-rules-for-deployment.md#update-a-deployment) says it updates that deployment).
 The code returns the message to the tab as the reason the deploy failed, and writes it to the L4 Output channel as `[sidebar] Deploy failed: …`.
-
----
-
-## If the service is too old
-
-The change to the service is part of the same pull request.
-A service built before it looks for an imported file from the folder of the first file in the upload (in alphabetical order), not from the top of the upload, so it can miss a file that sits at the top.
-A deploy to such a service can go two ways, and `l4` and the **Deploy** button cannot tell you which service you are talking to: neither checks its version.
-
-Both ways turned up with the example project from Step 2, on two services run on the machine where this page was checked.
-One was built before the service change (the "old" one) and one with it (the "new" one).
-
-**The old service rejected the `fees` rule at once.**
-It could not find `terms.l4`, and the rule then did not make sense without it:
-
-```
-Deploying 'late-fee' to http://127.0.0.1:18771: fees/late-fee.l4, fees/rates.l4, terms.l4
-Compiling…
-Update rejected: compilation failed: I found a problem while checking the definition of `late fee`:   There are multiple definitions for the identifier        `__LEQ__`      and I do not have sufficient information to make a choice between them.   …
-```
-
-That is the lucky outcome, because it is loud.
-
-**The old service accepted the `deadlines` rule, and every call to it failed.**
-
-```
-Deploying 'payment-deadline' to http://127.0.0.1:18771: deadlines/payment-deadline.l4, deadlines/grace.l4, terms.l4
-Compiling…
-Deployed 'payment-deadline' (version 0.0.0) with 1 function:
-  last free day
-API: http://127.0.0.1:18771/deployments/payment-deadline
-```
-
-Calling the rule answered with a failure, the status code 422, and this body.
-(HTTP, the protocol that programs use to talk to web services, puts a number like this on every answer; 200 means it worked.)
-
-```
-{"contents":{"contents":"Internal error:\n  `the grace period in days`\nis not in scope.\nPlease report this as a bug.\n","tag":"InterpreterError"},"report":"default","tag":"Error"}
-```
-
-The new service accepted both rules, and the calls answered 40 for the `fees` rule (1000 owed, 20 days overdue) and 17 for the `deadlines` rule (the customer asked for the extra days), with HTTP status 200.
-
-Which of the two outcomes you get depends on how the rule uses what it imports.
-Do not count on the loud one.
-
-**A test you can run yourself.**
-The `deadlines` rule is the useful one, because the old service accepted it and then failed.
-Deploy it from the Step 2 project under a name you will delete, and call it as in [Step 3](#step-3-call-each-rule-once):
-
-```bash
-JL4_LIBRARY_PATH=$PWD l4 deploy deadlines/payment-deadline.l4 --name canary-test
-```
-
-An answer with the value 17 means the service finds a file at the top of the upload, which is the change.
-The status 422 with `is not in scope` means it does not.
-Then remove the test deployment with `l4 undeploy canary-test`, which asks you to type the name to confirm.
-This page cannot tell you whether Legalese Cloud, or the service your organization runs, is a build that has the change; the test above can.
-Whoever runs the service can also tell you: for Legalese Cloud that is Legalese, the company that runs it.
 
 ---
 
 ## What does not work yet
 
 - **Path imports and the root-relative form do not deploy through these tools.**
-  Two other draft pull requests teach `IMPORT` to take a name with a slash ([#748](https://github.com/legalese/l4-ide/pull/748), a path such as `` `../terms` ``) and to start from the project's top folder ([#751](https://github.com/legalese/l4-ide/pull/751), a name starting with `/`, and aliases, which are short names for folders).
-  Neither is in the build this page describes, so there is nothing to type for them.
+  The draft pull requests [#748](https://github.com/legalese/l4-ide/pull/748) (a path such as `` `../terms` ``) and [#751](https://github.com/legalese/l4-ide/pull/751) (a name starting with `/`, and aliases) teach `IMPORT` to take a name with a slash; the page that teaches them, "Split a project into folders", is in the branch of #751 and so has no link here.
+  Neither is in this build.
   Here, a slash in an `IMPORT` name is not a folder: `l4` reads the name as its last part only, and says nothing.
   `` IMPORT `/rates` ``, `` IMPORT `@common/rates` `` and `` IMPORT `../fees/rates` `` in `fees/late-fee.l4` were each uploaded exactly as `IMPORT rates` is: `fees/late-fee.l4, fees/rates.l4, terms.l4`.
   Without quotation marks, a slash is an error: `IMPORT fees/rates` gives `unexpected /`.
   A backslash inside quotation marks, as in `` IMPORT `fees\rates` ``, is not a folder separator either: `l4` looked for a module whose whole name was `fees\rates` and did not find one (run on macOS).
-  With `` IMPORT `../terms` `` in `fees/rates.l4` and no variable, `l4` says:
-
-  ```
-  I could not find a module with this name: terms
-  ```
-
-  and with `JL4_LIBRARY_PATH` set to the top folder it deploys exactly as `IMPORT terms` does: `fees/late-fee.l4, fees/rates.l4, terms.l4`.
+  With `` IMPORT `../terms` `` in `fees/rates.l4` and no variable, `l4` says `I could not find a module with this name: terms`, and with `JL4_LIBRARY_PATH` set to the top folder it deploys exactly as `IMPORT terms` does: `fees/late-fee.l4, fees/rates.l4, terms.l4`.
   So write the name without a slash for now.
   When those pull requests land, this page and the refusals above will need revisiting.
 
-- **A rule you deploy that imports a standard library cannot be checked while `JL4_LIBRARY_PATH` is set.**
+- **A file you deploy that imports a standard library cannot be checked while `JL4_LIBRARY_PATH` is set, and a file at the top needs the setting.**
   With the variable set, `l4` stops reading the standard libraries from the copy built into it.
-  A rule that says `IMPORT prelude` and uses `sum` then fails, and `l4` stops:
+  When the file you deploy says `IMPORT prelude` and uses `sum` (from the prelude), `l4` stops:
 
   ```
   I could not find a module with this name: prelude
@@ -774,6 +785,10 @@ Whoever runs the service can also tell you: for Legalese Cloud that is Legalese,
   fees/late-fee.l4 doesn't typecheck; fix it before deploying (see `l4 check`).
   ```
 
+  When only a helper does, `fees/rates.l4` saying `IMPORT prelude` and using `sum`, `l4 check` of `fees/late-fee.l4` reports the same first message, yet `l4 deploy` sent the files, and the deployed rule answered 40, the answer it should give.
+  So the error stopped the deploy when it sat in the file you deploy, and did not when it sat in a helper, although `l4 check` of the deployed file reported it in both cases.
+  Why the service coped with the helper was not looked into.
+  Only `prelude` was tried; the other standard libraries were not.
   So a project whose deployed file imports a standard library and also shares a file at the top could not be deployed in the runs for this page.
   The one way round that was tried needs a copy of the standard library file that is exactly the copy built into your `l4`.
   Put that copy at the top of the project.
@@ -783,59 +798,40 @@ Whoever runs the service can also tell you: for Legalese Cloud that is Legalese,
   What does work without a checkout is to keep a rule's files together in one folder, as in Step 1, which needs no variable; the shared figure is then written once in each folder that needs it.
 
 - **`l4 deploy` can send files while `l4 check` on the same files is red.**
-  This was measured twice, one run each, and this page has not worked out where the line lies.
-  First, a rule said `IMPORT rates` and used no name from it, and no `rates.l4` was where `l4` looks: `l4 check` printed `I could not find a module with this name: rates`, and `l4 deploy` sent the files, and the service accepted them.
-  Second, the helper `fees/rates.l4` said `IMPORT prelude` and used `sum`, with `JL4_LIBRARY_PATH` set to the top folder: `l4 check` and `l4 run` of `fees/late-fee.l4` failed with `I could not find a module with this name: prelude`, `l4 deploy` sent the files, and the deployed rule answered 40, the answer it should give.
-  Why the service coped in the second run was not looked into.
-  Do not rely on it: when `l4 check` is red, treat what `l4 deploy` sent as unchecked.
-- **There is no list of names without sending.**
-  The "Deploying" line appears only when `l4` is about to send.
-  See [Check without sending](#check-without-sending) for what you can do instead.
-- **A shared file at the top whose own name has a space or an accented letter is not found by the service, and `l4` does not stop it.**
-  The code comments of this build say so, and the pull request says its author measured it.
-  That was not measured again for this page.
+  In the helper case above, nobody has worked out where the line lies, so when `l4 check` is red, treat what `l4 deploy` sent as unchecked.
+  The other case run was a rule that said `IMPORT rates`, used no name from it, and had no `rates.l4` where `l4` looks: `l4 check` printed `I could not find a module with this name: rates`, `l4 deploy` sent `late-fee.l4` alone, the service said "Deployed", and a call answered 2000, the answer the file gives.
+  That one is a decision recorded in the service: it accepts a deployment whose `IMPORT` finds nothing and writes one warning to its own log, "a WARN now, a refusal only by a later ruling" (ruling R5, 2026-10-12; the comment above `logUnresolvedImports` in `jl4-service/src/Compiler.hs`).
+- **A file at the top whose own name has a space or an accented letter is not found by the service, and `l4` does not stop it.**
+  The code comments of this build say so (`jl4/app/L4/Cli/DeployPlan.hs`).
+  Re-run for this page, with `terms.l4` renamed `my terms.l4` and `` IMPORT `my terms` `` in the helpers: `l4` did not stop, it sent `fees/late-fee.l4, fees/rates.l4, my terms.l4`, and the new service rejected the rule at once with `Update rejected: compilation failed`, the loud message of [If the service is too old](#if-the-service-is-too-old).
   Give shared files plain names too.
-- **Neither tool checks the version of the service.**
-  See [If the service is too old](#if-the-service-is-too-old).
-- **The Deploy button cannot check where a shared file sits.**
-  See [above](#the-vs-code-deploy-button).
+- **Neither tool checks the version of the service**, and **the Deploy button cannot check where a shared file sits.**
+  See [If the service is too old](#if-the-service-is-too-old) and [The VS Code Deploy button](#the-vs-code-deploy-button).
 
 ---
 
 ## Windows
 
 Nothing on this page was run on Windows.
-This is what was read in the code and in other pages.
+This is what was read in the code and in other pages; [Step 2](#step-2-move-the-shared-figure-to-the-top) has the lines for setting `JL4_LIBRARY_PATH`, [Step 1](#step-1-deploy-a-rule-whose-files-sit-in-one-folder) says what is missing for signing in, and [Step 3](#step-3-call-each-rule-once) for sending the call.
 
 - **Names in the upload use `/`, on every system.**
-  The code that makes them joins the parts with `/` (`jl4/app/L4/Cli/DeployPlan.hs` for `l4`, `ts-apps/vscode/src/deploy-bundle.ts` for the button).
-  So the upload holds `fees/late-fee.l4`, never `fees\late-fee.l4`.
+  The code that makes them joins the parts with `/` (`jl4/app/L4/Cli/DeployPlan.hs` for `l4`, `ts-apps/vscode/src/deploy-bundle.ts` for the button), so the upload holds `fees/late-fee.l4`, never `fees\late-fee.l4`.
   The names were looked at only on macOS.
 - **Drive letters.**
   `l4` compares a drive letter without regard to case (`C:` and `c:` are the same), because the checker and the operating system do not always agree on its case.
   The test for this is written but marked as pending anywhere but Windows, so it has not been seen to run.
-- **Typing the file name.**
-  The commands on this page write the file name with `/`, as they were run on macOS.
-  How a Windows terminal passes such a name on to `l4` was not tried, and neither was the same name with `\`.
-- **Folder names.**
-  The safe set (letters A to Z without accents, digits, `.`, `-`, `_`) is about what the service can read, so it is the same on every system.
 - **`IMPORT` names.**
   Write them without a path, as on this page.
-  The draft rules for path imports say a path is written with `/` only, and that a backslash is not a separator on any platform.
-  That is a proposal, in `specs/proposals/RELATIVE-IMPORTS-SPEC.md` (section 4.2).
+  The draft rules for path imports say a path is written with `/` only, and that a backslash is not a separator on any platform; that is a proposal, in `specs/proposals/RELATIVE-IMPORTS-SPEC.md` (section 4.2).
   What was run, on macOS, is that a backslash inside quotation marks is read as part of the name (see [What does not work yet](#what-does-not-work-yet)).
 - **The per-user library folder.**
-  On Windows it is `%APPDATA%\jl4\libraries\`, according to [How IMPORT finds libraries](../../reference/libraries/resolution.md), which says it was taken from the source and not run on Windows.
+  [How IMPORT finds libraries](../../reference/libraries/resolution.md) gives it on Windows as `%APPDATA%\jl4\libraries\`, usually `C:\Users\<you>\AppData\Roaming\jl4\libraries\`.
+  Nothing on that page says it was run on Windows, and nobody checked it on Windows for this page.
   A library `l4` finds there is not on the service.
-- **Setting `JL4_LIBRARY_PATH`.**
-  Step 2 needs it, and gives the PowerShell line (`$env:JL4_LIBRARY_PATH = "C:\Users\you\folders-example"`) and the Command Prompt line (`set JL4_LIBRARY_PATH=C:\Users\you\folders-example`).
-  Those are the ways those two terminals set any setting for the window you are typing in.
-  They were not tried with `l4`.
-  In the code, `l4` reads the setting with `lookupEnv "JL4_LIBRARY_PATH"` (`jl4-lsp/src/LSP/L4/Rules.hs`), the same call on every system.
-  Set it to the full path of the project's top folder, and do not set it for the whole account.
-- **Spaces in the path.**
-  A top folder with spaces and brackets in its name, `Smith v Jones (2024)`, deployed on macOS with the setting given in quotation marks (`JL4_LIBRARY_PATH="$PWD"`).
-  Whether that works on Windows was not tried.
+- **The setting.**
+  In the code, `l4` reads `JL4_LIBRARY_PATH` with `lookupEnv "JL4_LIBRARY_PATH"` (`jl4-lsp/src/LSP/L4/Rules.hs`), the same call on every system.
+  A top folder called `Smith v Jones (2024)` deployed on macOS with the setting in quotation marks (`JL4_LIBRARY_PATH="$PWD"`); whether that works on Windows was not tried.
 
 ---
 
@@ -843,34 +839,29 @@ This is what was read in the code and in other pages.
 
 - **The build.**
   The `l4` and the VS Code module were built from a tree whose code is the code of commit `8c6759479`, which `gh pr view 749` showed as the head of #749 on 2026-10-26.
-  That commit was made by a rebase at 10:04, after the `l4` file was written at 09:52:55, which is why the commit is newer than the file.
-  The branch tip when the `l4` was built was `2a453483e` (09:52:19), and `git diff --stat 2a453483e 8c6759479` over the `.hs`, `.cabal`, `.ts`, `.js` and `.json` files shows no difference.
-  The pull request is a draft and open.
-  The #748 and #751 pull requests are also open drafts.
+  The branch tip when the `l4` was built was `2a453483e` (09:52), and `git diff --stat 2a453483e 8c6759479` over the `.hs`, `.cabal`, `.ts`, `.js` and `.json` files shows no difference.
+  The pull requests #749, #748 and #751 are open drafts.
 - **Where the commands ran.**
   Every `l4` message quoted above was copied from a run of that `l4` on macOS (Apple silicon) on 2026-10-26, with `HOME` and `XDG_DATA_HOME` pointed at empty folders, so that no library of the person who ran them could be found.
   The commands that needed no service ran with `--server http://127.0.0.1:9`.
-- **The "Deploying" lines.**
-  The lines with port 18765 were printed while `l4` sent to a stand-in server on the same machine: a small script that answers "not found" to lookups and "accepted" to uploads, and prints the names of the files inside the zip it receives.
-  Those names agreed with the names on the "Deploying" line every time.
-  Nothing was deployed to Legalese Cloud, and the "Accepted" lines the stand-in caused are not shown because they mean nothing.
-  When this page was revised, the same deploys were run again against the `jl4-service` built in the worktree of #749, started on the same machine with an empty store; it printed the same names, and the calls in Step 3 and the 40, 17 and 119 in this page's text came from it.
+- **The "Deploying" lines and the calls** were printed while `l4` sent to a `jl4-service` on the same machine, built in the worktree of #749 and started on port 18880 with an empty store.
+  The calls in Step 3 and the 40, 17 and 119 in this page's text came from it.
+  Nothing was deployed to Legalese Cloud.
+  An earlier version of this page used a stand-in script that answered "not found" to every lookup, and that hid the "already exists" refusal of Step 2.
 - **The two services.**
-  The old service was a `jl4-service` built on 2026-10-26 in the main checkout of `unstable` (at `63254397f` when the check began), which does not contain the service change.
-  The new service was the `jl4-service` built in the worktree of #749.
-  The date on that file is earlier than the commit time git shows, so it was confirmed by behaviour that it has the change: it found `terms.l4` at the top of the upload, and the old service did not.
-- **The older `l4`.**
-  The line "An `l4` made from `unstable` before this pull request printed `late-fee.l4, rates.l4, terms.l4`" is from a run of an `l4` built in the main checkout of `unstable` on 2026-10-26, deploying the Step 2 project with the setting made, to the new service.
+  The old service was a `jl4-service` built on 2026-10-26 in the main checkout of `unstable`, which does not contain the service change (port 18771); the older `l4` was built there too.
+  The new service was the one in the worktree of #749.
+  The date on the new service's file is earlier than the commit time git shows, so it was confirmed by behaviour that it has the change: it found `terms.l4` at the top of the upload, and the old service did not.
+  The table in [If the service is too old](#if-the-service-is-too-old) and the test at the end of Step 2 come from runs of the older `l4` and of this build, against both services.
 - **The VS Code messages** came from the compiled module `ts-apps/vscode/out/deploy-bundle.js`, run with `node`.
-  VS Code was not opened.
 - **The example files.**
   Each of the five files, as shipped, passes `l4 run` on its own, which is what `doc/test-docs.sh` does with every `.l4` file under `doc/`.
   The project after Step 2 does not pass that way, because `terms.l4` is found only through `JL4_LIBRARY_PATH`, and the documentation check does not set it.
   That is why the shipped files do not contain the change that Step 2 asks you to make, nor the second `rates.l4` of case 4: a `rates.l4` at the top would change what Step 2 answers.
   After Step 2, `JL4_LIBRARY_PATH=$PWD l4 run fees/late-fee.l4` answers 40, and the same for `deadlines/payment-deadline.l4` answers 17.
 - **The section on splitting a file** was run in small projects made for the purpose and not shipped: one with a `DECLARE`, a rule, a figure, an `#EVAL` and an `@export` in the imported `terms.l4`; one with a second `rates.l4` in the `deadlines` folder; one with `IMPORT Rates`; and one with `IMPORT prelude` in the helper.
-- **The sentence about aliases** is from the draft pull request #751 and its own page on that branch; it was not run here, except that this `l4` stops at `IMPORT rates AS r`.
-- **Only read, not run:** anything on Windows; the message `Could not read …`, which the code has as a second line of defence after the check in case 5 and which `l4` could not be made to print; the other stops of the Deploy button listed in its section; and how the VS Code tab shows an error.
+- **The sentences about aliases and the page "Split a project into folders"** are from the draft pull request #751 and that page on its branch; they were not run here, except that this `l4` stops at `IMPORT rates AS r`.
+- **Only read, not run:** anything on Windows; the message `Could not read …`, which the code has as a second line of defence after the check in case 5 and which `l4` could not be made to print; the other stops of the Deploy button listed in its section; how the VS Code tab shows an error; and signing in to Legalese Cloud.
 
 ---
 
