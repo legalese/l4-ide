@@ -11,7 +11,7 @@
 
 When you **deploy** a rule, you put a copy of it on a server, so that other programs and AI agents can ask it questions.
 `l4 deploy` and the VS Code **Deploy** button do this the same way.
-They pack files into one upload, a single compressed file called a **zip file** (the kind you may have attached to an email), and send it.
+They pack files into one upload, a single file called a **zip file** (the kind you may have attached to an email), and send it.
 The service on the server unpacks it, reads the rules, and starts answering.
 
 The upload holds the file you deploy and the files it imports, directly or through other files.
@@ -466,7 +466,8 @@ Deployed 'payment-deadline' (version 0.0.0) with 1 function:
 API: http://127.0.0.1:18771/deployments/payment-deadline
 ```
 
-Calling the rule answered with HTTP status 422 and this body:
+Calling the rule answered with a failure, the status code 422, and this body.
+(HTTP, the protocol that programs use to talk to web services, puts a number like this on every answer; 200 means it worked.)
 
 ```
 {"contents":{"contents":"Internal error:\n  `the grace period in days`\nis not in scope.\nPlease report this as a bug.\n","tag":"InterpreterError"},"report":"default","tag":"Error"}
