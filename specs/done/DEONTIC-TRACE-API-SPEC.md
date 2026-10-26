@@ -698,7 +698,10 @@ A case carries its own `startTime` and `events` among its attributes.
 Before this, a batch case and an MCP call to a `DEONTIC` function dropped both fields without an error and answered the contract's initial obligation.
 **Assumed, not ruled:** a case or a call with no `startTime`, or no `events`, is refused with the message `/evaluation` gives, instead of being answered with the initial obligation.
 
-Q6, on the schema the service publishes for the answer of a `DEONTIC` function, was ruled on `unstable` (legalese/l4-ide#756) and reaches this branch with it.
+Q6, on the schema the service publishes for the answer of a `DEONTIC` function, was ruled on `unstable` (legalese/l4-ide#756) and is not in this file; it reaches `main` only when a wave carries #756.
+What it asks of the code is here: whatever a runtime withholds from a client is withheld in one place, `DeonticTrace.presentDeonticOutcome`, the identity today.
+Evaluation answers and their errors pass through it, because `DeonticTrace.runDeonticLimited` applies it to the whole outcome of a replay, on `/evaluation`, on MCP `tools/call` and its task path, and in a batch case.
+`GET .../state-graphs` and the source-browse tools (`list_files`, `read_file`, `search_identifier`, `search_text`) also expose a contract's structure and are outside it, so a setting that withholds the contract has to gate them too.
 
 ### Q7: Is a function whose return type is written `PROVISION OF` a `DEONTIC` function?
 
