@@ -344,7 +344,7 @@ The service exposes an [MCP](https://modelcontextprotocol.io/) JSON-RPC 2.0 endp
 | `POST` | `/{id}/.mcp`                | Deployment-scoped MCP endpoint (short route)                  |
 | `POST` | `/deployments/{id}/.mcp`    | Deployment-scoped MCP endpoint (canonical route)              |
 
-The org-wide endpoint (`/.mcp`) exposes tools from all deployments. The scoped endpoints (`/{id}/.mcp`) restrict tool visibility to a single deployment.
+The org-wide endpoint (`/.mcp`) exposes tools from all deployments. The scoped endpoints (`/{id}/.mcp`) restrict tool visibility to a single deployment. On a scoped endpoint the file tools (`list_files`, `read_file`, `search_identifier`, `search_text`) also reach only that deployment: a `deployment` argument naming another one finds nothing.
 
 #### Field Name Sanitization
 

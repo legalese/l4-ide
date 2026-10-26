@@ -437,10 +437,10 @@ findUniquePrefix dep others = go 1
 callTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Aeson.Value -> AppM Aeson.Value
 callTool vis mScope reqId toolName tasksRequested arguments = do
   case toolName of
-    "list_files" | vis.showFiles -> callListFiles reqId arguments
-    "read_file" | vis.showFiles -> callReadFile reqId arguments
-    "search_identifier" | vis.showFiles -> callSearchIdentifier reqId arguments
-    "search_text" | vis.showFiles -> callSearchText reqId arguments
+    "list_files" | vis.showFiles -> callListFiles mScope reqId arguments
+    "read_file" | vis.showFiles -> callReadFile mScope reqId arguments
+    "search_identifier" | vis.showFiles -> callSearchIdentifier mScope reqId arguments
+    "search_text" | vis.showFiles -> callSearchText mScope reqId arguments
     _ -> callFunctionTool vis mScope reqId toolName tasksRequested arguments
 
 -- | Execute a function evaluation tool call.
@@ -797,13 +797,24 @@ handleTasksCancel reqId params = case parseTaskId params of
 -- File browsing tool handlers
 -- ----------------------------------------------------------------------------
 
-callListFiles :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callListFiles reqId arguments = do
+-- | Does the endpoint's scope admit this deployment? On the org-wide endpoint
+-- every deployment; on a scoped one (@/{id}/.mcp@) only the scope itself.
+--
+-- The file tools name their deployment in an argument, not in the route, so
+-- they check it here: the auth proxy admits a caller with a grant for one
+-- deployment to that deployment's route only, and an argument naming another
+-- deployment must not reach past it. A deployment outside the scope is treated
+-- as one that does not exist.
+inScope :: Maybe Text -> Text -> Bool
+inScope mScope deployId = maybe True (== deployId) mScope
+
+callListFiles :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callListFiles mScope reqId arguments = do
   env <- ask
   let mDeployment = getStringArg "deployment" arguments
   registry <- liftIO $ readTVarIO env.deploymentRegistry
 
-  let deployIds = case mDeployment of
+  let deployIds = filter (inScope mScope) $ case mDeployment of
         Nothing -> [did.unDeploymentId | (did, _) <- Map.toList registry]
         Just d  -> [d]
 
@@ -833,8 +844,8 @@ callListFiles reqId arguments = do
       ]
     ]
 
-callReadFile :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callReadFile reqId arguments = do
+callReadFile :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callReadFile mScope reqId arguments = do
   env <- ask
   let mDeployment = getStringArg "deployment" arguments
       mPath = getStringArg "path" arguments
@@ -843,7 +854,9 @@ callReadFile reqId arguments = do
   case (mDeployment, mPath) of
     (Just deployId, Just rawPath) -> do
       let path = normalizeReadFilePath deployId rawPath
-      mContent <- liftIO $ BundleStore.loadSingleFile env.bundleStore deployId (Text.unpack path)
+      mContent <- if inScope mScope deployId
+        then liftIO $ BundleStore.loadSingleFile env.bundleStore deployId (Text.unpack path)
+        else pure Nothing
       case mContent of
         Nothing ->
           pure $ mcpTextResult reqId "File not found" True
@@ -871,8 +884,8 @@ normalizeReadFilePath deployId path
   | Just rest <- Text.stripPrefix "/" path = rest
   | otherwise = path
 
-callSearchIdentifier :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callSearchIdentifier reqId arguments = do
+callSearchIdentifier :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callSearchIdentifier mScope reqId arguments = do
   env <- ask
   let mIdentifier = getStringArg "identifier" arguments
       mDeployment = getStringArg "deployment" arguments
@@ -882,13 +895,13 @@ callSearchIdentifier reqId arguments = do
     Nothing ->
       pure $ jsonRpcError reqId (-32602) "Missing required argument: identifier"
     Just identifier -> do
-      sources <- loadSourcesForSearch env mDeployment mFile
+      sources <- loadSourcesForSearch env mScope mDeployment mFile
       let matches = searchIdentifier identifier sources
           result = Aeson.encode (map matchToJson matches)
       pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
 
-callSearchText :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callSearchText reqId arguments = do
+callSearchText :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callSearchText mScope reqId arguments = do
   env <- ask
   let mQuery = getStringArg "query" arguments
       mDeployment = getStringArg "deployment" arguments
@@ -898,15 +911,15 @@ callSearchText reqId arguments = do
     Nothing ->
       pure $ jsonRpcError reqId (-32602) "Missing required argument: query"
     Just query -> do
-      sources <- loadSourcesForSearch env mDeployment mFile
+      sources <- loadSourcesForSearch env mScope mDeployment mFile
       let matches = searchText query sources
           result = Aeson.encode (map matchToJson matches)
       pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
 
-loadSourcesForSearch :: AppEnv -> Maybe Text -> Maybe Text -> AppM (Map FilePath Text)
-loadSourcesForSearch env mDeployment mFile = do
+loadSourcesForSearch :: AppEnv -> Maybe Text -> Maybe Text -> Maybe Text -> AppM (Map FilePath Text)
+loadSourcesForSearch env mScope mDeployment mFile = do
   registry <- liftIO $ readTVarIO env.deploymentRegistry
-  let deployIds = case mDeployment of
+  let deployIds = filter (inScope mScope) $ case mDeployment of
         Nothing -> [did.unDeploymentId | (did, _) <- Map.toList registry]
         Just d  -> [d]
 

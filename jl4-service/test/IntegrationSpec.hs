@@ -2544,6 +2544,49 @@ spec = describe "integration" do
         -- Should find the function definition
         LBS.toStrict (responseBody resp) `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
 
+    it "MCP file tools on a scoped endpoint reach only the deployment of the scope" do
+      let marker = "scope_marker_rule" :: Text
+      withPendingServices "scope-files"
+        [ ("scope-own", [("qualifies.l4", qualifiesJL4)])
+        , ("scope-other", [("other.l4", "DECIDE " <> marker <> " IS TRUE\n")])
+        ] \baseUrl mgr -> do
+          let toolText endpoint name arguments = do
+                req <- buildJsonPost (baseUrl <> endpoint) $ Aeson.object
+                  [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                  , "id" Aeson..= (1 :: Int)
+                  , "method" Aeson..= ("tools/call" :: Text)
+                  , "params" Aeson..= Aeson.object
+                      [ "name" Aeson..= (name :: Text)
+                      , "arguments" Aeson..= Aeson.object arguments
+                      ]
+                  ]
+                maybe "" snd . mcpToolText . responseBody <$> httpLbs req mgr
+              reachesOther text = marker `Text.isInfixOf` text || "other.l4" `Text.isInfixOf` text
+              other = [ "deployment" Aeson..= ("scope-other" :: Text) ]
+              -- each file tool, naming the other deployment and naming none
+              calls =
+                [ ("read_file", other <> [ "path" Aeson..= ("other.l4" :: Text) ])
+                , ("list_files", other)
+                , ("list_files", [])
+                , ("search_text", other <> [ "query" Aeson..= marker ])
+                , ("search_text", [ "query" Aeson..= marker ])
+                , ("search_identifier", other <> [ "identifier" Aeson..= marker ])
+                , ("search_identifier", [ "identifier" Aeson..= marker ])
+                ]
+              scoped = "/deployments/scope-own/.mcp"
+          -- the controls: on the org-wide endpoint each call reaches the other
+          -- deployment, and the scoped endpoint reaches its own
+          forM_ calls \(name, arguments) -> do
+            text <- toolText "/.mcp" name arguments
+            (name, Aeson.object arguments, reachesOther text) `shouldBe` (name, Aeson.object arguments, True)
+          toolText scoped "read_file" [ "deployment" Aeson..= ("scope-own" :: Text), "path" Aeson..= ("qualifies.l4" :: Text) ]
+            >>= (`shouldSatisfy` ("compute_qualifies" `Text.isInfixOf`))
+          toolText scoped "list_files" [] >>= (`shouldSatisfy` ("qualifies.l4" `Text.isInfixOf`))
+          -- on the scoped endpoint none of them does
+          forM_ calls \(name, arguments) -> do
+            text <- toolText scoped name arguments
+            (name, Aeson.object arguments, reachesOther text) `shouldBe` (name, Aeson.object arguments, False)
+
     it "MCP read_file rejects path traversal (../)" do
       withPendingService "precomp-traversal" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         let rpcBody = Aeson.object
@@ -3004,8 +3047,12 @@ mkBatchCase n = Aeson.object
 -- | Save sources to the BundleStore and register as DeploymentPending,
 -- simulating a lazy-load restart. The sources exist on disk but are not compiled.
 withPendingService :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService deployId sources act = do
-  resOrExc <- try (withPendingService' deployId sources act)
+withPendingService deployId sources = withPendingServices deployId [(deployId, sources)]
+
+-- | 'withPendingService' with several deployments, in a store named by the first argument.
+withPendingServices :: Text -> [(Text, [(FilePath, Text)])] -> (String -> Manager -> IO a) -> IO a
+withPendingServices storeName deployments act = do
+  resOrExc <- try (withPendingServices' storeName deployments act)
   case resOrExc of
     Left ioe ->
       if isPermissionError ioe
@@ -3015,27 +3062,28 @@ withPendingService deployId sources act = do
           pure undefined
     Right result -> pure result
 
-withPendingService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+withPendingServices' :: Text -> [(Text, [(FilePath, Text)])] -> (String -> Manager -> IO a) -> IO a
+withPendingServices' storeName deployments act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack storeName
   cleanDir tmpPath
   store <- initStore tmpPath
   logger <- newLogger False
 
   -- Save sources to the BundleStore (so loadAndRegister can find them)
-  let sourceMap = Map.fromList sources
-      version = computeVersion sourceMap
-      storedMeta = BundleStore.StoredMetadata
-        { BundleStore.smVersion = version
-        , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
-        , BundleStore.smDescription = Nothing
-        , BundleStore.smServiceVersion = Nothing
-        , BundleStore.smDeploymentVersion = Nothing
-        }
-  BundleStore.saveBundle store deployId sourceMap storedMeta
+  forM_ deployments \(deployId, sources) -> do
+    let sourceMap = Map.fromList sources
+        version = computeVersion sourceMap
+        storedMeta = BundleStore.StoredMetadata
+          { BundleStore.smVersion = version
+          , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+          , BundleStore.smDescription = Nothing
+          , BundleStore.smServiceVersion = Nothing
+          , BundleStore.smDeploymentVersion = Nothing
+          }
+    BundleStore.saveBundle store deployId sourceMap storedMeta
 
   -- Register as Pending (not compiled)
-  registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentPending Nothing)
+  registry <- newTVarIO $ Map.fromList [(DeploymentId deployId, DeploymentPending Nothing) | (deployId, _) <- deployments]
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
