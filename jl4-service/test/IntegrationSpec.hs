@@ -2105,6 +2105,42 @@ spec = describe "integration" do
         -- a client that sends the rule's own names is read as well
         viaMcpOwn `shouldBe` viaRest
 
+    -- The limiter 'DeonticTrace.runDeonticLimited' applies is written out again
+    -- on this branch, with a branch of its own for a limit hit, and the path has
+    -- another for a function that has no compiled module. Neither was reached by
+    -- a test. A timeout of zero is over before the replay starts, as the
+    -- query-plan test relies on.
+    describe "a DEONTIC replay that cannot be run" do
+      let limitHit = "Evaluation resource limit exceeded"
+          noModule = "No compiled module available for deontic evaluation"
+          sale = [("contract.l4", deonticExportJL4)]
+          fn' = "the sale contract" :: Text
+          trace' = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])] :: [Pair]
+          noInputs' = "arguments" Aeson..= Aeson.object [] :: Pair
+
+      it "reports a replay that reaches the time limit on REST, on MCP and in a batch" do
+        withServiceFromSourcesWith testOptions {evalTimeout = 0} "deontic-limit" sale \_ baseUrl mgr -> do
+          viaRest <- evalFunction baseUrl mgr "deontic-limit" fn' (Aeson.object (noInputs' : trace'))
+          (statusCode' viaRest, errorMessageOf (responseBody viaRest)) `shouldBe` (500, limitHit)
+          viaMcp <- askMcp baseUrl mgr "deontic-limit" fn' [] trace'
+          viaMcp `shouldBe` Left limitHit
+          -- as for every other case of a batch on this branch, a limit fails the batch
+          viaBatch <- askBatchCases baseUrl mgr "deontic-limit" fn' [Aeson.object ("@id" Aeson..= (1 :: Int) : trace')]
+          viaBatch `shouldBe` [Left limitHit]
+
+      it "reports a DEONTIC function with no compiled module on REST, on MCP and in a batch" do
+        withServiceFromSourcesWith testOptions "deontic-no-module" sale \registry baseUrl mgr -> do
+          atomically $ modifyTVar' registry $ Map.map \case
+            DeploymentReady fns meta -> DeploymentReady (Map.map (\vf -> vf { fnCompiled = Nothing }) fns) meta
+            other -> other
+          viaRest <- evalFunction baseUrl mgr "deontic-no-module" fn' (Aeson.object (noInputs' : trace'))
+          (statusCode' viaRest, errorMessageOf (responseBody viaRest)) `shouldBe` (500, noModule)
+          viaMcp <- askMcp baseUrl mgr "deontic-no-module" fn' [] trace'
+          viaMcp `shouldBe` Left noModule
+          -- a case with no module is the one kind of case that fails a batch here, as a limit does
+          viaBatch <- askBatchCases baseUrl mgr "deontic-no-module" fn' [Aeson.object ("@id" Aeson..= (1 :: Int) : trace')]
+          viaBatch `shouldBe` [Left noModule]
+
     -- the fixture the REST tests use for a party that is a record: the rule has
     -- inputs of its own, and its function is spelled with a space. It returns
     -- `PROVISION OF …`, the deprecated alias of DEONTIC, so its MCP tool has the
