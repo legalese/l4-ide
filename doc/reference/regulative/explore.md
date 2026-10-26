@@ -184,14 +184,14 @@ It is true with ticks cut by `--until`, and true when write-only cells merged st
 
 The exit status is for scripts, so that a CI job cannot read a partial run as a green one.
 
-| status | means                                                                                                                                                                                                                                                                                  |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                                                                                                                                    |
-| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); an `--until` before the outset; a property, `--emit` or `--fair` asked of a file with nothing to explore; a contract cannot be run at its outset; an emitted file could not be written |
-| 2      | an act was refused, or a move could not be tried                                                                                                                                                                                                                                       |
-| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                                                                                                                                |
-| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                                                                                                                          |
-| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                                                                                                                             |
+| status | means                                                                                                                                                                                                                                                                                                                                    |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                                                                                                                                                                                      |
+| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); a property input named for a cell nothing writes; an `--until` before the outset; a property, `--emit` or `--fair` asked of a file with nothing to explore; a contract cannot be run at its outset; an emitted file could not be written |
+| 2      | an act was refused, or a move could not be tried                                                                                                                                                                                                                                                                                         |
+| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                                                                                                                                                                                  |
+| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                                                                                                                                                                            |
+| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                                                                                                                                                                               |
 
 When a run has more than one of these, the order of the table is not the order of precedence: 1 wins, then 4, then 2, then 3, then 5.
 A tick past `--until` is the exploration you asked for, not a failure of it, and does not change the status.
@@ -218,6 +218,11 @@ There is no property syntax, so the flag carries the property's class:
 | `--reachable P`                  | is `P` true in some reachable state?                                                                                                                              | holds, with a witness; violated                              |
 | `--stays P`                      | does no move go from a state where `P` is true to one where it is false (once true, always true)?                                                                 | holds; violated, with the move                               |
 | `--eventually P [--if-always Q]` | does `P` eventually hold (if `Q` always does)? Liveness needs a fairness assumption and a model checker, so the states are labelled and the answer is left to one | unknown, always: `unknown (liveness: run the emitted model)` |
+
+A property input named for a cell that no `RECORD`, `COMMIT` or `ATTEST` in the file or its imports writes is refused, with exit status 1, naming the property and the cell.
+The cell is empty in every state, which is also what a typo in the input's name gives, and nothing else tells the two apart.
+`--unwritten CELL` lifts the refusal for that cell alone, and may be repeated.
+Use it for a cell written by something the text cannot show, or empty by design in this file: one set of properties serves several designs.
 
 The property of the example says that a dinner is bought only if the ledger said unbought at the instant the purchase took effect.
 
@@ -291,6 +296,12 @@ These are sorted by which signal carries them.
   `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 10-state graph, printed `frontier NOT exhausted: 9 new states past the state bound 5 not added` and exited 3.
 - **A property is violated (exit 4)**, or **unknown (exit 5)**: every liveness property, and any path that fails its replay.
 - **An option names nothing (exit 1).** A property that is not a rule in the file or its imports; one that takes no inputs, or that reads a ledger itself (a `RECALL` inside it would read nothing, outside a run); a `--contract` that is not a rule with no inputs; a `--fair` that names no act; an `--until` earlier than the outset (`--until 0 is before the outset at 64800, so no act could fire`); a property, `--emit` or `--fair` asked of a file with no `#TRACE` and no `--contract`.
+- **A property input is named for a cell nothing writes (exit 1).**
+  The error names the property and the cell, and says to correct the name or to name the cell with `--unwritten`.
+  On `jl4/examples/explore/brief/d1-naive.l4`, `dinners cancelled` is such a cell for the properties `at most one dinner is bought` and `one dinner is bought`, because none of the brief's designs cancels a purchase.
+  A run that names either property says `--unwritten 'dinners cancelled'`, and then explores as before.
+  A misspelt `--unwritten` leaves the real refusal in place, since it lifts only the cell it names.
+  Nothing is refused in a file where some write names its cell by an expression that is not a literal, because any cell may be written there.
 
 ### Silent unless you read the output: the exit status can be 0, and the JSON says `complete`
 
@@ -319,15 +330,19 @@ These are all in the output, on the coverage line or the property's own line, an
 
   Name the property and the explorer keeps the cells it reads, and the same run has 8 states and exits 4, as above.
   `--keep CELL` and `--keep-latest CELL` keep a cell without naming a property.
+  `--emit DIR` with no property named keeps the cell that every property of the file or its imports reads, and lists them on standard error, because the emitted model goes to a checker whose properties the run cannot see.
+  A property is any rule that gives a `BOOLEAN`, takes only `LIST` and `MAYBE` inputs named for cells, and reads no ledger itself.
+  A cell that no write names is left out of the list: it is empty in every state, and keeping it changes nothing.
+  `d1-naive.l4` with `--until 75600 --emit DIR` and nothing else writes a `.aut` of 12 states, and the same run without `--emit` is 10.
+  With `--emit` and a property named, only that property's cells are kept.
   On the fixture `jl4/examples/explore/brief/d1-naive.l4` the difference is 10 states against 12.
 
 - **Ticks cut by the clock bound.** With `--until 100` the explorer does not take the move to just past the closing time.
   The line says `8 ticks past the clock bound not taken` and the JSON says `"complete": true`.
   "Complete" is relative to the bound you gave.
-- **A property reads a cell nothing writes.** The property's line says `never written in any state explored`, and, if no `RECORD`, `COMMIT` or `ATTEST` in the file names the cell, that none does.
-  The cell is then empty in every state, which is also what a typo in the input's name gives, so a property that reads it holds vacuously.
+- **A property reads a cell that no state explored writes.** The property's line says `never written in any state explored`.
+  The file's text does write the cell (a cell that no write names is refused, above), but no state the exploration reached has it written, so the property reads an empty cell and can hold vacuously.
   The verdict is `holds` and the exit status is 0.
-  On `d1-naive.l4`, `dinners cancelled` is such a cell for the properties `at most one dinner is bought` and `one dinner is bought`, and it is said so on both lines.
 - **Compared by name only; compared by printed form.** The clauses in the coverage table that appear only when they apply.
   Each means two positions that differ in one value could be merged.
   None of the files on this page produces them, so what they say here is taken from the explorer's source and not from a run.

@@ -1,6 +1,6 @@
 -- | @l4 explore FILE [--contract NAME [--at T]] [--until T] [--json | --dot]
 -- [--always P] [--reachable P] [--stays P] [--eventually P [--if-always Q]]
--- [--emit DIR [--fair NAME]…]@
+-- [--unwritten CELL]… [--emit DIR [--fair NAME]…]@
 -- — every position a contract can reach, as an explicit labelled
 -- transition system: the states, the events between them, and a coverage
 -- line that says how much of the contract that is; and, when properties are
@@ -30,6 +30,20 @@
 -- the class, so the flag carries it). The cells the properties read are
 -- kept in the state whether or not a @RECALL@ in the file reads them, as
 -- @--keep@ and @--keep-latest@ would keep them.
+--
+-- Two rules follow from what a run's observers are (REGULATIVE-LOWERING-SPEC
+-- §4.1; ruled 2026-10-26). A property input named for a cell that no literal
+-- @RECORD@, @COMMIT@ or @ATTEST@ of the file or its imports writes is
+-- refused, exit 1, naming the property and the cell: the cell is empty in
+-- every state, which a misspelt input would give too, and nothing else
+-- says which it is. @--unwritten CELL@ says the cell is written by
+-- something the text cannot show, or is legitimately empty in this design
+-- (one set of properties serves several), and lifts the refusal for that
+-- cell alone. And @--emit@ with no property named keeps, in the state, the
+-- cell every property-shaped rule of the file and its imports reads, since
+-- the emitted model goes to a consumer whose properties this run cannot
+-- see; the cells are listed on stderr. A run with neither @--emit@ nor a
+-- property keeps only what the rules read, as before.
 --
 -- Exit status, so that a CI job cannot read an incomplete run, or an
 -- unanswered check, as green (§4.2): 0 when the frontier was exhausted with
@@ -98,6 +112,7 @@ data ExploreCliOptions = ExploreCliOptions
   , exGrid      :: Maybe Rational
   , exKeep      :: [Text.Text]
   , exKeepLatest :: [Text.Text]
+  , exUnwritten :: [Text.Text]
   , exProperties :: [PropertyFlag]
   , exJson      :: Bool
   , exDot       :: Bool
@@ -163,6 +178,11 @@ exploreOptionsParser = ExploreCliOptions
         ( long "keep-latest"
         <> metavar "CELL"
         <> help "Keep this ledger cell's latest entry in the state although no RECALL in the file reads it (a cell a property reads as a MAYBE); repeatable"
+        ))
+  <*> many (strOption
+        ( long "unwritten"
+        <> metavar "CELL"
+        <> help "A property input named for this cell is not refused although no RECORD, COMMIT or ATTEST in the file or its imports writes it: the cell is written by something the text cannot show, or is empty by design in this file; repeatable"
         ))
   <*> many (asum
         [ FlagProperty Always <$> strOption
@@ -269,7 +289,25 @@ exploreCmd opts = do
           hPutStrLn stderr ("--" <> Text.unpack (kindWord rq.rqKind) <> " " <> Text.unpack rq.rqName <> ": " <> Text.unpack why)
           exitWith (ExitFailure 1)
         Right p -> pure p
-      let sites = keepCells ([ (c, True) | c <- opts.exKeep ] <> [ (c, False) | c <- opts.exKeepLatest ] <> propertyCells props)
+      -- an input named for a cell nothing writes is empty in every state,
+      -- as a misspelt one would be: refused, unless the cell is named (§4.1, A)
+      case unwrittenInputs opts.exUnwritten props of
+        [] -> pure ()
+        bad -> do
+          for_ bad \ (request, cell) -> hPutStrLn stderr
+            ("--" <> Text.unpack request <> ": its input `" <> Text.unpack cell <> "` is named for a cell that no RECORD, COMMIT or ATTEST in the file or its imports writes, "
+              <> "so it is empty in every state, as a misspelt input would be. If the name is wrong, correct it; if the cell is written by something the text cannot show, "
+              <> "or is empty by design in this file, say so with --unwritten '" <> Text.unpack cell <> "'")
+          exitWith (ExitFailure 1)
+      -- an emitted model goes to a consumer whose properties this run cannot
+      -- see: with none named, keep what every property of the modules reads (§4.1, A+)
+      let emitCells = case opts.exEmit of
+            Just _ | null props -> allPropertyCells rig.rigEntityInfo (rig.rigModule : imported)
+            _ -> []
+      unless (null emitCells) $
+        hPutStrLn stderr ("--emit with no property named keeps, in the state, every cell a property of the file or its imports reads: "
+          <> Text.unpack (Text.intercalate ", " [ "`" <> c <> "`" | c <- Set.toList (Set.fromList (map fst emitCells)) ]))
+      let sites = keepCells ([ (c, True) | c <- opts.exKeep ] <> [ (c, False) | c <- opts.exKeepLatest ] <> propertyCells props <> emitCells)
                     (readSitesOf rig.rigModule imported)
           options = defaultExploreOptions
             { eoMaxDepth = opts.exMaxDepth

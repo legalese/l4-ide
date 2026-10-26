@@ -24,10 +24,13 @@
 -- at all; a rule that reads a ledger itself, directly or through a rule it
 -- names (an @#EVAL@ has no ledger, so its @RECALL@ would read nothing, the
 -- silent kind of wrong). An input named for a cell nothing in the modules
--- writes is not refused, since one set of properties serves several designs
--- and a cell one of them never writes is legitimately empty there; but it is
--- empty in every state, which is also what a typo in its name would give,
--- so the property's line says so.
+-- writes is empty in every state, which is also what a typo in its name
+-- would give. 'resolveProperty' does not refuse it, since one set of
+-- properties serves several designs and a cell one of them never writes is
+-- legitimately empty there; the property's line says so, and
+-- 'unwrittenInputs' lists them for a caller that refuses (the @l4 explore@
+-- command does, unless the cell is named with @--unwritten@; ruled
+-- 2026-10-26, REGULATIVE-LOWERING-SPEC §4.1).
 --
 -- == The labels
 --
@@ -80,6 +83,8 @@ module L4.Lts.Explore.Check
   , Property (..)
   , resolveProperty
   , propertyCells
+  , allPropertyCells
+  , unwrittenInputs
   , kindWord
   , requestText
     -- * Labels
@@ -185,11 +190,12 @@ data Input = MkInput
   { inCell    :: !Text
   , inWhole   :: !Bool
   , inWritten :: !Bool
-    -- ^ some RECORD, COMMIT or ATTEST of the modules names the cell. One
-    -- that none names is empty in every state, which a typo in the input's
-    -- name would also give; it is not refused, since one set of properties
-    -- serves several designs and a cell one of them never writes is
-    -- legitimately empty there, but it is said on the property's line
+    -- ^ some RECORD, COMMIT or ATTEST of the modules names the cell (or one
+    -- of them names a cell by an expression that is not a literal, so any
+    -- cell may be written). One that none names is empty in every state,
+    -- which a typo in the input's name would also give. Resolving does not
+    -- refuse it, since a library caller may serve several designs; it is
+    -- said on the property's line, and 'unwrittenInputs' lists it
   }
   deriving stock (Eq, Show)
 
@@ -217,6 +223,43 @@ propertyCells :: [Property] -> [(Text, Bool)]
 propertyCells props =
   [ (i.inCell, i.inWhole) | p <- props, d <- decisionsOf p, i <- d.dcInputs ]
 
+-- | The cells every property-shaped rule of the modules reads, and how, for
+-- an exploration whose properties are not named: an emitted model
+-- (@--emit@ with no property flag) goes to a consumer this run cannot see,
+-- and the consumer's properties are the modules' (REGULATIVE-LOWERING-SPEC
+-- §4.1, A+). A rule is property-shaped when 'decisionOf' resolves it: it
+-- gives a BOOLEAN, takes only @LIST@ and @MAYBE@ inputs, each named for a
+-- cell, and reads no ledger itself. A rule that does not resolve is not a
+-- property and is passed over: that is the guards and helpers of the
+-- design, whose cells its @RECALL@ sites already keep. A rule that does
+-- resolve may still be a helper (the prelude's @all@ takes a @LIST@ named
+-- @list@); its input names a cell nothing writes, and a cell nothing
+-- writes is empty in every state, so keeping it changes nothing and
+-- listing it would be noise: only inputs named for a cell some write
+-- names ('inWritten') are returned. Each rule is resolved by its own
+-- unique, so two rules with one name are both read.
+allPropertyCells :: EntityInfo -> [Module Resolved] -> [(Text, Bool)]
+allPropertyCells info modules =
+  [ (i.inCell, i.inWhole)
+  | (u, n) <- nubOrdOn fst
+      [ (u, n) | MkModule _ _ section <- modules, MkDecide _ _ (MkAppForm _ (Def u n) _ _) _ <- decidesOf section ]
+  , Right d <- [decisionOf info modules u n]
+  , i <- d.dcInputs
+  , i.inWritten
+  ]
+
+-- | The inputs of the properties that are named for a cell nothing writes
+-- (see 'inWritten'), as the property's request text and the cell, once
+-- each, except the cells in the second argument. These are what the
+-- @l4 explore@ command refuses (§4.1, A): such an input is empty in every
+-- state, as a misspelt one would be, and a property that reads it holds or
+-- fails on a cell it was never given.
+unwrittenInputs :: [Text] -> [Property] -> [(Text, Text)]
+unwrittenInputs exempt props = nubOrd
+  [ (requestText p, i.inCell)
+  | p <- props, d <- decisionsOf p, i <- d.dcInputs
+  , not i.inWritten, i.inCell `notElem` exempt ]
+
 decisionsOf :: Property -> [Decision]
 decisionsOf p = p.prDecision : maybeToList p.prPremise
 
@@ -230,6 +273,15 @@ resolveDecision info modules wanted0 = do
     [] -> Left ("no rule named `" <> wanted <> "` in the file or the files it imports")
     [x] -> Right x
     _ -> Left ("more than one rule is named `" <> wanted <> "`")
+  decisionOf info modules u n
+  where
+    unquote t = fromMaybe t (Text.stripPrefix "`" t >>= Text.stripSuffix "`")
+
+-- | One rule of the modules, by its unique, as a property's decision. 'Left'
+-- says why it is not one.
+decisionOf :: EntityInfo -> [Module Resolved] -> Unique -> Name -> Either Text Decision
+decisionOf info modules u n = do
+  let wanted = nameToText n
   ty <- case Map.lookup u info of
     Just (_, TypeCheck.KnownTerm t _) -> Right (unforall t)
     _ -> Left ("the type of `" <> wanted <> "` is not recorded")
@@ -251,7 +303,6 @@ resolveDecision info modules wanted0 = do
     Right MkInput {inCell = name, inWhole = whole, inWritten = not writesKnown || Set.member name written}
   Right MkDecision {dcName = nameToText n, dcRef = Ref n u n, dcInputs = inputs}
   where
-    unquote t = fromMaybe t (Text.stripPrefix "`" t >>= Text.stripSuffix "`")
     unforall = \ case
       Forall _ _ t -> unforall t
       t -> t
