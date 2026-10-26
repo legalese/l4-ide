@@ -450,10 +450,30 @@ emptyMixfixRegistry :: MixfixRegistry
 emptyMixfixRegistry = MkMixfixRegistry Map.empty Map.empty Set.empty
 
 -- | Merge two registries (used when combining scopes).
+--
+-- Entries are merged with 'List.union', which keeps the first copy of an entry
+-- and drops later copies equal to it. A module's registry already holds every
+-- entry of its imports' registries, so merging with @++@ kept one copy per
+-- import PATH: with n modules that each import every earlier one, the last
+-- held 2^(n-1) copies of the first module's one mixfix function, all
+-- deep-forced with the rest of its 'TypeCheckResult', and
+-- 'lookupByFirstKeyword' returned the product of two such lists
+-- (smucclaw\/l4-ide#1008). A 'FunTypeSig' holds its name's 'Unique', which
+-- embeds the defining module, so two definitions are never equal and only a
+-- copy of the same definition is dropped; 'byFirstKeyword' lists canonical
+-- names, which 'lookupByFirstKeyword' resolves through 'byCanonicalName'.
+-- That changes no reader:
+-- 'L4.TypeCheck.tryMatchAnyPattern' (which keeps the first error),
+-- 'L4.TypeCheck.tryMatchFlattenedPattern' and
+-- 'L4.TypeCheck.tryMatchParamPositions' stop at the first candidate that
+-- matches, a copy of an earlier candidate would have matched or failed as that
+-- one did, the rest test for any candidate, and
+-- 'L4.Export.Document.mixfixHeadingsFromRegistry' builds a 'Map.fromList'
+-- keyed by 'Unique'.
 unionMixfixRegistry :: MixfixRegistry -> MixfixRegistry -> MixfixRegistry
 unionMixfixRegistry r1 r2 = MkMixfixRegistry
-  { byCanonicalName = Map.unionWith (++) r1.byCanonicalName r2.byCanonicalName
-  , byFirstKeyword  = Map.unionWith (++) r1.byFirstKeyword r2.byFirstKeyword
+  { byCanonicalName = Map.unionWith List.union r1.byCanonicalName r2.byCanonicalName
+  , byFirstKeyword  = Map.unionWith List.union r1.byFirstKeyword r2.byFirstKeyword
   , keywordUniverse = Set.union r1.keywordUniverse r2.keywordUniverse
   }
 

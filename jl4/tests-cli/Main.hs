@@ -897,9 +897,8 @@ spec bin = do
   -- modules it imports, and an error INSIDE one of them, or an IMPORT that
   -- finds no module at all, did not fail the run. In each case the entry file is
   -- fine and uses nothing from the import, so only the import's own error can
-  -- fail it. The unresolved IMPORT also publishes a second diagnostic (that the
-  -- module depends on itself), which the examples cannot tell apart from the
-  -- first.
+  -- fail it. The unresolved IMPORT is reported as a module that could not be
+  -- found, and not also as a module that depends on itself.
   describe "l4 check and run on an import that cannot be loaded" $
     forM_ [ ("a type error in an imported module", brokenImportEntry)
           , ("a syntax error in an imported module", syntaxImportEntry)

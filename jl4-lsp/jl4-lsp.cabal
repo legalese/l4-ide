@@ -169,12 +169,16 @@ test-suite jl4-lsp-test
     ClauseGroupLadderSpec
     EmbeddedLibrarySpec
     HoverDisplaySpec
+    ImportClosureSpec
+    ImportOnceSpec
+    ImportSharedSpec
     LibraryResolutionSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     aeson,
     containers,
+    deepseq,
     directory,
     filepath,
     hspec,
