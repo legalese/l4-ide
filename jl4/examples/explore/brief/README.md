@@ -131,8 +131,12 @@ The P1 to P4 columns are reproduced by `l4 explore`'s own checks (WP2), which ke
 ```sh
 l4 explore d1-naive.l4 --until 75600 \
   --always 'every dinner was accepted while open' --always 'at most one dinner is bought' \
-  --reachable "Alice's belief is stale" --stays 'one dinner is bought'
+  --reachable "Alice's belief is stale" --stays 'one dinner is bought' \
+  --unwritten 'dinners cancelled'
 ```
+
+P2 and P4 read `dinners cancelled`, which none of the three designs writes: one set of properties serves several.
+A property input named for a cell nothing writes is refused, exit 1, because a misspelt input would look the same; `--unwritten` says the cell is empty by design here.
 
 Each violated property prints its counterexample as a `#TRACE` that `l4 run` reproduces when it is pasted into the file, and each reached one its witness; every one is run as printed before it is reported.
 The events of a printed trace are all at 18:00 (64800), because the explorer fires an act first at the instant of the last event: the order is Sequence A's, the clock times are not, and the fixtures' guards do not read the clock.
@@ -152,6 +156,7 @@ l4 explore d3-atomic.l4 --until 75600 \
   --eventually 'Alice has bought or stopped' \
   --eventually 'one dinner is bought' --if-always 'the ledger is open' \
   --eventually 'Bob has bought' \
+  --unwritten 'dinners cancelled' \
   --emit out --fair Alice
 ```
 

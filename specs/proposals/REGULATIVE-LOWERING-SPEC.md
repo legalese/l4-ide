@@ -1,7 +1,7 @@
 # Regulative Lowering: an explicit transition system from the evaluator, then the backends
 
 **Status:** Proposal, written 2026-10-25. **On this branch the work packages WP0 to WP6 of §8 are built and committed, and so are the companion's WPO0 to WPO5; none of it has landed.**
-This tree is the local branch `mengwong/lowering-integ`: the merge of `mengwong/lowering-explore` (`2418f2f75`) and `mengwong/lowering-ledger` (`21e03a4bd`) onto `unstable` (`63254397f`, fetched 2026-10-26), with nothing pushed and no pull request.
+This tree is the local branch `mengwong/lowering-integ`: the merge of `mengwong/lowering-explore` (`19714a4c3`) and `mengwong/lowering-ledger` (`7e2c4801f`) onto `unstable` (`63254397f`, fetched 2026-10-26), with nothing pushed and no pull request.
 The checks quoted below ran on those two branches at the commits named, before the merge, except the one that begins "Checked 2026-10-26 on this tree", which ran on this tree.
 Checked 2026-10-26 on this tree at `9ddb5b682`, with the full `etc/verify-branch.sh` and not `--quick`: `cabal build all`; `jl4-test` 4823 examples, 0 failures; `l4-cli-test` 648 examples, 0 failures (83 pending); `jl4-core-test` 1604 examples, 0 failures (13 pending); `jl4-service-test` 742 examples, 0 failures, with `JL4_LEDGER_TEST_POSTGRES_URL` set to the local PostgreSQL 17.11 so that the live Postgres items ran and were not pending; the service restart probe; the corpus-golden and canon checks; `doc/test-docs.sh --no-l4`; prettier 3.4.2 on the changed files; and the commit trailers; with one warning, probe (c): three assertions at `jl4/tests-cli/CliTest/Explore.hs:225`, `:229` and `:237` that may compare output carrying `\r` on Windows, the same three as on the explore branch, and not run on Windows.
 Checked 2026-10-26 on `mengwong/lowering-explore` at `2c24d9547`: the cross-validation harness of WP4 (`make -C jl4/examples/explore/harness check`, with mCRL2, TLC and NuSMV installed and `RELEASE=1`) passed 287 of 287 checks against an `l4` built from this tree.
@@ -10,7 +10,12 @@ Not run on those branches: `jl4-test` (the goldens, about 12 minutes; it ran on 
 On `mengwong/lowering-explore`, after merging the pushed formatting fix `d8cda38fa` (draft PR #746 passed CI at that commit, Repo-Wide Invariants and TypeScript Checks included, 2026-10-26), `etc/verify-branch.sh --quick` passed at `dd4e2d08b`: `cabal build all`, `l4-cli-test` 641 examples, `jl4-core-test` 1574, `jl4-service-test` 661, the corpus-golden and canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 and the commit trailers, with one warning, probe (c), on three assertions of the explorer's CLI tests (`jl4/tests-cli/CliTest/Explore.hs`, lines 225, 229 and 237) that the script flags as possibly comparing text that still carries a `\r` on Windows; they are unchanged and have not been run on Windows.
 A pass of that script is not a green CI.
 Not built: a CI job that runs the harness; checks of the `.pnml` and `.dot` outputs; runs of Apalache, Spin and TAPAAL.
-Three silent failures of `l4 explore` reproduced on 2026-10-26 are fixed in `2c24d9547`, which is assumed, not ruled and can be reverted alone; a fourth is by design and documented; §12 lists them.
+Three silent failures of `l4 explore` reproduced on 2026-10-26 are fixed in `2c24d9547`, which is assumed, not ruled and can be reverted alone; a fourth, a property input named for a cell nothing writes, was silent by design and has been refused since `67a61e4ed` (ruled 2026-10-26, R-L8 in §9); §12 lists them.
+§4.1's rule for what a run keeps in a state was ruled in session on 2026-10-26 and built in `67a61e4ed`, a commit that reverts alone; the spec text that records it is in the commit after it.
+Checked 2026-10-26 on `mengwong/lowering-explore` at `67a61e4ed`: `etc/verify-branch.sh --quick` passed (exit 0): `cabal build all`, `l4-cli-test` 648 examples, 0 failures (83 pending), `jl4-core-test` 1576, 0 failures (13 pending), `jl4-service-test` 661, 0 failures, the corpus-goldens presence check, the canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 on the changed files and the commit trailers.
+Its probe (c) warned on 3 lines of `jl4/tests-cli/CliTest/Explore.hs`, the three it warned on before this change (they moved down by the lines this change added), and not on any of this change's.
+Also at that commit: `doc/test-docs.sh` with its L4 examples, 116 L4 files, 0 errors; and the harness of WP4 without `RELEASE=1` and with none of mCRL2, TLC or NuSMV installed, 236 checks, 114 pass, 0 fail, 122 unknown.
+Not run at that commit: `jl4-test`; the harness with its tools (the 287 of 287 above is from `2c24d9547`, before the harness gained `--unwritten`); and `ltscompare`, so the prediction in §6.2 stands unchecked.
 **Author:** Meng Wong, drafted by session pitch-Oct from the five verification probes of 2026-10-25.
 **Parent:** [VERIFICATION-BACKEND-LOWERING-SPEC.md](VERIFICATION-BACKEND-LOWERING-SPEC.md), whose Phase 0 and Phases 2 to 4 this document narrows to one fragment and one fixture.
 **Related:** [BOUNDED-DEONTICS-SPEC.md](../todo/BOUNDED-DEONTICS-SPEC.md) (object and assertion levels; contract time ruled discrete, T2, 2026-09-09), `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §2.4 (counterfactuals come from running the evaluator, never from a second semantics), `doc/reference/regulative/lts-list.md`, `doc/reference/regulative/STATE-GRAPH.md`.
@@ -136,12 +141,37 @@ The graph of record is the explicit LTS of §4, not the structural graph `l4 sta
 A **position** is what `L4.Lts.WhatIf.position` computes: the residual contract, the ledger (`RECORD`ed values), the clock, the marking.
 Two positions are **the same state** when their canonical forms are equal.
 The canonical form is: the residual after `reifyExpr` with source ranges erased and binders renamed in order of occurrence; a **projection** of the ledger; the clock **dropped** unless a live deadline reads it (§4.5).
-The projection keeps every ledger that some rule or property `RECALL`s, in recorded order (since `RECALL ALL` reads order), and drops every ledger that is only ever written.
-That is decided statically from the `RECALL` sites of the module and the property file, so it is not a ruling; on the original private example it is what makes exploration terminate at all, because the contract appends a time-stamped string to `decision log` on **every** act, and no two paths would ever merge if the log were in the state (buy-blocker, 2026-10-25).
-A write-only ledger is audit output, and the coverage line names each one dropped.
+The projection is chosen by what the run's observers can tell apart.
+Two positions are the same state when no observer of the run can distinguish them, so a state is a position seen through its observers.
+The observers are the rules of the file, which read the ledger by `RECALL`; the properties a run names, which read it through their inputs (§5.1); and, for an emitted model, the consumer's properties, which the run cannot see.
+So the projection keeps, in recorded order (since `RECALL ALL` reads order):
+
+- every ledger that some rule `RECALL`s, found statically from the literal `RECALL` sites of the file and the files it imports;
+- with properties named, every cell that a named property takes as an input, whole where the input is a `LIST` and as its latest entry where it is a `MAYBE`;
+- with `--emit` and no property named, every cell that any property-shaped rule of the file or its imports takes as an input, because the emitted model goes to a consumer whose properties this run cannot see; a rule is property-shaped when it gives a `BOOLEAN`, takes only `LIST` and `MAYBE` inputs named for cells, and reads no ledger itself, and a cell that no write names is left out, since it is empty in every state;
+- every cell that `--keep` or `--keep-latest` names.
+
+Every other ledger is dropped, and the coverage line names each one dropped.
+A bare run, with neither a property nor `--emit`, keeps only what the rules read, and so merges positions that differ only in a cell nothing in that run observes.
+On D1 that is 10 states and 18 transitions and not 12 and 21: Sequence A's bad purchase and Sequence B's good one differ only in `open at acceptance` and `dinners bought`, which no rule of D1 reads and which a bare run has no property to ask about.
+For that run the 10-state graph is the right one, and not an error to correct; naming P1 to P4, or `--emit`, gives 12 and 21.
+The static scan reads the property file with the other imports and finds no `RECALL` in it, because a property reads no ledger: its inputs are the cells it is handed.
+The counts are pinned by `jl4/tests-cli/CliTest/Explore.hs` (the examples under "unwritten cells and the cells an emitted model keeps").
+
+A property input is named for a cell, and nothing in the module ties the name to a cell.
+That convention is a declaration, and its defect was that nothing checked it: an input named for a cell that nothing writes is the empty list in every state, which a misspelt name gives too, so the property held vacuously and the run exited 0.
+Ruled 2026-10-26 (R-L8, §9): `l4 explore` refuses, with exit 1, naming the property and the cell, a property input named for a cell that no literal `RECORD`, `COMMIT` or `ATTEST` of the file or its imports writes.
+`--unwritten CELL` (repeatable) lifts the refusal for that cell alone, for a cell written by something the text cannot show or empty by design in this file, since one set of properties serves several designs: `dinners cancelled` is such a cell for the brief's three designs.
+A misspelt `--unwritten` lifts nothing, so the real refusal stands.
+A file in which some write names its cell by an expression that is not a literal is not checked this way, since any cell may be written there.
+Letting a property `RECALL` its cells itself (option B of the bench discussion) was not chosen: a property is evaluated in a fresh directive with an empty ledger (`withFreshLedger`, `jl4-core/src/L4/EvaluateLazy.hs:200-208`, read), so it would need a new evaluator entry point, and a `RECALL ALL` of a cell nothing wrote is the empty list with no error (`jl4-core/src/L4/EvaluateLazy/Machine.hs:4457-4471`, read, not run), so it would not have closed the typo either.
+
+On the original private example the projection is what makes exploration terminate at all, because the contract appends a time-stamped string to `decision log` on **every** act, and no two paths would ever merge if the log were in the state (buy-blocker, 2026-10-25).
+A write-only ledger is audit output.
 Without a canonical form a contract like `the evening`, which recurses through `HENCE` with changing menu picks, never terminates (TLA+ report §5: "the set of reachable residual contracts must be finite").
-The canonicalisation is **assumed, not ruled**, and it is the one place a faithfulness bug can hide silently: two positions the evaluator would treat differently, merged.
-The harness's bisimulation check (§6.2) is the guard against it.
+The canonicalisation of the residual and the clock is **assumed, not ruled**, and it is a place where a faithfulness bug can hide silently: two positions the evaluator would treat differently, merged.
+The guards against it that are read in the code are not the bisimulation of §6.2 (see there): a property is not labelled in a state where a cell it reads was not kept (`unkeptCells` in `L4/Lts/Explore/Check.hs`), and every counterexample or witness is replayed on the evaluator before it is printed (`replayPath`, called in the same file).
+The projection of cells is ruled (R-L8).
 
 ### 4.2 Candidates, and the finite enumeration of binders
 
@@ -250,15 +280,14 @@ The emitter derives the list from the graph: every label whose actor is Alice, o
 
 ### 5.1 Properties are boolean decisions over the position
 
-A property is an ordinary L4 `DECIDE` of type `BOOLEAN` whose inputs are what the position holds: the ledger (`RECALL ALL …`) and the contract's standing (`FULFILLED`, `BREACH BY p`, in progress).
-P1 of the brief, in L4:
+A property is an ordinary L4 `DECIDE` of type `BOOLEAN` whose inputs are what the position holds: the ledger cells it reads, each input named for its cell (a `LIST` is handed the cell's whole history, as `RECALL ALL` reads it, and a `MAYBE` its latest entry), and, as designed, the contract's standing (`FULFILLED`, `BREACH BY p`, in progress).
+A property does not `RECALL` itself: the built checker refuses one that does, and one whose input is named for a cell nothing writes (§4.1).
+P1 of the brief, in L4 (`brief/properties.l4`):
 
 ```l4
-GIVEN dinners IS A LIST OF Dinner
-      checks  IS A LIST OF `Acceptance check`     -- COMMITted by the accepting step: was the record open at that instant?
+GIVEN `open at acceptance` IS A LIST OF BOOLEAN     -- COMMITted by the accepting step: was the record open at that instant?
 GIVETH A BOOLEAN
-`every dinner was accepted while open` MEANS
-    all (GIVEN c YIELD c's `open at acceptance`) checks
+`every dinner was accepted while open` MEANS all (GIVEN ok YIELD ok) `open at acceptance`
 ```
 
 The explorer evaluates every property at every state and **labels** the state.
@@ -332,8 +361,12 @@ Two consequences of §1 finding 3:
   Beside each vendored file the harness records the two commands, the mCRL2 version, the SHA-256 of its relabelled source and of the `.aut` when built, and the solutions commit of the source it was relabelled from, so a changed brief cannot leave the bisimulation green against a stale oracle.
   Compare against the `-viz` build, whose labels are `step(t)`; the plain `dN.lts` labels carry the whole post-state.
 
-A generated model and a hand model agreeing up to bisimulation is the executable faithfulness the parent spec asks for, and the strongest guard on §4.1's canonicalisation.
-Where they are not bisimilar the harness prints the distinguishing trace, which is itself a `#TRACE` (§5.4) and so a bug report that runs.
+A generated model and a hand model agreeing up to bisimulation is the executable faithfulness the parent spec asks for, for what the `.aut` carries: the act labels and the shape of the graph.
+It is not claimed to be a guard on which ledger cells §4.1 keeps.
+The `.aut` compares on act labels, so two states with the same futures of acts and different ledgers are not told apart by it, and a bare run's 10-state D1 is such a merge (§4.1).
+UNVERIFIED: a reviewer's prediction (2026-10-26) that `ltscompare -ebisim` of the bare 10-state D1 `.aut` against the D1 reference prints `true`; `ltscompare` was not run, so this is a prediction and not a finding.
+The cheapest check is to run it.
+Where two graphs are not bisimilar the harness prints the distinguishing trace, which is itself a `#TRACE` (§5.4) and so a bug report that runs.
 
 ### 6.3 Verdict agreement, positive controls, mutants
 
@@ -403,6 +436,7 @@ These are visible to a rule author or a reader of the output, so they are Meng's
 - **R-L6 TLA+ fairness, reversed.** The first draft recommended `WF_vars(Next)` over real steps and rejected a per-action list as one more place to diverge; TLC showed `WF_vars(Next)` violates P5 and P6 on D3 (§1 finding 11). Recommendation: weak fairness per labelled action, derived from the graph by the emitter (§4.6), with the `lastAct`/`beat` step encoding kept so a pause is a visible step; a reader of an emitted `.tla` sees the list.
 - **R-L7 Target order.** The comparison in legalese/solutions#1 recommends TLA+ first, PNML second, NuSMV third, Spin as the alternative; it marks this "not ruled". Recommendation: TLA+ and NuSMV together as the first pair (the harness needs both for liveness), PNML last as a picture target (not a dense-time door: T2, petri/REPORT.md:405-419), Spin kept as the alternative, Maude and UPPAAL out; `.aut` built first as the harness oracle, which makes mCRL2 a required harness tool. The parent's phase order (Z3, Alloy, UPPAAL/TAPAAL, TLA+) is reordered by this for the explicit route, and WP6 says so.
   **Ruled 2026-10-25, card L7: accept, option A**: TLA+ and NuSMV as the first pair, PNML last as a picture target, Spin the alternative, Maude and UPPAAL out, `.aut` first as the harness oracle with mCRL2 a required harness tool, fairness per labelled action (R-L6 folded in); no note. Bench: https://claude.ai/artifact/CwGXLC6dCAzUfFGZQ2VDye#L7.
+- **R-L8 What a run keeps in a state (§4.1): A and A+ together, not B. Ruled 2026-10-26, in session, not on the bench**, on the conditions that a property input named for a cell no literal `RECORD`, `COMMIT` or `ATTEST` writes is refused with exit 1 unless `--unwritten CELL` names it (nothing is refused where a write names its cell by a non-literal), that `--emit` with no property named keeps every written cell that any property-shaped rule reads and nothing changes for a bare run or for `--emit` with a property named, and that a property does not `RECALL` itself; Meng's note, verbatim: "okay. in that case i will take your recommendation to do A and A+ together, please go ahead." Built in `67a61e4ed`.
 
 ## 10. Register of deferred obligations
 
@@ -428,16 +462,21 @@ These are visible to a rule author or a reader of the output, so they are Meng's
 
 ## 12. What this spec does not claim
 
-- On this branch the explorer is built, and the state counts quoted (12/21, 15/30, 10/21) are the probes' hand models, which `l4 explore` reproduces only under the run written out in `jl4/examples/explore/brief/README.md` (the clock bounded at closing, and the cells `properties.l4` reads kept with `--keep` and `--keep-latest`).
+- On this branch the explorer is built, and the state counts quoted (12/21, 15/30, 10/21) are the probes' hand models, which `l4 explore` reproduces only under the run written out in `jl4/examples/explore/brief/README.md` (the clock bounded at closing, and the cells `properties.l4` reads kept with `--keep` and `--keep-latest`, or named by the properties, or kept by `--emit` with none named, §4.1).
   A bare `l4 explore d1-naive.l4` reports 20 states and 38 transitions (measured 2026-10-26 at `8cf825feb`).
   On `unstable` nothing of this is built.
 - Three silent failures of `l4 explore` were reproduced on 2026-10-26 at `8cf825feb`, each exiting 0 on a confident line, and are fixed in `2c24d9547` (assumed, not ruled: the exit status of an error case is for Meng to rule on).
   An `--until` before the contract's outset fired no act and held every `--always` and `--stays` property of the one state, D1's P1 included; it now exits 1.
   A file with no `#TRACE` and a named property, `--emit` or `--fair` printed "Nothing to explore" and exited 0; it now exits 1, and still exits 0 when none of those was asked for.
   A position that merged into a state already seen dropped its coverage notes, so the coverage line could say "no write-only cell dropped" when a cell was written and dropped; it now notes them.
-- One silent failure is by design and not fixed: a property input named for a cell nothing writes is read as an empty list in every state, so the property holds vacuously.
-  `doc/reference/regulative/explore.md` documents it, and the property's line in the output says the cell was never written in any state explored.
-  The ledger of the companion spec is in this tree as well, from `mengwong/lowering-ledger`.
+- The fourth silent failure, a property input named for a cell nothing writes (read as an empty list in every state, so the property held vacuously and the run exited 0), was by design until Meng ruled on 2026-10-26 (R-L8, §4.1); since `67a61e4ed` it is refused, exit 1, unless `--unwritten` names the cell.
+  What stays silent is a cell the file's text does write but no state explored has written: the property's line says "never written in any state explored", and the exit status is 0.
+- Not verified, and so not claimed: that the bisimulation of §6.2 cannot see the bare 10-state D1 (§6.2, UNVERIFIED); and whether a `RECALL` can name its cell by a non-literal expression.
+  The parser reads the cell as an expression (`jl4-core/src/L4/Parser.hs`, `recallExpr`, read) and `readSitesOf` keeps only literal names (`jl4-core/src/L4/Lts/Explore.hs`), so a computed name would not be kept; whether the grammar admits one was not checked.
+- `--emit` with no property named keeps the written cells that property-shaped rules read, found by their shape.
+  A helper rule of that shape that is not a property adds its input's name, which changes nothing unless a write names that cell, and a consumer's property over a cell that no rule or property of the file mentions is not served.
+  The 12-state D1 `.aut` is measured; that it is the model a given checker needs is not.
+- The ledger of the companion spec is in this tree as well, from `mengwong/lowering-ledger`.
 - The probes ran on 10 to 25 untimed states; nothing here says the explicit route scales to a whole contract, and D-L1 exists because it may not.
 - The probes' models were written by Sonnet agents from one brief and spot-checked against their logs by the parent session; the bisimulation check of §6.2 is what would make them an oracle rather than a reference.
 - The probe reports cited here are in the private `legalese/solutions` repo, pushed 2026-10-25 as draft PR legalese/solutions#1 (commit `b0de111`), so they resolve for the team and for nobody else.

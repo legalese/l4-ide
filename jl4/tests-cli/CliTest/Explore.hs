@@ -35,10 +35,13 @@ acceptance =
   , "--keep", "dinner status record", "--keep-latest", "belief", "--keep-latest", "plan"
   ]
 
--- | The brief's safety and reachability properties, P1 to P4.
+-- | The brief's safety and reachability properties, P1 to P4. P2 and P4 read
+-- `dinners cancelled`, which none of the brief's designs writes (one set of
+-- properties serves several designs), so a run that names them says so.
 safety :: [String]
 safety =
   [ "--until", "75600"
+  , "--unwritten", "dinners cancelled"
   , "--always", "every dinner was accepted while open"
   , "--always", "at most one dinner is bought"
   , "--reachable", "Alice's belief is stale"
@@ -74,6 +77,14 @@ lastLine :: String -> String
 lastLine = \ s -> case lines s of
   [] -> ""
   ls -> last ls
+
+replaceAll :: String -> String -> String -> String
+replaceAll from to = go
+  where
+    go [] = []
+    go s@(c : cs)
+      | from `isPrefixOf` s = to <> go (drop (length from) s)
+      | otherwise = c : go cs
 
 spec :: FilePath -> Spec
 spec bin = describe "l4 explore" $ do
@@ -205,6 +216,60 @@ spec bin = describe "l4 explore" $ do
       Output code' _ serr' <- runL4 bin ["explore", brief </> "d1-naive.l4", "--if-always", "the ledger is open"]
       code' `shouldBe` ExitFailure 1
       serr' `shouldSatisfy` ("must come straight after one" `isInfixOf`)
+
+  -- §4.1, ruled 2026-10-26: what a run's observers can tell apart is what
+  -- it keeps in a state. A property input named for a cell nothing writes is
+  -- refused (it is empty in every state, as a misspelt one would be) unless
+  -- --unwritten names the cell; and --emit with no property named keeps the
+  -- cells the file's properties read, since the emitted model's consumer
+  -- is unseen.
+  describe "unwritten cells and the cells an emitted model keeps (§4.1)" $ do
+    it "refuses a property input named for a cell nothing writes, naming the property and the cell, and exits 1 before exploring" $ do
+      Output code sout serr <- runL4 bin ["explore", brief </> "d1-naive.l4", "--until", "75600", "--always", "at most one dinner is bought"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("--always `at most one dinner is bought`: its input `dinners cancelled` is named for a cell that no RECORD, COMMIT or ATTEST in the file or its imports writes" `isInfixOf`)
+      serr `shouldSatisfy` ("--unwritten 'dinners cancelled'" `isInfixOf`)
+      sout `shouldBe` ""
+
+    it "lifts the refusal for the cell --unwritten names, and the graph is the one that property's cells make: 10 states, not 12" $ do
+      Output code sout _ <- runL4 bin ["explore", brief </> "d1-naive.l4", "--until", "75600", "--always", "at most one dinner is bought", "--unwritten", "dinners cancelled"]
+      code `shouldBe` ExitSuccess
+      lastLine sout `shouldSatisfy` ("Coverage: 10 states, 18 transitions; frontier exhausted" `isPrefixOf`)
+
+    it "does not lift it for a cell --unwritten does not name, so a misspelt exemption leaves the refusal in place" $ do
+      Output code _ serr <- runL4 bin ["explore", brief </> "d1-naive.l4", "--until", "75600", "--always", "at most one dinner is bought", "--unwritten", "dinners canceled"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("its input `dinners cancelled`" `isInfixOf`)
+
+    it "refuses a misspelt input, which held on a cell nobody wrote before this rule" $
+      withSystemTempDirectory "explore-typo" $ \ dir -> do
+        copyFile (brief </> "d1-naive.l4") (dir </> "d1-naive.l4")
+        props <- readFile (brief </> "properties.l4")
+        writeFile (dir </> "properties.l4") (replaceAll "open at acceptance" "open at acceptence" props)
+        Output code _ serr <- runL4 bin ["explore", dir </> "d1-naive.l4", "--until", "75600", "--always", "every dinner was accepted while open"]
+        code `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` ("its input `open at acceptence` is named for a cell that no RECORD, COMMIT or ATTEST" `isInfixOf`)
+
+    it "leaves a bare run as it was: D1 is 10 states, with no --emit and no property" $ do
+      Output code sout _ <- runL4 bin ["explore", brief </> "d1-naive.l4", "--until", "75600"]
+      code `shouldBe` ExitSuccess
+      lastLine sout `shouldSatisfy` ("Coverage: 10 states, 18 transitions; frontier exhausted" `isPrefixOf`)
+
+    it "keeps, for an emitted model with no property named, every cell the file's properties read: D1's .aut has 12 states, and stderr lists the cells" $
+      withSystemTempDirectory "l4-explore-emit-keep" \ dir -> do
+        Output code _ serr <- runL4 bin ["explore", brief </> "d1-naive.l4", "--until", "75600", "--emit", dir]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("--emit with no property named keeps, in the state, every cell a property of the file or its imports reads: `belief`, `dinner status record`, `dinners bought`, `open at acceptance`, `plan`" `isInfixOf`)
+        aut <- readFile (dir </> "d1_naive.aut")
+        take 1 (map (filter (/= '\r')) (lines aut)) `shouldBe` ["des (0,21,12)"]
+
+    it "keeps only the named property's cells when --emit has one named: the same D1 is 10 states, and stderr does not claim otherwise" $
+      withSystemTempDirectory "l4-explore-emit-named" \ dir -> do
+        Output code _ serr <- runL4 bin ["explore", brief </> "d1-naive.l4", "--until", "75600", "--always", "at most one dinner is bought", "--unwritten", "dinners cancelled", "--emit", dir]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` (not . ("keeps, in the state" `isInfixOf`))
+        aut <- readFile (dir </> "d1_naive.aut")
+        take 1 (map (filter (/= '\r')) (lines aut)) `shouldBe` ["des (0,18,10)"]
 
   describe "--emit and --fair (WP3)" $ do
     it "writes D3's thirteen files, gives Alice's two moving acts weak fairness, and exits as it would without --emit" $

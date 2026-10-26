@@ -29,9 +29,14 @@
 --      deadline, so the counterexample is a tick; the printed #TRACE run
 --      as source; a source replay that disagrees caught; unknown when the
 --      exploration is incomplete or a cell is in two ledgers; and the
---      properties refused by name.
+--      properties refused by name;
+--   7. the cells a run keeps for its observers (§4.1, ruled 2026-10-26):
+--      an input named for a cell nothing writes is listed for refusal, and
+--      the cells an emitted model keeps are those of every property-shaped
+--      rule that some write names.
 module LtsExploreSpec (spec) where
 
+import Data.List (nub, sort)
 import qualified Data.Text as Text
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
@@ -483,6 +488,33 @@ spec = describe "l4 explore" do
       refusal (ask Always "no such rule") >>= (`shouldSatisfy` Text.isInfixOf "no rule named `no such rule`")
       refusal (MkRequest Always "nothing missed" (Just "something missed")) >>= (`shouldSatisfy` Text.isInfixOf "is for an eventually property")
       resolveIn late (ask Always "`nothing missed`") `shouldReturn` Right ()
+
+  describe "7. the cells a run keeps for its observers (§4.1)" do
+    let typoSrc = lateSrc "FULFILLED" <> Text.unlines
+          [ ""
+          , "GIVEN misssed IS A MAYBE BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "`a typo` MEANS TRUE"
+          ]
+        modulesOf = do
+          r <- either (fail . show) pure (checkWithImports (vfsFromList []) typoSrc)
+          pure (r, \ n -> either (fail . Text.unpack) pure (resolveProperty r.tcdEntityInfo [r.tcdModule] (ask Always n)))
+
+    it "lists an input named for a cell nothing writes, once, and neither a written cell nor an exempted one" do
+      (_, propOf) <- modulesOf
+      typo <- propOf "a typo"
+      fine <- propOf "nothing missed"
+      unwrittenInputs [] [typo, fine, typo] `shouldBe` [("always `a typo`", "misssed")]
+      unwrittenInputs ["misssed"] [typo, fine] `shouldBe` []
+      -- an exemption lifts the cell it names and no other
+      unwrittenInputs ["missed"] [typo, fine] `shouldBe` [("always `a typo`", "misssed")]
+
+    it "keeps, for an emitted model, the written cells of every property-shaped rule, and passes over the rest" do
+      (r, _) <- modulesOf
+      -- `missed` is written; `misssed` is not, so it is not kept; `m` is a
+      -- Move, `no inputs` has none and `reads itself` reads a ledger, so
+      -- none of those is a property
+      sort (nub (allPropertyCells r.tcdEntityInfo [r.tcdModule])) `shouldBe` [("missed", False), ("missed", True)]
   where
     decisionArgsText store = do
       r <- either (fail . show) pure (checkWithImports (vfsFromList []) (lateSrc "FULFILLED"))

@@ -331,6 +331,8 @@ class Harness:
             cmd += [KIND_FLAG[p["kind"]], p["decision"]]
             if p["premise"] != "-":
                 cmd += ["--if-always", p["premise"]]
+        # the properties file serves every design, and `dinners cancelled` is written by none of the brief's: a property input named for a cell nothing writes is refused, exit 1 (§4.1)
+        cmd += ["--unwritten", "dinners cancelled"]
         cmd += ["--json", "--emit", str(emit), "--fixed-now", FIXED_NOW]
         for f in VARIANTS[variant]["fair"]:
             cmd += ["--fair", f]
