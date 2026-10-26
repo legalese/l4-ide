@@ -64,7 +64,7 @@ instance FromJSON FnLiteral where
     Bool val -> pure $ FnLitBool val
     Number val
       -- Check if it's an integer (no fractional part) - supports arbitrary precision
-      | Scientific.isInteger val -> pure $ FnLitInt $ Scientific.coefficient val * (10 ^ Scientific.base10Exponent val)
+      | Scientific.isInteger val -> pure $ FnLitInt $ floor val
       -- Otherwise it's a floating point number
       | Right d <- Scientific.toBoundedRealFloat val -> pure $ FnLitDouble d
       | otherwise -> Aeson.typeMismatch "Failed to parse number into bounded real" (Number val)
