@@ -30,6 +30,7 @@
 ## Publish rules
 
 - [Deploy your rules](deploying-rules/exporting-rules-for-deployment.md)
+- [Deploy a project that has folders](deploying-rules/deploy-a-project-with-folders.md)
 - [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)
 
 ## Use deployed rules

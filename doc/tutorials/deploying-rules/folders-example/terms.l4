@@ -1,0 +1,2 @@
+-- terms.l4: the one figure that both rules in this project share.
+`the grace period in days` MEANS 14

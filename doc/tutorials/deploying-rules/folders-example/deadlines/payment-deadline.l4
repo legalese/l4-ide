@@ -1,0 +1,12 @@
+-- payment-deadline.l4: the last day a customer can pay without a late fee (the file to deploy).
+IMPORT grace
+
+@export default How many days after the due date can a customer pay without a late fee?
+GIVEN `asked for extra days` IS A BOOLEAN @desc Whether the customer asked for the courtesy days
+GIVETH A NUMBER
+DECIDE `last free day` IS
+    IF `asked for extra days`
+    THEN `the grace period in days` + `courtesy days`
+    ELSE `the grace period in days`
+
+#EVAL `last free day` TRUE

@@ -20,6 +20,7 @@
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
 - [Patterns](tutorials/getting-started/common-patterns.md)
+- [Deploy a project that has folders](tutorials/deploying-rules/deploy-a-project-with-folders.md)
 - [Errors and Troubleshooting](reference/errors/README.md)
 
 ## Exports

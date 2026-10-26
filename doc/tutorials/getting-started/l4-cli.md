@@ -629,6 +629,7 @@ The service that runs the deployment reads only those files and the standard lib
 It does not read your `JL4_LIBRARY_PATH` or your per-user library folder, where `l4` may have found a library.
 Within the upload, it looks for an `IMPORT` in two places only: beside the file that imports it, and at the top of the upload, which is the folder that holds all the uploaded files.
 `l4` checks that before it sends anything, and stops when a file would end up where the service does not look.
+[Deploy a project that has folders](../deploying-rules/deploy-a-project-with-folders.md) works through this with a small project, and quotes the messages `l4` stops with.
 
 - **Folders are kept.**
   Each file is named by its path below the folder that holds all of them, with `/` between the parts.
