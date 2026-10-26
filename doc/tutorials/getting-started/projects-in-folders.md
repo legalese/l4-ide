@@ -7,7 +7,7 @@ Until both have merged and a release carries them, only an `l4` built from the #
 **To find out whether your `l4` does,** make the files of [section 2](#2-split-it-into-a-shared-folder-and-a-rules-folder) and run `l4 check rules/notice.l4` from the `tenancy-rules` folder.
 `Check succeeded.` means it does.
 `I could not find a module with this name: terms` means it does not, and the rest of this page will not work for you.
-(`l4 --version` cannot tell you: it printed only `dev` for the build this page was written with and for an older `l4`.)
+(`l4 --version` cannot tell you: it printed only `dev` for the build this page was written with and for an `l4` that does not have #748.)
 **Deploying a project that keeps its folders does not work yet:** `l4 deploy` sends every file under its plain file name, so a deployed copy cannot find what these `IMPORT` lines name.
 [If you need to deploy now](#if-you-need-to-deploy-now) says what does work.
 A deploy that keeps folders is draft pull request #749.
@@ -606,7 +606,7 @@ DECIDE `notice is long enough` IF `days of notice given` AT LEAST `notice period
 Alex deployed the flat copy with `l4 deploy notice.l4 --server <address>` to a `jl4-service` running on the same Mac, which is the program that keeps deployed rules and answers calls to them.
 `l4` printed `Deploying 'notice' to …: notice.l4, terms.l4` and `Deployed 'notice' (version 0.0.0) with 1 function:`, a call made with `curl` with 45 days of notice answered `true`, and a call with 10 answered `false`.
 The service wrote no `Bundle IMPORT resolves to nothing` warning.
-This worked with the `l4` of the #751 branch and again with an older `l4` that printed `dev`.
+This worked with the `l4` of the #751 branch and again with an `l4` that does not have #748 (both print `dev`).
 Without `--server`, `l4 deploy` goes to Legalese Cloud, where you sign in first with the `legalese` command (this is what `l4 deploy --help` says); that was not tried for this page.
 [Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md) shows how to sign in, deploy and call a rule on Legalese Cloud.
 
@@ -726,12 +726,16 @@ The zip tool and `curl` were not tried on Windows, and nothing was tried against
 
 ## How this page was checked
 
-Every command and message on this page was run on 2026-10-26, on a Mac, with the `l4` built from the #751 branch that morning.
-That `l4` prints only `dev` for `--version`, so the branch is its only name; the branch's code directories (`jl4-core`, `jl4`, `jl4-service`, `jl4-lsp`) were not changed after that build, only the documentation and the specification were.
+Every command and message on this page was run on 2026-10-26, on a Mac, with one of three builds of `l4`.
+Almost all of them used the `l4` built from the #751 branch that morning.
+That build prints only `dev` for `--version`, so the branch is its only name; the branch's code directories (`jl4-core`, `jl4`, `jl4-service`, `jl4-lsp`) were not changed after that build, only the documentation and the specification were.
 The deploying runs used a `jl4-service` built from the same branch, started on the same Mac.
 The three pull requests, #748, #749 and #751, were all still open drafts that day (read with `gh pr view`).
 
-The one run that used another build is the one for #749, which has neither #748 nor #751.
+Two runs used the `l4` installed on that Mac, a build that does not have #748: the test in the status block, which gave `I could not find a module with this name: terms`, and the second deploy of the flat copy in [If you need to deploy now](#if-you-need-to-deploy-now).
+It was installed at 10:20 that morning and prints only `dev`; which commit it was built from is not known.
+
+One run used the `l4` built from #749, which has neither #748 nor #751.
 On this page's project, `l4 deploy rules/notice.l4` with that build stopped before sending anything, printing `I could not find a module with this name: terms` and `rules/notice.l4 doesn't typecheck; fix it before deploying (see `l4 check`).`
 In that build a slash in an `IMPORT` name is not a folder, and `l4` reads the name as its last part only, `terms` here.
 So #749 does not deploy the `IMPORT` lines taught on this page, and a build that has #748, #751 and #749 together was not tried.
