@@ -52,6 +52,7 @@ library
     Backend.Jl4
     Backend.MaybeLift
     BundleStore
+    CheckStore
     Compatibility
     Compiler
     ControlPlane
@@ -132,6 +133,7 @@ test-suite jl4-service-test
     ApiSpec
     BooleanDecisionQuerySpec
     BundleStoreSpec
+    CheckStoreSpec
     CodeGenSpec
     CompatibilitySpec
     DecisionQueryCacheKeySpec

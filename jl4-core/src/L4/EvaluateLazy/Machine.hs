@@ -4321,7 +4321,10 @@ lifecyclePointUnique = \ case
 -- @WITHIN 5 OF THE ARMING@ agree there too. What it cannot reach is a
 -- value that never reaches an obligation: a top-level
 -- @WHERE t MEANS THE ARMING@ is a thunk over the rule's environment, which
--- no arming touched, and is refused by name when forced.
+-- no arming touched. The checker refuses that where it is written
+-- (refusal 8, 'L4.TypeCheck.checkLifecycle', whose 'inOwnSlots' is set at
+-- exactly the slots this environment serves); the run refuses it by name
+-- when forced, as the backstop.
 withOwnArming :: Reference -> Environment -> Environment
 withOwnArming armedAt = Map.alter (Just . fromMaybe armedAt) lifecycleArmingUnique
 
@@ -4359,7 +4362,11 @@ lifecycleRefusal a = Text.unwords
 
 -- | What the machine says when a lifecycle VALUE ('Lifecycle') is forced
 -- where the position it names does not exist: the value's counterpart of
--- 'lifecycleRefusal', worded for an expression rather than an @OF@.
+-- 'lifecycleRefusal', worded for an expression rather than an @OF@. Its
+-- first cause, a noun defined at the top level and used there, is refused
+-- by the checker where it is written (refusals 1 and 8,
+-- 'L4.TypeCheck.checkLifecycle'), so a checked module reaches this only by
+-- the other causes; the wording keeps it as the backstop.
 lifecycleValueRefusal :: LifecyclePoint -> Text
 lifecycleValueRefusal p = Text.unwords
   [ lifecyclePointWords p <> " was read where it names nothing: it is the"

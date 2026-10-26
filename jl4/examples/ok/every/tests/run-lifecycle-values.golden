@@ -295,8 +295,8 @@ run-lifecycle-values.l4:233:1-235:50:
       MUST Refund theLandlord
     before their deadline, which was at
       34
-  Ledger (Tenant OF &1292@run-lifecycle-values.l4):
-    RECORD `receipt` IS 4   [party=Tenant OF &1292@run-lifecycle-values.l4, source=RECORD, at=2025-01-31T15:45:30Z]
+  Ledger (Tenant OF &1274@run-lifecycle-values.l4):
+    RECORD `receipt` IS 4   [party=Tenant OF &1274@run-lifecycle-values.l4, source=RECORD, at=2025-01-31T15:45:30Z]
 run-lifecycle-values.l4:246:27-32:
   I found a problem while checking the definition of `own arming, as a value`:
     In this action, `alice` refers to
@@ -388,30 +388,21 @@ run-lifecycle-values.l4:311:1-314:36:
   DEONTIC BREACHED:
     BREACH
     BECAUSE "every member acted, but the last of them acted after the ONCE line's WITHIN deadline"
-run-lifecycle-values.l4:324:27-32:
-  I found a problem while checking the definition of `arming defined outside`:
-    In this action, `alice` refers to
-    
-      alice (at run-lifecycle-values.l4:32:1-6)
-    
-    If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:327:1-328:36:
-  THE ARMING was read where it names nothing: it is the arming of the obligation an expression sits in the HENCE or LEST of, and this one was evaluated where no obligation had that position. One of: it was defined at the top level (a top-level rule's WHERE, or a function's body) and used there, where no obligation has been entered; it was passed in a value attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline (THE DEADLINE). Read it inside the HENCE or LEST whose position it means, and pass it to a function as an argument from there.
-run-lifecycle-values.l4:340:27-32:
+run-lifecycle-values.l4:335:27-32:
   I found a problem while checking the definition of `a value inside a handed-on obligation`:
     In this action, `alice` refers to
     
       alice (at run-lifecycle-values.l4:32:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:341:47-58:
+run-lifecycle-values.l4:336:47-58:
   I found a problem while checking the definition of `a value inside a handed-on obligation`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-lifecycle-values.l4:31:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:343:56-67:
+run-lifecycle-values.l4:338:56-67:
   I found a problem while checking the definition of `k`:
     I found a problem while checking the definition of `a value inside a handed-on obligation`:
       In this action, `theLandlord` refers to
@@ -419,7 +410,7 @@ run-lifecycle-values.l4:343:56-67:
         theLandlord (at run-lifecycle-values.l4:31:1-12)
       
       If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:345:1-348:50:
+run-lifecycle-values.l4:340:1-343:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -433,21 +424,21 @@ run-lifecycle-values.l4:345:1-348:50:
       MUST Refund theLandlord
     before their deadline, which was at
       15
-run-lifecycle-values.l4:358:27-32:
+run-lifecycle-values.l4:353:27-32:
   I found a problem while checking the definition of `a WHERE name inside a handed-on obligation`:
     In this action, `alice` refers to
     
       alice (at run-lifecycle-values.l4:32:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:359:47-58:
+run-lifecycle-values.l4:354:47-58:
   I found a problem while checking the definition of `a WHERE name inside a handed-on obligation`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-lifecycle-values.l4:31:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:361:56-67:
+run-lifecycle-values.l4:356:56-67:
   I found a problem while checking the definition of `k`:
     I found a problem while checking the definition of `a WHERE name inside a handed-on obligation`:
       In this action, `theLandlord` refers to
@@ -455,7 +446,7 @@ run-lifecycle-values.l4:361:56-67:
         theLandlord (at run-lifecycle-values.l4:31:1-12)
       
       If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:364:1-367:50:
+run-lifecycle-values.l4:359:1-362:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -472,21 +463,21 @@ run-lifecycle-values.l4:364:1-367:50:
     but was only entered at, and so failed at
       10
   NOTE: An obligation, MUST Refund theLandlord, was entered at 10, after its own deadline of 9, so it could never be met in time: it fails at 10, when it was entered. Its WITHIN counts from t, which came before it was entered. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
-run-lifecycle-values.l4:375:27-32:
+run-lifecycle-values.l4:370:27-32:
   I found a problem while checking the definition of `a PROVIDED inside a handed-on obligation`:
     In this action, `alice` refers to
     
       alice (at run-lifecycle-values.l4:32:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:376:47-58:
+run-lifecycle-values.l4:371:47-58:
   I found a problem while checking the definition of `a PROVIDED inside a handed-on obligation`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-lifecycle-values.l4:31:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lifecycle-values.l4:380:1-383:29:
+run-lifecycle-values.l4:375:1-378:29:
   PARTY Tenant OF "Bob" MUST Pay n PROVIDED (n EQUALS THE JOIN) WITHIN 48 HENCE FULFILLED
-run-lifecycle-values.l4:385:1-388:30:
+run-lifecycle-values.l4:380:1-383:30:
   FULFILLED

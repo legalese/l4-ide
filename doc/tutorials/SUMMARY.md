@@ -30,6 +30,7 @@
 ## Publish rules
 
 - [Deploy your rules](deploying-rules/exporting-rules-for-deployment.md)
+- [Checking a Store Before You Switch Versions](deploying-rules/checking-a-store-before-a-rollout.md)
 - [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)
 
 ## Use deployed rules

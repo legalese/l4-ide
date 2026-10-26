@@ -176,7 +176,13 @@ GIVETH A DEONTIC Actor Action
 
 A name in the act is required the same way a literal is, whether it names a defined figure, a rule's own input, or the whole act at once — there is no longer a spelling that works for one and not the other. The blank can equally be read inside a next obligation written directly under `HENCE`; the rule above is preferred because it can be used from more than one place.
 
-The time of an event is not something an obligation can read: there is no blank for it. That is why a rule that pays a debt in instalments cannot carry a single deadline down through the instalments (Question 5).
+The time of an event can be read too.
+In a next obligation, `THE JOIN` is the time of the act that led to it, and it is a number like any other: it can be added to, handed to a rule as an input, or recorded ([The anchor words as values](../../reference/regulative/consequences.md#the-anchor-words-as-values)).
+`THE DEADLINE` and `THE ARMING` are read the same way.
+One thing to watch: inside the next obligation's own `PROVIDED`, `THE JOIN` is still the time of the act before, not of the act being tested.
+
+A deadline that is already known can be carried down a chain: give it to the rule as an input and write `WITHIN 0 OF due`, and every instalment is due by the same day.
+A deadline worked out from when an act happened is written the same way, by handing on `THE JOIN PLUS 30`: "thirty days after the first payment, for all the rest".
 
 **Built:** all of this.
 

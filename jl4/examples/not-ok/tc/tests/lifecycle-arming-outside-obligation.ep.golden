@@ -1,0 +1,45 @@
+-- THE ARMING as a VALUE (EVERY-EACH-QUANTIFIER-SPEC §2.6 card B1) is the
+-- instant an obligation was entered. The machine binds it in a deonton's
+-- own slots as it arms the obligation, on an EVERY's join line, and at
+-- every HENCE or LEST hand-off; nowhere else. So the checker refuses it
+-- everywhere else (refusal 8 of §5.1.1.1, card B1c, RULED 2026-10-24):
+-- written in one of the places below it used to check clean and be
+-- refused by the run on every input.
+--
+-- Moved here from ok/every/run-lifecycle-values.l4 §11, which pinned the
+-- run-time refusal of the first case.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+alice MEANS Tenant OF "Alice"
+
+-- refused: `t` is a NUMBER the rule defines in a top-level WHERE, outside
+-- any obligation; no arming has happened where it is written
+GIVETH A DEONTIC Actor Action
+`arming defined outside` MEANS
+    PARTY alice MUST Sign alice WITHIN 5 OF t
+    WHERE t MEANS THE ARMING
+
+-- refused: a function's body is read where the function is defined, not
+-- where it is called, so calling it from a WITHIN does not help
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`d after the arming` MEANS THE ARMING PLUS d
+
+-- refused: a top-level rule's body
+GIVETH A NUMBER
+`the arming` MEANS THE ARMING
+
+-- not refused: in the obligation's own WITHIN it is that obligation's
+-- arming, and a function receives it as an argument from there
+GIVETH A DEONTIC Actor Action
+`arming passed in` MEANS
+    PARTY alice MUST Sign alice WITHIN 0 OF (`plus five` THE ARMING)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`plus five` MEANS x PLUS 5

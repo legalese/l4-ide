@@ -1452,7 +1452,7 @@ an ordinary expression (`fromMaybe 0 (RECALL …)`, where `0` is the epoch, not 
 B4 recorded now, and the anchor-slot doc page waits for B1 rather than teach the literal-`0`
 workaround.
 
-**B1 built in part, 2026-10-24 (`lang/lifecycle-values`, local, not merged).** The doc page waited
+**B1 built in part, 2026-10-24 (`lang/lifecycle-values`, a draft PR into `unstable`, not merged).** The doc page waited
 for B1 and is now written: `doc/reference/regulative/consequences.md`, "The anchor words as
 values", teaches the `fromMaybe THE ARMING (RECALL …)` default together with the freeze's silent
 failure (a fact recorded after the obligation's first scrutinised event does not move the deadline,
@@ -1473,23 +1473,31 @@ written — so moving `THE JOIN PLUS 5` from an obligation's `WITHIN` into that 
 and THE DEADLINE deleted from that environment (assumed, not ruled: it overrides rather than binds
 "only where absent", so that `OF (THE ARMING)` and `OF THE ARMING` agree there; it holds for the
 noun written on the join line only, and a `WHERE` name for `THE ARMING PLUS 10` written in the
-enclosing `HENCE` is that `HENCE`'s arming, §10). One assumed, not ruled, reading changes a
-spelling that was valid before: `THE` before `JOIN`, `DEADLINE` or `ARMING` is never an article
-any more, so `WITH start IS THE DEADLINE` passes the lifecycle position even where the program
-defines its own `DEADLINE` — silently under a `HENCE` — and the checker now warns at every such
-site (`LifecycleNounHidesName`, `not-ok/tc/lifecycle-value-hides-name.l4`). What is not built:
+enclosing `HENCE` is that `HENCE`'s arming, §10). One reading, RULED 2026-10-24 (B1a below),
+changes a spelling that was valid before: `THE` before `JOIN`, `DEADLINE` or `ARMING` is never an
+article any more, so `WITH start IS THE DEADLINE` passes the lifecycle position even where the
+program defines its own `DEADLINE` — silently under a `HENCE` — and the checker now warns at every
+such site (`LifecycleNounHidesName`, `not-ok/tc/lifecycle-value-hides-name.l4`), naming the hidden
+value and saying to drop `THE`; it offers renaming only when this module defines every such
+value, since an imported one may live in a file the importer does not own. `jl4-service` refuses
+to deploy a module that draws the warning (`hidesNameRefusal`, `jl4-service/src/Compiler.hs`;
+tests under "THE before a noun the program also defines" in `IntegrationSpec.hs`). What is not built:
 `Anchor` still has its three noun constructors beside `AnchorAt`, so `OF THE JOIN` and
 `OF (THE JOIN)` are two trees with one meaning — every consumer that asks which noun an anchor
 names now asks `lifecyclePointOfAnchor`, which reads through the bracket, so the empty-window
 refusal of §5.1.2.2 covers `OF (THE JOIN)` as well (`not-ok/tc/after-empty-window-value.l4`;
-review of 2026-10-24) — and `THE ARMING` written where no obligation is ever entered (a top-level
-rule's `WHERE`, a top-level function's body, an `@export`ed decision) is refused only when the run
-reaches it, so such a module checks and refuses on every input (the review of 2026-10-24 also reported deploying one to a local `jl4-service`; not re-run here). A check-time refusal
-is feasible — outside every obligation a `NUMBER` is evaluated in the environment it was
-defined in (a top-level function's body in its closure's, even when it is called from inside an
-obligation's slot), so the definition site decides, not the use site, and the checker already
-carries `enclosingObligation` and `inSlot`; the refusal would be "`THE ARMING` with no enclosing
-obligation and not inside a deonton's own slots" — but it would be a fifth refusal, which B1 did not rule: open, for a ruling.
+review of 2026-10-24). That is all of what is not built.
+
+`THE ARMING` written where the machine would not bind it is refused at check time, RULED 2026-10-24 (B1c below), as refusal 8 of §5.1.1.1 (`ArmingUnavailable`).
+Such a module used to check and refuse on every input (the review of 2026-10-24 also reported deploying one to a local `jl4-service`; not re-run here).
+The definition site decides, not the use site: outside every obligation a `NUMBER` is evaluated in the environment it was defined in, a top-level function's body in its closure's even when it is called from inside an obligation's slot.
+So the checker carries `inOwnSlots`, set exactly where the machine's `withOwnArming` applies, beside `enclosingObligation`, and refuses `THE ARMING` where neither holds: a top-level rule's `WHERE` or body, a top-level function's body, an `@export`ed decision, and an `EVERY`'s `IN` roll and `WHO` or `WHOSE` filter not under any `HENCE` or `LEST`, which the roll call reads before any member is armed.
+Witnesses: `not-ok/tc/lifecycle-arming-outside-obligation.l4` (which took over §11 of `run-lifecycle-values.l4`, the run-time witness) and `not-ok/tc/lifecycle-arming-in-every-roll.l4`.
+
+Rulings on the build, recorded 2026-10-25:
+
+- B1a: option A plus a jl4-service deploy refusal for LifecycleNounHidesName (names the hidden name, says to drop THE), warning reworded (no history claim; drop THE for imported names). Meng's note: "I feel like some other languages would have stricter rules around punctuation in types vs terms vs reserved words. Here we have an all caps builtin. If we were as strict we might not see this problem arising in the first place. Just a thought, not design guidance." Ruled 2026-10-24, bench https://claude.ai/artifact/PgiYUak5fBxjUJ1dd3FZ2F (collection l4-event-time-1024).
+- B1c: accepted (THE ARMING refused at check time wherever the machine would not bind it, including an EVERY's IN and WHO/WHOSE; fresh refusal number and own message; fixture §11 moved to not-ok). Ruled 2026-10-24, bench https://claude.ai/artifact/PgiYUak5fBxjUJ1dd3FZ2F (collection l4-event-time-1024).
 
 **Business-day clauses: reading (a) deferred, 2026-10-24 (assumed, not ruled; the library is a draft, its function names ruled).**
 A clause that mentions business days or public holidays is either (a) a condition on the act ("service may not be effected on a Sunday") or (b) arithmetic on the deadline ("if the fifth day falls on a Saturday, the next business day").
@@ -2157,6 +2165,14 @@ Two more are RUN-TIME refusals (`lifecycleRefusal`, `Machine.hs:2655`), because 
    the value is one operand of a compound. The checker accepted the anchor where it was written;
    the run refuses it where it is used (witnesses: `handed under a LEST`, `handed under a LEST,
 in a compound`, `handed to no WITHIN`).
+
+One more is a check-time refusal again, RULED 2026-10-24 by card B1c and added with the value form of B1:
+
+8. `THE ARMING` as a value written where the machine would not bind it — refused (`ArmingUnavailable`, its own message).
+   The machine binds it in a deonton's own slots as it arms the obligation (`withOwnArming`), on a join line, and at every `HENCE` or `LEST` hand-off.
+   The checker admits it inside a deonton's own slots (`inOwnSlots`: the party, the action and `PROVIDED`, the `AFTER` and `WITHIN`, an `EVERY`'s join line) or under a `HENCE` or `LEST` (`enclosingObligation`), and refuses it everywhere else: a top-level rule's `WHERE` or body, a top-level function's body, an `@export`ed decision, and an `EVERY`'s `IN` roll and `WHO` or `WHOSE` filter not under any `HENCE` or `LEST`.
+   Witnesses: `not-ok/tc/lifecycle-arming-outside-obligation.l4`, `not-ok/tc/lifecycle-arming-in-every-roll.l4`.
+   The run's refusal (`lifecycleValueRefusal`) stays as the backstop.
 
 **Printers and exporters.** `prettyLayout` prints `d [OF anchor]` with the duration bracketed
 exactly as before (`Print.hs:959`, `:968`), so every unanchored deadline prints byte-for-byte as it

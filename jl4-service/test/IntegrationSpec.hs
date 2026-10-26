@@ -4217,6 +4217,80 @@ spec = describe "integration" do
           Right _ -> pure ()
         logged `shouldBe` []
 
+    -- THE JOIN where the program has its own JOIN: a warning in the editor and
+    -- in `l4 check` (LifecycleNounHidesName), a refusal here (B1a, ruled
+    -- 2026-10-24). Until then that THE was an optional article, so the module
+    -- may mean its own JOIN, and under a HENCE the change is a different number
+    -- with no error. The refusal names the hidden name and says that dropping
+    -- THE reaches it; renaming is offered only for a name this module defines.
+    describe "THE before a noun the program also defines" do
+      let hidesJL4 the = Text.unlines
+            [ "DECLARE Actor IS ONE OF"
+            , "    Tenant HAS name IS A STRING"
+            , "DECLARE Action IS ONE OF"
+            , "    Sign   HAS signer IS AN Actor"
+            , "    Refund HAS who IS AN Actor"
+            , ""
+            , "alice MEANS Tenant OF \"Alice\""
+            , ""
+            , "GIVEN start IS A NUMBER"
+            , "GIVETH A DEONTIC Actor Action"
+            , "`refund within 30 of` MEANS"
+            , "    PARTY alice MUST Refund alice WITHIN 30 OF start"
+            , ""
+            , "GIVETH A DEONTIC Actor Action"
+            , "`passes the join` MEANS"
+            , "    PARTY alice MUST Sign alice WITHIN 10"
+            , "    HENCE `refund within 30 of` WITH start IS " <> the <> "JOIN"
+            , ""
+            , "@export default adds one to a number"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE `add one` n IS n + 1"
+            ]
+          compiled sources = do
+            logger <- newLogger False
+            compileBundle logger "test" (Map.fromList sources)
+          refusedWith needles absent sources = do
+            result <- compiled sources
+            case result of
+              Left err -> do
+                forM_ needles \needle -> err `shouldSatisfy` Text.isInfixOf needle
+                forM_ absent \needle -> err `shouldNotSatisfy` Text.isInfixOf needle
+              Right (_fns, meta) ->
+                expectationFailure $
+                  "Expected a refusal, but compiled and published "
+                    <> show (map (.fsName) meta.metaFunctions)
+
+      it "refuses THE JOIN that hides the module's own JOIN, naming it and saying to drop THE" $
+        refusedWith
+          [ "hides.l4:19:", "THE JOIN here is the lifecycle position", "hides `JOIN`"
+          , "which this module defines", "Write JOIN without THE to reach the program's own `JOIN`"
+          , "or rename it to keep THE JOIN" ]
+          []
+          [("hides.l4", "JOIN MEANS 100\n\n" <> hidesJL4 "THE ")]
+
+      it "refuses THE JOIN that hides an imported JOIN, and offers no rename" $
+        refusedWith
+          [ "main.l4:19:", "hides `JOIN`", "which this module imports"
+          , "Write JOIN without THE to reach the program's own `JOIN`" ]
+          [ "rename" ]
+          [ ("lib.l4", "JOIN MEANS 100\n")
+          , ("main.l4", "IMPORT lib.l4\n\n" <> hidesJL4 "THE ")
+          ]
+
+      it "deploys the same module written with JOIN and no THE" do
+        result <- compiled [("hides.l4", "JOIN MEANS 100\n\n" <> hidesJL4 "")]
+        case result of
+          Left err -> expectationFailure ("Expected the deployment, but it was refused: " <> Text.unpack err)
+          Right (fns, _meta) -> Map.keys fns `shouldBe` ["add one"]
+
+      it "deploys THE JOIN where the program has no JOIN of its own" do
+        result <- compiled [("hides.l4", hidesJL4 "THE ")]
+        case result of
+          Left err -> expectationFailure ("Expected the deployment, but it was refused: " <> Text.unpack err)
+          Right (fns, _meta) -> Map.keys fns `shouldBe` ["add one"]
+
     it "rejects empty bundles" do
       logger <- newLogger False
       let sources = Map.empty :: Map FilePath Text
@@ -5219,6 +5293,8 @@ testOptions = Options
   , compileTimeout = 60
   , instanceToken = Nothing
   , maxLadderNodes = 10000
+  , checkStore = Nothing
+  , checkJson = False
   }
 
 -- | A JSON answer without the numbers the visualizer gave its nodes: the
