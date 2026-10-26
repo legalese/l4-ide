@@ -83,9 +83,17 @@ logUnresolvedImports logger deployId unresolved =
     -- A name with a slash is a path import (a backticked @../b/mod@), which is
     -- resolved against the importing file's folder inside the bundle and never
     -- against the standard library; the text for a bare name would be false of it.
+    -- A name that starts with a slash is counted from the root of the bundle, not
+    -- from the importing file, and the text for a relative path would be false of it.
+    -- A name that starts with an @ and has a slash is an alias, defined by the
+    -- l4-project.json at the top of the bundle, and says neither of those.
     -- The two ways it can find nothing are told apart in the compile's own
     -- diagnostics, which the deploy does not return; the log says both.
     message modName
+      | Just '@' <- fst <$> Text.uncons modName, Text.any (== '/') modName =
+          "Bundle IMPORT resolves to nothing: the alias is not defined by the l4-project.json at the top of the bundle, or the file it leads to is not in the bundle, or the path leaves the bundle"
+      | Just '/' <- fst <$> Text.uncons modName =
+          "Bundle IMPORT resolves to nothing: no bundle file is at this path under the root of the bundle, or the path leaves the bundle"
       | Text.any (== '/') modName =
           "Bundle IMPORT resolves to nothing: no bundle file is at this path relative to the importing file, or the path leaves the bundle"
       | otherwise =

@@ -312,7 +312,7 @@ Exit code `0` means the file is valid L4; non-zero means there were errors (prin
 When a file says `IMPORT daydate` (or `time`, `currency`, ...), the tools resolve the library module by checking, in order:
 
 1. The `JL4_LIBRARY_PATH` environment variable (user/operator override)
-2. The project root directory
+2. The session root: the folder of the file you gave `l4`
 3. The directory of the importing file
 4. The standard library built into the `l4` you are running
 5. The XDG data directory (`~/.local/share/jl4/libraries/`)

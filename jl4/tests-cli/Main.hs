@@ -24,6 +24,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
   ( canonicalizePath
+  , copyFile
   , createDirectoryIfMissing
   , doesFileExist
   , emptyPermissions
@@ -39,7 +40,7 @@ import System.Directory
   )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath ((</>), isAbsolute, normalise, takeFileName)
+import System.FilePath ((</>), isAbsolute, normalise, takeDirectory, takeFileName)
 import System.IO (hClose, hPutStr, hSetBinaryMode)
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process
@@ -405,7 +406,7 @@ relImportDir :: FilePath
 relImportDir = fixtureDir </> "relative-import"
 
 relRowsEntry, relRowsDir, relDiamondEntry, relIdentityEntry, relNotFoundEntry,
-  relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry,
+  relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry,
   relParentEntry, relShortenedHyphenEntry :: FilePath
 relShortenedHyphenEntry = relImportDir </> "shortened" </> "hyphen.l4"
 relBackDir, relHebrewDir :: FilePath
@@ -419,8 +420,47 @@ relNotFoundEntry       = relImportDir </> "not-found" </> "main.l4"
 relShortenedExtEntry   = relImportDir </> "shortened" </> "ext.l4"
 relShortenedDottedEntry = relImportDir </> "shortened" </> "dotted.l4"
 relCycleEntry          = relImportDir </> "cycle" </> "a" </> "x.l4"
-relRootedEntry         = relImportDir </> "rooted" </> "main.l4"
+
+-- The root-relative form (a leading slash): a project with an l4-project.json at
+-- its top, a project inside a project, a path that leaves its project beside a
+-- planted file to find it by, and a tree with no marker (run from a copy).
+relProjectDir, relProjectEntry, relNestedInnerEntry, relNestedOuterEntry,
+  relNoMarkerEntry, relNoMarkerTarget, relClimbEntry, relClimbControlEntry,
+  relClimbInsideEntry, relClimbPlanted :: FilePath
+relProjectDir          = relImportDir </> "project"
+relProjectEntry        = relProjectDir </> "rules" </> "main.l4"
+relNestedInnerEntry    = relImportDir </> "nested" </> "inner" </> "main.l4"
+relNestedOuterEntry    = relImportDir </> "nested" </> "top.l4"
+relNoMarkerEntry       = relImportDir </> "nomarker" </> "main.l4"
+relNoMarkerTarget      = relImportDir </> "nomarker" </> "shared" </> "definitions.l4"
+relClimbEntry          = relImportDir </> "climb" </> "main.l4"
+relClimbControlEntry   = relImportDir </> "climb" </> "control.l4"
+relClimbInsideEntry    = relImportDir </> "climb" </> "inside.l4"
+relClimbPlanted        = relImportDir </> "climb-planted.l4"
 relParentEntry         = relImportDir </> "parent" </> "cases" </> "main.l4"
+
+-- Aliases (@alias/path, defined by the l4-project.json that marks the root;
+-- RELATIVE-IMPORTS-SPEC §4.7 C6, PROPOSED, FOR MENG, not ruled): a project with two
+-- aliases, a project inside a project that defines the same alias for its own
+-- folder, a name the manifest does not define, a chain of aliases, and an alias
+-- that leaves its project beside a planted file to find it by. A manifest that is
+-- not JSON, and a tree with no manifest, are written by the test into a copy.
+relAliasDir, relAliasEntry, relAliasIdentityEntry, relAliasNestedInnerEntry,
+  relAliasNestedOuterEntry, relAliasUnknownEntry, relAliasChainEntry,
+  relAliasEscapeEntry, relAliasEscapeDeepEntry, relAliasEscapeControlEntry,
+  relAliasEscapeInsideEntry, relAliasEscapePlanted :: FilePath
+relAliasDir               = relImportDir </> "alias"
+relAliasEntry             = relAliasDir </> "rules" </> "main.l4"
+relAliasIdentityEntry     = relAliasDir </> "identity" </> "top.l4"
+relAliasNestedInnerEntry  = relImportDir </> "alias-nested" </> "inner" </> "main.l4"
+relAliasNestedOuterEntry  = relImportDir </> "alias-nested" </> "top.l4"
+relAliasUnknownEntry      = relImportDir </> "alias-unknown" </> "main.l4"
+relAliasChainEntry        = relImportDir </> "alias-chain" </> "main.l4"
+relAliasEscapeEntry       = relImportDir </> "alias-escape" </> "main.l4"
+relAliasEscapeDeepEntry   = relImportDir </> "alias-escape" </> "deep.l4"
+relAliasEscapeControlEntry = relImportDir </> "alias-escape" </> "control.l4"
+relAliasEscapeInsideEntry = relImportDir </> "alias-escape" </> "inside.l4"
+relAliasEscapePlanted     = relImportDir </> "alias-escape-planted.l4"
 
 -- Diamond whose bottom module (d.l4) has a type error: top imports a, b and d;
 -- a and b import d. Regression fixture for smucclaw/l4-ide#1008.
@@ -626,8 +666,15 @@ coreFixtures =
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
   , relRowsEntry, relDiamondEntry, relIdentityEntry, relNotFoundEntry
-  , relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry, relRootedEntry
+  , relShortenedExtEntry, relShortenedDottedEntry, relCycleEntry
   , relParentEntry
+  , relProjectEntry, relProjectDir </> "l4-project.json", relNestedInnerEntry, relNestedOuterEntry
+  , relNoMarkerEntry, relNoMarkerTarget, relClimbEntry, relClimbControlEntry, relClimbInsideEntry, relClimbPlanted
+  , relAliasEntry, relAliasDir </> "l4-project.json", relAliasIdentityEntry, relAliasNestedInnerEntry, relAliasNestedOuterEntry
+  , relAliasUnknownEntry, relAliasChainEntry, relAliasEscapeEntry, relAliasEscapeDeepEntry
+  , relAliasEscapeControlEntry, relAliasEscapeInsideEntry, relAliasEscapePlanted
+  , relAliasDir </> "shared" </> "definitions.l4", relAliasDir </> "shared" </> "core.l4"
+  , relAliasDir </> "subjects" </> "vn" </> "nd67" </> "units.l4", relAliasDir </> "subjects" </> "vn" </> "nd67" </> "nouns.l4"
   , relBackDir </> "main.l4", relHebrewDir </> "main.l4", relShortenedHyphenEntry
   , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
   , shadowExtraEntry, shadowImporterEntry
@@ -3102,11 +3149,196 @@ spec bin = do
     it "fails a cycle that runs through path imports" $
       expectFail bin ["check", relCycleEntry]
 
-    it "refuses a leading slash" $ do
-      out <- runL4 bin ["check", relRootedEntry]
-      exitOf out `shouldNotBe` ExitSuccess
-      combined out `shouldSatisfy`
-        ("This import leaves the root of this deployment: /abs/mod" `isInfixOf`)
+    -- The root-relative form (RELATIVE-IMPORTS-SPEC §4.7, PROPOSED, FOR MENG, not
+    -- ruled): a leading slash names a file from the project root, the folder of
+    -- the nearest `l4-project.json` at or above the importing file. Fixtures:
+    -- `project/` (marker at its top, rules in two folders), `nested/` (a project
+    -- inside a project), `climb/` (a path that leaves its project, with a planted
+    -- file to find it by), `nomarker/` (copied elsewhere before it is run, so no
+    -- marker added above this repository can change what it measures).
+    describe "a root-relative import (a leading slash)" $ do
+      it "checks a project whose rules in two folders import each other from the root" $
+        expectOk bin ["check", relProjectEntry] "Check succeeded."
+
+      it "evaluates through them" $ do
+        -- definitionmarker is unitmarker * 2 = 42 (shared/definitions imports
+        -- /shared/units), helpmarker is 30 (rules/helper): only modules that were
+        -- really loaded can make `answer` 72.
+        out <- runL4 bin ["run", relProjectEntry]
+        exitOf out `shouldBe` ExitSuccess
+        combined out `shouldSatisfy` ("72" `isInfixOf`)
+
+      it "gives the same answer from the entry's own folder, from above, and by an absolute path" $ do
+        projectDir <- makeAbsolute relProjectDir
+        own <- runL4In (Just (projectDir </> "rules")) Nothing bin ["run", "main.l4"]
+        exitOf own `shouldBe` ExitSuccess
+        combined own `shouldSatisfy` ("72" `isInfixOf`)
+        fromAbove <- runL4In (Just (takeDirectory projectDir)) Nothing bin ["run", "project" </> "rules" </> "main.l4"]
+        exitOf fromAbove `shouldBe` ExitSuccess
+        combined fromAbove `shouldSatisfy` ("72" `isInfixOf`)
+        absolute <- runL4 bin ["run", projectDir </> "rules" </> "main.l4"]
+        exitOf absolute `shouldBe` ExitSuccess
+        combined absolute `shouldSatisfy` ("72" `isInfixOf`)
+
+      it "treats one file reached by `/identity/core`, `./core` and `../identity/core` as one module" $ do
+        -- Without a shared key these are three modules and the typechecker
+        -- would say coremarker is defined three times.
+        projectDir <- makeAbsolute relProjectDir
+        let entry = "identity" </> "top.l4"
+        relative <- runL4In (Just projectDir) Nothing bin ["run", entry]
+        exitOf relative `shouldBe` ExitSuccess
+        combined relative `shouldSatisfy` ("42" `isInfixOf`)
+        combined relative `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+        absolute <- runL4 bin ["run", projectDir </> entry]
+        exitOf absolute `shouldBe` ExitSuccess
+        combined absolute `shouldSatisfy` ("42" `isInfixOf`)
+        combined absolute `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
+      it "uses the nearest l4-project.json, so an inner project's root is its own" $ do
+        -- Both projects have shared/value.l4, and they define valuemarker as 111
+        -- (outer) and 222 (inner), so the answer says which marker was used.
+        inner <- runL4 bin ["run", relNestedInnerEntry]
+        exitOf inner `shouldBe` ExitSuccess
+        combined inner `shouldSatisfy` ("222" `isInfixOf`)
+        combined inner `shouldSatisfy` (not . ("111" `isInfixOf`))
+        outer <- runL4 bin ["run", relNestedOuterEntry]
+        exitOf outer `shouldBe` ExitSuccess
+        combined outer `shouldSatisfy` ("111" `isInfixOf`)
+        combined outer `shouldSatisfy` (not . ("222" `isInfixOf`))
+
+      it "is an error, not a fallback, when no l4-project.json is above the importer" $
+        -- The file the import names IS there, beside the importer and in the
+        -- working directory, so a fallback to either would succeed.
+        withSystemTempDirectory "l4-no-marker" \dir -> do
+          createDirectoryIfMissing True (dir </> "shared")
+          copyFile relNoMarkerEntry (dir </> "main.l4")
+          copyFile (takeDirectory relNoMarkerEntry </> "shared" </> "definitions.l4") (dir </> "shared" </> "definitions.l4")
+          out <- runL4In (Just dir) Nothing bin ["check", "main.l4"]
+          exitOf out `shouldNotBe` ExitSuccess
+          combined out `shouldSatisfy`
+            ("This import is relative to the project root, but no project root was found above" `isInfixOf`)
+          combined out `shouldSatisfy`
+            ("Add a file named l4-project.json at the top of your project; it may contain just {}." `isInfixOf`)
+
+      it "is refused when it climbs above the project root, though the file is there" $ do
+        -- The plant is reachable: `control.l4` finds it by a relative path. A
+        -- root-relative path that stays inside the project is found, so it is
+        -- the climb that is refused.
+        control <- runL4 bin ["run", relClimbControlEntry]
+        exitOf control `shouldBe` ExitSuccess
+        combined control `shouldSatisfy` ("99" `isInfixOf`)
+        inside <- runL4 bin ["run", relClimbInsideEntry]
+        exitOf inside `shouldBe` ExitSuccess
+        combined inside `shouldSatisfy` ("555" `isInfixOf`)
+        out <- runL4 bin ["check", relClimbEntry]
+        exitOf out `shouldNotBe` ExitSuccess
+        combined out `shouldSatisfy`
+          ("This import leaves the root of this deployment: /../climb-planted" `isInfixOf`)
+
+    -- Aliases (RELATIVE-IMPORTS-SPEC §4.7 C6, PROPOSED, FOR MENG, not ruled): a
+    -- name that starts with @ and has a slash is a folder the l4-project.json
+    -- names, and a path under it. Fixtures under `alias*/`; the manifest that is
+    -- not JSON and the tree with no manifest are written into a copy.
+    describe "an alias import (@alias/path)" $ do
+      it "checks and evaluates a project whose files reach shared folders by alias" $ do
+        -- definitionmarker is unitmarker * 2 = 40 (shared/definitions imports
+        -- @vn10/units, from another folder) and nounmarker is 2: only modules
+        -- that were really loaded can make `answer` 42.
+        expectOk bin ["check", relAliasEntry] "Check succeeded."
+        out <- runL4 bin ["run", relAliasEntry]
+        exitOf out `shouldBe` ExitSuccess
+        combined out `shouldSatisfy` ("42" `isInfixOf`)
+
+      it "gives the same answer from the entry's own folder, from above, and by an absolute path" $ do
+        aliasDir <- makeAbsolute relAliasDir
+        own <- runL4In (Just (aliasDir </> "rules")) Nothing bin ["run", "main.l4"]
+        exitOf own `shouldBe` ExitSuccess
+        combined own `shouldSatisfy` ("42" `isInfixOf`)
+        fromAbove <- runL4In (Just (takeDirectory aliasDir)) Nothing bin ["run", "alias" </> "rules" </> "main.l4"]
+        exitOf fromAbove `shouldBe` ExitSuccess
+        combined fromAbove `shouldSatisfy` ("42" `isInfixOf`)
+        absolute <- runL4 bin ["run", aliasDir </> "rules" </> "main.l4"]
+        exitOf absolute `shouldBe` ExitSuccess
+        combined absolute `shouldSatisfy` ("42" `isInfixOf`)
+
+      it "treats one file reached by `@common/core`, `/shared/core` and `../shared/core` as one module" $ do
+        aliasDir <- makeAbsolute relAliasDir
+        relative <- runL4In (Just aliasDir) Nothing bin ["run", "identity" </> "top.l4"]
+        exitOf relative `shouldBe` ExitSuccess
+        combined relative `shouldSatisfy` ("42" `isInfixOf`)
+        combined relative `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+        absolute <- runL4 bin ["run", aliasDir </> "identity" </> "top.l4"]
+        exitOf absolute `shouldBe` ExitSuccess
+        combined absolute `shouldSatisfy` ("42" `isInfixOf`)
+        combined absolute `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+
+      it "reads the aliases of the nearest l4-project.json, so an inner project's alias is its own" $ do
+        -- Both projects define `common` for their own `shared/`, and value.l4
+        -- there is 111 (outer) and 222 (inner), so the answer says which was read.
+        inner <- runL4 bin ["run", relAliasNestedInnerEntry]
+        exitOf inner `shouldBe` ExitSuccess
+        combined inner `shouldSatisfy` ("222" `isInfixOf`)
+        combined inner `shouldSatisfy` (not . ("111" `isInfixOf`))
+        outer <- runL4 bin ["run", relAliasNestedOuterEntry]
+        exitOf outer `shouldBe` ExitSuccess
+        combined outer `shouldSatisfy` ("111" `isInfixOf`)
+        combined outer `shouldSatisfy` (not . ("222" `isInfixOf`))
+
+      it "lists the aliases that are defined when the alias is not one of them" $ do
+        out <- runL4 bin ["check", relAliasUnknownEntry]
+        exitOf out `shouldNotBe` ExitSuccess
+        combined out `shouldSatisfy` ("This import uses an alias that is not defined: @nope" `isInfixOf`)
+        combined out `shouldSatisfy` ("are: @common, @vn10." `isInfixOf`)
+
+      it "refuses an alias that stands for another alias" $ do
+        out <- runL4 bin ["check", relAliasChainEntry]
+        exitOf out `shouldNotBe` ExitSuccess
+        combined out `shouldSatisfy` ("refers to another alias: @second/x" `isInfixOf`)
+
+      it "is refused when an alias, or the path under it, climbs above the project root, though the file is there" $ do
+        -- The plant is reachable: `control.l4` finds it by a relative path, and an
+        -- alias that stays inside the project is found, so it is the climb that is refused.
+        control <- runL4 bin ["run", relAliasEscapeControlEntry]
+        exitOf control `shouldBe` ExitSuccess
+        combined control `shouldSatisfy` ("99" `isInfixOf`)
+        inside <- runL4 bin ["run", relAliasEscapeInsideEntry]
+        exitOf inside `shouldBe` ExitSuccess
+        combined inside `shouldSatisfy` ("555" `isInfixOf`)
+        viaAlias <- runL4 bin ["check", relAliasEscapeEntry]
+        exitOf viaAlias `shouldNotBe` ExitSuccess
+        combined viaAlias `shouldSatisfy` ("leaves the root of the project" `isInfixOf`)
+        underAlias <- runL4 bin ["check", relAliasEscapeDeepEntry]
+        exitOf underAlias `shouldNotBe` ExitSuccess
+        combined underAlias `shouldSatisfy`
+          ("This import leaves the root of this deployment: @common/../../alias-escape-planted" `isInfixOf`)
+
+      it "names the file and the position of a manifest that is not JSON, and only for the import that needs it" $
+        withSystemTempDirectory "l4-alias-badjson" \dir -> do
+          createDirectoryIfMissing True (dir </> "shared")
+          writeFile (dir </> "shared" </> "definitions.l4") "definitionmarker MEANS 5\n"
+          writeFile (dir </> "l4-project.json") "{\n  \"aliases\": {\n    \"common\": \"shared\",\n  }\n}\n"
+          writeFile (dir </> "aliased.l4") "IMPORT `@common/definitions`\n\nx MEANS definitionmarker\n"
+          writeFile (dir </> "rooted.l4") "IMPORT `/shared/definitions`\n\nx MEANS definitionmarker\n"
+          bad <- runL4In (Just dir) Nothing bin ["check", "aliased.l4"]
+          exitOf bad `shouldNotBe` ExitSuccess
+          combined bad `shouldSatisfy` ("I could not read the project file" `isInfixOf`)
+          combined bad `shouldSatisfy` ("l4-project.json" `isInfixOf`)
+          combined bad `shouldSatisfy` ("It is not valid JSON: line 4, column 3, unexpected `}`." `isInfixOf`)
+          -- A root-relative import only looks for the file and never opens it.
+          good <- runL4In (Just dir) Nothing bin ["check", "rooted.l4"]
+          exitOf good `shouldBe` ExitSuccess
+
+      it "is an error, not a fallback, when no l4-project.json is above the importer" $
+        -- The folder the alias would name is there, beside the importer and in
+        -- the working directory, so a fallback to either would succeed.
+        withSystemTempDirectory "l4-alias-no-manifest" \dir -> do
+          createDirectoryIfMissing True (dir </> "shared")
+          writeFile (dir </> "shared" </> "definitions.l4") "definitionmarker MEANS 5\n"
+          writeFile (dir </> "main.l4") "IMPORT `@common/definitions`\n\nx MEANS definitionmarker\n"
+          out <- runL4In (Just dir) Nothing bin ["check", "main.l4"]
+          exitOf out `shouldNotBe` ExitSuccess
+          combined out `shouldSatisfy`
+            ("This import uses the alias @common, but no project root was found above" `isInfixOf`)
 
     it "lets the CLI climb out of the entry file's folder (it is not confined)" $ do
       -- The commons `cases/` rows: the entry file sits in a folder below the

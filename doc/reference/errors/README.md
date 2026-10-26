@@ -36,6 +36,11 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Module not found](#module-not-found)
 - [I could not find a module at this path](#i-could-not-find-a-module-at-this-path)
 - [This import leaves the root of this deployment](#this-import-leaves-the-root-of-this-deployment)
+- [This import is relative to the project root, but no project root was found](#this-import-is-relative-to-the-project-root-but-no-project-root-was-found)
+- [This import uses an alias that is not defined](#this-import-uses-an-alias-that-is-not-defined)
+- [This import uses an alias, but there is no project file to read it from](#this-import-uses-an-alias-but-there-is-no-project-file-to-read-it-from)
+- [I could not read the project file](#i-could-not-read-the-project-file)
+- [An alias in l4-project.json cannot be used](#an-alias-in-l4-projectjson-cannot-be-used)
 - [This import is relative, but has no directory to be relative to](#this-import-is-relative-but-has-no-directory-to-be-relative-to)
 - [IMPORT resolved to a module with a shorter name](#import-resolved-to-a-module-with-a-shorter-name)
 
@@ -555,12 +560,12 @@ DECIDE `is ready` IS TRUE
 
 This is an error, not a warning: it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module. Other commands, `l4 render`, `l4 nlg` and the transpilers among them, print the same error and still exit 0; [When nothing resolves](../libraries/resolution.md#which-commands-fail-on-it) has the measured list.
 
-An `IMPORT` names a module that is neither a standard library nor a file `helpers.l4` in your project's root folder or beside the importing file.
+An `IMPORT` names a module that is neither a standard library nor a file `helpers.l4` in the session root (the folder `l4` starts from) or beside the importing file.
 
 **How to fix it:**
 
 - Check the name. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output. A name with a hyphen needs backticks: ``IMPORT `legal-persons` ``. To import a file from another folder, write its path in backticks, with a slash: ``IMPORT `../shared/helpers` ``; that is a different error, [I could not find a module at this path](#i-could-not-find-a-module-at-this-path).
-- Put your own module in the project's root folder or beside the file that imports it.
+- Put your own module in the session root (the folder `l4` starts from) or beside the file that imports it.
 - If `JL4_LIBRARY_PATH` is set, the built-in standard library is not used at all, so that folder must hold every library you import, `prelude.l4` included.
 
 [IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
@@ -571,6 +576,10 @@ An `IMPORT` names a module that is neither a standard library nor a file `helper
 
 **Error:** `I could not find a module at this path: ../shared/helpers`, then `Nothing it defines is in scope here; names you expected from it are reported as undefined.`, then `Relative to <the importing file> that is <the path that was looked for>, which does not exist.`
 
+For a path that starts with `/` the third line reads `Relative to the project root <the folder that holds l4-project.json> that is <the path that was looked for>, which does not exist.` In a deployment it reads `Relative to the root of this deployment that is <the path that was looked for>, which does not exist.`
+
+For an alias import the third line reads `The alias @vn10 stands for <its folder> (in <the project file>); relative to the project root <the folder that holds l4-project.json> that is <the path that was looked for>, which does not exist.` In a deployment it says `relative to the root of this deployment`.
+
 Like [Module not found](#module-not-found), this is an error, not a warning, and it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module.
 
 An `IMPORT` with a slash in its name names one file, relative to the file that writes the `IMPORT`. The third line shows where that came out once `.` and `..` were worked through; the path is written as seen from the folder you ran `l4` in, so it may start with `..`.
@@ -578,7 +587,12 @@ An `IMPORT` with a slash in its name names one file, relative to the file that w
 **How to fix it:**
 
 - Compare the third line with where the file really is. The search started in the folder of the file that writes the `IMPORT`, not in the folder you ran `l4` in; only the way the answer is printed is relative to where you ran it.
+- For a path that starts with `/`, compare the third line with where the file really is under the project root, the folder named on that line. If that is not the folder you meant, the nearest `l4-project.json` is a different one: a project inside a project has its own root.
+- For an alias import, compare the folder on the third line with where the file really is. The alias may stand for a different folder than you meant, or for a folder that is not where you thought; the project file is named on that line.
 - Leave off `.l4`, or keep it; both name the same file. Use `/` and not `\`.
+- A leading `/` means the project root, and never the root of the disk, so an absolute path copied from a file manager or a terminal is looked for under the project root and is not found.
+  The first line repeats the path you wrote, and the third line shows it joined onto the end of the project root.
+  Write the path from the project root instead: ``IMPORT `/shared/helpers` ``.
 - In a deployment, the file must be among the files uploaded: a path import cannot reach a file that was not deployed with the rest.
 
 [Importing a file from another folder](../libraries/README.md#importing-a-file-from-another-folder) describes path imports; [Path imports](../libraries/resolution.md#path-imports) says exactly how one is resolved.
@@ -590,14 +604,127 @@ An `IMPORT` with a slash in its name names one file, relative to the file that w
 **Error:** `This import leaves the root of this deployment: ../../x`. Two forms of it:
 
 - A path that climbs out of the files that were uploaded, in `jl4-service` or Legalese Cloud. The second line shows where the path would have landed. The deploy does not return this message: the service accepts the deployment and logs a warning, `Bundle IMPORT resolves to nothing`, naming the file and the import. Look there.
-- A path that starts with `/`, on any machine. A leading slash is reserved for a form L4 does not have yet, and is refused rather than guessed at.
+- A path that starts with `/` or with an alias and climbs above the project root, such as ``IMPORT `/../x` `` or ``IMPORT `@vn10/../../x` ``, on any machine. The second line shows the path once `.` and `..` were worked through (for an alias, worked through from the folder the alias stands for), and the third line says that a root-relative import, or an alias import, may reach any file inside the project root and nothing outside it. The first line says "deployment" on your own machine too, because it is the same text in every runtime. The root of a root-relative path or an alias is the folder of the nearest `l4-project.json` on your own machine, and the top of the uploaded files in a deployment, and nothing above it can be named.
 
-A service that runs files somebody else uploaded does not read its own disk for them, so a path import there can reach other uploaded files and nothing else. On your own machine, `l4` lets a path leave the folder you started in.
+A service that runs files somebody else uploaded does not read its own disk for them, so a path import there can reach other uploaded files and nothing else. On your own machine, `l4` lets a path that starts from the importing file leave the folder you started in; a path that starts with `/` or with an alias may not leave its project.
+The check is made on the path as written, not on the file it reaches, so a symbolic link inside the project that points outside it is still followed on your own machine; a deployment is not affected.
 
 **How to fix it:**
 
 - Deploy the file the path points at together with the rest, and write the path so that it stays inside the deployed files.
-- If the path starts with `/`, write it relative to the importing file instead: ``IMPORT `../shared/helpers` ``.
+- If the path starts with `/` or with an alias, remove a `..` or two so that it stays inside the project, or move the file into the project. To reach a file outside the project from one inside it, write a path that starts from the importing file instead: ``IMPORT `../../elsewhere/helpers` ``.
+
+---
+
+### This import is relative to the project root, but no project root was found
+
+**Error:** `This import is relative to the project root, but no project root was found above <the importing file>`, then `Add a file named l4-project.json at the top of your project; it may contain just {}.`
+
+An `IMPORT` whose path starts with `/` is counted from the project root, which `l4` finds by looking for a file named `l4-project.json` in the folder of the importing file and then in each folder above it. None of them has one. This is an error, not a warning, and it fails `l4 check` and `l4 run`. `l4` does not guess the root from the folder of the file or the folder you ran it in, because the answer would then change with where you ran it.
+
+**How to fix it:**
+
+- Add a file named `l4-project.json` to the folder that should be the root of the project, the one the paths starting with `/` are written from. It may contain just `{}`.
+- Or write the path from the importing file instead, without the leading `/`: ``IMPORT `../shared/helpers` ``.
+- If you added the file while the editor had the importing file open, the editor does not look again by itself.
+  Type a change in the importing file, such as a new line at its end, and the language server finds the file.
+  Saving the importing file, closing and reopening it, and editing another file did not make it look again when this was measured with a scripted client on 2026-10-26; VS Code itself was not tried.
+
+[Importing from the root of a project](../libraries/README.md#importing-from-the-root-of-a-project) describes the form; [Root-relative imports](../libraries/resolution.md#root-relative-imports) says exactly how the root is found.
+
+---
+
+### This import uses an alias that is not defined
+
+**Error:** `This import uses an alias that is not defined: @vn11`, then `The aliases defined in <the project file> are: @common, @vn10.`
+When the file defines none, the second line reads `<the project file> defines no aliases.`
+
+An `IMPORT` whose name starts with `@` and has a `/`, such as ``IMPORT `@vn11/nouns` ``, names a folder of the project by an alias, and the aliases are written in the `aliases` object of the `l4-project.json` that marks the root of the project.
+That file does not have the alias you wrote.
+This is an error, not a warning, and it fails `l4 check` and `l4 run`.
+In a deployment the deploy does not return the message: the service accepts the deployment and logs a warning, `Bundle IMPORT resolves to nothing`, naming the file and the import.
+
+**How to fix it:**
+
+- Compare the alias with the list on the second line, which is in the file that was read: its path is on that line.
+  A capital letter makes a different alias.
+- Add the alias to the file: `{ "aliases": { "vn11": "subjects/vn/nd68" } }`.
+  The editor does not read the file again by itself: type a change in the importing file, such as a new line at its end.
+- If you meant a folder called `@vn11` beside the importing file, write the path with `./`: ``IMPORT `./@vn11/nouns` ``.
+- On `l4`, the file read is the nearest `l4-project.json` above the file that writes the `IMPORT`, and a project inside a project has its own aliases and none of the outer one's.
+  In a deployment it is the one at the top of the uploaded files.
+
+[Importing by alias](../libraries/README.md#importing-by-alias) describes the form; [Alias imports](../libraries/resolution.md#alias-imports) says exactly how one is resolved.
+
+---
+
+### This import uses an alias, but there is no project file to read it from
+
+**Error:** `This import uses the alias @vn10, but no project root was found above <the importing file>`, or, in a deployment, `This import uses the alias @vn10, but this deployment has no l4-project.json at its top`.
+The second line says where an alias is defined and shows a file that defines one.
+
+An alias is defined in the `l4-project.json` that marks the root of the project, and there is none to read: none above the importing file on your machine, or none at the top of the uploaded files in a deployment.
+This is an error, not a warning.
+`l4` does not guess a project from the folder of the file or the folder you ran it in, because the answer would then change with where you ran it.
+
+**How to fix it:**
+
+- Add a file named `l4-project.json` to the folder that should be the root of the project, containing the aliases: `{ "aliases": { "vn10": "subjects/vn" } }`.
+- In a deployment, upload the file with the rest, at the top of the upload.
+  A file in a folder of the upload is not used, and `l4 deploy` and the VS Code deploy action cannot yet build an upload with the project root at its top.
+  They also upload only the entry file and the files it imports, so neither would upload the `l4-project.json`; add it to the zip by hand.
+- If you added the file while the editor had the importing file open, the editor does not look again by itself.
+  Type a change in the importing file, such as a new line at its end, and the language server finds the file.
+  Saving the importing file, closing and reopening it, and editing another file did not make it look again when this was measured with a scripted client on 2026-10-26; VS Code itself was not tried.
+
+[Importing by alias](../libraries/README.md#importing-by-alias) describes the form.
+
+---
+
+### I could not read the project file
+
+**Error:** `I could not read the project file <the path>, which this import needs: @vn10/nouns`, then one of:
+
+- ``It is not valid JSON: line 4, column 3, unexpected `}`.``
+  The line and column are the first place where the text cannot be JSON.
+  The usual causes are a comma after the last alias, a missing colon or comma, single quotes, and a file that ends before its closing `}`; an empty file is not JSON either.
+  When the file ends too soon the position is the end of the file.
+- `It is valid JSON, but aliases must be an object that gives each alias a folder, like {"vn10": "subjects/vn"}.`
+- `It is valid JSON, but aliases.vn10 must be the folder the alias stands for, written as text.`
+- `It is valid JSON, but the top level must be an object, like {}.`
+- `It could not be read: ...`, for a file that is not UTF-8 text or that the system would not open.
+
+The third line shows a project file that defines an alias.
+On your own machine, L4 opens `l4-project.json` only when an alias import needs it, so a file that does not parse breaks the imports that use an alias and nothing else; a root-relative import such as ``IMPORT `/shared/definitions` `` still works.
+In a deployment a file that is not JSON can reject the whole deployment, whatever imports it holds: the service reads every uploaded file as L4 first, and a line of the file that L4 takes for an annotation, such as `@exprot foo`, refuses the upload (measured 2026-10-26; valid JSON was accepted).
+
+**How to fix it:** open the file named on the first line, go to the line and column, and correct it.
+The editor does not read the file again by itself: type a change in the importing file, such as a new line at its end.
+Keys other than `aliases` are ignored, so other things can be kept in the file.
+
+[Importing by alias](../libraries/README.md#importing-by-alias) describes the file.
+
+---
+
+### An alias in l4-project.json cannot be used
+
+**Error:** one of two forms, each naming the alias and the project file.
+
+- `The alias @a in <the path> refers to another alias: @b/x`.
+  The folder an alias stands for starts with `@`, so it would be built from another alias, which an alias may not be.
+- `The alias @a in <the path> leaves the root of the project`, then `Worked through, the folder it stands for is ../x, which is above the project root.`
+  The folder, once every `.` and `x/..` is worked through, is above the folder that holds the file.
+
+**How to fix it:**
+
+- Write the folder in full, from the folder that holds `l4-project.json`: `"a": "shared/x"` and not `"a": "@b/x"`.
+  To name a folder whose own name starts with `@`, write it with `./`: `"a": "./@b"`.
+- Keep the folder inside the project.
+  An alias may stand for any folder of the project, the root included (`"."`), and nothing above it.
+  The folder is checked as written, so a symbolic link inside the project that points outside it is not noticed.
+  A path under an alias that climbs above the project, such as ``IMPORT `@a/../../elsewhere` ``, is refused with [This import leaves the root of this deployment](#this-import-leaves-the-root-of-this-deployment).
+
+[Importing by alias](../libraries/README.md#importing-by-alias) describes the file.
 
 ---
 

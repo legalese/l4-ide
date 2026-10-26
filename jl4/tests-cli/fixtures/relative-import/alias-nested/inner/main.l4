@@ -1,0 +1,3 @@
+IMPORT `@common/value`
+
+#EVAL valuemarker

@@ -11,7 +11,8 @@ import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
-import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), classifyImport, collapsePath, pathImportFile)
+import L4.Import.ProjectManifest (AliasProblem (..), ManifestProblem (..), ProjectManifest (..), aliasFolder, parseProjectManifest, renderManifestProblem)
+import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), classifyImport, collapsePath, pathImportFile, projectMarkerFile, splitAlias)
 import L4.Lexer (PError, PosToken)
 import L4.Nlg (promoteHeadInputNlg)
 import Optics (gplate, toListOf, (%), (^.))
@@ -958,8 +959,41 @@ data PathResolution
   | PathNoImportingDirectory
     -- ^ the importer is not a file with a directory: an embedded library, or a
     -- browser document
-  | PathRootRefused
-    -- ^ a leading @\/@, which is reserved
+  | PathRootNotFound !(Maybe FilePath) !FilePath
+    -- ^ a root-relative path (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.7)
+    -- that found no file: the project root, or 'Nothing' in a confined runtime,
+    -- where the root is the deployment itself, and the path that was looked for
+  | PathEscapesProjectRoot !FilePath
+    -- ^ a root-relative path that climbs above its root, in any runtime: the
+    -- path once @.@ and @..@ were worked through
+  | PathNoProjectRoot !FilePath
+    -- ^ a root-relative path with no 'projectMarkerFile' at or above the
+    -- importing file: the importing file
+  -- BEGIN constructors that only exist with aliases (§4.7 C6, proposed and not ruled)
+  | PathAliasNoManifest !Text !(Maybe FilePath)
+    -- ^ an alias import with no project file to read it from: the alias, and the
+    -- importing file when there is no 'projectMarkerFile' at or above it, or
+    -- 'Nothing' when it is a deployment whose files hold none at their top
+  | PathManifestUnusable !FilePath !ManifestProblem
+    -- ^ the project file an alias import needs cannot be used: the file, and
+    -- what is wrong with it
+  | PathAliasUnknown !Text ![Text] !FilePath
+    -- ^ the project file does not define the alias: the alias, the ones it does
+    -- define (sorted), and the file
+  | PathAliasInvalid !Text !FilePath !AliasProblem
+    -- ^ the project file defines the alias with a folder that cannot be used: the
+    -- alias, the file, and why
+  | PathAliasNotFound !Text !FilePath !FilePath !(Maybe FilePath) !FilePath
+    -- ^ an alias import that found no file: the alias, the folder it stands for,
+    -- the project file, the project root (or 'Nothing' in a deployment) and the
+    -- path that was looked for
+  | PathAliasEscapesProjectRoot !Text !FilePath
+    -- ^ an alias import whose path, worked through from the folder the alias
+    -- stands for, climbs above the project root, in any runtime: the alias, and
+    -- the path once @.@ and @..@ were worked through. It is its own constructor
+    -- because the text of 'PathEscapesProjectRoot' names a root-relative import,
+    -- which is false of an alias.
+  -- END constructors that only exist with aliases
   deriving stock (Eq, Show)
 
 -- | What resolving one written @IMPORT@ came to: a bare name goes through the
@@ -984,6 +1018,14 @@ writtenOutcomeUri = \ case
 -- bundle. A path import names one file, and the point of writing one is that no
 -- ladder decides it.
 --
+-- A name with a leading @\/@ is joined to the project root instead
+-- ('findProjectRoot'; §4.7, proposed and not ruled), and one that starts with
+-- @\@@ and has a @\/@ is joined to a folder of the project that its
+-- @l4-project.json@ names ('resolveAliasImport'; §4.7 C6, likewise). Its confinement is not the
+-- scope's: a root-relative path that climbs above the root is refused whatever
+-- the scope, and it is checked on the written path alone, before the root is
+-- looked for, so that it cannot depend on where the root turned out to be.
+--
 -- __Confinement__ is read off the 'LibraryScope': 'EmbeddedStdlibOnly' is a host
 -- that serves bundles somebody else uploaded (jl4-service), and there a
 -- collapsed path that climbs above the bundle is refused before anything is
@@ -1004,33 +1046,222 @@ resolveRelativeImport
 resolveRelativeImport recorder scope rootDirectory importerUri written = do
   logWith recorder Info $ LogImportResolution $
     "Resolving path import: " <> written <> " from " <> (fromNormalizedUri importerUri).getUri
-  case classifyImport written of
-    RootedImport -> pure PathRootRefused
-    _ -> case uriToNormalizedFilePath importerUri of
-      Nothing -> pure PathNoImportingDirectory
-      Just nfp -> do
-        let importer = fromNormalizedFilePath nfp
-            target = collapsePath (takeDirectory importer </> pathImportFile written)
-            confined = scope == EmbeddedStdlibOnly
-        if confined && target.cpEscaped
-          then pure (PathEscapesRoot importer target.cpPath)
-          else do
-            key <- liftIO $ canonicalPathKey scope rootDirectory target.cpPath
-            candidateUri <- liftIO $ roundTrippingFileUri key
-            mContent <- use GetFileContents candidateUri
-            let inVfs = case mContent of
-                  Just (_, Just _rope) -> True
-                  _                    -> False
-            onDisk <-
-              if inVfs || confined
-                then pure False
-                else liftIO $ doesFileExist key
-            if inVfs || onDisk
-              then do
-                logWith recorder Info $ LogImportResolution $
-                  "Found path import: " <> Text.pack key
-                pure (PathFound candidateUri)
-              else pure (PathNotFound importer key)
+  case uriToNormalizedFilePath importerUri of
+    Nothing -> pure PathNoImportingDirectory
+    Just nfp -> do
+      let importer = fromNormalizedFilePath nfp
+          confined = scope == EmbeddedStdlibOnly
+      case (classifyImport written, splitAlias written) of
+        (AliasImport, Just (alias, rest)) ->
+          resolveAliasImport recorder scope rootDirectory importer alias rest
+        (RootRelativeImport, _) -> do
+          let underRoot = collapsePath (pathImportFile written)
+          if underRoot.cpEscaped
+            then pure (PathEscapesProjectRoot underRoot.cpPath)
+            else do
+              mRoot <- findProjectRoot recorder scope rootDirectory importer
+              case mRoot of
+                Nothing -> pure (PathNoProjectRoot importer)
+                Just root -> do
+                  let target = (collapsePath (root </> underRoot.cpPath)).cpPath
+                  probed <- probePathImport recorder scope rootDirectory target
+                  pure $ case probed of
+                    Right uri -> PathFound uri
+                    Left key  -> PathRootNotFound (if confined then Nothing else Just root) key
+        _ -> do
+          let target = collapsePath (takeDirectory importer </> pathImportFile written)
+          if confined && target.cpEscaped
+            then pure (PathEscapesRoot importer target.cpPath)
+            else do
+              probed <- probePathImport recorder scope rootDirectory target.cpPath
+              pure $ case probed of
+                Right uri -> PathFound uri
+                Left key  -> PathNotFound importer key
+
+-- | Look for the one file a path import names: among the files the session
+-- holds in memory (an open editor buffer, a bundle's file), and then, unless the
+-- scope is confined, on disk. 'Left' is the key it was looked for under.
+probePathImport
+  :: Recorder (WithPriority Log)
+  -> LibraryScope
+  -> FilePath          -- ^ root directory the session was started with
+  -> FilePath          -- ^ the collapsed path
+  -> Action (Either FilePath NormalizedUri)
+probePathImport recorder scope rootDirectory target = do
+  key <- liftIO $ canonicalPathKey scope rootDirectory target
+  candidateUri <- liftIO $ roundTrippingFileUri key
+  inVfs <- holdsInMemory candidateUri
+  onDisk <-
+    if inVfs || scope == EmbeddedStdlibOnly
+      then pure False
+      else liftIO $ doesFileExist key
+  if inVfs || onDisk
+    then do
+      logWith recorder Info $ LogImportResolution $
+        "Found path import: " <> Text.pack key
+      pure (Right candidateUri)
+    else pure (Left key)
+
+-- | Does the session hold content for this file, as an open editor buffer or a
+-- bundle's virtual file does? Asked through the rule, so that what is held wins
+-- over the disk and a change to it is a change the rules depend on.
+holdsInMemory :: NormalizedUri -> Action Bool
+holdsInMemory = fmap Maybe.isJust . memoryContents
+
+-- | What the session holds in memory for this file, if anything. Asking through
+-- the rule records a dependency on the file even when nothing is held, so what
+-- comes of it is rebuilt when the file changes.
+memoryContents :: NormalizedUri -> Action (Maybe Rope.Rope)
+memoryContents uri = do
+  mContent <- use GetFileContents uri
+  pure $ case mContent of
+    Just (_, Just rope) -> Just rope
+    _                   -> Nothing
+
+-- | The project root a root-relative import is counted from
+-- (RELATIVE-IMPORTS-SPEC §4.7, C2 and C3; proposed and not ruled).
+--
+-- A confined runtime has no file system of its own to search, so its root is the
+-- root of the files it was handed, @.@, and no 'projectMarkerFile' is looked
+-- for. Anywhere else it is the folder of the nearest 'projectMarkerFile',
+-- looking in the importing file's folder first and then in each folder above it.
+-- A marker the session holds in memory counts before the disk is asked, as every
+-- other file does ('markerSource'); what is inside it is not read here, only by
+-- an alias import ('resolveAliasImport'). The folder
+-- is absolute, so a relative importing path (@l4 check rows\/a\/main.l4@) can be
+-- followed above the folder it was started in, and 'canonicalPathKey' writes a
+-- file under it as it writes any other.
+--
+-- Not covered: a marker added or removed while the language server has the
+-- importer open is noticed when the importer's text next changes, and not when
+-- the marker does, because nothing watches the disk for it. Measured with a
+-- scripted client on 2026-10-26: writing the marker, saving the importer,
+-- closing and reopening it, a file-watch notice for the marker and an edit to
+-- another open file each left the old answer in place, and a typed change in
+-- the importer found the marker.
+findProjectRoot
+  :: Recorder (WithPriority Log)
+  -> LibraryScope
+  -> FilePath          -- ^ root directory the session was started with
+  -> FilePath          -- ^ the importing file
+  -> Action (Maybe FilePath)
+findProjectRoot recorder scope rootDirectory importer
+  | scope == EmbeddedStdlibOnly = pure (Just ".")
+  | otherwise = do
+      cwd <- liftIO getCurrentDirectory
+      let start = (collapsePath (cwd </> takeDirectory importer)).cpPath
+      climb (ancestors start)
+  where
+    ancestors dir = dir : case takeDirectory dir of
+      parent | parent /= dir -> ancestors parent
+      _                      -> []
+
+    climb = \ case
+      [] -> pure Nothing
+      dir : above -> do
+        marked <- hasMarker (dir </> projectMarkerFile)
+        if marked
+          then do
+            logWith recorder Info $ LogImportResolution $
+              "Found project root: " <> Text.pack dir
+            pure (Just dir)
+          else climb above
+
+    hasMarker marker = do
+      source <- markerSource scope rootDirectory marker
+      pure $ case source of
+        MarkerAbsent -> False
+        _            -> True
+
+-- | Where a 'projectMarkerFile' is held.
+data MarkerSource
+  = MarkerInMemory !Rope.Rope
+    -- ^ in the session: an open editor buffer, or a file a host handed over
+  | MarkerOnDisk
+  | MarkerAbsent
+
+-- | Look for a 'projectMarkerFile' the way 'probePathImport' looks for a module:
+-- in memory first, so that what the session holds wins over the disk, and then,
+-- unless the scope is confined, on disk. Presence ('findProjectRoot') and
+-- content ('readProjectFile') both come through here, so they cannot disagree
+-- about which copy of the file counts.
+markerSource :: LibraryScope -> FilePath -> FilePath -> Action MarkerSource
+markerSource scope rootDirectory marker = do
+  key <- liftIO $ canonicalPathKey scope rootDirectory marker
+  mRope <- memoryContents =<< liftIO (roundTrippingFileUri key)
+  case mRope of
+    Just rope -> pure (MarkerInMemory rope)
+    Nothing -> do
+      onDisk <- if scope == EmbeddedStdlibOnly then pure False else liftIO (doesFileExist marker)
+      pure (if onDisk then MarkerOnDisk else MarkerAbsent)
+
+-- | The text of a project file, or 'Nothing' if there is none. A copy the
+-- session holds in memory is read as it is held. Otherwise the disk is read, in
+-- bytes, so that a file that is not UTF-8 is a project file that cannot be used
+-- and not an exception. 'markerSource' has asked the rule for the file first, and
+-- that records the dependency on it, which a bare read would not.
+readProjectFile :: LibraryScope -> FilePath -> FilePath -> Action (Maybe (Either ManifestProblem Text))
+readProjectFile scope rootDirectory marker =
+  markerSource scope rootDirectory marker >>= \ case
+    MarkerAbsent -> pure Nothing
+    MarkerInMemory rope -> pure (Just (Right (Rope.toText rope)))
+    MarkerOnDisk -> do
+      bytes <- liftIO (tryIO (BS.readFile marker))
+      pure . Just $ case bytes of
+        Left e -> Left (ManifestUnreadable (Text.pack (displayException e)))
+        Right b -> first (const (ManifestUnreadable "it is not UTF-8 text")) (TextEncoding.decodeUtf8' b)
+
+-- | Resolve an alias import (RELATIVE-IMPORTS-SPEC §4.7, C6; proposed and not
+-- ruled): @IMPORT \`\@vn10\/nouns\`@ is the file @nouns@ under the folder that
+-- @l4-project.json@ gives the alias @vn10@.
+--
+-- The folder that holds the project file is the project root, so the file is
+-- found as 'findProjectRoot' finds the root of a root-relative import: the
+-- nearest one above the importing file, and the top of the uploaded files in a
+-- deployment. Only that file is read, so a project inside a project has the
+-- aliases of its own file and none of the outer one's. What is inside it is
+-- read here and nowhere else: a root-relative import never opens it.
+--
+-- The path under the alias may use @..@, and is confined by the project root
+-- as a root-relative path is, in every runtime ('PathAliasEscapesProjectRoot'); it
+-- is not confined to the alias's folder. The lookup after that is the one a
+-- relative path uses ('probePathImport'), so one file is one module however it
+-- was reached.
+resolveAliasImport
+  :: Recorder (WithPriority Log)
+  -> LibraryScope
+  -> FilePath          -- ^ root directory the session was started with
+  -> FilePath          -- ^ the importing file
+  -> Text              -- ^ the alias
+  -> Text              -- ^ the path under it
+  -> Action PathResolution
+resolveAliasImport recorder scope rootDirectory importer alias rest = do
+  mRoot <- findProjectRoot recorder scope rootDirectory importer
+  case mRoot of
+    Nothing -> pure (PathAliasNoManifest alias (Just importer))
+    Just root -> do
+      let confined = scope == EmbeddedStdlibOnly
+          manifestFile = (collapsePath (root </> projectMarkerFile)).cpPath
+      source <- readProjectFile scope rootDirectory manifestFile
+      case source of
+        Nothing -> pure (PathAliasNoManifest alias (if confined then Nothing else Just importer))
+        Just (Left why) -> pure (PathManifestUnusable manifestFile why)
+        Just (Right text) -> case parseProjectManifest text of
+          Left why -> pure (PathManifestUnusable manifestFile why)
+          Right manifest -> case Map.lookup alias manifest.aliases of
+            Nothing -> pure (PathAliasUnknown alias (Map.keys manifest.aliases) manifestFile)
+            Just stands -> case aliasFolder stands of
+              Left why -> pure (PathAliasInvalid alias manifestFile why)
+              Right folder -> do
+                let underRoot = collapsePath (folder </> pathImportFile rest)
+                if underRoot.cpEscaped
+                  then pure (PathAliasEscapesProjectRoot alias underRoot.cpPath)
+                  else do
+                    let target = (collapsePath (root </> underRoot.cpPath)).cpPath
+                    probed <- probePathImport recorder scope rootDirectory target
+                    pure $ case probed of
+                      Right uri -> PathFound uri
+                      Left key  -> PathAliasNotFound alias folder manifestFile (if confined then Nothing else Just root) key
 
 -- | The one spelling a path import's file is keyed under, so that one file is
 -- one module however it was reached (RELATIVE-IMPORTS-SPEC §4.4).
@@ -1095,10 +1326,74 @@ pathFailureMessage importerUri written = \ case
     [ "This import is relative, but " <> (fromNormalizedUri importerUri).getUri <> " has no directory to be relative to."
     , "Write a bare module name, or open the file from disk so that it has a folder to start from."
     ]
-  PathRootRefused -> Just $ Text.unlines
-    [ "This import leaves the root of this deployment: " <> written
-    , "A path import is written relative to the file that imports it. A leading / is reserved for a root-relative form that does not exist yet."
+  PathRootNotFound mRoot key -> Just $ Text.unlines
+    [ "I could not find a module at this path: " <> written
+    , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+    , "Relative to " <> maybe "the root of this deployment" (\r -> "the project root " <> Text.pack r) mRoot
+        <> " that is " <> Text.pack key <> ", which does not exist."
     ]
+  PathEscapesProjectRoot collapsed -> Just $ Text.unlines
+    [ "This import leaves the root of this deployment: " <> written
+    , "Worked through, that path is " <> Text.pack collapsed <> ", which is above the project root."
+    , "A root-relative import may reach any file inside the project root and nothing outside it."
+    ]
+  PathNoProjectRoot importer -> Just $ Text.unlines
+    [ "This import is relative to the project root, but no project root was found above " <> Text.pack importer
+    , "Add a file named l4-project.json at the top of your project; it may contain just {}."
+    ]
+  -- BEGIN messages that only exist with aliases (§4.7 C6, proposed and not ruled)
+  PathAliasNoManifest alias (Just importer) -> Just $ Text.unlines
+    [ "This import uses the alias @" <> alias <> ", but no project root was found above " <> Text.pack importer
+    , "An alias is defined in the file l4-project.json at the top of your project, like " <> aliasExample alias <> "."
+    ]
+  PathAliasNoManifest alias Nothing -> Just $ Text.unlines
+    [ "This import uses the alias @" <> alias <> ", but this deployment has no l4-project.json at its top"
+    , "An alias is defined in the file l4-project.json at the top of the uploaded files, like " <> aliasExample alias <> "."
+    ]
+  PathManifestUnusable manifest why -> Just $ Text.unlines
+    [ "I could not read the project file " <> Text.pack manifest <> ", which this import needs: " <> written
+    , renderManifestProblem why
+    , "A project file that defines an alias looks like " <> aliasExample "vn10" <> "."
+    ]
+  PathAliasUnknown alias known manifest -> Just $ Text.unlines
+    [ "This import uses an alias that is not defined: @" <> alias
+    , if null known
+        then Text.pack manifest <> " defines no aliases."
+        else "The aliases defined in " <> Text.pack manifest <> " are: " <> Text.intercalate ", " (map ("@" <>) known) <> "."
+    ]
+  PathAliasInvalid alias manifest (AliasIsAlias value) -> Just $ Text.unlines
+    [ "The alias @" <> alias <> " in " <> Text.pack manifest <> " refers to another alias: " <> value
+    , "An alias stands for a folder of the project, and cannot be built from another alias."
+    , "To name a folder whose name starts with @, write it as ./" <> value <> "."
+    ]
+  PathAliasInvalid alias manifest (AliasLeavesRoot collapsed) -> Just $ Text.unlines
+    [ "The alias @" <> alias <> " in " <> Text.pack manifest <> " leaves the root of the project"
+    , "Worked through, the folder it stands for is " <> Text.pack collapsed <> ", which is above the project root."
+    , "An alias may stand for any folder inside the project and nothing outside it."
+    ]
+  PathAliasNotFound alias folder manifest mRoot key -> Just $ Text.unlines
+    [ "I could not find a module at this path: " <> written
+    , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+    , "The alias @" <> alias <> " stands for " <> Text.pack folder <> " (in " <> Text.pack manifest <> "); relative to "
+        <> maybe "the root of this deployment" (\r -> "the project root " <> Text.pack r) mRoot
+        <> " that is " <> Text.pack key <> ", which does not exist."
+    ]
+  -- The first line is the one of 'PathEscapesProjectRoot', which a test pins, and
+  -- says "this deployment" on a person's machine too (RELATIVE-IMPORTS-SPEC §4.7.1,
+  -- C5 and C6d). The other two are the alias's own: the shared text names a
+  -- root-relative import.
+  PathAliasEscapesProjectRoot alias collapsed -> Just $ Text.unlines
+    [ "This import leaves the root of this deployment: " <> written
+    , "Worked through from the folder that the alias @" <> alias <> " stands for, that path is " <> Text.pack collapsed
+        <> ", which is above the project root."
+    , "An alias import may reach any file inside the project root and nothing outside it."
+    ]
+  -- END messages that only exist with aliases
+
+-- | What a project file that defines the alias looks like, for the messages that
+-- tell a person how to add one.
+aliasExample :: Text -> Text
+aliasExample alias = "{\"aliases\": {\"" <> alias <> "\": \"subjects/vn\"}}"
 
 -- | The warning for a bare import whose written name is not the module it
 -- resolves: a dot or an extension in a name is dropped, so @IMPORT a.b@ is

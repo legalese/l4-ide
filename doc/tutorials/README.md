@@ -45,4 +45,5 @@ Who must do what, by when, and what follows: one tenancy, carried through four p
 ## Advanced
 
 - [Using the l4 CLI](getting-started/l4-cli.md): check, run, batch-evaluate, render and deploy rules from the command line.
+- [Split a project into folders](getting-started/projects-in-folders.md): move shared definitions into their own folder and import them three ways, by a path from the file, from the project root, and by a short folder name (proposed, not landed).
 - [Manage rules in git and CI](getting-started/version-control-for-rules.md): commits, review, automatic checks and safe redeployment.

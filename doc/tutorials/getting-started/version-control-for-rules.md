@@ -39,7 +39,7 @@ Guidelines:
 
 - **Mirror the source text.** One file per statute part or contract, with `§` sections matching the source's numbering, keeps every diff traceable to a clause.
 - **Tests live with the rules.** Deployment publishes only the rules marked `@export`, so keep each rule's tests in the same file, in a `§§ Tests` section.
-- **Shared vocabulary in one place.** If several files need the same `DECLARE`s, put them in one file and `IMPORT` it (a same-directory file can be imported by name).
+- **Shared vocabulary in one place.** If several files need the same `DECLARE`s, put them in one file and `IMPORT` it (a same-directory file can be imported by name). To keep the shared file in another folder, see [Split a project into folders](projects-in-folders.md) (proposed, not landed).
 
 ---
 

@@ -43,4 +43,5 @@
 ## Advanced
 
 - [Using the l4 CLI](getting-started/l4-cli.md)
+- [Split a project into folders (proposed, not landed)](getting-started/projects-in-folders.md)
 - [Manage rules in git and CI](getting-started/version-control-for-rules.md)

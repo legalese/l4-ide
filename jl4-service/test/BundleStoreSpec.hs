@@ -75,6 +75,25 @@ spec = describe "BundleStore" do
         loadedSources `shouldBe` sources2
         loadedMeta.smVersion `shouldBe` "v2"
 
+      -- The marker of a project (RELATIVE-IMPORTS-SPEC §4.7, PROPOSED, FOR MENG)
+      -- is the one file besides the sources that a restart must bring back.
+      it "keeps an l4-project.json beside the .l4 files, and drops any other file as before" \store -> do
+        let kept = Map.fromList
+              [ ("l4-project.json", "{}\n")
+              , ("rules/main.l4", "IMPORT `/shared/mod`")
+              , ("rules/inner/l4-project.json", "{}\n")
+              , ("shared/mod.l4", "modmarker MEANS 1")
+              ]
+            sources = Map.insert "rules/notes.md" "not source" kept
+            meta = StoredMetadata "v1" "2025-01-01T00:00:00Z" Nothing Nothing Nothing
+        saveBundle store "project" sources meta
+        (loadedSources, _) <- loadBundle store "project"
+        loadedSources `shouldBe` kept
+        -- What the MCP read_file tool goes through: it does not look at the
+        -- extension, so the manifest can be read back that way.
+        manifest <- loadSingleFile store "project" "l4-project.json"
+        manifest `shouldBe` Just "{}\n"
+
       -- Regression for smucclaw/l4-ide#850. The tmp staging dir name is
       -- deterministic (@<id>.tmp@), so an interrupted deploy can leave a stale
       -- staging dir behind — the nginx `requires` restart cascade during

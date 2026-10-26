@@ -2559,6 +2559,72 @@ spec = describe "integration" do
   -- one question of one deployment, once on the freshly compiled functions and
   -- once on a service that came back from the store, and wants the same answer.
   describe "after a restart" do
+    -- A project that uses the root-relative form (RELATIVE-IMPORTS-SPEC §4.7,
+    -- PROPOSED, FOR MENG) carries an l4-project.json. The store used to keep only
+    -- the .l4 files of a bundle, so a restart dropped the marker and the version
+    -- the deployment reports (a hash of the files it was compiled from) moved with
+    -- it. That is true of l4-project.json and not of every file: a bundle with any
+    -- other file that is not a .l4, a README.md for one, still reports another
+    -- version after a restart (measured 2026-10-26; it predates this change and is
+    -- not covered here). The root-relative form does not read the file in the
+    -- service, so what a call answers cannot show the loss; the version does. The
+    -- alias test below reads it, and there the call shows the loss too.
+    it "answers a call through a root-relative import, and reports the same version, as it did before the restart" do
+      let sources =
+            [ ("l4-project.json", "{}\n")
+            , ( "rows/a/main.l4"
+              , Text.unlines
+                  [ "IMPORT `/shared/mod`"
+                  , ""
+                  , "@export Add the marker"
+                  , "GIVEN x IS A NUMBER"
+                  , "GIVETH A NUMBER"
+                  , "DECIDE addmark x IS x PLUS modmarker"
+                  ]
+              )
+            , ("shared/mod.l4", "modmarker MEANS 100\n")
+            ]
+          probe baseUrl mgr deployId = do
+            resp <- evalFunction baseUrl mgr deployId "addmark"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["x" Aeson..= (5 :: Int)]])
+            status <- deploymentStatus baseUrl mgr deployId
+            pure (answerOf baseUrl deployId resp, fmap (.metaVersion) (status >>= (.dsMetadata)))
+      (fresh, restarted) <- beforeAndAfterRestart "root-relative-restart" sources probe
+      fst (fst fresh) `shouldBe` 200
+      snd fresh `shouldSatisfy` Maybe.isJust
+      restarted `shouldBe` fresh
+
+    -- An alias is defined by the l4-project.json at the top of the bundle
+    -- (RELATIVE-IMPORTS-SPEC §4.7 C6, PROPOSED, FOR MENG). If the store did not
+    -- bring that file back, the restart would compile the same sources without
+    -- the alias, the import would resolve to nothing, and the call would answer
+    -- 422 where it answered 200.
+    it "answers a call through an alias, and reports the same version, as it did before the restart" do
+      let sources =
+            [ ("l4-project.json", "{\"aliases\": {\"common\": \"shared\"}}\n")
+            , ( "rows/a/main.l4"
+              , Text.unlines
+                  [ "IMPORT `@common/mod`"
+                  , ""
+                  , "@export Add the marker"
+                  , "GIVEN x IS A NUMBER"
+                  , "GIVETH A NUMBER"
+                  , "DECIDE addmark x IS x PLUS modmarker"
+                  ]
+              )
+            , ("shared/mod.l4", "modmarker MEANS 100\n")
+            ]
+          probe baseUrl mgr deployId = do
+            resp <- evalFunction baseUrl mgr deployId "addmark"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["x" Aeson..= (5 :: Int)]])
+            status <- deploymentStatus baseUrl mgr deployId
+            pure (answerOf baseUrl deployId resp, fmap (.metaVersion) (status >>= (.dsMetadata)))
+      (fresh, restarted) <- beforeAndAfterRestart "alias-restart" sources probe
+      fst (fst fresh) `shouldBe` 200
+      resultValue (snd (fst fresh)) `shouldBe` Just (Aeson.Number 105)
+      snd fresh `shouldSatisfy` Maybe.isJust
+      restarted `shouldBe` fresh
+
     it "answers query-plan for a boolean rule as it did before the restart" do
       let asks =
             [ Aeson.object ["arguments" Aeson..= Aeson.object []]
