@@ -1,6 +1,7 @@
 # Operational lowering: an L4 contract instance as an event ledger with conditional append
 
-Status: proposed, 2026-10-25. Nothing here is built, and nothing here has landed.
+Status: proposed, 2026-10-25. On this branch (`mengwong/lowering-explore`) none of this spec is built except the dinner fixtures it shares with the companion, which are the companion's WP0 and are committed here, and nothing has landed.
+WPO0 to WPO5 are built on the other local branch, `mengwong/lowering-ledger`, which is not this one.
 It becomes true when the work packages of §9 are merged and the acceptance items of §8 are green.
 Companion to `REGULATIVE-LOWERING-SPEC.md` (the verification lowering), which it depends on at one point (§4) and shares its fixtures with (§7).
 Written one sentence per line.
@@ -313,11 +314,12 @@ The text above each ruling is the proposal as it stood when marked, re-skinned a
 
 ## 12. What this spec does not claim
 
-- Nothing in it is built, and no line of it describes the tree in the present tense except §1.
+- On this branch nothing in it is built except the shared fixtures, and no line of it describes the tree in the present tense except §1.
 - It does not claim the ledger scales past one appender per instance, or that replay-per-append is fast; D-O4 holds the measurement.
 - It does not claim the MCP decision tools become transactional; the ledger routes beside them do, and only they touch the store (R-O5).
 - It does not claim the in-memory store is fit for anything but tests: it loses every instance on restart while deployments reload, and the table of §3.7 says so; it is no longer the default.
-- The §4.3 re-encoding this spec depends on, the companion's dinner brief fixtures, exists in no file of this branch yet: option A does not run on today's evaluator and option C has not been written (companion §1 finding 10), so WPO0 waits on the companion's WP0.
+- The §4.3 re-encoding this spec depends on, the companion's dinner brief fixtures, is committed in `jl4/examples/explore/brief/` of this branch as the companion's WP0: option C is written there, and option A does not run on today's evaluator (companion §1 finding 10).
+  WPO0 is built on `mengwong/lowering-ledger`, not on this branch.
 - Nine of this spec's claims were corrected on 2026-10-25 by the skeptics of the Lowering Rulings bench; each correction is marked where it lands (§1, §2, §3.1, §3.2, §3.4, §3.6, §3.8, §10, §11), and the first drafts are in the session record, not in this branch.
 - It does not claim the scenario's two sequences are enough: §8's two-oracle and concurrency items are the test, and the companion's explorer is where the other orderings come from.
 - The probes are cited by pull request and commit, not by path: they are in the private probes repository, draft PR legalese/solutions#1 (head `60d926c` when checked with `gh pr view` on 2026-10-25), and resolve for the team only.
