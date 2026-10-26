@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | The instance ledger's stores, OPERATIONAL-LOWERING-SPEC WPO2: the
 -- sqlite default, the in-memory store for tests, the Postgres adapter's
@@ -15,10 +16,12 @@
 --   instance, a retried key reads done, and an unknown instance is
 --   not-found.
 --
--- No Postgres server was available where this was written, so the
--- Postgres adapter's DDL and statements run here on sqlite standing in for
--- the server, and its error classification and the retry on a scripted
--- session; the live item is not run.
+-- The Postgres adapter's DDL and statements run here on sqlite standing in
+-- for a server, and its error classification and the retry on a scripted
+-- session. The same items run against a live server when
+-- @JL4_LEDGER_TEST_POSTGRES_URL@ names one ('liveSpec'): unset, they are
+-- pending and say so; set, on a build without the postgres cabal flag,
+-- they fail.
 module LedgerStoreSpec (spec) where
 
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
@@ -32,15 +35,17 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import Options.Applicative (defaultPrefs, execParserPure, getParseResult)
 import System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDirectory)
+import System.Environment (lookupEnv)
 import System.FilePath (takeDirectory, (</>))
 import Test.Hspec
 import Test.QuickCheck hiding (Result, replay)
 
 import BundleStore (cleanupStore, initStore, listDeployments)
 import Ledger.Store.Config
-import Ledger.Store.Postgres (classifySqlState, postgresBuilt, postgresDdl)
+import Ledger.Store.Postgres (classifySqlState, openPostgresStore, postgresBuilt, postgresDdl)
 import Ledger.Store.Sql
 import Ledger.Store.Sqlite (ledgerFileName, openSqliteSession, openSqliteStore)
 import Logging (newLogger)
@@ -53,6 +58,14 @@ import L4.Ledger.Replay (Deployment (..), Replayed (..), officialCount, replay)
 import L4.Ledger.Row
 import L4.Ledger.Store (LedgerStore (..), newMemoryStore)
 import L4.TracePolicy (apiDefaultPolicy)
+
+#ifdef LEDGER_POSTGRES
+import Control.Exception (bracket_)
+import Control.Monad (void)
+import qualified Data.Text.Encoding as Text.Encoding
+import qualified Database.PostgreSQL.Simple as PG
+import qualified Database.PostgreSQL.Simple.Types as PG.Values
+#endif
 
 spec :: Spec
 spec = do
@@ -84,6 +97,7 @@ spec = do
       sqlStoreContract
       concurrencyItem 8 dinner
       idempotencyItem dinner
+  liveSpec dinner
   scriptedSpec
   configSpec
 
@@ -104,6 +118,103 @@ withPostgresSqlOnSqlite :: (LedgerStore -> IO ()) -> IO ()
 withPostgresSqlOnSqlite act = withStoreDir "ledger-pg-sql" \ dir -> do
   createDirectoryIfMissing True dir
   bracket (openSqliteSession postgresDdl (dir </> "postgres-sql.sqlite3")) snd (act . sqlStore . fst)
+
+----------------------------------------------------------------------------
+-- The Postgres store, against a live server
+----------------------------------------------------------------------------
+
+-- | The store's items against the server that @JL4_LEDGER_TEST_POSTGRES_URL@
+-- names (a libpq URL or key/value string). Each example makes a schema of
+-- its own on the server, opens its stores there, and drops the schema
+-- after, so nothing else on the server is touched; a run that is killed
+-- leaves its @jl4_test_*@ schema behind. The concurrency and idempotency
+-- items run over eight connections ('withStores'), so that the server, and
+-- not a lock in this process, decides who wins an append.
+liveSpec :: Deployment -> Spec
+liveSpec dinner = describe "the ledger's Postgres store, against a live server (WPO2)" do
+  mUrl <- runIO (lookupEnv "JL4_LEDGER_TEST_POSTGRES_URL")
+  case Text.pack <$> mUrl of
+    Nothing ->
+      it "runs the store, concurrency, idempotency and restart items against a server" $
+        pendingWith "JL4_LEDGER_TEST_POSTGRES_URL is not set, so the Postgres store was NOT run against a server"
+    Just url
+      | not postgresBuilt ->
+          it "runs the store, concurrency, idempotency and restart items against the server named by JL4_LEDGER_TEST_POSTGRES_URL" $
+            expectationFailure "JL4_LEDGER_TEST_POSTGRES_URL is set, but this binary was built without the postgres cabal flag (cabal build -f postgres, with libpq on the PATH)"
+      | otherwise -> do
+          around (withLivePostgres url) do
+            storeContract
+            sqlStoreContract
+            concurrencyItem 8 dinner
+            idempotencyItem dinner
+          describe "restart (§8)" do
+            it "a store reopened on the same schema holds every instance; a retried key reads done, and an unknown instance is not-found" do
+              liveRestart url dinner
+
+withLivePostgres :: Text -> (LedgerStore -> IO ()) -> IO ()
+withLivePostgres url act = withSchema url \ u -> withStores u 8 act
+
+-- | Eight connections, each its own store on the same schema, behind one
+-- store that hands each call to the next, so that calls from different
+-- threads reach the server on different sessions.
+withStores :: Text -> Int -> (LedgerStore -> IO a) -> IO a
+withStores url n use = go n []
+  where
+    go 0 acc = do
+      next <- newIORef (0 :: Int)
+      let stores = reverse acc
+          pick = atomicModifyIORef' next \ i -> (i + 1, stores !! (i `mod` length stores))
+      use MkLedgerStore
+        { readRows = \ k -> pick >>= \ st -> st.readRows k
+        , appendRow = \ k s r -> pick >>= \ st -> st.appendRow k s r }
+    go k acc = bracket
+      (openPostgresStore url >>= either (fail . Text.unpack) pure)
+      (\ (_, _, close) -> close)
+      \ (st, _, _) -> go (k - 1) (st : acc)
+
+-- | A schema made for this one example, with the URL that puts it first on
+-- the search path; dropped, with everything in it, after.
+withSchema :: Text -> (Text -> IO a) -> IO a
+withSchema url use = do
+  nanos <- floor . (* 1000000000) <$> getPOSIXTime :: IO Integer
+  let schema = "jl4_test_" <> Text.pack (show nanos)
+  withAdmin url schema (use (inSchema url schema))
+
+inSchema :: Text -> Text -> Text
+inSchema url schema
+  | "postgresql://" `Text.isPrefixOf` url || "postgres://" `Text.isPrefixOf` url =
+      url <> (if "?" `Text.isInfixOf` url then "&" else "?") <> "options=-c%20search_path%3D" <> schema
+  | otherwise = url <> " options='-c search_path=" <> schema <> "'"
+
+-- | Create the schema on a connection of its own, and drop it after.
+withAdmin :: Text -> Text -> IO a -> IO a
+#ifdef LEDGER_POSTGRES
+withAdmin url schema act = bracket (PG.connectPostgreSQL (Text.Encoding.encodeUtf8 url)) PG.close \ admin -> do
+  let run sql = void (PG.execute_ admin (PG.Values.Query (Text.Encoding.encodeUtf8 sql)))
+  bracket_ (run ("CREATE SCHEMA " <> schema)) (run ("DROP SCHEMA IF EXISTS " <> schema <> " CASCADE")) act
+#else
+withAdmin _ _ _ = fail "this binary was built without the postgres cabal flag"
+#endif
+
+liveRestart :: Text -> Deployment -> IO ()
+liveRestart url dep = withSchema url \ u -> do
+  let inst = MkInstance dep "A"
+      key = instanceKey inst
+  firstRows <- withStores u 1 \ st -> do
+    env <- newLedger st
+    _ <- atClock env 64800 (createInstance env.ledger inst "`the arrangement`") >>= appended
+    _ <- atClock env 65100 (appendIf env.ledger inst (proposal "A2" check)) >>= appended
+    _ <- atClock env 65160 (appendIf env.ledger inst (proposal "A3" bobBuys)) >>= appended
+    st.readRows key
+  map (.seqNo) firstRows `shouldBe` [1, 2, 3]
+  withStores u 1 \ st -> do
+    st.readRows key >>= (`shouldBe` firstRows)
+    env <- newLedger st
+    retried <- atClock env 65170 (appendIf env.ledger inst (proposal "A3" bobBuys)) >>= appended
+    (retried.row.seqNo, retried.replayed) `shouldBe` (3, False)
+    atClock env 65230 (appendIf env.ledger (MkInstance dep "never created") (proposal "n" check)) >>= \ case
+      NotFound -> pure ()
+      other -> expectationFailure ("expected NotFound, got " <> show other)
 
 ----------------------------------------------------------------------------
 -- Fixtures

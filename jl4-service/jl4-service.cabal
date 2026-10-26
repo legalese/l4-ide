@@ -217,4 +217,11 @@ test-suite jl4-service-test
     time,
     transformers,
     warp,
-    zip-archive,
+    zip-archive
+
+  -- LedgerStoreSpec runs the store items against a live server when
+  -- JL4_LEDGER_TEST_POSTGRES_URL names one, and needs the driver to make
+  -- its own schema.
+  if flag(postgres)
+    build-depends: postgresql-simple
+    cpp-options: -DLEDGER_POSTGRES

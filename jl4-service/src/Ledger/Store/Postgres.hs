@@ -8,20 +8,26 @@
 -- @PRIMARY KEY (deployment, instance, seq)@ as the backstop. Under
 -- Postgres's default isolation two transactions can both read head
 -- @n - 1@; the second insert at @n@ should then wait on the first's key
--- and, once it commits, do nothing, and so be @Left@ the new head. That is
--- reasoned from how Postgres documents @ON CONFLICT DO NOTHING@, not run.
+-- and, once it commits, do nothing, and so be @Left@ the new head. That was
+-- reasoned from how Postgres documents @ON CONFLICT DO NOTHING@, and has
+-- since been run: see below.
 --
 -- The driver is built only with the cabal flag @postgres@ (see
 -- @jl4-service.cabal@ for why), and without it 'openPostgresStore' says
 -- so. The DDL and the error classification here are compiled either way.
 --
--- What has and has not been run, as of the commit that added this module:
--- no Postgres server was available, so this adapter's DDL and statements
--- have run only on sqlite standing in for a server, and its driver, built
--- with the flag, has been run only against a port with no server, where
--- opening the store is a 'Left' (a refused connection is libpq's
--- 'IOException', which the first such run found escaping). It has never
--- reached a server. One connection, no pool, no reconnect: a lost
+-- What has and has not been run. The DDL and statements run on sqlite
+-- standing in for a server in every build. The driver, built with the flag,
+-- was first run against a port with no server, where opening the store is
+-- a 'Left' (a refused connection is libpq's 'IOException', which that run
+-- found escaping). It has since been run against a live server, when
+-- @JL4_LEDGER_TEST_POSTGRES_URL@ names one ("LedgerStoreSpec", 'liveSpec'):
+-- on 2026-10-26, PostgreSQL 17.11 on the same machine (localhost, connecting
+-- without a password), the store's contract, its gapless-history race,
+-- the concurrency and idempotency items of OPERATIONAL-LOWERING-SPEC §8
+-- over eight connections, and a restart all passed. Not run: a server that
+-- needs a password or TLS, a server that drops the connection mid-run, more
+-- than one host, another version. One connection, no pool, no reconnect: a lost
 -- connection is a loud 'LedgerStoreError' on every call after it.
 module Ledger.Store.Postgres
   ( postgresDdl

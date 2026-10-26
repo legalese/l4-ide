@@ -233,8 +233,9 @@ Postgres is compiled in only when the service is built with the cabal flag `post
 Without the flag, `--ledger-store postgres` stops the service at start, saying how to get the adapter (measured).
 With the flag but no connection string it stops the service too.
 The adapter runs the same statements as the SQLite store.
-It has been run only against SQLite standing in for a server, and against a port with no server, where opening the store fails cleanly.
-It has not been run against a Postgres server.
+It has been run against SQLite standing in for a server, against a port with no server, where opening the store fails cleanly, and, on 2026-10-26, against PostgreSQL 17.11 on the same machine (localhost, connecting without a password).
+There the store's contract, the concurrency item over eight connections, the idempotency items and a restart passed; the tests run against a server when `JL4_LEDGER_TEST_POSTGRES_URL` names one, and say they were not run when it is unset.
+It has not been run against a server that needs a password or TLS, one that drops the connection mid-run, or another version.
 It holds one connection, with no pool and no reconnection, so a lost connection fails every call after it, loudly.
 
 **Memory, for tests.**
