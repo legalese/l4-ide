@@ -17,7 +17,7 @@ import EvalLimits (withEvalLimits)
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
 import L4.FunctionSchema (Parameters)
-import DeonticTrace (isDeonticFunction, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
+import DeonticTrace (isDeonticFunction, isStrayArgumentsField, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
 import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
 import Types
 
@@ -537,7 +537,9 @@ data McpCall = McpCall
 -- A tool that is not DEONTIC is flat, and a @startTime@ or @events@ on it is
 -- a trace unless the function declares an input of that name ('isStrayTraceField'),
 -- in which case it is an input as any other. A stray one is not an input and is
--- kept in the 'McpCall' so that the call can be refused.
+-- kept in the 'McpCall' so that the call can be refused. An @arguments@ on it is
+-- left out unless the function declares an input of that name
+-- ('isStrayArgumentsField'), in which case it is an input as any other.
 buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> McpCall
 buildMcpCall reverseMap params isDeontic arguments = case arguments of
   Aeson.Object obj
@@ -556,8 +558,9 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
           }
     | otherwise ->
         let strays = filter (isStrayTraceField params) traceKeys
+            wrappers = filter (isStrayArgumentsField params) ["arguments"]
         in McpCall
-          { inputs = pairs (without ("arguments" : strays) obj)
+          { inputs = pairs (without (wrappers <> strays) obj)
           , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
           , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
           }

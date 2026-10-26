@@ -19,6 +19,7 @@ module DeonticTrace (
   traceFromJSON,
   noTraceForOtherFunctions,
   isStrayTraceField,
+  isStrayArgumentsField,
   noDeonticModule,
   presentDeonticOutcome,
   runDeonticLimited,
@@ -110,6 +111,17 @@ noTraceForOtherFunctions = "startTime and events are only valid for functions re
 isStrayTraceField :: Parameters -> Text -> Bool
 isStrayTraceField params field =
   field `elem` ["startTime", "events"] && Map.notMember field params.parameterMap
+
+-- | Whether a field of a call to a function that is not DEONTIC is an
+-- @arguments@ wrapper and not an input: a field named @arguments@ that is not
+-- one of the function's inputs. The tool's schema is flat, so a wrapper is not
+-- read, only left out; a function may declare an input of that name, and then
+-- it is an input as any other, as @startTime@ and @events@ are
+-- ('isStrayTraceField'). A DEONTIC function's own schema nests its inputs under
+-- @arguments@, so this does not apply to it.
+isStrayArgumentsField :: Parameters -> Text -> Bool
+isStrayArgumentsField params field =
+  field == "arguments" && Map.notMember field params.parameterMap
 
 -- | What a DEONTIC function that has no compiled module reports. The compiler
 -- falls back to a per-file session for a function whose module did not

@@ -3780,6 +3780,89 @@ spec = describe "integration" do
           schema <- mcpToolInputSchema baseUrl mgr elapsedId elapsedFn
           fmap schemaProperties schema `shouldBe` Just ["events", "startTime"]
 
+    -- Found in review, 2026-10-27: MCP left a top-level @arguments@ out of every
+    -- call to a function that is not a DEONTIC, taking it for the wrapper a
+    -- client puts around a flat call, so an input of that name was never read:
+    -- the tool listed it as required and then the call said it was missing, or,
+    -- for a MAYBE, answered as if it had been NOTHING. /evaluation and a batch
+    -- answered. A wrapper that is not an input is still left out.
+    describe "a rule that is not a DEONTIC, with an input called arguments" do
+      let sevenId = "deontic-arguments-input"
+          sevenFn = "is seven" :: Text
+          sevenSource = [("seven.l4", Text.unlines
+            [ "@export default is seven"
+            , "GIVEN arguments IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`is seven` MEANS arguments EQUALS 7"
+            ])]
+          maybeId = "deontic-arguments-maybe"
+          maybeFn = "was given" :: Text
+          maybeSource = [("given.l4", Text.unlines
+            [ "@export default was given"
+            , "GIVEN arguments IS A MAYBE NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`was given` MEANS NOT arguments EQUALS NOTHING"
+            ])]
+          eventsId = "deontic-events-startTime-boolean"
+          eventsFn = "events match" :: Text
+          eventsSource = [("match.l4", Text.unlines
+            [ "@export default events match"
+            , "GIVEN events IS A NUMBER"
+            , "      startTime IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`events match` MEANS events EQUALS startTime"
+            ])]
+          doubleId = "deontic-arguments-wrapper"
+          doubleFn = "double it" :: Text
+          doubleSource = [("double.l4", Text.unlines
+            [ "@export default double"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE `double it` IS n TIMES 2"
+            ])]
+          isBool b = Right (Just (FnLitBool b))
+          answered = fmap (Map.lookup "value")
+          onAllThree baseUrl mgr did ruleName inputs = do
+            viaRest <- askRest baseUrl mgr did ruleName inputs []
+            viaMcp <- askMcpWith baseUrl mgr did ruleName (Aeson.object inputs)
+            viaBatch <- askBatch baseUrl mgr did ruleName inputs []
+            pure [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)]
+
+      it "is listed as a flat tool, with arguments among its inputs" do
+        withServiceFromSources sevenId sevenSource \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr sevenId sevenFn
+          fmap schemaProperties schema `shouldBe` Just ["arguments"]
+
+      it "reads it as an input: the same answer on REST, on MCP and in a batch" do
+        withServiceFromSources sevenId sevenSource \baseUrl mgr ->
+          forM_ [(7 :: Int, True), (8, False)] \(given, expected) -> do
+            answers <- onAllThree baseUrl mgr sevenId sevenFn ["arguments" Aeson..= given]
+            for_ answers \(surface, answer) ->
+              (given, surface :: String, answered answer) `shouldBe` (given, surface, isBool expected)
+
+      it "reads a MAYBE of that name as given when it is, and as NOTHING when it is left out" do
+        withServiceFromSources maybeId maybeSource \baseUrl mgr -> do
+          forM_ [("given", ["arguments" Aeson..= (3 :: Int)], True), ("left out", [], False)] \(what, inputs, expected) -> do
+            answers <- onAllThree baseUrl mgr maybeId maybeFn inputs
+            for_ answers \(surface, answer) ->
+              (what :: String, surface :: String, answered answer) `shouldBe` (what, surface, isBool expected)
+
+      -- the case that was already right, kept as the same shape on a BOOLEAN
+      it "reads inputs called events and startTime of a BOOLEAN rule as inputs, on REST, on MCP and in a batch" do
+        withServiceFromSources eventsId eventsSource \baseUrl mgr ->
+          forM_ [((3 :: Int, 10 :: Int), False), ((10, 10), True)] \((e, s), expected) -> do
+            answers <- onAllThree baseUrl mgr eventsId eventsFn ["events" Aeson..= e, "startTime" Aeson..= s]
+            for_ answers \(surface, answer) ->
+              ((e, s), surface :: String, answered answer) `shouldBe` ((e, s), surface, isBool expected)
+
+      -- assumed, not ruled: an arguments that is not an input of the function
+      -- is still left out, as it was, and not read as one
+      it "still leaves out an arguments that is not one of its inputs, as the wrapper it may be" do
+        withServiceFromSources doubleId doubleSource \baseUrl mgr -> do
+          viaMcp <- askMcpWith baseUrl mgr doubleId doubleFn
+            (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.object ["n" Aeson..= (99 :: Int)]])
+          answered viaMcp `shouldBe` Right (Just (FnLitInt 6))
+
     -- Meng, 2026-10-26: "trace going to non-DEONTIC should error." /evaluation
     -- has always answered 400 to a startTime or events for such a function. MCP
     -- and a batch case used to drop them and answer as if they had not been sent.
