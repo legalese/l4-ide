@@ -184,14 +184,14 @@ It is true with ticks cut by `--until`, and true when write-only cells merged st
 
 The exit status is for scripts, so that a CI job cannot read a partial run as a green one.
 
-| status | means                                                                                                                                                                        |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                          |
-| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); a contract cannot be run at its outset; an emitted file could not be written |
-| 2      | an act was refused, or a move could not be tried                                                                                                                             |
-| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                      |
-| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                |
-| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                   |
+| status | means                                                                                                                                                                                                                                                                                  |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                                                                                                                                    |
+| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); an `--until` before the outset; a property, `--emit` or `--fair` asked of a file with nothing to explore; a contract cannot be run at its outset; an emitted file could not be written |
+| 2      | an act was refused, or a move could not be tried                                                                                                                                                                                                                                       |
+| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                                                                                                                                |
+| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                                                                                                                          |
+| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                                                                                                                             |
 
 When a run has more than one of these, the order of the table is not the order of precedence: 1 wins, then 4, then 2, then 3, then 5.
 A tick past `--until` is the exploration you asked for, not a failure of it, and does not change the status.
@@ -290,7 +290,7 @@ These are sorted by which signal carries them.
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.
   `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 10-state graph, printed `frontier NOT exhausted: 9 new states past the state bound 5 not added` and exited 3.
 - **A property is violated (exit 4)**, or **unknown (exit 5)**: every liveness property, and any path that fails its replay.
-- **An option names nothing (exit 1).** A property that is not a rule in the file or its imports; one that takes no inputs, or that reads a ledger itself (a `RECALL` inside it would read nothing, outside a run); a `--contract` that is not a rule with no inputs; a `--fair` that names no act.
+- **An option names nothing (exit 1).** A property that is not a rule in the file or its imports; one that takes no inputs, or that reads a ledger itself (a `RECALL` inside it would read nothing, outside a run); a `--contract` that is not a rule with no inputs; a `--fair` that names no act; an `--until` earlier than the outset (`--until 0 is before the outset at 64800, so no act could fire`); a property, `--emit` or `--fair` asked of a file with no `#TRACE` and no `--contract`.
 
 ### Silent unless you read the output: the exit status can be 0, and the JSON says `complete`
 
@@ -344,6 +344,7 @@ These are all in the output, on the coverage line or the property's own line, an
   So the graph of such a contract is the graph of a world in which Bob cannot buy while Alice owes the restaurant, and a property checked on it is checked on that world.
   Keep the recurring permission a `MAY` throughout, as the files on this page do.
 - **No `#TRACE` and no `--contract`.** `Nothing to explore: the file has no #TRACE directive.` is printed on standard output and the exit status is 0, so a script that reads only the status sees a green run in which nothing ran.
+  When a property, `--emit` or `--fair` was asked for, the status is 1 instead, because none of them could be answered.
 - **An always-false guard.** An act whose guard never holds is passed over in every state, so it appears in no state and no arrow, and the only trace of it is the `acts passed over` count, which does not say which.
   The same count includes the ordinary pass-overs of a recurring permission (a purchase after the dinner is bought).
   Read the transitions for the acts you expect.

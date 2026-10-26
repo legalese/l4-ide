@@ -45,6 +45,23 @@ safety =
   , "--stays", "one dinner is bought"
   ]
 
+-- | A one-party contract with no #TRACE whose only COMMIT is on the tick of
+-- its deadline, so that cell is written on a path that merges into a state
+-- already seen.
+lateContract :: [String]
+lateContract =
+  [ "DECLARE Who IS ONE OF W"
+  , "DECLARE Move IS ONE OF go"
+  , ""
+  , "GIVETH A DEONTIC Who Move"
+  , "`late` MEANS"
+  , "    PARTY W"
+  , "    MUST  go"
+  , "    WITHIN 10"
+  , "    HENCE FULFILLED"
+  , "    LEST  COMMIT `missed` IS TRUE HENCE FULFILLED"
+  ]
+
 -- | The printed #TRACE that follows the comment line naming the property:
 -- the comment, the #TRACE line and its indented events.
 traceAfter :: String -> String -> [String]
@@ -92,6 +109,34 @@ spec bin = describe "l4 explore" $ do
     Output code _ serr <- runL4 bin ["explore", brief </> "d1-naive.l4", "--contract", "no such rule"]
     code `shouldBe` ExitFailure 1
     serr `shouldSatisfy` ("no rule named `no such rule`" `isInfixOf`)
+
+  -- Three silent failures that the adversarial pass of 2026-10-26 reproduced
+  -- (each exited 0 and printed a confident line), now loud or true.
+  describe "what used to pass without a word" $ do
+    it "exits 1 on an --until before the outset, instead of holding every property of the one state" $ do
+      Output code _ serr <- runL4 bin ["explore", brief </> "d1-naive.l4", "--until", "0", "--always", "every dinner was accepted while open"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("is before the outset at 64800" `isInfixOf`)
+
+    it "exits 1 when a property, --emit or --fair is asked of a file with no #TRACE, and 0 when nothing was asked" $
+      withSystemTempDirectory "explore-notrace" $ \ dir -> do
+        let file = dir </> "late.l4"
+        writeFile file (unlines lateContract)
+        Output plain sout _ <- runL4 bin ["explore", file]
+        plain `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("Nothing to explore" `isInfixOf`)
+        Output asked _ serr <- runL4 bin ["explore", file, "--always", "no such rule at all"]
+        asked `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` ("Nothing was checked" `isInfixOf`)
+        Output fair _ _ <- runL4 bin ["explore", file, "--emit", dir </> "out", "--fair", "W"]
+        fair `shouldBe` ExitFailure 1
+
+    it "names, on the coverage line, a cell written only on a path that merges into a state already seen" $
+      withSystemTempDirectory "explore-merge" $ \ dir -> do
+        let file = dir </> "late.l4"
+        writeFile file (unlines lateContract)
+        Output _ sout _ <- runL4 bin ["explore", file, "--contract", "late"]
+        lastLine sout `shouldSatisfy` ("write-only cells dropped: OFFICIAL's `missed`" `isInfixOf`)
 
   describe "--always, --reachable, --stays, --eventually (WP2)" $ do
     it "D1 violates P1 by check, Bob's purchase, buy, prints it as a #TRACE, and exits 4" $ do

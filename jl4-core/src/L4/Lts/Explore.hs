@@ -888,6 +888,10 @@ explore opts sites rig0 start = do
     Nothing -> pure (Left "the contract produced no result at its outset")
     Just pos0 -> case pos0.posResidual of
       Nothing -> pure (Left ("the contract could not be run at its outset: " <> standingText pos0.posResult))
+      Just _
+        | Just u <- opts.eoUntil, pos0.posClock > u ->
+            pure (Left ("--until " <> prettyRatio u <> " is before the outset at " <> prettyRatio pos0.posClock
+              <> ", so no act could fire and every property would hold of the one state"))
       Just _ -> do
         (key0, notes0) <- stateKey ex pos0
         let node0 = MkNode {ndId = 0, ndDepth = 0, ndEvents = [], ndPos = pos0}
@@ -979,7 +983,7 @@ record ex node acc = \ case
   TriedEdge label kind event pos' -> do
     (key, notes) <- stateKey ex pos'
     case Map.lookup key acc.acSeen of
-      Just j -> pure (addEdge acc (Just event) (MkTransition node.ndId label j kind))
+      Just j -> pure (addEdge (noteKey notes acc) (Just event) (MkTransition node.ndId label j kind))
       Nothing
         | Map.size acc.acSeen >= ex.exOptions.eoMaxStates ->
             pure acc {acStatesCut = acc.acStatesCut + 1}

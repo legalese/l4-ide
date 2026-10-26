@@ -257,7 +257,12 @@ exploreCmd opts = do
           Right s -> pure s
       when (null starts) do
         TIO.putStrLn "Nothing to explore: the file has no #TRACE directive. Add one (`#TRACE c AT 0 WITH`) or name a rule with --contract."
-        exitWith ExitSuccess
+        -- a property, an --emit or a --fair was asked for and none can be
+        -- answered, so a CI job must not read this as green
+        let asked = not (null opts.exProperties) || not (null opts.exEmit) || not (null opts.exFair)
+        when asked do
+          hPutStrLn stderr "Nothing was checked, written or made fair: --always, --reachable, --stays, --eventually, --emit and --fair need something to explore."
+        exitWith (if asked then ExitFailure 1 else ExitSuccess)
       requests <- either (\ why -> hPutStrLn stderr why >> exitWith (ExitFailure 1)) pure (requestsOf opts.exProperties)
       props <- for requests \ rq -> case resolveProperty rig.rigEntityInfo (rig.rigModule : imported) rq of
         Left why -> do
