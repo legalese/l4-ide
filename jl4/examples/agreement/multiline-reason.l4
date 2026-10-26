@@ -1,0 +1,16 @@
+-- A rule whose reason runs over two lines, written with a line break inside
+-- the string. See boolean-rules.l4 for what an "agreement:" line says, and
+-- for `pad`.
+--
+-- agreement: `the fee` may refuse with ["this schedule is not encoded:\nyears before 2000 follow the old schedule"]
+-- agreement: `the fee` {"year": 2001} => answers 100
+-- agreement: `the fee` {"year": 1999} => refuses "this schedule is not encoded:\nyears before 2000 follow the old schedule"
+
+@export the fee for a year
+GIVEN year IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`the fee` year pad MEANS
+  IF year AT LEAST 2000 THEN 100
+  ELSE REFUSE "this schedule is not encoded:
+years before 2000 follow the old schedule"

@@ -1,0 +1,10 @@
+-- A definition that franchise.l4 imports, and so one that two-hop-rules.l4
+-- reaches two imports away: it refuses to answer for a person who is not
+-- resident. A file of the agreement corpus with no "agreement:" line is
+-- read only by the files that import it.
+
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is resident` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "non-residents are not modelled"

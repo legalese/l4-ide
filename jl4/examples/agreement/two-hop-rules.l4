@@ -1,0 +1,19 @@
+-- A rule that may refuse through a definition two imports away: it calls
+-- one that franchise.l4 defines by calling one that franchise.l4 imports
+-- from residency.l4. See boolean-rules.l4 for what an "agreement:" line
+-- says, and for `pad`.
+--
+-- agreement: votes may refuse with ["non-residents are not modelled"]
+-- agreement: votes {"adult": true, "resident": true} => answers true
+-- agreement: votes {"adult": true, "resident": false} => refuses "non-residents are not modelled"
+-- agreement: votes {"adult": false, "resident": true} => answers false
+-- agreement: votes {"adult": false, "resident": false} => answers false
+
+IMPORT franchise
+
+@export whether the person votes
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE votes IF adult AND `the person may vote` resident

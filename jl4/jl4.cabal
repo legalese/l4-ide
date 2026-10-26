@@ -139,3 +139,44 @@ test-suite l4-cli-test
     process,
     temporary,
     text,
+
+test-suite l4-agreement-test
+  import: defaults
+  ghc-options: -threaded -rtsopts
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests-agreement
+  main-is: Main.hs
+  other-modules:
+    Agreement.Cli
+    Agreement.Corpus
+    Agreement.Lsp
+    Agreement.Process
+    Agreement.Registry
+    Agreement.Runners
+    Agreement.Service
+    Agreement.Surface
+    Agreement.Verdict
+  build-tool-depends:
+    jl4:l4,
+    jl4-lsp:jl4-lsp,
+    jl4-repl:jl4-repl
+  build-depends:
+    aeson,
+    bytestring,
+    containers,
+    directory,
+    filepath,
+    hspec,
+    http-client,
+    http-types,
+    jl4-core,
+    jl4-query-plan,
+    jl4-service,
+    lsp-types,
+    process,
+    scientific,
+    servant-server,
+    stm,
+    temporary,
+    text,
+    warp,
