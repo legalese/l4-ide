@@ -3645,6 +3645,64 @@ spec = describe "integration" do
           schema <- mcpToolInputSchema baseUrl mgr elapsedId elapsedFn
           fmap schemaProperties schema `shouldBe` Just ["events", "startTime"]
 
+    -- Meng, 2026-10-26: "trace going to non-DEONTIC should error." /evaluation
+    -- has always answered 400 to a startTime or events for such a function. MCP
+    -- and a batch case used to drop them and answer as if they had not been sent.
+    describe "a trace sent to a function that is not a DEONTIC" do
+      let ordinaryId = "deontic-ordinary"
+          ordinaryFn = "double it" :: Text
+          ordinarySource = [("double.l4", Text.unlines
+            [ "@export default double"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "DECIDE `double it` IS n TIMES 2"
+            ])]
+          withOrdinary = withServiceFromSources ordinaryId ordinarySource
+          refusal = "startTime and events are only valid for functions returning DEONTIC"
+          n k = ["n" Aeson..= (k :: Int)] :: [Pair]
+          valueOf k = Right (Just (FnLitInt k))
+          answered = fmap (Map.lookup "value")
+
+      it "is refused on REST, on MCP and in a batch, with the same message" do
+        withOrdinary \baseUrl mgr ->
+          forM_ [ ("startTime and events", late), ("startTime", ["startTime" Aeson..= (0 :: Int)])
+                , ("events", ["events" Aeson..= ([] :: [Aeson.Value])]) ] \(what, pairs) -> do
+            viaRest <- askRest baseUrl mgr ordinaryId ordinaryFn (n 3) pairs
+            viaMcp <- askMcpWith baseUrl mgr ordinaryId ordinaryFn (Aeson.object (n 3 <> pairs))
+            viaBatch <- askBatch baseUrl mgr ordinaryId ordinaryFn (n 3) pairs
+            for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+              (what :: String, surface :: String, answer) `shouldBe` (what, surface, Left refusal)
+
+      it "is refused in a task started while the deployment compiles" do
+        withCompilingService ordinaryId ordinarySource \compiling ready baseUrl mgr -> do
+          answer <- askMcpTask baseUrl mgr ordinaryId ordinaryFn compiling ready (Aeson.object (n 3 <> late))
+          answer `shouldBe` Left refusal
+
+      it "does not stop the other cases of a batch" do
+        withOrdinary \baseUrl mgr -> do
+          let caseOf i pairs = Aeson.object ("@id" Aeson..= (i :: Int) : pairs)
+          answers <- askBatchCases baseUrl mgr ordinaryId ordinaryFn
+            [caseOf 1 (n 1), caseOf 2 (n 2 <> late), caseOf 3 (n 3)]
+          map answered answers `shouldBe` [valueOf 2, Left refusal, valueOf 6]
+
+      -- a null is a field left out, on /evaluation and here
+      it "answers a call that sends the trace as null, on REST, on MCP and in a batch" do
+        withOrdinary \baseUrl mgr -> do
+          let nulls = ["startTime" Aeson..= Aeson.Null, "events" Aeson..= Aeson.Null] :: [Pair]
+          viaRest <- askRest baseUrl mgr ordinaryId ordinaryFn (n 3) nulls
+          viaMcp <- askMcpWith baseUrl mgr ordinaryId ordinaryFn (Aeson.object (n 3 <> nulls))
+          viaBatch <- askBatch baseUrl mgr ordinaryId ordinaryFn (n 3) nulls
+          for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+            (surface :: String, answered answer) `shouldBe` (surface, valueOf 6)
+
+      it "answers a call that sends no trace, as it always did" do
+        withOrdinary \baseUrl mgr -> do
+          viaRest <- askRest baseUrl mgr ordinaryId ordinaryFn (n 3) []
+          viaMcp <- askMcpWith baseUrl mgr ordinaryId ordinaryFn (Aeson.object (n 3))
+          viaBatch <- askBatch baseUrl mgr ordinaryId ordinaryFn (n 3) []
+          for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+            (surface :: String, answered answer) `shouldBe` (surface, valueOf 6)
+
   -- TWOFACE (fired 2026-10-08): one party and one action were spelled two ways
   -- in the same answer. BREACH's `eventParty` and `eventAction` are a
   -- constructor's name, plain, but OBLIGATION's `party`, `action`, and BREACH's

@@ -17,7 +17,7 @@ import EvalLimits (withEvalLimits)
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
 import L4.FunctionSchema (Parameters)
-import DeonticTrace (isDeonticFunction, isStrayTraceField, runDeonticLimited, traceFromJSON)
+import DeonticTrace (isDeonticFunction, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
 import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
 import Types
 
@@ -501,7 +501,9 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
 --
 -- The trace fields are kept as the client sent them. Whether they are read
 -- depends on the function ('isDeonticFunction'), which a call to a deployment
--- that is still compiling does not have yet.
+-- that is still compiling does not have yet. A call to a function that is not
+-- DEONTIC carries a trace only by mistake, and is refused when it is evaluated
+-- ('runMcpEvaluationIO'), with the message @/evaluation@ gives.
 data McpCall = McpCall
   { inputs    :: [(Text, Maybe FnLiteral)]
   , startTime :: Maybe Aeson.Value
@@ -529,8 +531,8 @@ data McpCall = McpCall
 --
 -- A tool that is not DEONTIC is flat, and a @startTime@ or @events@ on it is
 -- a trace unless the function declares an input of that name ('isStrayTraceField'),
--- in which case it is an input as any other. A stray one is not an input, and is
--- dropped, as it always was.
+-- in which case it is an input as any other. A stray one is not an input and is
+-- kept in the 'McpCall' so that the call can be refused.
 buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> McpCall
 buildMcpCall reverseMap params isDeontic arguments = case arguments of
   Aeson.Object obj
@@ -551,8 +553,8 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
         let strays = filter (isStrayTraceField params) traceKeys
         in McpCall
           { inputs = pairs (without ("arguments" : strays) obj)
-          , startTime = Nothing
-          , events = Nothing
+          , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
+          , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
           }
   _ -> McpCall { inputs = [], startTime = Nothing, events = Nothing }
  where
@@ -626,7 +628,9 @@ runMcpEvaluation vf call = do
 -- A DEONTIC export is replayed against the call's trace ('runDeonticLimited',
 -- the path @/evaluation@ takes), and a call that carries no trace is refused as
 -- @/evaluation@ refuses it, with the body of its 400, as an error result.
--- Any other function is called as it always was.
+-- A call to any other function that carries a trace is refused the same way,
+-- with @/evaluation@'s message for that. Otherwise the function is called as it
+-- always was.
 runMcpEvaluationIO :: Options -> ValidatedFunction -> McpCall -> IO (Either Text Text)
 runMcpEvaluationIO cfg vf call
   | isDeonticFunction vf =
@@ -634,6 +638,8 @@ runMcpEvaluationIO cfg vf call
         Left refusal -> pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError refusal)))
         Right (startTime, events) ->
           mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False PresumeSoft
+  | Maybe.isJust call.startTime || Maybe.isJust call.events =
+      pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError noTraceForOtherFunctions)))
   | otherwise =
       case Map.lookup JL4 vf.fnEvaluator of
         Nothing -> pure $ Left "No evaluator available"

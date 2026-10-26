@@ -771,6 +771,22 @@ Meng, verbatim: "i'd be in favour of fixing the PROVISION synonym as well. shoul
 
 **Assumed, not ruled:** a metadata-cache entry written before the cache held `isDeontic` reads the flag from the display name of the return type, `DEONTIC` or `PROVISION OF`; a recompile replaces that with the type's own answer.
 
+### Q8: What does a trace sent to a function that does not return `DEONTIC` do?
+
+**ANSWERED 2026-10-26 (Meng, in conversation).**
+
+Meng, verbatim: "trace going to non-DEONTIC should error."
+
+**What was true before:** `/evaluation` answered `400` with `startTime and events are only valid for functions returning DEONTIC`.
+MCP `tools/call`, the MCP task path and a batch case dropped the fields and answered as if they had not been sent.
+
+**Ruled:** it is an error on every surface, with `/evaluation`'s message, in each surface's usual form: a `400`, an error result (`isError`) and an `@error` on that batch case, the cases beside it answered.
+
+**Assumed, not ruled:**
+
+- On MCP and in a batch the trace and the inputs share a level, so a field is a trace only when it is named `startTime` or `events` and is not one of the function's inputs.
+- A `null` is a field left out, as it is on `/evaluation`.
+
 ---
 
 ## Example: Full API Walkthrough

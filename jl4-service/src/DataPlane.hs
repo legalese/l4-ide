@@ -18,7 +18,7 @@ import Servant.Multipart
 import Backend.DecisionQueryPlan (CachedDecisionQuery (ladderInfo), buildDecisionQueryCacheFromCompiled, queryPlan, QueryPlanResponse)
 import Shared (AnnotatedFunctionSummary (..), buildPropertyReverseMap, remapArguments, sanitizePropertyName)
 import Backend.Jl4 (CompiledModule (..))
-import DeonticTrace (isDeonticFunction, noDeonticModule, requireTrace, runDeonticLimited, traceFromJSON)
+import DeonticTrace (isDeonticFunction, isStrayTraceField, noDeonticModule, noTraceForOtherFunctions, requireTrace, runDeonticLimited, traceFromJSON)
 import qualified L4.StateGraph as StateGraph
 import qualified L4.StateGraph.Dot as StateGraph
 import qualified LSP.L4.Viz.VizExpr as VizExpr
@@ -256,9 +256,9 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
   (result, allocBytes) <- case (isDeontic, fnArgs.startTime, fnArgs.events) of
     -- Non-deontic function: reject deontic params
     (False, Just _, _) ->
-      throwError err400 { errBody = jsonError "startTime and events are only valid for functions returning DEONTIC" }
+      throwError err400 { errBody = jsonError noTraceForOtherFunctions }
     (False, _, Just _) ->
-      throwError err400 { errBody = jsonError "startTime and events are only valid for functions returning DEONTIC" }
+      throwError err400 { errBody = jsonError noTraceForOtherFunctions }
     -- Non-deontic function: existing path
     (False, Nothing, Nothing) ->
       runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz presumption
@@ -334,7 +334,9 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
       r <- runAppM env $
         if isDeonticFunction vf
           then runDeonticBatchCase vf reverseMap inputCase.attributes traceLevel includeGraphViz presumption'
-          else runEvaluatorForDirectLimited False vf Nothing args outputFilter traceLevel includeGraphViz presumption'
+          else case strayTraceOfCase vf inputCase.attributes of
+            Just refusal -> pure $ Right (SimpleError (InterpreterError refusal), 0)
+            Nothing -> runEvaluatorForDirectLimited False vf Nothing args outputFilter traceLevel includeGraphViz presumption'
       pure (inputCase.id, either limitHitCase id <$> r)
 
   -- Check for fatal errors and propagate. None is a case's own: the one left
@@ -754,6 +756,17 @@ runDeonticBatchCase vf reverseMap attributes traceLevel includeGraphViz presumpt
       pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
         Left err -> (SimpleError err, allocBytes)
         Right r -> (SimpleResponse r { reasoning = emptyReasoning }, allocBytes)
+
+-- | A batch case for a function that is not DEONTIC, with a trace among its
+-- attributes: a @startTime@ or @events@ that is not one of the function's
+-- inputs, and is not @null@. The case is an errored case with the refusal
+-- @/evaluation@ gives for the same request, and the cases beside it are
+-- answered. A function that declares inputs of those names reads them as inputs.
+strayTraceOfCase :: ValidatedFunction -> Map Text FnLiteral -> Maybe Text
+strayTraceOfCase vf attributes
+  | or [ isStrayTraceField vf.fnImpl.parameters k && Aeson.toJSON v /= Aeson.Null
+       | (k, v) <- Map.toList attributes ] = Just noTraceForOtherFunctions
+  | otherwise = Nothing
 
 -- | Run an AppM action in IO with a given environment.
 runAppM :: AppEnv -> AppM a -> IO (Either ServerError a)

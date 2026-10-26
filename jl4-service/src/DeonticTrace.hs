@@ -17,6 +17,7 @@ module DeonticTrace (
   isDeonticFunction,
   requireTrace,
   traceFromJSON,
+  noTraceForOtherFunctions,
   isStrayTraceField,
   noDeonticModule,
   presentDeonticAnswer,
@@ -92,6 +93,12 @@ traceFromJSON mStart mEvents = do
   field name (Just v) = case Aeson.fromJSON v of
     Aeson.Success a -> Right (Just a)
     Aeson.Error err -> Left (name <> ": " <> Text.pack err)
+
+-- | What a request that carries a trace is refused with when the function it
+-- is for does not return a DEONTIC: a trace has nothing to be replayed against.
+-- It is the message @/evaluation@ has always given, on every surface now.
+noTraceForOtherFunctions :: Text
+noTraceForOtherFunctions = "startTime and events are only valid for functions returning DEONTIC"
 
 -- | Whether a field of a request to a function that is not DEONTIC is a trace
 -- the function has no use for: a field named @startTime@ or @events@ that is
