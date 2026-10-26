@@ -27,7 +27,10 @@
 --   app-wide limiter's own 503 is (D-O10), and a retry with the same
 --   idempotency key is always safe. "Not applied" means the act: tick rows
 --   that were due are appended first and survive a refusal, a conflict or
---   an @Unknown@, and the reply does not list them.
+--   an @Unknown@, and those replies list them under @ticks@, as an applied
+--   one does. A caller that reads only @applied@ does not learn that the
+--   instance's head moved; @ticks@ says so, and so does @head@ on a
+--   refusal or a conflict, which is the head past them.
 -- * __Silent, if the caller lets it be__: a 503 from a limit that fell
 --   after the row was written. The reply cannot tell, and says so; the
 --   retry with the same key then reads the row back, as done. A proposer
@@ -410,11 +413,15 @@ resultReply = \ case
     , "replayed" .= replayed
     , "steps" .= length steps
     ])
-  Refused {because, headSeq} -> MkLedgerReply 422 (Aeson.object
-    [ "result" .= ("refused" :: Text), "applied" .= False, "because" .= because, "head" .= headSeq ])
-  Conflict {because, headSeq} -> MkLedgerReply 409 (Aeson.object
-    [ "result" .= ("conflict" :: Text), "applied" .= False, "because" .= because, "head" .= headSeq ])
-  Unknown {because} -> MkLedgerReply 503 (notApplied because `withField` ("result" .= ("unknown" :: Text)))
+  Refused {because, headSeq, ticks} -> MkLedgerReply 422 (Aeson.object
+    [ "result" .= ("refused" :: Text), "applied" .= False, "because" .= because, "head" .= headSeq
+    , "ticks" .= map rowJson ticks ])
+  Conflict {because, headSeq, ticks} -> MkLedgerReply 409 (Aeson.object
+    [ "result" .= ("conflict" :: Text), "applied" .= False, "because" .= because, "head" .= headSeq
+    , "ticks" .= map rowJson ticks ])
+  Unknown {because, ticks} -> MkLedgerReply 503 (notApplied because
+    `withField` ("result" .= ("unknown" :: Text))
+    `withField` ("ticks" .= map rowJson ticks))
   NotFound -> MkLedgerReply 404 (Aeson.object
     [ "result" .= ("not found" :: Text), "applied" .= False
     , "because" .= ("the ledger holds no such instance; an instance is created by POST /deployments/{id}/instances, never by an append or a read" :: Text) ])

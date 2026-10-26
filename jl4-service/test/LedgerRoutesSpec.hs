@@ -28,6 +28,7 @@ module LedgerRoutesSpec
   , texts
   , int
   , str
+  , tickRows
   , check
   , bobBuys
   , buy
@@ -210,6 +211,12 @@ field k = \ case
   Aeson.Object o -> KeyMap.lookup (Key.fromText k) o
   _ -> Nothing
 
+-- | The tick rows a reply lists: their seq and their time.
+tickRows :: Aeson.Value -> [(Maybe Int, Maybe Aeson.Value)]
+tickRows v = case field "ticks" v of
+  Just (Aeson.Array ts) -> map (\ t -> (int "seq" t, field "at" t)) (toList ts)
+  _ -> []
+
 texts :: Text -> Aeson.Value -> [Text]
 texts k v = case field k v of
   Just (Aeson.Array xs) -> [ t | Aeson.String t <- toList xs ]
@@ -333,6 +340,18 @@ protocolSpec dinner = describe "the dinner protocol of §6, over HTTP, against t
         (codeC, str "result" c, field "applied" c) `shouldBe` (409, Just "conflict", Just (Aeson.Bool False))
         (_, p) <- position s "dinner" "evening"
         int "head" p `shouldBe` Just 3
+
+  it "lists the tick that a refused proposal followed: an instance at head 2 past its deadline, given an act that is not the contract's, answers 422 at head 3, and the tick is a row" do
+    withStoreDir "ledger-routes-late-refusal" \ dir -> do
+      clk <- newIORef 0
+      withService dir clk [("dinner", dinner)] \ s -> do
+        _ <- at s 64800 (create s "dinner" "evening-late")
+        _ <- at s 65100 (propose s "dinner" "evening-late" "l2" check)
+        (code, r) <- at s 75700 (propose s "dinner" "evening-late" "l3" "`Alice sings`")
+        (code, str "result" r, field "applied" r, int "head" r) `shouldBe` (422, Just "refused", Just (Aeson.Bool False), Just 3)
+        tickRows r `shouldBe` [(Just 3, Just (Aeson.Number 75601))]
+        (_, p) <- position s "dinner" "evening-late"
+        (int "head" p, field "terminal" p) `shouldBe` (Just 3, Just (Aeson.Bool True))
 
 ----------------------------------------------------------------------------
 -- A deployment with instances (R-O5)

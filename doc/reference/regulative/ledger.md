@@ -132,7 +132,7 @@ The position's `ledger` list, which has every entry at the head, tells the same 
 ## Reading a reply
 
 Every reply from these routes is JavaScript Object Notation (JSON), and every one says `applied`: `true` if it appended the proposed act, `false` if it did not.
-A `false` can still follow tick rows that the same call appended; see "Due ticks survive a refusal" under [Silent](#silent).
+A `false` can still follow tick rows that the same call appended; they are listed under `ticks`, and "Due ticks survive a refusal" under [Silent](#silent) says what to read.
 Every reply also says which store answered (`store`), and the in-memory store adds a `warning`.
 
 | HTTP status              | `result`                   | `applied` | What it means                                                                                                               |
@@ -151,7 +151,9 @@ The `verdict` is one of four: `discharging` (the contract ended fulfilled), `bre
 Every act that evaluates is appended with its verdict, a breach included, because the record of a breach is part of the history.
 No per-deployment list of acts to refuse is built.
 
-The reply to an append also has `wrote`, the entries the act's own step added to the contract's ledgers, in the words `l4 run` uses; `ticks`, any tick rows appended first; and `steps`, how many rule steps the act caused.
+The reply to an append also has `wrote`, the entries the act's own step added to the contract's ledgers, in the words `l4 run` uses; `ticks`, the tick rows this call appended before the act, oldest first; and `steps`, how many rule steps the act caused.
+A `refused`, `conflict` or `unknown` reply has `ticks` too, because the ticks are appended before the act is looked at: the list is empty when no deadline was due.
+A reply that comes from a limit or a failure rather than from the ledger (`not applied`, `not found`) has none.
 
 ### Refused
 
@@ -276,11 +278,15 @@ The silent ones are the ones to build around.
   The reply says as much in `retry`, and a retry under the same key then reads the row back.
 - **A deadline that passes unnoticed.** No tick row is written until the next proposal, so an instance whose deadline has passed still shows its obligations at its head.
   The position's `deadlinePassed` is the sign.
-- **Due ticks survive a refusal.** The ledger appends the tick rows that are due before it looks at the act, so a proposal that is then `refused`, `conflict` or `unknown` can leave them behind.
-  The reply says `applied` false and has no `ticks`, and the only sign is that `head` is higher than the head the proposer last read.
-  Measured on 2026-10-26 on the service built at `420bb6258`: an instance at head 2 whose deadline had passed answered a proposal for an act the contract does not have with `422` `refused` and `head` 3, and its position then read head 3 and terminal.
-  The `conflict` and `unknown` cases follow from the same code in `appendIf` and were not measured.
-  After any reply that was not `appended`, read the position before deciding again.
+- **Due ticks survive a refusal.** The ledger appends the tick rows that are due before it looks at the act, so a proposal that is then `refused`, `conflict` or `unknown` can leave them behind, and the instance's head has moved.
+  The reply lists them under `ticks`, as an `appended` reply does, and a `refused` or `conflict` reply's `head` is the head past them.
+  `applied` stays false, because it means only that the proposed act was appended, so a proposer that reads `applied` or `result` alone does not see the rows; read `ticks`, or the position.
+  A call that lost a race to append, and ran again, lists the ticks of every attempt, since by the retry they are rows and no longer due.
+  Measured on 2026-10-26 on the service built at `420bb6258`, which did not list them: an instance at head 2 whose deadline had passed answered a proposal for an act the contract does not have with `422` `refused` and `head` 3, no `ticks`, and its position then read head 3 and terminal.
+  The same proposal now lists the tick (seq 3, at 75601), tested over HTTP in `jl4-service-test` and in the library's `LedgerSpec`.
+  A `strict` proposal against a whole-head version (no versioned cells) is a `conflict` whenever a tick came first, since the tick moves the head; the library tests that case, and the `conflict` reply lists the tick that caused it.
+  No test makes a tick precede an `unknown`: the code lists them there too, and that is not tested.
+  Option B, to write no tick when the act is refused, is not what the ledger does; it would change what a refused proposal writes and which head a strict proposal decides against.
 - **An advisory answer that went stale.** It is not an error at all.
   It names the head it was computed at, so a proposer can see how far the instance has moved.
 - **The rule changing under a live instance.** `PUT` to a deployment that holds instances is not refused, and the rows replay against whatever is deployed.

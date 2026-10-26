@@ -192,6 +192,18 @@ agentSpec dinner = describe "an agent following the tool's answers" do
         (_, r) <- at s 65130 (propose s "dinner" "x" "what-may-I-do-now preview" buy)
         (int "seq" r, field "replayed" r) `shouldBe` (Just 3, Just (Aeson.Bool True))
 
+  it "is told in a preview what a refused act would be preceded by, and appends nothing: past the deadline, the tick is listed and no row is written" do
+    withStoreDir "ledger-mcp-late-refusal" \ dir -> do
+      clk <- newIORef 0
+      withService dir clk [("dinner", dinner)] \ s -> do
+        evening s "late"
+        (isErr, answer) <- at s 75700 (askTool s "late" (Just "`Alice sings`"))
+        let would = field "ifProposedNow" answer
+        (isErr, would >>= str "result", would >>= int "head") `shouldBe` (False, Just "would be refused", Just 3)
+        fmap tickRows would `shouldBe` Just [(Just 3, Just (Aeson.Number 75601))]
+        (_, p) <- position s "dinner" "late"
+        int "head" p `shouldBe` Just 2
+
   it "is told plainly when the instance is not there" do
     withStoreDir "ledger-mcp-nf" \ dir -> do
       clk <- newIORef 65100

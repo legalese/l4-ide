@@ -19,9 +19,13 @@
 -- * __Silent, if ignored__: 'Unknown' (the evaluator could not decide, or
 --   the time bound passed). The act is not appended either, but a proposer
 --   that reads it as permission and acts anyway is design D1, unguarded.
--- * __Silent, always__: the due ticks. They are appended before the act is
---   looked at, so a 'Refused', 'Conflict' or 'Unknown' that follows them
---   leaves them written, and those results do not list them.
+-- * __Written before the act, and listed__: the due ticks. They are
+--   appended before the act is looked at, so a 'Refused', 'Conflict' or
+--   'Unknown' that follows them leaves them written. Every 'Result' but
+--   'NotFound' lists the ticks this call wrote under @ticks@ ('resultTicks'),
+--   those of a lost race included, and the head of a refusal or conflict
+--   is the head past them. A caller that reads only whether the act was
+--   appended does not learn that the head moved.
 -- * 'Appended' covers every act that evaluates, breaching and passed-over
 --   ones included (R-O2): the verdict is on the row, and an act the rule
 --   blocked is auditable because it is there.
@@ -31,6 +35,7 @@ module L4.Ledger.Append
   , instanceKey
   , Proposed (..)
   , Result (..)
+  , resultTicks
   , createInstance
   , appendIf
   , appendDueTicks
@@ -106,12 +111,24 @@ data Result
       , ticks    :: ![Row]
         -- ^ ticks that were due and were appended first
       }
-  | Refused  { because :: !Text, headSeq :: !SeqNo }
-  | Conflict { because :: !Text, headSeq :: !SeqNo }
-  | Unknown  { because :: !Text }
+  | Refused  { because :: !Text, headSeq :: !SeqNo, ticks :: ![Row] }
+    -- ^ every constructor but 'NotFound' carries @ticks@: the ticks that
+    -- this call appended, oldest first, whether or not the act followed
+  | Conflict { because :: !Text, headSeq :: !SeqNo, ticks :: ![Row] }
+  | Unknown  { because :: !Text, ticks :: ![Row] }
   | NotFound
     -- ^ the store does not hold the instance; never a fresh one (§3.2)
   deriving stock (Show)
+
+-- | The ticks a call appended, whatever it answered: total, where the
+-- field @ticks@ is not ('NotFound' wrote nothing).
+resultTicks :: Result -> [Row]
+resultTicks = \ case
+  Appended {ticks} -> ticks
+  Refused {ticks} -> ticks
+  Conflict {ticks} -> ticks
+  Unknown {ticks} -> ticks
+  NotFound -> []
 
 -- | Create an instance: its opening, row 1, is the @#TRACE@ header naming
 -- the contract expression, stamped with the ledger's clock. Refused if the
@@ -121,9 +138,9 @@ createInstance :: Ledger -> Instance -> Text -> IO Result
 createInstance l inst contract = do
   existing <- l.store.readRows key
   if not (null existing)
-    then pure (Refused "the instance already exists" (length existing))
+    then pure (Refused "the instance already exists" (length existing) [])
     else case canonicalExpr contract of
-      Left why -> pure (Refused why 0)
+      Left why -> pure (Refused why 0 [])
       Right c -> do
         now <- l.clock
         let tx = nextTxTime Nothing now
@@ -139,61 +156,65 @@ createInstance l inst contract = do
               }
         r <- replay l.evalConfig l.timeBound inst.deploymentOf [provisional] Nothing
         case r of
-          Left (Malformed why) -> pure (Refused why 0)
-          Left (Undecided why) -> pure (Unknown why)
+          Left (Malformed why) -> pure (Refused why 0 [])
+          Left (Undecided why) -> pure (Unknown why [])
           Right rep -> do
             let opening = withVerdict rep.headVerdict provisional
             appended <- l.store.appendRow key 1 opening
             pure case appended of
-              Left current -> Refused "the instance already exists" current
+              Left current -> Refused "the instance already exists" current []
               Right () -> Appended {row = opening, steps = rep.headSteps, wrote = rep.headLedger, replayed = True, ticks = []}
   where
     key = instanceKey inst
 
 -- | Propose an act (§3.2). In order: the idempotency key is looked up, and
 -- a hit returns the original row without replaying anything; the rows are
--- read; the clock is read, and any tick that is due is appended first; the
--- act is stamped (§3.4) and replayed as sent on the rows; a strict proposal
+-- read; the clock is read, and any tick that is due is appended first, and
+-- listed in the 'Result' whatever follows; the act is stamped (§3.4) and
+-- replayed as sent on the rows; a strict proposal
 -- is held to its versioned cells; and the row is appended at head plus one,
 -- the whole step re-run from the read if another appender won.
 appendIf :: Ledger -> Instance -> Proposed -> IO Result
-appendIf l inst p = attempt 0
+appendIf l inst p = attempt 0 []
   where
     dep = inst.deploymentOf
     key = instanceKey inst
-    attempt :: Int -> IO Result
-    attempt n
-      | n > l.retryCap = pure (Unknown ("lost the race to append " <> Text.pack (show n) <> " times; nothing was appended"))
+    -- @written@ is every tick this call has appended so far, across lost
+    -- races: a lost race re-reads the rows, and the ticks it already wrote
+    -- are rows by then, no longer due, so only this list remembers them.
+    attempt :: Int -> [Row] -> IO Result
+    attempt n written
+      | n > l.retryCap = pure (Unknown ("lost the race to append " <> Text.pack (show n) <> " times; the act was not appended") written)
       | otherwise = l.store.readRows key >>= \ case
           [] -> pure NotFound
           rows -> case find (\ r -> r.idempotencyKey == Just p.idempotencyKey) rows of
-            Just original -> pure Appended {row = original, steps = [], wrote = [], replayed = False, ticks = []}
-            Nothing -> fresh n rows
+            Just original -> pure Appended {row = original, steps = [], wrote = [], replayed = False, ticks = written}
+            Nothing -> fresh n written rows
 
-    fresh n rows0
-      | Text.null (Text.strip p.idempotencyKey) = pure (Refused "a proposal carries an idempotency key" (length rows0))
+    fresh n written rows0
+      | Text.null (Text.strip p.idempotencyKey) = pure (Refused "a proposal carries an idempotency key" (length rows0) written)
       | otherwise = case (,) <$> canonicalExpr p.party <*> canonicalExpr p.action of
-          Left why -> pure (Refused why (length rows0))
+          Left why -> pure (Refused why (length rows0) written)
           Right (party', action') -> do
             now <- l.clock
             due <- dueTicks l inst rows0 now
             case due of
-              TicksLost -> attempt (n + 1)
-              TicksFailed why -> pure (Unknown why)
-              TicksDone rows ticks' -> propose n rows ticks' now (ActEvent party' action')
+              TicksLost new -> attempt (n + 1) (written <> new)
+              TicksFailed why new -> pure (Unknown why (written <> new))
+              TicksDone rows new -> propose n (written <> new) rows now (ActEvent party' action')
 
-    propose n rows ticks' now ev = do
+    propose n written rows now ev = do
       let headNo = length rows
           prev = lastRow rows
           tx = nextTxTime (Just prev.txTime) now
       case spelled ev tx of
-        Just why -> pure (Refused why headNo)
+        Just why -> pure (Refused why headNo written)
         Nothing -> replay l.evalConfig l.timeBound dep rows (Just (ev, tx)) >>= \ case
-          Left (Malformed why) -> pure (Refused why headNo)
-          Left (Undecided why) -> pure (Unknown why)
+          Left (Malformed why) -> pure (Refused why headNo written)
+          Left (Undecided why) -> pure (Unknown why written)
           Right rep1 -> case rep1.outcome of
-            Nothing -> pure (Unknown "the replay returned no outcome for the act")
-            Just o1 -> strictCheck rows rep1 >>= \ case
+            Nothing -> pure (Unknown "the replay returned no outcome for the act" written)
+            Just o1 -> strictCheck written rows rep1 >>= \ case
               Just stop -> pure stop
               Nothing -> do
                 let committed = length o1.official > length rep1.headOfficial
@@ -207,8 +228,8 @@ appendIf l inst p = attempt 0
                         Right rep2 -> maybe (Left (Undecided "the replay returned no outcome for the act")) (Right . (reported,)) rep2.outcome
                   _ -> pure (Right (tx, o1))
                 case stamped of
-                  Left (Malformed why) -> pure (Refused why headNo)
-                  Left (Undecided why) -> pure (Unknown why)
+                  Left (Malformed why) -> pure (Refused why headNo written)
+                  Left (Undecided why) -> pure (Unknown why written)
                   Right (atTime, o) -> do
                     let newRow = MkRow
                           { seqNo = headNo + 1
@@ -221,8 +242,8 @@ appendIf l inst p = attempt 0
                           , ruleVersion = dep.deploymentVersion
                           }
                     l.store.appendRow key newRow.seqNo newRow >>= \ case
-                      Left _ -> attempt (n + 1)
-                      Right () -> pure Appended {row = newRow, steps = o.steps, wrote = o.wrote, replayed = True, ticks = ticks'}
+                      Left _ -> attempt (n + 1) written
+                      Right () -> pure Appended {row = newRow, steps = o.steps, wrote = o.wrote, replayed = True, ticks = written}
 
     -- The act must read back from its own line as itself, or the line
     -- says something the proposal did not.
@@ -234,16 +255,16 @@ appendIf l inst p = attempt 0
     -- R-O4's opt-in (b): the per-cell version, the count of recorded
     -- entries of each versioned cell, must not have moved since the head
     -- the proposer decided against.
-    strictCheck rows rep1
+    strictCheck written rows rep1
       | not p.strict = pure Nothing
       | otherwise = case p.decidedAgainst of
-          Nothing -> pure (Just (Refused "a strict proposal names the head it decided against" headNo))
+          Nothing -> pure (Just (Refused "a strict proposal names the head it decided against" headNo written))
           Just seen
-            | seen < 1 || seen > headNo -> pure (Just (Refused ("the head decided against, " <> showT seen <> ", is not one this instance has had") headNo))
+            | seen < 1 || seen > headNo -> pure (Just (Refused ("the head decided against, " <> showT seen <> ", is not one this instance has had") headNo written))
             | seen == headNo -> pure Nothing
-            | null dep.versionedCells -> pure (Just (Conflict ("the head moved from " <> showT seen <> " to " <> showT headNo) headNo))
+            | null dep.versionedCells -> pure (Just (Conflict ("the head moved from " <> showT seen <> " to " <> showT headNo) headNo written))
             | otherwise -> replay l.evalConfig l.timeBound dep (take seen rows) Nothing <&> \ case
-                Left f -> Just (Unknown ("the version at the head decided against could not be read: " <> failureText f))
+                Left f -> Just (Unknown ("the version at the head decided against could not be read: " <> failureText f) written)
                 Right then' ->
                   let moved = [ (c, before, now')
                               | c <- dep.versionedCells
@@ -254,33 +275,38 @@ appendIf l inst p = attempt 0
                     [] -> Nothing
                     _ -> Just (Conflict (Text.intercalate "; "
                            [ "the version of `" <> c <> "` moved from " <> showT b <> " to " <> showT a
-                           | (c, b, a) <- moved ]) headNo)
+                           | (c, b, a) <- moved ]) headNo written)
       where headNo = length rows
 
 -- | Append every tick that is due, oldest deadline first (§3.4, WPO1): read
 -- the head's marking, and while the clock is past a deadline it can read,
 -- append the tick past that deadline through the same compare-and-append
--- as any act. 'Left' is 'NotFound' or 'Unknown'.
+-- as any act. 'Left' is 'NotFound' or 'Unknown'; the ticks that the call
+-- wrote are listed on 'Right', and on an 'Unknown' that follows some.
 appendDueTicks :: Ledger -> Instance -> IO (Either Result [Row])
-appendDueTicks l inst = go (0 :: Int)
+appendDueTicks l inst = go (0 :: Int) []
   where
-    go n
-      | n > l.retryCap = pure (Left (Unknown "lost the race to append a tick too many times"))
+    go n written
+      | n > l.retryCap = pure (Left (Unknown "lost the race to append a tick too many times" written))
       | otherwise = l.store.readRows (instanceKey inst) >>= \ case
           [] -> pure (Left NotFound)
           rows -> do
             now <- l.clock
             dueTicks l inst rows now >>= \ case
-              TicksLost -> go (n + 1)
-              TicksFailed why -> pure (Left (Unknown why))
-              TicksDone _ ts -> pure (Right ts)
+              TicksLost new -> go (n + 1) (written <> new)
+              TicksFailed why new -> pure (Left (Unknown why (written <> new)))
+              TicksDone _ new -> pure (Right (written <> new))
 
+-- | Each outcome of the tick loop says which ticks it appended, oldest
+-- first, for the ticks that were appended stay appended whichever way the
+-- loop ends.
 data TickStep
   = TicksDone ![Row] ![Row]
     -- ^ the rows with the ticks appended, and the ticks
-  | TicksLost
-    -- ^ another appender won; re-read
-  | TicksFailed !Text
+  | TicksLost ![Row]
+    -- ^ another appender won; re-read. The ticks appended before it did
+  | TicksFailed !Text ![Row]
+    -- ^ why, and the ticks appended before it
 
 -- | The tick loop over rows already read. Each tick is stamped just past
 -- its deadline, as 'L4.Lts.WhatIf.tickPast' does (the machine expires on a
@@ -294,7 +320,7 @@ dueTicks l inst rows0 now = go (16 :: Int) rows0 []
     dep = inst.deploymentOf
     go 0 rows acc = pure (TicksDone rows (reverse acc))
     go k rows acc = replay l.evalConfig l.timeBound dep rows Nothing >>= \ case
-      Left f -> pure (TicksFailed (failureText f))
+      Left f -> pure (TicksFailed (failureText f) (reverse acc))
       Right rep -> case [ dt | dt@(d, _) <- rep.headDeadlines, d < now ] of
         [] -> pure (TicksDone rows (reverse acc))
         ((_, past) : _) -> do
@@ -302,9 +328,9 @@ dueTicks l inst rows0 now = go (16 :: Int) rows0 []
               stamp = max prev.at (min past now)
               tx = nextTxTime (Just prev.txTime) now
           replay l.evalConfig l.timeBound dep rows (Just (TickEvent, stamp)) >>= \ case
-            Left f -> pure (TicksFailed ("the tick at " <> either id id (renderStamp stamp) <> " could not be appended: " <> failureText f))
+            Left f -> pure (TicksFailed ("the tick at " <> either id id (renderStamp stamp) <> " could not be appended: " <> failureText f) (reverse acc))
             Right rep2 -> case rep2.outcome of
-              Nothing -> pure (TicksFailed "the replay returned no outcome for the tick")
+              Nothing -> pure (TicksFailed "the replay returned no outcome for the tick" (reverse acc))
               Just o -> do
                 let tickRow = MkRow
                       { seqNo = length rows + 1
@@ -317,7 +343,7 @@ dueTicks l inst rows0 now = go (16 :: Int) rows0 []
                       , ruleVersion = dep.deploymentVersion
                       }
                 l.store.appendRow (instanceKey inst) tickRow.seqNo tickRow >>= \ case
-                  Left _ -> pure TicksLost
+                  Left _ -> pure (TicksLost (reverse acc))
                   Right () -> go (k - 1) (rows <> [tickRow]) (tickRow : acc)
 
 -- | What may be done now (§3.3): advisory, stamped with the head it was
@@ -341,8 +367,8 @@ positionOf l inst = l.store.readRows (instanceKey inst) >>= \ case
     rep <- replay l.evalConfig l.timeBound inst.deploymentOf rows Nothing
     es <- positionAt l.evalConfig l.timeBound inst.deploymentOf rows
     pure case (rep, es) of
-      (Left f, _) -> Left (Unknown (failureText f))
-      (_, Left f) -> Left (Unknown (failureText f))
+      (Left f, _) -> Left (Unknown (failureText f) [])
+      (_, Left f) -> Left (Unknown (failureText f) [])
       (Right r, Right (e, rp)) -> Right MkLedgerPosition
         { headSeq = length rows
         , enabled = e

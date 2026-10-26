@@ -478,7 +478,7 @@ strictSpec deps = describe "strict mode on d3-reopen.l4: Bob's purchase recorded
     env <- newEnv
     inst <- pairHistory env "strict"
     atClock env 65220 (appendIf env.ledgerOf inst (against 2 True (proposal "p5" buy))) >>= \ case
-      Conflict why h -> do
+      Conflict why h _ -> do
         h `shouldBe` 4
         why `shouldBe` "the version of `dinner status record` moved from 1 to 3"
       other -> expectationFailure ("expected Conflict, got " <> show other)
@@ -496,7 +496,7 @@ strictSpec deps = describe "strict mode on d3-reopen.l4: Bob's purchase recorded
     r <- atClock env 65120 (appendIf env.ledgerOf perCell (against 2 True (proposal "w4" buy))) >>= appended
     commitsDinner r `shouldBe` True
     atClock env 65120 (appendIf env.ledgerOf wholeHead (against 2 True (proposal "w4" buy))) >>= \ case
-      Conflict why 3 -> why `shouldBe` "the head moved from 2 to 3"
+      Conflict why 3 _ -> why `shouldBe` "the head moved from 2 to 3"
       other -> expectationFailure ("expected Conflict at head 3, got " <> show other)
 
 ----------------------------------------------------------------------------
@@ -553,6 +553,49 @@ timeSpec deps = describe "ticks (WPO1)" do
     r <- atClock env 75700 (appendIf env.ledgerOf inst (proposal "t4" done)) >>= appended
     map (\ t -> (t.seqNo, t.at, t.verdict)) r.ticks `shouldBe` [(3, 75601, VDischarging)]
     (r.row.seqNo, r.row.at, r.row.verdict) `shouldBe` (4, 75700, VPassedOver "no obligation in force took it")
+
+  it "lists the due tick on a refusal that follows it, with the head past the tick: an instance at head 2 past its deadline, given an act that is not the contract's" do
+    env <- newEnv
+    let inst = MkInstance deps.dinner "late refusal"
+    _ <- history env inst [(65100, proposal "t2" check)]
+    atClock env 75700 (appendIf env.ledgerOf inst (proposal "t4" "`Alice eats dinner`")) >>= \ case
+      Refused _ h ts -> do
+        h `shouldBe` 3
+        map (\ t -> (t.seqNo, t.at, t.verdict)) ts `shouldBe` [(3, 75601, VDischarging)]
+      other -> expectationFailure ("expected Refused at head 3, listing the tick, got " <> show other)
+    -- the refusal left the tick written, as a row
+    map (.seqNo) <$> rowsOf env inst >>= (`shouldBe` [1, 2, 3])
+
+  it "lists the due tick on a strict conflict that the tick itself causes, when the whole head is versioned" do
+    env <- newEnv
+    let inst = MkInstance ((deps.dinner) {versionedCells = []}) "late strict"
+    _ <- history env inst [(65100, proposal "t2" check)]
+    atClock env 75700 (appendIf env.ledgerOf inst (against 2 True (proposal "t4" done))) >>= \ case
+      Conflict why h ts -> do
+        (why, h) `shouldBe` ("the head moved from 2 to 3", 3)
+        map (.seqNo) ts `shouldBe` [3]
+      other -> expectationFailure ("expected Conflict at head 3, listing the tick, got " <> show other)
+
+  it "lists the ticks of an attempt that lost the race to append the act: by the retry they are rows, no longer due, and only the call remembers them" do
+    env <- newEnv
+    lost <- newIORef False
+    let inst = MkInstance deps.dinner "lost race"
+        real = env.ledgerOf.store
+        -- the first append of an act loses, as if another appender had won
+        flaky = MkLedgerStore
+          { readRows = real.readRows
+          , appendRow = \ k n r -> case r.event of
+              ActEvent {} -> do
+                already <- readIORef lost
+                writeIORef lost True
+                if already then real.appendRow k n r else pure (Left (n - 1))
+              _ -> real.appendRow k n r
+          }
+    _ <- history env inst [(65100, proposal "t2" check)]
+    r <- atClock env 75700 (appendIf ((env.ledgerOf) {store = flaky}) inst (proposal "t4" done)) >>= appended
+    r.row.seqNo `shouldBe` 4
+    map (.seqNo) r.ticks `shouldBe` [3]
+    map (.seqNo) <$> rowsOf env inst >>= (`shouldBe` [1, 2, 3, 4])
 
   it "offers no tick on a fresh instance, whose deadline's anchor no act has forced yet (measured); the late act reveals the expiry itself" do
     env <- newEnv

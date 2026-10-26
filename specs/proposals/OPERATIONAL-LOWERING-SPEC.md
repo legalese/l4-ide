@@ -5,12 +5,15 @@ The branch lives on one machine: nothing of it is pushed or in a pull request, a
 Checked 2026-10-26 at `420bb6258`: `jl4-core-test` 1578 examples, 0 failures (13 pending); `l4-cli-test` 628 examples, 0 failures (83 pending); `jl4-service-test` 717 examples, 0 failures; and the nine fixtures under `jl4/examples/explore/` (`brief/` and `ledger/`) each exit 0 under `l4 run`.
 Also run, against the service built at that commit: an HTTP probe of create, append, position, restart and the refusal of a delete.
 The code of `5af3d0d9b` differs from `420bb6258` only in two comments, which compile, so the suites were not run again; `doc/test-docs.sh` was run at `5af3d0d9b` and has 0 errors.
+The tick-listing change was checked on `fcd265faf` with the change applied, before it was committed (it is the next commit on this branch): `jl4-core-test` 1581 examples, 0 failures (13 pending); `jl4-service-test` 719 examples, 0 failures; `l4-cli-test` 628 examples, 0 failures (83 pending); and `doc/test-docs.sh` 0 errors.
+It adds five tests, and four of them (the refusal and lost-race tests in the library, the HTTP test and the MCP test) were each shown to fail when the code they test is made to drop the ticks again; the strict-conflict test was not.
+The HTTP probe above was not repeated after the change.
 Not run: the rest of `etc/verify-branch.sh` (the `jl4-test` goldens and the other suites), the Nix build and CI.
 The gate's prettier step fails on this branch's spec files, which are not formatted with prettier 3.4.2; the same step failed in CI on draft PR #746 on 2026-10-26.
 Not run: the Postgres adapter against a server (this machine has no `postgres` binary and no container runtime answering), and §8's item on the checkers' counterexamples, which needs the explorer's output and the explorer is on the other local branch, `mengwong/lowering-explore`.
 Not built: the Redis, Zookeeper and etcd adapters, which `jl4-service/src/Ledger/Store/Config.hs` refuses by name.
-The ledger has a silent failure, reproduced on the running service on 2026-10-26: a `refused`, `conflict` or `unknown` reply can follow tick rows that it does not list.
-The doc says so and the code is unchanged; §12 describes it.
+The ledger had a silent failure, reproduced on the running service on 2026-10-26: a `refused`, `conflict` or `unknown` reply could follow tick rows that it did not list.
+On this branch each of those replies now lists them under `ticks`; the rows are still written before the act is looked at, and `applied` still means only that the proposed act was appended; §12 describes it.
 Merging this branch with `mengwong/lowering-explore` conflicts in `jl4-core/jl4-core.cabal`, `jl4/jl4.cabal` and `jl4/tests-cli/Main.hs` (`git merge-tree`, 2026-10-26); the merged tree has not been built.
 It becomes true when the work packages of §9 are merged and the acceptance items of §8 are green.
 Companion to `REGULATIVE-LOWERING-SPEC.md` (the verification lowering), which it depends on at one point (§4) and shares its fixtures with (§7).
@@ -325,9 +328,13 @@ The text above each ruling is the proposal as it stood when marked, re-skinned a
 ## 12. What this spec does not claim
 
 - On this branch WPO0 to WPO5 are built, and no line of the rest of it describes the tree in the present tense except §1.
-- A `Refused`, `Conflict` or `Unknown` reply can follow tick rows that the same call appended, and it does not list them.
-  `appendIf` appends every due tick (`dueTicks` in `jl4-core/src/L4/Ledger/Append.hs`) before it looks at the act, so when a deadline has passed and the proposal is then refused, the instance's head has moved and the reply says `applied` false and carries no `ticks`.
-  The proposer cannot tell from the reply that a row was written, except by the head number; `doc/reference/regulative/ledger.md` lists it under Silent, with the measurement of 2026-10-26.
+- A `Refused`, `Conflict` or `Unknown` reply can follow tick rows that the same call appended, and on this branch it lists them under `ticks`.
+  `appendIf` appends every due tick (`dueTicks` in `jl4-core/src/L4/Ledger/Append.hs`) before it looks at the act, so when a deadline has passed and the proposal is then refused, the instance's head has moved.
+  The reply says `applied` false, which means only that the proposed act was not appended, and lists the tick rows; a `refused` or `conflict` reply's `head` is the head past them.
+  A caller that reads only `applied` or `result` still does not learn that the head moved; `doc/reference/regulative/ledger.md` lists it under Silent, with the measurement of 2026-10-26 and what the same proposal now returns.
+  Tested: a refusal over HTTP and in the library, the MCP preview of a refused act, a strict `conflict` that the tick itself causes (whole head versioned), and a call that lost a race to append and ran again.
+  Not tested: an `unknown` that follows a tick, though the code lists the ticks there too.
+  Not changed: the rows are still written when the act is refused (option B, writing none, would change what a refused proposal writes and which head a strict proposal decides against), and a strict whole-head proposal is a `conflict` whenever a tick came first.
 - It does not claim the ledger scales past one appender per instance, or that replay-per-append is fast; D-O4 holds the measurement.
 - It does not claim the MCP decision tools become transactional; the ledger routes beside them do, and only they touch the store (R-O5).
 - It does not claim the in-memory store is fit for anything but tests: it loses every instance on restart while deployments reload, and the table of §3.7 says so; it is no longer the default.
