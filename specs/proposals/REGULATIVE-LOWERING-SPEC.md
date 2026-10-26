@@ -1,11 +1,12 @@
 # Regulative Lowering: an explicit transition system from the evaluator, then the backends
 
 **Status:** Proposal, written 2026-10-25. **On this branch the work packages WP0 to WP6 of §8 are built and committed; none of it has landed.**
-The branch is `mengwong/lowering-explore`, which lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`047311f36`, fetched 2026-10-26) holds none of its files.
+The branch is `mengwong/lowering-explore`, which lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`63254397f`, fetched 2026-10-26) holds none of its files.
 Checked 2026-10-26 at `2c24d9547`: the cross-validation harness of WP4 (`make -C jl4/examples/explore/harness check`, with mCRL2, TLC and NuSMV installed and `RELEASE=1`) passed 287 of 287 checks against an `l4` built from this tree.
 Also at that commit: `jl4-core-test` 1574 examples, 0 failures (13 pending); `l4-cli-test` 641 examples, 0 failures (83 pending); `doc/test-docs.sh` 0 errors.
-Not run: the rest of `etc/verify-branch.sh` (the `jl4-test` goldens and the other suites), the Nix build and CI.
-The gate's prettier step fails on this branch's spec files, which are not formatted with prettier 3.4.2; the same step failed in CI on draft PR #746 on 2026-10-26.
+Not run: `jl4-test` (the goldens, about 12 minutes), the suites and harnesses that `etc/verify-branch.sh` does not run (`jl4-lsp-test`, `jl4-mlir-test`, `jl4-websessions-test`, `jl4-proleg-burden`, `jl4-proleg-roundtrip`, the DMN harnesses, the go selftest, WASM, TypeScript), the Nix build and CI on this branch.
+After merging the pushed formatting fix `d8cda38fa` (draft PR #746 passed CI at that commit, Repo-Wide Invariants and TypeScript Checks included, 2026-10-26), `etc/verify-branch.sh --quick` passed at `dd4e2d08b`: `cabal build all`, `l4-cli-test` 641 examples, `jl4-core-test` 1574, `jl4-service-test` 661, the corpus-golden and canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 and the commit trailers, with one warning, probe (c), on three assertions of the explorer's CLI tests (`jl4/tests-cli/CliTest/Explore.hs`, lines 225, 229 and 237) that the script flags as possibly comparing text that still carries a `\r` on Windows; they are unchanged and have not been run on Windows.
+A pass of that script is not a green CI.
 Not built: a CI job that runs the harness; checks of the `.pnml` and `.dot` outputs; runs of Apalache, Spin and TAPAAL.
 Three silent failures of `l4 explore` reproduced on 2026-10-26 are fixed in `2c24d9547`, which is assumed, not ruled and can be reverted alone; a fourth is by design and documented; §12 lists them.
 The ledger of the companion spec is not on this branch, and merging this branch with `mengwong/lowering-ledger` conflicts in `jl4-core/jl4-core.cabal`, `jl4/jl4.cabal` and `jl4/tests-cli/Main.hs` (`git merge-tree`, 2026-10-26); the merged tree has not been built.
