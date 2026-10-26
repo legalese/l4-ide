@@ -3572,6 +3572,20 @@ spec = describe "integration" do
             ("could not be evaluated" `Text.isInfixOf` raised, "boom" `Text.isInfixOf` raised) `shouldBe` (True, False)
           other -> expectationFailure ("expected an answer, an error and an answer, got " <> show other)
 
+    -- Meng, 2026-10-26: a null is a field left out. On a rule that is not a
+    -- DEONTIC, a batch case passed it on to the evaluator as an input it does
+    -- not have, which took a defaulted input's default away from the case.
+    it "treats a null startTime or events in a batch case as left out, for a rule with a defaulted input" do
+      let nullsId = "deontic-null-default"
+          inputs = ["is adult" Aeson..= True, "unused flag" Aeson..= False] :: [Pair]
+          nulls = ["startTime" Aeson..= Aeson.Null, "events" Aeson..= Aeson.Null] :: [Pair]
+      withServiceFromSources nullsId [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
+        viaRest <- askRest baseUrl mgr nullsId "may contract" inputs nulls
+        viaMcp <- askMcpWith baseUrl mgr nullsId "may contract" (Aeson.object (inputs <> nulls))
+        viaBatch <- askBatch baseUrl mgr nullsId "may contract" inputs nulls
+        for_ [("REST", viaRest), ("MCP", viaMcp), ("batch", viaBatch)] \(surface, answer) ->
+          (surface :: String, fmap (Map.lookup "value") answer) `shouldBe` (surface, Right (Just (FnLitBool True)))
+
     -- the fixture the REST tests use for a party that is a record: the rule has
     -- inputs of its own, and its function is spelled with a space. It returns
     -- `PROVISION OF …`, the deprecated alias of DEONTIC, so its MCP tool has the

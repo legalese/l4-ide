@@ -330,7 +330,12 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     bracket_ (waitQSem local) (signalQSem local) $
     bracket_ (waitQSem env.batchSlots.shared) (signalQSem env.batchSlots.shared) do
       let presumption' = Maybe.fromMaybe PresumeSoft batchArgs.presumption
-          args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
+          -- a startTime or events that is not an input is not passed on: a
+          -- non-null one is refused below, and a null one is a field left out
+          args = remapArguments reverseMap
+            [ (k, Just v)
+            | (k, v) <- Map.toList inputCase.attributes
+            , not (isStrayTraceField vf.fnImpl.parameters k) ]
       -- An exception the case raises by itself is that case's error. It must not
       -- escape 'forConcurrently', which would fail the whole batch.
       r <- trySynchronous $ runAppM env $
