@@ -350,6 +350,7 @@ Over MCP the refusal is an error result (`isError`) whose text is the body of `/
 That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
 The field names inside an event's party or action are read as sent on `/evaluation` and in a batch.
 Over MCP they are read as `tools/list` spells them, as an input's are: a field the rule calls `full name` is `full-name` in the schema, and is mapped back to the rule's name, and a name that is not a sanitized one is read as it was sent.
+That is **assumed, not ruled**: the rulings of 2026-10-26 do not cover it.
 A time is a number and may be written with a decimal point: `0.0`, `0.05` and `12345678.5` are read as written.
 A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list`, the explorer and the WebMCP page show it as one.
 Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.
@@ -409,6 +410,7 @@ A case the rule refused carries `@refused` (the reason) and still counts as proc
 That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 Neither has a `value`.
 A case whose evaluation fails on the service's own fault, and not on a limit or on what the case said, is an `@error` too: it says the case could not be evaluated, the details are in the service log, and the cases beside it are answered.
+That wording and that treatment are **assumed, not ruled**.
 A case for a `DEONTIC` function carries its own `startTime` and `events`, and its `value` is the contract after them; a case without them is an `@error` (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
 The three `processor…` fields of `summary` are not measured, and are always `0`.
 The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describes this response key by key.
