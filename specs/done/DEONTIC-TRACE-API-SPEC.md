@@ -687,7 +687,7 @@ This is handled by composing the existing `generateEvalWrapper` logic with the n
 
 ### Q4: Maximum event list size?
 
-The existing `timeoutAction` wrapper (configurable `--eval-timeout` and `--max-eval-memory-mb`) applies to deontic evaluation too. Long event lists will hit these limits naturally. No additional limit is proposed for Phase 1.
+Deontic evaluation is held to the same limits, `--eval-timeout` and `--max-eval-memory-mb`, on every surface: `DeonticTrace.runDeonticLimited` runs it under `EvalLimits.withEvalLimits`, as the other evaluations run (`timeoutAction`, which this answer used to name, was replaced by it). Long event lists will hit these limits naturally. No additional limit is proposed for Phase 1.
 
 ### Q5: Should batch evaluation support events too?
 
@@ -761,10 +761,11 @@ Meng, verbatim: "i'd be in favour of fixing the PROVISION synonym as well. shoul
 
 - The compiler tells a `DEONTIC` function by its type: `isDeonticType` (`jl4-service/src/Backend/CodeGen.hs`) compares the type constructor's unique, and `PROVISION` resolves to the same unique (`jl4-core/src/L4/TypeCheck/Environment.hs`, "Deprecated alias for DEONTIC").
   So a `PROVISION OF` function already got `startTime` and `events` parameters, and `/evaluation` replayed it.
-- Three other tests of "is this `DEONTIC`" disagreed with that.
+- Four other tests of "is this `DEONTIC`" disagreed with that.
   MCP `tools/list` and `tools/call` tested the display name of the return type for the prefix `DEONTIC`, so a `PROVISION OF` function was listed as an ordinary tool with a flat schema.
+  The WebMCP page tested the same prefix, for a tool's schema, for the shape of its arguments and for whether it sends a trace.
   The explorer tested the display name for equality with `DEONTIC`, on the page and in its script.
-  `DeonticTrace.isDeonticFunction` tested for parameters named `startTime` and `events`.
+  `/evaluation` tested for parameters named `startTime` and `events`, inline in `evalFunctionHandler` (`DataPlane.hs:246-247` on `unstable` at `65adfc2de`); `DeonticTrace.isDeonticFunction` is what replaced it, and did not exist before this change.
 
 **Ruled:**
 
