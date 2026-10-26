@@ -74,7 +74,8 @@ For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohib
 
 `THE` is a keyword; `JOIN`, `DEADLINE` and `ARMING` are matched by spelling after it and are not reserved, so a program may still name a value `DEADLINE`.
 But `THE DEADLINE` is then always the lifecycle position, never that value: write the value as `DEADLINE`, without `THE`.
-Before 2026-10-24 the `THE` was an optional article, and `WITH start IS THE DEADLINE` passed the program's own value; since then it passes the enclosing obligation's deadline, and the checker warns wherever `THE` is written before a noun that the program also defines.
+Before 2026-10-24 the `THE` was an optional article, and `WITH start IS THE DEADLINE` passed the program's own value; since then it passes the enclosing obligation's deadline, and the checker warns wherever `THE` is written before a noun that the program also defines as a value.
+A type of that spelling (`DECLARE DEADLINE IS ONE OF …`) draws no warning: it is not a value, so `DEADLINE` without `THE` would not pass it either.
 The warning names the value that `THE DEADLINE` hides, and says to write `DEADLINE` without `THE` to reach it.
 When the program defines the value itself, renaming it also silences the warning; when the value comes from an `IMPORT`, the only remedy offered is to drop `THE`, because the module that defines it may not be yours to change.
 `jl4-service` goes further and refuses to deploy a module that draws this warning, naming the hidden value: a deployment publishes answers, and this is the one spelling whose answer can change with no error.

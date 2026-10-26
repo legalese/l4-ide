@@ -1,0 +1,48 @@
+-- A TYPE spelled like a lifecycle noun does not hide the noun.
+--
+-- LifecycleNounHidesName warns where THE is written before JOIN, DEADLINE or
+-- ARMING and the program also defines a VALUE of that spelling, because THE
+-- <noun> no longer reaches that value (not-ok/tc/lifecycle-value-hides-name.l4),
+-- and jl4-service refuses to deploy a module that draws it (card B1a). A
+-- type is not something a noun in an expression could mean, so the types
+-- below draw nothing and the module deploys. Until 2026-10-26 the lookup
+-- counted every name of the spelling, types included, so this file drew a
+-- warning at each THE and its remedy, "write it without THE", named a type.
+
+IMPORT prelude
+
+DECLARE DEADLINE IS ONE OF Soft, Hard
+DECLARE JOIN     IS ONE OF Early, Late
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign      HAS signer IS AN Actor
+    Refund    HAS who    IS AN Actor
+    Apologise HAS who    IS AN Actor
+
+alice MEANS Tenant OF "Alice"
+
+GIVEN kind IS A DEADLINE
+GIVETH A NUMBER
+`grace for` MEANS
+    CONSIDER kind
+    WHEN Hard THEN 0
+    WHEN Soft THEN 3
+
+-- Alice signs at 2, so the refund is due at THE JOIN PLUS 5 = 7. Had she
+-- missed her own deadline of 10, the apology would be due at THE DEADLINE
+-- PLUS a soft grace = 13.
+GIVETH A DEONTIC Actor Action
+`nouns beside types of their spelling` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (PARTY alice MUST Refund alice WITHIN 0 OF (THE JOIN PLUS 5))
+    LEST  (PARTY alice MUST Apologise alice WITHIN 0 OF (THE DEADLINE PLUS `grace for` Soft))
+
+#TRACE `nouns beside types of their spelling` AT 0 WITH
+  PARTY alice DOES Sign alice AT 2
+  PARTY alice DOES Refund alice AT 8
+
+#TRACE `nouns beside types of their spelling` AT 0 WITH
+  PARTY alice DOES Apologise alice AT 14
