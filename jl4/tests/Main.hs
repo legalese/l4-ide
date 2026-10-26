@@ -53,6 +53,7 @@ import qualified System.OsPath as OsPath
 import LSP.L4.Rules
 
 import qualified BpmnExport
+import qualified LtsExplore
 import qualified LtsList
 import qualified Hover
 import qualified SemanticTokens
@@ -216,6 +217,7 @@ main = do
     RelationalExport.spec examplesRoot
     describe "bpmn export" BpmnExport.spec
     describe "lts list" LtsList.spec
+    describe "lts explore" LtsExplore.spec
   where
     tests memo evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

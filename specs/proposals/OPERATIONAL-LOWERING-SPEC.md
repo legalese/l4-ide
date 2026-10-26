@@ -1,21 +1,21 @@
 # Operational lowering: an L4 contract instance as an event ledger with conditional append
 
-Status: proposed, 2026-10-25. On this branch (`mengwong/lowering-ledger`) the work packages WPO0 to WPO5 of §9 are built and committed, and none of it has landed.
-The branch lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`63254397f`, fetched 2026-10-26) holds none of its files.
-Checked 2026-10-26 at `420bb6258`: `jl4-core-test` 1578 examples, 0 failures (13 pending); `l4-cli-test` 628 examples, 0 failures (83 pending); `jl4-service-test` 717 examples, 0 failures; and the nine fixtures under `jl4/examples/explore/` (`brief/` and `ledger/`) each exit 0 under `l4 run`.
+Status: proposed, 2026-10-25. On this branch the work packages WPO0 to WPO5 of §9 are built and committed, and the companion's WP0 to WP6 beside them, and none of it has landed.
+This tree is the local branch `mengwong/lowering-integ`: the merge of `mengwong/lowering-explore` (`2418f2f75`) and `mengwong/lowering-ledger` (`21e03a4bd`) onto `unstable` (`63254397f`, fetched 2026-10-26), with nothing pushed and no pull request.
+The checks quoted below ran on those two branches at the commits named, before the merge; none has been run on this tree yet.
+Checked 2026-10-26 on `mengwong/lowering-ledger` at `420bb6258`: `jl4-core-test` 1578 examples, 0 failures (13 pending); `l4-cli-test` 628 examples, 0 failures (83 pending); `jl4-service-test` 717 examples, 0 failures; and the nine fixtures under `jl4/examples/explore/` (`brief/` and `ledger/`) each exit 0 under `l4 run`.
 Also run, against the service built at that commit: an HTTP probe of create, append, position, restart and the refusal of a delete.
 The code of `5af3d0d9b` differs from `420bb6258` only in two comments, which compile, so the suites were not run again; `doc/test-docs.sh` was run at `5af3d0d9b` and has 0 errors.
-The tick-listing change was checked on `fcd265faf` with the change applied, before it was committed (it is the next commit on this branch): `jl4-core-test` 1581 examples, 0 failures (13 pending); `jl4-service-test` 719 examples, 0 failures; `l4-cli-test` 628 examples, 0 failures (83 pending); and `doc/test-docs.sh` 0 errors.
+On `mengwong/lowering-ledger` the tick-listing change was checked on `fcd265faf` with the change applied, before it was committed (it is the next commit on this branch): `jl4-core-test` 1581 examples, 0 failures (13 pending); `jl4-service-test` 719 examples, 0 failures; `l4-cli-test` 628 examples, 0 failures (83 pending); and `doc/test-docs.sh` 0 errors.
 It adds five tests, and four of them (the refusal and lost-race tests in the library, the HTTP test and the MCP test) were each shown to fail when the code they test is made to drop the ticks again; the strict-conflict test was not.
 The HTTP probe above was not repeated after the change.
 Not run: `jl4-test` (the goldens, about 12 minutes), the suites and harnesses that `etc/verify-branch.sh` does not run (`jl4-lsp-test`, `jl4-mlir-test`, `jl4-websessions-test`, `jl4-proleg-burden`, `jl4-proleg-roundtrip`, the DMN harnesses, the go selftest, WASM, TypeScript), the Nix build and CI on this branch.
-After merging the pushed formatting fix `d8cda38fa` (draft PR #746 passed CI at that commit, Repo-Wide Invariants and TypeScript Checks included, 2026-10-26), `etc/verify-branch.sh --quick` passed at `86b890407`: `cabal build all`, `l4-cli-test` 628 examples, `jl4-core-test` 1581, `jl4-service-test` 719, the service restart probe, the corpus-golden and canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 and the commit trailers.
+On `mengwong/lowering-ledger`, after merging the pushed formatting fix `d8cda38fa` (draft PR #746 passed CI at that commit, Repo-Wide Invariants and TypeScript Checks included, 2026-10-26), `etc/verify-branch.sh --quick` passed at `86b890407`: `cabal build all`, `l4-cli-test` 628 examples, `jl4-core-test` 1581, `jl4-service-test` 719, the service restart probe, the corpus-golden and canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 and the commit trailers.
 A pass of that script is not a green CI.
-Not run: the Postgres adapter against a server (this machine has no `postgres` binary and no container runtime answering), and §8's item on the checkers' counterexamples, which needs the explorer's output and the explorer is on the other local branch, `mengwong/lowering-explore`.
+Not run: the Postgres adapter against a server (this machine has no `postgres` binary and no container runtime answering), and §8's item on the checkers' counterexamples proposed to a ledger: the explorer and the ledger are both in this tree now, but no work package claims the item and nothing runs it.
 Not built: the Redis, Zookeeper and etcd adapters, which `jl4-service/src/Ledger/Store/Config.hs` refuses by name.
 The ledger had a silent failure, reproduced on the running service on 2026-10-26: a `refused`, `conflict` or `unknown` reply could follow tick rows that it did not list.
 On this branch each of those replies now lists them under `ticks`; the rows are still written before the act is looked at, and `applied` still means only that the proposed act was appended; §12 describes it.
-Merging this branch with `mengwong/lowering-explore` conflicts in `jl4-core/jl4-core.cabal`, `jl4/jl4.cabal` and `jl4/tests-cli/Main.hs` (`git merge-tree`, 2026-10-26); the merged tree has not been built.
 It becomes true when the work packages of §9 are merged and the acceptance items of §8 are green.
 Companion to `REGULATIVE-LOWERING-SPEC.md` (the verification lowering), which it depends on at one point (§4) and shares its fixtures with (§7).
 Written one sentence per line.
@@ -328,7 +328,7 @@ The text above each ruling is the proposal as it stood when marked, re-skinned a
 
 ## 12. What this spec does not claim
 
-- On this branch WPO0 to WPO5 are built, and no line of the rest of it describes the tree in the present tense except §1.
+- On this branch WPO0 to WPO5 are built, with the companion's WP0 to WP6 beside them, and no line of the rest of it describes the tree in the present tense except §1.
 - A `Refused`, `Conflict` or `Unknown` reply can follow tick rows that the same call appended, and on this branch it lists them under `ticks`.
   `appendIf` appends every due tick (`dueTicks` in `jl4-core/src/L4/Ledger/Append.hs`) before it looks at the act, so when a deadline has passed and the proposal is then refused, the instance's head has moved.
   The reply says `applied` false, which means only that the proposed act was not appended, and lists the tick rows; a `refused` or `conflict` reply's `head` is the head past them.

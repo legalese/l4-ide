@@ -7,7 +7,7 @@
 Alice and Bob each mean to buy dinner tonight, and neither wants to buy it if the other already has.
 Each checks whether dinner has been bought, finds it has not, and buys; if their checks and purchases interleave, two dinners are bought.
 That is a classic race condition, and these files are how L4 states it, gets it wrong twice, and gets it right.
-They are the fixtures of [REGULATIVE-LOWERING-SPEC.md](../../../../specs/proposals/REGULATIVE-LOWERING-SPEC.md) §7, work package WP0: the test material for an explorer (`l4 explore`, not built yet) that turns an L4 contract into an explicit transition system.
+They are the fixtures of [REGULATIVE-LOWERING-SPEC.md](../../../../specs/proposals/REGULATIVE-LOWERING-SPEC.md) §7, work package WP0: the test material for an explorer, `l4 explore` (WP1, built 2026-10-26), that turns an L4 contract into an explicit transition system.
 
 The model checks one side, Alice's.
 Bob's purchase is the environment's act, recorded by the dinner ledger, and the message "I bought it" from Bob reaches Alice some time after it.
@@ -27,7 +27,7 @@ Bob's side is the same model with the names swapped.
 | `reference/*.aut`      | the probes' hand models as labelled transition systems, relabelled to these names | the oracle for bisimulation; see `reference/PROVENANCE.md`     |
 
 Every `.l4` file here runs with `l4 run <file>` on the installed `l4` of 2026-10-21, and exits 0.
-`jl4/examples/explore/` is in no golden glob, so nothing here has goldens.
+`jl4/examples/explore/` is in no corpus golden glob, so no `.l4` here has the corpus's four goldens; the explorer's own goldens over these files are in `../expected/`, written by `jl4/tests/LtsExplore.hs`.
 
 ## How the brief becomes L4
 
@@ -112,8 +112,74 @@ It knew nothing of the brief: the graph it found is the evaluator's.
 
 Each graph of `d1`, `d2` and `d3`, written with the labels above, is strongly and branching bisimilar to its reference (`ltscompare -ebisim` and `-ebranching-bisim` print `true`; D1's graph against D2's reference prints `false`).
 The properties were evaluated by `#EVAL` of the decisions in `properties.l4` on every state's ledgers.
-P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and were not checked.
-None of this is a test in the tree; WP1's explorer and WP4's harness are what make it one.
+P5 and P6 are liveness properties, which need a fairness assumption and a model checker (spec §5.3), and that explorer did not check them; TLC and NuSMV did, on the models `l4 explore --emit` writes (below).
+That throwaway explorer was not a test in the tree.
+`l4 explore` (WP1) now reproduces its state, transition and pass-over counts for all five rows, and `jl4/tests/LtsExplore.hs` asserts them as numbers; the bisimulation against the references is run by the harness in [`../harness/`](../harness/README.md) (WP4).
+The run that reproduces the table bounds the clock at closing and keeps the cells `properties.l4` reads, which no `RECALL` in a contract names (`--keep` for a cell a property reads whole, `--keep-latest` for one it reads as a `MAYBE`):
+
+```sh
+l4 explore d1-naive.l4 --until 75600 \
+  --keep 'open at acceptance' --keep 'dinners bought' --keep 'dinners cancelled' \
+  --keep 'dinner status record' --keep-latest belief --keep-latest plan
+```
+
+Without the kept cells `d1-naive.l4` gives 10 states and 18 transitions, and its coverage line names `dinners bought` and `open at acceptance` as write-only cells it dropped: the bad purchase of Sequence A and the good one of Sequence B are then one state.
+Without `--until`, each state's tick past closing reaches a `FULFILLED` twin, so `d1-naive.l4` gives 24 states and 45 transitions.
+
+The P1 to P4 columns are reproduced by `l4 explore`'s own checks (WP2), which keep the cells the properties read without being told, so the graph is the same 12 states and 21 transitions:
+
+```sh
+l4 explore d1-naive.l4 --until 75600 \
+  --always 'every dinner was accepted while open' --always 'at most one dinner is bought' \
+  --reachable "Alice's belief is stale" --stays 'one dinner is bought'
+```
+
+Each violated property prints its counterexample as a `#TRACE` that `l4 run` reproduces when it is pasted into the file, and each reached one its witness; every one is run as printed before it is reported.
+The events of a printed trace are all at 18:00 (64800), because the explorer fires an act first at the instant of the last event: the order is Sequence A's, the clock times are not, and the fixtures' guards do not read the clock.
+The exit status is 4 when a property is violated, so the D1 and D2 runs exit 4 by design.
+`--eventually` labels the states for P5, P6 (`--eventually 'one dinner is bought' --if-always 'the ledger is open'`) and the non-vacuity control, and answers each `unknown (liveness: run the emitted model)`; a run with nothing else wrong then exits 5.
+`jl4/tests/LtsExplore.hs` asserts every verdict and counterexample path on all five rows, and pins the checks' text under `../expected/*.check.txt`.
+
+### The emitted models (WP3)
+
+`--emit DIR` writes each design for other tools: `<base>.aut` for mCRL2, `<base>.tla` with `<base>.cfg` and one `.cfg` per property for TLC, `<base>.smv` for NuSMV, `<base>.dot`, and `<base>.pnml` (spec §6.1).
+`--fair Alice` names the actor whose acts are assumed fair:
+
+```sh
+l4 explore d3-atomic.l4 --until 75600 \
+  --always 'every dinner was accepted while open' --always 'at most one dinner is bought' \
+  --reachable "Alice's belief is stale" --stays 'one dinner is bought' \
+  --eventually 'Alice has bought or stopped' \
+  --eventually 'one dinner is bought' --if-always 'the ledger is open' \
+  --eventually 'Bob has bought' \
+  --emit out --fair Alice
+```
+
+Weak fairness then goes to each of Alice's acts that moves, and to nothing else: in D3 her check and her answered purchase; never Bob's purchase or the message, which are the environment's; never a pause such as the unanswered purchase or `Alice is done`.
+The ledger answering her is inside her act in these fixtures, so it is fair with it.
+
+On 2026-10-26, with the files loaded unedited by mCRL2 202607.0 (`ltsinfo`, `ltsconvert`), TLC 2.19 on JDK 21 (one run per property configuration) and NuSMV 2.7.0, the verdicts were:
+
+| property                                      | D1                                   | D2                                            | D3        |
+| --------------------------------------------- | ------------------------------------ | --------------------------------------------- | --------- |
+| P1, always                                    | violated: check, Bob's purchase, buy | violated: check, re-read, Bob's purchase, buy | holds     |
+| P2, always                                    | holds                                | holds                                         | holds     |
+| P3, reachable                                 | reachable                            | reachable                                     | reachable |
+| P4, stays                                     | holds                                | holds                                         | holds     |
+| P5, eventually, under `--fair Alice`          | holds                                | holds                                         | holds     |
+| P6, eventually if always open, `--fair Alice` | holds                                | holds                                         | holds     |
+| control, eventually `Bob has bought`, same    | violated                             | violated                                      | violated  |
+
+TLC and NuSMV agreed on every cell, and both agree with the in-process checker on P1 to P4 and on the two counterexample paths.
+TLC reports P3 as its invariant `Never_…` violated, which is how it finds a state: the configuration says so.
+
+Two controls show that the fairness is doing the work.
+With no `--fair`, nothing is fair: P5 and P6 hold on D1, which has no pause, and fail on D2 and D3 by a run that pauses forever, in both tools, which is the probes' table without fairness.
+With `--fair World`, every act that moves is fair, Bob's purchase included, and the control then holds on all three designs in both tools: the runs in which Bob never buys are gone, so P6 would pass on none of them.
+The control being violated is what shows P6 was checked on something.
+
+Each `.aut`, relabelled by the table of acts above, is strongly and branching bisimilar to its reference in `reference/` (`ltscompare` prints `true`, and D1's against D3's reference prints `false`), and TAPAAL's `verifypn` 4.4.2 reads each `.pnml` as a net of 12, 15 and 10 reachable markings.
+None of these tools runs in CI: the emitted text is pinned under `../expected/*.emit.txt`, and the harness in [`../harness/`](../harness/README.md) (WP4) runs the tools where they are installed and compares their verdicts, which no CI job does yet.
 
 ## What the explorer must know
 
@@ -127,7 +193,7 @@ Three things these fixtures need from `l4 explore` (WP1) and its harness (WP4), 
 2. **The closing deadline is not in the brief.**
    Every state has a live deadline, closing, so every state has a tick to just past it as a candidate.
    From each of the 12, 15 and 10 states that tick reaches a distinct `FULFILLED` state with the same ledgers.
-   An explorer that offers the tick finds those states beside the brief's; the harness has to bound the clock below closing, or remove the tick edges, before it compares counts or graphs.
+   An explorer that offers the tick finds those states beside the brief's; the harness bounds the clock at closing (`--until 75600`, in `../harness/fixtures.tsv`) before it compares counts or graphs.
    With the anchor named, the residual prints the same at every clock (`WITHIN 0 OF closing`), so the clock need not be in the state.
 3. **Passed over is no edge; a fired act that changes nothing is a self-loop.**
    `Alice is done` and the unanswered requests are self-loops, and they are what makes 21, 30 and 21 transitions.

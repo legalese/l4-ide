@@ -59,6 +59,7 @@ import qualified CliTest.BuildVersion as BuildVersion
 import qualified CliTest.Catala as Catala
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Ledger as Ledger
+import qualified CliTest.Explore as Explore
 import qualified CliTest.Docassemble as Docassemble
 import qualified CliTest.OpenFisca as OpenFisca
 import qualified CliTest.Yscript as Yscript
@@ -562,6 +563,7 @@ main = do
          , Blawx.fixtures
          , Docassemble.fixtures
          , Catala.fixtures
+         , Explore.fixtures
          , BuildIdentity.fixtures
          , Ledger.fixtures
          ]) \fp -> do
@@ -644,6 +646,7 @@ spec bin = do
       sout `shouldSatisfy` ("import" `isInfixOf`)
       sout `shouldSatisfy` ("nlg" `isInfixOf`)
       sout `shouldSatisfy` ("verify" `isInfixOf`)
+      sout `shouldSatisfy` ("explore" `isInfixOf`)
 
   -- CLI-SURFACE-SPEC C1: every foreign notation is a subcommand of `export`
   -- or `import`, and those two help screens are the catalogue. The old
@@ -3932,6 +3935,7 @@ spec bin = do
   Blawx.spec bin
   Docassemble.spec bin
   Catala.spec bin
+  Explore.spec bin
   BuildVersion.spec bin
   BuildIdentity.spec
   Ledger.spec bin

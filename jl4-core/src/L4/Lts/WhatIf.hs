@@ -74,9 +74,11 @@ module L4.Lts.WhatIf
   , BoundScope (..)
   , candidatesOf
   , tickPast
+  , deadlineOf
     -- * The replay
   , whatIf
   , tryCandidate
+  , tryCandidateFrom
   , confirmTick
   , confirmAct
   , confirmProposed
@@ -96,10 +98,14 @@ module L4.Lts.WhatIf
     -- * Instantiating a shape
   , patternExpr
   , patternBinders
+  , binderTypes
+  , fillBinders
   , closedAction
   , openLocals
   , reifyExpr
   , reifyNF
+  , reifyRef
+  , reifyValue
   ) where
 
 import Base
@@ -184,12 +190,19 @@ data Position = MkPosition
 
 -- | Replay the trace as written.
 position :: Rig -> Trace -> IO (Maybe Position)
-position rig tr = replay rig tr [] >>= pure . \ (topLevel, mres) -> flip fmap mres \ (res, steps) ->
+position rig tr = positionFrom rig tr [] <$> replay rig tr []
+
+-- | The position a replay of the trace, with these events appended, stands
+-- at. 'position' is this with nothing appended; 'tryCandidateFrom' is this
+-- with the hypothetical appended, read off the same replay that classified
+-- it.
+positionFrom :: Rig -> Trace -> [Expr Resolved] -> (Environment, Maybe (EvalDirectiveResult, [DeonticStep])) -> Maybe Position
+positionFrom rig tr extra (topLevel, mres) = flip fmap mres \ (res, steps) ->
   let ctx = contextOf steps
       residual = case res.result of
         Reduction (Reduced (MkNF v)) -> Just v
         _                            -> Nothing
-      literalStamps = mapMaybe literalStamp (tr.trStart : tr.trEvents)
+      literalStamps = mapMaybe literalStamp (tr.trStart : tr.trEvents <> extra)
       loggedClocks  = mapMaybe (.dsClock) steps
   in MkPosition
       { posResult   = res
@@ -513,9 +526,14 @@ data Outcome = MkOutcome
 
 -- | Endpoint 22 \/ 24: append the hypothetical and run.
 whatIf :: Rig -> Trace -> Position -> Hypothetical -> IO (Verdict, [DeonticStep])
-whatIf rig tr pos hyp = replay rig tr [hypotheticalExpr hyp] >>= pure . \ case
-  (_, Nothing) -> (Untried "the replay produced no result", [])
-  (_, Just (res, steps)) -> (classify (contextOf steps) res, afterCommonPrefix pos.posSteps steps)
+whatIf rig tr pos hyp = verdictOf pos . snd <$> replay rig tr [hypotheticalExpr hyp]
+
+-- | What a replay with the hypothetical appended says, before the
+-- candidate's self-checks ('tryCandidate').
+verdictOf :: Position -> Maybe (EvalDirectiveResult, [DeonticStep]) -> (Verdict, [DeonticStep])
+verdictOf pos = \ case
+  Nothing -> (Untried "the replay produced no result", [])
+  Just (res, steps) -> (classify (contextOf steps) res, afterCommonPrefix pos.posSteps steps)
 
 -- | One candidate, tried: 'whatIf' on its hypothetical, with the tick's
 -- stamp checked against what the machine did with it.
@@ -530,13 +548,29 @@ whatIf rig tr pos hyp = replay rig tr [hypotheticalExpr hyp] >>= pure . \ case
 -- saying so, rather than an 'Advancing' that looks like a genuine advance
 -- and lets 'breaching' return @[]@ for a deadline that does breach.
 tryCandidate :: Rig -> Trace -> Position -> Candidate -> IO Outcome
-tryCandidate rig tr pos cand = case cand.cdHypothetical of
-  Left why -> pure MkOutcome {ocCandidate = cand, ocVerdict = Untried why, ocSteps = []}
+tryCandidate rig tr pos cand = fst <$> tryCandidateFrom rig tr pos cand
+
+-- | 'tryCandidate', and beside it the position the hypothetical leads to,
+-- read off the SAME replay that classified it: the trace with the
+-- hypothetical appended, as 'position' would replay it. 'Nothing' when the
+-- candidate was not run or the replay produced no result.
+--
+-- This is what iterating the what-if needs ("L4.Lts.Explore"): the next
+-- position is the evaluator's own answer for the longer trace, so nothing
+-- about it is predicted, and asking for it costs no second replay. The
+-- position is returned whatever the verdict; a caller that reads it after
+-- a 'PassedOver' or an 'Untried' is reading a run the classification has
+-- already said moved nothing, or did not happen.
+tryCandidateFrom :: Rig -> Trace -> Position -> Candidate -> IO (Outcome, Maybe Position)
+tryCandidateFrom rig tr pos cand = case cand.cdHypothetical of
+  Left why -> pure (MkOutcome {ocCandidate = cand, ocVerdict = Untried why, ocSteps = []}, Nothing)
   Right hyp -> do
-    (verdict, steps) <- whatIf rig tr pos hyp
-    let verdict' = confirmBound cand.cdBound
+    let extra = [hypotheticalExpr hyp]
+    replayed <- replay rig tr extra
+    let (verdict, steps) = verdictOf pos (snd replayed)
+        verdict' = confirmBound cand.cdBound
                      (confirmAct cand.cdKind steps (confirmTick cand.cdKind hyp steps verdict))
-    pure MkOutcome {ocCandidate = cand, ocVerdict = verdict', ocSteps = steps}
+    pure (MkOutcome {ocCandidate = cand, ocVerdict = verdict', ocSteps = steps}, positionFrom rig tr extra replayed)
 
 -- | The act's self-check; see 'tryCandidate'. The candidate set is read off
 -- the residual before the guard is asked (spec §1.1b, G9: the shapes are an

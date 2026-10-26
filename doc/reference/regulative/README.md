@@ -86,6 +86,7 @@ See [DEONTIC: Evaluation](DEONTIC.md#evaluation) and [EVENT](EVENT.md).
 - [DEONTIC](DEONTIC.md): the type of rules, and `EVALTRACE`
 - [EVENT](EVENT.md): events and `` `WAIT UNTIL` ``
 - [What is owed now: `l4 lts`](lts-list.md): read a `#TRACE` out as a list of what is owed, what would discharge it and what would breach it
+- [Every position a contract can reach: `l4 explore`](explore.md): every position a contract can get to and every move between them, with a coverage line, property checks and a GraphViz picture
 - [State graph and `--dominators`](STATE-GRAPH.md): the map of a rule's `HENCE`/`LEST` paths, as **Show state graph** in the editor and `l4 state-graph` on the command line
 - [The instance ledger](ledger.md): run one contract as it happens, one proposed act at a time, each checked and recorded in a single step against the history as it stands at that instant
 

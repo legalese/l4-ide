@@ -1,10 +1,15 @@
 # Regulative Lowering: an explicit transition system from the evaluator, then the backends
 
-**Status:** Proposal, written 2026-10-25. **On this branch only WP0 of §8, the dinner fixtures, is built; none of it has landed.**
-The branch is `mengwong/lowering-ledger`, which lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`63254397f`, fetched 2026-10-26) holds none of its files.
-No explorer, no emitter and no harness is in this tree; WP1 to WP6 are built on the other local branch, `mengwong/lowering-explore`, which is not this one.
-Checked 2026-10-26 at `420bb6258`: the seven fixtures of `jl4/examples/explore/brief/` (`properties.l4`, the three designs, the two mutants and `refused-number.l4`) each exit 0 under `l4 run` with an `l4` built from this tree.
-Their state counts and property verdicts are checked only on the explore branch, by the harness of WP4.
+**Status:** Proposal, written 2026-10-25. **On this branch the work packages WP0 to WP6 of §8 are built and committed, and so are the companion's WPO0 to WPO5; none of it has landed.**
+This tree is the local branch `mengwong/lowering-integ`: the merge of `mengwong/lowering-explore` (`2418f2f75`) and `mengwong/lowering-ledger` (`21e03a4bd`) onto `unstable` (`63254397f`, fetched 2026-10-26), with nothing pushed and no pull request.
+The checks quoted below ran on those two branches at the commits named, before the merge; none has been run on this tree yet.
+Checked 2026-10-26 on `mengwong/lowering-explore` at `2c24d9547`: the cross-validation harness of WP4 (`make -C jl4/examples/explore/harness check`, with mCRL2, TLC and NuSMV installed and `RELEASE=1`) passed 287 of 287 checks against an `l4` built from this tree.
+Also at that commit: `jl4-core-test` 1574 examples, 0 failures (13 pending); `l4-cli-test` 641 examples, 0 failures (83 pending); `doc/test-docs.sh` 0 errors.
+Not run: `jl4-test` (the goldens, about 12 minutes), the suites and harnesses that `etc/verify-branch.sh` does not run (`jl4-lsp-test`, `jl4-mlir-test`, `jl4-websessions-test`, `jl4-proleg-burden`, `jl4-proleg-roundtrip`, the DMN harnesses, the go selftest, WASM, TypeScript), the Nix build and CI on this branch.
+On `mengwong/lowering-explore`, after merging the pushed formatting fix `d8cda38fa` (draft PR #746 passed CI at that commit, Repo-Wide Invariants and TypeScript Checks included, 2026-10-26), `etc/verify-branch.sh --quick` passed at `dd4e2d08b`: `cabal build all`, `l4-cli-test` 641 examples, `jl4-core-test` 1574, `jl4-service-test` 661, the corpus-golden and canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 and the commit trailers, with one warning, probe (c), on three assertions of the explorer's CLI tests (`jl4/tests-cli/CliTest/Explore.hs`, lines 225, 229 and 237) that the script flags as possibly comparing text that still carries a `\r` on Windows; they are unchanged and have not been run on Windows.
+A pass of that script is not a green CI.
+Not built: a CI job that runs the harness; checks of the `.pnml` and `.dot` outputs; runs of Apalache, Spin and TAPAAL.
+Three silent failures of `l4 explore` reproduced on 2026-10-26 are fixed in `2c24d9547`, which is assumed, not ruled and can be reverted alone; a fourth is by design and documented; §12 lists them.
 **Author:** Meng Wong, drafted by session pitch-Oct from the five verification probes of 2026-10-25.
 **Parent:** [VERIFICATION-BACKEND-LOWERING-SPEC.md](VERIFICATION-BACKEND-LOWERING-SPEC.md), whose Phase 0 and Phases 2 to 4 this document narrows to one fragment and one fixture.
 **Related:** [BOUNDED-DEONTICS-SPEC.md](../todo/BOUNDED-DEONTICS-SPEC.md) (object and assertion levels; contract time ruled discrete, T2, 2026-09-09), `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §2.4 (counterfactuals come from running the evaluator, never from a second semantics), `doc/reference/regulative/lts-list.md`, `doc/reference/regulative/STATE-GRAPH.md`.
@@ -422,8 +427,16 @@ These are visible to a rule author or a reader of the output, so they are Meng's
 
 ## 12. What this spec does not claim
 
-- On this branch only the dinner fixtures of §7 are built, and no explorer is in this tree, so the state counts quoted are the probes' hand models, not an explorer's output.
-  The explorer that reproduces them is on `mengwong/lowering-explore`, not here.
+- On this branch the explorer is built, and the state counts quoted (12/21, 15/30, 10/21) are the probes' hand models, which `l4 explore` reproduces only under the run written out in `jl4/examples/explore/brief/README.md` (the clock bounded at closing, and the cells `properties.l4` reads kept with `--keep` and `--keep-latest`).
+  A bare `l4 explore d1-naive.l4` reports 20 states and 38 transitions (measured 2026-10-26 at `8cf825feb`).
+  On `unstable` nothing of this is built.
+- Three silent failures of `l4 explore` were reproduced on 2026-10-26 at `8cf825feb`, each exiting 0 on a confident line, and are fixed in `2c24d9547` (assumed, not ruled: the exit status of an error case is for Meng to rule on).
+  An `--until` before the contract's outset fired no act and held every `--always` and `--stays` property of the one state, D1's P1 included; it now exits 1.
+  A file with no `#TRACE` and a named property, `--emit` or `--fair` printed "Nothing to explore" and exited 0; it now exits 1, and still exits 0 when none of those was asked for.
+  A position that merged into a state already seen dropped its coverage notes, so the coverage line could say "no write-only cell dropped" when a cell was written and dropped; it now notes them.
+- One silent failure is by design and not fixed: a property input named for a cell nothing writes is read as an empty list in every state, so the property holds vacuously.
+  `doc/reference/regulative/explore.md` documents it, and the property's line in the output says the cell was never written in any state explored.
+  The ledger of the companion spec is in this tree as well, from `mengwong/lowering-ledger`.
 - The probes ran on 10 to 25 untimed states; nothing here says the explicit route scales to a whole contract, and D-L1 exists because it may not.
 - The probes' models were written by Sonnet agents from one brief and spot-checked against their logs by the parent session; the bisimulation check of §6.2 is what would make them an oracle rather than a reference.
 - The probe reports cited here are in the private `legalese/solutions` repo, pushed 2026-10-25 as draft PR legalese/solutions#1 (commit `b0de111`), so they resolve for the team and for nobody else.
