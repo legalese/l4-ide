@@ -2,22 +2,26 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 module ExportValidationSpec (spec) where
 
+import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Control.Monad (forM_)
 import Test.Hspec
-import Data.List (sort)
+import Data.List (nubBy, sort)
+import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Optics (cosmosOf, foldMapOf, gplate, over, toListOf, (^.))
 import System.Timeout (timeout)
 
 import L4.API (l4Check)
-import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
-import L4.Export (ExportedFunction(..), getExportedFunctions, enrichReturnTypes)
-import L4.Import.Resolution (TypeCheckWithDepsResult(..))
+import L4.API.VirtualFS (VFS, checkWithImports, embeddedLibraryNames, emptyVFS, vfsFromList)
+import L4.Annotation (getAnno)
+import L4.Export (BodyReads(..), ExportedFunction(..), bodyReads, getExportedFunctions, enrichReturnTypes, isExportedDecide, validateExportInputs)
+import L4.Import.Resolution (ResolvedImport(..), TypeCheckWithDepsResult(..))
 import L4.Print (prettyTypeForDisplay)
-import L4.Syntax (getActual, nameToText)
+import L4.Syntax (AppForm(MkAppForm), Assume, Decide(MkDecide), Expr(App, List, Where), Info(TypeInfo), LocalDecl(LocalAssume), Module, Resolved(Ref), TermKind(Constructor), Type', Unique(MkUnique), annInfo, getActual, nameToText)
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), Severity(..))
+import L4.TypeCheck.Types (CheckEntity(KnownTerm), CheckErrorWithContext(..), CheckError(..), CheckResult(..), Severity(..))
 
 -- | Run typecheck on a source snippet and return the list of
 -- 'ExportFunctionTypeInput' errors that fired (or 'Left' on fatal failure).
@@ -146,6 +150,227 @@ exportedReturnTypes source =
         | ef <- exps
         ]
 
+-- | The (function, input) pairs that 'exportFnErrors' finds in a snippet.
+refusedFunctionInputs :: Text -> Either [Text] [(Text, Text)]
+refusedFunctionInputs source =
+  fmap
+    (\errs ->
+      [ (nameToText (getActual fn), nameToText (getActual p))
+      | MkCheckErrorWithContext{kind = ExportFunctionTypeInput fn p} <- errs
+      ])
+    (exportFnErrors source)
+
+-- | A module whose exported rule, `the rule`, has the given body. The module
+-- declares what the bodies of 'placesOfARead' use: two parties, two actions,
+-- a record, a rule that takes a NUMBER, and the function-typed ASSUME `f`.
+readsAt :: [Text] -> Text
+readsAt body = Text.unlines (header ++ map ("  " <>) body)
+ where
+  header =
+    [ "DECLARE Person IS ONE OF Alice, Bob"
+    , "DECLARE Action IS ONE OF"
+    , "  pay HAS amount IS A NUMBER"
+    , "  deliver"
+    , "DECLARE Box HAS v IS A NUMBER"
+    , ""
+    , "ASSUME f IS A FUNCTION FROM NUMBER TO NUMBER"
+    , ""
+    , "GIVEN m IS A NUMBER"
+    , "GIVETH A NUMBER"
+    , "double m MEANS m * 2"
+    , ""
+    , "@export The rule"
+    , "GIVEN n IS A NUMBER"
+    , "      a IS AN Action"
+    , "      xs IS A LIST OF NUMBER"
+    , "`the rule` n a xs MEANS"
+    ]
+
+-- | Each place in the body of a rule where an expression can stand, with a
+-- body that calls the ASSUME `f` at that place and nowhere else.
+placesOfARead :: [(Text, [Text])]
+placesOfARead =
+  [ ("the left of AND", ["f n > 0 AND TRUE"])
+  , ("the right of AND", ["TRUE AND f n > 0"])
+  , ("the left of OR", ["f n > 0 OR TRUE"])
+  , ("the right of OR", ["TRUE OR f n > 0"])
+  , ("the left of IMPLIES", ["f n > 0 IMPLIES TRUE"])
+  , ("the right of IMPLIES", ["TRUE IMPLIES f n > 0"])
+  , ("the left of EQUALS", ["f n EQUALS 1"])
+  , ("the right of EQUALS", ["1 EQUALS f n"])
+  , ("the operand of NOT", ["NOT (f n > 0)"])
+  , ("the left of PLUS", ["f n PLUS 1"])
+  , ("the right of PLUS", ["1 PLUS f n"])
+  , ("the left of MINUS", ["f n MINUS 1"])
+  , ("the right of MINUS", ["1 MINUS f n"])
+  , ("the left of TIMES", ["f n TIMES 1"])
+  , ("the right of TIMES", ["1 TIMES f n"])
+  , ("the left of DIVIDED BY", ["f n DIVIDED BY 1"])
+  , ("the right of DIVIDED BY", ["1 DIVIDED BY f n"])
+  , ("the left of MODULO", ["f n MODULO 1"])
+  , ("the right of MODULO", ["1 MODULO f n"])
+  , ("the left of FOLLOWED BY", ["f n FOLLOWED BY xs"])
+  , ("the right of FOLLOWED BY", ["0 FOLLOWED BY (LIST (f n))"])
+  , ("the left of AT MOST", ["f n AT MOST 1"])
+  , ("the right of AT MOST", ["1 AT MOST f n"])
+  , ("the left of AT LEAST", ["f n AT LEAST 1"])
+  , ("the right of AT LEAST", ["1 AT LEAST f n"])
+  , ("the left of LESS THAN", ["f n LESS THAN 1"])
+  , ("the right of LESS THAN", ["1 LESS THAN f n"])
+  , ("the left of GREATER THAN", ["f n GREATER THAN 1"])
+  , ("the right of GREATER THAN", ["1 GREATER THAN f n"])
+  , ( "the left of RAND"
+    , [ "(PARTY Alice MUST deliver WITHIN f n) RAND (PARTY Alice MUST deliver WITHIN 1)"
+      ]
+    )
+  , ( "the right of RAND"
+    , [ "(PARTY Alice MUST deliver WITHIN 1) RAND (PARTY Alice MUST deliver WITHIN f n)"
+      ]
+    )
+  , ( "the left of ROR"
+    , [ "(PARTY Alice MUST deliver WITHIN f n) ROR (PARTY Alice MUST deliver WITHIN 1)"
+      ]
+    )
+  , ( "the right of ROR"
+    , [ "(PARTY Alice MUST deliver WITHIN 1) ROR (PARTY Alice MUST deliver WITHIN f n)"
+      ]
+    )
+  , ("the record of a field read", ["(Box WITH v IS f n)'s v"])
+  , ("the body of a lambda", ["g n", "WHERE", "  g MEANS GIVEN x YIELD f x"])
+  , ("the argument of a call", ["double (f n)"])
+  , ("a named argument", ["Box WITH v IS f n"])
+  , ("the condition of IF", ["IF f n > 0 THEN 1 ELSE 2"])
+  , ("the THEN of IF", ["IF TRUE THEN f n ELSE 2"])
+  , ("the ELSE of IF", ["IF TRUE THEN 1 ELSE f n"])
+  , ("the condition of a BRANCH", ["BRANCH", "  IF f n > 0 THEN 1", "  OTHERWISE 2"])
+  , ("the value of a BRANCH", ["BRANCH", "  IF TRUE THEN f n", "  OTHERWISE 2"])
+  , ("the OTHERWISE of a BRANCH", ["BRANCH", "  IF TRUE THEN 1", "  OTHERWISE f n"])
+  , ("what CONSIDER looks at", ["CONSIDER f n", "  WHEN 1 THEN 2", "  OTHERWISE 3"])
+  , ("the THEN of a WHEN", ["CONSIDER n", "  WHEN 1 THEN f n", "  OTHERWISE 3"])
+  , ("the OTHERWISE of CONSIDER", ["CONSIDER n", "  WHEN 1 THEN 2", "  OTHERWISE f n"])
+  , ("an EXACTLY pattern", ["CONSIDER n", "  WHEN EXACTLY f n THEN 1", "  OTHERWISE 2"])
+  , ( "an argument of a constructor pattern"
+    , [ "CONSIDER a"
+      , "  WHEN pay EXACTLY f n THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    )
+  , ( "the left of a FOLLOWED BY pattern"
+    , [ "CONSIDER xs"
+      , "  WHEN (EXACTLY f n) FOLLOWED BY rest THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    )
+  , ( "the right of a FOLLOWED BY pattern"
+    , [ "CONSIDER xs"
+      , "  WHEN x FOLLOWED BY (EXACTLY (LIST (f n))) THEN 1"
+      , "  OTHERWISE 2"
+      ]
+    )
+  , ("the party of a duty", ["PARTY (IF f n > 0 THEN Alice ELSE Bob)", "MUST deliver", "WITHIN 1"])
+  , ("the action of a duty", ["PARTY Alice", "MUST pay EXACTLY f n", "WITHIN 1"])
+  , ("the PROVIDED of a duty", ["PARTY Alice", "MUST pay k PROVIDED k = f n", "WITHIN 1"])
+  , ("the WITHIN of a duty", ["PARTY Alice", "MUST deliver", "WITHIN f n"])
+  , ( "the HENCE of a duty"
+    , [ "PARTY Alice"
+      , "MUST deliver"
+      , "WITHIN 1"
+      , "HENCE (IF f n > 0 THEN FULFILLED ELSE BREACH)"
+      ]
+    )
+  , ( "the LEST of a duty"
+    , [ "PARTY Alice"
+      , "MUST deliver"
+      , "WITHIN 1"
+      , "LEST (IF f n > 0 THEN FULFILLED ELSE BREACH)"
+      ]
+    )
+  , ( "the BY of a BREACH"
+    , [ "PARTY Alice"
+      , "MUST deliver"
+      , "WITHIN 1"
+      , "LEST BREACH BY (IF f n > 0 THEN Alice ELSE Bob)"
+      ]
+    )
+  , ( "the BECAUSE of a BREACH"
+    , [ "PARTY Alice"
+      , "MUST deliver"
+      , "WITHIN 1"
+      , "LEST BREACH BECAUSE ((f n) AS STRING)"
+      ]
+    )
+  , ("the party of an event", ["PARTY (IF f n > 0 THEN Alice ELSE Bob) DOES deliver AT 1"])
+  , ("the action of an event", ["PARTY Alice DOES pay (f n) AT 1"])
+  , ("the time of an event", ["PARTY Alice DOES deliver AT f n"])
+  , ("a percentage", ["f n %"])
+  , ("an element of a LIST", ["LIST 1, f n"])
+  , ("what a WHERE qualifies", ["f n", "WHERE", "  k MEANS 1"])
+  , ("a definition under WHERE", ["k", "WHERE", "  k MEANS f n"])
+  , ("a definition under LET", ["LET", "  k IS f n", "IN k"])
+  , ("what a LET qualifies", ["LET", "  k IS 1", "IN f k"])
+  , ("the address of a FETCH", ["FETCH ((f n) AS STRING)"])
+  , ("the name of an ENV", ["ENV ((f n) AS STRING)"])
+  , ("the address of a POST", ["POST ((f n) AS STRING) \"h\" \"b\""])
+  , ("the headers of a POST", ["POST \"u\" ((f n) AS STRING) \"b\""])
+  , ("the body of a POST", ["POST \"u\" \"h\" ((f n) AS STRING)"])
+  , ("a part of a CONCAT", ["CONCAT \"a\", ((f n) AS STRING)"])
+  , ("the operand of AS STRING", ["(f n) AS STRING"])
+  ]
+
+-- | The three lists of 'BodyReads' as a generic traversal of the syntax tree
+-- ('gplate') finds them. It meets an expression before the expressions inside
+-- it, and those in the order of the fields that hold them, which is the order
+-- that 'bodyReads' documents.
+genericBodyReads :: Expr Resolved -> ([Resolved], [(Resolved, Type' Resolved)], [Assume Resolved])
+genericBodyReads body =
+  ( foldMapOf everyExpr reference body
+  , foldMapOf everyExpr readType body
+  , foldMapOf everyExpr declaredHere body
+  )
+ where
+  everyExpr = cosmosOf (gplate @(Expr Resolved))
+  reference = \case
+    App _ ref@Ref{} _ -> [ref]
+    _ -> []
+  readType = \case
+    App ann ref@Ref{} [] | Just (TypeInfo ty _) <- ann ^. annInfo -> [(ref, ty)]
+    _ -> []
+  declaredHere = \case
+    Where _ _ decls -> [ assume | LocalAssume _ assume <- decls ]
+    _ -> []
+
+-- | The rules of a module: every DECIDE that does not stand inside another.
+rulesOf :: Module Resolved -> [Decide Resolved]
+rulesOf = toListOf (gplate @(Decide Resolved))
+
+-- | Each rule of a module in whose body 'bodyReads' finds something else, or in
+-- another order, than 'genericBodyReads': the name of the rule, and the names
+-- of the lists that differ.
+walkDisagreements :: Module Resolved -> [(Text, [Text])]
+walkDisagreements m =
+  [ (nameToText (getActual name), differs)
+  | MkDecide _ _ (MkAppForm _ name _ _) body <- rulesOf m
+  , let found = bodyReads body
+        (refs, readsFound, locals) = genericBodyReads body
+        differs =
+          [ "references" | found.references /= refs ]
+          <> [ "readTypes" | found.readTypes /= readsFound ]
+          <> [ "localAssumes" | found.localAssumes /= locals ]
+  , not (null differs)
+  ]
+
+-- | How many references the walk finds in the bodies of the rules of a module,
+-- so that an example can tell that it compared some.
+referencesWalked :: Module Resolved -> Int
+referencesWalked m = sum [ length (bodyReads body).references | MkDecide _ _ _ body <- rulesOf m ]
+
+-- | 'walkDisagreements' of a source that can import the libraries that come
+-- with L4, with the number of rules and of references that it compared.
+walkDisagreementsOf :: Text -> IO ([(Text, [Text])], Int, Int)
+walkDisagreementsOf src = case checkWithImports emptyVFS src of
+  Left errs -> fail ("Fatal: " ++ show errs)
+  Right r -> pure (walkDisagreements r.tcdModule, length (rulesOf r.tcdModule), referencesWalked r.tcdModule)
+
 spec :: Spec
 spec = do
   describe "@export detection" $ do
@@ -269,6 +494,19 @@ spec = do
       case exportFnErrors src of
         Left errs -> fail $ "Fatal: " ++ show errs
         Right fns -> length fns `shouldBe` 1
+
+    -- The check finds the ASSUMEs that an exported rule reads by walking the
+    -- rule's body. Each body in 'placesOfARead' calls the function-typed ASSUME
+    -- `f` at one place where an expression can stand and nowhere else, so a part
+    -- of an expression that the walk passes over lets `f` through, and the
+    -- failure names the place.
+    it "refuses a function-typed ASSUME wherever in the body it is called" $ do
+      let missed =
+            [ place
+            | (place, body) <- placesOfARead
+            , refusedFunctionInputs (readsAt body) /= Right [("the rule", "f")]
+            ]
+      missed `shouldBe` []
 
   -- An EVENT has no JSON form: the service's input decoder reads an object
   -- only into a declared record, the builtin EVENT type has none, and so an
@@ -595,9 +833,12 @@ spec = do
 
       it "still finds an EVENT in a later field once the chain has been walked" $ do
         -- The chain holds none. The EVENT is in a field that comes after the
-        -- field that leads into it, so the walk has been all through the
-        -- chain before it gets there.
-        let src = parties <> chain "leaf IS A NUMBER" <> Text.unlines
+        -- field that leads into the chain, and the last record of the chain
+        -- refers back to the record that holds that field. So every record of
+        -- the chain leads to the EVENT, but only through a record that the walk
+        -- is still looking into, and the walk has been all through the chain
+        -- before it gets there.
+        let src = parties <> chain "back IS A Root" <> Text.unlines
               [ "DECLARE Root HAS"
               , "  first IS A T0"
               , "  second IS A Side"
@@ -1569,6 +1810,102 @@ spec = do
             ])
       blocks src `shouldReturn` (True, [])
 
+  -- When the body reads one ASSUME more than once, the check goes by the reads
+  -- in the order that the walk of the body meets them: the first read that
+  -- holds an EVENT or a DEONTIC says which of the two the error names, and the
+  -- last reference to the ASSUME gives the spelling of its name. The walk meets
+  -- what CONSIDER looks at before its branches, what a WHERE qualifies before
+  -- the definitions under it, and the time of an event written with AT first
+  -- after its party.
+  describe "the order in which the check meets the reads of an ASSUME" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        dutyHelper = Text.unlines
+          [ "GIVEN duty IS A DEONTIC Person Action"
+          , "GIVETH A BOOLEAN"
+          , "`fulfilled` duty MEANS"
+          , "  CONSIDER duty"
+          , "  WHEN FULFILLED THEN TRUE"
+          , "  OTHERWISE FALSE"
+          , ""
+          ]
+        eventHelper = Text.unlines
+          [ "GIVEN e IS AN EVENT Person Action"
+          , "GIVETH A NUMBER"
+          , "`time of` e MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a t THEN t"
+          , ""
+          ]
+        placeholder = Text.unlines
+          [ "GIVEN a IS A TYPE"
+          , "GIVETH AN a"
+          , "ASSUME `local placeholder`"
+          , ""
+          ]
+        blocks = exportBlocks emptyVFS
+        -- (function, input) as the message spells them
+        spelled src = either (fail . ("Fatal: " <>) . show) (pure . fst) (exportDeonticErrors emptyVFS src)
+
+    it "names the EVENT when what CONSIDER looks at reads it as an EVENT, and a branch as a DEONTIC" $ do
+      let src = parties <> dutyHelper <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  CONSIDER `time of` `local placeholder`"
+            , "  WHEN 0 THEN `fulfilled` `local placeholder`"
+            , "  OTHERWISE FALSE"
+            ]
+      blocks src `shouldReturn`
+        (False, [("EVENT", "reads in two ways", "local placeholder", SError)])
+
+    it "names the EVENT when what a WHERE qualifies reads it as an EVENT, and a definition under it as a DEONTIC" $ do
+      let src = parties <> dutyHelper <> eventHelper <> placeholder <> Text.unlines
+            [ "@export Reads in two ways"
+            , "GIVETH A BOOLEAN"
+            , "`reads in two ways` MEANS"
+            , "  `time of` `local placeholder` > 0 AND k"
+            , "  WHERE"
+            , "    k MEANS `fulfilled` `local placeholder`"
+            ]
+      blocks src `shouldReturn`
+        (False, [("EVENT", "reads in two ways", "local placeholder", SError)])
+
+    it "spells the name as a branch of CONSIDER does, not as what CONSIDER looks at does" $ do
+      let src = parties <> Text.unlines
+            [ "§ `Defs`"
+            , "ASSUME `the duty` IS A DEONTIC Person Action"
+            , ""
+            , "§ `Rules`"
+            , "@export Two spellings"
+            , "GIVETH A BOOLEAN"
+            , "`two spellings` MEANS"
+            , "  CONSIDER `Defs`.`the duty`"
+            , "  WHEN FULFILLED THEN"
+            , "    CONSIDER `the duty`"
+            , "    WHEN FULFILLED THEN TRUE"
+            , "    OTHERWISE FALSE"
+            , "  OTHERWISE FALSE"
+            ]
+      spelled src `shouldReturn` [("two spellings", "the duty")]
+
+    it "spells the name as the time of an event written with AT first does, not as its party does" $ do
+      let src = parties <> dutyHelper <> Text.unlines
+            [ "§ `Defs`"
+            , "GIVEN a IS A TYPE"
+            , "GIVETH AN a"
+            , "ASSUME x"
+            , ""
+            , "§ `Rules`"
+            , "@export At first"
+            , "`at first` MEANS"
+            , "  AT `Defs`.x PARTY (IF `fulfilled` x THEN Seller ELSE Buyer) DOES delivery"
+            ]
+      spelled src `shouldReturn` [("at first", "Defs.x")]
+
   -- An ASSUME can also be declared inside a rule, under WHERE. The checker's
   -- table of what a module declares holds the top-level and the imported
   -- ASSUMEs and not these, so the check finds them in the body, takes their
@@ -1865,6 +2202,230 @@ spec = do
             ) <> export "AN Entry"
       refusals (entry True) `shouldReturn` (both, [])
       refusals (entry False) `shouldReturn` ([], both)
+
+  -- The check does not look into a type that leads to neither an EVENT nor a
+  -- DEONTIC, and it works out which types lead to one once for the whole
+  -- module. That a type leads to one does not depend on the input that is
+  -- checked, nor on the way by which the walk came to the type.
+  describe "the types that the input check does not look into" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        export name input = Text.unlines
+          [ "@export " <> name
+          , "GIVEN x IS " <> input
+          , "GIVETH A BOOLEAN"
+          , "`" <> name <> "` x MEANS TRUE"
+          , ""
+          ]
+        refused src = sort . fst <$> unsendableRefusals emptyVFS src
+
+    it "refuses both of two records that refer to each other, when one of them holds an EVENT" $ do
+      let records = parties <> Text.unlines
+            [ "DECLARE Outer HAS"
+            , "  inner IS AN Inner"
+            , "  e IS AN EVENT Person Action"
+            , ""
+            , "DECLARE Inner HAS back IS AN Outer"
+            , ""
+            ]
+          both = [("takes an inner", "x"), ("takes an outer", "x")]
+      refused (records <> export "takes an outer" "AN Outer" <> export "takes an inner" "AN Inner")
+        `shouldReturn` both
+      refused (records <> export "takes an inner" "AN Inner" <> export "takes an outer" "AN Outer")
+        `shouldReturn` both
+
+    it "refuses a record that holds an EVENT, also after the input of another rule led the walk through it" $ do
+      let records = parties <> Text.unlines
+            [ "DECLARE Inner HAS e IS AN EVENT Person Action"
+            , "DECLARE Wrap HAS inner IS AN Inner"
+            , ""
+            ]
+      refused (records <> export "takes a wrap" "A Wrap" <> export "takes an inner" "AN Inner")
+        `shouldReturn` [("takes a wrap", "x"), ("takes an inner", "x")]
+
+    -- The check looks at an ASSUME once for each read of it, since each read
+    -- of a polymorphic ASSUME has a type of its own. The body here reads `cfg`
+    -- more often than a test could afford to check: the module is checked with
+    -- one read, and the input check then runs on the module with that body
+    -- repeated in a LIST, which it reads as it is. Each read walking the fields
+    -- of the record again takes many times as long as the watchdog allows.
+    it "does not walk the fields of a record again for each read of an ASSUME of it" $ do
+      let width = 4000 :: Int
+          readCount = 200000 :: Int
+          src = Text.unlines $
+            [ "DECLARE Wide HAS" ]
+            <> [ "  f" <> Text.pack (show i) <> " IS A NUMBER" | i <- [1 .. width] ]
+            <> [ ""
+               , "ASSUME cfg IS A Wide"
+               , ""
+               , "@export Reads cfg"
+               , "GIVETH A NUMBER"
+               , "`reads cfg` MEANS cfg's f1"
+               ]
+          readOften decide@(MkDecide ann sig appForm body)
+            | isExportedDecide decide =
+                MkDecide ann sig appForm (List (getAnno body) (replicate readCount body))
+            | otherwise = decide
+      r <- either (fail . ("Fatal: " <>) . show) pure (checkWithImports emptyVFS src)
+      map prettyCheckErrorWithContext [ e | e <- r.tcdErrors, severity e == SError ] `shouldBe` []
+      _ <- evaluate (force r.tcdModule)
+      let repeated = over (gplate @(Decide Resolved)) readOften r.tcdModule
+      within <- timeout (5 * 1000000) $
+        evaluate (length (validateExportInputs r.tcdSubstitution r.tcdEntityInfo repeated))
+      within `shouldBe` Just 0
+
+    -- The fields of every type are gathered once for the module, and read in
+    -- full the first time the check asks whether a type leads to an EVENT or a
+    -- DEONTIC, which one input of type NUMBER makes it ask. The sum type here
+    -- has more constructors than a test could afford to check: the module is
+    -- checked with two, and the input check then runs with an entity table in
+    -- which the first of them is copied under new uniques. Putting the fields
+    -- of each constructor behind those of the constructors before it does not
+    -- finish within the watchdog.
+    it "gathers the fields of a sum type of many constructors in one pass" $ do
+      let copies = 64000 :: Int
+          src = Text.unlines
+            [ "DECLARE Big IS ONE OF"
+            , "  first HAS n IS A NUMBER"
+            , "  second HAS m IS A NUMBER"
+            , ""
+            , "@export Plus one"
+            , "GIVEN x IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`plus one` x MEANS x + 1"
+            ]
+      r <- either (fail . ("Fatal: " <>) . show) pure (checkWithImports emptyVFS src)
+      map prettyCheckErrorWithContext [ e | e <- r.tcdErrors, severity e == SError ] `shouldBe` []
+      (MkUnique s _ uri, copied) <-
+        case [ entry | entry@(_, (name, KnownTerm _ Constructor)) <- Map.toList r.tcdEntityInfo, nameToText name == "first" ] of
+          [entry] -> pure entry
+          entries -> fail ("expected one constructor `first`, found " <> show (length entries))
+      let wide = Map.union r.tcdEntityInfo (Map.fromList [ (MkUnique s (negate i) uri, copied) | i <- [1 .. copies] ])
+      Map.size wide `shouldBe` Map.size r.tcdEntityInfo + copies
+      _ <- evaluate (force r.tcdModule)
+      _ <- evaluate (force wide)
+      within <- timeout (5 * 1000000) $
+        evaluate (length (validateExportInputs r.tcdSubstitution wide r.tcdModule))
+      within `shouldBe` Just 0
+
+  -- Which types the check looks into is worked out from the names that a
+  -- synonym or a field names, and a name under a FOR ALL counts. A FOR ALL
+  -- that is the input's own type is looked through by the walk of the input
+  -- itself ("rejects an EVENT under a FOR ALL" above); here it sits one step
+  -- further in, where only that working out reaches it.
+  describe "an EVENT or a DEONTIC under a FOR ALL in a synonym, a field or a constructor" $ do
+    let parties = Text.unlines
+          [ "DECLARE Person IS ONE OF Seller, Buyer"
+          , "DECLARE Action IS ONE OF delivery, payment"
+          , ""
+          ]
+        export name input = Text.unlines
+          [ "@export " <> name
+          , "GIVEN x IS " <> input
+          , "GIVETH A BOOLEAN"
+          , "`" <> name <> "` x MEANS TRUE"
+          ]
+        quantified builtin = "FOR ALL a (" <> builtin <> " Person Action)"
+        synonym builtin = parties <> Text.unlines
+          [ "DECLARE Q IS " <> quantified builtin
+          , ""
+          ] <> export "takes q" "A Q"
+        field builtin = parties <> Text.unlines
+          [ "DECLARE R HAS f IS " <> quantified builtin
+          , ""
+          ] <> export "takes r" "AN R"
+        constructor builtin = parties <> Text.unlines
+          [ "DECLARE S IS ONE OF"
+          , "  Mk HAS f IS " <> quantified builtin
+          , "  None"
+          , ""
+          ] <> export "takes s" "AN S"
+
+    it "refuses an EVENT under a FOR ALL that a synonym stands for" $
+      unsendableRefusals emptyVFS (synonym "EVENT") `shouldReturn` ([("takes q", "x")], [])
+
+    it "refuses a DEONTIC under a FOR ALL that a synonym stands for" $
+      unsendableRefusals emptyVFS (synonym "DEONTIC") `shouldReturn` ([], [("takes q", "x")])
+
+    it "refuses an EVENT under a FOR ALL in a field of a record" $
+      unsendableRefusals emptyVFS (field "EVENT") `shouldReturn` ([("takes r", "x")], [])
+
+    it "refuses a DEONTIC under a FOR ALL in a field of a record" $
+      unsendableRefusals emptyVFS (field "DEONTIC") `shouldReturn` ([], [("takes r", "x")])
+
+    it "refuses an EVENT under a FOR ALL in a field of a constructor" $
+      unsendableRefusals emptyVFS (constructor "EVENT") `shouldReturn` ([("takes s", "x")], [])
+
+    it "refuses a DEONTIC under a FOR ALL in a field of a constructor" $
+      unsendableRefusals emptyVFS (constructor "DEONTIC") `shouldReturn` ([], [("takes s", "x")])
+
+  -- The input check reads three lists from the body of an exported rule
+  -- ('BodyReads'), and the order of each tells it which input to refuse, for
+  -- which type, and how to spell the input's name. 'bodyReads' finds them in one
+  -- walk of the body; these examples compare it, list by list and in order,
+  -- with a generic traversal of the syntax tree on every rule of a module.
+  describe "the walk of the body of an exported rule (bodyReads)" $ do
+    it "finds what a generic traversal finds, in the same order, at every place of a read" $ do
+      results <- mapM (walkDisagreementsOf . readsAt . snd) placesOfARead
+      concat [ d | (d, _, _) <- results ] `shouldBe` []
+      -- each module has `double` and `the rule`, and each body calls `f` on an argument
+      sum [ rules | (_, rules, _) <- results ] `shouldSatisfy` (>= 2 * length placesOfARead)
+      sum [ refs | (_, _, refs) <- results ] `shouldSatisfy` (>= 2 * length placesOfARead)
+
+    it "finds what a generic traversal finds, in the same order, in reads that are written in another order" $ do
+      let src = Text.unlines
+            [ "DECLARE Person IS ONE OF Seller, Buyer"
+            , "DECLARE Action IS ONE OF delivery, payment"
+            , ""
+            , "§ `Defs`"
+            , "GIVEN a IS A TYPE"
+            , "GIVETH AN a"
+            , "ASSUME x"
+            , ""
+            , "§ `Rules`"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "double n MEANS n * 2"
+            , ""
+            , "`at first` MEANS"
+            , "  AT `Defs`.x PARTY (IF x THEN Seller ELSE Buyer) DOES delivery"
+            , ""
+            , "GIVETH A NUMBER"
+            , "`nested` MEANS"
+            , "  CONSIDER double x"
+            , "  WHEN 0 THEN k"
+            , "  OTHERWISE double (`Defs`.x + k)"
+            , "  WHERE"
+            , "    k MEANS"
+            , "      CONSIDER x"
+            , "      WHEN 1 THEN double x"
+            , "      OTHERWISE m"
+            , "      WHERE"
+            , "        ASSUME m IS A NUMBER"
+            ]
+      (disagreements, rules, refs) <- walkDisagreementsOf src
+      disagreements `shouldBe` []
+      rules `shouldBe` 3
+      refs `shouldSatisfy` (> 10)
+
+    it "finds what a generic traversal finds, in the same order, in every rule of the libraries that come with L4" $ do
+      -- A name with a hyphen in it is written in backticks; a library that does
+      -- not import drops out of the list below, so every one must be in it.
+      let imported =
+            nubBy (\a b -> a.riModuleName == b.riModuleName)
+              [ ri
+              | name <- embeddedLibraryNames
+              , Right r <- [checkWithImports emptyVFS ("IMPORT `" <> name <> "`")]
+              , ri <- r.tcdResolvedImports
+              ]
+      [ name | name <- embeddedLibraryNames, name `notElem` map (.riModuleName) imported ]
+        `shouldBe` []
+      [ (ri.riModuleName, d) | ri <- imported, d <- walkDisagreements ri.riTypeChecked.program ]
+        `shouldBe` []
+      sum [ referencesWalked ri.riTypeChecked.program | ri <- imported ] `shouldSatisfy` (> 0)
 
   -- The web editor runs the same checker and shows its error list: 'l4Check' is
   -- what the WASM language server answers with, an error being severity 1.
