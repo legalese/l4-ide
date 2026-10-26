@@ -693,6 +693,56 @@ The existing `timeoutAction` wrapper (configurable `--eval-timeout` and `--max-e
 
 Not in Phase 1. The `/evaluation/batch` endpoint evaluates the same function across multiple input cases. Adding events would mean each batch case could have different event lists, which significantly complicates the request schema. If needed, this can be added later.
 
+### Q6: What schema does the service publish for the answer of a function that returns `DEONTIC`?
+
+**ANSWERED 2026-10-26 (Meng, in conversation), option A, with one condition; see below.**
+
+**What is published today** (read from the code on `unstable` at `63254397f`, not run):
+
+- `jl4-service/src/Compiler.hs` leaves the structured return schema unset for a function that returns `DEONTIC` (the comment there calls it "the simulation envelope").
+  A client that reads the schema, such as an MCP client or the editor's AI tools, learns nothing about the shape of the answer.
+- The serializer (`valueToFnLiteral` in `jl4-service/src/Backend/Jl4.hs`) writes the answer under `result.value` as one of:
+  - the string `FULFILLED`;
+  - `{"BREACH": {…}}`, whose `reason` is `deadline_missed` or `explicit`;
+  - `{"OBLIGATION": {"party", "modal", "action", "deadline"}}`, with an `opens` field when the obligation has an opening edge still to reach;
+  - `{"AND": [a, b]}` or `{"OR": [a, b]}` for `RAND` and `ROR`, each operand an answer of this kind, or its printed source while it is unevaluated;
+  - `{"EVERY": "<source>"}` for an armed `EVERY` that has not run.
+- `deadline` is the printed deadline expression while the obligation has not been evaluated, `null` when there is none, and the evaluated value once there is one.
+
+**Ruled:**
+
+1. The published schema describes the answer as the service emits it.
+   It does not reshape it, because clients already read these keys.
+   It is a `oneOf` with one alternative per shape above.
+2. Core produces it, in `L4.FunctionSchema`, where the other return schemas are built.
+   OpenAPI, the function endpoint, MCP and the editor's tools then read the same schema.
+3. `party` and `action` are enums of the declared names when the party and action types are enums, and strings otherwise.
+4. `deadline` is declared as a string, a number or `null`, as emitted.
+   Making it always a number is a separate wire change and is not ruled here.
+5. This is ruled apart from any change to the return schema of an `EVENT` answer.
+   Neither depends on the other.
+
+**Condition (Meng, verbatim):** "we may optionally not want to return the residual contract because certain runtimes may say that some clients don't have a right to know the contract details -- it's a black box to them."
+
+What the condition means for the schema, and what it leaves open:
+
+- The schema a runtime publishes describes what that runtime returns to that client.
+  Where the residual is withheld, the schema does not list it as required and then leave it empty.
+  Whether the withheld parts are optional in one shared schema or absent from a smaller one is not ruled.
+- The residual is, as the service emits it today, the fields of an `OBLIGATION`, the operands of an `AND` or `OR` (printed as rule source while unevaluated), and, with a trace, the reasoning tree and the GraphViz source, which are rule source (`jl4-service/README.md`, "Rule source stays L4").
+- Not ruled: who decides (the deployment, the client or the request), what the setting is called, what a client that may not see the contract receives instead, and whether `FULFILLED` and `BREACH` stay visible to it.
+- The service already hides whole parts of itself per endpoint: the MCP endpoint's `Visibility` switches functions, evaluation and file browsing.
+  It does not hide part of an answer, so it is a precedent for the mechanism and not for this.
+
+**Assumed, not ruled:**
+
+- Whatever is withheld is withheld in one place that REST, batch and MCP share, so that the verdict cannot differ between surfaces and only the detail does (the principle of 2026-10-24: core owns the meaning, surfaces report it).
+- A shape the serializer gains adds an alternative to the schema in the same change.
+
+**Phase 2 above** proposes `{"OBLIGATION": {"operator": …, "children": […]}}` for `RAND` and `ROR`.
+The service emits `{"AND": [a, b]}` and `{"OR": [a, b]}`.
+This ruling publishes what is emitted; moving to Phase 2's form is a wire change and needs its own ruling.
+
 ---
 
 ## Example: Full API Walkthrough
