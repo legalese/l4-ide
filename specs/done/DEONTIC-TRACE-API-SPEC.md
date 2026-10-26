@@ -742,6 +742,9 @@ What the condition means for the schema, and what it leaves open:
 **Assumed, not ruled:**
 
 - Whatever is withheld is withheld in one place that REST, batch and MCP share, so that the verdict cannot differ between surfaces and only the detail does (the principle of 2026-10-24: core owns the meaning, surfaces report it).
+  That place is `DeonticTrace.presentDeonticOutcome`, the identity today.
+  Evaluation answers and their errors pass through it, because `DeonticTrace.runDeonticLimited` applies it to the whole outcome of a replay, on `/evaluation`, on MCP `tools/call` and its task path, and in a batch case.
+  `GET .../state-graphs` and the source-browse tools (`list_files`, `read_file`, `search_identifier`, `search_text`) also expose a contract's structure and are outside it, so a setting that withholds the contract has to gate them too.
 - A shape the serializer gains adds an alternative to the schema in the same change.
 
 **Phase 2 above** proposes `{"OBLIGATION": {"operator": …, "children": […]}}` for `RAND` and `ROR`.

@@ -20,7 +20,7 @@ module DeonticTrace (
   noTraceForOtherFunctions,
   isStrayTraceField,
   noDeonticModule,
-  presentDeonticAnswer,
+  presentDeonticOutcome,
   runDeonticLimited,
 ) where
 
@@ -117,10 +117,16 @@ isStrayTraceField params field =
 noDeonticModule :: Text
 noDeonticModule = "No compiled module available for deontic evaluation"
 
--- | THE seam: what of a DEONTIC answer leaves the service. Every surface gets
--- its answer from 'runDeonticLimited', which passes it through here before it
+-- | THE seam: what of a DEONTIC outcome leaves the service. Every surface gets
+-- its outcome from 'runDeonticLimited', which passes it through here before it
 -- returns, so a change here changes REST, MCP @tools/call@, the MCP task path
 -- and a batch case together, and the verdict cannot differ between them.
+--
+-- An outcome is an answer or an error, and both pass through. An error can
+-- carry the contract too: the evaluator's message prints the values and names
+-- it stopped on, and an error that reaches a client unfiltered would hand over
+-- what a withheld answer withholds. A limit hit carries no contract and is
+-- reported by the caller; so is the refusal of a request with no trace.
 --
 -- It is the identity today. It is one function so that a runtime that does not
 -- want a client to see the residual contract (Meng, 2026-10-26: "we may
@@ -134,8 +140,12 @@ noDeonticModule = "No compiled module available for deontic evaluation"
 -- the operands of an AND or OR in 'fnResult', and, with a trace, the 'reasoning'
 -- tree and the 'graphviz' source. All of them are fields of the one value this
 -- takes, so they pass through together; the response shapes are unchanged.
-presentDeonticAnswer :: ResponseWithReason -> ResponseWithReason
-presentDeonticAnswer = id
+--
+-- What is outside it: @GET .../state-graphs@ and the source-browse tools (@list_files@,
+-- @read_file@, @search_identifier@, @search_text@) also expose a contract's
+-- structure, and a setting that withholds must gate them too.
+presentDeonticOutcome :: Either EvaluatorError ResponseWithReason -> Either EvaluatorError ResponseWithReason
+presentDeonticOutcome = id
 
 -- | Replay a trace against a DEONTIC function, under the service's time and
 -- allocation limits.
@@ -161,7 +171,7 @@ runDeonticLimited
   -> Bool             -- ^ keep the reasoning tree; a batch case does not send it
   -> IO (Either (LimitHit, Int64) (Either EvaluatorError ResponseWithReason, Int64))
 runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presumption keepReasoning =
-  withEvalLimits cfg $ fmap dropReasoning $ runExceptT $ fmap presentDeonticAnswer $ case vf.fnCompiled of
+  withEvalLimits cfg $ fmap (dropReasoning . presentDeonticOutcome) $ runExceptT $ case vf.fnCompiled of
     Nothing -> throwE (InterpreterError noDeonticModule)
     Just compiled ->
       evaluateWithCompiledDeontic
