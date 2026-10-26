@@ -18,6 +18,7 @@ module DeonticTrace (
   requireTrace,
   traceFromJSON,
   noDeonticModule,
+  presentDeonticAnswer,
   runDeonticLimited,
 ) where
 
@@ -93,6 +94,26 @@ traceFromJSON mStart mEvents = do
 noDeonticModule :: Text
 noDeonticModule = "No compiled module available for deontic evaluation"
 
+-- | THE seam: what of a DEONTIC answer leaves the service. Every surface gets
+-- its answer from 'runDeonticLimited', which passes it through here before it
+-- returns, so a change here changes REST, MCP @tools/call@, the MCP task path
+-- and a batch case together, and the verdict cannot differ between them.
+--
+-- It is the identity today. It is one function so that a runtime that does not
+-- want a client to see the residual contract (Meng, 2026-10-26: "we may
+-- optionally not want to return the residual contract because certain runtimes
+-- may say that some clients don't have a right to know the contract details --
+-- it's a black box to them", DEONTIC-TRACE-API-SPEC Q6) can have that in one
+-- place. Not ruled, and not built here: who decides, what a withheld answer
+-- looks like, and whether FULFILLED and BREACH stay visible.
+--
+-- What is the residual, as the service emits it: the fields of an OBLIGATION and
+-- the operands of an AND or OR in 'fnResult', and, with a trace, the 'reasoning'
+-- tree and the 'graphviz' source. All of them are fields of the one value this
+-- takes, so they pass through together; the response shapes are unchanged.
+presentDeonticAnswer :: ResponseWithReason -> ResponseWithReason
+presentDeonticAnswer = id
+
 -- | Replay a trace against a DEONTIC function, under the service's time and
 -- allocation limits.
 --
@@ -116,7 +137,7 @@ runDeonticLimited
   -> Presumption
   -> IO (Either (LimitHit, Int64) (Either EvaluatorError ResponseWithReason, Int64))
 runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presumption =
-  withEvalLimits cfg $ runExceptT $ case vf.fnCompiled of
+  withEvalLimits cfg $ runExceptT $ fmap presentDeonticAnswer $ case vf.fnCompiled of
     Nothing -> throwE (InterpreterError noDeonticModule)
     Just compiled ->
       evaluateWithCompiledDeontic
