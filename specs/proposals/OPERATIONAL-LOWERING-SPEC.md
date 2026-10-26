@@ -20,7 +20,8 @@ WPO6 (the MCP write tools, D-O13; Meng's GUESTBOOK, 2026-10-26) is built on this
 Its ten tests in `jl4-service/test/LedgerMcpSpec.hs` pass on the working tree before it was committed, with the service built under `-Wall -Werror`, and five mutations of `jl4-service/src/Ledger/Mcp.hs` each made at least one of them fail: dropping the party check, dropping the flag check on a call, making a decided-against call not strict, defaulting the idempotency key, and dropping the check on an argument name that clashes with the call's own.
 The tools are off unless the service is given `--ledger-mcp-write`, and the caller's party is the `X-L4-Party` header, which is assumed and not ruled and is a claim and not an authentication.
 Every dinner fixture has `PARTY World` for every act, so the scoping separates parties only on `jl4/examples/explore/ledger/two-party.l4`, written for these tests.
-No gate has been run on this branch since WPO6 was added; the code that decides which acts a party may perform (`jl4-core/src/L4/Ledger/Offer.hs`) is tested only through the service, and only on the dinner and two-party fixtures.
+`etc/verify-branch.sh --quick` passed on this branch at `9b00862b1` (2026-10-26): `cabal build all`, `l4-cli-test` 628 examples, `jl4-core-test` 1581, `jl4-service-test` 729 (the earlier 719 and the ten new), the service restart probe, the corpus-golden and canon checks, `doc/test-docs.sh --no-l4`, prettier 3.4.2 and the commit trailers; a pass of that script is not a green CI.
+The code that decides which acts a party may perform (`jl4-core/src/L4/Ledger/Offer.hs`) is tested only through the service, and only on the dinner and two-party fixtures.
 It becomes true when the work packages of §9 are merged and the acceptance items of §8 are green.
 Companion to `REGULATIVE-LOWERING-SPEC.md` (the verification lowering), which it depends on at one point (§4) and shares its fixtures with (§7).
 Written one sentence per line.
