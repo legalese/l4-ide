@@ -121,13 +121,13 @@ A generic library function ("is some default continuing?") would need a variable
 But the traps are all silent, and a tutorial that has to warn about silent traps is teaching around missing features rather than a pattern.
 Three go away with rulings made or pending, and the fourth with the targeted idiom, **not** with a waiver primitive:
 
-| trap                        | goes away with                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1, a later waiver is read   | N12 (open): a `RECALL` inside a contract reads as of its own instant, and the latest by instant, not by log position                       |
-| 2, party-asserted time      | N4 (answered, spelling not chosen): a name for the contract instant, so ``COMMIT `waived at` IS THE INSTANT`` takes no time from the party |
-| 3, reader before writer     | not cured: N12 rule (4) and N10's run-time check make it a loud error; N10's lockstep option would make it right                           |
-| 4, untargeted waiver        | the targeted idiom today (`waiver-targeted.l4`); for reads of the norm log, N2's address with argument patterns                            |
-| Step 1's cooperating author | the norm log itself (N1–N8), which records the failure and the cure without the loan's author                                              |
+| trap                        | goes away with                                                                                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1, a later waiver is read   | N12 (its instants held 2026-10-26 and re-posed with N10's goal A): a `RECALL` inside a contract reads as of its own instant, and the latest by instant, not by log position |
+| 2, party-asserted time      | N4 (answered, spelling not chosen): a name for the contract instant, so ``COMMIT `waived at` IS THE INSTANT`` takes no time from the party                                  |
+| 3, reader before writer     | not cured: N12 rule (4) and N10's run-time check make it a loud error; N10's lockstep option would make it right                                                            |
+| 4, untargeted waiver        | the targeted idiom today (`waiver-targeted.l4`); for reads of the norm log, N2's address with argument patterns                                                             |
+| Step 1's cooperating author | the norm log itself (N1–N8), which records the failure and the cure without the loan's author                                                                               |
 
 So the evidence supports Meng's conservative instinct.
 A `WAIVE` primitive is not what makes waiver hard; the contract instant, as-of reads and operand order are, and naming the target is a habit the idiom can teach.
