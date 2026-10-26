@@ -697,6 +697,8 @@ Not in Phase 1. The `/evaluation/batch` endpoint evaluates the same function acr
 A case carries its own `startTime` and `events` among its attributes.
 Before this, a batch case and an MCP call to a `DEONTIC` function dropped both fields without an error and answered the contract's initial obligation.
 **Assumed, not ruled:** a case or a call with no `startTime`, or no `events`, is refused with the message `/evaluation` gives, instead of being answered with the initial obligation.
+**Assumed, not ruled:** over MCP the record fields of an event's `party` and `action` are read as `tools/list` spells them (sanitized) and mapped back to the rule's names, as an input's are, and a name that is not a sanitized one is read as sent; on `/evaluation` and in a batch the names are read as sent.
+**Assumed, not ruled:** a batch case whose evaluation raises an exception of the service's own, which is neither a limit nor something the case said, is an `@error` that says the case could not be evaluated, and the cases beside it are answered; the exception is in the service log and not in the answer.
 
 Q6, on the schema the service publishes for the answer of a `DEONTIC` function, was ruled on `unstable` (legalese/l4-ide#756) and is not in this file; it reaches `main` only when a wave carries #756.
 What it asks of the code is here: whatever a runtime withholds from a client is withheld in one place, `DeonticTrace.presentDeonticOutcome`, the identity today.

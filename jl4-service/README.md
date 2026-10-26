@@ -273,6 +273,7 @@ Over MCP the refusal is an error result (`isError`) whose text is the body of `/
 That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
 The field names inside an event's party or action are read as sent on `/evaluation` and in a batch.
 Over MCP they are read as `tools/list` spells them, as an input's are: a field the rule calls `full name` is `full-name` in the schema, and is mapped back to the rule's name, and a name that is not a sanitized one is read as it was sent.
+That is **assumed, not ruled**: the rulings of 2026-10-26 do not cover it.
 A time is a number and may be written with a decimal point: `0.0`, `0.05` and `12345678.5` are read as written.
 A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list`, the explorer and the WebMCP page show it as one.
 Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.
@@ -321,6 +322,7 @@ An answered case carries the function's result under `value`.
 A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
 A case for a `DEONTIC` function carries its own `startTime` and `events`, and its `value` is the contract after them; a case without them is an `@error` (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
 A case whose evaluation fails on the service's own fault, and not on a limit or on what the case said, is an `@error` too: it says the case could not be evaluated, the details are in the service log, and the cases beside it are answered.
+That wording and that treatment are **assumed, not ruled**.
 That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is refused in a batch and answered as text in a single request.
 A case that runs past `--eval-timeout` or `--max-eval-memory-mb` is not returned this way: it fails the whole batch with `500`, and no case comes back.
 Every case of a batch starts at once on one core, so each case's clock also counts the other cases' work, and a large batch of quick cases can fail this way: measured 2026-10-07 with `--eval-timeout 3`, 10 cases of a rule that answers a single request in about 0.12 s all answer, and 40 fail the batch.
