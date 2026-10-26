@@ -744,6 +744,13 @@ MCP `tools/call`, the MCP task path and a batch case dropped the fields and answ
 
 - On MCP and in a batch the trace and the inputs share a level, so a field is a trace only when it is named `startTime` or `events` and is not one of the function's inputs.
 - A `null` is a field left out, as it is on `/evaluation`.
+- An `arguments` on a function that is not `DEONTIC` is left out unless the function has an input of that name, which is then an input as any other (found in review, 2026-10-27: MCP left it out always, so such an input was never read there, and the tool listed it as required and then called it missing).
+  The `DEONTIC` branches are as they were.
+
+**Known limit:** a `DEONTIC` function with an input of its own called `arguments`.
+The tool's schema nests the inputs under `arguments`, so on MCP that input is sent as `{"arguments": {"arguments": ...}}`, which is read.
+A call that sends the inputs flat, which is read for a `DEONTIC` function with no `arguments` object, loses it, because `buildMcpCall` leaves a top-level `arguments` out of a flat read, and one that sends it as an object is taken for the envelope.
+Read from `buildMcpCall`, not run.
 
 ---
 
