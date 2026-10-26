@@ -32,3 +32,17 @@ export function isDeonticFunction(fn: MaybeDeontic): boolean {
     returnType.startsWith('DEONTIC') || returnType.startsWith('PROVISION OF')
   )
 }
+
+/**
+ * Whether the deploy sidebar strips the envelope before it diffs a function's
+ * local interface against the deployed one: when either side says the function
+ * is deontic. The deployed side carries the envelope and the local one does
+ * not, so the diff has to remove it from both or report it as a removed
+ * parameter. This is the whole decision, so that the sidebar page only calls it.
+ */
+export function takesDeonticEnvelope(
+  remote: MaybeDeontic,
+  local: MaybeDeontic
+): boolean {
+  return isDeonticFunction(remote) || isDeonticFunction(local)
+}

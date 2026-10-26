@@ -5,7 +5,7 @@
  *  Svelte component and has no rig; it calls this and nothing else to decide. */
 import { test, describe } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { isDeonticFunction } from 'jl4-client-rpc'
+import { isDeonticFunction, takesDeonticEnvelope } from 'jl4-client-rpc'
 
 describe('isDeonticFunction', () => {
   test('is the flag when there is one', () => {
@@ -52,5 +52,46 @@ describe('isDeonticFunction', () => {
       assert.equal(isDeonticFunction({ returnType: 'LIST OF NUMBER' }), false)
       assert.equal(isDeonticFunction({}), false)
     })
+  })
+})
+
+describe('takesDeonticEnvelope', () => {
+  test('strips when the deployed side says deontic, by its flag', () => {
+    assert.equal(
+      takesDeonticEnvelope(
+        { isDeontic: true, returnType: 'PROVISION OF Driver, `Driver Action`' },
+        { isDeontic: false }
+      ),
+      true
+    )
+  })
+
+  test('strips when the local side says deontic and the deployed one has no flag or name to go on', () => {
+    // a PROVISION OF function: the local flag comes from the type, and an
+    // older deployment has neither a flag nor a name that begins with DEONTIC
+    assert.equal(
+      takesDeonticEnvelope({ returnType: 'BOOLEAN' }, { isDeontic: true }),
+      true
+    )
+  })
+
+  test('strips for a deployment with no flag whose name is PROVISION OF', () => {
+    assert.equal(
+      takesDeonticEnvelope(
+        { returnType: 'PROVISION OF Driver, `Driver Action`' },
+        { isDeontic: false, returnType: 'BOOLEAN' }
+      ),
+      true
+    )
+  })
+
+  test('does not strip when neither side says deontic', () => {
+    assert.equal(
+      takesDeonticEnvelope(
+        { isDeontic: false, returnType: 'BOOLEAN' },
+        { isDeontic: false, returnType: 'BOOLEAN' }
+      ),
+      false
+    )
   })
 })
