@@ -17,6 +17,7 @@ import qualified Version
 import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
+import Ledger.Store.Config (defaultLedgerStoreConfig)
 import Types
 import L4.FunctionSchema (Parameters (..))
 
@@ -4612,7 +4613,7 @@ withPendingService' deployId sources act = withStoreDir (Text.unpack deployId) \
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots Nothing
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -4655,7 +4656,7 @@ withFailedService' deployId sources act = withStoreDir (Text.unpack deployId) \t
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots Nothing
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -4694,7 +4695,7 @@ withServiceFromSources' deployId sources act = withStoreDir (Text.unpack deployI
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots Nothing
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -4736,7 +4737,7 @@ withServiceFromSourcesOpts' opts deployId sources act = withStoreDir (Text.unpac
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots Nothing
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -4787,7 +4788,7 @@ withServiceFromSourcesTVar' deployId sources act = withStoreDir (Text.unpack dep
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots Nothing
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -4884,7 +4885,7 @@ withServicesRestarted' opts deployments editStore act = withStoreDir "restarted"
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger opts tasksReg slots Nothing
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -5069,7 +5070,7 @@ withEmptyService' act = withStoreDir "empty" \tmpPath -> do
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
-  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg slots Nothing
 
   mgr <- newManager defaultManagerSettings
   testWithApplication (pure $ app env) \port -> do
@@ -5295,6 +5296,8 @@ testOptions = Options
   , maxLadderNodes = 10000
   , checkStore = Nothing
   , checkJson = False
+  , ledgerStore = defaultLedgerStoreConfig
+  , ledgerMaxEvalMemoryMb = 8192
   }
 
 -- | A JSON answer without the numbers the visualizer gave its nodes: the

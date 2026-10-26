@@ -17,6 +17,7 @@
   - [AFTER](reference/regulative/AFTER.md)
   - [What is owed now: `l4 lts`](reference/regulative/lts-list.md)
   - [State graph and `--dominators`](reference/regulative/STATE-GRAPH.md)
+  - [The instance ledger](reference/regulative/ledger.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
 - [Patterns](tutorials/getting-started/common-patterns.md)

@@ -58,6 +58,7 @@ import qualified CliTest.BuildIdentity as BuildIdentity
 import qualified CliTest.BuildVersion as BuildVersion
 import qualified CliTest.Catala as Catala
 import qualified CliTest.DmnBpmn as DmnBpmn
+import qualified CliTest.Ledger as Ledger
 import qualified CliTest.Docassemble as Docassemble
 import qualified CliTest.OpenFisca as OpenFisca
 import qualified CliTest.Yscript as Yscript
@@ -562,6 +563,7 @@ main = do
          , Docassemble.fixtures
          , Catala.fixtures
          , BuildIdentity.fixtures
+         , Ledger.fixtures
          ]) \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
@@ -3932,6 +3934,7 @@ spec bin = do
   Catala.spec bin
   BuildVersion.spec bin
   BuildIdentity.spec
+  Ledger.spec bin
   where
     for_ xs f = mapM_ f xs
 

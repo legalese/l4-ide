@@ -8,6 +8,18 @@ source-repository head
   type: git
   location: https://github.com/legalese/l4-ide/tree/main/jl4-service
 
+-- Off by default because postgresql-simple links libpq dynamically, and the
+-- binaries this repository ships do not carry it: the Dockerfile's runtime
+-- stage installs no libpq, and main-tag.yml builds the published Linux
+-- jl4-service after installing only pkg-config, liblzma-dev and libgmp-dev,
+-- so every machine that runs it would need libpq too. The sqlite default
+-- needs nothing: direct-sqlite compiles sqlite in. Without the flag,
+-- `--ledger-store postgres` refuses to start, naming it.
+flag postgres
+  description: Build the Postgres adapter of the instance ledger's store (Ledger.Store.Postgres). Needs libpq at build and run time.
+  default: False
+  manual: True
+
 common defaults
   default-language: GHC2021
   ghc-options:
@@ -61,6 +73,13 @@ library
     EvalLimits
     FileBrowser
     ExplorerPage
+    Ledger
+    Ledger.Mcp
+    Ledger.Service
+    Ledger.Store.Config
+    Ledger.Store.Postgres
+    Ledger.Store.Sql
+    Ledger.Store.Sqlite
     Logging
     McpServer
     OpenApiDoc
@@ -95,6 +114,8 @@ library
     async,
     deepseq,
     stm,
+    -- The instance ledger's default store (bundles its own sqlite)
+    sqlite-simple,
     -- Crypto / archiving
     cryptohash-sha256,
     zip-archive,
@@ -112,6 +133,10 @@ library
     time,
     transformers,
     uuid,
+
+  if flag(postgres)
+    build-depends: postgresql-simple
+    cpp-options: -DLEDGER_POSTGRES
 
 executable jl4-service
   import: defaults
@@ -139,6 +164,9 @@ test-suite jl4-service-test
     DecisionQueryCacheKeySpec
     DeploymentIdSpec
     IntegrationSpec
+    LedgerMcpSpec
+    LedgerRoutesSpec
+    LedgerStoreSpec
     LoggingSpec
     MaybeLiftSpec
     PutGuardSpec
@@ -177,6 +205,7 @@ test-suite jl4-service-test
     jl4-query-plan,
     jl4-service,
     lsp-types,
+    optparse-applicative,
     QuickCheck,
     quickcheck-instances,
     servant >=0.20.2 && <0.21,

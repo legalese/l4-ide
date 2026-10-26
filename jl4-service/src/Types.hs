@@ -60,6 +60,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 import GHC.Generics (Generic)
+import Ledger.Service (LedgerService)
 import Logging (Logger)
 import Options (Options (..))
 import Servant (FromHttpApiData, Handler, ToHttpApiData)
@@ -673,6 +674,12 @@ data AppEnv = MkAppEnv
   -- with affinity.
   , batchSlots         :: BatchSlots
   -- ^ How many batch cases may run at once, across every batch in flight.
+  , ledger             :: Maybe LedgerService
+  -- ^ The instance ledger (OPERATIONAL-LOWERING-SPEC §9 WPO3), written
+  -- only by its own routes ("Ledger") and read besides only by its own MCP
+  -- tool ("Ledger.Mcp"). 'Nothing' when the service runs without one, as
+  -- most tests do: the decision routes and the decision tools never read
+  -- it.
   }
 
 -- | The batch slots: one per capability ('newBatchSlots'), shared by every

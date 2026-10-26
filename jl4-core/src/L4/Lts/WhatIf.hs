@@ -79,6 +79,10 @@ module L4.Lts.WhatIf
   , tryCandidate
   , confirmTick
   , confirmAct
+  , confirmProposed
+  , eventTaken
+  , classify
+  , afterCommonPrefix
   , Verdict (..)
   , PassOver (..)
   , Outcome (..)
@@ -584,35 +588,59 @@ tryCandidate rig tr pos cand = case cand.cdHypothetical of
 -- concluding.
 confirmAct :: CandidateKind -> [DeonticStep] -> Verdict -> Verdict
 confirmAct kind steps verdict = case (kind, verdict) of
-  (ActBy n, Advancing _) | not (any took steps) -> PassedOver (reasonFor n)
+  (ActBy n, Advancing _) | not (eventTaken steps) -> PassedOver (reasonFor n)
   _ -> verdict
   where
-    took s = case s.dsOutcome of
-      Matched _       -> True
-      Expired _ _     -> True
-      Breached _      -> True
-      JoinReleased    -> True
-      JoinExpired _ _ -> True
-      JoinFailed _    -> True
-      JoinStalled     -> True
-      Joined _ _      -> False
-      Waiting         -> False
-      PartyMismatch   -> False
-      ActionMismatch  -> False
-      GuardFailed     -> False
-      EarlyAct _      -> False
     reasonFor n =
       let atSite = [ (k, s) | s <- steps, Just k <- [s.dsNorm], k.nkSite == n.lnSite ]
           own = case n.lnBearer of
             KnownParty name -> [ s | (k, s) <- atSite, k.nkBearerName == Just name ]
             UnforcedParty _ -> map snd atSite
-      in fromMaybe NoTaker (listToMaybe (mapMaybe reason own <> mapMaybe reason (map snd atSite) <> mapMaybe reason steps))
-    reason s = case s.dsOutcome of
-      GuardFailed    -> Just GuardFalse
-      EarlyAct open  -> Just (TooEarly open)
-      ActionMismatch -> Just WrongAct
-      PartyMismatch  -> Just WrongParty
-      _              -> Nothing
+      in fromMaybe NoTaker (listToMaybe (mapMaybe passOverReason own <> mapMaybe passOverReason (map snd atSite) <> mapMaybe passOverReason steps))
+
+-- | 'confirmAct' for an act that is not a candidate: one proposed from
+-- outside, whose obligation nobody named in advance (the operational
+-- ledger's @appendIf@, OPERATIONAL-LOWERING-SPEC §3.2). The same rule —
+-- an 'Advancing' whose steps took nothing is 'PassedOver' — with the
+-- reason read from the first step that carries one, in the machine's
+-- order, since there is no candidate site or bearer to narrow it by.
+-- Under an @RAND@ or an @EVERY@ that first reason can be another norm's,
+-- which 'confirmAct' avoids by the candidate's site; a caller with a
+-- candidate in hand should use 'confirmAct'.
+confirmProposed :: [DeonticStep] -> Verdict -> Verdict
+confirmProposed steps verdict = case verdict of
+  Advancing _ | not (eventTaken steps) ->
+    PassedOver (fromMaybe NoTaker (listToMaybe (mapMaybe passOverReason steps)))
+  _ -> verdict
+
+-- | Did any of these steps take the event: match it, expire on it, breach
+-- on it, or conclude an @EVERY@ join? 'confirmAct' and 'confirmProposed'
+-- both read pass-over as "none did". A 'Joined' step does not count; see
+-- 'confirmAct'.
+eventTaken :: [DeonticStep] -> Bool
+eventTaken = any \ s -> case s.dsOutcome of
+  Matched _       -> True
+  Expired _ _     -> True
+  Breached _      -> True
+  JoinReleased    -> True
+  JoinExpired _ _ -> True
+  JoinFailed _    -> True
+  JoinStalled     -> True
+  Joined _ _      -> False
+  Waiting         -> False
+  PartyMismatch   -> False
+  ActionMismatch  -> False
+  GuardFailed     -> False
+  EarlyAct _      -> False
+
+-- | Why a step passed its event over, when it says.
+passOverReason :: DeonticStep -> Maybe PassOver
+passOverReason s = case s.dsOutcome of
+  GuardFailed    -> Just GuardFalse
+  EarlyAct open  -> Just (TooEarly open)
+  ActionMismatch -> Just WrongAct
+  PartyMismatch  -> Just WrongParty
+  _              -> Nothing
 
 -- | The bound act's self-check; see 'tryCandidate' and 'BoundAct'. An act
 -- completed with a witness is being asked about a SET, and everything the
