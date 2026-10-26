@@ -98,7 +98,7 @@ ledgerToolName = "what-may-I-do-now"
 ledgerToolDefinition :: Aeson.Value
 ledgerToolDefinition = Aeson.object
   [ "name" .= ledgerToolName
-  , "description" .= ("Contract instance ledger: what may be done now on a running contract instance, and, given an act, what it would do if it were proposed now. Advisory: the answer is computed at the head it names, outside the ledger's compare-and-append, and this tool appends nothing. To act, POST the act to /deployments/{deployment}/instances/{instance}/events with decidedAgainst set to that head, or, where the service has them on, call one of the act-* write tools (see writeTools in the answer); the ledger decides there, against the head that is current when the act arrives." :: Text)
+  , "description" .= ("Contract instance ledger: what may be done now on a running contract instance, and, given an act, what it would do if it were proposed now, including the official-record writes (commits) it would make. Advisory: the answer is computed at the head it names, outside the ledger's compare-and-append, and this tool appends nothing. To act, POST the act to /deployments/{deployment}/instances/{instance}/events with decidedAgainst set to that head, or, where the service has them on, call one of the act-* write tools (see writeTools in the answer); the ledger decides there, against the head that is current when the act arrives." :: Text)
   , "inputSchema" .= Aeson.object
       [ "type" .= ("object" :: Text)
       , "properties" .= Aeson.object
@@ -358,7 +358,7 @@ writeToolDefinition :: WriteTool -> Aeson.Value
 writeToolDefinition t = Aeson.object
   [ "name" .= t.toolName
   , "description" .= ("Propose the act `" <> t.act.constructor <> "` as " <> t.act.party
-      <> " on a contract instance's ledger. The ledger decides it against the true head, not against what you last read, and answers appended, refused, conflict or unknown, with the row, the head and any ticks it appended first. Only appended puts your act on the record. After a lost reply, call again with the same idempotencyKey: the first answer is read back and nothing more is appended. With decidedAgainst, the call is strict: it is a conflict if the head has moved since. The party is the one this connection is for and cannot be given here." :: Text)
+      <> " on a contract instance's ledger. The ledger decides it against the true head, not against what you last read, and answers appended, refused, conflict or unknown, with the row, the head and any ticks it appended first. Appended means your attempt was recorded on the ledger, not that it did what you meant: the reply's commits lists what the step wrote to the official record, and is empty when it wrote nothing there, so read it and not only the result. A call that finds its idempotencyKey already used reads the first answer back and leaves commits out, because that step is not replayed. After a lost reply, call again with the same idempotencyKey: the first answer is read back and nothing more is appended. With decidedAgainst, the call is strict: it is a conflict if the head has moved since. The party is the one this connection is for and cannot be given here." :: Text)
   , "inputSchema" .= Aeson.object
       [ "type" .= ("object" :: Text)
       , "properties" .= Aeson.object

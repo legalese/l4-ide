@@ -33,6 +33,7 @@ module LedgerRoutesSpec
   , bobBuys
   , buy
   , commitsDinner
+  , commitsOf
   , dinnersAtHead
   ) where
 
@@ -232,6 +233,13 @@ str k v = case field k v of
   Just (Aeson.String t) -> Just t
   _ -> Nothing
 
+-- | What a reply says the step committed to the official record, as cells
+-- and values; 'Nothing' when the reply has no @commits@ at all.
+commitsOf :: Aeson.Value -> Maybe [(Text, Text)]
+commitsOf v = case field "commits" v of
+  Just (Aeson.Array xs) -> Just [ (c, x) | e <- toList xs, Just c <- [str "cell" e], Just x <- [str "value" e] ]
+  _ -> Nothing
+
 commitsDinner :: Aeson.Value -> Bool
 commitsDinner v = any (Text.isPrefixOf "COMMIT `dinners bought`") (texts "wrote" v)
 
@@ -279,12 +287,16 @@ protocolSpec dinner = describe "the dinner protocol of §6, over HTTP, against t
       withService dir clk [("dinner", dinner)] \ s -> do
         (code1, r1) <- at s 64800 (create s "dinner" "evening-a")
         (code1, str "result" r1, int "seq" r1, str "store" r1) `shouldBe` (201, Just "appended", Just 1, Just "sqlite")
+        -- the opening commits that dinner is unbought, and says so
+        commitsOf r1 `shouldBe` Just [("dinner status record", "opened")]
         outcome <$> at s 65100 (propose s "dinner" "evening-a" "a2" check) `shouldReturn` (200, Just "appended", Just 2)
         (_, r3) <- at s 65160 (propose s "dinner" "evening-a" "a3" bobBuys)
         (int "seq" r3, "COMMIT `dinner status record` IS taken" `elem` texts "wrote" r3) `shouldBe` (Just 3, True)
         (code4, r4) <- at s 65220 (propose s "dinner" "evening-a" "a4" buy)
         (code4, int "seq" r4, texts "wrote" r4) `shouldBe`
           (200, Just 4, ["RECORD Alice's `belief` IS taken", "RECORD Alice's `plan` IS stopped"])
+        -- "appended" with no error, and nothing committed: a recorded attempt, not a purchase
+        (str "result" r4, field "applied" r4, commitsOf r4) `shouldBe` (Just "appended", Just (Aeson.Bool True), Just [])
         (field "row" r4 >>= field "at") `shouldBe` Just (Aeson.Number 65220)
         (codeP, p) <- position s "dinner" "evening-a"
         (codeP, int "head" p, dinnersAtHead p) `shouldBe` (200, Just 4, 0)
@@ -299,11 +311,14 @@ protocolSpec dinner = describe "the dinner protocol of §6, over HTTP, against t
         _ <- at s 65100 (propose s "dinner" "evening-b" "b2" check)
         (code3, r3) <- at s 65130 (propose s "dinner" "evening-b" "b3" buy)
         (code3, int "seq" r3, commitsDinner r3) `shouldBe` (200, Just 3, True)
+        commitsOf r3 `shouldBe` Just [("dinners bought", "`dinner for two`"), ("open at acceptance", "TRUE")]
         (_, r4) <- at s 65160 (propose s "dinner" "evening-b" "b4" bobBuys)
         (int "seq" r4, commitsDinner r4) `shouldBe` (Just 4, False)
         -- a retry after a lost reply reads done, at the same seq, replaying nothing
         (codeR, rR) <- at s 65170 (propose s "dinner" "evening-b" "b3" buy)
         (codeR, int "seq" rR, field "replayed" rR) `shouldBe` (200, Just 3, Just (Aeson.Bool False))
+        -- the step is not replayed, so what it committed is unknown: the field is absent, not []
+        field "commits" rR `shouldBe` Nothing
         (_, mid) <- position s "dinner" "evening-b"
         (int "head" mid, dinnersAtHead mid, field "terminal" mid) `shouldBe` (Just 4, 1, Just (Aeson.Bool False))
         -- past closing, an act is preceded by the tick that is due, and the

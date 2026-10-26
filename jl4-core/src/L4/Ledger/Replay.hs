@@ -38,6 +38,7 @@ module L4.Ledger.Replay
   , failureText
     -- * Reading a replay's ledgers
   , officialCount
+  , Commit (..)
   ) where
 
 import Base
@@ -104,6 +105,8 @@ data Replayed = MkReplayed
     -- words @l4 run@ prints, without the provenance stamp
   , headOfficial  :: ![Text]
     -- ^ the official record's entries alone
+  , headCommits   :: ![Commit]
+    -- ^ the same entries, as cells and values
   , headTerminal  :: !Bool
     -- ^ the head is already @FULFILLED@ or @BREACHED@
   , headDeadlines :: ![(Rational, Rational)]
@@ -125,8 +128,22 @@ data EventOutcome = MkEventOutcome
     -- parties' own, then the official record), in 'ledgerLines'' words
   , ledger   :: ![Text]
   , official :: ![Text]
+  , commits  :: ![Commit]
+    -- ^ the official record's entries the event's step appended, and only
+    -- those: 'wrote' less the parties' own ledgers, but as cells and values
+    -- and not as the words @l4 run@ prints, so that nobody has to read a
+    -- line to learn what was committed
   }
   deriving stock (Show, Generic)
+  deriving anyclass NFData
+
+-- | One entry the official record gained: the cell, as its name without
+-- quoting, and the value in the words 'wrote' gives it.
+data Commit = MkCommit
+  { cell  :: !Text
+  , value :: !Text
+  }
+  deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 
 -- | The generated module, checked, with the two directives the replays use.
@@ -162,6 +179,7 @@ replay cfg bound dep rows mextra =
               [ (d, t) | MkCandidate {cdKind = TickPast d _, cdHypothetical = Right (Tick t)} <- cands ]
             headLines = ledgerLines pos.posResult.ledger
             headOff = officialLines pos.posResult.ledger
+            headCommitted = officialEntries pos.posResult.ledger
         case rowVerdictOf headVerdict of
           Left why -> pure (Left (Undecided why))
           Right headRowVerdict -> do
@@ -182,6 +200,7 @@ replay cfg bound dep rows mextra =
                     , wrote = writtenLines pos.posResult.ledger after.posResult.ledger
                     , ledger = ledgerLines after.posResult.ledger
                     , official = officialLines after.posResult.ledger
+                    , commits = officialWrites pos.posResult.ledger after.posResult.ledger
                     }
             case sequence mout of
               Left f -> pure (Left f)
@@ -190,6 +209,7 @@ replay cfg bound dep rows mextra =
                 , headSteps = pos.posSteps
                 , headLedger = headLines
                 , headOfficial = headOff
+                , headCommits = headCommitted
                 , headTerminal = terminal
                 , headDeadlines = deadlines
                 , outcome = out
@@ -368,6 +388,19 @@ writtenLines before after =
   , e <- drop held (DList.toList led) ]
   <> [ "COMMIT " <> entry e
      | e <- drop (length (DList.toList before.officialLedger)) (DList.toList after.officialLedger) ]
+
+-- | The entries the official record gained between two runs of a ledger,
+-- as 'writtenLines' counts them: a suffix, the record being append-only.
+officialWrites :: LedgerStore -> LedgerStore -> [Commit]
+officialWrites before after =
+  [ commitOf e | e <- drop (length (DList.toList before.officialLedger)) (DList.toList after.officialLedger) ]
+
+-- | Every entry the official record holds.
+officialEntries :: LedgerStore -> [Commit]
+officialEntries store = [ commitOf e | e <- DList.toList store.officialLedger ]
+
+commitOf :: LedgerEvent -> Commit
+commitOf (Assign path val _) = MkCommit {cell = Text.intercalate "'s " path, value = prettyLayout val}
 
 entry :: LedgerEvent -> Text
 entry (Assign path val _) = pathText path <> " IS " <> prettyLayout val

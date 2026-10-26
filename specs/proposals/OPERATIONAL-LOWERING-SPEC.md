@@ -344,6 +344,9 @@ The text above each ruling is the proposal as it stood when marked, re-skinned a
   - **Each call is `appendIf` on the true head**, the function the events route calls, under the same limits, and the agent's own evaluation is not used.
   - **The idempotency key is required**, with no default; a `decidedAgainst` head is optional, and giving it makes the proposal strict.
   - **The reply is the events route's own**: `appended`, `refused`, `conflict` or `unknown`, with `seq`, `head` and `ticks`.
+    An `appended` reply, on this route and the events route alike, also carries `commits`: the entries the step wrote to the official record, as cells and values, empty when it wrote none (Meng's RECEIPT, 2026-10-26; the name and shape are assumed, not ruled).
+    `appended` says the attempt was recorded, not that it did what the proposer meant: a late buy that the contract's own step blocks is `appended` with `commits` empty.
+    A retry that finds its key has no `commits`, because its step is not replayed and an empty list would say that nothing was committed.
   - **The party comes from the caller and never from an argument.**
     Until D-O2 it is the request header `X-L4-Party`, set by the client's configuration or by a proxy beside `X-Include-Functions` (assumed, not ruled); it is a claim and not an authentication, as the events route's `party` is.
     With the flag on and no header, no write tool is listed and a call is refused.

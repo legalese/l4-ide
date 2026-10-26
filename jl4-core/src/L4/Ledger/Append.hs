@@ -105,6 +105,13 @@ data Result
       , wrote    :: ![Text]
         -- ^ the ledger entries the act's step appended, as @l4 run@ words
         -- them less the provenance stamp; empty for a retry
+      , commits  :: !(Maybe [Commit])
+        -- ^ the entries of 'wrote' that went to the official record, as
+        -- cells and values; empty when the step committed nothing, which
+        -- is a recorded attempt and not a completed one. 'Nothing' for a
+        -- retry, whose step is not replayed: an empty list there would say
+        -- that nothing was committed of an act that may have committed
+        -- something, so the reply leaves the field out
       , replayed :: !Bool
         -- ^ 'False' when the idempotency key was found: the row is the
         -- original, and nothing was replayed
@@ -163,7 +170,7 @@ createInstance l inst contract = do
             appended <- l.store.appendRow key 1 opening
             pure case appended of
               Left current -> Refused "the instance already exists" current []
-              Right () -> Appended {row = opening, steps = rep.headSteps, wrote = rep.headLedger, replayed = True, ticks = []}
+              Right () -> Appended {row = opening, steps = rep.headSteps, wrote = rep.headLedger, commits = Just rep.headCommits, replayed = True, ticks = []}
   where
     key = instanceKey inst
 
@@ -188,7 +195,7 @@ appendIf l inst p = attempt 0 []
       | otherwise = l.store.readRows key >>= \ case
           [] -> pure NotFound
           rows -> case find (\ r -> r.idempotencyKey == Just p.idempotencyKey) rows of
-            Just original -> pure Appended {row = original, steps = [], wrote = [], replayed = False, ticks = written}
+            Just original -> pure Appended {row = original, steps = [], wrote = [], commits = Nothing, replayed = False, ticks = written}
             Nothing -> fresh n written rows
 
     fresh n written rows0
@@ -243,7 +250,7 @@ appendIf l inst p = attempt 0 []
                           }
                     l.store.appendRow key newRow.seqNo newRow >>= \ case
                       Left _ -> attempt (n + 1) written
-                      Right () -> pure Appended {row = newRow, steps = o.steps, wrote = o.wrote, replayed = True, ticks = written}
+                      Right () -> pure Appended {row = newRow, steps = o.steps, wrote = o.wrote, commits = Just o.commits, replayed = True, ticks = written}
 
     -- The act must read back from its own line as itself, or the line
     -- says something the proposal did not.
