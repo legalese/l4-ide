@@ -10,7 +10,7 @@ Every `file:line` below was read on that tree; a later tree may have moved them.
 ## 0. The one-paragraph thesis
 
 L4 has two ways to say who an obligation falls on: `PARTY e`, an expression that must already have a value, and `EVERY v`, a variable that ranges over a group and makes one obligation per member.
-Neither says *whoever acts*: one obligation, consumed once, whose bearer is the party of the event that matched it, with that party then in scope for the consequence.
+Neither says _whoever acts_: one obligation, consumed once, whose bearer is the party of the event that matched it, with that party then in scope for the consequence.
 The action slot has had exactly this since R1: `MAY act` with `act` unbound is a fresh binder that the matching event fills.
 The subject slot does not, and the gap is one frame in the machine and one constructor in the parser.
 It is the construct the regulative lowering's option C is working around by writing one `World` party and the actor into the action's constructor name, and it is the construct that would let the operational ledger's `party` column hold the real actor.
@@ -272,7 +272,7 @@ Its footgun is the one R1 exists to manage, now in a worse place: `PARTY Alcie M
 It also leaves no room for a cast or a roll without further syntax.
 
 **C: `SOME p`.**
-`SOME` is lexed (`Lexer.hs:275`, `:382`) and unused, but Meng ruled on 2026-09-06 that `SOME m OF` means *at least m* (EVERY-EACH `:777-782`), so `SOME p MAY act` reads as a count and invites the misreading the ruling was written to prevent.
+`SOME` is lexed (`Lexer.hs:275`, `:382`) and unused, but Meng ruled on 2026-09-06 that `SOME m OF` means _at least m_ (EVERY-EACH `:777-782`), so `SOME p MAY act` reads as a count and invites the misreading the ruling was written to prevent.
 Not recommended.
 
 ### 3.2 Semantics, in one frame
@@ -379,11 +379,11 @@ It changes no file but this one and the regulative spec's §1, §4.3 and §10, a
 
 ## 7. Register
 
-| id | deferred | trigger | owed by |
-|---|---|---|---|
-| **D-P1** | `ANY p MUST act`: who is blamed on lapse | NORM-LOG-SPEC N7 being re-ruled | §3.5 |
-| **D-P2** | the §3.4 check extended to `EVERY`, closing `TypeCheck.hs:2865-2872`'s admitted hole | the first corpus file where `EVERY v MUST Act u` with `u ≠ v` is found to be a mistake rather than a procurement | §3.4 |
-| **D-P3** | spelling the bound party as a lifecycle noun through B1's `Lifecycle` constructor | B1 landing on `unstable` | §2.3, R-P1 |
+| id       | deferred                                                                             | trigger                                                                                                          | owed by    |
+| -------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ---------- |
+| **D-P1** | `ANY p MUST act`: who is blamed on lapse                                             | NORM-LOG-SPEC N7 being re-ruled                                                                                  | §3.5       |
+| **D-P2** | the §3.4 check extended to `EVERY`, closing `TypeCheck.hs:2865-2872`'s admitted hole | the first corpus file where `EVERY v MUST Act u` with `u ≠ v` is found to be a mistake rather than a procurement | §3.4       |
+| **D-P3** | spelling the bound party as a lifecycle noun through B1's `Lifecycle` constructor    | B1 landing on `unstable`                                                                                         | §2.3, R-P1 |
 
 ## 8. Evidence
 
