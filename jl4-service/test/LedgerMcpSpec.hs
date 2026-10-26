@@ -124,6 +124,8 @@ decideToBuy s inst = do
   field "appendedOverMcp" answer `shouldBe` Just (Aeson.Bool False)
   let would = field "ifProposedNow" answer
   (would >>= str "result", would >>= field "applied") `shouldBe` (Just "would be appended", Just (Aeson.Bool False))
+  -- what it would commit agrees with what it would write
+  (would >>= commitsOf >>= \ cs -> Just (any ((== "dinners bought") . fst) cs)) `shouldBe` Just (maybe False commitsDinner would)
   pure if maybe False commitsDinner would then headNow answer else Nothing
 
 -- | The agent acting on its decision: the buy, on the events route, naming
@@ -172,6 +174,23 @@ agentSpec dinner = describe "an agent following the tool's answers" do
         texts "wrote" r `shouldBe` ["RECORD Alice's `belief` IS taken", "RECORD Alice's `plan` IS stopped"]
         (_, p) <- position s "dinner" "a"
         dinnersAtHead p `shouldBe` 0
+
+  it "previews the commits that the append then makes, at the same head: Sequence B's buy lists them, Sequence A's late buy lists none" do
+    withStoreDir "ledger-mcp-preview-commits" \ dir -> do
+      clk <- newIORef 0
+      withService dir clk [("dinner", dinner)] \ s -> do
+        evening s "pb"
+        (_, askedB) <- at s 65130 (askTool s "pb" (Just buy))
+        (_, boughtB) <- at s 65130 (buyAgainst s "pb" [] "pb-buy" (maybe 0 id (headNow askedB)))
+        let previewB = field "ifProposedNow" askedB >>= commitsOf
+        previewB `shouldSatisfy` maybe False (not . null)
+        previewB `shouldBe` commitsOf boughtB
+        evening s "pa"
+        _ <- at s 65160 (propose s "dinner" "pa" "pa-bob" bobBuys)
+        (_, askedA) <- at s 65220 (askTool s "pa" (Just buy))
+        (_, boughtA) <- at s 65220 (buyAgainst s "pa" [] "pa-buy" (maybe 0 id (headNow askedA)))
+        (field "ifProposedNow" askedA >>= commitsOf) `shouldBe` Just []
+        commitsOf boughtA `shouldBe` Just []
 
   it "is refused in Sequence A as a strict proposal too: a 409, and no row" do
     withStoreDir "ledger-mcp-a-strict" \ dir -> do
@@ -386,12 +405,16 @@ writeSpec dinner exchange = do
       let call tool extra = callAs s "World" "dinner" "b" tool extra
       (e2, r2) <- at s 65100 (call "act-Alice-checks-whether-dinner-is-bought" [idemKey "b2"])
       (e2, str "result" r2, int "seq" r2) `shouldBe` (False, Just "appended", Just 2)
+      commitsOf r2 `shouldBe` Just []
       (e3, r3) <- at s 65130 (call "act-Alice-buys-dinner" [idemKey "b3", "ledger-answered" Aeson..= True])
       (e3, int "seq" r3, commitsDinner r3) `shouldBe` (False, Just 3, True)
+      commitsOf r3 `shouldBe` Just [("dinners bought", "`dinner for two`"), ("open at acceptance", "TRUE")]
       (_, r4) <- at s 65160 (call "act-ledger-records-Bob-s-purchase" [idemKey "b4"])
       (int "seq" r4, commitsDinner r4) `shouldBe` (Just 4, False)
       (eR, rR) <- at s 65170 (call "act-Alice-buys-dinner" [idemKey "b3", "ledger-answered" Aeson..= True])
       (eR, int "seq" rR, field "replayed" rR) `shouldBe` (False, Just 3, Just (Aeson.Bool False))
+      -- a retry's step is not replayed: the field is absent, and not [] that would say nothing was committed
+      field "commits" rR `shouldBe` Nothing
       (_, p) <- position s "dinner" "b"
       (int "head" p, dinnersAtHead p) `shouldBe` (Just 4, 1)
 
@@ -406,6 +429,8 @@ writeSpec dinner exchange = do
       headOf s "dinner" "a" `shouldReturn` Just 3
       (eN, rN) <- at s 65221 (call "act-Alice-buys-dinner" [idemKey "a4", "ledger-answered" Aeson..= True])
       (eN, int "seq" rN, commitsDinner rN) `shouldBe` (False, Just 4, False)
+      -- appended, no error, and nothing committed
+      (str "result" rN, commitsOf rN) `shouldBe` (Just "appended", Just [])
       (_, p) <- position s "dinner" "a"
       dinnersAtHead p `shouldBe` 0
 

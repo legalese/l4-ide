@@ -97,7 +97,7 @@ import System.FilePath (takeBaseName, takeExtension)
 
 import L4.API.VirtualFS (extractImportNames, moduleNameToProjectUri)
 import L4.Ledger.Append
-import L4.Ledger.Replay (Deployment (..))
+import L4.Ledger.Replay (Commit (..), Deployment (..))
 import L4.Ledger.Row
 import L4.Ledger.Store (LedgerStore (..))
 import L4.Lts.List (TraceReport (..), reportJson)
@@ -403,8 +403,8 @@ jsonHeader = ("Content-Type", "application/json")
 -- | A 'Result' as a reply.
 resultReply :: Result -> LedgerReply
 resultReply = \ case
-  Appended {row, steps, wrote, replayed, ticks} -> MkLedgerReply 200 (Aeson.object
-    [ "result" .= ("appended" :: Text)
+  Appended {row, steps, wrote, commits, replayed, ticks} -> MkLedgerReply 200 (Aeson.object
+    ([ "result" .= ("appended" :: Text)
     , "applied" .= True
     , "seq" .= row.seqNo
     , "row" .= rowJson row
@@ -412,7 +412,11 @@ resultReply = \ case
     , "ticks" .= map rowJson ticks
     , "replayed" .= replayed
     , "steps" .= length steps
-    ])
+    ]
+    -- @appended@ says the attempt was recorded; @commits@ says what the step
+    -- did to the official record, empty when it did nothing there. It is left
+    -- out of a retry's reply, whose step is not replayed (see 'Appended').
+    <> [ "commits" .= [ Aeson.object ["cell" .= c.cell, "value" .= c.value] | c <- cs ] | Just cs <- [commits] ]))
   Refused {because, headSeq, ticks} -> MkLedgerReply 422 (Aeson.object
     [ "result" .= ("refused" :: Text), "applied" .= False, "because" .= because, "head" .= headSeq
     , "ticks" .= map rowJson ticks ])

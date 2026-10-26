@@ -78,6 +78,7 @@ The routes exist in the long form only, because a short `/{id}/instances` would 
 | `GET`  | `/deployments/{id}/instances/{name}/position` | Says the head, whether the contract is finished, the next deadline, and what is owed, would discharge, or would breach, in the words of `l4 lts`. |
 
 The tool `what-may-I-do-now` takes the `instance`, the `deployment` (left out on a deployment's own endpoint), and optionally a `party` and an `action` to try.
+Given an act, the answer's `ifProposedNow` carries the `commits` the act would make, with `applied` `false`.
 A request that carries `X-Include-Functions: false` or `X-Include-Evaluate: false` is not shown the tool (measured: it is absent from `tools/list` with the second header).
 An instance name is letters, digits, hyphens and underscores, at most 128 of them.
 
@@ -106,7 +107,8 @@ The org-wide endpoint lists none.
 The tool is called `act-` and the act's name with every character that is not a letter, digit, underscore or hyphen turned into a hyphen, so the act `Alice buys dinner` is `act-Alice-buys-dinner`.
 It takes the `instance`, an `idempotencyKey` that is required and has no default, optionally `decidedAgainst`, and one argument for each field of the act, named the same way (the field `ledger answered` is the argument `ledger-answered`).
 Only BOOLEAN, NUMBER and STRING fields are taken.
-Each call is the same function as the events route, `appendIf`, on the true head, and its reply is the events route's reply: `appended`, `refused`, `conflict` or `unknown`, with the row, the head and the ticks.
+Each call is the same function as the events route, `appendIf`, on the true head, and its reply is the events route's reply: `appended`, `refused`, `conflict` or `unknown`, with the row, the head and the ticks, and for `appended` the `commits`.
+The tool's description says what `appended` means, and a reader of the tool result should read `commits` before it concludes that the act took effect.
 The tool result carries `isError` unless the act was appended.
 Giving `decidedAgainst` makes the call strict against the whole head, so it is a `conflict` if anything has been appended since.
 
@@ -168,16 +170,16 @@ Every reply from these routes is JavaScript Object Notation (JSON), and every on
 A `false` can still follow tick rows that the same call appended; they are listed under `ticks`, and "Due ticks survive a refusal" under [Silent](#silent) says what to read.
 Every reply also says which store answered (`store`), and the in-memory store adds a `warning`.
 
-| HTTP status              | `result`                   | `applied` | What it means                                                                                                               |
-| ------------------------ | -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `200` (`201` for create) | `appended`                 | `true`    | The act is now row `seq`. The row's `verdict` says what the rule made of it.                                                |
-| `422`                    | `refused`                  | `false`   | The proposal cannot be an event of this contract, or is malformed. `because` says how.                                      |
-| `422`                    | `not applied`              | `false`   | The deployment failed to compile, or has no single contract file to run.                                                    |
-| `409`                    | `conflict`                 | `false`   | A `strict` proposal whose versioned cell moved since the head it decided against.                                           |
-| `409`                    | `refused`                  | `false`   | Create only: the instance already exists.                                                                                   |
-| `404`                    | `not found`                | `false`   | No such instance. A deployment that does not exist is also `404`, with the result `not applied`.                            |
-| `503`                    | `unknown` or `not applied` | `false`   | The ledger could not decide, or a limit or a failure stopped the request. Nothing was applied, and `Retry-After: 1` is set. |
-| `400`                    | (an `error` text)          |           | The instance name is not one.                                                                                               |
+| HTTP status              | `result`                   | `applied` | What it means                                                                                                                  |
+| ------------------------ | -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `200` (`201` for create) | `appended`                 | `true`    | The act is now row `seq`. The row's `verdict` says what the rule made of it, and `commits` what it did to the official record. |
+| `422`                    | `refused`                  | `false`   | The proposal cannot be an event of this contract, or is malformed. `because` says how.                                         |
+| `422`                    | `not applied`              | `false`   | The deployment failed to compile, or has no single contract file to run.                                                       |
+| `409`                    | `conflict`                 | `false`   | A `strict` proposal whose versioned cell moved since the head it decided against.                                              |
+| `409`                    | `refused`                  | `false`   | Create only: the instance already exists.                                                                                      |
+| `404`                    | `not found`                | `false`   | No such instance. A deployment that does not exist is also `404`, with the result `not applied`.                               |
+| `503`                    | `unknown` or `not applied` | `false`   | The ledger could not decide, or a limit or a failure stopped the request. Nothing was applied, and `Retry-After: 1` is set.    |
+| `400`                    | (an `error` text)          |           | The instance name is not one.                                                                                                  |
 
 A row holds the act (`event`), the two times (`at` and `txTime`, see [The clock](#the-clock)), the `verdict`, the head the proposer says it decided against (`decidedAgainst`), the retry key, and the `ruleVersion`, which is the deployment version the row was appended under.
 The `verdict` is one of four: `discharging` (the contract ended fulfilled), `breaching` (it ended in breach, naming the party), `advancing` (it moved to another position) and `passed over` (no obligation in force took the act, and `because` says why).
@@ -187,6 +189,16 @@ No per-deployment list of acts to refuse is built.
 The reply to an append also has `wrote`, the entries the act's own step added to the contract's ledgers, in the words `l4 run` uses; `ticks`, the tick rows this call appended before the act, oldest first; and `steps`, how many rule steps the act caused.
 A `refused`, `conflict` or `unknown` reply has `ticks` too, because the ticks are appended before the act is looked at: the list is empty when no deadline was due.
 A reply that comes from a limit or a failure rather than from the ledger (`not applied`, `not found`) has none.
+
+The reply to an append also has `commits`, the part of `wrote` that went to the official record, as a list of `cell` and `value`.
+`appended` says the attempt was recorded as a row, and nothing more.
+A late buy that the contract's own step blocks is `appended` too, with `applied` `true` and status `200`, and its `commits` is the empty list.
+An agent that wants to know whether its act did what it meant reads `commits`, and not the status.
+`commits` says what the step wrote to the official record, and cannot say whether that was what the agent was after, because a contract may commit a refusal as readily as an acceptance; the agent looks for the cell it wanted.
+It covers the act's own step only: the tick rows under `ticks` are rows, and do not list what they wrote.
+The reply that creates an instance has it too, and lists what the opening committed.
+Measured over HTTP, over MCP and in the library on the dinner: Sequence A's late buy is row 4, `appended`, `commits` empty; Sequence B's buy lists the cells `dinners bought` and `open at acceptance`; the opening lists `dinner status record`.
+In the library test alone, Bob's purchase lists `dinner status record` as well.
 
 ### Refused
 
@@ -202,6 +214,8 @@ The ledger looks the retry key up before it replays anything.
 On a hit it returns the original row, with `replayed` set to `false` and the same `seq`, so a retry after a lost reply reads "done", never "forbidden" (measured, and measured again after a restart).
 A retry is always safe to send.
 If the first try wrote the row, the retry reads it back; if it did not, the retry appends it.
+The reply to a retry that finds its key has no `commits` at all: its step is not replayed, so what it committed is not known, and an empty list would say that nothing was committed.
+To learn what the first try committed, keep the first reply, or read the position.
 
 ### Strict proposals
 
@@ -299,10 +313,13 @@ The silent ones are the ones to build around.
 ### Silent
 
 - **An `appended` that is not a yes.** The ledger records every act that evaluates, so a blocked purchase, an act no obligation took (`passed over`), and a breach are all `200`.
-  Read the verdict and the `wrote` list, not the status.
+  Read the verdict and the `wrote` list, not the status; `commits` is the part of `wrote` that went to the official record, empty for a blocked purchase.
   The MCP tool says `would be appended` in the same way.
   A write tool is the same: an act no live obligation takes is appended as `passed over`, with `isError` false.
   Measured: asked about `` `Alice buys dinner` TRUE `` on a finished instance, it said `would be appended`, with verdict `passed over` and nothing written.
+- **A missing `commits` read as an empty one.** A retry that finds its key has no `commits`, and a reader that takes a missing list for an empty one reads a purchase that committed as a purchase that was blocked.
+  Absent means not known; `[]` means the step ran and committed nothing.
+  Tested over HTTP, over MCP and in the library: the retry of Sequence B's buy has no `commits`, and its first try has two.
 - **A proposer that ignores `unknown` and acts anyway.** The ledger answered `503` and appended nothing, and a proposer that reads that as permission and buys outside the ledger has built the race again.
   The right reading is the one the dinner rule already has: pause, and check again.
   Resending the same proposal under the same retry key is safe.

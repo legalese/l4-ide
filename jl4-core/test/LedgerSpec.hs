@@ -16,7 +16,7 @@ module LedgerSpec (spec) where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Monad (forM, forM_)
+import Control.Monad (forM, forM_, when)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Ratio ((%))
 import qualified Data.Text as Text
@@ -152,6 +152,10 @@ history env inst acts = do
 
 commitsDinner :: Result -> Bool
 commitsDinner r = any (Text.isPrefixOf "COMMIT `dinners bought`") r.wrote
+
+-- | What a result says it committed, as the lines @wrote@ would carry.
+commitLines :: Result -> [Text.Text]
+commitLines r = [ "COMMIT `" <> c.cell <> "` IS " <> c.value | Just cs <- [r.commits], c <- cs ]
 
 recordsTaken :: Result -> Bool
 recordsTaken r = "COMMIT `dinner status record` IS taken" `elem` r.wrote
@@ -325,7 +329,10 @@ dinnerSpec deps = describe "appendIf on d3-atomic.l4" do
         recordsTaken r3 `shouldBe` True
         r4.row.event `shouldBe` ActEvent "World" "(`Alice buys dinner` TRUE)"
         r4.wrote `shouldBe` ["RECORD Alice's `belief` IS taken", "RECORD Alice's `plan` IS stopped"]
+        -- appended, and it committed nothing: a recorded attempt, not a purchase
+        r4.commits `shouldBe` Just []
       _ -> expectationFailure "three appends"
+    forM_ rs \ r -> commitLines r `shouldBe` filter (Text.isPrefixOf "COMMIT ") r.wrote
     any commitsDinner rs `shouldBe` False
     pos <- positionNow env inst
     officialCount "dinners bought" pos.ledgerAtHead `shouldBe` 0
@@ -341,9 +348,11 @@ dinnerSpec deps = describe "appendIf on d3-atomic.l4" do
       [_, r3, r4] -> do
         r3.row.seqNo `shouldBe` 3
         r3.wrote `shouldContain` ["COMMIT `dinners bought` IS `dinner for two`", "COMMIT `open at acceptance` IS TRUE"]
+        r3.commits `shouldBe` Just [MkCommit "dinners bought" "`dinner for two`", MkCommit "open at acceptance" "TRUE"]
         r4.row.seqNo `shouldBe` 4
         recordsTaken r4 `shouldBe` True
         commitsDinner r4 `shouldBe` False
+        r4.commits `shouldBe` Just [MkCommit "dinner status record" "taken"]
       _ -> expectationFailure "three appends"
     ticked <- atClock env 75700 (appendDueTicks env.ledgerOf inst)
     case ticked of
@@ -361,11 +370,15 @@ dinnerSpec deps = describe "appendIf on d3-atomic.l4" do
   it "is bitemporal (§3.4, R-O1): a reported act's claimed time is clamped, a committing act takes txTime, and txTime never decreases" do
     env <- newEnv
     let inst = MkInstance deps.dinner "bitemporal"
-    _ <- history env inst
+    rs <- history env inst
       [ (65100, claiming 60000 (proposal "t2" check))     -- before the previous row's at
       , (65160, claiming 65000 (proposal "t3" bobBuys))   -- COMMITs: the claim is ignored
       , (65300, claiming 65280 (proposal "t4" deliver))   -- inside the window: kept
       , (65250, claiming 99999 (proposal "t5" done)) ]    -- the clock stepped back; a claim past txTime
+    -- a step that wrote to the official record is stamped at txTime, so a reply
+    -- that lists commits is never one of a row at a claimed, earlier time
+    forM_ rs \ r -> when (maybe False (not . null) r.commits) (r.row.at `shouldBe` r.row.txTime)
+    any (maybe False (not . null) . (.commits)) rs `shouldBe` True
     rows <- rowsOf env inst
     map (.at) rows `shouldBe` [64800, 64800, 65160, 65280, 65300]
     map (.txTime) rows `shouldBe` [64800, 65100, 65160, 65300, 65300]
@@ -380,6 +393,9 @@ dinnerSpec deps = describe "appendIf on d3-atomic.l4" do
     r <- atClock env 65170 (appendIf l inst (proposal "k" check)) >>= appended
     r.row.seqNo `shouldBe` 2
     r.replayed `shouldBe` False
+    -- the step is not replayed, so what it committed is not known: the field
+    -- is absent, and not the empty list that would say nothing was committed
+    r.commits `shouldBe` Nothing
     -- the same key, sent strict against head 1: the guard would refuse it...
     atClock env 65180 (appendIf l inst (against 1 True (proposal "fresh" check))) >>= \ case
       Conflict {} -> pure ()
@@ -391,6 +407,20 @@ dinnerSpec deps = describe "appendIf on d3-atomic.l4" do
     r'' <- atClock env 65190 (appendIf l inst (proposal "k" "`no such act`")) >>= appended
     r''.row.seqNo `shouldBe` 2
     map (.seqNo) <$> rowsOf env inst >>= (`shouldBe` [1, 2, 3])
+
+  it "lists what the opening committed, and reports a retry of a committing act as absent and not as empty" do
+    env <- newEnv
+    let inst = MkInstance deps.dinner "commits"
+        l = env.ledgerOf
+    created <- atClock env 64800 (createInstance l inst "`the arrangement`") >>= appended
+    created.commits `shouldBe` Just [MkCommit "dinner status record" "opened"]
+    _ <- atClock env 65100 (appendIf l inst (proposal "c2" check)) >>= appended
+    bought <- atClock env 65130 (appendIf l inst (proposal "c3" buy)) >>= appended
+    commitsDinner bought `shouldBe` True
+    bought.commits `shouldSatisfy` maybe False (not . null)
+    -- a retry of the buy reads the first answer back, and says nothing of what it committed
+    retried <- atClock env 65170 (appendIf l inst (proposal "c3" buy)) >>= appended
+    (retried.row.seqNo, retried.replayed, retried.commits) `shouldBe` (3, False, Nothing)
 
   it "appends an act no obligation takes, with its verdict (R-O2): Alice checking twice" do
     env <- newEnv
