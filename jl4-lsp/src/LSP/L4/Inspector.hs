@@ -21,6 +21,7 @@ import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
 import L4.Print (prettyLayout, prettyTypeForDisplay, ConstructorFieldNames)
 import L4.Annotation (Anno_(..))
 import L4.Syntax (getActual, Declare, Decide(..), AppForm(..), Resolved)
+import L4.TypeCheck.Environment (isContractType)
 
 import qualified L4.Export as Export
 import qualified L4.FunctionSchema as FSchema
@@ -445,8 +446,13 @@ exportedFunctionToSummary declares ef =
       Nothing -> "unknown"
       Just ty -> prettyTypeForDisplay ty
 
-    -- Deontic detection: check if return type pretty-prints as containing "DEONTIC"
-    isDeontic' = "DEONTIC" `Text.isInfixOf` Text.toUpper retType
+    -- Deontic detection reads the type, as jl4-service does when it exports the
+    -- function: a rule that returns @PROVISION OF P, A@, the deprecated alias of
+    -- @DEONTIC P A@, has the same type and is deontic, but its display name does
+    -- not contain "DEONTIC", and this used to be a search for that word in it.
+    -- The deploy sidebar reads this to strip the simulation envelope before it
+    -- diffs the local interface against the deployed one.
+    isDeontic' = maybe False isContractType ef.exportReturnType
 
     -- Structured return schema, mirroring jl4-service's Compiler: only for
     -- non-DEONTIC functions (DEONTIC surfaces the simulation envelope).
