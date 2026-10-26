@@ -78,6 +78,8 @@ IMPORT `rules/section-3`
 - **A path that starts with `/` is counted from the root of the project instead.** See [Importing from the root of a project](#importing-from-the-root-of-a-project).
 - **A path that starts with `@` is a folder with a short name instead.** See [Importing by alias](#importing-by-alias). A relative path through a folder whose own name starts with `@` is written ``IMPORT `./@folder/mod` ``, with the `./`, for that reason.
 
+A step-by-step walk-through that splits one file into folders and uses this form, the root form and the alias form is [Split a project into folders](../../tutorials/getting-started/projects-in-folders.md) (proposed, not landed).
+
 #### Importing from the root of a project
 
 A path that starts with `/` is counted from the **project root**, not from the file that writes the `IMPORT`:

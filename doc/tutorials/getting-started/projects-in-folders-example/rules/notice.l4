@@ -1,0 +1,11 @@
+-- How much notice a landlord must give a tenant.
+-- Imports the shared terms by a path that starts from THIS file's folder:
+-- `..` is the folder above (the project), then `shared`, then `terms`.
+IMPORT `../shared/terms`
+
+GIVEN `days of notice given` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `notice is long enough` IF `days of notice given` AT LEAST `notice period in days`
+
+#EVAL `notice is long enough` 45
+#EVAL `notice is long enough` 10

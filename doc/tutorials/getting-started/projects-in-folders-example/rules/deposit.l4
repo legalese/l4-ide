@@ -1,0 +1,12 @@
+-- How large a deposit a landlord may ask for.
+-- Imports the shared terms by their place in the PROJECT: the leading slash
+-- means "from the folder that holds l4-project.json".
+IMPORT `/shared/terms`
+
+GIVEN `monthly rent` IS A NUMBER
+      `deposit asked` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `deposit is within the cap` IF `deposit asked` AT MOST `monthly rent` TIMES `deposit cap in months of rent`
+
+#EVAL `deposit is within the cap` 1000 1800
+#EVAL `deposit is within the cap` 1000 2500

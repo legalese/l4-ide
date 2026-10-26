@@ -20,6 +20,7 @@
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
 - [Patterns](tutorials/getting-started/common-patterns.md)
+- [Split a project into folders (proposed, not landed)](tutorials/getting-started/projects-in-folders.md)
 - [Errors and Troubleshooting](reference/errors/README.md)
 
 ## Exports
