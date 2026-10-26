@@ -5,8 +5,17 @@ Nothing on this page works in a released version of L4 yet.
 Importing a file from another folder is built in draft pull request legalese/l4-ide#748.
 Importing from the project root, and importing by alias, are built in draft pull request legalese/l4-ide#751, which builds on top of #748.
 This page becomes true when both have merged and you are running an L4 that contains them; until then, a released L4 is not promised to read the `IMPORT` lines taught here.
-Deploying such a project is a separate piece, draft pull request legalese/l4-ide#749, and it is not part of the branch this page was written against; see [What does not work yet](#what-does-not-work-yet).
-Every command and message shown below was run on 2026-10-26 with the `l4` built from the #751 branch, on a Mac; where a sentence rests on the reference pages instead of a run, it says so.
+**To find out whether your `l4` reads them,** make the files of [section 2](#2-split-it-into-two-folders) and run `l4 check rules/notice.l4` from the `tenancy-rules` folder.
+`Check succeeded.` means it does.
+`I could not find a module with this name: terms` means it does not; an `l4` built without #748 printed that as the first line of its message, and ended with exit status 1.
+(`l4 --version` is no help here: the build used for this page printed only `dev`.)
+**Deploying such a project does not work yet.**
+`l4 deploy` sends every file under its plain file name and keeps no folders, so a deployed copy cannot find what these `IMPORT` lines name.
+Depending on the rule, the service either refuses the deploy or says it succeeded and then fails every call.
+Deploying in a way that keeps folders is a separate piece, draft pull request legalese/l4-ide#749, which is not part of the branch this page was written against.
+The build of it that was tried does not read the `IMPORT` lines taught here, and refuses this page's project; see [Deploying does not work yet](#deploying-does-not-work-yet).
+Every command and message shown below was run on 2026-10-26 with the `l4` built from the #751 branch, on a Mac, except the runs of the `l4` built from #749 (the `terms` message above, and the ones in [Deploying does not work yet](#deploying-does-not-work-yet)); where a sentence rests on the reference pages instead of a run, it says so.
+The deploying runs also used a `jl4-service` built from the same branch on the same day.
 Nothing was run on Windows; the section [If you work on Windows](#if-you-work-on-windows) says what that means for you._
 
 You have written a few single-file L4 programs.
@@ -94,6 +103,8 @@ Alex would rather keep the numbers in one place and let each rule file borrow th
 ## 2. Split it into two folders
 
 Alex makes a folder called `tenancy-rules`, and inside it two folders: `shared` for what several rules use, and `rules` for the rules themselves.
+The names are plain on purpose: lower-case letters and hyphens, no spaces and no accents.
+A folder name with spaces, accents or some punctuation can fail once the project is deployed, even where `l4` on your own machine reads it; [Plain names are the safe names](#if-you-work-on-windows) says which.
 
 ```
 tenancy-rules/
@@ -142,6 +153,18 @@ Check succeeded.
 
 `l4 check` ends with exit status 0 when the file is fine, and `l4 run rules/notice.l4` gives the same two results as before.
 
+### What you can put in a shared file
+
+Alex's `terms.l4` holds only numbers, but a file that is imported is an ordinary L4 file, and what it defines at its top level reaches the file that imports it.
+The reference lists [what an import gives you](../../reference/libraries/README.md#what-an-import-gives-you): the types, constructors, rules and plain values the imported file defines.
+Alex tried a `terms.l4` that also held a type written with `DECLARE` and a rule written with `GIVEN`, and `rules/notice.l4` used both with no further `IMPORT`; `l4 check rules/notice.l4` printed `Check succeeded.`.
+
+`#EVAL` lines behave differently.
+`l4 run rules/notice.l4` printed only the results of the `#EVAL` lines in `notice.l4` itself, numbered from 1.
+An `#EVAL` line in `terms.l4` ran when Alex ran `l4 run shared/terms.l4` on that file by itself, and not when it was imported.
+
+A rule of thumb, which is advice and not something L4 enforces: move into a shared file what two or more rules need, such as the numbers and the kinds of thing the rules talk about, and leave in each rule's own file the rule and the `#EVAL` lines that test it.
+
 ### What the `IMPORT` line says
 
 Read ``IMPORT `../shared/terms` `` from left to right:
@@ -157,6 +180,16 @@ Read ``IMPORT `../shared/terms` `` from left to right:
   Writing it, as in ``IMPORT `../shared/terms.l4` ``, names the same file and was accepted without a message.
 - A **path** is just the address of a file: the folders to go through, written with slashes between them.
   `.` means "this folder" and `..` means "the folder above".
+- A name with no slash is not a path.
+  By default `IMPORT terms` makes L4 look for `terms.l4` beside the file that writes the `IMPORT`, and then among the libraries built into L4; it does not go looking in the other folders of your project.
+  [Where modules are found](../../reference/libraries/README.md#where-modules-are-found) gives the complete list of places.
+- Two files with the same name in different folders are two different modules.
+  Alex put a `rates.l4` in each of two folders, imported both by path into one file, and used a name from each: it worked.
+  The reference says the same.
+  `l4 deploy` cannot send both yet; see [Deploying does not work yet](#deploying-does-not-work-yet).
+- Write an `IMPORT` for every file whose names the file uses.
+  A name can reach a file through a second file: in a small test, `z/c.l4` imported `y/b.l4`, which imported `x/a.l4`, and `c.l4` used a name from `a.l4` without importing it, and got its answer.
+  The reference says of the definitions a library imports for itself that they "also reach your file, but do not count on it" ([What an import gives you](../../reference/libraries/README.md#what-an-import-gives-you)); do not rely on it here either.
 
 **The path starts from the file that writes the `IMPORT`**, and not from the folder you are standing in when you type the `l4` command.
 Alex ran `l4 check` on this file three ways, from the folder above `tenancy-rules` (`l4 check tenancy-rules/rules/notice.l4`), from inside `rules` (`l4 check notice.l4`) and from inside `tenancy-rules`, and each printed `Check succeeded.`.
@@ -220,6 +253,10 @@ Alex moved it into `rules/deposits/` and the same line still worked: `l4 check r
 The project root is the folder of the nearest file named `l4-project.json`.
 "Nearest" means this: starting in the folder of the file that writes the `IMPORT`, L4 looks for a file with that name; if there is none, it looks in the folder above, and so on upwards, and the first folder that holds one is the project root.
 It looks upwards from the importing file, not from the folder you ran `l4` in.
+The folder you run `l4` from does not change this: from the folder above `tenancy-rules`, `l4 check tenancy-rules/rules/deposit.l4` and `l4 check tenancy-rules/rules/arrears/late-fee.l4` printed `Check succeeded.`, and so did `l4 check late-fee.l4` from inside `rules/arrears`.
+It also means two projects can sit side by side, each with its own `l4-project.json`.
+Alex copied `tenancy-rules` to a second folder next to it and changed the deposit cap in the copy from 2 months to 3.
+Run from the folder above both, `l4 run` on the second `#EVAL` line of each copy's `rules/deposit.l4` (1000 rent, 2500 asked) gave `FALSE` for the original and `TRUE` for the copy, so each root import found its own project's `terms.l4`.
 
 The project file is how you tell L4 where your project begins, so the folder it sits in is the one the `/` means.
 **To create it,** make a new plain-text file in the top folder of the project, `tenancy-rules/`, name it exactly `l4-project.json`, and type these two characters into it:
@@ -234,6 +271,7 @@ The next section puts something in it.
 The name has to be exactly `l4-project.json`: a file called `l4-project.json.txt` is a different file, and L4 will not see it.
 
 Without a project file, a root import is an error, not a guess; see [No project root](#no-l4-projectjson-above-the-file).
+The reference says that in VS Code the project file counts once it is saved to disk ([Root-relative imports](../../reference/libraries/resolution.md#root-relative-imports), step 3); VS Code itself was not tried for this page, and [the editor does not notice a changed project file](#what-does-not-work-yet).
 The reference describes this form in [Importing from the root of a project](../../reference/libraries/README.md#importing-from-the-root-of-a-project).
 
 **A leading `/` is the top of the project, never the top of your drive.**
@@ -279,8 +317,11 @@ An alias pays off when the shared folder itself moves.
 Alex moved `shared/` to `library/tenancy-terms/`, changed one line of the project file to `{ "aliases": { "common": "library/tenancy-terms" } }`, and `late-fee.l4`, untouched, printed `Check succeeded.`.
 With the other two spellings every importing file would have been edited.
 
-Some things to know about the project file:
+Some things to know about aliases and the project file:
 
+- An alias is a short name for a folder.
+  It is not a nickname for a single file or for a name inside one, and it is not written in the `IMPORT` line.
+  There is no `AS` form: ``IMPORT `../shared/terms` AS t `` is an error, and `l4 check` says `unexpected AS` and `expecting ;, end of input, or space token`.
 - The aliases come from the nearest `l4-project.json`, found as in the last section, and from that file alone.
 - Keys other than `aliases` are ignored, so the file can also hold notes for yourself.
 - L4 reads the contents of the file only when an alias import needs it.
@@ -480,12 +521,20 @@ What follows separates what the code and the reference state from what was tried
 - **Plain names are the safe names.**
   The example uses lower-case letters and hyphens, and an `l4` on a Mac read folders and files named like that without trouble.
   On the Mac, `l4` also read a folder called `Gemeinsame Regeln-für` (with spaces and an accented letter) through all three spellings.
-  But the reference records that a deployed service did not find a file at the top of an upload whose own name has a space or an accented letter, nor a file inside a top-level folder whose name has a space, an accented letter or punctuation such as `#`, `'`, `+`, `(` or `%`.
-  That was measured on 2026-10-26, by others, with hand-made zip files (compressed bundles of files) against a local service; a file inside a plain top-level folder was found whatever its own name or deeper folders were called.
-  If the project will be deployed, give its folders and files plain names: ASCII letters and hyphens, as in the example.
-- **Write capital letters the same way every time.**
+  But the reference records that the service does not find a file at the top of an upload whose own name has a space or a non-ASCII letter (a letter outside A to Z, such as `ü`), nor a file inside a top-level folder whose name has a space, a non-ASCII letter or punctuation such as `#`, `'`, `+`, `(` or `%`.
+  The reference says a deployment of such a project reports `ready` and every call then answers 422, an error status.
+  The reference says this was measured for a bare import, and that a path import into such a folder was seen to fail the same way in review; a file inside a plain top-level folder is found whatever its own name or deeper folders are called, and `l4` on your own machine is not affected ([How IMPORT finds libraries](../../reference/libraries/resolution.md), under "What a path import cannot do yet").
+  This page did not repeat those measurements.
+  If the project will be deployed, give its folders and files plain names: ASCII letters (A to Z) and hyphens, as in the example.
+- **Write capital letters the same way every time, and the way the folder is spelled on disk.**
   The reference says that on a system that ignores capitals in file names, two spellings of one folder reach one file but count as two modules to L4.
   On the disk this was tried on, which ignores capitals, a file that wrote both `` IMPORT `../shared/terms` `` and `` IMPORT `../Shared/terms` `` was refused with `There are multiple definitions for the identifier` followed by `` `notice period in days` ``.
+  A wrong capital on its own was not noticed: with only ``IMPORT `../Shared/terms` `` in `rules/notice.l4`, where the folder is `shared`, `l4 check rules/notice.l4` printed `Check succeeded.`.
+  A system that tells capitals apart is less forgiving, and the service is one.
+  Alex zipped `rules/notice.l4` and `shared/terms.l4` with their folders kept, and sent the zip straight to the service.
+  With ``IMPORT `../shared/terms` `` it deployed and answered a call; with ``IMPORT `../Shared/terms` `` the service's log said `Bundle IMPORT resolves to nothing` and the deploy was rejected.
+  `l4` itself was not tried on a disk that tells capitals apart.
+  A line that passes on your machine only because your disk ignores capitals can fail somewhere else, so match the folder's spelling exactly.
 - **Line endings and the byte-order mark.**
   The three rule files and `shared/terms.l4` were read correctly with Windows-style line endings (a carriage return before each line break), and a project file with those line endings and a byte-order mark at its start was read correctly too.
   Both were tried on the Mac by converting the files.
@@ -497,16 +546,89 @@ What follows separates what the code and the reference state from what was tried
 These are limits, not oversights.
 They are listed so that you find them here and not in a failed deployment.
 
+### Deploying does not work yet
+
+A deployed project is one zip file holding your files, and the service works out each `IMPORT` against the files inside it.
+For the root form, the top of the zip has to be the project root; for aliases, the top of the zip also has to hold the `l4-project.json` that defines them.
+`l4 deploy` and the VS Code deploy action put every file at the top level of the zip under its file name alone, and upload only the file you deploy and the files it imports (read in `jl4/app/L4/Cli/Deploy.hs` and `ts-apps/vscode/src/sidebar-provider.ts` on 2026-10-26), so the folders are lost and the project file is never uploaded.
+
+**`l4 deploy` does not stop you.**
+Alex ran it on each of the three rules, against a `jl4-service` on the same machine, built from the same branch.
+Each time `l4` printed a line like this, which shows the files going up flat, and sent them:
+
+```
+Deploying 'notice' to …: notice.l4, terms.l4
+```
+
+What happened next depended on the rule.
+
+- **Refused.**
+  The service refused all three of Alex's rules, and `l4` ended with exit status 1.
+  The message is one long line; here its runs of spaces are closed up and the list of options that follows is left out:
+
+  ```
+  Update rejected: compilation failed: I found a problem while checking the definition of `notice is long enough`: There are multiple definitions for the identifier `__GEQ__` and I do not have sufficient information to make a choice between them.
+  ```
+
+  The comparison it names is `__LEQ__` for `deposit.l4` and `__GT__` for `late-fee.l4`.
+  It is the same follow-on message as under [Messages you will see](#messages-you-will-see): the number the rule should have been compared with never arrived, so L4 cannot tell what kind of thing is being compared.
+
+- **Accepted, then failing.**
+  Alex wrote a fourth rule, in a file that is not part of the example, which uses the shared number in a sum and not in a comparison (`@export` marks a rule for deployment; see [Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md)):
+
+  ```l4
+  IMPORT `../shared/terms`
+
+  @export default Late fee for a number of days
+  GIVEN `days late` IS A NUMBER
+  GIVETH A NUMBER
+  DECIDE `fee` IS `days late` TIMES `grace period in days`
+  ```
+
+  `l4 check` printed `Check succeeded.` on it.
+  `l4 deploy` then printed `Deployed 'fee' (version 0.0.0) with 1 function:` and ended with exit status 0, and the service said it was `ready`.
+  Calling the rule, as [Deploy your rules](../deploying-rules/exporting-rules-for-deployment.md#step-5-call-a-rule) shows, answered with the error status 422, and this message:
+
+  ```
+  Internal error:
+    `grace period in days`
+  is not in scope.
+  Please report this as a bug.
+  ```
+
+In both cases the service wrote `Bundle IMPORT resolves to nothing` to its log, naming the file and the import; for a deployment that is accepted, the reference records that this warning is the only trace.
+Which of the two you get depends on how the rule uses what it imports, so a `Deployed` line does not show that the imports were found.
+After you deploy a project in folders, call each rule once and read the answer.
+
+One case is loud.
+If two files that you import have the same name in different folders, `l4 deploy` stops before sending anything, with exit status 1, because a flat upload cannot hold both.
+Its message begins `These imported files share a name, but the upload is flat (as from VS Code). Rename one of each:` and then lists the full address of each file.
+
+Deploying so that folders are kept is the subject of draft pull request legalese/l4-ide#749.
+Its deploying page is not on the branch this one was written against, so it is named here and not linked.
+Alex ran the `l4` built from #749, a build that has neither #748 nor #751, on this page's project.
+`l4 deploy rules/notice.l4` stopped before sending anything, with exit status 1:
+
+```
+I could not find a module with this name: terms
+…
+rules/notice.l4 doesn't typecheck; fix it before deploying (see `l4 check`).
+```
+
+In that build a slash in an `IMPORT` name is not a folder, and `l4` reads the name as its last part only, `terms` here.
+So #749 does not deploy the `IMPORT` lines taught on this page, and a build that has #748, #751 and #749 together was not tried.
+
+One way round this was measured, for the path form only.
+Alex made a zip of `rules/notice.l4` and `shared/terms.l4` with their folders kept (with an `@export` line added to `notice.l4`, so that there was something to call) and sent it to the service directly, as [what a deployment contains](../../reference/libraries/README.md#what-a-deployment-contains) describes.
+The service said `ready`, and a call with 45 days of notice answered `true`.
+Whether this works for the root form and for aliases, with the project root at the top of the zip and the `l4-project.json` beside it as described above, was not tried.
+
+### Other limits
+
 - **The editor does not notice a changed `l4-project.json`.**
   If you add, remove or edit the project file while a file that imports from the root or by alias is open, that file keeps the answer it found until you type a change in it, such as a new line at its end.
   The reference records that saving the file, closing and reopening it, and editing a different file did not make the editor's checker (the language server) look again when this was measured with a scripted client on 2026-10-26; VS Code itself was not tried.
   `l4 check` on the command line always looks afresh.
-- **A project that uses `/` or `@` cannot be deployed through the deploy tools yet.**
-  A deployed project is a bundle of files.
-  For the root form, the top of the bundle has to be the project root; for aliases, the top of the bundle also has to hold the `l4-project.json` that defines them.
-  `l4 deploy` and the VS Code deploy action put every file at the top level of the bundle under its file name alone, and upload only the file you deploy and the files it imports (read in `jl4/app/L4/Cli/Deploy.hs` and `ts-apps/vscode/src/sidebar-provider.ts` on 2026-10-26), so the folders are lost and the project file is never uploaded.
-  A project that uses only paths from the file (`../shared/terms`) checks and runs on your machine, and the reference records that it can be deployed without complaint and then fail in the deployed copy, with only a warning in the service's log.
-  Deploying a project in folders is the subject of the deploying page in legalese/l4-ide#749; that page is not on the branch this one was written against, so it is named here and not linked.
 - **A stray `l4-project.json` in a folder above your project becomes its root.**
   L4 looks upwards without stopping, past the folder you opened and past a git repository's top folder, to the top of the disk.
   If your project has no project file of its own, a forgotten one in a parent folder, left by another program for example, is taken as the root.
