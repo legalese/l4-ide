@@ -624,7 +624,7 @@ Stage 3, optional, is the root-relative form reserved in §4.2 and any alias man
 ## 10. Module identity: a summary of the survey of 2026-10-26 (proposed, not landed)
 
 **Status.** A survey and a design analysis. Nothing in this section is ruled and nothing is built.
-The full text, with its sources, its measurements and two adversarial reviews, is [MODULE-IDENTITY-SURVEY.md](MODULE-IDENTITY-SURVEY.md).
+The full text, with its sources, its measurements and its reviews (it was revised five times on 2026-10-26, the last time after an adversarial review of the fourth revision, which had itself followed three skeptics of the bench cards), is [MODULE-IDENTITY-SURVEY.md](MODULE-IDENTITY-SURVEY.md).
 The subsection numbers below (10.1 to 10.7) are that file's.
 
 **The question.**
@@ -635,29 +635,30 @@ So the default design is a fallback, and every option has to leave a bare `IMPOR
 **What was measured on L4** (10.4, 10.4b; macOS only, nothing was run on Windows).
 
 - An unquoted dotted `IMPORT` is cut at the last dot, not the first: `IMPORT Legalese.Commons.Penal` looks for the module `Legalese.Commons`, and `IMPORT l4.prelude` looks for `l4`.
-- A file that imports its own name ends in an unreadable `GraphException` on `unstable`, #748 and #751, in the command line and in the service.
-- A local `math.l4` beats the built-in `math`: the command line and the language server print a warning, the service writes a log line only, and WASM and runs with `JL4_LIBRARY_PATH` set say nothing.
+- A file that imports its own name ends in an unreadable `GraphException` on `unstable`, #748 and #751, in the command line and in the service; `origin/main` has printed a readable sentence on the `IMPORT` line since 2026-10-24, beside the same exception.
+- A local `math.l4` beats the built-in `math`: the command line prints a warning, the language server writes it to its log and publishes nothing, the service writes a log line only, and WASM and runs with `JL4_LIBRARY_PATH` set say nothing.
   No spelling reaches the built-in `math` from beside a local `math.l4`; only where the files are placed does.
 - NFC against NFD does not explain the accent and Hebrew folder failure of the service.
   The names that fail are the ones whose characters need percent-escaping (a space, `#`, `+`, `%`, `'` and `(` fail too), and only in the first path segment.
 - Stage 1's slash rule meets requirements (1) and (2) for paths.
   It does nothing to tell a new slash-free spelling from the bare name that Stage 1 keeps cutting.
-- The corpus: 953 `IMPORT` lines in 563 of 1,443 `.l4` files, none with a dot or a slash.
+- The corpus: 953 `IMPORT` lines in 563 of 1,443 `.l4` files, none with a dot or a slash (on unstable; the Stage 3 branch adds two dotted test fixtures of #748's own).
   The fallback touches four files, none of whose meaning changes in a golden glob, and forces no edit; 694 of the lines name one of the 22 standard libraries.
 
 **Recommendation** (10.6; proposed, not ruled).
 
-1. The fallback, with no keyword: a file never resolves to itself (R3), and the shadow warning that the command line prints is printed in the editor too (R4).
+1. The fallback, with no keyword: a file's import of itself stays an error and says what is wrong (R3a, which `origin/main` already has, and which unstable would get by a port of three commits that conflict with it, with the edge rule re-based on the classifier; the alternative R3b, a self-import reaching the library, is not recommended), and the shadow warning that the command line prints is published in the editor as a warning on the `IMPORT` line (R4; for that the resolver has to return the shadow, and the command line's own output changes).
 2. A reserved spelling for the standard library, the backticked ``IMPORT `l4:prelude` ``, so that a file beside a local `math.l4` can ask for the library.
-   Precedent for a prefix of this kind is Node's `node:` and the TC39 `js:` proposal; the first draft chose an unquoted dotted name, and the research on other systems changed that (10.2, 10.7).
+   Precedent for a prefix of this kind is Node's `node:` and Deno's schemes (the TC39 `js:` proposal gave reasons for one and did not advance); the first draft chose an unquoted dotted name, and the research on other systems changed that (10.2, 10.7).
 3. Option A for project files: a module's name is its path under the project root, written with dots.
 4. Then an optional `MODULE` line that must match the derived name, parse-and-check first.
 5. Options B (an authoritative declared name) and C (a project name in `l4-project.json`) wait for the triggers named in 10.6.
 
 **What it does not do.**
-Step 2 protects an importer's own import of a library, not the libraries' imports of each other: a library's own `IMPORT prelude` still reads a local `prelude.l4` (10.4b, 10.5.3 R3).
+Step 2 protects an importer's own import of a library, not the libraries' imports of each other: a library's own `IMPORT prelude` still reads a local `prelude.l4` (10.4b, 10.5.3 R3), which is true of 16 of the 22 libraries and not of the other 6.
 R4 does not reach the service response, WASM or pinned runs.
+In the browser build step 2 has a second change site, and open PR #752 would make a file the host supplies beat the library there (10.6).
 No option fixes the service's failure on a first path segment that needs escaping.
-Making a `MODULE` header mandatory would be a different edit, one line in each of 1,505 files here and 3,973 in `legalese/commons`, and it cannot be mechanical.
+Making a `MODULE` header mandatory would be a different edit, one line in each of 1,505 files here and 3,973 in `legalese/commons`: under option A a script could write the names once marker folders exist, and under option B they would be chosen by a person, file by file.
 
-**Rulings this needs from Meng** (10.6, Conditions): the spelling of the reserved library prefix before step 2; the meaning of an unquoted dotted `IMPORT` before step 3; whether R4 stays a warning; whether the libraries' own imports should read the library tiers only.
+**Rulings this needs from Meng** (10.6, Conditions): the spelling of the reserved library prefix before step 2 (linked to the ruling on C6a); the meaning of an unquoted dotted `IMPORT` before step 3; whether R4 stays a warning; whether the libraries' own imports should read the library tiers only (the ruling that makes the other 16 libraries safe); the ruling on the last commit of open PR #752, `20bad57ed`, which makes a file the host supplies beat the embedded library in the browser build and which step 2's browser change site depends on; and, if he wants the library to win for the 22 names, the B-versus-B-prime question that the earlier library-resolution spec reserved to him (10.5, 10.6).
