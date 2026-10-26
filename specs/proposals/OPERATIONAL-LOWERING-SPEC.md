@@ -2,8 +2,9 @@
 
 Status: proposed, 2026-10-25. On this branch (`mengwong/lowering-ledger`) the work packages WPO0 to WPO5 of §9 are built and committed, and none of it has landed.
 The branch lives on one machine: nothing of it is pushed or in a pull request, and `unstable` (`047311f36`, fetched 2026-10-26) holds none of its files.
-Checked 2026-10-26 at `420bb6258`: `jl4-core-test` 1578 examples, 0 failures (13 pending); `l4-cli-test` 628 examples, 0 failures (83 pending); `jl4-service-test` 717 examples, 0 failures; `doc/test-docs.sh` 0 errors; and the nine fixtures under `jl4/examples/explore/` (`brief/` and `ledger/`) each exit 0 under `l4 run`.
+Checked 2026-10-26 at `420bb6258`: `jl4-core-test` 1578 examples, 0 failures (13 pending); `l4-cli-test` 628 examples, 0 failures (83 pending); `jl4-service-test` 717 examples, 0 failures; and the nine fixtures under `jl4/examples/explore/` (`brief/` and `ledger/`) each exit 0 under `l4 run`.
 Also run, against the service built at that commit: an HTTP probe of create, append, position, restart and the refusal of a delete.
+The code of `5af3d0d9b` differs from `420bb6258` only in two comments, which compile, so the suites were not run again; `doc/test-docs.sh` was run at `5af3d0d9b` and has 0 errors.
 Not run: the rest of `etc/verify-branch.sh` (the `jl4-test` goldens and the other suites), the Nix build and CI.
 The gate's prettier step fails on this branch's spec files, which are not formatted with prettier 3.4.2; the same step failed in CI on draft PR #746 on 2026-10-26.
 Not run: the Postgres adapter against a server (this machine has no `postgres` binary and no container runtime answering), and §8's item on the checkers' counterexamples, which needs the explorer's output and the explorer is on the other local branch, `mengwong/lowering-explore`.
