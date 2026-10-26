@@ -774,8 +774,10 @@ Meng, verbatim: "i'd be in favour of fixing the PROVISION synonym as well. shoul
 1. Every surface asks the type-based flag (`Function.isDeontic`, and `fsIsDeontic` on the summary the metadata cache holds): `/evaluation`, `tools/list`, `tools/call`, the MCP task path, batch, the explorer and the WebMCP page.
 2. A function that is not `DEONTIC` and has inputs named `startTime` and `events` is an ordinary function.
    This is a behaviour change: `/evaluation` used to take it for a `DEONTIC` one, because it read the parameter names, and asked it for a trace.
+3. **Ruled 2026-10-26 (Meng, in conversation):** "Please go ahead and fix both the editor's outline view and the VS Code sidebar stripping the trace fields for provision." "Every surface" in 1 now includes the editor's outline view (`LSP.L4.DocumentSymbols`: a contract is an event, by its type for a top-level rule; a rule local to another is an event by its regulative body alone, `DEONTIC` and `PROVISION OF` alike, because `entityInfo` holds no type for a local rule, measured on one with a `GIVEN` and a `GIVETH`) and the deploy sidebar's schema diff (it strips `startTime` and `events` when `isDeontic` says so, from the language server's summary of the local function and from the deployed function's summary, both decided by the type; the display name is read only for a deployment stored without the flag).
 
 **Assumed, not ruled:** a metadata-cache entry written before the cache held `isDeontic` reads the flag from the display name of the return type, `DEONTIC` or `PROVISION OF`; a recompile replaces that with the type's own answer.
+The deploy sidebar reads the display name the same way for a deployed function's summary that has no flag (`isDeonticFunction` in `ts-shared/jl4-client-rpc/deontic-envelope.ts`), and nowhere else in the editor (searched `ts-apps`, `ts-shared` and `jl4-lsp` for the prefix).
 
 ### Q8: What does a trace sent to a function that does not return `DEONTIC` do?
 
