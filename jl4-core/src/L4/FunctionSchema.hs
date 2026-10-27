@@ -4,8 +4,10 @@
 module L4.FunctionSchema (
   Parameters (..),
   Parameter (..),
+  emptyParameter,
   declaresFromModule,
   typeToParameter,
+  returnSchemaOf,
   parametersFromDecide,
   parametersFromDecideWithErrors,
 ) where
@@ -20,7 +22,7 @@ import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
 import L4.Syntax
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeCheck.Environment (contractUnique, eventCName, eventUnique, maybeUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -39,6 +41,7 @@ data Parameter = Parameter
   , parameterProperties :: !(Maybe (Map Text Parameter)) -- Nested properties for object types
   , parameterPropertyOrder :: !(Maybe [Text]) -- Field order for object types (declaration order when available)
   , parameterItems :: !(Maybe Parameter) -- Array items schema for array types
+  , parameterPrefixItems :: !(Maybe [Parameter]) -- Item schemas of a fixed-length array, by position; serialised as "prefixItems", with "minItems" and "maxItems" equal to their number
   , parameterRequired :: !(Maybe [Text]) -- Required field names for nested object types
   , parameterL4Type :: !(Maybe Text) -- L4 user-declared type name (record/enum) when this node came from a DECLARE; serialised as "x-l4-type"
   }
@@ -82,6 +85,9 @@ instance ToJSON Parameter where
         ++ case p.parameterItems of
           Nothing -> []
           Just items -> ["items" .= items]
+        ++ case p.parameterPrefixItems of
+          Nothing -> []
+          Just parts -> ["prefixItems" .= parts, "minItems" .= length parts, "maxItems" .= length parts]
         ++ case p.parameterRequired of
           Nothing -> []
           Just req -> ["required" .= req]
@@ -100,8 +106,26 @@ instance FromJSON Parameter where
       <*> p .:? "properties"
       <*> p .:? "propertyOrder"
       <*> p .:? "items"
+      <*> p .:? "prefixItems"
       <*> p .:? "required"
       <*> p .:? "x-l4-type"
+
+-- | A schema node of the given JSON type, with nothing else set.
+emptyParameter :: Text -> Parameter
+emptyParameter t =
+  Parameter
+    { parameterType = t
+    , parameterAlias = Nothing
+    , parameterFormat = Nothing
+    , parameterEnum = []
+    , parameterDescription = ""
+    , parameterProperties = Nothing
+    , parameterPropertyOrder = Nothing
+    , parameterItems = Nothing
+    , parameterPrefixItems = Nothing
+    , parameterRequired = Nothing
+    , parameterL4Type = Nothing
+    }
 
 declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
 declaresFromModule (MkModule _ _ section) =
@@ -125,7 +149,7 @@ typeToParameter ::
   Parameter
 typeToParameter declares visited ty =
   case ty of
-    Type _ -> emptyParam "object"
+    Type _ -> emptyParameter "object"
     TyApp _ name [] ->
       typeNameToParameter name
     TyApp _ name [inner] ->
@@ -133,41 +157,31 @@ typeToParameter declares visited ty =
        in
         if lowered `elem` ["list", "listof"]
           then
-            (emptyParam "array")
+            (emptyParameter "array")
               { parameterItems = Just (typeToParameter declares visited inner)
               }
           else
             if lowered `elem` ["maybe", "optional"]
               then typeToParameter declares visited inner
               else typeNameToParameter name
+    TyApp _ name [partyTy, actionTy]
+      | getUnique name == eventUnique ->
+          eventParameter
+            (typeToParameter declares visited partyTy)
+            (typeToParameter declares visited actionTy)
     TyApp _ name _ ->
       typeNameToParameter name
-    Fun{} -> emptyParam "object"
+    Fun{} -> emptyParameter "object"
     Forall _ _ inner -> typeToParameter declares visited inner
-    InfVar{} -> emptyParam "object"
+    InfVar{} -> emptyParameter "object"
  where
-  emptyParam :: Text -> Parameter
-  emptyParam t =
-    Parameter
-      { parameterType = t
-      , parameterAlias = Nothing
-      , parameterFormat = Nothing
-      , parameterEnum = []
-      , parameterDescription = ""
-      , parameterProperties = Nothing
-      , parameterPropertyOrder = Nothing
-      , parameterItems = Nothing
-      , parameterRequired = Nothing
-      , parameterL4Type = Nothing
-      }
-
   typeNameToParameter :: Resolved -> Parameter
   typeNameToParameter name =
     case primitiveJsonType name of
-      Just (t, fmt) -> (emptyParam t) { parameterFormat = fmt }
+      Just (t, fmt) -> (emptyParameter t) { parameterFormat = fmt }
       Nothing ->
         case Map.lookup (resolvedNameText name) declares of
-          Nothing -> emptyParam "object"
+          Nothing -> emptyParameter "object"
           Just decl -> declareToParameter (resolvedNameText name) decl
 
   -- | Map L4 primitive type names to JSON Schema type and optional format.
@@ -195,7 +209,7 @@ typeToParameter declares visited ty =
         -- we must stop expanding to keep the schema finite, but we still
         -- carry the L4 type name so chat clients can render the value as
         -- `TypeName WITH …` rather than raw JSON.
-        (emptyParam "object") { parameterL4Type = Just typeName }
+        (emptyParameter "object") { parameterL4Type = Just typeName }
     | otherwise =
         case typeDecl of
           RecordDecl _ _ fields ->
@@ -214,7 +228,7 @@ typeToParameter declares visited ty =
                 , not (isMaybeFieldType fieldTy)
                 ]
              in
-              (emptyParam "object")
+              (emptyParameter "object")
                 { parameterDescription = Maybe.fromMaybe "" (fmap getDesc (declAnn Optics.^. annDesc))
                 , parameterProperties = Just props
                 , parameterPropertyOrder = Just fieldOrder
@@ -222,7 +236,7 @@ typeToParameter declares visited ty =
                 , parameterL4Type = Just typeName
                 }
           EnumDecl _ constructors ->
-            (emptyParam "string")
+            (emptyParameter "string")
               { parameterDescription = Maybe.fromMaybe "" (fmap getDesc (declAnn Optics.^. annDesc))
               , parameterEnum = [resolvedNameText c | MkConDecl _ c _ <- constructors]
               , parameterL4Type = Just typeName
@@ -233,6 +247,42 @@ typeToParameter declares visited ty =
     addDesc :: Maybe Text -> Parameter -> Parameter
     addDesc Nothing p = p
     addDesc (Just d) p = p {parameterDescription = d}
+
+-- | The schema of an event, as jl4-service answers one: an object whose one
+-- key, @EVENT@, holds the party, the action and the time, in that order. The
+-- built-in EVENT constructor has no field names, so its parts go by position,
+-- and the schema lists them by position too. The party and the action carry
+-- the descriptions of the events input of a rule whose answer is written
+-- @DEONTIC@.
+eventParameter :: Parameter -> Parameter -> Parameter
+eventParameter party action =
+  (emptyParameter "object")
+    { parameterProperties = Just (Map.singleton eventKey parts)
+    , parameterPropertyOrder = Just [eventKey]
+    , parameterRequired = Just [eventKey]
+    }
+ where
+  eventKey = rawNameToText (rawName eventCName)
+  parts =
+    (emptyParameter "array")
+      { parameterDescription = "The party, the action and the time of the event"
+      , parameterPrefixItems =
+          Just
+            [ party {parameterDescription = "The party performing the action"}
+            , action {parameterDescription = "The action performed"}
+            , (emptyParameter "number") {parameterDescription = "The time of the event"}
+            ]
+      }
+
+-- | The @returnSchema@ that jl4-service and the editor publish for an exported
+-- rule that gives back a value of this type. A rule whose answer is written
+-- @DEONTIC@ or @PROVISION@ has none. A synonym of @DEONTIC@ is not expanded
+-- here, so a rule whose answer type is one gets the schema of a value.
+returnSchemaOf :: Map Text (Declare Resolved) -> Type' Resolved -> Maybe Parameter
+returnSchemaOf declares ty =
+  case ty of
+    TyApp _ name [_, _] | getUnique name == contractUnique -> Nothing
+    _ -> Just (typeToParameter declares Set.empty ty)
 
 parametersFromDecide :: Module Resolved -> Decide Resolved -> Parameters
 parametersFromDecide resolvedModule decide =
@@ -254,7 +304,7 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
     mkOne (MkOptionallyTypedName ann resolved mType) =
       let
         base =
-          Maybe.fromMaybe (emptyParam "object") (typeToParameter declares Set.empty <$> mType)
+          Maybe.fromMaybe (emptyParameter "object") (typeToParameter declares Set.empty <$> mType)
         desc = Maybe.fromMaybe "" (fmap getDesc (ann Optics.^. annDesc))
        in
         (resolvedNameText resolved, base {parameterDescription = desc, parameterAlias = Nothing})
@@ -285,21 +335,6 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
     MkParameters
       { parameterMap = Map.fromList (givenParamList <> allAssumeParams)
       , required = requiredGivenParams <> map fst allAssumeParams
-      }
- where
-  emptyParam :: Text -> Parameter
-  emptyParam t =
-    Parameter
-      { parameterType = t
-      , parameterAlias = Nothing
-      , parameterFormat = Nothing
-      , parameterEnum = []
-      , parameterDescription = ""
-      , parameterProperties = Nothing
-      , parameterPropertyOrder = Nothing
-      , parameterItems = Nothing
-      , parameterRequired = Nothing
-      , parameterL4Type = Nothing
       }
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).

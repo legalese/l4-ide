@@ -172,6 +172,7 @@ test-suite jl4-lsp-test
     ImportClosureSpec
     ImportOnceSpec
     ImportSharedSpec
+    InspectorReturnSchemaSpec
     LibraryResolutionSpec
   build-tool-depends:
     hspec-discover:hspec-discover

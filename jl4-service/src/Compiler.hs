@@ -10,7 +10,7 @@ import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
-import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
+import L4.FunctionSchema (Parameters (..), Parameter (..), emptyParameter, typeToParameter, returnSchemaOf, declaresFromModule)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import Types
@@ -326,50 +326,33 @@ exportToFunction declares implicitParams export =
           ( (typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" }
           , (typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" }
           )
-        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing
-             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing
+        _ -> ( (emptyParameter "object") { parameterDescription = "The party performing the action" }
+             , (emptyParameter "object") { parameterDescription = "The action performed" }
              )
       finalParams = if isDeontic
         then mergedParams
           { parameterMap = mergedParams.parameterMap <> Map.fromList
-              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing)
-              , ("events", Parameter
-                  { parameterType = "array"
-                  , parameterAlias = Nothing
-                  , parameterFormat = Nothing
-                  , parameterEnum = []
-                  , parameterDescription = "Events for contract simulation (each: {party, action, at})"
-                  , parameterProperties = Nothing
-                  , parameterPropertyOrder = Nothing
-                  , parameterItems = Just $ Parameter
-                      { parameterType = "object"
-                      , parameterAlias = Nothing
-                      , parameterFormat = Nothing
-                      , parameterEnum = []
-                      , parameterDescription = "A trace event"
+              [ ("startTime", (emptyParameter "number") { parameterDescription = "Start time for contract simulation" })
+              , ("events", (emptyParameter "array")
+                  { parameterDescription = "Events for contract simulation (each: {party, action, at})"
+                  , parameterItems = Just $ (emptyParameter "object")
+                      { parameterDescription = "A trace event"
                       , parameterProperties = Just $ Map.fromList
                           [ ("party", partyParam)
                           , ("action", actionParam)
-                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing)
+                          , ("at", (emptyParameter "number") { parameterDescription = "Timestamp" })
                           ]
                       , parameterPropertyOrder = Just ["party", "action", "at"]
-                      , parameterItems = Nothing
                       , parameterRequired = Just ["party", "action", "at"]
-                      , parameterL4Type = Nothing
                       }
-                  , parameterRequired = Nothing
-                  , parameterL4Type = Nothing
                   })
               ]
           , required = mergedParams.required <> ["startTime", "events"]
           }
         else mergedParams
-      -- Structured return schema (with x-l4-type annotations on record/enum nodes).
-      -- For DEONTIC functions the surface return shape is the simulation envelope,
-      -- not the user's record type, so we leave the structured schema unset there.
-      mReturnSchema = case export.exportReturnType of
-        Just retTy | not isDeontic -> Just (typeToParameter declares Set.empty retTy)
-        _ -> Nothing
+      -- Structured return schema (with x-l4-type annotations on record/enum
+      -- nodes), from the one function that the editor's schema comes from too.
+      mReturnSchema = export.exportReturnType >>= returnSchemaOf declares
   in Function
     { name = export.exportName
     , description =
@@ -396,7 +379,7 @@ parametersFromExport declares params =
 paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares param =
   let p0 = maybe
-              (Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing)
+              (emptyParameter "object")
               (typeToParameter declares Set.empty)
               param.paramType
   in p0

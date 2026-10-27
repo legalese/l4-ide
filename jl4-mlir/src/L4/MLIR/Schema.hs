@@ -78,7 +78,7 @@ import L4.StateGraph
   , StateGraph(..)
   )
 import L4.FunctionSchema
-  ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter
+  ( Parameters(..), Parameter(..), declaresFromModule, emptyParameter, typeToParameter
   )
 import L4.TypeCheck.Environment (contractUnique)
 
@@ -1726,18 +1726,7 @@ paramToParameter declares p =
        }
 
 emptyParam :: Text -> Parameter
-emptyParam t = Parameter
-  { parameterType          = t
-  , parameterAlias         = Nothing
-  , parameterFormat        = Nothing
-  , parameterEnum          = []
-  , parameterDescription   = ""
-  , parameterProperties    = Nothing
-  , parameterPropertyOrder = Nothing
-  , parameterItems         = Nothing
-  , parameterRequired      = Nothing
-  , parameterL4Type        = Nothing
-  }
+emptyParam = emptyParameter
 
 
 -- ---------------------------------------------------------------------------

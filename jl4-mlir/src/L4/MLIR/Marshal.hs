@@ -46,7 +46,7 @@ import qualified Data.Scientific as Scientific
 import Data.Text (Text)
 import qualified Data.Vector as V
 
-import L4.FunctionSchema (Parameter(..), Parameters(..))
+import L4.FunctionSchema (Parameter(..), Parameters(..), emptyParameter)
 import L4.MLIR.Schema (FunctionExport(..), sanitizePropertyName)
 
 -- ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ resolveArgs fe args = do
           (_, Just _) -> Left "events is only valid for DEONTIC functions"
           _ -> Right $ ResolvedArgs positional Nothing Nothing
   where
-    missingParam _ = Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing
+    missingParam _ = emptyParameter "object"
 
 -- ---------------------------------------------------------------------------
 -- Name remapping (matches jl4-service/src/Shared.hs)

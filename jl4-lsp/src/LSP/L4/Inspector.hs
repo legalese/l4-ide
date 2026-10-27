@@ -392,18 +392,7 @@ exportedFunctionToSummary declares ef =
     mkParam :: Export.ExportedParam -> (Text, FSchema.Parameter)
     mkParam ep =
       let base = case ep.paramType of
-            Nothing -> FSchema.Parameter
-              { parameterType = "object"
-              , parameterAlias = Nothing
-              , parameterFormat = Nothing
-              , parameterEnum = []
-              , parameterDescription = ""
-              , parameterProperties = Nothing
-              , parameterPropertyOrder = Nothing
-              , parameterItems = Nothing
-              , parameterRequired = Nothing
-              , parameterL4Type = Nothing
-              }
+            Nothing -> FSchema.emptyParameter "object"
             Just ty -> FSchema.typeToParameter declares Set.empty ty
           desc = case ep.paramDescription of
             Just d  -> d
@@ -431,11 +420,8 @@ exportedFunctionToSummary declares ef =
     -- Deontic detection: check if return type pretty-prints as containing "DEONTIC"
     isDeontic' = "DEONTIC" `Text.isInfixOf` Text.toUpper retType
 
-    -- Structured return schema, mirroring jl4-service's Compiler: only for
-    -- non-DEONTIC functions (DEONTIC surfaces the simulation envelope).
-    mReturnSchema = case ef.exportReturnType of
-      Just retTy | not isDeontic' -> Just (FSchema.typeToParameter declares Set.empty retTy)
-      _ -> Nothing
+    -- Structured return schema, from the same function as jl4-service's.
+    mReturnSchema = ef.exportReturnType >>= FSchema.returnSchemaOf declares
 
     -- Extract line number from the function name's AppForm annotation
     MkDecide _ _ (MkAppForm (Anno _ appRange _) _ _ _) _ = ef.exportDecide

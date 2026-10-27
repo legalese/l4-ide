@@ -185,10 +185,17 @@ A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
 A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+An event is an object with one key, `EVENT`, holding its party, its action and its time, in that order: `{"EVENT": ["Seller", "delivery", 2]}`.
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 
-The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
+The function's published `returnSchema` does not describe every one of these shapes.
+It gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
+It gives an enum as a string with the enum's names, so it does not describe a constructor that holds fields, answered as an object keyed by its name, `{"pay": {"amount": 100}}`, or a constructor named `TRUE` or `FALSE`.
+It gives an event as an object with one required key, `EVENT`, whose array has three items under `prefixItems`, in order: the schema of the party's type, the schema of the action's type, and a number.
+So it does not describe an event whose party or action is a record, `NOTHING`, a constructor that holds fields, or a constructor named `TRUE` or `FALSE`.
+An event made by `WAITUNTIL` has the party `"NEVERMATCHESPARTY"` and the action `"NEVERMATCHESACT"`, whatever their types.
+Those two strings match the schema of a party or an action of type `STRING`, but the schema of an enum lists only the enum's own names.
 
 #### Missing inputs
 

@@ -205,9 +205,11 @@ test-suite jl4-core-test
     NlgSilentReadingSpec
     ImportErrorRangeSpec
     ResolutionCascadeSpec
+    FunctionSchemaSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
     base,
     bytestring,
     containers,

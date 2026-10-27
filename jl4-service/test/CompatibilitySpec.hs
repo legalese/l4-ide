@@ -13,7 +13,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
 
-import L4.FunctionSchema (Parameter (..), Parameters (..))
+import L4.FunctionSchema (Parameter (..), Parameters (..), emptyParameter)
 import Compatibility (FnIface (..), detectBreakingChanges)
 import ControlPlane (nextDeploymentVersion, parseVersionCounts)
 
@@ -23,7 +23,7 @@ import ControlPlane (nextDeploymentVersion, parseVersionCounts)
 
 -- | A primitive (scalar) parameter of the given JSON type.
 prim :: Text -> Parameter
-prim t = Parameter t Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing
+prim t = emptyParameter t
 
 -- | A string parameter constrained to an enum.
 enumP :: [Text] -> Parameter

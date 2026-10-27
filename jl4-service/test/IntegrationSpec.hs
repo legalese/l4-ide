@@ -1594,6 +1594,88 @@ spec = describe "integration" do
           other ->
             expectationFailure ("Expected returnSchema object with x-l4-type, got: " <> show other)
 
+    -- An @export can give back an EVENT. Every door answers one as an object
+    -- with one key, EVENT, holding the party, the action and the time by
+    -- position: {"EVENT": ["Seller", "delivery", 2]}. The returnSchema of the
+    -- function endpoint describes that shape, so a client that reads it can
+    -- read the answer. Each answer below is checked against the schema the
+    -- same deployment publishes, with 'undescribed'.
+    describe "the returnSchema of an @export that gives back an EVENT" do
+      let deployId = "event-answers"
+          withEvents = withServiceFromSources deployId [("events.l4", eventAnswerJL4)]
+          fnPath fn = Text.unpack (Text.replace " " "-" fn)
+          fnUrl baseUrl fn = baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> fnPath fn
+          schemaFor baseUrl mgr fn = do
+            resp <- parseRequest (fnUrl baseUrl fn) >>= (`httpLbs` mgr)
+            statusCode' resp `shouldBe` 200
+            maybe (fail ("no returnSchema for " <> Text.unpack fn)) pure
+              (lookupKey "returnSchema" (decodeObject (responseBody resp)))
+          eventAnswer door baseUrl mgr fn args = case door of
+            Direct -> do
+              resp <- buildJsonPost (fnUrl baseUrl fn <> "/evaluation") (Aeson.object [ "arguments" Aeson..= args ]) >>= (`httpLbs` mgr)
+              pure (Aeson.decode (responseBody resp) >>= jsonAt ["contents", "result", "value"])
+            Batch -> do
+              let kvs = case args of
+                    Aeson.Object o -> o
+                    _ -> Aeson.KeyMap.empty
+              resp <- buildJsonPost (fnUrl baseUrl fn <> "/evaluation/batch")
+                (Aeson.object
+                  [ "outcomes" Aeson..= ([] :: [Text])
+                  , "cases" Aeson..= [ Aeson.Object (Aeson.KeyMap.insert "@id" (Aeson.Number 1) kvs) ]
+                  ]) >>= (`httpLbs` mgr)
+              pure $ do
+                Aeson.Array cases <- Aeson.decode (responseBody resp) >>= jsonAt ["cases"]
+                c : _ <- pure (toList cases)
+                jsonAt ["value"] c
+            Mcp -> do
+              resp <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") (Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object [ "name" Aeson..= Text.replace " " "-" fn, "arguments" Aeson..= args ]
+                ]) >>= (`httpLbs` mgr)
+              pure $ do
+                (False, text) <- mcpToolText (responseBody resp)
+                Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 text)) >>= jsonAt ["contents", "result", "value"]
+          -- (rule, arguments): each answer is a whole event, or a list of them.
+          -- `the event at` is asked with a null and with a {} for its MAYBE
+          -- input, which sends the request through the generated wrapper.
+          -- A MAYBE answer of NOTHING is null, which the returnSchema does not
+          -- show (smucclaw/l4-ide#1010), so `maybe an event` is asked for its
+          -- JUST only.
+          wholeAnswers =
+            [ ("the delivery", Aeson.object [ "who" Aeson..= ("Seller" :: Text), "moment" Aeson..= (2 :: Int) ])
+            , ("two events", Aeson.object [ "who" Aeson..= ("Buyer" :: Text) ])
+            , ("maybe an event", Aeson.object [ "yes" Aeson..= True ])
+            , ("the event at", Aeson.object [ "who" Aeson..= ("Seller" :: Text), "hour" Aeson..= Aeson.Null ])
+            , ("the event at", Aeson.object [ "who" Aeson..= ("Buyer" :: Text), "hour" Aeson..= Aeson.object [] ])
+            ] :: [(Text, Aeson.Value)]
+      forM_ [Direct, Batch, Mcp] \door -> do
+        it ("describes each event answer of " <> doorName door) do
+          withEvents \baseUrl mgr -> forM_ wholeAnswers \(fn, args) -> do
+            schema <- schemaFor baseUrl mgr fn
+            answer <- eventAnswer door baseUrl mgr fn args
+            case answer of
+              Nothing -> expectationFailure (Text.unpack fn <> " gave no answer for " <> show args)
+              Just value -> (fn, undescribed schema value) `shouldBe` (fn, [])
+        -- A record answer has its constructor's name around its fields, which
+        -- the returnSchema does not show (smucclaw/l4-ide#1010), so only the
+        -- event in the field is checked here.
+        it ("describes the event in a field of a record answer of " <> doorName door) do
+          withEvents \baseUrl mgr -> do
+            schema <- schemaFor baseUrl mgr "a report"
+            answer <- eventAnswer door baseUrl mgr "a report" (Aeson.object [ "who" Aeson..= ("Buyer" :: Text) ])
+            case (jsonAt ["properties", "happened"] schema, answer >>= jsonAt ["Report", "happened"]) of
+              (Just fieldSchema, Just event) -> undescribed fieldSchema event `shouldBe` []
+              other -> expectationFailure ("no field schema or no event: " <> show other)
+      it "finds an answer that a schema does not describe" do
+        withEvents \baseUrl mgr -> do
+          schema <- schemaFor baseUrl mgr "the delivery"
+          let short = Aeson.object [ "EVENT" Aeson..= [ "Seller" :: Text, "delivery" ] ]
+              full = Aeson.object [ "EVENT" Aeson..= [ Aeson.String "Seller", Aeson.String "delivery", Aeson.Number 2 ] ]
+          undescribed schema short `shouldNotBe` []
+          undescribed (Aeson.object [ "type" Aeson..= ("object" :: Text) ]) full `shouldNotBe` []
+
     it "OpenAPI spec strips x-l4-type so the LLM-facing surface stays byte-clean" do
       withServiceFromSources "no-l4ext-openapi" [("record.l4", recordJL4)] \baseUrl mgr -> do
         req <- parseRequest (baseUrl <> "/deployments/no-l4ext-openapi/openapi.json")
@@ -1907,6 +1989,32 @@ spec = describe "integration" do
                 reqList `shouldSatisfy` maybe False (elem "events")
               _ -> expectationFailure "Missing required array in parameters"
           _ -> expectationFailure "Missing parameters in response"
+
+    -- At /evaluation, a rule whose answer is written DEONTIC or PROVISION is
+    -- answered by running the duty against the request's startTime and events,
+    -- not with a value of its type. Neither the function endpoint nor the
+    -- deployment's list of functions publishes a returnSchema for it.
+    -- /evaluation/batch and MCP tools/call do not run the duty: they answer
+    -- with it unrun, {"OBLIGATION": {...}}, which no returnSchema describes.
+    it "publishes no returnSchema for a rule whose answer is written DEONTIC or PROVISION" do
+      forM_
+        [ ("deontic-no-return-schema", "contract.l4", deonticExportJL4, "the sale contract")
+        , ("provision-no-return-schema", "seatbelt.l4", deonticRecordPartyJL4, "Seatbelt Requirement")
+        ] \(did, file, src, fn) ->
+        withServiceFromSources did [(file, src)] \baseUrl mgr -> do
+          let deployment = baseUrl <> "/deployments/" <> Text.unpack did
+          fnResp <- parseRequest (deployment <> "/functions/" <> Text.unpack (Text.replace " " "%20" fn)) >>= (`httpLbs` mgr)
+          statusCode' fnResp `shouldBe` 200
+          let fnBody = decodeObject (responseBody fnResp)
+          (fn, lookupKey "isDeontic" fnBody) `shouldBe` (fn, Just (Aeson.Bool True))
+          (fn, lookupKey "returnSchema" fnBody) `shouldBe` (fn, Nothing)
+          listResp <- parseRequest (deployment <> "?functions=full") >>= (`httpLbs` mgr)
+          statusCode' listResp `shouldBe` 200
+          case Aeson.decode (responseBody listResp) >>= jsonAt ["metadata", "functions"] of
+            Just (Aeson.Array entries)
+              | [entry] <- [o | Aeson.Object o <- toList entries, Aeson.KeyMap.lookup "name" o == Just (Aeson.String fn)] ->
+                  (fn, Aeson.KeyMap.lookup "returnSchema" entry) `shouldBe` (fn, Nothing)
+            other -> expectationFailure ("no entry for " <> Text.unpack fn <> " among the deployment's functions: " <> show other)
 
   -- One party and one action were spelled two ways in the same answer. A
   -- BREACH's `eventParty` and `eventAction` are a constructor's name, plain,
@@ -3902,6 +4010,122 @@ decodeObject = Aeson.decode
 -- | Look up a key in a Maybe Object.
 lookupKey :: Text -> Maybe Aeson.Object -> Maybe Aeson.Value
 lookupKey k = (>>= Aeson.KeyMap.lookup (Aeson.Key.fromText k))
+
+-- | The ways a request reaches an exported rule.
+data Door = Direct | Batch | Mcp
+
+doorName :: Door -> String
+doorName = \case
+  Direct -> "/evaluation"
+  Batch -> "/evaluation/batch"
+  Mcp -> "an MCP tools/call"
+
+-- | The JSON value at a path of object keys.
+jsonAt :: [Text] -> Aeson.Value -> Maybe Aeson.Value
+jsonAt [] v = Just v
+jsonAt (k : ks) (Aeson.Object o) = Aeson.KeyMap.lookup (Aeson.Key.fromText k) o >>= jsonAt ks
+jsonAt _ _ = Nothing
+
+-- | Where a published schema does not describe an answer: an answer of another
+-- JSON type than the node's @type@, a key of an object that the node's
+-- @properties@ does not declare, a key in @required@ that the answer lacks, an
+-- array whose node has neither @items@ nor @prefixItems@, an array of another
+-- length than @prefixItems@ (or outside @minItems@ and @maxItems@), and a
+-- string outside @enum@. Empty when the schema describes the answer.
+--
+-- This is stricter than a JSON Schema validator, which accepts a key that a
+-- schema does not declare: the question here is whether a client that reads
+-- the schema learns the shape of the answer, and a bare @{"type": "object"}@
+-- tells it nothing. The repository has no JSON Schema validator to call.
+undescribed :: Aeson.Value -> Aeson.Value -> [String]
+undescribed = go "answer"
+ where
+  go :: String -> Aeson.Value -> Aeson.Value -> [String]
+  go here (Aeson.Object s) v =
+    case (Aeson.KeyMap.lookup "type" s, v) of
+      (Just (Aeson.String "object"), Aeson.Object o) ->
+        let props = case Aeson.KeyMap.lookup "properties" s of
+              Just (Aeson.Object p) -> p
+              _ -> Aeson.KeyMap.empty
+            req = case Aeson.KeyMap.lookup "required" s of
+              Just (Aeson.Array r) -> [k | Aeson.String k <- toList r]
+              _ -> []
+        in [ here <> ": the key " <> show k <> " is not in the schema"
+           | k <- Aeson.KeyMap.keys o, not (Aeson.KeyMap.member k props) ]
+           <> [ here <> ": the required key " <> show k <> " is missing"
+              | k <- req, not (Aeson.KeyMap.member (Aeson.Key.fromText k) o) ]
+           <> concat
+              [ go (here <> "." <> Text.unpack (Aeson.Key.toText k)) ks kv
+              | (k, kv) <- Aeson.KeyMap.toList o
+              , Just ks <- [Aeson.KeyMap.lookup k props] ]
+      (Just (Aeson.String "array"), Aeson.Array xs) ->
+        let items = toList xs
+            n = length items
+            bound key cmp = case Aeson.KeyMap.lookup key s of
+              Just (Aeson.Number b) | not (fromIntegral n `cmp` b) ->
+                [ here <> ": " <> show n <> " items, against " <> Text.unpack (Aeson.Key.toText key) <> " " <> show b ]
+              _ -> []
+            itemsMsgs = case (Aeson.KeyMap.lookup "prefixItems" s, Aeson.KeyMap.lookup "items" s) of
+              (Just (Aeson.Array ps), _)
+                | length ps /= n -> [ here <> ": " <> show n <> " items, against " <> show (length ps) <> " in prefixItems" ]
+                | otherwise -> concat (zipWith3 (\i p x -> go (here <> "[" <> show i <> "]") p x) [0 :: Int ..] (toList ps) items)
+              (Nothing, Just p) -> concat (zipWith (\i x -> go (here <> "[" <> show i <> "]") p x) [0 :: Int ..] items)
+              _ -> [ here <> ": the schema gives no items for an array" ]
+        in bound "minItems" (>=) <> bound "maxItems" (<=) <> itemsMsgs
+      (Just (Aeson.String "string"), Aeson.String t) ->
+        case Aeson.KeyMap.lookup "enum" s of
+          Just (Aeson.Array es) | Aeson.String t `notElem` toList es ->
+            [ here <> ": " <> show t <> " is not in the enum " <> show (toList es) ]
+          _ -> []
+      (Just (Aeson.String "number"), Aeson.Number _) -> []
+      (Just (Aeson.String "boolean"), Aeson.Bool _) -> []
+      (ty, _) -> [ here <> ": the schema says " <> show ty <> " and the answer is " <> show v ]
+  go here s _ = [ here <> ": the schema node is not an object: " <> show s ]
+
+-- | Five exported rules that give back an event: one, a list of them, a MAYBE
+-- of one, a record with one in a field, and one whose input may be left out.
+eventAnswerJL4 :: Text
+eventAnswerJL4 = Text.unlines
+  [ "DECLARE Person IS ONE OF Seller, Buyer"
+  , "DECLARE Action IS ONE OF delivery, payment"
+  , ""
+  , "DECLARE Report HAS"
+  , "  label IS A STRING"
+  , "  happened IS AN EVENT Person Action"
+  , ""
+  , "@export The delivery event"
+  , "GIVEN who IS A Person"
+  , "      moment IS A NUMBER"
+  , "GIVETH AN EVENT Person Action"
+  , "`the delivery` who moment MEANS EVENT who delivery moment"
+  , ""
+  , "@export Two events"
+  , "GIVEN who IS A Person"
+  , "GIVETH A LIST OF EVENT Person Action"
+  , "`two events` who MEANS LIST (EVENT who delivery 1), (EVENT Seller payment 5)"
+  , ""
+  , "@export Maybe an event"
+  , "GIVEN yes IS A BOOLEAN"
+  , "GIVETH A MAYBE (EVENT Person Action)"
+  , "`maybe an event` yes MEANS IF yes THEN JUST (EVENT Seller delivery 3) ELSE NOTHING"
+  , ""
+  , "@export A report"
+  , "GIVEN who IS A Person"
+  , "GIVETH A Report"
+  , "`a report` who MEANS Report WITH label IS \"x\", happened IS EVENT who payment 9"
+  , ""
+  , "@export The event at an hour that may be missing"
+  , "GIVEN who IS A Person"
+  , "      hour IS A MAYBE NUMBER"
+  , "GIVETH AN EVENT Person Action"
+  , "`the event at` who hour MEANS"
+  , "  EVENT who delivery `the time`"
+  , "  WHERE"
+  , "    `the time` MEANS"
+  , "      CONSIDER hour"
+  , "      WHEN NOTHING THEN 0"
+  , "      WHEN JUST t THEN t"
+  ]
 
 -- | The text of an MCP tool call's answer, and whether the call was an error.
 mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)

@@ -5,7 +5,7 @@ module SanitizationSpec (spec) where
 import Test.Hspec
 
 import Backend.Api (FnLiteral (..), EvaluatorError (..), ParameterMismatch (..), prettyEvaluatorError)
-import L4.FunctionSchema (Parameters (..), Parameter (..))
+import L4.FunctionSchema (Parameters (..), Parameter (..), emptyParameter)
 import Shared (sanitizePropertyName, sanitizePropertyNames, buildPropertyReverseMap, remapFnLiteralKeys, remapArguments, validateNoSanitizationCollisions, sanitizeFieldNamesInText)
 
 import qualified Data.Map.Strict as Map
@@ -285,5 +285,5 @@ spec = describe "Sanitization" $ do
 
 -- | Helper to create a simple Parameter with no nested properties.
 simpleParam :: Text -> Parameter
-simpleParam ty = Parameter ty Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing
+simpleParam ty = emptyParameter ty
 

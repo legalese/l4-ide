@@ -10,7 +10,7 @@ import Test.QuickCheck.Instances ()
 
 import Backend.Api
 import Backend.DecisionQueryPlan (QueryAtom (..), QueryOutcome (..), QueryImpact (..), QueryInput (..), QueryAsk (..), QueryPlanResponse (..))
-import L4.FunctionSchema (Parameters (..), Parameter (..))
+import L4.FunctionSchema (Parameters (..), Parameter (..), emptyParameter)
 import ControlPlane (DeploymentStatusResponse (..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
@@ -45,6 +45,7 @@ spec = do
               , parameterProperties = Nothing
               , parameterPropertyOrder = Nothing
               , parameterItems = Nothing
+              , parameterPrefixItems = Nothing
               , parameterRequired = Nothing
               , parameterL4Type = Just "Child Order"
               }
@@ -53,7 +54,7 @@ spec = do
             Aeson.KeyMap.lookup "x-l4-type" o `shouldBe` Just (Aeson.String "Child Order")
           v -> expectationFailure ("Expected JSON object, got: " <> show v)
       it "omits x-l4-type when parameterL4Type is Nothing" do
-        let p = Parameter "string" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing
+        let p = emptyParameter "string"
         case Aeson.toJSON p of
           Aeson.Object o ->
             Aeson.KeyMap.member "x-l4-type" o `shouldBe` False
@@ -141,7 +142,7 @@ instance Arbitrary Parameters where
 instance Arbitrary Parameter where
   arbitrary = Q.sized $ \n ->
     if n <= 0
-      then Parameter <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing
+      then Parameter <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing <*> pure Nothing
       else
         Parameter
           <$> arbitrary
@@ -149,6 +150,7 @@ instance Arbitrary Parameter where
           <*> arbitrary
           <*> arbitrary
           <*> arbitrary
+          <*> Q.resize (n `div` 4) arbitrary
           <*> Q.resize (n `div` 4) arbitrary
           <*> Q.resize (n `div` 4) arbitrary
           <*> Q.resize (n `div` 4) arbitrary
