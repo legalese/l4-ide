@@ -7,7 +7,7 @@ You want it when two parties can act at the same time and the order in which the
 
 **Status (2026-10-26):** built, in the decision service (`jl4-service`).
 Each behaviour below was read off the code, and each sentence that says "measured" was run against the service built from the code this page describes.
-The Postgres store is the exception: it compiles, and it has never been run against a database server (see [Where the rows are kept](#where-the-rows-are-kept)).
+The Postgres store is the exception: it is built only when the service is built with the cabal flag `postgres`, which is off by default, and it has been run against one server, PostgreSQL 17.11 on the machine that built it, and no other (see [Where the rows are kept](#where-the-rows-are-kept)).
 
 ## Why it exists: the dinner race
 
