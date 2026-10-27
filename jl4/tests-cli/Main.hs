@@ -28,10 +28,7 @@ import System.Directory
   , doesFileExist
   , emptyPermissions
   , findExecutable
-  , getTemporaryDirectory
   , makeAbsolute
-  , removeFile
-  , removePathForcibly
   , setOwnerReadable
   , setOwnerSearchable
   , setOwnerWritable
@@ -700,11 +697,9 @@ spec bin = do
     it "won't send an API key over plain http to another host" $
       expectStderr ["deployments", "--server", "http://example.com"] (Just [("L4_API_KEY", "k")]) "over plain http"
 
-    it "needs the legalese CLI for Legalese Cloud" $ do
-      tmp <- getTemporaryDirectory
-      let emptyPath = tmp </> "l4-cli-test-empty-path"
-      createDirectoryIfMissing True emptyPath
-      expectStderr ["deployments"] (Just [("PATH", emptyPath)]) "l4 install legalese"
+    it "needs the legalese CLI for Legalese Cloud" $
+      withSystemTempDirectory "l4-cli-test-empty-path" \emptyPath ->
+        expectStderr ["deployments"] (Just [("PATH", emptyPath)]) "l4 install legalese"
 
     it "won't undeploy without a terminal unless --yes" $
       expectStderr (["undeploy", "anything"] ++ noServer) Nothing "Pass --yes"
@@ -1264,11 +1259,11 @@ spec bin = do
           Output code sout _ <- runL4 bin ["format", fixture]
           code `shouldBe` ExitSuccess
           filter (/= '\r') sout `shouldBe` filter (/= '\r') src
-          tmp <- getTemporaryDirectory
-          let formatted = tmp </> ("l4-cli-test-" ++ takeFileName fixture)
-          writeFile formatted sout
-          Output checkCode _ _ <- runL4 bin ["check", formatted]
-          removePathForcibly formatted
+          checkCode <- withSystemTempDirectory "l4-cli-test-format" \tmp -> do
+            let formatted = tmp </> takeFileName fixture
+            writeFile formatted sout
+            Output c _ _ <- runL4 bin ["check", formatted]
+            pure c
           checkCode `shouldBe` ExitSuccess
 
     it "prints a postfix mixfix call back with its argument, and the output checks" $
@@ -2102,8 +2097,7 @@ spec bin = do
       sout `shouldSatisfy` ("input_age" `isInfixOf`)
       sout `shouldSatisfy` ("status" `isInfixOf`)
 
-    it "writes results to a file with --output" $ do
-      tmp <- getTemporaryDirectory
+    it "writes results to a file with --output" $ withSystemTempDirectory "l4-batch-out" \tmp -> do
       let outFile = tmp </> "l4-batch-out.json"
       Output code sout _ <-
         runL4 bin [ "batch", batchEligFixture, "--inputs", batchDataJson
@@ -2115,7 +2109,6 @@ spec bin = do
       contents <- readFile outFile
       rows <- decodeArray contents
       length rows `shouldBe` 2
-      removeFile outFile
 
     it "stops at the first failing row by default (and exits non-zero)" $ do
       -- Row 2 has a non-numeric income; row 3 must NOT be processed.
@@ -2827,56 +2820,47 @@ spec bin = do
       map (`objField` "status") hrows `shouldBe` [Just (String "error"), Just (String "success")]
       hout `shouldSatisfy` ("Missing required field 'premium'" `isInfixOf`)
 
+  -- Each example works in a directory of its own (`withSystemTempDirectory`):
+  -- two runs of this suite on one machine, say two worktrees' gates at once,
+  -- used to share fixed names here and delete each other's directories.
   describe "l4 trace (output path safety)" $ do
-    it "never runs a shell for the output path, so metacharacters can't inject" $ do
+    it "never runs a shell for the output path, so metacharacters can't inject" $ withSystemTempDirectory "l4-trace-injection" \work -> do
       -- Render into a directory whose *name* would execute `touch <sentinel>`
       -- if the path were ever handed to a shell. With a direct `proc` call it
       -- is just a literal (if unusual) directory name. The sentinel must not
       -- appear regardless of whether Graphviz's `dot` is installed.
       -- The sentinel is relative, run from a scratch directory: an absolute
       -- Windows path would put a drive colon into the directory name.
-      tmp <- getTemporaryDirectory
-      let work     = tmp </> "l4-trace-injection"
-          sentinel = "l4-trace-injection-sentinel"
+      let sentinel = "l4-trace-injection-sentinel"
           evilDir  = "l4trace$(touch " ++ sentinel ++ ").d"
-      removePathForcibly work
       createDirectoryIfMissing True (work </> evilDir)
       fixture <- makeAbsolute evalTraceFixture
       _ <- runL4In (Just work) Nothing bin
         ["trace", fixture, "--format", "png", "--output-dir", evilDir]
       ranShell <- doesFileExist (work </> sentinel)
-      removePathForcibly work
       ranShell `shouldBe` False
 
-    it "writes trace output into a directory whose path contains a space" $ do
+    it "writes trace output into a directory whose path contains a space" $ withSystemTempDirectory "l4-trace-out" \tmp -> do
       -- The `.dot` branch needs no external tools; it exercises the same
       -- outDir path-join the png/svg branches feed to `dot`, proving spaces
       -- survive instead of being word-split.
-      tmp <- getTemporaryDirectory
       let outDir = tmp </> "l4 trace out"   -- note the space
-      removePathForcibly outDir
       Output code _ _ <- runL4 bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
       code `shouldBe` ExitSuccess
       wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
-      removePathForcibly outDir
       wrote `shouldBe` True
 
-    it "runs no shell for --output-dir, and renders or fails with a diagnostic" $ do
+    it "runs no shell for --output-dir, and renders or fails with a diagnostic" $ withSystemTempDirectory "l4-trace-metachar" \work -> do
       -- `;` ends a shell command, so this name, handed to a shell, runs
       -- `touch PWNED` in the working directory. The marker is relative, so
       -- unlike the case above the name has no drive colon and no separator,
       -- and is a legal directory on Windows as well.
-      tmp <- getTemporaryDirectory
-      let work    = tmp </> "l4-trace-metachar"
-          evilDir = "o;touch PWNED;x"
-      removePathForcibly work
-      createDirectoryIfMissing True work
+      let evilDir = "o;touch PWNED;x"
       fixture <- makeAbsolute evalTraceFixture
       Output code _ serr <- runL4In (Just work) Nothing bin
         ["trace", fixture, "--format", "png", "--output-dir", evilDir]
       ranShell <- doesFileExist (work </> "PWNED")
       rendered <- doesFileExist (work </> evilDir </> "evaltrace-eval1.png")
-      removePathForcibly work
       ranShell `shouldBe` False
       case code of
         ExitSuccess   -> rendered `shouldBe` True
@@ -2891,12 +2875,8 @@ spec bin = do
       mDot <- findExecutable "dot"
       case mDot of
         Nothing -> pendingWith "Graphviz `dot` is not on PATH"
-        Just _ -> do
-          tmp <- getTemporaryDirectory
-          let work    = tmp </> "l4-trace-dash-path"
-              svgFile = work </> "-out" </> "evaltrace-eval1.svg"
-          removePathForcibly work
-          createDirectoryIfMissing True work
+        Just _ -> withSystemTempDirectory "l4-trace-dash-path" \work -> do
+          let svgFile = work </> "-out" </> "evaltrace-eval1.svg"
           fixture <- makeAbsolute evalTraceFixture
           Output code _ _ <- runL4In (Just work) Nothing bin
             ["trace", fixture, "--format", "svg", "--output-dir=-out"]
@@ -2904,7 +2884,6 @@ spec bin = do
           svg <- if wrote
             then T.unpack . TE.decodeUtf8Lenient <$> BS.readFile svgFile
             else pure ""
-          removePathForcibly work
           code `shouldBe` ExitSuccess
           svg `shouldSatisfy` ("<svg" `isInfixOf`)
 
@@ -3014,18 +2993,18 @@ spec bin = do
   -- guarded against (§3.1 of the spec): a machine-global XDG symlink silently
   -- shadowing the stdlib the binary was built with.
   describe "l4 library resolution shadow (B′)" $ do
-    let mkXdgStore name libFileName mkLib = do
-          tmp <- getTemporaryDirectory
-          let xdgHome = tmp </> name
+    -- `tmp` is the example's own directory (`withSystemTempDirectory`), so
+    -- two runs of this suite on one machine cannot share a store.
+    let mkXdgStore tmp libFileName mkLib = do
+          let xdgHome = tmp </> "xdg"
               store = xdgHome </> "jl4" </> "libraries"
-          removePathForcibly xdgHome
           createDirectoryIfMissing True store
           _ <- mkLib (store </> libFileName)
           pure xdgHome
         poison = "this is not L4 at all ("
 
-    it "embedded stdlib outranks a poisoned machine-global XDG copy" $ do
-      xdgHome <- mkXdgStore "l4-shadow-xdg-poison" "prelude.l4" \p -> writeFile p poison
+    it "embedded stdlib outranks a poisoned machine-global XDG copy" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      xdgHome <- mkXdgStore tmp "prelude.l4" \p -> writeFile p poison
       Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
       case code of
         ExitSuccess -> pure ()
@@ -3047,12 +3026,10 @@ spec bin = do
     -- account may not make one (Windows without the symlink privilege). This
     -- pins that path: a link made in a folder the account may not write to is
     -- reported, not thrown.
-    it "reports a link it may not create, instead of throwing" $ do
-      tmp <- getTemporaryDirectory
-      let locked = tmp </> "l4-shadow-locked"
-          target = tmp </> "l4-shadow-locked-target.l4"
+    it "reports a link it may not create, instead of throwing" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      let locked = tmp </> "locked"
+          target = tmp </> "locked-target.l4"
           open' = setOwnerWritable True (setOwnerSearchable True (setOwnerReadable True emptyPermissions))
-      removePathForcibly locked
       createDirectoryIfMissing True locked
       writeFile target poison
       setPermissions locked emptyPermissions
@@ -3061,20 +3038,19 @@ spec bin = do
         Left why -> why `shouldSatisfy` ("cannot create a symbolic link" `isInfixOf`)
         Right () -> pendingWith "this account can make a link in a read-only folder (root, or a platform that ignores the mode)"
 
-    it "dereferences symlinks when naming the shadowed copy" $ do
-      tmp <- getTemporaryDirectory
-      let target = tmp </> "l4-shadow-poison-target.l4"
+    it "dereferences symlinks when naming the shadowed copy" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      let target = tmp </> "poison-target.l4"
       writeFile target poison
       realTarget <- canonicalizePath target
-      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> linkOrPending target p
+      xdgHome <- mkXdgStore tmp "prelude.l4" \p -> linkOrPending target p
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
       code `shouldBe` ExitSuccess
       -- The warning must print the symlink's real target, so a reader can see
       -- WHICH checkout/file a machine-global entry actually points at.
       serr `shouldSatisfy` (realTarget `isInfixOf`)
 
-    it "a project-local prelude override still outranks the embedded stdlib" $ do
-      xdgHome <- mkXdgStore "l4-shadow-xdg-empty" "unused.txt" \_ -> pure ()
+    it "a project-local prelude override still outranks the embedded stdlib" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      xdgHome <- mkXdgStore tmp "unused.txt" \_ -> pure ()
       Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowSiblingEntry]
       -- main.l4 uses `shadow marker`, defined only in the fixture's local
       -- prelude.l4 — this checks clean iff the project-scoped copy won.
@@ -3085,18 +3061,18 @@ spec bin = do
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
 
-    it "identical copies do not warn (content gate, non-embedded module)" $ do
+    it "identical copies do not warn (content gate, non-embedded module)" $ withSystemTempDirectory "l4-shadow" \tmp -> do
       -- `shadow-extra` is NOT an embedded module; it exists beside the
       -- importing file AND in the XDG store, byte-identical. Two sources, one
       -- content: the Option E warning must stay silent.
       localCopy <- readFile (fixtureDir </> "library-shadow" </> "xdg-extra" </> "shadow-extra.l4")
-      xdgHome <- mkXdgStore "l4-shadow-xdg-identical" "shadow-extra.l4" \p -> writeFile p localCopy
+      xdgHome <- mkXdgStore tmp "shadow-extra.l4" \p -> writeFile p localCopy
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
       code `shouldBe` ExitSuccess
       serr `shouldSatisfy` (not . ("Multiple differing copies" `isInfixOf`))
 
-    it "differing copies of the same non-embedded module do warn" $ do
-      xdgHome <- mkXdgStore "l4-shadow-xdg-differing" "shadow-extra.l4" \p ->
+    it "differing copies of the same non-embedded module do warn" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      xdgHome <- mkXdgStore tmp "shadow-extra.l4" \p ->
         writeFile p "`something else entirely` MEANS TRUE\n"
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
       -- The project-scoped copy wins either way; the differing ambient copy
@@ -3153,14 +3129,9 @@ spec bin = do
     -- main binds none of the prelude's names: `cd project && l4 run total.l4`
     -- answers "I could not find a definition for the identifier `sum`" and
     -- exits 1, while `l4 run project/total.l4` works.
-    it "a bare entry path still brings the stdlib's names into scope" $ do
-      tmp <- getTemporaryDirectory
-      let work = tmp </> "l4-bare-entry-stdlib-names"
-      removePathForcibly work
-      createDirectoryIfMissing True work
+    it "a bare entry path still brings the stdlib's names into scope" $ withSystemTempDirectory "l4-bare-entry-stdlib-names" \work -> do
       writeFile (work </> "total.l4") (unlines ["IMPORT prelude", "", "#EVAL sum (LIST 1, 2, 3)"])
       Output code sout serr <- runL4EmbeddedOnlyIn (Just work) bin ["run", "total.l4"]
-      removePathForcibly work
       let combined = sout ++ "\n" ++ serr
       when ("could not find a definition" `isInfixOf` combined) $
         expectationFailure ("`sum` was not in scope after IMPORT prelude:\n" ++ combined)
@@ -3241,11 +3212,7 @@ spec bin = do
   -- covers the non-ASCII spelling directly, at the string level, where no locale
   -- is involved.
   describe "l4 IMPORT resolution failures (#971)" $ do
-    let sandbox name files act = do
-          tmp <- getTemporaryDirectory
-          let dir = tmp </> name
-          removePathForcibly dir
-          createDirectoryIfMissing True dir
+    let sandbox name files act = withSystemTempDirectory name \dir -> do
           mapM_ (\(nm, body) -> BS.writeFile (dir </> nm) (TE.encodeUtf8 (T.pack body))) files
           act dir
         -- A library whose basename percent-escapes. It is ordinary L4 otherwise.
@@ -3710,11 +3677,8 @@ spec bin = do
     -- unfolded raw and its clauses' LETs drawn as one leaf: here a meaningless
     -- "read through", and with long clause bodies no answer at all (killed at
     -- 100 s and 2.7 GB in review).
-    it "leaves a call to clauses too long to read through as a box, and says why" $ do
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-cli-test-too-long-callee"
-          file = dir </> "too-long-callee.l4"
-      createDirectoryIfMissing True dir
+    it "leaves a call to clauses too long to read through as a box, and says why" $ withSystemTempDirectory "l4-cli-test-too-long-callee" \dir -> do
+      let file = dir </> "too-long-callee.l4"
       writeFile file tooLongCalleeSource
       mOut <- runL4Within 60 bin ["verify", file, "--format", "json"]
       case mOut of
