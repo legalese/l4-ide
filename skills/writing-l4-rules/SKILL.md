@@ -327,14 +327,12 @@ A function that the exported function gets in any other way passes `l4 check`, b
 
 ### Inputs no request can supply: `EVENT` and `DEONTIC`
 
-**No request can supply an `EVENT` or a `DEONTIC` input.**
+No request can supply an `EVENT` or a `DEONTIC` input.
 The typechecker refuses an `EVENT` input with `EVENT inputs are not supported for @export`, and a `DEONTIC` input with `DEONTIC inputs are not supported for @export`.
 Both errors name the input.
 `l4 check` fails, the editor shows an error, `l4 deploy` and `jl4-service` refuse the file, and the sidebar's **Deploy** button stays off.
 
-**A `DEONTIC` input is for use inside L4 only.**
-**Never give a rule marked `@export` a `DEONTIC` input.**
-**It may give a `DEONTIC` value as its answer.**
+An exported rule may still give a `DEONTIC` as its answer.
 
 An input that holds an `EVENT` or a `DEONTIC` is refused too, such as a list, a `MAYBE` or a record with one in it.
 A `GIVEN` with no written type is checked by the type that L4 works out for it from the file.

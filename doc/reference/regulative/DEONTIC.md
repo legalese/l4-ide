@@ -106,13 +106,8 @@ A `DEONTIC` value is a duty, a permission or a prohibition, with its deadline an
 Below, **duty** means any of these.
 The service turns each part of a request into the value the input asks for, but it cannot turn anything in a request into a duty, so a caller cannot supply one.
 
-> **A `DEONTIC` input is for use inside L4 only.**
->
-> **Never give a rule marked `@export` a `DEONTIC` input.**
->
-> **It may give a `DEONTIC` value as its answer.**
->
-> The ban covers an input that holds a duty: a `LIST OF DEONTIC Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the rule uses as a duty, or an `ASSUME` that the rule's own body reads as a duty, whether the `ASSUME` has a written type or not, and whether the file, a file that it imports, or the rule's own `WHERE` declares it.
+So a `DEONTIC` input is for use inside L4 only: a rule marked `@export` cannot take one, though it may give a `DEONTIC` value as its answer.
+The same holds for an input that holds a duty, such as a `LIST OF DEONTIC Person Action` or a record with a `DEONTIC` field; see [What counts as an input](#what-counts-as-an-input).
 
 The command `l4 check`, which checks a file for errors, refuses such a rule; [What happens if you do it anyway](#what-happens-if-you-do-it-anyway) shows the error.
 An `EVENT` input is refused in the same way; see [An exported rule cannot take an event](EVENT.md#an-exported-rule-cannot-take-an-event).
@@ -125,10 +120,6 @@ A rule that is not exported may take a duty and a list of events as freely as an
 **Example file:** [deontic-export-example.l4](deontic-export-example.l4)
 
 ```l4
--- A DEONTIC input is for use inside L4 only.
--- Never give a rule marked @export a DEONTIC input.
--- It may give a DEONTIC value as its answer.
-
 DECLARE Person IS ONE OF Seller, Buyer
 DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
 

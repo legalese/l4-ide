@@ -283,10 +283,6 @@ squared x MEANS x TIMES x
 
 ## An exported rule that takes a `DEONTIC` is refused
 
-**A `DEONTIC` input is for use inside L4 only.**
-**Never give a rule marked `@export` a `DEONTIC` input.**
-**It may give a `DEONTIC` value as its answer.**
-
 No request can supply the value, so the typechecker refuses the rule: `l4 check` fails with `DEONTIC inputs are not supported for @export`, naming the input, the editor shows it as an error, and the deploy is refused.
 The same holds for any input whose type contains a `DEONTIC`, whether the type is written or L4 works it out, and for an `ASSUME` that the rule reads.
 The message ends with what to do: give the rule the plain facts that the `DEONTIC` is made from as inputs, and build the `DEONTIC` inside it.

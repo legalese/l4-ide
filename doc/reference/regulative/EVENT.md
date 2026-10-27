@@ -130,11 +130,7 @@ This gives `2`.
 A request gives `who` and `what` by the name of the value, and `at time` as a number.
 Each of the three inputs needs a type that a request can carry, such as an enumeration or a `NUMBER`.
 
-A `DEONTIC` input of an exported rule is refused in the same way, with an error of its own, because no request can supply a value for it.
-**A `DEONTIC` input is for use inside L4 only.**
-**Never give a rule marked `@export` a `DEONTIC` input.**
-**It may give a `DEONTIC` value as its answer.**
-See [An exported rule cannot take a DEONTIC input](DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).
+A `DEONTIC` input is refused in the same way; see [An exported rule cannot take a DEONTIC input](DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).
 
 ## Related pages
 

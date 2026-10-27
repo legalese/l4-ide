@@ -1,7 +1,3 @@
--- A DEONTIC input is for use inside L4 only.
--- Never give a rule marked @export a DEONTIC input.
--- It may give a DEONTIC value as its answer.
-
 DECLARE Person IS ONE OF Seller, Buyer
 DECLARE Action IS ONE OF `deliver goods`, `pay invoice`
 
