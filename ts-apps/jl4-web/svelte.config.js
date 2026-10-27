@@ -18,6 +18,11 @@ const config = {
       precompress: true,
       strict: true,
     }),
+    // The one page is the only entry; following its links would request the
+    // preloaded WASM, which isn't there in builds that skip it.
+    prerender: {
+      crawl: false,
+    },
     serviceWorker: {
       register: false,
     },
