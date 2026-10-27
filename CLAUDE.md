@@ -166,48 +166,8 @@ there.
 
 ### 2.2 Cloud sessions (claude.ai/code): one shallow clone, and the toolchain is not on PATH
 
-A cloud session gets one fresh clone at `/home/user/l4-ide`, checked out on whatever branch the
-session was pointed at. Treat `/home/user/l4-ide` as the reference checkout and add worktrees beside it, e.g.
-`git -C /home/user/l4-ide worktree add -b <branch> /home/user/l4wt/<name> origin/unstable`. The
-clone is **shallow**, so `git log -S` and `git blame` answer from a truncated history — a pickaxe
-that finds only a merge commit is reporting the depth limit, not the origin of the change.
-
-**The toolchain is installed but not reachable.** Measured 2026-09-24 in a default cloud
-environment:
-
-| tool           | installed at            | on the agent's PATH?                                    |
-| -------------- | ----------------------- | ------------------------------------------------------- |
-| GHC 9.10.2     | `~/.ghcup/bin`          | **no** — `ghc: command not found`                       |
-| cabal 3.16.1.0 | `~/.ghcup/bin`          | **no**                                                  |
-| Node           | `/opt/node22/bin` (v22) | yes, and it is the **wrong** one                        |
-| nvm            | `/opt/nvm`              | loaded by `~/.bashrc`, which agent shells do not source |
-
-Node 22 fails `npm ci` outright with `EBADENGINE`: `package.json` requires `>=24` and `.npmrc`
-sets `engine-strict=true`. `nvm install 24` succeeds and sets the default alias, **and the next
-shell is still on 22**, because `/opt/node22/bin` is hard-coded in PATH and nothing loads nvm.
-`/root/.local/bin` is first on PATH, so linking into it is what works. Put this in the
-environment's setup script (tested by hand, not yet as a setup script):
-
-```bash
-source /opt/nvm/nvm.sh
-nvm install 24
-N="$(dirname "$(nvm which 24)")"
-for b in node npm npx corepack; do ln -sf "$N/$b" /root/.local/bin/$b; done
-for b in ghc ghc-pkg ghci cabal; do ln -sf /root/.ghcup/bin/$b /root/.local/bin/$b; done
-```
-
-With that, `npm ci` completes (40 s) and `npm run format:check` passes. Two things it does not fix:
-the cabal store starts **empty** — `cabal build all --dry-run` plans 254 units from scratch, so the
-first build is a cold one unless the setup script pre-builds dependencies (whether that is cached
-across sessions is unmeasured); and npm 11, which ships with Node 24, **skipped package install
-scripts** in that run, esbuild's among them, which has not been checked against the
-Vite/Svelte builds.
-
-> **Why.** On 2026-09-24 the pre-commit gate in `AGENTS.md` could not run in a cloud session at
-> either of its first two steps (`cabal test all`, then `npm ci`), while `etc/verify-branch.sh`'s
-> prettier step still worked — so a session that trusted the latter could believe it had run the
-> gate. `.nvmrc` said `20` at the time, contradicting `>=24`; nothing in the tree or in CI reads it
-> (every workflow pins `24.x`), which is how it drifted unnoticed.
+In a cloud session, read `specs/CLOUD-SESSIONS.md` before you build.
+The clone is shallow, and the toolchain is installed but not on the agent's PATH.
 
 ---
 
@@ -337,28 +297,8 @@ right) and make the intended edit in canon instead.
 > now runs in CI on every event with no filter and no build, and names the missing files. If you are
 > reading this because that check failed, it has done its job.
 
-**Pin `CAMUNDA_CHECK_JAVA_HOME`, and clear the harness's class cache when you change it.** The
-Camunda leg picks its own JDK from a candidate list whose FIRST entry is
-`/opt/homebrew/opt/openjdk/…` — deliberately "the newest JDK we can find" (`run.sh:51-53`), which
-on a machine that also has plain `openjdk` is **26**, where CI runs **21**. The bare `java` on PATH
-is irrelevant; the harness ignores it. Worse, `run.sh:84` recompiles `CamundaDmnCheck.java` only
-when the class is **missing or the source is newer** — it does not key on the JDK — so a class
-compiled by an earlier run under a different JDK is silently reused. Together those make a local
-green possibly a different JVM _and_ different bytecode from CI's, with nothing said. Do not trust
-which `java` you invoked: read the class-file major version
-(`od -An -tu1 -N8 "$TMPDIR/l4-camunda-dmn-check/classes/CamundaDmnCheck.class"`; `65` is Java 21),
-and reset with `rm -rf "$TMPDIR/l4-camunda-dmn-check/classes"`. The `kie-dmn-check` leg is immune
-because it compiles `--release 11` (`etc/kie-dmn-check/run.sh:81`); `--release 21` on the Camunda
-leg would fix it the same way. **That fix is deliberately not applied** — changing what every CI
-run compiles is not a corpus or exporter branch's call, and two branches have now declined it on
-that ground.
-
-> **Why.** 2026-09-05: a deputy reported Camunda results, was asked to re-run them on 21, did, and
-> reported them as reproduced. Both passes were in fact wrong in different ways — the first ran the
-> engine on 26, and the second reused bytecode the first had not compiled either. The numbers did
-> not move, but that was luck, and it was only visible after reading the class-file version. "I
-> re-ran it on 21" is a weaker claim than it sounds: re-running a command is not the same as
-> re-establishing a condition.
+**Pin `CAMUNDA_CHECK_JAVA_HOME`, and clear the harness's class cache when you change it.**
+Why, and the two commands: `etc/camunda-dmn-check/README.md`.
 
 **Never point an `l4` binary at a prelude newer than itself.** New prelude annotations
 (`@nonexhaustive`, in `jl4-core/libraries/prelude.l4` since #256) are parse errors to a binary
