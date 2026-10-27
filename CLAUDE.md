@@ -28,7 +28,7 @@ The incidents behind these rules are in this file's git history (`git log -p -- 
 Every skill under `skills/` is duplicated in **`legalese/l4-plugin`**, at the same path: today `writing-l4-rules` (the language) and `encoding-a-subject` (encoding a whole body of law and filing it in canon).
 `.claude/skills/<name>` are symlinks to them.
 The pipeline skill, `running-the-l4-pipeline`, is in neither: Meng ruled on 2026-09-26 that it does not ship with the public plugin (recorded in `specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md` on the `ci/skills-layout` branch), and it lives in the private `legalese/l4-pipeline`, cloned into `etc/go/`, which `.gitignore` excludes here.
-**Nothing in this repo's CI runs the pipeline.**
+**Nothing in this repo's CI runs the pipeline**; its own CI runs `unstable` daily.
 This repo is upstream: the `package-plugin` job of `.github/workflows/main-tag.yml` packages `skills/` into `l4-plugin.zip` when that workflow is run by hand to cut a release.
 There are two marketplace entries, `/plugin marketplace add legalese/l4-ide` and `/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.
 
@@ -56,7 +56,7 @@ What the script does, sorted by how its failures show up:
 **The copies are identical only just after a regeneration.**
 Every skill change that lands here afterwards leaves the bundle behind until the next one, so read `diff -rq skills <l4-plugin>/skills` as "how far behind is the bundle", not as "this should be empty".
 To ask whether anyone edited the bundle by hand, diff it against the l4-ide commit its README names.
-`etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` checks that the bundle's citations into canon still resolve.
+When you port a claim, check that it matches in the bundle; for citations into canon, `etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` does exactly that.
 One thing does not port: prose asserting something is "verifiable in situ" is false in the packaged bundle, which ships the skill **without** `jl4-core/src` beside it.
 Say which tree a check needs.
 Edit the tracked path, `skills/<name>/`, not the `.claude/skills/<name>` symlink.
@@ -115,8 +115,7 @@ there.
 
 ### 2.2 Cloud sessions (claude.ai/code): one shallow clone, and the toolchain is not on PATH
 
-In a cloud session, read `specs/CLOUD-SESSIONS.md` before you build.
-The clone is shallow, and the toolchain is installed but not on the agent's PATH.
+In a cloud session, read `specs/CLOUD-SESSIONS.md` before you start: `/home/user/l4-ide` is the reference checkout, so add worktrees beside it; the clone is shallow, so `git log -S` and `git blame` answer from a truncated history; and the toolchain is installed but not on the agent's PATH.
 
 ---
 
@@ -186,13 +185,14 @@ touch. Run `npx prettier@3.4.2` or the repo-local binary.
 **A new corpus file ships its goldens in the same commit as its `.l4` — if it is under a goldened
 glob.** `jl4-test` writes four goldens per file (`<dir>/tests/<stem>.{golden,ep.golden,nlg.golden,schema.golden}`)
 and `failFirstTime` is `True`, so a `.l4` with no `tests/` directory turns the whole suite red.
-No paths filter matches a `.l4` under `jl4/examples/`, so the Haskell job does not run on your PR.
+No paths filter that starts the Haskell job matches a `.l4` under `jl4/examples/`, so that job does not run on your PR.
 `etc/check-corpus-goldens.mjs` is what catches the gap: it runs in CI on every event, with no filter and no build (`pr-checks.yml`, job `corpus-goldens`), and names the missing files.
 
-**Which globs, exactly** (`jl4/tests/Main.hs:88-119`; `etc/check-corpus-goldens.mjs:31-74` mirrors all of them except the two `lsp/` ones, which use a different mechanism):
+**Which globs, exactly** (`jl4/tests/Main.hs:88-119`; `etc/check-corpus-goldens.mjs:31-74` must be kept in step with every one of them except the two `lsp/` ones, which use a different golden mechanism, so a glob added to one is added to the other in the same commit):
 `ok/**`, `legal/**`, `canon/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `not-ok/import/*-refused.l4`, `not-ok/import/unresolved-*.l4`,
 `lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`.
 **`jl4/examples/docassemble/` and `jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/` directory and adding one there needs no goldens.
+State this rule with its scope wherever you repeat it.
 Generate goldens by running `cabal test jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the `.golden` files — `.actual` is gitignored.
 Read them before committing: blessing output you have not looked at is how a wrong answer becomes the expected answer.
 
@@ -216,11 +216,11 @@ right) and make the intended edit in canon instead.
 > Doing that unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then silently rewrites later, untouched text in it: the spaces around code spans disappear, and the single asterisk in a later glob such as `not-ok/export-*.l4` can become an underscore.
 > Plain backticks with no bold are inert; use those.
 >
-> **The same applies inside a bold lead-in, where it fails worse.**
+> **The same applies inside a bold lead-in, which is the shape the obvious fix produces.**
 > Measured 2026-10-27 on the globs paragraph above: a lead-in containing such a code span turned `not-ok/export-*.l4` into `not-ok/export-_.l4`, escaped the asterisk in other globs, AND ate the spaces around several code spans.
-> That is the shape the obvious fix invites, so name the glob in prose there — "the canon glob" — rather than in a code span.
+> So name the glob in prose there — "the canon glob" — rather than in a code span.
 
-**Pin `CAMUNDA_CHECK_JAVA_HOME`, and clear the harness's class cache when you change it** — why, and the two commands, are in `etc/camunda-dmn-check/README.md`.
+**Pin `CAMUNDA_CHECK_JAVA_HOME` to a JDK 21, as CI does, and clear the harness's class cache when you change it** — why, and the commands, are in `etc/camunda-dmn-check/README.md`.
 
 **A binary must be at least as new as everything it will parse: prelude, corpus and docs alike.**
 A binary older than the code it reads reports newly-landed prelude annotations (`@nonexhaustive` is one) and newly-landed syntax (a bodiless `DECLARE T`, the opaque-type spelling) as broken source, and the failure does NOT present as a version mismatch.
@@ -304,7 +304,7 @@ produced no output at all compare **equal**: the instrument cannot tell "identic
 one started". Copy the binary somewhere unique first and point both sides at the copy.
 The same holds for any before/after probe that greps for a marker instead of checking the exit code (`l4 check`, `l4 export`, the engine harnesses): assert that the run HAPPENED before you compare what it said.
 
-Files that read the wall clock (`ok/excel-date/serials.l4`, the bitemporal ledger files) disagree with themselves across two runs unless `JL4_FIXED_NOW` pins the clock, so a difference confined to them is not a printer defect.
+Files that read the wall clock (`ok/excel-date/serials.l4`, the bitemporal ledger files) disagree with themselves across two runs, so run both sides under the same `JL4_FIXED_NOW`; with the clock pinned, a difference in them is a printer difference like any other.
 (Measured 2026-10-27 with the installed `l4`: `serials.l4` and `ok/ledger/bitemporal-stamps.l4` each differ across two runs, and are byte-identical across two runs under `JL4_FIXED_NOW=2025-01-31T15:45:30Z`.)
 A few files exit non-zero on both sides by design.
 
@@ -317,7 +317,8 @@ Fixed 2026-09-21 (smucclaw/l4-ide#967): two mixfix operators that share a head k
 `L4.Print.restoreMixfixPatterns` is what fixed it, and it must run wherever a whole module is printed; `l4 batch` (`jl4/app/L4/Cli/Batch.hs`), the REPL (`jl4-repl/app/Main.hs`) and the round-trip harness (`jl4/tests/Main.hs`) already call it.
 The residue is smucclaw/l4-ide#968, open on 2026-10-27: only mixfixes DEFINED IN THE MODULE are restored, so two IMPORTED operators that share a head keyword, an arity and an argument-type vector still print to the same text, and that one fails LOUDLY ("multiple definitions for the identifier").
 No golden captures `prettyLayout` output; the guard is a CLI test (`l4 batch` over `jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4`) plus the §3.2.1 differential.
-The risk check on a file is one line:
+Two constraints on changing this, each measured, are recorded in `jl4-core/src/L4/Print.hs` (`:244-260` and `:403-411`): call sites and definitions must change together, and imported operators keep the `OF` spelling because their surface form does not re-parse standing alone.
+**The risk check on a file is one line**, and still worth running before trusting printed output from anything this section does not cover:
 
 ```
 grep -oE '^`[^`]+`' <file> | sort | uniq -d
@@ -451,5 +452,7 @@ ruling.
 
 **Adding a word here needs a ruling, not a preference.**
 Cite the date and the document; the list holds only terms we coined and then retired, because for those a plain search is a sound check and for a merely discouraged word it is not.
+`discharge` and `assumed term` are current, in-use terms.
+`read-set`, `elaboration` and `section binder` have no retiring ruling to cite, so they are not here.
 
-**Plainer is not always truer:** the one diagnostic deliberately left in its technical wording is `NonDistinctQuantifiers` in `jl4-core/src/L4/TypeCheck.hs`, and `Note [Vocabulary of the NonDistinct messages]` there says why, so read it before tidying that message to match its neighbours.
+**Plainer is not always truer:** `NonDistinctQuantifiers` in `jl4-core/src/L4/TypeCheck.hs` is deliberately left in its technical wording; do not tidy it to match its neighbours unless you have a truer sentence, not merely a shorter one, and `Note [Vocabulary of the NonDistinct messages]` there says why.

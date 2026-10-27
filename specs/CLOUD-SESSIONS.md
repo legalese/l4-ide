@@ -3,7 +3,7 @@
 > **Status — moved from `CLAUDE.md` §2.2 on 2026-10-27; the environment facts were measured by hand on 2026-09-24 and not since.**
 > What is installed where in a default cloud environment, and what is on the agent's PATH, are measurements from 2026-09-24.
 > What this repository says (`package.json`, `.npmrc`, `.nvmrc`, the workflow pins, `AGENTS.md`) was re-checked against the tree on 2026-10-27.
-> The setup script below was tested by hand and has never been run as an environment setup script.
+> The setup script below was tested by hand on 2026-09-24, not as an environment setup script; nothing since records running it as one.
 
 A cloud session gets one fresh clone at `/home/user/l4-ide`, checked out on whatever branch the session was pointed at.
 Treat `/home/user/l4-ide` as the reference checkout and add worktrees beside it, for example:

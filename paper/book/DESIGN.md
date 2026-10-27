@@ -755,7 +755,7 @@ run is a foundation chapter that was not cashed.
 Two consequences to plan for before the first chapter is drafted, not after:
 
 - **The goldens trap.** Book examples living under the corpus globs pull in the four-goldens-per-file
-  rule (repo `CLAUDE.md` §3.3): a `.l4` with no `tests/` directory turns `jl4-test` red for the
+  rule (repo `CLAUDE.md` §3.1): a `.l4` with no `tests/` directory turns `jl4-test` red for the
   _next_ person, not for us, because no paths filter matches. Book `.l4` files ship their goldens
   in the same commit, read before blessing, or they do not ship.
 - **Fragments vs files.** Most chapters want three lines, not a module. Either the book quotes a
