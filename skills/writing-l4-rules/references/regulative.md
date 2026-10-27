@@ -17,6 +17,7 @@ Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, 
 - [Composition: RAND and ROR](#composition-rand-and-ror)
 - [Recursive obligations](#recursive-obligations)
 - [#TRACE — simulating contract execution](#trace--simulating-contract-execution)
+- [EVENT as a type, and `@export`](#event-as-a-type-and-export)
 - [Complete example](#complete-example)
 
 ---
@@ -323,6 +324,16 @@ With no events, or only events that settle nothing, the trace returns the rule s
 The residual is the most useful output from a trace: it is the contract in its current state, as a machine-readable value, showing exactly what is still owed by whom.
 
 Reference: <https://legalese.com/l4/reference/regulative.md>
+
+---
+
+## EVENT as a type, and `@export`
+
+`EVENT` is a type as well as a value: `GIVEN e IS AN EVENT Person Action` takes an event, with the type of the parties and the type of the actions, as `GIVEN duty IS A DEONTIC Person Action` takes a duty.
+
+A rule marked `@export` cannot take an event, a duty or a function as an input, because a request is JSON and has no form for any of them.
+`l4 check` refuses such a rule with `EVENT inputs are not supported for @export`, `DEONTIC inputs are not supported for @export` or `Function type inputs are not supported for @export`, and the error names the input.
+Take the plain facts as inputs and build the event or the duty inside the rule; the full pattern is in [SKILL.md](../SKILL.md#inputs-no-request-can-supply-event-and-deontic).
 
 ---
 

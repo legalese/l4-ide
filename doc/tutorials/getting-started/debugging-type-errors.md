@@ -144,9 +144,12 @@ The options are:
 
 The same "multiple definitions" message appears with `__PLUS__` and other operators when an imported library adds versions of them (`daydate` adds `PLUS` for dates) and the operands do not show which one you mean. Fix a mistyped literal, or give one operand a known type.
 
-### `@export` with a function-typed input
+### `@export` with a function, an event or a duty as an input
 
-A rule marked `@export` cannot take a function as an input, because a function cannot be sent as JSON. The error is "Function type inputs are not supported for @export". See [ASSUME and `@export`](../../reference/types/ASSUME.md#function-typed-inputs-are-not-supported-for-export).
+A rule marked `@export` cannot take a function, an event or a duty as an input, because none of them can be sent as JSON.
+The error is "Function type inputs are not supported for @export", "EVENT inputs are not supported for @export" or "DEONTIC inputs are not supported for @export", and it names the input.
+An event input is written `GIVEN e IS AN EVENT Person Action`, and a duty input `GIVEN duty IS A DEONTIC Person Action`.
+See [Inputs that an exported function cannot take](../../reference/types/ASSUME.md#inputs-that-an-exported-function-cannot-take).
 
 ---
 

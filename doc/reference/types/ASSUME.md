@@ -47,9 +47,10 @@ Here `` `the applicant's age` `` is an input of `` `the applicant is an adult` `
 
 A request can set an `ASSUME` only when it is declared as above: at the top level of the file that holds the exported function, with its type written after `IS A`.
 
-### Function-typed inputs are not supported for `@export`
+### Inputs that an exported function cannot take
 
-An exported function cannot take an input of function type, whether it is a `GIVEN` input or an `ASSUME` it uses:
+A request to an exported function is written in JSON, and JSON has no form for a function, an event or a duty.
+So an exported function cannot take any of them as an input, whether it is a `GIVEN` input or an `ASSUME` it uses:
 
 ```text
 ASSUME `the test` IS A FUNCTION FROM NUMBER TO BOOLEAN
@@ -57,8 +58,14 @@ ASSUME `the test` IS A FUNCTION FROM NUMBER TO BOOLEAN
 DECIDE `passes` IF `the test` 42
 ```
 
-`l4 check` reports "Function type inputs are not supported for @export", and the service refuses to deploy such a file.
-A function cannot be sent as JSON over REST or MCP, and an assumed function has no definition to run.
+`l4 check` refuses such a file, and the service refuses to deploy it, with one of three errors:
+
+- "Function type inputs are not supported for @export", for a function, such as `the test` above.
+- "EVENT inputs are not supported for @export", for an event. An event is a type too, written with the type of the parties and the type of the actions: `GIVEN e IS AN EVENT Person Action`.
+- "DEONTIC inputs are not supported for @export", for a duty, a permission or a prohibition, written `DEONTIC Person Action`.
+
+To publish `passes`, define `the test` with `MEANS` or `DECIDE` instead of assuming it.
+For an event or a duty, take the plain facts as inputs and build the value inside the function; see [EVENT](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event) and [DEONTIC](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).
 
 L4 refuses a function input only on a `GIVEN` of the exported function, or on a top-level `ASSUME` of the same file that the exported function reads in its own body, and only where it finds a function type in the type written after `IS A`.
 It looks in every part of that type, as in `LIST OF FUNCTION FROM NUMBER TO NUMBER`.
