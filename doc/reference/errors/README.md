@@ -394,9 +394,9 @@ IMPORT daydate
 #EVAL (Date 10 1 2024) `is before` (Date 11 1 2024)
 ```
 
-A type you declare yourself is ambiguous in the same way when it has the name and the number of parameters of a built-in type.
-`DECLARE EVENT party action HAS ...` is one: every use of `EVENT` with two arguments then has two candidates, yours and the built-in one, and so is `DECLARE MAYBE a HAS ...` for `MAYBE`.
-Each such use is reported once, as the multiple-definitions error with both candidates, yours and the built-in one.
+A type you declare yourself is ambiguous in the same way when it has the same name and the same number of parameters as a built-in type.
+For example, `DECLARE EVENT party action HAS ...` clashes with the built-in `EVENT`, and `DECLARE MAYBE a HAS ...` clashes with the built-in `MAYBE`.
+L4 then reports this error once at each place that uses the type, and lists your type and the built-in one as the two candidates.
 Give your type another name.
 A type called `EVENT` with no parameters is not affected, because the built-in `EVENT` takes two.
 
