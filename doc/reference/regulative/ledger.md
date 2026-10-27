@@ -123,7 +123,7 @@ A clause that names its party and takes any act of the contract (`PARTY World MA
 A clause whose party is a variable (`EVERY`) offers nothing, because binding a party by a variable is the party binder, which is not built.
 On the dinner fixtures every clause is `PARTY World MAY act`, so a caller who is `World` is offered all five acts and a caller who is `Alice` is offered none; the scoping separates parties only on a contract whose clauses name their actors, which `jl4/examples/explore/ledger/two-party.l4` does for the tests.
 
-What the tests show, in `jl4-service-test` (`LedgerMcpSpec`), run in the ledger worktree before this branch was merged with the explorer:
+What the tests show, in `jl4-service-test` (`LedgerMcpSpec`), run on the ledger branch (`mengwong/lowering-ledger`) before it was merged with the explorer:
 Sequence B over MCP is the buy as row 3 committing the dinner, Bob's purchase as row 4, and a retry under the same key reading back row 3 with `replayed` false.
 In Sequence A a strict buy decided against head 2 is a `conflict` with the head left at 3, and the same buy without `decidedAgainst` is row 4 and commits no dinner, as over HTTP.
 A caller that is not the act's party, and a caller that names no party, are refused and nothing is appended.

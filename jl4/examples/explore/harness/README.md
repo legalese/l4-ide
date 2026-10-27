@@ -45,7 +45,7 @@ A tool named by its variable that is not there, or is not what it says, is a fai
 
 ## What it checks
 
-On 2026-10-26, with the `l4` built from this branch, mCRL2 202607.0, TLC 2.19 on Java 21 and NuSMV 2.7.0, the run made 287 checks and passed all of them, in 40 to 50 seconds with `JOBS=4`, under Python 3.9 and 3.14.
+On 2026-10-26, with the `l4` built from the explore branch (`mengwong/lowering-explore`), mCRL2 202607.0, TLC 2.19 on Java 21 and NuSMV 2.7.0, the run made 287 checks and passed all of them, in 40 to 50 seconds with `JOBS=4`, under Python 3.9 and 3.14.
 
 **Exploration.**
 Each fixture of `fixtures.tsv` is explored once per fairness variant it names, with the seven properties of `properties.tsv`, `--json` and `--emit`.
