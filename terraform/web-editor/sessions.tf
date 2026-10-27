@@ -164,24 +164,11 @@ resource "aws_lambda_function" "session" {
 }
 
 # Public at the Lambda level; the origin secret is what limits it to CloudFront.
+# With NONE, the provider adds the lambda:InvokeFunctionUrl and (URL-only)
+# lambda:InvokeFunction permissions on creation, which function URLs need
+# since October 2025. Declaring them as aws_lambda_permission too races with
+# that and fails with a 409.
 resource "aws_lambda_function_url" "session" {
   function_name      = aws_lambda_function.session.function_name
   authorization_type = "NONE"
-}
-
-# Function URLs created since October 2025 need both permissions.
-resource "aws_lambda_permission" "session_url" {
-  statement_id           = "FunctionUrlAllowPublicAccess"
-  action                 = "lambda:InvokeFunctionUrl"
-  function_name          = aws_lambda_function.session.function_name
-  principal              = "*"
-  function_url_auth_type = "NONE"
-}
-
-resource "aws_lambda_permission" "session_invoke" {
-  statement_id             = "FunctionUrlAllowInvoke"
-  action                   = "lambda:InvokeFunction"
-  function_name            = aws_lambda_function.session.function_name
-  principal                = "*"
-  invoked_via_function_url = true
 }

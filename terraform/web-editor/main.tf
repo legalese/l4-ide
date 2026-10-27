@@ -2,8 +2,8 @@ terraform {
   required_version = ">= 1.5"
 
   required_providers {
-    # 6.x for `invoked_via_function_url`, which public function URLs need
-    # since October 2025 (see sessions.tf).
+    # 6.x adds the two permissions a public function URL needs since
+    # October 2025 (see sessions.tf).
     aws = {
       source  = "hashicorp/aws"
       version = "~> 6.0"
