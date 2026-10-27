@@ -553,6 +553,58 @@ spec = do
         Left errs -> fail $ "Fatal: " ++ show errs
         Right fns -> length fns `shouldBe` 1
 
+    it "rejects a function-typed ASSUME via type synonym" $ do
+      let src = Text.unlines
+            [ "DECLARE `Pred` IS A FUNCTION FROM BOOLEAN TO BOOLEAN"
+            , ""
+            , "ASSUME `pred` IS A `Pred`"
+            , ""
+            , "@export Via synonym"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `fn_assume_syn_test` IF `pred` OF TRUE"
+            ]
+      refusedFunctionInputs src `shouldBe` Right [("fn_assume_syn_test", "pred")]
+
+    -- A synonym of this module is followed through the other synonyms of this
+    -- module, for a GIVEN and for an ASSUME alike.
+    it "follows a type synonym through another synonym of the same module" $ do
+      let src = Text.unlines
+            [ "DECLARE Inner IS A FUNCTION FROM NUMBER TO NUMBER"
+            , "DECLARE Outer IS AN Inner"
+            , "ASSUME bump IS AN Outer"
+            , ""
+            , "@export Apply"
+            , "GIVEN f IS AN Outer"
+            , "GIVETH A NUMBER"
+            , "`apply` f MEANS f 3"
+            , ""
+            , "@export Bump"
+            , "GIVETH A NUMBER"
+            , "`bumped` MEANS bump 3"
+            ]
+      fmap sort (refusedFunctionInputs src) `shouldBe` Right [("apply", "f"), ("bumped", "bump")]
+
+    -- The function type need not be all of what the synonym stands for: here
+    -- it sits under a LIST, for a GIVEN and for an ASSUME alike.
+    it "looks in every part of what a type synonym of the same module stands for" $ do
+      let src = Text.unlines
+            [ "DECLARE Fns IS A LIST OF FUNCTION FROM NUMBER TO NUMBER"
+            , "ASSUME gs IS A Fns"
+            , ""
+            , "@export Apply"
+            , "GIVEN fs IS A Fns"
+            , "GIVETH A NUMBER"
+            , "`apply` fs MEANS 3"
+            , ""
+            , "@export Count"
+            , "GIVETH A NUMBER"
+            , "`count` MEANS"
+            , "  CONSIDER gs"
+            , "  WHEN EMPTY THEN 0"
+            , "  WHEN x FOLLOWED BY rest THEN 1"
+            ]
+      fmap sort (refusedFunctionInputs src) `shouldBe` Right [("apply", "fs"), ("count", "gs")]
+
     -- The check finds the ASSUMEs that an exported rule reads by walking the
     -- rule's body. Each body in 'placesOfARead' calls the function-typed ASSUME
     -- `f` at one place where an expression can stand and nowhere else, so a part

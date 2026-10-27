@@ -288,7 +288,7 @@ squared x MEANS x TIMES x
 **It may give a `DEONTIC` value as its answer.**
 
 No request can supply the value, so the typechecker refuses the rule: `l4 check` fails with `DEONTIC inputs are not supported for @export`, naming the input, the editor shows it as an error, and the deploy is refused.
-The same holds for a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as a `DEONTIC`, and an `ASSUME` that the rule's own body reads as a `DEONTIC`, whether the `ASSUME` has a written type or not, and whether the file, a file it imports, or the rule's own `WHERE` declares it.
+The same holds for any input whose type contains a `DEONTIC`, whether the type is written or L4 works it out, and for an `ASSUME` that the rule reads.
 The message ends with what to do: give the rule the plain facts that the `DEONTIC` is made from as inputs, and build the `DEONTIC` inside it.
 
 ```l4
@@ -305,10 +305,8 @@ GIVETH A BOOLEAN
 Take the plain facts as inputs and build the duty inside the rule; the full pattern is in [SKILL.md](../SKILL.md#inputs-no-request-can-supply-event-and-deontic).
 An `EVENT` input is refused in the same way, with `EVENT inputs are not supported for @export`.
 
-The check also follows the rules of the same file that an exported rule calls, directly or through other rules: a helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) makes the exported rule that calls it refused, and the error names the helper.
-A polymorphic helper reads a polymorphic `ASSUME` at the type that each call gives it, so handing what it answers to a rule that takes a `DEONTIC` is refused too.
-The check does not look inside a rule of another file: an exported rule that calls an imported helper that reads such an `ASSUME` passes `l4 check`.
-Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
+An `ASSUME` that a helper of the same file reads counts too, when the exported rule calls that helper, and the error names the helper.
+When it checks the inputs of an exported rule, L4 does not look inside the rules of an imported file, so give an imported helper its `DEONTIC` or `EVENT` as an input, not through an `ASSUME`.
 
 ---
 

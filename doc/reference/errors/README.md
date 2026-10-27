@@ -1040,8 +1040,8 @@ GIVETH A BOOLEAN
 
 **What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it is JSON.
 JSON has no form for an event, and none for a `DEONTIC` value, which is a duty, a permission or a prohibition, or the outcome of one; so no request could supply this input.
-The same holds for an input that holds one of them: a `LIST OF EVENT Person Action`, a `MAYBE (DEONTIC Person Action)`, a record with an event or a `DEONTIC` in one of its fields, a `GIVEN` with no written type that the file uses as one (L4 works the type out from how the file uses the input), or an `ASSUME` that the rule's own body reads as one, whether the `ASSUME` has a written type or not, and whether the file, a file that it imports, or the rule's own `WHERE` declares it.
-An `ASSUME` that a rule of the same file reads as one counts too when the exported rule calls that rule, directly or through other rules, and the error then names the rule that reads it.
+The same holds for an input that holds one of them, such as a `LIST OF EVENT Person Action`, whether its type is written or L4 works it out from the file.
+An `ASSUME` that the rule reads is an input too, and so is one that another rule of the same file reads when the exported rule calls it; the error then names that rule.
 So an `@export` of such a rule is an error, reported at the rule's name, and it names the input.
 An input that holds both gets one error, for the first of them that L4 finds.
 The error stops the whole file from checking: `l4 batch` and `jl4-schema` refuse the file, the editor shows it as an error, and jl4-service will not deploy it, until you change the input or remove the `@export`.

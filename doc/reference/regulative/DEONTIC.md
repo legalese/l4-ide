@@ -181,7 +181,7 @@ A request to `duty fulfilled on day` names its four inputs: `who` as `Seller`, `
 The answer is `true`, and with `20` for `day taken` it is `false`.
 
 A rule that gives a duty, such as `the duty`, is run against events, so its request must also carry `startTime`, the time to start from, and `events`, a list in which each event names a party, an action and a time.
-Both are required: without one, the service refuses the request with a Hypertext Transfer Protocol (HTTP) status of 400, for example `startTime is required for functions returning DEONTIC`.
+Both are required.
 To ask before anything has happened, send `"events": []`.
 
 ```json
@@ -194,11 +194,8 @@ To ask before anything has happened, send `"events": []`.
 
 The answer is `FULFILLED`.
 With `20` for `at` it is `{"BREACH": {"detail": "the deadline passed without the action", "party": "Seller", "reason": "explicit"}}`.
-With `"events": []` it is `{"OBLIGATION": {"action": "EXACTLY what", "deadline": "deadline", "modal": "MUST", "party": "who"}}`, the duty itself, not yet met and not yet missed.
-Its `party`, `action` and `deadline` hold the names of the inputs (`who`, `EXACTLY what`, `deadline`), not the values sent (`Seller`, `deliver goods`, `14`).
-With events that do not settle the duty, such as the buyer paying an invoice at `5`, `party` becomes `Seller`, but `action` stays `EXACTLY what`.
-`deadline` becomes the time left after the last event: `9` after an event at `5`, `6` after events at `5` and `8`, and not the `14` sent in the request.
-A program should not read the fields of a waiting duty as values; use `duty fulfilled on day` for a yes-or-no answer.
+With `"events": []` it is the duty itself, not yet met and not yet missed.
+For a yes-or-no answer, use a rule such as `duty fulfilled on day`.
 
 ### What happens if you do it anyway
 
@@ -230,11 +227,11 @@ The editor shows the same error on the rule.
 Nothing is published: `l4 deploy` refuses the file before it uploads anything, `jl4-service` refuses to deploy it, and the **Deploy** button in the VS Code sidebar stays off until the error is gone.
 To publish the rule, write what [What to write instead](#what-to-write-instead) shows.
 
-### An input that is a duty without being written as one is refused too
+### What counts as an input
 
 An input does not need a written type.
-When the rule leaves it off, L4 works the type out from how the file uses the input, in the rule's own body and in every call of the rule elsewhere in the same file, and the check goes by that type.
-Here `the duty` has no written type, and `already fulfilled` takes a `DEONTIC`, so `the duty` is one:
+When it has none, L4 works the type out from how the file uses the input, and refuses a duty just as if its type were written.
+Here `the duty` has no written type, but `already fulfilled` takes a `DEONTIC`, so `the duty` is one:
 
 ```l4
 -- ✘ Do not write this: `the duty` has no written type, but it is a DEONTIC all the same
@@ -255,50 +252,13 @@ GIVETH A BOOLEAN
 ```
 
 `l4 check` reports the error above, with `the duty` in it.
-An input whose type L4 cannot work out from the file, or works out to be a `NUMBER`, is not refused.
-Every call in the file counts, so an exported rule with `GIVEN x` and a body that ignores `x` is refused when another rule in the file calls it with a duty, and accepted when every call gives it a `NUMBER`.
-When two calls give the input different types, L4 takes the type from the first call in the file and reports a type error at the other.
 
-An `ASSUME` that the rule's own body reads counts in the same way when another file declares it.
-With ``ASSUME `the assumed duty` IS A DEONTIC Person Action`` in a file called `facts.l4`, a file that has `IMPORT facts` and an exported rule that reads `the assumed duty` in its own body gets the same error, with `the assumed duty` in it.
-The service publishes the `ASSUME`s of the file that holds the rule and no others, so a request could not set an imported one in any case.
-An `ASSUME` needs no written type either.
-One called `the assumed duty`, with nothing after the name, is refused in the same way when the rule's own body reads it as a duty: by taking it apart with `CONSIDER` and a `WHEN FULFILLED` branch, or by handing it to a rule that takes a `DEONTIC`.
-A polymorphic `ASSUME` is declared with a type variable, as with `GIVEN a IS A TYPE` and `GIVETH AN a`, and the prelude's `TBD` is one, in a file that has `IMPORT prelude`.
-Its declared type holds no `DEONTIC`, and each place that reads it gives it a type of its own, so the check goes by the type at each place that reads it, in the exported rule's own body or in a rule that the exported rule calls.
-A helper that is polymorphic too reads it at the type that each call of the helper gives, so an exported rule that hands what such a helper answers to a rule that takes a `DEONTIC` is refused as well.
-Handing `TBD` to a rule that takes a `DEONTIC` is refused in the same way, with `TBD` in the error, and reading it as a `NUMBER`, as `TBD + 1` does, is not.
-Without `IMPORT prelude`, `TBD` is an unknown name, and `l4 check` fails with "I could not find a definition for the identifier".
-The service deploys such a rule all the same, lists `TBD` as a required input, and answers every request with HTTP 422 and a message that begins `Internal error:` and says that `TBD` is not in scope.
-An `ASSUME` that the rule declares itself, under its own `WHERE`, counts in the same way.
-With ``ASSUME `local duty` IS A DEONTIC Person Action`` under the `WHERE` of an exported rule whose body reads `local duty`, `l4 check` reports the error above, with `local duty` in it.
-A read anywhere in the rule's body counts, its `WHERE` included, whether or not a local helper that makes the read is ever called.
-So does an `ASSUME` declared under the `WHERE` of a helper that sits inside the rule's `WHERE`, one with no written type that the body reads as a duty or as an event, and a polymorphic one that the body reads as one.
-An `ASSUME` under a `WHERE` that nothing in the rule's body reads, its `WHERE` included, one that the rule reads as a `NUMBER`, and one under the `WHERE` of a rule that is not exported and that no exported rule calls are not refused.
-A name in a `WHERE` does not hide a top-level one: each read is resolved by its type, two that both fit are reported as [multiple definitions](../errors/README.md#several-definitions-with-the-same-name), and the check goes by the one that the read resolves to.
-A duty that a rule defines, with `MEANS` and a body, is not an `ASSUME` and not an input, and an exported rule may read it.
+An `ASSUME` that an exported rule reads is an input too, so it cannot be a duty either.
+This includes an `ASSUME` that another rule of the same file reads when the exported rule calls it.
+Then [the error](../errors/README.md#an-export-that-takes-an-event-or-a-deontic) names that rule; give it the duty as an input, as `is fulfilled by` does above.
 
-### What the check does not catch
-
-The check looks at the exported rule's own inputs, at the `ASSUME`s that its own body reads, and at the `ASSUME`s that a rule of the same file reads when the exported rule calls that rule, directly or through other rules.
-So an exported rule that calls a helper that reads an `ASSUME` of type `DEONTIC` is refused, and the error names the helper.
-Give the helper the `DEONTIC` as an input, as `is fulfilled by` does above.
-The same holds for an `ASSUME` of type `EVENT`.
-
-The check does not look inside a rule of another file.
-An exported rule that calls a rule of a file that it imports passes `l4 check` when that rule reads an `ASSUME` of type `DEONTIC`, and no request can supply that `ASSUME`.
-Give such a rule the `DEONTIC` as an input too.
-
-Its test for an input of function type goes by the types that are written and by the `ASSUME`s of the file itself, and it does not look inside a rule that the exported rule calls.
-So some rules that no request can serve pass `l4 check` and deploy.
-
-**Loudly: every request is refused with HTTP 422.**
-
-- A `GIVEN` with no written type that the rule uses as a function, such as `f` in a rule with `GIVEN f` and the body `f 3 + 1`. The function endpoint of the service, `GET /deployments/<id>/functions/<fn>`, lists `f` as a required input of type `object`. A request that leaves out `f` gets `Parameter 'f': missing required parameter`. A request that sends a value for `f` gets a message that begins `Internal error:`, says `expected a function but found: 3`, and asks for a bug report.
-- An `ASSUME` of function type that the rule calls, when an imported file declares it, or when it is written with its signature before it, as in `GIVEN n IS A NUMBER`, `GIVETH A NUMBER`, `ASSUME bump`. The message says that the service `needed to know the value of` the `ASSUME`, but `it is an assumed term`.
-- An `ASSUME` that the rule declares under its own `WHERE` and reads as a `NUMBER`, or calls as a function. `l4 check` passes, the function endpoint lists no input for it, and every request gets the same message about an assumed term, with or without a value sent.
-
-A request cannot carry a function either, so give such a rule inputs that a request can carry.
+When it checks the inputs of an exported rule, L4 does not look inside the rules of an imported file.
+When an exported rule calls one of them, make sure that the imported rule takes the duty as an input, and does not read it from an `ASSUME`.
 
 ## Related pages
 

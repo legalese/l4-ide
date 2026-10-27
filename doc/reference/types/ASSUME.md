@@ -45,10 +45,7 @@ DECIDE `the applicant is an adult` IF `the applicant's age` >= 18
 
 Here `` `the applicant's age` `` is an input of `` `the applicant is an adult` ``; `` `an unused fact` `` is not.
 
-The function endpoint of the service, `GET /deployments/<id>/functions/<fn>`, lists an `ASSUME` with a written type by that type.
-It lists an `ASSUME` with no written type, one written with its signature before it, and a polymorphic one of the file itself as a required input of type `object`, and then ignores the value sent: every request that needs it answers HTTP 422, with "I could not continue evaluating, because I needed to know the value of … but it is an assumed term."
-An `ASSUME` that an imported file declares is not listed.
-An `ASSUME` that the rule declares itself, under its own `WHERE`, is not listed either, and a request that needs its value gets the same answer.
+A request can set an `ASSUME` only when it is declared as above: at the top level of the file that holds the exported function, with its type written after `IS A`.
 
 ### Function-typed inputs are not supported for `@export`
 
@@ -63,9 +60,11 @@ DECIDE `passes` IF `the test` 42
 `l4 check` reports "Function type inputs are not supported for @export", and the service refuses to deploy such a file.
 A function cannot be sent as JSON over REST or MCP, and an assumed function has no definition to run.
 
-The check goes by the types that are written and by the `ASSUME`s of the file itself.
-A `GIVEN` with no written type that the rule calls as a function, and a function-typed `ASSUME` that an imported file declares or that is written with its signature before it, pass `l4 check`, and every request to such a rule fails with the HTTP status 422.
-See [What the check does not catch](../regulative/DEONTIC.md#what-the-check-does-not-catch).
+L4 refuses a function input only on a `GIVEN` of the exported function, or on a top-level `ASSUME` of the same file that the exported function reads in its own body, and only where it finds a function type in the type written after `IS A`.
+It looks in every part of that type, as in `LIST OF FUNCTION FROM NUMBER TO NUMBER`.
+Where that type uses a [synonym](DECLARE.md#type-synonyms) that the same file declares, L4 looks in what the synonym stands for in the same way.
+It does not look into a synonym that an imported file declares.
+A function that the exported function gets in any other way passes `l4 check`, but no request can run it: for example a function in a field of a record, a synonym for a function type that an imported file declares, a `GIVEN` with no written type, an `ASSUME` written with its signature before it, or another rule that reads an assumed function.
 
 ## Related pages
 

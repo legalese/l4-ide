@@ -311,6 +311,7 @@ Module-level `ASSUME`s that an `@export` function references are promoted to
 parameters of that function and must be supplied by the caller — they behave
 just like `GIVEN` parameters at the API boundary. ASSUMEs not referenced by
 any exported function remain internal assumptions.
+A request can set an `ASSUME` only when it is declared at the top level of the file that holds the exported function, with its type written after `IS A`.
 
 **Function-typed inputs are not allowed for `@export`.** Neither a `GIVEN`
 parameter nor a referenced `ASSUME` may have a `FUNCTION FROM … TO …` type
@@ -318,6 +319,11 @@ on an exported function: GIVENs can't be passed over JSON, and function-typed
 ASSUMEs stay uninterpreted at runtime (any call fails with a stuck
 "assumed term" error). The typechecker and `jl4-service` deploy both reject
 such bundles with `Function type inputs are not supported for @export`.
+They refuse a function input only on a `GIVEN` of the exported function, or on a top-level `ASSUME` of the same file that the exported function reads in its own body, and only where they find a function type in the type written after `IS A`.
+They look in every part of that type, as in `LIST OF FUNCTION FROM NUMBER TO NUMBER`.
+Where that type uses a type synonym (`DECLARE Name IS Type`) that the same file declares, they look in what the synonym stands for in the same way.
+They do not look into a synonym that an imported file declares.
+A function that the exported function gets in any other way passes `l4 check`, but no request can run it: for example a function in a field of a record, a synonym for a function type that an imported file declares, a `GIVEN` with no written type, an `ASSUME` written with its signature before it, or another rule that reads an assumed function.
 
 ### Inputs no request can supply: `EVENT` and `DEONTIC`
 
@@ -330,19 +336,10 @@ Both errors name the input.
 **Never give a rule marked `@export` a `DEONTIC` input.**
 **It may give a `DEONTIC` value as its answer.**
 
-The ban covers an input that holds one: a `LIST OF DEONTIC …`, a `MAYBE (DEONTIC …)`, a record with a `DEONTIC` field, a `GIVEN` with no written type that the file uses as one (the check goes by the type that L4 works out for it from the whole file), or an `ASSUME` that an exported rule's own body reads as one, whether it has a written type or not, and whether the file, a file it imports, or the rule's own `WHERE` declares it.
-A polymorphic `ASSUME` (`GIVEN a IS A TYPE`, `GIVETH AN a`, as the prelude's `TBD` is, in a file that has `IMPORT prelude`) is checked by the type at the place where the body reads it.
-Without `IMPORT prelude`, `TBD` is an unknown name: `l4 check` fails, and the service deploys the rule all the same, with `TBD` as a required input and answers every request with HTTP 422.
-An `ASSUME` of the file itself with a written type becomes a required input; one that an imported file declares becomes none, so no request could set it, and it is refused all the same.
-`EVENT` and `DEONTIC` are both refused in each of these places.
-The function endpoint (`GET /deployments/<id>/functions/<fn>`) lists an `ASSUME` of the file itself that has no written type, one written with its signature before it, and a polymorphic one as a required input of type `object`, and then ignores the value sent: every request that needs it answers HTTP 422, with "needed to know the value of … it is an assumed term".
-An `ASSUME` that the rule declares under its own `WHERE` is not listed, and a request that needs its value gets the same 422.
-
-The check also follows the rules of the same file that an exported rule calls, directly or through other rules: a helper that reads an `ASSUME` of type `DEONTIC` (or `EVENT`) makes the exported rule that calls it refused, and the error names the helper.
-A polymorphic helper reads a polymorphic `ASSUME` at the type that each call gives it, so handing what it answers to a rule that takes a `DEONTIC` is refused too.
-The check does not look inside a rule of another file: an exported rule that calls an imported helper that reads such an `ASSUME` passes `l4 check`.
-Give the helper its `DEONTIC` (or `EVENT`) as an input instead.
-The test for a function-typed input goes by written types and by the `ASSUME`s of the file itself, so a `GIVEN` with no written type that the rule calls as a function, and a function-typed `ASSUME` that an imported file declares or that is written with its signature before it, also pass `l4 check`; every request to such a rule fails with HTTP 422.
+An input that holds an `EVENT` or a `DEONTIC` is refused too, such as a list, a `MAYBE` or a record with one in it.
+A `GIVEN` with no written type is checked by the type that L4 works out for it from the file.
+An `ASSUME` that the exported rule reads is an input too, and so is one that another rule of the same file reads when the exported rule calls it; the error then names that rule.
+When it checks the inputs of an exported rule, L4 does not look inside the rules of an imported file, so give such a rule its `DEONTIC` or `EVENT` as an input, not through an `ASSUME`.
 
 Take the plain facts as inputs, build the duty and the events inside the rule, and keep any helper that takes a `DEONTIC` or an `EVENT` without `@export`:
 
@@ -386,9 +383,8 @@ GIVETH A BOOLEAN
 ```
 
 An exported rule that gives a `DEONTIC`, such as `the duty` above once you mark it `@export`, needs two more fields in the request, `startTime` and `events`.
-The service answers HTTP 400 without either, and `"events": []` asks before anything has happened.
-The answer to `"events": []` holds the names of the inputs where the values should be (`"party": "who"`).
-With events that do not settle the duty, a waiting duty keeps `action` as `EXACTLY what` and gives `deadline` as the time left after the last event, so prefer a yes-or-no rule such as `duty fulfilled on day`.
+Both are required, and `"events": []` asks before anything has happened.
+For a yes-or-no answer, prefer a rule such as `duty fulfilled on day`.
 `EVALTRACE duty startTime events` runs a duty against events; see [references/regulative.md](references/regulative.md).
 
 ### `@desc` — document parameters
