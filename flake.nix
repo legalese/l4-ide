@@ -2,7 +2,6 @@
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    disko.url = "github:nix-community/disko";
   };
 
   outputs =
@@ -12,97 +11,7 @@
       perSystem =
         { pkgs, ... }:
         {
-          packages = import ./nix/default.nix { inherit pkgs; };
           devShells.default = import ./nix/shell.nix { inherit pkgs; };
         };
-      flake = {
-        # initial prototype from WT
-        nixosConfigurations.jl4-demo = inputs.nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-          modules = [
-            {
-              system.stateVersion = "24.11"; #  do not change even if you change nixpkgs.url above.
-              jl4-demo = {
-                domain = "jl4.well-typed.com";
-                acme-email = "magnus@well-typed.com";
-                root-ssh-keys = [
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEkSSWT6/5jBteJYcwiwltGp+hPZM/rQcqbOENvMvIj3 mangoiv@p14-nixos"
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJnW5fx9PJGfn5x6EcYdl2XlGxOiZKWfzPgzLYqCn7zW hannes@well-typed.com"
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfJEsr9v7Dh6uCv/gXRMW7AKGcBSprx23SwxiMPcYQP andres@well-typed.com"
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIORxGnRHtCTqoh2IijZMfgC+0nExW2ujUybdG54u8wS4 mengwong@nixos"
-                ];
-              };
-            }
-            inputs.disko.nixosModules.default
-            ./nix/configuration.nix
-            ./nix/hetzner.nix
-            ./nix/aws-vm.nix
-          ];
-        };
-
-        # working version on AWS
-        nixosConfigurations.jl4-aws-2505 = inputs.nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-
-          modules = [
-            (let stateVer = "25.05"; in {
-              system.stateVersion = stateVer;
-              # do not change the stateVersion even if you change nixpkgs.url above.
-              # the system is not fully stateless because the jl4-websessions component persists l4 programs to sqlite
-              jl4-demo = {
-                domain = "jl4.legalese.com";
-                acme-email = "mengwong@legalese.com";
-                root-ssh-keys = [
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO2u9PR5FnBb8joGKHUVGqy9/cZu/iXIjgLpblkOF0H+ meng-and-ruslan"
-                ];
-              };
-              # the web editor runs the LSP in the browser from WASM
-              services.jl4-lsp.enable = false;
-              environment.etc."my-deploy-marker" = {
-                text = ''
-                deployed-from-flake-2025-05-12 15:37
-                system.stateVersion = ${stateVer}
-                '';
-                mode = "0444";
-              };
-                 })
-            inputs.disko.nixosModules.default
-            ./nix/configuration.nix
-            ./nix/aws-ec2.nix
-            ./nix/aws-vm.nix
-          ];
-        };
-
-        # dev/staging environment on AWS EC2
-        nixosConfigurations.jl4-dev = inputs.nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
-
-          modules = [
-            (let stateVer = "25.05"; in {
-              system.stateVersion = stateVer;
-              jl4-demo = {
-                domain = "dev.jl4.legalese.com";
-                acme-email = "mengwong@legalese.com";
-                root-ssh-keys = [
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO2u9PR5FnBb8joGKHUVGqy9/cZu/iXIjgLpblkOF0H+ meng-and-ruslan"
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIORxGnRHtCTqoh2IijZMfgC+0nExW2ujUybdG54u8wS4 mengwong@nixos"
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN/JtalP151kdUUTh2/wA25IabXrJNkFIuMCeMj6U6CL nye"
-                ];
-              };
-              environment.etc."my-deploy-marker" = {
-                text = ''
-                deployed-from-flake-dev 2025-12-27
-                system.stateVersion = ${stateVer}
-                environment = development/staging
-                '';
-                mode = "0444";
-              };
-            })
-            inputs.disko.nixosModules.default
-            ./nix/configuration.nix
-            ./nix/aws-ec2.nix
-          ];
-        };
-      };
     };
 }
