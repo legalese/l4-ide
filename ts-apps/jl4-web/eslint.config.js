@@ -4,7 +4,7 @@ export default [
   ...config,
   {
     ignores: [
-      'static/wasm/*.mjs', // Exclude auto-generated WASM FFI glue code (from GHC WASM build)
+      'static/wasm/**/*.mjs', // Exclude auto-generated WASM FFI glue code (from GHC WASM build), also under static/wasm/<release>/
     ],
   },
 ]

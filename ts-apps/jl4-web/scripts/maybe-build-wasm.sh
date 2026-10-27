@@ -45,10 +45,11 @@ check_wasm_enabled() {
     return 1
 }
 
-# Check if WASM files exist
+# Check if WASM files exist (release builds put them in static/wasm/<release>/)
 wasm_files_exist() {
     local WASM_DIR="$WEB_APP_DIR/static/wasm"
-    if [ -f "$WASM_DIR/jl4-core.wasm" ] && [ -f "$WASM_DIR/jl4-core.mjs" ]; then
+    if [ -n "$(find "$WASM_DIR" -name jl4-core.wasm 2>/dev/null | head -1)" ] &&
+       [ -n "$(find "$WASM_DIR" -name jl4-core.mjs 2>/dev/null | head -1)" ]; then
         return 0
     fi
     return 1
