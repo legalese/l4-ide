@@ -69,6 +69,7 @@ library
     Compiler
     ControlPlane
     DataPlane
+    DeonticTrace
     DeploymentLoader
     EvalLimits
     FileBrowser

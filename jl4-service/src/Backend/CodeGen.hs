@@ -664,11 +664,20 @@ prepareEvents mPartyType mActionType events = do
   let eventListExpr = "(LIST " <> Text.intercalate ", " eventExprs <> ")"
   Right (partyDefns ++ actionDefns, eventListExpr)
 
--- | Format a Scientific number as L4 source
+-- | Format a Scientific number as L4 source: in decimal notation and never with
+-- an exponent, which L4's lexer does not read, and as the digits the client
+-- sent, not as the Double nearest to them.
+--
+-- A number the client writes with trailing zeros (@0.0@, @1.0@, @2.00@) arrives
+-- as a coefficient and a negative exponent that are not normalised. 'floor' of
+-- an integral number is its value; multiplying the coefficient by @10 ^ exponent@
+-- throws "Negative exponent" for it, and printing the Double of a fraction below
+-- @0.1@ or of a number from @1e7@ up (@5.0e-2@, @1.23456785e7@) gives text the
+-- lexer cannot read.
 formatScientific :: Scientific.Scientific -> Text
 formatScientific n
-  | Scientific.isInteger n = BaseText.textShow (Scientific.coefficient n * (10 ^ Scientific.base10Exponent n))
-  | otherwise = BaseText.textShow (Scientific.toRealFloat n :: Double)
+  | Scientific.isInteger n = BaseText.textShow (floor n :: Integer)
+  | otherwise = Text.pack (Scientific.formatScientific Scientific.Fixed Nothing n)
 
 -- | Generate L4 wrapper code for deontic evaluation with EVALTRACE.
 -- Extends generateEvalWrapper by wrapping the function call in EVALTRACE.

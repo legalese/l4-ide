@@ -259,7 +259,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
-Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every `/evaluation` request to a `DEONTIC` function; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every request to a `DEONTIC` function, whether to `/evaluation`, over MCP or as a batch case; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
 On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
 A rule that reads it where the other facts decide anyway, as in `walks OR TRUE`, still answers.
 If the answer does depend on it, evaluation stops and names it, and every other input the answer is waiting for:
@@ -341,6 +341,23 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 - `startTime` — start time for contract simulation (required for DEONTIC)
 - `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
 
+The same trace goes to a `DEONTIC` function over MCP and in a batch, and the answer is the same as `/evaluation`'s.
+Over MCP, `startTime` and `events` go beside `arguments`, as above (see [MCP Schema Design](#mcp-schema-design)).
+`tools/list` also lists them inside `arguments`, among the function's parameters, so a call may put them there; when both places have one, the one beside `arguments` is used, and a `null` is a field left out.
+In a batch, each case carries its own `startTime` and `events` among its attributes, beside the function's inputs: `{"@id": 1, "startTime": 0, "events": [...], "<input>": ...}`.
+A call or a case with no `startTime`, or no `events`, is refused with the message `/evaluation` gives: `startTime is required for functions returning DEONTIC`, or `events is required for functions returning DEONTIC`.
+Over MCP the refusal is an error result (`isError`) whose text is the body of `/evaluation`'s 400, `{"error": "..."}`; in a batch it is an `@error` on that case, and the cases beside it are still answered.
+That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
+The field names inside an event's party or action are read as sent on `/evaluation` and in a batch.
+Over MCP they are read as `tools/list` spells them, as an input's are: a field the rule calls `full name` is `full-name` in the schema, and is mapped back to the rule's name, and a name that is not a sanitized one is read as it was sent.
+That is **assumed, not ruled**: the rulings of 2026-10-26 do not cover it.
+A time is a number and may be written with a decimal point: `0.0`, `0.05` and `12345678.5` are read as written.
+A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list`, the explorer and the WebMCP page show it as one.
+Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.
+A `startTime` or `events` sent to a function that is not `DEONTIC` is refused on all three surfaces with `startTime and events are only valid for functions returning DEONTIC`: `/evaluation` answers `400`, MCP returns an error result, and a batch case is an `@error` while the cases beside it are answered.
+A `null` is a field left out.
+A function that is not `DEONTIC` and has inputs called `startTime` or `events` reads them as inputs; `/evaluation` used to take such a function for a `DEONTIC` one, because the compiler gives a `DEONTIC` function parameters of those names, and asked it for a trace.
+
 In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
 An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
 A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligatedParty` and `obligationAction` (the obligation that was missed), and in the `party` and `action` of each entry of `failures`.
@@ -392,6 +409,9 @@ Every case carries its own `@presumed`, the inputs it left out whose defaults it
 A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
 That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 Neither has a `value`.
+A case whose evaluation fails on the service's own fault, and not on a limit or on what the case said, is an `@error` too: it says the case could not be evaluated, the details are in the service log, and the cases beside it are answered.
+That wording and that treatment are **assumed, not ruled**.
+A case for a `DEONTIC` function carries its own `startTime` and `events`, and its `value` is the contract after them; a case without them is an `@error` (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
 The three `processor…` fields of `summary` are not measured, and are always `0`.
 The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describes this response key by key.
 
@@ -612,8 +632,8 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
-- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
-- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`.
+- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result. An `arguments` that is not one of the function's inputs is left out, and one that is, is read as an input.
+- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)). A function with an input of its own called `arguments` takes its inputs nested as the schema lists them, `{"arguments": {"arguments": ...}}`; a call that sends them flat loses that input (a known limit, read from the code and not run).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 

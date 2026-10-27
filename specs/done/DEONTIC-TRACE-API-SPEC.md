@@ -687,11 +687,18 @@ This is handled by composing the existing `generateEvalWrapper` logic with the n
 
 ### Q4: Maximum event list size?
 
-The existing `timeoutAction` wrapper (configurable `--eval-timeout` and `--max-eval-memory-mb`) applies to deontic evaluation too. Long event lists will hit these limits naturally. No additional limit is proposed for Phase 1.
+Deontic evaluation is held to the same limits, `--eval-timeout` and `--max-eval-memory-mb`, on every surface: `DeonticTrace.runDeonticLimited` runs it under `EvalLimits.withEvalLimits`, as the other evaluations run (`timeoutAction`, which this answer used to name, was replaced by it). Long event lists will hit these limits naturally. No additional limit is proposed for Phase 1.
 
 ### Q5: Should batch evaluation support events too?
 
 Not in Phase 1. The `/evaluation/batch` endpoint evaluates the same function across multiple input cases. Adding events would mean each batch case could have different event lists, which significantly complicates the request schema. If needed, this can be added later.
+
+**Since 2026-10-26 the service does take a trace per batch case** (`jl4-service/src/DataPlane.hs`, `runDeonticBatchCase`), and MCP `tools/call` and its task path take one too; all three call `DeonticTrace.runDeonticLimited`, the path `/evaluation` takes.
+A case carries its own `startTime` and `events` among its attributes.
+Before this, a batch case and an MCP call to a `DEONTIC` function dropped both fields without an error and answered the contract's initial obligation.
+**Assumed, not ruled:** a case or a call with no `startTime`, or no `events`, is refused with the message `/evaluation` gives, instead of being answered with the initial obligation.
+**Assumed, not ruled:** over MCP the record fields of an event's `party` and `action` are read as `tools/list` spells them (sanitized) and mapped back to the rule's names, as an input's are, and a name that is not a sanitized one is read as sent; on `/evaluation` and in a batch the names are read as sent.
+**Assumed, not ruled:** a batch case whose evaluation raises an exception of the service's own, which is neither a limit nor something the case said, is an `@error` that says the case could not be evaluated, and the cases beside it are answered; the exception is in the service log and not in the answer.
 
 ### Q6: What schema does the service publish for the answer of a function that returns `DEONTIC`?
 
@@ -737,11 +744,61 @@ What the condition means for the schema, and what it leaves open:
 **Assumed, not ruled:**
 
 - Whatever is withheld is withheld in one place that REST, batch and MCP share, so that the verdict cannot differ between surfaces and only the detail does (the principle of 2026-10-24: core owns the meaning, surfaces report it).
+  That place is `DeonticTrace.presentDeonticOutcome`, the identity today.
+  Evaluation answers and their errors pass through it, because `DeonticTrace.runDeonticLimited` applies it to the whole outcome of a replay, on `/evaluation`, on MCP `tools/call` and its task path, and in a batch case.
+  `GET .../state-graphs` and the source-browse tools (`list_files`, `read_file`, `search_identifier`, `search_text`) also expose a contract's structure and are outside it, so a setting that withholds the contract has to gate them too.
 - A shape the serializer gains adds an alternative to the schema in the same change.
 
 **Phase 2 above** proposes `{"OBLIGATION": {"operator": …, "children": […]}}` for `RAND` and `ROR`.
 The service emits `{"AND": [a, b]}` and `{"OR": [a, b]}`.
 This ruling publishes what is emitted; moving to Phase 2's form is a wire change and needs its own ruling.
+
+### Q7: Is a function whose return type is written `PROVISION OF` a `DEONTIC` function?
+
+**ANSWERED 2026-10-26 (Meng, in conversation).**
+
+Meng, verbatim: "i'd be in favour of fixing the PROVISION synonym as well. should be easy, right? We can look at the AST?"
+
+**What was true before** (read from the code on `unstable` at `65adfc2de`; the tests added with this ruling run it):
+
+- The compiler tells a `DEONTIC` function by its type: `isDeonticType` (`jl4-service/src/Backend/CodeGen.hs`) compares the type constructor's unique, and `PROVISION` resolves to the same unique (`jl4-core/src/L4/TypeCheck/Environment.hs`, "Deprecated alias for DEONTIC").
+  So a `PROVISION OF` function already got `startTime` and `events` parameters, and `/evaluation` replayed it.
+- Four other tests of "is this `DEONTIC`" disagreed with that.
+  MCP `tools/list` and `tools/call` tested the display name of the return type for the prefix `DEONTIC`, so a `PROVISION OF` function was listed as an ordinary tool with a flat schema.
+  The WebMCP page tested the same prefix, for a tool's schema, for the shape of its arguments and for whether it sends a trace.
+  The explorer tested the display name for equality with `DEONTIC`, on the page and in its script.
+  `/evaluation` tested for parameters named `startTime` and `events`, inline in `evalFunctionHandler` (`DataPlane.hs:246-247` on `unstable` at `65adfc2de`); `DeonticTrace.isDeonticFunction` is what replaced it, and did not exist before this change.
+
+**Ruled:**
+
+1. Every surface asks the type-based flag (`Function.isDeontic`, and `fsIsDeontic` on the summary the metadata cache holds): `/evaluation`, `tools/list`, `tools/call`, the MCP task path, batch, the explorer and the WebMCP page.
+2. A function that is not `DEONTIC` and has inputs named `startTime` and `events` is an ordinary function.
+   This is a behaviour change: `/evaluation` used to take it for a `DEONTIC` one, because it read the parameter names, and asked it for a trace.
+
+**Assumed, not ruled:** a metadata-cache entry written before the cache held `isDeontic` reads the flag from the display name of the return type, `DEONTIC` or `PROVISION OF`; a recompile replaces that with the type's own answer.
+
+### Q8: What does a trace sent to a function that does not return `DEONTIC` do?
+
+**ANSWERED 2026-10-26 (Meng, in conversation).**
+
+Meng, verbatim: "trace going to non-DEONTIC should error."
+
+**What was true before:** `/evaluation` answered `400` with `startTime and events are only valid for functions returning DEONTIC`.
+MCP `tools/call`, the MCP task path and a batch case dropped the fields and answered as if they had not been sent.
+
+**Ruled:** it is an error on every surface, with `/evaluation`'s message, in each surface's usual form: a `400`, an error result (`isError`) and an `@error` on that batch case, the cases beside it answered.
+
+**Assumed, not ruled:**
+
+- On MCP and in a batch the trace and the inputs share a level, so a field is a trace only when it is named `startTime` or `events` and is not one of the function's inputs.
+- A `null` is a field left out, as it is on `/evaluation`.
+- An `arguments` on a function that is not `DEONTIC` is left out unless the function has an input of that name, which is then an input as any other (found in review, 2026-10-27: MCP left it out always, so such an input was never read there, and the tool listed it as required and then called it missing).
+  The `DEONTIC` branches are as they were.
+
+**Known limit:** a `DEONTIC` function with an input of its own called `arguments`.
+The tool's schema nests the inputs under `arguments`, so on MCP that input is sent as `{"arguments": {"arguments": ...}}`, which is read.
+A call that sends the inputs flat, which is read for a `DEONTIC` function with no `arguments` object, loses it, because `buildMcpCall` leaves a top-level `arguments` out of a flat read, and one that sends it as an object is taken for the envelope.
+Read from `buildMcpCall`, not run.
 
 ---
 
