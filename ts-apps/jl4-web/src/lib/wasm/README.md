@@ -33,7 +33,7 @@ in the browser via WebAssembly, without requiring a server connection.
 ┌─────────────────────────────────────────────────────────────┐
 │                   L4WasmBridge                               │
 │  wasm-bridge.ts                                              │
-│  - Loads and caches WASM module                              │
+│  - Loads and compiles WASM module                            │
 │  - Typed interface to WASM exports                           │
 │  - JSON parsing of results                                   │
 └───────────────────────────┬─────────────────────────────────┘
@@ -241,9 +241,12 @@ IMPORT helper      -- Would look in VFS
 
 ## Environment Variables
 
-- `VITE_WASM_URL` - URL to fetch the WASM module (default: `/wasm/jl4-core.wasm`)
+- `VITE_WASM_URL` - URL to fetch the WASM module (default: `/wasm/jl4-core.wasm`); index.html preloads it
 - `VITE_WASM_JS_URL` - URL to fetch the JS FFI glue (default: `/wasm/jl4-core.mjs`)
-- `VITE_WASM_VERSION` - Version string for cache busting (default: `dev`)
+- `VITE_WASM_VERSION` - The release the WASM came from, shown in load errors (default: `dev`)
+
+Release builds (`main-tag.yml`) serve both files from `/wasm/<release>/`, cached as immutable, so the browser's HTTP cache keeps the WASM between visits and each release gets new URLs.
+
 - `VITE_PREFER_WASM` - Set to "true" to prefer WASM over WebSocket
 
 ## File Sizes

@@ -13,7 +13,8 @@ const config = {
       // these options are set automatically — see below
       pages: 'build',
       assets: 'build',
-      fallback: 'index.html',
+      // No SPA fallback: the one page is prerendered to index.html (see
+      // src/routes/+layout.ts), and a fallback would overwrite it.
       precompress: true,
       strict: true,
     }),
