@@ -150,6 +150,19 @@ library
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
+    L4.Ledger.Append
+    L4.Ledger.Offer
+    L4.Ledger.Replay
+    L4.Ledger.Row
+    L4.Ledger.Store
+    L4.Lts.Explore
+    L4.Lts.Explore.Check
+    L4.Lts.Explore.Emit
+    L4.Lts.Explore.Emit.Aut
+    L4.Lts.Explore.Emit.Model
+    L4.Lts.Explore.Emit.Pnml
+    L4.Lts.Explore.Emit.Smv
+    L4.Lts.Explore.Emit.Tla
     L4.Lts.List
     L4.Lts.Marking
     L4.Lts.WhatIf
@@ -287,9 +300,12 @@ test-suite jl4-core-test
     TraceOrderingSpec
     StateGraphSpec
     DeonticStepSpec
+    LtsEmitSpec
+    LtsExploreSpec
     LtsListSpec
     LtsMarkingSpec
     LtsWhatIfSpec
+    LedgerSpec
     DominatorsSpec
     RelationalSpec
     BlawxAssumeSpec
@@ -310,10 +326,13 @@ test-suite jl4-core-test
     bytestring,
     containers,
     deepseq,
+    directory,
+    filepath,
     hspec,
     jl4-core,
     megaparsec,
     optics,
+    QuickCheck,
     text,
     time,
     vector

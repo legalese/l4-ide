@@ -16,6 +16,8 @@ import System.Exit (ExitCode (..), exitSuccess, exitWith)
 import System.IO (hPutStrLn, stderr)
 import Text.Read (readMaybe)
 
+import Ledger.Store.Config (LedgerStoreConfig (..), StoreChoice (..), parseStoreChoice)
+
 data Options = Options
   { port                  :: !Int
   , storePath             :: !FilePath
@@ -56,6 +58,23 @@ data Options = Options
   -- binary over a store before a rollout switches to it.
   , checkJson             :: !Bool
   -- ^ With 'checkStore': print the report as one JSON document.
+  , ledgerStore           :: !LedgerStoreConfig
+  -- ^ Which store the instance ledger keeps its rows in
+  -- (OPERATIONAL-LOWERING-SPEC §3.7): sqlite under 'storePath' by default.
+  , ledgerMaxEvalMemoryMb :: !Int
+  -- ^ The allocation limit one ledger request evaluates under, in MB, in
+  -- place of 'maxEvalMemoryMb' ('EvalLimits.withThreadLimits' says why it is
+  -- not published). Like that one it counts bytes allocated,
+  -- not memory held. One append to the dinner fixture re-typechecks the
+  -- contract with its imports, twice, and allocated about 2.1 GB (measured
+  -- 2026-10-26), so the 256 MB a decision gets would refuse every append.
+  -- The default is that measurement with room for a longer history and a
+  -- larger contract (D-O10: sized by the first deployment).
+  , ledgerMcpWrite        :: !Bool
+  -- ^ Whether the ledger's MCP write tools exist (OPERATIONAL-LOWERING-SPEC
+  -- §9 WPO6, D-O13): one per act the caller's party may perform. Off by
+  -- default until D-O2 (who the caller is) and D-O11 are decided. With it
+  -- off no write tool is listed, and a call to one is an unknown tool.
   }
 
 -- | Build the CLI parser with environment variable defaults.
@@ -77,6 +96,12 @@ buildOpts = do
   envEvalTO     <- readEnvInt "JL4_EVAL_TIMEOUT"
   envCompTO     <- readEnvInt "JL4_COMPILE_TIMEOUT"
   envMaxLadder  <- readEnvInt "JL4_MAX_LADDER_NODES"
+  envLedgerStore <- lookupEnv "JL4_LEDGER_STORE" >>= traverse \raw ->
+    either (\err -> fail ("JL4_LEDGER_STORE: " <> err)) pure (parseStoreChoice raw)
+  envLedgerPg   <- lookupEnv "JL4_LEDGER_POSTGRES_URL"
+  envLedgerNonDurable <- readEnvBool "JL4_LEDGER_ALLOW_NONDURABLE"
+  envLedgerMem  <- readEnvInt "JL4_LEDGER_MAX_EVAL_MEMORY_MB"
+  envLedgerMcpWrite <- readEnvBool "JL4_LEDGER_MCP_WRITE"
 
   let parser = Options
         <$> option auto
@@ -203,6 +228,52 @@ buildOpts = do
               ( long "json"
                   <> help "With --check-store, print the report as one JSON document"
               )
+        <*> ( MkLedgerStoreConfig
+                <$> option (eitherReader parseStoreChoice)
+                      ( long "ledger-store"
+                          <> metavar "sqlite|postgres|memory"
+                          <> value (maybe ChooseSqlite id envLedgerStore)
+                          <> showDefaultWith (\case ChooseSqlite -> "sqlite"; ChoosePostgres -> "postgres"; ChooseMemory -> "memory")
+                          <> help
+                               "Where the instance ledger keeps its rows: sqlite, a file under the \
+                               \store path; postgres, for more than one process; memory, for tests \
+                               \only (env: JL4_LEDGER_STORE)"
+                      )
+                <*> optional
+                      ( strOption
+                          ( long "ledger-postgres-url"
+                              <> metavar "URL"
+                              <> maybe mempty (value . Text.pack) envLedgerPg
+                              <> help "Connection string for --ledger-store postgres (env: JL4_LEDGER_POSTGRES_URL)"
+                          )
+                      )
+                <*> ( flag' True
+                        ( long "ledger-allow-nondurable"
+                            <> help
+                                 "Allow --ledger-store memory, which loses every instance on restart; \
+                                 \for tests only (env: JL4_LEDGER_ALLOW_NONDURABLE)"
+                        )
+                      <|> pure (maybe False id envLedgerNonDurable)
+                    )
+            )
+        <*> option auto
+              ( long "ledger-max-eval-memory-mb"
+                  <> metavar "MB"
+                  <> value (maybe 8192 id envLedgerMem)
+                  <> showDefault
+                  <> help
+                       "Maximum memory allocation per instance-ledger request in MB; one append \
+                       \re-typechecks its contract (env: JL4_LEDGER_MAX_EVAL_MEMORY_MB)"
+              )
+        <*> ( flag' True
+                ( long "ledger-mcp-write"
+                    <> help
+                         "Let an agent append to an instance ledger over MCP: one write tool per \
+                         \act the caller's party (the X-L4-Party header) may perform. Off by \
+                         \default until who the caller is has been decided (env: JL4_LEDGER_MCP_WRITE)"
+                )
+              <|> pure (maybe False id envLedgerMcpWrite)
+            )
 
   pure $ info
     (parser <**> helper)

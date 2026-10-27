@@ -25,6 +25,7 @@ import qualified LSP.L4.Viz.VizExpr as VizExpr
 import Compiler (toDecl)
 import EvalLimits (limitHitMessage)
 import qualified EvalLimits
+import Ledger (InstanceRoutes, instanceRoutesHandler)
 import Logging (logInfo)
 import Options (Options (..))
 import Shared (jsonError)
@@ -86,6 +87,9 @@ type DeploymentRoutes =
        "functions" :> Get '[JSON] [SimpleFunction]
   :<|> "functions" :> Capture "name" Text :> FunctionRoutes
   :<|> "openapi.json" :> Get '[JSON] Aeson.Value
+       -- /deployments/{id}/instances/... → the instance ledger ("Ledger");
+       -- long routes only, since a short /{id}/instances is a function name
+  :<|> InstanceRoutes
 
 -- | Evaluation responses include an X-Eval-Alloc-Bytes header reporting
 -- the GHC allocation bytes consumed by the evaluation.
@@ -108,6 +112,7 @@ dataPlaneHandler vis deployIdText =
        listFunctionsHandler deployId
   :<|> functionRoutesHandler deployId
   :<|> openApiHandler vis deployId
+  :<|> instanceRoutesHandler deployIdText
  where
   deployId = DeploymentId deployIdText
 
