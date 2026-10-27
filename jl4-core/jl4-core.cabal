@@ -197,6 +197,7 @@ test-suite jl4-core-test
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     RefAnnotationSpec
+    RefusalReportSpec
     RefuseSpec
     NlgPercentSpec
     NlgRenderSpec
@@ -208,6 +209,7 @@ test-suite jl4-core-test
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
     base,
     bytestring,
     containers,

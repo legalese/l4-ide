@@ -223,6 +223,18 @@ data Directive n =
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | How a directive is named to a user: in the editor's code lenses, which
+-- pass the name back when they ask for the directive's result, and in its
+-- outline. A @#CHECK@ with a contract is named as a plain @#CHECK@ is.
+directiveLabel :: Directive n -> Text
+directiveLabel = \case
+  LazyEval{}      -> "#EVAL"
+  LazyEvalTrace{} -> "#EVALTRACE"
+  Check{}         -> "#CHECK"
+  Contract{}      -> "#CHECK"
+  Assert{}        -> "#ASSERT"
+  AssertRefused{} -> "#ASSERT REFUSED"
+
 data Event n
   = MkEvent
   { anno :: Anno

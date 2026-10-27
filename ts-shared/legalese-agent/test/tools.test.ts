@@ -232,6 +232,19 @@ describe('l4__evaluate', () => {
       '[a.l4 1-3/3]\n--- L4 directives: 2 (full) ---\n  1 → TRUE\n  3 → FALSE'
     )
   })
+
+  test('marks a failure with ! and a refusal, whose success is null, with ~', async () => {
+    const { l4, tools } = session({ 'a.l4': 'l1\nl2\nl3' })
+    l4.directives.record(uriOf('/ws/a.l4'), [
+      row(1, 'TRUE'),
+      { ...row(2, 'assertion failed'), success: false },
+      { ...row(3, 'The model refuses to answer: deep'), success: null },
+    ])
+    assert.equal(
+      await tools.evaluate({ path: 'a.l4' }),
+      '[a.l4 1-3/3]\n--- L4 directives: 3 (full) ---\n  1 → TRUE\n! 2 → assertion failed\n~ 3 → The model refuses to answer: deep'
+    )
+  })
 })
 
 describe('l4__refactor rename', () => {

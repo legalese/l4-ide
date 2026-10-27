@@ -1,0 +1,10 @@
+§ `Refusals`
+
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "not modelled"
+
+#EVAL `not modelled`
+
+#ASSERT REFUSED `not modelled`
+
+#ASSERT REFUSED `not modelled` BECAUSE "not modelled"

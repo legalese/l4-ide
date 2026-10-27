@@ -15,6 +15,8 @@ module L4.EvaluateLazy
 , execEvalExprInContextOfModule
 , prettyEvalException
 , prettyRefusal
+, refusalMarker
+, parseRefusalMarker
 , Refusal(..)
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
@@ -33,6 +35,7 @@ import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
 import L4.Syntax
+import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (initialTemporalContext)
 import L4.TracePolicy (TracePolicy)
@@ -56,6 +59,13 @@ data EvalConfig = EvalConfig
     -- 'Just t' means use a fixed time (for tests / JL4_FIXED_NOW).
   , tracePolicy :: !TracePolicy
   , safeMode :: !Bool  -- ^ When True, HTTP operations (FETCH/POST) return errors instead of making requests
+  , answerInJust :: !Bool
+    -- ^ When True, a directive that answers @JUST x@ reads @x@ as deep as a
+    -- directive that answers @x@ alone reads it: the JUST takes no level of
+    -- the depth. A caller that asks for an answer as @JUST (f args)@, as
+    -- @l4 batch@ and jl4-service's generated wrapper do, sets it, so that it
+    -- reaches the same depth of the answer as a directive that asks for
+    -- @f args@, and gives the same verdict.
   }
 
 resolveEvalConfig :: Maybe UTCTime -> TracePolicy -> IO EvalConfig
@@ -63,7 +73,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe)
+  pure (EvalConfig mTime tracePolicy safe False)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -129,10 +139,10 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
       then second Just <$> do
         captureTrace $ tryEval $ do
           whnf <- runConfig $ ForwardMachine env expr
-          nf whnf
+          nfAnswer whnf
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
-        nf whnf
+        nfAnswer whnf
   let
     -- The root of the trace carries the outcome of the directive's expression.
     -- The trace records the reduction to weak head normal form, so an
@@ -187,6 +197,10 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
           -- Nor is a bare assumed term an answer: it is reported as the plain
           -- '#ASSERT' reports it, as an assertion that could not be decided.
           Right (MkNF (ValAssumed a)) -> Errored (UserEvalException (Stuck a))
+          -- A value read only to the depth a directive reads may refuse
+          -- below it, so it is no evidence that the expression does not
+          -- refuse: the assertion is undecided.
+          Right nfv | reachesOmitted nfv -> Errored (UserEvalException ValueTooDeep)
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
   pure (MkEvalDirectiveResult r v' finalTrace)
@@ -357,6 +371,28 @@ prettyEvalDirectiveValueWithFields fields  (Reduction (Reduced v))          = pr
 nf :: WHNF -> Eval NF
 nf = nfAux maximumStackSize
 
+-- | Whether a normal form stops anywhere at the depth a directive reads,
+-- leaving a part of the value unread.
+reachesOmitted :: NF -> Bool
+reachesOmitted Omitted = True
+reachesOmitted (MkNF v) = any reachesOmitted v
+
+-- | The normal form of a directive's answer. Under 'answerInJust' a @JUST x@
+-- answer is the caller's envelope, so @x@ is read from the full depth, as a
+-- directive that asked for @x@ alone reads it.
+nfAnswer :: WHNF -> Eval NF
+nfAnswer whnf = do
+  wrapped <- getAnswerInJust
+  case whnf of
+    -- Only a JUST is the caller's envelope; any other constructor of one
+    -- field is the rule's, and takes a level as it does without the setting.
+    ValConstructor con [r]
+      | wrapped, getUnique con == TypeCheck.justUnique -> do
+          inner <- runConfig (EvalRefMachine r)
+          v <- nf inner
+          pure (MkNF (ValConstructor con [v]))
+    _ -> nf whnf
+
 nfAux :: Int -> WHNF -> Eval NF
 nfAux  d _v | d < 0                  = pure Omitted
 nfAux _d (ValNumber i)               = pure (MkNF (ValNumber i))
@@ -445,7 +481,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
   let evalTrace = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode}
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust}
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,

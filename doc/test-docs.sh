@@ -368,13 +368,10 @@ if $JL4_AVAILABLE; then
         set -e  # Re-enable
         
         if [[ $run_exit_code -eq 0 ]]; then
-            # Check if there are actual errors (not just #EVAL output containing "error" text)
-            # Real errors have "Severity: DiagnosticSeverity_Error" while #EVAL output has "Information"
-            # A refused #ASSERT is not a successful example either, whatever
-            # severity its diagnostic carries: `l4 run` exits 0 for it, and
-            # reports it on a line of its own that starts "assertion refused:".
-            if echo "$output" | grep -qi "DiagnosticSeverity_Error" \
-               || echo "$output" | grep -qE '^[[:space:]]*assertion refused:'; then
+            # An example that runs at exit 0 can still be unsuccessful: a
+            # diagnostic of error severity, or a refused #ASSERT, which is a
+            # warning. check-l4-run-output.sh says which.
+            if ! echo "$output" | bash "$SCRIPT_DIR/check-l4-run-output.sh"; then
                 log_error "Validation failed: $relative_path"
                 echo "$output" | head -20 | sed 's/^/       /'
                 ((L4_ERRORS+=1))

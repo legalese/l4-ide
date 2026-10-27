@@ -658,6 +658,11 @@ export type EvalResult = EvalResultSuccess | EvalResultFailure
 
 export interface EvalDirectiveResult {
   result: string
-  success: boolean
+  /** True for an answer or a satisfied assertion, false for a failed
+   * assertion or an evaluation that raised, null for a refusal. */
+  success: boolean | null
+  /** The LSP severity the editor shows the result with: 1 Error, 2 Warning,
+   * 3 Information. */
+  severity: number
   range?: Range
 }

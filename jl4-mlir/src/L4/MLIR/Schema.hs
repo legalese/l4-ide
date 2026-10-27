@@ -773,8 +773,10 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
       returnSchema_ = ef.exportReturnType >>= typeToRetSchema declares Set.empty
       -- A REFUSE has no WASM image: the compiled module cannot stop with a
       -- reason. So an export from which evaluation may reach a REFUSE is
-      -- marked unsupported here, and a request goes to the fallback
-      -- evaluator, which raises the refusal. The REFUSE may be written in
+      -- marked unsupported here, and the WASM backend does not run it: the
+      -- runtime's 'invokeFunction' declines it, and so does @jl4-mlir run@,
+      -- each naming this reason and sending the caller to jl4-service,
+      -- which raises the refusal. The REFUSE may be written in
       -- the export's body, in any clause of a regulative rule, or in a
       -- definition the body names, in this module or in one it imports.
       -- This is the one mark a REFUSE gets. The lowering emits a

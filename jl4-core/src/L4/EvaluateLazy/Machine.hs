@@ -22,6 +22,7 @@ module L4.EvaluateLazy.Machine
 , getEvalTime
 , getModuleUri
 , getSafeMode
+, getAnswerInJust
 -- * The string parsers TODATE, TOTIME and TODATETIME use, for callers that must
 -- agree with them (jl4-service names the input one of them refused).
 , parseDateText
@@ -158,6 +159,7 @@ data EvalState =
     , temporalContext :: !(IORef TemporalContext)
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
+    , answerInJust :: !Bool        -- see 'L4.EvaluateLazy.EvalConfig'
     }
 
 data Stack =
@@ -300,6 +302,9 @@ getTracePolicy = asks (.tracePolicy)
 
 getSafeMode :: Eval Bool
 getSafeMode = asks (.safeMode)
+
+getAnswerInJust :: Eval Bool
+getAnswerInJust = asks (.answerInJust)
 
 getEntityInfo :: Eval EntityInfo
 getEntityInfo = asks (.entityInfo)

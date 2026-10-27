@@ -16,6 +16,8 @@ module L4.Diagnostic
   , checkErrorToDiagnostic
   , parseErrorToDiagnostic
   , evalResultToDiagnostic
+  , evalResultSeverity
+  , evalResultSuccess
     -- * Severity conversion
   , fromCheckSeverity
     -- * Helpers
@@ -107,19 +109,47 @@ parseErrorToDiagnostic err = SimpleDiagnostic
   , sdSource   = "parser"
   }
 
--- | Convert an evaluation result to a platform-agnostic diagnostic.
---
--- Failed assertions, and assertions whose expression raised or refused, get
--- Error severity; every other result gets Info.
+-- | Convert an evaluation result to a platform-agnostic diagnostic, with the
+-- severity 'evalResultSeverity' gives it.
 evalResultToDiagnostic :: EL.EvalDirectiveResult -> SimpleDiagnostic
 evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace) = SimpleDiagnostic
   { sdLocation = RangeLoc <$> mrange
-  , sdSeverity = case res of
-      EL.Assertion EL.Fails            -> DSError
-      EL.Assertion (EL.FailsBecause _) -> DSError
-      EL.Assertion (EL.Errored _)      -> DSError
-      EL.Assertion (EL.Refused _)      -> DSError
-      _                                -> DSInformation
+  , sdSeverity = evalResultSeverity res
   , sdMessage  = EL.prettyEvalDirectiveResult r
   , sdSource   = "eval"
   }
+
+-- | The severity with which an editor shows a directive's result. A refusal,
+-- of an #EVAL or of an #ASSERT, is a warning: the model declined to answer,
+-- which is neither a success nor a defect in the program. A failed assertion,
+-- and an evaluation that raised, are errors. Everything else is information.
+--
+-- The language server and the browser editor both take a result's severity
+-- from here.
+evalResultSeverity :: EL.EvalDirectiveValue -> DiagnosticSeverity
+evalResultSeverity = \case
+  EL.Assertion EL.Holds              -> DSInformation
+  EL.Assertion EL.Fails              -> DSError
+  EL.Assertion (EL.FailsBecause _)   -> DSError
+  EL.Assertion (EL.Refused _)        -> DSWarning
+  EL.Assertion (EL.Errored _)        -> DSError
+  EL.Reduction (EL.Reduced _)        -> DSInformation
+  EL.Reduction (EL.ReducedRefused _) -> DSWarning
+  EL.Reduction (EL.ReducedErrored _) -> DSError
+
+-- | Whether a directive's result is a success: an answer or a holding
+-- assertion is, a failure or an evaluation that raised is not, and a refusal,
+-- of an #EVAL or of an #ASSERT, is neither.
+--
+-- L4.API's 'l4Eval' and 'l4EvalDirective' and the language server's Inspector
+-- all take a result's success from here.
+evalResultSuccess :: EL.EvalDirectiveValue -> Maybe Bool
+evalResultSuccess = \case
+  EL.Assertion EL.Holds              -> Just True
+  EL.Assertion EL.Fails              -> Just False
+  EL.Assertion (EL.FailsBecause _)   -> Just False
+  EL.Assertion (EL.Refused _)        -> Nothing
+  EL.Assertion (EL.Errored _)        -> Just False
+  EL.Reduction (EL.Reduced _)        -> Just True
+  EL.Reduction (EL.ReducedRefused _) -> Nothing
+  EL.Reduction (EL.ReducedErrored _) -> Just False

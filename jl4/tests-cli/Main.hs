@@ -29,6 +29,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
   ( canonicalizePath
+  , copyFile
   , createDirectoryIfMissing
   , createFileLink
   , doesFileExist
@@ -1125,6 +1126,71 @@ spec bin = do
       sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
       sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
 
+  -- doc/test-docs.sh runs doc/check-l4-run-output.sh on what `l4 run` prints
+  -- for each example under doc/, and fails an example for which it exits 1:
+  -- one with a diagnostic of error severity, or with a refused #ASSERT, whose
+  -- diagnostic is a warning. A refusing #EVAL passes, also when a later line
+  -- of its reason starts as a refused #ASSERT's result does, or is that
+  -- result's line exactly. It reads output whose lines end in CRLF as it reads
+  -- output whose lines end in LF.
+  describe "doc/check-l4-run-output.sh, on what l4 run prints" $ do
+    let posixOnly act
+          | Info.os == "mingw32" = pendingWith "needs a POSIX shell and awk"
+          | otherwise = act
+        checkRun fixture = do
+          (code, _, _) <- readCreateProcessWithExitCode
+            (proc "bash" ["-c", "\"$0\" run \"$1\" 2>&1 | bash \"$2\"", bin, fixtureDir </> fixture, checkRunOutputScript]) ""
+          pure code
+    it "passes a refusing #EVAL whose reason runs onto a line that starts \"assertion refused:\"" $ posixOnly $
+      checkRun "refuse-multiline-reason.l4" `shouldReturn` ExitSuccess
+    it "passes a refusing #EVAL whose reason has a line that holds only \"assertion refused:\"" $ posixOnly $
+      checkRun "refuse-reason-line-assertion-refused.l4" `shouldReturn` ExitSuccess
+    it "passes a refusing #EVAL beside a satisfied #ASSERT REFUSED" $ posixOnly $
+      checkRun "refuse-eval.l4" `shouldReturn` ExitSuccess
+    it "fails a refused #ASSERT" $ posixOnly $
+      checkRun "refuse-assert.l4" `shouldReturn` ExitFailure 1
+    it "fails a failed #ASSERT REFUSED, by its error diagnostic" $ posixOnly $
+      checkRun "assert-refused-fails.l4" `shouldReturn` ExitFailure 1
+    it "fails a refused #ASSERT when the lines end in CRLF" $ posixOnly $ do
+      (code, _, _) <- readCreateProcessWithExitCode
+        (proc "bash" [checkRunOutputScript])
+        "Result:\r\n  assertion refused:\r\n  not modelled\r\n"
+      code `shouldBe` ExitFailure 1
+
+    -- doc/test-docs.sh runs this check, and no other, over what `l4 run`
+    -- prints for each .l4 file under doc/ that it runs at exit 0: a refused
+    -- #ASSERT there fails the docs, at that file, though `l4 run` exits 0
+    -- for it, and a refusing #EVAL passes them, also when a line of its
+    -- reason reads as a refused #ASSERT's result. A copy of the script and
+    -- of the check, with one linked .l4 file beside them, is a doc/ of its
+    -- own; this build's l4 is first on its PATH.
+    let testDocsWith fixture = withSystemTempDirectory "l4-test-docs" \tmp -> do
+          let doc = tmp </> "doc"
+              binDir = tmp </> "bin"
+          forM_ [doc </> "courses", doc </> "reference", binDir] (createDirectoryIfMissing True)
+          forM_ ["test-docs.sh", "check-l4-run-output.sh"] \f ->
+            copyFile (".." </> "doc" </> f) (doc </> f)
+          copyFile (fixtureDir </> fixture) (doc </> "probe.l4")
+          writeFile (doc </> "README.md") "[the probe](probe.l4)\n"
+          createFileLink bin (binDir </> "l4")
+          parent <- getEnvironment
+          let path = binDir <> ":" <> fromMaybe "" (lookup "PATH" parent)
+              inherited = filter ((/= "PATH") . fst) parent
+          (code, out, err) <- readCreateProcessWithExitCode
+            (proc "bash" [doc </> "test-docs.sh"]) {env = Just (("PATH", path) : inherited)} ""
+          pure (code, out <> err)
+    it "fails doc/test-docs.sh at a file under doc/ that holds a refused #ASSERT" $ posixOnly $ do
+      (code, out) <- testDocsWith "refuse-assert.l4"
+      (code, "Validation failed: probe.l4" `isInfixOf` out) `shouldBe` (ExitFailure 1, True)
+    it "passes doc/test-docs.sh at a file under doc/ that holds a refusing #EVAL beside a satisfied #ASSERT REFUSED" $ posixOnly $ do
+      (code, out) <- testDocsWith "refuse-eval.l4"
+      (code, "Validation failed" `isInfixOf` out) `shouldBe` (ExitSuccess, False)
+    forM_ [ ("runs onto a line that starts", "refuse-multiline-reason.l4")
+          , ("has a line that holds only", "refuse-reason-line-assertion-refused.l4") ] \(how, fixture) ->
+      it ("passes doc/test-docs.sh at a file under doc/ that holds a refusing #EVAL whose reason " <> how <> " \"assertion refused:\"") $ posixOnly $ do
+        (code, out) <- testDocsWith fixture
+        (code, "Validation failed" `isInfixOf` out) `shouldBe` (ExitSuccess, False)
+
   -- A directive that cannot be evaluated is not always the same failure. A
   -- CONSIDER with no matching branch, a division by zero and an #ASSERT whose
   -- expression raises are caught for that one directive: the run fails, but the
@@ -1262,6 +1328,25 @@ spec bin = do
               other   -> expectationFailure ("Expected a refused object, got " ++ show other)
           other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The editor's squiggles come from these diagnostics. A refusal is a
+    -- warning: not the error of a failed or a raising directive, and not the
+    -- information of an answer. A satisfied #ASSERT REFUSED is information.
+    it "publishes a refusing #EVAL and a refused #ASSERT as Warning diagnostics, and a satisfied #ASSERT REFUSED as Information" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s' | String s' <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "7" `shouldSatisfy` ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          at "7" `shouldSatisfy` ("The model refuses to answer:" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("assertion satisfied" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("assertion refused:" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
 
     -- #ASSERT REFUSED has three ways to come out other than satisfied, and
     -- --json keeps them apart: an answer where a refusal was expected, and a
@@ -1473,6 +1558,115 @@ spec bin = do
             failed `shouldBe`
               "// Result: False (assertion failed: expected a refusal, but the expression produced a value)"
           other -> expectationFailure ("Expected one Result line in each of three traces, got " ++ show other)
+
+  -- A directive reads a list answer only so deep, so a REFUSE or a division by
+  -- zero at the end of a long list stops it for a short list and not for a
+  -- longer one. `l4 batch` reads each row's answer to the same depth as `l4 run`
+  -- reads an #EVAL, so the two give the same verdict for every n, including the
+  -- n on each side of the depth limit.
+  describe "l4 run and l4 batch read a long list answer to the same depth" $ do
+    let depthFixture = fixtureDir </> "refuse-depth.l4"
+        depthRows = fixtureDir </> "refuse-depth-rows.json"
+        verdictOf :: T.Text -> String
+        verdictOf t
+          | "The model refuses to answer:" `T.isInfixOf` t = "refuses"
+          | "Division by zero" `T.isInfixOf` t = "division by zero"
+          | otherwise = "answers"
+        runVerdictsOf fixture = do
+          Output _ sout _ <- runL4 bin ["run", fixture]
+          let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
+              result b = fst (T.breakOn "Trace:" (snd (T.breakOn "Result:" b)))
+          pure (map (verdictOf . result) blocks)
+        runVerdicts = runVerdictsOf depthFixture
+        batchRowsOf :: FilePath -> FilePath -> String -> IO [Value]
+        batchRowsOf fixture rowsFile entry = do
+          Output _ sout _ <- runL4 bin ["batch", "-c", fixture, "-i", rowsFile, "-e", entry]
+          pure [ row | l <- map (filter (/= '\r')) (lines sout)
+                     , Right row <- [eitherDecode (BSL8.pack l)] ]
+        batchRows = batchRowsOf depthFixture depthRows
+        maybeFixture = fixtureDir </> "refuse-depth-maybe.l4"
+        maybeRows = fixtureDir </> "refuse-depth-maybe-rows.json"
+        rowResult row = case objField row "output" of
+          Just (Array outs) | (o : _) <- toList outs -> objField o "result"
+          _ -> Nothing
+        batchVerdict :: Value -> String
+        batchVerdict row = case rowResult row of
+          Just (Object o)
+            | Just (Object _) <- KeyMap.lookup (Key.fromString "refused") o
+            , objField row "status" == Just (String "refused") -> "refuses"
+            | Just (String e) <- KeyMap.lookup (Key.fromString "error") o -> verdictOf e
+          Just (Array _) | objField row "status" == Just (String "success") -> "answers"
+          other -> "unexpected: " <> take 300 (show other)
+        -- each rule, with the verdicts `l4 run` gives for n = 200, 201, 202
+        expected :: [(String, [String])]
+        expected =
+          [ ("refusal in the list",  ["refuses", "answers", "answers"])
+          , ("refusal as the rest",  ["refuses", "refuses", "answers"])
+          , ("division in the list", ["division by zero", "answers", "answers"])
+          , ("division as the rest", ["division by zero", "division by zero", "answers"])
+          ]
+
+    it "l4 run reaches the end of the list for the smaller n and answers for the larger" $ do
+      verdicts <- runVerdicts
+      verdicts `shouldBe` concatMap snd expected
+
+    forM_ expected \(entry, verdicts) ->
+      it ("l4 batch gives the verdict l4 run gives for each n, for `" <> entry <> "`") $ do
+        rows <- batchRows entry
+        map batchVerdict rows `shouldBe` verdicts
+
+    -- An answered row carries the list as deep as the service's direct path
+    -- does: the numbers, then a null for the element and one for the rest of
+    -- the list that the depth limit leaves unprinted.
+    it "l4 batch answers a row past the limit with the numbers the depth limit reaches, then a null for the element and one for the rest" $ do
+      rows <- batchRows "refusal in the list"
+      case drop 1 rows of
+        (row : _) -> case rowResult row of
+          Just (Array xs) -> do
+            let entries = toList xs
+            length entries `shouldBe` 202
+            take 200 entries `shouldBe` map (Number . fromInteger) [201, 200 .. 2]
+            drop 200 entries `shouldBe` [Null, Null]
+          other -> expectationFailure ("Expected a list answer, got " <> take 300 (show other))
+        [] -> expectationFailure "Expected three rows"
+
+    -- The rule's own JUST takes a level on both paths, so the refusal at the
+    -- end of the list is reached one element sooner than in a bare list. l4
+    -- batch reads a function's answer inside a JUST of its own, and only that
+    -- outer JUST takes no level.
+    it "l4 run and l4 batch reach a refusal one element sooner in a list inside the rule's own JUST" $ do
+      runV <- runVerdictsOf maybeFixture
+      rows <- batchRowsOf maybeFixture maybeRows "refusal in a MAYBE list"
+      runV `shouldBe` ["refuses", "answers"]
+      map batchVerdict rows `shouldBe` ["refuses", "answers"]
+
+    it "l4 batch answers the row past that limit with the numbers one element sooner, then the two nulls" $ do
+      rows <- batchRowsOf maybeFixture maybeRows "refusal in a MAYBE list"
+      case drop 1 rows of
+        (row : _) -> case rowResult row of
+          Just (Array xs) -> do
+            let entries = toList xs
+            length entries `shouldBe` 201
+            take 199 entries `shouldBe` map (Number . fromInteger) [200, 199 .. 2]
+            drop 199 entries `shouldBe` [Null, Null]
+          other -> expectationFailure ("Expected a list answer, got " <> take 300 (show other))
+        [] -> expectationFailure "Expected two rows"
+
+    -- An export with no inputs is asked for bare, not inside a JUST, so a JUST
+    -- in its answer is the rule's own and takes a level, as it does for an
+    -- #EVAL of the export. The fixture's list ends in a refusal one level below
+    -- the depth read, so both answer.
+    it "l4 batch gives the verdict l4 run gives for an export with no inputs whose answer is in its own JUST" $ do
+      let fixture = fixtureDir </> "refuse-depth-no-inputs.l4"
+          rowsFile = fixtureDir </> "refuse-depth-no-inputs-rows.json"
+      Output _ rout _ <- runL4 bin ["run", fixture]
+      Output _ bout _ <- runL4 bin ["batch", "-c", fixture, "-i", rowsFile, "-e", "wrapped"]
+      let runResult = fst (T.breakOn "Trace:" (snd (T.breakOn "Result:" (T.pack (filter (/= '\r') rout)))))
+          rows = [ row | l <- map (filter (/= '\r')) (lines bout)
+                       , Right row <- [eitherDecode (BSL8.pack l)] ]
+      runResult `shouldSatisfy` T.isInfixOf "JUST OF (LIST 200, 199"
+      verdictOf runResult `shouldBe` "answers"
+      map batchVerdict rows `shouldBe` ["answers"]
 
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
@@ -3205,6 +3399,10 @@ batchAnswer bin file inputs entry = do
 buildIdentityScript, buildIdentityPackageJson :: FilePath
 buildIdentityScript      = "../etc/build-identity.sh"
 buildIdentityPackageJson = "../ts-apps/vscode/package.json"
+
+-- | doc/test-docs.sh's check of what @l4 run@ printed, relative to @jl4/@.
+checkRunOutputScript :: FilePath
+checkRunOutputScript = "../doc/check-l4-run-output.sh"
 
 -- | No white space at either end, and any run of it inside a single space: how
 -- the renderer treats each part, so a value with a line break in it still gives

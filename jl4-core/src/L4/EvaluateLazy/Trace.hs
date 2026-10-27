@@ -315,6 +315,9 @@ printUserEvalExceptionShort (DivisionByZero _)              = "division by zero"
 printUserEvalExceptionShort (NotAnInteger _ _)              = "not an integer"
 printUserEvalExceptionShort (Stuck _)                       = "stuck"
 printUserEvalExceptionShort (UserError _)                   = "user error"
+-- 'ValueTooDeep' is the outcome of an #ASSERT REFUSED, not of an evaluation,
+-- and a trace carries the evaluation's, so no trace holds it.
+printUserEvalExceptionShort ValueTooDeep                    = "value deeper than read"
 
 -- | This is a stack data structure that is maintained while building an 'EvalPreTrace'.
 type PreTraceStack = [PreTraceFrame]

@@ -28,6 +28,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import qualified L4.EvaluateLazy as EL
+import L4.Diagnostic (evalResultSuccess)
 import qualified L4.Evaluate.ValueLazy as Val
 
 ------------------------------------------------------
@@ -142,7 +143,7 @@ evalDirectiveToResult fields dirType rng (EL.MkEvalDirectiveResult _range res mt
   DirectiveResult
     { directiveType = dirType
     , prettyText = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult _range res mtrace)
-    , success = successOf res
+    , success = evalResultSuccess res
     , structuredValue = case res of
         EL.Assertion EL.Holds              -> Just (Aeson.toJSON True)
         EL.Assertion EL.Fails              -> Just (Aeson.toJSON False)
@@ -276,22 +277,10 @@ evalDirectiveToUpdateItem fields getLines (EL.MkEvalDirectiveResult (Just rng@(M
   Just DirectiveUpdateItem
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
     , prettyText  = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult (Just rng) res mtrace)
-    , success     = successOf res
+    , success     = evalResultSuccess res
     , body        = getLines startLine endLine
     }
 evalDirectiveToUpdateItem _ _ _ = Nothing
-
--- | The @success@ of a directive, shared by both result shapes.
-successOf :: EL.EvalDirectiveValue -> Maybe Bool
-successOf = \case
-  EL.Assertion EL.Holds              -> Just True
-  EL.Assertion EL.Fails              -> Just False
-  EL.Assertion (EL.FailsBecause _)   -> Just False
-  EL.Assertion (EL.Refused _)        -> Just False
-  EL.Assertion (EL.Errored _)        -> Just False
-  EL.Reduction (EL.Reduced _)        -> Just True
-  EL.Reduction (EL.ReducedRefused _) -> Just False
-  EL.Reduction (EL.ReducedErrored _) -> Just False
 
 ------------------------------------------------------
 -- l4/getExportedFunctions method name

@@ -136,28 +136,42 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
       let appExpr = evalAppMaker evalParams
       res <- liftIO $ EL.execEvalExprInContextOfModule evalConfig entityInfo appExpr contextModule
       case res of
-        Just evalRes -> Aeson.toJSON <$> evalResultToLadderEvalAppResult evalRes
+        Just (EL.MkEvalDirectiveResult _ v _mtrace) ->
+          either throwError (pure . Aeson.toJSON) (ladderEvalAppResult v)
         Nothing -> defaultResponseError "No eval result found"
-  where
-    evalResultToLadderEvalAppResult :: EL.EvalDirectiveResult -> ExceptT (TResponseError method) m EvalAppResult
-    evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace) = case res of
-      EL.Assertion EL.Holds   -> pure $ EvalAppResult (toUBoolValue True)
-      EL.Assertion EL.Fails   -> pure $ EvalAppResult (toUBoolValue False)
-      EL.Assertion a@(EL.FailsBecause _) -> defaultResponseError $ EL.prettyAssertionOutcome a
-      EL.Assertion a@(EL.Refused _)      -> defaultResponseError $ EL.prettyAssertionOutcome a
-      EL.Assertion a@(EL.Errored _)      -> defaultResponseError $ EL.prettyAssertionOutcome a
-      EL.Reduction v ->
-        case v of
-          EL.Reduced (EL.MkNF val) ->
-            case EL.boolView val of
-              Just b  -> pure $ EvalAppResult (toUBoolValue b)
-              Nothing -> throwExpectBoolResultError
-          EL.Reduced EL.Omitted -> defaultResponseError "Evaluation exceeded maximum depth limit"
-          EL.ReducedRefused r   -> defaultResponseError $ Text.unlines $ EL.prettyRefusal r
-          EL.ReducedErrored err -> defaultResponseError $ Text.unlines $ EL.prettyEvalException err
 
-    throwExpectBoolResultError :: ExceptT (TResponseError method) m a
-    throwExpectBoolResultError = defaultResponseError "Ladder visualizer is expecting a boolean result (and it should be impossible to have got a fn with a non-bool return type in the first place)"
+-- | The ladder's answer to the evaluation of an application: a value, or the
+-- error response 'evalApp' answers with. A refusal is answered with an error
+-- response, as an evaluation that raises is, and the response's data is the
+-- refusal ('EL.refusalMarker'), so a client can tell the two apart. Every
+-- other error response carries no data.
+ladderEvalAppResult
+  :: EL.EvalDirectiveValue
+  -> Either (TResponseError ('Method_CustomMethod Ladder.EvalAppMethodName)) EvalAppResult
+ladderEvalAppResult = \case
+  -- evalApp evaluates its application as an #EVAL
+  -- ('EL.execEvalExprInContextOfModule'), whose value is a 'EL.Reduction', so
+  -- it does not reach the 'EL.Assertion' arms; they answer as the
+  -- 'EL.Reduction' arms do, for any other caller.
+  EL.Assertion EL.Holds   -> Right $ EvalAppResult (toUBoolValue True)
+  EL.Assertion EL.Fails   -> Right $ EvalAppResult (toUBoolValue False)
+  EL.Assertion a@(EL.FailsBecause _) -> noAnswer $ EL.prettyAssertionOutcome a
+  EL.Assertion a@(EL.Refused r)      -> refusedWith (EL.prettyAssertionOutcome a) r
+  EL.Assertion a@(EL.Errored _)      -> noAnswer $ EL.prettyAssertionOutcome a
+  EL.Reduction v ->
+    case v of
+      EL.Reduced (EL.MkNF val) ->
+        case EL.boolView val of
+          Just b  -> Right $ EvalAppResult (toUBoolValue b)
+          Nothing -> noAnswer "Ladder visualizer is expecting a boolean result (and it should be impossible to have got a fn with a non-bool return type in the first place)"
+      EL.Reduced EL.Omitted -> noAnswer "Evaluation exceeded maximum depth limit"
+      EL.ReducedRefused r   -> refusedWith (Text.unlines (EL.prettyRefusal r)) r
+      EL.ReducedErrored err -> noAnswer $ Text.unlines $ EL.prettyEvalException err
+  where
+    noAnswer _message =
+      Left TResponseError { _code = InL LSPErrorCodes_RequestFailed, _xdata = Nothing, _message }
+    refusedWith _message r =
+      Left TResponseError { _code = InL LSPErrorCodes_RequestFailed, _xdata = Just (EL.refusalMarker r), _message }
 
     toUBoolValue :: Bool -> Ladder.UBoolValue
     toUBoolValue b = if b then Ladder.TrueV else Ladder.FalseV

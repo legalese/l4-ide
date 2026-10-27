@@ -502,12 +502,12 @@ DECIDE `is an adult` IF age >= 18
 
 An `#ASSERT` has one of four outcomes:
 
-| When the expression…                                                                                         | It prints                                          | The editor shows          | `l4 run` exit code | In `l4 run --json`                                 |
-| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ------------------------- | ------------------ | -------------------------------------------------- |
-| is TRUE                                                                                                      | `assertion satisfied`                              | information               | not affected       | `"value": true`                                    |
-| is FALSE                                                                                                     | `assertion failed`                                 | an error                  | not affected       | `"value": false`                                   |
-| cannot be evaluated: a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d | `assertion could not be evaluated:` and the reason | an error, with the reason | non-zero           | `"value": null`, with the reason under `"error"`   |
-| reaches a `REFUSE`: the rules decline to answer                                                              | `assertion refused:` and the reason                | an error, with the reason | not affected       | `"value": null`, with the reason under `"refused"` |
+| When the expression…                                                                                         | It prints                                          | The editor shows           | `l4 run` exit code | In `l4 run --json`                                 |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | -------------------------- | ------------------ | -------------------------------------------------- |
+| is TRUE                                                                                                      | `assertion satisfied`                              | information                | not affected       | `"value": true`                                    |
+| is FALSE                                                                                                     | `assertion failed`                                 | an error                   | not affected       | `"value": false`                                   |
+| cannot be evaluated: a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d | `assertion could not be evaluated:` and the reason | an error, with the reason  | non-zero           | `"value": null`, with the reason under `"error"`   |
+| reaches a `REFUSE`: the rules decline to answer                                                              | `assertion refused:` and the reason                | a warning, with the reason | not affected       | `"value": null`, with the reason under `"refused"` |
 
 In `--json` the result's `"kind"` is `"assertion"` in all four.
 

@@ -8,6 +8,8 @@ module L4.EvaluateLazy.Exceptions
 , Refusal (..)
 , prettyEvalException
 , prettyRefusal
+, refusalMarker
+, parseRefusalMarker
 , maximumStackSize
 , maximumFrameDepth
 )
@@ -16,6 +18,8 @@ where
 import Base
 import qualified Base.Text as Text
 import Control.Exception (Exception)
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
 import L4.Evaluate.ValueLazy
 import L4.Evaluate.Operators
 import L4.Print
@@ -55,6 +59,23 @@ newtype Refusal =
 prettyRefusal :: Refusal -> [Text]
 prettyRefusal r = "The model refuses to answer:" : map indentSingle (Text.splitOn "\n" r.message)
 
+-- | A refusal as a JSON value, for a surface that reports one in the place of
+-- an answer or an error: @{"kind": "refused", "reason": ...}@. jl4-service
+-- writes this value at each of its three doors, so a client of the service
+-- reads a refusal the same way at each, and the ladder's evaluation carries
+-- it as the data of its error response. @l4 batch@ and @l4 run --json@ write
+-- a refusal in shapes of their own.
+refusalMarker :: Refusal -> Aeson.Value
+refusalMarker r = Aeson.object ["kind" Aeson..= ("refused" :: Text), "reason" Aeson..= r.message]
+
+-- | Read the value 'refusalMarker' writes.
+parseRefusalMarker :: Aeson.Value -> Aeson.Parser Refusal
+parseRefusalMarker = Aeson.withObject "refusal" \o -> do
+  kind <- o Aeson..: "kind"
+  if kind == ("refused" :: Text)
+    then MkRefusal <$> o Aeson..: "reason"
+    else fail ("expected a refusal, whose kind is \"refused\", got the kind " <> show kind)
+
 -- | Thrown as a (synchronous) IO exception by the evaluation machine and
 -- caught at directive boundaries; see 'L4.EvaluateLazy.Machine'.
 instance Exception EvalException
@@ -82,6 +103,10 @@ data UserEvalException =
   | NotAnInteger BinOp Rational
   | Stuck Resolved -- ^ stores the term we got stuck on
   | UserError Text -- ^ general user-facing error (e.g. missing TIMEZONE declaration)
+  | ValueTooDeep
+    -- ^ An @#ASSERT REFUSED@ of a value that goes deeper than a directive
+    -- reads ('maximumStackSize'): whether it refuses below that depth is not
+    -- known, so the assertion is undecided.
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -169,6 +194,8 @@ prettyUserEvalException = \ case
     <> [ "but it is an assumed term." ]
   UserError msg ->
     [ msg ]
+  ValueTooDeep ->
+    [ "The value goes deeper than a directive reads, so whether it refuses below that depth is not known." ]
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').

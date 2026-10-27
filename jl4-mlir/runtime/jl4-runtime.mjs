@@ -496,6 +496,33 @@ export class DeonticInputError extends Error {
   }
 }
 
+/**
+ * Thrown, before anything is run, for a function the schema marks
+ * "supported": false: one from which evaluation may reach a REFUSE, or
+ * one that holds a construct the backend cannot compile. Its compiled
+ * body would answer where jl4-service does not, so the runtime runs no
+ * part of it. 'unsupportedReason' is the schema's reason. The HTTP
+ * wrapper answers it with a 501.
+ */
+export class UnsupportedFunctionError extends Error {
+  constructor(meta) {
+    const reason = meta.unsupportedReason || "it is marked unsupported";
+    super(
+      (meta.name || meta.wasmSymbol || "this function") +
+        " is not evaluated by the WASM backend: " +
+        reason +
+        ". Evaluate it with jl4-service.",
+    );
+    this.name = "UnsupportedFunctionError";
+    this.unsupportedReason = reason;
+  }
+}
+
+// Every entry point that evaluates a function calls this first.
+function declineUnsupported(meta) {
+  if (meta.supported === false) throw new UnsupportedFunctionError(meta);
+}
+
 // ===========================================================================
 // M6 — deontic interpreter. Walks 'schema.deonticContract' against the
 // request's startTime + events stream, returning a wire-shaped value
@@ -3024,6 +3051,7 @@ export function createRuntime(opts) {
   // ---- High-level helper: marshal args, call an exported function,
   //      decode the return per the schema's return type. ----
   function invokeFunction(instance, meta, args) {
+    declineUnsupported(meta);
     resetHeap();
     // M6 — deontic functions never invoke the wasm body. The JS
     // interpreter walks 'meta.deonticContract' against the request's
@@ -3134,6 +3162,7 @@ export function createRuntime(opts) {
   }
 
   function invokeFunctionWithReasoning(instance, meta, args) {
+    declineUnsupported(meta);
     // M6 — deontic functions skip wasm entirely; the JS interpreter
     // owns the value AND the reasoning. For the parameter-less
     // variant (sale-contract pattern) we synthesise an 'EVALTRACE'

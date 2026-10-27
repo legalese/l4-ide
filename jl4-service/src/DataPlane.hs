@@ -307,9 +307,10 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    -- Every case that finishes comes back. An answer carries its result; an
-    -- error carries its message, so that no case vanishes into the count
-    -- without a reason. Only answers count as processed. A case that reaches
+    -- Every case that finishes comes back. An answer carries its result, a
+    -- refusal its reason, and an error its message, so that no case vanishes
+    -- into the count without a reason. A refusal is how the rules answer a
+    -- case, so answers and refusals count as processed. A case that reaches
     -- --eval-timeout or --max-eval-memory-mb does not finish: 'timeoutAction'
     -- throws, and the check above fails the whole batch with it. Unstable
     -- returns such a case with @error and @limit, from 0765fef5d and
@@ -319,12 +320,19 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
       SimpleResponse r -> OutputCase
         { id = rid, attributes = r.fnResult, graphviz = r.graphviz
         , outcome = CaseAnswered }
+      SimpleError (EvaluatorRefused reason) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , outcome = CaseRefused reason }
       SimpleError err -> OutputCase
         { id = rid, attributes = Map.empty, graphviz = Nothing
         , outcome = CaseErrored (prettyEvaluatorError err) }
     outputCases = map outputCase responses
 
-    nSuccessful = length [ () | c <- outputCases, c.outcome == CaseAnswered ]
+    processed = \case
+      CaseAnswered  -> True
+      CaseRefused _ -> True
+      CaseErrored _ -> False
+    nSuccessful = length [ () | c <- outputCases, processed c.outcome ]
     nIgnored = nCases - nSuccessful
 
   pure $ addHeader totalAllocBytes $ BatchResponse

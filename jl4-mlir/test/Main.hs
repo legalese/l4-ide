@@ -5,7 +5,12 @@
 module Main (main) where
 
 import qualified Data.Text as Text
-import System.Exit (exitFailure, exitSuccess)
+import System.Exit (ExitCode (..), exitFailure, exitSuccess)
+import System.Directory (findExecutable)
+import System.Environment (lookupEnv)
+import System.FilePath ((</>))
+import System.IO.Temp (withSystemTempDirectory)
+import System.Process (proc, readCreateProcessWithExitCode)
 
 import qualified Data.Text as T
 
@@ -221,6 +226,7 @@ main = do
     , test "deontic BREACH BY tag round-trips" testDeonticBreachByRoundTrip
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "REFUSE marks the export unsupported" testRefuseUnsupported
+    , test "jl4-mlir run declines an unsupported export" testRunDeclinesUnsupported
     , test "deontic REFUSE after HENCE is unsupported" $
         testDeonticRefuse False ["MUST `pay`", "WITHIN 10", "HENCE REFUSE \"after payment\""]
     , test "deontic REFUSE after LEST is unsupported" $
@@ -505,8 +511,7 @@ testPlainFunctionSupported = do
 -- | REFUSE has no WASM image: the compiled module has no way to stop with a
 -- reason, and lowering it to a value would answer where the program declined.
 -- So an export that contains one in its body is marked @supported: false@,
--- which routes the request to a fallback evaluator, and that one raises the
--- refusal.
+-- and the WASM backend does not run it ('testRunDeclinesUnsupported').
 testRefuseUnsupported :: IO Bool
 testRefuseUnsupported = do
   let src = T.unlines
@@ -563,6 +568,66 @@ testDeonticRefuse wantSupported clauses = do
           ok = if wantSupported then supported else refused
       if ok then pure () else putStrLn $ "\n    json: " <> T.unpack (T.take 800 json)
       pure ok
+
+-- | @jl4-mlir run@ does not run an export the schema marks
+-- @supported: false@. It names the schema's reason on stderr, prints no
+-- answer, and exits 1, before it reads the request or the @.wasm@; so the
+-- schema alone is the fixture. The control is a supported export in the same
+-- schema: the CLI goes on to read its request, and stops at the malformed one.
+--
+-- The binary is @JL4_MLIR_BIN@ if set, else the @jl4-mlir@ that @cabal test@
+-- puts on PATH (@build-tool-depends@). Not finding one fails the test.
+testRunDeclinesUnsupported :: IO Bool
+testRunDeclinesUnsupported = do
+  let src = T.unlines
+        [ "@export Direct refusal"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`direct` `age` MEANS IF `age` >= 18 THEN 1 ELSE REFUSE \"not modelled\""
+        , ""
+        , "@export Adult check"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `adult` IF `age` >= 18"
+        ]
+  fromEnv <- lookupEnv "JL4_MLIR_BIN"
+  onPath <- findExecutable "jl4-mlir"
+  case (maybe onPath Just fromEnv, schemaWithDiagnostics src) of
+    (Nothing, _) -> do
+      putStrLn "\n    no jl4-mlir binary: set JL4_MLIR_BIN or run under cabal test"
+      pure False
+    (_, Left errs) -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    (Just bin, Right json) -> withSystemTempDirectory "jl4-mlir-run" \dir -> do
+      writeFile (dir </> "test.schema.json") (T.unpack json)
+      let run fn input =
+            readCreateProcessWithExitCode
+              (proc bin ["run", dir </> "test.wasm", "-f", fn]) input
+          declineText = "direct is not evaluated by the WASM backend: " <> T.unpack refuseReason
+      (code, out, err) <- run "direct" "{\"arguments\": {\"age\": 3}}"
+      (ctlCode, _, ctlErr) <- run "adult" "not json"
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("exits 1", code == ExitFailure 1)
+            , ("prints no answer", null out)
+            , ("names the schema's reason", declineText `isPrefixOfS` err)
+            , ("sends the caller to jl4-service", "Evaluate it with jl4-service." `isInfixOfS` err)
+            , ("stops at the decline", lines err == [declineText <> ". Evaluate it with jl4-service."])
+            , ("control: a supported export is not declined", not ("not evaluated by the WASM backend" `isInfixOfS` ctlErr))
+            , ("control: a supported export reaches its request", "Invalid JSON request" `isInfixOfS` ctlErr && ctlCode /= ExitSuccess)
+            ]
+          failures = [name | (name, ok) <- checks, not ok]
+      if null failures
+        then pure True
+        else do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    exit: " <> show code <> "; stdout: " <> show out <> "; stderr: " <> show err
+          putStrLn $ "    control stderr: " <> show ctlErr
+          pure False
+  where
+    isPrefixOfS a b = T.pack a `T.isPrefixOf` T.pack b
+    isInfixOfS a b = T.pack a `T.isInfixOf` T.pack b
 
 -- | The reason the schema gives an export from which evaluation may reach a
 -- REFUSE.

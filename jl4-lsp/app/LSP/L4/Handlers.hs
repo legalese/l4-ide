@@ -384,15 +384,6 @@ handlers evalConfig recorder =
           -- adds codelenses to visualize DECIDE or MEANS clauses
           visualizeDecides :: [CodeLens] = decisionGraphCodeLenses verTextDocId typeCheck
 
-          directiveLabel :: Directive Resolved -> Text
-          directiveLabel = \case
-            LazyEval{}      -> "#EVAL"
-            LazyEvalTrace{} -> "#EVALTRACE"
-            Check{}         -> "#CHECK"
-            Contract{}      -> "#CHECK"
-            Assert{}        -> "#ASSERT"
-            AssertRefused{} -> "#ASSERT REFUSED"
-
           mkRenderResultCodeLens srcPos label = CodeLens
             { _command = Just Command
               { _title = "Track result"
@@ -528,15 +519,15 @@ handlers evalConfig recorder =
                 case rangeOfNode d of
                   Just rng ->
                     let lspRange = srcRangeToLspRange (Just rng)
-                        (label, dExpr) = case d of
-                          LazyEval _ e      -> ("#EVAL", e)
-                          LazyEvalTrace _ e -> ("#EVALTRACE", e)
-                          Check _ e         -> ("#CHECK", e)
-                          Contract _ e _ _  -> ("#CHECK", e)
-                          Assert _ e        -> ("#ASSERT", e)
-                          AssertRefused _ e _ -> ("#ASSERT REFUSED", e)
+                        dExpr = case d of
+                          LazyEval _ e        -> e
+                          LazyEvalTrace _ e   -> e
+                          Check _ e           -> e
+                          Contract _ e _ _    -> e
+                          Assert _ e          -> e
+                          AssertRefused _ e _ -> e
                         detail = prettyLayout dExpr
-                    in [ mkSymbol label (Just detail) SymbolKind_Operator lspRange lspRange ]
+                    in [ mkSymbol (directiveLabel d) (Just detail) SymbolKind_Operator lspRange lspRange ]
                   Nothing -> []
 
               Import _ imp@(MkImport _ n _) ->

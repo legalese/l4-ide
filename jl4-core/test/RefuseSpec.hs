@@ -51,19 +51,44 @@ evalAll = evalAllWith apiDefaultPolicy
 -- | Every directive's result under the given trace policy, printed the way the
 -- golden suite prints it, with its trace below it when the policy keeps one.
 evalAllWith :: TracePolicy -> Text -> IO [Text]
-evalAllWith policy src = case frontEnd src of
+evalAllWith policy = evalAllConfigured policy id
+
+-- | Every directive's result under the given trace policy, evaluated under a
+-- configuration the caller adjusts.
+evalAllConfigured :: TracePolicy -> (EL.EvalConfig -> EL.EvalConfig) -> Text -> IO [Text]
+evalAllConfigured policy adjust src = case frontEnd src of
   Left msg -> do
     expectationFailure ("the module did not check:\n" <> Text.unpack msg)
     pure []
   Right r -> do
     cfg <- EL.resolveEvalConfigWithSafeMode Nothing policy True
-    (_, results) <- EL.execEvalModuleWithEnv cfg r.tcdEntityInfo mempty r.tcdModule
+    (_, results) <- EL.execEvalModuleWithEnv (adjust cfg) r.tcdEntityInfo mempty r.tcdModule
     pure (map EL.prettyEvalDirectiveResult results)
 
 -- | The last line of a directive's printed result: the root of its trace,
 -- when it has one.
 rootOf :: Text -> Text
 rootOf out = Text.strip (last ("" : Text.lines (Text.strip out)))
+
+-- | Two rules that answer a list of n numbers and then refuse: with the
+-- refusal as one more element, and as the rest of the list.
+deepRefusals :: [Text]
+deepRefusals =
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A LIST OF NUMBER"
+  , "`refusal in the list` n MEANS"
+  , "  IF n EQUALS 0 THEN LIST (REFUSE \"deep\") ELSE n FOLLOWED BY `refusal in the list` (n MINUS 1)"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A LIST OF NUMBER"
+  , "`refusal as the rest` n MEANS"
+  , "  IF n EQUALS 0 THEN REFUSE \"deep\" ELSE n FOLLOWED BY `refusal as the rest` (n MINUS 1)"
+  , ""
+  ]
+
+-- | Whether a directive's result is a refusal.
+refuses :: Text -> Bool
+refuses = Text.isInfixOf "The model refuses to answer:"
 
 -- | The result of a module's one directive.
 evalOne :: Text -> IO Text
@@ -366,6 +391,66 @@ spec = describe "REFUSE" $ do
           long `shouldBe` divided
         _ -> expectationFailure ("expected four directive results, got " <> show (length outs))
 
+    -- The limit itself: a refusal that is the 201st element of a list answer
+    -- is reached and the 202nd is not, and a refusal that is the rest of the
+    -- list after 201 numbers is reached and after 202 it is not.
+    it "is reached at the last depth a directive reads, and not one level below it" $ do
+      outs <- evalAll $ Text.unlines $ deepRefusals <>
+        [ "#EVAL `refusal in the list` 200"
+        , "#EVAL `refusal in the list` 201"
+        , "#EVAL `refusal as the rest` 201"
+        , "#EVAL `refusal as the rest` 202"
+        ]
+      map refuses outs `shouldBe` [True, False, True, False]
+
+    -- `l4 batch` and the service's wrapper ask for an answer as
+    -- `JUST (f args)`, and say so with 'EL.answerInJust'. That JUST is the
+    -- caller's, not the rule's, so the answer inside it is read as deep as a
+    -- bare answer is. A JUST inside the caller's is the rule's own and takes
+    -- a level, so the last two calls reach a refusal one element sooner.
+    -- Without the setting the caller's JUST is part of the answer and takes a
+    -- level too, which the second half pins. A traced call is read the same
+    -- as an untraced one, so each call is asked both ways, and the verdict is
+    -- read from the answer above the trace.
+    it "is reached inside a caller's JUST at the depth a bare answer is, when the caller says the answer is wrapped" $ do
+      let calls =
+            [ "JUST (`refusal in the list` 199)"
+            , "JUST (`refusal in the list` 200)"
+            , "JUST (`refusal in the list` 201)"
+            , "JUST (`refusal as the rest` 200)"
+            , "JUST (`refusal as the rest` 201)"
+            , "JUST (`refusal as the rest` 202)"
+            , "JUST (JUST (`refusal in the list` 199))"
+            , "JUST (JUST (`refusal in the list` 200))"
+            ]
+          src = Text.unlines $ deepRefusals
+            <> map ("#EVAL " <>) calls
+            <> map ("#EVALTRACE " <>) calls
+          answerRefuses = refuses . fst . Text.breakOn "─────"
+      wrapped <- evalAllConfigured apiDefaultPolicy (\cfg -> cfg { EL.answerInJust = True }) src
+      map (Text.isInfixOf "─────") wrapped `shouldBe` (map (const False) calls <> map (const True) calls)
+      map answerRefuses wrapped `shouldBe` concat (replicate 2 [True, True, False, True, True, False, True, False])
+      plain <- evalAll src
+      map answerRefuses plain `shouldBe` concat (replicate 2 [True, False, False, True, False, False, False, False])
+
+    -- The setting reads past a JUST and nothing else: an answer whose head is
+    -- another constructor of one field is read as it is without the setting,
+    -- its constructor taking a level, and each constructor inside it takes
+    -- one more, so a list in a box in a crate is reached two elements sooner.
+    it "is reached one element sooner inside any other constructor, when the caller says the answer is wrapped" $ do
+      let src = Text.unlines $ deepRefusals <>
+            [ "DECLARE Box IS ONE OF box HAS contents IS A LIST OF NUMBER"
+            , "DECLARE Crate IS ONE OF crate HAS held IS A Box"
+            , "#EVAL box (`refusal in the list` 199)"
+            , "#EVAL box (`refusal in the list` 200)"
+            , "#EVAL crate (box (`refusal in the list` 198))"
+            , "#EVAL crate (box (`refusal in the list` 199))"
+            ]
+      wrapped <- evalAllConfigured apiDefaultPolicy (\cfg -> cfg { EL.answerInJust = True }) src
+      map refuses wrapped `shouldBe` [True, False, True, False]
+      plain <- evalAll src
+      map refuses plain `shouldBe` [True, False, True, False]
+
     it "is named in an evaluation trace, with its reason" $ do
       out <- evalOne "#EVALTRACE 1 PLUS REFUSE \"traced\"\n"
       out `shouldSatisfy` Text.isInfixOf "↯ refused: traced"
@@ -492,6 +577,38 @@ spec = describe "REFUSE" $ do
         , "assertion satisfied"
         , "assertion failed: expected a refusal, but the expression produced a value"
         ]
+
+    -- A directive reads a value only so deep. An #ASSERT REFUSED of a value
+    -- that goes deeper cannot say whether it refuses, so it is undecided,
+    -- whatever lies past that depth: a refusal, a division by zero, or more
+    -- numbers. A refusal within the depth satisfies it, and a value that ends
+    -- within the depth fails it.
+    it "is undecided for a value that goes deeper than a directive reads, whatever lies past that depth" $ do
+      outs <- map Text.strip <$> evalAll (Text.unlines $ deepRefusals <>
+        [ "GIVEN n IS A NUMBER"
+        , "GIVETH A LIST OF NUMBER"
+        , "`division in the list` n MEANS"
+        , "  IF n EQUALS 0 THEN LIST (1 DIVIDED BY 0) ELSE n FOLLOWED BY `division in the list` (n MINUS 1)"
+        , ""
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A LIST OF NUMBER"
+        , "`numbers` n MEANS"
+        , "  IF n EQUALS 0 THEN EMPTY ELSE n FOLLOWED BY `numbers` (n MINUS 1)"
+        , ""
+        , "#ASSERT REFUSED `refusal in the list` 200"
+        , "#ASSERT REFUSED `refusal as the rest` 201"
+        , "#ASSERT REFUSED `refusal in the list` 201"
+        , "#ASSERT REFUSED `refusal as the rest` 202"
+        , "#ASSERT REFUSED `division in the list` 201"
+        , "#ASSERT REFUSED `numbers` 300"
+        , "#ASSERT REFUSED `numbers` 150"
+        ])
+      length outs `shouldBe` 7
+      take 2 outs `shouldBe` replicate 2 "assertion satisfied"
+      for_ (take 4 (drop 2 outs)) $ \out -> do
+        notDecided out
+        out `shouldSatisfy` Text.isInfixOf "The value goes deeper than a directive reads"
+      drop 6 outs `shouldBe` ["assertion failed: expected a refusal, but the expression produced a value"]
 
     it "rejects a computed reason at the parser, at the reason, naming what it expects" $ do
       let directive = "#ASSERT REFUSED `not modelled` BECAUSE `the reason`"

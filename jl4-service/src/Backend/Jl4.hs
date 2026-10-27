@@ -131,6 +131,7 @@ buildCompiledFromShared shared funName = runExceptT $ do
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
+  evalErrorToText err@(EvaluatorRefused _) = prettyEvaluatorError err
 
 -- | Where the 'IMPORT's of a deployed bundle may be resolved: the bundle's own
 -- files (the VFS tier, consulted first), then the standard library built into
@@ -330,6 +331,7 @@ precompileModule filepath source moduleContext funName = runExceptT $ do
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
+  evalErrorToText err@(EvaluatorRefused _) = prettyEvaluatorError err
 
 -- ----------------------------------------------------------------------------
 -- Direct AST evaluation (avoiding text round-trip)
@@ -699,7 +701,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     Right gc -> pure gc
 
   -- Evaluate the wrapper in the context of the precompiled module
-  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext filepath genCode.generatedWrapper sourceText modContext
+  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext genCode.answerShape filepath genCode.generatedWrapper sourceText modContext
 
   -- Handle result
   case mEvalRes of
@@ -807,7 +809,7 @@ handleEvalResultDirect
 handleEvalResultDirect ei result trace traceLevel includeGraphViz mModule = case result of
   Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
   Eval.Reduction (Eval.ReducedErrored evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
-  Eval.Reduction (Eval.ReducedRefused r) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyRefusal r)
+  Eval.Reduction (Eval.ReducedRefused r) -> throwError $ EvaluatorRefused r.message
   Eval.Reduction (Eval.Reduced val) -> do
     r <- nfToFnLiteral ei val
     pure $ ResponseWithReason
@@ -857,7 +859,7 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
   -- The wrapper contains JSONDECODE and function application
   -- We evaluate the wrapper in the context of the precompiled module
   -- This avoids re-parsing and re-typechecking the main module
-  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext filepath genCode.generatedWrapper sourceText modContext
+  (errs, mEvalRes) <- liftIO $ evaluateWrapperInContext genCode.answerShape filepath genCode.generatedWrapper sourceText modContext
 
   -- Handle result
   case mEvalRes of
@@ -870,12 +872,13 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
 -- | Evaluate wrapper code in the context of a precompiled module
 -- This combines the wrapper (small) with the precompiled module and evaluates
 evaluateWrapperInContext
-  :: FilePath
+  :: AnswerShape  -- ^ how the wrapper's #EVAL delivers the answer
+  -> FilePath
   -> Text  -- ^ Wrapper code containing #EVAL directive
   -> Text  -- ^ Original source text (preserves layout)
   -> ModuleContext  -- ^ Module context for IMPORT resolution
   -> IO ([Text], Maybe [Eval.EvalDirectiveResult])
-evaluateWrapperInContext filepath wrapperCode sourceText modContext = do
+evaluateWrapperInContext shape filepath wrapperCode sourceText modContext = do
   -- Use original source text to preserve layout-sensitive formatting
   -- L4 is layout-sensitive (like Python), so prettyLayout can break indentation
   -- We filter IDE directives (#EVAL, #TRACE, etc.) using text-based filtering
@@ -884,7 +887,7 @@ evaluateWrapperInContext filepath wrapperCode sourceText modContext = do
 
   -- Evaluate the combined program using the original module context
   -- This ensures IMPORT statements can be resolved correctly
-  evaluateModule filepath combinedProgram modContext
+  evaluateModule shape filepath combinedProgram modContext
 
 -- | Filter IDE directives from source text while preserving layout
 -- Removes lines starting with #EVAL, #TRACE, #EVALTRACE, #ASSERT, #CHECK
@@ -986,12 +989,14 @@ fnLiteralToJson = \case
 -- 'FnUnknown' at the top level is now @NOTHING@ or @JUST NOTHING@, which are
 -- answers: refusing it here would refuse on this path an answer the direct
 -- path gives. "Could not compute" does not arrive as @null@ on either path:
--- an evaluation that raises or refuses is a 'Eval.ReducedErrored' or a
--- 'Eval.ReducedRefused' reduction, and is answered with an error. Nor can
+-- an evaluation that raises is a 'Eval.ReducedErrored' reduction, and is
+-- answered with an error, and one that refuses is a 'Eval.ReducedRefused'
+-- reduction, and is answered with the refusal ('EvaluatorRefused'). Nor can
 -- the top-level value be the evaluator's 'Eval.Omitted' truncation marker:
 -- 'Eval.nf' starts at depth 'maximumStackSize' (200) and marks 'Eval.Omitted'
--- only below depth 0, so the direct path's answer is read at depth 200 and
--- this path's, one level inside the envelope, at 199. 'Eval.Omitted' appears
+-- only below depth 0. The direct path's answer is read from depth 200, and so
+-- is the answer inside this path's envelope, since 'evaluateModule' sets
+-- 'Eval.answerInJust' for a 'WrappedInJust' wrapper. 'Eval.Omitted' appears
 -- only nested, as the @null@s that end a list answer cut short at the README's
 -- limit on list answers.
 handleEvalResult
@@ -1131,7 +1136,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 let l4Program = filteredSource <> genCode.generatedWrapper
 
                 -- 7. Evaluate
-                (errs, mEvalRes) <- evaluateModule filepath l4Program moduleContext
+                (errs, mEvalRes) <- evaluateModule genCode.answerShape filepath l4Program moduleContext
 
                 -- 8. Handle result
                 case mEvalRes of
@@ -1514,10 +1519,15 @@ typecheckModule file input moduleContext = do
     _ <- Shake.addVirtualFile nfp input
     Shake.use Rules.TypeCheck uri
 
-evaluateModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text], Maybe [Eval.EvalDirectiveResult])
-evaluateModule file input moduleContext = do
+-- | Evaluate a generated wrapper's module. A wrapper that answers
+-- @JUST (f args)@ has the answer inside its JUST read as deep as the direct
+-- path reads @f args@ ('Eval.answerInJust'), so both paths reach the same
+-- depth of an answer and give the same verdict.
+evaluateModule :: (MonadIO m) => AnswerShape -> FilePath -> Text -> ModuleContext -> m ([Text], Maybe [Eval.EvalDirectiveResult])
+evaluateModule shape file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
-  evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
+  baseConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
+  let evalConfig = baseConfig { Eval.answerInJust = shape == WrappedInJust }
   liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp

@@ -481,5 +481,94 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   );
 }
 
+// --- A function the schema marks "supported": false is not run ------------
+// The schema marks a function unsupported when this backend would compute a
+// wrong answer for it (a REFUSE it lowers to a number, a lambda it cannot
+// compile). Both entry points decline it before touching the instance, and
+// the error names the function and the schema's reason and sends the caller
+// to jl4-service, so that a caller can tell a decline from a crash.
+{
+  const rtU = createRuntime();
+  rtU.attachMemory(new WebAssembly.Memory({ initial: 1 }));
+  const calls = [];
+  // Any export the runtime looks up records the call and answers 1.
+  const instance = {
+    exports: new Proxy(
+      {},
+      {
+        get: (_target, sym) => () => {
+          calls.push(String(sym));
+          return 1;
+        },
+      },
+    ),
+  };
+  const reason = "REFUSE is not supported by the WASM backend";
+  const plain = {
+    name: "eligible",
+    wasmSymbol: "eligible",
+    supported: false,
+    unsupportedReason: reason,
+    parameters: { properties: { age: { type: "number" } }, required: ["age"] },
+    paramOrder: ["age"],
+    returnType: "BOOLEAN",
+  };
+  const deontic = {
+    ...plain,
+    name: "the-sale-contract",
+    isDeontic: true,
+    parameters: { properties: {} },
+    paramOrder: [],
+    deonticContract: { kind: "FULFILLED" },
+  };
+  const declined = (label, meta, call) => {
+    let err = null;
+    try {
+      call();
+    } catch (e) {
+      err = e;
+    }
+    eq(
+      `unsupported (${label}): declined`,
+      err && err.name,
+      "UnsupportedFunctionError",
+    );
+    eq(
+      `unsupported (${label}): the error names the schema's reason`,
+      !!(err && String(err.message).includes(reason)),
+      true,
+    );
+    eq(
+      `unsupported (${label}): the message`,
+      err && err.message,
+      meta.name +
+        " is not evaluated by the WASM backend: " +
+        reason +
+        ". Evaluate it with jl4-service.",
+    );
+  };
+  declined("invokeFunction", plain, () =>
+    rtU.invokeFunction(instance, plain, { age: 30 }),
+  );
+  declined("invokeFunctionWithReasoning", plain, () =>
+    rtU.invokeFunctionWithReasoning(instance, plain, { age: 30 }),
+  );
+  declined("deontic, invokeFunction", deontic, () =>
+    rtU.invokeFunction(instance, deontic, { startTime: 0, events: [] }),
+  );
+  declined("deontic, invokeFunctionWithReasoning", deontic, () =>
+    rtU.invokeFunctionWithReasoning(instance, deontic, {
+      startTime: 0,
+      events: [],
+    }),
+  );
+  eq("unsupported: nothing reached the instance", calls.join(","), "");
+
+  // Positive control: the same function marked supported does reach it.
+  calls.length = 0;
+  rtU.invokeFunction(instance, { ...plain, supported: true }, { age: 30 });
+  eq("supported: the call reaches the instance", calls.join(","), "eligible");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

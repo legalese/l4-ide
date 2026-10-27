@@ -71,7 +71,7 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePat
 import L4.Export (ExportedFunction(..), ExportedParam(..), getDefaultFunction, getExportedFunctions)
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.EvaluateLazy
-  ( EvalConfig
+  ( EvalConfig(..)
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
   , AssertionOutcome(..)
@@ -348,7 +348,13 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
       let wrapperCode     = generateBatchWrapper exportFn.exportName params input
           combinedProgram = filteredSource <> wrapperCode
           virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
-      (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
+          -- A function with inputs is asked for as JUST (f args). That JUST
+          -- is the wrapper's, so the answer inside it is read as deep as
+          -- `l4 run` reads an #EVAL of the call.
+          rowConfig
+            | null params = evalConfig
+            | otherwise   = evalConfig { answerInJust = True }
+      (evalErrs, mEval) <- runOneshot rowConfig virtualPath \nfp -> do
         let uri = normalizedFilePathToUri nfp
         _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
         Shake.use Rules.EvaluateLazy uri

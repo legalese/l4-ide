@@ -39,6 +39,7 @@ import Backend.Api (EvalBackend, FnLiteral, RunFunction, EvaluatorError, Respons
 import Backend.DecisionQueryPlan (CachedDecisionQuery)
 import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
+import L4.EvaluateLazy.Exceptions (Refusal (..), parseRefusalMarker, refusalMarker)
 import BundleStore (BundleStore)
 import Control.Applicative ((<|>))
 import Control.Concurrent.Async (Async)
@@ -412,15 +413,18 @@ data OutputCase = OutputCase
   , attributes :: Map Text FnLiteral
   , graphviz :: Maybe GraphVizResponse
   , outcome :: CaseOutcome
-    -- ^ whether the case was answered; an error as @\@error@
+    -- ^ how the case ended: an answer, an error as @\@error@, or a refusal
+    -- as @\@refused@
   }
   deriving stock (Show, Eq, Ord)
 
 -- | How one case of the batch endpoint ended. An errored case is still
--- returned, with its message, rather than only counted.
+-- returned, with its message, rather than only counted. A refused case is
+-- returned with its reason, and is neither an answer nor an error.
 data CaseOutcome
   = CaseAnswered
   | CaseErrored Text
+  | CaseRefused Text
   deriving stock (Show, Eq, Ord)
 
 data BatchResponse = BatchResponse
@@ -513,11 +517,16 @@ instance FromJSON OutputCase where
     caseId <- o .: "@id"
     graphvizVal <- o .:? "@graphviz"
     errorVal <- o .:? "@error"
+    refusedVal <- traverse parseRefusalMarker =<< o .:? "@refused"
     let attrs = Aeson.KeyMap.toMapText $
+          Aeson.KeyMap.delete "@refused" $
           Aeson.KeyMap.delete "@error" $
           Aeson.KeyMap.delete "@graphviz" $
           Aeson.KeyMap.delete "@id" (Aeson.KeyMap.map id o)
-        outcomeVal = maybe CaseAnswered CaseErrored errorVal
+        outcomeVal = case (refusedVal, errorVal) of
+          (Just r, _)        -> CaseRefused r.message
+          (Nothing, Just e)  -> CaseErrored e
+          (Nothing, Nothing) -> CaseAnswered
     parsedAttrs <- traverse parseJSON attrs
     pure $ OutputCase caseId parsedAttrs graphvizVal outcomeVal
 
@@ -529,6 +538,7 @@ instance ToJSON OutputCase where
         <> case oc.outcome of
              CaseAnswered  -> []
              CaseErrored e -> ["@error" .= e]
+             CaseRefused r -> ["@refused" .= refusalMarker (MkRefusal r)]
         <> [(Aeson.Key.fromText k, Aeson.toJSON v) | (k, v) <- Map.toList oc.attributes]
 
 instance FromJSON OutputSummary where
