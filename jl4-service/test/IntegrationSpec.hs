@@ -23,7 +23,7 @@ import L4.FunctionSchema (Parameters (..))
 import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
-import Control.Exception (bracket, try)
+import Control.Exception (bracket, finally, try)
 import System.Timeout (timeout)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -50,6 +50,7 @@ import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileE
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
+import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
@@ -760,6 +761,27 @@ spec = describe "integration" do
             status.dsStatus `shouldBe` "compiling"
 
         pollUntilReady baseUrl mgr "http-deploy" 60
+
+    it "accepts a zip entry in a sub-folder" do
+      withEmptyService \baseUrl mgr -> do
+        let zipBytes = createZipBundle [("rules/qualifies.l4", qualifiesJL4)]
+        postReq <- buildMultipartRequest (baseUrl <> "/deployments") "nested-entry" zipBytes
+        postResp <- httpLbs postReq mgr
+        statusCode' postResp `shouldBe` 202
+        pollUntilReady baseUrl mgr "nested-entry" 60
+
+    it "refuses a zip entry whose path is not relative, and writes nothing" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-zip-entry-spec"
+      (withEmptyService \baseUrl mgr -> do
+          let absolute = dir </> "outside.l4"
+          forM_ [absolute, "\\rooted.l4", "C:/drive.l4", "a/../../up.l4"] \name -> do
+            postReq <- buildMultipartRequest (baseUrl <> "/deployments") "bad-entry"
+              (createZipBundle [(name, qualifiesJL4)])
+            postResp <- httpLbs postReq mgr
+            statusCode' postResp `shouldBe` 400
+          doesFileExist absolute `shouldReturn` False)
+        `finally` removePathForcibly dir
 
     it "lists deployments" do
       withEmptyService \baseUrl mgr -> do
@@ -2630,6 +2652,49 @@ spec = describe "integration" do
         -- Should find the function definition
         LBS.toStrict (responseBody resp) `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
 
+    it "MCP file tools on a scoped endpoint reach only the deployment of the scope" do
+      let marker = "scope_marker_rule" :: Text
+      withPendingServices "scope-files"
+        [ ("scope-own", [("qualifies.l4", qualifiesJL4)])
+        , ("scope-other", [("other.l4", "DECIDE " <> marker <> " IS TRUE\n")])
+        ] \baseUrl mgr -> do
+          let toolText endpoint name arguments = do
+                req <- buildJsonPost (baseUrl <> endpoint) $ Aeson.object
+                  [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                  , "id" Aeson..= (1 :: Int)
+                  , "method" Aeson..= ("tools/call" :: Text)
+                  , "params" Aeson..= Aeson.object
+                      [ "name" Aeson..= (name :: Text)
+                      , "arguments" Aeson..= Aeson.object arguments
+                      ]
+                  ]
+                maybe "" snd . mcpToolText . responseBody <$> httpLbs req mgr
+              reachesOther text = marker `Text.isInfixOf` text || "other.l4" `Text.isInfixOf` text
+              other = [ "deployment" Aeson..= ("scope-other" :: Text) ]
+              -- each file tool, naming the other deployment and naming none
+              calls =
+                [ ("read_file", other <> [ "path" Aeson..= ("other.l4" :: Text) ])
+                , ("list_files", other)
+                , ("list_files", [])
+                , ("search_text", other <> [ "query" Aeson..= marker ])
+                , ("search_text", [ "query" Aeson..= marker ])
+                , ("search_identifier", other <> [ "identifier" Aeson..= marker ])
+                , ("search_identifier", [ "identifier" Aeson..= marker ])
+                ]
+              scoped = "/deployments/scope-own/.mcp"
+          -- the controls: on the org-wide endpoint each call reaches the other
+          -- deployment, and the scoped endpoint reaches its own
+          forM_ calls \(name, arguments) -> do
+            text <- toolText "/.mcp" name arguments
+            (name, Aeson.object arguments, reachesOther text) `shouldBe` (name, Aeson.object arguments, True)
+          toolText scoped "read_file" [ "deployment" Aeson..= ("scope-own" :: Text), "path" Aeson..= ("qualifies.l4" :: Text) ]
+            >>= (`shouldSatisfy` ("compute_qualifies" `Text.isInfixOf`))
+          toolText scoped "list_files" [] >>= (`shouldSatisfy` ("qualifies.l4" `Text.isInfixOf`))
+          -- on the scoped endpoint none of them does
+          forM_ calls \(name, arguments) -> do
+            text <- toolText scoped name arguments
+            (name, Aeson.object arguments, reachesOther text) `shouldBe` (name, Aeson.object arguments, False)
+
     it "MCP read_file rejects path traversal (../)" do
       withPendingService "precomp-traversal" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         let rpcBody = Aeson.object
@@ -2650,6 +2715,87 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp)
         -- Should return a "File not found" result (path safety check rejects ../)
         lookupKey "result" body `shouldSatisfy` Maybe.isJust
+
+    it "MCP read_file does not read a file named by an absolute path" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-read-file-spec"
+      let planted = dir </> "planted.txt"
+      writeFile planted "PLANTED-CONTENT-FOR-THE-READ-FILE-SPEC\n"
+      (withPendingService "precomp-abs-read" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+          let readFileOf path = do
+                let rpcBody = Aeson.object
+                      [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                      , "id" Aeson..= (1 :: Int)
+                      , "method" Aeson..= ("tools/call" :: Text)
+                      , "params" Aeson..= Aeson.object
+                          [ "name" Aeson..= ("read_file" :: Text)
+                          , "arguments" Aeson..= Aeson.object
+                              [ "deployment" Aeson..= ("precomp-abs-read" :: Text)
+                              , "path" Aeson..= (Text.pack path :: Text)
+                              ]
+                          ]
+                      ]
+                req <- buildJsonPost (baseUrl <> "/.mcp") rpcBody
+                responseBody <$> httpLbs req mgr
+          -- the control: a file of the deployment is read
+          control <- readFileOf "qualifies.l4"
+          LBS.toStrict control `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
+          -- the planted file is reached by no spelling of its absolute path
+          -- (the route strips one leading slash, so two slashes used to be an
+          -- absolute path again)
+          forM_ [planted, "/" <> planted, "//" <> planted] \path -> do
+            body <- readFileOf path
+            LBS.toStrict body `shouldSatisfy` (not . BS.isInfixOf "PLANTED-CONTENT")
+            LBS.toStrict body `shouldSatisfy` BS.isInfixOf "File not found")
+        `finally` removePathForcibly dir
+
+    it "a deployment id that is not a plain name reaches nothing outside the store" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-deployment-id-spec"
+      -- a deployment of its own, in a store this test owns, apart from the service's
+      outsideStore <- initStore dir
+      BundleStore.saveBundle outsideStore "outside"
+        (Map.singleton "planted.l4" "PLANTED-CONTENT-FOR-THE-DEPLOYMENT-ID-SPEC\n")
+        (BundleStore.StoredMetadata "v" "2026-01-01T00:00:00Z" Nothing Nothing Nothing)
+      -- its absolute path, as the MCP argument that names it
+      let outsideId = dir </> "outside"
+      (withPendingService "precomp-idguard" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+          let toolCall name arguments = do
+                let rpcBody = Aeson.object
+                      [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                      , "id" Aeson..= (1 :: Int)
+                      , "method" Aeson..= ("tools/call" :: Text)
+                      , "params" Aeson..= Aeson.object
+                          [ "name" Aeson..= (name :: Text)
+                          , "arguments" Aeson..= Aeson.object arguments
+                          ]
+                      ]
+                req <- buildJsonPost (baseUrl <> "/.mcp") rpcBody
+                LBS.toStrict . responseBody <$> httpLbs req mgr
+              readFileOf deployment path = toolCall "read_file"
+                [ "deployment" Aeson..= (deployment :: Text)
+                , "path" Aeson..= (path :: Text) ]
+              listFilesOf deployment = toolCall "list_files"
+                [ "deployment" Aeson..= (deployment :: Text) ]
+          -- the controls: the deployment's own id works
+          control <- readFileOf "precomp-idguard" "qualifies.l4"
+          control `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
+          controlList <- listFilesOf "precomp-idguard"
+          controlList `shouldSatisfy` ("qualifies.l4" `BS.isInfixOf`)
+          -- the absolute path of the other deployment names nothing
+          readFileOf (Text.pack outsideId) "planted.l4" >>= \body -> do
+            body `shouldSatisfy` (not . BS.isInfixOf "PLANTED-CONTENT")
+            body `shouldSatisfy` BS.isInfixOf "File not found"
+          -- (Two routes are not tried here. The raw .l4 route is a middleware of
+          -- defaultMain, not of app, so this harness cannot reach it. For an id
+          -- that names nothing, the file browser fails inside its handler, and
+          -- testWithApplication rethrows that into the test, so it fails for a
+          -- refused id as for an unknown one. Both routes end in functions that
+          -- BundleStoreSpec covers: loadSingleFile, as read_file does, and
+          -- loadBundle.)
+          listFilesOf (Text.pack outsideId) >>= \body ->
+            body `shouldSatisfy` (not . BS.isInfixOf "planted.l4"))
+        `finally` removePathForcibly dir
 
     it "GET /deployments/{id}/files rejects path traversal in file param" do
       withPendingService "precomp-traversal2" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -3422,8 +3568,12 @@ mkBatchCase n = Aeson.object
 -- | Save sources to the BundleStore and register as DeploymentPending,
 -- simulating a lazy-load restart. The sources exist on disk but are not compiled.
 withPendingService :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService deployId sources act = do
-  resOrExc <- try (withPendingService' deployId sources act)
+withPendingService deployId sources = withPendingServices deployId [(deployId, sources)]
+
+-- | 'withPendingService' with several deployments, in a store named by the first argument.
+withPendingServices :: Text -> [(Text, [(FilePath, Text)])] -> (String -> Manager -> IO a) -> IO a
+withPendingServices storeName deployments act = do
+  resOrExc <- try (withPendingServices' storeName deployments act)
   case resOrExc of
     Left ioe ->
       if isPermissionError ioe
@@ -3433,27 +3583,28 @@ withPendingService deployId sources act = do
           pure undefined
     Right result -> pure result
 
-withPendingService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService' deployId sources act = do
-  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+withPendingServices' :: Text -> [(Text, [(FilePath, Text)])] -> (String -> Manager -> IO a) -> IO a
+withPendingServices' storeName deployments act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack storeName
   cleanDir tmpPath
   store <- initStore tmpPath
   logger <- newLogger False
 
   -- Save sources to the BundleStore (so loadAndRegister can find them)
-  let sourceMap = Map.fromList sources
-      version = computeVersion sourceMap
-      storedMeta = BundleStore.StoredMetadata
-        { BundleStore.smVersion = version
-        , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
-        , BundleStore.smDescription = Nothing
-        , BundleStore.smServiceVersion = Nothing
-        , BundleStore.smDeploymentVersion = Nothing
-        }
-  BundleStore.saveBundle store deployId sourceMap storedMeta
+  forM_ deployments \(deployId, sources) -> do
+    let sourceMap = Map.fromList sources
+        version = computeVersion sourceMap
+        storedMeta = BundleStore.StoredMetadata
+          { BundleStore.smVersion = version
+          , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+          , BundleStore.smDescription = Nothing
+          , BundleStore.smServiceVersion = Nothing
+          , BundleStore.smDeploymentVersion = Nothing
+          }
+    BundleStore.saveBundle store deployId sourceMap storedMeta
 
   -- Register as Pending (not compiled)
-  registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentPending Nothing)
+  registry <- newTVarIO $ Map.fromList [(DeploymentId deployId, DeploymentPending Nothing) | (deployId, _) <- deployments]
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
