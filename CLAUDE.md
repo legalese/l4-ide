@@ -1,7 +1,7 @@
 # CLAUDE.md — `legalese/l4-ide`
 
 Repo-specific working notes.
-Time-sensitive claims carry the date they were checked.
+Where a claim is time-sensitive, it says so.
 If you find one of these wrong, **fix it here in the same PR as the work that revealed it** — a stale entry in this file is worse than a missing one, because it is believed.
 The incidents behind these rules are in this file's git history (`git log -p -- CLAUDE.md`).
 
@@ -305,7 +305,7 @@ one started". Copy the binary somewhere unique first and point both sides at the
 The same holds for any before/after probe that greps for a marker instead of checking the exit code (`l4 check`, `l4 export`, the engine harnesses): assert that the run HAPPENED before you compare what it said.
 
 Files that read the wall clock (`ok/excel-date/serials.l4`, the bitemporal ledger files) disagree with themselves across two runs unless `JL4_FIXED_NOW` pins the clock, so a difference confined to them is not a printer defect.
-(`JL4_FIXED_NOW=2025-01-31T15:45:30Z` makes two runs of `serials.l4` byte-identical; measured 2026-10-27 with the installed `l4`.)
+(Measured 2026-10-27 with the installed `l4`: `serials.l4` and `ok/ledger/bitemporal-stamps.l4` each differ across two runs, and are byte-identical across two runs under `JL4_FIXED_NOW=2025-01-31T15:45:30Z`.)
 A few files exit non-zero on both sides by design.
 
 It is deliberately **not** a test: it is slow, and the clock-dependent files would need exactly the

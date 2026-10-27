@@ -9,7 +9,7 @@ The line numbers below were checked against `run.sh` on that date.
 `run.sh` ignores the bare `java` on `PATH`.
 It exports `JAVA_HOME` from `CAMUNDA_CHECK_JAVA_HOME` (`run.sh:64-66`), and when that is unset it takes the first usable entry of a candidate list (`run.sh:54-63`).
 The first entry is `/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home`, deliberately "the newest JDK we can find" (the comment at `run.sh:51-53`; 21 is the floor, because zeebe-dmn is compiled to class file 65).
-On a machine with Homebrew's plain `openjdk` that is whatever release Homebrew currently ships: 26.0.1 on `nye` on 2026-10-27.
+On a machine with Homebrew's plain `openjdk` that is whatever release Homebrew currently ships (26.0.1 on 2026-10-27).
 CI runs 21: the `DMN Engine Checks` job in `.github/workflows/pr-checks.yml` sets `CAMUNDA_CHECK_JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}`.
 So pin `CAMUNDA_CHECK_JAVA_HOME` to a JDK 21 if you want your result to mean what CI's means.
 
