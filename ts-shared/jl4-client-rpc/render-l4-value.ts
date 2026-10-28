@@ -80,7 +80,7 @@ function formatNode(
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
   if (typeof value === 'number') return String(value)
   if (typeof value === 'string') return formatString(value, schema)
-  if (Array.isArray(value)) return formatArray(value, schema?.items, depth)
+  if (Array.isArray(value)) return formatArray(value, schema, depth)
   if (typeof value === 'object') {
     return formatObject(value as Record<string, unknown>, schema, depth)
   }
@@ -139,13 +139,20 @@ function escapeL4String(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
+/**
+ * `schema` is the schema of the array itself: an item at position `i`
+ * takes `prefixItems[i]` when the array has one (an event answer's
+ * party, action and time), and `items` otherwise.
+ */
 function formatArray(
   value: unknown[],
-  itemsSchema: FunctionParameter | undefined,
+  schema: FunctionParameter | undefined,
   depth: number
 ): string {
   if (value.length === 0) return 'LIST'
-  const parts = value.map((v) => formatNode(v, itemsSchema, depth + 1))
+  const parts = value.map((v, i) =>
+    formatNode(v, schema?.prefixItems?.[i] ?? schema?.items, depth + 1)
+  )
   // Multi-line when any item rendered onto multiple lines (records,
   // nested lists). Flat primitive lists stay inline.
   const anyMulti = parts.some((p) => p.includes('\n'))
@@ -183,7 +190,10 @@ function formatObject(
         if (inner.length === 1) {
           return `${quoteIdent(ctor)} ${formatNode(inner[0], undefined, depth + 1)}`
         }
-        return `${quoteIdent(ctor)} ${formatArray(inner, undefined, depth)}`
+        // An event answer, `{ EVENT: [party, action, time] }`: the schema
+        // of the wrapped array sits under the constructor's key.
+        const wrapped = schema?.properties?.[ctor]
+        return `${quoteIdent(ctor)} ${formatArray(inner, wrapped?.type === 'array' ? wrapped : undefined, depth)}`
       }
       if (inner !== null && typeof inner === 'object') {
         return formatObject(

@@ -177,6 +177,10 @@ export interface FunctionParameter {
   properties?: Record<string, FunctionParameter>
   propertyOrder?: string[]
   items?: FunctionParameter
+  /** Item schemas of a fixed-length array, by position (an event
+   *  answer's party, action and time). When present it takes the place
+   *  of `items` for the item at that position. */
+  prefixItems?: FunctionParameter[]
   required?: string[]
   /** L4 user-declared type name (record/enum) when this node came
    *  from a DECLARE. Drives chat-side rendering of JSON values into
