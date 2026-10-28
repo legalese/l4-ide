@@ -76,9 +76,6 @@ export type SessionsApiDetailCode =
   /** 409 on every git route (§9.2) until the harness's first commit has
    *  written `state/git/main.bundle`. */
   | 'no_commits_yet'
-  /** 409 on start: the caller's current organisation isn't the
-   *  session's. */
-  | 'wrong_organization'
 
 export const SESSIONS_API_DETAIL_CODES: readonly SessionsApiDetailCode[] = [
   'not_initialized',
@@ -89,7 +86,6 @@ export const SESSIONS_API_DETAIL_CODES: readonly SessionsApiDetailCode[] = [
   'unavailable',
   'internal',
   'no_commits_yet',
-  'wrong_organization',
 ]
 
 export interface ApiError {
