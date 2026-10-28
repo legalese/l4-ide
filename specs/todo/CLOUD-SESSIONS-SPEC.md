@@ -599,8 +599,12 @@ the session starts.
 
 One Lambda: a container image with `git`, Node 24, in the VPC. It mounts the
 root access point at `/mnt/users` and is exposed through a Lambda function URL
-with auth type NONE; every route verifies the WorkOS JWT itself. A
-`sessions.legalese.cloud` domain can be added later with CloudFront.
+with auth type NONE; every route verifies the WorkOS JWT itself. Clients use
+its stable name `https://sessions.legalese.cloud` (since 2026-10-29): a
+CloudFront distribution in front of the function URL that caches nothing, so
+the extension's default survives the function being recreated. The URLs the
+API hands out (git remotes) use that name. jl4-auth-proxy reserves `sessions`
+as a subdomain and org slug.
 
 ### 7.1 Routes
 
@@ -1212,11 +1216,17 @@ moved, with its history, to its own repo
       the sweep, state from the lease first, one folder per user and
       organisation, bounded inputs, RS256 only, OIDC roles for the `prod` environment only
       (§6.1, §7.1–§7.3, §9.3).
-- [ ] `move-cloud-sessions` (base `main`) ([PR #15](https://github.com/legalese/jl4-auth-proxy/pull/15)) —
+- [x] `move-cloud-sessions` (base `main`) ([PR #15](https://github.com/legalese/jl4-auth-proxy/pull/15)) —
       removes `cloud-sessions/` and its workflows from jl4-auth-proxy once
       they are in the cloud-sessions repo. There, the deploy role trusts that
       repo (`github_repo`), so the next apply replaces the two roles of
-      2026-10-09 that trust jl4-auth-proxy (§14).
+      2026-10-09 that trust jl4-auth-proxy (§14). Merged and applied
+      2026-10-28.
+- [x] `reserve-sessions` (base `main`) ([PR #16](https://github.com/legalese/jl4-auth-proxy/pull/16)) —
+      reserves `sessions` as a subdomain and org slug for
+      `sessions.legalese.cloud` (§7). Merged 2026-10-29, deployed with the
+      next proxy rollout; until then nothing depends on it, because the
+      name's own DNS records keep its traffic away from the proxy.
 
 Deploy-time steps, not pull requests: Fargate vCPU quota increase; the
 one-time file-system root ownership (§4.1); `FOLDER_KEY` value.
@@ -1255,7 +1265,9 @@ reference for §8 shapes; the Sessions API mirrors them.
 **Sessions API**
 
 - Base URL comes from the extension setting
-  `legaleseAi.cloudSessions.apiUrl`. The feature is off while it is empty.
+  `legaleseAi.cloudSessions.apiUrl`, default `https://sessions.legalese.cloud`
+  (§7). The feature is off while it is empty or while
+  `legaleseAi.cloudSessions.enabled` (default `false`) is off.
 - Routes, request and response bodies: §7.1. Errors are
   `{ error: "<code>" }` with 400, 401, 403, 404, 409, 413, 500 or 503. The
   `409` codes are `conflict`, `not_initialized`, `already_initialized`,
@@ -1315,7 +1327,7 @@ us-west-2, in an isolated VPC; all resources deleted afterwards.
 | P4   | Passed                   | Commands written by the Lambda were seen by the task after 177–1,079 ms, including the 1 s poll interval. The newest task event was 58–988 ms old when the Lambda read it (the task writes one per second). Exclusive create across clients returned `EEXIST`. A name probed before it existed took 6.1 s to become visible, which confirms the known-names rule in §8. The Lambda refused a symlink planted by the task (`ELOOP`) and read the task's bundle.                                               |
 | P5   | Passed with a test image | 23–28 s from `RunTask` to running with a public test image: about 13 s before the pull starts, 5.6 s pull, 4–8.5 s to mount and start. The real ~300 MB image adds pull time.                                                                                                                                                                                                                                                                                                                                |
 | P6   | Not run                  | Needs WorkOS credentials and a test user.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| P7   | Partly                   | A Lambda in the VPC mounting the root access point works (all P4 checks). Function URL, git over HTTP and body limits not tested.                                                                                                                                                                                                                                                                                                                                                                            |
+| P7   | Partly                   | A Lambda in the VPC mounting the root access point works (all P4 checks). 2026-10-29, prod: the function URL and `sessions.legalese.cloud` answer, and unauthenticated calls get 401. Function URLs rename the git challenge `WWW-Authenticate` to `x-amzn-Remapped-WWW-Authenticate`, with or without CloudFront; git still asks for credentials on the 401. An authenticated clone, pull and push, and the body limits, are not tested yet.                                                                |
 
 Also confirmed: Fargate ARM64 accepts a read-only root, tmpfs, all
 capabilities dropped (`CapEff` 0), user 1000 and an S3 Files volume together.
