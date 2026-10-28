@@ -1,19 +1,21 @@
--- Example: Genitive ('s) for field access
--- Demonstrates possessive syntax for record fields
+-- Genitive: 's reads a field of a record, as in English
+
+DECLARE Address
+  HAS city IS A STRING
 
 DECLARE Person
   HAS `full name` IS A STRING
       age         IS A NUMBER
+      address     IS AN Address
 
 DECIDE `the applicant` IS Person WITH
-  `full name` IS "John Doe"
+  `full name` IS "Kim Tan"
   age         IS 30
+  address     IS Address WITH city IS "Singapore"
 
--- Using genitive (reads like English)
-DECIDE `applicant age using genitive` IS `the applicant`'s age
+-- A field is also a function of its record, so these two mean the same
+#EVAL `the applicant`'s age
+#EVAL age OF `the applicant`
 
--- Equivalent to using THE ... OF
-DECIDE `applicant age using THE OF` IS age OF `the applicant`
-
-#EVAL `applicant age using genitive`
-#EVAL `applicant age using THE OF`
+-- 's can be chained
+#EVAL `the applicant`'s address's city

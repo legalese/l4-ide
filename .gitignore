@@ -56,6 +56,7 @@ tsconfig.tsbuildinfo
 ts-apps/vscode/bin
 ts-apps/vscode/static/webview/
 ts-apps/vscode/static/skills/
+ts-apps/vscode/static/pvrecorder/
 *.exe
 *.vsix
 yarn-debug.log*

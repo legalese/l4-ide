@@ -267,12 +267,133 @@ instance LayoutPrinterWithName a => LayoutPrinter (Assume a) where
 
 instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
   printWithLayout = \ case
-    MkDecide _ tySig appForm expr ->
-      vcat
-        [ printWithLayout tySig
-        , "DECIDE" <+> printWithLayout appForm <+> "IS"
-        , indent 2 (printWithLayout expr)
+    MkDecide ann tySig appForm expr -> case writtenClauses ann appForm expr of
+      -- A multi-clause group prints as the clauses the drafter wrote. Its
+      -- tree is what they compile to, and that names things the desugarer
+      -- made up ('L4.Parser.generatedName'), which source cannot spell:
+      -- printed as text, a drafter's definition of the same text would
+      -- capture them, and the printed module would answer differently
+      -- (@l4 batch@ and the REPL run the printed module).
+      Just clauses -> vcat (printWithLayout (writtenSignature tySig) : clauses)
+      -- A group that will not read back as a group, whose inputs the
+      -- desugarer named: a plain definition, with each input renamed to a
+      -- name its body does not use (see 'unusedInputNames').
+      Nothing
+        | Just _ <- view annPmMatrix ann
+        , MkAppForm _ hd args maka <- appForm
+        , any (isGeneratedName . rawName . getName) args ->
+            vcat
+              [ printWithLayout (writtenSignature tySig)
+              , "DECIDE" <+> printWithLayout hd
+                  <> foldMap ((space <>) . pretty . quoteIfNeeded) (unusedInputNames (length args) expr)
+                  <> foldMap ((space <>) . printWithLayout) maka
+                  <+> "IS"
+              , indent 2 (printWithLayout expr)
+              ]
+      Nothing ->
+        vcat
+          [ printWithLayout tySig
+          , "DECIDE" <+> printWithLayout appForm <+> "IS"
+          , indent 2 (printWithLayout expr)
+          ]
+
+-- | The clauses of a multi-clause group, printed from the AST: each clause's
+-- patterns from the clause matrix the parser kept ('PmMatrix'), in which
+-- every ditto is already resolved, and its body from the tree the clauses
+-- compile to ('clauseBodies'). Nothing is copied from the source text, so
+-- nothing depends on the layout around it there.
+--
+-- A clause after one whose every pattern matches anything is never tried, and
+-- the checker drops it from the tree it returns, so it is not printed. That
+-- cannot change an answer.
+--
+-- 'Nothing' for anything that is not a group, for a group whose tree does not
+-- have the shape the desugarer builds, and for a single clause that would not
+-- be read back as a group (no pattern in it tells it from a plain
+-- definition): those print as a plain definition.
+writtenClauses :: LayoutPrinterWithName a => Anno -> AppForm a -> Expr a -> Maybe [Doc ann]
+writtenClauses ann (MkAppForm _ hd _ _) expr = do
+  matrix <- view annPmMatrix ann
+  let patterns = map (.patterns) matrix.clauses
+  guard (all ((== length matrix.scrutinees) . length) patterns)
+  bodies <- clauseBodies matrix.scrutinees patterns expr
+  let clauses = zip patterns bodies
+  guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
+  pure
+    [ vcat
+        -- Each clause with its own @AKA@ ('PmMatrixClause'): a run of bare
+        -- names that the checker separates into overloads gives each its
+        -- own, so a printed module must keep them with their clauses.
+        [ "DECIDE" <+> printWithLayout hd <> foldMap ((space <>) . clauseHeadPattern) pats
+            <> foldMap ((space <>) . printWithLayout) cl.clauseAka
+            <+> "IS"
+        , indent 2 (printWithLayout body)
         ]
+    | (cl, (pats, body)) <- zip matrix.clauses clauses
+    ]
+
+-- | A pattern in a clause head, as 'L4.Parser.pmClause' reads one: all on one
+-- line, and in brackets unless it is a single name or a literal, with every
+-- argument of a constructor read the same way.
+clauseHeadPattern :: Pattern Name -> Doc ann
+clauseHeadPattern p = case p of
+  PatVar {}     -> inline p
+  PatLit {}     -> inline p
+  PatApp _ _ [] -> inline p
+  _             -> "(" <> inline p <> ")"
+  where
+    inline = \ case
+      PatVar _ n       -> printWithLayout n
+      PatApp _ n ps    -> printWithLayout n <> foldMap ((space <>) . clauseHeadPattern) ps
+      PatCons _ hd' tl -> clauseHeadPattern hd' <+> "FOLLOWED BY" <+> clauseHeadPattern tl
+      PatExpr _ e      -> "EXACTLY" <+> printWithLayout e
+      PatLit _ l       -> printWithLayout l
+
+-- | Names for the inputs of a group whose only clause left matches anything
+-- and whose inputs the desugarer named ('writtenClauses' gives up on it: one
+-- clause with no distinguishing pattern reads back as a plain definition).
+-- That clause's body never reads its inputs, so they need only be distinct,
+-- and spelled unlike every name the body does use, so that none of those can
+-- be read as an input in the printed module. Printing the desugarer's own
+-- names here would do exactly that: @`input 1`@ in source is the drafter's.
+unusedInputNames :: HasName a => Int -> Expr a -> [Text]
+unusedInputNames n body = take n (filter (`notElem` used) candidates)
+  where
+    used = map (nameToText . getName) (toList body)
+    candidates = [ "_" <> Text.textShow i <> Text.replicate k "'" | k <- [0 :: Int ..], i <- [1 .. n] ]
+
+-- | The body of each clause of a group that its tree still holds, in order,
+-- found by the marks 'L4.Parser.matchClauses' leaves: a clause is tested by
+-- one generated CONSIDER per input its pattern does not match outright
+-- ('patAlwaysMatchesAs'), its body is under their first branches, and the
+-- clauses after it are under the binding of the later clauses. 'Nothing'
+-- when the tree is not shaped so.
+clauseBodies :: [Name] -> [[Pattern Name]] -> Expr a -> Maybe [Expr a]
+clauseBodies scrutinees = go
+  where
+    go [] _ = Just []
+    go (pats : rest) e = case e of
+      LetIn _ [LocalDecide _ (MkDecide dann _ _ later)] tree
+        | isLaterClauses dann -> (:) <$> bodyOf pats tree <*> go rest later
+      -- the last clause, or one that matches anything, the rest dropped
+      _ -> (: []) <$> bodyOf pats e
+    bodyOf pats = under (length (filter not (zipWith patAlwaysMatchesAs scrutinees pats)))
+    under :: Int -> Expr a -> Maybe (Expr a)
+    under 0 e = Just e
+    under n (Consider cann _ (MkBranch _ (When _ _) b : _))
+      | Just (PmConsider{}) <- view annPmSynthetic cann = under (n - 1) b
+    under _ _ = Nothing
+    isLaterClauses dann = case view annPmSynthetic dann of
+      Just (PmFallthrough _) -> True
+      Just (PmUnreachable _) -> True
+      _                      -> False
+
+-- | The signature of a multi-clause group as the drafter wrote it: without
+-- the inputs the desugarer named when the drafter's GIVEN named none
+-- ('L4.Parser.generatedName'), which only the checker added to it.
+writtenSignature :: HasName a => TypeSig a -> TypeSig a
+writtenSignature (MkTypeSig ann (MkGivenSig gann otns) giveth) =
+  MkTypeSig ann (MkGivenSig gann [ o | o@(MkOptionallyTypedName _ n _) <- otns, not (isGeneratedName (rawName (getName n))) ]) giveth
 
 instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
   printWithLayout = \ case
@@ -397,8 +518,26 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
     Regulative _ (MkDeonton _ p a t f l) -> prettyObligation p a t f l
+    -- One branch per line, aligned, and WITHOUT the comma separator.
+    -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
+    -- `manyLines` over comma-separated groups: continuation lines must start at
+    -- EXACTLY the first branch's column, and a comma at the end of a line is
+    -- instead eaten by whatever comma-list the branch body ended in (`… THEN
+    -- LIST x,` continues the LIST). The same layout is what keeps a CONSIDER
+    -- inside a branch apart from the branches after it: the arms of an inner
+    -- CONSIDER sit at the inner one's column, so the outer's next WHEN, at the
+    -- outer's, is not one of them. Written as a comma-separated list on one
+    -- hanging indent, as this was, the outer's later arms were read as more arms
+    -- of the inner CONSIDER.
+    -- Each arm is nested two more columns, which moves every line of the arm
+    -- after its first and not the first itself: an arm's later lines must sit
+    -- PAST its WHEN, or they read as the next arm's neighbours. The case that
+    -- needs it is a WHERE under an arm: the `Where` printer breaks its lines at
+    -- the current nesting, so unnested its `WHERE` stood at the WHEN's column,
+    -- which ends the definition, and the arms after it did not parse.
     Consider   _ expr branches ->
-      "CONSIDER" <+> printWithLayout expr <+> hang 2 (vsep $ punctuate comma (fmap printWithLayout branches))
+      hang 2 $ vcatHard $
+        ("CONSIDER" <+> printWithLayout expr) : fmap (nest 2 . printWithLayout) branches
 
     Lit        _ lit -> printWithLayout lit
     Percent    _ expr -> parensIfNeeded expr <+> "%"
@@ -577,7 +716,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (LocalDecl a) where
 instance LayoutPrinter Lit where
   printWithLayout = \ case
     NumericLit _ t -> pretty (prettyRatio t)
-    StringLit _ t -> surround (pretty $ escapeStringLiteral t) "\"" "\""
+    StringLit _ t -> surround (pretty $ escapeSourceStringLiteral t) "\"" "\""
 
 instance LayoutPrinterWithName a => LayoutPrinter (BranchLhs a) where
   printWithLayout = \ case
@@ -600,8 +739,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Pattern a) where
 instance LayoutPrinter Nlg where
   printWithLayout = \ case
     MkInvalidNlg _ -> "Invalid Nlg"
-    MkParsedNlg _ frags -> prettyNlgs frags
-    MkResolvedNlg _ frags -> prettyNlgs frags
+    MkParsedNlg _ _ frags -> prettyNlgs frags
+    MkResolvedNlg _ _ frags -> prettyNlgs frags
     where
       prettyNlgs [] = mempty
       prettyNlgs [x@MkNlgRef{}] = printWithLayout x
@@ -753,9 +892,6 @@ instance LayoutPrinter BinOp where
     BinOpIndexOf -> "INDEXOF"
     BinOpSplit -> "SPLIT"
     BinOpCharAt -> "CHARAT"
-    BinOpWhenLast -> "WHEN LAST"
-    BinOpWhenNext -> "WHEN NEXT"
-    BinOpValueAt -> "VALUE AT"
 
 instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
   printWithLayout = \ case
@@ -872,12 +1008,44 @@ prettyConj cnj (d:ds) =
   -- This avoids layout issues when the output is re-parsed
   Prettyprinter.group $ d <> mconcat [softline <> pretty cnj <+> x | x <- ds]
 
+-- | 'vcat' whose line breaks cannot be flattened away.
+--
+-- Prettyprinter's 'vcat'/'vsep' separators are @FlatAlt Line _@: inside a
+-- 'group' (which 'prettyConj' introduces, and which
+-- @layoutPretty (LayoutOptions Unbounded)@ always resolves in favour of the
+-- flattened branch) they collapse to nothing or to a space, jamming the lines
+-- together. A break the layout parser needs is a 'hardline', which 'flatten'
+-- turns into a failure, so 'group' keeps the vertical rendering.
+vcatHard :: [Doc ann] -> Doc ann
+vcatHard = concatWith (\ x y -> x <> hardline <> y)
+
 
 escapeStringLiteral :: Text -> Text
 escapeStringLiteral = Text.concatMap (\ case
   '\"' -> "\\\""
   '\\' -> "\\\\"
   c -> Text.singleton c
+  )
+
+-- | 'escapeStringLiteral' for a string literal printed as SOURCE, which also
+-- writes a line break, tab or carriage return as its escape.
+--
+-- A raw newline handed to 'pretty' becomes a layout line break, and a layout
+-- line break takes the current nesting: @"line\nnext"@ printed inside an
+-- indented body came out as @"line@, then a new line @  next"@, which reads
+-- back as a different string. @l4 batch@ re-prints the module and runs the
+-- printed text, so it answered @"line\n  next"@ with status success
+-- (smucclaw/l4-ide#1028). The lexer reads these escapes back
+-- (@Lexer.charLiteral@), so the printed source means what the tree does.
+--
+-- A value being displayed ('Lazy.ValString') still goes through
+-- 'escapeStringLiteral', so @l4 run@ shows a multi-line string as before.
+escapeSourceStringLiteral :: Text -> Text
+escapeSourceStringLiteral = Text.concatMap (\ case
+  '\n' -> "\\n"
+  '\t' -> "\\t"
+  '\r' -> "\\r"
+  c -> escapeStringLiteral (Text.singleton c)
   )
 
 -- | Format a UTCTime with timezone offset as ISO-8601

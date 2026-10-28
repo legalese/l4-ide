@@ -1,4 +1,4 @@
-# Module A3: Contracts in Depth
+# Module A3: Contracts in depth
 
 In this module, you'll learn advanced contract modeling including complex payment terms, recursive obligations, and penalty structures. Find the full working example at the bottom.
 
@@ -496,6 +496,4 @@ Key insight: Complex contracts are **compositions of simpler patterns**, often w
 
 ---
 
-## What's Next?
-
-In [Module A4: Production Patterns](module-a4-production.md), you'll learn patterns for organizing large codebases, testing strategies, and integration considerations.
+Next, [Module A4: Production patterns](module-a4-production.md) shows how to structure, test and ship a real rulebase.

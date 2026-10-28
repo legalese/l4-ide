@@ -11,9 +11,9 @@ IMPORT daydate
 
 §§§§§ `Part 7 - Implementation Of State Environmental Quality Review Act`
 
-§§§§§§ `Section 7.3 - Environmental review procedures`
 @ref url https://regulations.justia.com/states/new-york/title-16/chapter-i/subchapter-a/part-7/section-7-3/
 @ref 16 NY Comp Codes Rules and Regs § 7.3
+§§§§§§ `Section 7.3 - Environmental review procedures`
 
 -- Current through Register Vol. 47, No. 12, March 26, 2025
 
@@ -117,16 +117,16 @@ GIVEN `The commission`  IS A Commission
 #EVAL `Example Filing`
 
 #TRACE `Example Filing` AT Day (Jul 19 2025) WITH
-    PARTY   Day (Jul 20 2025)
-
-
-
-DOES    `Example Commission`
-    AT      (`File draft copy of EIS and cause notice of hearing to be published`
+    PARTY   `Example Commission`
+    DOES    (`File draft copy of EIS and cause notice of hearing to be published`
                 `Example Hearing Notice`
                 `Example Notice of EIS Completion`
                 (JUST `Example EIS`))
-    §§§§§§§ `Section 7.3 (b)`
+    AT      Day (Jul 20 2025)
+
+
+
+§§§§§§§ `Section 7.3 (b)`
 
 §§§§§§§§ `Section 7.3 (b) (1)`
 

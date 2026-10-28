@@ -38,7 +38,6 @@ module L4.Export.Document
 
 import Base
 
-import Control.Applicative ((<|>))
 import qualified Base.Text as Text
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -48,12 +47,14 @@ import Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as Map
 import Data.Ratio (denominator, numerator)
 import qualified Data.Set as Set
-import Optics (gplate, (%), (^.))
+import Optics (gplate, toListOf, (%), (^.))
 
+import L4.Annotation (emptyAnno)
 import L4.Desugar (carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
-import L4.Nlg (simpleLinearizer)
+import L4.Nlg (simpleLinearizer, NlgFnInfo, nlgFnInfo, substituteNlgCalls, renderNlgWith, normalizeWs, oxford)
+import qualified L4.Nlg as Nlg
 import L4.Syntax
 import L4.TypeCheck.Types (CheckInfo (..), FunTypeSig (..), MixfixRegistry (..))
 import L4.Utils.Ratio (prettyRatio)
@@ -272,75 +273,21 @@ normalizePositionalRecords ctorFields
             AppNamed ann ctor [ MkNamedExpr ann f a | (f, a) <- zip fnames args ] Nothing
       e -> e
 
--- | For every function that carries an @\@nlg@ annotation: its authored
--- sentence and its GIVEN parameter uniques (in order), so a call's positional
--- arguments can be matched to the sentence's @%parameter%@ slots. The @\@nlg@
--- may attach to the declaration, the function name, or the body, so we look in
--- all three.
--- | Keyed by @(function name, arity)@ rather than 'Unique': a call site in the
--- importing module and the definition in a dependency module do not share
--- 'Unique's (each module is resolved independently), so a unique-based key
--- would never match across an @IMPORT@. The inner @%param%@ substitution stays
--- 'Unique'-based — those refs are self-consistent within the defining module.
-nlgFnInfo :: [Module Resolved] -> Map.Map (Text, Int) (Nlg, [Unique])
-nlgFnInfo mods = Map.fromList
-  [ ((resolvedText headName, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
-    -- Value parameters are the appform arguments, not the GIVEN names: a
-    -- polymorphic function (@GIVEN a IS A TYPE@) lists its type parameter in
-    -- GIVEN but never in the appform, so keying arity off GIVEN would not match
-    -- the call's positional argument count.
-  | m <- mods
-  , d@(MkDecide _ _ (MkAppForm _ headName appArgs _) _) <- foldTopLevelDecides (: []) m
-  , Just nlg <- [ decideNlg d ]
-  ]
-
--- | The @\@nlg@ annotation attached to a DECIDE, wherever it landed: authors
--- place it differently for the @MEANS@ shorthand (lands on an appform argument)
--- vs the @DECIDE … IF@ form (lands on the head name), so we look in all of the
--- declaration's annotation-bearing positions.
+-- | The @\@nlg@ annotation attached to a DECIDE, wherever it landed.
+--
+-- One line now, because the search itself moved to 'L4.Nlg.decideNlg' — this
+-- module and @l4 nlg@ had different answers for the same bytes, because the
+-- list of positions to search was kept by hand in each place
+-- (smucclaw\/l4-ide#972). The enclosing 'TopDecl'\'s annotation is not
+-- available here, hence the 'Nothing'.
 decideNlg :: Decide Resolved -> Maybe Nlg
-decideNlg (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAnno headName appArgs _) body) =
-  foldr (<|>) Nothing $
-       [ decAnno ^. annNlg
-       , afAnno ^. annNlg
-       , body ^. annoOf % annNlg
-       , getOriginal headName ^. annoOf % annNlg
-       ]
-    <> [ getOriginal a ^. annoOf % annNlg | a <- appArgs ]
-    <> [ getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ <- names ]
+decideNlg = Nlg.decideNlg Nothing
 
-substNlgInUnit :: Map.Map (Text, Int) (Nlg, [Unique]) -> Unit -> Unit
+substNlgInUnit :: NlgFnInfo -> Unit -> Unit
 substNlgInUnit info u = case u.uDecl of
   UDecide (MkDecide a t af body) ->
     u { uDecl = UDecide (MkDecide a t af (substituteNlgCalls info body)) }
   _ -> u
-
--- | Replace a call to an @\@nlg@-annotated function with its authored sentence,
--- splicing the call's arguments into the @%parameter%@ slots. Bottom-up, so
--- nested @\@nlg@ calls inside the arguments are expanded first.
-substituteNlgCalls :: Map.Map (Text, Int) (Nlg, [Unique]) -> Expr Resolved -> Expr Resolved
-substituteNlgCalls info = transformOf (gplate @(Expr Resolved)) $ \case
-  App ann n args
-    | Just (nlg, params) <- Map.lookup (resolvedText n, length args) info
-    , length params == length args ->
-        Inert ann (renderNlgWith (Map.fromList (zip params args)) nlg) InertCtxNone
-  e -> e
-
--- | Render an @\@nlg@ annotation, substituting each parameter reference with the
--- corresponding call argument.
-renderNlgWith :: Map.Map Unique (Expr Resolved) -> Nlg -> Text
-renderNlgWith argMap = \case
-  MkResolvedNlg _ frags -> normalizeWs (Text.concat (map frag frags))
-  other                 -> simpleLinearizer other
- where
-  frag (MkNlgText _ t) = t
-  -- An unsubstituted reference (definition view, or a name with no matching
-  -- argument) renders as the bare parameter name — NOT via 'simpleLinearizer',
-  -- which would re-expand that parameter's own @\@nlg@ and recurse when the
-  -- annotation is attached to a parameter it also references.
-  frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
-    Just a  -> simpleLinearizer a
-    Nothing -> resolvedText r
 
 -- | Replace a mixfix function's heading with its precomputed prose form
 -- (e.g. "a Person buyer may trade with a Person seller"). The map is keyed by
@@ -748,7 +695,7 @@ unitRendering u = case u.uDecl of
     -- render as an attached "where:" block.
     | otherwise ->
         let subst              = paramSubst tysig
-            (inner, locals)    = peelWhere body
+            (inner, locals)    = peelWhere (clauseLayout body)
             (conn, mainClause) = decideRendering tysig (rewriteExpr (substParams subst inner))
         in case mapMaybe (localDefClause subst) locals of
              []   -> (conn, mainClause)
@@ -788,6 +735,65 @@ decideRendering tysig body
       (connectorFor tysig body, toClause body)
  where
   fieldPair (MkNamedExpr _ f v) = (resolvedText f, leafText v)
+
+-- | Lay out a rule written as a list of clauses the way its clauses read.
+--
+-- The desugarer compiles the clauses to CONSIDERs ('PmConsider') that hand
+-- the input to a local definition holding the later clauses ('PmFallthrough',
+-- see 'L4.Parser.matchClauses') when they do not match. Read off as it stands,
+-- that tree renders each such definition as a "where" entry, and loses every
+-- one nested inside another, which is every one after the first. So:
+--
+-- * a definition of the later clauses that is read once, as it is whenever the
+--   clauses test a single input, is put in place of the reading, and a
+--   CONSIDER that then tests the same input in its OTHERWISE is merged into
+--   its parent, so that the clauses read as one list of cases;
+--
+-- * one read more than once, which happens when clauses test several inputs,
+--   is kept, and moved to the top, where 'peelWhere' renders it as a "where"
+--   entry named for the clauses it holds.
+--
+-- Only nodes carrying the desugarer's marks are touched; any other rule is
+-- returned unchanged.
+clauseLayout :: Expr Resolved -> Expr Resolved
+clauseLayout = hoist . transformOf (gplate @(Expr Resolved)) merge . transformOf (gplate @(Expr Resolved)) inline
+ where
+  inline = \case
+    LetIn _ [LocalDecide _ (MkDecide dann _ (MkAppForm _ ft [] _) later)] e
+      | isLaterClauses dann
+      , length (filter (readsName ft) (everyExpr e)) <= 1 ->
+          transformOf (gplate @(Expr Resolved)) (\x -> if readsName ft x then later else x) e
+    e -> e
+  merge = \case
+    Consider ann s brs
+      | isGenerated ann
+      , Just (front, MkBranch _ (Otherwise _) (Consider ann' s' brs')) <- List.unsnoc brs
+      , isGenerated ann'
+      , sameInput s s' -> Consider ann s (front <> brs')
+    e -> e
+  hoist e = case [ d | LetIn _ ds _ <- everyExpr e, d <- ds, laterClausesDecl d ] of
+    [] -> e
+    ds -> LetIn emptyAnno ds (transformOf (gplate @(Expr Resolved)) unwrap e)
+  unwrap = \case
+    LetIn _ ds e | all laterClausesDecl ds -> e
+    e -> e
+  laterClausesDecl = \case
+    LocalDecide _ (MkDecide dann _ _ _) -> isLaterClauses dann
+    LocalAssume{} -> False
+  isLaterClauses dann = case dann ^. annPmSynthetic of
+    Just (PmFallthrough _) -> True
+    _ -> False
+  isGenerated ann = case ann ^. annPmSynthetic of
+    Just (PmConsider{}) -> True
+    _ -> False
+  readsName n = \case
+    Var _ r      -> getUnique r == getUnique n
+    App _ r []   -> getUnique r == getUnique n
+    _            -> False
+  sameInput a b = case (a, b) of
+    (App _ r [], App _ r' []) -> getUnique r == getUnique r'
+    _ -> False
+  everyExpr x = x : concatMap everyExpr (toListOf (gplate @(Expr Resolved)) x)
 
 -- | Peel a top-level @WHERE@ / @LET … IN@ wrapper off a rule body, returning the
 -- inner body and its local definitions. Only the rule's own top-level locals are
@@ -1362,31 +1368,6 @@ monthName = \case
   5 -> "May"; 6 -> "June"; 7 -> "July"; 8 -> "August"
   9 -> "September"; 10 -> "October"; 11 -> "November"; 12 -> "December"
   m -> "month " <> showInt m
-
--- ----------------------------------------------------------------------------
--- Text tidying
--- ----------------------------------------------------------------------------
-
-normalizeWs :: Text -> Text
-normalizeWs t0 =
-  let t1 = Text.replace "it 's" "its" t0
-      t2 = Text.replace " 's"  "'s"  t1
-      t3 = Text.replace " %"   "%"   t2
-      t4 = Text.replace " ,"   ","   t3
-      t5 = Text.replace " ."   "."   t4
-      t6 = Text.replace " :"   ":"   t5
-      t7 = Text.replace " ;"   ";"   t6
-      -- Collapse empty list slots that produce ",," / ", ,".
-      t8 = Text.replace ", ," "," (Text.replace ",," "," t7)
-      t9 = Text.replace "is equal to" "is" t8
-  in Text.unwords (Text.words t9)
-
-oxford :: Text -> [Text] -> Text
-oxford conj = \case
-  []     -> ""
-  [a]    -> a
-  [a, b] -> a <> " " <> conj <> " " <> b
-  xs     -> Text.intercalate ", " (init xs) <> ", " <> conj <> " " <> last xs
 
 -- ----------------------------------------------------------------------------
 -- Plan construction

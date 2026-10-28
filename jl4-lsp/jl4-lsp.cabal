@@ -52,6 +52,7 @@ library
     safe-exceptions,
     stm,
     stm-containers,
+    template-haskell,
     text,
     text-rope,
     time,
@@ -98,6 +99,9 @@ library
     LSP.Core.Types.Shake
 
     LSP.L4.Actions
+    LSP.L4.BlockingErrors
+    LSP.L4.BuildInfo
+    LSP.L4.EmbeddedLibrary
     LSP.L4.Inspector
     LSP.L4.SemanticTokens
     LSP.L4.Rules
@@ -151,3 +155,35 @@ executable jl4-lsp
     LSP.L4.Config
     LSP.L4.Handlers
     LSP.L4.LanguageServer
+
+test-suite jl4-lsp-test
+  import: defaults
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Spec.hs
+  other-modules:
+    BlockingErrorsSpec
+    BuildInfoSpec
+    CheckSource
+    ClauseGeneratedNamesSpec
+    ClauseGroupLadderSpec
+    EmbeddedLibrarySpec
+    HoverDisplaySpec
+    ImportClosureSpec
+    ImportOnceSpec
+    ImportSharedSpec
+    LibraryResolutionSpec
+  build-tool-depends:
+    hspec-discover:hspec-discover
+  build-depends:
+    aeson,
+    containers,
+    deepseq,
+    directory,
+    filepath,
+    hspec,
+    jl4-core,
+    jl4-lsp,
+    lsp-types,
+    text,
+    text-rope

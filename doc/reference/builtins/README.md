@@ -1,213 +1,109 @@
-# Built-in Functions (Not a Library)
+# Built-in functions
 
-L4 includes several **built-in functions** that are always available without importing any library. These are implemented in the compiler core.
+Built-in functions are part of the language, so they work in every file without an `IMPORT`. Functions that come from a library, such as `map`, `sum` or `Date`, are listed under [Standard libraries](../libraries/README.md).
 
-> For operators (arithmetic, comparison, boolean), see also [Operators](../operators/README.md) for precedence and usage details.
+Operators (`+`, `AND`, `EQUALS`, `UNLESS`, `FOLLOWED BY` and the rest) are described under [Operators](../operators/README.md). The conversions `TOSTRING`, `TONUMBER`, `TODATE`, `TOTIME`, `TODATETIME` and `AS STRING` are described under [Coercions](../types/coercions.md).
 
-### Type Coercion Builtins
+## Numbers
 
-| Function     | Signature                                    | Description                      |
-| ------------ | -------------------------------------------- | -------------------------------- |
-| `TOSTRING`   | `NUMBER/BOOLEAN/DATE/TIME/DATETIME → STRING` | Convert to string representation |
-| `TONUMBER`   | `STRING → MAYBE NUMBER`                      | Parse string to number           |
-| `TODATE`     | `STRING → MAYBE DATE`                        | Parse string to date             |
-| `TOTIME`     | `STRING → MAYBE TIME`                        | Parse string to time             |
-| `TODATETIME` | `STRING → MAYBE DATETIME`                    | Parse string to datetime         |
-| `TRUNC`      | `NUMBER → NUMBER → NUMBER`                   | Truncate decimal places          |
-| `AS STRING`  | `value AS STRING`                            | Inline string conversion         |
+| Function            | Inputs         | Gives   | What it does                                                                                                                                                   |
+| ------------------- | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ISINTEGER`         | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
+| `FLOOR`             | NUMBER         | NUMBER  | Rounds down to a whole number                                                                                                                                  |
+| `CEILING`           | NUMBER         | NUMBER  | Rounds up to a whole number                                                                                                                                    |
+| `ROUND`             | NUMBER         | NUMBER  | Rounds to the nearest whole number; a half goes to the even number, so 2.5 gives 2 and 3.5 gives 4                                                             |
+| `TRUNC`             | NUMBER, NUMBER | NUMBER  | `TRUNC x n` cuts `x` toward zero to `n` decimal places: `TRUNC 12.987 2` is 12.98. A negative `n` cuts to tens, hundreds and so on: `TRUNC 123.45 (-1)` is 120 |
+| `EXPONENT`          | NUMBER, NUMBER | NUMBER  | `EXPONENT base power`: `EXPONENT 2 10` is 1024                                                                                                                 |
+| `SQRT`              | NUMBER         | NUMBER  | Square root                                                                                                                                                    |
+| `LN`                | NUMBER         | NUMBER  | Natural logarithm; an error for 0 or less                                                                                                                      |
+| `LOG10`             | NUMBER         | NUMBER  | Base-10 logarithm; an error for 0 or less                                                                                                                      |
+| `SIN`, `COS`, `TAN` | NUMBER         | NUMBER  | Trigonometry, in radians                                                                                                                                       |
+| `ASIN`, `ACOS`      | NUMBER         | NUMBER  | Inverse sine and cosine; an error outside -1 to 1                                                                                                              |
+| `ATAN`              | NUMBER         | NUMBER  | Inverse tangent                                                                                                                                                |
 
-### Numeric Builtins
+The [math](../libraries/math.md) library has lowercase versions (`ln`, `sqrt`, `asin`, ...) that give `NOTHING` instead of an error.
 
-| Function            | Signature                  | Description                                           |
-| ------------------- | -------------------------- | ----------------------------------------------------- |
-| `IS INTEGER`        | `NUMBER → BOOLEAN`         | TRUE if the number has no fractional part             |
-| `FLOOR`             | `NUMBER → NUMBER`          | Round down to integer                                 |
-| `CEILING`           | `NUMBER → NUMBER`          | Round up to integer                                   |
-| `ROUND`             | `NUMBER → NUMBER`          | Round to nearest integer                              |
-| `EXPONENT`          | `NUMBER → NUMBER → NUMBER` | Exponentiation (base, power)                          |
-| `LN`                | `NUMBER → NUMBER`          | Natural logarithm (runtime error if x ≤ 0)            |
-| `LOG10`             | `NUMBER → NUMBER`          | Base-10 logarithm (runtime error if x ≤ 0)            |
-| `SQRT`              | `NUMBER → NUMBER`          | Square root                                           |
-| `SIN`, `COS`, `TAN` | `NUMBER → NUMBER`          | Trigonometric functions (radians)                     |
-| `ASIN`, `ACOS`      | `NUMBER → NUMBER`          | Inverse trigonometric (runtime error outside [-1, 1]) |
-| `ATAN`              | `NUMBER → NUMBER`          | Inverse tangent                                       |
+## Text
 
-> The [math library](../libraries/math.md) provides safe lowercase wrappers (`ln`, `sqrt`, `asin`, ...) that return `MAYBE NUMBER` instead of raising runtime errors on domain violations.
+Positions in a STRING count from 0.
 
-### String Builtins
+| Function       | Inputs                 | Gives          | What it does                                                      |
+| -------------- | ---------------------- | -------------- | ----------------------------------------------------------------- |
+| `CONCAT`       | STRING, STRING, ...    | STRING         | Joins any number of strings: `CONCAT "Hello, ", name, "!"`        |
+| `STRINGLENGTH` | STRING                 | NUMBER         | The number of characters                                          |
+| `TOUPPER`      | STRING                 | STRING         | Upper case                                                        |
+| `TOLOWER`      | STRING                 | STRING         | Lower case                                                        |
+| `TRIM`         | STRING                 | STRING         | Without spaces at the start and end                               |
+| `CONTAINS`     | STRING, STRING         | BOOLEAN        | `CONTAINS text part`: TRUE if `part` occurs in `text`             |
+| `STARTSWITH`   | STRING, STRING         | BOOLEAN        | `STARTSWITH text start`                                           |
+| `ENDSWITH`     | STRING, STRING         | BOOLEAN        | `ENDSWITH text end`                                               |
+| `INDEXOF`      | STRING, STRING         | NUMBER         | `INDEXOF text part`: the position of the first `part`, or -1      |
+| `SPLIT`        | STRING, STRING         | LIST OF STRING | `SPLIT text separator`: `SPLIT "a,b" ","` is `LIST "a", "b"`      |
+| `CHARAT`       | STRING, NUMBER         | STRING         | `CHARAT text position`: one character                             |
+| `SUBSTRING`    | STRING, NUMBER, NUMBER | STRING         | `SUBSTRING text start length`: `SUBSTRING "hello" 1 3` is `"ell"` |
+| `REPLACE`      | STRING, STRING, STRING | STRING         | `REPLACE text old new`: every `old` replaced by `new`             |
 
-| Function           | Signature                           | Description                            |
-| ------------------ | ----------------------------------- | -------------------------------------- |
-| `STRINGLENGTH`     | `STRING → NUMBER`                   | Length of string                       |
-| `TOUPPER`          | `STRING → STRING`                   | Convert to uppercase                   |
-| `TOLOWER`          | `STRING → STRING`                   | Convert to lowercase                   |
-| `TRIM`             | `STRING → STRING`                   | Remove leading/trailing whitespace     |
-| `CONTAINS`         | `STRING → STRING → BOOLEAN`         | Substring test                         |
-| `STARTSWITH`       | `STRING → STRING → BOOLEAN`         | Prefix test                            |
-| `ENDSWITH`         | `STRING → STRING → BOOLEAN`         | Suffix test                            |
-| `INDEXOF`          | `STRING → STRING → NUMBER`          | Find position of substring             |
-| `SPLIT`            | `STRING → STRING → LIST OF STRING`  | Split by delimiter                     |
-| `CHARAT`           | `STRING → NUMBER → STRING`          | Character at index                     |
-| `SUBSTRING`        | `STRING → NUMBER → NUMBER → STRING` | Substring (string, start, length)      |
-| `REPLACE`          | `STRING → STRING → STRING → STRING` | Replace occurrences (string, old, new) |
-| `CONCAT x, y, ...` | `STRING → ... → STRING`             | Concatenate multiple strings           |
+`STARTSWITH` and `ENDSWITH` are written as one word.
 
-**Note:** `STARTSWITH` and `ENDSWITH` are single tokens (no space).
+## Dates
 
-### Date Builtins
+| Function           | Inputs                 | Gives              | What it does                                                   |
+| ------------------ | ---------------------- | ------------------ | -------------------------------------------------------------- |
+| `DATE_FROM_DMY`    | NUMBER, NUMBER, NUMBER | DATE               | The date from day, month and year                              |
+| `DATE_FROM_SERIAL` | NUMBER                 | DATE               | The date with this serial number                               |
+| `DATE_SERIAL`      | DATE                   | NUMBER             | The date's serial number (a count of days)                     |
+| `DATE_DAY`         | DATE                   | NUMBER             | The day of the month                                           |
+| `DATE_MONTH`       | DATE                   | NUMBER             | The month                                                      |
+| `DATE_YEAR`        | DATE                   | NUMBER             | The year                                                       |
+| `DATEVALUE`        | STRING                 | EITHER STRING DATE | Reads date text such as `"2024-02-01"`; `LEFT` holds the error |
+| `TODAY`            | none                   | DATE               | Today's date in the document's time zone; needs `TIMEZONE IS`  |
 
-| Function           | Signature                         | Description                             |
-| ------------------ | --------------------------------- | --------------------------------------- |
-| `DATE_FROM_DMY`    | `NUMBER → NUMBER → NUMBER → DATE` | Construct DATE from day, month, year    |
-| `DATE_FROM_SERIAL` | `NUMBER → DATE`                   | Construct DATE from serial number       |
-| `DATE_SERIAL`      | `DATE → NUMBER`                   | Get serial number from DATE             |
-| `DATE_DAY`         | `DATE → NUMBER`                   | Extract day from DATE                   |
-| `DATE_MONTH`       | `DATE → NUMBER`                   | Extract month from DATE                 |
-| `DATE_YEAR`        | `DATE → NUMBER`                   | Extract year from DATE                  |
-| `DATEVALUE`        | `STRING → EITHER STRING DATE`     | Parse date text (LEFT is error message) |
-| `TODAY`            | `DATE`                            | Current date (requires `TIMEZONE IS`)   |
+The [daydate](../libraries/daydate.md) library builds on these with `Date`, weekdays, months and more.
 
-### Time Builtins
+## Times of day
 
-| Function           | Signature                         | Description                                     |
-| ------------------ | --------------------------------- | ----------------------------------------------- |
-| `TIME_HOUR`        | `TIME → NUMBER`                   | Extract hour (0-23)                             |
-| `TIME_MINUTE`      | `TIME → NUMBER`                   | Extract minute (0-59)                           |
-| `TIME_SECOND`      | `TIME → NUMBER`                   | Extract second (0-59)                           |
-| `TIME_SERIAL`      | `TIME → NUMBER`                   | Get serial number (day fraction) from TIME      |
-| `TIME_FROM_SERIAL` | `NUMBER → TIME`                   | Construct TIME from day fraction                |
-| `TIME_FROM_HMS`    | `NUMBER → NUMBER → NUMBER → TIME` | Construct TIME from hour, minute, second        |
-| `TIMEVALUE`        | `STRING → EITHER STRING NUMBER`   | Parse time text to day fraction (LEFT is error) |
-| `CURRENTTIME`      | `TIME`                            | Current local time (requires `TIMEZONE IS`)     |
+| Function           | Inputs                 | Gives                | What it does                                                                     |
+| ------------------ | ---------------------- | -------------------- | -------------------------------------------------------------------------------- |
+| `TIME_FROM_HMS`    | NUMBER, NUMBER, NUMBER | TIME                 | The time from hour, minute and second                                            |
+| `TIME_FROM_SERIAL` | NUMBER                 | TIME                 | The time from a fraction of a day (0.5 is noon)                                  |
+| `TIME_SERIAL`      | TIME                   | NUMBER               | The time as a fraction of a day                                                  |
+| `TIME_HOUR`        | TIME                   | NUMBER               | 0 to 23                                                                          |
+| `TIME_MINUTE`      | TIME                   | NUMBER               | 0 to 59                                                                          |
+| `TIME_SECOND`      | TIME                   | NUMBER               | 0 to 59                                                                          |
+| `TIMEVALUE`        | STRING                 | EITHER STRING NUMBER | Reads time text such as `"12:00"` as a fraction of a day; `LEFT` holds the error |
+| `CURRENTTIME`      | none                   | TIME                 | The current time in the document's time zone; needs `TIMEZONE IS`                |
 
-### DateTime Builtins
+## Date and time together
 
-| Function            | Signature                         | Description                                                   |
-| ------------------- | --------------------------------- | ------------------------------------------------------------- |
-| `DATETIME_DATE`     | `DATETIME → DATE`                 | Extract the date part                                         |
-| `DATETIME_TIME`     | `DATETIME → TIME`                 | Extract the time-of-day part                                  |
-| `DATETIME_TZ`       | `DATETIME → STRING`               | Extract the IANA timezone name                                |
-| `DATETIME_SERIAL`   | `DATETIME → NUMBER`               | Get UTC serial number from DATETIME                           |
-| `DATETIME_FROM_DTZ` | `DATE → TIME → STRING → DATETIME` | Construct from date, time, and IANA timezone name             |
-| `NOW`               | `DATETIME`                        | Current date and time (defaults to UTC without `TIMEZONE IS`) |
+| Function            | Inputs             | Gives    | What it does                                                  |
+| ------------------- | ------------------ | -------- | ------------------------------------------------------------- |
+| `DATETIME_FROM_DTZ` | DATE, TIME, STRING | DATETIME | A DATETIME from a date, a time and an IANA time zone name     |
+| `DATETIME_DATE`     | DATETIME           | DATE     | The local date                                                |
+| `DATETIME_TIME`     | DATETIME           | TIME     | The local time of day                                         |
+| `DATETIME_TZ`       | DATETIME           | STRING   | The IANA time zone name                                       |
+| `DATETIME_SERIAL`   | DATETIME           | NUMBER   | A serial number counted in UTC                                |
+| `NOW`               | none               | DATETIME | The current moment; in UTC when the file has no `TIMEZONE IS` |
+| `TIMEZONE`          | none               | STRING   | The document's time zone name; needs `TIMEZONE IS`            |
 
-### Timezone Builtins
+`TIMEZONE IS` is a line of its own at the top level of a file that sets the document's time zone, such as `TIMEZONE IS "Asia/Singapore"`. The [timezone](../libraries/timezone.md) library has constants for common zones, and [datetime](../libraries/datetime.md) builds on these functions.
 
-| Function      | Signature   | Description                                                   |
-| ------------- | ----------- | ------------------------------------------------------------- |
-| `TIMEZONE`    | `STRING`    | Returns the document timezone string (requires `TIMEZONE IS`) |
-| `TIMEZONE IS` | declaration | Top-level declaration setting the document timezone           |
+## Regulative traces
 
-### Temporal and Bitemporal Builtins
+| Function    | Inputs                                 | Gives       | What it does                                                                                        |
+| ----------- | -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
+| `WAITUNTIL` | NUMBER                                 | EVENT a b   | An event that matches no party and no action; in a `#TRACE` it moves time forward to the given time |
+| `EVALTRACE` | DEONTIC a b, NUMBER, LIST OF EVENT a b | DEONTIC a b | The function behind `#TRACE`: what remains of a rule after the events, starting at the given time   |
 
-These builtins interact with L4's temporal evaluation context. Days are scanned inclusively; while a predicate is evaluated for a day, the valid time and rules-effective date are set to that day.
+See [EVENT](../regulative/EVENT.md) and [Regulative rules](../regulative/README.md).
 
-| Function         | Signature                                  | Description                                                                                                         |
-| ---------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `EVER BETWEEN`   | `DATE → DATE → (DATE → BOOLEAN) → BOOLEAN` | TRUE if the predicate holds on **any** day from start to end (inclusive). FALSE when start is after end.            |
-| `ALWAYS BETWEEN` | `DATE → DATE → (DATE → BOOLEAN) → BOOLEAN` | TRUE if the predicate holds on **every** day from start to end (inclusive). Vacuously TRUE when start is after end. |
-| `WHEN LAST`      | `DATE → (DATE → BOOLEAN) → MAYBE DATE`     | Most recent day at or before the given date on which the predicate holds; NOTHING if none is found.                 |
-| `WHEN NEXT`      | `DATE → (DATE → BOOLEAN) → MAYBE DATE`     | Earliest day at or after the given date on which the predicate holds (searching up to 9999-12-31); NOTHING if none. |
-| `VALUE AT`       | `DATE → (DATE → a) → a`                    | Evaluates the function at the given date, with valid time and rules-effective date set to that date.                |
+## HTTP and JSON
 
-Example (see [temporal-acceptance.l4](https://github.com/legalese/l4-ide/blob/main/jl4/examples/ok/temporal-acceptance.l4)):
+| Function     | Inputs                 | Gives           | What it does                                                      |
+| ------------ | ---------------------- | --------------- | ----------------------------------------------------------------- |
+| `FETCH`      | STRING                 | STRING          | Sends an HTTPS GET request and gives the response body            |
+| `POST`       | STRING, STRING, STRING | STRING          | Sends an HTTPS POST request: URL, headers, body                   |
+| `ENV`        | STRING                 | MAYBE STRING    | The value of an environment variable, or `NOTHING`                |
+| `JSONENCODE` | a                      | STRING          | Any value as JSON text                                            |
+| `JSONDECODE` | STRING                 | EITHER STRING a | JSON text as a value of the expected type; `LEFT` holds the error |
 
-```l4
-#EVAL `EVER BETWEEN` (Date 5 1 2024) (Date 7 1 2024) `weekend?`
-#EVAL `WHEN NEXT` (Date 10 1 2024) `weekend?`
-#EVAL `VALUE AT` (Date 4 7 1776) (GIVEN d YIELD d)
-```
-
-The `EVAL ...` builtins re-evaluate an expression under an altered temporal context, then restore the original context. The first argument is a date/time **serial number** (see `DATE_SERIAL`, `DATETIME_SERIAL`); the second is the expression to evaluate.
-
-| Function                        | Signature        | Description                                                                  |
-| ------------------------------- | ---------------- | ---------------------------------------------------------------------------- |
-| `EVAL AS OF SYSTEM TIME`        | `NUMBER → a → a` | Evaluate as if the system (transaction) time were the given serial timestamp |
-| `EVAL UNDER VALID TIME`         | `NUMBER → a → a` | Evaluate with the valid time set to the given date serial                    |
-| `EVAL UNDER RULES EFFECTIVE AT` | `NUMBER → a → a` | Evaluate under the version of the rules effective at the given date          |
-| `EVAL UNDER RULES ENCODED AT`   | `NUMBER → a → a` | Evaluate under the rules as they were encoded (known) at the given timestamp |
-
-For regulative traces, `WAIT UNTIL` produces a synthetic event that matches no party or action and is only relevant for its timestamp — use it to advance time in an event list:
-
-| Function     | Signature            | Description                                              |
-| ------------ | -------------------- | -------------------------------------------------------- |
-| `WAIT UNTIL` | `NUMBER → EVENT a b` | Event that advances contract time to the given timestamp |
-
-```l4
-#TRACE aContract AT 0 WITH
-  PARTY S DOES delivery AT 2
-  (`WAIT UNTIL` 10)
-```
-
-See [Regulative Rules](../regulative/README.md) and [EVENT](../regulative/EVENT.md) for details.
-
-### Arithmetic Operators
-
-These operators are always available without import.
-
-| Operator   | Text Alias   | Signature                  | Description           |
-| ---------- | ------------ | -------------------------- | --------------------- |
-| `+`        | `PLUS`       | `NUMBER → NUMBER → NUMBER` | Addition              |
-| `-`        | `MINUS`      | `NUMBER → NUMBER → NUMBER` | Subtraction           |
-| `*`        | `TIMES`      | `NUMBER → NUMBER → NUMBER` | Multiplication        |
-| `/`        | `DIVIDED BY` | `NUMBER → NUMBER → NUMBER` | Division              |
-| `MODULO`   | --           | `NUMBER → NUMBER → NUMBER` | Remainder             |
-| `EXPONENT` | --           | `NUMBER → NUMBER → NUMBER` | Exponentiation        |
-| `FLOOR`    | --           | `NUMBER → NUMBER`          | Round down to integer |
-| `CEILING`  | --           | `NUMBER → NUMBER`          | Round up to integer   |
-| `TRUNC`    | --           | `NUMBER → NUMBER → NUMBER` | Truncate toward zero  |
-
-### Comparison Operators
-
-| Operator | Text Alias     | Signature         | Description               |
-| -------- | -------------- | ----------------- | ------------------------- |
-| `=`      | `EQUALS`       | `a → a → BOOLEAN` | Equality (not assignment) |
-| `>`      | `GREATER THAN` | `a → a → BOOLEAN` | Greater than              |
-| `<`      | `LESS THAN`    | `a → a → BOOLEAN` | Less than                 |
-| `>=`     | `AT LEAST`     | `a → a → BOOLEAN` | Greater than or equal     |
-| `<=`     | `AT MOST`      | `a → a → BOOLEAN` | Less than or equal        |
-
-**Note:** `=` is equality, NOT assignment. L4 has no assignment (pure functional).
-
-### Boolean Operators
-
-| Operator  | Symbol Alias | Precedence  | Description             |
-| --------- | ------------ | ----------- | ----------------------- |
-| `NOT`     | --           | Highest     | Logical negation        |
-| `AND`     | `&&`         | High        | Logical and             |
-| `OR`      | `\|\|`       | Medium      | Logical or              |
-| `IMPLIES` | `=>`         | Lowest      | Logical implication     |
-| `UNLESS`  | --           | = `AND NOT` | Shorthand for `AND NOT` |
-
-### List Construction
-
-| Syntax             | Description    |
-| ------------------ | -------------- |
-| `LIST x, y, z`     | Literal list   |
-| `EMPTY`            | Empty list     |
-| `x FOLLOWED BY xs` | Cons (prepend) |
-
-### Nullary Builtins
-
-| Function      | Type       | Description                                                   |
-| ------------- | ---------- | ------------------------------------------------------------- |
-| `TODAY`       | `DATE`     | Current date in document timezone                             |
-| `NOW`         | `DATETIME` | Current date and time (defaults to UTC without `TIMEZONE IS`) |
-| `CURRENTTIME` | `TIME`     | Current local time (requires `TIMEZONE IS`)                   |
-| `TIMEZONE`    | `STRING`   | Document timezone (IANA name)                                 |
-
----
-
-### HTTP and JSON Builtins
-
-| Function     | Signature                         | Description                  |
-| ------------ | --------------------------------- | ---------------------------- |
-| `FETCH`      | `STRING → STRING`                 | HTTP GET request             |
-| `POST`       | `STRING, STRING, STRING → STRING` | HTTP POST request            |
-| `ENV`        | `STRING → MAYBE STRING`           | Read environment variable    |
-| `JSONENCODE` | `a → STRING`                      | Convert value to JSON string |
-| `JSONDECODE` | `STRING → EITHER STRING a`        | Parse JSON string to value   |
-
-For detailed HTTP/JSON documentation, see [HTTP and JSON](http-json.md).
-
-For detailed coercion documentation, see [Coercions](../types/coercions.md).
+Details, including the header format and how records are encoded, are under [HTTP and JSON](http-json.md).

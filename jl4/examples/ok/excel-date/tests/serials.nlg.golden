@@ -6,6 +6,6 @@
 `ExcelTimeValue` with 2:30 PM
 `ExcelTimeValue` with 23:59:59
 `ExcelTimeValue` with `Bad time text`
-`excelSerial1900` with `Date` with 1, 3 and 1900
+`excelSerial1900` with 1 March 1900
 `dateFromExcelSerial` with 61
 `dateFromExcelSerial` with 60

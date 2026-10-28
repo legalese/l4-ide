@@ -1,0 +1,137 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 7:10-7:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The second argument of UNLESS is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      NUMBER
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 10:36-10:45
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first argument of UNLESS is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      NUMBER
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 13:61-13:66
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The argument of NOT is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      NUMBER
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 16:32-16:37
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The argument of NOT is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      NUMBER
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 19:52-19:54
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The second argument of AND is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      NUMBER
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 22:55-22:56
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The second argument of '&&' is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      NUMBER
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 25:43-25:47
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The second argument of '+' is expected to be of type
+
+      NUMBER
+
+    but is here of type
+
+      BOOLEAN
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 28:37-28:46
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first argument of PLUS is expected to be of type
+
+      NUMBER
+
+    but is here of type
+
+      BOOLEAN
+
+File: operator-operand-types.l4
+  Hidden: no
+  Range: 31:61-31:62
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The second argument of FOLLOWED BY is expected to be of type
+
+      LIST OF NUMBER
+
+    but is here of type
+
+      NUMBER

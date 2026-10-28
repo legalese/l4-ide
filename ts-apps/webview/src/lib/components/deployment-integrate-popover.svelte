@@ -68,7 +68,7 @@
             label: 'MCP server',
             value: `https://mcp.legalese.cloud/${orgSlug}/${deploymentId}`,
             hint: 'Use with any MCP enabled AI chat',
-            doc: 'legalese-cloud/mcp-server.md',
+            doc: 'legalese-cloud/ai-agents.md#mcp-endpoint',
           },
           {
             label: 'WebMCP embed script',
@@ -88,7 +88,7 @@
             label: 'MCP server',
             value: `${trimmedHost}/${deploymentId}/.mcp`,
             hint: 'Use with any MCP enabled AI chat',
-            doc: 'legalese-cloud/mcp-server.md',
+            doc: 'legalese-cloud/ai-agents.md#mcp-endpoint',
           },
           {
             label: 'WebMCP embed script',
@@ -198,8 +198,9 @@
             <button
               class="learn-more"
               onclick={() =>
-                onLearnMore(`${DOCS_BASE}/legalese-cloud/agent-plugin.md`)}
-              >Learn more</button
+                onLearnMore(
+                  `${DOCS_BASE}/legalese-cloud/ai-agents.md#install-one-deployment-as-a-plugin`
+                )}>Learn more</button
             >
           </div>
         </div>

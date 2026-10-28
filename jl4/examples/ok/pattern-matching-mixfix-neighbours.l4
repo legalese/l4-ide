@@ -1,0 +1,32 @@
+-- What stays legal beside a mixfix rule: clauses written with a name of their
+-- own first, whether the name is a new one or a constructor's; a second
+-- definition of the same words with a GIVEN of its own, for other types; and
+-- the rule itself, written with a word between its inputs and no clauses at
+-- all. The not-ok/tc/pattern-matching-mixfix-form-* files are what is refused.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` n MEANS n
+
+GIVEN c IS A Colour
+      s IS A STRING
+GIVETH A NUMBER
+c `costs` s MEANS 7
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE price Red 0 IS 1
+DECIDE price c n IS n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE Green 0 IS 7
+DECIDE Green n IS n
+
+#EVAL Red `costs` 0
+#EVAL Red `costs` "x"
+#EVAL price Red 0
+#EVAL price Blue 4

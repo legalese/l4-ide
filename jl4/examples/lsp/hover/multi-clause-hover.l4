@@ -1,0 +1,23 @@
+-- Hover on a rule written as a list of clauses. Its definition binds the
+-- inputs at the GIVEN's own location (L4.Parser.givenInputBinding), so two
+-- nodes sit on the GIVEN's name; hover must answer as for any other GIVEN.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour @desc The colour being priced
+GIVETH A NUMBER
+DECIDE price Red IS 1
+DECIDE price c   IS code c
+
+GIVEN x IS A Colour
+GIVETH A NUMBER
+DECIDE code x IS 3
+
+-- A pattern that is its input's own name compiles to nothing. Hover on it
+-- answers with the input's type. An earlier build gave the binding of the
+-- later clauses a range from clause 2's body to clause 3's, which covered
+-- this pattern, and hover answered NUMBER, the type of that binding.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE fee Red   IS 1
+DECIDE fee Green IS 2
+DECIDE fee c     IS 3

@@ -1,0 +1,11 @@
+-- A `Date` of the user's own is not daydate's, and `l4 nlg` does not read it as
+-- a calendar date: the rule is keyed on the definition coming from daydate.l4,
+-- not on the name. This is the positive control for `nlg-literals.l4`, which
+-- imports daydate.
+GIVEN d IS A NUMBER
+      m IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`Date` d m y MEANS d PLUS m PLUS y
+
+#EVAL `Date` 16 7 2025

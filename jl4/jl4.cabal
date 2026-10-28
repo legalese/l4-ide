@@ -31,12 +31,19 @@ executable l4
     jl4-core,
     jl4-lsp,
     aeson,
+    attoparsec,
     bytestring,
     cassava,
+    containers,
+    crypton,
     directory,
     filepath,
     hls-graph,
+    http-client,
+    http-client-tls,
+    http-types,
     lsp-types,
+    network-uri,
     process,
     text,
     time,
@@ -45,13 +52,20 @@ executable l4
     unordered-containers,
     vector,
     yaml,
+    zip-archive,
+  if !os(windows)
+    build-depends: unix
   main-is: Main.hs
   other-modules:
     L4.Cli.Ast
     L4.Cli.Batch
     L4.Cli.Check
+    L4.Cli.Cloud
     L4.Cli.Common
+    L4.Cli.Deploy
     L4.Cli.Format
+    L4.Cli.Install
+    L4.Cli.Nlg
     L4.Cli.Render
     L4.Cli.Run
     L4.Cli.StateGraph
@@ -111,7 +125,9 @@ test-suite l4-cli-test
   autogen-modules:
     Paths_jl4
   build-tool-depends:
-    jl4:l4
+    jl4:l4,
+    jl4-lsp:jl4-lsp,
+    jl4-repl:jl4-repl
   build-depends:
     aeson,
     bytestring,
@@ -119,4 +135,5 @@ test-suite l4-cli-test
     filepath,
     hspec,
     process,
+    temporary,
     text,

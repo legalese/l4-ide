@@ -48,6 +48,7 @@ module L4.Import.Resolution
   , ImportResolutionError(..)
     -- * Type Checking with Dependencies
   , typecheckWithDependencies
+  , typecheckWithDependenciesLocated
   , TypeCheckWithDepsResult(..)
   ) where
 
@@ -56,10 +57,12 @@ import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
-import L4.Annotation (emptyAnno)
+import L4.Annotation (emptyAnno, rangeOf)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
+import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (doCheckProgramWithDependencies, initialCheckState, initialCheckEnv, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext, Substitution, Environment, EntityInfo, MixfixRegistry, InfoMap, ScopeMap, NlgMap, DescMap)
 import qualified L4.TypeCheck as TypeCheck
@@ -166,21 +169,29 @@ data ImportResolutionError
 -- 4. Type-checks imports in dependency order
 -- 5. Returns all resolved imports (including transitive)
 --
--- Cycle detection prevents infinite loops. We track two sets:
+-- Cycle detection prevents infinite loops. We track two collections:
 -- - @inProgress@: modules currently being resolved (detecting these = cycle)
--- - @resolved@: modules already fully resolved (can skip these)
+-- - @resolved@: modules already fully resolved, keyed to their resolved records
+--
+-- The @resolved@ map holds the actual 'ResolvedImport' records (not just names)
+-- so that when a module is re-encountered we can hand back its already-computed,
+-- fully-type-checked record. This matters for /diamond/ imports: in
+-- @A -> {B, C} -> D@, once B has resolved D, C must still receive D's exported
+-- environment. Returning @[]@ here (the old, name-set behaviour) type-checked C
+-- against an empty dependency environment, silently degrading the types and
+-- entities of the second sibling that A then consumed. See smucclaw/l4-ide#904.
 resolveImports
   :: forall m. Monad m
   => ModuleLookup m                      -- ^ How to find module sources
   -> Set.Set Text                        -- ^ Modules currently being resolved (for cycle detection)
-  -> Set.Set Text                        -- ^ Modules already fully resolved (to skip)
+  -> Map.Map Text ResolvedImport         -- ^ Modules already fully resolved, keyed to their records
   -> [Text]                              -- ^ Import names to resolve
   -> m (Either ImportResolutionError [ResolvedImport])
 resolveImports _lookup _inProgress _resolved [] = pure $ Right []
 resolveImports lookupModule inProgress resolved (modName : rest)
-  -- Already resolved - skip it
-  | modName `Set.member` resolved =
-      resolveImports lookupModule inProgress resolved rest
+  -- Already resolved - reuse its record so *siblings* inherit its environment
+  | Just cached <- Map.lookup modName resolved =
+      (fmap . fmap) (cached :) $ resolveImports lookupModule inProgress resolved rest
   -- Currently being resolved - cycle detected!
   | modName `Set.member` inProgress = 
       pure $ Left $ CyclicImport $ toList inProgress <> [modName]
@@ -223,10 +234,12 @@ resolveImports lookupModule inProgress resolved (modName : rest)
                         , riTypeChecked = tcResult
                         }
                   
-                  -- This module is now fully resolved
-                  -- Collect all resolved module names from transitive imports
-                  let transitiveNames = Set.fromList $ map (\ri -> ri.riModuleName) transitiveResolved
-                      newResolved = Set.insert modName $ Set.union resolved transitiveNames
+                  -- This module is now fully resolved.
+                  -- Register this module and everything its subtree resolved,
+                  -- keyed to their records, so that later siblings inherit the
+                  -- records (not just the names) via the already-resolved branch.
+                  let transitiveCache = Map.fromList [ (ri.riModuleName, ri) | ri <- transitiveResolved ]
+                      newResolved = Map.insert modName thisResolved (Map.union resolved transitiveCache)
                   
                   -- Continue with remaining imports (back to original inProgress)
                   restResult <- resolveImports lookupModule inProgress newResolved rest
@@ -266,6 +279,9 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdSuccess :: Bool
   , tcdResolvedImports :: [ResolvedImport]
   , tcdUri :: NormalizedUri  -- ^ URI of the main module
+  , tcdAnnotationWarnings :: [Resolve.Warning]
+    -- ^ The main module's annotation warnings, from the parser: an @\@nlg@
+    -- that attaches to nothing, a lone language tag, a slot with spaces in it.
   }
   deriving stock (Generic)
 
@@ -278,25 +294,44 @@ typecheckWithDependencies
   -> NormalizedUri      -- ^ URI of the main module
   -> Text               -- ^ Source code of the main module
   -> m (Either [Text] TypeCheckWithDepsResult)
-typecheckWithDependencies lookupModule uri source = do
+typecheckWithDependencies lookupModule uri source =
+  either (Left . snd) Right <$> typecheckWithDependenciesLocated lookupModule uri source
+
+-- | 'typecheckWithDependencies', where an import error also carries the range
+-- of the main module's @IMPORT@ it belongs to, when that is known: the
+-- @IMPORT@ of the module the error names, or for a cycle, of a module in it.
+typecheckWithDependenciesLocated
+  :: forall m. Monad m
+  => ModuleLookup m     -- ^ How to find module sources
+  -> NormalizedUri      -- ^ URI of the main module
+  -> Text               -- ^ Source code of the main module
+  -> m (Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult)
+typecheckWithDependenciesLocated lookupModule uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
-      pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
+      pure $ Left (Nothing, map (\(PError msg _ _) -> msg) (toList parseErrors))
     
-    Right (parsed, _hints, _warnings) -> do
+    Right (parsed, _hints, annotationWarnings) -> do
       -- Extract and resolve imports
       let importNames = extractImportNames parsed
+          importRanges = foldTopDecls importRange parsed
+          importRange = \case
+            Import _ (MkImport a n _) -> [(rawNameToText (rawName n), rangeOf a)]
+            _ -> []
+          rangeOfImportOf names = case [ r | (n, Just r) <- importRanges, n `elem` names ] of
+            r : _ -> Just r
+            [] -> Nothing
       
-      importResult <- resolveImports lookupModule Set.empty Set.empty importNames
+      importResult <- resolveImports lookupModule Set.empty Map.empty importNames
       
       case importResult of
         Left (ModuleNotFound modName searched) ->
-          pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
+          pure $ Left (rangeOfImportOf [modName], ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"])
         Left (ParseError modName errs) ->
-          pure $ Left $ ("Parse error in " <> modName <> ":") : errs
+          pure $ Left (rangeOfImportOf [modName], ("Parse error in " <> modName <> ":") : errs)
         Left (CyclicImport cycleModules) ->
-          pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
+          pure $ Left (rangeOfImportOf cycleModules, ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules])
         
         Right resolvedImports -> do
           -- Combine environments from imports
@@ -327,6 +362,7 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdSuccess = not (any ((== TypeCheck.SError) . TypeCheck.severity) result.errors)
             , tcdResolvedImports = resolvedImports
             , tcdUri = uri
+            , tcdAnnotationWarnings = annotationWarnings
             }
 
 -- ----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 IMPORT prelude
-IMPORT dayDate
+IMPORT daydate
 
 DECLARE `Risk Category` IS ONE OF
     `Low Risk`

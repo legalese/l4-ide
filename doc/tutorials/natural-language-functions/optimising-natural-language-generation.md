@@ -1,291 +1,385 @@
-# Optimising for Natural Language Document Generation with `@nlg`
+# Make rules read like law
 
-**Prerequisites:** Basic L4 functions ([Your First L4 File](../getting-started/first-l4-file.md)) and [Infix, Postfix, and Mixfix Functions](natural-language-functions.md) — the calling-syntax foundation this tutorial builds on
+Write rules whose calls read like sentences, and whose rendered document reads like legal drafting.
 
----
+**Before you start:** [Install L4 and write your first rule](../getting-started/first-l4-file.md).
 
-L4 can render your rules back into formatted English prose — in the VS Code
-**Render** tab, or with `l4 render`. The renderer is **deterministic**: it walks
-your code and turns each construct into a sentence or an outline. That means the
-quality of the generated prose is mostly in your hands. Well-named, well-shaped
-rules read almost like professionally drafted legal writing with no extra effort; awkward ones read like a
-transcript of an algorithm.
+This page has two parts:
 
-This tutorial shows how to get transparent English prose out of the renderer, using three increasingly powerful levers:
-
-1. **Names** — backticked identifiers and parameter names.
-2. **Shape** — mixfix word order, control flow, section titles, and arithmetic.
-3. **`@nlg`** — an authored sentence that overrides the structural rendering.
-
-It finishes with how **Legalese AI** can then apply drafting policies to refine
-the result further.
-
-## Lever 1 — Names do most of the work
-
-The renderer prints identifiers and parameter names **verbatim**. Good names are
-the single highest-leverage thing you can do.
-
-### Name rules as the phrase you want to read
-
-A backticked identifier can contain spaces, so name a rule as the noun phrase or
-clause it represents:
-
-```l4
--- Renders: "Monthly property tax means ..."
-`monthly property tax` MEANS ...
-
--- Renders: "Mpt means ..."
-mpt MEANS ...
-```
-
-> [!NOTE]
-> Beginner programmers are routinely and pointedly reminded to use the first form whenever they reach for the latter.
-
-### Name parameters as nouns, not letters
-
-Parameters appear in the rendered prose and in every `@nlg` slot. Name them the
-way they should read:
-
-```l4
--- Renders: "... the buyer ... the seller ..."
-GIVEN `the buyer` IS A Person
-      `the seller` IS A Person
-
--- Renders: "... p ... q ..."
-GIVEN p IS A Person
-      q IS A Person
-```
-
-Sometimes existing legal writing will deliberately adopt this form: "A person (A) discriminates against another (B) if ..." (Equality Act 2010, s.13). In that situation the renderer will aim to obey the "legislative variable" style.
-
-If a parameter has a record type, the renderer promotes the type name into a noun phrase: ``GIVEN claim IS A `Payment Claim` `` renders as "the payment claim". This works cleanly only when one parameter has that type — two `Payment Claim` parameters would collide on the same phrase.
-
-### Name record fields readably
-
-Projections render as `X's field`, so field names carry straight into the prose:
-
-```l4
-DECLARE `Property Details` HAS
-    `market value`         IS A NUMBER
-    `monthly property tax` IS A NUMBER
--- "the property's market value", "the property's monthly property tax"
-```
+1. **Infix, postfix and mixfix functions**: put a rule's name and its inputs in natural word order, so `` `the applicant` `is eligible for` `the programme` `` is valid L4.
+2. **Rendering**: L4 can turn your rules back into an English document. Names, the shape of the code, and `@nlg` annotations decide how well it reads.
 
 ---
 
-## Lever 2 — Shape the code so it reads in order
+## Infix, postfix and mixfix functions
 
-### Use mixfix so calls read as sentences
+Most programming languages put the function name first: `isEligible(person, programme)`. In L4 the inputs can go before, between or after the words of the name:
 
-Put the words and the argument holes where they belong in the sentence. (See the
-[mixfix tutorial](natural-language-functions.md) for the full mechanics.)
+| Pattern | Definition                                         | Call                          |
+| ------- | -------------------------------------------------- | ----------------------------- |
+| Prefix  | `` `plus` a b MEANS ... ``                         | `` `plus` 3 5 ``              |
+| Infix   | ``a `plus` b MEANS ...``                           | ``3 `plus` 5``                |
+| Postfix | ``amount `percent` MEANS ...``                     | ``50 `percent` ``             |
+| Mixfix  | ``value `is between` lower `and` upper MEANS ...`` | ``5 `is between` 0 `and` 10`` |
+
+The inputs are the names declared with `GIVEN`; every other word in the definition is part of the function's name. A call uses the same word order as the definition.
+
+**Complete example:** [natural-language-example.l4](natural-language-example.l4)
+
+### Infix: one input on each side
 
 ```l4
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+a `plus` b MEANS a + b
+
+#EVAL 3 `plus` 5
+#EVAL `plus` 3 5
+```
+
+Both calls return `8`: a function defined in infix form can also be called in prefix form.
+
+Names in backticks can contain spaces, so the name can be a whole phrase:
+
+```l4
+DECLARE Person
+    HAS `name`   IS A STRING
+        `age`    IS A NUMBER
+        `income` IS A NUMBER
+
+GIVEN `the person` IS A Person
+      `the threshold` IS A NUMBER
+GIVETH A BOOLEAN
+`the person` `has income above` `the threshold` MEANS
+    `the person`'s `income` > `the threshold`
+
+`Alice` MEANS Person WITH
+    `name`   IS "Alice"
+    `age`    IS 30
+    `income` IS 50000
+
+#EVAL `Alice` `has income above` 40000
+```
+
+### Postfix: the input before the name
+
+```l4
+GIVEN `the person` IS A Person
+GIVETH A BOOLEAN
+`the person` `is an adult` MEANS `the person`'s `age` >= 18
+
+#EVAL `Alice` `is an adult`
+```
+
+For a one-word name, the backticks are optional at the call site: with ``n `squared` MEANS n * n``, both `5 squared` and ``5 `squared` `` work.
+
+### Mixfix: words and inputs interleaved
+
+A mixfix name has several words, with inputs between them:
+
+```l4
+GIVEN value IS A NUMBER
+      lower IS A NUMBER
+      upper IS A NUMBER
+GIVETH A BOOLEAN
+value `is between` lower `and` upper MEANS
+    lower <= value AND value <= upper
+
+#EVAL 5 `is between` 0 `and` 10
+
+GIVEN principal IS A NUMBER
+      rate      IS A NUMBER
+      term      IS A NUMBER
+GIVETH A NUMBER
+`simple interest on` principal `at` rate `percent for` term `years` MEANS
+    principal * rate / 100 * term
+
+#EVAL `simple interest on` 1000 `at` 5 `percent for` 3 `years`
+```
+
+The calls return `TRUE` and `150`. There is no limit on the number of inputs.
+
+### Points to watch
+
+- **List the inputs in `GIVEN` in the order they appear in the definition.** For ``value `is between` lower `and` upper``, the `GIVEN` must list `value`, `lower`, `upper`, in that order.
+- **An input cannot share a name with a word of the function name.** `` `percent for` years `years` `` is an error; call the input `term`.
+- **Use parentheses** when an argument is itself an expression: ``(1 + 2) `plus` (3 + 4)``.
+- **Define local helpers in `WHERE`.** A `WHERE` block can hold a full `GIVEN ... MEANS` definition, mixfix ones included; the complete example shows one.
+
+For the exact rules of how L4 matches mixfix calls, see [Mixfix functions](../../reference/functions/README.md#mixfix-functions).
+
+---
+
+## Render your rules as a document
+
+L4 can render your rules as formatted English, in the VS Code **Render** tab or with `l4 render file.l4 --format text`. The renderer is deterministic: it walks your code and turns each construct into a sentence or an outline. So the quality of the prose is mostly in your hands. Well-named, well-shaped rules read almost like professional drafting with no extra effort; badly named ones read like a transcript of an algorithm.
+
+Three levers, from the cheapest to the most precise:
+
+1. **Names**: backticked identifiers and input names.
+2. **Shape**: mixfix word order, control flow, arithmetic and section headings.
+3. **`@nlg`**: a sentence you write that replaces the generated one.
+
+---
+
+## Names do most of the work
+
+The renderer prints names as you wrote them. Good names are the most effective thing you can do.
+
+**Name rules as the phrase you want to read.** A backticked name can contain spaces:
+
+```l4
+`monthly property tax` MEANS 250
+mpt MEANS 250
+```
+
+The first renders as "Monthly property tax means 250."; the second as "Mpt means 250."
+
+**Name inputs as nouns, not letters.** Inputs appear in the prose and in every `@nlg` slot:
+
+```l4
+GIVEN `the purchase price` IS A NUMBER
+      `the deposit paid`   IS A NUMBER
+GIVETH A NUMBER
+`the balance due` MEANS `the purchase price` MINUS `the deposit paid`
+
+GIVEN p IS A NUMBER
+      d IS A NUMBER
+GIVETH A NUMBER
+`balance` MEANS p MINUS d
+```
+
+The first renders as "The balance due equals the purchase price − the deposit paid."; the second as "Balance equals p − d."
+
+Legal writing sometimes uses letters on purpose, as in "A person (A) discriminates against another (B) if …" (Equality Act 2010, s.13). There, single letters are the right choice.
+
+When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". This works well when only one input has that type; two inputs of the same type would share the same phrase.
+
+**Name record fields readably.** A field renders as "X's field", so field names go straight into the prose:
+
+```l4
+DECLARE `Property Details`
+    HAS `market value`         IS A NUMBER
+        `monthly property tax` IS A NUMBER
+```
+
+---
+
+## Shape the code so it reads in order
+
+**Use mixfix so calls read as sentences.** Put the words and the inputs where they belong in the sentence:
+
+```l4
+DECLARE Person    HAS `age`           IS A NUMBER
+DECLARE Programme HAS `minimum age`   IS A NUMBER
+
 GIVEN `the applicant` IS A Person
       `the programme` IS A Programme
-      `application date` IS A DATE
 GIVETH A BOOLEAN
-DECIDE `as at an` `application date` `the applicant` `is eligible for` `the programme` IF ...
-
+DECIDE `the applicant` `is eligible for` `the programme` IF
+    `the applicant`'s `age` AT LEAST `the programme`'s `minimum age`
 ```
 
-In a conventional programming language, this would be a function taking three arguments: `eligibility(applicant, programme, date)`.
-
-In L4, it is also a function taking three arguments, but the arguments are intermingled across the function name for the sake of readability.
-
-### End helper names in a preposition
-
-A function whose name ends in a preposition (`of`, `for`, `to`, `between`, …)
-gets its arguments joined naturally, without a stray "with":
+**End helper names with a preposition.** When a function's name ends in a word such as `of`, `for`, `to` or `between`, its arguments are joined naturally:
 
 ```l4
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
 `the later of` x y MEANS IF x >= y THEN x ELSE y
--- "the later of the start date and the end date"
+
+`start date` MEANS 3
+`end date`   MEANS 7
+`the deadline` MEANS `the later of` `start date` `end date`
 ```
 
-### Let control flow stay structured
+The call renders as "the later of start date and end date". The same function named `` `maximum` `` renders as "maximum with start date and end date".
 
-`CONSIDER`, `IF`/`THEN`/`ELSE`, and `AND`/`OR` render as indented outlines, not
-run-on sentences. Keep operative logic where the renderer can see it as
-structure rather than burying it inside an unrelated expression:
+**Let control flow stay structured.** `CONSIDER`, `IF`/`THEN`/`ELSE` and `AND`/`OR` render as indented outlines, not run-on sentences, so keep the operative logic where the renderer can see it:
 
 ```l4
-CONSIDER claim's status
-WHEN Paid    THEN ...
-WHEN Overdue THEN ...
+DECLARE Status IS ONE OF Paid, Overdue
+DECLARE Claim HAS `status` IS A Status
+
+GIVEN claim IS A Claim
+GIVETH A STRING
+`the reminder` MEANS
+    CONSIDER claim's `status`
+    WHEN Paid    THEN "none"
+    WHEN Overdue THEN "send a reminder"
 ```
 
 renders as
 
 ```
-depending on the claim's status:
-- if it is Paid: ...
-- if it is Overdue: ...
+• The reminder is determined by:
+    depending on the claim's status:
+    - if it is Paid: none
+    - if it is Overdue: send a reminder
 ```
 
-### Keep arithmetic as arithmetic
-
-Numeric expressions render in **formula mode** — with `+ − × ÷` and parentheses —
-not as nested "the sum of the product of …". Write the maths directly instead of
-wrapping it in prose helpers:
+**Keep arithmetic as arithmetic.** Numeric expressions render as formulas, with `+ − × ÷` and parentheses, not as "the sum of the product of …":
 
 ```l4
-(`base rent` PLUS `service charge`) TIMES `months` PLUS `deposit`
--- "(base rent + service charge) × months + deposit"
+`base rent`      MEANS 1000
+`service charge` MEANS 100
+`months`         MEANS 12
+`deposit`        MEANS 2000
+
+`the total payable` MEANS (`base rent` PLUS `service charge`) TIMES `months` PLUS `deposit`
 ```
 
-### Group rules into titled sections
+renders as "The total payable equals (base rent + service charge) × months + deposit."
 
-Section markers organise a document into titled, numbered sections — they become
-headings in the rendered output and entries in the table of contents.
-
-- `` § `Section Name` `` starts a top-level section.
-- `` §§ `Subsection Name` `` nests one level deeper (`§§§` deeper still).
-
-The name is backtick-quoted, so it can be a full phrase. Every declaration after
-a marker belongs to that section until the next marker:
+**Group rules into titled sections.** `` § `Name` `` starts a section and `` §§ `Name` `` a subsection (`§§§` goes deeper). Every declaration after a marker belongs to that section until the next marker. Sections become headings in the rendered document and entries in its table of contents:
 
 ```l4
+DECLARE Person HAS `age` IS A NUMBER
+
 § `Eligibility`
 
 GIVEN `the applicant` IS A Person
-`the applicant` `qualifies for EP` IF ...
+GIVETH A BOOLEAN
+DECIDE `the applicant` `qualifies` IF
+    `the applicant` `is of working age`
 
 §§ `Age requirements`
 
 GIVEN `the applicant` IS A Person
-`the applicant` `is of working age` IF ...
+GIVETH A BOOLEAN
+DECIDE `the applicant` `is of working age` IF
+    `the applicant`'s `age` AT LEAST 18
 ```
 
-renders as
-
-```
-§ 1  Eligibility
-    • The applicant qualifies for EP if ...
-    1.1  Age requirements
-        • The applicant is of working age if ...
-```
-
-The `§` numbers appear when **Number sections** is enabled in the Render tab
-(or `--number-sections` on the CLI); the headings and table-of-contents entries
-appear either way.
-
-A flat file with no markers still gets sensible structure — its type
-definitions and rules are grouped into automatic **Definitions** and
-**Provisions** sections — but explicit `§`/`§§` markers let you name and order
-the parts the way a reader of the contract or statute would expect. Imported
-modules that carry their own section titles keep them, rendering under their own
-heading rather than a generic one.
+With **Number sections** turned on in the Render tab (or `--number-sections` on the command line), the headings are numbered: `§ 2  Eligibility`, then `2.1  Age requirements`. A file with no section markers is still grouped into automatic **Definitions** and **Provisions** sections, but your own markers let you name and order the parts the way a reader of the contract or statute expects.
 
 ---
 
-## Lever 3 — `@nlg`: author the exact sentence
+## `@nlg` annotations
 
-When structure and naming aren't enough — a recursive helper, domain jargon, or
-a formula you'd rather state in words — attach an `@nlg` annotation. It is the
-authoritative natural-language form of that definition.
+When names and shape are not enough (a recursive helper, a term of art, a formula you would rather state in words), add an `@nlg` annotation. It is the natural-language form of the definition and replaces the generated sentence.
 
-### Where it goes: end of the line
-
-Write `@nlg` at the **end of the construct's line**, trailing the signature, with
-the body on the next line:
+Write `@nlg` at the end of the definition's line, after the name and inputs, with the body on the next line. Inside the sentence, `%name%` is a slot for an input; an input whose name has spaces keeps its backticks: ``%`the principal`%``.
 
 ```l4
-GIVEN x IS A NUMBER, y IS A NUMBER
+GIVEN x IS A NUMBER
+      y IS A NUMBER
 GIVETH A NUMBER
-`the greater of` x y @nlg the greater of %x% and %y%
+`bigger` x y @nlg whichever is larger of %x% and %y%
   MEANS IF x >= y THEN x ELSE y
+
+`start date` MEANS 3
+`end date`   MEANS 7
+`the deadline` MEANS `bigger` `start date` `end date`
 ```
 
-### `%param%` slots
+Each slot is filled with the input's name in the definition itself, and with the actual argument at each call:
 
-Inside the sentence, `%name%` refers to a parameter. The renderer fills each slot
-with:
+```
+• Bigger means whichever is larger of x and y.
+• The deadline means whichever is larger of start date and end date.
+```
 
-- the **parameter name** when it shows the definition itself, and
-- the **actual argument** at each call site.
-
-So the rule above renders as _"The greater of means the greater of x and y"_ in
-its own definition, and a call `` `the greater of` `start date` `end date` ``
-renders as _"the greater of the start date and the end date"_.
-
-### It replaces the implementation
-
-A function with an `@nlg` renders **as its sentence**, not as its body. This is
-what makes recursive library functions readable — for example `filter` ships
-with:
+A slot is **tight**: `%amount%`, with no spaces inside the delimiters.
+That is what keeps a written-out percentage from being mistaken for one.
+In
 
 ```l4
-filter f list @nlg the items of %list% for which %f% holds
-  MEANS ...
+@nlg a 5% levy on %amount%
 ```
 
-so ``filter `is eligible` applicants`` reads _"the items of applicants for
-which is eligible holds"_ instead of exposing the recursion.
+the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot, while `%amount%` is one.
+Where a percent sign would end up flush against a word, as in `5%levy`, wrap it in backticks (`` `5%` ``) or spell it out ("5 percent"), either of which puts it beyond doubt.
 
-### When to reach for it
+**It replaces the body.** A function with `@nlg` renders as its sentence, not as its implementation. That is what makes recursive library functions readable; the prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so a call reads as a sentence instead of exposing the recursion.
 
-| Situation                                             | Why `@nlg` helps                                 |
-| ----------------------------------------------------- | ------------------------------------------------ |
-| Recursive / higher-order helpers                      | Hide the implementation behind a description     |
-| Math you'd rather phrase in words                     | "the pro-rated premium" instead of the formula   |
-| Domain terms of art                                   | Match the exact statutory or contractual wording |
-| A name that can't be both valid code _and_ good prose | Decouple the two                                 |
+| Situation                                            | Why `@nlg` helps                                   |
+| ---------------------------------------------------- | -------------------------------------------------- |
+| Recursive or higher-order helpers                    | Describes the result, hides the implementation     |
+| A formula better said in words                       | "the pro-rated premium" instead of the arithmetic  |
+| Terms of art                                         | Matches the exact statutory or contractual wording |
+| A name that cannot be both valid code and good prose | Separates the two                                  |
 
-### Tips
+Tips:
 
-- Keep slots to the function's own parameters; the sentence should make sense
-  with each slot read as a noun phrase.
-- Prefer **naming and shape first**, `@nlg` second — an `@nlg` is a maintenance
-  cost (it can drift from the logic), so reserve it for where it earns its keep.
-- One sentence per definition. If you need branching prose, let the structure
-  (`CONSIDER`/`IF`) render and annotate the leaves.
+- Use only the function's own inputs as slots, and write the sentence so that it reads well with each slot as a noun phrase.
+- Try names and shape first. An `@nlg` sentence can drift away from the logic it describes, so use it where it pays off.
+- One sentence per definition. For branching prose, let `CONSIDER` or `IF` render as an outline instead.
+
+---
+
+## One encoding, several languages
+
+An `@nlg` sentence is in whatever language you wrote it in.
+To keep the same rule readable in two languages, give it one sentence per language and tag each with its language:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
+
+Nothing about the rule is duplicated, only its wording.
+Ask for the language you want:
+
+```bash
+l4 render --lang he --format html contract.l4 > contract.he.html
+l4 nlg --lang he contract.l4
+```
+
+A rule with no sentence in that language keeps its default one, so a half-translated file produces a whole document.
+When a whole module is in one language, say it once with `@lang he` on a line of its own instead of tagging every sentence; the tag then means "every untagged `@nlg` in this module is Hebrew".
+
+What this does not do is translate.
+L4 prints the words you wrote.
+The little words it adds itself, such as "is equal to" or "with", stay English unless L4 has a phrase table for the language.
+Hebrew is the one language with a table, and it is small, so have a Hebrew speaker read its output before you rely on it.
+[The syntax reference](../../reference/syntax/README.md#labelling-the-language-nlghe) has the details and the limits.
 
 ---
 
 ## Putting it together
 
-Before — terse names, no annotations:
+Before, with short names and no annotation:
 
 ```l4
-GIVEN p IS A NUMBER, r IS A NUMBER, n IS A NUMBER
+GIVEN p IS A NUMBER
+      r IS A NUMBER
+      n IS A NUMBER
 GIVETH A NUMBER
-pmt p r n MEANS p TIMES r DIVIDED BY (1 MINUS (1 PLUS r) EXPONENT (0 MINUS n))
+pmt p r n MEANS p TIMES r DIVIDED BY (1 MINUS EXPONENT (1 PLUS r) (0 MINUS n))
 ```
 
-renders as a bare formula with opaque single letters.
+This renders as "Pmt equals p × r ÷ (1 − EXPONENT with the sum of 1 and r and the difference between n and 0)."
 
-After — descriptive names plus one `@nlg`:
+After, with descriptive names and one `@nlg`:
 
 ```l4
-GIVEN `the principal` IS A NUMBER
-      `the monthly rate` IS A NUMBER
+GIVEN `the principal`      IS A NUMBER
+      `the monthly rate`   IS A NUMBER
       `the term in months` IS A NUMBER
 GIVETH A NUMBER
-`the monthly repayment on` `the principal`
-    `at` `the monthly rate` `over` `the term in months`
-    @nlg the level monthly repayment on %the principal% at %the monthly rate% over %the term in months%
-  MEANS ...
+`the monthly repayment` `the principal` `the monthly rate` `the term in months` @nlg the level monthly repayment on %`the principal`% at %`the monthly rate`% over %`the term in months`%
+  MEANS     `the principal` TIMES `the monthly rate`
+        DIVIDED BY (1 MINUS EXPONENT (1 PLUS `the monthly rate`) (0 MINUS `the term in months`))
+
+`the loan`          MEANS 10000
+`the interest rate` MEANS 0.01
+`the term`          MEANS 12
+`the repayment`     MEANS `the monthly repayment` `the loan` `the interest rate` `the term`
 ```
 
-Now both the definition and every call site read as a sentence a lawyer can check.
+Now the call renders as "The repayment means the level monthly repayment on the loan at the interest rate over the term.", a sentence a lawyer can check.
 
 ---
 
-## Refining further with Legalese AI
+## Refine the style with Legalese AI
 
-The renderer gives you a faithful, deterministic baseline — the same input always
-produces the same prose, and it never invents facts. That baseline is the right
-foundation, but house style, tone, and jurisdiction conventions are editorial
-choices that go beyond what deterministic rules should decide.
+The renderer gives a faithful, deterministic baseline: the same input always gives the same prose, and it never adds facts. House style, tone and jurisdiction conventions are editorial choices that deterministic rules should not make.
 
-That is where **Legalese AI** comes in. Once your rendered output is accurate,
-you can apply **drafting policies** — reusable style and language rules such as
-"use plain English", "prefer active voice", "expand defined terms on first use",
-or a firm's house style — and Legalese AI rewrites the rendered prose to match,
-while staying anchored to the deterministic output so the meaning is preserved.
+Once the rendered output is accurate, Legalese AI can apply **drafting policies** to it: reusable style rules such as "use plain English", "prefer the active voice", "expand defined terms on first use", or a firm's house style. It rewrites the rendered prose to match, while staying anchored to the deterministic output so the meaning is kept.
 
-In other words: **names, shape, and `@nlg` get the content right; drafting
-policies get the _style_ right.** See
-[Composing L4 with AI](../llm-integration/composing-l4-with-ai.md) for how
-Legalese AI fits into the authoring loop.
+Names, shape and `@nlg` get the content right; drafting policies get the style right. See [Draft rules with Legalese AI](../llm-integration/composing-l4-with-ai.md) for how Legalese AI fits into writing rules.

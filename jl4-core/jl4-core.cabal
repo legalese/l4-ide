@@ -4,17 +4,31 @@ version: 0.1
 build-type: Simple
 tested-with: GHC==9.10.2
 
+-- KEEP THIS ABOVE THE `flag` STANZAS, AND ABOVE EVERY OTHER SECTION.
+--
+-- Cabal ignores package-level fields that appear after the first section, so a
+-- stanza inserted above this line silently disables it. `cabal check` then says
+-- "Ignoring trailing fields after sections: data-files", the sdist ships no .l4
+-- files at all, and because `cabal install` builds from the sdist, every
+-- installed `l4` gets an EMPTY embedded stdlib and answers "Module not found:
+-- prelude". `cabal build` keeps working, because GHC's cwd for an inplace build
+-- is this directory and the TH splice's cwd fallback finds libraries/ anyway —
+-- which is why the two disagreed, and why nobody noticed for months.
+--
+-- That is not hypothetical: it is what happened between 61653b0e (which
+-- inserted `flag safe-mode` here) and this commit. See the CI step that runs
+-- `cabal check` and greps `cabal sdist --list-only`.
+data-files: libraries/*.l4
+
 flag safe-mode
   description: Disable FETCH/POST builtins (for WASM builds). When enabled, HTTP operations return errors.
   default: False
   manual: True
 
 flag serialise-support
-  description: Enable Serialise instances for AST types (for jl4-service CBOR caching). Disable for WASM builds where cborg doesn't compile.
+  description: Enable Serialise instances for AST types. jl4-service used them to cache checked modules and no longer does, so nothing in this repository uses them. Disable for WASM builds where cborg doesn't compile.
   default: True
   manual: True
-
-data-files: libraries/*.l4
 
 common defaults
   default-language: GHC2021
@@ -121,9 +135,11 @@ library
     L4.Mixfix
     L4.Names
     L4.Nlg
+    L4.Nlg.Phrasebook
     L4.Parser
     L4.Parser.Anno
     L4.Parser.MixfixRegistry
+    L4.Parser.AnnotationWarning
     L4.Parser.ResolveAnnotation
     L4.Parser.SrcSpan
     L4.ParserCombinators
@@ -161,21 +177,43 @@ test-suite jl4-core-test
   other-modules:
     Paths_jl4_core
     ImportResolutionSpec
-    TemporalContextSpec
+    UnifySpec
     MixfixParserSpec
+    MixfixRegistryMergeSpec
+    PatternMatchParserSpec
+    PatternClausesMissingSpec
+    EventExactPrintSpec
+    FormatFidelitySpec
     UUID5Spec
     ExportValidationSpec
+    DisambiguationWarningsSpec
     NumberLiteralSpec
+    AssertRaisesSpec
+    NlgLangTagSpec
+    RenderLangDirSpec
     DirectiveRenameSpec
+    MultiClausePrintSpec
+    ConsiderScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
+    RefAnnotationSpec
+    NlgPercentSpec
+    NlgRenderSpec
+    DirectiveAmbiguitySpec
+    NlgMultiplicitySpec
+    NlgAttachmentSpec
+    NlgSilentReadingSpec
+    ImportErrorRangeSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
     base,
     bytestring,
     containers,
+    deepseq,
     hspec,
     jl4-core,
+    megaparsec,
+    optics,
     text,
     time

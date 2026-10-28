@@ -8,7 +8,7 @@ import Base
 import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
-import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, emptyAnno)
+import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
 import L4.Lexer (PosToken)
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
 import L4.Syntax
@@ -74,6 +74,16 @@ data CheckError =
   | TypeMismatch ExpectationContext (Type' Resolved) (Type' Resolved) -- expected, given
   | InconsistentNameInSignature Name (Maybe Name)
   | InconsistentNameInAppForm Name (Maybe Name)
+  | ClausePatternCountMismatch (Maybe SrcRange) Name Int Int
+    -- ^ The clauses of a multi-clause group have a different number of
+    -- patterns than its GIVEN names inputs ('L4.TypeCheck.clauseInputsAgainstGiven').
+    -- Carries the first clause's head range, the group's name, the number of
+    -- patterns in each clause, and the number of inputs the GIVEN names.
+  | ExportedClausesWithoutGiven (Maybe SrcRange) Name
+    -- ^ An @\@export@ed definition written as clauses with patterns, one
+    -- clause or several, with no GIVEN to name its inputs
+    -- ('L4.TypeCheck.refuseExportedClausesWithoutGiven'). Carries the range of
+    -- the @\@export@ and the definition's name.
   | NonDistinctError NonDistinctContext [[Name]]
   | AmbiguousTermError Name [(Resolved, Type' Resolved)]
   | AmbiguousOperatorError Text
@@ -92,6 +102,13 @@ data CheckError =
     -- ^ Error in mixfix pattern matching (function name, error details)
   | CyclicComputedFields Name [Name]
     -- ^ Circular dependency between computed fields (record name, cycle of field names)
+  | CyclicTypeSynonyms [Name]
+    -- ^ Circular dependency between type synonym declarations (cycle members)
+  | SynonymExpansionLimit Int Resolved
+    -- ^ Comparing two types followed this many type synonyms in a row and
+    -- stopped at the one given, which still stands for another type. The
+    -- types are not known to differ, so this is not a 'TypeMismatch'. See
+    -- 'L4.TypeCheck.Unify.synonymExpansionFuel'.
   | SuppliedComputedField Name
     -- ^ Tried to supply a computed field in a record constructor (field name)
   | ExportFunctionTypeInput Resolved Resolved
@@ -101,9 +118,54 @@ data CheckError =
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
+-- | Why a clause of a multi-clause group is never tried.
+--
+-- Unstable also has @CoveredByClausesAbove@ (every input the clause matches
+-- is matched by a clause above it), found from the redundant rows of its
+-- coverage analysis. Main's analysis ('L4.TypeCheck.uncoveredRows') does not
+-- compute redundant rows, so that form is not reported here; see
+-- 'L4.TypeCheck.warnUnreachableClauses'.
+data UnreachableClause
+  = AfterClauseMatchingAnything Int
+    -- ^ a clause above it matches every input; carries how many further
+    -- clauses after this one are unreachable for the same reason
+  | AfterClauseBindingNewName [Name] Int
+    -- ^ a clause above it matches every input because its patterns are
+    -- new names (the first argument, as written), such as a misspelled
+    -- value; carries how many further clauses are unreachable for the same
+    -- reason
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
 data CheckWarning
   = PatternMatchRedundant [Branch Resolved]
   | PatternMatchesMissing [BranchLhs Resolved]
+  | PatternClausesMissing SrcRange Name Int [[Pattern Resolved]]
+    -- ^ A multi-clause DECIDE\/MEANS pattern-matching group does not cover
+    -- all cases ('L4.TypeCheck.checkClauseMatrix'). Carries the hull of the
+    -- clause-head ranges (the warning anchor — never @\<no location\>@), the
+    -- group's head name for display, how many clauses it has, and one row per
+    -- missing clause: one pattern per argument column, wildcard columns
+    -- pre-substituted with the column's GIVEN name so the renderer is dumb.
+  | PatternClauseUnreachable SrcRange Name UnreachableClause
+    -- ^ A clause of a multi-clause DECIDE\/MEANS group can never be tried
+    -- ('L4.TypeCheck.warnUnreachableClauses'). Carries the clause head's
+    -- range, the group's head name for display, and why.
+  | ClauseAnnotationUnused SrcRange Name Int Text Bool
+    -- ^ An @\@desc@, @\@export@ or @\@nlg@ written between two clauses of a
+    -- multi-clause group, which takes its annotations from above its first
+    -- clause only ('L4.TypeCheck.checkClauseMatrix'). Carries the
+    -- annotation's range, the group's head name, the later clause's number
+    -- (counting from 1), the annotation as written (@\@export@, say), and
+    -- whether the group has a GIVEN, which is where its @\@desc@ and
+    -- @\@export@ go.
+  | ClauseArityChanged SrcRange Name Int [Name]
+    -- ^ A definition with no GIVEN of its own, right after a multi-clause
+    -- group of the same name, that has another number of inputs than the
+    -- group has patterns ('L4.TypeCheck.warnClauseArityChange'). It is not a
+    -- clause of the group: it is a rule of its own, and the names after its
+    -- head are its inputs. Carries the head's range, the name, the number of
+    -- patterns each clause above has, and the definition's input names.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -130,7 +192,15 @@ data ExpectationContext =
   -- | ExpectProjectionSelectorContext
   | ExpectIfConditionContext -- condition of if-then-else
   | ExpectPatternScrutineeContext (Expr Resolved) -- pattern type must match type of scrutinee
-  | ExpectNotArgumentContext -- arg of NOT
+  | ExpectClauseInputContext RawName Int Bool
+    -- ^ a clause pattern of a multi-clause group must match the type of the
+    -- input it stands in for: the group's name, the input's 1-based
+    -- position, and whether the GIVEN declares its type. See
+    -- 'L4.TypeCheck.checkConsider'.
+  | ExpectOperatorArgContext Text (Maybe Int)
+    -- ^ an operand of an operator: the operator as written in the source
+    -- ('L4.TypeCheck.operatorAsWritten'), and the operand's 1-based position
+    -- ('Nothing' for the only operand of a prefix operator such as NOT)
   | ExpectPercentArgumentContext -- arg of '%'
   | ExpectConsArgument2Context -- second arg of cons
   | ExpectIfBranchesContext -- all branches of an if-then-else must have the same type
@@ -181,6 +251,33 @@ data CheckErrorContext =
 data Severity = SWarn | SError | SInfo
   deriving stock (Eq, Show)
 
+-- | THE canonical severity mapping for checker diagnostics — the one place
+-- that decides what blocks ('SError'), what warns ('SWarn'), and what is
+-- informational only ('SInfo'). Candidate viability during type-directed
+-- disambiguation ('viableCandidate', used by 'prune'\/'orElse'\/'softprune')
+-- and the diagnostic renderers all key off this single definition.
+severity :: CheckErrorWithContext -> Severity
+severity (MkCheckErrorWithContext e _) =
+  case e of
+    CheckInfo {}    -> SInfo
+    CheckWarning {} -> SWarn
+    _               -> SError
+
+-- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
+-- a candidate. A warning attached along the way must NOT influence name
+-- resolution: with a purely structural test (any diagnostic = failure), a
+-- mere exhaustiveness warning inside one branch of a type-directed
+-- disambiguation knocks out the correct candidate, and resolution collapses
+-- into a spurious "multiple definitions" error.
+--
+-- The walk stops at the first fatal diagnostic, so rejected candidates cost
+-- no more than under the old structural test whenever their first
+-- diagnostic is already fatal (the common case).
+viableCandidate :: With CheckErrorWithContext a -> Bool
+viableCandidate = \ case
+  Plain _  -> True
+  With e w -> severity e /= SError && viableCandidate w
+
 -- | The answers to @#CHECK@ directives among a module's diagnostics.
 -- A @#CHECK@ is answered with a 'CheckInfo', the only 'SInfo' diagnostic.
 -- The warnings beside it ('SWarn', such as a @CONSIDER@ that misses a case)
@@ -209,7 +306,15 @@ instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
+  rangeOf (ClausePatternCountMismatch r _ _ _) = r
+  rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (CheckInfo _ mr)                  = mr
+  -- The clause-head hull anchors the warning; it wins over the enclosing
+  -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
+  rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
+  rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
+  rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
+  rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -337,10 +442,30 @@ emptyMixfixRegistry :: MixfixRegistry
 emptyMixfixRegistry = MkMixfixRegistry Map.empty Map.empty Set.empty
 
 -- | Merge two registries (used when combining scopes).
+--
+-- Entries are merged with 'List.union', which keeps the first copy of an entry
+-- and drops later copies equal to it. A module's registry already holds every
+-- entry of its imports' registries, so merging with @++@ kept one copy per
+-- import PATH: with n modules that each import every earlier one, the last
+-- held 2^(n-1) copies of the first module's one mixfix function, all
+-- deep-forced with the rest of its 'TypeCheckResult', and
+-- 'lookupByFirstKeyword' returned the product of two such lists
+-- (smucclaw\/l4-ide#1008). A 'FunTypeSig' holds its name's 'Unique', which
+-- embeds the defining module, so two definitions are never equal and only a
+-- copy of the same definition is dropped; 'byFirstKeyword' lists canonical
+-- names, which 'lookupByFirstKeyword' resolves through 'byCanonicalName'.
+-- That changes no reader:
+-- 'L4.TypeCheck.tryMatchAnyPattern' (which keeps the first error),
+-- 'L4.TypeCheck.tryMatchFlattenedPattern' and
+-- 'L4.TypeCheck.tryMatchParamPositions' stop at the first candidate that
+-- matches, a copy of an earlier candidate would have matched or failed as that
+-- one did, the rest test for any candidate, and
+-- 'L4.Export.Document.mixfixHeadingsFromRegistry' builds a 'Map.fromList'
+-- keyed by 'Unique'.
 unionMixfixRegistry :: MixfixRegistry -> MixfixRegistry -> MixfixRegistry
 unionMixfixRegistry r1 r2 = MkMixfixRegistry
-  { byCanonicalName = Map.unionWith (++) r1.byCanonicalName r2.byCanonicalName
-  , byFirstKeyword  = Map.unionWith (++) r1.byFirstKeyword r2.byFirstKeyword
+  { byCanonicalName = Map.unionWith List.union r1.byCanonicalName r2.byCanonicalName
+  , byFirstKeyword  = Map.unionWith List.union r1.byFirstKeyword r2.byFirstKeyword
   , keywordUniverse = Set.union r1.keywordUniverse r2.keywordUniverse
   }
 
@@ -377,6 +502,10 @@ data CheckEnv =
     -- a computed field in a record constructor.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
+    , unlessOperand        :: !(Maybe SrcRange)
+    -- ^ The source range of @r@ while @l UNLESS r@ is checked. The checker
+    -- reads it as @l AND (NOT r)@ ('L4.Parser.infixUnless'), so that a type
+    -- error in @r@ names UNLESS rather than a NOT the author never wrote.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
@@ -423,6 +552,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry =
     , computedFields = Map.empty
     , errorContext = None
     , sectionStack = []
+    , unlessOperand = Nothing
     }
 
 newtype SectionNames =
@@ -704,10 +834,24 @@ setAnnNlg nlg a = withRange a $ \r -> do
 setAnnResolvedType ::
      (HasAnno a, AnnoToken a ~ PosToken, AnnoExtra a ~ Extension)
   => Type' Resolved -> Maybe TermKind -> a -> Check a
-setAnnResolvedType t k a = withRange a $ \r -> do
-  let info = TypeInfo t k
-  addInfoForSrcRange r info
-  pure $ a & annoOf % annInfo ?~ info
+setAnnResolvedType t k a = case rangeOf (getAnno a) of
+  Just r -> do
+    let info = TypeInfo t k
+    addInfoForSrcRange r info
+    pure $ a & annoOf % annInfo ?~ info
+  -- A node the clause desugarer generated has no range, on purpose: it has no
+  -- source to point at, and a range would put it in the position index that
+  -- hover and go-to-definition search. Its type is still a fact about the
+  -- node, and the ladder reads a DECIDE body's type off the node
+  -- ('L4.Viz.Ladder.hasBooleanType'), so it is recorded ON the node and
+  -- nowhere else: the position index and every diagnostic are as they were.
+  Nothing
+    | isJust (Optics.view annPmSynthetic (getAnno a)) -> do
+        -- With the substitution so far applied: a group with no GIVETH is
+        -- checked against a fresh type that its clauses have already fixed.
+        t' <- applySubst t
+        pure $ a & annoOf % annInfo ?~ TypeInfo t' k
+    | otherwise -> pure a
 
 setAnnResolvedKind ::
      (HasAnno a, AnnoToken a ~ PosToken, AnnoExtra a ~ Extension)
@@ -807,14 +951,76 @@ instance ApplySubst (Type' Resolved) where
 instance ApplySubst (OptionallyNamedType Resolved) where
   applySubst (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn <$> applySubst t
 
+-- | The type 'applySubst' makes of a type, read off a snapshot of the
+-- substitution. Only the path compression 'applySubst' writes back is left
+-- out, and that changes no answer: it saves later lookups, and every reader
+-- of the substitution chases it to the end.
+--
+-- For a structure that is only read, this is the cheap way to resolve the
+-- types in it. 'applySubst' through 'gplate' rebuilds every node of the
+-- structure inside 'Check', annotations and tokens included, and holds the
+-- rebuilt nodes as closures until they are read; @'Optics.over' ('gplate'
+-- \@('Type'' 'Resolved')) ('substituteInfVars' s)@ rebuilds a node when it
+-- is read.
+substituteInfVars :: Substitution -> Type' Resolved -> Type' Resolved
+substituteInfVars s = go
+  where
+    go = \ case
+      Type ann       -> Type ann
+      TyApp ann n ts -> TyApp ann n (map go ts)
+      Fun ann onts t -> Fun ann (map goNamed onts) (go t)
+      Forall ann ns t -> Forall ann ns (go t)
+      InfVar ann rn i -> maybe (InfVar ann rn i) go (Map.lookup i s)
+    goNamed (MkOptionallyNamedType ann mn t) = MkOptionallyNamedType ann mn (go t)
+
 instance ApplySubst CheckError where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckError) applySubst
 
 instance ApplySubst CheckErrorContext where
   applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorContext) applySubst
 
+-- | The context is resolved lazily ('substituteInfVars'), and only when it
+-- holds a type the substitution changes ('contextChanges'); otherwise it is
+-- kept as it is. It is the syntax that was being checked when the
+-- diagnostic was raised, as written, so it can be a whole definition, such
+-- as a CONSIDER of thousands of arms for a warning about that CONSIDER, and
+-- each level of it holds the levels inside it. 'applySubst' rebuilt all of
+-- it, for each diagnostic raised inside it, whether anything read it or
+-- not; rebuilt lazily, it is still rebuilt in full where the diagnostics
+-- are forced, as the language server's rules force them, and a copy per
+-- level made a CONSIDER nested 600 deep, warned about at the innermost
+-- level, peak at 520 MB. Kept, it is shared.
 instance ApplySubst CheckErrorWithContext where
-  applySubst = traverseOf (gplate @(Type' Resolved) @CheckErrorWithContext) applySubst
+  applySubst (MkCheckErrorWithContext e ctx) = do
+    e' <- applySubst e
+    s <- use #substitution
+    let ctx'
+          | contextChanges s ctx = Optics.over (gplate @(Type' Resolved)) (substituteInfVars s) ctx
+          | otherwise = ctx
+    pure (MkCheckErrorWithContext e' ctx')
+
+-- | Whether 'substituteInfVars' changes a type in this context. A context is
+-- syntax as written, over 'Name's, so a 'Type'' 'Resolved' can only sit in
+-- an annotation's extras (its 'resolvedInfo', or the names of a resolved
+-- annotation); each annotation's extras are searched, and the syntax around
+-- them is walked only as far as its annotations, never into their tokens,
+-- which are most of it.
+contextChanges :: Substitution -> CheckErrorContext -> Bool
+contextChanges s =
+  Optics.anyOf (gplate @Anno) \ (a :: Anno) ->
+    Optics.anyOf (gplate @(Type' Resolved) @Extension) (substitutionChanges s) (Optics.view annoExtra a)
+
+-- | Whether 'substituteInfVars' changes this type: whether it mentions an
+-- inference variable the substitution binds.
+substitutionChanges :: Substitution -> Type' Resolved -> Bool
+substitutionChanges s = go
+  where
+    go = \ case
+      Type _         -> False
+      TyApp _ _ ts   -> any go ts
+      Fun _ onts t   -> any (go . optionallyNamedTypeType) onts || go t
+      Forall _ _ t   -> go t
+      InfVar _ _ i   -> Map.member i s
 
 instance ApplySubst EntityInfo where
   applySubst = traverse (\(n, entity) -> (n, ) <$> applySubst entity)
@@ -837,11 +1043,8 @@ orElse m1 m2 = do
   MkCheck $ \ e s ->
     let
       candidates = runCheck m1 e s
-
-      isSuccess (Plain _, _)  = True
-      isSuccess (With _ _, _) = False
     in
-      case filter isSuccess candidates of
+      case filter (viableCandidate . fst) candidates of
         [] -> runCheck m2 e s
         xs -> xs
 
@@ -861,34 +1064,31 @@ prune m = do
       candidates :: [(With CheckErrorWithContext a, CheckState)]
       candidates = runCheck m s env
 
-      proc []                    = [] -- should never occur
-      proc [a]                   = [a]
-      proc ((Plain a, s')  : cs) = procPlain (Plain a, s') cs
-      proc ((With e x, s') : cs) = procWith (With e x, s') cs
+      proc []       = [] -- should never occur
+      proc [a]      = [a]
+      proc (a : cs)
+        | viableCandidate (fst a) = procViable a cs
+        | otherwise               = procFailed a cs
 
-      -- We have a success, we don't want a second one
-      procPlain a []                   = [a]
-      procPlain a ((With _ _, _) : cs) = procPlain a cs
-      procPlain a cs
-        | plain = [first (With (MkCheckErrorWithContext InternalAmbiguityError ctx)) a]
-        -- NOTE: in the case of ambiguity errors, the ambiguity error will always occurs as
-        -- the last element in the list
-        | otherwise = [last cs]
-        where
-          plain = allPlain $ map fst cs
+      -- We have a (possibly warning-carrying) success, we don't want a second one
+      procViable a []       = [a]
+      procViable a (c : cs)
+        | viableCandidate (fst c) =
+            if all (viableCandidate . fst) cs
+              then [first (With (MkCheckErrorWithContext InternalAmbiguityError ctx)) a]
+              -- NOTE: in the case of ambiguity errors, the ambiguity error will always occur as
+              -- the last element in the list
+              else [last (c : cs)]
+        | otherwise = procViable a cs
 
       -- We have a failure, we're still looking for a success, and prefer the last failure
-      procWith a []                    = [a]
-      procWith _ ((Plain a, s')  : cs) = procPlain (Plain a, s') cs
-      procWith _ ((With e x, s') : cs) = procWith (With e x, s') cs
+      procFailed a []       = [a]
+      procFailed _ (c : cs)
+        | viableCandidate (fst c) = procViable c cs
+        | otherwise               = procFailed c cs
 
     in
       proc candidates
-
-allPlain :: [With e a] -> Bool
-allPlain = all \case
-  Plain{} -> True
-  With {} -> False
 
 -- | Prune to one result if there's a clearly best one at this point,
 -- but don't force it.
@@ -900,20 +1100,23 @@ softprune m = do
       candidates :: [(With CheckErrorWithContext a, CheckState)]
       candidates = runCheck m s env
 
-      proc []                    = [] -- should never occur
-      proc [a]                   = [a]
-      proc ((Plain a, s')  : cs) = procPlain (Plain a, s') cs
-      proc ((With e x, s') : cs) = procWith (With e x, s') cs
+      proc []       = [] -- should never occur
+      proc [a]      = [a]
+      proc (a : cs)
+        | viableCandidate (fst a) = procViable a cs
+        | otherwise               = procFailed a cs
 
       -- We have a success, we don't want a second one
-      procPlain a []                    = [a]
-      procPlain _ ((Plain _, _)  : _cs) = candidates
-      procPlain a ((With _ _, _) :  cs) = procPlain a cs
+      procViable a []       = [a]
+      procViable a (c : cs)
+        | viableCandidate (fst c) = candidates
+        | otherwise               = procViable a cs
 
       -- We have a failure, we're still looking for a success, and prefer the last failure
-      procWith a []                     = [a]
-      procWith _ ((Plain a, s')  : cs)  = procPlain (Plain a, s') cs
-      procWith _ ((With e x, s') : cs)  = procWith (With e x, s') cs
+      procFailed a []       = [a]
+      procFailed _ (c : cs)
+        | viableCandidate (fst c) = procViable c cs
+        | otherwise               = procFailed c cs
 
     in
       proc candidates
@@ -965,6 +1168,7 @@ extendEnv cis env =
     , mixfixRegistry = e.mixfixRegistry
     , computedFields = e.computedFields
     , sectionStack = e.sectionStack
+    , unlessOperand = e.unlessOperand
     }
     where
       u :: Unique

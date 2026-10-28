@@ -23,6 +23,8 @@ L4_ERRORS=0
 L4_OK=0
 ORPHAN_ERRORS=0
 ORPHAN_OK=0
+REDIRECT_ERRORS=0
+REDIRECT_OK=0
 
 # Options
 VERBOSE=false
@@ -50,40 +52,63 @@ log_verbose() {
     fi
 }
 
-# Convert a markdown heading to its anchor form
+# Convert markdown headings to their anchor form, one per line on stdin
 # Rules: lowercase, spaces to hyphens, remove most special chars
-heading_to_anchor() {
-    local heading="$1"
-    echo "$heading" | \
-        tr '[:upper:]' '[:lower:]' | \
-        sed 's/ /-/g' | \
-        sed 's/[^a-z0-9_-]//g'
+headings_to_anchors() {
+    tr '[:upper:]' '[:lower:]' | sed 's/ /-/g; s/[^a-z0-9_-]//g'
 }
 
 # Extract all valid anchors from a markdown file
 # Returns one anchor per line
 get_file_anchors() {
     local file="$1"
-    
-    # Extract headings (lines starting with #)
-    grep -E '^#{1,6} ' "$file" 2>/dev/null | while IFS= read -r line; do
-        # Remove the # prefix and leading/trailing whitespace
-        heading=$(echo "$line" | sed -E 's/^#+ *//' | sed 's/ *$//')
-        heading_to_anchor "$heading"
-    done
-    
+
+    # Headings (lines starting with #), without the # prefix and leading/trailing whitespace
+    grep -E '^#{1,6} ' "$file" 2>/dev/null | sed -E 's/^#+ *//; s/ *$//' | headings_to_anchors || true
+
     # Also extract explicit anchor targets: {#anchor-name} or <a name="anchor"> or <a id="anchor">
     grep -oE '\{#[^}]+\}' "$file" 2>/dev/null | sed 's/{#//;s/}$//' || true
     grep -oE '<a [^>]*(name|id)="[^"]+"' "$file" 2>/dev/null | sed 's/.*[name|id]="//;s/"$//' || true
 }
 
+# The anchors of every file read so far, as "<file><TAB><anchor>" lines, and the
+# files read. Each file is read once, however many links point into it. (Plain
+# strings rather than an associative array, which the bash 3.2 on macOS lacks.)
+ANCHOR_CACHE=$'\n'
+ANCHOR_CACHE_FILES=$'\n'
+
 # Check if an anchor exists in a file
 anchor_exists() {
     local file="$1"
     local anchor="$2"
-    
-    # Get all anchors and check if our anchor is among them
-    get_file_anchors "$file" | grep -qFx "$anchor"
+    local a
+
+    if [[ "$ANCHOR_CACHE_FILES" != *$'\n'"$file"$'\n'* ]]; then
+        while IFS= read -r a; do
+            ANCHOR_CACHE+="$file"$'\t'"$a"$'\n'
+        done < <(get_file_anchors "$file")
+        ANCHOR_CACHE_FILES+="$file"$'\n'
+    fi
+    [[ "$ANCHOR_CACHE" == *$'\n'"$file"$'\t'"$anchor"$'\n'* ]]
+}
+
+# Set NORMALIZED to the absolute form of a path, by changing into its folder
+# and back in this shell rather than in a subshell, which is costly on Windows.
+# Empty if the folder does not exist.
+normalize_path() {
+    local path="$1"
+    local dir base
+    while [[ "$path" == */ && "$path" != / ]]; do path="${path%/}"; done
+    dir="${path%/*}"
+    base="${path##*/}"
+    [[ "$dir" == "$path" ]] && dir="."
+    [[ -z "$dir" ]] && dir="/"
+    if CDPATH= cd "$dir" 2>/dev/null; then
+        NORMALIZED="$PWD/$base"
+        cd "$OLDPWD"
+    else
+        NORMALIZED=""
+    fi
 }
 
 show_help() {
@@ -112,6 +137,10 @@ CHECKS:
     3. Orphan file detection
        - Finds .md and .l4 files not linked from any other file
        - README.md and SUMMARY.md files are exempt (they are index files)
+
+    4. Redirects (redirects.json)
+       - Each old slug must no longer be a page
+       - Each new slug (and #anchor, if given) must exist
 
 EXAMPLES:
     ./doc/test-docs.sh              # Run all checks
@@ -158,11 +187,14 @@ echo ""
 log_info "Checking markdown links..."
 echo ""
 
+# Every file a link resolves to, for the orphan check (part 3)
+LINKED_FILES_TMP=$(mktemp)
+trap "rm -f $LINKED_FILES_TMP" EXIT
+
 check_link() {
     local source_file="$1"
     local link="$2"
-    local source_dir
-    source_dir="$(dirname "$source_file")"
+    local source_dir="${source_file%/*}"
     
     # Skip external links
     if [[ "$link" =~ ^https?:// ]] || [[ "$link" =~ ^mailto: ]]; then
@@ -205,9 +237,11 @@ check_link() {
         resolved_path="$source_dir/$file_path"
     fi
     
-    # Normalize the path
-    resolved_path="$(cd "$(dirname "$resolved_path")" 2>/dev/null && pwd)/$(basename "$resolved_path")" 2>/dev/null || resolved_path=""
-    
+    # Normalize the path, and record it for the orphan check (part 3)
+    normalize_path "$resolved_path"
+    resolved_path="$NORMALIZED"
+    [[ -n "$resolved_path" ]] && echo "$resolved_path" >> "$LINKED_FILES_TMP"
+
     # Check if file exists
     if [[ -z "$resolved_path" ]] || [[ ! -e "$resolved_path" ]]; then
         log_error "Broken link in $source_file"
@@ -371,69 +405,17 @@ echo ""
 log_info "Checking for orphaned files..."
 echo ""
 
-# Create a temporary file to store all linked file paths
-LINKED_FILES_TMP=$(mktemp)
-trap "rm -f $LINKED_FILES_TMP" EXIT
-
-# First, collect all links from all markdown files and resolve them to absolute paths
-while IFS= read -r -d '' md_file; do
-    source_dir="$(dirname "$md_file")"
-    
-    # Extract markdown links: [text](link)
-    while IFS= read -r link; do
-        [[ -z "$link" ]] && continue
-        
-        # Skip external links and anchors
-        [[ "$link" =~ ^https?:// ]] && continue
-        [[ "$link" =~ ^mailto: ]] && continue
-        [[ "$link" =~ ^# ]] && continue
-        
-        # Extract the file path (remove anchor if present)
-        file_path="${link%%#*}"
-        [[ -z "$file_path" ]] && continue
-        
-        # Resolve the path relative to the source file
-        if [[ "$file_path" =~ ^/ ]]; then
-            resolved_path="$REPO_ROOT$file_path"
-        else
-            resolved_path="$source_dir/$file_path"
-        fi
-        
-        # Normalize the path and add to temp file
-        normalized="$(cd "$(dirname "$resolved_path")" 2>/dev/null && pwd)/$(basename "$resolved_path")" 2>/dev/null
-        [[ -n "$normalized" ]] && echo "$normalized" >> "$LINKED_FILES_TMP"
-    done < <(grep -oE '\]\([^)]+\)' "$md_file" 2>/dev/null | sed 's/\](//;s/)$//' || true)
-    
-    # Also check reference-style links [text]: url
-    while IFS= read -r link; do
-        [[ -z "$link" ]] && continue
-        
-        # Skip external links
-        [[ "$link" =~ ^https?:// ]] && continue
-        [[ "$link" =~ ^mailto: ]] && continue
-        
-        file_path="${link%%#*}"
-        [[ -z "$file_path" ]] && continue
-        
-        if [[ "$file_path" =~ ^/ ]]; then
-            resolved_path="$REPO_ROOT$file_path"
-        else
-            resolved_path="$source_dir/$file_path"
-        fi
-        
-        normalized="$(cd "$(dirname "$resolved_path")" 2>/dev/null && pwd)/$(basename "$resolved_path")" 2>/dev/null
-        [[ -n "$normalized" ]] && echo "$normalized" >> "$LINKED_FILES_TMP"
-    done < <(grep -oE '^\[.*\]: .+$' "$md_file" 2>/dev/null | sed 's/^\[.*\]: //' || true)
-    
-done < <(find "$SCRIPT_DIR" -name "*.md" -type f -print0)
-
-# Sort and dedupe the linked files list
+# The files the links in part 1 resolve to, sorted and deduplicated, as one
+# string to look each file up in
 sort -u "$LINKED_FILES_TMP" -o "$LINKED_FILES_TMP"
+LINKED_FILES=$'
+'"$(< "$LINKED_FILES_TMP")"$'
+'
 
 # Now check all .md and .l4 files to see if they're linked
 while IFS= read -r -d '' file; do
     relative_path="${file#$SCRIPT_DIR/}"
-    filename="$(basename "$file")"
+    filename="${file##*/}"
     
     # Skip README.md and SUMMARY.md files - they are index files
     if [[ "$filename" == "README.md" ]] || [[ "$filename" == "SUMMARY.md" ]]; then
@@ -442,8 +424,10 @@ while IFS= read -r -d '' file; do
         continue
     fi
     
-    # Check if this file is linked from anywhere (grep for exact match)
-    if grep -qFx "$file" "$LINKED_FILES_TMP"; then
+    # Check if this file is linked from anywhere (exact match)
+    if [[ "$LINKED_FILES" == *$'
+'"$file"$'
+'* ]]; then
         log_verbose "  [OK] $relative_path"
         ((ORPHAN_OK+=1))
     else
@@ -461,6 +445,74 @@ else
 fi
 
 # =============================================================================
+# PART 4: Check Redirects
+# =============================================================================
+# redirects.json maps the slug of a page that moved or was merged away to its
+# new slug, optionally with #anchor. The website publishes a redirect at each
+# old URL, so the old page must be gone and the new one must exist.
+
+echo ""
+log_info "Checking redirects..."
+echo ""
+
+REDIRECTS_FILE="$SCRIPT_DIR/redirects.json"
+
+# The page file for a slug: <slug>.md, or <slug>/README.md for a folder
+slug_to_file() {
+    local slug="$1"
+    if [[ -z "$slug" ]]; then
+        echo "$SCRIPT_DIR/README.md"
+    elif [[ -f "$SCRIPT_DIR/$slug.md" ]]; then
+        echo "$SCRIPT_DIR/$slug.md"
+    elif [[ -f "$SCRIPT_DIR/$slug/README.md" ]]; then
+        echo "$SCRIPT_DIR/$slug/README.md"
+    fi
+}
+
+if [[ -f "$REDIRECTS_FILE" ]]; then
+    if ! redirect_lines=$(python3 -c 'import json, sys
+for old, new in json.load(open(sys.argv[1])).items():
+    print(old + "\t" + new)' "$REDIRECTS_FILE"); then
+        log_error "redirects.json is not a valid JSON object"
+        ((REDIRECT_ERRORS+=1))
+        redirect_lines=""
+    fi
+
+    while IFS=$'\t' read -r old new; do
+        [[ -z "$old" ]] && continue
+        # Python on Windows ends its lines with CRLF
+        new="${new%$'\r'}"
+        new_slug="${new%%#*}"
+        anchor=""
+        [[ "$new" == *"#"* ]] && anchor="${new#*#}"
+
+        if [[ -n "$(slug_to_file "$old")" ]]; then
+            log_error "Redirect from a page that still exists: $old"
+            ((REDIRECT_ERRORS+=1))
+            continue
+        fi
+
+        target="$(slug_to_file "$new_slug")"
+        if [[ -z "$target" ]]; then
+            log_error "Redirect to a missing page: $old -> $new"
+            ((REDIRECT_ERRORS+=1))
+        elif [[ -n "$anchor" ]] && ! anchor_exists "$target" "$anchor"; then
+            log_error "Redirect to a missing anchor: $old -> $new"
+            ((REDIRECT_ERRORS+=1))
+        else
+            log_verbose "  [OK] $old -> $new"
+            ((REDIRECT_OK+=1))
+        fi
+    done <<< "$redirect_lines"
+fi
+
+if [[ $REDIRECT_ERRORS -eq 0 ]]; then
+    log_success "All $REDIRECT_OK redirects point at existing pages"
+else
+    log_error "$REDIRECT_ERRORS broken redirects found ($REDIRECT_OK valid)"
+fi
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 
@@ -472,9 +524,10 @@ echo ""
 echo "  Markdown links:  $LINK_OK valid, $LINK_ERRORS errors"
 echo "  L4 files:        $L4_OK valid, $L4_ERRORS errors"
 echo "  Orphan check:    $ORPHAN_OK linked, $ORPHAN_ERRORS orphaned"
+echo "  Redirects:       $REDIRECT_OK valid, $REDIRECT_ERRORS errors"
 echo ""
 
-TOTAL_ERRORS=$((LINK_ERRORS + L4_ERRORS + ORPHAN_ERRORS))
+TOTAL_ERRORS=$((LINK_ERRORS + L4_ERRORS + ORPHAN_ERRORS + REDIRECT_ERRORS))
 
 if [[ $TOTAL_ERRORS -eq 0 ]]; then
     log_success "All documentation checks passed!"

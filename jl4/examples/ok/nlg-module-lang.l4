@@ -1,0 +1,24 @@
+-- `@lang` declares the language a module is written in — the language an
+-- untagged `@nlg` in it carries. It means exactly what tagging every herald
+-- would mean, which is the point: one declaration instead of one tag per
+-- rule.
+--
+-- A herald that names its own language still wins for that language, so a
+-- Hebrew module can carry English renderings without declaring anything else.
+@lang he
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg %amount% עולה על הסף
+                  @nlg:en the claim of %amount% exceeds the threshold
+  IF amount GREATER THAN 100
+
+-- No English rendering here: asking for English falls back to this one, so a
+-- partly translated module still produces a whole document.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is small` @nlg %amount% קטן מן הסף
+  IF amount LESS THAN 10
+
+#EVAL `is large` 150
+#EVAL `is small` 5

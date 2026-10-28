@@ -216,9 +216,22 @@ export interface GetExportedFunctionsParams {
   verDocId: { uri: string; version: number }
 }
 
+/** An error that stops the file from being deployed: a parse or type error,
+ *  an IMPORT that finds no module, or an import cycle, in the file or in a
+ *  module it imports. */
+export interface BlockingErrorInfo {
+  uri: string
+  /** 1-based */
+  line: number
+  message: string
+}
+
 export interface GetExportedFunctionsResponse {
   functions: ExportedFunctionInfo[]
   importedFiles: string[]
+  /** Non-empty when the file must not be deployed. Absent from older
+   *  language servers. */
+  blockingErrors?: BlockingErrorInfo[]
 }
 
 /**
@@ -228,6 +241,32 @@ export const GetExportedFunctionsRequestType = makeL4RpcRequestType<
   GetExportedFunctionsParams,
   GetExportedFunctionsResponse
 >('l4/getExportedFunctions')
+
+// ---------------------------------------------------------------------------
+// l4/embeddedLibrary — the source of a stdlib module compiled into the server
+// ---------------------------------------------------------------------------
+
+export interface EmbeddedLibraryParams {
+  /** A `jl4-embedded:/<module>.l4` URI, spelled as the server returned it in a
+   *  definition, a diagnostic or an import list. */
+  uri: string
+}
+
+export interface EmbeddedLibraryResponse {
+  /** The module's source: byte-for-byte what the server type-checks when
+   *  another file imports it. */
+  text: string
+}
+
+/**
+ * The standard library that `jl4-lsp` carries inside its binary has no file on
+ * disk, so the server names those modules with `jl4-embedded:` URIs. This is
+ * how a client reads one (to show it read-only, for go-to-definition).
+ */
+export const EmbeddedLibraryRequestType = makeL4RpcRequestType<
+  EmbeddedLibraryParams,
+  EmbeddedLibraryResponse
+>('l4/embeddedLibrary')
 
 // ---------------------------------------------------------------------------
 // l4/exportDocument — deterministic L4 → formatted document
@@ -245,6 +284,9 @@ export interface ExportDocumentParams {
   toc?: boolean
   /** Module URIs to exclude from the render (deselected imports). */
   excludeModules?: string[]
+  /** The language to render, spelled exactly as one of the result's
+   *  `languages` (e.g. "he", "he-IL"). Omitted: the module's own language. */
+  lang?: string
 }
 
 export interface ExportDocumentResult {
@@ -253,6 +295,13 @@ export interface ExportDocumentResult {
   content: string
   /** The structured document IR (always present). */
   ir: unknown
+  /** The distinct languages the main file's wordings are in: the module's
+   *  own language first, then the others. Empty when the file has no
+   *  wordings. Absent from servers that predate it. */
+  languages?: string[]
+  /** The language the returned document is in. Absent from servers that
+   *  predate it. */
+  lang?: string
 }
 
 export const ExportDocumentRequestType = makeL4RpcRequestType<

@@ -198,13 +198,20 @@ generateSimpleEval funName traceLevel =
 
 -- | Generate DECLARE for input record with ALL parameters lifted to MAYBE
 -- This enables uniform handling of null/missing JSON values
+--
+-- One field per line, each indented, with no separating commas: a leading @, @
+-- after a field whose type is an application (@MAYBE OF NUMBER@) does not parse
+-- ("incorrect indentation"), because the next line's comma is read as another
+-- argument of the type. That failed every request to a function with such an
+-- input before another input, which is why a MAYBE written out, or a synonym
+-- for one, could not be followed by another input on the wrapper path.
 generateInputRecordLifted :: [(Text, Type' Resolved)] -> Text
 generateInputRecordLifted params = Text.unlines $
   ["DECLARE InputArgs HAS"] ++
   map formatField (zip [0::Int ..] params)
   where
-    formatField (idx, (name, ty)) =
-      let indent = if idx == 0 then "  " else ", "
+    formatField (_idx, (name, ty)) =
+      let indent = "  " :: Text
           -- Lift ALL types to MAYBE
           tyText = liftTypeToMaybe ty
           -- Use prefixed field names to avoid collision with source identifiers

@@ -3,8 +3,7 @@
 A new first-position sidebar tab in the VSCode extension that runs an agent
 loop against `ai.legalese.cloud`. Tools execute locally (file ops, LSP,
 local MCP servers including the built-in `l4-rules` one); the ai-proxy only
-handles LLM round-trips (client-declared tool passthrough shipped in
-ai-proxy 0429443).
+handles LLM round-trips and passes client-declared tools through.
 
 Visuals inline with message flow, Continue/Claude Code style — not a
 floating "tool card" panel. The existing ai-chat repo is a functional
@@ -553,10 +552,10 @@ even though they still exist server-side. A later "list my
 conversations" API over the server's storage would fix this, but isn't
 v1. Users swapping machines keep a bare awareness of this limitation.
 
-**Deletion renames the file out of the way; no `unlink`, no restore
-UI.** Locally: `{id}.json` → `{id}.deleted-{ts}.json`. Server-side:
-`DELETE /v1/conversations/{id}` does the same rename on EFS. A future
-cleanup job (not v1) reaps renamed files past some TTL. From the user's
+**Local deletion renames the file out of the way; no `unlink`, no
+restore UI.** `{id}.json` → `{id}.deleted-{ts}.json`, and the extension
+calls `DELETE /v1/conversations/{id}` on the server. A future cleanup
+job (not v1) reaps renamed files past some TTL. From the user's
 perspective it's gone; no "recently deleted" panel. The rename is just
 for operational safety — accidental drops stay recoverable from disk
 until the cleanup reaps them.
@@ -756,27 +755,20 @@ Permissions don't apply to attachments (user explicitly attached).
 
 ## 10. Required ai-proxy changes (post the client-tool commit)
 
-1. **Remove `maxToolRounds` cap on compose.** The daily token quota is
-   the only safety valve the agent loop needs. Keep the field in the
-   `Pipeline` type (summize uses 0); stop decrementing in the compose
-   loop → replace the bounded `for` with an open `while` that exits on
-   "model called no tools."
+What the extension needs from the proxy, as the wire contract only. How
+the proxy implements it is specified with the proxy.
+
+1. **No fixed tool-round cap on compose.** A turn runs until the model
+   calls no tools; the daily token quota bounds usage.
 2. **Multi-modal content on user messages.** Accept array content with
    text + Anthropic `document` parts; pass through to the provider.
    Required for PDF attachments.
 3. **Thinking pass-through** — new `event: thinking_delta` SSE frame
    streamed when the provider emits reasoning parts.
-4. **Conversation deletion by rename** — `DELETE /v1/conversations/{id}`
-   renames `{id}.json` → `{id}.deleted-{ts}.json` on EFS. No `unlink`,
-   no restore UI. A later cleanup job reaps renamed files past TTL.
-5. **Record creator user ID; store per-user.** Today:
-   `/efs/conversations/{org}/{conversationId}.json`. New layout:
-   `/efs/conversations/{org}/{userId}/{conversationId}.json`. Pulls the
-   `userId` from the sealed session (`wos_*`) or falls back to a
-   reserved `api-key-{keyId}` subfolder for `sk_*` callers. Enables
-   future "list my conversations" API per user without scanning
-   org-wide, and records provenance. The `userId` also lands inside the
-   conversation file for resilience against future path changes.
+4. **Conversation deletion** — `DELETE /v1/conversations/{id}`.
+5. **Per-user conversations.** A conversation is recorded against the
+   user who created it. Enables a future "list my conversations" API
+   per user.
 
 Phase mapping: (1) + (4) + (5) in Phase 1. (2) + (3) in Phase 3.
 
@@ -937,9 +929,9 @@ be stopped cleanly.
 
 **Ai-proxy**
 
-- Remove `maxToolRounds` cap on compose (§10.1).
-- Add `DELETE /v1/conversations/{id}` rename-delete endpoint (§10.4).
-- Per-user subfolder layout + user ID in the conversation JSON (§10.5).
+- No fixed tool-round cap on compose (§10.1).
+- Add `DELETE /v1/conversations/{id}` endpoint (§10.4).
+- Per-user conversations (§10.5).
 
 **Deliberately out of scope in Phase 1:** tools, approvals, attachments,
 thinking, math, MCP, settings panel content. Without tools it's a pure
@@ -1037,11 +1029,10 @@ math rendering; final feature cleanup.
 - **No privacy notice in-tab** — covered at Legalese Cloud signup.
 - **PDFs pass through natively to Claude** — no OCR; Word → "save as
   PDF" nudge.
-- **No tool-round cap** — daily token quota is the only safety valve.
-- **Delete conversations by rename** — `{id}.json` →
-  `{id}.deleted-{ts}.json` on both sides. No `unlink`, no restore UI,
-  no "recently deleted" panel. A later cleanup job reaps the renamed
-  files.
+- **No tool-round cap** — the daily token quota bounds usage.
+- **Delete local conversations by rename** — `{id}.json` →
+  `{id}.deleted-{ts}.json`. No `unlink`, no restore UI, no "recently
+  deleted" panel. A later cleanup job reaps the renamed files.
 - **Tool naming** — `category__name` everywhere (`fs__edit_file`,
   `l4-rules__calculate_tax`).
 - **String-anchored edits** — `fs__edit_file({path, old, new})`, not

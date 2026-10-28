@@ -29,7 +29,6 @@ import qualified LSP.Core.Shake as Shake
 import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
-import Optics
 import System.Environment (lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
@@ -91,6 +90,17 @@ main = do
       corpusNonEmpty "hover"           hoverFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
+    -- Invariant: exactprint is the identity on the source for every parseable
+    -- corpus file. This is the single guard against the whole class of
+    -- format-mangling bugs (mixfix/event reordering, dropped TIMEZONE/DECIDE
+    -- tokens, duplicated UNLESS, re-escaped unicode). Unlike the per-file
+    -- ".ep.golden" test — which blesses whatever exactprint currently emits, so
+    -- it silently records mangled output — this compares against the verbatim
+    -- source and so cannot bless a regression.
+    describe "exactprint identity (source round-trips l4 format)" $
+      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4ExactPrintIdentity evalConfig inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
@@ -148,6 +158,44 @@ jl4ExactPrintGolden evalConfig dir inputFile = do
       , failFirstTime = True
       }
 
+-- | Assert @exactprint (parse f) == f@: the exact-printer reproduces the source
+-- byte-for-byte. Runs the same 'Rules.ExactPrint' rule that @l4 format@ uses and
+-- compares to the verbatim file contents (no whitespace normalisation — that is
+-- the whole point). On mismatch we report the first differing line so failures
+-- stay legible instead of dumping the whole file.
+jl4ExactPrintIdentity :: JL4Lazy.EvalConfig -> FilePath -> IO ()
+jl4ExactPrintIdentity evalConfig inputFile = do
+  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.ExactPrint uri
+  src <- Text.readFile inputFile
+  case moutput of
+    Nothing ->
+      expectationFailure $
+        "exactprint produced no output for " <> inputFile <> ":\n"
+          <> Text.unpack (Text.unlines errs)
+    Just out
+      | out == src -> pure ()
+      | otherwise ->
+          expectationFailure $
+            "exactprint is not the identity for " <> inputFile
+              <> firstDiff (Text.lines src) (Text.lines out)
+  where
+    firstDiff ss os =
+      let n      = max (length ss) (length os)
+          pad xs = xs <> replicate (n - length xs) ""
+          diffs  = [ (i, s, o)
+                   | (i, s, o) <- zip3 [1 :: Int ..] (pad ss) (pad os)
+                   , s /= o ]
+      in case diffs of
+        [] -> " (line contents match; differ only in trailing newline / length: "
+                <> show (length ss) <> " vs " <> show (length os) <> " lines)"
+        ((i, s, o) : _) ->
+          "\n  first difference at line " <> show i
+            <> "\n  source:    " <> show s
+            <> "\n  exactprint:" <> show o
+
 jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
   (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
@@ -157,11 +205,13 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
   let output_ = case moutput of
         Nothing -> "Cannot linearize module that doesn't typecheck\n"
         Just checkResult ->
-          let
-            mod' = checkResult.module'
-            directives = toListOf (gplate @(Directive Resolved)) mod'
-          in
-            Text.unlines $ fmap Nlg.simpleLinearizer directives
+          -- The SAME function @l4 nlg@ calls (see its module header). Both sides
+          -- used to spell the payload out and a comment asked the reader to keep
+          -- them in step; they now cannot diverge. The dependencies ride along:
+          -- a heralded call in a directive can name a rule an imported module
+          -- defines, and its sentence is read from there.
+          let deps = map (.module') (Rules.transitiveDependencies checkResult)
+          in Text.unlines $ Nlg.linearizeDirectives Nothing checkResult.module' deps
   -- Strip ANSI codes and normalize whitespace for cross-platform consistency
   let output = normalizeWhitespace $ stripAnsiCodes $
         if isOk

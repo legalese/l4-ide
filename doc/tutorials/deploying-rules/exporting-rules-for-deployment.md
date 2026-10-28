@@ -1,132 +1,92 @@
-# Exporting Rules for Deployment
+# Deploy your rules
 
-Turn your L4 rules into live REST API endpoints on [Legalese Cloud](https://legalese.cloud) that applications and AI agents can call.
+Publish L4 rules on [Legalese Cloud](https://legalese.cloud), where applications and AI agents can call them.
 
-**Prerequisites:** Basic L4 knowledge ([Your First L4 File](../getting-started/first-l4-file.md))
+**Before you start:** [Install L4 and write your first rule](../getting-started/first-l4-file.md).
 
----
-
-## What You'll Build
-
-An insurance premium calculator with two exported rules: one to compute a premium and one to check discount eligibility. You will deploy them from VS Code to the Legalese Cloud and call them as a REST API.
+You will deploy an insurance premium calculator with two published rules, one that computes a premium and one that checks whether a discount applies, and then call one of them.
 
 **Complete example:** [insurance-premium.l4](insurance-premium.l4)
 
 ---
 
-## Step 1: Mark Rules with `@export`
+## Step 1: Mark rules with `@export`
 
-The `@export` annotation tells L4 which rules should be exposed as API endpoints. Place it directly above a `DECIDE` or `MEANS` definition:
+`@export` marks a rule for publication. Put it on the line directly above the rule's `GIVEN` (or above the rule itself, if it has no `GIVEN`). The rest of the line describes the rule:
 
 ```l4
+DECLARE Applicant
+    HAS `age`                  IS A NUMBER
+        `risk score`           IS A NUMBER
+        `is existing customer` IS A BOOLEAN
+
 @export default Calculate the insurance premium for an applicant
-GIVEN applicant IS A Applicant @desc The applicant's details
+GIVEN applicant IS AN Applicant @desc The applicant's details
 GIVETH A NUMBER
 DECIDE `calculate premium` IS
     IF applicant's `risk score` > 0.7
     THEN applicant's `age` * 100
-    ELSE applicant's `age` * 60
-```
+    ELSE IF applicant's `is existing customer`
+         THEN applicant's `age` * 40
+         ELSE applicant's `age` * 60
 
-Without `@export`, a rule stays internal — only usable within the file, never exposed to the outside world.
-
-### The `@export` annotation for rules explained
-
-| Syntax                          | Meaning                                                              |
-| ------------------------------- | -------------------------------------------------------------------- |
-| `@export <description>`         | Export this rule with a human-readable description                   |
-| `@export default <description>` | Export as the **default** rule (used when no rule name is specified) |
-| `@desc <description>`           | Internal description only — **not** exported                         |
-
-The description text becomes the rule's documentation in the generated API schema. Use it above the GIVEN/GIVETH parameter or return type definitions.
-
-### Parameter descriptions with `@desc`
-
-Add inline `@desc` annotations to `GIVEN` parameters so API consumers can learn what each input means:
-
-```l4
 @export Check whether the applicant qualifies for a discount
-GIVEN applicant IS A Applicant @desc The applicant to check
+GIVEN applicant IS AN Applicant @desc The applicant to check
 GIVETH A BOOLEAN
 DECIDE `qualifies for discount` IF
-    applicant's `is existing customer`
+        applicant's `is existing customer`
     AND applicant's `risk score` <= 0.5
 ```
 
----
+| Annotation                      | Meaning                                                                     |
+| ------------------------------- | --------------------------------------------------------------------------- |
+| `@export <description>`         | Publish this rule, with this description.                                   |
+| `@export default <description>` | Publish it as the **default** rule, used when a caller names no rule.       |
+| `@desc <description>`           | After a `GIVEN` input: describe the input for people and agents calling it. |
 
-## Step 2: Verify Locally
+The descriptions become the rule's documentation in the API schema, and they are all an AI agent knows when it decides whether and how to call the rule, so write them with care. Rules without `@export` stay internal: other rules can use them, but they are not published.
 
-Before deploying, make sure your file compiles and the exports look right.
-
-### In VS Code
-
-1. Open your `.l4` file
-2. Open the **L4 sidebar** panel
-3. Click the **Deploy** tab
-
-The Deploy tab shows a preview of all exported rules discovered in the active file — their names, descriptions, parameters, and return types. If the list is empty, your file either has no `@export` annotations or contains errors.
+An `@export` anywhere else, such as between `GIVETH` and `DECIDE`, is not picked up, and the rule is not published. See [annotations](../../reference/syntax/README.md#annotations) for the details.
 
 ---
 
-## Step 3: Deploy from VS Code
+## Step 2: Check what will be published
 
-1. Make sure your extension is properly connected to your free [Legalese Cloud](https://legalese.cloud) account.
-2. Verify the exported rules preview looks correct
-3. Click **Deploy**
-4. Enter a **deployment name** (e.g. `insurance-premium`) — this becomes part of the API URL. The name must be 1–36 characters, using only letters, numbers, hyphens, and underscores.
-5. Click **Deploy Now**
-
-The extension uploads your file to the L4 service, which compiles it and makes the rules available as REST endpoints.
-
-### Deployment status
-
-After deploying, the status progresses through:
-
-| Status        | Meaning                                     |
-| ------------- | ------------------------------------------- |
-| **Pending**   | Uploaded, waiting to compile                |
-| **Compiling** | Being compiled by the service               |
-| **Ready**     | Live and accepting requests                 |
-| **Failed**    | Compilation error — check the error message |
-
-### Updating an existing deployment
-
-When you deploy to a name that already exists, the extension checks for **breaking changes** — such as removed parameters, changed return types, or renamed rules. If breaking changes are detected, you will see a warning before confirming the update.
+In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab. It lists every exported rule in the file, with its description, inputs and result type. If the list is empty, the file has no `@export` or does not type-check.
 
 ---
 
-## Step 4: Manage Deployments
+## Step 3: Deploy
 
-Switch to the **Deployments** tab in the sidebar to see all active deployments. Each deployment shows:
+1. In the sidebar, sign in to your [Legalese Cloud](https://legalese.cloud) account.
+2. Check the list of exported rules.
+3. Click **Deploy**.
+4. Enter a **deployment name**, such as `insurance-premium`. It becomes part of the API address: 1 to 36 characters, using letters, digits, hyphens and underscores.
+5. Click **Deploy Now**.
 
-- The deployment name
-- The number of exported rules
-- Each rule's name, description, and parameters
+**Deploy** stays off while the file, or a file it imports, has an error. VS Code underlines errors in red. Warnings and failing `#ASSERT`s don't stop a deploy.
 
-From here you can:
+The extension uploads the file and the service compiles it, and its status goes through **Pending** (uploaded), **Compiling**, then **Ready** (live) or **Failed** (with the compiler's error message).
 
-- **Expand/collapse** deployments to inspect their rules
-- **Undeploy** a deployment to remove it (with a confirmation prompt, since this breaks existing integrations)
+### Update a deployment
+
+Deploying to a name that already exists updates that deployment. The extension first checks for **breaking changes**, such as a removed rule, a removed or renamed input, or a changed result type, and warns you before you confirm. [Manage rules in git and CI](../getting-started/version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api) explains which changes break callers.
+
+### From the command line
+
+The `l4` command deploys the same way. Sign in once with the `legalese` command (`l4 install legalese`, then `legalese login`), then run `l4 deploy insurance-premium.l4` to create the deployment and `l4 redeploy insurance-premium.l4` to update it; `redeploy` refuses breaking changes unless you add `--force`. `l4 deployments` lists your deployments and `l4 undeploy NAME` removes one. With `--server`, the same commands deploy to a jl4-service you run yourself. See [Using the l4 CLI](../getting-started/l4-cli.md).
 
 ---
 
-## Step 5: Call the API
+## Step 4: Manage deployments
 
-Once a deployment is **Ready**, its rules are available as REST endpoints at `https://api.legalese.cloud/{orgSlug}/{deploymentId}/...`, where `{orgSlug}` is your Legalese Cloud organization and `{deploymentId}` is the deployment name you chose. Authenticate with an API key from the [Legalese Cloud console](https://legalese.cloud) (`Authorization: Bearer sk_...`).
+The **Deployments** tab in the sidebar lists your organization's deployments, with each one's rules, descriptions and inputs. From there you can open a deployment's **Integrate** dialog, which shows its addresses for each kind of client, or **Undeploy** it. Undeploying asks for confirmation, because it breaks every integration that uses the deployment.
 
-Note that rule and parameter names are **sanitized** for the API: spaces and other special characters become hyphens, so the rule `qualifies for discount` is called as `qualifies-for-discount` and the field `risk score` is passed as `"risk-score"`.
+---
 
-### List available rules
+## Step 5: Call a rule
 
-Here are some ways you can use the REST API from your command line:
-
-```bash
-curl https://api.legalese.cloud/{orgSlug}/insurance-premium/functions \
-  -H "Authorization: Bearer sk_..."
-```
-
-### Evaluate the default rule
+Once the deployment is **Ready**, each exported rule can be called over REST. Create an API key in the [Legalese Cloud console](https://legalese.cloud), then:
 
 ```bash
 curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/calculate-premium/evaluation \
@@ -143,230 +103,35 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/ca
   }'
 ```
 
-### Evaluate a specific rule
-
-```bash
-curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/qualifies-for-discount/evaluation \
-  -H "Authorization: Bearer sk_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "arguments": {
-      "applicant": {
-        "age": 35,
-        "risk-score": 0.4,
-        "is-existing-customer": true
-      }
-    }
-  }'
-```
-
-### Reading the answer
-
-The answer comes back as JSON, in `value`, under `result`.
-For the applicant above, `calculate-premium` returns:
+`{orgSlug}` is your organization on Legalese Cloud. In the address and the arguments, spaces in names become hyphens: the rule `` `calculate premium` `` is `calculate-premium`, and the field `` `risk score` `` is `"risk-score"`. The answer:
 
 ```json
 { "contents": { "result": { "value": 1400 } }, "tag": "SimpleResponse" }
 ```
 
-and `qualifies-for-discount` returns:
-
-```json
-{ "contents": { "result": { "value": true } }, "tag": "SimpleResponse" }
-```
-
-What `value` holds depends on what the rule gives back:
-
-| The rule gives back                                   | `value` is                                                                                                                  |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `TRUE` or `FALSE`                                     | `true` or `false`                                                                                                           |
-| a number                                              | that number; one that is not whole comes back as a decimal, to about 16 significant digits: a third is `0.3333333333333333` |
-| a string                                              | that string                                                                                                                 |
-| a `DATE`                                              | the date as text, year first: `"2026-01-31"`                                                                                |
-| `NOTHING`, from a `MAYBE`                             | `null`                                                                                                                      |
-| `JUST` a value, from a `MAYBE`                        | the value itself, with nothing around it                                                                                    |
-| a list                                                | a JSON array, even when the list has only one item                                                                          |
-| one of an enum's names, such as `` `under review` ``  | the name as a string, without backticks: `"under review"`                                                                   |
-| a record, such as a `Pair` of `left` and `right side` | an object with one key, the record's name, holding its fields: `{"Pair": {"left": 5, "right side": 6}}`                     |
-
-Four things to know when you read an answer:
-
-- The field names inside an answer are spelled as the rule spells them, spaces included; they are not turned into hyphens.
-- A rule that gives back a `MAYBE` of a `MAYBE` answers `null` both for `NOTHING` and for `JUST NOTHING`, so the two cannot be told apart.
-- Each published rule comes with a description of its answer, its `returnSchema`.
-  That description does not yet show the record's name around a record's fields, or that a `MAYBE` answer can be `null`.
-  Go by the table above, not by the `returnSchema`, for those two.
-- A long list can come back cut short.
-  A list answer of around 200 items or more may end with two `null`s in place of the rest, still with status 200, so two `null`s at the end of a long list mean it was cut, not that items were empty.
-
-### Interactive query plans
-
-Not sure which inputs matter? Use the query-plan endpoint to ask only the questions that affect the outcome:
-
-```bash
-curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/calculate-premium/query-plan \
-  -H "Authorization: Bearer sk_..." \
-  -H "Content-Type: application/json" \
-  -d '{"arguments": {"applicant": {"is-existing-customer": true}}}'
-```
-
-This returns which inputs are still needed, ranked by their impact on the result.
+The same deployment also works with AI agents, chat clients and websites. To pick a way in, see [Choose an integration](../legalese-cloud/README.md); for the REST interface in detail, including the answer format, see [Call rules over REST](../legalese-cloud/openapi-spec.md).
 
 ---
 
-## Step 6: Expose to AI Agents
+## Common mistakes
 
-Once deployed, your L4 rules are automatically available to AI agents through two complementary protocols: **MCP** for server-side tool use and **WebMCP** for browser-based agents.
+**Forgetting `@export`.** Without it, a rule is not published, however useful it is.
 
-### MCP (Model Context Protocol)
-
-The L4 service includes a built-in [MCP](https://modelcontextprotocol.io/) server that exposes your deployed rules as structured tools over JSON-RPC 2.0. LLM tool-use clients, agent frameworks, and IDE extensions can connect to it directly — no browser required.
-
-**Discover available tools:**
-
-```bash
-curl -X POST https://mcp.legalese.cloud/{orgSlug}/insurance-premium \
-  -H "Authorization: Bearer sk_..." \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-```
-
-**Call a tool:**
-
-```bash
-curl -X POST https://mcp.legalese.cloud/{orgSlug}/insurance-premium \
-  -H "Authorization: Bearer sk_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 2,
-    "method": "tools/call",
-    "params": {
-      "name": "calculate-premium",
-      "arguments": {
-        "applicant": {
-          "age": 35,
-          "risk-score": 0.4,
-          "is-existing-customer": true
-        }
-      }
-    }
-  }'
-```
-
-This endpoint is scoped to one deployment. There is also an org-wide rules MCP at `https://mcp.legalese.cloud` (no org in the URL — your organization is resolved from your sign-in); see [Use Deployed Rules from an AI Agent](../legalese-cloud/agent-marketplace.md). For MCP client setup, see the [MCP Server](../legalese-cloud/mcp-server.md) tutorial.
-
-The service logs every MCP tool call as structured JSON — the same format used for REST API requests — so you can monitor agent activity in your log aggregator alongside regular API traffic.
-
-### WebMCP (Browser AI Agents)
-
-[WebMCP](https://webmachinelearning.github.io/webmcp/) is a W3C standard that lets websites expose structured tools to browser-based AI agents — no scraping or DOM inspection required.
-
-The L4 service provides a JavaScript snippet you can embed on any web page:
-
-```html
-<!-- Expose all deployed rules as WebMCP tools -->
-<script
-  src="https://api.legalese.cloud/.webmcp/embed.js"
-  data-org="{orgSlug}"
-  data-api-key="sk_..."
-></script>
-
-<!-- Scope to specific deployments -->
-<script
-  src="https://api.legalese.cloud/.webmcp/embed.js"
-  data-org="{orgSlug}"
-  data-api-key="sk_..."
-  data-scope="insurance-premium/*"
-></script>
-```
-
-By default (`data-tools="auto"`) the script registers one tool per exported rule when the scope covers at most 10 rules; with more than 10, it registers discovery tools (`search_rules`, `get_rule_schema`, `evaluate_rule`) that browser AI agents call to find and invoke your L4 rules. See the [WebMCP Embed Script](../legalese-cloud/webmcp-embed.md) tutorial for all attributes and how to get an API key.
-
----
-
-## Summary
-
-| Step     | What you do                                          |
-| -------- | ---------------------------------------------------- |
-| Annotate | Add `@export` (and optionally `default`) above rules |
-| Describe | Add `@desc` to parameters for API documentation      |
-| Preview  | Check the Deploy tab in VS Code                      |
-| Deploy   | Click Deploy, choose a name, confirm                 |
-| Manage   | Use the Deployments tab to inspect and undeploy      |
-| Call     | Use the REST API, MCP, or embed WebMCP on a web page |
-
----
-
-## Common Mistakes
-
-### Forgetting `@export`
+**Putting `@export` in the wrong place.** It goes directly above `GIVEN`, not between `GIVETH` and the rule:
 
 ```l4
--- ❌ No @export — this rule won't be deployed
-GIVEN x IS A NUMBER
-GIVETH A NUMBER
-squared x MEANS x * x
-
--- ✅ With @export — available via the API
-@export Calculate the square of a number
-GIVEN x IS A NUMBER @desc The input number
-GIVETH A NUMBER
-squared x MEANS x * x
-```
-
-### Placing `@export` in the wrong position
-
-`@export` must appear directly above the rule definition (before `GIVEN` or the rule name), not between `GIVETH` and `DECIDE`:
-
-```l4
--- ❌ Wrong — @export between GIVETH and DECIDE
-GIVEN x IS A NUMBER
-GIVETH A NUMBER
 @export Square a number
-squared x MEANS x * x
-
--- ✅ Right — @export before the rule
-@export Square a number
-GIVEN x IS A NUMBER
+GIVEN x IS A NUMBER @desc The number to square
 GIVETH A NUMBER
 squared x MEANS x * x
 ```
 
-### Missing parameter descriptions
-
-Without `@desc` on parameters, API consumers won't know what inputs mean. Always describe your parameters:
-
-```l4
--- ❌ No parameter descriptions
-@export Calculate premium
-GIVEN applicant IS A Applicant
-GIVETH A NUMBER
-DECIDE `calculate premium` IS ...
-
--- ✅ With parameter descriptions
-@export Calculate premium
-GIVEN applicant IS A Applicant @desc The applicant's details
-GIVETH A NUMBER
-DECIDE `calculate premium` IS ...
-```
+**Leaving inputs undescribed.** Without `@desc`, callers and AI agents have only the input's name to go on.
 
 ---
 
-## Self-hosted jl4-service
+## Next steps
 
-If you run your own `jl4-service` instead of Legalese Cloud, the same API surface is served from your own host (e.g. `http://localhost:8080`), with the deployment id in the path instead of the org/deployment pair:
-
-- `GET /deployments/{deploymentId}/functions` — list exported rules
-- `POST /deployments/{deploymentId}/functions/{name}/evaluation` — evaluate a rule
-- `POST /deployments/{deploymentId}/functions/{name}/query-plan` — interactive query plan
-- `POST /deployments/{deploymentId}/.mcp` (or `/{deploymentId}/.mcp`) — deployment-scoped MCP; `/.mcp` is the org-wide endpoint
-- `GET /.webmcp/embed.js` — the WebMCP embed script
-- `GET /deployments/{deploymentId}/openapi.json` — the deployment's OpenAPI spec (`/openapi.json` covers all deployments)
-
----
-
-## Next Steps
-
-- [Common Patterns](../../reference/patterns/common-patterns.md) — Frequently used L4 patterns
-- [Reference: Annotations](../../reference/GLOSSARY.md) — All L4 annotations including `@export` and `@desc`
+- [Choose an integration](../legalese-cloud/README.md): AI agents, chat, REST or a website.
+- [Manage rules in git and CI](../getting-started/version-control-for-rules.md): test and redeploy safely.
+- [Annotations](../../reference/syntax/README.md#annotations): `@export`, `@desc` and the others.

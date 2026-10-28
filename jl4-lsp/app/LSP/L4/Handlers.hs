@@ -13,7 +13,6 @@ import Control.Monad.Extra (guard)
 import qualified Control.Monad.Extra as Extra
 import Control.Monad.Reader (MonadReader (..))
 import Control.Monad.Trans.Reader (ReaderT)
-import Data.Either (isRight)
 import Data.Monoid (Ap (..))
 import Data.Tuple (swap)
 import UnliftIO (MonadUnliftIO, atomically, STM, MonadIO(..))
@@ -63,6 +62,8 @@ import Language.LSP.Server hiding (notificationHandler, requestHandler)
 import qualified Language.LSP.Server as LSP
 import Language.LSP.VFS (VFS)
 import LSP.L4.Actions
+import LSP.L4.EmbeddedLibrary
+import qualified LSP.L4.BlockingErrors as BlockingErrors
 import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
@@ -70,6 +71,7 @@ import qualified L4.Export as Export
 import qualified L4.Export.Document as ExportDoc
 import qualified L4.Export.Render as ExportRender
 import qualified L4.FunctionSchema as FSchema
+import qualified L4.Nlg as Nlg
 
 data ReactorMessage
   = ReactorNotification (IO ())
@@ -379,33 +381,8 @@ handlers evalConfig recorder =
           use_ TypeCheck (toNormalizedUri verTextDocId._uri)
 
         let
-          mkDecisionGraphCodeLens srcPos = CodeLens
-            { _command = Just Command
-              { _title = "Show decision graph"
-              , _command = "l4.visualize"
-              , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
-              }
-            , _range = pointRange $ srcPosToPosition srcPos
-            , _data_ = Nothing
-            }
-
-          --  Check if can make viz (without simplification — simplification is now a toggle inside the panel)
-          canVisualize decide =
-            let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
-            in isRight (Ladder.doVisualize decide cfg)
-
-          decideToCodeLens decide =
-            -- NOTE: there's a lot of DECIDE/MEANS statements that the visualizer currently doesn't work on
-            -- We try to not offer any code lenses for the visualizer if that's the case.
-            -- If in future this is too slow, we should think about caching these results or, even better,
-            -- make the visualizer work on as many examples as possible.
-            case rangeOfNode decide of
-              Just node
-                | canVisualize decide -> [mkDecisionGraphCodeLens node.start]
-              _ -> []
-
           -- adds codelenses to visualize DECIDE or MEANS clauses
-          visualizeDecides :: [CodeLens] = foldTopLevelDecides decideToCodeLens typeCheck.module'
+          visualizeDecides :: [CodeLens] = decisionGraphCodeLenses verTextDocId typeCheck
 
           directiveLabel :: Directive Resolved -> Text
           directiveLabel = \case
@@ -528,8 +505,8 @@ handlers evalConfig recorder =
                             Just t  -> "DEONTIC" `Text.isPrefixOf` t
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
-                        paramChildren = map (givenParamToSymbol lspRange) givenParams
-                        localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals body)
+                        paramChildren = map (givenParamToSymbol lspRange) (outlineGivenParams givenParams)
+                        localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (outlineLocals body)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind lspRange selRange (paramChildren <> localChildren) ]
                   Nothing -> []
 
@@ -629,11 +606,6 @@ handlers evalConfig recorder =
               | "FUNCTION" `Text.isPrefixOf` tyText        = SymbolKind_Field
               | otherwise                                 = SymbolKind_TypeParameter
 
-            collectLocals :: Expr Resolved -> [LocalDecl Resolved]
-            collectLocals (Where _ _ locals)  = locals
-            collectLocals (LetIn _ locals _)  = locals
-            collectLocals _                   = []
-
             localDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> LSP.Range -> LocalDecl Resolved -> [DocumentSymbol]
             localDeclToSymbol moduleNuri subst entInfo parentRange = \case
               LocalDecide _ decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givenParams) _) (MkAppForm _ n _ _) localBody) ->
@@ -649,7 +621,7 @@ handlers evalConfig recorder =
                             Nothing -> False
                         kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
                         paramChildren = map (givenParamToSymbol lspRange) givenParams
-                        nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals localBody)
+                        nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (outlineLocals localBody)
                     in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind parentRange selRange (paramChildren <> nestedLocals) ]
                   Nothing -> []
               LocalAssume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy) ->
@@ -821,6 +793,20 @@ handlers evalConfig recorder =
                     , _xdata = Nothing
                     }
 
+    , requestHandler (SMethod_CustomMethod (Proxy @EmbeddedLibraryMethodName)) $ \_ide params ->
+        pure case Aeson.fromJSON params of
+          Aeson.Error err -> Left $ TResponseError
+            { _code = InR ErrorCodes_InvalidParams
+            , _message = "Failed to parse l4/embeddedLibrary params: " <> Text.pack err
+            , _xdata = Nothing
+            }
+          Aeson.Success reqParams -> case embeddedLibraryResponse reqParams of
+            Nothing -> Left $ TResponseError
+              { _code = InR ErrorCodes_InvalidParams
+              , _message = "Not an embedded library: " <> reqParams.uri
+              , _xdata = Nothing
+              }
+            Just response -> Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.GetExportedFunctionsMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.GetExportedFunctionsParams
             parseParams v = case Aeson.fromJSON v of
@@ -836,14 +822,50 @@ handlers evalConfig recorder =
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
 
-            mTcResult <- liftIO $ runAction "l4/getExportedFunctions" _ide $
-              use TypeCheck nuri
+            (mTcResult, closure, cycles) <- liftIO $ runAction "l4/getExportedFunctions" _ide $
+              (,,) <$> use TypeCheck nuri
+                   <*> BlockingErrors.importClosure nuri
+                   <*> BlockingErrors.importCycles nuri
+            -- Read after the action: the rules it ran have published their
+            -- diagnostics for every file in the closure by now.
+            diags <- liftIO $ atomically $ getDiagnostics _ide
+            let fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
+                -- A cycle is also among the diagnostics, as the engine's raw
+                -- exception, which names rules rather than files. Name the
+                -- files first.
+                cycleErrors =
+                  [ Inspector.BlockingError
+                      { uri = getUri (fromNormalizedUri c.importer)
+                      , line = Maybe.fromMaybe 1 c.line
+                      , message = "Import cycle: " <> Text.intercalate " -> " (map fileName c.cycle)
+                      }
+                  | c <- cycles
+                  ]
+                diagErrors =
+                  [ Inspector.BlockingError
+                      { uri = getUri (fromNormalizedUri fd.fdFilePath)
+                      , line = fromIntegral fd.fdLspDiagnostic._range._start._line + 1
+                      , message = Text.strip fd.fdLspDiagnostic._message
+                      }
+                  -- The engine's own errors (a raw exception, or "depends on
+                  -- itself", which an IMPORT that finds no module also
+                  -- causes) say less than the parser's and the typechecker's,
+                  -- so they go last.
+                  | fd <- uncurry (<>) $ List.partition
+                      (\fd -> fd.fdLspDiagnostic._source `notElem` [Just "jl4", Just "compiler"])
+                      (BlockingErrors.blockingErrorsIn closure diags)
+                  ]
+                -- A diagnostic is stored once per rule that published it, and
+                -- a typecheck runs once per import path that reaches it.
+                blockingErrors = List.nub (cycleErrors <> diagErrors)
 
             case mTcResult of
-              Nothing -> pure $ Left $ TResponseError
-                { _code = InR ErrorCodes_InvalidRequest
-                , _message = "No type check result available"
-                , _xdata = Nothing
+              -- The file does not parse: nothing to export, and the parse
+              -- error is the reason Deploy is off.
+              Nothing -> pure $ Right $ Aeson.toJSON Inspector.GetExportedFunctionsResponse
+                { functions = []
+                , importedFiles = []
+                , blockingErrors
                 }
               Just tcResult -> do
                 let -- `tc.dependencies` is the transitive-import *tree*, so a
@@ -883,6 +905,7 @@ handlers evalConfig recorder =
                     response = Inspector.GetExportedFunctionsResponse
                       { functions = summaries
                       , importedFiles = importUris
+                      , blockingErrors
                       }
                 pure $ Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportDocumentMethodName)) $ \_ide params -> do
@@ -897,7 +920,14 @@ handlers evalConfig recorder =
             , _xdata = Nothing }
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
-            mTc <- liftIO $ runAction "l4/exportDocument" _ide $ use TypeCheck nuri
+            -- The token stream alongside the type-check result, for the same
+            -- reason `l4 render` reads it: the document's language — the HTML
+            -- wrapper's @lang@, and the AKN Expression FRBR URIs — comes from the
+            -- module's declared @\@lang@, which lives in the tokens, unless the
+            -- request names one (@lang@, which the Render tab's language picker
+            -- sets, as @--lang@ does for the CLI).
+            (mTc, mToks) <- liftIO $ runAction "l4/exportDocument" _ide $
+              (,) <$> use TypeCheck nuri <*> use GetLexTokens nuri
             case mTc of
               Nothing -> pure $ Left $ TResponseError
                 { _code = InR ErrorCodes_InvalidRequest
@@ -913,7 +943,17 @@ handlers evalConfig recorder =
                     excludedUris = Set.fromList
                       [ toNormalizedUri (Uri u) | u <- reqParams.excludeModules ]
                     keepModule (MkModule _ u _) = not (u `Set.member` excludedUris)
-                    deps = filter keepModule (drop 1 (flattenExportModules tcResult))
+                    rawDeps = filter keepModule (drop 1 (flattenExportModules tcResult))
+                    declaredLang =
+                      Maybe.fromMaybe defaultModuleLang (declaredModuleLang . fst =<< mToks)
+                    requestedLang = MkLangTag <$> reqParams.lang
+                    -- Chosen before the document is built, and in the imports
+                    -- too, as `l4 render --lang` does ('Nlg.selectLanguage').
+                    -- With no @lang@ it is the identity.
+                    localise = Nlg.selectLanguage requestedLang
+                    (docLang, _unsupported) =
+                      Nlg.documentLanguage declaredLang requestedLang (tcResult.module' : rawDeps)
+                    deps = map localise rawDeps
                     ecfg = ExportDoc.defaultExportConfig
                       { ExportDoc.dropUnused = not reqParams.includeUnused
                       , ExportDoc.mixfixHeadings =
@@ -922,17 +962,25 @@ handlers evalConfig recorder =
                     rcfg = ExportRender.MkRenderConfig
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
-                             , ExportRender.toc = reqParams.toc }
-                    doc = ExportDoc.buildDocument ecfg tcResult.module' deps
+                             , ExportRender.toc = reqParams.toc
+                             , ExportRender.docLang = docLang }
+                    doc = ExportDoc.buildDocument ecfg (localise tcResult.module') deps
+                    -- What the Render tab offers to switch to: the languages
+                    -- of the file's own wordings, not of its imports, whose
+                    -- English would otherwise be offered for every file.
+                    languages = Nlg.moduleLanguages declaredLang tcResult.module'
+                    langText (MkLangTag t) = t
                     content = case reqParams.format of
                       "text" -> ExportRender.renderText rcfg doc
-                      "akn"  -> ExportRender.renderAkn doc
+                      "akn"  -> ExportRender.renderAkn rcfg doc
                       "json" -> ""
                       _      -> ExportRender.renderHtml rcfg doc
                 pure $ Right $ Aeson.object
-                  [ "format"  Aeson..= reqParams.format
-                  , "content" Aeson..= content
-                  , "ir"      Aeson..= doc
+                  [ "format"    Aeson..= reqParams.format
+                  , "content"   Aeson..= content
+                  , "ir"        Aeson..= doc
+                  , "languages" Aeson..= map langText languages
+                  , "lang"      Aeson..= langText docLang
                   ]
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportPlanMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Ladder.ExportPlanParams
