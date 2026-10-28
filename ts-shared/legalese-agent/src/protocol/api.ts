@@ -504,15 +504,17 @@ export const renewAgentKeyResponse: Check<RenewAgentKeyResponse> = obj({
 })
 
 /**
- * Renew / end errors and their statuses (§15.5); `end` answers 204.
- * jl4-auth-proxy also answers `502 { error: "upstream_unavailable" }`
- * when WorkOS fails (the chain may be gone: park), and
- * `400 invalid_session_id` / `unknown_purpose` on a bad mint.
+ * Renew / end errors the harness reports by name, and their statuses
+ * (§15.5); `end` answers 204. Renew also refuses with
+ * `403 not_a_member` and `403 forbidden`: like any other 4xx, they end
+ * the chain, reported as `invalid_key`. jl4-auth-proxy answers
+ * `502 { error: "upstream_unavailable" }` when WorkOS fails (retried,
+ * like any 5xx), and `400 invalid_session_id` / `unknown_purpose` on a
+ * bad mint.
  */
 export const AGENT_KEY_ERROR_STATUS: Record<AgentKeyFailure, number> = {
   invalid_key: 401,
   chain_expired: 403,
-  inactive: 403,
   chain_forked: 409,
 }
 

@@ -309,13 +309,16 @@ describe('Runner', () => {
     assert.equal(chain.ended, 0)
   })
 
-  test('an inactive refusal while idle just sleeps', async () => {
+  test('parks when the key chain ends while idle', async () => {
     const runner = build()
     const done = runner.run()
     await waitUntil(async () => (await readEvents(stateDir)).length > 0)
-    runner.onChainEnded('inactive')
-    assert.equal(await done, 'idle')
-    assert.equal((await session()).status, 'sleeping')
+    runner.onChainEnded('chain_expired')
+    assert.equal(await done, 'parked')
+    const s = await session()
+    assert.equal(s.status, 'parked')
+    assert.equal(s.parkedReason, 'chain_expired')
+    assert.equal(chain.ended, 0)
   })
 
   test('SIGTERM aborts the running turn and exits', async () => {

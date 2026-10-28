@@ -16,8 +16,8 @@ import {
 /** Why a chain ended, as the harness reports it. */
 export interface ChainEnded {
   reason: AgentKeyFailure
-  /** The renew error said so (vs. transport / upstream failures that
-   *  outlasted the key). */
+  /** jl4-auth-proxy refused the renewal (vs. 5xx / network failures
+   *  that outlasted the retries or the key). */
   fromServer: boolean
 }
 
@@ -46,12 +46,18 @@ const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000]
  * - After that it renews when 5 minutes of the 15 are left, and when a
  *   request made with the current key comes back 401, or 403
  *   `invalid-credentials` from ai-proxy ({@link renewAfterUnauthorized}).
- * - `401 invalid_key`, `403 chain_expired`, `403 inactive` and
- *   `409 chain_forked` end the chain. `502 upstream_unavailable` and
- *   network errors are retried with backoff while the key is still
- *   valid: if jl4-auth-proxy had already deleted the old key before
- *   WorkOS failed, the retry answers `invalid_key` and the chain ends
- *   there; if the key runs out first, the chain ends too.
+ * - Any 4xx from renew ends the chain at once. `401 invalid_key`,
+ *   `403 chain_expired` and `409 chain_forked` keep their reason; any
+ *   other (`403 not_a_member`, `403 forbidden`, …) ends it as
+ *   `invalid_key`.
+ * - 5xx (`502 upstream_unavailable`), network errors and a 200 that
+ *   doesn't parse are retried with backoff (`retryDelaysMs`, five tries
+ *   over about a minute by default), each only if it starts before the
+ *   key expires. When the retries run out, or the key would expire
+ *   first, the chain ends as `invalid_key` (not `fromServer`). If
+ *   jl4-auth-proxy had already deleted the old key before WorkOS
+ *   failed, the retry answers `401 invalid_key` and the chain ends
+ *   there.
  * - When the chain ends, headers become `{}` (requests fail fast as
  *   unauthenticated) and `onEnded` fires once; the runner parks.
  * - Every ai-proxy request carries `X-Legalese-Session: <sid>`.
@@ -234,14 +240,15 @@ export class KeyChainAuth implements AuthProvider {
       this.expiresAt = parsed.value.expiresAt
       return 'ok'
     }
-    const failure = parseAgentKeyError(body)
-    this.opts.logger.warn(
-      `agent key renewal refused: ${res.status} ${failure ?? 'unknown'}`
-    )
-    if (failure) return failure
-    if (res.status === 401) return 'invalid_key'
-    // 502 upstream_unavailable, 5xx, 429 and unknown errors: retry.
-    return 'retry'
+    if (res.status >= 500) {
+      // 502 upstream_unavailable and other server errors: retry.
+      this.opts.logger.warn(`agent key renewal failed: ${res.status}`)
+      return 'retry'
+    }
+    // Any other refusal is final: the chain is over.
+    const failure = parseAgentKeyError(body) ?? 'invalid_key'
+    this.opts.logger.warn(`agent key renewal refused: ${res.status} ${failure}`)
+    return failure
   }
 
   private finish(ended: ChainEnded): void {

@@ -61,16 +61,11 @@ import {
 export type SessionFileStatus = 'new' | 'running' | 'sleeping' | 'parked'
 
 /** Why a session is parked or needs auth (renew errors, §15.5). */
-export type AgentKeyFailure =
-  | 'invalid_key'
-  | 'chain_expired'
-  | 'inactive'
-  | 'chain_forked'
+export type AgentKeyFailure = 'invalid_key' | 'chain_expired' | 'chain_forked'
 
 export const AGENT_KEY_FAILURES: readonly AgentKeyFailure[] = [
   'invalid_key',
   'chain_expired',
-  'inactive',
   'chain_forked',
 ]
 
@@ -112,7 +107,7 @@ export const sessionFile: Check<SessionFile> = obj({
   conversationId: optional(opaqueId),
   status: literal('new', 'running', 'sleeping', 'parked'),
   parkedReason: optional(
-    literal('invalid_key', 'chain_expired', 'inactive', 'chain_forked')
+    literal('invalid_key', 'chain_expired', 'chain_forked')
   ),
   seedBase: optional(seedBase),
   mcpServers: (v, path) => {

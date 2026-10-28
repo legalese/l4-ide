@@ -78,7 +78,6 @@ describe('KeyChainAuth', () => {
   for (const [status, error] of [
     [401, 'invalid_key'],
     [403, 'chain_expired'],
-    [403, 'inactive'],
     [409, 'chain_forked'],
   ] as const) {
     test(`${status} ${error} ends the chain`, async () => {
@@ -86,8 +85,24 @@ describe('KeyChainAuth', () => {
       const proxy = authProxy([{ status, body: { error } }])
       const auth = chain(proxy.fetch, (e) => ended.push(e))
       assert.equal(await auth.start(), false)
+      assert.equal(proxy.calls.length, 1)
       assert.deepEqual(ended, [{ reason: error, fromServer: true }])
       assert.deepEqual(await auth.getAiAuthHeaders(), {})
+    })
+  }
+
+  for (const [status, error] of [
+    [403, 'not_a_member'],
+    [403, 'forbidden'],
+    [429, undefined],
+  ] as const) {
+    test(`${status} ${error ?? '(no body)'} ends the chain as invalid_key, without retrying`, async () => {
+      const ended: ChainEnded[] = []
+      const proxy = authProxy([{ status, body: error ? { error } : undefined }])
+      const auth = chain(proxy.fetch, (e) => ended.push(e))
+      assert.equal(await auth.start(), false)
+      assert.equal(proxy.calls.length, 1)
+      assert.deepEqual(ended, [{ reason: 'invalid_key', fromServer: true }])
     })
   }
 

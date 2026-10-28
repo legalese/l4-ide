@@ -587,6 +587,22 @@ describe('Sessions API and agent keys', () => {
     assert.equal(parseAgentKeyName('cloud-session:x:1'), null)
     assert.equal(parseAgentKeyError({ error: 'chain_forked' }), 'chain_forked')
     assert.equal(parseAgentKeyError({ error: 'toString' }), null)
+    // Other refusals end the chain by status, not by name.
+    assert.equal(parseAgentKeyError({ error: 'not_a_member' }), null)
+  })
+
+  test('inactive is no longer a chain failure', () => {
+    assert.equal(parseAgentKeyError({ error: 'inactive' }), null)
+    assert.throws(
+      () =>
+        parseCloudEvent({
+          seq: 1,
+          ts: 1,
+          type: 'auth-required',
+          reason: 'inactive',
+        }),
+      /reason/
+    )
   })
 })
 

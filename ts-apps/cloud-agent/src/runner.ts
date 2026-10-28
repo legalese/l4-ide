@@ -344,15 +344,10 @@ export class Runner {
     void this.shutdown('sigterm')
   }
 
-  /** The key chain ended (renew refused, or upstream failures outlasted
-   *  the key). */
+  /** The key chain ended (renew refused, or 5xx / network failures
+   *  outlasted the retries or the key): park. */
   onChainEnded(reason: AgentKeyFailure): void {
     if (this.phase === 'stopping' || this.phase === 'stopped') return
-    if (reason === 'inactive' && !this.working && this.queue.length === 0) {
-      // No real use for 10 minutes and nothing to do: just go to sleep.
-      void this.shutdown('idle')
-      return
-    }
     this.parkedReason = reason
     this.events.emit({ type: 'auth-required', reason })
     void this.shutdown('parked')

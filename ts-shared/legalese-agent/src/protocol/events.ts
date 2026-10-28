@@ -244,13 +244,7 @@ const payloads: { [T in CloudEventType]: Check<Payload<T>> } = {
   }),
   'auth-required': obj({
     type: literal('auth-required'),
-    reason: literal(
-      'invalid_key',
-      'chain_expired',
-      'inactive',
-      'chain_forked',
-      'mcp'
-    ),
+    reason: literal('invalid_key', 'chain_expired', 'chain_forked', 'mcp'),
     server: optional(str({ max: 64 })),
   }),
 }
