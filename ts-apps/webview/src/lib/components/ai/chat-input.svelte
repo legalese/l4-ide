@@ -792,17 +792,19 @@
             title="Run in cloud: start a cloud session with this prompt and the active file"
             aria-label="Run in cloud"
           >
+            <!-- Cloud symmetric about x = 8 (three lobes, open at the
+                 bottom for the arrow); the glyph is centred in the box. -->
             <svg viewBox="0 0 16 16" aria-hidden="true">
               <path
-                d="M4.6 12.2a2.4 2.4 0 0 1-.3-4.8 3.1 3.1 0 0 1 6-1 2.5 2.5 0 0 1 .5 5"
+                d="M5.75 11.25H4.75A2.75 2.75 0 0 1 4.535 5.758A3.5 3.5 0 0 1 11.465 5.758A2.75 2.75 0 0 1 11.25 11.25H10.25"
                 stroke="currentColor"
-                stroke-width="1.3"
+                stroke-width="1.4"
                 fill="none"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
               <path
-                d="M8 14.5V7M5.8 9.2L8 7l2.2 2.2"
+                d="M8 13.5V6.5M6 8.5L8 6.5l2 2"
                 stroke="currentColor"
                 stroke-width="1.6"
                 fill="none"
@@ -1188,11 +1190,12 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
-  /* Streaming state: darker tint of the same crimson so it reads as
-     "same affordance, different mode" rather than a new color. */
+  /* Outlined secondary of Send: crimson border, gray glyph; on hover it
+     fills like Send. border-box keeps it 28×28 next to Send. */
   .submit-btn.cloud {
+    box-sizing: border-box;
     background: transparent;
-    color: #c8376a;
+    color: var(--vscode-descriptionForeground, #9d9d9d);
     border: 1px solid #c8376a;
     margin-right: 6px;
   }
@@ -1229,6 +1232,8 @@
     font-size: 9px;
     color: var(--vscode-editorWarning-foreground, #cca700);
   }
+  /* Streaming state: darker tint of the same crimson so it reads as
+     "same affordance, different mode" rather than a new color. */
   .submit-btn.stop {
     background: #6e1636;
     /* Dim the rectangle so it doesn't hot-spot against the dark bg. */
