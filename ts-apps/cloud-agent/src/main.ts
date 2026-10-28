@@ -96,7 +96,8 @@ export async function runHarness(
       logger,
       onEnded: (e) => holder.runner?.onChainEnded(e.reason),
     })
-    // Renew and retry once when ai-proxy or MCP answer 401.
+    // Renew and retry once when ai-proxy or MCP answer 401 (or ai-proxy
+    // answers 403 invalid-credentials).
     globalThis.fetch = authRetryingFetch(
       globalThis.fetch.bind(globalThis),
       keyChain,

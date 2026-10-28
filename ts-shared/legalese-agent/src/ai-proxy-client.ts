@@ -236,7 +236,7 @@ export class AiProxyClient {
         // ignore
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
-      const code = extractErrorCode(body) ?? httpStatusToCode(res.status)
+      const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
       throw new AiProxyError(message, code, res.status)
     }
     yield* parseSse(res.body, this.opts.logger, cursor)
@@ -298,7 +298,7 @@ export class AiProxyClient {
         // ignore
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
-      const code = extractErrorCode(body) ?? httpStatusToCode(res.status)
+      const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
       throw new AiProxyError(message, code, res.status)
     }
     yield* parseSse(res.body, this.opts.logger, cursor)
@@ -426,7 +426,7 @@ export class AiProxyClient {
         // ignore
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
-      const code = extractErrorCode(body) ?? httpStatusToCode(res.status)
+      const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
       throw new AiProxyError(message, code, res.status)
     }
     const json = (await res.json()) as { text?: unknown }
@@ -620,9 +620,24 @@ function sameOrigin(a: string, b: string): boolean {
   }
 }
 
-function httpStatusToCode(status: number): string {
+/**
+ * Does an ai-proxy error body say the credential itself was refused?
+ * ai-proxy answers a key or session it no longer accepts (expired,
+ * revoked, replaced by a renewal) with `403` and the message
+ * `Authentication failed: invalid-credentials`, not `401`, which it
+ * keeps for a request with no credential at all. That 403 means "sign
+ * in again / renew the key"; every other 403 (origin, scope) is a real
+ * refusal.
+ */
+export function isInvalidCredentialsBody(body: string): boolean {
+  return body.includes('invalid-credentials')
+}
+
+function httpStatusToCode(status: number, body = ''): string {
   if (status === 401) return 'unauthenticated'
-  if (status === 403) return 'forbidden'
+  if (status === 403) {
+    return isInvalidCredentialsBody(body) ? 'unauthenticated' : 'forbidden'
+  }
   if (status === 404) return 'not_found'
   if (status === 429) return 'rate_limited'
   if (status >= 500) return 'upstream_error'

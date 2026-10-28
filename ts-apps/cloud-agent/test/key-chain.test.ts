@@ -200,6 +200,87 @@ describe('authRetryingFetch', () => {
     assert.deepEqual(seen, [`Bearer ${KEY0}`, `Bearer ${key(1)}`])
   })
 
+  // ai-proxy answers a key it no longer accepts with 403, not 401.
+  test('renews and retries once on a 403 invalid-credentials from ai-proxy', async () => {
+    const renew = authProxy([
+      { status: 200, body: { token: key(1), id: 'k1', expiresAt: 1_900_000 } },
+    ])
+    const auth = chain(renew.fetch)
+    const seen: Array<string | null> = []
+    const base = (async (
+      _input: string | URL | Request,
+      init?: RequestInit
+    ) => {
+      const a = new Headers(init?.headers).get('authorization')
+      seen.push(a)
+      return a === `Bearer ${KEY0}`
+        ? Response.json(
+            {
+              error: { message: 'Authentication failed: invalid-credentials' },
+            },
+            { status: 403 }
+          )
+        : new Response('{}', { status: 200 })
+    }) as typeof fetch
+    const wrapped = authRetryingFetch(base, auth, ['https://ai.legalese.cloud'])
+    const res = await wrapped('https://ai.legalese.cloud/v1/chat/completions', {
+      method: 'POST',
+      headers: await auth.getAiAuthHeaders(),
+      body: '{"x":1}',
+    })
+    assert.equal(res.status, 200)
+    assert.deepEqual(seen, [`Bearer ${KEY0}`, `Bearer ${key(1)}`])
+    assert.equal(renew.calls.length, 1)
+  })
+
+  test('returns any other 403 unread, without renewing', async () => {
+    const renew = authProxy([])
+    const auth = chain(renew.fetch)
+    let calls = 0
+    const base = (async () => {
+      calls++
+      return Response.json(
+        { error: { message: 'Origin not allowed' } },
+        { status: 403 }
+      )
+    }) as typeof fetch
+    const wrapped = authRetryingFetch(base, auth, ['https://ai.legalese.cloud'])
+    const res = await wrapped('https://ai.legalese.cloud/v1/chat/completions', {
+      method: 'POST',
+      headers: await auth.getAiAuthHeaders(),
+      body: '{"x":1}',
+    })
+    assert.equal(res.status, 403)
+    assert.deepEqual(await res.json(), {
+      error: { message: 'Origin not allowed' },
+    })
+    assert.equal(calls, 1)
+    assert.equal(renew.calls.length, 0)
+  })
+
+  test('returns the 403 when the renewal ends the chain', async () => {
+    const renew = authProxy([{ status: 401, body: { error: 'invalid_key' } }])
+    const ended: ChainEnded[] = []
+    const auth = chain(renew.fetch, (e) => ended.push(e))
+    let calls = 0
+    const base = (async () => {
+      calls++
+      return Response.json(
+        { error: { message: 'Authentication failed: invalid-credentials' } },
+        { status: 403 }
+      )
+    }) as typeof fetch
+    const wrapped = authRetryingFetch(base, auth, ['https://ai.legalese.cloud'])
+    const res = await wrapped('https://ai.legalese.cloud/v1/models', {
+      headers: await auth.getAiAuthHeaders(),
+    })
+    assert.equal(res.status, 403)
+    assert.match(await res.text(), /invalid-credentials/)
+    assert.equal(calls, 1)
+    assert.equal(ended.length, 1)
+    assert.equal(ended[0]!.reason, 'invalid_key')
+  })
+
   test('leaves other origins and other credentials alone', async () => {
     const renew = authProxy([])
     const auth = chain(renew.fetch)

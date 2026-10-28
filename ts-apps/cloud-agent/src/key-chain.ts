@@ -1,4 +1,8 @@
-import type { AuthProvider, Logger } from '@repo/legalese-agent'
+import {
+  isInvalidCredentialsBody,
+  type AuthProvider,
+  type Logger,
+} from '@repo/legalese-agent'
 import {
   AGENT_KEY_LIFETIME_MS,
   AGENT_KEY_RENEW_BEFORE_MS,
@@ -40,8 +44,8 @@ const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000]
  * - The key from `AGENT_KEY` is renewed immediately at start, which
  *   deletes it (it was visible in the `RunTask` overrides).
  * - After that it renews when 5 minutes of the 15 are left, and when a
- *   request made with the current key comes back 401
- *   ({@link renewAfterUnauthorized}).
+ *   request made with the current key comes back 401, or 403
+ *   `invalid-credentials` from ai-proxy ({@link renewAfterUnauthorized}).
  * - `401 invalid_key`, `403 chain_expired`, `403 inactive` and
  *   `409 chain_forked` end the chain. `502 upstream_unavailable` and
  *   network errors are retried with backoff while the key is still
@@ -112,7 +116,8 @@ export class KeyChainAuth implements AuthProvider {
   }
 
   /**
-   * A request made with `usedAuthorization` came back 401. Renew unless
+   * A request made with `usedAuthorization` came back 401 (or ai-proxy's
+   * 403 `invalid-credentials`, see {@link authRetryingFetch}). Renew unless
    * a renewal already replaced that key; resolves true when a newer key
    * is available to retry with.
    */
@@ -269,7 +274,10 @@ export class DevAuth implements AuthProvider {
 /**
  * Wrap `fetch` so a 401 from one of `origins` for a request that
  * carried the chain's current key triggers a renewal and one retry
- * with the new key (spec §5.4: renew "on 401"). Bodies are strings in
+ * with the new key (spec §5.4: renew "on 401"). ai-proxy answers a key
+ * it no longer accepts with `403` and `Authentication failed:
+ * invalid-credentials` instead, so that 403 counts as a 401; any other
+ * 403 is a real refusal and is returned as is. Bodies are strings in
  * both clients (ai-proxy, MCP), so the retry can resend them.
  */
 export function authRetryingFetch(
@@ -280,7 +288,7 @@ export function authRetryingFetch(
   const allowed = new Set(origins.map((o) => new URL(o).origin))
   return async (input, init) => {
     const res = await base(input, init)
-    if (res.status !== 401) return res
+    if (res.status !== 401 && res.status !== 403) return res
     const url =
       typeof input === 'string'
         ? input
@@ -304,6 +312,7 @@ export function authRetryingFetch(
     ) {
       return res
     }
+    if (res.status === 403 && !(await saysInvalidCredentials(res))) return res
     const renewed = await auth.renewAfterUnauthorized(used)
     if (!renewed) return res
     const fresh = await auth.getAiAuthHeaders()
@@ -311,5 +320,15 @@ export function authRetryingFetch(
     headers.set('authorization', fresh.Authorization)
     await res.body?.cancel().catch(() => undefined)
     return base(input, { ...init, headers })
+  }
+}
+
+/** Is `res` (a 403) ai-proxy refusing the key itself? Reads a clone, so
+ *  `res` can still be returned to the caller unread. */
+async function saysInvalidCredentials(res: Response): Promise<boolean> {
+  try {
+    return isInvalidCredentialsBody(await res.clone().text())
+  } catch {
+    return false
   }
 }
