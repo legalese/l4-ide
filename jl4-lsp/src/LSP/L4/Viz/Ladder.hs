@@ -726,7 +726,7 @@ translateGo = go
           notId <- getFresh
           p' <- go CtxNone p
           q' <- go CtxNone q
-          pure $ V.Or orId [V.Not notId p', q']
+          pure $ V.Or orId [V.negateIR notId p', q']
 
         And {} -> do
           vid <- getFresh

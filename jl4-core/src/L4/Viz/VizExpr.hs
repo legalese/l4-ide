@@ -10,6 +10,7 @@ module L4.Viz.VizExpr
   , FunDecl(..)
   , IRExpr(..)
   , irExceeds
+  , negateIR
   , InertContext(..)
   , Name(..)
   , ID(..)
@@ -226,6 +227,22 @@ boolPriorsFromBody = Map.fromList . go
     -- the atoms of a rule live on BOTH sides of the implication.
     Implies _ p q _ -> go p <> go q
     _          -> []
+
+-- | The negation a lowering ADDS: a guard's failure on a later route, the scope of a
+-- nested implication read as @NOT scope OR requirement@. If the operand is itself a
+-- negation, the two cancel and the operand's negand is returned, so a guard written
+-- @NOT x@ is drawn as @x@ where it fails, not as @NOT (NOT x)@. The 'ID' is used only
+-- when a 'Not' is built.
+--
+-- This is the first equation of 'L4.Transform.neg', on the IR. It does not push the
+-- negation further in (no De Morgan): the drawing keeps the shape of the source, and
+-- 'L4.Transform.simplify' is the reader's opt-in for normal forms.
+--
+-- Use it only for negations the lowering introduces. A @NOT@ the author wrote is
+-- translated as written, @NOT NOT x@ included.
+negateIR :: ID -> IRExpr -> IRExpr
+negateIR _ (Not _ negand) = negand
+negateIR nid e            = Not nid e
 
 -- | Does the expression have more than this many nodes? Stops counting at the
 -- budget, so it costs at most the budget however large the argument is.

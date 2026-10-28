@@ -272,10 +272,12 @@ guardedToLadder fresh go rows = do
         | rows.grDisjoint = pure []
         | otherwise       = traverse negatedAt [0 .. i - 1]
 
+      -- A guard written @NOT x@ fails where @x@ holds: 'V.negateIR' cancels the
+      -- pair, and the @x@ it returns is the guard's own copy, so its Unique is shared.
       negatedAt :: Int -> m IRExpr
       negatedAt j = do
         nid <- fresh
-        V.Not nid <$> guardAt j
+        V.negateIR nid <$> guardAt j
 
       allNegated :: m [IRExpr]
       allNegated = traverse negatedAt [0 .. length guards - 1]
