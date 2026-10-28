@@ -237,12 +237,12 @@
           "legaleseAi.cloudSessions.enabled": {
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Preview: run Legalese AI conversations as cloud sessions. Also needs `#legaleseAi.cloudSessions.apiUrl#`."
+            "markdownDescription": "Preview: run Legalese AI conversations as cloud sessions, through `#legaleseAi.cloudSessions.apiUrl#`."
           },
           "legaleseAi.cloudSessions.apiUrl": {
             "scope": "machine-overridable",
             "type": "string",
-            "default": "",
+            "default": "https://sessions.legalese.cloud",
             "markdownDescription": "Base URL of the Legalese Cloud Sessions API. Cloud sessions stay off while this is empty."
           },
           "legaleseAi.permissions.askUser": {
