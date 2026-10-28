@@ -1181,6 +1181,12 @@ of looking up shared resources by tag.
       its container image. Unit tests run against a temporary directory as the
       mount, with AWS mocked.
 
+- [ ] `sessions-api-fixes` (base `main`) ([PR #13](https://github.com/legalese/jl4-auth-proxy/pull/13)) —
+      review fixes before the first deploy: delete requests carried out by
+      the sweep, state from the lease first, `wrong_organization`, bounded
+      inputs, RS256 only, OIDC roles for the `prod` environment only
+      (§6.1, §7.1–§7.3, §9.3).
+
 Deploy-time steps, not pull requests: Fargate vCPU quota increase; the
 one-time file-system root ownership (§4.1); `FOLDER_KEY` value.
 
