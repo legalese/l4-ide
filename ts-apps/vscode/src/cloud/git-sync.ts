@@ -186,7 +186,17 @@ export function sessionIdFromGitUrl(
   return m && ULID_RE.test(m[1]!) ? m[1] : undefined
 }
 
-/** Turn a failed pull/push into a message a user can act on. */
+/** A push over the Sessions API's request limit (413). */
+export const PUSH_TOO_LARGE_MESSAGE =
+  'This push is too large for a cloud session (about 4.5 MB per push). Push fewer or smaller changes at a time.'
+
+/** A clone, pull or fetch whose answer is over the Sessions API's
+ *  response limit (413). */
+export const HISTORY_TOO_LARGE_MESSAGE =
+  "This cloud session's history is too large to clone or pull during the beta (the limit is about 4.5 MB)."
+
+/** Turn a failed clone/pull/push into a message a user can act on. A
+ *  pull's fetch fails as the pull. */
 export function describeGitError(
   err: unknown,
   op: 'pull' | 'push' | 'clone'
@@ -202,10 +212,12 @@ export function describeGitError(
   // The Sessions API answers 409 `no_commits_yet` before the first turn
   // is committed (nothing to clone or pull yet).
   if (/no_commits_yet|\b409\b/i.test(detail)) return NOT_READY_MESSAGE
+  // 413: a request or a response over about 4.5 MB (the Sessions API's
+  // Lambda limit, during the beta).
   if (
     /\b413\b|too_large|Request Entity Too Large|body.*too large/i.test(detail)
   ) {
-    return 'This push is too large for a cloud session (about 4.5 MB per push). Push fewer or smaller changes at a time.'
+    return op === 'push' ? PUSH_TOO_LARGE_MESSAGE : HISTORY_TOO_LARGE_MESSAGE
   }
   if (/AuthenticationFailed|Authentication failed|\b401\b/i.test(detail)) {
     return 'Git could not authenticate to the cloud session. Sign in to Legalese Cloud and try again.'

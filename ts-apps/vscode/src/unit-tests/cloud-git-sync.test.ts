@@ -3,7 +3,9 @@ import * as assert from 'node:assert/strict'
 import {
   CLONES_STORAGE_KEY,
   CloudGitSync,
+  HISTORY_TOO_LARGE_MESSAGE,
   NOT_READY_MESSAGE,
+  PUSH_TOO_LARGE_MESSAGE,
   GitSyncError,
   describeGitError,
   sessionIdFromGitUrl,
@@ -71,6 +73,7 @@ class FakeGit implements GitApi {
   sources: GitRemoteSourceProvider | undefined
   openListeners: Array<(r: GitRepository) => unknown> = []
   cloned: Array<{ url: string; parent?: string; action?: string }> = []
+  cloneError: Error | undefined
   onDidOpenRepository = (l: (r: GitRepository) => unknown) => {
     this.openListeners.push(l)
     return { dispose: () => {} }
@@ -84,6 +87,7 @@ class FakeGit implements GitApi {
       parent: o?.parentPath?.fsPath,
       action: o?.postCloneAction,
     })
+    if (this.cloneError) throw this.cloneError
     const folder = fileUri(`${o?.parentPath?.fsPath}/${SID}`)
     this.repositories.push(new FakeRepo(folder, u.toString()))
     return folder
@@ -224,6 +228,35 @@ describe('CloudGitSync', () => {
     assert.deepEqual(repo.log, ['pull'])
   })
 
+  test('a clone or pull over the response limit gets the beta limit', async () => {
+    const tooLarge = () =>
+      Object.assign(new Error('Failed to execute git'), {
+        stderr:
+          'error: RPC failed; HTTP 413 curl 22 The requested URL returned error: 413',
+      })
+    const { git, sync } = setup()
+    await sync.markCommitted(SID)
+    git.cloneError = tooLarge()
+    await assert.rejects(
+      sync.clone(SID, fileUri('/w')),
+      (err: Error) => err.message === HISTORY_TOO_LARGE_MESSAGE
+    )
+    git.cloneError = undefined
+    await sync.clone(SID, fileUri('/w'))
+    const repo = git.repositories[0]!
+    repo.pull = async () => {
+      throw tooLarge()
+    }
+    await assert.rejects(
+      sync.sync(SID),
+      (err: Error) => err.message === HISTORY_TOO_LARGE_MESSAGE
+    )
+    assert.match(
+      HISTORY_TOO_LARGE_MESSAGE,
+      /history is too large to clone or pull during the beta/
+    )
+  })
+
   test('a push over the body limit gets a clear message', async () => {
     const { git, sync } = setup()
     await sync.markCommitted(SID)
@@ -234,7 +267,10 @@ describe('CloudGitSync', () => {
       stderr:
         'error: RPC failed; HTTP 413 curl 22 The requested URL returned error: 413',
     })
-    await assert.rejects(sync.sync(SID), /too large for a cloud session/)
+    await assert.rejects(
+      sync.sync(SID),
+      (err: Error) => err.message === PUSH_TOO_LARGE_MESSAGE
+    )
   })
 
   test('configures clones made through Git: Clone', async () => {
