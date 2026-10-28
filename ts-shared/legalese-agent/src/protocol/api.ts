@@ -62,8 +62,8 @@ export const SESSIONS_API_ERROR_STATUS: Record<SessionsApiErrorCode, number> = {
   too_large: 413,
 }
 
-/** More specific codes the Sessions API also returns (jl4-auth-proxy
- *  `cloud-sessions-api`). Clients branch on the HTTP status and treat
+/** More specific codes the Sessions API also returns (cloud-sessions
+ *  repo, `api/`). Clients branch on the HTTP status and treat
  *  these as detail. */
 export type SessionsApiDetailCode =
   | 'not_initialized'

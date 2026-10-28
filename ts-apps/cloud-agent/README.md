@@ -83,12 +83,12 @@ This repository only publishes the harness. The release build
 `cloud-agent.cjs` and `jl4-lsp-linux-arm64`, each with a `.sha256`, to the
 `l4-ide-build-<n>` release.
 
-The image (Dockerfile, entry point, smoke test) and its deploy live in
-jl4-auth-proxy under `cloud-sessions/agent-image/`, next to the task
-definition the Sessions API registers. Its `deploy-cloud-sessions-agent.yml`
-builds `legalese-cloud-agent:<tag>` from a release tag and switches new
-sessions to it; rolling back is a run with the previous tag. This repository has no AWS
-access.
+The image (Dockerfile, entry point, smoke test) and its deploy live in the
+[cloud-sessions](https://github.com/legalese/cloud-sessions) repo under
+`agent-image/`, next to the task definition the Sessions API registers. Its
+`deploy-cloud-sessions-agent.yml` builds `legalese-cloud-agent:<tag>` from a
+release tag and switches new sessions to it; rolling back is a run with the
+previous tag. This repository has no AWS access.
 
 What the image guarantees the harness: the language server at
 `/app/bin/jl4-lsp`, the bundle at `/app/cloud-agent.cjs`, user `1000:1000`,

@@ -80,5 +80,5 @@ instead.
 | `protocol/api.ts`      | Sessions API requests/responses (incl. `AddFilesRequest`/`AddFilesResponse`), `GET /events` query helpers, access-token and agent-key routes, key-name helpers, error codes                                                                                                             |
 | `protocol/sealed.ts`   | sealed secrets: `generateSealingKeyPair`, `seal`, `openSealed`, `encodeSealed`/`decodeSealed` (`v1.<epk>.<iv>.<ct>.<tag>`), `SealedEnvelope` (X25519 + HKDF-SHA256 + AES-256-GCM, context-bound)                                                                                        |
 
-The Sessions API (in `jl4-auth-proxy`) mirrors these shapes; this package is
+The Sessions API (in the `cloud-sessions` repo) mirrors these shapes; this package is
 the reference.

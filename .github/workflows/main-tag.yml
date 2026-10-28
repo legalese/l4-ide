@@ -439,7 +439,8 @@ jobs:
 
   # The headless Legalese AI harness for cloud sessions. This repository only
   # publishes it (with jl4-lsp-linux-arm64) as release assets; the image is
-  # built and deployed from jl4-auth-proxy (deploy-cloud-sessions-agent.yml).
+  # built and deployed from the cloud-sessions repo
+  # (deploy-cloud-sessions-agent.yml).
   build-cloud-agent:
     name: Build cloud agent bundle
     runs-on: ubuntu-latest
@@ -866,7 +867,8 @@ jobs:
           fi
 
           # Collect the cloud agent bundle and its language server (linux-arm64),
-          # each with a SHA256, for jl4-auth-proxy's deploy-cloud-sessions-agent.yml
+          # each with a SHA256, for the cloud-sessions repo's
+          # deploy-cloud-sessions-agent.yml
           cp artifacts/cloud-agent/cloud-agent.cjs release-artifacts/cloud-agent.cjs
           cp artifacts/cloud-agent/cloud-agent.cjs.sha256 release-artifacts/cloud-agent.cjs.sha256
           cp artifacts/jl4-lsp-linux-arm64/jl4-lsp release-artifacts/jl4-lsp-linux-arm64
