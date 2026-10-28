@@ -32,7 +32,8 @@ Plugins (`RunnerPlugin` in `runner.ts`):
   `git-committed { turnId, sha, parent, summary }`; `state/git/main.bundle`
   rewritten (temp + rename) after every commit and at start; `apply-bundle`
   merges `state/git/incoming/<ulid>.bundle` (`local ^main`) into `main`
-  (`local-merged` / `local-merge-conflict`, the merge aborted on conflict);
+  (`local-merged` / `local-merge-conflict`, the merge aborted on conflict)
+  and then deletes the bundle;
   `rollback` restores the parent of the turn's commit and commits "Roll back: …"
   (`rolled-back`); `git gc` on sleep. `tmp/` and its `tmp/deleted/` copies are
   committed like the rest. git runs with hooks and fsmonitor

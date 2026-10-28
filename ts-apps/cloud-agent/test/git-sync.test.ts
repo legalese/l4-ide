@@ -88,6 +88,12 @@ describe('GitSync', () => {
   const read = (rel: string): Promise<string> =>
     readFile(path.join(repo, rel), 'utf8')
   const bundlePath = (): string => path.join(stateDir, 'git', 'main.bundle')
+  const incoming = (): string => path.join(stateDir, 'git', 'incoming', BUNDLE)
+  const exists = (p: string): Promise<boolean> =>
+    stat(p).then(
+      () => true,
+      () => false
+    )
 
   /** Clone main.bundle the way a client would get it. */
   function cloneBundle(): string {
@@ -347,6 +353,7 @@ describe('GitSync', () => {
     assert.equal(merged.type, 'local-merged')
     assert.equal(merged.sha, sh(repo, 'rev-parse', 'HEAD'))
     assert.equal(sh(repo, 'for-each-ref', 'refs/incoming'), '')
+    assert.equal(await exists(incoming()), false)
     // The client can pull it back.
     sh(client, 'fetch', '-q', bundlePath(), 'main:refs/remotes/origin/main')
     assert.equal(
@@ -384,6 +391,7 @@ describe('GitSync', () => {
     assert.equal(sh(repo, 'rev-parse', 'HEAD'), head)
     assert.equal(sh(repo, 'status', '--porcelain'), '')
     assert.equal(await read('a.l4'), 'agent version\n')
+    assert.equal(await exists(incoming()), false)
   })
 
   test('skips missing and bogus bundles', async () => {
@@ -398,6 +406,8 @@ describe('GitSync', () => {
     assert.deepEqual(events, [])
     assert.ok(logger.has('warn', /missing/))
     assert.ok(logger.has('warn', /fetching incoming bundle/))
+    // Left in place for a look.
+    assert.equal(await exists(incoming()), true)
   })
 
   test('commits added files on their own and reports blob ids', async () => {

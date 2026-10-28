@@ -145,7 +145,8 @@ export function summaryMessages(
  *   fetch `state/git/incoming/<file>` (a `local ^main` bundle) into
  *   `refs/incoming/<ulid>`, merge it into `main`, rewrite the bundle,
  *   emit `local-merged { sha }`; on a conflict abort the merge and emit
- *   `local-merge-conflict { files }`.
+ *   `local-merge-conflict { files }`. Either way the incoming bundle is
+ *   then deleted; one that can't be fetched is left in place.
  * - **`rollback { turnId }`** (queued): restore index and working tree
  *   to the parent of that turn's commit
  *   (`git restore --source=<parent> --staged --worktree :/`), commit
@@ -459,15 +460,33 @@ export class GitSync implements RunnerPlugin {
         type: 'local-merge-conflict',
         files: files.slice(0, 1000),
       })
+      await this.removeIncoming(bundle)
       return
     }
     await this.git.run(['update-ref', '-d', ref])
     const sha = await this.git.head()
     if (!sha) throw new Error('git: merge produced no HEAD')
     await this.writeBundle()
+    await this.removeIncoming(bundle)
     if (before && before !== sha) await this.filesChanged(before, sha)
     this.ctx.emit({ type: 'local-merged', sha })
     logger.info(`git: merged local changes from ${file}`)
+  }
+
+  /**
+   * Delete an incoming bundle that was merged (`main.bundle` now has its
+   * commits) or refused on a conflict. Its command is handled, so
+   * nothing reads it again; the Sessions API skips a pending push whose
+   * bundle is gone.
+   */
+  private async removeIncoming(bundle: string): Promise<void> {
+    await fs
+      .rm(bundle, { force: true })
+      .catch((err: unknown) =>
+        this.ctx.logger.warn(
+          `git: deleting an incoming bundle failed: ${String(err)}`
+        )
+      )
   }
 
   private async rollback(turnId: string): Promise<void> {

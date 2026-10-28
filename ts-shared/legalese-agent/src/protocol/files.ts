@@ -17,7 +17,8 @@
  *     state/commands.seq            decimal integer      (Sessions API)
  *     state/commands/<n>.json       CloudCommand         (Sessions API; exclusive create)
  *     state/git/main.bundle         bundle of main       (harness)
- *     state/git/incoming/<ulid>.bundle                   (Sessions API; exclusive create)
+ *     state/git/incoming/<ulid>.bundle                   (Sessions API; exclusive create;
+ *                                   the harness deletes it once merged or refused)
  *     state/init.json, state/stop-requested.json, state/git/local.json
  *                                   Sessions API bookkeeping; the harness ignores them
  *
