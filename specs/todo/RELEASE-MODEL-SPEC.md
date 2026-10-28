@@ -8,7 +8,7 @@
 > because the tree had no release document: a grep for one matched only `release-l4-skill.yml` and
 > four corpus image files.
 >
-> Nothing here changes a workflow, a branch or a tag. What it changes is `CLAUDE.md:19`, which said
+> Nothing here changes a workflow, a branch or a tag. What it changes is `CLAUDE.md` §1 (line 19 as of `1b975bc90`, since removed), which said
 > something that is not true (§D9.2).
 
 ## D9.1 — `unstable` reaches `main` through human-reviewable topic PRs, not one merge PR. RULED 2026-09-06.

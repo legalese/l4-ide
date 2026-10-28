@@ -249,12 +249,12 @@ l4Golden memo evalConfig isOk examplesRoot dir inputFile = do
       , failFirstTime = True
       }
 
--- | Build a scrubber that replaces the two absolute, machine-specific path
+-- | Build a scrubber that replaces the absolute, machine-specific path
 -- prefixes that reach golden output with stable tokens, so goldens capturing
 -- import-resolution logs like @Found on filesystem: <abspath>@ are portable
 -- across machines and CI.
 --
--- There are TWO such prefixes and scrubbing only one is not enough:
+-- There are FOUR such prefixes, and scrubbing only some is not enough:
 --
 --   * @JL4_LIBRARY_PATH@ -> @$JL4_LIBRARY_PATH@, for an import resolved out of
 --     the stdlib. In jl4-test the variable is always set (see 'main').
