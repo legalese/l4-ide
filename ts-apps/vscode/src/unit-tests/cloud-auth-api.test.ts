@@ -48,14 +48,20 @@ function header(init: RequestInit, name: string): string | undefined {
 function authDeps(
   f: typeof fetch,
   opts: { session?: string; now?: () => number } = {}
-): AuthProxyDeps & { stored: string[] } {
+): AuthProxyDeps & { stored: string[]; signIn: (t: string) => void } {
   const stored: string[] = []
   let session = opts.session ?? 'sealed-1'
   return {
     stored,
+    signIn: (t) => {
+      session = t
+    },
     authBaseUrl: () => 'https://auth.example/',
     getSessionToken: async () => session || undefined,
-    storeSessionToken: async (t) => {
+    // As AuthManager.storeRotatedSessionToken: only over the session the
+    // request presented.
+    storeSessionToken: async (t, replaces) => {
+      if (session !== replaces) return
       stored.push(t)
       session = t
     },
@@ -102,6 +108,22 @@ describe('AccessTokenManager', () => {
     const all = await Promise.all([tokens.get(), tokens.get(), tokens.get()])
     assert.deepEqual(all, ['jwt', 'jwt', 'jwt'])
     assert.equal(calls.length, 1)
+  })
+
+  test('drops a rotation once the stored session has changed', async () => {
+    const { fetch } = fakeFetch(() => {
+      // Another sign-in while the request is in flight.
+      deps.signIn('sealed-other')
+      return json(200, {
+        accessToken: 'jwt',
+        expiresAt: Date.now() + 300_000,
+        token: 'sealed-2',
+      })
+    })
+    const deps = authDeps(fetch)
+    await new AccessTokenManager(deps).get()
+    assert.deepEqual(deps.stored, [])
+    assert.equal(await deps.getSessionToken(), 'sealed-other')
   })
 
   test('stores a rotated sealed session', async () => {
