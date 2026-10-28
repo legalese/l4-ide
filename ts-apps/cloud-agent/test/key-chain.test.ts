@@ -175,6 +175,27 @@ describe('KeyChainAuth', () => {
     assert.equal(proxy.calls.length, 1)
   })
 
+  test('end deletes the initial key when the chain never started, once', async () => {
+    const proxy = authProxy([{ status: 204 }])
+    const auth = chain(proxy.fetch)
+    await auth.end()
+    await auth.end()
+    assert.deepEqual(proxy.calls, [
+      {
+        url: 'https://legalese.cloud/auth/agent-token/end',
+        auth: `Bearer ${KEY0}`,
+      },
+    ])
+  })
+
+  test('end does nothing once the chain ended', async () => {
+    const proxy = authProxy([{ status: 401, body: { error: 'invalid_key' } }])
+    const auth = chain(proxy.fetch)
+    assert.equal(await auth.start(), false)
+    await auth.end()
+    assert.equal(proxy.calls.length, 1)
+  })
+
   test('end deletes the current key', async () => {
     const proxy = authProxy([
       { status: 200, body: { token: key(1), id: 'k1', expiresAt: 1_900_000 } },

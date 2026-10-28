@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -87,6 +87,40 @@ export async function waitUntil(
     await new Promise((r) => setTimeout(r, 10))
   }
   throw new Error(`timed out waiting for ${what}`)
+}
+
+/**
+ * Write an executable language server that only answers requests
+ * (`initialize` with no capabilities, everything else with `null`) and
+ * exits on `exit`: enough for the harness to start and stop. Returns its
+ * path.
+ */
+export async function writeFakeLsp(dir: string): Promise<string> {
+  const file = path.join(dir, 'fake-lsp')
+  await writeFile(
+    file,
+    String.raw`#!${process.execPath}
+let buf = Buffer.alloc(0)
+process.stdin.on('data', (d) => {
+  buf = Buffer.concat([buf, d])
+  for (;;) {
+    const sep = buf.indexOf('\r\n\r\n')
+    if (sep < 0) return
+    const len = Number(/Content-Length: *(\d+)/i.exec(buf.subarray(0, sep).toString())[1])
+    if (buf.length < sep + 4 + len) return
+    const msg = JSON.parse(buf.subarray(sep + 4, sep + 4 + len).toString())
+    buf = buf.subarray(sep + 4 + len)
+    if (msg.method === 'exit') process.exit(0)
+    if (msg.id === undefined || !msg.method) continue
+    const result = msg.method === 'initialize' ? { capabilities: {} } : null
+    const out = JSON.stringify({ jsonrpc: '2.0', id: msg.id, result })
+    process.stdout.write('Content-Length: ' + Buffer.byteLength(out) + '\r\n\r\n' + out)
+  }
+})
+`
+  )
+  await chmod(file, 0o755)
+  return file
 }
 
 /** A language server that knows nothing (the runner tests don't compile L4). */

@@ -1,9 +1,17 @@
-import { describe, test } from 'node:test'
+import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { ConfigError, parseCloudEnv, parseDevArgs } from '../src/config.js'
+import { readFile, writeFile } from 'node:fs/promises'
+import * as path from 'node:path'
+import {
+  ConfigError,
+  parseCloudEnv,
+  parseDevArgs,
+  type HarnessConfig,
+} from '../src/config.js'
+import { initSessionFolder } from '../src/dev.js'
 import { JsonLogger, redact } from '../src/logger.js'
-import { main } from '../src/main.js'
-import { SID } from './helpers.js'
+import { main, runHarness } from '../src/main.js'
+import { SID, silent, tempDir, writeFakeLsp } from './helpers.js'
 
 const good = {
   SESSION_ID: SID,
@@ -90,6 +98,90 @@ describe('main', () => {
       process.stderr.write = orig
     }
     assert.ok(!writes.join('').includes(good.AGENT_KEY))
+  })
+})
+
+describe('runHarness ends the key chain on an early exit', () => {
+  const RENEW = 'https://legalese.cloud/auth/agent-token/renew'
+  const END = {
+    url: 'https://legalese.cloud/auth/agent-token/end',
+    auth: `Bearer ${good.AGENT_KEY}`,
+  }
+  const realFetch = globalThis.fetch
+  let root: string
+  let cleanup: () => Promise<void>
+  let calls: Array<{ url: string; auth: string | null }>
+
+  beforeEach(async () => {
+    ;({ dir: root, cleanup } = await tempDir())
+    calls = []
+    // jl4-auth-proxy: end answers 204, renew refuses the key.
+    globalThis.fetch = (async (input: string | URL | Request, init) => {
+      const url = String(input)
+      calls.push({ url, auth: new Headers(init?.headers).get('authorization') })
+      return url === RENEW
+        ? new Response(JSON.stringify({ error: 'invalid_key' }), {
+            status: 401,
+          })
+        : new Response(null, { status: 204 })
+    }) as typeof fetch
+  })
+
+  afterEach(async () => {
+    globalThis.fetch = realFetch
+    await cleanup()
+  })
+
+  const cfg = (lspCommand: string): HarnessConfig => ({
+    mode: 'cloud',
+    sessionId: SID,
+    agentKey: good.AGENT_KEY,
+    root,
+    aiProxyUrl: 'https://ai.legalese.cloud',
+    aiLocal: false,
+    authUrl: 'https://legalese.cloud',
+    logLevel: 'info',
+    lspCommand,
+  })
+
+  test('when the session folder is missing', async () => {
+    assert.equal(await runHarness(cfg('jl4-lsp'), {}, silent), 1)
+    assert.deepEqual(calls, [END])
+  })
+
+  test('when another task holds the lease', async () => {
+    const sessionDir = await initSessionFolder(root, SID)
+    await writeFile(
+      path.join(sessionDir, 'state', 'lease.json'),
+      JSON.stringify({
+        taskId: 'other',
+        state: 'running',
+        expiresAt: Date.now() + 60_000,
+      })
+    )
+    assert.equal(await runHarness(cfg(await writeFakeLsp(root)), {}, silent), 0)
+    assert.deepEqual(calls, [END])
+  })
+
+  test('when the language server does not start', async () => {
+    await initSessionFolder(root, SID)
+    await assert.rejects(
+      runHarness(cfg(path.join(root, 'no-such-lsp')), {}, silent)
+    )
+    assert.deepEqual(calls, [END])
+  })
+
+  test('but not when the first renewal parks the session', async () => {
+    const sessionDir = await initSessionFolder(root, SID)
+    assert.equal(await runHarness(cfg(await writeFakeLsp(root)), {}, silent), 0)
+    assert.deepEqual(
+      calls.map((c) => c.url),
+      [RENEW]
+    )
+    const session = JSON.parse(
+      await readFile(path.join(sessionDir, 'session.json'), 'utf8')
+    )
+    assert.equal(session.status, 'parked')
   })
 })
 

@@ -136,8 +136,11 @@ export class KeyChainAuth implements AuthProvider {
     return this.renew('unauthorized')
   }
 
-  /** `POST /auth/agent-token/end` (best effort) and stop renewing. */
+  /** `POST /auth/agent-token/end` (best effort) and stop renewing.
+   *  Only the first call ends the key; once the chain ended (parked)
+   *  there is none to end. */
   async end(): Promise<void> {
+    if (this.stopped) return
     this.stopTimer()
     this.stopped = true
     if (this.renewing) await this.renewing.catch(() => false)

@@ -29,7 +29,12 @@ import { DevAuth, KeyChainAuth, authRetryingFetch } from './key-chain.js'
 import { JsonLogger } from './logger.js'
 import { DATA_DIR, NodeWorkspace, TMP_DIR } from './node-workspace.js'
 import { ensureDirNoFollow } from './safe-fs.js'
-import { Runner, type ChainControl, type RunnerPlugin } from './runner.js'
+import {
+  CHAIN_END_WAIT_MS,
+  Runner,
+  waitFor,
+  type RunnerPlugin,
+} from './runner.js'
 
 export const HARNESS_VERSION = '0.1.0'
 
@@ -73,6 +78,35 @@ export async function runHarness(
   env: NodeJS.ProcessEnv,
   logger: Logger
 ): Promise<number> {
+  const holder: { runner?: Runner } = {}
+  const keyChain =
+    cfg.mode === 'cloud'
+      ? new KeyChainAuth({
+          authUrl: cfg.authUrl!,
+          sessionId: cfg.sessionId,
+          initialKey: cfg.agentKey!,
+          logger,
+          onEnded: (e) => holder.runner?.onChainEnded(e.reason),
+        })
+      : undefined
+  try {
+    return await runSession(cfg, env, logger, keyChain, holder)
+  } finally {
+    // An early exit (no session folder, another task holds the lease, a
+    // failed start) ends the chain too, so the key from AGENT_KEY doesn't
+    // stay valid for 15 minutes. After a normal exit the runner already
+    // ended it, and a parked chain has no key left: end() does nothing.
+    if (keyChain) await waitFor(keyChain.end(), CHAIN_END_WAIT_MS)
+  }
+}
+
+async function runSession(
+  cfg: HarnessConfig,
+  env: NodeJS.ProcessEnv,
+  logger: Logger,
+  keyChain: KeyChainAuth | undefined,
+  holder: { runner?: Runner }
+): Promise<number> {
   const sessionDir = path.join(cfg.root, 'sessions', cfg.sessionId)
   const repoDir = path.join(sessionDir, 'repo')
   const st = await stat(sessionDir).catch(() => null)
@@ -85,17 +119,8 @@ export async function runHarness(
     `harness ${HARNESS_VERSION} starting (mode=${cfg.mode}, task=${taskId})`
   )
 
-  const holder: { runner?: Runner } = {}
   let auth: AuthProvider
-  let chain: ChainControl | undefined
-  if (cfg.mode === 'cloud') {
-    const keyChain = new KeyChainAuth({
-      authUrl: cfg.authUrl!,
-      sessionId: cfg.sessionId,
-      initialKey: cfg.agentKey!,
-      logger,
-      onEnded: (e) => holder.runner?.onChainEnded(e.reason),
-    })
+  if (keyChain) {
     // Renew and retry once when ai-proxy or MCP answer 401 (or ai-proxy
     // answers 403 invalid-credentials).
     globalThis.fetch = authRetryingFetch(
@@ -104,7 +129,6 @@ export async function runHarness(
       [cfg.aiProxyUrl, ...(cfg.mcpUrl ? [cfg.mcpUrl] : [])]
     )
     auth = keyChain
-    chain = keyChain
   } else {
     auth = new DevAuth(cfg.sessionId)
   }
@@ -143,7 +167,7 @@ export async function runHarness(
     taskId,
     logger,
     auth,
-    chain,
+    chain: keyChain,
     workspace,
     l4: lsp,
     aiEndpoint: { url: cfg.aiProxyUrl, local: cfg.aiLocal },

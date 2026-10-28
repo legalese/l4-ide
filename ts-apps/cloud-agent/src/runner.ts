@@ -50,6 +50,8 @@ export const COMMAND_POLL_MS = 1_000
 export const SHUTDOWN_BUDGET_MS = 25_000
 /** How long a parked harness lets the current turn finish its step. */
 export const PARK_TURN_GRACE_MS = 60_000
+/** How long an exit waits for `POST /auth/agent-token/end`. */
+export const CHAIN_END_WAIT_MS = 5_000
 
 /**
  * Cloud tool policy (spec §11): cloud sessions never ask for tool
@@ -785,7 +787,7 @@ export class Runner {
       }
     }
     if (reason !== 'parked' && this.opts.chain) {
-      await waitFor(this.opts.chain.end(), 5_000)
+      await waitFor(this.opts.chain.end(), CHAIN_END_WAIT_MS)
     }
     const status = reason === 'parked' ? 'parked' : 'sleeping'
     await this.session
@@ -811,7 +813,7 @@ export class Runner {
 }
 
 /** Wait for `p` at most `ms`; never rejects. */
-function waitFor(p: Promise<unknown>, ms: number): Promise<void> {
+export function waitFor(p: Promise<unknown>, ms: number): Promise<void> {
   return new Promise((resolve) => {
     const t = setTimeout(resolve, ms)
     p.then(
