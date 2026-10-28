@@ -190,7 +190,10 @@ s3://legalese-cloud-sessions-<env>/
 - The model may write only inside `data/` and `tmp/`. Anything else at the
   repo root (files or directories) is platform metadata, read-only to the
   model; writes there are refused with a readable error.
-- `tmp/` of abandoned sessions is cleared by the sweep (§7.1).
+- `tmp/` isn't cleared: it is in the session's git history like everything
+  else.
+- `users/.trash/<sid>-<hex>/` holds deleted sessions until the sweep removes
+  them (§7.1). It is outside every user's folder, so no task can reach it.
 - There is no other backup or tmp folder.
 
 ### 4.3 Folder names
@@ -395,8 +398,6 @@ compromises it can change what runs or where it connects.
        keeps written `.l4` files open and re-sends the other open files
        after a change (and after a merge or rollback), so importers are
        checked again. Verified with `jl4-lsp`.
-   - If the sweep cleared `repo/tmp/` while the session slept (§7.1), commit
-     the deletion ("Clear tmp of abandoned session").
    - Load `session.json`, including the conversation id and MCP servers.
    - Generate an ephemeral key pair for sealed secrets (§6.4).
    - Write `state/git/main.bundle` and emit `session-state: running` with the
@@ -439,8 +440,13 @@ sealed session. It returns `{ accessToken, expiresAt }`: the WorkOS access
 token (a JWT valid for about 5 minutes) from the user's session.
 
 - The extension refreshes it as needed.
-- The Sessions API verifies it against the AuthKit JWKS (issuer = the AuthKit
-  domain). It takes `sub` as the user id and `org_id` as the organisation.
+- The Sessions API verifies it (RS256 only) against the issuer and JWKS URL
+  set in its Terraform (`jwt_issuer`, `jwt_jwks_url`). Check both against a
+  real `/auth/access-token` token before deploying: WorkOS session tokens may
+  carry `https://api.workos.com/user_management/<client_id>` rather than the
+  AuthKit domain. Expecting our own session issuer also refuses tokens WorkOS
+  issues to third-party OAuth apps. It takes `sub` as the user id and `org_id`
+  as the organisation.
 - It requires the `ai:chat` permission. Confirm which permission or role claims
   the WorkOS JWT template provides.
 - The sealed session never leaves the extension and jl4-auth-proxy.
@@ -562,21 +568,21 @@ with auth type NONE; every route verifies the WorkOS JWT itself. A
 
 ### 7.1 Routes
 
-| Route                                                                                                                                   | Does                                                                                                                                                                                                                                                                                                                       |
-| --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /sessions` `{ title?, mcpServers?, seedSize?, seedBase?: { workspaceFolder, path }, attachments: [{ name, size, contentType }] }` | Provisions if needed (§4.4). Creates `sessions/<sid>/` with `session.json`, `repo/` (`git init -b main` plus the config in §4.7), `attachments/` and `state/`. Returns `{ sessionId, gitUrl, uploads }` with pre-signed, size-bound PUT URLs into `inbox/<sid>/` for the seed and each attachment.                         |
-| `POST /sessions/:sid/init`                                                                                                              | Extracts the seed tarball into `repo/data/`, creates `repo/tmp/`, and copies attachments, through the file system. Rejects absolute paths, `..`, `.git/`, links and device files. Deletes the inbox objects.                                                                                                               |
-| `GET /sessions`                                                                                                                         | Lists the caller's cloud conversations for the history view (§12.1): id, title, created, last activity and state (§7.3), read from `sessions/*/session.json`.                                                                                                                                                              |
-| `GET /sessions/:sid`                                                                                                                    | `session.json` plus state.                                                                                                                                                                                                                                                                                                 |
-| `POST /sessions/:sid/start` `{ agentKey }`                                                                                              | If the session is already `starting` or `running`, ends the unused key and returns the state. Otherwise provisions if needed and calls `RunTask` (§5.1). Returns `202 { state: "starting" }`.                                                                                                                              |
-| `POST /sessions/:sid/commands` `{ type, … }`                                                                                            | Queues a command (§8). Works while the session sleeps; the harness reads queued commands when it starts. Returns `{ commandId, state }`.                                                                                                                                                                                   |
-| `POST /sessions/:sid/files` `{ files: [{ path, size, contentType }] }`                                                                  | Adds files mid-session (§10). `path` is repo-relative under `data/`, validated like seed paths; 10 MB per file, 50 MB per batch. Returns `{ batchId, uploads: [{ path, url, method, headers, maxBytes }] }` with pre-signed PUTs into `inbox/<sid>/files/<batchId>/`.                                                      |
-| `POST /sessions/:sid/files/:batchId/commit`                                                                                             | Copies the batch into `sessions/<sid>/incoming/files/<batchId>/` and queues `add-files`. Returns `{ commandId, state }`.                                                                                                                                                                                                   |
-| `GET /events?s=<sid>:<cursor>&s=…`                                                                                                      | New events for up to 10 sessions per call, with new cursors and states (§8).                                                                                                                                                                                                                                               |
-| `POST /sessions/:sid/stop`                                                                                                              | Queues a `stop` command, then calls `StopTask` 60 s later if the task is still running.                                                                                                                                                                                                                                    |
-| `DELETE /sessions/:sid`                                                                                                                 | Stops the session, then deletes `sessions/<sid>/`.                                                                                                                                                                                                                                                                         |
-| `GET /git/:sid.git/info/refs`, `POST /git/:sid.git/git-upload-pack`, `POST /git/:sid.git/git-receive-pack`                              | Smart-HTTP git (§9). Accepts the JWT as a Bearer token or as the password in HTTP Basic auth, which is how git sends credentials.                                                                                                                                                                                          |
-| Scheduled `sweep` (EventBridge Scheduler, every 5 min)                                                                                  | Stops tasks running longer than 25 hours, or with a lease stale for more than 5 minutes. Clears `repo/tmp/` (file-system delete only, no git, no symlink following, no running task) of sessions whose `lastActivity` is older than `ABANDONED_TMP_DAYS` (default 30); the harness commits the deletion on its next start. |
+| Route                                                                                                                                   | Does                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /sessions` `{ title?, mcpServers?, seedSize?, seedBase?: { workspaceFolder, path }, attachments: [{ name, size, contentType }] }` | Provisions if needed (§4.4). Creates `sessions/<sid>/` with `session.json`, `repo/` (`git init -b main` plus the config in §4.7), `attachments/` and `state/`. Returns `{ sessionId, gitUrl, uploads }` with pre-signed, size-bound PUT URLs into `inbox/<sid>/` for the seed and each attachment. A missing or zero `seedSize` means no seed. |
+| `POST /sessions/:sid/init`                                                                                                              | Extracts the seed tarball into `repo/data/`, creates `repo/tmp/`, and copies attachments, through the file system. Rejects absolute paths, `..`, `.git/`, links and device files. Deletes the inbox objects.                                                                                                                                   |
+| `GET /sessions`                                                                                                                         | Lists the caller's cloud conversations for the history view (§12.1): id, title, created, last activity and state (§7.3), read from `sessions/*/session.json`.                                                                                                                                                                                  |
+| `GET /sessions/:sid`                                                                                                                    | `session.json` plus state.                                                                                                                                                                                                                                                                                                                     |
+| `POST /sessions/:sid/start` `{ agentKey }`                                                                                              | If the session's task is pending, running or still stopping, ends the unused key and returns the state. Refuses with `409 too_many_sessions` when the user already has 3 live tasks (running or stopping). Otherwise provisions if needed and calls `RunTask` (§5.1). Returns `202 { state: "starting" }`.                                     |
+| `POST /sessions/:sid/commands` `{ type, … }`                                                                                            | Queues a command (§8). Works while the session sleeps; the harness reads queued commands when it starts. Returns `{ commandId, state }`.                                                                                                                                                                                                       |
+| `POST /sessions/:sid/files` `{ files: [{ path, size, contentType }] }`                                                                  | Adds files mid-session (§10). `path` is repo-relative under `data/`, validated like seed paths; 10 MB per file, 50 MB per batch. Returns `{ batchId, uploads: [{ path, url, method, headers, maxBytes }] }` with pre-signed PUTs into `inbox/<sid>/files/<batchId>/`.                                                                          |
+| `POST /sessions/:sid/files/:batchId/commit`                                                                                             | Copies the batch into `sessions/<sid>/incoming/files/<batchId>/` and queues `add-files`. Returns `{ commandId, state }`.                                                                                                                                                                                                                       |
+| `GET /events?s=<sid>:<cursor>&s=…`                                                                                                      | New events for up to 10 sessions per call, with new cursors and states (§8); at most 16 segment reads per call, then `more: true`.                                                                                                                                                                                                             |
+| `POST /sessions/:sid/stop`                                                                                                              | Queues a `stop` command, then calls `StopTask` 60 s later if the task is still running.                                                                                                                                                                                                                                                        |
+| `DELETE /sessions/:sid`                                                                                                                 | If the session's task runs, stops it and answers `409 stopping`. While any other task of the user is running or stopping, answers `409 conflict`. Otherwise renames `sessions/<sid>/` to `users/.trash/<sid>-<hex>/` (one rename, out of every task's reach); the sweep deletes it.                                                            |
+| `GET /git/:sid.git/info/refs`, `POST /git/:sid.git/git-upload-pack`, `POST /git/:sid.git/git-receive-pack`                              | Smart-HTTP git (§9). Accepts the JWT as a Bearer token or as the password in HTTP Basic auth, which is how git sends credentials.                                                                                                                                                                                                              |
+| Scheduled `sweep` (EventBridge Scheduler, every 5 min)                                                                                  | Stops tasks running longer than 25 hours, or with a lease stale for more than 5 minutes. Empties `users/.trash/` (never follows symlinks; bounded per run, continued next run).                                                                                                                                                                |
 
 - Every route derives the folder from the JWT `sub` (§4.3). A `sid` that isn't
   in the caller's folder returns 404.
@@ -598,15 +604,20 @@ folder contents steer it elsewhere:
   a regular file under a size cap.
 - **Directories.** It never lists a directory to discover files — it follows
   `head.json` and `commands.seq` (§8). It never returns directory listings,
-  paths or filesystem errors to clients. The one exception is the hourly
-  sweep: to find abandoned `repo/tmp/` folders it may list user folders
-  (32-hex names) and their ULID session directories, and never returns what
-  it lists to clients.
+  paths or filesystem errors to clients. The one exception is the sweep, which
+  lists `users/.trash/` (written only by the Sessions API).
 - **Git.** It never runs git inside a user folder. It serves git from scratch
   repositories in its own `/tmp`, built from bundle files (§9). This rules out
-  repository-controlled hooks, filters, config, alternates and symlinks.
-- **Deleting.** It deletes a session only after its task has stopped. Deletion
-  doesn't follow symlinks.
+  repository-controlled hooks, filters, config, alternates and symlinks. It
+  fetches only from files with a git bundle header (a file containing
+  `gitdir: <path>` would otherwise make git read another repository), and caps
+  pushed packs at the bundle size limit.
+- **Deleting.** It deletes a session only while none of the user's tasks is
+  running or stopping — otherwise another of their tasks could swap a
+  directory for a symlink mid-delete, and the Sessions API sees every folder.
+  It first renames the session to `users/.trash/` (out of every task's reach),
+  making it writable first if the task removed that; the sweep then deletes it
+  without following symlinks.
 
 ### 7.3 Session states
 
@@ -618,6 +629,11 @@ States are derived; nothing extra is stored.
 | `starting`                     | Task pending or running, no lease yet                                                    |
 | `running` / `busy` / `waiting` | Live lease. `busy` while a turn runs, `waiting` while an `ask-user` question is pending. |
 | `parked`                       | `session.json` status `parked`: needs a new key chain                                    |
+
+`start` and `DELETE` also count a task that is still stopping (desired
+status STOPPED, last status not yet STOPPED) as live, so they don't race its
+final commit; `/events` and the sweep list running tasks only, to keep ECS
+calls down.
 
 The lease is `state/lease.json { taskId, state, turnId?, expiresAt }`,
 rewritten every 30 s (write to a temp file, then rename) with 90 s validity. A
@@ -991,20 +1007,24 @@ cloud folder instead of on their machine:
 
 ## 14. Image build and upgrades
 
-- **Workflow.** A new l4-ide workflow, `cloud-agent-image.yml`. It runs on
-  changes under `ts-shared/legalese-agent/`, `ts-apps/cloud-agent/`,
-  `jl4-lsp/` or `jl4-core/`, and manually. It:
-  1. builds `jl4-lsp` for linux-arm64, as `main-tag.yml:273-346` does;
-  2. bundles the harness;
-  3. builds the image for arm64 with `docker buildx`;
-  4. pushes `legalese-cloud-agent:<git-sha>` to ECR through a GitHub OIDC role
-     (pattern: `ai-proxy/terraform/github-actions.tf`);
-  5. runs a smoke-test session;
-  6. writes the digest to SSM `/cloud-sessions/<env>/image-digest`.
-- **Rollout.** On `start`, the Sessions API compares the user's task
+- **Inputs.** l4-ide has no AWS access. Each `l4-ide-build-<n>` release
+  (`main-tag.yml`) carries the harness bundle `cloud-agent.cjs` and
+  `jl4-lsp-linux-arm64`, each with a `.sha256`.
+- **Rollout.** jl4-auth-proxy's `rollout-cloud-agent.yml` (manual, with a
+  release tag) rolls them out, as `rollout-jl4-service.yml` does for
+  jl4-service. A preview job checks the release and its hashes without AWS
+  access; the rollout job runs in the `prod` GitHub environment (one
+  approval). It builds `legalese-cloud-agent:<tag>` for arm64 from
+  `cloud-sessions/agent-image`, smoke-tests it, pushes it and writes its digest
+  to SSM `/cloud-sessions/<env>/image-digest`.
+- **Who can push.** The GitHub OIDC roles for both cloud-sessions workflows
+  (this one and `cloud-sessions-api-image.yml`) trust only jobs in the `prod`
+  environment, so the approval gate is enforced by AWS, not just by GitHub.
+- **Upgrades.** On `start`, the Sessions API compares the user's task
   definition with that digest and registers a new revision if they differ
   (§4.4). Running sessions keep their image until they sleep.
-- **Rollback.** Set the parameter back to the previous digest.
+- **Rollback.** Run the workflow with the previous tag; its image is still in
+  ECR, so only the parameter changes.
 - **ECR.** Immutable tags; a lifecycle rule keeps the last 30 images.
 
 ## 15. Implementation tracker
@@ -1054,7 +1074,9 @@ Tracking rules:
       user's HTTP MCP servers (§6.4).
 - [x] [post-mortem](cloud-sessions/cloud-agent-image.md) · `cloud-agent-image` (base `cloud-agent-mcp`) ([PR #516](https://github.com/legalese/l4-ide/pull/516)) — Dockerfile, entry point
       with the environment allow-list, and the `cloud-agent-image.yml`
-      workflow (§5.1, §5.3, §14).
+      workflow (§5.1, §5.3, §14). The image, its smoke test and its rollout
+      later moved to jl4-auth-proxy (`rollout-cloud-agent.yml`, #9); l4-ide
+      only releases `cloud-agent.cjs` and `jl4-lsp-linux-arm64`.
 - [x] [post-mortem](cloud-sessions/cloud-sessions-client.md) · `cloud-sessions-client` (base `cloud-session-protocol`) ([PR #510](https://github.com/legalese/l4-ide/pull/510)) — extension side:
       Sessions API client, access token, polling, commands, key-chain minting,
       seeding (path fix, size limits), MCP transfer and sealing. Takes over
@@ -1313,9 +1335,10 @@ vCPU-hour and $0.00356 per GB-hour.
 - **Deleted files.** Deleting a `data/` file copies it to
   `tmp/deleted/t-<turnId>/…`; the model restores by reading it back. No
   backup tools, nothing cleared at turn end (§4.2, §9.4).
-- **Clearing `tmp/`.** On session delete, and by the sweep after
-  `ABANDONED_TMP_DAYS` (30) without activity; the harness commits the cleared
-  folder on its next start (§5.4, §7.1).
+- **Clearing `tmp/`.** Only with the session (delete). The sweep's clearing
+  of abandoned sessions' `tmp/` was dropped on 2026-10-28: `tmp/` is in the
+  session's git history anyway, and it was a second path that deleted user
+  data (§7.2).
 - **No git for the model.** No model-facing tool runs git, and `.git` can't be
   read, listed or searched. The harness alone uses git (§11).
 - **L4 anywhere in the repo.** The L4 tools work on any `.l4` file in `data/`
