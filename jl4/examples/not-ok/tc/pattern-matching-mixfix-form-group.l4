@@ -1,0 +1,15 @@
+-- A rule with a word between its inputs is one definition and has no clauses.
+-- Two lines written in its form, with a literal for an input, were read as a
+-- group of clauses defining a rule named like its own input, and refused in
+-- twelve messages, three of them with no location. They are refused once, at
+-- the first line.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` 0 MEANS 0
+c `costs` n MEANS n
+
+#EVAL Red `costs` 0
+#EVAL Green `costs` 5

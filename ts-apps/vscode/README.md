@@ -176,7 +176,7 @@ The script registers your L4 functions with the browser's `navigator.modelContex
 
 ### L4 CLI
 
-The extension ships with the `l4` command-line tool for running L4 files, checking rules, and other workflows outside the editor.
+The extension ships with the `l4` command-line tool for running L4 files, checking rules, deploying them (`l4 deploy`), and other workflows outside the editor.
 
 Run **L4: Install L4 CLI** from the command palette, or accept the prompt the first time you open an L4 project. This installs the bundled `l4` binary onto your PATH:
 

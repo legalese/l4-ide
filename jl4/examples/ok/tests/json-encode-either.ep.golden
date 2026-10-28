@@ -1,0 +1,13 @@
+-- JSONENCODE writes LEFT x as {"LEFT": x} and RIGHT x as {"RIGHT": x},
+-- so the two sides of an EITHER stay apart.
+
+DECLARE Decision HAS
+  applicant IS A STRING
+  outcome   IS AN EITHER STRING NUMBER
+
+#EVAL JSONENCODE (LEFT 1)
+#EVAL JSONENCODE (RIGHT "approved")
+#EVAL JSONENCODE (LEFT (LIST 1, 2))
+#EVAL JSONENCODE (RIGHT (JUST 3))
+#EVAL JSONENCODE (LIST (LEFT "missing document"), (RIGHT 250))
+#EVAL JSONENCODE (Decision WITH applicant IS "Kim", outcome IS RIGHT 250)

@@ -1,126 +1,121 @@
 # CONSIDER
 
-Pattern matching construct that examines a value and executes different branches based on its structure.
+`CONSIDER` looks at a value and chooses a result by its shape: which value of an enumeration it is, whether a `MAYBE` holds something, whether a list is empty, and so on. Other languages call this `case` or `match`.
 
 ## Syntax
 
-```l4
+```text
 CONSIDER expression
 WHEN pattern1 THEN result1
 WHEN pattern2 THEN result2
-...
+OTHERWISE default-result
 ```
 
-## Purpose
-
-CONSIDER enables pattern matching on algebraic types (enums and records), lists, and other structured data. It's similar to `case` or `match` in other functional languages.
-
-## Examples
+The branches are tried from top to bottom, and the first that matches gives the result.
+`OTHERWISE` matches anything and is optional. On one line, separate the branches with commas.
 
 **Example file:** [consider-example.l4](consider-example.l4)
 
-### Matching Enums
+## Patterns
+
+### Values of an enumeration
 
 ```l4
-DECLARE Colour IS ONE OF red, green, blue
+DECLARE Colour IS ONE OF Red, Green, Blue
 
-GIVEN c IS A Colour
-colourName c MEANS
-  CONSIDER c
-  WHEN red THEN "Red"
-  WHEN green THEN "Green"
-  WHEN blue THEN "Blue"
+GIVEN colour IS A Colour
+GIVETH A STRING
+`name of` colour MEANS
+  CONSIDER colour
+  WHEN Red THEN "red"
+  WHEN Green THEN "green"
+  WHEN Blue THEN "blue"
 ```
 
-### Matching Lists
+### Values with fields
 
-```l4
-GIVEN xs IS A LIST OF NUMBER
-GIVETH A NUMBER
-sumList xs MEANS
-  CONSIDER xs
-  WHEN EMPTY THEN 0
-  WHEN head FOLLOWED BY tail THEN head PLUS sumList tail
-```
-
-### Matching MAYBE Values
-
-```l4
-GIVEN mx IS A MAYBE NUMBER
-getOrDefault mx MEANS
-  CONSIDER mx
-  WHEN NOTHING THEN 0
-  WHEN JUST x THEN x
-```
-
-### Matching Constructors with Fields
+A pattern names the fields it takes apart, in the order they are declared:
 
 ```l4
 DECLARE Shape IS ONE OF
   Circle HAS radius IS A NUMBER
   Rectangle HAS width IS A NUMBER, height IS A NUMBER
 
-GIVEN s IS A Shape
-area s MEANS
-  CONSIDER s
+GIVEN shape IS A Shape
+GIVETH A NUMBER
+`area of` shape MEANS
+  CONSIDER shape
   WHEN Circle r THEN 3.14159 TIMES r TIMES r
   WHEN Rectangle w h THEN w TIMES h
 ```
 
-### Using Wildcards
-
-Use `_` to ignore values:
+### Lists
 
 ```l4
 GIVEN xs IS A LIST OF NUMBER
-firstElement xs MEANS
+GIVETH A NUMBER
+`total of` xs MEANS
   CONSIDER xs
   WHEN EMPTY THEN 0
-  WHEN head FOLLOWED BY _ THEN head
+  WHEN first FOLLOWED BY rest THEN first PLUS `total of` rest
 ```
 
-## OTHERWISE
+### MAYBE values
 
-Use OTHERWISE for a catch-all pattern:
+```l4
+GIVEN amount IS A MAYBE NUMBER
+GIVETH A NUMBER
+`amount or zero` amount MEANS
+  CONSIDER amount
+  WHEN NOTHING THEN 0
+  WHEN JUST a THEN a
+```
+
+### Numbers and text
+
+A number or a piece of text matches only itself. Such a `CONSIDER` needs an `OTHERWISE` for the rest:
 
 ```l4
 GIVEN n IS A NUMBER
-describe n MEANS
+GIVETH A STRING
+`count word for` n MEANS
   CONSIDER n
-  WHEN 0 THEN "zero"
+  WHEN 0 THEN "none"
   WHEN 1 THEN "one"
   OTHERWISE "many"
 ```
 
-## Exhaustiveness Checking
+### Names and wildcards
 
-The typechecker analyzes every CONSIDER expression and emits **warnings** (not errors) for two situations:
+- A name in a pattern matches anything and stands for that part of the value, like `r` and `first` above.
+- `` `_` ``, an underscore in backquotes, matches anything without naming it. A bare `_` is a syntax error.
+- `EXACTLY expression` matches a value equal to the expression, for example ``WHEN EXACTLY `the limit` THEN …``.
 
-- **Missing branches:** the branches do not cover all constructors of the scrutinee's type. The warning lists the uncovered patterns. The program still compiles, but matching an uncovered value raises a runtime error.
-- **Redundant branches:** a branch can never be reached because earlier branches (or an earlier OTHERWISE) already cover everything it could match.
+## Missing and redundant branches
 
-```l4
-DECLARE Status IS ONE OF Active, Suspended, Closed
+`l4 check` looks at every `CONSIDER` and warns about two things:
 
-GIVEN s IS A Status
-describe s MEANS
-  CONSIDER s
-  WHEN Active THEN "running"
-  WHEN Closed THEN "stopped"
-  -- Warning: missing branch for Suspended
-```
+- **Missing branches:** a value of the type that no branch matches. The warning lists the branches still needed:
 
-Adding the missing constructor branch or an OTHERWISE catch-all silences the warning.
+  ```text
+  The following branches still need to be considered:
 
-**Primitive-type caveat:** the analysis is skipped when the scrutinee has type NUMBER, STRING, or DATE. These types have effectively infinite value sets, so exhaustiveness cannot be decided by enumerating constructors. Matches on such values are never warned about — include an OTHERWISE branch to avoid runtime failures. BOOLEAN (just TRUE/FALSE) is checked normally; the builtin container types MAYBE, EITHER, and LIST are not yet analysed.
+    WHEN Suspended THEN
+  ```
 
-The analysis applies wherever the CONSIDER appears, including inside WHERE- and LET-bound local definitions. Warnings do not stop the file from evaluating — `#EVAL` directives still run.
+- **Redundant branches:** a branch that can never be reached, because the branches above it already match everything it could.
 
-See [Troubleshooting: Compiler Warnings](../errors/README.md#compiler-warnings) for the warning messages and fixes.
+The check knows every value of an enumeration declared in the same file, and `TRUE` and `FALSE`. A `CONSIDER` over an enumeration declared in an imported file gets no missing-branch warning.
+A number, a piece of text or a date has no end of values, so the check asks for an `OTHERWISE`.
+For `MAYBE`, `EITHER` and lists, it checks what they hold but does not ask for each of `JUST`/`NOTHING`, `LEFT`/`RIGHT` or `EMPTY`/`FOLLOWED BY`.
+The check also applies inside `WHERE` and `LET`.
 
-## Related Keywords
+The warnings do not stop the file from running. If evaluation reaches a value that no branch matches, it stops with "The value … reached a CONSIDER that has no branch for it."
 
-- **[IF](IF.md)** - Simple conditional alternative
-- **[CONTROL-FLOW](README.md)** - All control flow keywords
+The messages and their fixes are in [Error messages: Non-exhaustive pattern match](../errors/README.md#non-exhaustive-pattern-match). Why L4 checks this, and the details of what it can and cannot see, are in [Exhaustiveness](../../concepts/type-system/exhaustiveness.md).
 
-> Note: WHEN, OTHERWISE, and BRANCH are part of the CONSIDER syntax.
+## Related pages
+
+- [DECIDE: Several clauses](../functions/DECIDE.md#several-clauses): a function written as one clause per case, which means the same as a `CONSIDER`
+- [IF](IF.md) and [BRANCH](BRANCH.md): choose by conditions
+- [Control flow](README.md)

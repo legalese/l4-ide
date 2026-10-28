@@ -160,6 +160,7 @@
     subscribeToMessenger(messenger)
     subscribed = true
     void store.refreshHistory()
+    void store.refreshDictationStatus()
   })
 
   onDestroy(() => {
@@ -174,6 +175,12 @@
       store.usageSubscribe()
       return () => store.usageUnsubscribe()
     }
+  })
+
+  // Mirror of the extension's own guard: a recording doesn't outlive
+  // the tab being on screen.
+  $effect(() => {
+    if (!visible) store.cancelDictation()
   })
 
   function openHistory(): void {

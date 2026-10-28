@@ -4,14 +4,37 @@
 -- we can use ref-map annotations to specify new reference
 -- mappings in the same source file
 @ref-map foo bar baz https://example.com
-GIVEN x IS A BOOLEAN, y IS A BOOLEAN @ref foo bar baz
-GIVETH A BOOLEAN @ref 1981/61 sec. 2
+-- a @ref cites what comes AFTER it, so each one below sits on the line above
+-- the thing it cites
+@ref foo bar baz
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+@ref 1981/61 sec. 2
+GIVETH A BOOLEAN
                   -- we can use ref annotations
                   -- with regexes which must be
                   -- aware that before matching,
                   -- the string in the reference
                   -- is normalized
-DECIDE xor x y IS  @ref SG-c-2025-sghcf-14
-     x AND NOT y <<SG-c-2025-sghcf-12>>
+@ref SG-c-2025-sghcf-14
+DECIDE xor x y IS
+     <<SG-c-2025-sghcf-12>> x AND NOT y
   OR NOT x AND y
 
+-- A literal `>>` inside an inline citation needs `\>`, because the annotation
+-- would otherwise terminate at the first `>>` and leave the remainder to fail
+-- the enclosing parse. The backslash is KEPT in the token, so exactprint
+-- re-emits the citation byte for byte (this file's `.ep.golden` pins that);
+-- it is decoded where the parser builds the `Ref`, which is the reader's copy.
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE cited IS
+  <<SG-c-2025-sghcf-12 \>> as amended>>
+  a
+
+-- A LONE `>` does not complete the herald and has always been ordinary text.
+-- It must stay that way: the escape is for the herald, not for the character.
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE compared IS
+  <<see s.5 > s.3>>
+  b

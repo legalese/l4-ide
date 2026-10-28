@@ -14,7 +14,11 @@ import {
   type PresignedUpload,
   type SessionState,
 } from '@repo/legalese-agent/protocol'
-import { CloudSessionManager } from '../cloud/cloud-session-manager.js'
+import {
+  AUTO_RESUME_DELAYS_MS,
+  CloudSessionManager,
+  START_SETTLE_MS,
+} from '../cloud/cloud-session-manager.js'
 import type { McpServerSource } from '../cloud/mcp-transfer.js'
 import { SeedLimitError } from '../cloud/seed.js'
 import { SessionsApiError, type SessionsApi } from '../cloud/sessions-api.js'
@@ -91,9 +95,12 @@ class FakeApi implements SessionsApi {
       },
     }
   }
+  /** The old task is still stopping: `start` answers without starting
+   *  a task, and state reads still say `sleeping`. */
+  startNoop = false
   async startSession(_sid: string, agentKey: string) {
     this.log.push(`start:${agentKey}`)
-    this.state = 'starting'
+    if (!this.startNoop) this.state = 'starting'
     return 'starting' as const
   }
   async postCommand(_sid: string, command: ClientCommandPayload) {
@@ -146,6 +153,7 @@ function setup(
   opts: {
     mcp?: McpServerSource
     pick?: (sid: string, name: string) => Promise<string | undefined>
+    mint?: (sid: string) => Promise<{ token: string }>
   } = {}
 ) {
   const api = new FakeApi()
@@ -161,7 +169,7 @@ function setup(
   const logger = new MemoryLogger()
   const manager = new CloudSessionManager({
     api,
-    mintAgentKey: async () => ({ token: KEY }),
+    mintAgentKey: opts.mint ?? (async () => ({ token: KEY })),
     mcp: opts.mcp,
     ...(opts.pick ? { pickLocalFolder: opts.pick } : {}),
     logger,
@@ -349,6 +357,149 @@ describe('CloudSessionManager events', () => {
       ['command:answer'],
       'parked needs an explicit resume'
     )
+  })
+})
+
+describe('CloudSessionManager: a message sent while the task shuts down', () => {
+  const starts = (api: FakeApi) =>
+    api.log.filter((l) => l.startsWith('start:')).length
+
+  /** A running session; `turn-2` is sent, then the task exits without
+   *  picking it up. */
+  async function sentThenAsleep(s: ReturnType<typeof setup>) {
+    s.api.state = 'running'
+    s.api.commandState = 'running'
+    await s.manager.sendMessage(SID, 'turn-2', 'next')
+    await s.clock.advance(0)
+    assert.equal(starts(s.api), 0)
+    s.api.state = 'sleeping'
+    await s.clock.advance(5000)
+  }
+
+  test('starts the session again once it has gone to sleep', async () => {
+    const s = setup()
+    await sentThenAsleep(s)
+    assert.equal(starts(s.api), 1)
+    assert.deepEqual(s.api.commands, [
+      { type: 'message', turnId: 'turn-2', text: 'next' },
+    ])
+    // The start took (a poll sees it); a session that goes to sleep
+    // again without running the message is not started a second time.
+    await s.clock.advance(1000)
+    s.api.state = 'sleeping'
+    await s.clock.advance(120_000)
+    assert.equal(starts(s.api), 1)
+  })
+
+  test('nothing to do once an event acknowledged the message', async () => {
+    const s = setup()
+    s.api.state = 'running'
+    s.api.commandState = 'running'
+    await s.manager.sendMessage(SID, 'turn-2', 'next')
+    s.api.pending = [
+      ev({
+        type: 'user-message',
+        turnId: 'turn-2',
+        text: 'next',
+        attachments: [],
+      }),
+    ]
+    await s.clock.advance(0)
+    s.api.state = 'sleeping'
+    await s.clock.advance(60_000)
+    assert.equal(starts(s.api), 0)
+  })
+
+  test('nothing to do after Stop or Abort', async () => {
+    const stopped = setup()
+    stopped.api.state = 'running'
+    stopped.api.commandState = 'running'
+    await stopped.manager.sendMessage(SID, 'turn-2', 'next')
+    await stopped.manager.stop(SID)
+    stopped.api.state = 'sleeping'
+    await stopped.clock.advance(60_000)
+    assert.equal(starts(stopped.api), 0)
+
+    const aborted = setup()
+    aborted.api.state = 'running'
+    aborted.api.commandState = 'running'
+    await aborted.manager.sendMessage(SID, 'turn-2', 'next')
+    await aborted.manager.abort(SID, 'turn-2')
+    aborted.api.state = 'sleeping'
+    await aborted.clock.advance(60_000)
+    assert.equal(starts(aborted.api), 0)
+  })
+
+  test('a start answered while the old task still stops is retried, a bounded number of times', async () => {
+    const s = setup()
+    s.api.startNoop = true
+    await sentThenAsleep(s)
+    assert.equal(starts(s.api), 1)
+    // Polls still say `sleeping`: not again before the delay.
+    await s.clock.advance(AUTO_RESUME_DELAYS_MS[1]! - 2000)
+    assert.equal(starts(s.api), 1)
+    await s.clock.advance(2000)
+    assert.equal(starts(s.api), 2)
+    await s.clock.advance(10 * 60_000)
+    assert.equal(starts(s.api), AUTO_RESUME_DELAYS_MS.length)
+  })
+
+  test('polls that still say sleeping just after a start leave it be', async () => {
+    const s = setup()
+    // Sending to a sleeping session starts it; the new task takes a
+    // moment to show up in ECS, so the next polls still say sleeping.
+    s.api.state = 'sleeping'
+    s.api.commandState = 'sleeping'
+    s.api.startNoop = true
+    await s.manager.sendMessage(SID, 'turn-2', 'next')
+    assert.equal(starts(s.api), 1)
+    await s.clock.advance(START_SETTLE_MS - 2000)
+    assert.equal(starts(s.api), 1)
+    s.api.state = 'starting'
+    await s.clock.advance(60_000)
+    assert.equal(starts(s.api), 1)
+  })
+
+  test('a retried start that takes is the last', async () => {
+    const s = setup()
+    s.api.startNoop = true
+    await sentThenAsleep(s)
+    assert.equal(starts(s.api), 1)
+    // The old task has stopped by the next try.
+    s.api.startNoop = false
+    await s.clock.advance(AUTO_RESUME_DELAYS_MS[1]!)
+    assert.equal(starts(s.api), 2)
+    await s.clock.advance(1000)
+    s.api.state = 'sleeping'
+    await s.clock.advance(10 * 60_000)
+    assert.equal(starts(s.api), 2)
+  })
+
+  test('a failed start is reported in the conversation, and not retried', async () => {
+    let mints = 0
+    const s = setup({
+      mint: async () => {
+        mints++
+        throw new Error('not signed in')
+      },
+    })
+    s.api.conversationId = 'conv-1'
+    s.api.state = 'running'
+    await s.manager.open(SID)
+    await sentThenAsleep(s)
+    const errors = s.chat.filter((e) => e.kind === 'error')
+    assert.equal(errors.length, 1)
+    assert.equal(
+      (errors[0] as { conversationId: string }).conversationId,
+      'conv-1'
+    )
+    assert.match(
+      (errors[0] as { message: string }).message,
+      /starting it again failed: not signed in/
+    )
+    await s.clock.advance(10 * 60_000)
+    assert.equal(mints, 1)
+    assert.equal(s.chat.filter((e) => e.kind === 'error').length, 1)
   })
 })
 

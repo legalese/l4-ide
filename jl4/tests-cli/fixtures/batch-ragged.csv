@@ -1,0 +1,5 @@
+age,income,hasViolations
+25,50000,false
+30,40000
+	 
+40,60000,false,extra

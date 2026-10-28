@@ -1,0 +1,15 @@
+-- A ditto in a clause body copies from the line above it in the source.
+-- Printed from the source text, it copied from the printer's line
+-- instead, and `charge Red` answered 2 under `l4 batch` (probe q/dit7).
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+`b`MEANS IF TRUE THEN 1 ELSE 2
+`fee` Red       MEANS ^
+`fee` c         MEANS 0
+
+@export default charge
+GIVEN c IS A Colour
+GIVETH A NUMBER
+charge c MEANS `fee` c
+

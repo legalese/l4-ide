@@ -8,7 +8,8 @@
  * - commands (message, inject, abort, answer, rollback, stop); cloud
  *   sessions never ask for tool approval, so there is no `approve`
  *   are queued through the Sessions API; a command to a sleeping
- *   session starts it with a fresh key chain;
+ *   session starts it with a fresh key chain, and so does a session
+ *   that goes to sleep before its harness picked up a sent message;
  * - polled events are turned back into the chat-service events the
  *   webview already renders (`cloudEventToChatEvent`); cloud-only
  *   events go to a separate listener with the conversation they belong
@@ -194,7 +195,46 @@ interface Tracked {
   startingTurn?: string
   /** `session.json` `seedBase`; `null` = known to be absent. */
   seedBase?: SeedBaseRef | null
+  /** `message` commands sent from here that no event has acknowledged
+   *  yet (`user-message` / `started` with their turn id), by turn id. */
+  unanswered: Map<string, Unanswered>
+  /** {@link CloudSessionManager.resume} calls in flight, and when the
+   *  last one ended. */
+  resuming: number
+  lastStartAt: number
 }
+
+/** A sent message the harness hasn't picked up yet. */
+interface Unanswered {
+  /** `POST /commands` answered (until then a poll can't tell whether
+   *  the harness could have seen it). */
+  sent: boolean
+  /** Starts made for it because the session went to sleep first. */
+  autoResumes: number
+  /** When the next one may be made. */
+  nextAutoResumeAt: number
+  /** A poll saw the session start after one of them, or one failed:
+   *  none again. */
+  spent: boolean
+}
+
+/**
+ * When a session goes to sleep with a sent message no event has
+ * acknowledged (it was sent while the task was shutting down), it is
+ * started again for it: once, counting only a start a poll then sees
+ * take (`starting` or live), or one that fails. The Sessions API
+ * answers a start without starting a task while the old task is still
+ * stopping (polls go on saying `sleeping`); such starts are retried,
+ * each after the delay at its index (the first at once), and then
+ * given up.
+ */
+export const AUTO_RESUME_DELAYS_MS: readonly number[] = [
+  0, 10_000, 20_000, 30_000,
+]
+
+/** A started task takes a moment to show up in ECS: polls that still
+ *  say `sleeping` this soon after a start don't count against it. */
+export const START_SETTLE_MS = 10_000
 
 function titleFrom(text: string): string {
   const line = text.trim().split('\n')[0] ?? ''
@@ -223,9 +263,11 @@ export class CloudSessionManager {
   private readonly poller: EventPoller
   private readonly credentialJobs = new Map<string, Promise<void>>()
   private readonly files: SessionFilesStore
+  private readonly now: () => number
 
   constructor(private readonly deps: CloudSessionManagerDeps) {
     this.files = deps.files ?? memoryFilesStore()
+    this.now = deps.poller?.now ?? Date.now
     this.poller = new EventPoller({
       getEvents: (streams) => deps.api.getEvents(streams),
       onStream: (s) => this.handleStream(s),
@@ -266,7 +308,14 @@ export class CloudSessionManager {
   private track(sid: string): Tracked {
     let t = this.sessions.get(sid)
     if (!t) {
-      t = { lastSeq: 0, replaying: false, mcpAuthHandled: 0 }
+      t = {
+        lastSeq: 0,
+        replaying: false,
+        mcpAuthHandled: 0,
+        unanswered: new Map(),
+        resuming: 0,
+        lastStartAt: -Infinity,
+      }
       this.sessions.set(sid, t)
     }
     return t
@@ -390,7 +439,7 @@ export class CloudSessionManager {
       }
       await Promise.all(uploads)
       this.setState(sid, await this.deps.api.initSession(sid))
-      await this.deps.api.postCommand(sid, {
+      await this.postMessage(sid, {
         type: 'message',
         turnId,
         text,
@@ -420,11 +469,71 @@ export class CloudSessionManager {
   /** Mint a new key chain and start the session (also "Resume" for
    *  parked sessions and `auth-required`). */
   async resume(sid: string): Promise<SessionState> {
-    const key = await this.deps.mintAgentKey(sid)
-    const state = await this.deps.api.startSession(sid, key.token)
-    this.setState(sid, state)
-    this.poller.poke(sid, state)
-    return state
+    const t = this.track(sid)
+    t.resuming++
+    try {
+      const key = await this.deps.mintAgentKey(sid)
+      const state = await this.deps.api.startSession(sid, key.token)
+      this.setState(sid, state)
+      this.poller.poke(sid, state)
+      return state
+    } finally {
+      t.resuming--
+      t.lastStartAt = this.now()
+    }
+  }
+
+  /**
+   * After a poll that has caught up: a session that went to sleep with
+   * a sent message no event has acknowledged is started again for it
+   * (see {@link AUTO_RESUME_DELAYS_MS}). Not while a start runs or has
+   * only just been made ({@link START_SETTLE_MS}).
+   */
+  private autoResume(sid: string, t: Tracked, state: SessionState): void {
+    if (state !== 'sleeping') {
+      // A start took (or the user must act, `parked`): don't start the
+      // session again for these messages.
+      for (const m of t.unanswered.values()) {
+        if (m.autoResumes > 0 || state === 'parked') m.spent = true
+      }
+      return
+    }
+    const now = this.now()
+    if (t.resuming > 0 || now < t.lastStartAt + START_SETTLE_MS) return
+    const due = [...t.unanswered.values()].filter(
+      (m) =>
+        m.sent &&
+        !m.spent &&
+        m.autoResumes < AUTO_RESUME_DELAYS_MS.length &&
+        now >= m.nextAutoResumeAt
+    )
+    if (due.length === 0) return
+    for (const m of due) {
+      m.autoResumes++
+      m.nextAutoResumeAt =
+        now + (AUTO_RESUME_DELAYS_MS[m.autoResumes] ?? Infinity)
+    }
+    this.deps.logger.info(
+      `cloud-sessions: ${sid} went to sleep before running a sent message; starting it again`
+    )
+    this.resume(sid).catch((err) => {
+      // Refused (not signed in, another organisation, …): no retry.
+      for (const m of due) m.spent = true
+      const message = err instanceof Error ? err.message : String(err)
+      this.deps.logger.warn(
+        `cloud-sessions: starting ${sid} again for a sent message failed: ${message}`
+      )
+      if (t.conversationId) {
+        this.deps.listener.chat(
+          {
+            kind: 'error',
+            conversationId: t.conversationId,
+            message: `The cloud session stopped before it ran your message, and starting it again failed: ${message}`,
+          },
+          sid
+        )
+      }
+    })
   }
 
   // ── Watching ────────────────────────────────────────────────────────
@@ -477,6 +586,9 @@ export class CloudSessionManager {
     }
     if (!stream.more) t.replaying = false
     this.setState(sid, stream.state)
+    if (!stream.more && t.unanswered.size > 0) {
+      this.autoResume(sid, t, stream.state)
+    }
     if (LIVE_STATES.has(stream.state)) {
       await this.maybeSendCredentials(sid, t)
     }
@@ -488,6 +600,7 @@ export class CloudSessionManager {
       if (chat.kind === 'started') {
         this.setConversation(sid, chat.conversationId)
         this.byTurn.set(chat.turnId, sid)
+        t.unanswered.delete(chat.turnId)
       } else if (!t.conversationId && 'conversationId' in chat) {
         this.setConversation(sid, chat.conversationId)
       }
@@ -497,6 +610,7 @@ export class CloudSessionManager {
     switch (event.type) {
       case 'user-message':
         this.byTurn.set(event.turnId, sid)
+        t.unanswered.delete(event.turnId)
         break
       case 'ask-user':
         if (!t.conversationId) this.setConversation(sid, event.conversationId)
@@ -580,14 +694,48 @@ export class CloudSessionManager {
     sid: string,
     command: ClientCommandPayload
   ): Promise<PostCommandResponse> {
+    const t = this.track(sid)
     if (command.type === 'message') this.byTurn.set(command.turnId, sid)
-    const res = await this.deps.api.postCommand(sid, command)
+    // The user asked for these to end: don't start the session for them.
+    if (command.type === 'stop') t.unanswered.clear()
+    if (command.type === 'abort') t.unanswered.delete(command.turnId)
+    const res =
+      command.type === 'message'
+        ? await this.postMessage(sid, command)
+        : await this.deps.api.postCommand(sid, command)
     this.setState(sid, res.state)
     this.poller.poke(sid, res.state)
     if (res.state === 'sleeping' && command.type !== 'stop') {
       await this.resume(sid)
     }
     return res
+  }
+
+  /** Queue a `message`, remembering it until an event acknowledges it
+   *  (from before the request: the harness may pick it up before the
+   *  response arrives). */
+  private async postMessage(
+    sid: string,
+    command: Extract<ClientCommandPayload, { type: 'message' }>
+  ): Promise<PostCommandResponse> {
+    const t = this.track(sid)
+    const m: Unanswered = {
+      sent: false,
+      autoResumes: 0,
+      nextAutoResumeAt: 0,
+      spent: false,
+    }
+    t.unanswered.set(command.turnId, m)
+    try {
+      const res = await this.deps.api.postCommand(sid, command)
+      m.sent = true
+      return res
+    } catch (err) {
+      if (t.unanswered.get(command.turnId) === m) {
+        t.unanswered.delete(command.turnId)
+      }
+      throw err
+    }
   }
 
   /**
@@ -741,14 +889,15 @@ export class CloudSessionManager {
   }
 
   async stop(sid: string): Promise<SessionState> {
+    this.track(sid).unanswered.clear()
     const state = await this.deps.api.stopSession(sid)
     this.setState(sid, state)
     this.poller.poke(sid, state)
     return state
   }
 
-  /** Delete a session. The Sessions API answers `409 stopping` while
-   *  the task still runs; the caller retries later. */
+  /** Delete a session. The Sessions API answers 204 at once, also while
+   *  the task still runs (it is gone from lists and cleaned up later). */
   async delete(sid: string): Promise<void> {
     await this.deps.api.deleteSession(sid)
     this.poller.unwatch(sid)

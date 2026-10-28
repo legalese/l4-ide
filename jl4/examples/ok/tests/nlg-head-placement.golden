@@ -1,0 +1,73 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+nlg-head-placement.l4:107:1-20:
+  TRUE
+nlg-head-placement.l4:108:1-35:
+  TRUE
+nlg-head-placement.l4:116:1-20:
+  TRUE
+nlg-head-placement.l4:117:1-35:
+  TRUE
+nlg-head-placement.l4:125:1-22:
+  TRUE
+nlg-head-placement.l4:126:1-37:
+  TRUE
+nlg-head-placement.l4:134:1-21:
+  TRUE
+nlg-head-placement.l4:135:1-36:
+  TRUE
+nlg-head-placement.l4:144:1-21:
+  TRUE
+nlg-head-placement.l4:145:1-36:
+  TRUE
+nlg-head-placement.l4:155:1-20:
+  TRUE
+nlg-head-placement.l4:156:1-35:
+  TRUE
+nlg-head-placement.l4:168:1-22:
+  TRUE
+nlg-head-placement.l4:169:1-37:
+  TRUE
+nlg-head-placement.l4:178:1-22:
+  20
+nlg-head-placement.l4:179:1-37:
+  20
+nlg-head-placement.l4:192:1-21:
+  TRUE
+nlg-head-placement.l4:193:1-36:
+  TRUE
+nlg-head-placement.l4:206:1-20:
+  TRUE
+nlg-head-placement.l4:207:1-35:
+  TRUE
+nlg-head-placement.l4:208:1-26:
+  TRUE
+nlg-head-placement.l4:220:1-23:
+  TRUE
+nlg-head-placement.l4:221:1-38:
+  TRUE
+nlg-head-placement.l4:234:1-27:
+  TRUE
+nlg-head-placement.l4:235:1-52:
+  TRUE
+nlg-head-placement.l4:248:1-25:
+  TRUE
+nlg-head-placement.l4:249:1-40:
+  TRUE
+nlg-head-placement.l4:263:1-25:
+  TRUE
+nlg-head-placement.l4:264:1-40:
+  TRUE
+nlg-head-placement.l4:275:1-28:
+  TRUE
+nlg-head-placement.l4:276:1-53:
+  TRUE
+nlg-head-placement.l4:284:1-24:
+  TRUE
+nlg-head-placement.l4:285:1-39:
+  TRUE
+nlg-head-placement.l4:293:1-26:
+  TRUE
+nlg-head-placement.l4:294:1-41:
+  TRUE

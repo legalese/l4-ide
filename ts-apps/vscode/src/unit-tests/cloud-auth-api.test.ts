@@ -10,6 +10,7 @@ import {
   NO_COMMITS_YET_MESSAGE,
   SessionsApiClient,
   SessionsApiError,
+  WRONG_ORGANIZATION_MESSAGE,
   describeSessionsApiError,
 } from '../cloud/sessions-api.js'
 
@@ -203,6 +204,24 @@ describe('SessionsApiClient', () => {
     })
   })
 
+  test('start: 409 wrong_organization says which organisation to switch to', async () => {
+    const { api } = client(() => json(409, { error: 'wrong_organization' }))
+    await assert.rejects(api.startSession(SID, KEY), (err: unknown) => {
+      assert.ok(err instanceof SessionsApiError)
+      assert.equal(err.status, 409)
+      assert.equal(err.code, 'wrong_organization')
+      assert.equal(err.message, WRONG_ORGANIZATION_MESSAGE)
+      return true
+    })
+  })
+
+  test('DELETE: 204 with no body', async () => {
+    const { api, calls } = client(() => new Response(null, { status: 204 }))
+    await api.deleteSession(SID)
+    assert.equal(calls[0]!.init.method, 'DELETE')
+    assert.equal(calls[0]!.url, `https://sessions.example/sessions/${SID}`)
+  })
+
   test('off while the API URL is empty', async () => {
     const api = new SessionsApiClient({
       baseUrl: () => '',
@@ -310,5 +329,16 @@ describe('describeSessionsApiError', () => {
       NO_COMMITS_YET_MESSAGE
     )
     assert.match(NO_COMMITS_YET_MESSAGE, /^Available after the first turn/)
+  })
+
+  test('409 wrong_organization: switch organisation to resume', () => {
+    assert.equal(
+      describeSessionsApiError(409, 'wrong_organization'),
+      WRONG_ORGANIZATION_MESSAGE
+    )
+    assert.match(
+      WRONG_ORGANIZATION_MESSAGE,
+      /belongs to another organisation.*Legalese Cloud to resume/
+    )
   })
 })

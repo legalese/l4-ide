@@ -1,0 +1,13 @@
+-- The Hebrew wording is tagged with a region, `he-IL`. `l4 nlg --lang he`
+-- and `l4 nlg --lang he-IL` both read it, and both give it the Hebrew frame
+-- words, because a tag and a request match by language, region or not.
+IMPORT daydate
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% exceeds the threshold
+                  @nlg:he-IL %amount% עולה על הסף
+  IF amount GREATER THAN 100
+
+#EVAL `is large` 150 EQUALS TRUE
+#EVAL NOT `is large` 5

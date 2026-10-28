@@ -1,0 +1,83 @@
+-- encoding-legislation-example.l4
+-- Section 3 of the (imaginary) Alcohol Act 2024: who must not sell alcohol.
+
+§ `Imaginary Alcohol Act 2024, section 3`
+
+{-
+Section 3. A person must not sell alcohol if:
+(a) the person is a body corporate;
+(b) the person engages in business for profit;
+(c) the person is not a public house or hotel; and
+(d) any of the following applies:
+    (i)   the person has an unspent conviction for fraud;
+    (ii)  the person has an unspent conviction for providing misleading information; or
+    (iii) the person has an alcohol banning order.
+-}
+
+GIVEN `the person is a body corporate`                                            IS A BOOLEAN
+      `the person engages in business for profit`                                 IS A BOOLEAN
+      `the person is a public house`                                              IS A BOOLEAN
+      `the person is a hotel`                                                     IS A BOOLEAN
+      `the person has an unspent conviction for fraud`                            IS A BOOLEAN
+      `the person has an unspent conviction for providing misleading information` IS A BOOLEAN
+      `the person has an alcohol banning order`                                   IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the person must not sell alcohol` IF
+        `is a commercial enterprise`          -- (a) and (b)
+    AND NOT `is an exempt establishment`      -- (c)
+    AND `has a disqualifying factor`          -- (d)
+    WHERE
+        `is a commercial enterprise` MEANS
+                `the person is a body corporate`
+            AND `the person engages in business for profit`
+
+        `is an exempt establishment` MEANS
+                `the person is a public house`
+            OR  `the person is a hotel`
+
+        `has a disqualifying factor` MEANS
+                `the person has an unspent conviction for fraud`
+            OR  `the person has an unspent conviction for providing misleading information`
+            OR  `the person has an alcohol banning order`
+
+§§ `Tests`
+
+-- A corporate pub is exempt under (c), even with a fraud conviction.
+#ASSERT NOT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS TRUE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS TRUE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS FALSE
+
+-- A company with a banning order is prohibited.
+#ASSERT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS FALSE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS FALSE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS TRUE
+
+-- A company with no disqualifying factor under (d) is not prohibited.
+#ASSERT NOT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS FALSE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS FALSE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS FALSE
+
+-- A natural person is not covered by (a).
+#EVAL `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS FALSE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS FALSE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS TRUE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS FALSE

@@ -3,8 +3,11 @@ import * as assert from 'node:assert/strict'
 import {
   CLONES_STORAGE_KEY,
   CloudGitSync,
+  HISTORY_TOO_LARGE_MESSAGE,
   NOT_READY_MESSAGE,
+  PUSH_TOO_LARGE_MESSAGE,
   GitSyncError,
+  addGitEnvConfig,
   describeGitError,
   sessionIdFromGitUrl,
   type GitApi,
@@ -71,6 +74,10 @@ class FakeGit implements GitApi {
   sources: GitRemoteSourceProvider | undefined
   openListeners: Array<(r: GitRepository) => unknown> = []
   cloned: Array<{ url: string; parent?: string; action?: string }> = []
+  /** The environment git would run the clone with. */
+  envAtClone: Record<string, string | undefined> | undefined
+  env: Record<string, string | undefined> = {}
+  cloneError: Error | undefined
   onDidOpenRepository = (l: (r: GitRepository) => unknown) => {
     this.openListeners.push(l)
     return { dispose: () => {} }
@@ -84,6 +91,8 @@ class FakeGit implements GitApi {
       parent: o?.parentPath?.fsPath,
       action: o?.postCloneAction,
     })
+    this.envAtClone = { ...this.env }
+    if (this.cloneError) throw this.cloneError
     const folder = fileUri(`${o?.parentPath?.fsPath}/${SID}`)
     this.repositories.push(new FakeRepo(folder, u.toString()))
     return folder
@@ -128,6 +137,7 @@ function setup(result?: GitApiResult<GitUri>) {
     parseUri: uri,
     fileUri,
     logger: { info() {}, warn() {} },
+    gitEnv: git.env,
   })
   return { git, sync, store }
 }
@@ -224,6 +234,67 @@ describe('CloudGitSync', () => {
     assert.deepEqual(repo.log, ['pull'])
   })
 
+  test('the first clone already keeps the token out of the keychain', async () => {
+    const { git, sync } = setup()
+    git.env.GIT_CONFIG_COUNT = '1'
+    git.env.GIT_CONFIG_KEY_0 = 'user.name'
+    git.env.GIT_CONFIG_VALUE_0 = 'Someone'
+    await sync.markCommitted(SID)
+    await sync.clone(SID, fileUri('/w'))
+    // Set before git ran: the user's own entry kept, ours appended.
+    assert.deepEqual(git.envAtClone, {
+      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_KEY_0: 'user.name',
+      GIT_CONFIG_VALUE_0: 'Someone',
+      GIT_CONFIG_KEY_1: 'credential.https://sessions.example.helper',
+      GIT_CONFIG_VALUE_1: '',
+    })
+    // Once only, also across registrations (for Git: Clone).
+    await sync.register()
+    git.repositories = []
+    await sync.clone(SID, fileUri('/v'))
+    assert.equal(git.env.GIT_CONFIG_COUNT, '2')
+  })
+
+  test('registering sets it for clones made through Git: Clone', async () => {
+    const { git, sync } = setup()
+    await sync.register()
+    assert.deepEqual(git.env, {
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'credential.https://sessions.example.helper',
+      GIT_CONFIG_VALUE_0: '',
+    })
+  })
+
+  test('a clone or pull over the response limit gets the beta limit', async () => {
+    const tooLarge = () =>
+      Object.assign(new Error('Failed to execute git'), {
+        stderr:
+          'error: RPC failed; HTTP 413 curl 22 The requested URL returned error: 413',
+      })
+    const { git, sync } = setup()
+    await sync.markCommitted(SID)
+    git.cloneError = tooLarge()
+    await assert.rejects(
+      sync.clone(SID, fileUri('/w')),
+      (err: Error) => err.message === HISTORY_TOO_LARGE_MESSAGE
+    )
+    git.cloneError = undefined
+    await sync.clone(SID, fileUri('/w'))
+    const repo = git.repositories[0]!
+    repo.pull = async () => {
+      throw tooLarge()
+    }
+    await assert.rejects(
+      sync.sync(SID),
+      (err: Error) => err.message === HISTORY_TOO_LARGE_MESSAGE
+    )
+    assert.match(
+      HISTORY_TOO_LARGE_MESSAGE,
+      /history is too large to clone or pull during the beta/
+    )
+  })
+
   test('a push over the body limit gets a clear message', async () => {
     const { git, sync } = setup()
     await sync.markCommitted(SID)
@@ -234,7 +305,10 @@ describe('CloudGitSync', () => {
       stderr:
         'error: RPC failed; HTTP 413 curl 22 The requested URL returned error: 413',
     })
-    await assert.rejects(sync.sync(SID), /too large for a cloud session/)
+    await assert.rejects(
+      sync.sync(SID),
+      (err: Error) => err.message === PUSH_TOO_LARGE_MESSAGE
+    )
   })
 
   test('configures clones made through Git: Clone', async () => {
@@ -335,6 +409,23 @@ describe('git helpers', () => {
       describeGitError(new Error('remote: no_commits_yet'), 'clone'),
       NOT_READY_MESSAGE
     )
+  })
+
+  test('env config: appends, once, and leaves a malformed count alone', () => {
+    const env: Record<string, string | undefined> = {}
+    addGitEnvConfig(env, 'a.b', '')
+    addGitEnvConfig(env, 'a.b', '')
+    addGitEnvConfig(env, 'c.d', 'x')
+    assert.deepEqual(env, {
+      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_KEY_0: 'a.b',
+      GIT_CONFIG_VALUE_0: '',
+      GIT_CONFIG_KEY_1: 'c.d',
+      GIT_CONFIG_VALUE_1: 'x',
+    })
+    const bogus: Record<string, string | undefined> = { GIT_CONFIG_COUNT: 'x' }
+    addGitEnvConfig(bogus, 'a.b', '')
+    assert.deepEqual(bogus, { GIT_CONFIG_COUNT: 'x' })
   })
 
   test('auth failures point at signing in', () => {

@@ -1,0 +1,8 @@
+-- A 0-ary definition whose evaluation raises, used by two directives. Each
+-- use must raise the division by zero; the second used to be reported as an
+-- infinite loop.
+GIVETH A NUMBER
+`one over zero` MEANS 1 DIVIDED BY 0
+
+#EVAL `one over zero`
+#EVAL `one over zero`

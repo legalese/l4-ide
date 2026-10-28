@@ -1,101 +1,70 @@
-# HTTP and JSON Built-ins
+# HTTP and JSON
 
-L4 provides built-in functions for HTTP requests and JSON serialization. These enable integration with external APIs and data interchange.
-
-## HTTP Functions
-
-### FETCH
-
-Performs an HTTP GET request.
-
-**Signature:** `STRING → STRING`
-
-**Parameters:**
-
-- `url` - The URL to fetch
-
-**Returns:** Response body as a STRING
+Built-in functions for calling web APIs and for turning L4 values into JSON and back. They need no `IMPORT`.
 
 **Example:** [http-json-example.l4](http-json-example.l4)
 
+## Where HTTP requests are allowed
+
+`FETCH` and `POST` make a real request every time they are evaluated, and only when their result is needed. They accept `https://` addresses only. Where L4 runs in safe mode, as it does in the browser, both give an error instead of making a request.
+
+## When a request fails
+
+In `l4 run`, a request that fails, for example because the server can't be reached, hides the results of every directive in the file, not only that one.
+[Evaluate a file with `l4 run`](../../tutorials/getting-started/l4-cli.md#step-3-l4-run--evaluate-a-file) says what to do.
+
+## FETCH
+
+`FETCH url` sends a GET request and gives the response body as a STRING.
+
 ```l4
--- Fetch data from an API
 DECIDE uuid IS FETCH "https://www.uuidtools.com/api/generate/v4"
 ```
 
-**Note:** FETCH is evaluated lazily. Multiple references to the same FETCH call return the same cached result.
+Query parameters can be written in the address: `"https://api.example.com/search?q=lease"`.
 
----
+## POST
 
-### POST
+`POST url headers body` sends a POST request and gives the response body as a STRING. All three inputs are STRINGs.
 
-Performs an HTTP POST request.
-
-**Signature:** `STRING → STRING → STRING → STRING`
-
-**Parameters:**
-
-- `url` - The URL to post to
-- `headers` - HTTP headers as a JSON string (e.g., `"{\"Content-Type\": \"application/json\"}"`)
-- `body` - Request body as a STRING
-
-**Returns:** Response body as a STRING
-
-**Example:** [http-json-example.l4](http-json-example.l4)
+- `headers` holds one header per line, each written `Name: value`. Separate the lines with `\n`: `"content-type: application/json\nauthorization: Bearer abc"`. Use `""` for no headers.
+- `body` is sent as it is; build JSON with `JSONENCODE`.
 
 ```l4
--- Post JSON to an API
-DECIDE response IS POST
-  "https://api.example.com/data"
-  "{\"Content-Type\": \"application/json\"}"
-  "{\"name\": \"test\"}"
+DECIDE response IS
+  POST
+    "https://api.example.com/data"
+    "content-type: application/json"
+    "{\"name\": \"test\"}"
 ```
 
----
+## ENV
 
-### ENV
-
-Reads an environment variable.
-
-**Signature:** `STRING → STRING`
-
-**Parameters:**
-
-- `name` - The environment variable name
-
-**Returns:** The value of the environment variable, or empty string if not set
-
-**Example:** [http-json-example.l4](http-json-example.l4)
+`ENV name` reads an environment variable of the process that evaluates the file. It gives `JUST` the value, or `NOTHING` when the variable is not set. Use it to keep API keys out of your files.
 
 ```l4
--- Read API key from environment
-DECIDE apiKey IS ENV "API_KEY"
+DECIDE `the API key` IS
+  CONSIDER ENV "API_KEY"
+  WHEN JUST key THEN key
+  WHEN NOTHING THEN ""
 ```
 
-**Security Note:** Use ENV to keep sensitive values like API keys out of source code.
+## JSONENCODE
 
----
+`JSONENCODE value` gives the JSON text for any value.
 
-## JSON Functions
-
-### JSONENCODE
-
-Converts an L4 value to its JSON string representation.
-
-**Signature:** `a → STRING` (polymorphic)
-
-**Behavior:**
-
-- Numbers render as JSON numbers
-- Strings render as JSON strings (with escaping)
-- Booleans render as `true` or `false`
-- Lists render as JSON arrays
-- Records render as JSON objects
-- NOTHING renders as `null`
-- JUST x renders as the encoding of x
-- Enum constructors render as JSON objects with constructor name
-
-**Example:** [http-json-example.l4](http-json-example.l4)
+| L4 value                                  | JSON                                                            |
+| ----------------------------------------- | --------------------------------------------------------------- |
+| NUMBER                                    | a number                                                        |
+| STRING                                    | a string, with escapes                                          |
+| BOOLEAN                                   | `true` or `false`                                               |
+| LIST                                      | an array                                                        |
+| record (`DECLARE ... HAS`)                | an object with one entry per field                              |
+| constructor without fields, such as `Red` | its name as a string: `"Red"`                                   |
+| constructor with fields                   | an object of its fields; the constructor's name is not included |
+| `NOTHING`                                 | `null`                                                          |
+| `JUST x`                                  | the JSON for `x`                                                |
+| `LEFT x`, `RIGHT x`                       | an object with the side as its one key: `{"LEFT": x}`           |
 
 ```l4
 DECLARE Person HAS
@@ -104,98 +73,56 @@ DECLARE Person HAS
 
 DECIDE alice IS Person WITH name IS "Alice", age IS 30
 
--- Produces: {"name":"Alice","age":30}
-DECIDE aliceJson IS JSONENCODE alice
+-- {"name":"Alice","age":30}
+DECIDE `alice as JSON` IS JSONENCODE alice
 ```
 
----
+## JSONDECODE
 
-### JSONDECODE
+`JSONDECODE text` reads JSON text. It gives `RIGHT value`, or `LEFT message` when the text is not valid JSON. JSON that is valid but does not fit the expected type, such as a record with a field missing or a string where a number belongs, stops the evaluation with an error naming the problem.
 
-Parses a JSON string into an L4 value.
+The type you expect guides the decoding, so say it, with `GIVETH` or by the way the result is used:
 
-**Signature:** `STRING → EITHER STRING a` (polymorphic)
-
-**Returns:**
-
-- `RIGHT value` on successful parse
-- `LEFT errorMessage` on parse failure
-
-**Behavior:**
-
-- JSON objects decode to records (field names must match)
-- JSON arrays decode to lists
-- JSON numbers decode to NUMBER
-- JSON strings decode to STRING
-- JSON booleans decode to BOOLEAN
-- JSON null decodes to NOTHING (for MAYBE types)
-
-**Example:** [http-json-example.l4](http-json-example.l4)
+- A JSON object decodes to a record whose field names match its keys. Keys the record does not declare are ignored.
+- An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
+- `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
+- A string with a constructor's name decodes to that constructor of an enumeration.
+- A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 
 ```l4
 DECLARE Person HAS
   name IS A STRING
   age IS A NUMBER
 
--- Parse JSON into a Person record
-DECIDE parsed IS JSONDECODE "{\"name\":\"Bob\",\"age\":25}"
+GIVETH AN EITHER STRING Person
+parsed MEANS JSONDECODE "{\"name\":\"Bob\",\"age\":25}"
 
--- Handle parse result
 DECIDE person IS
   CONSIDER parsed
   WHEN RIGHT p THEN p
-  WHEN LEFT err THEN Person WITH name IS "Unknown", age IS 0
+  WHEN LEFT problem THEN Person WITH name IS "Unknown", age IS 0
 ```
 
-**Type Inference:** JSONDECODE uses bidirectional type checking. The expected type guides parsing:
+## Example: an authenticated request
 
 ```l4
--- Type annotation guides decoding
-ASSUME result IS A EITHER STRING Person
-DECIDE result IS JSONDECODE jsonString
+DECLARE `payment request` HAS
+  amount   IS A NUMBER
+  currency IS A STRING
+
+GIVEN `the request` IS A `payment request`
+GIVETH A STRING
+`send` `the request` MEANS
+  CONSIDER ENV "PAYMENTS_API_KEY"
+  WHEN JUST key THEN
+    POST
+      "https://api.example.com/payments"
+      (CONCAT "content-type: application/json\nauthorization: Bearer ", key)
+      (JSONENCODE `the request`)
+  WHEN NOTHING THEN "PAYMENTS_API_KEY is not set"
 ```
 
----
+## See also
 
-## Common Patterns
-
-### API Integration
-
-```l4
--- Fetch and parse JSON from an API
-DECIDE fetchUser userId IS
-  LET url IS CONCAT "https://api.example.com/users/", userId
-  IN LET response IS FETCH url
-     IN JSONDECODE response
-```
-
-### Authenticated Requests
-
-```l4
--- Use environment variable for API key
-DECIDE callApi endpoint body IS
-  LET apiKey IS ENV "API_KEY"
-  IN LET headers IS CONCAT "{\"Authorization\": \"Bearer ", apiKey, "\"}"
-     IN POST endpoint headers body
-```
-
-### Error Handling
-
-```l4
--- Safely decode with fallback
-GIVEN jsonStr IS A STRING
-GIVEN fallback IS A Person
-GIVETH A Person
-safeDecode jsonStr fallback MEANS
-  CONSIDER JSONDECODE jsonStr
-  WHEN RIGHT person THEN person
-  WHEN LEFT _ THEN fallback
-```
-
----
-
-## See Also
-
-- **[LLM Library](../libraries/llm.md)** - Higher-level LLM API integration
-- **[Type Coercions](../types/coercions.md)** - TOSTRING and other conversions
-- **[EITHER Type](../types/README.md)** - Error handling with EITHER
+- [llm](../libraries/llm.md): calls to Anthropic, OpenAI and OpenRouter built on `POST`.
+- [Coercions](../types/coercions.md): `TOSTRING`, `TONUMBER` and other conversions.

@@ -10,7 +10,7 @@ import L4.Annotation
 -- import qualified L4.Evaluate.Value as Eval
 import qualified L4.Evaluate.ValueLazy as Eval
 import qualified L4.EvaluateLazy as Eval
-import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment)
+import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment, parseDateText, parseTimeText, parseDatetimeText)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import L4.EvaluateLazy.Trace
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
@@ -24,18 +24,19 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo, Environment)
 import L4.Utils.Ratio
 import qualified LSP.Core.Shake as Shake
-import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..), prettyDiagnostic)
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnosticsIn, oneshotL4ActionAndErrorsIn)
 import qualified LSP.L4.Rules as Rules
 import Optics ((^.), (%))
 
-import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
-import System.FilePath ((<.>), takeFileName)
+import Language.LSP.Protocol.Types (Diagnostic (..), DiagnosticSeverity (..), normalizedFilePathToUri, toNormalizedFilePath)
+import System.FilePath ((<.>), takeExtension, takeFileName)
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 
 import Backend.Api
-import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..))
+import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..), AnswerShape(..), RequiredInput(..))
 import L4.Export (extractAssumeParamTypes, extractAssumeParamResolveds)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
@@ -130,55 +131,91 @@ buildCompiledFromShared shared funName = runExceptT $ do
   evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
 
+-- | Where the 'IMPORT's of a deployed bundle may be resolved: the bundle's own
+-- files (the VFS tier, consulted first), then the standard library built into
+-- this binary, and nothing from the host. The service serves bundles that
+-- somebody else uploaded, to callers who cannot see the machine it runs on, so
+-- a `prelude.l4` in the working directory or a `JL4_LIBRARY_PATH` in the
+-- environment must not be able to replace the stdlib for every deployment.
+-- (Before this scope existed the service registered the stdlib at
+-- `./<name>.l4`, which the VFS tier hits first, so the host could not replace
+-- it either; registering it at `jl4-embedded:` made the host's files win,
+-- silently — a deploy "applied" and every call answered 422 `sum is not in
+-- scope` — and this scope is what makes that impossible.) Every session the
+-- service opens uses this.
+--
+-- Ruled 2026-10-12: a deployment resolves its own files and the built-in
+-- stdlib, nothing from the host. One of the conditions is that an IMPORT that
+-- resolves to nothing is logged at WARN when a bundle is compiled, which a restart
+-- does again ('typecheckAndEvalBundle' returns them); a refusal would need a
+-- later ruling.
+bundleScope :: Rules.LibraryScope
+bundleScope = Rules.EmbeddedStdlibOnly
+
 -- | Typecheck and evaluate all files in a bundle in a SINGLE Shake session.
 -- This avoids creating N independent IDE sessions that redundantly re-parse
 -- and re-typecheck overlapping imports. Shake caches intermediate results
 -- (parse, import resolution, typecheck) and shares them across all files.
 --
 -- Returns per-file typecheck results and per-file evaluator environments
--- (for files that have exports and need import environments).
+-- (for files that have exports and need import environments), and the IMPORTs
+-- of the bundle's @.l4@ files that resolved to nothing, as (importing file,
+-- module name). The caller says so in its log: the diagnostic for one is in the
+-- session's store, which this function does not hand back, and a bundle with an
+-- unresolvable IMPORT still compiles.
 typecheckAndEvalBundle
   :: ModuleContext
   -- ^ All source files in the bundle (filepath -> content)
   -> [FilePath]
   -- ^ Files that need evaluator import environments (i.e., files with exports).
   -- Pass empty list to skip evaluation entirely (typecheck only).
-  -> IO ( [Text]
-        -- ^ Diagnostic/error messages from the session
+  -> IO ( [(FilePath, Text)]
+        -- ^ The errors the session reported, rendered, with the bundle file
+        -- each belongs to. This is where the reason a file did not parse is
+        -- to be found: its 'Rules.TypeCheckResult' is just 'Nothing'.
         , Map FilePath (Maybe Rules.TypeCheckResult)
         -- ^ Typecheck results per file (Nothing if typecheck failed)
         , Map FilePath EvalEnv.Environment
         -- ^ Evaluator import environments for requested files
+        , [(FilePath, Text)]
+        -- ^ IMPORTs that resolved to nothing: (importing file, module name)
         )
 typecheckAndEvalBundle moduleContext evalFiles = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  -- Core libraries (prelude, …) to register as stable virtual files, unless the
-  -- deployment ships its own copy of the same name (which then shadows the
-  -- embedded one). Registering them up front means `IMPORT prelude` resolves via
-  -- the VFS, instead of the resolver's on-demand `addVirtualFile` embedded
-  -- fallback (LSP.L4.Rules). That fallback mutates the VFS mid-rule and — under
-  -- -O, in the multi-pass compileBundle/eval path — yields an unstable/duplicate
-  -- prelude module and spurious overload ambiguity (e.g. `count xs >= n` →
-  -- "ambiguous __GEQ__"). Verified: the same source is rejected via the embedded
-  -- fallback and accepted when the library is a real virtual file. The libraries
-  -- stay *dependencies* (NOT added to `allUris`), so they are never serialized or
-  -- surfaced as deployment files — only resolved when imported.
+  -- Core libraries (prelude, …) to register as virtual files, unless the
+  -- deployment ships a file of the same basename. They are registered at
+  -- `Shake.embeddedLibraryUri`, the one URI the resolver hands back for an
+  -- embedded winner, so every importer that falls through to the embedded tier
+  -- names the same module: a bundle must not hold two `prelude` modules (the
+  -- duplicate-module ambiguity, e.g. "ambiguous __GEQ__" on `count xs >= n`).
+  -- This service used to register them at `./<name>.l4`; see
+  -- `Shake.embeddedLibraryUriScheme` for why that key is forgeable.
+  --
+  -- This registration does NOT make `IMPORT prelude` resolve to the stdlib.
+  -- The VFS tier probes `project:/` and `./<module>.l4` keys, which a
+  -- `jl4-embedded:/` URI can never match, so what makes the stdlib the answer
+  -- is the resolver's embedded tier, and what keeps anything else from
+  -- standing in for it is that every session below runs under
+  -- `Rules.EmbeddedStdlibOnly` ('bundleScope'). Since 'Shake.getVirtualFile'
+  -- serves the same libraries from a pure map, these writes are redundant for
+  -- lookup; they stay *dependencies* (NOT added to `allUris`), so they are
+  -- never serialized or surfaced as deployment files — only resolved when
+  -- imported.
   let bundleBasenames = Set.fromList (map takeFileName (StrictMap.keys moduleContext))
       embeddedLibFiles =
-        [ (libName, content)
+        [ (name, content)
         | (name, content) <- StrictMap.toList EmbeddedLibraries.embeddedLibraries
-        , let libName = Text.unpack name <.> "l4"
-        , not (libName `Set.member` bundleBasenames)
+        , not ((Text.unpack name <.> "l4") `Set.member` bundleBasenames)
         ]
 
   -- Use the first file's directory as the session root (arbitrary but required)
   let allFiles = StrictMap.toList moduleContext
   case allFiles of
-    [] -> pure ([], StrictMap.empty, StrictMap.empty)
+    [] -> pure ([], StrictMap.empty, StrictMap.empty, [])
     ((firstPath, _) : _) -> do
-      (errs, (tcMap, evalMap)) <- oneshotL4ActionAndErrors evalConfig firstPath $ \_nfp -> do
+      (_log, diags, (tcMap, evalMap, unresolved)) <- oneshotL4ActionAndDiagnosticsIn bundleScope evalConfig firstPath $ \_nfp -> do
         -- Register ALL bundle files as virtual files in one go.
         -- Use the full path from the bundle (not just the basename) to avoid
         -- collisions when multiple files share the same filename in different dirs.
@@ -190,7 +227,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         -- Register embedded core libraries as stable virtual files (dependencies
         -- only — deliberately NOT added to allUris, see note above).
         forM_ embeddedLibFiles $ \(libName, content) ->
-          void $ Shake.addVirtualFile (toNormalizedFilePath ("./" <> libName)) content
+          void $ Shake.addVirtualFileUri (Shake.embeddedLibraryUri libName) content
 
         -- Typecheck ALL bundle files in one batch — Shake shares import resolution
         let allUris = [uri | (_, _, uri) <- fileNfps]
@@ -199,11 +236,19 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         let tcMap = StrictMap.fromList
               [(path, mTc) | ((path, _, _), mTc) <- zip fileNfps (toList tcResults)]
 
+        -- The IMPORTs that found nothing. The typecheck above has already
+        -- resolved every import, so this reads memoised results.
+        unresolved <- fmap concat $
+          forM [(path, uri) | (path, _, uri) <- fileNfps, takeExtension path == ".l4"] $
+            \(path, uri) -> map (path,) <$> Rules.unresolvedImports uri
+
         -- Build evaluator import environments for files that need them.
         -- Uses GetLazyEvaluationDependencies which recursively evaluates imports.
-        -- Within the same session, Shake reuses already-evaluated imports.
-        -- We use per-file `use` (not batch `uses`) because each call needs its
-        -- own AttachCallStack with the file's URI for cycle detection.
+        -- Within the same session, Shake reuses already-evaluated imports: the
+        -- rule ignores the call stack in its key and evaluates each file once
+        -- (GetLazyEvaluationDependenciesFile, smucclaw/l4-ide#1008). Before
+        -- that, the stack made each file's imports separate keys, and nothing
+        -- was shared between bundle files.
         let evalUriMap = [(path, uri) | (path, _, uri) <- fileNfps
                                       , path `elem` evalFiles]
         evalPairs <- forM evalUriMap $ \(path, uri) -> do
@@ -215,9 +260,19 @@ typecheckAndEvalBundle moduleContext evalFiles = do
               | (path, Just (env, _dirResults)) <- evalPairs
               ]
 
-        pure (tcMap, evalMap)
+        pure (tcMap, evalMap, unresolved)
 
-      pure (errs, tcMap, evalMap)
+      -- The errors of the bundle's own files; a library's are its own business.
+      let uriToPath = StrictMap.fromList
+            [ (normalizedFilePathToUri (toNormalizedFilePath ("./" <> path)), path)
+            | (path, _) <- allFiles
+            ]
+          errs =
+            [ (path, Text.pack (show (prettyDiagnostic d)))
+            | d@FileDiagnostic{fdFilePath = uri, fdLspDiagnostic = Diagnostic{_severity = Just DiagnosticSeverity_Error}} <- diags
+            , Just path <- [StrictMap.lookup uri uriToPath]
+            ]
+      pure (errs, tcMap, evalMap, unresolved)
 
 buildFunDecide :: Text -> FunctionDeclaration -> ExceptT EvaluatorError IO (Decide Resolved)
 buildFunDecide fnImpl fnDecl = do
@@ -353,6 +408,8 @@ data ModuleInfo = ModuleInfo
     -- ^ record type unique -> (type-constructor ref, [(field name, field type)])
   , miEnumVariants :: Map Unique [(Text, Resolved)]
     -- ^ enum type unique -> [(variant name, variant constructor ref)]
+  , miSynonyms     :: Map Unique ([Unique], Type' Resolved)
+    -- ^ synonym type unique -> (its parameters, its body)
   }
 
 -- | Flatten a module's own top-level + nested DECLAREs. Does not
@@ -372,6 +429,9 @@ buildModuleInfo :: [Declare Resolved] -> ModuleInfo
 buildModuleInfo decls = ModuleInfo
   { miRecords      = Map.fromList [ r | Just r <- map recordFor decls ]
   , miEnumVariants = Map.fromList [ r | Just r <- map enumFor   decls ]
+  , miSynonyms     = Map.fromList
+      [ (getUnique tyName, (map getUnique params, body))
+      | MkDeclare _ _ (MkAppForm _ tyName params _) (SynonymDecl _ body) <- decls ]
   }
   where
 
@@ -403,6 +463,52 @@ stripList :: Type' Resolved -> Maybe (Type' Resolved)
 stripList (TyApp _ name [inner]) | getUnique name == TypeCheck.listUnique = Just inner
 stripList _ = Nothing
 
+-- | A type with its synonyms expanded at the head, so that a synonym for MAYBE
+-- is a MAYBE when deciding what a missing or @null@ value means, and a synonym
+-- for a record or an enum is found. A synonym that takes parameters is expanded
+-- when every parameter is given.
+expandSyn :: ModuleInfo -> Type' Resolved -> Type' Resolved
+expandSyn mi = go (16 :: Int)
+  where
+    go 0 ty = ty
+    go n ty@(TyApp _ name args)
+      | Just (params, body) <- Map.lookup (getUnique name) mi.miSynonyms
+      , length params == length args =
+          go (n - 1) (subst (Map.fromList (zip params args)) body)
+      | otherwise = ty
+    go _ ty = ty
+    subst sub = \case
+      TyApp ann r []
+        | Just t <- Map.lookup (getUnique r) sub -> t
+        | otherwise -> TyApp ann r []
+      TyApp ann r ts -> TyApp ann r (map (subst sub) ts)
+      other -> other
+
+-- | The types of a function's inputs, with a synonym for a MAYBE at the head of
+-- a type replaced by the MAYBE it stands for. Any other type is left as written.
+--
+-- The generated wrapper decides from the head of an input's type whether the
+-- input may be left out or sent as @null@ ('Backend.CodeGen.isMaybeType'), and
+-- it does not expand a synonym. So an input declared through a synonym for a
+-- MAYBE was a required one: a @null@ for it, in a batch case or an MCP call, or
+-- a @{}@ value anywhere, was refused as a missing parameter. Expanding the head
+-- fixes that.
+--
+-- Every other kind of synonym is left as written. The JSON decoder expands a
+-- synonym itself ('L4.EvaluateLazy.Machine.expandTypeSynonyms'), which is why the
+-- wrapper answers a record, an enum or a DATE declared through one. It answers a
+-- LIST, a TIME, a DATETIME or a BOOLEAN declared through one because it leaves
+-- the synonym's name alone; expanding those here would break a LIST, a TIME and
+-- a DATETIME, which the wrapper fails when they are written out. Only the head of
+-- the type is looked at.
+maybeSynonymHeads :: [Declare Resolved] -> [(Text, Type' Resolved)] -> [(Text, Type' Resolved)]
+maybeSynonymHeads decls tys = [ (name, headOf ty) | (name, ty) <- tys ]
+  where
+    mi = buildModuleInfo decls
+    headOf ty = case expandSyn mi ty of
+      expanded | isJust (stripMaybe expanded) -> expanded
+      _                                        -> ty
+
 -- | Look up an enum or record type by unique.
 lookupEnum :: ModuleInfo -> Type' Resolved -> Maybe [(Text, Resolved)]
 lookupEnum mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miEnumVariants
@@ -424,7 +530,7 @@ fnLiteralToExprTyped
   -> Type' Resolved
   -> Maybe FnLiteral
   -> Either Text (Expr Resolved)
-fnLiteralToExprTyped mi ty mVal
+fnLiteralToExprTyped mi ty0 mVal
   -- MAYBE type: map missing / null / explicit NOTHING literal to NOTHING,
   -- anything else to JUST <recurse with inner type>.
   | Just inner <- stripMaybe ty =
@@ -441,6 +547,8 @@ fnLiteralToExprTyped mi ty mVal
       Just FnUnknown   -> Left "unknown value for a non-MAYBE parameter"
       Just FnUncertain -> Left "uncertain value is not supported in direct evaluation"
       Just v           -> nonMaybeValue mi ty v
+  where
+    ty = expandSyn mi ty0
 
 nonMaybeValue
   :: ModuleInfo
@@ -577,8 +685,9 @@ evaluateWithCompiledDeontic
   -> Bool
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext params startTime traceEvents mPartyType mActionType traceLevel includeGraphViz = do
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -595,7 +704,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz compiled.compiledModule
+      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode params traceLevel includeGraphViz compiled.compiledModule
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -731,8 +840,9 @@ evaluateWithWrapper
   -> ExceptT EvaluatorError IO ResponseWithReason
 evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz = do
   -- Extract parameter types from the compiled function definition
-  let givenParamTypes = extractParamTypes compiled.compiledDecide
-      assumeParamTypes = extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide
+  let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
+      assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
+        (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params
@@ -751,7 +861,7 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [Eval.MkEvalDirectiveResult{result, trace}] ->
-      handleEvalResult compiled.compiledEntityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz compiled.compiledModule
+      handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode params traceLevel includeGraphViz compiled.compiledModule
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -849,58 +959,107 @@ fnLiteralToJson = \case
   FnUncertain -> Aeson.Null
   FnUnknown -> Aeson.Null
 
--- | Handle evaluation result, checking for decode failure sentinel
+-- | Handle the result of a generated wrapper.
+--
+-- The wrapper answers @JUST answer@, or @NOTHING@ when it could not call the
+-- function (see 'AnswerShape'). That envelope is taken apart here, at the
+-- 'Eval.Value' level, and the answer inside it is then handled exactly as the
+-- direct path handles its own, by 'handleEvalResultDirect'. Taking it apart
+-- after conversion does not work: 'valueToFnLiteral' dissolves every @JUST@,
+-- the envelope's included, so @JUST NOTHING@ arrived as no value at all and
+-- @JUST (LIST x)@ as a one-element list that was then unwrapped to @x@
+-- (smucclaw/l4-ide#1003).
+--
+-- So a top-level answer that converts to 'FnUnknown' is returned as @null@
+-- with status 200, as on the direct path. Before the fix for #1003 this
+-- path's handler refused it with "Evaluation produced unknown value";
+-- dropping that refusal is deliberate.
+-- 'FnUnknown' at the top level is now @NOTHING@ or @JUST NOTHING@, which are
+-- answers: refusing it here would refuse on this path an answer the direct
+-- path gives. "Could not compute" does not arrive as @null@ on either path:
+-- an evaluation that fails is a @Reduction (Left _)@ and is refused. Nor can
+-- the top-level value be the evaluator's 'Eval.Omitted' truncation marker:
+-- 'Eval.nf' starts at depth 'maximumStackSize' (200) and marks 'Eval.Omitted'
+-- only below depth 0, so the direct path's answer is read at depth 200 and
+-- this path's, one level inside the envelope, at 199. 'Eval.Omitted' appears
+-- only nested, as the @null@s that end a list answer cut short at the README's
+-- limit on list answers.
 handleEvalResult
   :: EntityInfo
   -> Eval.EvalDirectiveValue
   -> Maybe EvalTrace
-  -> Text
+  -> Text  -- ^ the function's name, for a NOTHING no input explains
+  -> GeneratedCode
+  -> [(Text, Maybe FnLiteral)]  -- ^ the request's inputs, to say why a NOTHING came back
   -> TraceLevel
   -> Bool
   -> Module Resolved
   -> ExceptT EvaluatorError IO ResponseWithReason
-handleEvalResult ei result trace _sentinel traceLevel includeGraphViz mModule = case result of
-  Eval.Assertion _ -> throwError $ InterpreterError "L4: Got an assertion instead of a normal result."
-  Eval.Reduction (Left evalExc) -> throwError $ InterpreterError $ Text.unlines (Eval.prettyEvalException evalExc)
-  Eval.Reduction (Right val) -> do
-    r <- nfToFnLiteral ei val
-    -- Check if the result is NOTHING (decode failure from LEFT error) or JUST value
-    actualResult <- case r of
-      -- If result is FnUnknown, it means evaluation produced undefined/unknown
-      FnUnknown ->
-        throwError $ InterpreterError "Evaluation produced unknown value"
-      -- If result is NOTHING constructor, it means JSONDECODE returned LEFT (JSON decode failed)
-      FnObject [("NOTHING", _)] ->
-        throwError $ InterpreterError "JSON decoding failed: input does not match expected schema"
-      -- If result is JUST x (wrapper returns JUST when JSONDECODE returns RIGHT)
-      FnObject [("JUST", FnArray [val'])] ->
-        pure val'
-      FnObject [("JUST", FnObject [(_fieldName, val')])] ->
-        pure val'
-      -- For backwards compatibility, if result is an array with one element
-      FnArray [val'] ->
-        pure val'
-      -- For any other result, return as-is
-      _ ->
-        pure r
+handleEvalResult ei result trace fnName genCode params traceLevel includeGraphViz mModule = do
+  answer <- case (genCode.answerShape, result) of
+    (WrappedInJust, Eval.Reduction (Right envelope)) ->
+      Eval.Reduction . Right <$> openEnvelope envelope
+    _ -> pure result
+  handleEvalResultDirect ei answer trace traceLevel includeGraphViz mModule
+  where
+    openEnvelope = \case
+      Eval.MkNF (Eval.ValConstructor con [inner])
+        | getUnique con == TypeCheck.justUnique -> pure inner
+      Eval.MkNF (Eval.ValConstructor con [])
+        | getUnique con == TypeCheck.nothingUnique -> throwError (wrapperDeclined fnName genCode params)
+      _ -> throwError $ InterpreterError "L4: the generated wrapper answered neither JUST nor NOTHING."
 
-    pure $ ResponseWithReason
-      { fnResult = Map.singleton "value" actualResult
-      , reasoning = case traceLevel of
-          TraceNone -> emptyTree
-          TraceFull -> buildReasoningTree trace
-      , graphviz =
-          if includeGraphViz && traceLevel == TraceFull
-            then
-              fmap
-                ( \tr ->
-                    GraphVizResponse
-                      { dot = GraphViz.traceToGraphViz GraphViz.defaultGraphVizOptions (Just mModule) tr
-                      }
-                )
-                trace
-            else Nothing
-      }
+-- | Why a wrapper answered NOTHING. It does so without calling the function
+-- for one of the two reasons given at 'requiredInputs': a required input is
+-- absent, which here means left out, @null@ or @{}@; or a required DATE, TIME
+-- or DATETIME string does not parse. A value of the wrong JSON type is not
+-- one of them: it stops JSONDECODE with an error of its own. An absent input
+-- is reported with the message the direct path gives for it. When both happen,
+-- the absent input is named, though the wrapper may have stopped earlier, at
+-- a string it could not parse.
+wrapperDeclined :: Text -> GeneratedCode -> [(Text, Maybe FnLiteral)] -> EvaluatorError
+wrapperDeclined fnName genCode params = InterpreterError $
+  case (filter (absent . valueOf) required, if null failing then unparsed else failing) of
+    (input : _, _) -> label input <> ": missing required parameter"
+    ([], [(input, ty, s)]) -> label input <> ": could not read " <> Text.textShow s <> " as a " <> ty
+    ([], candidates@(_ : _)) ->
+      "One of these inputs could not be read: "
+        <> Text.intercalate ", " [ label input <> " as a " <> ty | (input, ty, _) <- candidates ]
+    -- Defensive: no request is known to reach this. A wrapper answers NOTHING
+    -- only for a required input that is absent or a temporal string it cannot
+    -- parse, and both are caught above; a value of the wrong JSON type stops
+    -- JSONDECODE with an error of its own before the envelope is read. No
+    -- test pins this message.
+    ([], []) ->
+      "L4: the generated wrapper did not call '" <> fnName
+        <> "', and no input explains why. The inputs it checked: "
+        <> (if null required then "none" else Text.intercalate ", " (map label required))
+        <> "."
+  where
+    required = genCode.requiredInputs
+    valueOf input = join (lookup input.inputName params)
+    unparsed =
+      [ (input, ty, s)
+      | input <- required, Just ty <- [input.parsedAs], Just (FnLitString s) <- [valueOf input] ]
+    -- The wrapper's own parsers, those of TODATE, TOTIME and TODATETIME, pick
+    -- out the string that failed. The direct path's ISO parsers are stricter
+    -- ("2026/01/31" is a DATE to TODATE and not to parseIsoDate), so with two
+    -- such inputs they could blame one the wrapper had read.
+    failing = [ c | c@(_, ty, s) <- unparsed, not (parses ty s) ]
+    parses = \case
+      "DATE"     -> isJust . parseDateText
+      "TIME"     -> isJust . parseTimeText
+      "DATETIME" -> isJust . parseDatetimeText
+      _          -> const False
+    -- the direct path's labels ('evaluateDirectAST')
+    label input
+      | input.isRuleGiven = "Parameter '" <> input.inputName <> "'"
+      | otherwise = "ASSUME '" <> input.inputName <> "'"
+    absent = \case
+      Nothing          -> True
+      Just FnUnknown   -> True
+      Just FnUncertain -> True
+      Just _           -> False
 
 createFunction ::
   FilePath ->
@@ -934,10 +1093,17 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                   Nothing -> throwError $ InterpreterError (mconcat initErrs)
                   Just tcRes -> pure tcRes
 
-                -- 2. Get function definition and extract parameter types
+                -- 2. Get function definition and extract parameter types.
+                -- The entry module's own declarations are all this path has, as in
+                -- precompileModule's single-file fallback. It runs only after
+                -- precompileModule failed, and that fails only where typecheckModule
+                -- or getFunctionDefinition does (buildImportEnvironment falls back
+                -- to an empty environment instead). Both are repeated here with the
+                -- same arguments, so a request stops before it reaches the wrapper.
                 funDecide <- getFunctionDefinition funRawName tcRes.module'
-                let givenParamTypes = extractParamTypes funDecide
-                    assumeParamTypes = extractAssumeParamTypes tcRes.module' funDecide
+                let givenParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module') (extractParamTypes funDecide)
+                    assumeParamTypes = maybeSynonymHeads (moduleDeclaresOnly tcRes.module')
+                      (extractAssumeParamTypes tcRes.module' funDecide)
 
                 -- 3. Filter IDE directives from the original source text
                 -- L4 is layout-sensitive, so we must preserve the original formatting
@@ -961,7 +1127,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                 case mEvalRes of
                   Nothing -> throwError $ InterpreterError (mconcat errs)
                   Just [Eval.MkEvalDirectiveResult{result, trace}] ->
-                    handleEvalResult tcRes.entityInfo result trace genCode.decodeFailedSentinel traceLevel includeGraphViz tcRes.module'
+                    handleEvalResult tcRes.entityInfo result trace fnDecl.name genCode params' traceLevel includeGraphViz tcRes.module'
                   Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
                   Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
             }
@@ -1028,11 +1194,12 @@ buildImportEnvironment filepath source moduleContext _entityInfo = do
   fixedNow <- Eval.readFixedNowEnv
   evalConfig <- Eval.resolveEvalConfig fixedNow apiDefaultPolicy
 
-  result <- oneshotL4ActionAndErrors evalConfig filepath $ \nfp -> do
+  result <- oneshotL4ActionAndErrorsIn bundleScope evalConfig filepath $ \nfp -> do
     let uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1083,7 +1250,7 @@ valueToFnLiteral ei = \case
   Eval.ValPartialTernary2{} -> throwError $ InterpreterError "#EVAL produced partial closure."
   -- Deontic values: serialize as structured JSON objects
   Eval.ValObligation _env party action due _followup _lest -> do
-    partyLit <- serializeEitherValue ei party
+    partyLit <- serializeParty ei party
     let actionLit = serializeRAction action
     dueLit <- serializeDue ei due
     pure $ FnObject
@@ -1112,17 +1279,34 @@ valueToFnLiteral ei = \case
   Eval.ValEnvironment{} -> throwError $ InterpreterError "#EVAL produced environment."
   Eval.ValUnappliedConstructor name ->
     pure $ FnLitString $ prettyLayout name
+  -- NOTHING is the absence of a value, and JSON spells that null.
+  -- Emitting the string "NOTHING" made an optional field's empty case
+  -- indistinguishable from a genuine string answer, and made
+  -- `MAYBE NUMBER` unusable for exactly the job it is for: saying that
+  -- a limit does not apply without naming a number that could be
+  -- mistaken for one.
+  --
+  -- NOTHING and JUST are recognised by their uniques, not their names: a
+  -- rule may declare its own constructor called @Nothing@ or @Just@, and
+  -- that is an answer, not the absence of one.
+  Eval.ValConstructor resolved []
+    | getUnique resolved == TypeCheck.nothingUnique -> pure FnUnknown
   Eval.ValConstructor resolved [] ->
     -- Special case boolean constructors (preserve original casing for others)
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
      in case Text.toUpper name of
           "TRUE" -> pure $ FnLitBool True
           "FALSE" -> pure $ FnLitBool False
           -- Other nullary constructors become strings (original casing preserved)
           _ -> pure $ FnLitString name
+  -- JUST x is x. The Maybe wrapper is L4's, not the caller's, and wrapping it
+  -- in an object would make every optional field a tagged union the client has
+  -- to unwrap.
+  Eval.ValConstructor resolved [v]
+    | getUnique resolved == TypeCheck.justUnique -> nfToFnLiteral ei v
   Eval.ValConstructor resolved vals -> do
     lits <- traverse (nfToFnLiteral ei) vals
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
         fieldNames = lookupFieldNames ei resolved
     pure $ case fieldNames of
       Just names | length names == length lits ->
@@ -1137,6 +1321,23 @@ valueToFnLiteral ei = \case
           ]
   Eval.ValAssumed var ->
     throwError $ InterpreterError $ "#EVAL produced ASSUME: " <> prettyLayout var
+
+-- | A constructor's name, as a JSON payload should carry it.
+--
+-- NOT 'prettyLayout': that renders a 'Name' as L4 /source/, so an identifier
+-- with spaces in it comes back backtick-quoted — and this value is compared by
+-- clients against the @enum@ the service itself declared in its
+-- @returnSchema@, which is built by 'L4.FunctionSchema.resolvedNameText' and
+-- carries no backticks. So the service was handing out a schema and then
+-- returning values that fail it: declared
+-- @\"financial statements reviewed by an independent public accountant\"@,
+-- returned
+-- @\"\`financial statements reviewed by an independent public accountant\`\"@.
+--
+-- 'getActual' rather than 'getOriginal', matching 'L4.FunctionSchema', so that
+-- the two agree by construction rather than by coincidence.
+constructorText :: Resolved -> Text
+constructorText = rawNameToText . rawName . getActual
 
 -- | Look up field names for a constructor from the EntityInfo.
 -- Returns 'Just' field names if the constructor has named fields, 'Nothing' otherwise.
@@ -1196,13 +1397,54 @@ serializeRAction (MkAction _ deonticModal pat _) =
         DMay     -> "MAY"
         DMustNot -> "SHANT"
         DDo      -> "DO"
-    , actionPat = FnLitString (Print.prettyLayout pat)
+    , actionPat = FnLitString (actionText pat)
     }
 
--- | Serialize Either RExpr (Value NF) — used for obligation party and ROp operands
+-- | An action, as a JSON payload should carry it.
+--
+-- A bare action name is spelled as 'constructorText' spells it, without
+-- backticks. That is how the @eventAction@ of the event that answers the
+-- obligation is spelled, and how the README's "Answers" says an enum answer is
+-- spelled, so a client can compare them. A name the rule does not declare is a
+-- binder, a 'PatVar', which matches any event; it is a bare name all the same,
+-- and a space in it must not change how it is spelled. An action that carries a
+-- value, a string say, is rule source, and stays 'Print.prettyLayout'; so does a
+-- pattern that is not a name at all (a 'PatExpr', say).
+actionText :: Pattern Resolved -> Text
+actionText = \ case
+  PatApp _ name [] -> constructorText name
+  PatVar _ name    -> constructorText name
+  pat              -> Print.prettyLayout pat
+
+-- | An obligation's party, as a JSON payload should carry it. A bare name is
+-- spelled as 'constructorText' spells it, as 'actionText' spells an action, and
+-- as the @eventParty@ of the event that answers the obligation is spelled; that
+-- includes a bare name that is not a constructor, a @GIVEN@ the party is read
+-- from say. A party expression that is more than a name, a record built
+-- @WITH@ fields, is rule source.
+--
+-- The name is the identifier, not the party it stands for: @PARTY seller@ with
+-- @seller MEANS ...@, or with @seller@ a @GIVEN@, answers @seller@ until an
+-- event has been compared with it, so comparing that with an @eventParty@ is
+-- still false there.
+partyText :: Expr Resolved -> Text
+partyText = \ case
+  App _ name [] -> constructorText name
+  expr          -> Print.prettyLayout expr
+
+-- | Serialize Either RExpr (Value NF) — used for ROp operands
 serializeEitherValue :: (Monad m) => EntityInfo -> Either (Expr Resolved) (Eval.Value Eval.NF) -> ExceptT EvaluatorError m FnLiteral
 serializeEitherValue _  (Left expr)  = pure $ FnLitString (Print.prettyLayout expr)
 serializeEitherValue ei (Right val)  = valueToFnLiteral ei val
+
+-- | Serialize the party of an obligation: an evaluated one is a value, and an
+-- unevaluated one is 'partyText'.
+--
+-- NOT 'serializeEitherValue', which is also how an unevaluated operand of
+-- @RAND@ \/ @ROR@ is printed, and that is a whole contract, not a name.
+serializeParty :: (Monad m) => EntityInfo -> Either (Expr Resolved) (Eval.Value Eval.NF) -> ExceptT EvaluatorError m FnLiteral
+serializeParty _  (Left expr) = pure $ FnLitString (partyText expr)
+serializeParty ei (Right val) = valueToFnLiteral ei val
 
 -- | Serialize the deadline/due field of an obligation
 serializeDue :: (Monad m) => EntityInfo -> Either (Maybe (Expr Resolved)) (Eval.Value Eval.NF) -> ExceptT EvaluatorError m FnLiteral
@@ -1246,12 +1488,13 @@ typecheckModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text]
 typecheckModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)
@@ -1265,12 +1508,13 @@ evaluateModule :: (MonadIO m) => FilePath -> Text -> ModuleContext -> m ([Text],
 evaluateModule file input moduleContext = do
   fixedNow <- liftIO Eval.readFixedNowEnv
   evalConfig <- liftIO $ Eval.resolveEvalConfig fixedNow apiDefaultPolicy
-  liftIO $ oneshotL4ActionAndErrors evalConfig file \nfp -> do
+  liftIO $ oneshotL4ActionAndErrorsIn bundleScope evalConfig file \nfp -> do
     let
       uri = normalizedFilePathToUri nfp
     -- Add all module files as virtual files for IMPORT resolution
-    -- Note: embedded libraries are resolved by the import resolver via
-    -- JL4_LIBRARY_PATH or Paths_jl4_core data-dir; no need to register
+    -- Note: embedded libraries are resolved by the import resolver's embedded
+    -- tier (the only library tier 'bundleScope' leaves), which
+    -- 'Shake.getVirtualFile' serves from a pure map; no need to register
     -- them as virtual files here.
     forM_ (Map.toList moduleContext) $ \(path, content) -> do
       let modulePath = toNormalizedFilePath ("./" <> path)

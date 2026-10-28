@@ -8,15 +8,13 @@ module L4.EvaluateLazy
 , EvalDirectiveResult (..)
 , EvalDirectiveValue(..)
 , EntityInfo
-, getTemporalContext
-, setTemporalContext
-, withEvalClauses
 , execEvalModuleWithEnv
 , execEvalModuleWithJSON
 , execEvalExprInContextOfModule
 , prettyEvalException
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, prettyAssertionOutcome
 )
 where
 
@@ -31,10 +29,10 @@ import L4.Annotation
 import L4.Print
 import L4.Syntax
 import L4.TypeCheck.Types (EntityInfo)
-import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext)
+import L4.TemporalContext (initialTemporalContext)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Exception (throwIO, try)
+import Control.Exception (try)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
@@ -76,20 +74,6 @@ readFixedNowEnv = do
   menv <- lookupEnv "JL4_FIXED_NOW"
   pure $ menv >>= parseFixedNow . Text.pack
 
--- | The previous temporal context is restored afterwards.
-setTemporalContext :: TemporalContext -> Eval ()
-setTemporalContext = putTemporalContext
-
--- | Apply runtime EVAL clauses for the duration of an action,
--- restoring the previous temporal context afterwards.
-withEvalClauses :: [EvalClause] -> Eval a -> Eval a
-withEvalClauses clauses action = do
-  original <- getTemporalContext
-  setTemporalContext (applyEvalClauses clauses original)
-  result <- tryEval action
-  setTemporalContext original
-  either (liftIO . throwIO) pure result
-
 -- | For the given eval action, enable tracing and accumulate a trace.
 --
 -- We try to make it so that in principle, nested calls to `captureTrace`
@@ -114,8 +98,8 @@ runConfig = \ case
     traceEval (Enter expr)
     next <- forwardExpr env expr
     runConfig next
-  MatchBranchesMachine scrutinee env branches -> do
-    next <- matchBranches scrutinee env branches
+  MatchBranchesMachine clauses scrutinee env branches -> do
+    next <- matchBranches clauses scrutinee env branches
     runConfig next
   MatchPatternMachine r env pat -> do
     next <- matchPattern r env pat
@@ -150,8 +134,20 @@ nfDirective (MkEvalDirective r traced isAssert expr env) = do
       if isAssert
         then Assertion
           case v of
-            Right (MkNF (ValBool True)) -> True
-            _                           -> False
+            -- An assertion whose expression RAISED is neither satisfied nor
+            -- failed: the evaluator could not decide it. Collapsing the
+            -- exception into 'False' made '#ASSERT P' and '#ASSERT NOT P'
+            -- both report "assertion failed" whenever P raised, so a test
+            -- suite could not tell a wrong answer from an error.
+            Left exc                    -> Left exc
+            Right (MkNF (ValBool True)) -> Right True
+            -- A result that is a bare assumed term did not raise, but it is
+            -- no verdict either — neither TRUE nor FALSE. Report it exactly as
+            -- the raising polarity does ('#ASSERT NOT b' forces b and raises
+            -- 'Stuck'), so both polarities of an '#ASSERT' on an assumed
+            -- BOOLEAN agree instead of one of them collapsing to "failed".
+            Right (MkNF (ValAssumed a)) -> Left (UserEvalException (Stuck a))
+            Right _                     -> Right False
         else Reduction v
   pure (MkEvalDirectiveResult r v' finalTrace)
 
@@ -180,16 +176,28 @@ data EvalDirectiveResult =
   deriving anyclass NFData
 
 data EvalDirectiveValue =
-    Assertion Bool
+    Assertion (Either EvalException Bool)
+    -- ^ @#ASSERT@: 'Right' is the verdict. 'Left' means the expression raised
+    -- before it could be decided — a distinct outcome from @Right False@,
+    -- and every consumer must render it as such.
   | Reduction (Either EvalException NF)
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
 prettyEvalDirectiveValue :: EvalDirectiveValue -> Text
-prettyEvalDirectiveValue (Assertion True)       = "assertion satisfied"
-prettyEvalDirectiveValue (Assertion False)      = "assertion failed"
+prettyEvalDirectiveValue (Assertion a)          = prettyAssertionOutcome a
 prettyEvalDirectiveValue (Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValue (Reduction (Right v))  = prettyLayout v
+
+-- | The three outcomes of an @#ASSERT@, as the user sees them. The exception
+-- case keeps the exception's own lines verbatim under a header, so the reason
+-- (division by zero, an assumed term, a CONSIDER with no matching branch, …)
+-- is never lost. Every surface that renders an assertion goes through here.
+prettyAssertionOutcome :: Either EvalException Bool -> Text
+prettyAssertionOutcome (Right True)  = "assertion satisfied"
+prettyAssertionOutcome (Right False) = "assertion failed"
+prettyAssertionOutcome (Left exc)    =
+  Text.unlines ("assertion could not be evaluated:" : prettyEvalException exc)
 
 -- | Prints the results but not the range of an eval directive, including
 -- the trace if present.
@@ -221,9 +229,16 @@ instance Aeson.ToJSON EvalDirectiveResult where
     ]
 
 instance Aeson.ToJSON EvalDirectiveValue where
-  toJSON (Assertion b) = Aeson.object
+  toJSON (Assertion (Right b)) = Aeson.object
     [ "type"  Aeson..= ("assertion" :: Text)
     , "value" Aeson..= b
+    ]
+  -- Still an assertion (consumers counting them must see it), with a value
+  -- that is neither true nor false, and the reason alongside.
+  toJSON (Assertion (Left exc)) = Aeson.object
+    [ "type"  Aeson..= ("assertion" :: Text)
+    , "value" Aeson..= Aeson.Null
+    , "error" Aeson..= prettyAssertionOutcome (Left exc)
     ]
   toJSON (Reduction (Right val)) = Aeson.toJSON val
   toJSON (Reduction (Left exc)) = Aeson.object
@@ -231,8 +246,7 @@ instance Aeson.ToJSON EvalDirectiveValue where
     ]
 
 prettyEvalDirectiveValueWithFields :: ConstructorFieldNames -> EvalDirectiveValue -> Text
-prettyEvalDirectiveValueWithFields _fields (Assertion True)        = "assertion satisfied"
-prettyEvalDirectiveValueWithFields _fields (Assertion False)       = "assertion failed"
+prettyEvalDirectiveValueWithFields _fields (Assertion a)           = prettyAssertionOutcome a
 prettyEvalDirectiveValueWithFields _fields (Reduction (Left exc))  = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValueWithFields fields  (Reduction (Right v))   = prettyLayoutNF fields v
 

@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Gebühr für eine Änderung des Antrags — in Euro",
+    "properties": {
+        "Zahl der Änderungen": {
+            "$ref": "#/$defs/NUMBER",
+            "description": " Wie oft der Antrag geändert wurde"
+        }
+    },
+    "required": [
+        "Zahl der Änderungen"
+    ],
+    "title": "Gebühr für",
+    "type": "object"
+}

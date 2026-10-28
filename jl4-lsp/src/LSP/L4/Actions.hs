@@ -11,6 +11,7 @@ import qualified Data.Aeson as Aeson
 import Data.Char (isAlphaNum)
 import qualified Data.List as List
 import Data.Ord (Down (..))
+import GHC.Generics (Generically (..))
 import Data.Text.Mixed.Rope (Rope)
 import qualified Data.Text.Mixed.Rope as Rope
 import qualified Text.Fuzzy as Fuzzy
@@ -29,6 +30,7 @@ import qualified L4.Utils.IntervalMap as IV
 import LSP.Core.PositionMapping
 import LSP.Core.Shake
 import LSP.L4.Rules
+import LSP.L4.SemanticTokens (srcPosToPosition)
 
 import qualified LSP.L4.Viz.Ladder as Ladder
 import qualified LSP.L4.Viz.VizExpr as Ladder
@@ -139,8 +141,8 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
   where
     evalResultToLadderEvalAppResult :: EL.EvalDirectiveResult -> ExceptT (TResponseError method) m EvalAppResult
     evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace) = case res of
-      EL.Assertion True  -> pure $ EvalAppResult (toUBoolValue True)
-      EL.Assertion False -> pure $ EvalAppResult (toUBoolValue False)
+      EL.Assertion (Right b)  -> pure $ EvalAppResult (toUBoolValue b)
+      EL.Assertion (Left err) -> defaultResponseError $ EL.prettyAssertionOutcome (Left err)
       EL.Reduction v ->
         case v of
           Right (EL.MkNF val) ->
@@ -273,6 +275,24 @@ decideNodeStartsAtPos pos d = Just pos == do
 -- LSP Code Actions
 -- ----------------------------------------------------------------------------
 
+-- | The inputs of a definition that the outline lists: the ones the drafter
+-- wrote. The desugarer of a multi-clause definition names the inputs a GIVEN
+-- does not ('L4.Parser.generatedName'), and the outline leaves those out.
+-- Here rather than in the document-symbol handler, which the tests cannot
+-- reach (@jl4-lsp\/app@).
+outlineGivenParams :: [OptionallyTypedName Resolved] -> [OptionallyTypedName Resolved]
+outlineGivenParams = filter \ (MkOptionallyTypedName _ pn _) ->
+  not (isGeneratedName (rawName (getOriginal pn)))
+
+-- | The local definitions of a body that the outline lists. The bindings a
+-- multi-clause definition is compiled to ('PmSynthetic') are not things the
+-- drafter wrote, so they are left out.
+outlineLocals :: Expr Resolved -> [LocalDecl Resolved]
+outlineLocals = \ case
+  Where _ _ locals -> filter (not . isClausesBinding) locals
+  LetIn _ locals _ -> filter (not . isClausesBinding) locals
+  _                -> []
+
 completions :: Rope -> NormalizedUri -> TypeCheckResult -> Position -> [CompletionItem]
 completions rope nuri typeCheck pos@(Position ln col) = do
   let textBeforeCursor =
@@ -324,9 +344,13 @@ completions rope nuri typeCheck pos@(Position ln col) = do
 
       keywordItems = map mkKeyWordCompletionItem keyWordMatches
 
-      -- NOTE: combine toplevel check info and info brought in scope
+      -- NOTE: combine toplevel check info and info brought in scope. A name
+      -- the compiler made up (the inputs and clause bindings of a multi-clause
+      -- definition, and the second spelling of a GIVEN input it reads them
+      -- by) cannot be written in source, so it is never offered.
       finalCheckInfos
-        = Map.unionsWith (\a b -> nub $ a <> b)
+        = Map.filterWithKey (\name _ -> not (isGeneratedName name))
+        $ Map.unionsWith (\a b -> nub $ a <> b)
         $ map (uncurry combineEnvironmentEntityInfo)
         $ (typeCheck.environment, typeCheck.entityInfo)
             : map snd (IV.search (lspPositionToSrcPos pos) typeCheck.scopeMap)
@@ -389,7 +413,12 @@ infoToHover nuri subst r i mNlg mDesc =
     x =
       case i of
         TypeInfo t _ ->
-          mdCodeBlock (prettyLayout (applyFinalSubstitution subst nuri t)) <>
+          -- Render the type via 'prettyTypeForDisplay' (not raw 'prettyLayout') so
+          -- residual inference variables — e.g. an un-annotated lambda parameter,
+          -- whose 'InfVar' prints @rawName <> uniq@ like @x10@ — are normalised to
+          -- stable names (@a@, @b@, …). This also makes hover consistent with the
+          -- deployed schema's @returnType@, which already uses this renderer. See smucclaw/l4-ide#313.
+          mdCodeBlock (prettyTypeForDisplay (applyFinalSubstitution subst nuri t)) <>
             case mNlg of
               Nothing -> mempty
               Just nlg -> mdSeparator <> mdCodeBlock (simpleLinearizer nlg)
@@ -420,3 +449,48 @@ typeFunction :: Kind -> Type' Resolved
 typeFunction 0 = Type emptyAnno
 typeFunction n | n > 0 = Fun emptyAnno (replicate n (MkOptionallyNamedType emptyAnno Nothing (Type emptyAnno))) (Type emptyAnno)
 typeFunction _ = error "Internal error: negative arity of type constructor"
+
+-- ----------------------------------------------------------------------------
+-- Code lenses above DECIDEs
+-- ----------------------------------------------------------------------------
+
+-- | The ladder's lens: "Show decision graph" above every top-level @DECIDE@
+-- the visualiser can draw. The gate is speculative (each candidate is
+-- actually visualised and kept only if that succeeds) because there are many
+-- @DECIDE@/@MEANS@ shapes the visualiser does not handle yet, and a lens that
+-- fails when clicked is worse than none. If this is ever too slow the fix is
+-- to cache, or better, to make the visualiser accept more.
+--
+-- One refusal keeps its lens: a rule written as DECIDE clauses that is too
+-- large to draw. Its drafter has done nothing wrong, and a lens that silently
+-- went missing would not say why, so the lens's title says it, and clicking it
+-- answers with the whole message.
+decisionGraphCodeLenses :: VersionedTextDocumentIdentifier -> TypeCheckResult -> [CodeLens]
+decisionGraphCodeLenses verTextDocId typeCheck =
+  foldTopLevelDecides decideToCodeLens typeCheck.module'
+  where
+    mkDecisionGraphCodeLens title srcPos = CodeLens
+      { _command = Just Command
+        { _title = title
+        , _command = "l4.visualize"
+        , _arguments = Just [Aeson.toJSON verTextDocId, Aeson.toJSON (Generically srcPos), Aeson.toJSON False]
+        }
+      , _range = pointRange $ srcPosToPosition srcPos
+      , _data_ = Nothing
+      }
+
+    -- Without simplification: simplification is a toggle inside the panel.
+    lensTitle decide =
+      let cfg = Ladder.mkVizConfig verTextDocId typeCheck.module' typeCheck.substitution False
+      in case Ladder.doVisualize decide cfg of
+           Right _ -> Just "Show decision graph"
+           Left (Ladder.ClauseGroupTooLarge budget) ->
+             Just ("No decision graph: these clauses would draw more than " <> Text.pack (show budget) <> " boxes")
+           Left (Ladder.ClauseGroupTooLong _) ->
+             Just "No decision graph: these clauses are too long to draw"
+           Left _ -> Nothing
+
+    decideToCodeLens decide =
+      case (rangeOfNode decide, lensTitle decide) of
+        (Just node, Just title) -> [mkDecisionGraphCodeLens title node.start]
+        _ -> []
