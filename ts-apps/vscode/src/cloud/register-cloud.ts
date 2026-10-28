@@ -306,18 +306,8 @@ export function registerCloudHandlers(deps: {
 
   messenger.onRequest(AiCloudDelete, ({ sessionId }) =>
     guard('delete', async () => {
-      try {
-        await manager.delete(sessionId)
-      } catch (err) {
-        if (err instanceof SessionsApiError && err.code === 'stopping') {
-          return {
-            ok: false,
-            error:
-              'The cloud session is stopping. Delete it again in a minute.',
-          }
-        }
-        throw err
-      }
+      // 204 at once, also while the task still runs (cleaned up later).
+      await manager.delete(sessionId)
       const cached = storage.get<AiCloudSessionSummary[]>(LIST_CACHE_KEY) ?? []
       await storage.update(
         LIST_CACHE_KEY,
