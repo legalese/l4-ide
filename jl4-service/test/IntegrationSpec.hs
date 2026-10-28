@@ -1671,6 +1671,7 @@ spec = describe "integration" do
             , ("maybe an event", Aeson.object [ "yes" Aeson..= True ])
             , ("the event at", Aeson.object [ "who" Aeson..= ("Seller" :: Text), "hour" Aeson..= Aeson.Null ])
             , ("the event at", Aeson.object [ "who" Aeson..= ("Buyer" :: Text), "hour" Aeson..= Aeson.object [] ])
+            , ("a waiting event", Aeson.object [ "moment" Aeson..= (4 :: Int) ])
             ] :: [(Text, Aeson.Value)]
       forM_ [Direct, Batch, Mcp] \door -> do
         it ("describes each event answer of " <> doorName door) do
@@ -4233,8 +4234,9 @@ undescribed = go "answer"
       (ty, _) -> [ here <> ": the schema says " <> show ty <> " and the answer is " <> show v ]
   go here s _ = [ here <> ": the schema node is not an object: " <> show s ]
 
--- | Five exported rules that give back an event: one, a list of them, a MAYBE
--- of one, a record with one in a field, and one whose input may be left out.
+-- | Six exported rules that give back an event: one, a list of them, a MAYBE
+-- of one, a record with one in a field, one whose input may be left out, and
+-- one made by @WAITUNTIL@, whose party and action are placeholders.
 eventAnswerJL4 :: Text
 eventAnswerJL4 = Text.unlines
   [ "DECLARE Person IS ONE OF Seller, Buyer"
@@ -4264,6 +4266,11 @@ eventAnswerJL4 = Text.unlines
   , "GIVEN who IS A Person"
   , "GIVETH A Report"
   , "`a report` who MEANS Report WITH label IS \"x\", happened IS EVENT who payment 9"
+  , ""
+  , "@export A waiting event"
+  , "GIVEN moment IS A NUMBER"
+  , "GIVETH AN EVENT Person Action"
+  , "`a waiting event` moment MEANS WAITUNTIL moment"
   , ""
   , "@export The event at an hour that may be missing"
   , "GIVEN who IS A Person"

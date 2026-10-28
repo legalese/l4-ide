@@ -22,7 +22,7 @@ import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
 import L4.Syntax
-import L4.TypeCheck.Environment (contractUnique, eventCName, eventUnique, maybeUnique)
+import L4.TypeCheck.Environment (contractUnique, eventCName, eventUnique, maybeUnique, neverMatchesActName, neverMatchesPartyName)
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -254,6 +254,13 @@ typeToParameter declares visited ty =
 -- and the schema lists them by position too. The party and the action carry
 -- the descriptions of the events input of a rule whose answer is written
 -- @DEONTIC@.
+--
+-- @WAITUNTIL@ builds an event whose party and action are the evaluator's two
+-- placeholders, which match nothing, and an answer holds their names. A
+-- position that lists the constructors of its type therefore lists the
+-- placeholder too, so that the answer of a rule that returns a waiting event
+-- is valid against the schema. A position of another type is unchanged: see
+-- the README of jl4-service for the events it does not describe.
 eventParameter :: Parameter -> Parameter -> Parameter
 eventParameter party action =
   (emptyParameter "object")
@@ -268,11 +275,15 @@ eventParameter party action =
       { parameterDescription = "The party, the action and the time of the event"
       , parameterPrefixItems =
           Just
-            [ party {parameterDescription = "The party performing the action"}
-            , action {parameterDescription = "The action performed"}
+            [ (listsWaiting neverMatchesPartyName party) {parameterDescription = "The party performing the action"}
+            , (listsWaiting neverMatchesActName action) {parameterDescription = "The action performed"}
             , (emptyParameter "number") {parameterDescription = "The time of the event"}
             ]
       }
+  listsWaiting :: Name -> Parameter -> Parameter
+  listsWaiting placeholder p
+    | null p.parameterEnum = p
+    | otherwise = p {parameterEnum = p.parameterEnum <> [rawNameToText (rawName placeholder)]}
 
 -- | The @returnSchema@ that jl4-service and the editor publish for an exported
 -- rule that gives back a value of this type. A rule whose answer is written

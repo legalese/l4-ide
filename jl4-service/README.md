@@ -193,9 +193,8 @@ The function's published `returnSchema` does not describe every one of these sha
 It gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
 It gives an enum as a string with the enum's names, so it does not describe a constructor that holds fields, answered as an object keyed by its name, `{"pay": {"amount": 100}}`, or a constructor named `TRUE` or `FALSE`.
 It gives an event as an object with one required key, `EVENT`, whose array has three items under `prefixItems`, in order: the schema of the party's type, the schema of the action's type, and a number.
-So it does not describe an event whose party or action is a record, `NOTHING`, a constructor that holds fields, or a constructor named `TRUE` or `FALSE`.
-An event made by `WAITUNTIL` has the party `"NEVERMATCHESPARTY"` and the action `"NEVERMATCHESACT"`, whatever their types.
-Those two strings match the schema of a party or an action of type `STRING`, but the schema of an enum lists only the enum's own names.
+When the party's or the action's type is an enum, its list of names includes the name that an event made by `WAITUNTIL` has in that place, so that such an event is described.
+So it does not describe an event whose party or action is a record, `NOTHING`, a constructor that holds fields, or a constructor named `TRUE` or `FALSE`, and it does not describe an event made by `WAITUNTIL` whose party or action is of a type other than a string or an enum.
 
 #### Missing inputs
 
