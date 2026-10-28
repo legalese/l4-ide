@@ -94,7 +94,6 @@ describe('KeyChainAuth', () => {
   for (const [status, error] of [
     [403, 'not_a_member'],
     [403, 'forbidden'],
-    [429, undefined],
   ] as const) {
     test(`${status} ${error ?? '(no body)'} ends the chain as invalid_key, without retrying`, async () => {
       const ended: ChainEnded[] = []
@@ -105,6 +104,18 @@ describe('KeyChainAuth', () => {
       assert.deepEqual(ended, [{ reason: 'invalid_key', fromServer: true }])
     })
   }
+
+  test('retries a 429 like a server error', async () => {
+    const ended: ChainEnded[] = []
+    const proxy = authProxy([
+      { status: 429, body: undefined },
+      { status: 401, body: { error: 'invalid_key' } },
+    ])
+    const auth = chain(proxy.fetch, (e) => ended.push(e))
+    assert.equal(await auth.start(), false)
+    assert.equal(proxy.calls.length, 2)
+    assert.deepEqual(ended, [{ reason: 'invalid_key', fromServer: true }])
+  })
 
   test('retries 502 upstream_unavailable; a deleted key then ends as invalid_key', async () => {
     const ended: ChainEnded[] = []

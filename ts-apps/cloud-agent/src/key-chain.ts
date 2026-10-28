@@ -50,7 +50,7 @@ const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000]
  *   `403 chain_expired` and `409 chain_forked` keep their reason; any
  *   other (`403 not_a_member`, `403 forbidden`, …) ends it as
  *   `invalid_key`.
- * - 5xx (`502 upstream_unavailable`), network errors and a 200 that
+ * - 5xx (`502 upstream_unavailable`), 429, network errors and a 200 that
  *   doesn't parse are retried with backoff (`retryDelaysMs`, five tries
  *   over about a minute by default), each only if it starts before the
  *   key expires. When the retries run out, or the key would expire
@@ -243,8 +243,9 @@ export class KeyChainAuth implements AuthProvider {
       this.expiresAt = parsed.value.expiresAt
       return 'ok'
     }
-    if (res.status >= 500) {
-      // 502 upstream_unavailable and other server errors: retry.
+    if (res.status >= 500 || res.status === 429) {
+      // 502 upstream_unavailable, other server errors, and rate limiting
+      // (e.g. the firewall in front of legalese.cloud): retry.
       this.opts.logger.warn(`agent key renewal failed: ${res.status}`)
       return 'retry'
     }
