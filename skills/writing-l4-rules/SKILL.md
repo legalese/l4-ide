@@ -319,11 +319,8 @@ on an exported function: GIVENs can't be passed over JSON, and function-typed
 ASSUMEs stay uninterpreted at runtime (any call fails with a stuck
 "assumed term" error). The typechecker and `jl4-service` deploy both reject
 such bundles with `Function type inputs are not supported for @export`.
-They refuse a function input only on a `GIVEN` of the exported function, or on a top-level `ASSUME` of the same file that the exported function reads in its own body, and only where they find a function type in the type written after `IS A`.
-They look in every part of that type, as in `LIST OF FUNCTION FROM NUMBER TO NUMBER`.
-Where that type uses a type synonym (`DECLARE Name IS Type`) that the same file declares, they look in what the synonym stands for in the same way.
-They do not look into a synonym that an imported file declares.
-A function that the exported function gets in any other way passes `l4 check`, but no request can run it: for example a function in a field of a record, a synonym for a function type that an imported file declares, a `GIVEN` with no written type, an `ASSUME` written with its signature before it, or another rule that reads an assumed function.
+Keep a function out of an exported function's inputs in every shape, whether it is a field of a record, a type synonym (`DECLARE Name IS Type`) for a function type, or an `ASSUME` that stands for a function: no request can supply any of them.
+Define the function with `MEANS` or `DECIDE` in the file instead.
 
 ### Inputs no request can supply: `EVENT` and `DEONTIC`
 

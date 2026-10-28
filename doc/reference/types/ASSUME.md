@@ -67,11 +67,8 @@ DECIDE `passes` IF `the test` 42
 To publish `passes`, define `the test` with `MEANS` or `DECIDE` instead of assuming it.
 For an event or a duty, take the plain facts as inputs and build the value inside the function; see [EVENT](../regulative/EVENT.md#an-exported-rule-cannot-take-an-event) and [DEONTIC](../regulative/DEONTIC.md#an-exported-rule-cannot-take-a-deontic-input).
 
-L4 refuses a function input only on a `GIVEN` of the exported function, or on a top-level `ASSUME` of the same file that the exported function reads in its own body, and only where it finds a function type in the type written after `IS A`.
-It looks in every part of that type, as in `LIST OF FUNCTION FROM NUMBER TO NUMBER`.
-Where that type uses a [synonym](DECLARE.md#type-synonyms) that the same file declares, L4 looks in what the synonym stands for in the same way.
-It does not look into a synonym that an imported file declares.
-A function that the exported function gets in any other way passes `l4 check`, but no request can run it: for example a function in a field of a record, a synonym for a function type that an imported file declares, a `GIVEN` with no written type, an `ASSUME` written with its signature before it, or another rule that reads an assumed function.
+Keep a function out of an exported function's inputs in every shape, whether it is a field of a record, a [synonym](DECLARE.md#type-synonyms) for a function type, or an `ASSUME` that stands for a function: no request can supply any of them.
+Define the function with `MEANS` or `DECIDE` in the file instead.
 
 ## Related pages
 
