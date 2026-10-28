@@ -48,8 +48,9 @@ export interface AuthProxyDeps {
   authBaseUrl: () => string
   /** The stored sealed session, if any. */
   getSessionToken: () => Promise<string | undefined>
-  /** Store a rotated sealed session. */
-  storeSessionToken: (token: string) => Promise<void>
+  /** Store a rotated sealed session in place of `replaces`, the one the
+   *  request presented; a no-op if the stored session has changed since. */
+  storeSessionToken: (token: string, replaces: string) => Promise<void>
   fetch?: FetchFn
   now?: () => number
 }
@@ -137,7 +138,7 @@ export class AccessTokenManager {
     if (body.token && body.token !== session) {
       // jl4-auth-proxy refreshed the WorkOS session: keep the rotation,
       // or the next refresh would present a spent refresh token.
-      await this.deps.storeSessionToken(body.token)
+      await this.deps.storeSessionToken(body.token, session)
     }
     this.cached = { token: body.accessToken, expiresAt: body.expiresAt }
     return body.accessToken
