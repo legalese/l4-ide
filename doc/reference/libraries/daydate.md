@@ -25,6 +25,7 @@ The month names also build dates: `January 15 2024` is 15 January 2024.
 | Function                               | Gives      | What it does                                                                 |
 | -------------------------------------- | ---------- | ---------------------------------------------------------------------------- |
 | `Date` day month year                  | DATE       | The date from its parts: `Date 25 12 2024`                                   |
+| `YMD` year month day                   | DATE       | The date from its parts, year first: `YMD 2024 12 25`                        |
 | `Date` days                            | DATE       | The date with this day number                                                |
 | `Date` text                            | MAYBE DATE | Reads an ISO date such as `"2025-06-15"`; any time and time zone are ignored |
 | `Date` datetime                        | DATE       | The date part of a DATETIME, ignoring time and time zone                     |
@@ -34,7 +35,39 @@ The month names also build dates: `January 15 2024` is 15 January 2024.
 | `Month` date, `Week` date, `Year` date | DATE       | The first day of the month, ISO week or year that contains `date`            |
 | `January` day year, ...                | DATE       | The date in that month: `March 1 2025`                                       |
 
-`Date` rolls a day that does not exist in the month forward: `Date 29 2 2025` is 1 March 2025. `Days to date` is another name for `Date`.
+When the day is past the end of the month, or the month is past 12, `Date day month year` rolls forward: `Date 29 2 2025` is 1 March 2025, and `Date 7 28 2026` is 7 April 2028.
+`Days to date` is another name for `Date`.
+
+`YMD year month day` takes the year first, the month second and the day third, as ISO 8601 writes a date.
+The year must be a whole number, as for `Date`, and is not otherwise checked: `YMD 0 1 1` is 1 January of year 0.
+`YMD` gives the date when that day exists in that month and year: `YMD 2024 2 29` is 29 February 2024, the same date as `Date 29 2 2024`.
+When the month or the day does not exist, it refuses to answer, with a reason that says which part is wrong ([REFUSE](../control-flow/REFUSE.md)).
+`#EVAL YMD 2026 28 7`, where the day and the month have changed places, prints:
+
+```text
+The model refuses to answer:
+  YMD: the month is not a whole number from 1 to 12
+```
+
+and `#EVAL YMD 2023 2 29`, a day that 2023 does not have, prints:
+
+```text
+The model refuses to answer:
+  YMD: that month has no such day in that year
+```
+
+A wrong month gives the month's reason, even when the day is wrong too.
+`Year month day` is another name for `YMD`.
+
+What to know before using `YMD`:
+
+- A rule that calls `YMD` has no query plan, even when the date exists, as in `YMD 2026 7 28`.
+  So a questionnaire built on the rule cannot ask for only the inputs it still needs; the same rule written with `Date` has a query plan ([REFUSE: the query plan](../control-flow/REFUSE.md#the-query-plan)).
+- The WASM backend (`jl4-mlir`) does not evaluate an `@export` that calls `YMD`, with the reason "REFUSE is not supported by the WASM backend"; evaluate it with jl4-service ([REFUSE: limits](../control-flow/REFUSE.md#limits)).
+- `YMD` and `Year month day` are names in every file that imports `daydate`, or a library that imports it, such as `datetime`.
+  A file that also defines its own `YMD` or `Year month day` of three numbers can fail to check where it uses that name, with "There are multiple definitions for the identifier".
+  A file that uses that name many times in one rule can instead take a very long time to check.
+  Rename its own definition.
 
 ## Reading a date
 
@@ -98,4 +131,4 @@ To read the day, month or year of a date as a number, use the built-ins `DATE_DA
 | `Month of` date (or `month of`) | NUMBER | The month, like `DATE_MONTH`                                  |
 | `Year of` date (or `year of`)   | NUMBER | The year, like `DATE_YEAR`                                    |
 
-New files should use `Date` from `daydate`, and `DATE_DAY`, `DATE_MONTH` and `DATE_YEAR`.
+New files should use `Date` or `YMD` from `daydate`, and `DATE_DAY`, `DATE_MONTH` and `DATE_YEAR`.
