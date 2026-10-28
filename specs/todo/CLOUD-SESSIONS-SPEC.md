@@ -105,7 +105,7 @@ conversations, client-declared tools), [AI_CHAT_PLAN.md](../done/AI_CHAT_PLAN.md
   harness and `jl4-lsp`. It mounts only its owner's folder, through a per-user
   access point.
 - **Storage (§4).** One S3 bucket, one S3 Files file system over its `users/`
-  prefix, one folder per user.
+  prefix, one folder per user and organisation (§4.3).
 - **Sessions API (§7).** One Lambda. It is the only component that can reach
   every user's folder and start tasks. It runs no AI-driven or user-supplied
   code, and treats folder contents as hostile.
@@ -204,16 +204,27 @@ s3://legalese-cloud-sessions-<env>/
 
 ### 4.3 Folder names
 
-`folder = hex(HMAC-SHA256(FOLDER_KEY, workosUserId))[0:32]` (128 bits).
+`folder = hex(HMAC-SHA256(FOLDER_KEY, workosUserId + "\n" + orgId))[0:32]`
+(128 bits), with an empty `orgId` for a token without an organisation.
 
+- **One folder per user and organisation.** Every task of a folder mounts all
+  of it, so a path bug in one session could reach the folder's other
+  sessions. Keeping each organisation's sessions in their own folder means
+  such a bug can't move one organisation's files into another's sessions or
+  MCP servers. A session of another organisation than the caller's current
+  one is simply not found (`404`), and the agent key, which acts in the
+  current organisation, always matches the session's.
+- In this spec, "per user" for folders, access points, task families and the
+  live-session cap means per user and organisation: someone in two
+  organisations has two folders, and up to 3 live sessions in each.
 - `FOLDER_KEY` is an SSM SecureString readable only by the Sessions API role.
 - There is no mapping table. The Sessions API derives the folder from the
-  verified user id on every request.
+  verified user id and organisation on every request.
 - Nobody browsing the bucket, S3 logs or the S3 Files lost+found directory can
   tell whose folder is whose without the key, and folder names can't be
   guessed.
-- `session.json` records `ownerUserId`, so a folder can still be attributed
-  during break-glass recovery.
+- `session.json` records `ownerUserId` and `orgId`, so a folder can still be
+  attributed during break-glass recovery.
 - Rotating `FOLDER_KEY` means renaming every folder. Treat it as permanent.
 
 ### 4.4 Per-user access point and task definition
@@ -587,21 +598,21 @@ with auth type NONE; every route verifies the WorkOS JWT itself. A
 
 ### 7.1 Routes
 
-| Route                                                                                                                                   | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POST /sessions` `{ title?, mcpServers?, seedSize?, seedBase?: { workspaceFolder, path }, attachments: [{ name, size, contentType }] }` | Provisions if needed (§4.4). Creates `sessions/<sid>/` with `session.json`, `repo/` (`git init -b main` plus the config in §4.7), `attachments/` and `state/`. Returns `{ sessionId, gitUrl, uploads }` with pre-signed, size-bound PUT URLs into `inbox/<sid>/` for the seed and each attachment. A missing or zero `seedSize` means no seed.                                                                                                                                                                                       |
-| `POST /sessions/:sid/init`                                                                                                              | Extracts the seed tarball into `repo/data/`, creates `repo/tmp/`, and copies attachments, through the file system. Rejects absolute paths, `..`, `.git/`, links and device files. Deletes the inbox objects.                                                                                                                                                                                                                                                                                                                         |
-| `GET /sessions`                                                                                                                         | Lists the caller's cloud conversations for the history view (§12.1): id, title, created, last activity and state (§7.3), read from `sessions/*/session.json`.                                                                                                                                                                                                                                                                                                                                                                        |
-| `GET /sessions/:sid`                                                                                                                    | `session.json` plus state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `POST /sessions/:sid/start` `{ agentKey }`                                                                                              | Refuses with `409 wrong_organization` when the caller's current organisation isn't the one the session was created in, and `409 not_initialized` before `init`. If the session has a live lease, or a task pending, running or still stopping, returns the state. Refuses with `409 too_many_sessions` when the user already has 3 live tasks (pending, running or stopping). Otherwise provisions if needed and calls `RunTask` (§5.1) and returns `202 { state: "starting" }`. Whenever it starts nothing, it ends the unused key. |
-| `POST /sessions/:sid/commands` `{ type, … }`                                                                                            | Queues a command (§8). Works while the session sleeps; the harness reads queued commands when it starts. Returns `{ commandId, state }`.                                                                                                                                                                                                                                                                                                                                                                                             |
-| `POST /sessions/:sid/files` `{ files: [{ path, size, contentType }] }`                                                                  | Adds files mid-session (§10). `path` is repo-relative under `data/`, validated like seed paths; 10 MB per file, 50 MB per batch. Returns `{ batchId, uploads: [{ path, url, method, headers, maxBytes }] }` with pre-signed PUTs into `inbox/<sid>/files/<batchId>/`.                                                                                                                                                                                                                                                                |
-| `POST /sessions/:sid/files/:batchId/commit`                                                                                             | Copies the batch into `sessions/<sid>/incoming/files/<batchId>/` and queues `add-files`. Returns `{ commandId, state }`.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `GET /events?s=<sid>:<cursor>&s=…`                                                                                                      | New events for up to 10 sessions per call, with new cursors and states (§8); at most 16 segment reads per call, then `more: true`.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `POST /sessions/:sid/stop`                                                                                                              | Queues a `stop` command and records the request (`stop-requested.json`). If the task still runs 60 s later, the sweep calls `StopTask`, so a hung task stops within about 6 minutes.                                                                                                                                                                                                                                                                                                                                                 |
-| `DELETE /sessions/:sid`                                                                                                                 | Records a delete request, `users/.trash/requests/<folder>-<sid>` (outside every user folder), stops the session's task and answers `204`, also while the request waits. From then on the session is gone for clients (`404`). The sweep moves the session to the trash later (§7.2).                                                                                                                                                                                                                                                 |
-| `GET /git/:sid.git/info/refs`, `POST /git/:sid.git/git-upload-pack`, `POST /git/:sid.git/git-receive-pack`                              | Smart-HTTP git (§9). Accepts the JWT as a Bearer token or as the password in HTTP Basic auth, which is how git sends credentials.                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Scheduled `sweep` (EventBridge Scheduler, every 5 min)                                                                                  | Stops tasks running longer than 25 hours, running over 5 minutes with no lease or a lease stale for more than 5 minutes, or asked to stop more than 60 s ago. Then carries out delete requests and empties `users/.trash/` (never follows symlinks). Each part has a time budget per run and continues next run.                                                                                                                                                                                                                     |
+| Route                                                                                                                                   | Does                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /sessions` `{ title?, mcpServers?, seedSize?, seedBase?: { workspaceFolder, path }, attachments: [{ name, size, contentType }] }` | Provisions if needed (§4.4). Creates `sessions/<sid>/` with `session.json`, `repo/` (`git init -b main` plus the config in §4.7), `attachments/` and `state/`. Returns `{ sessionId, gitUrl, uploads }` with pre-signed, size-bound PUT URLs into `inbox/<sid>/` for the seed and each attachment. A missing or zero `seedSize` means no seed.                                                                         |
+| `POST /sessions/:sid/init`                                                                                                              | Extracts the seed tarball into `repo/data/`, creates `repo/tmp/`, and copies attachments, through the file system. Rejects absolute paths, `..`, `.git/`, links and device files. Deletes the inbox objects.                                                                                                                                                                                                           |
+| `GET /sessions`                                                                                                                         | Lists the caller's cloud conversations for the history view (§12.1): id, title, created, last activity and state (§7.3), read from `sessions/*/session.json`.                                                                                                                                                                                                                                                          |
+| `GET /sessions/:sid`                                                                                                                    | `session.json` plus state.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `POST /sessions/:sid/start` `{ agentKey }`                                                                                              | Refuses with `409 not_initialized` before `init`. If the session has a live lease, or a task pending, running or still stopping, returns the state. Refuses with `409 too_many_sessions` when the user already has 3 live tasks (pending, running or stopping). Otherwise provisions if needed and calls `RunTask` (§5.1) and returns `202 { state: "starting" }`. Whenever it starts nothing, it ends the unused key. |
+| `POST /sessions/:sid/commands` `{ type, … }`                                                                                            | Queues a command (§8). Works while the session sleeps; the harness reads queued commands when it starts. Returns `{ commandId, state }`.                                                                                                                                                                                                                                                                               |
+| `POST /sessions/:sid/files` `{ files: [{ path, size, contentType }] }`                                                                  | Adds files mid-session (§10). `path` is repo-relative under `data/`, validated like seed paths; 10 MB per file, 50 MB per batch. Returns `{ batchId, uploads: [{ path, url, method, headers, maxBytes }] }` with pre-signed PUTs into `inbox/<sid>/files/<batchId>/`.                                                                                                                                                  |
+| `POST /sessions/:sid/files/:batchId/commit`                                                                                             | Copies the batch into `sessions/<sid>/incoming/files/<batchId>/` and queues `add-files`. Returns `{ commandId, state }`.                                                                                                                                                                                                                                                                                               |
+| `GET /events?s=<sid>:<cursor>&s=…`                                                                                                      | New events for up to 10 sessions per call, with new cursors and states (§8); at most 16 segment reads per call, then `more: true`.                                                                                                                                                                                                                                                                                     |
+| `POST /sessions/:sid/stop`                                                                                                              | Queues a `stop` command and records the request (`stop-requested.json`). If the task still runs 60 s later, the sweep calls `StopTask`, so a hung task stops within about 6 minutes.                                                                                                                                                                                                                                   |
+| `DELETE /sessions/:sid`                                                                                                                 | Records a delete request, `users/.trash/requests/<folder>-<sid>` (outside every user folder), stops the session's task and answers `204`, also while the request waits. From then on the session is gone for clients (`404`). The sweep moves the session to the trash later (§7.2).                                                                                                                                   |
+| `GET /git/:sid.git/info/refs`, `POST /git/:sid.git/git-upload-pack`, `POST /git/:sid.git/git-receive-pack`                              | Smart-HTTP git (§9). Accepts the JWT as a Bearer token or as the password in HTTP Basic auth, which is how git sends credentials.                                                                                                                                                                                                                                                                                      |
+| Scheduled `sweep` (EventBridge Scheduler, every 5 min)                                                                                  | Stops tasks running longer than 25 hours, running over 5 minutes with no lease or a lease stale for more than 5 minutes, or asked to stop more than 60 s ago. Then carries out delete requests and empties `users/.trash/` (never follows symlinks). Each part has a time budget per run and continues next run.                                                                                                       |
 
 - Every route derives the folder from the JWT `sub` (§4.3). A `sid` that isn't
   in the caller's folder returns 404.
@@ -1183,8 +1194,8 @@ of looking up shared resources by tag.
 
 - [ ] `sessions-api-fixes` (base `main`) ([PR #13](https://github.com/legalese/jl4-auth-proxy/pull/13)) —
       review fixes before the first deploy: delete requests carried out by
-      the sweep, state from the lease first, `wrong_organization`, bounded
-      inputs, RS256 only, OIDC roles for the `prod` environment only
+      the sweep, state from the lease first, one folder per user and
+      organisation, bounded inputs, RS256 only, OIDC roles for the `prod` environment only
       (§6.1, §7.1–§7.3, §9.3).
 
 Deploy-time steps, not pull requests: Fargate vCPU quota increase; the
@@ -1228,7 +1239,7 @@ reference for §8 shapes; the Sessions API mirrors them.
 - Routes, request and response bodies: §7.1. Errors are
   `{ error: "<code>" }` with 400, 401, 403, 404, 409, 413, 500 or 503. The
   `409` codes are `conflict`, `not_initialized`, `already_initialized`,
-  `too_many_sessions`, `wrong_organization` and `no_commits_yet`. Clients
+  `too_many_sessions` and `no_commits_yet`. Clients
   treat an unknown code as a plain string.
 - `DELETE /sessions/:sid` always answers `204` with no body.
 - Git URL: `<apiUrl>/git/<sid>.git`.
@@ -1414,6 +1425,9 @@ vCPU-hour and $0.00356 per GB-hour.
   tasks is live. Clients never wait on a stopping task (§7.1, §7.2).
 - **State from the lease first (2026-10-28).** A live lease gives the state
   without an ECS call (§7.3).
+- **Folders per user and organisation (2026-10-28).** A user's sessions in
+  different organisations live in different folders, so no task can reach
+  another organisation's files; `409 wrong_organization` is gone (§4.3).
 - **Standing note.** Each prompt starts with a short note on `data/`, `tmp/`,
   deleted-file copies and import resolution; it doesn't mention git (§11).
 
@@ -1423,8 +1437,9 @@ vCPU-hour and $0.00356 per GB-hour.
   adapters (`legalese-agent-core`, #508).
 
 - ~~Live cloud sessions per user, and the chain maximum age per
-  organisation~~ — decided 2026-10-28: 3 live sessions per user; chains stop
-  at 24 hours, and an organisation can only shorten that.
+  organisation~~ — decided 2026-10-28: 3 live sessions per user and
+  organisation (one folder each, §4.3); chains stop at 24 hours, and an
+  organisation can only shorten that.
 - Where conversation content should live: the ai-proxy store or the user's
   folder.
 - Fargate Spot for background sessions. About 70% cheaper, with a 2-minute
