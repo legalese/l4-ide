@@ -7,10 +7,10 @@ import {
   type AuthProxyDeps,
 } from '../cloud/auth-proxy.js'
 import {
+  NOT_FOUND_MESSAGE,
   NO_COMMITS_YET_MESSAGE,
   SessionsApiClient,
   SessionsApiError,
-  WRONG_ORGANIZATION_MESSAGE,
   describeSessionsApiError,
 } from '../cloud/sessions-api.js'
 
@@ -204,13 +204,13 @@ describe('SessionsApiClient', () => {
     })
   })
 
-  test('start: 409 wrong_organization says which organisation to switch to', async () => {
-    const { api } = client(() => json(409, { error: 'wrong_organization' }))
+  test('start: 404 not_found mentions another organisation', async () => {
+    const { api } = client(() => json(404, { error: 'not_found' }))
     await assert.rejects(api.startSession(SID, KEY), (err: unknown) => {
       assert.ok(err instanceof SessionsApiError)
-      assert.equal(err.status, 409)
-      assert.equal(err.code, 'wrong_organization')
-      assert.equal(err.message, WRONG_ORGANIZATION_MESSAGE)
+      assert.equal(err.status, 404)
+      assert.equal(err.code, 'not_found')
+      assert.equal(err.message, NOT_FOUND_MESSAGE)
       return true
     })
   })
@@ -331,14 +331,11 @@ describe('describeSessionsApiError', () => {
     assert.match(NO_COMMITS_YET_MESSAGE, /^Available after the first turn/)
   })
 
-  test('409 wrong_organization: switch organisation to resume', () => {
-    assert.equal(
-      describeSessionsApiError(409, 'wrong_organization'),
-      WRONG_ORGANIZATION_MESSAGE
-    )
+  test('404 not_found: deleted, or another organisation', () => {
+    assert.equal(describeSessionsApiError(404, 'not_found'), NOT_FOUND_MESSAGE)
     assert.match(
-      WRONG_ORGANIZATION_MESSAGE,
-      /belongs to another organisation.*Legalese Cloud to resume/
+      NOT_FOUND_MESSAGE,
+      /deleted, or it belongs to another organisation.*Legalese Cloud/
     )
   })
 })
