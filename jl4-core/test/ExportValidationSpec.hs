@@ -2240,8 +2240,8 @@ spec = do
           Text.unlines msg `shouldBe` Text.unlines
             [ "I found a problem while checking the definition of `via helper`:"
             , "  DEONTIC inputs are not supported for @export."
-            , "  The input `the duty` is an ASSUME that `duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `duty fulfilled` the DEONTIC as an input."
-            , "  Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+            , "  The input `the duty` is an ASSUME that `duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC."
+            , "  Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give `duty fulfilled` the DEONTIC as an input."
             ]
 
     it "blocks an ASSUME of type EVENT that a helper reads, names the helper, and says what to do" $ do
@@ -2263,8 +2263,8 @@ spec = do
           Text.unlines msg `shouldBe` Text.unlines
             [ "I found a problem while checking the definition of `via event helper`:"
             , "  EVENT inputs are not supported for @export."
-            , "  The input `the event` is an ASSUME that `event time` reads as a value whose type contains an EVENT, and this rule calls `event time`, directly or through other rules. A request has no JSON form for an event, so give `event time` the event as an input."
-            , "  Give the rule the party, the action and the time as separate inputs, and build the event inside it."
+            , "  The input `the event` is an ASSUME that `event time` reads as a value whose type contains an EVENT, and this rule calls `event time`, directly or through other rules. A request has no JSON form for an event."
+            , "  Give this rule the party, the action and the time as separate inputs, build the event inside it, and give `event time` the event as an input."
             ]
 
     it "follows a chain of rules, and names the one that reads the ASSUME" $ do

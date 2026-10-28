@@ -20,8 +20,8 @@ File: export-polymorphic-helper.l4
   Code: <none>
   Message:
     DEONTIC inputs are not supported for @export.
-    The input `the placeholder` is an ASSUME that `top fetch` reads as a value whose type contains a DEONTIC, and this rule calls `top fetch`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `top fetch` the DEONTIC as an input.
-    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+    The input `the placeholder` is an ASSUME that `top fetch` reads as a value whose type contains a DEONTIC, and this rule calls `top fetch`, directly or through other rules. A request has no JSON form for a DEONTIC.
+    Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give `top fetch` the DEONTIC as an input.
 
 File: export-polymorphic-helper.l4
   Hidden: no
@@ -31,8 +31,8 @@ File: export-polymorphic-helper.l4
   Code: <none>
   Message:
     EVENT inputs are not supported for @export.
-    The input `the placeholder` is an ASSUME that `top fetch` reads as a value whose type contains an EVENT, and this rule calls `top fetch`, directly or through other rules. A request has no JSON form for an event, so give `top fetch` the event as an input.
-    Give the rule the party, the action and the time as separate inputs, and build the event inside it.
+    The input `the placeholder` is an ASSUME that `top fetch` reads as a value whose type contains an EVENT, and this rule calls `top fetch`, directly or through other rules. A request has no JSON form for an event.
+    Give this rule the party, the action and the time as separate inputs, build the event inside it, and give `top fetch` the event as an input.
 
 File: export-polymorphic-helper.l4
   Hidden: no
@@ -42,8 +42,8 @@ File: export-polymorphic-helper.l4
   Code: <none>
   Message:
     DEONTIC inputs are not supported for @export.
-    The input `the placeholder` is an ASSUME that `top fetch` reads as a value whose type contains a DEONTIC, and this rule calls `top fetch`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `top fetch` the DEONTIC as an input.
-    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+    The input `the placeholder` is an ASSUME that `top fetch` reads as a value whose type contains a DEONTIC, and this rule calls `top fetch`, directly or through other rules. A request has no JSON form for a DEONTIC.
+    Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give `top fetch` the DEONTIC as an input.
 
 File: export-polymorphic-helper.l4
   Hidden: no
@@ -53,8 +53,8 @@ File: export-polymorphic-helper.l4
   Code: <none>
   Message:
     DEONTIC inputs are not supported for @export.
-    The input `the placeholder` is an ASSUME that `with placeholder` reads as a value whose type contains a DEONTIC, and this rule calls `with placeholder`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `with placeholder` the DEONTIC as an input.
-    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+    The input `the placeholder` is an ASSUME that `with placeholder` reads as a value whose type contains a DEONTIC, and this rule calls `with placeholder`, directly or through other rules. A request has no JSON form for a DEONTIC.
+    Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give `with placeholder` the DEONTIC as an input.
 
 File: export-polymorphic-helper.l4
   Hidden: no
@@ -64,5 +64,5 @@ File: export-polymorphic-helper.l4
   Code: <none>
   Message:
     DEONTIC inputs are not supported for @export.
-    The input `the placeholder` is an ASSUME that `countdown` reads as a value whose type contains a DEONTIC, and this rule calls `countdown`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `countdown` the DEONTIC as an input.
-    Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+    The input `the placeholder` is an ASSUME that `countdown` reads as a value whose type contains a DEONTIC, and this rule calls `countdown`, directly or through other rules. A request has no JSON form for a DEONTIC.
+    Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give `countdown` the DEONTIC as an input.

@@ -858,13 +858,15 @@ spec bin = do
   describe "l4 check: an @export that reaches a DEONTIC ASSUME through a rule that it calls" $ do
     forM_ [ ( "a helper of the file that reads an ASSUME of type DEONTIC"
             , exportDeonticHelperFixture
-            , "The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled` the DEONTIC as an input."
+            , "The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC."
+            , "Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give `assumed duty fulfilled` the DEONTIC as an input."
             )
           , ( "a polymorphic helper under its WHERE that the call makes read a polymorphic ASSUME as a DEONTIC"
             , exportDeonticLocalHelperFixture
             , "The input `the placeholder` has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+            , "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
             )
-          ] \(what, fixture, line) ->
+          ] \(what, fixture, line, advice) ->
       it ("fails on " <> what <> ", and says what is wrong and what to do") $ do
         Output code sout serr0 <- runL4 bin ["check", fixture]
         let serr = filter (/= '\r') serr0
@@ -873,8 +875,7 @@ spec bin = do
         serr `shouldSatisfy` isInfixOf "Severity: DiagnosticSeverity_Error"
         serr `shouldSatisfy` isInfixOf "DEONTIC inputs are not supported for @export."
         serr `shouldSatisfy` isInfixOf line
-        serr `shouldSatisfy` isInfixOf
-          "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+        serr `shouldSatisfy` isInfixOf advice
 
   -- An import ring used to pass `l4 check` and `l4 run` with exit 0 and "Check
   -- succeeded." printed under the cycle's own error. The engine reports the

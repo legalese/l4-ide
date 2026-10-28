@@ -4687,43 +4687,47 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
       <> " has a function type."
   ]
 prettyCheckError (ExportEventTypeInput _fnName paramName readBy) =
-  [ "EVENT inputs are not supported for @export."
-  , case readBy of
+  "EVENT inputs are not supported for @export."
+    : case readBy of
       Nothing ->
-        "The input "
-          <> quotedName (getActual paramName)
-          <> " has a type that contains an EVENT, and a request has no JSON form for an event."
+        [ "The input "
+            <> quotedName (getActual paramName)
+            <> " has a type that contains an EVENT, and a request has no JSON form for an event."
+        , "Give the rule the party, the action and the time as separate inputs, and build the event inside it."
+        ]
       Just r ->
-        "The input "
-          <> quotedName (getActual paramName)
-          <> " is an ASSUME that "
-          <> quotedName (getActual r)
-          <> " reads as a value whose type contains an EVENT, and this rule calls "
-          <> quotedName (getActual r)
-          <> ", directly or through other rules. A request has no JSON form for an event, so give "
-          <> quotedName (getActual r)
-          <> " the event as an input."
-  , "Give the rule the party, the action and the time as separate inputs, and build the event inside it."
-  ]
+        [ "The input "
+            <> quotedName (getActual paramName)
+            <> " is an ASSUME that "
+            <> quotedName (getActual r)
+            <> " reads as a value whose type contains an EVENT, and this rule calls "
+            <> quotedName (getActual r)
+            <> ", directly or through other rules. A request has no JSON form for an event."
+        , "Give this rule the party, the action and the time as separate inputs, build the event inside it, and give "
+            <> quotedName (getActual r)
+            <> " the event as an input."
+        ]
 prettyCheckError (ExportDeonticTypeInput _fnName paramName readBy) =
-  [ "DEONTIC inputs are not supported for @export."
-  , case readBy of
+  "DEONTIC inputs are not supported for @export."
+    : case readBy of
       Nothing ->
-        "The input "
-          <> quotedName (getActual paramName)
-          <> " has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+        [ "The input "
+            <> quotedName (getActual paramName)
+            <> " has a type that contains a DEONTIC, and a request has no JSON form for a DEONTIC."
+        , "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
+        ]
       Just r ->
-        "The input "
-          <> quotedName (getActual paramName)
-          <> " is an ASSUME that "
-          <> quotedName (getActual r)
-          <> " reads as a value whose type contains a DEONTIC, and this rule calls "
-          <> quotedName (getActual r)
-          <> ", directly or through other rules. A request has no JSON form for a DEONTIC, so give "
-          <> quotedName (getActual r)
-          <> " the DEONTIC as an input."
-  , "Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it."
-  ]
+        [ "The input "
+            <> quotedName (getActual paramName)
+            <> " is an ASSUME that "
+            <> quotedName (getActual r)
+            <> " reads as a value whose type contains a DEONTIC, and this rule calls "
+            <> quotedName (getActual r)
+            <> ", directly or through other rules. A request has no JSON form for a DEONTIC."
+        , "Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give "
+            <> quotedName (getActual r)
+            <> " the DEONTIC as an input."
+        ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.
 prettyMixfixMatchError :: Name -> MixfixMatchError -> [Text]

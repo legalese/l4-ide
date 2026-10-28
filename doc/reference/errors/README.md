@@ -1005,8 +1005,8 @@ or, when a rule that the exported rule calls reads an `ASSUME`,
 
 ```
 DEONTIC inputs are not supported for @export.
-The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC, so give `assumed duty fulfilled` the DEONTIC as an input.
-Give the rule the plain facts that the DEONTIC is made from as inputs, and build the DEONTIC inside it.
+The input `the assumed duty` is an ASSUME that `assumed duty fulfilled` reads as a value whose type contains a DEONTIC, and this rule calls `assumed duty fulfilled`, directly or through other rules. A request has no JSON form for a DEONTIC.
+Give this rule the plain facts that the DEONTIC is made from as inputs, build the DEONTIC inside it, and give `assumed duty fulfilled` the DEONTIC as an input.
 ```
 
 **What you wrote:**
