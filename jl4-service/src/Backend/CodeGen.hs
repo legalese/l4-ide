@@ -29,7 +29,7 @@ import L4.Lexer (showStringLit)
 import L4.Presumption (requestRecordName)
 import L4.Print (prettyLayout)
 import L4.Syntax (Type'(..), Resolved, getUnique)
-import L4.TypeCheck.Environment (booleanUnique, dateUnique, timeUnique, datetimeUnique, maybeUnique, contractUnique)
+import L4.TypeCheck.Environment (booleanUnique, dateUnique, timeUnique, datetimeUnique, maybeUnique, isContractType)
 import Backend.Api (TraceLevel(..), TraceEvent(..), FnLiteral(..))
 import qualified Base.Text as BaseText
 import Backend.MaybeLift (liftTypeToMaybe)
@@ -522,10 +522,10 @@ maybeConvertedVar name
 -- Deontic evaluation support
 -- ----------------------------------------------------------------------------
 
--- | Check if a type is DEONTIC a b (contract type with two type parameters)
+-- | Check if a type is DEONTIC a b (contract type with two type parameters).
+-- 'isContractType', so that the service and the editor ask the same question.
 isDeonticType :: Type' Resolved -> Bool
-isDeonticType (TyApp _ name [_, _]) = getUnique name == contractUnique
-isDeonticType _ = False
+isDeonticType = isContractType
 
 -- | Convert an FnLiteral to inline L4 source text.
 -- Used for generating EVENT expressions in deontic wrappers.

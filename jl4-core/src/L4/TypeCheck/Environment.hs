@@ -195,6 +195,17 @@ eitherType a b = app eitherRef [a, b]
 contract :: Type' Resolved -> Type' Resolved -> Type' Resolved
 contract party action = TyApp emptyAnno contractRef [party, action]
 
+-- | Whether a type is @DEONTIC a b@, the type of a contract.
+--
+-- It compares the type constructor's unique, not how the type was written:
+-- @PROVISION@, the deprecated alias of @DEONTIC@, resolves to the same unique,
+-- so a rule that says @PROVISION OF P, A@ is as much a contract as one that says
+-- @DEONTIC P A@ is. Anything that has to tell the two apart by their display
+-- names has the wrong test.
+isContractType :: Type' Resolved -> Bool
+isContractType (TyApp _ name [_, _]) = getUnique name == contractUnique
+isContractType _ = False
+
 -- Number conversion
 
 isInteger :: Type' Resolved
