@@ -215,6 +215,13 @@ describe('SessionsApiClient', () => {
     })
   })
 
+  test('DELETE: 204 with no body', async () => {
+    const { api, calls } = client(() => new Response(null, { status: 204 }))
+    await api.deleteSession(SID)
+    assert.equal(calls[0]!.init.method, 'DELETE')
+    assert.equal(calls[0]!.url, `https://sessions.example/sessions/${SID}`)
+  })
+
   test('off while the API URL is empty', async () => {
     const api = new SessionsApiClient({
       baseUrl: () => '',

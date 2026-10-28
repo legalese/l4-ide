@@ -892,8 +892,8 @@ export class CloudSessionManager {
     return state
   }
 
-  /** Delete a session. The Sessions API answers `409 stopping` while
-   *  the task still runs; the caller retries later. */
+  /** Delete a session. The Sessions API answers 204 at once, also while
+   *  the task still runs (it is gone from lists and cleaned up later). */
   async delete(sid: string): Promise<void> {
     await this.deps.api.deleteSession(sid)
     this.poller.unwatch(sid)

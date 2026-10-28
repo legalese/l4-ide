@@ -71,8 +71,6 @@ export function describeSessionsApiError(status: number, code: string): string {
       return 'Cloud sessions are temporarily unavailable. Try again later.'
     case 'not_initialized':
       return 'The cloud session was not set up completely. Start a new one.'
-    case 'stopping':
-      return 'The cloud session is still stopping. Try again in a minute.'
     case 'no_commits_yet':
       return NO_COMMITS_YET_MESSAGE
     case 'invalid_seed':
@@ -118,6 +116,8 @@ export interface SessionsApi {
   addFiles(sid: string, req: AddFilesRequest): Promise<AddFilesResponse>
   /** …then queue it for the harness (`add-files`). */
   commitFiles(sid: string, batchId: string): Promise<PostCommandResponse>
+  /** `DELETE /sessions/:sid` answers 204 at once (the server cleans up
+   *  later), also while the session's task is still running. */
   deleteSession(sid: string): Promise<void>
   getEvents(
     streams: EventStreamRequest[]
