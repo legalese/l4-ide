@@ -1,0 +1,4 @@
+-- The same directives as request-post-fails.l4, without the request.
+#EVAL 1 PLUS 1
+
+#EVAL 2 PLUS 2

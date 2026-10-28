@@ -8,6 +8,7 @@ import type { VSCodeL4LanguageClient } from './vscode-l4-language-client.js'
 import { type AuthManager, LEGALESE_CLOUD_DOMAIN } from './auth.js'
 import type { ServiceClient } from './service-client.js'
 import { installDeploymentSkill } from './deployment-install.js'
+import { isEmbeddedLibraryUri } from './embedded-library.js'
 import { installMarketplaceToHarness } from './harness-config.js'
 import { getWebviewContent } from './webview-panel.js'
 import {
@@ -347,6 +348,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
+  /** Re-fetch the active file's exported functions and blocking errors,
+   *  without resetting the Deploy tab's form the way a file switch does. */
+  refreshExportedFunctions() {
+    if (!this.view) return
+    this.view.webview.postMessage({
+      type: 'l4-sidebar-refresh-exports',
+    })
+  }
+
   clearActiveFile() {
     if (!this.view) return
     this.view.webview.postMessage({
@@ -486,6 +496,7 @@ export function initializeSidebarMessenger(
           numberClauses: params.numberClauses,
           toc: params.toc,
           excludeModules: params.excludeModules ?? [],
+          lang: params.lang,
         })
         if (!res) {
           return {
@@ -560,8 +571,9 @@ export function initializeSidebarMessenger(
   })
 
   // Render the active L4 document to a content string in the requested
-  // format via the LSP. Returns the rendered content and the IR title.
-  // Shared by the inline preview and the Save action. Throws on LSP failure.
+  // format via the LSP. Returns the rendered content, the IR title, and the
+  // languages the file offers / the one the content is in. Shared by the
+  // inline preview and the Save action. Throws on LSP failure.
   async function renderToContent(
     verDocId: { uri: string; version: number },
     params: {
@@ -571,8 +583,14 @@ export function initializeSidebarMessenger(
       numberClauses: boolean
       toc: boolean
       excludeModules?: string[]
+      lang?: string
     }
-  ): Promise<{ content: string; title: string | undefined }> {
+  ): Promise<{
+    content: string
+    title: string | undefined
+    languages?: string[]
+    lang?: string
+  }> {
     if (params.format === 'plan') {
       const plan = await client.sendRequest(ExportPlanRequestType, { verDocId })
       return { content: JSON.stringify(plan ?? {}, null, 2), title: undefined }
@@ -585,6 +603,7 @@ export function initializeSidebarMessenger(
       numberClauses: params.numberClauses,
       toc: params.toc,
       excludeModules: params.excludeModules ?? [],
+      lang: params.lang,
     })
     if (!res) throw new Error('No response from the language server.')
     const title =
@@ -595,7 +614,7 @@ export function initializeSidebarMessenger(
       params.format === 'json'
         ? JSON.stringify(res.ir ?? {}, null, 2)
         : res.content
-    return { content, title }
+    return { content, title, languages: res.languages, lang: res.lang }
   }
 
   // Handle Render-tab live inline preview: render the active file as HTML
@@ -611,15 +630,19 @@ export function initializeSidebarMessenger(
     }
     try {
       const verDocId = { uri: doc.uri.toString(), version: doc.version }
-      const { content, title } = await renderToContent(verDocId, {
-        format: 'html',
-        includeUnused: params.includeUnused,
-        numberSections: params.numberSections,
-        numberClauses: params.numberClauses,
-        toc: params.toc,
-        excludeModules: params.excludeModules ?? [],
-      })
-      return { success: true, html: content, title }
+      const { content, title, languages, lang } = await renderToContent(
+        verDocId,
+        {
+          format: 'html',
+          includeUnused: params.includeUnused,
+          numberSections: params.numberSections,
+          numberClauses: params.numberClauses,
+          toc: params.toc,
+          excludeModules: params.excludeModules ?? [],
+          lang: params.lang,
+        }
+      )
+      return { success: true, html: content, title, languages, lang }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       return { success: false, error: msg }
@@ -770,6 +793,17 @@ export function initializeSidebarMessenger(
         GetExportedFunctionsRequestType,
         { verDocId: { uri: params.fileUri, version: doc.version } }
       )
+      // The sidebar disables Deploy for such a file; this catches a click
+      // that raced an edit which broke it.
+      const blocking = lspResponse.blockingErrors ?? []
+      if (blocking.length > 0) {
+        const first = blocking[0]
+        const where = `${path.basename(vscode.Uri.parse(first.uri).fsPath)}:${first.line}`
+        return {
+          success: false,
+          error: `Fix the errors before deploying (${where}: ${first.message.split('\n')[0]})`,
+        }
+      }
       const importUris = lspResponse.importedFiles ?? []
 
       // Collect the main file and all its LSP-resolved imports
@@ -1273,6 +1307,14 @@ async function collectL4Sources(
   // Collect main file first, then all imports
   await collectFile(fileUri)
   for (const importUri of importUris) {
+    // The stdlib jl4-lsp carries inside its binary. A deployment runs on the
+    // service's own built-in stdlib unless the bundle ships a same-named file
+    // (`bundleScope` in jl4-service's Backend/Jl4.hs), so zipping this
+    // machine's would pin it over the service's. Ruled 2026-10-12: deployments
+    // run on the service's built-in stdlib, and this skip stands; a later,
+    // non-blocking change is to warn at deploy time when this machine's stdlib
+    // differs from the service's.
+    if (isEmbeddedLibraryUri(importUri)) continue
     await collectFile(importUri)
   }
 

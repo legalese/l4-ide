@@ -9,6 +9,7 @@
 
 import {
   createRuntime,
+  runDeontic,
   makeTracePool,
   MemoryLimitError,
   DEFAULT_MAX_HEAP_BYTES,
@@ -174,6 +175,311 @@ eq("concat then eq", env.__l4_str_eq(c, box("ab")), 1);
 // Default cap is 64 MiB — published as a public constant so the HTTP
 // wrapper and tests stay in sync without hard-coding the number.
 eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
+
+// --- Deontic: a bare party / action name is a plain string plus a kind key --
+// The schema carries a bare name and rule source alike as a string and says
+// which in the obligation's sibling key partyKind / actionKind ("name"). The
+// answer's wire prints the string as it is; the trace's source text backticks a
+// tagged name that has a space, so that it stays L4, and prints anything else
+// as given.
+{
+  const sale = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "the seller",
+    partyKind: "name",
+    action: "deliver the goods",
+    actionKind: "name",
+    deadline: 14,
+    hence: {
+      kind: "OBLIGATION",
+      modal: "MUST",
+      party: "the buyer",
+      partyKind: "name",
+      action: "pay the invoice",
+      actionKind: "name",
+      deadline: 30,
+      hence: { kind: "FULFILLED" },
+      lest: { kind: "BREACH", by: null, because: null },
+    },
+    lest: { kind: "BREACH", by: null, because: null },
+  };
+  const rtD = createRuntime();
+  rtD.attachMemory(new WebAssembly.Memory({ initial: 1 }));
+  const metaOf = (contract) => ({
+    name: "the-sale-contract",
+    isDeontic: true,
+    parameters: { properties: {} },
+    paramOrder: [],
+    deonticContract: contract,
+    traceMeta: { fnName: "`the sale contract`" },
+  });
+  const answer = (contract, events) =>
+    JSON.stringify(runDeontic(contract, 0, events, {}, null));
+  const traced = (contract, events) =>
+    rtD.invokeFunctionWithReasoning({ exports: {} }, metaOf(contract), {
+      startTime: 0,
+      events,
+    }).reasoning.explanation[0];
+  const delivered = [
+    { party: "the seller", action: "deliver the goods", at: 5 },
+  ];
+
+  eq(
+    "deontic: an obligation names its party and action plain",
+    answer(sale, []),
+    JSON.stringify({
+      OBLIGATION: {
+        action: "deliver the goods",
+        deadline: "14",
+        modal: "MUST",
+        party: "the seller",
+      },
+    }),
+  );
+  eq(
+    "deontic trace: a tagged name with a space is backticked in the source text",
+    traced(sale, delivered),
+    "Result: PARTY `the buyer`\nMUST `pay the invoice`\nWITHIN 30\nHENCE FULFILLED\nLEST BREACH",
+  );
+
+  // Rule source is a string with no kind key and is printed as given.
+  const valued = (action) => ({
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "Alice",
+    partyKind: "name",
+    action,
+    deadline: 14,
+    hence: { kind: "FULFILLED" },
+    lest: { kind: "BREACH", by: null, because: null },
+  });
+  eq(
+    "deontic trace: an action that carries a value stays as the source it is",
+    traced(valued('say "pay now"'), []),
+    'Result: PARTY Alice\nMUST say "pay now"\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH',
+  );
+  eq(
+    "deontic trace: `pay 100` is an application, not a name, and is untouched",
+    traced(valued("pay 100"), []),
+    "Result: PARTY Alice\nMUST pay 100\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+  );
+
+  // L4's printer backticks a name unless it starts with a letter and holds
+  // only letters, digits and underscores. A hyphen, a percent sign, a dot, an
+  // apostrophe and a leading digit all need the backticks, with or without a
+  // space, or the source text does not parse. The same rule spells an event's
+  // party and action in the trace.
+  const named = (name) => ({
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: name,
+    partyKind: "name",
+    action: name,
+    actionKind: "name",
+    deadline: 14,
+    hence: { kind: "FULFILLED" },
+    lest: { kind: "BREACH", by: null, because: null },
+  });
+  const tracedCode = (contract, events) =>
+    rtD.invokeFunctionWithReasoning({ exports: {} }, metaOf(contract), {
+      startTime: 0,
+      events,
+    }).reasoning.exampleCode[0];
+  [
+    ["ship-it", true],
+    ["50%", true],
+    ["x.y", true],
+    ["it's", true],
+    ["2nd", true],
+    ["2nd buyer", true],
+    ["the seller", true],
+    ["Alice", false],
+    ["seller_1", false],
+    ["x2", false],
+    ["Zoë", false],
+  ].forEach(([name, quoted]) => {
+    const shown = quoted ? "`" + name + "`" : name;
+    const verb = quoted ? " is" : " is not";
+    eq(
+      "deontic trace: the name " + name + verb + " backticked",
+      traced(named(name), []),
+      "Result: PARTY " +
+        shown +
+        "\nMUST " +
+        shown +
+        "\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+    );
+    eq(
+      "deontic trace: an event named " + name + verb + " backticked",
+      tracedCode(named("Alice"), [
+        { party: name, action: name, at: 5 },
+      ]).includes("EVENT OF " + shown + ", " + shown + ", 5"),
+      true,
+    );
+  });
+
+  // A bundle compiled before the kind keys existed has none. Its literals are
+  // printed as given: never backticked again, never an error.
+  const older = {
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "`the seller`",
+    action: "`deliver the goods`",
+    deadline: 14,
+    hence: { kind: "FULFILLED" },
+    lest: { kind: "BREACH", by: null, because: null },
+  };
+  eq(
+    "deontic trace: a literal with no kind key (older bundle) is printed as given",
+    traced(older, []),
+    "Result: PARTY `the seller`\nMUST `deliver the goods`\nWITHIN 14\nHENCE FULFILLED\nLEST BREACH",
+  );
+
+  // The kind keys are siblings of the plain strings, so a runtime that
+  // predates them reads a new bundle as it reads an old one. Stripping them
+  // models that reader: no answer may depend on them, only the trace text.
+  const withoutKinds = JSON.parse(
+    JSON.stringify(sale, (k, v) =>
+      k === "partyKind" || k === "actionKind" || k === "byKind" ? undefined : v,
+    ),
+  );
+  eq(
+    "deontic: the kind keys are gone from the model of an older runtime",
+    JSON.stringify(withoutKinds).includes("Kind"),
+    false,
+  );
+  [
+    [],
+    delivered,
+    [{ party: "the seller", action: "deliver the goods", at: 20 }],
+    [
+      { party: "the seller", action: "deliver the goods", at: 5 },
+      { party: "the buyer", action: "pay the invoice", at: 20 },
+    ],
+  ].forEach((events, i) =>
+    eq(
+      "deontic: an older runtime reading a new bundle answers the same, stream " +
+        i,
+      answer(withoutKinds, events),
+      answer(sale, events),
+    ),
+  );
+
+  // The party of an explicit BREACH BY. The answer prints it plain, as
+  // jl4-service does, and the trace's source text prints it as L4: a name is
+  // backticked, and the BREACH node's byKind says it is one. Both trace nodes
+  // that print the clause read the kind from the contract, not from the answer.
+  const lapsing = (by, byKind) => ({
+    kind: "OBLIGATION",
+    modal: "MUST",
+    party: "the borrower",
+    partyKind: "name",
+    action: "repay loan",
+    actionKind: "name",
+    deadline: 30,
+    hence: { kind: "FULFILLED" },
+    lest: {
+      kind: "BREACH",
+      by,
+      ...(byKind ? { byKind } : {}),
+      because: '"not repaid"',
+    },
+  });
+  const late = [{ party: "the borrower", action: "repay loan", at: 40 }];
+  const breachTrace = (contract, meta = metaOf(contract), args = {}) =>
+    rtD.invokeFunctionWithReasoning({ exports: {} }, meta, {
+      startTime: 0,
+      events: late,
+      ...args,
+    }).reasoning;
+  const breached = lapsing("the borrower", "name");
+  eq(
+    "deontic: a BREACH BY party is answered plain",
+    answer(breached, late),
+    JSON.stringify({
+      BREACH: {
+        detail: "not repaid",
+        party: "the borrower",
+        reason: "explicit",
+      },
+    }),
+  );
+  const tree = breachTrace(breached);
+  eq(
+    "deontic trace: the Result text backticks a BREACH BY name",
+    tree.explanation[0],
+    'Result: DEONTIC BREACHED:\n  BREACH\n  BY `the borrower`\n  BECAUSE "not repaid"',
+  );
+  eq(
+    "deontic trace: the BREACH clause node backticks a BREACH BY name",
+    tree.children[2].children[1].exampleCode[0],
+    'BREACH BY `the borrower` BECAUSE "not repaid"',
+  );
+  [
+    ["Alice", false],
+    ["seller_1", false],
+    ["ship-it", true],
+    ["2nd buyer", true],
+  ].forEach(([name, quoted]) => {
+    const shown = quoted ? "`" + name + "`" : name;
+    const t = breachTrace(lapsing(name, "name"));
+    eq(
+      "deontic trace: BREACH BY " +
+        name +
+        (quoted ? " is" : " is not") +
+        " backticked, in the Result text and in the clause",
+      t.explanation[0].includes("  BY " + shown + "\n") &&
+        t.children[2].children[1].exampleCode[0] ===
+          "BREACH BY " + shown + ' BECAUSE "not repaid"',
+      true,
+    );
+  });
+  // Rule source (a party that is not a bare name) carries no byKind and is
+  // printed as given, and so is a bundle compiled before the key existed.
+  const sourceParty = breachTrace(lapsing("Person OF `the borrower`"));
+  eq(
+    "deontic trace: a BREACH BY with no byKind is printed as given (Result)",
+    sourceParty.explanation[0],
+    'Result: DEONTIC BREACHED:\n  BREACH\n  BY Person OF `the borrower`\n  BECAUSE "not repaid"',
+  );
+  eq(
+    "deontic trace: a BREACH BY with no byKind is printed as given (clause)",
+    sourceParty.children[2].children[1].exampleCode[0],
+    'BREACH BY Person OF `the borrower` BECAUSE "not repaid"',
+  );
+  const olderBreach = breachTrace(lapsing("the borrower"));
+  eq(
+    "deontic trace: an older bundle's BREACH BY name is printed as given",
+    olderBreach.children[2].children[1].exampleCode[0],
+    'BREACH BY the borrower BECAUSE "not repaid"',
+  );
+  eq(
+    "deontic: the byKind key never changes the answer",
+    answer(lapsing("the borrower"), late),
+    answer(breached, late),
+  );
+
+  // The parameterised synthesizer prints the clause too.
+  const paramMeta = {
+    ...metaOf(breached),
+    paramOrder: ["flag"],
+    parameters: { properties: { flag: { type: "boolean" } } },
+  };
+  const paramTree = JSON.stringify(
+    breachTrace(breached, paramMeta, { arguments: { flag: true }, flag: true }),
+  );
+  eq(
+    "deontic trace (parameterised): a BREACH BY name is backticked",
+    paramTree.includes("BY `the borrower`"),
+    true,
+  );
+  eq(
+    "deontic trace (parameterised): and never printed bare",
+    paramTree.includes("BY the borrower"),
+    false,
+  );
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

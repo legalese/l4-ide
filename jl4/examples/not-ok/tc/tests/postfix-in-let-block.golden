@@ -8,11 +8,7 @@ File: postfix-in-let-block.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
-
-      `__TIMES__` (predefined)
-
-    is expected to be of type
+    The first argument of '*' is expected to be of type
 
       NUMBER
 
@@ -27,11 +23,7 @@ File: postfix-in-let-block.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The second argument of function 
-
-      `__TIMES__` (predefined)
-
-    is expected to be of type
+    The second argument of '*' is expected to be of type
 
       NUMBER
 

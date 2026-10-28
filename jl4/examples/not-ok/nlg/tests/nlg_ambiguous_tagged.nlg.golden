@@ -1,0 +1,15 @@
+
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: nlg_ambiguous_tagged.l4
+  Hidden: no
+  Range: 8:8-8:18
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    More than one NLG annotation in language `he` attached to: `is large`
+    An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags.
+    The following annotations would be attached:
+
+    * `one rendering`
+    * `another rendering`

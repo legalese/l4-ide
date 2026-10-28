@@ -1,0 +1,238 @@
+-- A user-defined infix operator is admitted as a later operand of a
+-- built-in operator (AND, OR, comparisons, arithmetic), exactly as it is
+-- already admitted as the first operand, inside parentheses, and as a
+-- prefix call.
+-- It binds tighter than every built-in operator, as prefix application
+-- does, so the bare spelling and the parenthesised spelling mean the same.
+
+§ `The operator`
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A BOOLEAN
+a `exceeds by at least` b MEANS a AT LEAST b
+
+§ `After AND and OR`
+
+-- The bare spelling: the operator is the second operand of AND.
+GIVEN n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `ok plain` n x IF
+    TRUE AND n `exceeds by at least` x
+
+-- The same, parenthesised (always admitted).
+GIVEN n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `ok parenthesised` n x IF
+    TRUE AND (n `exceeds by at least` x)
+
+-- The same, as a prefix call (always admitted).
+GIVEN n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `ok prefix` n x IF
+    TRUE AND `exceeds by at least` n x
+
+-- The operator as the first operand (always admitted).
+GIVEN n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `ok first` n x IF
+    n `exceeds by at least` x AND TRUE
+
+-- The operator on both sides of the connective.
+GIVEN n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `ok both sides` n x IF
+    n `exceeds by at least` x AND x `exceeds by at least` 0
+
+GIVEN p IS A BOOLEAN
+      n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `bare and` p n x IF p AND n `exceeds by at least` x
+
+GIVEN p IS A BOOLEAN
+      n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `parenthesised and` p n x IF p AND (n `exceeds by at least` x)
+
+GIVEN p IS A BOOLEAN
+      n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `bare or` p n x IF p OR n `exceeds by at least` x
+
+GIVEN p IS A BOOLEAN
+      n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `parenthesised or` p n x IF p OR (n `exceeds by at least` x)
+
+#EVAL `ok plain` 5 3
+#EVAL `ok plain` 1 3
+#EVAL `ok parenthesised` 5 3
+#EVAL `ok prefix` 5 3
+#EVAL `ok first` 5 3
+#EVAL `ok both sides` 5 3
+#EVAL `ok both sides` 5 8
+
+-- Bare and parenthesised agree on every combination of a Boolean and a
+-- comparison that holds or fails.
+#ASSERT `bare and` TRUE 5 3 EQUALS `parenthesised and` TRUE 5 3
+#ASSERT `bare and` TRUE 1 3 EQUALS `parenthesised and` TRUE 1 3
+#ASSERT `bare and` FALSE 5 3 EQUALS `parenthesised and` FALSE 5 3
+#ASSERT `bare and` FALSE 1 3 EQUALS `parenthesised and` FALSE 1 3
+#ASSERT `bare or` TRUE 5 3 EQUALS `parenthesised or` TRUE 5 3
+#ASSERT `bare or` TRUE 1 3 EQUALS `parenthesised or` TRUE 1 3
+#ASSERT `bare or` FALSE 5 3 EQUALS `parenthesised or` FALSE 5 3
+#ASSERT `bare or` FALSE 1 3 EQUALS `parenthesised or` FALSE 1 3
+
+-- Known answers for the bare spelling.
+#ASSERT `bare and` TRUE 5 3
+#ASSERT NOT `bare and` TRUE 1 3
+#ASSERT NOT `bare and` FALSE 5 3
+
+§ `Inside a CONSIDER arm`
+
+-- The bare spelling after AND, in the body of a WHEN arm.
+GIVEN m IS A MAYBE NUMBER
+      n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `arm plain` m n IF
+    CONSIDER m
+    WHEN JUST x THEN TRUE AND n `exceeds by at least` x
+    WHEN NOTHING THEN FALSE
+
+-- The operator alone in the arm (always admitted).
+GIVEN m IS A MAYBE NUMBER
+      n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `arm alone` m n IF
+    CONSIDER m
+    WHEN JUST x THEN n `exceeds by at least` x
+    WHEN NOTHING THEN FALSE
+
+-- The operator parenthesised after AND in the arm (always admitted).
+GIVEN m IS A MAYBE NUMBER
+      n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `arm parenthesised` m n IF
+    CONSIDER m
+    WHEN JUST x THEN TRUE AND (n `exceeds by at least` x)
+    WHEN NOTHING THEN FALSE
+
+#EVAL `arm plain` (JUST 3) 5
+#EVAL `arm plain` (JUST 8) 5
+#EVAL `arm plain` NOTHING 5
+#EVAL `arm alone` (JUST 3) 5
+#EVAL `arm parenthesised` (JUST 3) 5
+
+#ASSERT `arm plain` (JUST 3) 5 EQUALS `arm parenthesised` (JUST 3) 5
+#ASSERT `arm plain` (JUST 8) 5 EQUALS `arm parenthesised` (JUST 8) 5
+#ASSERT `arm plain` NOTHING 5 EQUALS `arm parenthesised` NOTHING 5
+
+§ `After a comparison and an arithmetic operator`
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x SCALEDBY y MEANS x TIMES y
+
+-- A bare-word operator is admitted the same way.
+-- It binds tighter than PLUS on either side, so both spell 16.
+#EVAL 10 PLUS 2 SCALEDBY 3
+#EVAL 2 SCALEDBY 3 PLUS 10
+#ASSERT 10 PLUS 2 SCALEDBY 3 EQUALS 2 SCALEDBY 3 PLUS 10
+
+-- The operator as the later operand of a comparison.
+#EVAL TRUE EQUALS 5 `exceeds by at least` 3
+#EVAL FALSE EQUALS 5 `exceeds by at least` 3
+#EVAL 2 SCALEDBY 3 EQUALS 6 AND TRUE
+
+§ `An operand that is not known`
+
+ASSUME `unknown count` IS A NUMBER
+
+-- When the first operand settles the connective, the unknown operand is
+-- never needed, and the bare and parenthesised spellings agree.
+#EVAL FALSE AND `unknown count` `exceeds by at least` 3
+#EVAL FALSE AND (`unknown count` `exceeds by at least` 3)
+#EVAL TRUE OR `unknown count` `exceeds by at least` 3
+#EVAL TRUE OR (`unknown count` `exceeds by at least` 3)
+
+§ `A multi-keyword operator`
+
+GIVEN x IS A NUMBER
+      lo IS A NUMBER
+      hi IS A NUMBER
+GIVETH A BOOLEAN
+x `lies from` lo `up to` hi MEANS x AT LEAST lo AND x AT MOST hi
+
+#EVAL TRUE AND 5 `lies from` 1 `up to` 9
+#EVAL TRUE AND 12 `lies from` 1 `up to` 9
+#EVAL FALSE OR 5 `lies from` 1 `up to` 9
+
+§ `Written as a MEANS or IS definition`
+
+-- The ordinary way to write a rule is a definition with a MEANS or IS body,
+-- not a DECIDE ... IF condition or a directive.
+-- Each body below puts the operator after a built-in operator.
+
+GIVETH A BOOLEAN
+`bare in a MEANS body` MEANS TRUE AND 5 `exceeds by at least` 3
+
+GIVETH A BOOLEAN
+`parenthesised in a MEANS body` MEANS TRUE AND (5 `exceeds by at least` 3)
+
+GIVETH A BOOLEAN
+`arithmetic in a MEANS body` MEANS TRUE AND 6 SCALEDBY 2 EQUALS 12
+
+GIVETH A BOOLEAN
+`parenthesised arithmetic in a MEANS body` MEANS TRUE AND (6 SCALEDBY 2) EQUALS 12
+
+GIVETH A BOOLEAN
+`multi-keyword in a MEANS body` MEANS TRUE AND 5 `lies from` 1 `up to` 9
+
+GIVETH A BOOLEAN
+`parenthesised multi-keyword in a MEANS body` MEANS TRUE AND (5 `lies from` 1 `up to` 9)
+
+-- An IS body whose expression starts on the next line.
+GIVETH A BOOLEAN
+DECIDE `multi-keyword in an IS body` IS
+    TRUE AND 5 `lies from` 1 `up to` 9
+
+GIVETH A BOOLEAN
+DECIDE `parenthesised multi-keyword in an IS body` IS
+    TRUE AND (5 `lies from` 1 `up to` 9)
+
+#ASSERT `bare in a MEANS body`
+#ASSERT `arithmetic in a MEANS body`
+#ASSERT `multi-keyword in a MEANS body`
+#ASSERT `multi-keyword in an IS body`
+#ASSERT `bare in a MEANS body` EQUALS `parenthesised in a MEANS body`
+#ASSERT `arithmetic in a MEANS body` EQUALS `parenthesised arithmetic in a MEANS body`
+#ASSERT `multi-keyword in a MEANS body` EQUALS `parenthesised multi-keyword in a MEANS body`
+#ASSERT `multi-keyword in an IS body` EQUALS `parenthesised multi-keyword in an IS body`
+
+§ `A call spread over several lines`
+
+-- A chain split across lines needs parentheses, with a new line after the
+-- opening one.
+-- Without them every keyword must be on the operand's own line, as below.
+GIVEN n IS A NUMBER
+      x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `spread over lines` n x IF
+    TRUE AND (
+        n
+        `exceeds by at least`
+        x
+    )
+
+#EVAL `spread over lines` 5 3
+#EVAL `spread over lines` 1 3

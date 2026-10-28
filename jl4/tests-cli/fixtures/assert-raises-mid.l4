@@ -1,0 +1,7 @@
+-- The middle directive is an #ASSERT whose expression raises, so it can be
+-- neither satisfied nor failed. The #EVAL directives around it can be evaluated.
+#EVAL 1 PLUS 1
+
+#ASSERT (1 DIVIDED BY 0) EQUALS 1
+
+#EVAL 2 PLUS 2

@@ -9,6 +9,7 @@ module L4.Viz.VizExpr
   , VersionedDocId(..)
   , FunDecl(..)
   , IRExpr(..)
+  , irExceeds
   , InertContext(..)
   , Name(..)
   , ID(..)
@@ -157,3 +158,24 @@ instance Aeson.FromJSON UBoolValue where
     "TrueV"    -> pure TrueV
     "UnknownV" -> pure UnknownV
     t -> fail $ "Unknown UBoolValue: " <> show t
+
+-- | Does the expression have more than this many nodes? Stops counting at the
+-- budget, so it costs at most the budget however large the argument is.
+irExceeds :: Int -> IRExpr -> Bool
+irExceeds budget root = go (budget + 1) [root]
+ where
+  go :: Int -> [IRExpr] -> Bool
+  go fuel _ | fuel <= 0 = True
+  go _    []            = False
+  go fuel (e : rest)    = go (fuel - 1) (children e <> rest)
+
+  children :: IRExpr -> [IRExpr]
+  children = \case
+    And _ args       -> args
+    Or _ args        -> args
+    Not _ negand     -> [negand]
+    App _ _ args _   -> args
+    UBoolVar{}       -> []
+    TrueE{}          -> []
+    FalseE{}         -> []
+    InertE{}         -> []

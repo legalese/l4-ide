@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+json-encode-either.l4:8:1-26:
+  "{\"LEFT\":1}"
+json-encode-either.l4:9:1-36:
+  "{\"RIGHT\":\"approved\"}"
+json-encode-either.l4:10:1-36:
+  "{\"LEFT\":[1,2]}"
+json-encode-either.l4:11:1-34:
+  "{\"RIGHT\":3}"
+json-encode-either.l4:12:1-63:
+  "[{\"LEFT\":\"missing document\"},{\"RIGHT\":250}]"
+json-encode-either.l4:13:1-74:
+  "{\"applicant\":\"Kim\",\"outcome\":{\"RIGHT\":250}}"

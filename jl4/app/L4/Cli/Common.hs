@@ -7,6 +7,8 @@ module L4.Cli.Common
     FixedNowOpt(..)
   , fixedNowParser
   , parseFixedNowText
+  , langTagReader
+  , langOption
 
     -- * Evaluation config
   , makeEvalConfig
@@ -15,7 +17,11 @@ module L4.Cli.Common
 
     -- * Running the LSP pipeline
   , runOneshot
+  , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , hasBlockingError
+  , transitiveDeps
+  , dedupModules
 
     -- * Rendering
   , TraceTextMode(..)
@@ -46,6 +52,8 @@ import qualified Options.Applicative as Options
 import System.IO (hPutStrLn, stderr)
 import Control.Applicative ((<|>))
 
+import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
+import LSP.L4.BlockingErrors (hasBlockingError)
 import LSP.L4.Oneshot (oneshotL4Action)
 import qualified LSP.L4.Oneshot as Oneshot
 import LSP.Logger
@@ -60,11 +68,16 @@ import LSP.Logger
 import Language.LSP.Protocol.Types (NormalizedFilePath)
 import Development.IDE.Graph (Action)
 
+import L4.Lexer (LangTag(..), isLangTagChar)
+import qualified LSP.L4.Rules as Rules
+import L4.Syntax (Module (..), Resolved)
+import qualified Data.List as List
 import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
   , parseFixedNow
+  , prettyAssertionOutcome
   , prettyEvalException
   , readFixedNowEnv
   , resolveEvalConfig
@@ -102,6 +115,65 @@ fixedNowParser = fmap FixedNowOpt $ optional $
     ( long "fixed-now"
     <> metavar "ISO8601"
     <> help "Pin evaluation clock (e.g. 2025-01-31T15:45:30Z) so NOW/TODAY stay deterministic"
+    )
+
+-- | Read a @--lang@ value into a 'LangTag'.
+--
+-- __Validated, because the value reaches markup.__ @l4 render --format html@
+-- puts it in @\<html lang="…"\>@ and the AKN writer puts it in an FRBR URI, so
+-- an unreadable value is an unreadable document rather than a rendering that
+-- merely falls back. The module-side spelling of the same thing has always been
+-- validated — the lexer restricts @\@lang@ to 'isLangTagChar' — and this closes
+-- the asymmetry the flag had against it.
+--
+-- Two normalisations, both silent because both are BCP 47 saying the same tag:
+--
+--   * __surrounding whitespace is trimmed__. @--lang 'he '@ used to label the
+--     document @he @ and then lose @dir="rtl"@, because the direction lookup
+--     compared @"he "@ against the table and missed — a Hebrew document laid out
+--     left to right, exit 0, no diagnostic. A trailing space out of a shell
+--     variable or a spreadsheet column is how that arrives.
+--   * __the primary subtag is lowercased__, which is its conventional form
+--     (@he-IL@, not @HE-IL@). Nothing else is re-cased: canonicalising the
+--     script and region too would be inventing a tag the user did not type.
+--     This also makes @--lang HE@ SELECT the @\@nlg:he@ renderings, which it did
+--     not before — rendering selection compares tags exactly.
+--
+-- Rejected: empty or all-whitespace, anything outside @[A-Za-z0-9-]@, and any tag
+-- whose @-@-separated subtags are not each one to eight characters — which covers
+-- a leading, trailing or doubled hyphen (@-he@, @he-@, @he--IL@) and an
+-- over-long subtag, because BCP 47 spells every subtag @1*8alphanum@.
+--
+-- __That is a shape check, not a grammar.__ It does not know which subtags are
+-- registered, nor that a script sits before a region; @xx-Qrst@ passes. The line
+-- is drawn at "could this be a language tag at all", because the point is to keep
+-- an unreadable value out of an attribute, not to validate against the IANA
+-- registry — which would mean vendoring it.
+langTagReader :: ReadM LangTag
+langTagReader = eitherReader \input ->
+  let tag             = Text.strip (Text.pack input)
+      subtags         = Text.splitOn "-" tag
+      (primary, rest) = Text.break (== '-') tag
+      bad why = Left $ "Invalid --lang value " <> show input <> ": " <> why
+                     <> " (expected a BCP 47 language tag, e.g. he, he-IL, az-Arab)"
+  in if Text.null tag
+       then bad "empty"
+     else if not (Text.all isLangTagChar tag)
+       then bad "only letters, digits and '-' are allowed"
+     else if any (\ st -> Text.null st || Text.length st > 8) subtags
+       then bad "each '-'-separated subtag must be 1 to 8 characters"
+     else Right (MkLangTag (Text.toLower primary <> rest))
+
+-- | The @--lang@ option itself, so that every verb that takes one takes the
+-- same one. @help@ differs between verbs only in what it calls the output.
+langOption :: String -> Options.Parser (Maybe LangTag)
+langOption what = optional $
+  option langTagReader
+    ( long "lang"
+   <> metavar "SUBTAG"
+   <> help ("Render using the @nlg:SUBTAG annotations, e.g. --lang he. A "
+         <> what <> " with no rendering in that language falls back to its "
+         <> "default one, so a partial translation still produces a whole document.")
     )
 
 ----------------------------------------------------------------------------
@@ -174,6 +246,36 @@ runOneshot evalConfig fp act = do
   -- Post-filter: drop lines matching known progress-chatter prefixes.
   pure (filter (not . isProgressChatter) rawErrs, res)
 
+-- | Like 'runOneshot', but additionally returns the structured diagnostics
+-- published to the Shake store during the run, across every file in the import
+-- closure and not just the entry file.
+--
+-- The rendered @[Text]@ is still returned for display; the @[FileDiagnostic]@
+-- is what a caller consults for a verdict that knows severity. An import cycle
+-- is the case that needs it: the engine attaches its error to a module that is
+-- imported, so the entry file's own typecheck result can look successful.
+runOneshotWithDiagnostics
+  :: EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+runOneshotWithDiagnostics evalConfig fp act = do
+  (getLog, refRecorder) <- makeRefRecorder
+  let prettyRecorder = cmapWithPrio pretty refRecorder
+      keep wp = wp.priority /= Debug
+      filteredRec = cfilter keep prettyRecorder
+  (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
+  rawErrs <- getLog
+  pure (filter (not . isProgressChatter) rawErrs, diags, res)
+
+-- 'hasBlockingError' (re-exported) is the rule for whether a diagnostics set
+-- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
+-- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
+-- It leaves out the evaluator's diagnostics (source @\"eval\"@): a failed
+-- @#ASSERT@ is one, at Error severity, and keeps @l4 run@ at exit 0. A
+-- directive that CRASHES does fail the run, but @l4 run@ decides that from the
+-- directive results, not from here.
+
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather
 -- than user-facing diagnostics.
@@ -181,11 +283,17 @@ runOneshot evalConfig fp act = do
 -- The rendered format puts priority + content inline, e.g.
 -- @"Info | [Import Resolution] Found on filesystem: ..."@, so we look
 -- past the @"Priority | "@ prefix.
+--
+-- Import-resolution lines at Warning/Error priority are NOT chatter: they
+-- carry the library-shadow warning (multiple differing copies of a module
+-- visible; see specs/as-built/import-resolution.md) and module-not-found notices,
+-- which a CLI user must see.
 isProgressChatter :: Text -> Bool
 isProgressChatter txt =
-  let body    = dropPriorityPrefix txt
+  let (mPriority, body) = splitPriorityPrefix txt
       starts p = p `Text.isPrefixOf` body
-  in  starts "[Import Resolution]"
+      warningOrWorse = mPriority `elem` [Just "Warning", Just "Error"]
+  in  (starts "[Import Resolution]" && not warningOrWorse)
    || starts "[VFS"
    || starts "Ide: Shake"
    || starts "Shake:"
@@ -193,11 +301,12 @@ isProgressChatter txt =
    || starts "Opening Shake database"
    || Text.null (Text.strip body)
 
-dropPriorityPrefix :: Text -> Text
-dropPriorityPrefix txt =
+-- | Split a rendered log line into its priority column (if present) and body.
+splitPriorityPrefix :: Text -> (Maybe Text, Text)
+splitPriorityPrefix txt =
   case Text.breakOn " | " txt of
-    (_, rest) | not (Text.null rest) -> Text.stripStart (Text.drop 3 rest)
-    _                                -> txt
+    (prio, rest) | not (Text.null rest) -> (Just (Text.strip prio), Text.stripStart (Text.drop 3 rest))
+    _                                   -> (Nothing, txt)
 
 -- | Like 'runOneshot', but routes LSP diagnostics through a caller-supplied
 -- recorder (e.g. one backed by stderr) and returns only the action's result.
@@ -256,8 +365,7 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
 
 renderEvalValue :: EvalDirectiveValue -> Text
 renderEvalValue = \case
-  Assertion True -> "assertion satisfied"
-  Assertion False -> "assertion failed"
+  Assertion a -> prettyAssertionOutcome a
   Reduction (Left exc) -> Text.unlines (prettyEvalException exc)
   Reduction (Right val) -> prettyLayout val
 
@@ -311,3 +419,17 @@ putDiagnostics = mapM_ (hPutStrLn stderr . Text.unpack)
 -- JSON envelope quotes the already-prettified LSP log text.
 diagnosticsToJson :: [Text] -> Aeson.Value
 diagnosticsToJson = Aeson.toJSON
+
+-- | Every module the checked one reaches through @IMPORT@, transitively, once
+-- each, in the order a depth-first walk of the imports first meets it
+-- ('Rules.transitiveDependencies'). This used to recurse into each
+-- dependency's own list, which is already transitive, so it listed a module
+-- once per import path and took time exponential in the depth of the imports
+-- (smucclaw\/l4-ide#1008). 'dedupModules' is now a no-op on it.
+transitiveDeps :: Rules.TypeCheckResult -> [Module Resolved]
+transitiveDeps tc = map (.module') (Rules.transitiveDependencies tc)
+
+dedupModules :: [Module Resolved] -> [Module Resolved]
+dedupModules = List.nubBy (\a b -> muri a == muri b)
+ where
+  muri (MkModule _ u _) = u

@@ -1,0 +1,27 @@
+-- The first group of not-ok/tc/pattern-matching-export-without-given.l4, with
+-- a GIVEN that names and types its inputs: it checks, and is published under
+-- those names. A group with no GIVEN that is not published, and a published
+-- definition that is not a group, need no GIVEN (ruling M2, option A,
+-- 2026-10-08).
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+
+@desc The size before rounding, which is not published
+DECIDE `unpublished size` Red   n IS n
+DECIDE `unpublished size` Green n IS n + 1
+DECIDE `unpublished size` Blue  n IS 0
+
+@export The answer
+DECIDE answer IS 42
+
+#EVAL size Green 4
+#EVAL `unpublished size` Green 4
+#EVAL answer

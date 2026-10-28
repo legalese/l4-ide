@@ -5,6 +5,7 @@ import Base
 import Control.Monad.Trans.Maybe
 import qualified Data.Aeson.Encode.Pretty as AP
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.Text.Encoding as TE
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified L4.Annotation as JL4
@@ -28,7 +29,7 @@ import qualified LSP.Core.Shake as Shake
 import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
-import Optics
+import System.Environment (lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
@@ -46,6 +47,16 @@ main :: IO ()
 main = do
   dataDir <- Paths_jl4.getDataDir
   dataDirCore <- Paths_jl4_core.getDataDir
+  -- Make the golden suite self-sufficient under a bare `cabal test`: point
+  -- library resolution at the bundled core libraries unless the caller has
+  -- already chosen a store. Without this, examples that IMPORT a library (e.g.
+  -- actus-library-test) fail locally because embedded transitive resolution is
+  -- incomplete. CI already exports JL4_LIBRARY_PATH, so this only restores
+  -- local/CI parity; an explicit setting is respected.
+  mLibEnv <- lookupEnv "JL4_LIBRARY_PATH"
+  case mLibEnv of
+    Just _  -> pure ()
+    Nothing -> setEnv "JL4_LIBRARY_PATH" (dataDirCore </> "libraries")
   envFixed <- JL4Lazy.readFixedNowEnv
   let fallbackNow =
         fromMaybe (error "Internal: invalid fallback timestamp for JL4 tests")
@@ -61,10 +72,39 @@ main = do
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
+  -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs.
+  -- The export-*.l4 files typecheck fine but assert (via their schema golden)
+  -- that an @export in an unsupported position yields no default export.
+  -- (empty.l4 used to live here while warnings still failed typecheck; now
+  -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
+  exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
   hspec do
+    describe "corpus sanity (every glob matched something)" $ do
+      let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
+      corpusNonEmpty "ok"              okFiles
+      corpusNonEmpty "libraries"       librariesFiles
+      corpusNonEmpty "legal"           legalFiles
+      corpusNonEmpty "tc-fails"        tcFailsFiles
+      corpusNonEmpty "nlg-fails"       nlgFailsFiles
+      corpusNonEmpty "semantic-tokens" semanticTokenFiles
+      corpusNonEmpty "hover"           hoverFiles
+      corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
+    -- Invariant: exactprint is the identity on the source for every parseable
+    -- corpus file. This is the single guard against the whole class of
+    -- format-mangling bugs (mixfix/event reordering, dropped TIMEZONE/DECIDE
+    -- tokens, duplicated UNLESS, re-escaped unicode). Unlike the per-file
+    -- ".ep.golden" test — which blesses whatever exactprint currently emits, so
+    -- it silently records mangled output — this compares against the verbatim
+    -- source and so cannot bless a regression.
+    describe "exactprint identity (source round-trips l4 format)" $
+      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4ExactPrintIdentity evalConfig inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
+    describe "export placement (typechecks; no default export)" $
+      tests evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
   where
@@ -118,6 +158,44 @@ jl4ExactPrintGolden evalConfig dir inputFile = do
       , failFirstTime = True
       }
 
+-- | Assert @exactprint (parse f) == f@: the exact-printer reproduces the source
+-- byte-for-byte. Runs the same 'Rules.ExactPrint' rule that @l4 format@ uses and
+-- compares to the verbatim file contents (no whitespace normalisation — that is
+-- the whole point). On mismatch we report the first differing line so failures
+-- stay legible instead of dumping the whole file.
+jl4ExactPrintIdentity :: JL4Lazy.EvalConfig -> FilePath -> IO ()
+jl4ExactPrintIdentity evalConfig inputFile = do
+  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.ExactPrint uri
+  src <- Text.readFile inputFile
+  case moutput of
+    Nothing ->
+      expectationFailure $
+        "exactprint produced no output for " <> inputFile <> ":\n"
+          <> Text.unpack (Text.unlines errs)
+    Just out
+      | out == src -> pure ()
+      | otherwise ->
+          expectationFailure $
+            "exactprint is not the identity for " <> inputFile
+              <> firstDiff (Text.lines src) (Text.lines out)
+  where
+    firstDiff ss os =
+      let n      = max (length ss) (length os)
+          pad xs = xs <> replicate (n - length xs) ""
+          diffs  = [ (i, s, o)
+                   | (i, s, o) <- zip3 [1 :: Int ..] (pad ss) (pad os)
+                   , s /= o ]
+      in case diffs of
+        [] -> " (line contents match; differ only in trailing newline / length: "
+                <> show (length ss) <> " vs " <> show (length os) <> " lines)"
+        ((i, s, o) : _) ->
+          "\n  first difference at line " <> show i
+            <> "\n  source:    " <> show s
+            <> "\n  exactprint:" <> show o
+
 jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
   (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
@@ -127,11 +205,13 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
   let output_ = case moutput of
         Nothing -> "Cannot linearize module that doesn't typecheck\n"
         Just checkResult ->
-          let
-            mod' = checkResult.module'
-            directives = toListOf (gplate @(Directive Resolved)) mod'
-          in
-            Text.unlines $ fmap Nlg.simpleLinearizer directives
+          -- The SAME function @l4 nlg@ calls (see its module header). Both sides
+          -- used to spell the payload out and a comment asked the reader to keep
+          -- them in step; they now cannot diverge. The dependencies ride along:
+          -- a heralded call in a directive can name a rule an imported module
+          -- defines, and its sentence is read from there.
+          let deps = map (.module') (Rules.transitiveDependencies checkResult)
+          in Text.unlines $ Nlg.linearizeDirectives Nothing checkResult.module' deps
   -- Strip ANSI codes and normalize whitespace for cross-platform consistency
   let output = normalizeWhitespace $ stripAnsiCodes $
         if isOk
@@ -164,7 +244,21 @@ jl4JsonSchemaGolden evalConfig dir inputFile = do
                Just export ->
                  let ctx = buildSchemaContext checkResult.module'
                      schema = JsonSchema.generateJsonSchema ctx export
-                 in BL.unpack (AP.encodePretty schema) ++ "\n"
+                 -- NOT 'BL.unpack'. 'Data.ByteString.Lazy.Char8.unpack' maps
+                 -- each BYTE to a 'Char', and 'AP.encodePretty' returns UTF-8
+                 -- bytes — so every non-ASCII character arrived here as its
+                 -- individual bytes, and 'writeFile' then re-encoded each of
+                 -- those as UTF-8. Double encoding: source @ä@ (@c3 a4@) was
+                 -- stored as @c3 83 c2 a4@, i.e. @Ã¤@.
+                 --
+                 -- It survived because it ROUND-TRIPS. 'readFromFile' was
+                 -- 'readFile', which decodes UTF-8 and so undid the damage
+                 -- symmetrically; golden and actual agreed and the suite stayed
+                 -- green while the file on disk held mojibake. The @.ep.golden@
+                 -- beside it, written from 'Text', held the same source text
+                 -- correctly — which is the control that makes this visible.
+                 -- smucclaw/l4-ide#962.
+                 in Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty schema))) ++ "\n"
   pure
     Golden
       { output

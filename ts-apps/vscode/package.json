@@ -401,6 +401,7 @@
   },
   "prettier": "@repo/prettier-config",
   "dependencies": {
+    "@picovoice/pvrecorder-node": "1.2.9",
     "@repo/legalese-agent": "*",
     "@repo/viz-expr": "*",
     "@repo/webview": "*",

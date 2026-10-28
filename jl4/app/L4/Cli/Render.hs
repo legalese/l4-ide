@@ -25,7 +25,6 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BSL8
-import qualified Data.List as List
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 
@@ -34,8 +33,11 @@ import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Export.Document
+import L4.Lexer (LangTag (..))
+import L4.Syntax (defaultModuleLang)
+import qualified L4.Nlg as Nlg
+import qualified L4.Parser as Parser
 import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
-import L4.Syntax
 
 import L4.Cli.Common
 
@@ -54,6 +56,7 @@ data RenderOptions = RenderOptions
   , renderNumberSections :: Bool
   , renderNumberClauses  :: Bool
   , renderToc            :: Bool
+  , renderLang           :: Maybe LangTag
   , renderFixedNow       :: FixedNowOpt
   }
 
@@ -102,6 +105,7 @@ renderOptionsParser = RenderOptions
         ( long "toc"
        <> help "Prepend a linked table of contents (HTML only)"
         )
+  <*> langOption "rule"
   <*> fixedNowParser
 
 ----------------------------------------------------------------------------
@@ -111,10 +115,16 @@ renderOptionsParser = RenderOptions
 renderCmd :: RenderOptions -> IO ()
 renderCmd opts = do
   evalConfig <- makeEvalConfig opts.renderFixedNow
-  (errs, mTc) <- runOneshot evalConfig opts.renderFile \nfp -> do
+  -- The token stream as well as the type-check result: the document's language
+  -- falls back to the module's own @\@lang@, and that is a declaration in the
+  -- token stream (see 'Parser.declaredModuleLang') rather than anything the
+  -- resolved AST keeps. 'Rules.GetLexTokens' is what the parse rule itself
+  -- consumed, so this re-reads nothing.
+  (errs, (mTc, mToks)) <- runOneshot evalConfig opts.renderFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
+    (,) <$> Shake.use Rules.SuccessfulTypeCheck uri
+        <*> Shake.use Rules.GetLexTokens uri
 
   case mTc of
     Nothing -> do
@@ -128,19 +138,71 @@ renderCmd opts = do
                   { dropUnused = not opts.renderIncludeUnused
                   , mixfixHeadings = mixfixHeadingsFromRegistry tc.mixfixRegistry
                   }
+          -- The language the document SAYS it is in, in one place: the one
+          -- asked for, else the one the module declares, else @en@. The
+          -- same order 'localise' below effectively applies to the renderings
+          -- themselves — @--lang@ promotes a tagged herald, and with no flag the
+          -- default herald is the one @\@lang@ stamped.
+          declaredLanguage = fromMaybe defaultModuleLang
+                               (Parser.declaredModuleLang . fst =<< mToks)
+
+          -- A label the document cannot support is not taken, and stderr
+          -- says so below ('Nlg.documentLanguage').
+          (docLanguage, unsupportedRequest) =
+            Nlg.documentLanguage declaredLanguage opts.renderLang (tc.module' : rawDeps)
           rcfg = MkRenderConfig
                    { numberSections = opts.renderNumberSections
                    , numberClauses  = opts.renderNumberClauses
                    , toc            = opts.renderToc
+                   , docLang        = docLanguage
                    }
-          doc = buildDocument cfg tc.module' (dedupModules (transitiveDeps tc))
+          -- Choose the language BEFORE building the document, not inside it.
+          -- 'selectLanguage' moves the requested rendering into the slot
+          -- 'L4.Export.Document' already reads, so every format below becomes
+          -- language-aware without one of them being touched — which is the
+          -- whole reason selection was built as a rewrite rather than as a
+          -- parameter threaded through the exporters.
+          --
+          -- Applied to the DEPENDENCIES too: a rule rendered here can come
+          -- from an imported module, and a document half in one language
+          -- because its imports were missed is worse than one in either.
+          --
+          -- 'selectLanguage' 'Nothing' is the identity, so with no --lang the
+          -- output is byte-for-byte what it was.
+          localise = Nlg.selectLanguage opts.renderLang
+          rawDeps = dedupModules (transitiveDeps tc)
+          mainModule = localise tc.module'
+          depModules = map localise rawDeps
+          doc = buildDocument cfg mainModule depModules
+      -- Said only for the formats that carry a document language, so that
+      -- `--format text --lang zz` stays byte-identical on BOTH streams.
+      case (unsupportedRequest, formatLabelsLanguage opts.renderFormat) of
+        (Just (MkLangTag want), True) ->
+          let MkLangTag label = docLanguage
+          in hPutStrLn stderr $ Text.unpack $
+               "l4 render: no renderings in \"" <> want <> "\"; document labelled \""
+                 <> label <> "\" instead."
+        _ -> pure ()
       case opts.renderFormat of
         FmtJson -> emitBytes opts (Aeson.encode doc)
-        FmtPlan -> emitBytes opts (Aeson.encode (buildPlan cfg tc.module' (dedupModules (transitiveDeps tc))))
+        FmtPlan -> emitBytes opts (Aeson.encode (buildPlan cfg mainModule depModules))
         FmtText -> emitText opts (renderText rcfg doc)
         FmtHtml -> emitText opts (renderHtml rcfg doc)
-        FmtAkn  -> emitText opts (renderAkn doc)
+        FmtAkn  -> emitText opts (renderAkn rcfg doc)
       exitSuccess
+
+-- | Does this format put the document's language in its output?
+--
+-- HTML as @\<html lang="…"\>@, Akoma Ntoso as the language component of its
+-- Expression-level FRBR URIs. @text@, @json@ and @plan@ carry the chosen
+-- WORDINGS but say nothing about which language they are.
+formatLabelsLanguage :: RenderFormat -> Bool
+formatLabelsLanguage = \ case
+  FmtHtml -> True
+  FmtAkn  -> True
+  FmtJson -> False
+  FmtPlan -> False
+  FmtText -> False
 
 ----------------------------------------------------------------------------
 -- Output dispatch
@@ -157,12 +219,3 @@ emitBytes opts b = case opts.renderOutput of
   Nothing -> BSL8.putStrLn b
 
 -- | All transitively-imported modules (the resolved dependency forest).
-transitiveDeps :: Rules.TypeCheckResult -> [Module Resolved]
-transitiveDeps tc = go tc.dependencies
- where
-  go = concatMap (\d -> d.module' : go d.dependencies)
-
-dedupModules :: [Module Resolved] -> [Module Resolved]
-dedupModules = List.nubBy (\a b -> muri a == muri b)
- where
-  muri (MkModule _ u _) = u

@@ -1,0 +1,17 @@
+-- Two lone tags that look like a language at a glance.
+--
+-- `en-route` starts like English, but `route` is neither a script nor a
+-- region, so it is not English with a region added.
+--
+-- The wording written after `income` in the head of `is taxable` is that
+-- rule's sentence, so the diagnostic names the rule and says where the wording
+-- is, rather than calling it the input's.
+GIVEN days IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is late` @nlg:en-route for %days% days
+  IF days GREATER THAN 3
+
+GIVEN income IS A NUMBER
+GIVETH A BOOLEAN
+`is taxable` income @nlg:the income of %income% is over the threshold
+  MEANS income GREATER THAN 100

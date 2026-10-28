@@ -1,0 +1,10 @@
+-- Two renderings that claim the SAME language are still ambiguous, and the
+-- diagnostic says which language. Distinct tags on one name are fine and
+-- attach both; that case is not a failure and so is not witnessed here.
+--
+-- The bare `[...]` form cannot carry a tag, so this uses the heralded form.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:he one rendering
+                  @nlg:he another rendering
+  IF amount GREATER THAN 100

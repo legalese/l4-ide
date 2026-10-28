@@ -1,19 +1,20 @@
 # Concepts - Summary
 
-- [Concepts Home](README.md)
+- [Concepts home](README.md)
 
-## Language Design
+## Language design
 
-- [Design Principles](language-design/principles.md)
-- [Linguistic Syntax](language-design/linguistic-syntax.md)
+- [Design principles](language-design/principles.md)
+- [Reading like the law](language-design/linguistic-syntax.md)
 
-## Legal Modeling
+## Legal modeling
 
-- [Regulative Rules](legal-modeling/regulative-rules.md)
-- [Constitutive vs Regulative Rules](legal-modeling/constitutive-vs-regulative.md)
-- [Default Reasoning and Exceptions](legal-modeling/default-reasoning.md)
+- [Definitions and duties](legal-modeling/constitutive-vs-regulative.md)
+- [Exceptions and defaults](legal-modeling/default-reasoning.md)
+- [How obligations unfold](legal-modeling/regulative-rules.md)
 
-## Type System
+## Types
 
-- [Algebraic Types](type-system/algebraic-types.md)
+- [Types as legal categories](type-system/algebraic-types.md)
 - [Exhaustiveness](type-system/exhaustiveness.md)
+- [Type theory](type-system/type-theory.md)

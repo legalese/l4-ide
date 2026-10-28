@@ -1,0 +1,3 @@
+IMPORT helper
+
+baz MEANS bar + 1

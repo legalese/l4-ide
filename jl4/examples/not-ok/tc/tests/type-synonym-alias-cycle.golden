@@ -1,0 +1,59 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: type-synonym-alias-cycle.l4
+  Hidden: no
+  Range: 11:9-11:11
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Circular dependency detected between type synonyms:
+
+      `W1`
+
+    A type synonym must not refer to itself, directly or via other
+    synonyms, because it could then never be fully expanded.
+
+File: type-synonym-alias-cycle.l4
+  Hidden: no
+  Range: 14:9-14:11
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Circular dependency detected between type synonyms:
+
+      `W2`
+
+    A type synonym must not refer to itself, directly or via other
+    synonyms, because it could then never be fully expanded.
+
+File: type-synonym-alias-cycle.l4
+  Hidden: no
+  Range: 18:9-18:11
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Circular dependency detected between type synonyms:
+
+      `W3`
+
+    A type synonym must not refer to itself, directly or via other
+    synonyms, because it could then never be fully expanded.
+
+File: type-synonym-alias-cycle.l4
+  Hidden: no
+  Range: 23:14-23:15
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The type of this definition must match its type signature at type-synonym-alias-cycle.l4:22:8-12, namely
+
+      W2
+
+    but is here of type
+
+      W1

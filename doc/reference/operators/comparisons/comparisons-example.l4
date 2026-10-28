@@ -54,36 +54,36 @@
 
 ASSUME age IS A NUMBER
 
-DECIDE isWorkingAge IS
+DECIDE `is of working age` IS
       age AT LEAST 18
   AND age AT MOST 65
 
-#CHECK isWorkingAge
+#CHECK `is of working age`
 
 -- Comparison in Functions
 
 GIVEN n IS A NUMBER
 GIVETH A STRING
-classifyNumber n MEANS
+`classification of` n MEANS
   IF n LESS THAN 0
     THEN "negative"
     ELSE IF n EQUALS 0
            THEN "zero"
            ELSE "positive"
 
-#EVAL classifyNumber (-5)
-#EVAL classifyNumber 0
-#EVAL classifyNumber 42
+#EVAL `classification of` (-5)
+#EVAL `classification of` 0
+#EVAL `classification of` 42
 
 -- Range Check Pattern
 
 GIVEN val IS A NUMBER
-      minVal IS A NUMBER
-      maxVal IS A NUMBER
+      `minimum value` IS A NUMBER
+      `maximum value` IS A NUMBER
 GIVETH A BOOLEAN
-inRange val minVal maxVal MEANS
-  val AT LEAST minVal AND val AT MOST maxVal
+`is in range` val `minimum value` `maximum value` MEANS
+  val AT LEAST `minimum value` AND val AT MOST `maximum value`
 
-#EVAL inRange 5 1 10
-#EVAL inRange 15 1 10
-#EVAL inRange 1 1 10
+#EVAL `is in range` 5 1 10
+#EVAL `is in range` 15 1 10
+#EVAL `is in range` 1 1 10
