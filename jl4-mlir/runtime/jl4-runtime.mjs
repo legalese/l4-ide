@@ -631,7 +631,16 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     case "FULFILLED":
       return { value: "FULFILLED", residual: null, ctx };
     case "BREACH":
-      return { value: deonticBreachToWire(current), residual: null, ctx };
+      // The wire answer prints the party as the plain name, as jl4-service
+      // does; how the trace's source text must spell it (a name is
+      // backticked, rule source is not) is the contract node's @byKind@, and
+      // travels beside the answer, not in it.
+      return {
+        value: deonticBreachToWire(current),
+        residual: null,
+        ctx,
+        breachByKind: current.byKind,
+      };
     default:
       throw new Error(
         "deontic interpreter: unexpected node kind: " + current.kind,
@@ -852,6 +861,7 @@ function synthesizeDeonticReasoning(
   residualContract,
   residualDeadline,
   args,
+  breachByKind,
 ) {
   const givenParams = (meta.paramOrder || []).filter(
     (p) => p !== "startTime" && p !== "events",
@@ -869,6 +879,7 @@ function synthesizeDeonticReasoning(
       residualDeadline,
       args,
       givenParams,
+      breachByKind,
     );
   }
 
@@ -891,7 +902,7 @@ function synthesizeDeonticReasoning(
       : value === "BREACH"
         ? "BREACH"
         : explicitBreach
-          ? deonticBreachResultText(value.BREACH)
+          ? deonticBreachResultText(value.BREACH, breachByKind)
           : residualContract
             ? renderContractAsSource(residualContract, residualDeadline)
             : contractBodyText;
@@ -939,7 +950,7 @@ function synthesizeDeonticReasoning(
   ];
   if (explicitBreach) {
     callChildren.push({
-      exampleCode: [renderExplicitBreachClause(value.BREACH)],
+      exampleCode: [renderExplicitBreachClause(value.BREACH, breachByKind)],
       explanation: ["Result: " + resultText],
       children: [],
     });
@@ -975,19 +986,26 @@ function synthesizeDeonticReasoning(
 // 'BREACH BY <party> BECAUSE "<detail>"' — source form for the extra
 // child node svc inserts under 'a OF b, c' on an explicit-BREACH
 // outcome. 'detail' is the un-quoted L4 string literal; re-quote it
-// so the rendered clause matches the original source.
-function renderExplicitBreachClause(br) {
+// so the rendered clause matches the original source. 'byKind' is the
+// contract's @byKind@ for the party (`breachByKind` of the interpreter's
+// result): a name is backticked as L4's printer does, anything else is printed
+// as given.
+function renderExplicitBreachClause(br, byKind) {
   const parts = ["BREACH"];
-  if (br.party != null) parts.push("BY " + br.party);
+  if (br.party != null) {
+    parts.push("BY " + deonticLiteralAsSource(br.party, byKind));
+  }
   if (br.detail != null) parts.push('BECAUSE "' + br.detail + '"');
   return parts.join(" ");
 }
 
 // 'DEONTIC BREACHED:\n  BREACH\n  BY p\n  BECAUSE "r"' — the
 // "Result:" line text on every node that ends in an explicit BREACH.
-function deonticBreachResultText(br) {
+function deonticBreachResultText(br, byKind) {
   const lines = ["DEONTIC BREACHED:", "  BREACH"];
-  if (br.party != null) lines.push("  BY " + br.party);
+  if (br.party != null) {
+    lines.push("  BY " + deonticLiteralAsSource(br.party, byKind));
+  }
   if (br.detail != null) lines.push('  BECAUSE "' + br.detail + '"');
   return lines.join("\n");
 }
@@ -1024,6 +1042,7 @@ function synthesizeParameterizedDeonticReasoning(
   residualDeadline,
   args,
   givenParams,
+  breachByKind,
 ) {
   const fnNameRendered =
     (meta.traceMeta && meta.traceMeta.fnName) || meta.name || "";
@@ -1038,7 +1057,7 @@ function synthesizeParameterizedDeonticReasoning(
       : value === "BREACH"
         ? "BREACH"
         : explicitBreach
-          ? deonticBreachResultText(value.BREACH)
+          ? deonticBreachResultText(value.BREACH, breachByKind)
           : residualContract
             ? renderResidualForParamCtx(
                 residualContract,
@@ -1244,7 +1263,7 @@ function renderEventsAsArgListParam(events) {
 function renderEventOfTextParam(ev, actionForced) {
   let partyText;
   if (typeof ev.party === "string") {
-    partyText = /\s/.test(ev.party) ? "`" + ev.party + "`" : ev.party;
+    partyText = quoteL4NameIfNeeded(ev.party);
   } else {
     partyText = "`event party 0`";
   }
@@ -1738,7 +1757,7 @@ function renderParamEvent(ev, _idx, paramSchemas, activePartySchema) {
   let exampleParty;
   let resultParty;
   if (typeof ev.party === "string") {
-    exampleParty = /\s/.test(ev.party) ? "`" + ev.party + "`" : ev.party;
+    exampleParty = quoteL4NameIfNeeded(ev.party);
     resultParty = exampleParty;
   } else {
     // Record-typed party — placeholder + resolved value. Svc uses a
@@ -1932,8 +1951,12 @@ function renderResidualForParamCtx(
       args,
       meta,
       givenParams,
+      contract.partyKind,
     );
-    const actionText = renderDeonticExprForSource(contract.action);
+    const actionText = renderDeonticExprForSource(
+      contract.action,
+      contract.actionKind,
+    );
     const lines = ["PARTY " + partyText, contract.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : contract.deadline;
@@ -1951,9 +1974,9 @@ function renderResidualForParamCtx(
 
 // Render the primary obligation's party with its type tag —
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
-function renderActiveDeonticExpr(expr, args, meta, givenParams) {
+function renderActiveDeonticExpr(expr, args, meta, givenParams, kind) {
   if (expr == null) return "";
-  if (typeof expr === "string") return expr;
+  if (typeof expr === "string") return deonticLiteralAsSource(expr, kind);
   if (expr.param != null) {
     const props = (meta && meta.parameters && meta.parameters.properties) || {};
     const schema = props[expr.param];
@@ -1974,8 +1997,8 @@ function renderContractAsSource(c, deadlineOverride) {
   if (c.kind === "FULFILLED") return "FULFILLED";
   if (c.kind === "BREACH") return "BREACH";
   if (c.kind === "OBLIGATION") {
-    const partyText = renderDeonticExprForSource(c.party);
-    const actionText = renderDeonticExprForSource(c.action);
+    const partyText = renderDeonticExprForSource(c.party, c.partyKind);
+    const actionText = renderDeonticExprForSource(c.action, c.actionKind);
     const lines = ["PARTY " + partyText, c.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : c.deadline;
@@ -1987,9 +2010,24 @@ function renderContractAsSource(c, deadlineOverride) {
   return "";
 }
 
-function renderDeonticExprForSource(e) {
+// A literal party or action as L4 source. The schema carries a bare name and
+// rule source alike as a string, and says which in the obligation's sibling
+// key @partyKind@ / @actionKind@ (`Schema.hs`, 'DeonticExpr'). The answer's wire
+// prints a name plain, as jl4-service does, so a name with a space has to be
+// backticked again here for the trace's source text to be L4, as
+// 'formatEventComponent' does for an event's. Only a literal tagged "name" is
+// touched. Anything else is rule source (an action that carries a value,
+// @pay 100@ or @say "pay"@, or a record built @WITH@ fields), or a literal from
+// a bundle compiled before the key existed, and is printed as given. The key is
+// a sibling, so a runtime that predates it reads the same bundle correctly and
+// only its trace text lacks the backticks.
+function deonticLiteralAsSource(text, kind) {
+  return kind === "name" ? quoteL4NameIfNeeded(text) : text;
+}
+
+function renderDeonticExprForSource(e, kind) {
   if (e == null) return "";
-  if (typeof e === "string") return e; // already a literal text
+  if (typeof e === "string") return deonticLiteralAsSource(e, kind);
   if (e.param != null) return e.param; // bare param name
   return String(e);
 }
@@ -2034,11 +2072,21 @@ function renderEventOfText(ev, actionForced) {
   );
 }
 
+// A name as L4 source, as the printer (`quoteIfNeeded` in jl4-core's
+// L4/Print.hs) spells it: bare when it starts with a letter and holds only
+// letters, digits and underscores, backticked otherwise. So `ship-it`, `50%`,
+// `x.y`, `it's` and `2nd buyer` are backticked, as well as `the seller`; the
+// trace's source text then parses. Main's printer does not backtick a name that
+// spells a reserved word (`A`, `IS`), and neither does this, so the trace text
+// matches jl4-service's.
+function quoteL4NameIfNeeded(name) {
+  return name === "" || /^\p{L}[\p{L}\p{N}_]*$/u.test(name)
+    ? name
+    : "`" + name + "`";
+}
+
 function formatEventComponent(v) {
-  if (typeof v === "string") {
-    // Match svc's prettyLayout: backtick only multi-word names.
-    return /\s/.test(v) ? "`" + v + "`" : v;
-  }
+  if (typeof v === "string") return quoteL4NameIfNeeded(v);
   return JSON.stringify(v);
 }
 
@@ -3121,6 +3169,7 @@ export function createRuntime(opts) {
         result.residual,
         result.residualDeadline,
         args,
+        result.breachByKind,
       );
       return { value: result.value, reasoning };
     }

@@ -176,6 +176,9 @@ export interface RenderPreviewParams {
   toc: boolean
   /** Module URIs the user deselected in the imports checklist. */
   excludeModules?: string[]
+  /** The language the user picked in the language menu, as one of
+   *  {@link RenderInlineResponse.languages}. Omitted: the module's own. */
+  lang?: string
   /** Whether to surface the rendered document in an editor/browser
    *  tab. Defaults to true. The Render tab sets this to false when it
    *  is about to hand the render off to Legalese AI for refinement —
@@ -232,6 +235,9 @@ export interface RenderInlineParams {
   includeUnused: boolean
   /** Module URIs the user deselected in the imports tray. */
   excludeModules?: string[]
+  /** The language the user picked in the language menu, as one of
+   *  {@link RenderInlineResponse.languages}. Omitted: the module's own. */
+  lang?: string
 }
 
 export interface RenderInlineResponse {
@@ -240,6 +246,12 @@ export interface RenderInlineResponse {
   html?: string
   /** The document title, echoed for the sidebar. */
   title?: string
+  /** The languages the active file's wordings are in, the module's own
+   *  first — what the language menu offers. Empty when the file has no
+   *  wordings; absent when the language server predates it. */
+  languages?: string[]
+  /** The language the returned document is in. */
+  lang?: string
   error?: string
 }
 
@@ -262,6 +274,9 @@ export interface RenderSaveParams {
   toc: boolean
   includeUnused: boolean
   excludeModules?: string[]
+  /** The language the user picked in the language menu. Omitted: the
+   *  module's own. */
+  lang?: string
 }
 
 export interface RenderSaveResponse {
@@ -1400,6 +1415,45 @@ export const AiUsageUpdate: NotificationType<{
   blockOnOverage: boolean
 }> = {
   method: 'aiUsageUpdate',
+}
+
+/**
+ * Voice dictation for the chat input. The microphone lives on the host
+ * side of the messenger: a VSCode webview can't open one, so the
+ * extension records natively; the standalone web chat records in the
+ * page. Either way the clip goes to the ai-proxy's speech-to-text
+ * endpoint (`legalese-listen-4`) and the transcript comes back here for
+ * the input to insert.
+ */
+
+/** Whether this host can record at all (no microphone → no mic button),
+ *  and the longest clip the input should let run before stopping it. */
+export const AiDictationStatus: RequestType<
+  void,
+  { available: boolean; maxSeconds: number }
+> = {
+  method: 'aiDictationStatus',
+}
+
+/** Start recording. `error` is a user-facing reason when it couldn't. */
+export const AiDictationStart: RequestType<void, { error?: string }> = {
+  method: 'aiDictationStart',
+}
+
+/** Stop recording and transcribe. `apiBaseUrl` routes the request to a
+ *  deployment-bound chat's endpoint, like `AiChatStartParams.apiBaseUrl`.
+ *  Exactly one of `text` / `error` is set; `text` may be empty when
+ *  nothing intelligible was said. */
+export const AiDictationStop: RequestType<
+  { apiBaseUrl?: string },
+  { text?: string; error?: string }
+> = {
+  method: 'aiDictationStop',
+}
+
+/** Stop recording and throw the clip away. */
+export const AiDictationCancel: NotificationType<void> = {
+  method: 'aiDictationCancel',
 }
 
 /*******************************************************************************

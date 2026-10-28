@@ -1,0 +1,49 @@
+-- `l4 batch` re-prints a module and evaluates the printed text, so a printer
+-- that drops the brackets around an operand changes the answer with no
+-- diagnostic. Each export here puts one kind of operand inside an AND; the
+-- expected answers are those of the #EVAL lines below, which `l4 run` gives.
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+negate x MEANS NOT x
+
+@export A disjunction inside a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`or under and` MEANS (p OR q) AND r
+
+@export A negation inside a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`not under and` MEANS (NOT p) AND q
+
+@export An implication inside a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`implies under and` MEANS (p IMPLIES q) AND r
+
+@export A conditional inside a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`if under and` MEANS (IF p THEN q ELSE TRUE) AND r
+
+@export A function call inside a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`call under and` MEANS (negate p) AND q
+
+#EVAL `or under and` TRUE FALSE FALSE
+#EVAL `not under and` TRUE FALSE FALSE
+#EVAL `implies under and` FALSE FALSE FALSE
+#EVAL `if under and` TRUE TRUE FALSE
+#EVAL `call under and` FALSE FALSE FALSE

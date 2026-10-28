@@ -38,7 +38,9 @@ import qualified Data.Vector as Vector
 import L4.Lexer (execLexer, PosToken(..), TokenType(..), TLiterals(..), TSpaces(..), TIdentifiers(..))
 
 import L4.Annotation (HasSrcRange(..), rangeOfNode)
-import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
+import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..), SrcSpan(..))
+import L4.Parser.AnnotationWarning (annotationWarningMessage, annotationWarningSpan)
+import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (severity, prettyCheckErrorWithContext, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext(..), Severity(..), Substitution)
 import L4.Print (prettyLayout, prettyLayoutNF, ConstructorFieldNames, extractConstructorFieldNames)
@@ -55,7 +57,7 @@ import L4.FindDefinition (findDefinition)
 import L4.FindReferences (findReferences)
 
 -- Import resolution (VFS + embedded libs)
-import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult(..), ResolvedImport(..))
+import L4.API.VirtualFS (checkWithImports, checkWithImportsLocated, emptyVFS, TypeCheckWithDepsResult(..), ResolvedImport(..))
 import qualified L4.Evaluate.ValueLazy as ValLazy
 
 
@@ -90,13 +92,17 @@ import GHC.Wasm.Prim (JSString(..), fromJSString, toJSString)
 l4Check :: Text -> Text
 l4Check source =
   -- Use checkWithImports for full import resolution support
-  case checkWithImports emptyVFS source of
-    Left errors ->
+  case checkWithImportsLocated emptyVFS source of
+    Left (mRange, errors) ->
       -- Import/parse errors
-      encodeJson $ Vector.fromList $ map importErrorToDiagnostic errors
+      encodeJson $ Vector.fromList $ map (importErrorToDiagnostic mRange) errors
     Right result ->
-      -- Type check errors (if any)
-      let diagnostics = map checkErrorToDiagnostic result.tcdErrors
+      -- Type check errors (if any), and the parser's annotation warnings, which
+      -- the language server reports too: without them a wording that L4 reads
+      -- differently from how it was written changes with no message here.
+      let diagnostics =
+            map checkErrorToDiagnostic result.tcdErrors
+              <> map annotationWarningToDiagnostic result.tcdAnnotationWarnings
       in encodeJson $ Vector.fromList diagnostics
 
 -- | Get hover information at a position.
@@ -220,16 +226,20 @@ l4SemanticTokens source =
 -- If there are parse or type errors, returns diagnostics instead.
 l4Eval :: Text -> IO Text
 l4Eval source =
-  case checkWithImports emptyVFS source of
-    Left errors ->
+  case checkWithImportsLocated emptyVFS source of
+    Left (mRange, errors) ->
       -- Return import/parse errors as diagnostics
       pure $ encodeJson $ Aeson.object
         [ "success" .= False
-        , "diagnostics" .= Vector.fromList (map importErrorToDiagnostic errors)
+        , "diagnostics" .= Vector.fromList (map (importErrorToDiagnostic mRange) errors)
         ]
     Right result ->
-      -- Only fail on actual errors; SInfo items (e.g. #CHECK type annotations) are informational
-      let actualErrors = filter (\e -> severity e /= SInfo) result.tcdErrors
+      -- Only fail on actual errors: SInfo items (e.g. #CHECK type annotations)
+      -- are informational, and SWarn items (exhaustiveness, for example)
+      -- are warnings the checker has already decided do not
+      -- block. Keying this on "not SInfo" made every warning fatal here while
+      -- the LSP, `l4 check` and the service all let the file through.
+      let actualErrors = filter (\e -> severity e == SError) result.tcdErrors
       in if not (null actualErrors)
         then
           -- Return type check errors as diagnostics
@@ -307,10 +317,12 @@ l4EvalDirective source line col directiveType =
             [ "directiveType" .= directiveType
             , "prettyText" .= prettyEvalResult conFields res
             , "success" .= case res of
-                EL.Assertion b -> Aeson.toJSON b
+                EL.Assertion (Right b) -> Aeson.toJSON b
+                EL.Assertion (Left _)  -> Aeson.toJSON False
                 EL.Reduction _ -> Aeson.Null
             , "structuredValue" .= case res of
-                EL.Assertion b -> Aeson.toJSON b
+                EL.Assertion (Right b) -> Aeson.toJSON b
+                EL.Assertion (Left _)  -> Aeson.Null
                 EL.Reduction (Left _) -> Aeson.Null
                 EL.Reduction (Right nf) -> Aeson.toJSON (prettyLayoutNF conFields nf)
             , "range" .= rangeJson
@@ -424,11 +436,12 @@ js_l4_references source line col = pure $ toJSString $ Text.unpack $
 encodeJson :: Aeson.ToJSON a => a -> Text
 encodeJson = LazyText.toStrict . LazyText.decodeUtf8 . Aeson.encode
 
--- | Convert an import/resolution error to an LSP diagnostic.
-importErrorToDiagnostic :: Text -> Aeson.Value
-importErrorToDiagnostic errMsg =
+-- | Convert an import/resolution error to an LSP diagnostic, on the @IMPORT@ it
+-- belongs to when that is known, else at the start of the file.
+importErrorToDiagnostic :: Maybe SrcRange -> Text -> Aeson.Value
+importErrorToDiagnostic mRange errMsg =
   Aeson.object
-    [ "range" .= defaultRangeJson
+    [ "range" .= maybe defaultRangeJson rangeToJson mRange
     , "severity" .= (1 :: Int)  -- Error
     , "message" .= errMsg
     , "source" .= ("l4" :: Text)
@@ -448,6 +461,21 @@ checkErrorToDiagnostic err =
     , "message" .= Text.intercalate "\n" (prettyCheckErrorWithContext err)
     , "source" .= ("l4" :: Text)
     ]
+
+-- | Convert a parser annotation warning to an LSP diagnostic, in the words
+-- the language server uses ('annotationWarningMessage').
+annotationWarningToDiagnostic :: Resolve.Warning -> Aeson.Value
+annotationWarningToDiagnostic warn =
+  Aeson.object
+    [ "range" .= spanToJson (annotationWarningSpan warn)
+    , "severity" .= (2 :: Int)  -- Warning
+    , "message" .= annotationWarningMessage warn
+    , "source" .= ("parser" :: Text)
+    ]
+  where
+    spanToJson = \ case
+      Just sp -> Aeson.object [ "start" .= posToJson sp.start, "end" .= posToJson sp.end ]
+      Nothing -> Aeson.object [ "start" .= posToJson (MkSrcPos 1 1), "end" .= posToJson (MkSrcPos 1 1) ]
 
 -- | Get the source range for an error, with a default fallback.
 errorRange :: CheckErrorWithContext -> SrcRange
@@ -533,14 +561,14 @@ evalResultToJson fields edr = Aeson.object $
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
   where
-    isSuccess (EL.Assertion b) = b
+    isSuccess (EL.Assertion (Right b)) = b
+    isSuccess (EL.Assertion (Left _)) = False
     isSuccess (EL.Reduction (Right _)) = True
     isSuccess (EL.Reduction (Left _)) = False
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text
-prettyEvalResult _fields (EL.Assertion True)       = "assertion satisfied"
-prettyEvalResult _fields (EL.Assertion False)      = "assertion failed"
+prettyEvalResult _fields (EL.Assertion a)          = EL.prettyAssertionOutcome a
 prettyEvalResult _fields (EL.Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalResult fields  (EL.Reduction (Right v))  = prettyLayoutNF fields v
 
@@ -570,7 +598,9 @@ l4VisualizeByName source uriText version functionName simplify =
         [ "error" .= Text.intercalate "; " errors
         ]
     Right result ->
-      if not (null result.tcdErrors)
+      -- Only an SError-severity diagnostic is a type check error; a #CHECK
+      -- info or a warning (exhaustiveness, for example) is not.
+      if any ((== SError) . severity) result.tcdErrors
         then
           encodeJson $ Aeson.object
             [ "error" .= ("Type check error" :: Text)
@@ -793,7 +823,7 @@ tokenToSemanticType tok = case tok.payload of
   -- Literals
   TLiterals (TIntLit _ _) -> Just 4      -- Numbers (type index 4)
   TLiterals (TRationalLit _ _) -> Just 4 -- Numbers (type index 4)
-  TLiterals (TStringLit _) -> Just 5     -- Strings (type index 5)
+  TLiterals (TStringLit _ _) -> Just 5   -- Strings (type index 5)
   
   -- Operators (type index 6)
   TOperators _ -> Just 6

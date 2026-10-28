@@ -1,0 +1,9 @@
+-- Typechecks cleanly; none of the three #ASSERTs can be decided. A bare assumed
+-- BOOLEAN is neither TRUE nor FALSE: `#ASSERT NOT b` forces b and RAISES (stuck
+-- on an assumed term), while `#ASSERT b`, and `#ASSERT TRUE AND b`, which is just
+-- b, reduce to the symbolic b WITHOUT raising. All three must report the same
+-- undecided outcome.
+ASSUME b IS A BOOLEAN
+#ASSERT b
+#ASSERT NOT b
+#ASSERT TRUE AND b

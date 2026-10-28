@@ -1,270 +1,72 @@
-# L4 Core Libraries
+# Standard libraries
 
-L4 ships with a set of core libraries that provide essential functions for common tasks. These libraries are written in L4 itself and serve as both utilities and examples of idiomatic L4 code.
+The standard libraries are L4 files that ship with every `l4` binary, the editor extension and Legalese Cloud. They are written in L4 and add functions for lists, dates, money, legal entities and more. Nothing from them is available until you `IMPORT` it, not even the prelude.
 
-## Overview
+Functions built into the language, such as `TOSTRING`, `CONCAT` or `FETCH`, need no import: see [Built-in functions](../builtins/README.md).
 
-Core libraries are located in the [jl4-core/libraries/](https://github.com/legalese/l4-ide/tree/main/jl4-core/libraries) directory:
+## Libraries
 
-- **[prelude](prelude.md)** - Standard functions (automatically imported)
-- **[daydate](daydate.md)** - Date calculations and temporal logic
-- **[time](time.md)** - Wall-clock time-of-day operations
-- **[datetime](datetime.md)** - Absolute points in time with timezones
-- **[timezone](timezone.md)** - IANA timezone constants
-- **[excel-date](excel-date.md)** - Excel date compatibility
-- **[math](math.md)** - Mathematical functions
-- **[currency](currency.md)** - Currency handling (ISO 4217)
-- **[legal-persons](legal-persons.md)** - Legal entity types and capacity
-- **[jurisdiction](jurisdiction.md)** - Jurisdiction definitions
-- **[holdings](holdings.md)** - Holdings and ownership
-- **[actus](actus.md)** - ACTUS financial contract types and evaluation
-- **[date-compat](date-compat.md)** - Legacy DATE syntax compatibility
-- **[llm](llm.md)** - LLM API integration
+### Core
 
----
+- [prelude](prelude.md): lists, MAYBE and EITHER values, pairs and dictionaries.
+- [math](math.md): `exp`, logarithms, square roots and trigonometry that give `NOTHING` instead of failing on bad input.
 
-## Using Libraries
+### Dates and time
 
-Libraries require explicit import:
+- [daydate](daydate.md): build, compare and shift dates; weekdays, ISO weeks, months and leap years. Its page also covers `date-compat`, the older `DATE d m y` spelling.
+- [time](time.md): time of day without a date or time zone, in 24-hour or AM/PM form.
+- [datetime](datetime.md): a date, a time and a time zone together, compared across time zones.
+- [timezone](timezone.md): constants such as `SGT` and `EST` for IANA time zone names.
+- [excel-date](excel-date.md): Excel date serials and `DATEDIF`, `DAYS360`, `YEARFRAC`, `EDATE`, `EOMONTH`, `WORKDAY` and `NETWORKDAYS`.
+
+### Money and finance
+
+- [currency](currency.md): amounts in whole minor units (cents) with ISO 4217 currency codes.
+- [holdings](holdings.md): cap tables, vesting, convertible notes and SAFEs, liquidation preferences and valuations.
+- [actus](actus.md): ACTUS financial contract types, events, day count conventions and schedules.
+
+### Legal entities and places
+
+- [legal-persons](legal-persons.md): names, addresses, identity documents, age and legal capacity, corporate entities and beneficial ownership.
+- [jurisdiction](jurisdiction.md): ISO 3166 country and subdivision codes, with checks and conversions.
+
+### AI
+
+- [llm](llm.md): call Anthropic, OpenAI or OpenRouter models over HTTP.
+
+## IMPORT
+
+`IMPORT` makes the definitions of another L4 file available in the current file. Put the `IMPORT` lines at the top of the file, before the first `§` section, one module per line. An `IMPORT` below a section heading is ignored without a warning: the names it should bring in are then reported as [not defined](../errors/README.md#i-could-not-find-a-definition-for-the-identifier).
+
+**Example:** [import-example.l4](import-example.l4)
 
 ```l4
+IMPORT prelude
 IMPORT daydate
-IMPORT math
-IMPORT currency
+IMPORT `legal-persons`
 ```
 
-### Import Paths
+### Module names
 
-Import by library name or file path:
+- A module is named by its file name without `.l4`: `IMPORT daydate` loads `daydate.l4`.
+- A name with a hyphen goes in backticks: ``IMPORT `excel-date` ``, ``IMPORT `legal-persons` ``, ``IMPORT `date-compat` ``. Without them, `IMPORT excel-date` is a parse error ("unexpected -").
+- `IMPORT` takes a module name, not a path or a quoted string. `IMPORT "helpers.l4"` is a parse error, and a folder in front of the name is ignored: ``IMPORT `rules/helpers` `` looks for `helpers.l4`.
 
-```l4
-IMPORT daydate                   -- Standard/core library
-IMPORT "my-custom-lib.l4"        -- Custom library
-```
+### Files cannot import each other in a ring
 
----
+A file can't import itself, and files can't import each other in a ring: if `a.l4` imports `b.l4`, then `b.l4`, and anything it imports, can't import `a.l4`. See [Import cycle](../errors/README.md#import-cycle) for how to fix it.
 
-## Library Quick Reference
+### What an import gives you
 
-Condensed function tables for each core library. See individual library pages for full details.
+- Every top-level definition of the imported file: its types, constructors, functions and constants.
+- Nothing is imported for you. A file that uses `map`, `sum` or `fromMaybe` needs `IMPORT prelude` like any other library.
+- What a library imports also reaches your file: `IMPORT datetime` gives you `daydate` too, and `IMPORT daydate` gives you `date-compat`. Importing each library you use by name still makes a file easier to read.
 
-### prelude
+### Where modules are found
 
-Automatically imported. Provides foundational functions for lists, numbers, and data types.
+For `IMPORT helpers`, L4 uses the first of these that exists:
 
-**List Functions:**
+1. `helpers.l4` in your project's root folder, or in the folder of the file that writes the `IMPORT`.
+2. The standard library built into the `l4` you are running. It needs no files on disk and always matches that `l4`.
 
-| Function           | Type                            | Description            |
-| ------------------ | ------------------------------- | ---------------------- |
-| `null list`        | `[a] → Bool`                    | Is list empty?         |
-| `count list`       | `[a] → Number`                  | List length            |
-| `map f list`       | `(a→b) → [a] → [b]`             | Transform each element |
-| `filter f list`    | `(a→Bool) → [a] → [a]`          | Keep matching elements |
-| `foldr f z list`   | `(a→r→r) → r → [a] → r`         | Right fold             |
-| `foldl f z list`   | `(r→a→r) → r → [a] → r`         | Left fold              |
-| `append l1 l2`     | `[a] → [a] → [a]`               | Concatenate lists      |
-| `concat lists`     | `[[a]] → [a]`                   | Flatten list of lists  |
-| `reverse list`     | `[a] → [a]`                     | Reverse list           |
-| `at list i`        | `[a] → Number → a`              | Index access (0-based) |
-| `take n list`      | `Number → [a] → [a]`            | First n elements       |
-| `drop n list`      | `Number → [a] → [a]`            | Drop first n elements  |
-| `elem x list`      | `a → [a] → Bool`                | Membership test        |
-| `sort list`        | `[Number] → [Number]`           | Sort ascending         |
-| `zip l1 l2`        | `[a] → [b] → [Pair a b]`        | Pair up elements       |
-| `nub list`         | `[a] → [a]`                     | Remove duplicates      |
-| `partition f list` | `(a→Bool) → [a] → Pair [a] [a]` | Split by predicate     |
-
-**Boolean Quantifiers:**
-
-| Function     | Type                    | Description            |
-| ------------ | ----------------------- | ---------------------- |
-| `all f list` | `(a→Bool) → [a] → Bool` | All satisfy predicate? |
-| `any f list` | `(a→Bool) → [a] → Bool` | Any satisfy predicate? |
-| `and list`   | `[Bool] → Bool`         | All true?              |
-| `or list`    | `[Bool] → Bool`         | Any true?              |
-
-**Numeric:**
-
-| Function       | Type                       | Description        |
-| -------------- | -------------------------- | ------------------ |
-| `sum list`     | `[Number] → Number`        | Sum of numbers     |
-| `product list` | `[Number] → Number`        | Product of numbers |
-| `max x y`      | `Number → Number → Number` | Maximum of two     |
-| `min x y`      | `Number → Number → Number` | Minimum of two     |
-| `maximum list` | `[Number] → Number`        | Maximum of list    |
-| `minimum list` | `[Number] → Number`        | Minimum of list    |
-
-**Maybe (Optional):**
-
-| Function              | Type                        | Description         |
-| --------------------- | --------------------------- | ------------------- |
-| `fromMaybe default x` | `a → Maybe a → a`           | Unwrap with default |
-| `isJust x`            | `Maybe a → Bool`            | Is Just?            |
-| `isNothing x`         | `Maybe a → Bool`            | Is Nothing?         |
-| `mapMaybe f list`     | `(a → Maybe b) → [a] → [b]` | Filter-map          |
-| `catMaybes list`      | `[Maybe a] → [a]`           | Collect Justs       |
-
-**Either, Pair, Utility:**
-
-| Function              | Type                             | Description         |
-| --------------------- | -------------------------------- | ------------------- |
-| `either left right x` | `(a→c) → (b→c) → Either a b → c` | Fold over Either    |
-| `PAIR OF x, y`        | constructor                      | Create pair         |
-| `p's fst`             | `Pair a b → a`                   | First element       |
-| `p's snd`             | `Pair a b → b`                   | Second element      |
-| `id x`                | `a → a`                          | Identity function   |
-| `const x y`           | `a → b → a`                      | Always return first |
-
-**Dictionary:**
-
-| Function                  | Type                                      | Description       |
-| ------------------------- | ----------------------------------------- | ----------------- |
-| `emptyDict`               | `Dictionary k v`                          | Empty dictionary  |
-| `listToDict pairs`        | `[Pair k v] → Dictionary k v`             | Create from pairs |
-| `dictLookup key dict`     | `k → Dictionary k v → Maybe v`            | Query by key      |
-| `dictInsert key val dict` | `k → v → Dictionary k v → Dictionary k v` | Add/replace entry |
-| `dictDelete key dict`     | `k → Dictionary k v → Dictionary k v`     | Remove entry      |
-| `dictKeys dict`           | `Dictionary k v → [k]`                    | All keys          |
-| `dictElems dict`          | `Dictionary k v → [v]`                    | All values        |
-| `mapDict f dict`          | `(v→w) → Dict k v → Dict k w`             | Map over values   |
-| `filterDict f dict`       | `(v→Bool) → Dict → Dict`                  | Filter by value   |
-
-See [prelude.md](prelude.md) for the complete function list including `sortBy`, `zipWith`, `deleteBy`, `dictUnion`, and more.
-
-### math
-
-Requires: `IMPORT prelude`
-
-| Function      | Type                    | Description               |
-| ------------- | ----------------------- | ------------------------- |
-| `EULER`       | `NUMBER`                | Euler's number (2.718...) |
-| `exp x`       | `NUMBER → NUMBER`       | e^x                       |
-| `ln x`        | `NUMBER → MAYBE NUMBER` | Natural logarithm         |
-| `log10 x`     | `NUMBER → MAYBE NUMBER` | Base-10 logarithm         |
-| `sqrt x`      | `NUMBER → MAYBE NUMBER` | Square root               |
-| `sin x`       | `NUMBER → MAYBE NUMBER` | Sine                      |
-| `cos x`       | `NUMBER → MAYBE NUMBER` | Cosine                    |
-| `tan x`       | `NUMBER → MAYBE NUMBER` | Tangent                   |
-| `asin x`      | `NUMBER → MAYBE NUMBER` | Arcsine (domain [-1,1])   |
-| `acos x`      | `NUMBER → MAYBE NUMBER` | Arccosine (domain [-1,1]) |
-| `atan x`      | `NUMBER → MAYBE NUMBER` | Arctangent                |
-| `absNumber x` | `NUMBER → NUMBER`       | Absolute value            |
-
-Trig functions return MAYBE to handle domain errors safely.
-
-### daydate
-
-Date arithmetic library. ISO 8601 conventions.
-
-**Constants:** `Monday`(1) through `Sunday`(0), `January`(1) through `December`(12), `Days in a week`(7), `Days in a year`(365.2425), `Days in a month`(30.44)
-
-**Constructors:**
-
-| Function              | Type                              | Description                    |
-| --------------------- | --------------------------------- | ------------------------------ |
-| `Date day month year` | `NUMBER → NUMBER → NUMBER → DATE` | From d/m/y                     |
-| `Date days`           | `NUMBER → DATE`                   | From serial (days since epoch) |
-| `Year year`           | `NUMBER → DATE`                   | Jan 1 of year                  |
-| `Month month year`    | `NUMBER → NUMBER → DATE`          | 1st of month                   |
-| `Week week year`      | `NUMBER → NUMBER → DATE`          | Monday of ISO week             |
-
-**Queries:**
-
-| Function                 | Description                   |
-| ------------------------ | ----------------------------- |
-| `Weekday of date`        | Day of week (0=Sun, 1=Mon...) |
-| `Week of the year date`  | ISO week number               |
-| `Month of the year date` | Month number                  |
-| `is weekend date`        | Saturday or Sunday?           |
-| `is weekday date`        | Monday through Friday?        |
-| `is leap year year`      | Leap year?                    |
-
-**Relative Dates:** `the day after date`, `the day before date`, `the week after date`, `the month after date`, `the year after date`, `the earlier of date1 date2`, `the later of date1 date2`
-
-**Arithmetic:** `date + n` (add days), `date - n` (subtract days), `date1 - date2` (difference in days), `date1 >= date2` (comparison)
-
-See [daydate.md](daydate.md) for full documentation.
-
-### time
-
-Wall-clock time of day (no date, no timezone). 24-hour format.
-
-**Constants:** `Midnight` (00:00:00), `Noon` (12:00:00)
-
-**Constructors:**
-
-| Function           | Description                  |
-| ------------------ | ---------------------------- |
-| `Time h m s`       | From hours, minutes, seconds |
-| `Time h m`         | From hours, minutes (s=0)    |
-| `Time h m s am/pm` | 12-hour format with meridiem |
-
-**Extractors:** `the hour of t`, `the minute of t`, `the second of t`
-
-**Arithmetic:** ``t `plus hours` n``, ``t `plus minutes` n``, ``t `plus seconds` n``, ``t `minus hours` n``, ``t `minus minutes` n``, ``t `minus seconds` n``
-
-**Predicates:** `` t `is before noon` ``, `` t `is after noon` ``, `` t `is morning` ``, `` t `is afternoon` ``, `` t `is evening` ``
-
-**Comparators:** `the earlier of t1 t2`, `the later of t1 t2`, `t1 >= t2`, `t1 - t2` (difference in seconds)
-
-See [time.md](time.md) for full documentation.
-
-### datetime
-
-Combined date + time + timezone. Stored internally as UTC.
-
-**Constructors:**
-
-| Function                | Description                   |
-| ----------------------- | ----------------------------- |
-| `Datetime date time`    | Using document TIMEZONE       |
-| `Datetime date time tz` | Explicit IANA timezone        |
-| `Datetime date h m s`   | From date + h/m/s             |
-| `Datetime date`         | Midnight in document TIMEZONE |
-
-**Extractors:** `Date of dt`, `Time of dt`, `Timezone of dt`, `the hour of dt`, `the minute of dt`, `the second of dt`, `the day of dt`, `the month of dt`, `the year of dt`
-
-**Relative:** `at midnight dt`, `at noon dt`, ``dt `at` time``
-
-**Comparators:** `the earlier of dt1 dt2`, `the later of dt1 dt2`, `dt1 >= dt2`, `dt1 <= dt2`
-
-See [datetime.md](datetime.md) for full documentation.
-
-### currency
-
-ISO 4217 currency handling. Uses integer minor units (cents) to avoid floating-point issues. Key functions: `Money minorUnits code`, `major to minor units`, `add money`, `multiply money`, and the comparison suite (`money equal`, `money greater than`, `money less than`, `money at least`, `money at most`). Supports USD, EUR, GBP, JPY, SGD, and others.
-
-**Status:** Prototype. API may change. See [currency.md](currency.md).
-
-### legal-persons
-
-Legal entity types, identity documents, and capacity checks. Key functions: `age in years`, `is adult birthDate jurisdictionCode`, `can enter contract`, `is beneficial owner`. Includes corporate entity types and jurisdiction-aware majority age. Import with `` IMPORT `legal-persons` `` (backticks required).
-
-**Status:** Prototype. API may change. See [legal-persons.md](legal-persons.md).
-
-### jurisdiction
-
-ISO 3166 country and subdivision codes: alpha-2/alpha-3/numeric constants for 20 major countries, US state / Canadian province / UK constituent-country codes, format validators (`is valid ISO 3166-1 alpha-2`, `is valid ISO 3166-1 alpha-3`, `is valid ISO 3166-2`), name lookups, and alpha-2 ↔ alpha-3 conversions returning `EITHER STRING STRING`.
-
-**Status:** Prototype. API may change. See [jurisdiction.md](jurisdiction.md).
-
-### holdings
-
-Debt and equity ownership for cap tables: security/debt type codes, `ownership percentage`, `liquidation preference`, `preferred payout`, `vested shares`, `shares from convertible`, `shares from SAFE`, `accrued interest`, `fully diluted shares`, `post-money valuation`, `pre-money valuation`, and temporal helpers (`is active at`, `has matured`).
-
-**Status:** Prototype. API may change. See [holdings.md](holdings.md).
-
-### excel-date
-
-Excel-compatible date math: serial conversion in the 1900 (with leap-bug handling) and 1904 systems, `ExcelDays`, `DATEDIF`, `ExcelDays360`, `ExcelYearFrac`, `ExcelEDate`/`ExcelEOMonth`, and `ExcelWorkday`/`ExcelNetworkDays`. Import with `` IMPORT `excel-date` `` (backticks required).
-
-See [excel-date.md](excel-date.md).
-
----
-
-## See Also
-
-- **[GLOSSARY](../GLOSSARY.md)** - Language feature index
-- **[Types](../types/README.md)** - Type system documentation
-- **[IMPORT keyword](IMPORT.md)** - IMPORT keyword details
-- **[Specs](https://github.com/legalese/l4-ide/tree/main/specs)** - Technical specifications
+So a file of your own with the name of a standard library, such as `prelude.l4` beside your rules, is used instead of the standard one. Operators and library developers can change the search with the `JL4_LIBRARY_PATH` environment variable; [How IMPORT finds libraries](resolution.md) gives the full order, what Legalese Cloud does, and the warning shown when two different copies of a module are visible. When nothing is found, the error is [Module not found](../errors/README.md#module-not-found).

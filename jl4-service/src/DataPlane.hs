@@ -29,10 +29,11 @@ import Types
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch)
+import Control.Exception (catch, evaluate)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
@@ -306,26 +307,28 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    successfulRuns =
-      Maybe.mapMaybe
-        ( \(rid, simpleRes, _) -> case simpleRes of
-            SimpleResponse r -> Just (rid, r)
-            SimpleError _ -> Nothing
-        )
-        responses
+    -- Every case that finishes comes back. An answer carries its result; an
+    -- error carries its message, so that no case vanishes into the count
+    -- without a reason. Only answers count as processed. A case that reaches
+    -- --eval-timeout or --max-eval-memory-mb does not finish: 'timeoutAction'
+    -- throws, and the check above fails the whole batch with it. Unstable
+    -- returns such a case with @error and @limit, from 0765fef5d and
+    -- a09544dd6, later commits of #549 than the one this carries (35d7b63b3),
+    -- which need its EvalLimits module and threaded RTS.
+    outputCase (rid, simpleRes, _) = case simpleRes of
+      SimpleResponse r -> OutputCase
+        { id = rid, attributes = r.fnResult, graphviz = r.graphviz
+        , outcome = CaseAnswered }
+      SimpleError err -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , outcome = CaseErrored (prettyEvaluatorError err) }
+    outputCases = map outputCase responses
 
-    nSuccessful = length successfulRuns
+    nSuccessful = length [ () | c <- outputCases, c.outcome == CaseAnswered ]
     nIgnored = nCases - nSuccessful
 
   pure $ addHeader totalAllocBytes $ BatchResponse
-    { cases =
-        [ OutputCase
-          { id = rid
-          , attributes = response.fnResult
-          , graphviz = response.graphviz
-          }
-        | (rid, response) <- successfulRuns
-        ]
+    { cases = outputCases
     , summary = OutputSummary
         { casesRead = nCases
         , casesProcessed = nSuccessful
@@ -347,6 +350,11 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
         batchArgs.outcomes
 
 -- | POST /deployments/{id}/functions/{fn}/query-plan
+--
+-- The plan is computed here, under --eval-timeout. Returned unevaluated, it
+-- would be computed while Warp sends the response, and by then Warp's own
+-- connection timeout (30 s) is running again: a plan that took longer was cut
+-- off at 30 to 60 s, the connection closed with no status and no error.
 queryPlanHandler' :: DeploymentId -> Text -> FnArguments -> AppM QueryPlanResponse
 queryPlanHandler' deployId fnName fnArgs = do
   logger <- asks (.logger)
@@ -364,10 +372,16 @@ queryPlanHandler' deployId fnName fnArgs = do
         Nothing -> throwError err500 { errBody = jsonError "No compiled module available for query-plan" }
         Just c -> pure c
       c <- buildDecisionQueryCacheFromCompiled fnName compiled vf.fnSourceText
+      -- Stored before it is computed: what a timed-out request got through
+      -- is kept for the next one.
       storeDecisionQueryCache deployId fnName c
       pure c
 
-  pure $ queryPlan fnName cached fnArgs
+  withinEvalTimeout $ do
+    let plan = queryPlan fnName cached fnArgs
+    -- Encoding computes all of the plan that is sent.
+    _ <- evaluate (LBS.length (Aeson.encode plan))
+    pure plan
 
 -- | Persist a freshly-built decision query cache back into the deployment registry
 -- so subsequent requests can reuse it without rebuilding.
@@ -574,6 +588,17 @@ timeoutAction act = do
       pure Nothing
   case result of
     Nothing -> throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
+    Just x -> pure x
+
+-- | Run an action under --eval-timeout only. Unlike 'timeoutAction' it sets no
+-- allocation limit: that limit counts every byte allocated, not memory held,
+-- and query plans have never been held to it.
+withinEvalTimeout :: IO a -> AppM a
+withinEvalTimeout act = do
+  cfg <- asks (.options)
+  result <- liftIO $ timeout (cfg.evalTimeout * 1_000_000) act
+  case result of
+    Nothing -> throwError err500 { errBody = jsonError "Query plan timed out" }
     Just x -> pure x
 
 -- ----------------------------------------------------------------------------

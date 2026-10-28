@@ -22,7 +22,7 @@ test.l4  ──►  MLIR (textual IR)
 
 ## Why
 
-Running rules via the HTTP evaluator is convenient but slow; on the auth-proxy `test.l4` fixture each call costs ~160 ms of Haskell CPU. Compiling the same rules to wasm drops per-call cost to tens of microseconds and lets the rules execute anywhere — edge workers, in-browser agents, embedded in other services — without Haskell on the host. See [Performance](#performance).
+Running rules via the HTTP evaluator is convenient but slow; on a 12-function `test.l4` fixture each call costs ~160 ms of Haskell CPU. Compiling the same rules to wasm drops per-call cost to tens of microseconds and lets the rules execute anywhere — edge workers, in-browser agents, embedded in other services — without Haskell on the host. See [Performance](#performance).
 
 ## Build
 
@@ -97,13 +97,14 @@ This is a working compiler, not a finished one. Out of 431 `.l4` files in this r
 Known gaps:
 
 - String operations (`__l4_str_concat`, `__l4_str_len`, `__l4_to_string`) are stubbed at runtime — good for passing strings through, not for heavy string work.
-- No DEONTIC evaluator — trace evaluation still lives in `jl4-service`.
-- No state graphs, no GraphViz, no reasoning traces in the response — the envelope is `SimpleResponse` only.
+- A function that returns `DEONTIC` is not compiled to wasm. Its wasm body is a placeholder that returns `0.0` ([Lower.hs](src/L4/MLIR/Lower.hs)); the JS runtime evaluates the function instead, walking the contract stored in the `.schema.json` against the request's `events`.
+- No GraphViz rendering of a trace. jl4-service answers an evaluation with `?trace=full&graphviz=true` with one, tagged `GraphVizResponse`; the WASM server ignores `graphviz`. A request with `?trace=full` gets the trace itself, tagged `TraceResponse`, with `result` and `reasoning`.
+- The WASM server answers only the evaluation route, and reads the trace level only from the `?trace=` query, not from the `X-L4-Trace` header that jl4-service also accepts. It has no state-graphs route: each state graph's GraphViz source is in the `.schema.json`, written when the program is compiled.
 - Only the Node.js wasm runtime is wired end-to-end for marshaling. `--wasmtime` / `--wasmer` flags exist but are not yet connected to the schema-driven marshaler.
 
 ## Performance
 
-Benchmark on the [auth-proxy](https://github.com/legalese/jl4-auth-proxy) `validation/test.l4` fixture — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and return the same `SimpleResponse` envelope.
+Benchmark on the same `test.l4` fixture (kept outside this repo) — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and return the same `SimpleResponse` envelope.
 
 | Backend                                       |  Wall time | Per-call avg | Server RSS |
 | --------------------------------------------- | ---------: | -----------: | ---------: |

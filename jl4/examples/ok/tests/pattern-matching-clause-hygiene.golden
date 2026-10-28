@@ -1,0 +1,72 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-clause-hygiene.l4:20:3-22:20:
+  I found a problem while checking the definition of `consider in clause two`:
+    The following branches still need to be considered:
+    
+      WHEN Blue THEN
+    
+pattern-matching-clause-hygiene.l4:30:3-31:18:
+  I found a problem while checking the definition of `__pm_fallthrough_0`:
+    The following branches still need to be considered:
+    
+      WHEN Green THEN
+      WHEN Blue THEN
+    
+pattern-matching-clause-hygiene.l4:38:8-32:
+  I found a problem while checking the definition of `matches anything first`:
+    This clause of `matches anything first` is never used, and neither is the clause after it.
+    The clause above it matches every input, so `matches anything first` never gets this far.
+    Move these clauses above that one, or remove them.
+pattern-matching-clause-hygiene.l4:49:8-34:
+  I found a problem while checking the definition of `fresh name in the middle`:
+    This clause of `fresh name in the middle` is never used, because the clause above it with the new name `other` matches every input.
+    `other` is not a value of its input's type, so it is a new name, and a new name matches anything.
+    If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+pattern-matching-clause-hygiene.l4:60:8-61:18:
+  I found a problem while checking the definition of `no given`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `no given` Red Large IS
+      DECIDE `no given` Green Small IS
+      DECIDE `no given` Blue `_` IS
+    
+pattern-matching-clause-hygiene.l4:66:8-20:
+  I found a problem while checking the definition of `one clause`:
+    This clause does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `one clause` (Circle Green) IS
+      DECIDE `one clause` (Circle Blue) IS
+      DECIDE `one clause` Square IS
+    
+pattern-matching-clause-hygiene.l4:70:8-71:21:
+  I found a problem while checking the definition of `two clauses`:
+    This multi-clause definition does not cover all cases. The following clauses are still needed:
+    
+      DECIDE `two clauses` Blue IS
+    
+pattern-matching-clause-hygiene.l4:73:1-45:
+  2
+pattern-matching-clause-hygiene.l4:74:1-35:
+  0
+pattern-matching-clause-hygiene.l4:75:1-39:
+  0
+pattern-matching-clause-hygiene.l4:76:1-28:
+  1
+pattern-matching-clause-hygiene.l4:79:1-25:
+  No clause of `two clauses` matches these inputs.
+  The value that the last clause could not match is
+    Blue
+  Add a clause for this case, or end the clauses with one that matches every input.
+pattern-matching-clause-hygiene.l4:80:1-26:
+  The only clause of `one clause` does not match these inputs.
+  The value it could not match is
+    Square
+  Add a clause for this case.
+pattern-matching-clause-hygiene.l4:83:1-32:
+  The value
+    Blue
+  reached a CONSIDER that has no branch for it.
+  Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
+  The typechecker's exhaustiveness warning lists all missing branches.

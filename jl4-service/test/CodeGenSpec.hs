@@ -6,10 +6,39 @@ import Test.Hspec
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Text as Text
-import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String)
+import Backend.Api (TraceLevel (..))
+import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String, generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode (..), AnswerShape (..), RequiredInput (..))
+import L4.TypeCheck.Environment (boolean, date, maybeType, number)
 
 spec :: SpecWith ()
 spec = describe "CodeGen" $ do
+  -- A function with no inputs has nothing to decode, so its wrapper is a bare
+  -- #EVAL, and handleEvalResult must not look for a JUST around the answer.
+  describe "answerShape of a function with no inputs" $ do
+    it "is Bare for an ordinary function" $
+      fmap (.answerShape) (generateEvalWrapper "f" [] [] (Aeson.object []) TraceNone)
+        `shouldBe` Right Bare
+
+    it "is Bare for a deontic function" $
+      fmap (.answerShape) (generateDeonticEvalWrapper "f" [] [] (Aeson.object []) 0 [] Nothing Nothing TraceNone)
+        `shouldBe` Right Bare
+
+  -- The wrapper unwraps every input that is neither a BOOLEAN nor a MAYBE,
+  -- GIVENs before ASSUMEs, and reads a DATE from a string.
+  describe "requiredInputs" $
+    it "lists the inputs the wrapper cannot go on without, in its order" $
+      fmap (.requiredInputs)
+        (generateEvalWrapper "f"
+          [("a", number), ("b", boolean), ("c", maybeType number), ("d", date)]
+          [("e", number), ("f", date), ("g", maybeType date)]
+          (Aeson.object []) TraceNone)
+        `shouldBe` Right
+          [ RequiredInput "a" True Nothing
+          , RequiredInput "d" True (Just "DATE")
+          , RequiredInput "e" False Nothing
+          , RequiredInput "f" False (Just "DATE")
+          ]
+
   describe "inputFieldName" $ do
     it "adds (input) suffix to simple names" $ do
       inputFieldName "x" `shouldBe` "x (input)"

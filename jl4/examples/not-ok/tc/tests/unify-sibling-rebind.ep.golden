@@ -1,0 +1,19 @@
+-- Unification soundness regression (SHOULD FAIL).
+-- `firstOf` requires both pair components to have the same type. A bug in
+-- the unifier let an inference variable occurring twice in one type be
+-- silently rebound mid-unification, so `Pair OF a, a` wrongly unified with
+-- `Pair OF STRING, NUMBER` and this module was accepted — with `n`
+-- evaluating to a STRING despite its NUMBER signature.
+DECLARE Pair OF a, b
+  HAS fst IS AN a
+      snd IS A  b
+
+GIVEN a IS A TYPE
+      p IS A Pair OF a, a
+GIVETH AN a
+firstOf p MEANS
+  CONSIDER p
+  WHEN Pair OF x, y THEN x
+
+GIVETH A NUMBER
+n MEANS firstOf (Pair OF "hello", 42)

@@ -1,14 +1,16 @@
-# Encoding Legislation
+# Encode legislation
 
-Turn a legal provision into L4 code.
+Turn a legal provision into L4 that mirrors the text, test it, and use an AI assistant to draft larger pieces.
 
-**Prerequisites:** Basic L4 knowledge ([Your First L4 File](first-l4-file.md))
+**Before you start:** [Install L4 and write your first rule](first-l4-file.md) and [Test your rules](testing-your-rules.md).
+
+**Complete example:** [encoding-legislation-example.l4](encoding-legislation-example.l4)
 
 ---
 
-## What You'll Build
+## The provision
 
-We'll encode this provision from an imaginary Alcohol Act:
+We will encode this section of an imaginary Alcohol Act:
 
 > **Section 3.** A person must not sell alcohol if:
 > (a) the person is a body corporate;
@@ -21,15 +23,15 @@ We'll encode this provision from an imaginary Alcohol Act:
 
 ---
 
-## Step 1: Analyze the Structure
+## Step 1: Analyse the structure
 
-Before writing code, identify:
+Before writing code, find:
 
-1. **Outcome:** "must not sell alcohol"
-2. **Conditions:** (a), (b), (c), (d) - all must be true
-3. **Sub-conditions:** (d)(i), (d)(ii), (d)(iii) - any one triggers
+1. **The outcome**: "must not sell alcohol".
+2. **The conditions**: (a), (b), (c) and (d), which must all hold.
+3. **The alternatives**: (d)(i), (d)(ii) and (d)(iii), of which any one is enough.
 
-The logical structure:
+The logical shape is:
 
 ```
 (a) AND (b) AND (c) AND ((d)(i) OR (d)(ii) OR (d)(iii))
@@ -37,310 +39,237 @@ The logical structure:
 
 ---
 
-## Step 2: Declare the Inputs
+## Step 2: Write the rule
 
-First, declare the facts we need. These are **assumptions** because their truth comes from outside L4:
+Each fact the section depends on becomes an input, named in the words of the statute. Each condition becomes one line, with a comment pointing to its paragraph:
 
 ```l4
-§ `Imaginary Alcohol Act - Section 3`
+§ `Imaginary Alcohol Act 2024, section 3`
 
--- Facts about the person
-ASSUME `the person is a body corporate` IS BOOLEAN
-ASSUME `the person engages in business for profit` IS BOOLEAN
-ASSUME `the person is a public house` IS BOOLEAN
-ASSUME `the person is a hotel` IS BOOLEAN
-
--- Criminal history and orders
-ASSUME `the person has an unspent conviction for fraud` IS BOOLEAN
-ASSUME `the person has an unspent conviction for providing misleading information` IS BOOLEAN
-ASSUME `the person has an alcohol banning order` IS BOOLEAN
+GIVEN `the person is a body corporate`                                            IS A BOOLEAN
+      `the person engages in business for profit`                                 IS A BOOLEAN
+      `the person is a public house`                                              IS A BOOLEAN
+      `the person is a hotel`                                                     IS A BOOLEAN
+      `the person has an unspent conviction for fraud`                            IS A BOOLEAN
+      `the person has an unspent conviction for providing misleading information` IS A BOOLEAN
+      `the person has an alcohol banning order`                                   IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the person must not sell alcohol` IF
+        `the person is a body corporate`                                              -- (a)
+    AND `the person engages in business for profit`                                   -- (b)
+    AND NOT (`the person is a public house` OR `the person is a hotel`)               -- (c)
+    AND (    `the person has an unspent conviction for fraud`                         -- (d)(i)
+         OR  `the person has an unspent conviction for providing misleading information` -- (d)(ii)
+         OR  `the person has an alcohol banning order`)                               -- (d)(iii)
 ```
 
-### Why ASSUME?
+| Legal text                                  | L4                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| "the person is a body corporate"            | `` `the person is a body corporate` ``                              |
+| "the person is not a public house or hotel" | ``NOT (`the person is a public house` OR `the person is a hotel`)`` |
+| "any of the following applies"              | `( ... OR ... OR ... )`                                             |
 
-`ASSUME` declares facts that come from outside L4:
-
-- User input
-- Database lookup
-- Another system
-
-L4 doesn't know or check these values—it just uses them.
+The facts are `GIVEN` inputs, so a caller, a test or a deployed API supplies them. If you prefer to declare them once at the top of a file, see [ASSUME](../../reference/types/ASSUME.md).
 
 ---
 
-## Step 3: Encode the Rule
+## Step 3: Test it
 
-Now translate the legal text directly:
+Add tests that state the expected outcome. A rule can be called with its inputs named, ``rule WITH `input` IS value``, one input per line, which keeps long test cases readable:
 
 ```l4
--- Section 3: Prohibition on selling alcohol
-DECIDE `the person must not sell alcohol`
-IF  `the person is a body corporate`
-    AND `the person engages in business for profit`
-    AND NOT `the person is a public house`
-    AND NOT `the person is a hotel`
-    AND (
-        `the person has an unspent conviction for fraud`
-        OR `the person has an unspent conviction for providing misleading information`
-        OR `the person has an alcohol banning order`
-    )
+-- A corporate pub is exempt under (c), even with a fraud conviction.
+#ASSERT NOT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS TRUE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS TRUE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS FALSE
+
+-- A company with a banning order is prohibited.
+#ASSERT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS FALSE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS FALSE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS TRUE
 ```
 
-### Matching the Legal Text
+`l4 run` prints `assertion satisfied` for each. Use `#ASSERT` (or `#EVAL` and compare the result yourself), not `#CHECK`: `#CHECK` only type-checks and never evaluates the rule.
 
-Notice how the L4 mirrors the legislation:
+Cover at least:
 
-| Legal Text                                  | L4 Code                                                |
-| ------------------------------------------- | ------------------------------------------------------ |
-| "the person is a body corporate"            | `` `the person is a body corporate` ``                 |
-| "the person is not a public house or hotel" | `` NOT `..is a public house` AND NOT `..is a hotel` `` |
-| "any of the following applies"              | `(...OR...OR...)`                                      |
+- each exemption on its own;
+- each disqualifying factor on its own;
+- the case where nothing in (d) applies;
+- a person outside the section altogether, for example not a body corporate.
 
 ---
 
-## Step 4: Add Test Cases
+## Step 4: Name the parts
 
-Test the rule with specific scenarios:
+For longer provisions, give each part of the test a name. `WHERE` defines the parts after the rule, so the main condition reads like a summary of the section:
 
 ```l4
-§ `Test Cases`
+GIVEN `the person is a body corporate`                                            IS A BOOLEAN
+      `the person engages in business for profit`                                 IS A BOOLEAN
+      `the person is a public house`                                              IS A BOOLEAN
+      `the person is a hotel`                                                     IS A BOOLEAN
+      `the person has an unspent conviction for fraud`                            IS A BOOLEAN
+      `the person has an unspent conviction for providing misleading information` IS A BOOLEAN
+      `the person has an alcohol banning order`                                   IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the person must not sell alcohol` IF
+        `is a commercial enterprise`          -- (a) and (b)
+    AND NOT `is an exempt establishment`      -- (c)
+    AND `has a disqualifying factor`          -- (d)
+    WHERE
+        `is a commercial enterprise` MEANS
+                `the person is a body corporate`
+            AND `the person engages in business for profit`
 
-{-
-Scenario 1: Corporate pub (exempt)
-- Body corporate: Yes
-- For profit: Yes
-- Public house: Yes (exempt!)
-Expected: FALSE (not prohibited because it's a public house)
--}
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS TRUE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS TRUE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS FALSE
+        `is an exempt establishment` MEANS
+                `the person is a public house`
+            OR  `the person is a hotel`
 
-{-
-Scenario 2: Banned corporate (prohibited)
-- Body corporate: Yes
-- For profit: Yes
-- Public house: No
-- Hotel: No
-- Banning order: Yes
-Expected: TRUE (prohibited)
--}
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS FALSE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS FALSE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS TRUE
-
-{-
-Scenario 3: Clean corporate (not prohibited)
-- Body corporate: Yes
-- For profit: Yes
-- No exemption, but no disqualifying factors
-Expected: FALSE (not prohibited - no (d) condition met)
--}
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS FALSE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS FALSE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS FALSE
+        `has a disqualifying factor` MEANS
+                `the person has an unspent conviction for fraud`
+            OR  `the person has an unspent conviction for providing misleading information`
+            OR  `the person has an alcohol banning order`
 ```
+
+The inputs and the tests stay the same, so the tests from Step 3 confirm that the refactored rule still means the same thing.
 
 ---
 
-## Step 5: Refactor for Readability
+## Tips
 
-For complex rules, break into named sub-rules:
+**Keep the statute's words.** `` `the person is a body corporate` `` lets a lawyer check the rule against the text; `isCompany` does not.
 
-```l4
-§ `Refactored Version`
+**Read "or" carefully.** In legislation, "A, B or C" usually means any one or more of them: `A OR B OR C`.
 
--- Sub-rule: Is this a commercial enterprise?
-DECIDE `is commercial enterprise`
-IF  `the person is a body corporate`
-    AND `the person engages in business for profit`
+**Watch negations.** "Not a public house or hotel" normally means neither: `NOT (pub OR hotel)`. The other reading, `NOT pub OR NOT hotel`, is true for almost everyone and is rarely intended. When the text is ambiguous, write down which reading you chose, in a comment or a test.
 
--- Sub-rule: Is this an exempt establishment?
-DECIDE `is exempt establishment`
-IF  `the person is a public house`
-    OR `the person is a hotel`
-
--- Sub-rule: Does person have disqualifying factors?
-DECIDE `has disqualifying factors`
-IF  `the person has an unspent conviction for fraud`
-    OR `the person has an unspent conviction for providing misleading information`
-    OR `the person has an alcohol banning order`
-
--- Main rule: Prohibition (refactored)
-DECIDE `the person must not sell alcohol (refactored)`
-IF  `is commercial enterprise`
-    AND NOT `is exempt establishment`
-    AND `has disqualifying factors`
-```
-
-This version is easier to understand and maintain.
+**Keep the source next to the code.** The complete example puts the text of section 3 in a `{- ... -}` comment above the rule and marks each condition with its paragraph number.
 
 ---
 
-## Step 6: Add Documentation
+## Drafting with an AI assistant
 
-Link back to the source legislation:
+An AI assistant can draft L4 from legislation quickly, but it can also misread the law. Use it for the first draft, and let the type checker and a human reviewer decide whether the draft is right. In VS Code, Legalese AI already knows L4 syntax and sees the type checker's errors after every edit; see [Draft rules with Legalese AI](../llm-integration/composing-l4-with-ai.md). The prompts below work with any assistant.
 
-```l4
-{-
-Imaginary Alcohol Act 2024
-==========================
+### The workflow
 
-Section 3 - Prohibition on Sale of Alcohol
+1. **Segment.** Split the legislation into self-contained pieces: one article or section each, with its number, and with the definitions it uses.
+2. **Extract.** Ask the assistant for the types and inputs the piece needs.
+3. **Draft.** Ask for the L4 rule.
+4. **Check.** Run `l4 check`, then the tests, then review the draft against the text.
+5. **Iterate.** Give the errors and your review notes back to the assistant.
 
-This section implements the prohibition in s.3 which prevents
-certain commercial entities from selling alcohol if they have
-disqualifying factors (fraud, misleading info, or banning orders).
+### Prompt: extract types
 
-Exemptions:
-- Public houses (s.3(c))
-- Hotels (s.3(c))
-
-Note: "unspent conviction" follows the Rehabilitation of Offenders
-Act interpretation - see s.2 for definitions.
--}
 ```
+You are analysing legislation to encode it in L4, a programming language
+for law.
+
+Legislation:
+"""
+Article 2 - Interpretation
+In this Law -
+"charitable purpose" means any of the purposes specified in Schedule 1;
+"charity" means an entity that is established for charitable purposes only;
+"governor" means any person who is responsible for the control and
+management of the administration of a registered charity;
+"""
+
+List every defined term that should become a type. For each, say:
+1. its name;
+2. whether it is a fixed list of choices or a record with fields;
+3. its choices or fields, with their types;
+4. which other types or provisions it refers to.
+```
+
+### Prompt: draft the rule
+
+```
+Write L4 for the provision below.
+
+L4 basics:
+- Records: DECLARE Charity HAS `purposes` IS A LIST OF Purpose
+- Choices: DECLARE Purpose IS ONE OF `relief of poverty`, `advancement of education`
+- Rules: GIVEN `the entity` IS A Charity
+         GIVETH A BOOLEAN
+         DECIDE `meets the charity test` IF ... AND ...
+- Names with spaces go in backticks; fields are read with 's.
+- List functions such as all, any, map and filter need IMPORT prelude.
+
+Provision:
+"""
+Article 5 - Charity test
+An entity meets the charity test if -
+(a) all of its purposes are charitable purposes; and
+(b) it satisfies the public benefit requirement.
+"""
+
+Types already defined:
+- Charity, with `purposes` (a LIST OF Purpose)
+- Purpose, a list of the charitable purposes
+
+Use the words of the provision as names. Mark each condition with a
+comment giving its paragraph, and add #ASSERT tests for each paragraph.
+```
+
+### Prompt: fix an error
+
+Paste the checker's message exactly as `l4 check` printed it:
+
+```
+l4 check reported this error:
+
+    I could not find a definition for the identifier
+
+      Purpose
+
+The types defined in the file are CharitablePurpose and Charity.
+Fix the draft and explain the change.
+```
+
+### Problems to look for
+
+| In the draft                                 | Problem                   | Fix                                  |
+| -------------------------------------------- | ------------------------- | ------------------------------------ |
+| `purposes IS A Purpose`                      | Should be a list          | `purposes IS A LIST OF Purpose`      |
+| `entity purposes`                            | Field access without `'s` | `entity's purposes`                  |
+| `IF x = TRUE`                                | Redundant comparison      | `IF x`                               |
+| `x == 5`                                     | Not L4                    | `x = 5` or `x EQUALS 5`              |
+| `any`, `all`, `map` without `IMPORT prelude` | Unknown name              | Add `IMPORT prelude` at the top      |
+| `#CHECK rule WITH ...` used as a test        | `#CHECK` only type-checks | `#ASSERT rule WITH ...`              |
+| An exception the text does not contain       | Invented law              | Remove it, or record why it is there |
+
+### Review checklist
+
+- Types and names match the definitions in the legislation.
+- Every condition in the text appears in the rule, and nothing else does.
+- Cross-references point to the right provisions.
+- There are tests for each paragraph and for the edges (thresholds, empty lists, exemptions).
+- `l4 check` passes and every `#ASSERT` is satisfied.
+
+**Example:** a reviewed draft of a governor-disqualification article, with its tests: [governor-disqualification-example.l4](governor-disqualification-example.l4)
+
+### Keep a record
+
+Commit the source text, the prompts and the L4 together, and note which assistant produced the draft. [Manage rules in git and CI](version-control-for-rules.md) shows how.
+
+An assistant can misread a legal structure, miss a cross-reference, or invent an interpretation. A draft that type-checks can still be wrong: only the tests and the review show whether it says what the law says.
 
 ---
 
-## Complete Example
+## Next steps
 
-Here's the full file:
-
-```l4
-§ `Imaginary Alcohol Act - Section 3`
-
-{-
-Implements Section 3 of the Imaginary Alcohol Act 2024.
-Determines whether a person is prohibited from selling alcohol.
--}
-
--- External facts (from user input or database)
-ASSUME `the person is a body corporate` IS BOOLEAN
-ASSUME `the person engages in business for profit` IS BOOLEAN
-ASSUME `the person is a public house` IS BOOLEAN
-ASSUME `the person is a hotel` IS BOOLEAN
-ASSUME `the person has an unspent conviction for fraud` IS BOOLEAN
-ASSUME `the person has an unspent conviction for providing misleading information` IS BOOLEAN
-ASSUME `the person has an alcohol banning order` IS BOOLEAN
-
-§§ `Sub-rules`
-
-DECIDE `is commercial enterprise`
-IF  `the person is a body corporate`
-    AND `the person engages in business for profit`
-
-DECIDE `is exempt establishment`
-IF  `the person is a public house`
-    OR `the person is a hotel`
-
-DECIDE `has disqualifying factors`
-IF  `the person has an unspent conviction for fraud`
-    OR `the person has an unspent conviction for providing misleading information`
-    OR `the person has an alcohol banning order`
-
-§§ `Main Rule`
-
-DECIDE `the person must not sell alcohol`
-IF  `is commercial enterprise`
-    AND NOT `is exempt establishment`
-    AND `has disqualifying factors`
-
-§§ `Tests`
-
--- Exempt: public house
-#CHECK NOT `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS TRUE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS TRUE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS FALSE
-
--- Prohibited: has banning order
-#CHECK `the person must not sell alcohol` WITH
-    `the person is a body corporate` IS TRUE,
-    `the person engages in business for profit` IS TRUE,
-    `the person is a public house` IS FALSE,
-    `the person is a hotel` IS FALSE,
-    `the person has an unspent conviction for fraud` IS FALSE,
-    `the person has an unspent conviction for providing misleading information` IS FALSE,
-    `the person has an alcohol banning order` IS TRUE
-```
-
----
-
-## Tips for Encoding Legislation
-
-### 1. Preserve Legal Language
-
-Use the exact terms from the legislation where possible:
-
-```l4
--- ✅ Good: matches statute
-ASSUME `the person is a body corporate` IS BOOLEAN
-
--- ❌ Less good: paraphrased
-ASSUME isCompany IS BOOLEAN
-```
-
-### 2. Handle "And/Or" Carefully
-
-Legal "or" is often inclusive (any one or more):
-
-```l4
--- "A, B, or C" usually means "A OR B OR C"
-condition1 OR condition2 OR condition3
-```
-
-### 3. Watch for Implicit Negation
-
-"not a public house or hotel" can be ambiguous:
-
-```l4
--- Could mean: NOT (public house OR hotel)
-NOT (`is public house` OR `is hotel`)
-
--- Or: (NOT public house) OR (NOT hotel)  -- usually not intended
-```
-
-### 4. Test Edge Cases
-
-- All conditions true
-- All conditions false
-- Each exemption independently
-- Each disqualifying factor independently
-
----
-
-## What You Learned
-
-- How to analyze legal text structure
-- How to use ASSUME for external facts
-- How to encode AND/OR conditions
-- How to refactor for readability
-- How to test legislative rules
-
----
-
-## Next Steps
-
-- [Common Patterns](../../reference/patterns/common-patterns.md) - More L4 patterns
-- [Foundation Course Module 1](../../courses/foundation/module-1-first-rule.md) - Deep dive on legal rules
-- [LLM Integration](../llm-integration/llm-getting-started.md) - LLM-assisted encoding
+- [Common patterns](common-patterns.md): more ways to structure rules.
+- [Make rules read like law](../natural-language-functions/optimising-natural-language-generation.md): names and shapes that render as readable prose.
+- [Real regulatory schemes](../../courses/advanced/module-a1-regulatory.md): a longer encoding exercise in the Advanced course.

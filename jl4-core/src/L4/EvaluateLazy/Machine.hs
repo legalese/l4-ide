@@ -22,6 +22,11 @@ module L4.EvaluateLazy.Machine
 , getEvalTime
 , getModuleUri
 , getSafeMode
+-- * The string parsers TODATE, TOTIME and TODATETIME use, for callers that must
+-- agree with them (jl4-service names the input one of them refused).
+, parseDateText
+, parseTimeText
+, parseDatetimeText
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -70,7 +75,7 @@ import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
-import L4.TemporalContext (EvalClause (..), TemporalContext (..), applyEvalClauses)
+import L4.TemporalContext (TemporalContext (..))
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print hiding (tryLoadTZ, tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
@@ -96,7 +101,7 @@ data Frame =
   | Post3 WHNF WHNF {- -}
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
-  | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
+  | ConsiderWhen1 (Maybe PmGroup) Reference {- -} (Expr Resolved) [Branch Resolved] Environment
   | PatNil0
   | PatCons0 (Pattern Resolved) Environment (Pattern Resolved)
   | PatCons1 {- -} Reference Environment (Pattern Resolved)
@@ -116,24 +121,6 @@ data Frame =
   | TernaryBuiltin1 TernaryBuiltinFun Reference Reference  -- evaluating 1st arg, has refs to 2nd and 3rd
   | TernaryBuiltin2 TernaryBuiltinFun WHNF Reference       -- has 1st arg value, evaluating 2nd, has ref to 3rd
   | TernaryBuiltin3 TernaryBuiltinFun WHNF WHNF            -- has 1st and 2nd arg values, evaluating 3rd
-  -- Temporal context scoping for EVAL AS OF SYSTEM TIME
-  | EvalAsOfSystemTime1 Reference Environment
-  | EvalAsOfSystemTime2 TemporalContext
-  -- Temporal context scoping for EVAL UNDER VALID TIME
-  | EvalUnderValidTime1 Reference Environment
-  | EvalUnderValidTime2 TemporalContext
-  -- Temporal context scoping for rules effective time
-  | EvalUnderRulesEffectiveAt1 Reference Environment
-  | EvalUnderRulesEffectiveAt2 TemporalContext
-  -- Temporal context scoping for rules encoded time
-  | EvalUnderRulesEncodedAt1 Reference Environment
-  | EvalUnderRulesEncodedAt2 TemporalContext
-  -- Temporal iteration frames
-  | EverBetweenFrame TemporalContext WHNF Time.Day Time.Day Integer
-  | AlwaysBetweenFrame TemporalContext WHNF Time.Day Time.Day Integer
-  | WhenLastFrame TemporalContext WHNF Time.Day
-  | WhenNextFrame TemporalContext WHNF Time.Day Time.Day
-  | ValueAtFrame TemporalContext
   | UpdateThunk Reference
   | ContractFrame ContractFrame
   | ConcatFrame [WHNF] {- -} [Expr Resolved] Environment -- accumulated values, remaining exprs, env
@@ -232,7 +219,31 @@ raiseException e = do
   traceEval (Exit (Left e))
   withPoppedFrame \ case
     Nothing -> liftIO (Control.Exception.throwIO e)
-    Just _f -> raiseException e
+    Just f -> do
+      unwindThunk f
+      raiseException e
+
+-- | An exception aborted the force that this frame belongs to. If it is an
+-- 'UpdateThunk' frame, take the thunk's blackhole mark back, so that a later
+-- force of the thunk evaluates it again, and raises again.
+--
+-- Without this the aborted force leaves the mark behind, and every later force
+-- of the same thunk, in the same file or on the same deployment, is reported as
+-- an infinite loop: a definition that raised, used by a second directive, said
+-- @Infinite loop detected@ instead of what it raised.
+--
+-- A genuine loop is still found: the mark is only given back as the exception
+-- unwinds, and a loop forces the thunk again while its mark is still there.
+--
+-- Only 'UpdateThunk' has state to give back on this branch, so the other frames
+-- are matched by a wildcard here; unstable's @unwindFrame@ also restores the
+-- temporal context and the acting party, and lists every frame (unstable only).
+unwindThunk :: Frame -> Eval ()
+unwindThunk = \ case
+  UpdateThunk rf -> pokeThunk rf \tid -> \ case
+    Unevaluated tids e env -> (Unevaluated (Set.delete tid tids) e env, ())
+    thunk                  -> (thunk, ())
+  _ -> pure ()
 
 internalException :: InternalEvalException -> Eval a
 internalException = raiseException . InternalEvalException
@@ -335,7 +346,9 @@ preAllocateRef r = do
 
 data Config
   = ForwardMachine Environment (Expr Resolved)
-  | MatchBranchesMachine Reference Environment [Branch Resolved]
+  | MatchBranchesMachine (Maybe PmGroup) Reference Environment [Branch Resolved]
+    -- ^ the group, when the CONSIDER was generated from a multi-clause
+    -- definition's clauses (see 'NonExhaustivePatterns')
   | MatchPatternMachine Reference Environment (Pattern Resolved)
   | BackwardMachine WHNF
   | EvalRefMachine Reference
@@ -348,9 +361,15 @@ continueExpr :: Environment -> Expr Resolved -> Machine Config
 continueExpr env e = pure (ForwardMachine env e)
 {-# INLINE continueExpr #-}
 
-continueBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-continueBranches r env e = pure (MatchBranchesMachine r env e)
+continueBranches :: Maybe PmGroup -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+continueBranches g r env e = pure (MatchBranchesMachine g r env e)
 {-# INLINE continueBranches #-}
+
+-- | The multi-clause group a CONSIDER was generated from, if it was.
+consideredClauses :: Anno -> Maybe PmGroup
+consideredClauses ann = case view annPmSynthetic ann of
+  Just (PmConsider g _ _) -> Just g
+  _ -> Nothing
 
 continuePattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
 continuePattern r env pat = pure (MatchPatternMachine r env pat)
@@ -399,9 +418,6 @@ forwardExpr env = \ case
   Modulo _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpModulo e2 env)
     continueExpr env e1
-  Exponent _ann e1 e2 -> do
-    pushFrame (BinOp1 BinOpExponent e2 env)
-    continueExpr env e1
   Leq _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpLeq e2 env)
     continueExpr env e1
@@ -427,36 +443,12 @@ forwardExpr env = \ case
   App _ann n [] ->
     expectTerm env n >>= continueRef
   App ann n es@(_ : _) -> do
-    -- Handle temporal context override: EVAL AS OF SYSTEM TIME <serial> <thunk>
-    -- The second argument is evaluated under the mutated temporal context.
-    case getUnique n of
-      uniq | uniq == TypeCheck.evalAsOfSystemTimeUnique
-           , [dateExpr, thunkExpr] <- es -> do
-               thunkRef <- allocate_ thunkExpr env
-               pushFrame (EvalAsOfSystemTime1 thunkRef env)
-               continueExpr env dateExpr
-      uniq | uniq == TypeCheck.evalUnderValidTimeUnique
-           , [dateExpr, thunkExpr] <- es -> do
-               thunkRef <- allocate_ thunkExpr env
-               pushFrame (EvalUnderValidTime1 thunkRef env)
-               continueExpr env dateExpr
-      uniq | uniq == TypeCheck.evalUnderRulesEffectiveAtUnique
-           , [dateExpr, thunkExpr] <- es -> do
-               thunkRef <- allocate_ thunkExpr env
-               pushFrame (EvalUnderRulesEffectiveAt1 thunkRef env)
-               continueExpr env dateExpr
-      uniq | uniq == TypeCheck.evalUnderRulesEncodedAtUnique
-           , [dateExpr, thunkExpr] <- es -> do
-               thunkRef <- allocate_ thunkExpr env
-               pushFrame (EvalUnderRulesEncodedAt1 thunkRef env)
-               continueExpr env dateExpr
-      _ -> do
-        let expectedType = case getAnno ann of
-              Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
-              _ -> Nothing
-        rs <- traverse (`allocate_` env) es
-        pushFrame (App1 rs expectedType)
-        continueExpr env (Var emptyAnno n)
+    let expectedType = case getAnno ann of
+          Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
+          _ -> Nothing
+    rs <- traverse (`allocate_` env) es
+    pushFrame (App1 rs expectedType)
+    continueExpr env (Var emptyAnno n)
   AppNamed ann n [] _ ->
     continueExpr env (App ann n [])
   AppNamed _ann _n _nes Nothing ->
@@ -476,9 +468,9 @@ forwardExpr env = \ case
     desugarMultiWayIf :: [GuardedExpr Resolved] -> Expr Resolved -> Expr Resolved
     desugarMultiWayIf [] o = o
     desugarMultiWayIf (MkGuardedExpr _ann c f : es') o = IfThenElse emptyAnno c f $ desugarMultiWayIf es' o
-  Consider _ann e branches -> do
+  Consider ann e branches -> do
     rf <- allocate_ e env
-    continueBranches rf env branches
+    continueBranches (consideredClauses ann) rf env branches
   Lit _ann lit -> do
     rval <- runLit lit
     continueBackward rval
@@ -608,36 +600,6 @@ backward val = withPoppedFrame $ \ case
       ValAssumed r ->
         stuckOnAssumed r -- TODO: we can do better here
       res -> internalException (RuntimeTypeError $ "expected a function but found: " <> prettyLayout res)
-  -- Evaluate thunk under overridden system time (serial number)
-  Just (EvalAsOfSystemTime1 thunkRef _env) -> do
-    serial <- expectNumber val
-    originalCtx <- getTemporalContext
-    let newCtx = applyEvalClauses [AsOfSystemTime (serialToUTCTime serial)] originalCtx
-    putTemporalContext newCtx
-    pushFrame (EvalAsOfSystemTime2 originalCtx)
-    continueRef thunkRef
-  Just (EvalUnderValidTime1 thunkRef _env) -> do
-    serial <- expectNumber val
-    originalCtx <- getTemporalContext
-    let newCtx = applyEvalClauses [UnderValidTime (Time.utctDay (serialToUTCTime serial))] originalCtx
-    putTemporalContext newCtx
-    pushFrame (EvalUnderValidTime2 originalCtx)
-    continueRef thunkRef
-  Just (EvalUnderRulesEffectiveAt1 thunkRef _env) -> do
-    serial <- expectNumber val
-    originalCtx <- getTemporalContext
-    let retroDay = Time.utctDay (serialToUTCTime serial)
-        newCtx = applyEvalClauses [UnderRulesEffectiveAt retroDay] originalCtx
-    putTemporalContext newCtx
-    pushFrame (EvalUnderRulesEffectiveAt2 originalCtx)
-    continueRef thunkRef
-  Just (EvalUnderRulesEncodedAt1 thunkRef _env) -> do
-    serial <- expectNumber val
-    originalCtx <- getTemporalContext
-    let newCtx = applyEvalClauses [UnderRulesEncodedAt (serialToUTCTime serial)] originalCtx
-    putTemporalContext newCtx
-    pushFrame (EvalUnderRulesEncodedAt2 originalCtx)
-    continueRef thunkRef
   Just (IfThenElse1 e2 e3 env) ->
     case val of
       ValBool True -> continueExpr env e2
@@ -647,7 +609,7 @@ backward val = withPoppedFrame $ \ case
 
       _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating IF-THEN-ELSE"
-  Just (ConsiderWhen1 _scrutinee e _branches env) -> do
+  Just (ConsiderWhen1 _clauses _scrutinee e _branches env) -> do
     case val of
       ValEnvironment env' ->
         continueExpr (Map.union env' env) e
@@ -752,86 +714,6 @@ backward val = withPoppedFrame $ \ case
   -- Ternary builtin handling: got all 3 args
   Just (TernaryBuiltin3 fn val1 val2) -> do
     runTernaryBuiltin fn val1 val2 val
-  -- Temporal context scoping: restore original context after thunk evaluation
-  Just (EvalAsOfSystemTime2 originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
-  Just (EvalUnderValidTime2 originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
-  Just (EvalUnderRulesEffectiveAt2 originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
-  Just (EvalUnderRulesEncodedAt2 originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
-  Just (EverBetweenFrame originalCtx predicate endDay currentDay step) -> do
-    putTemporalContext originalCtx
-    case boolView val of
-      Just True -> continueBackward (valBool True)
-      Just False ->
-        if currentDay == endDay
-          then continueBackward (valBool False)
-          else do
-            let nextDay = Time.addDays (fromIntegral step) currentDay
-            let ctxForDay = applyEvalClauses [UnderValidTime nextDay, UnderRulesEffectiveAt nextDay] originalCtx
-            putTemporalContext ctxForDay
-            pushFrame (EverBetweenFrame originalCtx predicate endDay nextDay step)
-            applyDatePredicate predicate nextDay
-      Nothing ->
-        userException $ UserError "EVER BETWEEN expects predicate returning BOOLEAN"
-  Just (AlwaysBetweenFrame originalCtx predicate endDay currentDay step) -> do
-    putTemporalContext originalCtx
-    case boolView val of
-      Just False -> continueBackward (valBool False)
-      Just True ->
-        if currentDay == endDay
-          then continueBackward (valBool True)
-          else do
-            let nextDay = Time.addDays (fromIntegral step) currentDay
-            let ctxForDay = applyEvalClauses [UnderValidTime nextDay, UnderRulesEffectiveAt nextDay] originalCtx
-            putTemporalContext ctxForDay
-            pushFrame (AlwaysBetweenFrame originalCtx predicate endDay nextDay step)
-            applyDatePredicate predicate nextDay
-      Nothing ->
-        userException $ UserError "ALWAYS BETWEEN expects predicate returning BOOLEAN"
-  Just (WhenLastFrame originalCtx predicate currentDay) -> do
-    putTemporalContext originalCtx
-    case boolView val of
-      Just True -> do
-        dateRef <- allocateValue (ValDate currentDay)
-        continueBackward $ ValConstructor TypeCheck.justRef [dateRef]
-      Just False -> do
-        if dayNumberFromDay currentDay <= 0
-          then continueBackward $ ValConstructor TypeCheck.nothingRef []
-          else do
-            let nextDay = Time.addDays (-1) currentDay
-            let ctxForDay = applyEvalClauses [UnderValidTime nextDay, UnderRulesEffectiveAt nextDay] originalCtx
-            putTemporalContext ctxForDay
-            pushFrame (WhenLastFrame originalCtx predicate nextDay)
-            applyDatePredicate predicate nextDay
-      Nothing ->
-        userException $ UserError "WHEN LAST expects predicate returning BOOLEAN"
-  Just (WhenNextFrame originalCtx predicate currentDay limitDay) -> do
-    putTemporalContext originalCtx
-    case boolView val of
-      Just True -> do
-        dateRef <- allocateValue (ValDate currentDay)
-        continueBackward $ ValConstructor TypeCheck.justRef [dateRef]
-      Just False -> do
-        if currentDay >= limitDay
-          then continueBackward $ ValConstructor TypeCheck.nothingRef []
-          else do
-            let nextDay = Time.addDays 1 currentDay
-            let ctxForDay = applyEvalClauses [UnderValidTime nextDay, UnderRulesEffectiveAt nextDay] originalCtx
-            putTemporalContext ctxForDay
-            pushFrame (WhenNextFrame originalCtx predicate nextDay limitDay)
-            applyDatePredicate predicate nextDay
-      Nothing ->
-        userException $ UserError "WHEN NEXT expects predicate returning BOOLEAN"
-  Just (ValueAtFrame originalCtx) -> do
-    putTemporalContext originalCtx
-    continueBackward val
   Just (ConcatFrame acc [] _env) -> do
     -- All arguments evaluated, concatenate them
     runConcat (reverse (val : acc))
@@ -1172,18 +1054,18 @@ matchGivens' ns f rs = do
       internalException $
         RuntimeTypeError "given signatures' values' lengths do not match"
 
-matchBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-matchBranches scrutinee _env [] = do
+matchBranches :: Maybe PmGroup -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+matchBranches clauses scrutinee _env [] = do
   -- The scrutinee has been forced by the failed branch matches, so we can
   -- usually show the actual value in the error instead of a heap reference.
   thunk <- readThunk scrutinee
-  userException $ NonExhaustivePatterns case thunk of
+  userException $ NonExhaustivePatterns clauses case thunk of
     WHNF val      -> Right val
     Unevaluated{} -> Left scrutinee
-matchBranches _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
+matchBranches _clauses _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
   continueExpr env e
-matchBranches scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
-  pushFrame (ConsiderWhen1 scrutinee e branches env)
+matchBranches clauses scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
+  pushFrame (ConsiderWhen1 clauses scrutinee e branches env)
   continuePattern scrutinee env pat
 
 matchPattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
@@ -1213,8 +1095,8 @@ patternMatchFailure :: Machine Config
 patternMatchFailure = withPoppedFrame $ \ case
   Nothing ->
     internalException UnhandledPatternMatch
-  Just (ConsiderWhen1 scrutinee _ branches env) ->
-    continueBranches scrutinee env branches
+  Just (ConsiderWhen1 clauses scrutinee _ branches env) ->
+    continueBranches clauses scrutinee env branches
   -- we have unwound the frame that would reenter when scrutinizing the event
   Just (ContractFrame (Contract11 ActionDoesn'tmatch {..})) -> do
     newTime <- allocateValue time
@@ -1374,7 +1256,9 @@ decodeJsonToValueTyped jsonStr ty = do
 -- | Convert Aeson Value to L4 WHNF using type information
 -- This function recursively handles nested structures: lists of records, records containing records, etc.
 jsonValueToWHNFTyped :: Aeson.Value -> Type' Resolved -> Machine WHNF
-jsonValueToWHNFTyped jsonValue ty = do
+jsonValueToWHNFTyped jsonValue ty0 = do
+  -- a synonym decodes as what it stands for (a synonym for MAYBE X as MAYBE X)
+  ty <- expandTypeSynonyms ty0
   case ty of
     -- Handle LIST OF α
     TyApp _anno listRef [elementType]
@@ -1507,7 +1391,9 @@ jsonValueToWHNFTyped jsonValue ty = do
                     Aeson.Object obj -> do
                       -- Decode each field from the JSON object WITH TYPE INFORMATION
                       -- Note: We ignore extra fields in the JSON (Postel's Law)
-                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType) -> do
+                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
+                        -- a synonym for MAYBE is a MAYBE: expand before deciding
+                        fieldType <- expandTypeSynonyms fieldType0
                         case KeyMap.lookup (Key.fromText fieldName) obj of
                           Nothing
                             | isMaybeFieldTy fieldType ->
@@ -1530,6 +1416,37 @@ jsonValueToWHNFTyped jsonValue ty = do
 
     -- For other types, fall back to generic decoding
     _ -> jsonValueToWHNF jsonValue
+
+-- | A type with its synonyms expanded at the head, as far as they go. The
+-- checker records a synonym's body on its 'TypeCheck.KnownType'; a
+-- parameterised synonym has its arguments substituted for its parameters.
+-- Without this, @DECLARE Year IS A NUMBER@ is not a primitive here, and a JSON
+-- string for a @Year@ is accepted as it stands instead of refused as it is for
+-- a @NUMBER@.
+expandTypeSynonyms :: Type' Resolved -> Machine (Type' Resolved)
+expandTypeSynonyms = go (16 :: Int)
+  where
+    go 0 ty = pure ty
+    go n ty@(TyApp _ tyRef args) = do
+      entityInfo <- getEntityInfo
+      case Map.lookup (getUnique tyRef) entityInfo of
+        Just (_, TypeCheck.KnownType _ params (Just body))
+          | length params == length args ->
+              go (n - 1) (substituteTypeParams (Map.fromList (zip (map getUnique params) args)) body)
+        _ -> pure ty
+    go _ ty = pure ty
+
+substituteTypeParams :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
+substituteTypeParams sub = \ case
+  TyApp ann r []
+    | Just t <- Map.lookup (getUnique r) sub -> t
+    | otherwise -> TyApp ann r []
+  TyApp ann r ts -> TyApp ann r (map (substituteTypeParams sub) ts)
+  Fun ann args res ->
+    Fun ann [ MkOptionallyNamedType a n (substituteTypeParams sub t) | MkOptionallyNamedType a n t <- args ]
+      (substituteTypeParams sub res)
+  Forall ann vs t -> Forall ann vs (substituteTypeParams sub t)
+  other -> other
 
 -- | Check if a type is MAYBE α (used for optional record field handling)
 isMaybeFieldTy :: Type' Resolved -> Bool
@@ -1749,7 +1666,16 @@ runBuiltin es op mTy = do
               TypeCheck.KnownTerm conType Constructor -> do
                 -- Extract field names from the constructor's function type
                 fieldNames <- extractFieldNames conType
-                if length fieldNames /= length fields
+                case (fieldNames, fields) of
+                 ([], [field]) -> do
+                  -- One argument without a name, as in LEFT x and RIGHT x:
+                  -- an object keyed by the constructor, {"LEFT": x}, so the
+                  -- two sides of an EITHER stay apart.
+                  pushFrame (JsonEncodeConstructorFrame [] (nameToText (TypeCheck.getName conRef)) [])
+                  pushFrame (UnaryBuiltin0 UnaryJsonEncode Nothing)
+                  continueRef field
+                 _ ->
+                  if length fieldNames /= length fields
                   then internalException $ RuntimeTypeError $
                     "Field count mismatch for constructor " <> nameToText (TypeCheck.getName conRef) <>
                     ": expected " <> Text.pack (show (length fieldNames)) <>
@@ -2048,10 +1974,6 @@ runTernaryBuiltin TernaryDatetimeFromDTZ dateVal timeVal tzVal = do
       continueBackward $ ValDateTime utc tzName
     Nothing ->
       userException $ UserError $ "Unknown timezone: '" <> tzName <> "'. Use an IANA timezone name like \"Asia/Singapore\" or \"America/New_York\"."
-runTernaryBuiltin TernaryEverBetween startVal endVal predicate =
-  startEverBetween startVal endVal predicate
-runTernaryBuiltin TernaryAlwaysBetween startVal endVal predicate =
-  startAlwaysBetween startVal endVal predicate
 
 runBinOp :: BinOp -> WHNF -> WHNF -> Machine Config
 runBinOp BinOpPlus   (ValNumber num1) (ValNumber num2)           = continueBackward $ ValNumber (num1 + num2)
@@ -2128,9 +2050,6 @@ runBinOp BinOpCharAt     (ValString text) (ValNumber idx) =
   in if i < 0 || i >= Text.length text
      then continueBackward $ ValString ""  -- Out of bounds returns empty string
      else continueBackward $ ValString (Text.singleton (Text.index text i))
-runBinOp BinOpWhenLast startVal predicateVal = startWhenLast startVal predicateVal
-runBinOp BinOpWhenNext startVal predicateVal = startWhenNext startVal predicateVal
-runBinOp BinOpValueAt dateVal attrVal = startValueAt dateVal attrVal
 runBinOp _op         (ValAssumed r) _e2                          = stuckOnAssumed r
 runBinOp _op         _e1 (ValAssumed r)                          = stuckOnAssumed r
 runBinOp _           _                _                          = internalException (RuntimeTypeError "running bin op with invalid operation / value combination")
@@ -2161,70 +2080,6 @@ runBinOpEquals (ValConstructor n1 rs1) (ValConstructor n2 rs2)
 -- TODO: we probably also want to check ValObligations for equality
 runBinOpEquals (ValAssumed r)          _                = stuckOnAssumed r
 runBinOpEquals v1                       v2              = userException (EqualityOnUnsupportedType v1 v2)
-
-infinityDay :: Time.Day
-infinityDay = Time.fromGregorian 9999 12 31
-
-applyDatePredicate :: WHNF -> Time.Day -> Machine Config
-applyDatePredicate predicate day = do
-  argRef <- allocateValue (ValDate day)
-  pushFrame (App1 [argRef] Nothing)
-  continueBackward predicate
-
-startEverBetween :: WHNF -> WHNF -> WHNF -> Machine Config
-startEverBetween startVal endVal predicate = do
-  startDay <- expectDateValue startVal
-  endDay <- expectDateValue endVal
-  case compare startDay endDay of
-    GT -> continueBackward (valBool False)
-    _ -> do
-      originalCtx <- getTemporalContext
-      let step = if startDay <= endDay then 1 else -1
-          ctxForDay = applyEvalClauses [UnderValidTime startDay, UnderRulesEffectiveAt startDay] originalCtx
-      putTemporalContext ctxForDay
-      pushFrame (EverBetweenFrame originalCtx predicate endDay startDay step)
-      applyDatePredicate predicate startDay
-
-startAlwaysBetween :: WHNF -> WHNF -> WHNF -> Machine Config
-startAlwaysBetween startVal endVal predicate = do
-  startDay <- expectDateValue startVal
-  endDay <- expectDateValue endVal
-  case compare startDay endDay of
-    GT -> continueBackward (valBool True)
-    _ -> do
-      originalCtx <- getTemporalContext
-      let step = if startDay <= endDay then 1 else -1
-          ctxForDay = applyEvalClauses [UnderValidTime startDay, UnderRulesEffectiveAt startDay] originalCtx
-      putTemporalContext ctxForDay
-      pushFrame (AlwaysBetweenFrame originalCtx predicate endDay startDay step)
-      applyDatePredicate predicate startDay
-
-startWhenLast :: WHNF -> WHNF -> Machine Config
-startWhenLast startVal predicate = do
-  startDay <- expectDateValue startVal
-  originalCtx <- getTemporalContext
-  let ctxForDay = applyEvalClauses [UnderValidTime startDay, UnderRulesEffectiveAt startDay] originalCtx
-  putTemporalContext ctxForDay
-  pushFrame (WhenLastFrame originalCtx predicate startDay)
-  applyDatePredicate predicate startDay
-
-startWhenNext :: WHNF -> WHNF -> Machine Config
-startWhenNext startVal predicate = do
-  startDay <- expectDateValue startVal
-  originalCtx <- getTemporalContext
-  let ctxForDay = applyEvalClauses [UnderValidTime startDay, UnderRulesEffectiveAt startDay] originalCtx
-  putTemporalContext ctxForDay
-  pushFrame (WhenNextFrame originalCtx predicate startDay infinityDay)
-  applyDatePredicate predicate startDay
-
-startValueAt :: WHNF -> WHNF -> Machine Config
-startValueAt dateVal attrVal = do
-  day <- expectDateValue dateVal
-  originalCtx <- getTemporalContext
-  let ctxForDay = applyEvalClauses [UnderValidTime day, UnderRulesEffectiveAt day] originalCtx
-  putTemporalContext ctxForDay
-  pushFrame (ValueAtFrame originalCtx)
-  applyDatePredicate attrVal day
 
 pattern ValFulfilled :: Value a
 pattern ValFulfilled <- (fulfilView -> True)
@@ -2718,13 +2573,6 @@ initialEnvironment = do
   dateMonthRef <- allocateValue (ValUnaryBuiltinFun UnaryDateMonth)
   dateYearRef <- allocateValue (ValUnaryBuiltinFun UnaryDateYear)
   timeValueRef <- allocateValue (ValUnaryBuiltinFun UnaryTimeValue)
-  everBetweenRef <- allocateValue (ValTernaryBuiltinFun TernaryEverBetween)
-  alwaysBetweenRef <- allocateValue (ValTernaryBuiltinFun TernaryAlwaysBetween)
-  -- Temporal context switching entry (handled specially by the evaluator)
-  evalAsOfSystemTimeRef <- allocateValue (ValAssumed TypeCheck.evalAsOfSystemTimeRef)
-  evalUnderValidTimeRef <- allocateValue (ValAssumed TypeCheck.evalUnderValidTimeRef)
-  evalUnderRulesEffectiveAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEffectiveAtRef)
-  evalUnderRulesEncodedAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEncodedAtRef)
   fulfilRef <- allocateValue ValFulfilled
   neverMatchesPartyRef <- allocateValue ValNeverMatchesParty
   neverMatchesActRef <- allocateValue ValNeverMatchesAct
@@ -2782,12 +2630,6 @@ initialEnvironment = do
       , (TypeCheck.dateMonthUnique, dateMonthRef)
       , (TypeCheck.dateYearUnique, dateYearRef)
       , (TypeCheck.timeValueFractionUnique, timeValueRef)
-      , (TypeCheck.everBetweenUnique, everBetweenRef)
-      , (TypeCheck.alwaysBetweenUnique, alwaysBetweenRef)
-      , (TypeCheck.evalAsOfSystemTimeUnique, evalAsOfSystemTimeRef)
-      , (TypeCheck.evalUnderValidTimeUnique, evalUnderValidTimeRef)
-      , (TypeCheck.evalUnderRulesEffectiveAtUnique, evalUnderRulesEffectiveAtRef)
-      , (TypeCheck.evalUnderRulesEncodedAtUnique, evalUnderRulesEncodedAtRef)
       , (TypeCheck.waitUntilUnique, waitUntilRef)
       , (TypeCheck.andUnique, andRef)
       , (TypeCheck.orUnique, orRef)
@@ -2848,9 +2690,6 @@ builtinBinOps =
       , (BinOpIndexOf,    [TypeCheck.indexOfUnique])
       , (BinOpSplit,      [TypeCheck.splitUnique])
       , (BinOpCharAt,     [TypeCheck.charAtUnique])
-      , (BinOpWhenLast,   [TypeCheck.whenLastUnique])
-      , (BinOpWhenNext,   [TypeCheck.whenNextUnique])
-      , (BinOpValueAt,    [TypeCheck.valueAtUnique])
       ]
   , unique <- uniques
   ]

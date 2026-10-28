@@ -1,261 +1,154 @@
-# Module A4: Production Patterns
+# Module A4: Production patterns
 
-In this module, you'll learn patterns for robust, maintainable L4 code in production environments.
+In this module, you'll learn how to structure a real rulebase so that it stays traceable to its source, easy to test, and ready to deploy.
 
 ## Learning Objectives
 
 By the end of this module, you will be able to:
 
-- Organize large L4 codebases
-- Implement comprehensive testing strategies
-- Debug common issues effectively
-- Integrate L4 with other systems
+- Organise a rulebase into files and sections that mirror the source text
+- Share types between files with `IMPORT`
+- Keep tests beside the rules they check, and build test data that is easy to vary
+- Isolate a problem quickly
+- Get a rulebase ready for deployment
 
 ---
 
-## Organizing Large Codebases
+## Organizing a Rulebase
 
 ### File Structure
 
-For substantial legal models, organize files by domain:
+Keep the layout simple, and let it follow the instrument you are encoding:
 
 ```
-my-legal-system/
-├── types/
-│   ├── parties.l4        -- Actor types
-│   ├── actions.l4        -- Action types
-│   ├── records.l4        -- Data records
-│   └── enums.l4          -- Enumerations
-├── rules/
-│   ├── eligibility.l4    -- Eligibility rules
-│   ├── obligations.l4    -- MUST/MAY/SHANT
-│   ├── procedures.l4     -- Multi-step procedures
-│   └── calculations.l4   -- Computational rules
-├── tests/
-│   ├── unit/
-│   │   ├── eligibility-tests.l4
-│   │   └── calculation-tests.l4
-│   └── integration/
-│       ├── happy-paths.l4
-│       └── edge-cases.l4
-└── main.l4               -- Main entry point with imports
+charity-rules/
+├── README.md              # what these rules encode: which instrument, which version
+└── rules/
+    ├── shared-types.l4    # DECLAREs used by several files
+    ├── registration.l4    # Part 2 of the Law, with its §§ Tests section
+    ├── governors.l4       # Part 3, with its §§ Tests section
+    └── enforcement.l4     # Part 5: notices and appeals, with its §§ Tests section
 ```
 
-### Using IMPORT
+Guidelines:
 
-Split code across files and import:
+- **Mirror the source text.** One file per part of the statute or per contract, named after it, with `§` sections that follow the source's numbering. Every change to the code can then be traced to a clause.
+- **Shared vocabulary in one place.** Put the `DECLARE`s that several files need in one file, and `IMPORT` it. A file in the same folder is imported by its name.
+- **Tests live with the rules.** Keep each rule's checks in a `§§ Tests` section of the same file, so that a change to a rule and the change to its tests travel together.
+
+[Manage rules in git and CI](../../tutorials/getting-started/version-control-for-rules.md) builds on this layout with commit discipline, review, and a CI check for every change.
+
+### Sharing Types with IMPORT
+
+The shared file holds the vocabulary:
 
 ```l4
--- main.l4
-IMPORT "types/parties.l4"
-IMPORT "types/actions.l4"
-IMPORT "rules/eligibility.l4"
-IMPORT "rules/obligations.l4"
+-- shared-types.l4
+§ `Shared types`
 
--- Your main definitions here
+DECLARE Person
+    HAS `the name` IS A STRING
+        `the age` IS A NUMBER
+        `is bankrupt` IS A BOOLEAN
 ```
 
-### Sections for Organization
-
-Within files, use sections:
+Each rule file imports it by name; a name with a hyphen goes in backticks:
 
 ```l4
-§ `Charity Registration System`
+-- governors.l4
+IMPORT `shared-types`
 
-§§ `Type Definitions`
--- All DECLARE statements
+§ `Part 3: Governors`
 
-§§ `Eligibility Rules`
--- All eligibility-related DECIDE statements
+§§ `Article 19: Who may be a governor`
 
-§§ `Filing Obligations`
--- All DEONTIC-related rules
-
-§§ `Helper Functions`
--- Utility functions
+-- A person may be a governor if they are an adult and not bankrupt.
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `the person may be a governor` IF
+        person's `the age` AT LEAST 18
+    AND NOT person's `is bankrupt`
 
 §§ `Tests`
--- #EVAL and #TRACE statements
+
+`an adult` MEANS Person "Ann" 18 FALSE
+`a minor` MEANS Person "Ben" 17 FALSE
+`a bankrupt adult` MEANS Person "Cy" 40 TRUE
+
+#ASSERT `the person may be a governor` `an adult`
+#ASSERT NOT `the person may be a governor` `a minor`
+#ASSERT NOT `the person may be a governor` `a bankrupt adult`
 ```
+
+`l4 run governors.l4` reports each assertion as satisfied, or tells you which one failed.
 
 ---
 
-## Testing Strategies
+## Testing a Rulebase
 
-### Unit Tests with #EVAL
+[Test your rules](../../tutorials/getting-started/testing-your-rules.md) covers the testing directives step by step: `#EVAL` to look at a value, `#ASSERT` to state what a value must be, `#CHECK` to confirm a type, and `#TRACE` to run a regulative rule against a timeline. In a real rulebase, three habits matter most:
 
-Test individual functions:
-
-```l4
-§ `Unit Tests`
-
--- Test helper functions
-#EVAL `is adult` (Person "Test" 18)    -- TRUE (boundary)
-#EVAL `is adult` (Person "Test" 17)    -- FALSE (below boundary)
-#EVAL `is adult` (Person "Test" 100)   -- TRUE (well above)
-
--- Test calculations
-#EVAL `monthly payment` (`Loan Terms` (USD 10000) 0.12 12)
--- Expected: approximately $888.49
-
--- Test with edge values
-#EVAL `monthly payment` (`Loan Terms` (USD 0) 0.12 12)
--- Expected: $0 (no principal)
-```
-
-### Integration Tests with #TRACE
-
-Test complete workflows:
-
-```l4
-§ `Integration Tests`
-
-§§ `Happy Paths`
-
--- Complete successful workflow
-#TRACE `complete procedure` `the test input` AT 0 WITH
-    PARTY Actor1 DOES Action1 AT 5
-    PARTY Actor2 DOES Action2 AT 15
-    PARTY Actor1 DOES Action3 AT 25
--- Expected: FULFILLED
-
-§§ `Edge Cases`
-
--- Boundary timing
-#TRACE `time-sensitive rule` `the test input` AT 0 WITH
-    PARTY Actor1 DOES Action1 AT 14  -- Exactly at deadline
--- Expected: FULFILLED (just in time)
-
-#TRACE `time-sensitive rule` `the test input` AT 0 WITH
-    PARTY Actor1 DOES Action1 AT 15  -- One day late
--- Expected: BREACH or enters late path
-
-§§ `Failure Scenarios`
-
--- Missing required action
-#TRACE `required action rule` `the test input` AT 0 WITH
-    -- No actions performed
--- Expected: BREACH (timeout)
-```
+- **Assert, don't just evaluate.** An `#EVAL` shows a result for you to read; an `#ASSERT` fails the run when the result is wrong, so CI can catch it.
+- **Test both sides of every boundary.** For "at least 18", test 17 and 18. For a deadline of 14 days, trace an event on day 14 and one after it.
+- **Cover every path of a regulative rule**: compliance, a missed deadline, and each `LEST` fallback.
 
 ### Test Data Factory
 
-Create reusable test data:
+A function that builds test data from the one value you want to vary keeps boundary tests short:
 
 ```l4
-§ `Test Data Factory`
+DECLARE Person
+    HAS `the name` IS A STRING
+        `the age` IS A NUMBER
+        `is bankrupt` IS A BOOLEAN
 
--- Valid test entities
-`a valid person` MEANS Person "Valid Person" 30 FALSE (LIST)
-`a valid charity` MEANS `Registered Charity` "Test Charity" "CH999" Active ...
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is adult` IF person's `the age` AT LEAST 18
 
--- Invalid test entities
-`an underage person` MEANS Person "Minor" 16 FALSE (LIST)
-`a bankrupt person` MEANS Person "Bankrupt" 40 TRUE (LIST)
-
--- Parameterized test data
+-- Test data factory
 GIVEN age IS A NUMBER
 GIVETH A Person
-`person with age` MEANS Person "Test" age FALSE (LIST)
+`person with age` MEANS Person "Test" age FALSE
 
--- Test: boundary conditions
-#EVAL `is adult` (`person with age` 17)   -- FALSE
-#EVAL `is adult` (`person with age` 18)   -- TRUE
-#EVAL `is adult` (`person with age` 19)   -- TRUE
+-- Boundary tests
+#ASSERT NOT `is adult` (`person with age` 17)
+#ASSERT `is adult` (`person with age` 18)
+#ASSERT `is adult` (`person with age` 19)
 ```
 
 ---
 
 ## Debugging Patterns
 
-### Common Errors and Fixes
+[Fix errors](../../tutorials/getting-started/debugging-type-errors.md) explains the common error messages and how to fix each one. Two habits help in a large rulebase:
 
-| Error                     | Likely Cause              | Fix                                           |
-| ------------------------- | ------------------------- | --------------------------------------------- |
-| "Type not in scope"       | Using type before DECLARE | Move DECLARE before use                       |
-| "Expected BOOLEAN, got X" | Wrong type in IF          | Check condition returns BOOLEAN               |
-| "Not enough arguments"    | Missing function args     | Count parameters in GIVEN                     |
-| "Ambiguous parse"         | Missing parentheses       | Add parentheses around expressions            |
-| "Unexpected indent"       | Inconsistent spacing      | Use consistent indentation (spaces, not tabs) |
+**When in doubt, add parentheses.** A field access passed to a function needs them:
 
-### The Parentheses Rule
-
-When in doubt, add parentheses:
-
-```l4
--- ❌ Ambiguous
-length charity's `the governors` > 0
-
--- ✅ Clear
+```
 length (charity's `the governors`) > 0
-
--- ❌ Ambiguous
-all (GIVEN g YIELD g's `the age` >= 18) charity's `the governors`
-
--- ✅ Clear
 all (GIVEN g YIELD g's `the age` >= 18) (charity's `the governors`)
 ```
 
-### Debug with #EVAL
+**Isolate the failing part.** When a rule gives a surprising answer, evaluate its parts one at a time, starting from the input:
 
-Isolate problems by evaluating sub-expressions:
-
-```l4
--- Full expression fails
-#EVAL `complex function` `the complex input`
-
--- Debug by breaking apart
-#EVAL `the complex input`                           -- Check input is valid
-#EVAL `the complex input`'s `the first field`       -- Check field access
-#EVAL `helper function` (`the complex input`'s `the first field`)  -- Check helper
 ```
-
-### Trace Intermediate Values
-
-Use WHERE to name and inspect intermediate values:
-
-```l4
-GIVEN x IS A `Some Type`
-GIVETH A Result
-`debug me` MEANS
-    `the final result`
-    WHERE
-        step1 MEANS `first operation` x
-        step2 MEANS `second operation` step1
-        step3 MEANS `third operation` step2
-        `the final result` MEANS `final operation` step3
-
--- Debug by evaluating each step
-#EVAL step1 WHERE step1 MEANS `first operation` `the test input`
-#EVAL step2 WHERE ... -- and so on
+#EVAL `the test charity`                                  -- is the input what you think?
+#EVAL `the test charity`'s `the governors`                -- is the field right?
+#EVAL `the person may be a governor` `the first governor` -- does the helper agree?
 ```
 
 ---
 
-## Integration Patterns
+## Getting Ready to Deploy
 
-### JSON Input/Output
-
-L4 supports JSON encoding and decoding for integration:
+Rules become API endpoints only when you mark them. Place `@export` directly above a rule to expose it, and add `@desc` to each input so that callers know what it means:
 
 ```l4
--- Encode a record to JSON
-#EVAL JSONENCODE `my charity`
+DECLARE Person
+    HAS `the age` IS A NUMBER
+        `is bankrupt` IS A BOOLEAN
 
--- Decode JSON to a record
-GIVEN `the JSON string` IS A STRING
-GIVETH A MAYBE `Registered Charity`
-`parse charity` MEANS JSONDECODE `the JSON string`
-```
-
-### Marking Rules for Deployment
-
-Rules become API endpoints only when you mark them. Place `@export` directly
-above a rule to expose it, add `@desc` to parameters so API consumers know
-what each input means, and use `@export default` for the rule that should be
-used when no rule name is specified:
-
-```l4
 @export Check whether a person is eligible
 GIVEN person IS A Person @desc The person to check
 GIVETH A BOOLEAN
@@ -264,150 +157,40 @@ DECIDE `is eligible` IF
     AND NOT person's `is bankrupt`
 ```
 
-### Deploying to Legalese Cloud
+[Deploy your rules](../../tutorials/deploying-rules/exporting-rules-for-deployment.md) takes it from there: deploying from VS Code or the command line, calling the deployed rules over REST, reading the JSON answers, and exposing the rules to AI agents. Test directives such as `#ASSERT` and `#TRACE` stay in the file; deployment ignores them. For calling other services from L4, see [HTTP and JSON](../../reference/builtins/http-json.md).
 
-Deploy from the VS Code extension: open the **L4 sidebar**, switch to the
-**Deploy** tab, review the preview of exported rules, and click **Deploy**.
-The extension uploads your file to Legalese Cloud, which compiles it and
-serves the exported rules as a REST API:
+### Keep It Fast
 
-```bash
-# List the functions in a deployment
-curl https://api.legalese.cloud/{orgSlug}/{deploymentId}/functions
+- **Prefer library functions to hand-written recursion.** `foldl (GIVEN acc, x YIELD acc + x) 0 xs` from the prelude says what it does and needs no base case.
+- **Prefer a formula to a loop** where the law gives one: the sum of 1 to n is `n * (n + 1) / 2`.
+- **Keep `#TRACE` scenarios short.** Test a 30-year loan contract with a version of three instalments; the same rule on a short timeline exercises the same paths.
 
-# Evaluate a function
-curl -X POST https://api.legalese.cloud/{orgSlug}/{deploymentId}/functions/is-eligible/evaluation \
-  -H "Content-Type: application/json" \
-  -d '{"arguments": {"person": {"the-age": 25, "is-bankrupt": false}}}'
+### Deployment Checklist
 
-# Ask which inputs still affect the outcome (interactive query plans)
-curl -X POST https://api.legalese.cloud/{orgSlug}/{deploymentId}/functions/is-eligible/query-plan \
-  -H "Content-Type: application/json" \
-  -d '{"arguments": {}}'
-```
+**Code quality**
 
-Note the naming: function names in URLs and property names in JSON bodies are
-sanitized — spaces become hyphens — so the rule `is eligible` is addressed as
-`is-eligible`, and the field `the age` as `the-age`.
+- [ ] `l4 check` passes with no errors
+- [ ] Every `#ASSERT` is satisfied and every `#TRACE` gives the expected result
+- [ ] No missing-case warnings left, or each one is deliberate
+- [ ] Sections follow the source, and rules cite the provisions they encode
 
-AI agents can call the same deployed rules through the built-in MCP server at
-`https://mcp.legalese.cloud/{orgSlug}/{deploymentId}`.
-
-For the complete walkthrough, see
-[Exporting Rules for Deployment](../../tutorials/deploying-rules/exporting-rules-for-deployment.md).
-
-### Web Form Generation
-
-L4 can generate web forms from type definitions:
-
-```l4
--- Types become form fields
-DECLARE Application
-    HAS `the name` IS A STRING          -- Text input
-        `the age` IS A NUMBER           -- Number input
-        `the status` IS A Status        -- Dropdown
-        `the purposes` IS A LIST OF Purpose  -- Multi-select
-```
-
-> **Self-hosting note:** a self-hosted `jl4-service` serves the same
-> data-plane API from your own host, e.g.
-> `http://localhost:PORT/deployments/{deploymentId}/functions/...`.
-
----
-
-## Performance Considerations
-
-### Avoid Deep Recursion
-
-L4 uses lazy evaluation but deep recursion can be slow:
-
-```l4
--- ❌ Potentially slow for large n
-GIVEN n IS A NUMBER
-GIVETH A NUMBER
-`sum to n` MEANS
-    IF n = 0 THEN 0
-    ELSE n + `sum to n` (n - 1)
-
--- ✅ Better: use formula
-`sum to n formula` MEANS n * (n + 1) / 2
-```
-
-### Use Prelude Functions
-
-Prefer built-in functions over manual recursion:
-
-```l4
--- ❌ Manual recursion
-GIVEN xs IS A LIST OF NUMBER
-GIVETH A NUMBER
-`my sum` MEANS
-    CONSIDER xs
-    WHEN EMPTY THEN 0
-    WHEN x FOLLOWED BY rest THEN x + `my sum` rest
-
--- ✅ Use prelude
-`my sum` MEANS foldl (GIVEN acc, x YIELD acc + x) 0 xs
-```
-
-### Limit Trace Depth
-
-When testing with #TRACE, limit scenario complexity:
-
-```l4
--- ❌ Very long trace (slow)
-#TRACE `loan contract` AT 0 WITH
-    -- 360 monthly payments...
-
--- ✅ Test with shorter period
-#TRACE `loan contract with` 3 AT 0 WITH  -- 3 payments
-    PARTY `the borrower` DOES `pay` AT 30
-    PARTY `the borrower` DOES `pay` AT 60
-    PARTY `the borrower` DOES `pay` AT 90
-```
-
----
-
-## Deployment Checklist
-
-Before deploying L4 code:
-
-### Code Quality
-
-- [ ] All #EVAL tests pass
-- [ ] All #TRACE scenarios work correctly
-- [ ] No ambiguous parses or type errors
-- [ ] Code is properly sectioned and commented
-
-### Test Coverage
+**Test coverage**
 
 - [ ] Happy path tested
-- [ ] Boundary conditions tested
-- [ ] Error cases tested
-- [ ] All CONSIDER branches have tests
+- [ ] Both sides of every boundary tested
+- [ ] Every `CONSIDER` branch and every `LEST` fallback reached by a test
 
-### Documentation
+**Deployment**
 
-- [ ] Types documented with comments
-- [ ] Complex rules explained
-- [ ] External references (legislation) cited
-- [ ] Examples provided
-
-### Integration
-
-- [ ] Rules marked with `@export` and parameters described with `@desc`
-- [ ] Deploy tab preview shows the expected rules
-- [ ] Input validation confirmed
-- [ ] Error responses defined
+- [ ] Rules marked with `@export`, and every input described with `@desc`
+- [ ] The Deploy tab preview shows the expected rules
+- [ ] A few calls to the deployed API return the answers your tests expect
 
 ---
 
 ## Exercise: Test a Rule Thoroughly
 
-Take this eligibility rule: a person qualifies if they are at least 21 years
-old and not bankrupt. Build a test data factory, write unit tests covering
-both sides of the age boundary, and replace a manual recursion with a prelude
-fold.
+Take this eligibility rule: a person qualifies if they are at least 21 years old and not bankrupt. Build a test data factory, assert the results on both sides of the age boundary and for a bankrupt person, and add the total of a list with a prelude fold instead of hand-written recursion.
 
 <details>
 <summary>Solution</summary>
@@ -426,23 +209,25 @@ DECIDE `is eligible` IF
     person's `the age` >= 21
     AND NOT person's `is bankrupt`
 
+§§ `Tests`
+
 -- Test data factory
 GIVEN age IS A NUMBER
 GIVETH A Person
 `person with age` MEANS Person "Test" age FALSE
 
 -- Boundary tests
-#EVAL `is eligible` (`person with age` 20)        -- FALSE (below boundary)
-#EVAL `is eligible` (`person with age` 21)        -- TRUE (at boundary)
-#EVAL `is eligible` (`person with age` 22)        -- TRUE (above boundary)
-#EVAL `is eligible` (Person "Bankrupt" 40 TRUE)   -- FALSE (bankrupt)
+#ASSERT NOT `is eligible` (`person with age` 20)
+#ASSERT `is eligible` (`person with age` 21)
+#ASSERT `is eligible` (`person with age` 22)
+#ASSERT NOT `is eligible` (Person "Bankrupt" 40 TRUE)
 
 -- Prelude fold instead of manual recursion
 GIVEN xs IS A LIST OF NUMBER
 GIVETH A NUMBER
 `total of` MEANS foldl (GIVEN acc, x YIELD acc + x) 0 xs
 
-#EVAL `total of` (LIST 1, 2, 3)   -- 6
+#ASSERT `total of` (LIST 1, 2, 3) EQUALS 6
 ```
 
 </details>
@@ -451,32 +236,12 @@ GIVETH A NUMBER
 
 ## Summary
 
-| Area             | Best Practice                                               |
-| ---------------- | ----------------------------------------------------------- |
-| **Organization** | Split into files by domain, use sections                    |
-| **Testing**      | Unit tests (#EVAL), integration tests (#TRACE)              |
-| **Debugging**    | Isolate with #EVAL, use parentheses                         |
-| **Integration**  | JSON for data exchange, `@export` + Legalese Cloud for APIs |
-| **Performance**  | Prefer formulas over recursion, use prelude                 |
+| Area             | Best Practice                                                        |
+| ---------------- | -------------------------------------------------------------------- |
+| **Organization** | One file per part of the source, `§` sections, shared types IMPORTed |
+| **Testing**      | `#ASSERT` in a `§§ Tests` section of each file; test every boundary  |
+| **Debugging**    | Isolate with `#EVAL`; add parentheses                                |
+| **Deployment**   | `@export` and `@desc`, then deploy to Legalese Cloud                 |
+| **Performance**  | Prefer library functions and formulas; keep traces short             |
 
----
-
-## Course Complete!
-
-You've finished the Advanced Course. You now know how to:
-
-- Model complete regulatory schemes using the three-layer approach
-- Implement cross-cutting concerns (timing, notices, appeals)
-- Build complex contracts with recursive obligations
-- Organize and test production L4 code
-
-### Continue Learning
-
-- **[Tutorials](../../tutorials/README.md)** - Task-focused guides
-- **[Concepts](../../concepts/README.md)** - Theoretical foundations
-- **[Reference](../../reference/README.md)** - Complete syntax reference
-
-### Get Help
-
-- **GitHub Issues**: Report bugs or ask questions
-- **Example Code**: Study `jl4/examples/legal/` and the `module-a*-examples.l4` files in this course
+You have completed the Advanced course. For a specific task, see the [Tutorials](../../tutorials/README.md); for the theory behind L4, [Concepts](../../concepts/README.md).

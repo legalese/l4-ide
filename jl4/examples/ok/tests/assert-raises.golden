@@ -1,0 +1,37 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+assert-raises.l4:10:1-34:
+  assertion could not be evaluated:
+  Division by zero in the operation:
+  DIVIDED BY
+assert-raises.l4:11:1-40:
+  assertion could not be evaluated:
+  Division by zero in the operation:
+  DIVIDED BY
+assert-raises.l4:14:1-19:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+assert-raises.l4:15:1-25:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the value of
+    x
+  but it is an assumed term.
+assert-raises.l4:18:1-29:
+  assertion satisfied
+assert-raises.l4:24:1-10:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the value of
+    b
+  but it is an assumed term.
+assert-raises.l4:25:1-14:
+  assertion could not be evaluated:
+  I could not continue evaluating, because I needed to know the value of
+    b
+  but it is an assumed term.
+assert-raises.l4:28:1-19:
+  assertion failed
+assert-raises.l4:29:1-19:
+  assertion satisfied

@@ -52,9 +52,17 @@ export class SessionsApiError extends Error {
 export const NO_COMMITS_YET_MESSAGE =
   "Available after the first turn: the session's files can be cloned once its first turn has been committed."
 
-/** A user-facing sentence for a Sessions API error. */
+/** 409 `wrong_organization` from `start`: the user's active Legalese
+ *  Cloud organisation isn't the one the session belongs to. */
+export const WRONG_ORGANIZATION_MESSAGE =
+  'This cloud session belongs to another organisation. Switch to that organisation in Legalese Cloud to resume it.'
+
+/** A user-facing sentence for a Sessions API error. `code` is a plain
+ *  string: servers may send codes this client's protocol doesn't list. */
 export function describeSessionsApiError(status: number, code: string): string {
   switch (code) {
+    case 'wrong_organization':
+      return WRONG_ORGANIZATION_MESSAGE
     case 'too_many_sessions':
       return 'Too many cloud sessions are running. Stop one and try again.'
     case 'start_failed':
@@ -63,8 +71,6 @@ export function describeSessionsApiError(status: number, code: string): string {
       return 'Cloud sessions are temporarily unavailable. Try again later.'
     case 'not_initialized':
       return 'The cloud session was not set up completely. Start a new one.'
-    case 'stopping':
-      return 'The cloud session is still stopping. Try again in a minute.'
     case 'no_commits_yet':
       return NO_COMMITS_YET_MESSAGE
     case 'invalid_seed':
@@ -110,6 +116,8 @@ export interface SessionsApi {
   addFiles(sid: string, req: AddFilesRequest): Promise<AddFilesResponse>
   /** …then queue it for the harness (`add-files`). */
   commitFiles(sid: string, batchId: string): Promise<PostCommandResponse>
+  /** `DELETE /sessions/:sid` answers 204 at once (the server cleans up
+   *  later), also while the session's task is still running. */
   deleteSession(sid: string): Promise<void>
   getEvents(
     streams: EventStreamRequest[]

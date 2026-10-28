@@ -1,43 +1,23 @@
 # DEONTIC
 
-The type for regulative rules representing obligations, permissions, and prohibitions.
+`DEONTIC` is the type of regulative rules: obligations, permissions and prohibitions.
+It takes two type parameters, the type of the parties and the type of the actions.
 
 ## Syntax
 
-```l4
-GIVETH A DEONTIC ActorType ActionType
-ruleName MEANS
-    PARTY actor
-    MUST/MAY/SHANT/DO action
-    WITHIN deadline
-    HENCE consequence
-    LEST breach
+```text
+GIVETH A DEONTIC PartyType ActionType
 ```
-
-## Purpose
-
-`DEONTIC` is L4's type for modeling legal obligations, permissions, and prohibitions. A DEONTIC value captures:
-
-1. **Who** has the obligation/permission (`PARTY`)
-2. **What** they must/may/must not do (`MUST`/`MAY`/`SHANT`/`DO`)
-3. **When** it must occur (`WITHIN`)
-4. **What happens** on compliance (`HENCE`)
-5. **What happens** on breach (`LEST`)
-
-The DEONTIC type is parameterized by two type arguments:
-
-- **ActorType**: The type of parties who can act (e.g., `Buyer`, `Seller`)
-- **ActionType**: The type of actions that can be performed (e.g., `deliver`, `pay`)
-
-## Examples
 
 **Example file:** [deontic-example.l4](deontic-example.l4)
 
-### Basic Usage
+## Example
 
 ```l4
 DECLARE Actor IS ONE OF Buyer, Seller
-DECLARE Action IS ONE OF `deliver goods`, `pay invoice` HAS amount IS A NUMBER
+DECLARE Action IS ONE OF
+  `deliver goods`
+  `pay invoice` HAS amount IS A NUMBER
 
 GIVETH A DEONTIC Actor Action
 `delivery obligation` MEANS
@@ -48,148 +28,80 @@ GIVETH A DEONTIC Actor Action
     LEST BREACH
 ```
 
-### Terminal Values
+Every `PARTY` in the rule must be an `Actor`, and every action an `Action`.
 
-DEONTIC has two terminal values:
+## Values
 
-| Value       | Meaning                    |
-| ----------- | -------------------------- |
-| `FULFILLED` | Contract successfully done |
-| `BREACH`    | Contract broken            |
+A value of type `DEONTIC Party Action` is one of:
 
-### Breach with Blame
+- a rule, `PARTY … MUST/MAY/SHANT …` (see [PARTY, MUST, MAY, SHANT](PARTY.md));
+- `FULFILLED`: nothing more is owed;
+- `BREACH`, optionally `BREACH BY party BECAUSE reason`: a party failed;
+- two rules combined with `RAND` or `ROR` (see [Deadlines and consequences](consequences.md#rand-and-ror)).
 
-```l4
-LEST BREACH BY Seller BECAUSE "failed to deliver on time"
-```
-
-## Type Signature
-
-When a function returns a DEONTIC value, use:
+Like any other value, a `DEONTIC` value can be the result of a function with `GIVEN` inputs, or of an `IF` or a `CONSIDER`:
 
 ```l4
-GIVETH A DEONTIC ActorType ActionType
-```
+DECLARE Actor IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF `deliver goods`
 
-For example:
-
-- `GIVETH A DEONTIC Person Action` — Obligations involving `Person` actors and `Action` actions
-- `GIVETH A DEONTIC ContractParty ContractAction` — Custom actor and action types
-
-## Composition
-
-DEONTIC values can be composed in several ways:
-
-### Chaining with HENCE
-
-```l4
-PARTY Seller MUST `deliver` WITHIN 14
-HENCE
-    PARTY Buyer MUST `pay` WITHIN 30
-    HENCE FULFILLED
-    LEST BREACH
-LEST BREACH
-```
-
-### Parallel with RAND
-
-All obligations must be fulfilled:
-
-```l4
-(PARTY Seller MUST `deliver` WITHIN 14 HENCE FULFILLED LEST BREACH)
-RAND
-(PARTY Buyer MUST `pay` WITHIN 30 HENCE FULFILLED LEST BREACH)
-```
-
-### Alternative with ROR
-
-Either obligation fulfills the contract:
-
-```l4
-(PARTY Seller MUST `ship` WITHIN 14 HENCE FULFILLED LEST BREACH)
-ROR
-(PARTY Seller MUST `pickup` WITHIN 7 HENCE FULFILLED LEST BREACH)
+GIVEN `is urgent` IS A BOOLEAN
+GIVETH A DEONTIC Actor Action
+`delivery` `is urgent` MEANS
+    IF `is urgent`
+    THEN PARTY Seller MUST `deliver goods` WITHIN 3
+    ELSE PARTY Seller MUST `deliver goods` WITHIN 14
 ```
 
 ## Evaluation
 
-### #TRACE
+A rule decides nothing on its own. It is evaluated from a start time against a list of events, each saying which party did what, and when (see [EVENT](EVENT.md)).
+The result is a `DEONTIC` value again:
 
-Test DEONTIC values by simulating events:
+- `FULFILLED`, when every duty was discharged;
+- `BREACH`, with who missed which deadline, when a duty failed and nothing absorbed the failure;
+- the rule still waiting, when the events run out before either happens. This value can be given more events later.
+
+`#TRACE` evaluates a rule in a file:
+
+```text
+#TRACE rule AT start-time WITH
+  PARTY party DOES action AT time
+  ...
+```
+
+`EVALTRACE` is the same evaluation as a function:
+
+```text
+EVALTRACE : DEONTIC party action → NUMBER → LIST OF EVENT party action → DEONTIC party action
+```
 
 ```l4
+DECLARE Actor IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF `deliver goods`
+
+GIVETH A DEONTIC Actor Action
+`delivery obligation` MEANS
+    PARTY Seller
+    MUST `deliver goods`
+    WITHIN 14
+
 #TRACE `delivery obligation` AT 0 WITH
     PARTY Seller DOES `deliver goods` AT 10
+
+#EVAL EVALTRACE `delivery obligation` 0 (LIST EVENT Seller `deliver goods` 10)
 ```
 
-### EVALTRACE Function
+Both give `FULFILLED`. With no events at all, both give the rule still waiting, not `BREACH`: to let a deadline pass without anyone acting, add a `WAITUNTIL` event.
 
-The underlying evaluation function:
+`l4 state-graph` draws a rule's possible paths as a state diagram; see [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md).
 
-```l4
-EVALTRACE : FORALL party action.
-    DEONTIC party action ->    -- The contract
-    NUMBER ->                  -- Start time
-    LIST (EVENT party action) -> -- Events
-    DEONTIC party action       -- Result
-```
+## Related pages
 
-Use `EVENT` to construct events:
-
-```l4
-#EVAL EVALTRACE myContract 0 (LIST EVENT Seller `deliver` 5, EVENT Buyer `pay` 20)
-```
-
-## Deontic Modalities
-
-| Modality  | Keyword | Meaning     | On Action      | On No Action   |
-| --------- | ------- | ----------- | -------------- | -------------- |
-| Must      | `MUST`  | Obligation  | HENCE (comply) | LEST (breach)  |
-| May       | `MAY`   | Permission  | HENCE (comply) | Nothing        |
-| Shall not | `SHANT` | Prohibition | LEST (breach)  | HENCE (comply) |
-
-## Advanced Features
-
-### PROVIDED Clause
-
-Add conditions to action matching:
-
-```l4
-PARTY Buyer
-MUST `pay invoice` amount PROVIDED amount >= 100
-WITHIN 30
-```
-
-### EXACTLY Keyword
-
-Require exact value matching:
-
-```l4
-PARTY Buyer
-MUST EXACTLY `pay invoice` 500
-WITHIN 30
-```
-
-### WAIT UNTIL
-
-Advance time in traces without events:
-
-```l4
-#TRACE myContract AT 0 WITH
-    (`WAIT UNTIL` 20)
-```
-
-## Related Keywords
-
-- **[PARTY](PARTY.md)** — Specifies who has the obligation
-- **[MUST](MUST.md)** — Creates an obligation
-- **[MAY](MAY.md)** — Creates a permission
-- **[SHANT](SHANT.md)** — Creates a prohibition
-- **[BECAUSE](BECAUSE.md)** — Adds blame reason to breach
-- **[Regulative Rules](README.md)** — Full regulative reference
-
-## Further Reading
-
-- [Regulative Rules Concept](../../concepts/legal-modeling/regulative-rules.md) — Deep dive into deontic logic
-- [Foundation Module 5](../../courses/foundation/module-6-regulative.md) — Tutorial on regulative rules
-- [Tom Hvitved's PhD Thesis](https://di.ku.dk/english/research/phd/phd-theses/2011/hvitved12phd.pdf) — Theoretical foundation
+- [Regulative rules](README.md)
+- [PARTY, MUST, MAY, SHANT](PARTY.md)
+- [Deadlines and consequences](consequences.md)
+- [EVENT](EVENT.md)
+- [Foundation module 6: Regulative rules](../../courses/foundation/module-6-regulative.md): a step-by-step introduction
+- [How obligations unfold](../../concepts/legal-modeling/regulative-rules.md): the model behind regulative rules
+- [Tom Hvitved's PhD thesis](https://di.ku.dk/english/research/phd/phd-theses/2011/hvitved12phd.pdf): the theory L4's contract model is based on

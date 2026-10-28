@@ -381,7 +381,7 @@ DECIDE `purpose valid at date` IF
 
 -- Test 2: Active charity misses deadline, commissioner issues notice
 #TRACE `annual return obligation` `Acme Animal Shelter` AT 0 WITH
-    (`WAIT UNTIL` 70)
+    WAITUNTIL 70
 
 -- Test 3: Governor reports bankruptcy promptly
 `bankruptcy matter` MEANS Bankruptcy (Date 1 7 2024)
@@ -390,7 +390,7 @@ DECIDE `purpose valid at date` IF
 
 -- Test 4: Governor fails to report, commissioner may suspend
 #TRACE `governor reporting obligation` `John Smith` `bankruptcy matter` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    WAITUNTIL 20
 
 -- ============================================================
 § `Evaluations`

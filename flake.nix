@@ -56,6 +56,8 @@
                   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO2u9PR5FnBb8joGKHUVGqy9/cZu/iXIjgLpblkOF0H+ meng-and-ruslan"
                 ];
               };
+              # the web editor runs the LSP in the browser from WASM
+              services.jl4-lsp.enable = false;
               environment.etc."my-deploy-marker" = {
                 text = ''
                 deployed-from-flake-2025-05-12 15:37

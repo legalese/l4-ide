@@ -12,16 +12,26 @@ resolveNlgAnnotation ::
   a ->
   Check a
 resolveNlgAnnotation a = do
-  case a ^. annoOf % annNlg of
-    Nothing -> pure a
+  -- The other-language renderings resolve too. They are promoted into the
+  -- default slot by 'L4.Nlg.selectLanguage' at render time, and a slot splice
+  -- keys on the 'Unique' of each @%parameter%@ reference — a rendering left
+  -- parsed has none, so under @--lang he@ every slot fell back to the bare name.
+  alts <- traverse resolveOne (a ^. annoOf % annNlgAlts)
+  let a' = a & annoOf % annNlgAlts .~ alts
+  case a' ^. annoOf % annNlg of
+    Nothing -> pure a'
     Just nlgM -> do
-      resolvedNlg <- case nlgM of
-        MkInvalidNlg{} -> pure nlgM
-        MkResolvedNlg{} -> pure nlgM
-        MkParsedNlg ann frags -> do
-          resolvedFrags <- traverse resolveNlgFragment frags
-          pure $ MkResolvedNlg ann resolvedFrags
-      setAnnNlg resolvedNlg a
+      resolvedNlg <- resolveOne nlgM
+      setAnnNlg resolvedNlg a'
+ where
+  resolveOne nlgM = case nlgM of
+    MkInvalidNlg{} -> pure nlgM
+    MkResolvedNlg{} -> pure nlgM
+    -- The tag travels with the annotation through resolution: a
+    -- resolved Hebrew rendering is still a Hebrew rendering.
+    MkParsedNlg ann mtag frags -> do
+      resolvedFrags <- traverse resolveNlgFragment frags
+      pure $ MkResolvedNlg ann mtag resolvedFrags
 
 resolveNlgFragment :: NlgFragment Name -> Check (NlgFragment Resolved)
 resolveNlgFragment = \ case
@@ -88,10 +98,6 @@ nlgExpr = \ case
       e1' <- nlgExpr e1
       e2' <- nlgExpr e2
       pure $ Modulo ann e1' e2'
-    Exponent ann e1 e2 -> do
-      e1' <- nlgExpr e1
-      e2' <- nlgExpr e2
-      pure $ Exponent ann e1' e2'
     Cons ann e1 e2 -> do
       e1' <- nlgExpr e1
       e2' <- nlgExpr e2
@@ -244,7 +250,16 @@ nlgAppForm (MkAppForm ann n ns maka) =
   MkAppForm ann
     <$> resolveNlgAnnotationInResolved n
     <*> traverse resolveNlgAnnotationInResolved ns
-    <*> traverse resolveNlgAnnotation maka
+    <*> traverse nlgAka maka
+
+-- | The @AKA@'s own annotation, and each alias name's. A herald on its own line
+-- under @\`r\` p AKA \`a\`@ lands on the alias name, and left parsed its
+-- @%slots%@ had no 'Unique' to splice a call's arguments into
+-- (smucclaw\/l4-ide#978).
+nlgAka :: Aka Resolved -> Check (Aka Resolved)
+nlgAka aka = do
+  MkAka ann ns <- resolveNlgAnnotation aka
+  MkAka ann <$> traverse resolveNlgAnnotationInResolved ns
 
 nlgTypeSig :: TypeSig Resolved -> Check (TypeSig Resolved)
 nlgTypeSig (MkTypeSig ann givenSig mGivethSig) =
