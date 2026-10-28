@@ -2498,7 +2498,10 @@ export function createAiChatStore(
       )
       if (conv?.cloud) {
         conv.cloud.state = 'gone'
-        conv.cloud.notice = 'This cloud session no longer exists.'
+        // Not found: deleted, or of another organisation than the one
+        // signed in (the Sessions API keeps each organisation's apart).
+        conv.cloud.notice =
+          'This cloud session was not found. It was deleted, or it belongs to another organisation: switch organisation in Legalese Cloud to open it.'
       }
       return
     }
