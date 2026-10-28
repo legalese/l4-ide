@@ -7,6 +7,10 @@
  *   host with a fresh WorkOS access token (any username, the JWT as the
  *   password — §9.2);
  * - lists cloud sessions in VS Code's "Git: Clone" picker;
+ * - keeps the token out of system credential helpers (the keychain)
+ *   for the host: in the config git reads from the extension host's
+ *   environment, which the Git extension passes to every git it runs
+ *   (so also a first clone), and in each clone's own config;
  * - clones with the Git API's `clone(url, { parentPath, postCloneAction:
  *   'none' })` and configures the clone: pushes go to `refs/heads/local`,
  *   no stored credential helper for the host, a 5 MB post buffer;
@@ -149,6 +153,47 @@ export class GitSyncError extends Error {
   }
 }
 
+/** The variables git reads extra config from (git 2.31 and later):
+ *  `GIT_CONFIG_COUNT` and `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>`. */
+export type GitConfigEnv = Record<string, string | undefined>
+
+/**
+ * Add `key = value` to the config git takes from `env`, unless it's
+ * there already. Entries put there by others are kept; a malformed
+ * `GIT_CONFIG_COUNT` is left alone.
+ */
+export function addGitEnvConfig(
+  env: GitConfigEnv,
+  key: string,
+  value: string
+): void {
+  const raw = env.GIT_CONFIG_COUNT
+  const count = raw === undefined || raw === '' ? 0 : Number(raw)
+  if (!Number.isInteger(count) || count < 0) return
+  for (let i = 0; i < count; i++) {
+    if (
+      env[`GIT_CONFIG_KEY_${i}`] === key &&
+      env[`GIT_CONFIG_VALUE_${i}`] === value
+    ) {
+      return
+    }
+  }
+  env[`GIT_CONFIG_KEY_${count}`] = key
+  env[`GIT_CONFIG_VALUE_${count}`] = value
+  env.GIT_CONFIG_COUNT = String(count + 1)
+}
+
+/** `credential.<scheme>://<host>.helper` for the Sessions API, or
+ *  undefined when the URL is unset or invalid. */
+export function credentialHelperKey(apiUrl: string): string | undefined {
+  try {
+    const url = new URL(apiUrl.trim())
+    return `credential.${url.protocol}//${url.host}.helper`
+  } catch {
+    return undefined
+  }
+}
+
 export interface CloudGitSyncDeps<U extends GitUri> {
   getGitApi(): Promise<GitApiResult<U>>
   /** `legaleseAi.cloudSessions.apiUrl`; '' = off. */
@@ -159,6 +204,9 @@ export interface CloudGitSyncDeps<U extends GitUri> {
   parseUri(url: string): U
   fileUri(fsPath: string): U
   logger: { info(m: string): void; warn(m: string): void }
+  /** The environment the Git extension runs git with: the extension
+   *  host's (`process.env`, the default). */
+  gitEnv?: GitConfigEnv
 }
 
 /** The Sessions API host (`host[:port]`), or '' when unset/invalid. */
@@ -286,6 +334,8 @@ export class CloudGitSync<U extends GitUri> {
     const git = await this.deps.getGitApi()
     if ('unavailable' in git) return git.unavailable
     const { api } = git
+    // Also for clones made through "Git: Clone".
+    this.keepTokenOutOfCredentialHelpers()
     this.registrations.push(
       api.registerCredentialsProvider({
         getCredentials: async (host) => {
@@ -362,13 +412,26 @@ export class CloudGitSync<U extends GitUri> {
     }
   }
 
+  /**
+   * An empty credential helper list for the Sessions API host in the
+   * config git reads from the environment the Git extension runs it
+   * with. A clone runs before its repository config exists: without
+   * this, a system helper (the OS keychain) stores the short-lived
+   * token, and a later clone from the same host presents it expired.
+   */
+  private keepTokenOutOfCredentialHelpers(): void {
+    const key = credentialHelperKey(this.deps.apiUrl())
+    if (key) addGitEnvConfig(this.deps.gitEnv ?? process.env, key, '')
+  }
+
   /** The three repository options of §9.3. */
   async configure(repo: GitRepository<U>): Promise<void> {
-    const host = new URL(this.deps.apiUrl().trim())
+    const key = credentialHelperKey(this.deps.apiUrl())
+    if (!key) throw new GitSyncError('Cloud sessions are not configured.')
     await repo.setConfig('remote.origin.push', GIT_PUSH_REFSPEC)
     // Empty helper list for this host: git asks VS Code every time
     // instead of reusing an expired token from the system keychain.
-    await repo.setConfig(`credential.${host.protocol}//${host.host}.helper`, '')
+    await repo.setConfig(key, '')
     await repo.setConfig('http.postBuffer', GIT_POST_BUFFER)
   }
 
@@ -423,6 +486,7 @@ export class CloudGitSync<U extends GitUri> {
     if (!apiUrl) throw new GitSyncError('Cloud sessions are not configured.')
     this.requireFirstCommit(sid)
     const api = await this.api()
+    this.keepTokenOutOfCredentialHelpers()
     let folder: U | null
     try {
       folder = await api.clone(this.deps.parseUri(sessionGitUrl(apiUrl, sid)), {
