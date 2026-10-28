@@ -93,7 +93,7 @@ conversations, client-declared tools), [AI_CHAT_PLAN.md](../done/AI_CHAT_PLAN.md
                                                            │ mounts users/ (root access point)
  Fargate task — one per running session                   ▼
    headless harness + jl4-lsp ── /workspace = AP(user) ── S3 Files ⇄ s3://…/users/<folder>/
-   └─ agent key (15 min, self-renewing while active) ──► ai.legalese.cloud, mcp.legalese.cloud
+   └─ agent key (15 min, renewed by the task, ends with it) ──► ai.legalese.cloud, mcp.legalese.cloud
 ```
 
 **Components**
@@ -292,8 +292,8 @@ Each invariant gets a test in Phase 5.
 - **I6** Only the Sessions API reaches every folder, and only after verifying
   the caller's WorkOS JWT. It runs no AI-driven or user-supplied code, and
   treats everything in a user folder as hostile input (§7.2).
-- **I7** Agent credentials are short-lived, have limited permissions, renew
-  only while the agent is active, and stop after 24 hours (§6).
+- **I7** Agent credentials are short-lived, have limited permissions, live
+  only as long as the task that renews them, and stop after 24 hours (§6).
 - **I8** There is no ECS Exec or SSH into tasks. Operators can read user data
   only through the audited break-glass role.
 
@@ -449,7 +449,7 @@ token (a JWT valid for about 5 minutes) from the user's session.
 
 The session task authenticates to ai-proxy and MCP with WorkOS user-scoped API
 keys, as the prototype does. A key lasts 15 minutes. The task renews it
-itself while the agent is active, for up to 24 hours.
+itself while it runs, for up to 24 hours, and ends it when it stops (§6.3).
 
 **Mint** (by the extension, with the user present)
 
@@ -467,13 +467,18 @@ itself while the agent is active, for up to 24 hours.
 1. validates the key with WorkOS: it must be valid, user-scoped, and named
    `cloud-session:…`;
 2. refuses with `chain_expired` if the chain start in the name is more than 24
-   hours ago (per-organisation setting);
-3. refuses with `inactive` if the key had no real use in the last 10 minutes
-   (§6.3);
+   hours ago (a per-organisation setting can only shorten this);
+3. refuses with `not_a_member` if the user is no longer an active member of
+   the organisation, and with `forbidden` if none of the key's permissions
+   remain in the agent set ∩ the user's current role;
 4. **deletes the presented key first**. If WorkOS says it's already gone,
    another renewal won and it refuses with `chain_forked`;
-5. mints the successor with the same name and permissions and returns
-   `{ token, id, expiresAt }`.
+5. mints the successor with the same name, the key's permissions ∩ the agent
+   set ∩ the user's current role, and a lifetime of 15 minutes or until the
+   chain's cap, whichever is sooner, and returns `{ token, id, expiresAt }`.
+
+The harness renews on `401`, and on ai-proxy's `403` whose body says
+`invalid-credentials` (how ai-proxy answers an expired or deleted key).
 
 **End** (by the task): `POST /auth/agent-token/end` with the current key
 deletes it.
@@ -486,27 +491,43 @@ deletes it.
   only for those seconds.
 - At most one key per chain is valid. A stolen key either dies at the next
   renewal, or — if the thief renews first — breaks the real task's chain within
-  minutes (`chain_forked` → parked + `auth-required`).
+  minutes: the real task's key no longer exists, so its next renewal fails
+  validation (`invalid_key` → parked + `auth-required`). `chain_forked` only
+  shows when two renewals race.
 - Chains are stateless; there is no store. A user who creates an API key
-  themselves could give it a chain name, but that only extends their own
-  authority.
+  themselves could give it a chain name, but renewal narrows it to the agent
+  set ∩ their current role, so it can't carry more than a minted chain.
 - If a task stops renewing (idle, crashed, hung), its key dies within 15
-  minutes.
+  minutes; on idle exit, `stop` and SIGTERM the harness ends it at once.
 - The 24-hour cap and the permission set are enforced by jl4-auth-proxy, not
-  by the task.
+  by the task, and each renewal re-checks membership and role, so removing a
+  user from the organisation or demoting them takes effect within minutes.
 
-### 6.3 Activity signal
+### 6.3 Key lifetime
 
-Real use means a model call through ai-proxy (including sending tool results
-back) or an MCP call. Renewal calls don't count.
+A key lives as long as the task that renews it. There is no activity signal:
 
-- **Preferred:** WorkOS `last_used_at` on the key, which WorkOS updates when
-  ai-proxy or MCP validate it. P6 must confirm it is accurate to about a minute
-  and isn't bumped by the renewal's own validation.
-- **Fallback:** on each model call with a `cloud-session:` key, ai-proxy
-  writes a timestamp to `/efs/agent-activity/<sid>` (at most once a minute).
-  That is the EFS volume ai-proxy and jl4-auth-proxy already share; the renew
-  route reads it.
+- The harness exits after 10 minutes with no running turn and no new command
+  (§5.4), and on `stop` or SIGTERM. On the way out it ends its chain
+  (`POST /auth/agent-token/end`), so the key is deleted at once.
+- A task that dies without ending it (crash, hang, kill) stops renewing, so
+  its key expires within 15 minutes.
+- The sweep (§7.1) stops tasks with a stale lease or older than 25 hours.
+
+So the keys of inactive sessions are invalidated without anything shared
+between ai-proxy and jl4-auth-proxy. What renewal doesn't check is activity: a
+key copied out of a task can be renewed by whoever holds it, within the 24-hour
+cap and while the user keeps those permissions, and doing so breaks the real
+task's chain (§6.2).
+
+The first design refused renewal after 10 minutes without real use (from
+WorkOS `last_used_at`, or stamps ai-proxy wrote to the shared EFS). It was
+dropped on 2026-10-28 (jl4-auth-proxy #12, ai-proxy #11): it only stopped a key
+that is renewed but never used — a key in use creates activity itself — and
+cost a cross-service file contract with two open issues (stamps not tied to
+their user; running turns not counted). If server-side idle detection is wanted
+later, WorkOS `last_used_at` on the key needs no shared state, once P6 shows
+the renewal's own validation doesn't count as use.
 
 ### 6.4 MCP servers and sealed secrets
 
@@ -1055,9 +1076,9 @@ Tracking rules:
 - [x] [post-mortem](cloud-sessions/ai-turn-reattach-ownership.md) · `ai-turn-reattach-ownership` (base `main`) ([PR #4](https://github.com/legalese/ai-proxy/pull/4)) — turn reattach checks that
       the turn belongs to the caller (`src/index.ts:534`).
 - [x] [post-mortem](cloud-sessions/ai-cloud-session-activity.md) · `ai-cloud-session-activity` (base `ai-user-scoped-agent-keys`) ([PR #5](https://github.com/legalese/ai-proxy/pull/5)) — session
-      id in billing records; the `/efs/agent-activity/<sid>` stamp for
-      `cloud-session:` keys (§6.3 fallback); an optional validation cache of
-      at most 60 s, off by default.
+      id in billing records; an optional validation cache of at most 60 s,
+      off by default. (Its `agent-activity/` stamp was removed with the
+      activity check, ai-proxy #11, §6.3.)
 
 Related, outside this plan: `ai-conversation-delete-ownership`
 ([ai-proxy #6](https://github.com/legalese/ai-proxy/pull/6)) limits
@@ -1071,8 +1092,9 @@ merges it should switch to #3's `conversationCreatorId` helper.
 - [x] [post-mortem](cloud-sessions/auth-access-token.md) · `auth-access-token` (base `auth-agent-token-revoke-ownership`) ([PR #5](https://github.com/legalese/jl4-auth-proxy/pull/5)) —
       `GET /auth/access-token` (§6.1).
 - [x] [post-mortem](cloud-sessions/auth-agent-key-chains.md) · `auth-agent-key-chains` (base `auth-access-token`) ([PR #7](https://github.com/legalese/jl4-auth-proxy/pull/7)) — `purpose:
-"cloud-session"`, `renew` and `end`, with the activity check and its EFS
-      fallback (§6.2, §6.3).
+"cloud-session"`, `renew` and `end` (§6.2, §6.3). Review before merging
+      added the membership and role re-check on renew; the activity check was
+      removed in jl4-auth-proxy #12.
 
 ### 15.4 cloud-sessions (in jl4-auth-proxy, under `cloud-sessions/`)
 
@@ -1103,12 +1125,12 @@ reference for §8 shapes; the Sessions API mirrors them.
 
 **jl4-auth-proxy (`https://legalese.cloud`)**
 
-| Route                                                              | Auth                   | Success                                     | Errors                                                                                                                         |
-| ------------------------------------------------------------------ | ---------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /auth/access-token`                                           | sealed session         | `200 { accessToken, expiresAt }` (epoch ms) | `401 { error: "unauthenticated" }`                                                                                             |
-| `POST /auth/agent-token` `{ purpose: "cloud-session", sessionId }` | sealed session         | `200 { token, id, expiresAt, permissions }` | as today                                                                                                                       |
-| `POST /auth/agent-token/renew`                                     | `Bearer <current key>` | `200 { token, id, expiresAt }`              | `401 { error: "invalid_key" }`, `403 { error: "chain_expired" }`, `403 { error: "inactive" }`, `409 { error: "chain_forked" }` |
-| `POST /auth/agent-token/end`                                       | `Bearer <current key>` | `204`                                       | `401 { error: "invalid_key" }`                                                                                                 |
+| Route                                                              | Auth                   | Success                                     | Errors                                                                                                                                                           |
+| ------------------------------------------------------------------ | ---------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/access-token`                                           | sealed session         | `200 { accessToken, expiresAt }` (epoch ms) | `401 { error: "unauthenticated" }`                                                                                                                               |
+| `POST /auth/agent-token` `{ purpose: "cloud-session", sessionId }` | sealed session         | `200 { token, id, expiresAt, permissions }` | as today                                                                                                                                                         |
+| `POST /auth/agent-token/renew`                                     | `Bearer <current key>` | `200 { token, id, expiresAt }`              | `401 { error: "invalid_key" }`, `403 { error: "chain_expired" }`, `403 { error: "not_a_member" }`, `403 { error: "forbidden" }`, `409 { error: "chain_forked" }` |
+| `POST /auth/agent-token/end`                                       | `Bearer <current key>` | `204`                                       | `401 { error: "invalid_key" }`                                                                                                                                   |
 
 - Key name: `cloud-session:<sid>:<chainStartEpochSeconds>`; lifetime 900 s;
   permissions `{ai:chat, l4:rules, l4:evaluate, l4:read}` ∩ the user's.
@@ -1118,12 +1140,8 @@ reference for §8 shapes; the Sessions API mirrors them.
 
 - The harness sends `X-Legalese-Session: <sid>` on every request; ai-proxy adds
   `sessionId` to its billing records.
-- Activity stamp (§6.3 fallback): after each successful model call made with a
-  `cloud-session:` key, ai-proxy writes `agent-activity/<sid>.json` at the root
-  of the EFS file system it shares with jl4-auth-proxy, containing
-  `{ "sessionId": "<sid>", "lastActiveAt": <epoch ms> }`. It writes at most
-  once a minute per session, through a temporary file and a rename, with mode
-  `0644`. jl4-auth-proxy reads it in `renew`.
+- ai-proxy answers an expired or deleted key with `403` and a body containing
+  `invalid-credentials`; the harness renews on it as on a `401` (§6.2).
 
 **Sessions API**
 
@@ -1170,7 +1188,7 @@ changes the design.
 | P3 Git on S3 Files | Harness-side commit, gc and bundle times are acceptable on a 500-file repo                                                                                                                                                                                                    | EFS, with the same access-point model                                 |
 | P4 File relay      | Commands and events cross between Lambda and task within 1.5 s p95; exclusive create works across clients                                                                                                                                                                     | AppSync Events for delivery (§8)                                      |
 | P5 Cold start      | `RunTask` to harness `running` in ≤ 40 s p50                                                                                                                                                                                                                                  | zstd or SOCI, a smaller image, clearer progress UI                    |
-| P6 WorkOS          | `last_used_at` is accurate to about a minute and not bumped by renewal; delete-then-mint renewal works; rate limits allow about 12 mints per active session-hour                                                                                                              | ai-proxy activity stamp (§6.3 fallback)                               |
+| P6 WorkOS          | Deleting an already-deleted key answers 404 (fork detection); delete-then-mint renewal works; rate limits allow about 12 mints per active session-hour                                                                                                                        | Detect forks by listing the chain's keys after the mint               |
 | P7 Lambda          | Function URL, VPC and S3 Files mount work together; clone, pull and push of a 5 MB repo through VS Code's Git extension with Basic auth and `http.postBuffer` succeed; JWKS verification works through the NAT                                                                | Front the Lambda with CloudFront or API Gateway                       |
 
 **Proof-of-concept results (2026-09-28).** Run in account 370008249754,
@@ -1207,7 +1225,8 @@ create → init → start → message → events → idle sleep → start again 
 clone and push.
 
 **Phase 3 — auth (about 1 week, in parallel with Phase 2).** Chains renew while
-active, are refused after 10 idle minutes, stop at 24 hours, and detect forks.
+the task runs, end when it goes idle or stops, stop at 24 hours, follow the
+user's current role, and detect forks.
 Conversations stay continuous across key rotations.
 
 **Phase 4 — VS Code (about 2 weeks).** These journeys work:
@@ -1259,9 +1278,9 @@ vCPU-hour and $0.00356 per GB-hour.
 - **R4** Lambda body limits (6 MB). Attachments stay out of git; large pushes
   are rejected.
 - **R5** WorkOS behaviour:
-  - how current `last_used_at` is;
   - undocumented rate limits;
-  - chain names on user-created keys (affects only that user).
+  - whether deleting an already-deleted key answers 404 (fork detection, P6);
+  - chain names on user-created keys (renewal narrows them to the agent set).
 - **R6** Cold starts of 30–60 s on every wake.
 - **R7** Conversation content outside the per-user boundary: the ai-proxy
   conversation store, CloudWatch tool logs, and the model provider.
@@ -1315,8 +1334,9 @@ vCPU-hour and $0.00356 per GB-hour.
 - Per-conversation (rather than per-consumer) snapshot stores in the VS Code
   adapters (`legalese-agent-core`, #508).
 
-- Live cloud sessions per user (proposed: 3), and the chain maximum age per
-  organisation (proposed: 24 hours).
+- ~~Live cloud sessions per user, and the chain maximum age per
+  organisation~~ — decided 2026-10-28: 3 live sessions per user; chains stop
+  at 24 hours, and an organisation can only shorten that.
 - Where conversation content should live: the ai-proxy store or the user's
   folder.
 - Fargate Spot for background sessions. About 70% cheaper, with a 2-minute
