@@ -52,9 +52,17 @@ export class SessionsApiError extends Error {
 export const NO_COMMITS_YET_MESSAGE =
   "Available after the first turn: the session's files can be cloned once its first turn has been committed."
 
-/** A user-facing sentence for a Sessions API error. */
+/** 409 `wrong_organization` from `start`: the user's active Legalese
+ *  Cloud organisation isn't the one the session belongs to. */
+export const WRONG_ORGANIZATION_MESSAGE =
+  'This cloud session belongs to another organisation. Switch to that organisation in Legalese Cloud to resume it.'
+
+/** A user-facing sentence for a Sessions API error. `code` is a plain
+ *  string: servers may send codes this client's protocol doesn't list. */
 export function describeSessionsApiError(status: number, code: string): string {
   switch (code) {
+    case 'wrong_organization':
+      return WRONG_ORGANIZATION_MESSAGE
     case 'too_many_sessions':
       return 'Too many cloud sessions are running. Stop one and try again.'
     case 'start_failed':
