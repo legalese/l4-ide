@@ -52,17 +52,16 @@ export class SessionsApiError extends Error {
 export const NO_COMMITS_YET_MESSAGE =
   "Available after the first turn: the session's files can be cloned once its first turn has been committed."
 
-/** 409 `wrong_organization` from `start`: the user's active Legalese
- *  Cloud organisation isn't the one the session belongs to. */
-export const WRONG_ORGANIZATION_MESSAGE =
-  'This cloud session belongs to another organisation. Switch to that organisation in Legalese Cloud to resume it.'
+/** 404 `not_found`: the session was deleted, or it belongs to another
+ *  organisation than the one signed in. Each organisation has its own
+ *  cloud sessions, so the API can't tell the two apart. */
+export const NOT_FOUND_MESSAGE =
+  'This cloud session was not found. It was deleted, or it belongs to another organisation: switch organisation in Legalese Cloud to open it.'
 
 /** A user-facing sentence for a Sessions API error. `code` is a plain
  *  string: servers may send codes this client's protocol doesn't list. */
 export function describeSessionsApiError(status: number, code: string): string {
   switch (code) {
-    case 'wrong_organization':
-      return WRONG_ORGANIZATION_MESSAGE
     case 'too_many_sessions':
       return 'Too many cloud sessions are running. Stop one and try again.'
     case 'start_failed':
@@ -78,7 +77,7 @@ export function describeSessionsApiError(status: number, code: string): string {
     case 'too_large':
       return 'The upload is too large for a cloud session.'
     case 'not_found':
-      return 'This cloud session no longer exists.'
+      return NOT_FOUND_MESSAGE
     case 'unauthenticated':
       return 'Sign in to Legalese Cloud to use cloud sessions.'
     case 'forbidden':
