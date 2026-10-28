@@ -1,0 +1,88 @@
+28 July 2026
+28 July 2026 is equal to 28 July 2026
+28 July 2026 is equal to 28 July 2026
+1 January 2026
+31 January 2023
+28 February 2023
+31 March 2023
+30 April 2023
+31 May 2023
+30 June 2023
+31 July 2023
+31 August 2023
+30 September 2023
+31 October 2023
+30 November 2023
+31 December 2023
+31 January 2024
+29 February 2024
+31 March 2024
+30 April 2024
+31 May 2024
+30 June 2024
+31 July 2024
+31 August 2024
+30 September 2024
+31 October 2024
+30 November 2024
+31 December 2024
+the following must refuse: `YMD` with 2023, 1 and 32
+the following must refuse: `YMD` with 2023, 2 and 29
+the following must refuse: `YMD` with 2023, 3 and 32
+the following must refuse: `YMD` with 2023, 4 and 31
+the following must refuse: `YMD` with 2023, 5 and 32
+the following must refuse: `YMD` with 2023, 6 and 31
+the following must refuse: `YMD` with 2023, 7 and 32
+the following must refuse: `YMD` with 2023, 8 and 32
+the following must refuse: `YMD` with 2023, 9 and 31
+the following must refuse: `YMD` with 2023, 10 and 32
+the following must refuse: `YMD` with 2023, 11 and 31
+the following must refuse: `YMD` with 2023, 12 and 32
+the following must refuse: `YMD` with 2024, 1 and 32
+the following must refuse: `YMD` with 2024, 2 and 30
+the following must refuse: `YMD` with 2024, 3 and 32
+the following must refuse: `YMD` with 2024, 4 and 31
+the following must refuse: `YMD` with 2024, 5 and 32
+the following must refuse: `YMD` with 2024, 6 and 31
+the following must refuse: `YMD` with 2024, 7 and 32
+the following must refuse: `YMD` with 2024, 8 and 32
+the following must refuse: `YMD` with 2024, 9 and 31
+the following must refuse: `YMD` with 2024, 10 and 32
+the following must refuse: `YMD` with 2024, 11 and 31
+the following must refuse: `YMD` with 2024, 12 and 32
+`YMD` with 1900, 2 and 29
+`YMD` with 2100, 2 and 29
+29 February 2000
+29 February 2400
+`YMD` with 2023, 2 and 29
+`Date` with 29, 2 and 2023
+`Date` with 7, 28 and 2026
+`YMD` with 2026, 28 and 7
+`YMD` with 2026, 0 and 7
+`YMD` with 2026, 13 and 7
+`Date` with 28, 7.5 and 2026
+`YMD` with 2026, 7.5 and 28
+`YMD` with 2026, 13 and 32
+`YMD` with 2026, 20260728 and 1
+the following must refuse: `YMD` with 2026, 28 and 7
+the following must refuse: `YMD` with 2026, 0 and 7
+the following must refuse: `YMD` with 2026, 13 and 7
+the following must refuse: `YMD` with 2026, 7.5 and 28
+the following must refuse: `YMD` with 2026, 20260728 and 1
+the following must refuse: `YMD` with 2026, 13 and 32
+the following must refuse: `YMD` with 2026, 13 and 0
+the following must refuse: `YMD` with 2026, 13 and 7.5
+the following must refuse: `YMD` with 2026.5, 13 and 1
+the following must refuse: `YMD` with 2026.5, 0 and 1
+the following must refuse: `YMD` with 2026.5, 7.5 and 1
+`YMD` with 2026, 7 and 0
+`YMD` with 2026, 7 and 32
+`Date` with 28.5, 7 and 2026
+`YMD` with 2026, 7 and 28.5
+the following must refuse: `YMD` with 2026, 7 and 0
+the following must refuse: `YMD` with 2026, 7 and 32
+the following must refuse: `YMD` with 2026, 7 and 28.5
+the following must refuse: `YMD` with 1900, 2 and 29
+the following must refuse: `YMD` with 2100, 2 and 29
+1 January 0
+1 March -5

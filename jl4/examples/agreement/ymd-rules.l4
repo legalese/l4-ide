@@ -1,0 +1,32 @@
+-- Rules that call YMD, from the daydate library. `due` answers the date YMD
+-- gives: a date for a month and a day that exist in that year, and YMD's
+-- refusal, with its reason, for a month or a day that does not. `overdue`
+-- calls YMD on a date that exists, so it answers on every input, and core,
+-- the service, the REPL and the language server decline to plan it even so,
+-- with both of YMD's reasons. See boolean-rules.l4 for what an "agreement:"
+-- line says, and for `pad`.
+--
+-- agreement: due may refuse with ["YMD: that month has no such day in that year", "YMD: the month is not a whole number from 1 to 12"]
+-- agreement: due {"year": 2024, "month": 2, "day": 29} => answers "2024-02-29"
+-- agreement: due {"year": 2026, "month": 13, "day": 1} => refuses "YMD: the month is not a whole number from 1 to 12"
+-- agreement: due {"year": 2023, "month": 2, "day": 29} => refuses "YMD: that month has no such day in that year"
+--
+-- agreement: overdue may refuse with ["YMD: that month has no such day in that year", "YMD: the month is not a whole number from 1 to 12"]
+-- agreement: overdue {"late": true} => answers true
+-- agreement: overdue {"late": false} => answers false
+
+IMPORT daydate
+
+@export the date a payment is due
+GIVEN year IS A NUMBER
+      month IS A NUMBER
+      day IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A DATE
+due year month day pad MEANS YMD year month day
+
+@export whether a payment due on 28 July 2026 is overdue
+GIVEN late IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE overdue IF late AND DATE_DAY (YMD 2026 7 28) EQUALS 28
