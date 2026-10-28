@@ -253,14 +253,6 @@ export const MODEL_WRITABLE_REPO_DIRS: readonly string[] = [
   REPO_TMP_DIR,
 ]
 
-/**
- * The Sessions API sweep clears `repo/tmp/` of sessions whose
- * `session.json` `lastActivity` is older than this many days (while no
- * task runs); the harness commits the deletion on its next start.
- */
-export const ABANDONED_TMP_DAYS = 30
-export const ABANDONED_TMP_MS = ABANDONED_TMP_DAYS * 24 * 60 * 60 * 1000
-
 /** Validate a relative path (`/`-separated, no `.`/`..`/empty parts). */
 function relativePath(p: string, what: string): string {
   const parts = p.split('/')

@@ -5,7 +5,6 @@ import {
   ProtocolError,
   agentKeyName,
   chatEventToPayload,
-  ABANDONED_TMP_DAYS,
   addFilesRequest,
   addFilesResponse,
   SESSIONS_API_DETAIL_CODES,
@@ -163,7 +162,6 @@ describe('session files', () => {
     assert.equal(isModelWritableRepoPath('.git/config'), false)
     assert.equal(isModelWritableRepoPath('data/../x'), false)
     assert.equal(isModelWritableRepoPath('/data/x'), false)
-    assert.equal(ABANDONED_TMP_DAYS, 30)
   })
 
   test('cursors', () => {

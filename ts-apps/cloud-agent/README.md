@@ -35,9 +35,7 @@ Plugins (`RunnerPlugin` in `runner.ts`):
   (`local-merged` / `local-merge-conflict`, the merge aborted on conflict);
   `rollback` restores the parent of the turn's commit and commits "Roll back: …"
   (`rolled-back`); `git gc` on sleep. `tmp/` and its `tmp/deleted/` copies are
-  committed like the rest; if the Sessions API sweep cleared `tmp/` of an
-  abandoned session, the next start commits that ("Clear tmp of abandoned
-  session"). git runs with hooks and fsmonitor
+  committed like the rest. git runs with hooks and fsmonitor
   disabled, `core.createObject=rename` and `gc.auto=0` (`git.ts`).
 - `mcp-servers.ts` (§6.4): an ephemeral X25519 key pair at start, whose public
   key rides on every running/busy/waiting `session-state` event;
