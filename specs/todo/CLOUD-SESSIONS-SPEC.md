@@ -5,16 +5,19 @@ per running session, working directly on the user's files in S3 through Amazon
 S3 Files. The VS Code extension starts, watches and drives cloud sessions next
 to its local session, and syncs a session's files with git.
 
-**Status:** built, not deployed (2026-10-28). The proxy changes, the
-cloud-sessions Terraform and the Sessions API are merged in `jl4-auth-proxy`
-and `ai-proxy`, with follow-up fixes in review; the harness and the extension
-are in review in `l4-ide` (§15). P6 and P7 (§16) need a live run before
-go-live.
+**Status:** built, not deployed (2026-10-28). The proxy changes are merged
+and deployed in `jl4-auth-proxy` and `ai-proxy`; the cloud-sessions Terraform
+and the Sessions API are merged in `cloud-sessions`, whose Terraform is
+applied but whose Lambda and images are not deployed yet; the harness and the
+extension are in review in `l4-ide` (§15). P6 and P7 (§16) need a live run
+before go-live.
 **Scope:** `l4-ide` (agent core, cloud runner, extension, webview, image
 build), `jl4-auth-proxy` (access-token route, agent key chains), `ai-proxy`
-(user-scoped agent keys), and new infrastructure `cloud-sessions` (Terraform
-plus one Lambda) as a second Terraform root in `jl4-auth-proxy/cloud-sessions/`,
-following the `ai-proxy` Terraform pattern. It can move to its own repo later.
+(user-scoped agent keys), and new infrastructure in its own repo
+[`cloud-sessions`](https://github.com/legalese/cloud-sessions) (Terraform plus
+one Lambda and the session task image), following the `ai-proxy` Terraform
+pattern. It started as `cloud-sessions/` in `jl4-auth-proxy` and moved on
+2026-10-28.
 **Client requirements:** VS Code 1.106 or newer (raised from 1.95; §9.3) and
 `git` installed.
 **Audience:** implementers familiar with the Legalese Cloud request path
@@ -1066,17 +1069,19 @@ cloud folder instead of on their machine:
 - **Inputs.** l4-ide has no AWS access. Each `l4-ide-build-<n>` release
   (`main-tag.yml`) carries the harness bundle `cloud-agent.cjs` and
   `jl4-lsp-linux-arm64`, each with a `.sha256`.
-- **Deploy.** jl4-auth-proxy's `deploy-cloud-sessions-agent.yml` (manual,
-  with a release tag) deploys them, as `rollout-jl4-service.yml` does for
-  jl4-service. A preview job checks the release and its hashes without AWS
-  access; the deploy job runs in the `prod` GitHub environment (one
-  approval). It builds `legalese-cloud-agent:<tag>` for arm64 from
-  `cloud-sessions/agent-image`, smoke-tests it, pushes it and writes its digest
-  to SSM `/cloud-sessions/<env>/image-digest`.
+- **Deploy.** The cloud-sessions repo's `deploy-cloud-sessions-agent.yml`
+  (manual, with a release tag) deploys them, as jl4-auth-proxy's
+  `rollout-jl4-service.yml` does for jl4-service. A preview job checks the
+  release and its hashes without AWS access; the deploy job runs in the
+  `prod` GitHub environment (one approval). It builds
+  `legalese-cloud-agent:<tag>` for arm64 from `agent-image/`, smoke-tests it,
+  pushes it and writes its digest to SSM `/cloud-sessions/<env>/image-digest`.
 - **Who can push.** Both cloud-sessions deploy workflows (this one and
   `deploy-cloud-sessions-api.yml`) share one GitHub OIDC role (secret
-  `CLOUD_SESSIONS_DEPLOY_ROLE_ARN`), which trusts only jobs in the `prod`
-  environment, so the approval gate is enforced by AWS, not just by GitHub.
+  `CLOUD_SESSIONS_DEPLOY_ROLE_ARN`), which trusts only jobs in the
+  cloud-sessions repo's `prod` environment, so the approval gate is enforced
+  by AWS, not just by GitHub, and no other repository's workflows can assume
+  it.
 - **Upgrades.** On `start`, the Sessions API compares the user's task
   definition with that digest and registers a new revision if they differ
   (§4.4). Running sessions keep their image until they sleep.
@@ -1133,8 +1138,9 @@ Tracking rules:
       with the environment allow-list, and the `cloud-agent-image.yml`
       workflow (§5.1, §5.3, §14). The image, its smoke test and its rollout
       later moved to jl4-auth-proxy (`rollout-cloud-agent.yml`, #9, since
-      renamed `deploy-cloud-sessions-agent.yml`, #14); l4-ide
-      only releases `cloud-agent.cjs` and `jl4-lsp-linux-arm64`.
+      renamed `deploy-cloud-sessions-agent.yml`, #14) and from there to the
+      cloud-sessions repo (2026-10-28); l4-ide only releases
+      `cloud-agent.cjs` and `jl4-lsp-linux-arm64`.
 - [x] [post-mortem](cloud-sessions/cloud-sessions-client.md) · `cloud-sessions-client` (base `cloud-session-protocol`) ([PR #510](https://github.com/legalese/l4-ide/pull/510)) — extension side:
       Sessions API client, access token, polling, commands, key-chain minting,
       seeding (path fix, size limits), MCP transfer and sealing. Takes over
@@ -1176,10 +1182,14 @@ merges it should switch to #3's `conversationCreatorId` helper.
       added the membership and role re-check on renew; the activity check was
       removed in jl4-auth-proxy #12.
 
-### 15.4 cloud-sessions (in jl4-auth-proxy, under `cloud-sessions/`)
+### 15.4 cloud-sessions
 
-A second Terraform root plus the Sessions API, following the ai-proxy pattern
-of looking up shared resources by tag.
+A Terraform root plus the Sessions API and the session task image, following
+the ai-proxy pattern of looking up shared resources by tag. Built as
+`cloud-sessions/` in jl4-auth-proxy (the PRs below are jl4-auth-proxy PRs) and
+moved, with its history, to its own repo
+[legalese/cloud-sessions](https://github.com/legalese/cloud-sessions) on
+2026-10-28.
 
 - [x] [post-mortem](cloud-sessions/cloud-sessions-terraform.md) · `cloud-sessions-terraform` (base `main`) ([PR #6](https://github.com/legalese/jl4-auth-proxy/pull/6)) — §4, §5.1, §5.2 and §13 as
       Terraform: bucket and lifecycle rules, S3 Files file system, mount
@@ -1194,11 +1204,16 @@ of looking up shared resources by tag.
       its container image. Unit tests run against a temporary directory as the
       mount, with AWS mocked.
 
-- [ ] `sessions-api-fixes` (base `main`) ([PR #13](https://github.com/legalese/jl4-auth-proxy/pull/13)) —
+- [x] `sessions-api-fixes` (base `main`) ([PR #13](https://github.com/legalese/jl4-auth-proxy/pull/13)) —
       review fixes before the first deploy: delete requests carried out by
       the sweep, state from the lease first, one folder per user and
       organisation, bounded inputs, RS256 only, OIDC roles for the `prod` environment only
       (§6.1, §7.1–§7.3, §9.3).
+- [ ] `move-cloud-sessions` (base `main`) ([PR #15](https://github.com/legalese/jl4-auth-proxy/pull/15)) —
+      removes `cloud-sessions/` and its workflows from jl4-auth-proxy once
+      they are in the cloud-sessions repo. There, the deploy role trusts that
+      repo (`github_repo`), so the next apply replaces the two roles of
+      2026-10-09 that trust jl4-auth-proxy (§14).
 
 Deploy-time steps, not pull requests: Fargate vCPU quota increase; the
 one-time file-system root ownership (§4.1); `FOLDER_KEY` value.

@@ -11,9 +11,11 @@ live tracker and all post-mortems once the implementation items are done.
 
 ## Spec sections covered, and deviations (with reasons)
 
-All of it; docs only. The Sessions API and Terraform live in
+All of it; docs only. The Sessions API and Terraform were built in
 `jl4-auth-proxy/cloud-sessions/` instead of a new repo, so no GitHub repo had
-to be created without approval.
+to be created without approval. On 2026-10-28, once the repo was created,
+they moved with their history to
+[legalese/cloud-sessions](https://github.com/legalese/cloud-sessions).
 
 ## Checks run
 
