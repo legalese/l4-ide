@@ -349,7 +349,8 @@ export function createCloudSessions(deps: {
   const authDeps: AuthProxyDeps = {
     authBaseUrl: () => `https://${LEGALESE_CLOUD_DOMAIN}`,
     getSessionToken: () => deps.auth.getSessionToken(),
-    storeSessionToken: (token) => deps.auth.setSessionToken(token),
+    storeSessionToken: (token, replaces) =>
+      deps.auth.storeRotatedSessionToken(token, replaces),
   }
   const tokens = new AccessTokenManager(authDeps)
   const api = new SessionsApiClient({
