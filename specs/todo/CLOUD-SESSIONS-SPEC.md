@@ -5,12 +5,12 @@ per running session, working directly on the user's files in S3 through Amazon
 S3 Files. The VS Code extension starts, watches and drives cloud sessions next
 to its local session, and syncs a session's files with git.
 
-**Status:** built, not deployed (2026-10-28). The proxy changes are merged
-and deployed in `jl4-auth-proxy` and `ai-proxy`; the cloud-sessions Terraform
-and the Sessions API are merged in `cloud-sessions`, whose Terraform is
-applied but whose Lambda and images are not deployed yet; the harness and the
-extension are in review in `l4-ide` (§15). P6 and P7 (§16) need a live run
-before go-live.
+**Status:** built, partly deployed (2026-10-29). The proxy changes are
+merged and deployed in `jl4-auth-proxy` and `ai-proxy`; the cloud-sessions
+Terraform and the Sessions API are merged in `cloud-sessions`, whose Terraform
+is applied and whose Sessions API Lambda is deployed; no harness image is
+rolled out yet; the harness and the extension are in review in `l4-ide`
+(§15). P6 and P7 (§16) need a live run before go-live.
 **Scope:** `l4-ide` (agent core, cloud runner, extension, webview, image
 build), `jl4-auth-proxy` (access-token route, agent key chains), `ai-proxy`
 (user-scoped agent keys), and new infrastructure in its own repo
@@ -461,14 +461,17 @@ token (a JWT valid for about 5 minutes) from the user's session.
 
 - The extension refreshes it as needed.
 - The Sessions API verifies it (RS256 only) against the issuer and JWKS URL
-  set in its Terraform (`jwt_issuer`, `jwt_jwks_url`). Check both against a
-  real `/auth/access-token` token before deploying: WorkOS session tokens may
-  carry `https://api.workos.com/user_management/<client_id>` rather than the
-  AuthKit domain. Expecting our own session issuer also refuses tokens WorkOS
-  issues to third-party OAuth apps. It takes `sub` as the user id and `org_id`
-  as the organisation.
-- It requires the `ai:chat` permission. Confirm which permission or role claims
-  the WorkOS JWT template provides.
+  set in its Terraform (`jwt_issuer`, `jwt_jwks_url`). Checked against a real
+  `/auth/access-token` token on 2026-10-28: WorkOS session tokens carry
+  `iss` = `https://api.workos.com/user_management/<client_id>`, with keys at
+  `https://api.workos.com/sso/jwks/<client_id>`, not the AuthKit domain; the
+  Terraform defaults are those. Expecting our own session issuer also refuses
+  tokens WorkOS issues to third-party OAuth apps. It takes `sub` as the user
+  id and `org_id` as the organisation.
+- It requires the permission `required_permission` names (default `ai:chat`)
+  in the token's `permissions` claim, an array of permission slugs. During the
+  beta prod requires `ai:cloud-sessions`, a WorkOS permission only staff roles
+  carry.
 - The sealed session never leaves the extension and jl4-auth-proxy.
 
 ### 6.2 Agent key chains
