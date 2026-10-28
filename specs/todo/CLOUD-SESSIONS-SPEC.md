@@ -1066,15 +1066,16 @@ cloud folder instead of on their machine:
 - **Inputs.** l4-ide has no AWS access. Each `l4-ide-build-<n>` release
   (`main-tag.yml`) carries the harness bundle `cloud-agent.cjs` and
   `jl4-lsp-linux-arm64`, each with a `.sha256`.
-- **Rollout.** jl4-auth-proxy's `rollout-cloud-agent.yml` (manual, with a
-  release tag) rolls them out, as `rollout-jl4-service.yml` does for
+- **Deploy.** jl4-auth-proxy's `deploy-cloud-sessions-agent.yml` (manual,
+  with a release tag) deploys them, as `rollout-jl4-service.yml` does for
   jl4-service. A preview job checks the release and its hashes without AWS
-  access; the rollout job runs in the `prod` GitHub environment (one
+  access; the deploy job runs in the `prod` GitHub environment (one
   approval). It builds `legalese-cloud-agent:<tag>` for arm64 from
   `cloud-sessions/agent-image`, smoke-tests it, pushes it and writes its digest
   to SSM `/cloud-sessions/<env>/image-digest`.
-- **Who can push.** The GitHub OIDC roles for both cloud-sessions workflows
-  (this one and `cloud-sessions-api-image.yml`) trust only jobs in the `prod`
+- **Who can push.** Both cloud-sessions deploy workflows (this one and
+  `deploy-cloud-sessions-api.yml`) share one GitHub OIDC role (secret
+  `CLOUD_SESSIONS_DEPLOY_ROLE_ARN`), which trusts only jobs in the `prod`
   environment, so the approval gate is enforced by AWS, not just by GitHub.
 - **Upgrades.** On `start`, the Sessions API compares the user's task
   definition with that digest and registers a new revision if they differ
@@ -1131,7 +1132,8 @@ Tracking rules:
 - [x] [post-mortem](cloud-sessions/cloud-agent-image.md) · `cloud-agent-image` (base `cloud-agent-mcp`) ([PR #516](https://github.com/legalese/l4-ide/pull/516)) — Dockerfile, entry point
       with the environment allow-list, and the `cloud-agent-image.yml`
       workflow (§5.1, §5.3, §14). The image, its smoke test and its rollout
-      later moved to jl4-auth-proxy (`rollout-cloud-agent.yml`, #9); l4-ide
+      later moved to jl4-auth-proxy (`rollout-cloud-agent.yml`, #9, since
+      renamed `deploy-cloud-sessions-agent.yml`, #14); l4-ide
       only releases `cloud-agent.cjs` and `jl4-lsp-linux-arm64`.
 - [x] [post-mortem](cloud-sessions/cloud-sessions-client.md) · `cloud-sessions-client` (base `cloud-session-protocol`) ([PR #510](https://github.com/legalese/l4-ide/pull/510)) — extension side:
       Sessions API client, access token, polling, commands, key-chain minting,
