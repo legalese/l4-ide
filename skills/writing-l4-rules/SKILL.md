@@ -413,7 +413,11 @@ Just enough to write most rules without a round-trip. Anything not here, check <
 `TODAY` returns `DATE`. `CURRENTTIME` returns `TIME`. Both need e.g. `TIMEZONE IS "America/New_York"` in scope to return a value.
 `NOW` returns `DATETIME` and defaults to `"Etc/UTC"`.
 
-Construct literals (after `IMPORT daydate`) with `Date day month year` — e.g. `Date 15 1 2025`, **not** `DATE 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
+Construct literals (after `IMPORT daydate`) with `Date day month year` — e.g. `Date 15 1 2025`, **not** `DATE 2025 1 15` — or with `YMD year month day` — e.g. `YMD 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
+`Date` rolls a day past the end of the month, or a month past 12, forward: `Date 29 2 2025` is 1 March 2025, and a year-first `Date 2025 1 15` is 17 July of the year 20.
+With a whole-number year, `YMD` refuses a month or a day that does not exist instead, with a reason that says which part is wrong.
+A rule that calls `YMD` has no query plan, even when the date exists; the same rule written with `Date` has one.
+Both are described at <https://legalese.com/l4/reference/libraries/daydate.md>.
 
 ### Operators
 

@@ -80,6 +80,28 @@ GIVEN dt IS A DATETIME
 GIVETH A DATE
 `Date` AKA `Days to date` MEANS DATETIME_DATE dt
 
+-- YMD year month day  -> the date, with its parts in ISO 8601 order.
+-- Where `Date` rolls a month or a day that does not exist forward, YMD
+-- refuses, and its reason says whether the month or the day is wrong.
+-- The year must be a whole number and is not otherwise checked.
+-- `Year month day` is another name for YMD.
+GIVEN year  IS A NUMBER
+      month IS A NUMBER
+      day   IS A NUMBER
+GIVETH A DATE
+`YMD` AKA `Year month day` MEANS
+    IF      month AT LEAST 1
+        AND month AT MOST 12
+        AND FLOOR month EQUALS month
+    THEN IF      DATE_YEAR  candidate EQUALS year
+             AND DATE_MONTH candidate EQUALS month
+             AND DATE_DAY   candidate EQUALS day
+         THEN candidate
+         ELSE REFUSE "YMD: that month has no such day in that year"
+    ELSE REFUSE "YMD: the month is not a whole number from 1 to 12"
+    WHERE
+        candidate MEANS Date day month year
+
 
 
 §§ `Datestamp Constructors`

@@ -8,6 +8,25 @@ DECIDE `New Year 2025` IS Date 1 1 2025
 #EVAL `Christmas 2024`
 #EVAL `New Year 2025`
 
+-- Date construction in ISO 8601 order: year, month, day
+DECIDE `Christmas 2024, year first` IS YMD 2024 12 25
+#EVAL `Christmas 2024, year first`                          -- DATE OF 25, 12, 2024
+#EVAL `Christmas 2024, year first` EQUALS `Christmas 2024`  -- TRUE
+#ASSERT `Year month day` 2024 12 25 EQUALS YMD 2024 12 25
+#ASSERT YMD 2024 2 29 EQUALS Date 29 2 2024
+#ASSERT YMD 0 1 1 EQUALS Date 1 1 0  -- a whole-number year is not otherwise checked
+
+-- Date rolls a day past the end of the month, or a month past 12, forward
+#ASSERT Date 29 2 2025 EQUALS Date 1 3 2025
+#ASSERT Date 7 28 2026 EQUALS Date 7 4 2028
+#ASSERT Date 2025 1 15 EQUALS Date 17 7 20  -- Date takes the day first
+
+-- YMD refuses a month or a day that does not exist, and says which part is wrong
+#EVAL YMD 2023 2 29
+#ASSERT REFUSED YMD 2023 2 29 BECAUSE "YMD: that month has no such day in that year"
+#ASSERT REFUSED YMD 2026 28 7 BECAUSE "YMD: the month is not a whole number from 1 to 12"
+#ASSERT REFUSED YMD 2026 13 32 BECAUSE "YMD: the month is not a whole number from 1 to 12"
+
 -- Date from ISO string (returns MAYBE DATE, ignores time/timezone if present)
 DECIDE `from iso date` IS Date "2025-06-15"
 DECIDE `from iso datetime` IS Date "2025-06-15T10:30:00Z"
