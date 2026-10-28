@@ -591,6 +591,13 @@ describe('Sessions API and agent keys', () => {
     assert.equal(parseAgentKeyError({ error: 'not_a_member' }), null)
   })
 
+  test('error codes include wrong_organization for a start from another organisation', () => {
+    assert.ok(SESSIONS_API_DETAIL_CODES.includes('wrong_organization'))
+    assert.deepEqual(apiError({ error: 'wrong_organization' }, ''), {
+      error: 'wrong_organization',
+    })
+  })
+
   test('inactive is no longer a chain failure', () => {
     assert.equal(parseAgentKeyError({ error: 'inactive' }), null)
     assert.throws(
