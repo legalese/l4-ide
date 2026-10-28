@@ -70,7 +70,6 @@ export type SessionsApiDetailCode =
   | 'already_initialized'
   | 'too_many_sessions'
   | 'invalid_seed'
-  | 'stopping'
   | 'start_failed'
   | 'unavailable'
   | 'internal'
@@ -86,7 +85,6 @@ export const SESSIONS_API_DETAIL_CODES: readonly SessionsApiDetailCode[] = [
   'already_initialized',
   'too_many_sessions',
   'invalid_seed',
-  'stopping',
   'start_failed',
   'unavailable',
   'internal',
