@@ -4,12 +4,14 @@ import {
   type DirectiveSnapshotStore,
 } from './directive-snapshot.js'
 import {
+  fsCopyFile,
   fsCreateFile,
   fsDeleteFile,
   fsEditFile,
   fsReadFile,
   resolveCurrentContents,
   resolveFileUri,
+  type FsCopyArgs,
   type FsCreateArgs,
   type FsDeleteArgs,
   type FsEditArgs,
@@ -113,6 +115,10 @@ export class BuiltinTools {
 
   deleteFile(args: FsDeleteArgs): Promise<string> {
     return fsDeleteFile(this, args)
+  }
+
+  copyFile(args: FsCopyArgs, ctx?: ToolSessionContext): Promise<string> {
+    return fsCopyFile(this.withStores(ctx), args)
   }
 
   evaluate(args: L4EvaluateArgs, ctx?: ToolSessionContext): Promise<string> {

@@ -14,6 +14,7 @@ import {
 import { BUILTIN_TOOLS } from './tool-registry.js'
 import { metaAskUser } from './tools/ask-user.js'
 import type { BuiltinTools } from './tools/builtin-tools.js'
+import type { FsCopyArgs } from './tools/fs.js'
 import type { L4RefactorArgs } from './tools/refactor.js'
 
 /** Result returned to the proxy as the content of a `role:"tool"` message. */
@@ -77,12 +78,12 @@ export class ToolDispatcher {
   }
 
   /** Resolve a tool-call's target file to its current URI. Read /
-   *  create / edit / delete all take `{ path }`. */
+   *  create / edit / delete take `{ path }`; copy targets `to`. */
   resolveFile(call: ToolCall): string | null {
     try {
-      const args = JSON.parse(call.argsJson || '{}') as { path?: string }
-      if (!args.path) return null
-      return this.opts.tools.resolveFileUri(args.path)
+      const p = targetPath(call.name, JSON.parse(call.argsJson || '{}'))
+      if (!p) return null
+      return this.opts.tools.resolveFileUri(p)
     } catch {
       return null
     }
@@ -216,10 +217,14 @@ export class ToolDispatcher {
     call: ToolCall,
     args: unknown
   ): Promise<void> {
-    if (call.name !== 'fs__edit_file' && call.name !== 'fs__create_file') {
+    if (
+      call.name !== 'fs__edit_file' &&
+      call.name !== 'fs__create_file' &&
+      call.name !== 'fs__copy_file'
+    ) {
       return
     }
-    const { path: p } = args as { path?: string }
+    const p = targetPath(call.name, args)
     if (!p) return
     const tools = this.opts.tools
     const uri = tools.resolveFileUri(p)
@@ -260,6 +265,8 @@ export class ToolDispatcher {
         )
       case 'fs__delete_file':
         return tools.deleteFile(args as { path: string })
+      case 'fs__copy_file':
+        return tools.copyFile(args as FsCopyArgs, ctx)
       case 'l4__evaluate':
         return tools.evaluate(
           args as {
@@ -285,6 +292,13 @@ export class ToolDispatcher {
         throw new Error(`No executor for tool: ${name}`)
     }
   }
+}
+
+/** The file a tool call writes or names: `to` for a copy, else `path`. */
+function targetPath(name: string, args: unknown): string | undefined {
+  const a = (args ?? {}) as { path?: unknown; to?: unknown }
+  const p = name === 'fs__copy_file' ? a.to : a.path
+  return typeof p === 'string' && p ? p : undefined
 }
 
 function parseArgs(json: string): unknown {

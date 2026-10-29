@@ -379,6 +379,8 @@ async function runBuiltin(
       return tools.editFile(args as Parameters<BuiltinTools['editFile']>[0])
     case 'fs__delete_file':
       return tools.deleteFile(args as Parameters<BuiltinTools['deleteFile']>[0])
+    case 'fs__copy_file':
+      return tools.copyFile(args as Parameters<BuiltinTools['copyFile']>[0])
     case 'l4__evaluate':
       return tools.evaluate(args as Parameters<BuiltinTools['evaluate']>[0])
     default:

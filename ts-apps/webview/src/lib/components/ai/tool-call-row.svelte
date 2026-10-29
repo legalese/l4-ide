@@ -107,6 +107,17 @@
         // just open the file so the user can see the context.
         click: call.status === 'done' ? 'diff' : 'open',
       }
+    if (name === 'fs__copy_file') {
+      const from = typeof a.from === 'string' ? a.from : null
+      const to = typeof a.to === 'string' ? a.to : null
+      const move = a.deleteSource === true
+      return {
+        running: move ? 'Moving…' : 'Copying…',
+        settled: move ? 'Moved' : 'Copied',
+        target: from && to ? `${from} → ${to}` : to,
+        click: to ? 'open' : null,
+      }
+    }
     if (name === 'fs__delete_file')
       return {
         running: 'Deleting…',

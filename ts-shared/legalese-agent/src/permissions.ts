@@ -89,6 +89,9 @@ export function categoryForTool(toolName: string): PermissionCategory | null {
   if (toolName === 'fs__create_file') return 'fs.create'
   if (toolName === 'fs__edit_file') return 'fs.edit'
   if (toolName === 'fs__delete_file') return 'fs.delete'
+  // A copy or move keeps the content: like an edit, it may replace a
+  // file's text, and the source it removes stays recoverable.
+  if (toolName === 'fs__copy_file') return 'fs.edit'
   if (toolName === 'l4__evaluate') return 'l4.evaluate'
   if (toolName === 'l4__refactor') return 'l4.refactor'
   if (toolName === 'meta__ask_user') return 'meta.askUser'

@@ -75,6 +75,25 @@ describe('ToolDispatcher', () => {
     assert.equal((result as { code?: string }).code, 'denied')
   })
 
+  test('runs a copy as an edit, snapshots and opens its target', async () => {
+    const { ws, dispatcher: d } = dispatcher({
+      files: { 'tmp/a.txt': 'new', 'a.txt': 'old' },
+    })
+    assert.equal(d.categoryFor('fs__copy_file'), 'fs.edit')
+    const call = {
+      callId: 'c1',
+      name: 'fs__copy_file',
+      argsJson:
+        '{"from":"tmp/a.txt","to":"a.txt","overwrite":true,"deleteSource":true}',
+    }
+    const result = await d.run(call, ctxA)
+    assert.equal(result.ok, true)
+    assert.equal(ws.get('a.txt'), 'new')
+    // The applied-diff view's "before" side is the replaced target.
+    assert.equal(d.snapshotFor('c1')?.before, 'old')
+    assert.equal(d.resolveFile(call), 'file:///ws/a.txt')
+  })
+
   test('asks before deleting (the default) and honours a deny', async () => {
     const {
       ws,
