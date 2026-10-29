@@ -2,9 +2,10 @@
   import type { AiCloudSessionState } from 'jl4-client-rpc'
 
   // A cloud session's state as its cloud outline (§12): a band sweeps
-  // along it while the session loads or starts (slower while busy); it
-  // is white when running, amber when the session needs the user, gray
-  // asleep. The state's wording is the tooltip and the accessible name.
+  // along it while the view loads it (quickly), while its compute starts
+  // (slowly) and, in crimson, while the agent works; it is white when
+  // running, amber when the session needs the user, gray asleep. The
+  // state's wording is the tooltip and the accessible name.
   let {
     state,
     loading = false,
@@ -25,7 +26,7 @@
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
   type Look = {
-    tone: 'dim' | 'bright' | 'warn' | 'gone'
+    tone: 'dim' | 'bright' | 'active' | 'warn' | 'gone'
     /** The sweep's period, or null for a still outline. */
     sweep: string | null
     label: string
@@ -38,12 +39,12 @@
       case 'starting':
         return {
           tone: 'bright',
-          sweep: '1.4s',
+          sweep: '2.6s',
           label: detail ?? 'Starting cloud compute…',
         }
       case 'busy':
         return {
-          tone: 'bright',
+          tone: 'active',
           sweep: '2.6s',
           label: 'Busy: the agent is working',
         }
@@ -136,6 +137,9 @@
   }
   .cloud-icon.tone-bright {
     color: var(--vscode-foreground);
+  }
+  .cloud-icon.tone-active {
+    color: #c8376a;
   }
   .cloud-icon.tone-warn {
     color: var(--vscode-editorWarning-foreground, #cca700);

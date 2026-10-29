@@ -96,7 +96,7 @@
                 <span class="row-title">
                   <!-- One slot for every row, so titles line up: a cloud
                        session's state as its cloud; a local chat's dot
-                       (white, fading in and out, while a turn runs; amber
+                       (crimson, fading in and out, while a turn runs; amber
                        while it waits for the user), or nothing. -->
                   <span class="row-lead">
                     {#if item.kind === 'cloud'}
@@ -280,7 +280,7 @@
     border-radius: 50%;
   }
   .dot.streaming {
-    background: var(--vscode-foreground);
+    background: #c8376a;
     animation: streaming-pulse 1.2s ease-in-out infinite;
   }
   .dot.waiting {
