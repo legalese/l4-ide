@@ -7,6 +7,8 @@
  * Everything is behind `legaleseAi.cloudSessions.enabled` and a
  * non-empty `legaleseAi.cloudSessions.apiUrl` (§15.5).
  */
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import * as vscode from 'vscode'
 import {
   GetExportedFunctionsRequestType,
@@ -403,6 +405,13 @@ export function createCloudSessions(deps: {
     parseUri: (url) => vscode.Uri.parse(url),
     fileUri: (fsPath) => vscode.Uri.file(fsPath),
     logger: deps.logger,
+    writeConfig: async (gitPath, folder, key, value) => {
+      await promisify(execFile)(
+        gitPath,
+        ['-C', folder, 'config', '--local', '--replace-all', key, value],
+        { timeout: 10_000 }
+      )
+    },
   })
   // The credentials and "Git: Clone" providers exist only while the
   // feature is on; they're (re)registered when the settings change.
