@@ -234,6 +234,9 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    /* As tall as the row with its buttons (about 18px), so the cloud and
+       the name don't move when Clone / Sync and the menu appear. */
+    min-height: 20px;
   }
   .label {
     flex: 0 1 auto;
