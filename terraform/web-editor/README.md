@@ -7,15 +7,15 @@ play.legalese.com ── CloudFront ── default    → S3 site bucket (OAC)
                                 └─ /session   → Lambda function URL → S3 sessions bucket
 ```
 
-| File                       | Purpose                                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------------------ |
-| `main.tf`                  | Providers (us-west-2, plus us-east-1 for the certificate), S3 backend, tags                      |
-| `site.tf`                  | Private bucket for the build, readable only by the distribution                                  |
-| `sessions.tf`              | Sessions bucket, the share-link Lambda, its function URL and the Turnstile secret parameter      |
-| `session-lambda/index.mjs` | The Lambda: same API as jl4-websessions, POSTs need the editor's origin and a Turnstile token    |
-| `cloudfront.tf`            | Certificate, security headers, the `/session` cache policy and the distribution                  |
-| `redirect.tf`              | The later jl4.legalese.com → play.legalese.com redirect (off until `enable_jl4_redirect = true`) |
-| `github-actions.tf`        | The OIDC role `deploy-web-editor` assumes; it trusts only the `web-editor` environment           |
+| File                       | Purpose                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------- |
+| `main.tf`                  | Providers (us-west-2, plus us-east-1 for the certificate), S3 backend, tags                   |
+| `site.tf`                  | Private bucket for the build, readable only by the distribution                               |
+| `sessions.tf`              | Sessions bucket, the share-link Lambda, its function URL and the Turnstile secret parameter   |
+| `session-lambda/index.mjs` | The Lambda: same API as jl4-websessions, POSTs need the editor's origin and a Turnstile token |
+| `cloudfront.tf`            | Certificate, security headers, the `/session` cache policy and the distribution               |
+| `redirect.tf`              | The function that redirects jl4.legalese.com → play.legalese.com on the same distribution     |
+| `github-actions.tf`        | The OIDC role `deploy-web-editor` assumes; it trusts only the `web-editor` environment        |
 
 ## Caching
 
@@ -84,7 +84,7 @@ npx turbo build --filter=jl4-web
 
 ## Importing jl4.legalese.com share links
 
-Run this once the first deploy works, and again just before the redirect switch: programs never change, so `sync` only adds the ones shared since. It needs root SSH to jl4.legalese.com.
+Run this once the first deploy works, and again once jl4.legalese.com redirects (below): programs never change, so `sync` only adds the ones shared since. It needs root SSH to jl4.legalese.com.
 
 ```bash
 scp root@jl4.legalese.com:/var/lib/private/jl4-websessions/sessions.db .
@@ -119,11 +119,13 @@ The wildcard covers the cached copy of every `?id=`.
 
 ## Redirecting jl4.legalese.com
 
-1. Re-run the import above.
-2. Set `enable_jl4_redirect = true` and `terraform apply`.
-3. Before switching DNS, check a redirect keeps an encoded `?program=` intact. CloudFront Functions pass query values through as received; test that here:
+The editor's distribution answers for jl4.legalese.com too, and sends each of its requests to the same path and query on play.legalese.com (`redirect.tf`).
+
+1. Before switching DNS, check a redirect keeps an encoded `?program=` intact. CloudFront Functions pass query values through as received; test that here:
    ```bash
-   curl -sI "https://$(terraform output -raw jl4_redirect_domain_name)/?program=DECIDE%20x%20IS%201%26" | grep -i location
+   EDGE=$(dig +short "$(terraform output -raw distribution_domain_name)" | head -1)
+   curl -sI --resolve "jl4.legalese.com:443:$EDGE" "https://jl4.legalese.com/?program=DECIDE%20x%20IS%201%26" | grep -i location
    # location: https://play.legalese.com/?program=DECIDE%20x%20IS%201%26
    ```
-4. Point the `jl4` CNAME in DNSimple at `terraform output jl4_redirect_domain_name`.
+2. Point the `jl4` CNAME in DNSimple at `terraform output distribution_domain_name`, the same target as `play`.
+3. Once the old record's TTL (an hour) has passed, re-run the import above for the programs shared on the box in the meantime. Then the box can go.

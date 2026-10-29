@@ -11,15 +11,9 @@ variable "domain" {
 }
 
 variable "legacy_domain" {
-  description = "The old editor hostname, which becomes a redirect to var.domain"
+  description = "The old editor hostname; the editor's distribution redirects it to var.domain"
   type        = string
   default     = "jl4.legalese.com"
-}
-
-variable "enable_jl4_redirect" {
-  description = "Create the distribution that redirects var.legacy_domain to var.domain. Switch the DNS record over only after this applies."
-  type        = bool
-  default     = false
 }
 
 variable "github_repository" {

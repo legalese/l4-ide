@@ -11,7 +11,7 @@ output "certificate_validation_records" {
 }
 
 output "distribution_domain_name" {
-  description = "Target of the play CNAME in DNSimple"
+  description = "Target of the play and jl4 CNAMEs in DNSimple"
   value       = aws_cloudfront_distribution.editor.domain_name
 }
 
@@ -33,9 +33,4 @@ output "sessions_bucket" {
 output "github_deploy_role_arn" {
   description = "Set as the AWS_ROLE_ARN secret of the web-editor environment"
   value       = aws_iam_role.github_deploy.arn
-}
-
-output "jl4_redirect_domain_name" {
-  description = "Target of the jl4 CNAME in DNSimple once enable_jl4_redirect is on"
-  value       = var.enable_jl4_redirect ? aws_cloudfront_distribution.jl4_redirect[0].domain_name : null
 }

@@ -7,7 +7,7 @@ resource "aws_acm_certificate" "editor" {
   provider = aws.us_east_1
 
   domain_name = var.domain
-  # Covered now so the later jl4.legalese.com redirect needs no new certificate.
+  # The distribution answers for the old hostname too, as a redirect.
   subject_alternative_names = [var.legacy_domain]
   validation_method         = "DNS"
 
@@ -94,9 +94,10 @@ locals {
 }
 
 resource "aws_cloudfront_distribution" "editor" {
-  enabled             = true
-  comment             = "Web editor (${var.domain})"
-  aliases             = [var.domain]
+  enabled = true
+  comment = "Web editor (${var.domain})"
+  # Requests for var.legacy_domain only get a redirect (redirect.tf).
+  aliases             = [var.domain, var.legacy_domain]
   default_root_object = "index.html"
   http_version        = "http2and3"
   is_ipv6_enabled     = true
@@ -137,6 +138,11 @@ resource "aws_cloudfront_distribution" "editor" {
     compress                   = true
     cache_policy_id            = data.aws_cloudfront_cache_policy.caching_optimized.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.editor.id
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.jl4_redirect.arn
+    }
   }
 
   ordered_cache_behavior {
@@ -149,6 +155,11 @@ resource "aws_cloudfront_distribution" "editor" {
     cache_policy_id            = aws_cloudfront_cache_policy.session.id
     origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.editor.id
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.jl4_redirect.arn
+    }
   }
 
   restrictions {
