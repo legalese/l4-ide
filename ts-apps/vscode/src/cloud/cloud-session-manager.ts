@@ -178,6 +178,9 @@ export interface CloudSessionManagerDeps {
  *  packed meanwhile, and the compute start takes far longer. */
 export const TITLE_TIMEOUT_MS = 4_000
 
+/** How long {@link CloudSessionManager.replayed} waits at most. */
+export const REPLAY_WAIT_MS = 10_000
+
 const LIVE_STATES: ReadonlySet<SessionState> = new Set([
   'running',
   'busy',
@@ -192,6 +195,8 @@ interface Tracked {
   /** Reading the log that existed when the session was opened (no
    *  notifications for those events). */
   replaying: boolean
+  /** {@link CloudSessionManager.replayed} callers waiting for that. */
+  replayWaiters: Array<() => void>
   /** Sealing key from the latest `session-state: running`. */
   publicKey?: string
   /** Key the credentials were last sealed to. */
@@ -320,6 +325,7 @@ export class CloudSessionManager {
       t = {
         lastSeq: 0,
         replaying: false,
+        replayWaiters: [],
         mcpAuthHandled: 0,
         unanswered: new Map(),
         resuming: 0,
@@ -591,9 +597,35 @@ export class CloudSessionManager {
     return info
   }
 
+  /**
+   * Resolves once the log that existed when the session was opened has
+   * been read, or after `timeoutMs`: a view that waits, then reads
+   * {@link stateOf}, shows the session as it is, not the states its log
+   * passes through.
+   */
+  replayed(sid: string, timeoutMs = REPLAY_WAIT_MS): Promise<void> {
+    const t = this.sessions.get(sid)
+    if (!t?.replaying) return Promise.resolve()
+    return new Promise((resolve) => {
+      const done = (): void => {
+        clearTimeout(timer)
+        resolve()
+      }
+      const timer = setTimeout(done, timeoutMs)
+      t.replayWaiters.push(done)
+    })
+  }
+
   /** Stop following a session (the view closed it). */
   close(sid: string): void {
     this.poller.unwatch(sid)
+    const t = this.sessions.get(sid)
+    if (t) this.endReplay(t)
+  }
+
+  private endReplay(t: Tracked): void {
+    t.replaying = false
+    for (const done of t.replayWaiters.splice(0)) done()
   }
 
   async list(): Promise<ListSessionsResponse> {
@@ -610,6 +642,8 @@ export class CloudSessionManager {
     const sid = stream.sessionId
     if ('error' in stream) {
       this.deps.listener.gone?.(sid, stream.error)
+      const t = this.sessions.get(sid)
+      if (t) this.endReplay(t)
       return
     }
     const t = this.track(sid)
@@ -618,8 +652,9 @@ export class CloudSessionManager {
       t.lastSeq = event.seq
       this.handleEvent(sid, t, event)
     }
-    if (!stream.more) t.replaying = false
     this.setState(sid, stream.state)
+    // After the state: a waiting view reads it with stateOf.
+    if (!stream.more && t.replaying) this.endReplay(t)
     if (!stream.more && t.unanswered.size > 0) {
       this.autoResume(sid, t, stream.state)
     }
