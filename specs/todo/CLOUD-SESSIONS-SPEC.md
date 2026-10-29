@@ -446,7 +446,8 @@ compromises it can change what runs or where it connects.
    - set status `parked` and emit `auth-required`;
    - exit as in an idle exit.
 
-   The next start resumes from the server-held conversation.
+   The next start resumes from the server-held conversation. The extension
+   makes that start itself (§12.2, Parked sessions): there is no Resume.
 
 7. **SIGTERM** (from `StopTask` or a deploy). Same as an idle exit, within the
    30 s stop timeout.
@@ -592,6 +593,12 @@ the session starts.
 - **Expiry.** Refresh tokens stay on the user's machine. When a token expires,
   the harness emits `auth-required { server }`, and the extension, if open,
   sends a fresh sealed token.
+- **Sign-in.** A server the extension can't answer for needs the user: it has
+  no sign-in in this window, or the harness turned down the same headers
+  again and nothing fresher is here. Its chip turns amber (§12.2); a click
+  runs the sign-in that Start in the server's settings menu runs, and the
+  extension sends the new credentials at once. Only these servers are shown:
+  a token refreshed silently needs nothing from the user.
 - **Permissions.** No approvals: the MCP servers passed at start count as
   approved by the user, and their tools run without asking (§11).
 
@@ -672,7 +679,7 @@ States are derived; nothing extra is stored.
 | `sleeping`                     | No live lease and no pending task (`ListTasks(family, startedBy=sid)` is empty)          |
 | `starting`                     | Task pending or running, no lease yet                                                    |
 | `running` / `busy` / `waiting` | Live lease. `busy` while a turn runs, `waiting` while an `ask-user` question is pending. |
-| `parked`                       | `session.json` status `parked`: needs a new key chain                                    |
+| `parked`                       | `session.json` status `parked`: the next start needs a new key chain                     |
 
 A live lease alone gives the state; tasks are listed (`ListTasks`) only for
 a session without one, to keep ECS calls down. A task that died reads as
@@ -757,7 +764,9 @@ P4 measures the delay end to end.
 
 - The extension host polls `GET /events` every second while any watched
   session is `busy`, and every 5 s while `running` or `waiting`.
-- It stops polling `sleeping` and `parked` sessions until the user acts.
+- It stops polling `sleeping` and `parked` sessions until the user acts, or
+  until it starts one itself (a sent message it went to sleep before, a
+  session parked mid-turn).
 - The harness checks `commands.seq` every second.
 - Cost: about 3,600 short Lambda calls per watched session-hour (about $0.001)
   plus S3 Files operations (about $0.004).
@@ -1066,9 +1075,9 @@ cloud folder instead of on their machine:
   a later option.)
 - **Opening a session** from the history shows it at once and replays its
   log (§12.1). While the replay catches up, the banner's cloud outline
-  shimmers (no state, actions or notices) and the chat stays empty; the
-  open request then answers with the session's current state, so states
-  the log merely passed through never show.
+  shimmers (no state or actions) and the chat stays empty; the open request
+  then answers with the session's current state, so states the log merely
+  passed through never show.
 - **Rollback.** An icon on the prompt of each completed turn that changed
   files (§9.4). A rolled-back turn collapses to "This turn was rolled back",
   centred under its prompt, with a chevron that shows the turn (dimmed) and
@@ -1077,26 +1086,36 @@ cloud folder instead of on their machine:
   history, with the state's wording as its tooltip: gray asleep, white
   running, a band sweeping along the outline quickly while the view loads
   the session, slowly while its compute starts, and in crimson while the
-  agent works; amber while waiting for an answer or parked; faded when
-  gone. The history's list already carries each session's state, so this
-  costs no requests.
+  agent works; amber while waiting for an answer; faded when gone. Parked
+  looks like asleep. Progress (files uploading or being added) is the
+  tooltip while it lasts. The history's list already carries each session's
+  state, so this costs no requests.
 - **Header title.** "Cloud session starting…" while a new session starts,
   then its name (§12, Session title), which comes with the start.
 - **MCP servers** passed to a session show as chips with its first prompt,
   after its files (a tool icon, no fill); their tools run without approval,
-  which their tooltip says.
+  which their tooltip says. A server that needs a sign-in in this window is
+  an amber chip, and a click on it signs in (§6.4).
 - **History rows** line up behind one leading slot: a cloud session's
   cloud, or a local chat's dot (crimson, fading in and out, while a turn runs;
   amber while it waits for an approval or a question).
 - **Header actions.** Clone / Sync (§9.3) at the top right of the cloud
   session header, and next to it a ⋯ menu with the session's actions: Stop
-  session for now. Resume, when needed, is a button in the header.
+  session for now.
+- **No text under the header.** What needs the user goes on the thing to act
+  on (an MCP chip); failed actions and a sync that conflicts
+  (`local-merge-conflict`) are VS Code notifications.
 - **@-mentions in later prompts.** Mentioned files not yet in the session are
   uploaded before the message is sent (§10).
 - **Notifications.** A background cloud session that asks a question raises a
   notification. There are no approvals in cloud sessions.
-- **Resume.** For `parked` sessions and `auth-required` events, "Resume" mints
-  a new chain and starts the session.
+- **Parked sessions.** A session's key chain doesn't run out while the user
+  works with it. A message, answer or other command to a parked session
+  starts it with a new chain, as for a sleeping one. One that parked
+  mid-turn (the 24-hour cap, …) is started again as soon as it has parked,
+  so the turn goes on; at most once every 10 minutes, so a chain refused
+  after each start can't loop. If that start fails, the conversation says
+  so.
 - **Where polling runs.** In the extension host: the webview's content
   security policy only allows `https://legalese.com`
   (`ts-apps/vscode/src/webview-panel.ts:177`).
@@ -1208,7 +1227,7 @@ Tracking rules:
       through VS Code's Git extension (§9.3).
 - [x] [post-mortem](cloud-sessions/cloud-sessions-ui.md) · `cloud-sessions-ui` (base `cloud-sessions-git-sync`) ([PR #512](https://github.com/legalese/l4-ide/pull/512)) — webview: history
       with cloud entries, cloud session view, `user-message` handling, Run in
-      cloud, Resume, rollback and Sync buttons (§12).
+      cloud, rollback and Sync buttons, MCP sign-in chips (§12).
 - [ ] `fs-copy-file` (base `main`) ([PR #770](https://github.com/legalese/l4-ide/pull/770)) — `fs__copy_file`
       (`overwrite`, `deleteSource` for a move) for both hosts, from the first
       prod session: a scratch draft took 18 `fs__edit_file` calls to bring
@@ -1416,7 +1435,7 @@ Conversations stay continuous across key rotations.
 - watch a cloud session while working locally;
 - answer a question from a background session;
 - sync both ways;
-- resume after sleep and after parking;
+- start again after sleep and after parking (no Resume);
 - find cloud conversations in the history (cloud icon) on a second machine;
 - roll back the last turn and an earlier one;
 - use an HTTP MCP server from a cloud session.
