@@ -721,6 +721,7 @@ export async function activate(context: ExtensionContext) {
     emitChat: (event) => aiInteraction.emit(event),
     logger: aiLogger,
     storage: context.globalState,
+    summarizeTitle: (text) => aiProxy.summarizeTitle(text),
   })
   context.subscriptions.push(cloudSessions)
 
