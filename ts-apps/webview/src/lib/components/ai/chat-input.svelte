@@ -1190,18 +1190,26 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
-  /* Outlined secondary of Send: crimson border, gray glyph; on hover it
-     fills like Send. border-box keeps it 28×28 next to Send. */
+  /* Neutral secondary of Send, which stays the one crimson button: gray
+     outline and glyph (both currentColor), white on hover; light themes
+     take their foreground instead. border-box keeps it 28×28 next to
+     Send. */
   .submit-btn.cloud {
     box-sizing: border-box;
     background: transparent;
     color: var(--vscode-descriptionForeground, #9d9d9d);
-    border: 1px solid #c8376a;
+    border: 1px solid currentColor;
     margin-right: 6px;
+    transition:
+      color 0.1s ease-out,
+      opacity 0.1s ease-out;
   }
   .submit-btn.cloud:hover:not(:disabled) {
-    background: #c8376a;
+    background: transparent;
     color: #fff;
+  }
+  :global(body.vscode-light) .submit-btn.cloud:hover:not(:disabled) {
+    color: var(--vscode-foreground);
   }
   .git-btn {
     display: inline-flex;
