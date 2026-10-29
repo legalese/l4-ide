@@ -858,3 +858,23 @@ describe('CloudSessionManager.replayed', () => {
     await manager.replayed(SID, 5)
   })
 })
+
+describe('CloudSessionManager.mcpServerLabels', () => {
+  test('maps stored server names back to the names here', () => {
+    const mcp: McpServerSource = {
+      enabledServers: () => [
+        {
+          id: 'Docs Server',
+          url: 'https://docs.example/mcp',
+          transport: 'http',
+        },
+      ],
+      headersFor: async () => ({}),
+    }
+    const { manager } = setup({ mcp })
+    assert.deepEqual(manager.mcpServerLabels(['Docs_Server', 'Gone_Server']), [
+      'Docs Server',
+      'Gone_Server',
+    ])
+  })
+})
