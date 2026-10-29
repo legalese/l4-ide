@@ -186,6 +186,31 @@ export class L4WasmBridge {
   }
 
   /**
+   * Fetch and compile the WASM module.
+   *
+   * It comes through the HTTP cache: release builds serve it from a URL
+   * versioned by release and cached as immutable, and index.html preloads it
+   * (hooks.server.ts) so the download starts with the page. Streaming
+   * compiles while downloading and lets the browser cache the compiled
+   * code; it needs the application/wasm content type, which dev servers
+   * may not send.
+   */
+  private async compileWasm(): Promise<WebAssembly.Module> {
+    const response = await fetch(this.wasmUrl)
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch WASM ${this.version}: ${response.status} ${response.statusText}`
+      )
+    }
+
+    if (response.headers.get('content-type')?.startsWith('application/wasm')) {
+      return WebAssembly.compileStreaming(response)
+    }
+    return WebAssembly.compile(await response.arrayBuffer())
+  }
+
+  /**
    * Load WASM module with GHC JS FFI support.
    *
    * GHC WASM modules require a two-phase instantiation:
@@ -193,48 +218,12 @@ export class L4WasmBridge {
    * 2. Instantiate WASM with the JS FFI imports
    */
   private async loadModule(): Promise<L4WasmExports> {
-    const cacheKey = `l4-wasm-${this.version}`
-
-    // Load the JS FFI glue code
-    const jsModule = await import(/* @vite-ignore */ this.jsUrl)
+    // Load the JS FFI glue code while the WASM downloads and compiles
+    const [jsModule, wasmModule] = await Promise.all([
+      import(/* @vite-ignore */ this.jsUrl),
+      this.compileWasm(),
+    ])
     const generateImports: JsFFIImportsGenerator = jsModule.default
-
-    // Try cache first for WASM
-    let wasmBuffer: ArrayBuffer | null = null
-    try {
-      const cache = await caches.open('l4-wasm-cache-v1')
-      const cached = await cache.match(cacheKey)
-
-      if (cached) {
-        wasmBuffer = await cached.arrayBuffer()
-      }
-    } catch {
-      // Cache not available, will fetch
-    }
-
-    // Fetch fresh if not cached
-    if (!wasmBuffer) {
-      const response = await fetch(this.wasmUrl)
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch WASM: ${response.status} ${response.statusText}`
-        )
-      }
-
-      wasmBuffer = await response.arrayBuffer()
-
-      // Cache for future use
-      try {
-        const cache = await caches.open('l4-wasm-cache-v1')
-        await cache.put(cacheKey, new Response(wasmBuffer.slice(0)))
-      } catch {
-        // Failed to cache, continue anyway
-      }
-    }
-
-    // Compile the WASM module
-    const wasmModule = await WebAssembly.compile(wasmBuffer)
 
     // Create a placeholder exports object for the JS FFI generator
     // We'll update it after instantiation

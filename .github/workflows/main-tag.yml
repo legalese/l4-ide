@@ -784,6 +784,8 @@ jobs:
       - package-vscode-universal
       - build-wasm
       - package-plugin
+    outputs:
+      tag: ${{ steps.tag-name.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -922,6 +924,85 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================
+  # Deploy the web editor (play.legalese.com)
+  # ============================================
+  # Runs once the release exists, with that release's WASM. The bucket and
+  # distribution come from terraform/web-editor/; until its outputs are set as
+  # repository variables, the job is skipped.
+
+  deploy-web-editor:
+    name: Deploy Web Editor
+    runs-on: ubuntu-latest
+    needs:
+      - build-wasm
+      - create-tag
+    if: ${{ vars.WEB_EDITOR_BUCKET != '' && vars.WEB_EDITOR_DISTRIBUTION_ID != '' }}
+    environment:
+      name: web-editor
+      url: https://play.legalese.com
+    permissions:
+      contents: read
+      id-token: write # OIDC → AWS role assumption
+    env:
+      RELEASE_TAG: ${{ needs.create-tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: jl4-wasm-${{ needs.build-wasm.outputs.version }}
+          path: ${{ runner.temp }}/wasm
+
+      # The WASM lives under its release tag, so each release has new URLs and
+      # browsers never mix a cached module with a newer page.
+      - name: Configure the build for this release
+        env:
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+        run: |
+          # The session Lambda rejects shares without a Turnstile token, so a
+          # build without the key would ship a Share button that always fails.
+          if [ -z "$TURNSTILE_SITE_KEY" ]; then
+            echo "::error::Repository variable TURNSTILE_SITE_KEY is not set"
+            exit 1
+          fi
+          WASM_DIR="ts-apps/jl4-web/static/wasm/$RELEASE_TAG"
+          mkdir -p "$WASM_DIR"
+          cp "$RUNNER_TEMP/wasm/jl4-core.wasm" "$RUNNER_TEMP/wasm/jl4-core.mjs" "$WASM_DIR/"
+          cat > ts-apps/jl4-web/.env.production.local <<EOF
+          VITE_WASM_VERSION=$RELEASE_TAG
+          VITE_WASM_URL=/wasm/$RELEASE_TAG/jl4-core.wasm
+          VITE_WASM_JS_URL=/wasm/$RELEASE_TAG/jl4-core.mjs
+          VITE_SESSION_URL=/session
+          VITE_TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY
+          EOF
+          cat ts-apps/jl4-web/.env.production.local
+
+      - name: Build web editor
+        run: npx turbo build --filter=jl4-web
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Upload to S3 and invalidate CloudFront
+        run: >-
+          ts-apps/jl4-web/scripts/deploy-static.sh ts-apps/jl4-web/build
+          "${{ vars.WEB_EDITOR_BUCKET }}" "${{ vars.WEB_EDITOR_DISTRIBUTION_ID }}"
+
+  # ============================================
   # Build summary
   # ============================================
 
@@ -935,6 +1016,7 @@ jobs:
       - build-wasm
       - package-plugin
       - create-tag
+      - deploy-web-editor
     if: always()
     steps:
       - name: Summary
@@ -954,3 +1036,4 @@ jobs:
           echo "| WASM Build | ${{ needs.build-wasm.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Claude Code Plugin | ${{ needs.package-plugin.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Git Tag | ${{ needs.create-tag.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web Editor | ${{ needs.deploy-web-editor.result == 'success' && '✅' || needs.deploy-web-editor.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
