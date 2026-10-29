@@ -1867,7 +1867,11 @@ inferType g = softprune $ do
     Type ann -> pure (Type ann)
     TyApp ann n ts -> do
       (rn, kind) <- resolveType n
-      checkKind kind ts
+      -- A name that failed to resolve has no kind to count the arguments
+      -- against: 'resolveType' hands back kind 0 for it so that checking can
+      -- go on, and comparing the arguments with that would report "expected 0
+      -- arguments" for a type that takes two. The failure has been reported.
+      unless (isOutOfScope rn) $ checkKind kind ts
       rts <- traverse inferType ts
       pure (TyApp ann rn rts)
     Fun ann onts t -> do
@@ -4841,17 +4845,19 @@ prettyTypeMismatch ExpectAsStringArgumentContext _expected given =
 prettyTypeMismatch ExpectConsArgument2Context expected given =
   standardTypeMismatch [ "The second argument of FOLLOWED BY is expected to be of type" ] expected given
 prettyTypeMismatch (ExpectClauseInputContext h i declared) expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ if declared
       then "The " <> prettyOrdinal i <> " input of " <> quotedName (MkName emptyAnno h) <> " is declared to be of type"
       else "From looking at the context, I have inferred that the " <> prettyOrdinal i <> " input of " <> quotedName (MkName emptyAnno h) <> " is of type"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but the pattern written for it here is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "A pattern in a WHEN-clause of a CONSIDER construct is expected to have the type of the expression being matched."
   , "The expression being matched here is"
   , ""
@@ -4859,41 +4865,44 @@ prettyTypeMismatch (ExpectPatternScrutineeContext scrutinee) expected given =
   , ""
   , "of type"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but the type of this pattern is"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectIfBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "Both the THEN and the ELSE branch of an IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs must have the same type."
   , "From looking at the context, if have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectConsiderBranchesContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All branches in a CONSIDER construct must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this branch is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch ExpectHomogeneousListContext expected given =
+  let (e, g) = prettyMismatchedTypes expected given in
   [ "All elements in a LIST literal must have the same type."
   , "From looking at the context, I have inferred that this type must be"
   , ""
-  , "  " <> prettyLayout expected
+  , "  " <> e
   , ""
   , "but this element is of type"
   , ""
-  , "  " <> prettyLayout given
+  , "  " <> g
   ]
 prettyTypeMismatch (ExpectDecideSignatureContext Nothing) expected given =
   standardTypeMismatch [ "From looking at the context, I have inferred that the type of this definition must be" ] expected given
@@ -4966,14 +4975,55 @@ prettyOrdinal n = Text.pack (show n) <> "th"
 
 standardTypeMismatch :: [Text] -> Type' Resolved -> Type' Resolved -> [Text]
 standardTypeMismatch prefix expected given =
-  prefix ++
-  [ ""
-  , "  " <> prettyLayout expected
-  , ""
-  , "but is here of type"
-  , ""
-  , "  " <> prettyLayout given
-  ]
+  let (e, g) = prettyMismatchedTypes expected given
+  in prefix ++
+     [ ""
+     , "  " <> e
+     , ""
+     , "but is here of type"
+     , ""
+     , "  " <> g
+     ]
+
+-- | Render the two sides of a type mismatch so that they can be told apart.
+--
+-- 'prettyLayout' prints a type from its surface names only — 'Unique's are
+-- never part of any rendering — so two distinct types that happen to be spelled
+-- the same (two @DECLARE Verdict@s whose constructors are used without ever
+-- naming the type, say) produced the famously unhelpful
+--
+-- > must match ... namely
+-- >   Verdict
+-- > but is here of type
+-- >   Verdict
+--
+-- When the two renderings collide we therefore append, to each side, where the
+-- user-defined names it is built from were declared. Predefined names carry no
+-- range and are skipped, so @LIST OF Verdict@ is annotated with @Verdict@ only;
+-- if nothing can be said we fall back to the plain rendering rather than emit
+-- an empty parenthesis. Placeholders from failed resolution are skipped too:
+-- their 'getOriginal' is the *reference* site, so labelling it "defined at"
+-- would lie.
+prettyMismatchedTypes :: Type' Resolved -> Type' Resolved -> (Text, Text)
+prettyMismatchedTypes expected given
+  | e /= g    = (e, g)
+  | otherwise = (annotate expected e, annotate given g)
+  where
+    e = prettyLayout expected
+    g = prettyLayout given
+
+    annotate :: Type' Resolved -> Text -> Text
+    annotate t rendered =
+      case mapMaybe describeHead (nubOrdOn getUnique (typeHeads t)) of
+        []          -> rendered
+        descriptions -> rendered <> " (" <> Text.intercalate ", " descriptions <> ")"
+
+    describeHead :: Resolved -> Maybe Text
+    describeHead r
+      | isOutOfScope r = Nothing
+      | otherwise      = do
+          range <- rangeOf (getOriginal r)
+          pure (prettyLayout r <> " defined at " <> prettySrcRange range)
 
 prettyOptionallyNamedType :: OptionallyNamedType Resolved -> Text
 prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =

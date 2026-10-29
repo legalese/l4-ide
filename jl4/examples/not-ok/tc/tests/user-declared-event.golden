@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: user-declared-event.l4
+  Hidden: no
+  Range: 18:12-18:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      EVENT
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      EVENT (defined at user-declared-event.l4:14:9-14) of arity 2
+      EVENT (predefined) of arity 2
