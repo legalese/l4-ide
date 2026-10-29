@@ -512,6 +512,12 @@
         history.replaceState(null, '', ownUrl)
       }
 
+      const fragmentProgram = programFromFragment(ownUrl)
+      if (fragmentProgram !== undefined) {
+        editor.setValue(fragmentProgram)
+        clearProgramFragment()
+      }
+
       persistSession = async () => {
         if (!editor || !sessionUrl) return undefined
         const bufferContent: string = editor.getValue()
@@ -984,6 +990,36 @@
     })
   }
 
+  // A program too long for CloudFront's 8 KB URL limit comes in the fragment,
+  // which never leaves the browser: #program=<encodeURIComponent(program)>
+  function programFromFragment(url: URL): string | undefined {
+    const encoded = url.hash.match(/^#program=(.*)$/)?.[1]
+    if (encoded === undefined) return undefined
+    try {
+      return decodeURIComponent(encoded)
+    } catch (e) {
+      console.error(`could not decode program from url fragment, error: ${e}`)
+      return undefined
+    }
+  }
+
+  function clearProgramFragment() {
+    const url = new URL(window.location.href)
+    url.hash = ''
+    history.replaceState(null, '', url)
+  }
+
+  // The docs open examples in a tab named l4-code. When that tab already
+  // shows the editor, a new #program= changes only the fragment, so the page
+  // doesn't load again.
+  function handleHashChange() {
+    if (!editor) return
+    const program = programFromFragment(new URL(window.location.href))
+    if (program === undefined) return
+    clearProgramFragment()
+    openDocsExample(program)
+  }
+
   function handleLoadFile() {
     // Create a hidden file input
     const input = document.createElement('input')
@@ -1102,7 +1138,7 @@
   }
 </script>
 
-<svelte:window onmessage={handleDocsMessage} />
+<svelte:window onmessage={handleDocsMessage} onhashchange={handleHashChange} />
 
 {#if showFrame}
   <div class="top-bar">
