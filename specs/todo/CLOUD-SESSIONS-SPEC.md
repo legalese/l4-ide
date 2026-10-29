@@ -1052,7 +1052,8 @@ cloud folder instead of on their machine:
   `chat-input.svelte`), behind `legaleseAi.cloudSessions.enabled`. It shows
   progress: uploading, starting compute, ready. A cold start takes about
   25–45 s (P5). Before starting it lists the MCP servers being passed, with a
-  note that their tools run without approval.
+  note that their tools run without approval (as chips with the first
+  prompt).
 - **Session title.** A 4–6 word title from ai-proxy's summize pipeline for
   the first prompt, the same call local chats use, asked for while the seed
   is packed. The session is created with it; after 4 s, on a failure or an
@@ -1079,7 +1080,11 @@ cloud folder instead of on their machine:
   agent works; amber while waiting for an answer or parked; faded when
   gone. The history's list already carries each session's state, so this
   costs no requests.
-- **Header title.** The session's name (§12, Session title).
+- **Header title.** "Cloud session starting…" while a new session starts,
+  then its name (§12, Session title), which comes with the start.
+- **MCP servers** passed to a session show as chips with its first prompt,
+  after its files (a tool icon, no fill); their tools run without approval,
+  which their tooltip says.
 - **History rows** line up behind one leading slot: a cloud session's
   cloud, or a local chat's dot (crimson, fading in and out, while a turn runs;
   amber while it waits for an approval or a question).
