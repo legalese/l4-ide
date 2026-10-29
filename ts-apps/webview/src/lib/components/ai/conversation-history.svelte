@@ -40,6 +40,13 @@
     return new Date(d).toLocaleDateString()
   }
 
+  const monthLabel = new Intl.DateTimeFormat('en', {
+    month: 'long',
+    year: 'numeric',
+  })
+
+  /** Today, Yesterday, Earlier this week, This month (the calendar
+   *  month), then one group per month: "September 2026". */
   function groupKey(ms: number): string {
     const d = new Date(ms)
     const now = new Date()
@@ -48,8 +55,8 @@
     if (d >= today) return 'Today'
     if (d >= yesterday) return 'Yesterday'
     if (now.getTime() - d.getTime() < 7 * 86_400_000) return 'Earlier this week'
-    if (now.getTime() - d.getTime() < 30 * 86_400_000) return 'This month'
-    return 'Older'
+    if (d >= new Date(now.getFullYear(), now.getMonth(), 1)) return 'This month'
+    return monthLabel.format(d)
   }
 
   const grouped = $derived.by(() => {
