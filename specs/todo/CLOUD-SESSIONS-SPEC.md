@@ -1063,11 +1063,11 @@ cloud folder instead of on their machine:
   and the "Files changed" card are plain text: they name files in the cloud,
   not on this machine. (Opening a read-only copy fetched from the session is
   a later option.)
-- **Opening a session** from the history replays its log (§12.1). The banner
-  reads "Loading…" (no state, actions or notices) and the chat shows its
-  spinner until the replay has caught up; the open request then answers
-  with the session's current state, so states the log merely passed
-  through never show.
+- **Opening a session** from the history shows it at once and replays its
+  log (§12.1). While the replay catches up, the banner's cloud outline
+  shimmers (no state, actions or notices) and the chat stays empty; the
+  open request then answers with the session's current state, so states
+  the log merely passed through never show.
 - **Rollback.** An icon on the prompt of each completed turn that changed
   files (§9.4). A rolled-back turn collapses to "This turn was rolled back",
   centred under its prompt, with a chevron that shows the turn (dimmed) and
