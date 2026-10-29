@@ -87,14 +87,24 @@
       (cloud.state === 'parked' ||
         (!!cloud.authRequired && cloud.authRequired.reason !== 'mcp'))
   )
+  // A new session is "starting" until it runs (its title comes with the
+  // start); then its name.
+  const heading = $derived(
+    !cloud.sessionId ||
+      cloud.progress === 'uploading' ||
+      cloud.progress === 'starting'
+      ? 'Cloud session starting…'
+      : title || 'Cloud session'
+  )
+
+  // Files on their way; the compute starting shows as the cloud's sweep
+  // (and its tooltip), not a line.
   const progressText = $derived(
     cloud.progress === 'adding-files'
       ? `Adding ${cloud.addingFiles} ${cloud.addingFiles === 1 ? 'file' : 'files'} to the session…`
       : cloud.progress === 'uploading'
         ? 'Uploading files…'
-        : cloud.progress === 'starting' || cloud.state === 'starting'
-          ? 'Starting cloud compute (this can take up to a minute)…'
-          : null
+        : null
   )
 </script>
 
@@ -112,9 +122,7 @@
       loading={cloud.loading}
       detail={progressText}
     />
-    <span class="label" title={title || undefined}
-      >{title || 'Cloud session'}</span
-    >
+    <span class="label" title={heading}>{heading}</span>
     <span class="spacer"></span>
     {#if !cloud.loading && cloud.sessionId}
       <!-- Nothing until the session's state is known (while loading). -->
@@ -191,12 +199,6 @@
   </div>
   {#if progressText}
     <div class="detail">{progressText}</div>
-    {#if cloud.mcpServers.length > 0 && cloud.progress !== 'adding-files'}
-      <div class="detail">
-        MCP servers passed to this session: {cloud.mcpServers.join(', ')}. Their
-        tools run without approval in the cloud.
-      </div>
-    {/if}
   {/if}
   {#if cloud.loading}
     <!-- Replayed notices may be stale until the replay catches up. -->

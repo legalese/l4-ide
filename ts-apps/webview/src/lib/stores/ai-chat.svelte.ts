@@ -2364,6 +2364,7 @@ export function createAiChatStore(
     error?: string
     mcpServers?: string[]
     fileCount?: number
+    title?: string
   }): void {
     const conv =
       pendingConversation?.activeTurnId === params.turnId
@@ -2386,6 +2387,7 @@ export function createAiChatStore(
       }
     }
     if (params.mcpServers) conv.cloud.mcpServers = params.mcpServers
+    if (params.title) conv.title = params.title
     if (params.phase === 'error') {
       conv.cloud.progress = null
       const reply = conv.turns.find(
@@ -2442,6 +2444,7 @@ export function createAiChatStore(
       error?: string
       state?: AiCloudSessionState
       title?: string
+      mcpServers?: string[]
     }
     try {
       res = await m.sendRequest(AiCloudOpen, HOST_EXTENSION, { sessionId })
@@ -2454,6 +2457,7 @@ export function createAiChatStore(
     if (res.ok) {
       if (res.state) conv.cloud.state = res.state
       if (res.title) conv.title = res.title
+      if (res.mcpServers) conv.cloud.mcpServers = res.mcpServers
     } else {
       notifyCloudError(res.error || 'Could not open the cloud session.')
     }
@@ -2884,6 +2888,7 @@ export type AiChatStore = {
     error?: string
     mcpServers?: string[]
     fileCount?: number
+    title?: string
   }) => void
   onCloudReveal: (params: { sessionId: string }) => void
   pickAttachment: (

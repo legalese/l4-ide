@@ -163,6 +163,7 @@ export function registerCloudHandlers(deps: {
     phase,
     mcpServers,
     fileCount,
+    title,
   }) => {
     messenger.sendNotification(AiCloudProgress, frontend, {
       turnId,
@@ -170,6 +171,7 @@ export function registerCloudHandlers(deps: {
       phase,
       ...(mcpServers ? { mcpServers } : {}),
       ...(fileCount !== undefined ? { fileCount } : {}),
+      ...(title ? { title } : {}),
     })
   }
 
@@ -228,6 +230,7 @@ export function registerCloudHandlers(deps: {
         ok: true,
         state: manager.stateOf(sessionId) ?? info.state,
         title: info.session.title,
+        mcpServers: info.session.mcpServers.map((s) => s.name),
       }
     })
   )

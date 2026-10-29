@@ -40,7 +40,7 @@
         return {
           tone: 'bright',
           sweep: '2.6s',
-          label: detail ?? 'Starting cloud compute…',
+          label: detail ?? 'Starting cloud compute: this can take a minute',
         }
       case 'busy':
         return {

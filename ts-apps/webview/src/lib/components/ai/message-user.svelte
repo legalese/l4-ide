@@ -8,6 +8,7 @@
     shouldStick = false,
     userIndex = -1,
     pending = false,
+    tools = [],
     rollback = null,
   }: {
     content: string
@@ -22,6 +23,9 @@
      *  scroll-sticky header set (the data-pending attribute below
      *  is read by message-list's offset collector). */
     pending?: boolean
+    /** Cloud conversations: MCP servers passed to the session (on its
+     *  first prompt), as chips after the files. */
+    tools?: string[]
     /** Cloud conversations (§9.4): roll the files back to before this
      *  prompt. A subtle icon in the bubble's top right corner. */
     rollback?: { title: string; onClick: () => void } | null
@@ -58,12 +62,12 @@
         </svg>
       </button>
     {/if}
-    {#if chips && chips.length > 0}
+    {#if (chips && chips.length > 0) || tools.length > 0}
       <!-- Echo the staged-context chips captured at submit time. Same
            mild gray fill / layout as the input strip so the bubble
            reads as "this is what I sent you". -->
       <div class="user-chips" role="list" aria-label="Attached context">
-        {#each chips as chip, i (i)}
+        {#each chips ?? [] as chip, i (i)}
           <span
             class="user-chip"
             role="listitem"
@@ -103,6 +107,28 @@
                   : ''}
               </span>
             {/if}
+          </span>
+        {/each}
+        {#each tools as tool (tool)}
+          <span
+            class="user-chip tool"
+            role="listitem"
+            title={`MCP server passed to the cloud session: ${tool}. Its tools run there without approval.`}
+          >
+            <svg
+              class="chip-icon"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M10.6 2.2a3.2 3.2 0 0 0-3.1 4.2L2.6 11.3a1.5 1.5 0 0 0 2.1 2.1l4.9-4.9a3.2 3.2 0 0 0 4.2-3.1l-2 2-1.9-.5-.5-1.9z"
+              />
+            </svg>
+            <span class="chip-name">{tool}</span>
           </span>
         {/each}
       </div>
@@ -186,6 +212,11 @@
     font-size: 11px;
     color: var(--vscode-descriptionForeground);
     max-width: 220px;
+  }
+  /* MCP servers: like a file chip, without the fill. */
+  .user-chip.tool {
+    background: transparent;
+    padding-left: 2px;
   }
   .chip-icon {
     width: 12px;

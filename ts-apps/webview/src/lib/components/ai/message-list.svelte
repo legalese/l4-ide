@@ -25,6 +25,7 @@
     onOpenFile,
     onOpenFileDiff,
     filesOpenable = true,
+    tools = [],
     rollbackOfferAt,
     onRollback,
   }: {
@@ -56,6 +57,9 @@
     /** False when the conversation's files aren't on this machine
      *  (cloud sessions): file paths render as plain text. */
     filesOpenable?: boolean
+    /** Cloud conversations: the MCP servers passed to the session, shown
+     *  with the first prompt. */
+    tools?: string[]
     /** Cloud conversations (§9.4): the rollback offer for the turn at
      *  an index, and what to do when it's clicked. It shows on the
      *  prompt the turn answered. */
@@ -185,6 +189,7 @@
         shouldStick={!pending && stickyUserIndex === userIndex}
         {userIndex}
         {pending}
+        tools={userIndex === 0 ? tools : []}
         rollback={offer
           ? {
               title:

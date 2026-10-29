@@ -308,6 +308,7 @@
         onOpenFile={(callId) => store.openFile(callId)}
         onOpenFileDiff={(callId) => store.openFileDiff(callId)}
         filesOpenable={!store.current.cloud}
+        tools={store.current.cloud?.mcpServers ?? []}
         rollbackOfferAt={store.current.cloud
           ? (i) => store.rollbackOfferAt(i)
           : undefined}

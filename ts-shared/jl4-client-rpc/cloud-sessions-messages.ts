@@ -122,6 +122,8 @@ export const AiCloudProgress: NotificationType<{
   mcpServers?: string[]
   /** With `adding-files`: how many files. */
   fileCount?: number
+  /** With `starting`: the new session's title. */
+  title?: string
   /** With `phase: 'error'`: what to tell the user. */
   error?: string
 }> = {
@@ -163,7 +165,11 @@ export interface AiCloudResult {
  *  once that replay has caught up, with the session's current state. */
 export const AiCloudOpen: RequestType<
   { sessionId: string },
-  AiCloudResult & { title?: string }
+  AiCloudResult & {
+    title?: string
+    /** MCP servers passed to the session (names). */
+    mcpServers?: string[]
+  }
 > = {
   method: 'aiCloudOpen',
 }
