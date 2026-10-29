@@ -1078,6 +1078,10 @@ cloud folder instead of on their machine:
   slower, while busy; amber while waiting for an answer or parked; faded
   when gone. The history's list already carries each session's state, so
   this costs no requests.
+- **Header title.** The session's name (§12, Session title).
+- **History rows** line up behind one leading slot: a cloud session's
+  cloud, or a local chat's dot (white, fading in and out, while a turn runs;
+  amber while it waits for an approval or a question).
 - **Header actions.** Clone / Sync (§9.3) at the top right of the cloud
   session header, and next to it a ⋯ menu with the session's actions: Stop
   session for now. Resume, when needed, is a button in the header.
