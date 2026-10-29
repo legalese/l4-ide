@@ -8,12 +8,15 @@
  *   password — §9.2);
  * - lists cloud sessions in VS Code's "Git: Clone" picker;
  * - keeps the token out of system credential helpers (the keychain)
- *   for the host: in the config git reads from the extension host's
- *   environment, which the Git extension passes to every git it runs
- *   (so also a first clone), and in each clone's own config;
+ *   for the host, and has git send it with the first request
+ *   (`http.proactiveAuth`): in the config git reads from the extension
+ *   host's environment, which the Git extension passes to every git it
+ *   runs (so also a first clone), and in each clone's own config;
  * - clones with the Git API's `clone(url, { parentPath, postCloneAction:
- *   'none' })` and configures the clone: pushes go to `refs/heads/local`,
- *   no stored credential helper for the host, a 5 MB post buffer;
+ *   'none' })`, the URL ending in the session title so that names the
+ *   folder, and configures the clone: pushes go to `refs/heads/local`,
+ *   no stored credential helper for the host, credentials sent up
+ *   front, a 5 MB post buffer;
  * - syncs with `pull()` then `push()`, and reports ahead / behind.
  *
  * The Git API types are a structural subset of VS Code's `git.d.ts`
@@ -115,7 +118,7 @@ export const COMMITTED_STORAGE_KEY = 'legaleseAi.cloudSessions.committed'
 /** Why Clone / Sync aren't offered yet (§9.3). */
 export const NOT_READY_MESSAGE = NO_COMMITS_YET_MESSAGE
 
-const SESSION_GIT_PATH_RE = /\/git\/([0-9A-Z]{26})\.git(?:\/|$)/
+const SESSION_GIT_PATH_RE = /\/git\/([0-9A-Z]{26})(?:\/[^/]+)?\.git(?:\/|$)/
 
 export interface CloneRecord {
   /** Absolute path of the clone. */
@@ -194,6 +197,24 @@ export function credentialHelperKey(apiUrl: string): string | undefined {
   }
 }
 
+/**
+ * `http.<scheme>://<host>/.proactiveAuth` for the Sessions API, or
+ * undefined when the URL is unset or invalid. Git (curl) sends
+ * credentials only in answer to a `WWW-Authenticate` challenge, and
+ * Lambda function URLs rename that header in a 401
+ * (`x-amzn-Remapped-WWW-Authenticate`), so git would never send them.
+ * `basic` (git 2.46 and later) asks for them before the first request
+ * and sends them with it.
+ */
+export function proactiveAuthKey(apiUrl: string): string | undefined {
+  try {
+    const url = new URL(apiUrl.trim())
+    return `http.${url.protocol}//${url.host}/.proactiveAuth`
+  } catch {
+    return undefined
+  }
+}
+
 export interface CloudGitSyncDeps<U extends GitUri> {
   getGitApi(): Promise<GitApiResult<U>>
   /** `legaleseAi.cloudSessions.apiUrl`; '' = off. */
@@ -218,8 +239,32 @@ export function apiHost(apiUrl: string): string {
   }
 }
 
-export function sessionGitUrl(apiUrl: string, sid: string): string {
-  return `${apiUrl.trim().replace(/\/+$/, '')}/git/${sid}.git`
+/**
+ * A clone folder name from a session title: letters (accents folded),
+ * digits, `.`, `_` and `-`; runs of anything else become `-`; at most
+ * 60 characters. '' when nothing usable is left.
+ */
+export function titleSlug(title: string | undefined): string {
+  return (title ?? '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .slice(0, 60)
+    .replace(/^[-.]+|[-.]+$/g, '')
+}
+
+/**
+ * `<apiUrl>/git/<sid>.git`, or `<apiUrl>/git/<sid>/<title>.git` with a
+ * title: VS Code names a clone's folder after the URL's last segment.
+ */
+export function sessionGitUrl(
+  apiUrl: string,
+  sid: string,
+  title?: string
+): string {
+  const base = `${apiUrl.trim().replace(/\/+$/, '')}/git/${sid}`
+  const slug = titleSlug(title)
+  return slug ? `${base}/${slug}.git` : `${base}.git`
 }
 
 /** The session id in a Sessions API git URL, or undefined. */
@@ -230,7 +275,9 @@ export function sessionIdFromGitUrl(
   if (!url) return undefined
   const prefix = `${apiUrl.trim().replace(/\/+$/, '')}/git/`
   if (!apiUrl.trim() || !url.startsWith(prefix)) return undefined
-  const m = /^([0-9A-Z]{26})\.git\/?$/.exec(url.slice(prefix.length))
+  const m = /^([0-9A-Z]{26})(?:\/[^/]+)?\.git\/?$/.exec(
+    url.slice(prefix.length)
+  )
   return m && ULID_RE.test(m[1]!) ? m[1] : undefined
 }
 
@@ -335,7 +382,7 @@ export class CloudGitSync<U extends GitUri> {
     if ('unavailable' in git) return git.unavailable
     const { api } = git
     // Also for clones made through "Git: Clone".
-    this.keepTokenOutOfCredentialHelpers()
+    this.configureGitEnv()
     this.registrations.push(
       api.registerCredentialsProvider({
         getCredentials: async (host) => {
@@ -369,7 +416,7 @@ export class CloudGitSync<U extends GitUri> {
             .map((s) => ({
               name: s.title || s.sessionId,
               description: s.state,
-              url: sessionGitUrl(apiUrl, s.sessionId),
+              url: sessionGitUrl(apiUrl, s.sessionId, s.title),
             }))
         },
       }),
@@ -413,18 +460,24 @@ export class CloudGitSync<U extends GitUri> {
   }
 
   /**
-   * An empty credential helper list for the Sessions API host in the
-   * config git reads from the environment the Git extension runs it
-   * with. A clone runs before its repository config exists: without
-   * this, a system helper (the OS keychain) stores the short-lived
-   * token, and a later clone from the same host presents it expired.
+   * For the Sessions API host, in the config git reads from the
+   * environment the Git extension runs it with (a clone runs before its
+   * repository config exists):
+   * - an empty credential helper list: otherwise a system helper (the OS
+   *   keychain) stores the short-lived token, and a later clone from the
+   *   same host presents it expired;
+   * - `proactiveAuth = basic`: otherwise git never sends the token (see
+   *   {@link proactiveAuthKey}).
    */
-  private keepTokenOutOfCredentialHelpers(): void {
-    const key = credentialHelperKey(this.deps.apiUrl())
-    if (key) addGitEnvConfig(this.deps.gitEnv ?? process.env, key, '')
+  private configureGitEnv(): void {
+    const env = this.deps.gitEnv ?? process.env
+    const helper = credentialHelperKey(this.deps.apiUrl())
+    if (helper) addGitEnvConfig(env, helper, '')
+    const auth = proactiveAuthKey(this.deps.apiUrl())
+    if (auth) addGitEnvConfig(env, auth, 'basic')
   }
 
-  /** The three repository options of §9.3. */
+  /** The repository options of §9.3. */
   async configure(repo: GitRepository<U>): Promise<void> {
     const key = credentialHelperKey(this.deps.apiUrl())
     if (!key) throw new GitSyncError('Cloud sessions are not configured.')
@@ -432,6 +485,10 @@ export class CloudGitSync<U extends GitUri> {
     // Empty helper list for this host: git asks VS Code every time
     // instead of reusing an expired token from the system keychain.
     await repo.setConfig(key, '')
+    // Send the token with the first request, also for git run outside
+    // the extension host (VS Code's terminal answers through the same
+    // askpass); its only remote is the session.
+    await repo.setConfig('http.proactiveAuth', 'basic')
     await repo.setConfig('http.postBuffer', GIT_POST_BUFFER)
   }
 
@@ -480,16 +537,28 @@ export class CloudGitSync<U extends GitUri> {
     }
   }
 
-  /** Clone into `parentPath/<sid>` and configure it. Returns the folder. */
+  /** The session's title, or undefined if it can't be listed. */
+  private async titleOf(sid: string): Promise<string | undefined> {
+    try {
+      return (await this.deps.listSessions()).find((s) => s.sessionId === sid)
+        ?.title
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Clone into `parentPath/<session title>` (or `<sid>` without a
+   *  title) and configure it. Returns the folder. */
   async clone(sid: string, parentPath: U): Promise<U> {
     const apiUrl = this.deps.apiUrl()
     if (!apiUrl) throw new GitSyncError('Cloud sessions are not configured.')
     this.requireFirstCommit(sid)
     const api = await this.api()
-    this.keepTokenOutOfCredentialHelpers()
+    this.configureGitEnv()
+    const url = sessionGitUrl(apiUrl, sid, await this.titleOf(sid))
     let folder: U | null
     try {
-      folder = await api.clone(this.deps.parseUri(sessionGitUrl(apiUrl, sid)), {
+      folder = await api.clone(this.deps.parseUri(url), {
         parentPath,
         postCloneAction: 'none',
       })
