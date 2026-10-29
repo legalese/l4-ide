@@ -1132,6 +1132,22 @@
     position: relative;
     z-index: 1;
   }
+  /* Disabled, Send is dimmed with solid colours (40% over the input's
+     background, as the opacity elsewhere): see-through, it would show
+     the cloud button's outline running under it. */
+  .submit-btn.cloud + .submit-btn:disabled {
+    opacity: 1;
+    background: color-mix(
+      in srgb,
+      #c8376a 40%,
+      var(--vscode-input-background, #3c3c3c)
+    );
+    color: color-mix(
+      in srgb,
+      #fff 40%,
+      var(--vscode-input-background, #3c3c3c)
+    );
+  }
   .submit-btn.cloud:hover:not(:disabled) {
     background: transparent;
     color: #fff;
