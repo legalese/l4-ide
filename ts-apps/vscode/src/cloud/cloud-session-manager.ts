@@ -97,6 +97,8 @@ export interface CloudSessionListener {
     mcpServers?: string[]
     /** With `adding-files`: how many files are being added. */
     fileCount?: number
+    /** With `starting`: the session's title (an AI title, §12). */
+    title?: string
     turnId: string
     sessionId?: string
     phase: CloudStartPhase
@@ -432,8 +434,9 @@ export class CloudSessionManager {
       seed.root && seed.files.length > 0
         ? seedBaseFor(seed.root, seed.workspaceFolders ?? [])
         : undefined
+    const sessionTitle = (await title).slice(0, 200)
     const created = await this.deps.api.createSession({
-      title: (await title).slice(0, 200),
+      title: sessionTitle,
       ...(seedBase ? { seedBase } : {}),
       mcpServers: mcp?.configs ?? [],
       ...(gz ? { seedSize: gz.byteLength } : {}),
@@ -495,6 +498,7 @@ export class CloudSessionManager {
         turnId,
         sessionId: sid,
         phase: 'starting',
+        title: sessionTitle,
       })
       t.startingTurn = turnId
       await this.resume(sid)

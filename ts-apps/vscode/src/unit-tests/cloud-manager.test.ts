@@ -168,6 +168,7 @@ function setup(
   }> = []
   const progress: string[] = []
   const mcpListed: string[] = []
+  const starting: Array<string | undefined> = []
   const logger = new MemoryLogger()
   const manager = new CloudSessionManager({
     api,
@@ -185,6 +186,7 @@ function setup(
       progress: (e) => {
         progress.push(e.phase)
         if (e.mcpServers) mcpListed.push(...e.mcpServers)
+        if (e.phase === 'starting') starting.push(e.title)
       },
     },
     poller: {
@@ -193,7 +195,17 @@ function setup(
       clearTimer: clock.clearTimer,
     },
   })
-  return { api, clock, chat, cloud, progress, mcpListed, manager, logger }
+  return {
+    api,
+    clock,
+    chat,
+    cloud,
+    progress,
+    mcpListed,
+    starting,
+    manager,
+    logger,
+  }
 }
 
 let seq = 0
@@ -249,12 +261,14 @@ describe('CloudSessionManager.runInCloud', () => {
 
   test('names the session with an AI title, else the first line', async () => {
     const run = async (opts: Parameters<typeof setup>[0]) => {
-      const { api, manager } = setup(opts)
+      const { api, manager, starting } = setup(opts)
       await manager.runInCloud({
         turnId: 'turn-1',
         text: 'Check clause 4\nplease',
         seed: { files: [], attachments: [] },
       })
+      // The view learns it with the start.
+      assert.deepEqual(starting, [api.created[0]!.title])
       return api.created[0]!.title
     }
     const asked: string[] = []
