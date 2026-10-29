@@ -37,6 +37,9 @@ export interface McpServerSource {
    *  fresh OAuth access token. `{}` when it needs none; `null` when it
    *  needs a sign-in first. */
   headersFor(id: string): Promise<Record<string, string> | null>
+  /** The interactive sign-in (a browser OAuth consent) that Start in
+   *  the server's settings menu runs. */
+  signIn?(id: string): Promise<{ ok: boolean; error?: string }>
 }
 
 /** Map a server id to a protocol-safe name, unique within `used`. */
