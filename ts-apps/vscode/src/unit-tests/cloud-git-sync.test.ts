@@ -9,7 +9,10 @@ import {
   GitSyncError,
   addGitEnvConfig,
   describeGitError,
+  sessionGitUrl,
   sessionIdFromGitUrl,
+  titleSlug,
+  type CloudGitSyncDeps,
   type GitApi,
   type GitApiResult,
   type GitCredentialsProvider,
@@ -93,7 +96,12 @@ class FakeGit implements GitApi {
     })
     this.envAtClone = { ...this.env }
     if (this.cloneError) throw this.cloneError
-    const folder = fileUri(`${o?.parentPath?.fsPath}/${SID}`)
+    // As VS Code: the folder is named after the URL's last segment.
+    const name = u
+      .toString()
+      .replace(/^.*\//, '')
+      .replace(/\.git$/, '')
+    const folder = fileUri(`${o?.parentPath?.fsPath}/${name}`)
     this.repositories.push(new FakeRepo(folder, u.toString()))
     return folder
   }
@@ -112,21 +120,26 @@ class FakeGit implements GitApi {
   }
 }
 
-function setup(result?: GitApiResult<GitUri>) {
+function setup(
+  result?: GitApiResult<GitUri>,
+  listSessions?: CloudGitSyncDeps<GitUri>['listSessions']
+) {
   const git = new FakeGit()
   const store = new Map<string, unknown>()
   const sync = new CloudGitSync<GitUri>({
     getGitApi: async () => result ?? { api: git },
     apiUrl: () => API,
-    listSessions: async () => [
-      {
-        sessionId: SID,
-        title: 'Lease review',
-        created: 1,
-        lastActivity: 2,
-        state: 'sleeping',
-      },
-    ],
+    listSessions:
+      listSessions ??
+      (async () => [
+        {
+          sessionId: SID,
+          title: 'Lease review',
+          created: 1,
+          lastActivity: 2,
+          state: 'sleeping',
+        },
+      ]),
     getAccessToken: async () => 'jwt-fresh',
     storage: {
       get: <T>(k: string) => store.get(k) as T | undefined,
@@ -178,7 +191,7 @@ describe('CloudGitSync', () => {
       {
         name: 'Lease review',
         description: 'sleeping',
-        url: `https://sessions.example/git/${SID}.git`,
+        url: `https://sessions.example/git/${SID}/Lease-review.git`,
       },
     ])
   })
@@ -187,10 +200,11 @@ describe('CloudGitSync', () => {
     const { git, sync, store } = setup()
     await sync.markCommitted(SID)
     const folder = await sync.clone(SID, fileUri('/home/u/src'))
-    assert.equal(folder.fsPath, `/home/u/src/${SID}`)
+    // Named after the session title.
+    assert.equal(folder.fsPath, '/home/u/src/Lease-review')
     assert.deepEqual(git.cloned, [
       {
-        url: `https://sessions.example/git/${SID}.git`,
+        url: `https://sessions.example/git/${SID}/Lease-review.git`,
         parent: '/home/u/src',
         action: 'none',
       },
@@ -198,18 +212,29 @@ describe('CloudGitSync', () => {
     assert.deepEqual(Object.fromEntries(git.repositories[0]!.config), {
       'remote.origin.push': 'refs/heads/main:refs/heads/local',
       'credential.https://sessions.example.helper': '',
+      'http.proactiveAuth': 'basic',
       'http.postBuffer': '5242880',
     })
     assert.deepEqual(store.get(CLONES_STORAGE_KEY), {
-      [SID]: { folder: `/home/u/src/${SID}` },
+      [SID]: { folder: '/home/u/src/Lease-review' },
     })
     assert.deepEqual(await sync.status(SID), {
       kind: 'cloned',
-      folder: `/home/u/src/${SID}`,
+      folder: '/home/u/src/Lease-review',
       ahead: 0,
       behind: 0,
       pending: false,
     })
+  })
+
+  test('clones under the session id when its title is unknown', async () => {
+    const { git, sync } = setup(undefined, async () => {
+      throw new Error('offline')
+    })
+    await sync.markCommitted(SID)
+    const folder = await sync.clone(SID, fileUri('/w'))
+    assert.equal(folder.fsPath, `/w/${SID}`)
+    assert.equal(git.cloned[0]!.url, `https://sessions.example/git/${SID}.git`)
   })
 
   test('sync pulls then pushes, and reports a pending push', async () => {
@@ -222,7 +247,7 @@ describe('CloudGitSync', () => {
     assert.deepEqual(repo.log, ['pull', 'push'])
     assert.deepEqual(status, {
       kind: 'cloned',
-      folder: `/w/${SID}`,
+      folder: '/w/Lease-review',
       ahead: 2,
       behind: 0,
       pending: true,
@@ -243,26 +268,30 @@ describe('CloudGitSync', () => {
     await sync.clone(SID, fileUri('/w'))
     // Set before git ran: the user's own entry kept, ours appended.
     assert.deepEqual(git.envAtClone, {
-      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'user.name',
       GIT_CONFIG_VALUE_0: 'Someone',
       GIT_CONFIG_KEY_1: 'credential.https://sessions.example.helper',
       GIT_CONFIG_VALUE_1: '',
+      GIT_CONFIG_KEY_2: 'http.https://sessions.example/.proactiveAuth',
+      GIT_CONFIG_VALUE_2: 'basic',
     })
     // Once only, also across registrations (for Git: Clone).
     await sync.register()
     git.repositories = []
     await sync.clone(SID, fileUri('/v'))
-    assert.equal(git.env.GIT_CONFIG_COUNT, '2')
+    assert.equal(git.env.GIT_CONFIG_COUNT, '3')
   })
 
   test('registering sets it for clones made through Git: Clone', async () => {
     const { git, sync } = setup()
     await sync.register()
     assert.deepEqual(git.env, {
-      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_COUNT: '2',
       GIT_CONFIG_KEY_0: 'credential.https://sessions.example.helper',
       GIT_CONFIG_VALUE_0: '',
+      GIT_CONFIG_KEY_1: 'http.https://sessions.example/.proactiveAuth',
+      GIT_CONFIG_VALUE_1: 'basic',
     })
   })
 
@@ -379,6 +408,13 @@ describe('git helpers', () => {
       SID
     )
     assert.equal(
+      sessionIdFromGitUrl(
+        `https://sessions.example/git/${SID}/Lease-review.git`,
+        API
+      ),
+      SID
+    )
+    assert.equal(
       sessionIdFromGitUrl(`https://other.example/git/${SID}.git`, API),
       undefined
     )
@@ -389,6 +425,23 @@ describe('git helpers', () => {
     assert.equal(
       sessionIdFromGitUrl(`https://sessions.example/git/${SID}.git`, ''),
       undefined
+    )
+  })
+
+  test('a title names the clone folder through the git URL', () => {
+    assert.equal(titleSlug('Lease review'), 'Lease-review')
+    assert.equal(titleSlug('Révision du bail: §3 / §4'), 'Revision-du-bail-3-4')
+    assert.equal(titleSlug('..hidden..'), 'hidden')
+    assert.equal(titleSlug('漢字'), '')
+    assert.equal(titleSlug(undefined), '')
+    assert.equal(titleSlug('x'.repeat(80)).length, 60)
+    assert.equal(
+      sessionGitUrl(API, SID, 'Lease review'),
+      `https://sessions.example/git/${SID}/Lease-review.git`
+    )
+    assert.equal(
+      sessionGitUrl(API, SID, '漢字'),
+      `https://sessions.example/git/${SID}.git`
     )
   })
 
