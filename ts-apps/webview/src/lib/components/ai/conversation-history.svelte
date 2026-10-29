@@ -228,6 +228,8 @@
     gap: 3px;
   }
   .row-subtitle {
+    /* Under the title, past the leading slot (13px) and its gap (6px). */
+    padding-left: 19px;
     font-size: 10px;
     color: var(--vscode-descriptionForeground);
     overflow: hidden;
