@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { AiCloudGitStatus } from 'jl4-client-rpc'
   import type { CloudConversationInfo } from '$lib/stores/ai-chat.svelte'
+  import { CLONE_NOT_READY } from '$lib/stores/cloud-chat'
   import CloudStatusIcon from './cloud-status-icon.svelte'
 
   // Header of a cloud conversation (§12.2): state, start progress,
   // Resume for parked sessions / auth-required, Clone / Sync, the
-  // session menu (Stop) and notices (merge conflicts, command errors).
+  // session menu (Stop) and notices (merge conflicts). Failed actions
+  // are VS Code notifications.
   let {
     cloud,
     title,
@@ -42,7 +44,7 @@
   })
   const canGit = $derived(gitReady && git?.kind !== 'not-ready')
   const gitTitle = $derived.by(() => {
-    if (!canGit) return 'Available after the first turn'
+    if (!canGit) return CLONE_NOT_READY
     if (!git) return "Clone this cloud session's files with git"
     if (git.kind === 'unavailable' || git.kind === 'not-ready') {
       return git.message
@@ -216,9 +218,6 @@
       again.
     </div>
   {/if}
-  {#if cloud.notice}
-    <div class="detail error">{cloud.notice}</div>
-  {/if}
 </div>
 
 <style>
@@ -350,8 +349,5 @@
   }
   .detail.warn {
     color: var(--vscode-editorWarning-foreground, #cca700);
-  }
-  .detail.error {
-    color: var(--vscode-errorForeground, #d7263d);
   }
 </style>

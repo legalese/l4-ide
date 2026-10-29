@@ -32,8 +32,6 @@ export interface CloudConversationInfo {
   /** `turns.length` when each `local-merged` arrived: local changes
    *  merged after turn N sit at indices greater than N. */
   localMergesAt: number[]
-  /** Last command error to show in the banner. */
-  notice: string | null
   /** A `git-committed` event was seen (live or replayed): the session
    *  has files to clone (§9.3). */
   committed: boolean
@@ -84,7 +82,6 @@ export function newCloudInfo(
     authRequired: null,
     mergeConflict: null,
     localMergesAt: [],
-    notice: null,
     mcpServers: [],
     committed: false,
     loading: false,

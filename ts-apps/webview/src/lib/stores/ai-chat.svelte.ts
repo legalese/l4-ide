@@ -58,10 +58,10 @@ import {
   type AiMentionCandidate,
   type AiPermissionCategory,
   type AiPermissionValue,
+  ShowNotification,
 } from 'jl4-client-rpc'
 import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
 import {
-  CLONE_NOT_READY,
   adoptTurn,
   applyCloudEvent,
   canCloneOrSync,
@@ -634,8 +634,7 @@ export function createAiChatStore(
         res = { ok: false, error: err instanceof Error ? err.message : '' }
       }
       if (!res.ok) {
-        const conv = conversations[id]
-        if (conv?.cloud) conv.cloud.notice = res.error ?? 'Delete failed.'
+        notifyCloudError(res.error || 'Deleting the cloud session failed.')
         return
       }
       cloudHistory = cloudHistory.filter((s) => s.sessionId !== cloudSid)
@@ -2186,21 +2185,24 @@ export function createAiChatStore(
     if (!conv.cloud) return res.ok
     if (conv.cloud.progress === 'adding-files') conv.cloud.progress = null
     if (res.ok) {
-      conv.cloud.notice = null
       if (res.state) conv.cloud.state = res.state
       return true
     }
-    conv.cloud.notice = res.error || 'The cloud session did not accept that.'
+    const error = res.error || 'The cloud session did not accept that.'
     if (command.type === 'message') {
+      // A message that wasn't taken ends its turn with the error, as a
+      // local chat's failed turn does.
       const reply = conv.turns.find(
         (t) => t.role === 'assistant' && t.turnId === command.turnId
       )
       if (reply) {
         reply.streaming = false
-        reply.error = { message: conv.cloud.notice, code: 'cloud_command' }
+        reply.error = { message: error, code: 'cloud_command' }
       }
       conv.streaming = false
       conv.activeTurnId = null
+    } else {
+      notifyCloudError(error)
     }
     return false
   }
@@ -2213,8 +2215,9 @@ export function createAiChatStore(
     mentions: AiChatStartParams['mentions'] = []
   ): void {
     if (stagedAttachments.length > 0) {
-      conv.cloud!.notice =
+      notifyCloudError(
         'Attachments can only be added when a cloud session starts.'
+      )
       return
     }
     // The prompt's @-mentioned files (and the active file, when its
@@ -2308,7 +2311,6 @@ export function createAiChatStore(
     const conv = ensureCurrent()
     const cloud = (conv.cloud ??= newCloudInfo('', 'starting'))
     cloud.progress = 'uploading'
-    cloud.notice = null
     dropTrailingErroredAssistantTurns(conv)
     const withFile =
       includeActiveFile && activeFile.path && activeFile.name
@@ -2453,7 +2455,7 @@ export function createAiChatStore(
       if (res.state) conv.cloud.state = res.state
       if (res.title) conv.title = res.title
     } else {
-      conv.cloud.notice = res.error || 'Could not open the cloud session.'
+      notifyCloudError(res.error || 'Could not open the cloud session.')
     }
     void refreshCloudGit(sessionId)
   }
@@ -2509,8 +2511,9 @@ export function createAiChatStore(
         conv.cloud.state = 'gone'
         // Not found: deleted, or of another organisation than the one
         // signed in (the Sessions API keeps each organisation's apart).
-        conv.cloud.notice =
+        notifyCloudError(
           'This cloud session was not found. It was deleted, or it belongs to another organisation: switch organisation in Legalese Cloud to open it.'
+        )
       }
       return
     }
@@ -2546,6 +2549,15 @@ export function createAiChatStore(
     return conv ? rollbackOffer(conv, index) : null
   }
 
+  /** A failed cloud action, as a VS Code notification (the chat isn't
+   *  the place for it). */
+  function notifyCloudError(message: string): void {
+    getMessenger()?.sendNotification(ShowNotification, HOST_EXTENSION, {
+      type: 'error',
+      message,
+    })
+  }
+
   async function rollbackCloudTurn(offer: RollbackOffer): Promise<void> {
     const m = getMessenger()
     const conv = getConversation()
@@ -2559,13 +2571,10 @@ export function createAiChatStore(
         undoesLocalSync: offer.undoesLocalSync,
       })
       if (!res.ok && !res.cancelled) {
-        conv.cloud.notice = res.error || 'The rollback was not accepted.'
-      } else if (res.ok) {
-        conv.cloud.notice = null
+        notifyCloudError(res.error || 'The rollback was not accepted.')
       }
     } catch (err) {
-      conv.cloud.notice =
-        err instanceof Error ? err.message : 'Rollback failed.'
+      notifyCloudError(err instanceof Error ? err.message : 'Rollback failed.')
     }
   }
 
@@ -2582,15 +2591,13 @@ export function createAiChatStore(
         { sessionId }
       )
       if (res.ok) {
-        conv.cloud.notice = null
         if (action === 'resume') conv.cloud.authRequired = null
         if (res.state) conv.cloud.state = res.state
       } else {
-        conv.cloud.notice = res.error || `Could not ${action} the session.`
+        notifyCloudError(res.error || `Could not ${action} the session.`)
       }
     } catch (err) {
-      conv.cloud.notice =
-        err instanceof Error ? err.message : `${action} failed.`
+      notifyCloudError(err instanceof Error ? err.message : `${action} failed.`)
     }
   }
 
@@ -2614,10 +2621,8 @@ export function createAiChatStore(
     const conv = getConversation()
     const sessionId = conv?.cloud?.sessionId
     if (!m || !conv?.cloud || !sessionId) return
-    if (!canCloneOrSync(conv.cloud)) {
-      conv.cloud.notice = CLONE_NOT_READY
-      return
-    }
+    // The button is disabled until then.
+    if (!canCloneOrSync(conv.cloud)) return
     const status = cloudGit[sessionId]
     const action = status?.kind === 'cloned' ? 'sync' : 'clone'
     try {
@@ -2626,9 +2631,9 @@ export function createAiChatStore(
         action,
       })
       cloudGit[sessionId] = res.status
-      conv.cloud.notice = res.error ?? null
+      if (res.error) notifyCloudError(res.error)
     } catch (err) {
-      conv.cloud.notice = err instanceof Error ? err.message : 'Git failed.'
+      notifyCloudError(err instanceof Error ? err.message : 'Git failed.')
     }
   }
 

@@ -54,6 +54,17 @@ function setup(answers: Record<string, (params: never) => unknown> = {}) {
 }
 
 describe('cloud conversations in the chat store', () => {
+  test('a failed action is a VS Code notification, not a banner line', async () => {
+    const { store, sent } = setup({
+      aiCloudStop: () => ({ ok: false, error: 'The session is busy.' }),
+    })
+    await store.loadConversation(KEY)
+    await store.stopCloud()
+    expect(
+      sent.filter((s) => s.method === 'showNotification').map((s) => s.params)
+    ).toEqual([{ type: 'error', message: 'The session is busy.' }])
+  })
+
   test('opening replays a turn started elsewhere', async () => {
     const { store, sent } = setup()
     await store.loadConversation(KEY)
@@ -305,7 +316,6 @@ describe('cloud conversations in the chat store', () => {
     expect(store.cloudGitReady).toBe(false)
     await store.cloudGitAction()
     expect(sent.some((s) => s.method === 'aiCloudGitAction')).toBe(false)
-    expect(store.current?.cloud?.notice).toBe('Available after the first turn')
     // Replaying the log of a session that committed earlier.
     store.onCloudEvent({
       conversationId: KEY,
