@@ -1072,6 +1072,12 @@ cloud folder instead of on their machine:
   files (§9.4). A rolled-back turn collapses to "This turn was rolled back",
   centred under its prompt, with a chevron that shows the turn (dimmed) and
   hides it again.
+- **Session state** shows as the cloud icon in the header and in the
+  history, with the state's wording as its tooltip: gray asleep, white
+  running, a band sweeping along the outline while starting or loading and,
+  slower, while busy; amber while waiting for an answer or parked; faded
+  when gone. The history's list already carries each session's state, so
+  this costs no requests.
 - **Header actions.** Clone / Sync (§9.3) at the top right of the cloud
   session header, and next to it a ⋯ menu with the session's actions: Stop
   session for now. Resume, when needed, is a button in the header.
