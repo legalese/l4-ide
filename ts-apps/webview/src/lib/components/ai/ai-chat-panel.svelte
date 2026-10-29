@@ -24,6 +24,7 @@
     AiCloudState,
     RequestOpenUrl,
     RequestSidebarLogin,
+    cloudSessionIdOf,
     type AiChatAttachment,
   } from 'jl4-client-rpc'
   import { createAiChatStore } from '$lib/stores/ai-chat.svelte'
@@ -221,7 +222,11 @@
   }
 
   async function onLoadConversation(id: string): Promise<void> {
-    await store.loadConversation(id)
+    const loading = store.loadConversation(id)
+    // A cloud session shows at once (its banner animates while the log
+    // is replayed); a local one is read first.
+    if (cloudSessionIdOf(id)) historyOpen = false
+    await loading
     historyOpen = false
   }
 
@@ -286,8 +291,8 @@
       />
     {:else if showChat && store.current}
       <MessageList
-        turns={store.current.turns}
-        streaming={store.current.streaming || !!store.current.cloud?.loading}
+        turns={store.current.cloud?.loading ? [] : store.current.turns}
+        streaming={store.current.streaming}
         pipelineActive={store.pipelineActive}
         pendingApproval={store.pendingApproval}
         pendingQuestion={store.pendingQuestion}

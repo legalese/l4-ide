@@ -26,6 +26,12 @@
       (cloud.state === 'parked' ||
         (!!cloud.authRequired && cloud.authRequired.reason !== 'mcp'))
   )
+  // The cloud's outline shimmers while an opened session loads.
+  const shimmerId = `cloud-shimmer-${Math.random().toString(36).slice(2)}`
+  const reducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
   const progressText = $derived(
     cloud.progress === 'adding-files'
       ? `Adding ${cloud.addingFiles} ${cloud.addingFiles === 1 ? 'file' : 'files'} to the session…`
@@ -37,12 +43,37 @@
   )
 </script>
 
-<div class="cloud-banner" role="status">
+<div class="cloud-banner" role="status" aria-busy={cloud.loading}>
   <div class="line">
-    <svg class="cloud-icon" viewBox="0 0 16 16" aria-hidden="true">
+    <svg
+      class="cloud-icon"
+      class:loading={cloud.loading}
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+    >
+      {#if cloud.loading}
+        <!-- A bright band sweeps along a dimmed outline. -->
+        <defs>
+          <linearGradient id={shimmerId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="currentColor" stop-opacity="0.3" />
+            <stop offset="0.5" stop-color="currentColor" stop-opacity="1" />
+            <stop offset="1" stop-color="currentColor" stop-opacity="0.3" />
+            {#if !reducedMotion}
+              <animateTransform
+                attributeName="gradientTransform"
+                type="translate"
+                from="-1 0"
+                to="1 0"
+                dur="1.4s"
+                repeatCount="indefinite"
+              />
+            {/if}
+          </linearGradient>
+        </defs>
+      {/if}
       <path
         d="M4.6 12.5a2.6 2.6 0 0 1-.3-5.2 3.4 3.4 0 0 1 6.6-1 2.7 2.7 0 0 1 .6 6.2z"
-        stroke="currentColor"
+        stroke={cloud.loading ? `url(#${shimmerId})` : 'currentColor'}
         stroke-width="1.2"
         fill="none"
         stroke-linejoin="round"
@@ -50,7 +81,7 @@
     </svg>
     <span class="label">Cloud session</span>
     {#if cloud.loading}
-      <span class="loading">Loading…</span>
+      <span class="visually-hidden">Loading</span>
     {:else if cloud.sessionId}
       <span class="state state-{cloud.state}">{cloud.state}</span>
     {/if}
@@ -117,6 +148,9 @@
     width: 14px;
     height: 14px;
   }
+  .cloud-icon.loading {
+    color: var(--vscode-foreground);
+  }
   .label {
     color: var(--vscode-foreground);
   }
@@ -136,9 +170,13 @@
     color: var(--vscode-editorWarning-foreground, #cca700);
     border-color: var(--vscode-editorWarning-foreground, #cca700);
   }
-  .loading {
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
   .spacer {
     flex: 1;
