@@ -7,15 +7,15 @@ play.legalese.com ── CloudFront ── default    → S3 site bucket (OAC)
                                 └─ /session   → Lambda function URL → S3 sessions bucket
 ```
 
-| File                       | Purpose                                                                                               |
-| -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `main.tf`                  | Providers (us-west-2, plus us-east-1 for the certificate), S3 backend, tags                           |
-| `site.tf`                  | Private bucket for the build, readable only by the distribution                                       |
-| `sessions.tf`              | Sessions bucket, the share-link Lambda, its function URL and the Turnstile secret parameter           |
-| `session-lambda/index.mjs` | The Lambda: same API as the old jl4-websessions, POSTs need the editor's origin and a Turnstile token |
-| `cloudfront.tf`            | Certificate, security headers, the `/session` cache policy and the distribution                       |
-| `redirect.tf`              | The later jl4.legalese.com → play.legalese.com redirect (off until `enable_jl4_redirect = true`)      |
-| `github-actions.tf`        | The OIDC role `deploy-web-editor` assumes; it trusts only the `web-editor` environment                |
+| File                       | Purpose                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `main.tf`                  | Providers (us-west-2, plus us-east-1 for the certificate), S3 backend, tags                      |
+| `site.tf`                  | Private bucket for the build, readable only by the distribution                                  |
+| `sessions.tf`              | Sessions bucket, the share-link Lambda, its function URL and the Turnstile secret parameter      |
+| `session-lambda/index.mjs` | The Lambda: same API as jl4-websessions, POSTs need the editor's origin and a Turnstile token    |
+| `cloudfront.tf`            | Certificate, security headers, the `/session` cache policy and the distribution                  |
+| `redirect.tf`              | The later jl4.legalese.com → play.legalese.com redirect (off until `enable_jl4_redirect = true`) |
+| `github-actions.tf`        | The OIDC role `deploy-web-editor` assumes; it trusts only the `web-editor` environment           |
 
 ## Caching
 

@@ -1,6 +1,6 @@
 // Share links for the web editor, served at play.legalese.com/session.
 //
-// The API is the one the old jl4-websessions service had:
+// The API matches jl4-websessions, so the editor works against either:
 //   POST /session            body: the program as a JSON string  →  its new id as a JSON string
 //   GET  /session?id=<uuid>  →  the program as a JSON string (404 when unknown)
 //
