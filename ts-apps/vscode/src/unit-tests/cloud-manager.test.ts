@@ -154,6 +154,8 @@ function setup(
     mcp?: McpServerSource
     pick?: (sid: string, name: string) => Promise<string | undefined>
     mint?: (sid: string) => Promise<{ token: string }>
+    summarizeTitle?: (text: string) => Promise<string | null>
+    titleTimeoutMs?: number
   } = {}
 ) {
   const api = new FakeApi()
@@ -172,6 +174,10 @@ function setup(
     mintAgentKey: opts.mint ?? (async () => ({ token: KEY })),
     mcp: opts.mcp,
     ...(opts.pick ? { pickLocalFolder: opts.pick } : {}),
+    ...(opts.summarizeTitle ? { summarizeTitle: opts.summarizeTitle } : {}),
+    ...(opts.titleTimeoutMs !== undefined
+      ? { titleTimeoutMs: opts.titleTimeoutMs }
+      : {}),
     logger,
     listener: {
       chat: (e) => chat.push(e),
@@ -239,6 +245,50 @@ describe('CloudSessionManager.runInCloud', () => {
     api.state = 'busy'
     await clock.advance(0)
     assert.deepEqual(progress, ['uploading', 'uploading', 'starting', 'ready'])
+  })
+
+  test('names the session with an AI title, else the first line', async () => {
+    const run = async (opts: Parameters<typeof setup>[0]) => {
+      const { api, manager } = setup(opts)
+      await manager.runInCloud({
+        turnId: 'turn-1',
+        text: 'Check clause 4\nplease',
+        seed: { files: [], attachments: [] },
+      })
+      return api.created[0]!.title
+    }
+    const asked: string[] = []
+    assert.equal(
+      await run({
+        summarizeTitle: async (text) => {
+          asked.push(text)
+          return '  Clause 4 review  '
+        },
+      }),
+      'Clause 4 review'
+    )
+    // The whole prompt, as for a local chat's title.
+    assert.deepEqual(asked, ['Check clause 4\nplease'])
+    assert.equal(
+      await run({
+        summarizeTitle: async () => {
+          throw new Error('offline')
+        },
+      }),
+      'Check clause 4'
+    )
+    assert.equal(
+      await run({ summarizeTitle: async () => null }),
+      'Check clause 4'
+    )
+    // A slow answer doesn't hold up the start.
+    assert.equal(
+      await run({
+        summarizeTitle: () => new Promise(() => {}),
+        titleTimeoutMs: 5,
+      }),
+      'Check clause 4'
+    )
   })
 
   test('declines oversized attachments before creating anything', async () => {

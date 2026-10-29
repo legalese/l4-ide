@@ -347,6 +347,8 @@ export function createCloudSessions(deps: {
   /** Extension global state: per-session file hashes and the
    *  session → clone folder map. */
   storage: vscode.Memento
+  /** AI titles for new sessions (the local chat's summize call). */
+  summarizeTitle?: (text: string) => Promise<string | null>
 }): CloudSessions & vscode.Disposable {
   const authDeps: AuthProxyDeps = {
     authBaseUrl: () => `https://${LEGALESE_CLOUD_DOMAIN}`,
@@ -367,6 +369,7 @@ export function createCloudSessions(deps: {
     files: mementoFilesStore(deps.storage),
     pickLocalFolder: (_sid, name) => pickLocalFolder(name),
     logger: deps.logger,
+    ...(deps.summarizeTitle ? { summarizeTitle: deps.summarizeTitle } : {}),
     listener: {
       chat: deps.emitChat,
       cloudEvent: (e) => {

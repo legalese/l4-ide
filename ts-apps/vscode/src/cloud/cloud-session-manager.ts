@@ -166,7 +166,17 @@ export interface CloudSessionManagerDeps {
   logger: Logger
   /** Timer / clock overrides for the poller (tests). */
   poller?: Pick<PollerDeps, 'now' | 'setTimer' | 'clearTimer'>
+  /** An AI title for a first prompt (ai-proxy's summize pipeline, as
+   *  local chats get), or null. Without one a session is named after
+   *  the prompt's first line. */
+  summarizeTitle?(text: string): Promise<string | null>
+  /** How long a new session waits for that title (tests). */
+  titleTimeoutMs?: number
 }
+
+/** A start waits at most this long for the AI title; the seed is
+ *  packed meanwhile, and the compute start takes far longer. */
+export const TITLE_TIMEOUT_MS = 4_000
 
 const LIVE_STATES: ReadonlySet<SessionState> = new Set([
   'running',
@@ -343,6 +353,30 @@ export class CloudSessionManager {
 
   // ── Starting ────────────────────────────────────────────────────────
 
+  /** The AI title for a first prompt, or its first line when there is
+   *  none, it fails, or it takes longer than {@link TITLE_TIMEOUT_MS}. */
+  private async titleFor(text: string): Promise<string> {
+    const fallback = titleFrom(text)
+    const generate = this.deps.summarizeTitle
+    if (!generate) return fallback
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(
+        () => resolve(null),
+        this.deps.titleTimeoutMs ?? TITLE_TIMEOUT_MS
+      )
+    })
+    try {
+      const title = await Promise.race([
+        generate.call(this.deps, text).catch(() => null),
+        timeout,
+      ])
+      return title?.trim() || fallback
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
   /**
    * Seed a new session and run `text` as its first turn (§10). Throws
    * `SeedLimitError` before anything is uploaded when a limit is hit,
@@ -356,6 +390,10 @@ export class CloudSessionManager {
     seed: CloudSeed
   }): Promise<{ sessionId: string }> {
     const { turnId, text, seed } = input
+    // Asked first: the seed is packed while the title is generated.
+    const title = input.title
+      ? Promise.resolve(input.title)
+      : this.titleFor(text)
     checkAttachmentSizes(seed.attachments)
     const names = attachmentNames(seed.attachments.map((a) => a.name))
     const attachments = seed.attachments.map((a, i) => ({
@@ -389,7 +427,7 @@ export class CloudSessionManager {
         ? seedBaseFor(seed.root, seed.workspaceFolders ?? [])
         : undefined
     const created = await this.deps.api.createSession({
-      title: (input.title ?? titleFrom(text)).slice(0, 200),
+      title: (await title).slice(0, 200),
       ...(seedBase ? { seedBase } : {}),
       mcpServers: mcp?.configs ?? [],
       ...(gz ? { seedSize: gz.byteLength } : {}),
