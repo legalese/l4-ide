@@ -201,48 +201,6 @@
     void tick().then(() => autoresize())
   }
 
-  const cloudConv = $derived(
-    store.current?.cloud?.sessionId ? store.current.cloud : null
-  )
-  const git = $derived(store.cloudGitStatus)
-  let gitBusy = $state(false)
-  const gitLabel = $derived.by(() => {
-    if (gitBusy) return git?.kind === 'cloned' ? 'Syncing…' : 'Cloning…'
-    if (!git || git.kind !== 'cloned') return 'Clone'
-    const counts = [
-      git.ahead > 0 ? `↑${git.ahead}` : '',
-      git.behind > 0 ? `↓${git.behind}` : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-    return counts ? `Sync ${counts}` : 'Sync'
-  })
-  const gitReady = $derived(store.cloudGitReady && git?.kind !== 'not-ready')
-  const gitTitle = $derived.by(() => {
-    if (!gitReady) return 'Available after the first turn'
-    if (!git) return "Clone this cloud session's files with git"
-    if (git.kind === 'unavailable' || git.kind === 'not-ready') {
-      return git.message
-    }
-    if (git.kind === 'not-cloned') {
-      return "Clone this cloud session's files with git"
-    }
-    if (git.pending && cloudConv?.state === 'sleeping') {
-      return `Pushed changes are pending until the session runs. Clone: ${git.folder}`
-    }
-    return `Pull, then push your commits. Clone: ${git.folder}`
-  })
-
-  async function gitAction(): Promise<void> {
-    if (gitBusy) return
-    gitBusy = true
-    try {
-      await store.cloudGitAction()
-    } finally {
-      gitBusy = false
-    }
-  }
-
   // Attachment picker state. `attachBusy` guards against double-clicks
   // while the native dialog is open; `attachNote` surfaces soft warnings
   // ("this PDF might eat a lot of context") and rejection reasons from
@@ -642,50 +600,6 @@
           <circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none" />
         </svg>
       </button>
-      {#if cloudConv}
-        <!-- Clone / Sync the cloud session's files (§9.3). -->
-        <button
-          type="button"
-          class="git-btn"
-          onclick={gitAction}
-          disabled={gitBusy || !gitReady || git?.kind === 'unavailable'}
-          title={gitTitle}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none">
-            <circle
-              cx="4.5"
-              cy="4"
-              r="1.6"
-              stroke="currentColor"
-              stroke-width="1.3"
-            />
-            <circle
-              cx="4.5"
-              cy="12"
-              r="1.6"
-              stroke="currentColor"
-              stroke-width="1.3"
-            />
-            <circle
-              cx="11.5"
-              cy="6"
-              r="1.6"
-              stroke="currentColor"
-              stroke-width="1.3"
-            />
-            <path
-              d="M4.5 5.6v4.8M11.5 7.6c0 2.2-2.5 2.4-7 2.8"
-              stroke="currentColor"
-              stroke-width="1.3"
-              stroke-linecap="round"
-            />
-          </svg>
-          <span>{gitLabel}</span>
-          {#if git?.kind === 'cloned' && git.pending && cloudConv.state === 'sleeping'}
-            <span class="git-pending">pending</span>
-          {/if}
-        </button>
-      {/if}
     </div>
     <div class="right-actions">
       <!-- No active-file context chip in a deployment-bound chat:
@@ -1210,35 +1124,6 @@
   }
   :global(body.vscode-light) .submit-btn.cloud:hover:not(:disabled) {
     color: var(--vscode-foreground);
-  }
-  .git-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: transparent;
-    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-    border-radius: 4px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 11px;
-    padding: 1px 6px;
-    margin-left: 4px;
-    cursor: pointer;
-  }
-  .git-btn svg {
-    width: 13px;
-    height: 13px;
-  }
-  .git-btn:hover:not(:disabled) {
-    color: var(--vscode-foreground);
-    border-color: var(--vscode-foreground);
-  }
-  .git-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-  .git-pending {
-    font-size: 9px;
-    color: var(--vscode-editorWarning-foreground, #cca700);
   }
   /* Streaming state: darker tint of the same crimson so it reads as
      "same affordance, different mode" rather than a new color. */

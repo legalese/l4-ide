@@ -275,8 +275,11 @@
     {#if showChat && store.current?.cloud}
       <CloudBanner
         cloud={store.current.cloud}
+        git={store.cloudGitStatus}
+        gitReady={store.cloudGitReady}
         onResume={() => void store.resumeCloud()}
         onStop={() => void store.stopCloud()}
+        onGit={() => store.cloudGitAction()}
       />
     {/if}
     {#if showEmptyState}
