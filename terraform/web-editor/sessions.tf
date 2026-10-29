@@ -147,8 +147,11 @@ resource "aws_lambda_function" "session" {
   memory_size      = 128
   timeout          = 10
 
-  # Caps how fast anyone can write, whatever gets past Turnstile.
-  reserved_concurrent_executions = 5
+  # Caps the share API's cost and keeps it from taking concurrency from the
+  # other Lambdas in this account. It covers reads too: a GET for an id that
+  # isn't cached at the edge runs the Lambda. Each call is a few tens of ms,
+  # so 20 is a few hundred requests a second.
+  reserved_concurrent_executions = 20
 
   environment {
     variables = {

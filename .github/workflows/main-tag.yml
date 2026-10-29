@@ -936,7 +936,7 @@ jobs:
     needs:
       - build-wasm
       - create-tag
-    if: ${{ vars.WEB_EDITOR_BUCKET != '' }}
+    if: ${{ vars.WEB_EDITOR_BUCKET != '' && vars.WEB_EDITOR_DISTRIBUTION_ID != '' }}
     environment:
       name: web-editor
       url: https://play.legalese.com
@@ -967,7 +967,15 @@ jobs:
       # The WASM lives under its release tag, so each release has new URLs and
       # browsers never mix a cached module with a newer page.
       - name: Configure the build for this release
+        env:
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
         run: |
+          # The session Lambda rejects shares without a Turnstile token, so a
+          # build without the key would ship a Share button that always fails.
+          if [ -z "$TURNSTILE_SITE_KEY" ]; then
+            echo "::error::Repository variable TURNSTILE_SITE_KEY is not set"
+            exit 1
+          fi
           WASM_DIR="ts-apps/jl4-web/static/wasm/$RELEASE_TAG"
           mkdir -p "$WASM_DIR"
           cp "$RUNNER_TEMP/wasm/jl4-core.wasm" "$RUNNER_TEMP/wasm/jl4-core.mjs" "$WASM_DIR/"
@@ -976,7 +984,7 @@ jobs:
           VITE_WASM_URL=/wasm/$RELEASE_TAG/jl4-core.wasm
           VITE_WASM_JS_URL=/wasm/$RELEASE_TAG/jl4-core.mjs
           VITE_SESSION_URL=/session
-          VITE_TURNSTILE_SITE_KEY=${{ vars.TURNSTILE_SITE_KEY }}
+          VITE_TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY
           EOF
           cat ts-apps/jl4-web/.env.production.local
 

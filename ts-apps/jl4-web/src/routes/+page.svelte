@@ -479,13 +479,22 @@
             if (prog) {
               editor.setValue(prog)
             }
-          } else {
-            logger.debug('response was not okay - deleting search param')
+          } else if (response.status === 404 || response.status === 400) {
+            logger.debug('no such session - deleting search param')
             ownUrl.searchParams.delete('id')
             history.pushState(null, '', ownUrl)
+          } else {
+            // Throttled or a server error: keep the id so a reload can retry
+            logger.error(
+              `could not load session ${sessionid}, status ${response.status}`
+            )
+            toast.push(
+              'Could not load the shared program. Reload to try again.'
+            )
           }
         } catch (e) {
           logger.error(`could not load session ${sessionid}, error: ${e}`)
+          toast.push('Could not load the shared program. Reload to try again.')
         }
       }
 
@@ -905,14 +914,24 @@
       window.history.pushState(null, '', shareUrl)
 
       if (navigator.share) {
-        navigator.share({
-          url: shareUrl,
-          text: 'L4 document',
-        })
+        navigator
+          .share({
+            url: shareUrl,
+            text: 'L4 document',
+          })
+          .catch(() => {})
       }
 
-      await navigator.clipboard.writeText(shareUrl)
-      toast.push('Link copied to clipboard.', { duration: 4000 })
+      // The Turnstile check and the POST can outlast the click's user
+      // activation, and then the browser refuses the clipboard write
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        toast.push('Link copied to clipboard.', { duration: 4000 })
+      } catch {
+        toast.push(`Share link (also in the address bar): ${shareUrl}`, {
+          duration: 15000,
+        })
+      }
     } else {
       toast.push('Could not persist the file to generate a share link.')
     }

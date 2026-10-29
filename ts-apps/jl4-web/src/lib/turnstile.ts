@@ -23,15 +23,17 @@ function loadScript(): Promise<TurnstileApi> {
     const script = document.createElement('script')
     script.src = SCRIPT_URL
     script.async = true
+    // Forget a failed load, so the next Share tries again
+    const fail = (message: string) => {
+      scriptPromise = undefined
+      script.remove()
+      reject(new Error(message))
+    }
     script.onload = () =>
       window.turnstile
         ? resolve(window.turnstile)
-        : reject(new Error('Turnstile did not initialise'))
-    script.onerror = () => {
-      scriptPromise = undefined
-      script.remove()
-      reject(new Error('Could not load Turnstile'))
-    }
+        : fail('Turnstile did not initialise')
+    script.onerror = () => fail('Could not load Turnstile')
     document.head.appendChild(script)
   })
   return scriptPromise

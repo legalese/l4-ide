@@ -32,8 +32,29 @@ const SITEVERIFY_URL =
 const s3 = new S3Client({});
 const ssm = new SSMClient({});
 
-// Fetched from SSM once per cold start.
+// Read from SSM again after a few minutes, or straight away once Cloudflare
+// rejects it, so a new secret takes effect without waiting for warm containers
+// to recycle.
+const SECRET_MAX_AGE_MS = 5 * 60 * 1000;
 let turnstileSecret;
+let turnstileSecretReadAt = 0;
+
+async function getTurnstileSecret() {
+  if (
+    !turnstileSecret ||
+    Date.now() - turnstileSecretReadAt > SECRET_MAX_AGE_MS
+  ) {
+    const { Parameter } = await ssm.send(
+      new GetParameterCommand({
+        Name: TURNSTILE_SECRET_PARAM,
+        WithDecryption: true,
+      }),
+    );
+    turnstileSecret = Parameter.Value;
+    turnstileSecretReadAt = Date.now();
+  }
+  return turnstileSecret;
+}
 
 function json(statusCode, value, cacheControl = "no-store") {
   return {
@@ -54,22 +75,21 @@ function hasOriginSecret(headers) {
 
 async function passesTurnstile(token) {
   if (!token) return false;
-  turnstileSecret ??= (
-    await ssm.send(
-      new GetParameterCommand({
-        Name: TURNSTILE_SECRET_PARAM,
-        WithDecryption: true,
-      }),
-    )
-  ).Parameter.Value;
+  const secret = await getTurnstileSecret();
 
   const response = await fetch(SITEVERIFY_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ secret: turnstileSecret, response: token }),
+    body: JSON.stringify({ secret, response: token }),
   });
   if (!response.ok) return false;
   const result = await response.json();
+  if (result["error-codes"]?.includes("invalid-input-secret")) {
+    console.error(
+      "Cloudflare rejected the Turnstile secret; reading it again next time",
+    );
+    turnstileSecret = undefined;
+  }
   return (
     result.success === true &&
     result.hostname === TURNSTILE_HOSTNAME &&
@@ -131,7 +151,10 @@ async function readSession(event) {
       statusCode: 200,
       headers: {
         "content-type": "application/json",
-        "cache-control": "public, max-age=31536000, immutable",
+        // Programs never change, so CloudFront keeps them for a year. Browsers
+        // only keep them for an hour: a program taken down (README.md) stops
+        // loading once its object is deleted and the edge copy invalidated.
+        "cache-control": "public, max-age=3600, s-maxage=31536000",
       },
       // Stored as the JSON string the editor expects, so it goes out as is.
       body: await object.Body.transformToString(),

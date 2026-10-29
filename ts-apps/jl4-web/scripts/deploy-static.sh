@@ -9,7 +9,8 @@
 #   uploaded, so they are cached for a year and never deleted: tabs still on
 #   the previous release keep loading their files.
 # - Everything else (index.html, _app/version.json, ...) is revalidated on each
-#   load and replaced, so the next load picks up the new release's file names.
+#   load, replaced and invalidated, so the next load picks up the new release's
+#   file names.
 # - CloudFront only compresses files up to 10 MB, so larger ones are uploaded
 #   as the brotli copy SvelteKit's precompress already made.
 
@@ -89,18 +90,30 @@ done < <(find ./_app/immutable ./wasm -type f \( -name '*.mjs' -o -name '*.wasm'
 # 3. Everything else, replaced on each deploy. wasm-test.html is a dev page that
 # loads unversioned WASM paths, so it isn't published. index.html goes last, once
 # everything it references is in place.
-aws s3 sync ${DRYRUN[@]+"${DRYRUN[@]}"} . "s3://$BUCKET/" --delete \
+SYNC_LOG=$(mktemp)
+trap 'rm -f "$SYNC_LOG"' EXIT
+aws s3 sync ${DRYRUN[@]+"${DRYRUN[@]}"} . "s3://$BUCKET/" --delete --no-progress \
     --exclude '_app/immutable/*' --exclude 'wasm/*' \
     --exclude '*.br' --exclude '*.gz' --exclude 'wasm-test.html' --exclude 'index.html' \
     ${EXCLUDE_BIG[@]+"${EXCLUDE_BIG[@]}"} \
-    --cache-control "$REVALIDATE"
+    --cache-control "$REVALIDATE" | tee "$SYNC_LOG"
 aws s3 cp ${DRYRUN[@]+"${DRYRUN[@]}"} index.html "s3://$BUCKET/index.html" \
     --content-type "text/html" --cache-control "$REVALIDATE"
 
-# 4. Drop CloudFront's copies of the replaced files (one path, so it's free).
+# 4. Drop CloudFront's copies of what step 3 replaced or deleted. Only those: a
+# blanket /* would also flush the edge copies of every share link and the WASM.
+PATHS=(/)
+while IFS= read -r file; do
+    PATHS+=("/${file#./}")
+done < <(find . -type f ! -name '*.br' ! -name '*.gz' ! -name 'wasm-test.html' \
+    ! -path './_app/immutable/*' ! -path './wasm/*' | sort)
+while IFS= read -r key; do
+    PATHS+=("/$key")
+done < <(sed -n "s|^.*delete: s3://$BUCKET/||p" "$SYNC_LOG")
+
 if [ "${4:-}" != "--dryrun" ]; then
-    aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' \
+    aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "${PATHS[@]}" \
         --query 'Invalidation.Id' --output text
 else
-    echo "(dryrun) aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths '/*'"
+    echo "(dryrun) aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths ${PATHS[*]}"
 fi
