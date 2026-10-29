@@ -21,7 +21,8 @@
       cloud.state === 'starting'
   )
   const needsResume = $derived(
-    !!cloud.sessionId &&
+    !cloud.loading &&
+      !!cloud.sessionId &&
       (cloud.state === 'parked' ||
         (!!cloud.authRequired && cloud.authRequired.reason !== 'mcp'))
   )
@@ -48,11 +49,15 @@
       />
     </svg>
     <span class="label">Cloud session</span>
-    {#if cloud.sessionId}
+    {#if cloud.loading}
+      <span class="loading">Loading…</span>
+    {:else if cloud.sessionId}
       <span class="state state-{cloud.state}">{cloud.state}</span>
     {/if}
     <span class="spacer"></span>
-    {#if needsResume}
+    {#if cloud.loading}
+      <!-- No actions until the session's state is known. -->
+    {:else if needsResume}
       <button class="btn primary" onclick={onResume}>Resume</button>
     {:else if live && cloud.sessionId}
       <button class="btn" onclick={onStop} title="Stop the cloud compute"
@@ -69,7 +74,9 @@
       </div>
     {/if}
   {/if}
-  {#if cloud.authRequired?.reason === 'mcp'}
+  {#if cloud.loading}
+    <!-- Replayed notices may be stale until the replay catches up. -->
+  {:else if cloud.authRequired?.reason === 'mcp'}
     <div class="detail warn">
       MCP server {cloud.authRequired.server ?? ''} needs a sign-in in this window
       before the cloud session can use it.
@@ -128,6 +135,10 @@
   .state-waiting {
     color: var(--vscode-editorWarning-foreground, #cca700);
     border-color: var(--vscode-editorWarning-foreground, #cca700);
+  }
+  .loading {
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
   }
   .spacer {
     flex: 1;

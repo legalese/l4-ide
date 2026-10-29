@@ -40,6 +40,10 @@ export interface CloudConversationInfo {
   /** MCP servers passed at the start (their tools run without
    *  approval in the cloud); shown while the session starts. */
   mcpServers: string[]
+  /** An opened session whose log is still being replayed: its state
+   *  isn't known yet (replayed states are the log's, not the
+   *  session's). */
+  loading: boolean
 }
 
 /** The part of a rendered turn this module reads and writes. */
@@ -83,6 +87,7 @@ export function newCloudInfo(
     notice: null,
     mcpServers: [],
     committed: false,
+    loading: false,
   }
 }
 

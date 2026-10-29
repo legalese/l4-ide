@@ -2422,7 +2422,10 @@ export function createAiChatStore(
       streaming: false,
       activeTurnId: null,
       queuedInjections: [],
-      cloud: newCloudInfo(sessionId, summary?.state ?? 'sleeping'),
+      cloud: {
+        ...newCloudInfo(sessionId, summary?.state ?? 'sleeping'),
+        loading: true,
+      },
     }
     clearPendingQuestionFor(key)
     currentId = key
@@ -2441,6 +2444,7 @@ export function createAiChatStore(
     }
     const conv = conversations[key]
     if (!conv?.cloud) return
+    conv.cloud.loading = false
     if (res.ok) {
       if (res.state) conv.cloud.state = res.state
       if (res.title) conv.title = res.title
@@ -2470,7 +2474,8 @@ export function createAiChatStore(
     event: AiCloudEventPayload
   }): void {
     const { event } = params
-    if (event.type === 'session-state') {
+    // A replayed state is the log's, not the session's.
+    if (event.type === 'session-state' && !params.replay) {
       updateCloudHistoryState(params.sessionId, event.state)
     }
     const conv = conversations[params.conversationId]

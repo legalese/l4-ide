@@ -159,7 +159,8 @@ export interface AiCloudResult {
 }
 
 /** Webview → extension: open a cloud conversation; its event log is
- *  replayed from the start through the usual notifications. */
+ *  replayed from the start through the usual notifications. Answers
+ *  once that replay has caught up, with the session's current state. */
 export const AiCloudOpen: RequestType<
   { sessionId: string },
   AiCloudResult & { title?: string }

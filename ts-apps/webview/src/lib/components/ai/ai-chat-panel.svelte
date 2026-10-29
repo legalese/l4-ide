@@ -287,7 +287,7 @@
     {:else if showChat && store.current}
       <MessageList
         turns={store.current.turns}
-        streaming={store.current.streaming}
+        streaming={store.current.streaming || !!store.current.cloud?.loading}
         pipelineActive={store.pipelineActive}
         pendingApproval={store.pendingApproval}
         pendingQuestion={store.pendingQuestion}

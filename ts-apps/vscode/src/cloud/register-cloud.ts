@@ -221,7 +221,14 @@ export function registerCloudHandlers(deps: {
     guard('open', async () => {
       viewedSession = sessionId
       const info = await manager.open(sessionId)
-      return { ok: true, state: info.state, title: info.session.title }
+      // The webview shows "Loading…" until this answers: wait for the
+      // replay, so it never shows a state the log merely passed through.
+      await manager.replayed(sessionId)
+      return {
+        ok: true,
+        state: manager.stateOf(sessionId) ?? info.state,
+        title: info.session.title,
+      }
     })
   )
 
