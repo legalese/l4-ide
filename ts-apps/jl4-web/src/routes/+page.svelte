@@ -73,9 +73,11 @@
   // `no-examples` predates the docs sidebar; existing embeds use it to hide the sidebar
   const showDocsToggle = !ownUrl.searchParams.has('no-examples')
   const docsUrl = 'https://legalese.com/l4'
+  const docsOrigin = new URL(docsUrl).origin
   let showSidebar = $state(false)
   // The docs iframe stays mounted once opened, so reopening keeps the reader's place
   let docsOpened = $state(false)
+  let docsFrame: HTMLIFrameElement | undefined = $state(undefined)
   let showVisualizer = $state(false)
   let rightPaneView: 'ladder' | 'inspector' = $state('ladder')
   let inspectorPanel: InspectorPanel | undefined = $state(undefined)
@@ -942,6 +944,46 @@
     docsOpened ||= showSidebar
   }
 
+  // The docs in the sidebar ask whether they're in the editor (l4-docs-hello).
+  // Once told, their "Run code" buttons send the example here
+  // (l4-open-program) instead of opening a new tab.
+  function handleDocsMessage(event: MessageEvent) {
+    if (event.origin !== docsOrigin) return
+    if (!docsFrame || event.source !== docsFrame.contentWindow) return
+    if (event.data?.type === 'l4-docs-hello') {
+      docsFrame.contentWindow?.postMessage(
+        { type: 'l4-editor-host' },
+        docsOrigin
+      )
+    } else if (
+      event.data?.type === 'l4-open-program' &&
+      typeof event.data.program === 'string'
+    ) {
+      openDocsExample(event.data.program)
+    }
+  }
+
+  function openDocsExample(program: string) {
+    const model = editor?.getModel()
+    if (!editor || !model) return
+    // An edit rather than setValue, so undo brings back the previous program
+    editor.pushUndoStop()
+    editor.executeEdits('docs-example', [
+      { range: model.getFullModelRange(), text: program },
+    ])
+    editor.pushUndoStop()
+    editor.setPosition({ lineNumber: 1, column: 1 })
+    editor.revealLine(1)
+    inspectorPanel?.clear()
+    // Below 1024px the sidebar covers the editor
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      showSidebar = false
+    }
+    toast.push('Opened the example. Undo brings back your program.', {
+      duration: 6000,
+    })
+  }
+
   function handleLoadFile() {
     // Create a hidden file input
     const input = document.createElement('input')
@@ -1059,6 +1101,8 @@
     URL.revokeObjectURL(url)
   }
 </script>
+
+<svelte:window onmessage={handleDocsMessage} />
 
 {#if showFrame}
   <div class="top-bar">
@@ -1217,6 +1261,7 @@
     <div class="sidebar" class:hidden-pane={!showSidebar}>
       <!-- No allow-top-navigation: the docs can't navigate the editor away -->
       <iframe
+        bind:this={docsFrame}
         class="docs-frame"
         src={docsUrl}
         title="L4 documentation"
