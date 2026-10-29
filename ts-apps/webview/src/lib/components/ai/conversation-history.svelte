@@ -6,6 +6,7 @@
     items,
     currentId,
     streamingIds,
+    waitingIds,
     onLoad,
     onDelete,
     onClose,
@@ -18,12 +19,16 @@
      *  chats are burning tokens in the background — a defence against
      *  silent ghost-sessions. */
     streamingIds: string[]
+    /** Local conversations waiting for the user (an approval or a
+     *  question): an amber dot. */
+    waitingIds: string[]
     onLoad: (id: string) => void
     onDelete: (id: string) => void
     onClose: () => void
   } = $props()
 
   const streamingSet = $derived(new Set(streamingIds))
+  const waitingSet = $derived(new Set(waitingIds))
 
   function relativeTime(d: number): string {
     const now = Date.now()
@@ -82,16 +87,29 @@
             >
               <span class="row-text">
                 <span class="row-title">
-                  {#if streamingSet.has(item.id)}
-                    <span
-                      class="streaming-dot"
-                      aria-label="Streaming"
-                      title="A turn is still running in this conversation"
-                    ></span>
-                  {/if}
-                  {#if item.kind === 'cloud'}
-                    <CloudStatusIcon state={item.state} size={13} />
-                  {/if}
+                  <!-- One slot for every row, so titles line up: a cloud
+                       session's state as its cloud; a local chat's dot
+                       (white, fading in and out, while a turn runs; amber
+                       while it waits for the user), or nothing. -->
+                  <span class="row-lead">
+                    {#if item.kind === 'cloud'}
+                      <CloudStatusIcon state={item.state} size={13} />
+                    {:else if waitingSet.has(item.id)}
+                      <span
+                        class="dot waiting"
+                        role="img"
+                        aria-label="Waiting for you"
+                        title="Waiting for you: an approval or a question"
+                      ></span>
+                    {:else if streamingSet.has(item.id)}
+                      <span
+                        class="dot streaming"
+                        role="img"
+                        aria-label="Running"
+                        title="A turn is still running in this conversation"
+                      ></span>
+                    {/if}
+                  </span>
                   <span class="row-title-text">{item.title || 'Untitled'}</span>
                 </span>
                 {#if item.kind === 'local' && item.deploymentId}
@@ -239,13 +257,29 @@
      active-tab underline, so a streaming chat in the history list
      reads as "live" without needing a label. Kept small and
      non-interactive; users still click the row to open it. */
-  .streaming-dot {
+  .row-lead {
     flex-shrink: 0;
+    width: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #c8376a;
+  }
+  .dot.streaming {
+    background: var(--vscode-foreground);
     animation: streaming-pulse 1.2s ease-in-out infinite;
+  }
+  .dot.waiting {
+    background: var(--vscode-editorWarning-foreground, #cca700);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dot.streaming {
+      animation: none;
+    }
   }
   @keyframes streaming-pulse {
     0%,

@@ -8,6 +8,7 @@
   // session menu (Stop) and notices (merge conflicts, command errors).
   let {
     cloud,
+    title,
     git,
     gitReady,
     onResume,
@@ -15,6 +16,8 @@
     onGit,
   }: {
     cloud: CloudConversationInfo
+    /** The session's name; "Cloud session" until it has one. */
+    title: string | null
     /** Clone / Sync state of the session's files (§9.3). */
     git: AiCloudGitStatus | null
     /** The first turn is committed: there is something to clone. */
@@ -107,7 +110,9 @@
       loading={cloud.loading}
       detail={progressText}
     />
-    <span class="label">Cloud session</span>
+    <span class="label" title={title || undefined}
+      >{title || 'Cloud session'}</span
+    >
     <span class="spacer"></span>
     {#if !cloud.loading && cloud.sessionId}
       <!-- Nothing until the session's state is known (while loading). -->
@@ -231,6 +236,11 @@
     gap: 6px;
   }
   .label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--vscode-foreground);
   }
   .spacer {

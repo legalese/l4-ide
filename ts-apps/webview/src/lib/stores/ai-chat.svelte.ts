@@ -1720,8 +1720,12 @@ export function createAiChatStore(
    *  it can surface Accept/Reject buttons in place of the spinner. */
   function getPendingApproval(): RenderedToolCall | null {
     const conv = getConversation()
+    return conv ? pendingApprovalIn(conv) : null
+  }
+
+  function pendingApprovalIn(conv: ConversationState): RenderedToolCall | null {
     // Cloud sessions never ask for tool approval.
-    if (!conv || conv.cloud) return null
+    if (conv.cloud) return null
     for (const turn of conv.turns) {
       if (turn.role !== 'assistant' || !turn.blocks) continue
       for (const block of turn.blocks) {
@@ -2698,6 +2702,19 @@ export function createAiChatStore(
       }
       return ids
     },
+    /** Local conversations waiting for the user: a tool approval or a
+     *  `meta__ask_user` question. (A cloud session shows it through its
+     *  state.) */
+    get waitingConversationIds() {
+      const ids: string[] = []
+      for (const [key, conv] of Object.entries(conversations)) {
+        if (!conv?.id || conv.cloud) continue
+        const asking =
+          !!pendingQuestionsByConv[key] || !!pendingQuestionsByConv[conv.id]
+        if (asking || pendingApprovalIn(conv)) ids.push(conv.id)
+      }
+      return ids
+    },
     get stagedAttachments() {
       return stagedAttachments
     },
@@ -2824,6 +2841,7 @@ export type AiChatStore = {
   readonly pendingQuestion: PendingQuestion | null
   readonly pipelineActive: boolean
   readonly streamingConversationIds: string[]
+  readonly waitingConversationIds: string[]
   toggleIncludeActiveFile: () => void
   setIncludeActiveFile: (value: boolean) => void
   answerQuestion: (answer: string) => void

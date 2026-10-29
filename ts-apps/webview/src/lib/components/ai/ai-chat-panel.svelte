@@ -275,6 +275,7 @@
     {#if showChat && store.current?.cloud}
       <CloudBanner
         cloud={store.current.cloud}
+        title={store.current.title}
         git={store.cloudGitStatus}
         gitReady={store.cloudGitReady}
         onResume={() => void store.resumeCloud()}
@@ -319,6 +320,7 @@
         items={store.historyEntries}
         currentId={store.currentId}
         streamingIds={store.streamingConversationIds}
+        waitingIds={store.waitingConversationIds}
         onLoad={onLoadConversation}
         onDelete={onDeleteConversation}
         onClose={() => (historyOpen = false)}
