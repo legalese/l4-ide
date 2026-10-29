@@ -1053,13 +1053,25 @@ cloud folder instead of on their machine:
   progress: uploading, starting compute, ready. A cold start takes about
   25–45 s (P5). Before starting it lists the MCP servers being passed, with a
   note that their tools run without approval.
+- **Session title.** A 4–6 word title from ai-proxy's summize pipeline for
+  the first prompt, the same call local chats use, asked for while the seed
+  is packed. The session is created with it; after 4 s, on a failure or an
+  empty answer it is named after the prompt's first line. The history, the
+  banner and the clone folder (§9.2) show it.
 - **Cloud session view.** The same components as local chats. Sending,
   injecting, aborting and answering become commands. File paths in tool rows
   and the "Files changed" card are plain text: they name files in the cloud,
   not on this machine. (Opening a read-only copy fetched from the session is
   a later option.)
+- **Opening a session** from the history replays its log (§12.1). The banner
+  reads "Loading…" (no state, actions or notices) and the chat shows its
+  spinner until the replay has caught up; the open request then answers
+  with the session's current state, so states the log merely passed
+  through never show.
 - **Rollback.** An icon on the prompt of each completed turn that changed
-  files (§9.4).
+  files (§9.4). A rolled-back turn collapses to "This turn was rolled back",
+  centred under its prompt, with a chevron that shows the turn (dimmed) and
+  hides it again.
 - **Sync button** in the prompt field (§9.3).
 - **@-mentions in later prompts.** Mentioned files not yet in the session are
   uploaded before the message is sent (§10).
