@@ -134,17 +134,18 @@ describe('turns this webview did not start', () => {
     })
   })
 
-  test('session state, auth and merge notices', () => {
+  test('session state; auth and merge conflicts leave the conversation be', () => {
     const c = conv()
-    applyCloudEvent(c, { type: 'auth-required', reason: 'chain_expired' })
-    expect(c.cloud!.authRequired).toEqual({ reason: 'chain_expired' })
+    const before = JSON.stringify(c)
+    expect(
+      applyCloudEvent(c, { type: 'auth-required', reason: 'chain_expired' })
+    ).toEqual({})
+    expect(
+      applyCloudEvent(c, { type: 'local-merge-conflict', files: ['a.l4'] })
+    ).toEqual({})
+    expect(JSON.stringify(c)).toBe(before)
     applyCloudEvent(c, { type: 'session-state', state: 'running' })
     expect(c.cloud!.state).toBe('running')
-    expect(c.cloud!.authRequired).toBeNull()
-    applyCloudEvent(c, { type: 'local-merge-conflict', files: ['a.l4'] })
-    expect(c.cloud!.mergeConflict).toEqual(['a.l4'])
-    applyCloudEvent(c, { type: 'local-merged', sha: SHA })
-    expect(c.cloud!.mergeConflict).toBeNull()
   })
 })
 

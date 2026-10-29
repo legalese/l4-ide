@@ -18,9 +18,10 @@ import {
   AiCloudEvent,
   AiCloudGitAction,
   AiCloudGitStatusRequest,
+  AiCloudMcpSignIn,
+  AiCloudMcpSignInNeeded,
   AiCloudOpen,
   AiCloudProgress,
-  AiCloudResume,
   AiCloudReveal,
   AiCloudRollback,
   AiCloudRun,
@@ -59,6 +60,13 @@ export function cloudErrorMessage(err: unknown): string {
     return err.message
   }
   return `Cloud session request failed: ${err instanceof Error ? err.message : String(err)}`
+}
+
+/** The notification for a `local-merge-conflict` (§9.1). */
+export function mergeConflictMessage(files: string[]): string {
+  const shown = files.slice(0, 3).join(', ')
+  const more = files.length > 3 ? ` and ${files.length - 3} more` : ''
+  return `Your synced changes conflict with the cloud session's and were not merged (${shown}${more}). Resolve the conflict in your clone, then sync again.`
 }
 
 export function registerCloudHandlers(deps: {
@@ -130,19 +138,27 @@ export function registerCloudHandlers(deps: {
         event: payload as AiCloudEventPayload,
       })
     )
+    if (replay) return
+    if (event.type === 'local-merge-conflict') {
+      // The answer to the user's Sync, wherever they are now.
+      void vscode.window.showWarningMessage(mergeConflictMessage(event.files))
+      return
+    }
     const background = !visibility.isVisible() || viewedSession !== sessionId
-    if (replay || !background) return
-    if (event.type === 'ask-user') {
+    if (background && event.type === 'ask-user') {
       void notify(
         sessionId,
         `A cloud session has a question: ${event.question}`
       )
-    } else if (event.type === 'auth-required' && event.reason !== 'mcp') {
-      void notify(
-        sessionId,
-        'A cloud session stopped because its credentials ran out. Open it and choose Resume.'
-      )
     }
+  }
+  cloud.listener.mcpSignIn = (sessionId, servers) => {
+    post(() =>
+      messenger.sendNotification(AiCloudMcpSignInNeeded, frontend, {
+        sessionId,
+        servers,
+      })
+    )
   }
   cloud.listener.state = (sessionId, state) => {
     post(() =>
@@ -235,7 +251,15 @@ export function registerCloudHandlers(deps: {
         mcpServers: manager.mcpServerLabels(
           info.session.mcpServers.map((s) => s.name)
         ),
+        mcpSignIn: manager.mcpSignInNeeded(sessionId),
       }
+    })
+  )
+
+  messenger.onRequest(AiCloudMcpSignIn, ({ sessionId, server }) =>
+    guard('MCP sign-in', async () => {
+      await manager.signInMcp(sessionId, server)
+      return { ok: true }
     })
   )
 
@@ -302,13 +326,6 @@ export function registerCloudHandlers(deps: {
         const res = await manager.rollback(sessionId, turnId)
         return { ok: true, state: manager.stateOf(sessionId) ?? res.state }
       })
-  )
-
-  messenger.onRequest(AiCloudResume, ({ sessionId }) =>
-    guard('resume', async () => ({
-      ok: true,
-      state: await manager.resume(sessionId),
-    }))
   )
 
   messenger.onRequest(AiCloudStop, ({ sessionId }) =>

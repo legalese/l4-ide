@@ -19,6 +19,7 @@
     AiUsageUpdate,
     AiCloudConfig,
     AiCloudEvent,
+    AiCloudMcpSignInNeeded,
     AiCloudProgress,
     AiCloudReveal,
     AiCloudState,
@@ -28,6 +29,7 @@
     type AiChatAttachment,
   } from 'jl4-client-rpc'
   import { createAiChatStore } from '$lib/stores/ai-chat.svelte'
+  import { cloudToolChips } from '$lib/stores/cloud-chat'
   import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
   import MessageList from './message-list.svelte'
   import ChatInput from './chat-input.svelte'
@@ -144,6 +146,7 @@
     m.onNotification(AiCloudEvent, (p) => store.onCloudEvent(p))
     m.onNotification(AiCloudState, (p) => store.onCloudState(p))
     m.onNotification(AiCloudProgress, (p) => store.onCloudProgress(p))
+    m.onNotification(AiCloudMcpSignInNeeded, (p) => store.onCloudMcpSignIn(p))
     m.onNotification(AiCloudReveal, (p) => {
       historyOpen = false
       store.onCloudReveal(p)
@@ -278,7 +281,6 @@
         title={store.current.title}
         git={store.cloudGitStatus}
         gitReady={store.cloudGitReady}
-        onResume={() => void store.resumeCloud()}
         onStop={() => void store.stopCloud()}
         onGit={() => store.cloudGitAction()}
       />
@@ -308,7 +310,8 @@
         onOpenFile={(callId) => store.openFile(callId)}
         onOpenFileDiff={(callId) => store.openFileDiff(callId)}
         filesOpenable={!store.current.cloud}
-        tools={store.current.cloud?.mcpServers ?? []}
+        tools={cloudToolChips(store.current.cloud)}
+        onToolSignIn={(server) => void store.signInCloudMcp(server)}
         rollbackOfferAt={store.current.cloud
           ? (i) => store.rollbackOfferAt(i)
           : undefined}

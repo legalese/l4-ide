@@ -4,16 +4,15 @@
   import { CLONE_NOT_READY } from '$lib/stores/cloud-chat'
   import CloudStatusIcon from './cloud-status-icon.svelte'
 
-  // Header of a cloud conversation (§12.2): state, start progress,
-  // Resume for parked sessions / auth-required, Clone / Sync, the
-  // session menu (Stop) and notices (merge conflicts). Failed actions
-  // are VS Code notifications.
+  // Header of a cloud conversation (§12.2): the cloud (state and
+  // progress, in its tooltip), the name, Clone / Sync and the session
+  // menu (Stop). No text lines: what needs the user goes on the thing
+  // to act on, failures and conflicts are VS Code notifications.
   let {
     cloud,
     title,
     git,
     gitReady,
-    onResume,
     onStop,
     onGit,
   }: {
@@ -24,7 +23,6 @@
     git: AiCloudGitStatus | null
     /** The first turn is committed: there is something to clone. */
     gitReady: boolean
-    onResume: () => void
     onStop: () => void
     /** Clone, or pull then push. */
     onGit: () => Promise<void>
@@ -81,12 +79,6 @@
       cloud.state === 'waiting' ||
       cloud.state === 'starting'
   )
-  const needsResume = $derived(
-    !cloud.loading &&
-      !!cloud.sessionId &&
-      (cloud.state === 'parked' ||
-        (!!cloud.authRequired && cloud.authRequired.reason !== 'mcp'))
-  )
   // A new session is "starting" until it runs (its title comes with the
   // start); then its name.
   const heading = $derived(
@@ -97,9 +89,7 @@
       : title || 'Cloud session'
   )
 
-  // Files on their way. A start (uploading, then the compute starting)
-  // shows as the heading and the cloud's sweep, with this as its
-  // tooltip; only files added to a running session get a line.
+  // Files on their way: the cloud's tooltip.
   const progressText = $derived(
     cloud.progress === 'adding-files'
       ? `Adding ${cloud.addingFiles} ${cloud.addingFiles === 1 ? 'file' : 'files'} to the session…`
@@ -127,9 +117,6 @@
     <span class="spacer"></span>
     {#if !cloud.loading && cloud.sessionId}
       <!-- Nothing until the session's state is known (while loading). -->
-      {#if needsResume}
-        <button class="btn primary" onclick={onResume}>Resume</button>
-      {/if}
       <button
         type="button"
         class="btn git-btn"
@@ -198,36 +185,10 @@
       </div>
     {/if}
   </div>
-  {#if cloud.progress === 'adding-files'}
-    <div class="detail">{progressText}</div>
-  {/if}
-  {#if cloud.loading}
-    <!-- Replayed notices may be stale until the replay catches up. -->
-  {:else if cloud.authRequired?.reason === 'mcp'}
-    <div class="detail warn">
-      MCP server {cloud.authRequired.server ?? ''} needs a sign-in in this window
-      before the cloud session can use it.
-    </div>
-  {:else if needsResume}
-    <div class="detail warn">
-      The session paused because its credentials ran out. Resume starts it
-      again.
-    </div>
-  {/if}
-  {#if cloud.mergeConflict}
-    <div class="detail warn">
-      Your synced changes conflict with the session's and were not merged:
-      {cloud.mergeConflict.join(', ')}. Resolve them in your clone and sync
-      again.
-    </div>
-  {/if}
 </div>
 
 <style>
   .cloud-banner {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
     padding: 5px 10px;
     font-size: 11px;
     color: var(--vscode-descriptionForeground);
@@ -259,11 +220,6 @@
     font-size: 11px;
     border-radius: 3px;
     cursor: pointer;
-  }
-  .btn.primary {
-    background: #c8376a;
-    border-color: transparent;
-    color: #fff;
   }
   .git-btn {
     display: inline-flex;
@@ -349,8 +305,5 @@
   .menu button:disabled {
     opacity: 0.5;
     cursor: default;
-  }
-  .detail.warn {
-    color: var(--vscode-editorWarning-foreground, #cca700);
   }
 </style>

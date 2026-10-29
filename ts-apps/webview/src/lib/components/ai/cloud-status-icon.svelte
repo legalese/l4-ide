@@ -4,8 +4,9 @@
   // A cloud session's state as its cloud outline (§12): a band sweeps
   // along it while the view loads it (quickly), while its compute starts
   // (slowly) and, in crimson, while the agent works; it is white when
-  // running, amber when the session needs the user, gray asleep. The
-  // state's wording is the tooltip and the accessible name.
+  // running, amber when the agent asked a question, gray asleep (or
+  // parked). The state's wording, or the progress, is the tooltip and
+  // the accessible name.
   let {
     state,
     loading = false,
@@ -15,7 +16,7 @@
     state: AiCloudSessionState | 'gone'
     /** An opened session whose state isn't known yet. */
     loading?: boolean
-    /** The tooltip while starting (upload or start progress). */
+    /** Progress (files uploading or being added): the tooltip. */
     detail?: string | null
     size?: number
   } = $props()
@@ -40,7 +41,7 @@
         return {
           tone: 'bright',
           sweep: '2.6s',
-          label: detail ?? 'Starting cloud compute: this can take a minute',
+          label: 'Starting cloud compute: this can take a minute',
         }
       case 'busy':
         return {
@@ -60,12 +61,6 @@
           sweep: null,
           label: 'Waiting: the agent asked you a question',
         }
-      case 'parked':
-        return {
-          tone: 'warn',
-          sweep: null,
-          label: 'Paused: its credentials ran out. Resume starts it again',
-        }
       case 'gone':
         return {
           tone: 'gone',
@@ -73,6 +68,8 @@
           label: 'This session no longer exists',
         }
       default:
+        // Sleeping, or parked (its key chain ended): either way the next
+        // message starts it.
         return {
           tone: 'dim',
           sweep: null,
@@ -80,15 +77,11 @@
         }
     }
   })
+  const label = $derived(!loading && detail ? detail : look.label)
   const sweeping = $derived(look.sweep !== null && !reducedMotion)
 </script>
 
-<span
-  class="cloud-status"
-  role="img"
-  aria-label={look.label}
-  title={look.label}
->
+<span class="cloud-status" role="img" aria-label={label} title={label}>
   <svg
     class="cloud-icon tone-{look.tone}"
     style:width="{size}px"

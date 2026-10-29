@@ -1,6 +1,7 @@
 <script lang="ts">
   // import CopyButton from './copy-button.svelte'
   import type { UserTurnChip } from '$lib/stores/ai-chat.svelte'
+  import type { CloudToolChip } from '$lib/stores/cloud-chat'
 
   let {
     content,
@@ -9,6 +10,7 @@
     userIndex = -1,
     pending = false,
     tools = [],
+    onToolSignIn,
     rollback = null,
   }: {
     content: string
@@ -24,13 +26,31 @@
      *  is read by message-list's offset collector). */
     pending?: boolean
     /** Cloud conversations: MCP servers passed to the session (on its
-     *  first prompt), as chips after the files. */
-    tools?: string[]
+     *  first prompt), as chips after the files. One that needs a
+     *  sign-in here is amber, and a click on it signs in (§6.4). */
+    tools?: CloudToolChip[]
+    onToolSignIn?: (server: string) => void
     /** Cloud conversations (§9.4): roll the files back to before this
      *  prompt. A subtle icon in the bubble's top right corner. */
     rollback?: { title: string; onClick: () => void } | null
   } = $props()
 </script>
+
+{#snippet toolIcon()}
+  <svg
+    class="chip-icon"
+    viewBox="0 0 16 16"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.4"
+    stroke-linejoin="round"
+  >
+    <path
+      d="M10.6 2.2a3.2 3.2 0 0 0-3.1 4.2L2.6 11.3a1.5 1.5 0 0 0 2.1 2.1l4.9-4.9a3.2 3.2 0 0 0 4.2-3.1l-2 2-1.9-.5-.5-1.9z"
+    />
+  </svg>
+{/snippet}
 
 <div
   class="user-row user-message-wrapper"
@@ -109,27 +129,32 @@
             {/if}
           </span>
         {/each}
-        {#each tools as tool (tool)}
-          <span
-            class="user-chip tool"
-            role="listitem"
-            title={`MCP server passed to the cloud session: ${tool}. Its tools run there without approval.`}
-          >
-            <svg
-              class="chip-icon"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linejoin="round"
+        {#each tools as tool (tool.name)}
+          {#if tool.needsSignIn}
+            <span class="chip-slot" role="listitem">
+              <button
+                type="button"
+                class="user-chip tool sign-in"
+                disabled={tool.signingIn}
+                title={tool.signingIn
+                  ? `Signing in to ${tool.name}…`
+                  : `Sign in to ${tool.name}: the cloud session can't use its tools until you do`}
+                onclick={() => onToolSignIn?.(tool.name)}
+              >
+                {@render toolIcon()}
+                <span class="chip-name">{tool.name}</span>
+              </button>
+            </span>
+          {:else}
+            <span
+              class="user-chip tool"
+              role="listitem"
+              title={`MCP server passed to the cloud session: ${tool.name}. Its tools run there without approval.`}
             >
-              <path
-                d="M10.6 2.2a3.2 3.2 0 0 0-3.1 4.2L2.6 11.3a1.5 1.5 0 0 0 2.1 2.1l4.9-4.9a3.2 3.2 0 0 0 4.2-3.1l-2 2-1.9-.5-.5-1.9z"
-              />
-            </svg>
-            <span class="chip-name">{tool}</span>
-          </span>
+              {@render toolIcon()}
+              <span class="chip-name">{tool.name}</span>
+            </span>
+          {/if}
         {/each}
       </div>
     {/if}
@@ -217,6 +242,23 @@
   .user-chip.tool {
     background: transparent;
     padding-left: 2px;
+  }
+  .chip-slot {
+    display: contents;
+  }
+  /* One that needs a sign-in here (§6.4): amber, and a button. */
+  .user-chip.tool.sign-in {
+    border: none;
+    font-family: inherit;
+    color: var(--vscode-editorWarning-foreground, #cca700);
+    cursor: pointer;
+  }
+  .user-chip.tool.sign-in:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+  .user-chip.tool.sign-in:disabled {
+    cursor: default;
+    opacity: 0.7;
   }
   .chip-icon {
     width: 12px;

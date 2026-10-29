@@ -34,8 +34,8 @@ import {
   AiCloudDelete,
   AiCloudGitAction,
   AiCloudGitStatusRequest,
+  AiCloudMcpSignIn,
   AiCloudOpen,
-  AiCloudResume,
   AiCloudRollback,
   AiCloudRun,
   AiCloudSessionList,
@@ -2445,6 +2445,7 @@ export function createAiChatStore(
       state?: AiCloudSessionState
       title?: string
       mcpServers?: string[]
+      mcpSignIn?: string[]
     }
     try {
       res = await m.sendRequest(AiCloudOpen, HOST_EXTENSION, { sessionId })
@@ -2458,6 +2459,7 @@ export function createAiChatStore(
       if (res.state) conv.cloud.state = res.state
       if (res.title) conv.title = res.title
       if (res.mcpServers) conv.cloud.mcpServers = res.mcpServers
+      if (res.mcpSignIn) conv.cloud.mcpSignIn = res.mcpSignIn
     } else {
       notifyCloudError(res.error || 'Could not open the cloud session.')
     }
@@ -2582,27 +2584,56 @@ export function createAiChatStore(
     }
   }
 
-  /** Resume (parked sessions, `auth-required`) or Stop. */
-  async function cloudLifecycle(action: 'resume' | 'stop'): Promise<void> {
+  async function stopCloud(): Promise<void> {
     const m = getMessenger()
     const conv = getConversation()
     const sessionId = conv?.cloud?.sessionId
     if (!m || !conv?.cloud || !sessionId) return
     try {
-      const res = await m.sendRequest(
-        action === 'resume' ? AiCloudResume : AiCloudStop,
-        HOST_EXTENSION,
-        { sessionId }
-      )
+      const res = await m.sendRequest(AiCloudStop, HOST_EXTENSION, {
+        sessionId,
+      })
       if (res.ok) {
-        if (action === 'resume') conv.cloud.authRequired = null
         if (res.state) conv.cloud.state = res.state
       } else {
-        notifyCloudError(res.error || `Could not ${action} the session.`)
+        notifyCloudError(res.error || 'Could not stop the session.')
       }
     } catch (err) {
-      notifyCloudError(err instanceof Error ? err.message : `${action} failed.`)
+      notifyCloudError(err instanceof Error ? err.message : 'Stop failed.')
     }
+  }
+
+  /** Sign in to an MCP server of the current cloud session (an amber
+   *  chip, §6.4); the extension then sends the session the new
+   *  credentials and reports the servers still needing one. */
+  async function signInCloudMcp(server: string): Promise<void> {
+    const m = getMessenger()
+    const cloud = getConversation()?.cloud
+    if (!m || !cloud?.sessionId || cloud.mcpSigningIn) return
+    cloud.mcpSigningIn = server
+    try {
+      const res = await m.sendRequest(AiCloudMcpSignIn, HOST_EXTENSION, {
+        sessionId: cloud.sessionId,
+        server,
+      })
+      if (!res.ok) {
+        notifyCloudError(res.error || `Signing in to ${server} failed.`)
+      }
+    } catch (err) {
+      notifyCloudError(
+        err instanceof Error ? err.message : `Signing in to ${server} failed.`
+      )
+    } finally {
+      cloud.mcpSigningIn = null
+    }
+  }
+
+  function onCloudMcpSignIn(params: {
+    sessionId: string
+    servers: string[]
+  }): void {
+    const conv = conversations[cloudConversationId(params.sessionId)]
+    if (conv?.cloud) conv.cloud.mcpSignIn = params.servers
   }
 
   async function refreshCloudGit(sessionId: string): Promise<void> {
@@ -2750,8 +2781,9 @@ export function createAiChatStore(
     refreshCloudHistory,
     rollbackOfferAt,
     rollbackCloudTurn,
-    resumeCloud: () => cloudLifecycle('resume'),
-    stopCloud: () => cloudLifecycle('stop'),
+    stopCloud,
+    signInCloudMcp,
+    onCloudMcpSignIn,
     cloudGitAction,
     onCloudConfig,
     onCloudEvent,
@@ -2867,8 +2899,9 @@ export type AiChatStore = {
   refreshCloudHistory: (refresh: boolean) => Promise<void>
   rollbackOfferAt: (index: number) => RollbackOffer | null
   rollbackCloudTurn: (offer: RollbackOffer) => Promise<void>
-  resumeCloud: () => Promise<void>
   stopCloud: () => Promise<void>
+  signInCloudMcp: (server: string) => Promise<void>
+  onCloudMcpSignIn: (params: { sessionId: string; servers: string[] }) => void
   cloudGitAction: () => Promise<void>
   onCloudConfig: (params: { enabled: boolean }) => void
   onCloudEvent: (params: {

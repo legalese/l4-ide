@@ -169,9 +169,32 @@ export const AiCloudOpen: RequestType<
     title?: string
     /** MCP servers passed to the session (names). */
     mcpServers?: string[]
+    /** Those of them that need a sign-in here (see
+     *  {@link AiCloudMcpSignInNeeded}). */
+    mcpSignIn?: string[]
   }
 > = {
   method: 'aiCloudOpen',
+}
+
+/** Extension → webview: the session's MCP servers (their names here)
+ *  that need a sign-in in this window before it can use them (§6.4);
+ *  `[]` once none do. */
+export const AiCloudMcpSignInNeeded: NotificationType<{
+  sessionId: string
+  servers: string[]
+}> = {
+  method: 'aiCloudMcpSignInNeeded',
+}
+
+/** Webview → extension: sign in to one of those servers (its name
+ *  here), as Start in its settings menu does, and send the session the
+ *  new credentials. */
+export const AiCloudMcpSignIn: RequestType<
+  { sessionId: string; server: string },
+  AiCloudResult
+> = {
+  method: 'aiCloudMcpSignIn',
 }
 
 /** Commands a webview may send to a cloud session (§8). Cloud
@@ -217,13 +240,6 @@ export const AiCloudRollback: RequestType<
 > = {
   method: 'aiCloudRollback',
 }
-
-/** Webview → extension: mint a new key chain and start the session
- *  (Resume, for `parked` sessions and `auth-required`). */
-export const AiCloudResume: RequestType<{ sessionId: string }, AiCloudResult> =
-  {
-    method: 'aiCloudResume',
-  }
 
 export const AiCloudStop: RequestType<{ sessionId: string }, AiCloudResult> = {
   method: 'aiCloudStop',

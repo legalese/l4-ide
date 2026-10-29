@@ -24,11 +24,6 @@ export interface CloudConversationInfo {
   progress: 'uploading' | 'starting' | 'adding-files' | null
   /** With `progress: 'adding-files'`: how many. */
   addingFiles: number
-  /** Set by `auth-required` (the key chain or an MCP token failed);
-   *  cleared when the session runs again. */
-  authRequired: { reason: string; server?: string } | null
-  /** Files of the last `local-merge-conflict`. */
-  mergeConflict: string[] | null
   /** `turns.length` when each `local-merged` arrived: local changes
    *  merged after turn N sit at indices greater than N. */
   localMergesAt: number[]
@@ -36,12 +31,35 @@ export interface CloudConversationInfo {
    *  has files to clone (§9.3). */
   committed: boolean
   /** MCP servers passed at the start (their tools run without
-   *  approval in the cloud); shown while the session starts. */
+   *  approval in the cloud); chips on the first prompt. */
   mcpServers: string[]
+  /** Those that need a sign-in in this window first (amber chips). */
+  mcpSignIn: string[]
+  /** The one whose sign-in runs. */
+  mcpSigningIn: string | null
   /** An opened session whose log is still being replayed: its state
    *  isn't known yet (replayed states are the log's, not the
    *  session's). */
   loading: boolean
+}
+
+/** An MCP server's chip on a cloud session's first prompt. */
+export interface CloudToolChip {
+  name: string
+  /** It needs a sign-in in this window: amber, and a click signs in. */
+  needsSignIn: boolean
+  signingIn: boolean
+}
+
+/** The chips for a conversation's MCP servers. */
+export function cloudToolChips(
+  info: CloudConversationInfo | undefined
+): CloudToolChip[] {
+  return (info?.mcpServers ?? []).map((name) => ({
+    name,
+    needsSignIn: info!.mcpSignIn.includes(name),
+    signingIn: info!.mcpSigningIn === name,
+  }))
 }
 
 /** The part of a rendered turn this module reads and writes. */
@@ -79,10 +97,10 @@ export function newCloudInfo(
     state,
     progress: null,
     addingFiles: 0,
-    authRequired: null,
-    mergeConflict: null,
     localMergesAt: [],
     mcpServers: [],
+    mcpSignIn: [],
+    mcpSigningIn: null,
     committed: false,
     loading: false,
   }
@@ -230,7 +248,6 @@ export function applyCloudEvent(
     case 'session-state':
       info.state = event.state
       if (event.state === 'running' || event.state === 'busy') {
-        info.authRequired = null
         info.progress = null
       }
       return {}
@@ -254,7 +271,6 @@ export function applyCloudEvent(
     }
     case 'local-merged':
       info.localMergesAt.push(conv.turns.length)
-      info.mergeConflict = null
       return {}
     case 'files-added': {
       // Shown under the prompt they were added for: the latest one.
@@ -269,13 +285,10 @@ export function applyCloudEvent(
       return {}
     }
     case 'local-merge-conflict':
-      info.mergeConflict = event.files
-      return {}
     case 'auth-required':
-      info.authRequired = {
-        reason: event.reason,
-        ...(event.server ? { server: event.server } : {}),
-      }
+      // A conflict is a VS Code notification; an ended key chain starts
+      // the session again, and MCP servers needing a sign-in arrive on
+      // their own (the extension knows whether it could answer).
       return {}
   }
 }
