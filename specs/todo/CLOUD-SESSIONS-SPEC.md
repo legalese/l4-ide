@@ -799,11 +799,22 @@ working tree is never touched by anything but the harness.
 
 ### 9.2 Endpoint and auth
 
-- URL: `https://<sessions-api>/git/<sid>.git`.
+- URL: `https://<sessions-api>/git/<sid>.git`, or
+  `https://<sessions-api>/git/<sid>/<title>.git` (the title is ignored).
+  Git clients, VS Code's clone among them, name a clone's folder after the
+  URL's last segment, so the extension puts the session title there
+  (letters, digits, `.`, `_`, `-`; at most 60 characters).
 - Clients authenticate with the WorkOS JWT, either as
   `Authorization: Bearer <jwt>` or as HTTP Basic auth with any username and
   the JWT as the password. Basic auth is how git's own credential system sends
   it.
+- Git (curl) sends credentials only in answer to a `WWW-Authenticate`
+  challenge, and Lambda function URLs rename that header in a 401
+  (`x-amzn-Remapped-WWW-Authenticate`), with or without CloudFront in front.
+  So the extension sets `http.proactiveAuth = basic` (git 2.46 and later) for
+  the host, and git sends the token with its first request (§9.3). Older git
+  can't authenticate; a CloudFront Function on `sessions.legalese.cloud` that
+  copies the header back is the fallback if that matters.
 - Terminal git can use the same endpoint later through a credential helper
   (`legalese git-credential` in `legalese-cli`).
 
@@ -824,13 +835,20 @@ built-in Git extension, which runs the user's installed `git`.
     `registerRemoteSourceProvider`.
   - A clone shows the whole repo: `data/`, `tmp/` and any metadata files at
     the root (§4.2).
-- **After cloning,** the extension sets three repository options through the
+- **Before cloning,** the extension adds `credential.<host>.helper` (empty)
+  and `http.<host>/.proactiveAuth = basic` to the config git reads from the
+  extension host's environment (`GIT_CONFIG_COUNT`), which the Git extension
+  passes to every git it runs, so they already apply to the clone itself.
+- **After cloning,** the extension sets four repository options through the
   Git API's `setConfig`:
   - `remote.origin.push = refs/heads/main:refs/heads/local`, so an ordinary
     push, or VS Code's own "Sync Changes", sends the user's commits to
     `local`;
   - `credential.<host>.helper` set to empty, so git asks VS Code every time
     instead of reusing an expired token saved in the system keychain;
+  - `http.proactiveAuth = basic`, so git sends the token with the first
+    request (§9.2), also from VS Code's terminal, which answers through the
+    same askpass;
   - `http.postBuffer = 5 MB`, so pushes go out as one request rather than a
     chunked upload (whether function URLs accept chunked uploads is checked in
     P7).
@@ -869,9 +887,10 @@ built-in Git extension, which runs the user's installed `git`.
 
 ### 9.4 Rolling back a turn
 
-- **Where.** In a cloud conversation, each completed turn that changed files
-  shows a rollback button until the user sends the next prompt. Earlier turns
-  offer "Restore to before this turn".
+- **Where.** In a cloud conversation, the prompt of each completed turn that
+  changed files has a subtle rollback icon in its top right corner: "Roll
+  back" until the user sends the next prompt, "Restore to before this
+  prompt" on earlier ones.
 - **How.** The extension sends `rollback { turnId }` as a command
   (`POST /sessions/:sid/commands`). When the agent is idle,
   the harness:
@@ -1035,10 +1054,12 @@ cloud folder instead of on their machine:
   25–45 s (P5). Before starting it lists the MCP servers being passed, with a
   note that their tools run without approval.
 - **Cloud session view.** The same components as local chats. Sending,
-  injecting, aborting and answering become commands.
-- **Rollback.** Each completed turn that changed files shows a rollback button
-  until the next prompt is sent; earlier turns offer "Restore to before this
-  turn" (§9.4).
+  injecting, aborting and answering become commands. File paths in tool rows
+  and the "Files changed" card are plain text: they name files in the cloud,
+  not on this machine. (Opening a read-only copy fetched from the session is
+  a later option.)
+- **Rollback.** An icon on the prompt of each completed turn that changed
+  files (§9.4).
 - **Sync button** in the prompt field (§9.3).
 - **@-mentions in later prompts.** Mentioned files not yet in the session are
   uploaded before the message is sent (§10).
@@ -1158,6 +1179,10 @@ Tracking rules:
 - [x] [post-mortem](cloud-sessions/cloud-sessions-ui.md) · `cloud-sessions-ui` (base `cloud-sessions-git-sync`) ([PR #512](https://github.com/legalese/l4-ide/pull/512)) — webview: history
       with cloud entries, cloud session view, `user-message` handling, Run in
       cloud, Resume, rollback and Sync buttons (§12).
+- [ ] `fs-copy-file` (base `main`) ([PR #770](https://github.com/legalese/l4-ide/pull/770)) — `fs__copy_file`
+      (`overwrite`, `deleteSource` for a move) for both hosts, from the first
+      prod session: a scratch draft took 18 `fs__edit_file` calls to bring
+      back.
 
 ### 15.2 ai-proxy
 
@@ -1274,7 +1299,8 @@ reference for §8 shapes; the Sessions API mirrors them.
   `too_many_sessions` and `no_commits_yet`. Clients
   treat an unknown code as a plain string.
 - `DELETE /sessions/:sid` always answers `204` with no body.
-- Git URL: `<apiUrl>/git/<sid>.git`.
+- Git URL: `<apiUrl>/git/<sid>.git` or `<apiUrl>/git/<sid>/<title>.git`
+  (§9.2).
 - `RunTask` overrides carry only `SESSION_ID` and `AGENT_KEY`. The task
   definition carries `AI_PROXY_URL`, `MCP_URL`, `AUTH_URL` and `LOG_LEVEL`.
 - Session ids are ULIDs (26 characters, Crockford base32).
@@ -1319,15 +1345,15 @@ changes the design.
 **Proof-of-concept results (2026-09-28).** Run in account 370008249754,
 us-west-2, in an isolated VPC; all resources deleted afterwards.
 
-| Gate | Result                   | Measured                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ---- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P1   | Passed                   | No access point or file-system ID in the environment, the ECS task and container metadata, or `/proc/self/mountinfo`; the mount shows as `127.0.0.1:/` through a local proxy. Root access point with the shared task role: "access denied by server". Mount without an access point: worked before the file-system policy (the container could list the file-system root), denied after it — the `Null` condition works. Mounting another user's access point by ID wasn't run; AWS documents that it works. |
-| P2   | Passed                   | The task role had no S3 permissions; mounting and all file operations worked.                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| P3   | Passed                   | Hard links unsupported; git works with `core.createObject=rename`. First `git add` of 500 files 9.5 s (about 19 ms per file), commit 0.9 s; commits of 5 changed files 327 ms on average; `git status` 57 ms; bundle 1.4 s (44 KB); `git gc` 5.7 s; `git fsck` clean. Bulk operations are slow; per-turn commits are fine.                                                                                                                                                                                   |
-| P4   | Passed                   | Commands written by the Lambda were seen by the task after 177–1,079 ms, including the 1 s poll interval. The newest task event was 58–988 ms old when the Lambda read it (the task writes one per second). Exclusive create across clients returned `EEXIST`. A name probed before it existed took 6.1 s to become visible, which confirms the known-names rule in §8. The Lambda refused a symlink planted by the task (`ELOOP`) and read the task's bundle.                                               |
-| P5   | Passed with a test image | 23–28 s from `RunTask` to running with a public test image: about 13 s before the pull starts, 5.6 s pull, 4–8.5 s to mount and start. The real ~300 MB image adds pull time.                                                                                                                                                                                                                                                                                                                                |
-| P6   | Not run                  | Needs WorkOS credentials and a test user.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| P7   | Partly                   | A Lambda in the VPC mounting the root access point works (all P4 checks). 2026-10-29, prod: the function URL and `sessions.legalese.cloud` answer, and unauthenticated calls get 401. Function URLs rename the git challenge `WWW-Authenticate` to `x-amzn-Remapped-WWW-Authenticate`, with or without CloudFront; git still asks for credentials on the 401. An authenticated clone, pull and push, and the body limits, are not tested yet.                                                                |
+| Gate | Result                   | Measured                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1   | Passed                   | No access point or file-system ID in the environment, the ECS task and container metadata, or `/proc/self/mountinfo`; the mount shows as `127.0.0.1:/` through a local proxy. Root access point with the shared task role: "access denied by server". Mount without an access point: worked before the file-system policy (the container could list the file-system root), denied after it — the `Null` condition works. Mounting another user's access point by ID wasn't run; AWS documents that it works.                                                                                                                  |
+| P2   | Passed                   | The task role had no S3 permissions; mounting and all file operations worked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| P3   | Passed                   | Hard links unsupported; git works with `core.createObject=rename`. First `git add` of 500 files 9.5 s (about 19 ms per file), commit 0.9 s; commits of 5 changed files 327 ms on average; `git status` 57 ms; bundle 1.4 s (44 KB); `git gc` 5.7 s; `git fsck` clean. Bulk operations are slow; per-turn commits are fine.                                                                                                                                                                                                                                                                                                    |
+| P4   | Passed                   | Commands written by the Lambda were seen by the task after 177–1,079 ms, including the 1 s poll interval. The newest task event was 58–988 ms old when the Lambda read it (the task writes one per second). Exclusive create across clients returned `EEXIST`. A name probed before it existed took 6.1 s to become visible, which confirms the known-names rule in §8. The Lambda refused a symlink planted by the task (`ELOOP`) and read the task's bundle.                                                                                                                                                                |
+| P5   | Passed with a test image | 23–28 s from `RunTask` to running with a public test image: about 13 s before the pull starts, 5.6 s pull, 4–8.5 s to mount and start. The real ~300 MB image adds pull time.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| P6   | Not run                  | Needs WorkOS credentials and a test user.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| P7   | Partly                   | A Lambda in the VPC mounting the root access point works (all P4 checks). 2026-10-29, prod: the function URL and `sessions.legalese.cloud` answer, and unauthenticated calls get 401. Function URLs rename the git challenge `WWW-Authenticate` to `x-amzn-Remapped-WWW-Authenticate`, with or without CloudFront, so the first clone failed with two 401s: curl never sent the token without a challenge. Fixed with `http.proactiveAuth = basic` (§9.2); checked with `GIT_TRACE_CURL` that the first request then carries `Authorization`. An authenticated clone, pull and push, and the body limits, are not tested yet. |
 
 Also confirmed: Fargate ARM64 accepts a read-only root, tmpfs, all
 capabilities dropped (`CapEff` 0), user 1000 and an S3 Files volume together.
@@ -1418,8 +1444,9 @@ vCPU-hour and $0.00356 per GB-hour.
 - **R11** MCP credentials reach cloud compute. They are sealed to the task and
   never stored in the clear (§6.4), but a compromised task can use them while
   it runs.
-- **R12** Git through VS Code needs `git` installed, and relies on the
-  repository options the extension sets after cloning (§9.3).
+- **R12** Git through VS Code needs `git` 2.46 or later installed (for
+  `http.proactiveAuth`, §9.2), and relies on the repository options the
+  extension sets after cloning (§9.3).
 - **R13** Raising the minimum to VS Code 1.106 drops users on older versions.
   The extension is published only to the VS Code Marketplace, but anyone who
   installs the release VSIX into a fork (Cursor, Windsurf, VSCodium) needs a
