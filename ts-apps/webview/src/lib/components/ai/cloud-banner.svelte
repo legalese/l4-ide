@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { AiCloudGitStatus } from 'jl4-client-rpc'
   import type { CloudConversationInfo } from '$lib/stores/ai-chat.svelte'
+  import CloudStatusIcon from './cloud-status-icon.svelte'
 
   // Header of a cloud conversation (§12.2): state, start progress,
   // Resume for parked sessions / auth-required, Clone / Sync, the
@@ -81,12 +82,6 @@
       (cloud.state === 'parked' ||
         (!!cloud.authRequired && cloud.authRequired.reason !== 'mcp'))
   )
-  // The cloud's outline shimmers while an opened session loads.
-  const shimmerId = `cloud-shimmer-${Math.random().toString(36).slice(2)}`
-  const reducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
   const progressText = $derived(
     cloud.progress === 'adding-files'
       ? `Adding ${cloud.addingFiles} ${cloud.addingFiles === 1 ? 'file' : 'files'} to the session…`
@@ -107,46 +102,12 @@
 
 <div class="cloud-banner" role="status" aria-busy={cloud.loading}>
   <div class="line">
-    <svg
-      class="cloud-icon"
-      class:loading={cloud.loading}
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-    >
-      {#if cloud.loading}
-        <!-- A bright band sweeps along a dimmed outline. -->
-        <defs>
-          <linearGradient id={shimmerId} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="currentColor" stop-opacity="0.3" />
-            <stop offset="0.5" stop-color="currentColor" stop-opacity="1" />
-            <stop offset="1" stop-color="currentColor" stop-opacity="0.3" />
-            {#if !reducedMotion}
-              <animateTransform
-                attributeName="gradientTransform"
-                type="translate"
-                from="-1 0"
-                to="1 0"
-                dur="1.4s"
-                repeatCount="indefinite"
-              />
-            {/if}
-          </linearGradient>
-        </defs>
-      {/if}
-      <path
-        d="M4.6 12.5a2.6 2.6 0 0 1-.3-5.2 3.4 3.4 0 0 1 6.6-1 2.7 2.7 0 0 1 .6 6.2z"
-        stroke={cloud.loading ? `url(#${shimmerId})` : 'currentColor'}
-        stroke-width="1.2"
-        fill="none"
-        stroke-linejoin="round"
-      />
-    </svg>
+    <CloudStatusIcon
+      state={cloud.state}
+      loading={cloud.loading}
+      detail={progressText}
+    />
     <span class="label">Cloud session</span>
-    {#if cloud.loading}
-      <span class="visually-hidden">Loading</span>
-    {:else if cloud.sessionId}
-      <span class="state state-{cloud.state}">{cloud.state}</span>
-    {/if}
     <span class="spacer"></span>
     {#if !cloud.loading && cloud.sessionId}
       <!-- Nothing until the session's state is known (while loading). -->
@@ -269,39 +230,8 @@
     align-items: center;
     gap: 6px;
   }
-  .cloud-icon {
-    width: 14px;
-    height: 14px;
-  }
-  .cloud-icon.loading {
-    color: var(--vscode-foreground);
-  }
   .label {
     color: var(--vscode-foreground);
-  }
-  .state {
-    font-size: 9px;
-    padding: 1px 4px;
-    border-radius: 3px;
-    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.4));
-  }
-  .state-busy,
-  .state-starting {
-    color: #c8376a;
-    border-color: #c8376a;
-  }
-  .state-parked,
-  .state-waiting {
-    color: var(--vscode-editorWarning-foreground, #cca700);
-    border-color: var(--vscode-editorWarning-foreground, #cca700);
-  }
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
   }
   .spacer {
     flex: 1;
