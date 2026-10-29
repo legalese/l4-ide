@@ -230,7 +230,11 @@ export function registerCloudHandlers(deps: {
         ok: true,
         state: manager.stateOf(sessionId) ?? info.state,
         title: info.session.title,
-        mcpServers: info.session.mcpServers.map((s) => s.name),
+        // By their names here ("Elefant Pro"), not the protocol-safe
+        // ones the session stores ("Elefant_Pro").
+        mcpServers: manager.mcpServerLabels(
+          info.session.mcpServers.map((s) => s.name)
+        ),
       }
     })
   )
