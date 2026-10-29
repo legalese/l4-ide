@@ -98,8 +98,6 @@
     flex-direction: column;
     gap: 3px;
     padding: 5px 10px;
-    border-bottom: 1px solid
-      var(--vscode-widget-border, rgba(128, 128, 128, 0.3));
     font-size: 11px;
     color: var(--vscode-descriptionForeground);
   }

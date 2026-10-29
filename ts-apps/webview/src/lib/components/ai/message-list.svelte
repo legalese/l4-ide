@@ -24,6 +24,7 @@
     onAnswerQuestion,
     onOpenFile,
     onOpenFileDiff,
+    filesOpenable = true,
     rollbackOfferAt,
     onRollback,
   }: {
@@ -52,11 +53,21 @@
     onAnswerQuestion: (answer: string) => void
     onOpenFile: (callId: string) => void
     onOpenFileDiff: (callId: string) => void
+    /** False when the conversation's files aren't on this machine
+     *  (cloud sessions): file paths render as plain text. */
+    filesOpenable?: boolean
     /** Cloud conversations (§9.4): the rollback offer for the turn at
-     *  an index, and what to do when it's clicked. */
+     *  an index, and what to do when it's clicked. It shows on the
+     *  prompt the turn answered. */
     rollbackOfferAt?: (index: number) => RollbackOffer | null
     onRollback?: (offer: RollbackOffer) => void
   } = $props()
+
+  /** Index of the assistant turn answering the user turn at `i`: the
+   *  next turn, when it is an assistant turn. */
+  function answerIndex(i: number): number {
+    return turns[i + 1]?.role === 'assistant' ? i + 1 : -1
+  }
 
   let scrollEl = $state<HTMLDivElement>()
   let stickToBottom = $state(true)
@@ -162,12 +173,23 @@
       {@const userIndex =
         turns.slice(0, i + 1).filter((t) => t.role === 'user').length - 1}
       {@const pending = !!turn.injectionId}
+      {@const answer = answerIndex(i)}
+      {@const offer = answer >= 0 ? (rollbackOfferAt?.(answer) ?? null) : null}
       <UserMessage
         content={turn.content}
         chips={turn.chips}
         shouldStick={!pending && stickyUserIndex === userIndex}
         {userIndex}
         {pending}
+        rollback={offer
+          ? {
+              title:
+                offer.label === 'Roll back'
+                  ? 'Roll back: undo the file changes made for this prompt'
+                  : 'Restore the files to how they were before this prompt (undoes later turns too)',
+              onClick: () => onRollback?.(offer),
+            }
+          : null}
       />
       {#if turn.filesAdded?.length}
         <div class="files-added" title={turn.filesAdded.join('\n')}>
@@ -175,7 +197,6 @@
         </div>
       {/if}
     {:else}
-      {@const offer = rollbackOfferAt?.(i) ?? null}
       <div class="assistant-turn" class:rolled-back={turn.rolledBack}>
         <AssistantMessage
           content={turn.content}
@@ -188,20 +209,11 @@
           {onRetry}
           {onOpenFile}
           {onOpenFileDiff}
+          {filesOpenable}
         />
         {#if turn.rolledBack}
           <div class="turn-note">
             File changes of this turn were rolled back.
-          </div>
-        {:else if offer}
-          <div class="rollback-row">
-            <button
-              class="rollback-btn"
-              title={offer.label === 'Roll back'
-                ? "Undo this turn's file changes"
-                : 'Restore the files to how they were before this turn (undoes later turns too)'}
-              onclick={() => onRollback?.(offer)}>{offer.label}</button
-            >
           </div>
         {/if}
       </div>
@@ -283,24 +295,6 @@
     font-size: 11px;
     color: var(--vscode-descriptionForeground);
     margin: -4px 0 8px;
-  }
-  .rollback-row {
-    display: flex;
-    justify-content: flex-start;
-    margin: -4px 0 10px;
-  }
-  .rollback-btn {
-    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-    background: transparent;
-    color: var(--vscode-descriptionForeground);
-    padding: 2px 10px;
-    font-size: 11px;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  .rollback-btn:hover {
-    color: var(--vscode-foreground);
-    border-color: var(--vscode-foreground);
   }
   .bottom-spinner {
     display: flex;

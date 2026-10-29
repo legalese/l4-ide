@@ -8,6 +8,7 @@
     shouldStick = false,
     userIndex = -1,
     pending = false,
+    rollback = null,
   }: {
     content: string
     chips?: UserTurnChip[]
@@ -21,6 +22,9 @@
      *  scroll-sticky header set (the data-pending attribute below
      *  is read by message-list's offset collector). */
     pending?: boolean
+    /** Cloud conversations (§9.4): roll the files back to before this
+     *  prompt. A subtle icon in the bubble's top right corner. */
+    rollback?: { title: string; onClick: () => void } | null
   } = $props()
 </script>
 
@@ -31,7 +35,29 @@
   data-user-index={userIndex}
   data-pending={pending ? 'true' : 'false'}
 >
-  <div class="user-bubble">
+  <div class="user-bubble" class:has-action={!!rollback}>
+    {#if rollback}
+      <button
+        type="button"
+        class="rollback-btn"
+        title={rollback.title}
+        aria-label={rollback.title}
+        onclick={rollback.onClick}
+      >
+        <svg
+          viewBox="0 0 16 16"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3.67 6A5 5 0 1 1 3.08 9.37" />
+          <path d="M3.4 2.9V6.2H6.7" />
+        </svg>
+      </button>
+    {/if}
     {#if chips && chips.length > 0}
       <!-- Echo the staged-context chips captured at submit time. Same
            mild gray fill / layout as the input strip so the bubble
@@ -202,4 +228,39 @@
     top: 2px;
     right: 2px;
   } */
+  .user-bubble.has-action {
+    padding-right: 28px;
+  }
+  .rollback-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.6;
+    cursor: pointer;
+  }
+  .user-bubble:hover .rollback-btn,
+  .rollback-btn:focus-visible {
+    opacity: 1;
+  }
+  .rollback-btn:hover {
+    color: var(--vscode-foreground);
+    background: var(
+      --vscode-toolbar-hoverBackground,
+      rgba(128, 128, 128, 0.15)
+    );
+  }
+  .rollback-btn svg {
+    width: 13px;
+    height: 13px;
+  }
 </style>
