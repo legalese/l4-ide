@@ -97,8 +97,9 @@
       : title || 'Cloud session'
   )
 
-  // Files on their way; the compute starting shows as the cloud's sweep
-  // (and its tooltip), not a line.
+  // Files on their way. A start (uploading, then the compute starting)
+  // shows as the heading and the cloud's sweep, with this as its
+  // tooltip; only files added to a running session get a line.
   const progressText = $derived(
     cloud.progress === 'adding-files'
       ? `Adding ${cloud.addingFiles} ${cloud.addingFiles === 1 ? 'file' : 'files'} to the session…`
@@ -197,7 +198,7 @@
       </div>
     {/if}
   </div>
-  {#if progressText}
+  {#if cloud.progress === 'adding-files'}
     <div class="detail">{progressText}</div>
   {/if}
   {#if cloud.loading}
