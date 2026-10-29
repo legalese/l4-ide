@@ -12,6 +12,7 @@ import { GetExportedFunctionsRequestType } from 'jl4-client-rpc'
 import type { AiChatStartParams } from 'jl4-client-rpc'
 import type { ChatServiceEvent, Logger } from '@repo/legalese-agent'
 import { LEGALESE_CLOUD_DOMAIN, type AuthManager } from '../auth.js'
+import { EMBEDDED_LIBRARY_SCHEME } from '../embedded-library.js'
 import type { VSCodeL4LanguageClient } from '../vscode-l4-language-client.js'
 import {
   AccessTokenManager,
@@ -116,8 +117,12 @@ async function collectPromptSources(
             GetExportedFunctionsRequestType,
             { verDocId: { uri: doc.uri.toString(), version: doc.version } }
           )
-          for (const u of res?.importedFiles ?? [])
-            uris.push(vscode.Uri.parse(u))
+          for (const u of res?.importedFiles ?? []) {
+            const uri = vscode.Uri.parse(u)
+            // Built-in libraries come with the session's language
+            // server; they aren't files to seed or to report as missing.
+            if (uri.scheme !== EMBEDDED_LIBRARY_SCHEME) uris.push(uri)
+          }
         } catch (err) {
           logger.warn(
             `cloud-sessions: could not resolve imports: ${err instanceof Error ? err.message : String(err)}`
