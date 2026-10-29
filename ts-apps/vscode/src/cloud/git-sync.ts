@@ -87,6 +87,8 @@ export interface GitRemoteSourceProvider {
 }
 
 export interface GitApi<U extends GitUri = GitUri> {
+  /** The git the Git extension runs. */
+  readonly git?: { readonly path: string }
   readonly repositories: GitRepository<U>[]
   readonly onDidOpenRepository: GitEvent<GitRepository<U>>
   clone(
@@ -111,6 +113,14 @@ export const GIT_POST_BUFFER = '5242880'
 export const GIT_PUSH_REFSPEC = 'refs/heads/main:refs/heads/local'
 
 export const CLONES_STORAGE_KEY = 'legaleseAi.cloudSessions.clones'
+
+/** After a clone, how long to wait for the Git extension to open the
+ *  repository before giving up. */
+export const OPEN_WAIT_MS = 10_000
+
+/** Tries of a repository option that hits the Git extension's own
+ *  config lock ("could not lock config file"). */
+const CONFIG_TRIES = 3
 /** Sessions known to have a first commit (a `git-committed` event was
  *  seen, live or replayed). */
 export const COMMITTED_STORAGE_KEY = 'legaleseAi.cloudSessions.committed'
@@ -228,6 +238,17 @@ export interface CloudGitSyncDeps<U extends GitUri> {
   /** The environment the Git extension runs git with: the extension
    *  host's (`process.env`, the default). */
   gitEnv?: GitConfigEnv
+  /** `git -C folder config --local --replace-all key value` with the
+   *  Git extension's git: the Git API's setConfig drops an empty value.
+   *  Without it, the Git API is used (tests). */
+  writeConfig?(
+    gitPath: string,
+    folder: string,
+    key: string,
+    value: string
+  ): Promise<void>
+  /** {@link OPEN_WAIT_MS} (tests). */
+  openWaitMs?: number
 }
 
 /** The Sessions API host (`host[:port]`), or '' when unset/invalid. */
@@ -242,15 +263,23 @@ export function apiHost(apiUrl: string): string {
 /**
  * A clone folder name from a session title: letters (accents folded),
  * digits, `.`, `_` and `-`; runs of anything else become `-`; at most
- * 60 characters. '' when nothing usable is left.
+ * 60 characters, ending at a word where it can. '' when nothing usable
+ * is left.
  */
 export function titleSlug(title: string | undefined): string {
-  return (title ?? '')
+  const slug = (title ?? '')
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .slice(0, 60)
     .replace(/^[-.]+|[-.]+$/g, '')
+  if (slug.length <= 60) return slug
+  // Too long: end at a word boundary, unless that loses most of it.
+  const cut = slug.slice(0, 61)
+  const end = cut.lastIndexOf('-')
+  return (end >= 30 ? cut.slice(0, end) : cut.slice(0, 60)).replace(
+    /[-.]+$/,
+    ''
+  )
 }
 
 /**
@@ -327,6 +356,8 @@ export function describeGitError(
 
 export class CloudGitSync<U extends GitUri> {
   private registrations: Disposable[] = []
+  /** Configurations running, by repository folder. */
+  private readonly configuring = new Map<string, Promise<void>>()
 
   constructor(private readonly deps: CloudGitSyncDeps<U>) {}
 
@@ -452,7 +483,7 @@ export class CloudGitSync<U extends GitUri> {
     } catch {
       // unset: getConfig fails with exit code 1
     }
-    if (push.trim() !== GIT_PUSH_REFSPEC) await this.configure(repo)
+    if (push.trim() !== GIT_PUSH_REFSPEC) await this.configureOnce(repo)
     const rec = this.cloneOf(sid)
     if (rec?.folder !== repo.rootUri.fsPath) {
       await this.saveClone(sid, { folder: repo.rootUri.fsPath })
@@ -481,15 +512,91 @@ export class CloudGitSync<U extends GitUri> {
   async configure(repo: GitRepository<U>): Promise<void> {
     const key = credentialHelperKey(this.deps.apiUrl())
     if (!key) throw new GitSyncError('Cloud sessions are not configured.')
-    await repo.setConfig('remote.origin.push', GIT_PUSH_REFSPEC)
+    await this.setOption(repo, 'remote.origin.push', GIT_PUSH_REFSPEC)
     // Empty helper list for this host: git asks VS Code every time
     // instead of reusing an expired token from the system keychain.
-    await repo.setConfig(key, '')
+    await this.setOption(repo, key, '')
     // Send the token with the first request, also for git run outside
     // the extension host (VS Code's terminal answers through the same
     // askpass); its only remote is the session.
-    await repo.setConfig('http.proactiveAuth', 'basic')
-    await repo.setConfig('http.postBuffer', GIT_POST_BUFFER)
+    await this.setOption(repo, 'http.proactiveAuth', 'basic')
+    await this.setOption(repo, 'http.postBuffer', GIT_POST_BUFFER)
+  }
+
+  /** A fresh clone is configured twice at once (VS Code reports it as
+   *  opened, and the clone configures it): once is enough. */
+  private configureOnce(repo: GitRepository<U>): Promise<void> {
+    const key = repo.rootUri.fsPath
+    let running = this.configuring.get(key)
+    if (!running) {
+      running = this.configure(repo).finally(() => this.configuring.delete(key))
+      this.configuring.set(key, running)
+    }
+    return running
+  }
+
+  /**
+   * One repository option. The Git API's setConfig drops an empty value
+   * (git then fails with "wrong number of arguments"), so that one is
+   * written with git itself; a config lock held by the Git extension's
+   * own writes is waited out.
+   */
+  private async setOption(
+    repo: GitRepository<U>,
+    key: string,
+    value: string
+  ): Promise<void> {
+    if (value === '' && this.deps.writeConfig) {
+      const git = await this.deps.getGitApi()
+      const gitPath = 'api' in git ? git.api.git?.path : undefined
+      if (gitPath) {
+        await this.deps.writeConfig(gitPath, repo.rootUri.fsPath, key, value)
+        return
+      }
+    }
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await repo.setConfig(key, value)
+        return
+      } catch (err) {
+        const locked = /could not lock config file/i.test(
+          String((err as { stderr?: unknown })?.stderr ?? err)
+        )
+        if (!locked || attempt >= CONFIG_TRIES) throw err
+        await new Promise((r) => setTimeout(r, 100 * attempt))
+      }
+    }
+  }
+
+  /**
+   * The repository at `folder`, once the Git extension has it. A clone
+   * into an open workspace folder is opened by the extension on its
+   * own, and openRepository answers null while that runs.
+   */
+  private async openedRepository(
+    api: GitApi<U>,
+    folder: U
+  ): Promise<GitRepository<U> | null> {
+    const find = (): GitRepository<U> | undefined =>
+      api.repositories.find((r) => r.rootUri.fsPath === folder.fsPath)
+    const now = (await api.openRepository(folder)) ?? find()
+    if (now) return now
+    return new Promise((resolve) => {
+      const sub = api.onDidOpenRepository((repo) => {
+        if (repo.rootUri.fsPath === folder.fsPath) finish(repo)
+      })
+      const timer = setTimeout(() => {
+        void api
+          .openRepository(folder)
+          .catch(() => null)
+          .then((repo) => finish(repo ?? find() ?? null))
+      }, this.deps.openWaitMs ?? OPEN_WAIT_MS)
+      function finish(repo: GitRepository<U> | null): void {
+        clearTimeout(timer)
+        sub.dispose()
+        resolve(repo)
+      }
+    })
   }
 
   private async api(): Promise<GitApi<U>> {
@@ -567,11 +674,11 @@ export class CloudGitSync<U extends GitUri> {
     }
     if (!folder)
       throw new GitSyncError('Cloning the cloud session was cancelled.')
-    const repo = await api.openRepository(folder)
+    const repo = await this.openedRepository(api, folder)
     if (!repo) {
       throw new GitSyncError('VS Code could not open the cloned repository.')
     }
-    await this.configure(repo)
+    await this.configureOnce(repo)
     await this.saveClone(sid, { folder: folder.fsPath })
     this.deps.logger.info(`cloud-sessions: cloned ${sid} to ${folder.fsPath}`)
     return folder

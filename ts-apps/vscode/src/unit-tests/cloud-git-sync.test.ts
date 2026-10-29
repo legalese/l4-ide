@@ -38,6 +38,10 @@ const fileUri = (p: string) => uri(`file://${p}`)
 
 class FakeRepo implements GitRepository {
   config = new Map<string, string>()
+  /** Every setConfig, in order. */
+  sets: string[] = []
+  /** A key whose first setConfig fails on the config lock. */
+  lockOnce: string | undefined
   log: string[] = []
   pushError: Error | undefined
   head: { ahead: number; behind: number } = { ahead: 0, behind: 0 }
@@ -58,6 +62,13 @@ class FakeRepo implements GitRepository {
     return v
   }
   async setConfig(key: string, value: string) {
+    this.sets.push(key)
+    if (key === this.lockOnce) {
+      this.lockOnce = undefined
+      throw Object.assign(new Error('Failed to execute git'), {
+        stderr: 'error: could not lock config file .git/config: File exists',
+      })
+    }
     this.config.set(key, value)
     return ''
   }
@@ -72,7 +83,14 @@ class FakeRepo implements GitRepository {
 }
 
 class FakeGit implements GitApi {
+  git = { path: '/usr/bin/git' }
   repositories: FakeRepo[] = []
+  /** As VS Code for a clone into an open workspace folder: the
+   *  repository is opened later, on its own (`late`). */
+  openLate = false
+  late: FakeRepo | undefined
+  /** `lockOnce` for the next clone's repository. */
+  nextLock: string | undefined
   credentials: GitCredentialsProvider | undefined
   sources: GitRemoteSourceProvider | undefined
   openListeners: Array<(r: GitRepository) => unknown> = []
@@ -102,7 +120,10 @@ class FakeGit implements GitApi {
       .replace(/^.*\//, '')
       .replace(/\.git$/, '')
     const folder = fileUri(`${o?.parentPath?.fsPath}/${name}`)
-    this.repositories.push(new FakeRepo(folder, u.toString()))
+    const repo = new FakeRepo(folder, u.toString())
+    repo.lockOnce = this.nextLock
+    if (this.openLate) this.late = repo
+    else this.repositories.push(repo)
     return folder
   }
   async openRepository(root: GitUri) {
@@ -122,7 +143,8 @@ class FakeGit implements GitApi {
 
 function setup(
   result?: GitApiResult<GitUri>,
-  listSessions?: CloudGitSyncDeps<GitUri>['listSessions']
+  listSessions?: CloudGitSyncDeps<GitUri>['listSessions'],
+  extra: Partial<CloudGitSyncDeps<GitUri>> = {}
 ) {
   const git = new FakeGit()
   const store = new Map<string, unknown>()
@@ -151,6 +173,7 @@ function setup(
     fileUri,
     logger: { info() {}, warn() {} },
     gitEnv: git.env,
+    ...extra,
   })
   return { git, sync, store }
 }
@@ -235,6 +258,87 @@ describe('CloudGitSync', () => {
     const folder = await sync.clone(SID, fileUri('/w'))
     assert.equal(folder.fsPath, `/w/${SID}`)
     assert.equal(git.cloned[0]!.url, `https://sessions.example/git/${SID}.git`)
+  })
+
+  test('waits for the Git extension to open a fresh clone itself', async () => {
+    const { git, sync } = setup()
+    git.openLate = true
+    await sync.markCommitted(SID)
+    const cloning = sync.clone(SID, fileUri('/w'))
+    await new Promise((r) => setImmediate(r))
+    // openRepository answered null; the Git extension opens it now.
+    const repo = git.late!
+    git.repositories.push(repo)
+    for (const l of git.openListeners) l(repo)
+    assert.equal((await cloning).fsPath, '/w/Lease-review')
+    assert.equal(repo.config.get('http.proactiveAuth'), 'basic')
+  })
+
+  test('gives up when the clone never opens', async () => {
+    const { git, sync } = setup(undefined, undefined, { openWaitMs: 5 })
+    git.openLate = true
+    await sync.markCommitted(SID)
+    await assert.rejects(
+      sync.clone(SID, fileUri('/w')),
+      /could not open the cloned repository/
+    )
+  })
+
+  test('configures a fresh clone once, also when VS Code opens it meanwhile', async () => {
+    const { git, sync } = setup()
+    await sync.register()
+    git.openLate = true
+    await sync.markCommitted(SID)
+    const cloning = sync.clone(SID, fileUri('/w'))
+    await new Promise((r) => setImmediate(r))
+    const repo = git.late!
+    git.repositories.push(repo)
+    // Both our adopt() and the clone configure it.
+    for (const l of git.openListeners) l(repo)
+    await cloning
+    await new Promise((r) => setImmediate(r))
+    assert.deepEqual(repo.sets, [
+      'remote.origin.push',
+      'credential.https://sessions.example.helper',
+      'http.proactiveAuth',
+      'http.postBuffer',
+    ])
+  })
+
+  test('writes the empty credential helper with git itself', async () => {
+    const written: string[][] = []
+    const { git, sync } = setup(undefined, undefined, {
+      writeConfig: async (gitPath, folder, key, value) => {
+        written.push([gitPath, folder, key, value])
+      },
+    })
+    await sync.markCommitted(SID)
+    await sync.clone(SID, fileUri('/w'))
+    // The Git API's setConfig would drop the empty value.
+    assert.deepEqual(written, [
+      [
+        '/usr/bin/git',
+        '/w/Lease-review',
+        'credential.https://sessions.example.helper',
+        '',
+      ],
+    ])
+    assert.ok(
+      !git.repositories[0]!.sets.includes(
+        'credential.https://sessions.example.helper'
+      )
+    )
+  })
+
+  test('waits out the config lock of the Git extension', async () => {
+    const { git, sync } = setup()
+    // Locked once while VS Code writes its own branch config.
+    git.nextLock = 'http.postBuffer'
+    await sync.markCommitted(SID)
+    await sync.clone(SID, fileUri('/w'))
+    const repo = git.repositories[0]!
+    assert.equal(repo.config.get('http.postBuffer'), '5242880')
+    assert.equal(repo.sets.filter((k) => k === 'http.postBuffer').length, 2)
   })
 
   test('sync pulls then pushes, and reports a pending push', async () => {
@@ -435,6 +539,13 @@ describe('git helpers', () => {
     assert.equal(titleSlug('漢字'), '')
     assert.equal(titleSlug(undefined), '')
     assert.equal(titleSlug('x'.repeat(80)).length, 60)
+    // Long titles end at a word.
+    assert.equal(
+      titleSlug(
+        'Update this L4 file to work the same but read a lot more like the act'
+      ),
+      'Update-this-L4-file-to-work-the-same-but-read-a-lot-more'
+    )
     assert.equal(
       sessionGitUrl(API, SID, 'Lease review'),
       `https://sessions.example/git/${SID}/Lease-review.git`
