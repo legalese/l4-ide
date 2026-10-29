@@ -156,6 +156,7 @@ function setup(
     mint?: (sid: string) => Promise<{ token: string }>
     summarizeTitle?: (text: string) => Promise<string | null>
     titleTimeoutMs?: number
+    onMcpSignIn?: (servers: string[]) => void
   } = {}
 ) {
   const api = new FakeApi()
@@ -183,6 +184,9 @@ function setup(
     listener: {
       chat: (e) => chat.push(e),
       cloudEvent: (e) => cloud.push(e),
+      ...(opts.onMcpSignIn
+        ? { mcpSignIn: (_sid, servers) => opts.onMcpSignIn!(servers) }
+        : {}),
       progress: (e) => {
         progress.push(e.phase)
         if (e.mcpServers) mcpListed.push(...e.mcpServers)
@@ -408,7 +412,7 @@ describe('CloudSessionManager events', () => {
     )
   })
 
-  test('a command to a sleeping session starts it', async () => {
+  test('a command to a sleeping or parked session starts it', async () => {
     const { api, manager } = setup()
     api.commandState = 'sleeping'
     await manager.sendMessage(SID, 'turn-2', 'next')
@@ -418,8 +422,8 @@ describe('CloudSessionManager events', () => {
     await manager.answer(SID, 'call-1', 'yes')
     assert.deepEqual(
       api.log,
-      ['command:answer'],
-      'parked needs an explicit resume'
+      ['command:answer', `start:${KEY}`],
+      'a parked one with a new key chain, no Resume'
     )
   })
 })
@@ -567,6 +571,58 @@ describe('CloudSessionManager: a message sent while the task shuts down', () => 
   })
 })
 
+describe('CloudSessionManager: a session whose key chain ends', () => {
+  const starts = (api: FakeApi) =>
+    api.log.filter((l) => l.startsWith('start:')).length
+
+  /** An open session in `state`; its chain then ends (`auth-required`)
+   *  and it parks. */
+  async function parks(s: ReturnType<typeof setup>, state: SessionState) {
+    s.api.state = state
+    await s.manager.open(SID)
+    await s.clock.advance(0)
+    s.api.pending = [ev({ type: 'auth-required', reason: 'chain_expired' })]
+    await s.clock.advance(1000)
+    s.api.state = 'parked'
+    await s.clock.advance(5000)
+  }
+
+  test('mid-turn: started again with a new chain, so the turn goes on', async () => {
+    const s = setup()
+    await parks(s, 'busy')
+    assert.equal(starts(s.api), 1)
+    assert.ok(s.logger.lines.some((l) => /parked mid-turn/.test(l)))
+    // It runs again, then parks mid-turn once more right away (a chain
+    // refused after each start): not started again within the gap.
+    s.api.state = 'busy'
+    await s.clock.advance(2000)
+    s.api.pending = [ev({ type: 'auth-required', reason: 'forbidden' })]
+    await s.clock.advance(1000)
+    s.api.state = 'parked'
+    await s.clock.advance(5 * 60_000)
+    assert.equal(starts(s.api), 1)
+  })
+
+  test('while idle: it waits for the next message, which starts it', async () => {
+    const s = setup()
+    await parks(s, 'running')
+    await s.clock.advance(60_000)
+    assert.equal(starts(s.api), 0)
+    s.api.commandState = 'parked'
+    await s.manager.sendMessage(SID, 'turn-2', 'next')
+    assert.equal(starts(s.api), 1)
+  })
+
+  test('a park already in the log when the session is opened starts nothing', async () => {
+    const s = setup()
+    s.api.state = 'parked'
+    s.api.pending = [ev({ type: 'auth-required', reason: 'chain_expired' })]
+    await s.manager.open(SID)
+    await s.clock.advance(60_000)
+    assert.equal(starts(s.api), 0)
+  })
+})
+
 describe('CloudSessionManager MCP credentials (§6.4)', () => {
   test('seals credentials to the running harness key, once per key', async () => {
     const keyPair = generateSealingKeyPair()
@@ -579,8 +635,11 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
         },
         { id: 'local', url: '', transport: 'stdio' },
       ],
-      headersFor: async () => ({ Authorization: 'Bearer secret-token' }),
+      headersFor: async () => ({
+        Authorization: tokens++ === 0 ? 'Bearer secret-token' : 'Bearer next',
+      }),
     }
+    let tokens = 0
     const { api, clock, manager } = setup({ mcp })
     api.mcpNames = ['Docs_Server']
     api.state = 'running'
@@ -611,7 +670,8 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
       ],
     })
 
-    // Same key: nothing more. An MCP auth-required asks again.
+    // Same key: nothing more. An MCP auth-required asks again (with a
+    // refreshed token).
     await clock.advance(5000)
     assert.equal(
       api.commands.filter((c) => c.type === 'mcp-credentials').length,
@@ -625,6 +685,73 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
       api.commands.filter((c) => c.type === 'mcp-credentials').length,
       2
     )
+  })
+
+  /** A running session with the MCP server `Docs Server`; returns what
+   *  the listener was told needs a sign-in, and the sends. */
+  async function docsSession(mcp: McpServerSource) {
+    const signIns: string[][] = []
+    const s = setup({ mcp, onMcpSignIn: (servers) => signIns.push(servers) })
+    s.api.mcpNames = ['Docs_Server']
+    s.api.state = 'running'
+    s.api.pending = [
+      ev({
+        type: 'session-state',
+        state: 'running',
+        publicKey: generateSealingKeyPair().publicKey,
+      }),
+    ]
+    await s.manager.open(SID)
+    await s.clock.advance(0)
+    const sends = () =>
+      s.api.commands.filter((c) => c.type === 'mcp-credentials').length
+    return { ...s, signIns, sends }
+  }
+  const docs = [
+    { id: 'Docs Server', url: 'https://docs.example/mcp', transport: 'http' },
+  ] as const
+
+  test('a server without a sign-in here is reported, and signing in sends it', async () => {
+    let signedIn = false
+    const mcp: McpServerSource = {
+      enabledServers: () => [...docs],
+      headersFor: async () =>
+        signedIn ? { Authorization: 'Bearer fresh' } : null,
+      signIn: async (id) => {
+        assert.equal(id, 'Docs Server')
+        signedIn = true
+        return { ok: true }
+      },
+    }
+    const s = await docsSession(mcp)
+    assert.equal(s.sends(), 0)
+    assert.deepEqual(s.signIns, [['Docs Server']])
+    assert.deepEqual(s.manager.mcpSignInNeeded(SID), ['Docs Server'])
+    await s.manager.signInMcp(SID, 'Docs Server')
+    assert.equal(s.sends(), 1)
+    assert.deepEqual(s.signIns, [['Docs Server'], []])
+    assert.deepEqual(s.manager.mcpSignInNeeded(SID), [])
+  })
+
+  test('headers the harness turned down are not sent again: a sign-in instead', async () => {
+    const mcp: McpServerSource = {
+      enabledServers: () => [...docs],
+      headersFor: async () => ({ Authorization: 'Bearer revoked' }),
+      signIn: async () => ({ ok: false, error: 'consent denied' }),
+    }
+    const s = await docsSession(mcp)
+    assert.equal(s.sends(), 1)
+    s.api.pending = [
+      ev({ type: 'auth-required', reason: 'mcp', server: 'Docs_Server' }),
+    ]
+    await s.clock.advance(5000)
+    assert.equal(s.sends(), 1)
+    assert.deepEqual(s.signIns, [['Docs Server']])
+    await assert.rejects(
+      s.manager.signInMcp(SID, 'Docs Server'),
+      /consent denied/
+    )
+    assert.deepEqual(s.manager.mcpSignInNeeded(SID), ['Docs Server'])
   })
 
   test('passes only https HTTP/SSE servers in POST /sessions', async () => {

@@ -7,15 +7,18 @@
  *   the start and keeps polling while it runs (§12.1);
  * - commands (message, inject, abort, answer, rollback, stop); cloud
  *   sessions never ask for tool approval, so there is no `approve`
- *   are queued through the Sessions API; a command to a sleeping
- *   session starts it with a fresh key chain, and so does a session
- *   that goes to sleep before its harness picked up a sent message;
+ *   are queued through the Sessions API; a command to a sleeping or
+ *   parked session starts it with a fresh key chain, and so does a
+ *   session that goes to sleep (or parks) before its harness picked up
+ *   a sent message, or parks mid-turn;
  * - polled events are turned back into the chat-service events the
  *   webview already renders (`cloudEventToChatEvent`); cloud-only
  *   events go to a separate listener with the conversation they belong
  *   to;
  * - when a session reports `session-state: running` with a public key,
- *   the user's MCP credentials are sealed to it and sent (§6.4).
+ *   the user's MCP credentials are sealed to it and sent (§6.4); the
+ *   servers that need a sign-in here first are reported to the
+ *   listener.
  *
  * No `vscode` import: the extension supplies the listener, the MCP
  * source and the seed (vscode-cloud.ts).
@@ -90,6 +93,9 @@ export interface CloudSessionListener {
   state?(sessionId: string, state: SessionState): void
   /** The session can't be read any more (deleted elsewhere). */
   gone?(sessionId: string, error: string): void
+  /** The session's MCP servers (their names here) that need a sign-in
+   *  in this window before it can use them; `[]` once none do. */
+  mcpSignIn?(sessionId: string, servers: string[]): void
   /** Start progress for a turn started with `runInCloud`. */
   progress?(e: {
     /** With the first `uploading`: the MCP servers passed to the
@@ -205,6 +211,13 @@ interface Tracked {
   credentialsSentTo?: string
   /** Latest `auth-required { reason: 'mcp' }` seq answered. */
   mcpAuthHandled: number
+  /** Servers it reported (`auth-required`) since credentials were last
+   *  sent, and a hash of the headers last sent per server: headers it
+   *  turned down are not sent again. */
+  mcpReported: Set<string>
+  mcpSent: Map<string, string>
+  /** Session names of the servers that need a sign-in here, sorted. */
+  mcpSignIn: string[]
   /** MCP server names in `session.json`. */
   mcpNames?: string[]
   /** Turn started with `runInCloud`, until the session is live. */
@@ -218,6 +231,8 @@ interface Tracked {
    *  last one ended. */
   resuming: number
   lastStartAt: number
+  /** When a start was last queued for a session parked mid-turn. */
+  lastParkedRestartAt: number
 }
 
 /** A sent message the harness hasn't picked up yet. */
@@ -232,6 +247,8 @@ interface Unanswered {
   /** A poll saw the session start after one of them, or one failed:
    *  none again. */
   spent: boolean
+  /** Not a message: the turn that was running when the session parked. */
+  parked?: boolean
 }
 
 /**
@@ -251,6 +268,14 @@ export const AUTO_RESUME_DELAYS_MS: readonly number[] = [
 /** A started task takes a moment to show up in ECS: polls that still
  *  say `sleeping` this soon after a start don't count against it. */
 export const START_SETTLE_MS = 10_000
+
+/** A session parked mid-turn is started again at most this often, so a
+ *  key chain refused right after each start can't loop. */
+export const PARKED_RESTART_GAP_MS = 10 * 60_000
+
+function headersHash(headers: Record<string, string>): string {
+  return contentHash(new TextEncoder().encode(JSON.stringify(headers)))
+}
 
 function titleFrom(text: string): string {
   const line = text.trim().split('\n')[0] ?? ''
@@ -329,9 +354,13 @@ export class CloudSessionManager {
         replaying: false,
         replayWaiters: [],
         mcpAuthHandled: 0,
+        mcpReported: new Set(),
+        mcpSent: new Map(),
+        mcpSignIn: [],
         unanswered: new Map(),
         resuming: 0,
         lastStartAt: -Infinity,
+        lastParkedRestartAt: -Infinity,
       }
       this.sessions.set(sid, t)
     }
@@ -513,8 +542,7 @@ export class CloudSessionManager {
     return { sessionId: sid }
   }
 
-  /** Mint a new key chain and start the session (also "Resume" for
-   *  parked sessions and `auth-required`). */
+  /** Mint a new key chain and start the session (sleeping or parked). */
   async resume(sid: string): Promise<SessionState> {
     const t = this.track(sid)
     t.resuming++
@@ -531,17 +559,19 @@ export class CloudSessionManager {
   }
 
   /**
-   * After a poll that has caught up: a session that went to sleep with
-   * a sent message no event has acknowledged is started again for it
-   * (see {@link AUTO_RESUME_DELAYS_MS}). Not while a start runs or has
-   * only just been made ({@link START_SETTLE_MS}).
+   * After a poll that has caught up: a session that went to sleep or
+   * parked with a sent message no event has acknowledged, or that
+   * parked mid-turn, is started again for it (see
+   * {@link AUTO_RESUME_DELAYS_MS}). Not while a start runs or has only
+   * just been made ({@link START_SETTLE_MS}).
    */
   private autoResume(sid: string, t: Tracked, state: SessionState): void {
-    if (state !== 'sleeping') {
-      // A start took (or the user must act, `parked`): don't start the
-      // session again for these messages.
-      for (const m of t.unanswered.values()) {
-        if (m.autoResumes > 0 || state === 'parked') m.spent = true
+    if (state !== 'sleeping' && state !== 'parked') {
+      // A start took: don't start the session again for these.
+      for (const [id, m] of t.unanswered) {
+        if (m.autoResumes === 0) continue
+        if (m.parked) t.unanswered.delete(id)
+        else m.spent = true
       }
       return
     }
@@ -560,8 +590,11 @@ export class CloudSessionManager {
       m.nextAutoResumeAt =
         now + (AUTO_RESUME_DELAYS_MS[m.autoResumes] ?? Infinity)
     }
+    const parked = due.every((m) => m.parked)
     this.deps.logger.info(
-      `cloud-sessions: ${sid} went to sleep before running a sent message; starting it again`
+      parked
+        ? `cloud-sessions: ${sid} parked mid-turn; starting it again with a new key chain`
+        : `cloud-sessions: ${sid} went to sleep before running a sent message; starting it again`
     )
     this.resume(sid).catch((err) => {
       // Refused (not signed in, another organisation, …): no retry.
@@ -574,7 +607,9 @@ export class CloudSessionManager {
         this.deps.listener.chat({
           kind: 'error',
           conversationId: t.conversationId,
-          message: `The cloud session stopped before it ran your message, and starting it again failed: ${message}`,
+          message: parked
+            ? `The cloud session's credentials ended mid-turn, and starting it again failed: ${message}`
+            : `The cloud session stopped before it ran your message, and starting it again failed: ${message}`,
         })
       }
     })
@@ -631,6 +666,47 @@ export class CloudSessionManager {
       ? cloudMcpServers(this.deps.mcp.enabledServers()).ids
       : new Map<string, string>()
     return names.map((name) => ids.get(name) ?? name)
+  }
+
+  /** The session's MCP servers (names here) that need a sign-in in
+   *  this window before it can use them (§6.4). */
+  mcpSignInNeeded(sid: string): string[] {
+    return this.mcpServerLabels(this.sessions.get(sid)?.mcpSignIn ?? [])
+  }
+
+  /**
+   * Sign in to one of a session's MCP servers (`label`, its name here)
+   * and, if the session runs, send it the new credentials. Throws when
+   * the sign-in fails.
+   */
+  async signInMcp(sid: string, label: string): Promise<void> {
+    const mcp = this.deps.mcp
+    if (!mcp?.signIn) throw new Error('MCP sign-in is not available here.')
+    const ids = cloudMcpServers(mcp.enabledServers()).ids
+    const name = [...ids].find(([, id]) => id === label)?.[0]
+    if (!name) {
+      throw new Error(`${label} is not one of your enabled MCP servers.`)
+    }
+    const res = await mcp.signIn(label)
+    if (!res.ok) throw new Error(res.error ?? `Signing in to ${label} failed.`)
+    const t = this.track(sid)
+    t.mcpSent.delete(name)
+    this.setMcpSignIn(
+      sid,
+      t,
+      t.mcpSignIn.filter((n) => n !== name)
+    )
+    t.credentialsSentTo = undefined
+    if (t.state && LIVE_STATES.has(t.state)) {
+      await this.maybeSendCredentials(sid, t)
+    }
+  }
+
+  private setMcpSignIn(sid: string, t: Tracked, names: string[]): void {
+    const next = [...new Set(names)].sort()
+    if (next.join('\n') === t.mcpSignIn.join('\n')) return
+    t.mcpSignIn = next
+    this.deps.listener.mcpSignIn?.(sid, this.mcpServerLabels(next))
   }
 
   /** Stop following a session (the view closed it). */
@@ -710,10 +786,15 @@ export class CloudSessionManager {
               : undefined
         break
       case 'auth-required':
-        if (event.reason === 'mcp' && event.seq > t.mcpAuthHandled) {
-          // Answer with fresh credentials once the batch is processed.
-          t.mcpAuthHandled = event.seq
-          t.credentialsSentTo = undefined
+        if (event.reason === 'mcp') {
+          if (event.seq > t.mcpAuthHandled) {
+            // Answer with fresh credentials once the batch is processed.
+            t.mcpAuthHandled = event.seq
+            t.credentialsSentTo = undefined
+            if (event.server) t.mcpReported.add(event.server)
+          }
+        } else if (!t.replaying && t.state === 'busy') {
+          this.restartParked(t)
         }
         break
     }
@@ -722,6 +803,25 @@ export class CloudSessionManager {
       conversationId: t.conversationId,
       event,
       replay: t.replaying,
+    })
+  }
+
+  /**
+   * The key chain ended mid-turn (the 24-hour cap, …) and the session
+   * parks: once it has, start it again with a new chain so the turn
+   * goes on, as for a sent message (autoResume). Not again within
+   * {@link PARKED_RESTART_GAP_MS}.
+   */
+  private restartParked(t: Tracked): void {
+    const now = this.now()
+    if (now < t.lastParkedRestartAt + PARKED_RESTART_GAP_MS) return
+    t.lastParkedRestartAt = now
+    t.unanswered.set(`parked:${now}`, {
+      sent: true,
+      autoResumes: 0,
+      nextAutoResumeAt: 0,
+      spent: false,
+      parked: true,
     })
   }
 
@@ -746,18 +846,35 @@ export class CloudSessionManager {
           this.deps.mcp!,
           names
         )
-        if (unauthorized.length > 0) {
+        // Headers the harness turned down, with nothing fresher here:
+        // a sign-in, like a server without one.
+        const reported = t.mcpReported
+        t.mcpReported = new Set()
+        const rejected = credentials.servers
+          .filter(
+            (s) =>
+              reported.has(s.name) &&
+              t.mcpSent.get(s.name) === headersHash(s.headers)
+          )
+          .map((s) => s.name)
+        const signIn = [...unauthorized, ...rejected]
+        this.setMcpSignIn(sid, t, signIn)
+        if (signIn.length > 0) {
           this.deps.logger.warn(
-            `cloud-sessions: MCP server(s) need a sign-in before the cloud session can use them: ${unauthorized.join(', ')}`
+            `cloud-sessions: MCP server(s) need a sign-in before the cloud session can use them: ${signIn.join(', ')}`
           )
         }
-        if (credentials.servers.length === 0) return
+        const servers = credentials.servers.filter(
+          (s) => !rejected.includes(s.name)
+        )
+        if (servers.length === 0) return
         await this.deps.api.postCommand(sid, {
           type: 'mcp-credentials',
-          sealed: sealMcpCredentials(key, sid, credentials),
+          sealed: sealMcpCredentials(key, sid, { ...credentials, servers }),
         })
+        for (const s of servers) t.mcpSent.set(s.name, headersHash(s.headers))
         this.deps.logger.info(
-          `cloud-sessions: sent sealed credentials for ${credentials.servers.length} MCP server(s)`
+          `cloud-sessions: sent sealed credentials for ${servers.length} MCP server(s)`
         )
       } catch (err) {
         t.credentialsSentTo = undefined
@@ -773,8 +890,8 @@ export class CloudSessionManager {
   // ── Commands ────────────────────────────────────────────────────────
 
   /**
-   * Queue a command. Commands to a sleeping session start it (a fresh
-   * key chain); a parked session needs {@link resume} (the UI asks).
+   * Queue a command. Commands to a sleeping or parked session start it
+   * (a fresh key chain).
    */
   async send(
     sid: string,
@@ -791,7 +908,10 @@ export class CloudSessionManager {
         : await this.deps.api.postCommand(sid, command)
     this.setState(sid, res.state)
     this.poller.poke(sid, res.state)
-    if (res.state === 'sleeping' && command.type !== 'stop') {
+    if (
+      (res.state === 'sleeping' || res.state === 'parked') &&
+      command.type !== 'stop'
+    ) {
       await this.resume(sid)
     }
     return res

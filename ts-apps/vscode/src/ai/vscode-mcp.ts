@@ -618,6 +618,12 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     return { ...headers, Authorization: `Bearer ${token}` }
   }
 
+  /** A cloud session's sign-in for one server: the same interactive
+   *  start as the settings menu's Start. */
+  signIn(id: string): Promise<{ ok: boolean; error?: string }> {
+    return this.start(id, { interactive: true })
+  }
+
   // ── Tool funnel for the chat loop ─────────────────────────────────
 
   /** Advertise the enabled servers' enabled tools in OpenAI
