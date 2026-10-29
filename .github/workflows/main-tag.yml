@@ -927,8 +927,8 @@ jobs:
   # Deploy the web editor (play.legalese.com)
   # ============================================
   # Runs once the release exists, with that release's WASM. The bucket and
-  # distribution come from terraform/web-editor/; until its outputs are set as
-  # repository variables, the job is skipped.
+  # distribution come from terraform/web-editor/ in legalese/jl4-auth-proxy;
+  # until its outputs are set as repository variables, the job is skipped.
 
   deploy-web-editor:
     name: Deploy Web Editor

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Upload a jl4-web build to the S3 bucket behind play.legalese.com and refresh
-# CloudFront. main-tag.yml runs this after each release; see
-# terraform/web-editor/ for the bucket and distribution.
+# CloudFront. main-tag.yml runs this after each release; the bucket and
+# distribution come from terraform/web-editor/ in legalese/jl4-auth-proxy.
 #
 # Usage: ./scripts/deploy-static.sh <build-dir> <bucket> <distribution-id> [--dryrun]
 #
