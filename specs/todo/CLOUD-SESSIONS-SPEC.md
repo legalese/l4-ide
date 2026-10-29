@@ -1074,13 +1074,14 @@ cloud folder instead of on their machine:
   hides it again.
 - **Session state** shows as the cloud icon in the header and in the
   history, with the state's wording as its tooltip: gray asleep, white
-  running, a band sweeping along the outline while starting or loading and,
-  slower, while busy; amber while waiting for an answer or parked; faded
-  when gone. The history's list already carries each session's state, so
-  this costs no requests.
+  running, a band sweeping along the outline quickly while the view loads
+  the session, slowly while its compute starts, and in crimson while the
+  agent works; amber while waiting for an answer or parked; faded when
+  gone. The history's list already carries each session's state, so this
+  costs no requests.
 - **Header title.** The session's name (§12, Session title).
 - **History rows** line up behind one leading slot: a cloud session's
-  cloud, or a local chat's dot (white, fading in and out, while a turn runs;
+  cloud, or a local chat's dot (crimson, fading in and out, while a turn runs;
   amber while it waits for an approval or a question).
 - **Header actions.** Clone / Sync (§9.3) at the top right of the cloud
   session header, and next to it a ⋯ menu with the session's actions: Stop
