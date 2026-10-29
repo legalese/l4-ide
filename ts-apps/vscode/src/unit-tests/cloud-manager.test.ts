@@ -817,3 +817,30 @@ describe('CloudSessionManager files in later prompts (§10)', () => {
     )
   })
 })
+
+describe('CloudSessionManager.replayed', () => {
+  test('waits for the opened log to be read; then the state is current', async () => {
+    const { api, clock, manager } = setup()
+    api.state = 'sleeping'
+    // The log passes through busy; the session is asleep now.
+    api.pending = [ev({ type: 'session-state', state: 'busy' })]
+    await manager.open(SID)
+    let done = false
+    const waiting = manager.replayed(SID).then(() => (done = true))
+    await Promise.resolve()
+    assert.equal(done, false)
+    await clock.advance(0)
+    await waiting
+    assert.equal(manager.stateOf(SID), 'sleeping')
+    // Nothing left to wait for, nor for a session never opened.
+    await manager.replayed(SID)
+    await manager.replayed('01JZZZZZZZZZZZZZZZZZZZZZZZ')
+  })
+
+  test('gives up after its timeout', async () => {
+    const { manager } = setup()
+    await manager.open(SID)
+    // No poll ran (the clock didn't move): the timeout ends the wait.
+    await manager.replayed(SID, 5)
+  })
+})
