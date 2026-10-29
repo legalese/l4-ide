@@ -1109,11 +1109,14 @@
      take their foreground instead. border-box keeps it 28×28 next to
      Send. */
   /* Tucked 4px under Send (past the row's 2px gap) with no right border,
-     so it reads as Send extended to the left: a second way to send. The
-     extra 4px keep the visible part 28px wide, the icon centred. */
+     so it reads as Send extended to the left: a second way to send. A
+     pixel smaller than Send at the top, bottom and left (the row centres
+     it on Send); the extra 4px keep the icon centred in the 27px that
+     show. */
   .submit-btn.cloud {
     box-sizing: border-box;
-    width: 32px;
+    width: 31px;
+    height: 26px;
     padding-right: 4px;
     margin-right: -6px;
     background: transparent;
