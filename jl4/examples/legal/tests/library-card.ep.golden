@@ -1,0 +1,85 @@
+-- Welcome to L4, a programming language for law.
+--
+-- This file turns a short rule into code that can be checked and run.
+-- Try changing it: mistakes are underlined as you type.
+-- Click "Show decision graph" above a DECIDE to see the rule as a diagram,
+-- and "Track result" above an #EVAL to see what it works out.
+-- To learn more, open the documentation with the button at the top left.
+
+§ `Library cards`
+
+-- 1. The rule, as a library might write it:
+--
+--      A person who lives in the city may get a library card if they are
+--      16 or older, or if a parent or guardian consents. No one with
+--      overdue books may get a card.
+
+-- 2. What the rule talks about.
+--    DECLARE ... IS ONE OF lists the possible values of something.
+DECLARE Residence IS ONE OF
+    `in the city`
+    `outside the city`
+
+--    DECLARE ... HAS describes what we know about an applicant.
+--    Names in `backticks` can contain spaces, so rules read like prose.
+DECLARE Applicant HAS
+    `name`                      IS A STRING
+    `age`                       IS A NUMBER
+    `residence`                 IS A Residence
+    `has a guardian's consent`  IS A BOOLEAN
+    `number of overdue books`   IS A NUMBER
+
+-- 3. The decisions. GIVEN names the input, GIVETH says what kind of answer
+--    comes out, and DECIDE ... IF states when the answer is TRUE.
+--    The applicant can be written in the middle of the name.
+GIVEN applicant IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE applicant `has overdue books` IF
+    applicant's `number of overdue books` GREATER THAN 0
+
+GIVEN applicant IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE applicant `may get a library card` IF
+        applicant's `residence` EQUALS `in the city`
+    AND (    applicant's `age` AT LEAST 16
+         OR  applicant's `has a guardian's consent`
+        )
+    AND NOT applicant `has overdue books`
+
+--    A decision can also answer with one of several values.
+DECLARE Card IS ONE OF
+    `adult card`
+    `junior card`
+    `no card`
+
+GIVEN applicant IS AN Applicant
+GIVETH A Card
+DECIDE `the card for` applicant IS
+    BRANCH
+        IF NOT applicant `may get a library card`   THEN `no card`
+        IF applicant's `age` AT LEAST 16            THEN `adult card`
+        OTHERWISE                                        `junior card`
+
+-- 4. Try it out. MEANS gives a name to a value.
+`Ada` MEANS Applicant WITH
+    `name`                      IS "Ada"
+    `age`                       IS 14
+    `residence`                 IS `in the city`
+    `has a guardian's consent`  IS TRUE
+    `number of overdue books`   IS 0
+
+`Ben` MEANS Applicant WITH
+    `name`                      IS "Ben"
+    `age`                       IS 30
+    `residence`                 IS `in the city`
+    `has a guardian's consent`  IS FALSE
+    `number of overdue books`   IS 2
+
+--    #EVAL works out a result. Track it, then change Ada's age or Ben's
+--    overdue books and watch it update.
+#EVAL `Ada` `may get a library card`
+#EVAL `the card for` `Ada`
+#EVAL `the card for` `Ben`
+
+--    #ASSERT checks that a result is TRUE, like a test.
+#ASSERT NOT `Ben` `may get a library card`
