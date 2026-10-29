@@ -1108,15 +1108,26 @@
      outline and glyph (both currentColor), white on hover; light themes
      take their foreground instead. border-box keeps it 28×28 next to
      Send. */
+  /* Tucked 4px under Send (past the row's 2px gap) with no right border,
+     so it reads as Send extended to the left: a second way to send. The
+     extra 4px keep the visible part 28px wide, the icon centred. */
   .submit-btn.cloud {
     box-sizing: border-box;
+    width: 32px;
+    padding-right: 4px;
+    margin-right: -6px;
     background: transparent;
     color: var(--vscode-descriptionForeground, #9d9d9d);
     border: 1px solid currentColor;
-    margin-right: 6px;
+    border-right: none;
+    border-radius: 4px 0 0 4px;
     transition:
       color 0.1s ease-out,
       opacity 0.1s ease-out;
+  }
+  .submit-btn.cloud + .submit-btn {
+    position: relative;
+    z-index: 1;
   }
   .submit-btn.cloud:hover:not(:disabled) {
     background: transparent;
