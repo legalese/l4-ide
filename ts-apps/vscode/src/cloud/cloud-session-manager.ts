@@ -620,6 +620,19 @@ export class CloudSessionManager {
     })
   }
 
+  /**
+   * The names a session's MCP servers have here (their ids, as in the
+   * settings), from the protocol-safe names in its `session.json`
+   * ("Docs Server" for `Docs_Server`). A server not configured here
+   * keeps its stored name.
+   */
+  mcpServerLabels(names: string[]): string[] {
+    const ids = this.deps.mcp
+      ? cloudMcpServers(this.deps.mcp.enabledServers()).ids
+      : new Map<string, string>()
+    return names.map((name) => ids.get(name) ?? name)
+  }
+
   /** Stop following a session (the view closed it). */
   close(sid: string): void {
     this.poller.unwatch(sid)
