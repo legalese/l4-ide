@@ -703,8 +703,8 @@
             class="submit-btn cloud"
             onclick={submitCloud}
             disabled={disabled || !text.trim()}
-            title="Run in cloud: start a cloud session with this prompt and the active file"
-            aria-label="Run in cloud"
+            title="Send as cloud session"
+            aria-label="Send as cloud session"
           >
             <!-- Cloud symmetric about x = 8 (three lobes, open at the
                  bottom for the arrow); the glyph is centred in the box. -->
