@@ -49,7 +49,7 @@ conversations, client-declared tools), [AI_CHAT_PLAN.md](../done/AI_CHAT_PLAN.md
   action starts new compute on the same files.
 - **G6** An active agent keeps working without the user for up to a day.
 - **G7** A session's files can be cloned and synced (pull and push) with git,
-  from a button in the prompt field. The extension uses VS Code's built-in Git
+  from a button in the cloud session header. The extension uses VS Code's built-in Git
   support rather than a git implementation of its own.
 - **G8** No session can reach another user's files. Compute is never reused and
   keeps no residual data.
@@ -852,7 +852,7 @@ built-in Git extension, which runs the user's installed `git`.
   - `http.postBuffer = 5 MB`, so pushes go out as one request rather than a
     chunked upload (whether function URLs accept chunked uploads is checked in
     P7).
-- **Sync.** The prompt-field button calls the repository's `pull()` and then
+- **Sync.** The header button calls the repository's `pull()` and then
   `push()`. VS Code's Sync button does the same. Conflicts are resolved with
   VS Code's usual merge editor.
 - **Button states.** "Clone" until a clone exists (`sid → folder` is kept in
@@ -1072,7 +1072,9 @@ cloud folder instead of on their machine:
   files (§9.4). A rolled-back turn collapses to "This turn was rolled back",
   centred under its prompt, with a chevron that shows the turn (dimmed) and
   hides it again.
-- **Sync button** in the prompt field (§9.3).
+- **Header actions.** Clone / Sync (§9.3) at the top right of the cloud
+  session header, and next to it a ⋯ menu with the session's actions: Stop
+  session for now. Resume, when needed, is a button in the header.
 - **@-mentions in later prompts.** Mentioned files not yet in the session are
   uploaded before the message is sent (§10).
 - **Notifications.** A background cloud session that asks a question raises a
