@@ -189,6 +189,14 @@ batchMixfixSharedHead, batchMixfixSharedHeadJson :: FilePath
 batchMixfixSharedHead     = fixtureDir </> "batch-mixfix-shared-head.l4"
 batchMixfixSharedHeadJson = fixtureDir </> "batch-mixfix-shared-head.json"
 
+-- | The prelude's @\`the amount by which\` a \`exceeds\` b@, which means
+-- @max 0 (a MINUS b)@: eleven @#ASSERT@s, and an @\@export@ (the New Zealand
+-- rates rebate) that @l4 batch@ re-prints and re-runs. A CLI fixture, outside
+-- every goldened glob, for the reason 'captionFixture' gives.
+exceedsFixture, exceedsRows :: FilePath
+exceedsFixture = fixtureDir </> "exceeds-operator.l4"
+exceedsRows    = fixtureDir </> "exceeds-operator.json"
+
 -- | Multi-clause groups whose compiled form, printed, met a drafter's name
 -- (review of legalese/l4-ide#545); see the fixtures.
 batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans :: FilePath
@@ -1923,6 +1931,31 @@ spec bin = do
       -- back quote in a string literal silently defeated the wrap for
       -- everything after it and the box grew with no diagnostic.
       sout `shouldSatisfy` ("after\\nit" `isInfixOf`)
+
+  -- The operator is a prelude mixfix, so a module that uses it meets it as an
+  -- IMPORTED operator, which the printer spells in its `OF` form (CLAUDE.md
+  -- 3.2.2). No golden captures 'prettyLayout' output, so the batch test below
+  -- is the only guard that the re-printed call still means `max 0 (a MINUS b)`.
+  describe "the prelude's `the amount by which` ... `exceeds` ..." $ do
+    it "passes every #ASSERT in its fixture, including the rebate that plain subtraction gets wrong" $ do
+      env <- jsonEnvelope bin ["run", exceedsFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) ->
+          map (`objField` "value") (toList v) `shouldBe` replicate 11 (Just (Bool True))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "keeps its meaning when `l4 batch` re-prints and re-runs the module" $ do
+      Output code sout _ <- runL4 bin ["batch", exceedsFixture, "--inputs", exceedsRows]
+      code `shouldBe` ExitSuccess
+      let rows = [ row | l <- lines sout, Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ]
+          resultOf row = case objField row "output" of
+            Just (Array os) | [o] <- toList os -> objField o "result"
+            _ -> Nothing
+      map (`objField` "status") rows `shouldBe` replicate 3 (Just (String "success"))
+      -- Rates 1000, no dependants, incomes 20000, 26000 and 30000: the first
+      -- is the case plain subtraction answered 630.
+      map resultOf rows `shouldBe` map (Just . Number) [560, 458, 0]
 
   describe "l4 batch" $ do
     -- `batch` re-prints the module through 'prettyLayout' and re-runs it per
