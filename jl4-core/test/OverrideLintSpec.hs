@@ -158,6 +158,12 @@ spec = do
     it "accepts a third decision calling both" do
       fs <- findingsOf notwithstandingJoin
       map (.outcome) (filter ((== PhNotwithstanding) . (.phrase)) fs) `shouldBe` [Wired AtJoin]
+    it "accepts a third decision that reaches the prevailing provision through a wrapper" do
+      fs <- findingsOf notwithstandingWrapperJoin
+      map (.outcome) (filter ((== PhNotwithstanding) . (.phrase)) fs) `shouldBe` [Wired AtJoin]
+    it "does not let a wrapper join satisfy a 'subject to' the host itself leaves out" do
+      fs <- findingsOf subjectToWrapperJoin
+      map (.outcome) (filter ((== PhSubjectTo) . (.phrase)) fs) `shouldBe` [MissingConjunct]
     it "reports an open-class target and does not judge it" do
       fs <- findingsOf openClass
       map (.outcome) fs `shouldBe` [OpenClassTarget]
@@ -366,6 +372,53 @@ notwithstandingJoin = Text.unlines
   , "GIVETH A BOOLEAN"
   , "`extensions in the end` n MEANS"
   , "    IF `s 9 — extensions may be granted` n THEN TRUE ELSE NOT (`s 7 — extensions are barred` n)"
+  ]
+
+-- | The Jersey charity-test shape: the override sits behind a wrapper, and the
+-- decision that combines the two calls the wrapper, not the override.
+notwithstandingWrapperJoin :: Text
+notwithstandingWrapperJoin = Text.unlines
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 7 — extensions are barred` n MEANS n GREATER THAN 10"
+  , ""
+  , "@ref Act s 9 — \"Notwithstanding section 7, the Director may grant extensions.\""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 9 — extensions may be granted` n MEANS n GREATER THAN 1"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`the s 9 override bites` n MEANS `s 9 — extensions may be granted` n"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`extensions in the end` n MEANS"
+  , "    IF `the s 9 override bites` n THEN TRUE ELSE NOT (`s 7 — extensions are barred` n)"
+  ]
+
+-- | The same wrapper shape for \"subject to\": the host's own body still leaves
+-- section 7 out, and a decision elsewhere combining them does not change what
+-- the host says.
+subjectToWrapperJoin :: Text
+subjectToWrapperJoin = Text.unlines
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 7 — extensions are barred` n MEANS n GREATER THAN 10"
+  , ""
+  , "@ref Act s 9 — \"Subject to section 7, the Director may grant extensions.\""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 9 — extensions may be granted` n MEANS n GREATER THAN 1"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`the s 9 grant` n MEANS `s 9 — extensions may be granted` n"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`extensions in the end` n MEANS"
+  , "    IF `the s 9 grant` n THEN TRUE ELSE NOT (`s 7 — extensions are barred` n)"
   ]
 
 openClass :: Text

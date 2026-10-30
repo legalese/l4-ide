@@ -674,10 +674,19 @@ lintModule m = sortOn order (concatMap hostFindings hosts)
     direct = not (Set.null (Set.intersection (Map.findWithDefault Set.empty h.uniq graph) tgtSet))
     helper = not (Set.null (Set.intersection (reach h.uniq) tgtSet))
     fromTarget = any (\t -> h.uniq `Set.member` reach t.uniq) tgts
-    atJoin = any (\c -> c.uniq /= h.uniq
-                         && h.uniq `Set.member` Map.findWithDefault Set.empty c.uniq graph
-                         && not (Set.null (Set.intersection (Map.findWithDefault Set.empty c.uniq graph) tgtSet)))
-                 hosts
+    -- A decision that combines the two. For "subject to" it must call both
+    -- itself; for "notwithstanding" and "despite" it may reach either through
+    -- helpers, as `meets the charity test` does in the Jersey charity-test case
+    -- study (`... AND NOT the Article 5(2) knock-out bites`, a wrapper around
+    -- the Article 5(2) decision that said "despite paragraph (1)").
+    atJoin = any (\c -> c.uniq /= h.uniq && joins c) hosts
+    joins c
+      | phraseDirection ph == Yields =
+          h.uniq `Set.member` Map.findWithDefault Set.empty c.uniq graph
+            && not (Set.null (Set.intersection (Map.findWithDefault Set.empty c.uniq graph) tgtSet))
+      | otherwise =
+          h.uniq `Set.member` reach c.uniq
+            && not (Set.null (Set.intersection (reach c.uniq) tgtSet))
     verdict
       | direct = Wired Direct
       | helper = Wired ViaHelper

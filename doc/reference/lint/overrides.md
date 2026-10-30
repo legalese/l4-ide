@@ -113,6 +113,7 @@ The rest are shown with `--all`, and counted at the foot of every run.
 "Notwithstanding" and "despite" look back: the provision prevails.
 For those, the edge can sit on either side.
 Statute's own drafting leaves it open, and so does the lint: the overridden provision may call the prevailing one, the prevailing one may consult the overridden one, or a third decision may call both and decide.
+For "notwithstanding" and "despite", that third decision may reach either side through helper decisions; for "subject to" it must call both itself, because the words are about what this provision's own answer takes into account.
 
 ## Options
 
@@ -133,5 +134,6 @@ A file that does not type-check cannot be linted; the command says so and exits 
 - **It cannot reach the shapes §12.1 calls out of reach of any static check.** "Notwithstanding any other provision" names no target; a comparative override is not an edge.
 - **Two instruments in one file can be confused.** If a file encodes two Acts that both have a section 6, a call to either satisfies "subject to section 6".
 - **A paragraph is not resolved inside a section.** "Paragraph (a)" of a section is relative to a subsection the lint does not track. In an article, regulation, rule or clause, "paragraph (2)" is read as that provision's own subdivision.
-- **It can raise a finding that is not a defect.** The priority may be settled by a decision in another file that calls both provisions, or the other provision's test may be written out inside this decision instead of called. The lint sees neither; the finding is a prompt to look, not a verdict.
+- **It can raise a finding that is not a defect.** The priority may be settled by a decision in another file that calls both provisions, or the other provision's test may be written out inside this decision, or handed to it as an input, instead of called. The lint sees neither; the finding is a prompt to look, not a verdict.
+- **A bare "except" is not read.** The lint takes "except" only when "as", "under", "in", "by" or "pursuant" follows it ("except as provided in section 4"); "except sections 298 and 298A" is a real exception, and it is also ordinary English far more often than an override, so the lint stays silent on it.
 - **A clean report is not a faithful encoding.** It says the encoding is not silently dropping the effect of the phrases it can see. Whether the encoding says what the law says remains the reviewer's judgement.
