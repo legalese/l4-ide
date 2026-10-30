@@ -59,6 +59,7 @@ import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
 import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
+import L4.Cli.Prove (ProveOptions, proveBound, proveCmd, proveOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
@@ -88,6 +89,7 @@ data Command
   | CmdLts        LtsOptions
   | CmdExplore    ExploreCliOptions
   | CmdVerify     VerifyOptions
+  | CmdProve      ProveOptions
   | CmdYscript    YscriptOptions
   | CmdDeploy     DeployOptions
   | CmdRedeploy   DeployOptions
@@ -154,6 +156,10 @@ commandParser =
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
                <> footerDoc (Just (verbatim propositionalBound))))
+      <> command "prove"
+           (info (helper <*> (CmdProve <$> proveOptionsParser))
+             (progDesc "Prove or refute, with an SMT solver (z3), each #ASSERT the evaluator cannot decide because it reads a section GIVEN"
+               <> footerDoc (Just (verbatim proveBound))))
       <> command "export"
            (info (helper <*> exportFormats)
              (progDesc "Write an L4 module out in another notation: an interchange document, a runnable program, or an interview. Run `l4 export --help` for the formats, `l4 export FORMAT --help` for each one's options"))
@@ -288,6 +294,7 @@ main = do
     CmdLts        opts -> ltsCmd        opts
     CmdExplore    opts -> exploreCmd    opts
     CmdVerify     opts -> verifyCmd     opts
+    CmdProve      opts -> proveCmd      opts
     CmdYscript    opts -> yscriptCmd    opts
     CmdDeploy     opts -> deployCmd     opts
     CmdRedeploy   opts -> redeployCmd   opts

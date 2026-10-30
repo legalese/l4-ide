@@ -1,0 +1,22 @@
+-- `l4 prove` over records and enumerations.
+DECLARE Colour IS ONE OF red, green, blue
+
+DECLARE Item
+  HAS price  IS A NUMBER
+      colour IS A Colour
+
+GIVEN c IS A Colour
+GIVETH A BOOLEAN
+`is warm` c MEANS
+  CONSIDER c
+  WHEN red THEN TRUE
+  OTHERWISE FALSE
+
+§ `Items`
+    GIVEN i IS AN Item
+
+-- proved: excluded middle, through a CONSIDER
+#ASSERT `is warm` (i's colour) OR NOT `is warm` (i's colour)
+
+-- refuted: nothing ties the colour to the price
+#ASSERT `is warm` (i's colour) IMPLIES i's price GREATER THAN 0

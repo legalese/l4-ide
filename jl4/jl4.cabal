@@ -75,6 +75,7 @@ executable l4
     L4.Cli.Lts
     L4.Cli.Nlg
     L4.Cli.OpenFisca
+    L4.Cli.Prove
     L4.Cli.Render
     L4.Cli.Run
     L4.Cli.StateGraph
@@ -177,6 +178,7 @@ test-suite l4-cli-test
     CliTest.Ledger
     CliTest.Explore
     CliTest.OpenFisca
+    CliTest.Prove
     CliTest.Yscript
     Paths_jl4
   autogen-modules:

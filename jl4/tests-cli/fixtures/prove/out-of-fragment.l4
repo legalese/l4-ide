@@ -1,0 +1,6 @@
+-- `l4 prove` refuses by name what it cannot lower, as unknown.
+§ `Strings`
+    GIVEN s IS A STRING
+
+-- unknown: STRING is out of the fragment
+#ASSERT s EQUALS "a string"
