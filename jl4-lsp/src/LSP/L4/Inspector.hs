@@ -428,8 +428,10 @@ exportedFunctionToSummary declares ef =
       Nothing -> "unknown"
       Just ty -> prettyTypeForDisplay ty
 
-    -- Deontic detection: check if return type pretty-prints as containing "DEONTIC"
-    isDeontic' = "DEONTIC" `Text.isInfixOf` Text.toUpper retType
+    -- A rule that returns a DEONTIC is not exported: 'Export.checkExports'
+    -- refuses it, and the caller leaves refused rules out of the summaries
+    -- (so none reaches here). The field stays for the sidebar's sake.
+    isDeontic' = False
 
     -- Structured return schema, mirroring jl4-service's Compiler: only for
     -- non-DEONTIC functions (DEONTIC surfaces the simulation envelope).

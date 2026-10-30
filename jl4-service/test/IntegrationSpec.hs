@@ -2906,7 +2906,7 @@ spec = describe "integration" do
         ]
       case result of
         Left err -> do
-          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as an input yet"
+          err `shouldSatisfy` Text.isInfixOf "its input `e` is an EVENT, and @export does not support that yet"
           err `shouldSatisfy` Text.isInfixOf "who acted"
         Right (_fns, meta) ->
           expectationFailure $
@@ -2926,7 +2926,7 @@ spec = describe "integration" do
         ]
       case result of
         Left err -> do
-          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as a result yet"
+          err `shouldSatisfy` Text.isInfixOf "its result is an EVENT, and @export does not support that yet"
           err `shouldSatisfy` Text.isInfixOf "make event"
         Right (_fns, meta) ->
           expectationFailure $

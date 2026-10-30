@@ -30,6 +30,8 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
 import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams)
+import qualified L4.Export as Export
+import qualified L4.Export.Shape as Shape
 import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
 import Logging (Logger, logInfo, logWarn)
@@ -184,12 +186,16 @@ processTypecheckedFile logger deployId filepath content moduleContext
   tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
   evalMap = do
     let exports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
-        exportFnTypeErrs =
-          [ "Function type inputs are not supported for @export (parameter "
-              <> resolvedText paramName <> " of "
-              <> resolvedText fnName <> ")"
-          | MkCheckErrorWithContext{kind = ExportFunctionTypeInput fnName paramName} <- tcErrors
+        -- What cannot cross the boundary of an @export, and the exports that
+        -- the editor refuses with the same words ('Export.checkExports'). A
+        -- missing type is a warning, which does not block the deploy.
+        exportErrs =
+          [ e
+          | e <- Export.checkExports (Shape.shapeEnvFromDeclares declaredTypes ei) resolvedModule
+          , Export.exportErrorSeverity e == SError
           ]
+        declaredTypes = foldMap (Shape.moduleDeclares . (.module')) (tcResult : Rules.transitiveDependencies tcResult)
+        exportFnTypeErrs = [Text.unwords (Export.prettyExportError e) | e <- exportErrs]
         -- Genuine type errors that must block the deploy. We deliberately
         -- tolerate OutOfScopeError for a name an expression reads: it's
         -- repurposed by extractImplicitAssumeParams to derive implicit ASSUME
@@ -209,7 +215,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
           ]
     if not (null exportFnTypeErrs)
       then do
-        logWarn logger "Deploy rejected: @export function has FUNCTION-typed input"
+        logWarn logger "Deploy rejected: an @export has an input or result that cannot be sent"
           [ ("deploymentId", toJSON deployId)
           , ("file", toJSON filepath)
           , ("errors", toJSON exportFnTypeErrs)
@@ -432,10 +438,6 @@ extractDeonticTypeNames ty@(TyApp _ _ [partyTy, actionTy])
     typeName (TyApp _ n _) = rawNameToText (rawName (getActual n))
     typeName _ = "Unknown"
 extractDeonticTypeNames _ = Nothing
-
--- | Extract display text from a Resolved name.
-resolvedText :: Resolved -> Text
-resolvedText = rawNameToText . rawName . getActual
 
 -- | An OutOfScopeError for a name that an expression reads is not a
 -- deploy-blocking error: it's how the type checker reports references the
