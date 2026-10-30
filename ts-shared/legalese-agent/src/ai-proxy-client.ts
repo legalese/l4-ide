@@ -156,10 +156,12 @@ export class AiProxyClient {
     return this.opts.endpoint?.() ?? { url: PROD_AI_ENDPOINT, local: false }
   }
 
-  /** Auth headers for a request to the default endpoint, with the
-   *  dev-local stand-in in local mode. */
-  async getAuthHeaders(): Promise<Record<string, string>> {
-    const headers = await this.opts.auth.getAiAuthHeaders()
+  /** Auth headers for a request to `url` (default: the endpoint), with
+   *  the dev-local stand-in in local mode. */
+  async getAuthHeaders(
+    url: string = this.getEndpoint().url
+  ): Promise<Record<string, string>> {
+    const headers = await this.opts.auth.getAiAuthHeaders(url)
     if (!headers.Authorization && this.getEndpoint().local) {
       headers.Authorization = 'Bearer dev-local'
     }
@@ -181,7 +183,7 @@ export class AiProxyClient {
     const endpoint = request.apiBaseUrl ?? defaultEndpoint.url
     const local = request.apiBaseUrl ? false : defaultEndpoint.local
     const url = `${endpoint}/v1/chat/completions`
-    const headers = await this.opts.auth.getAiAuthHeaders()
+    const headers = await this.opts.auth.getAiAuthHeaders(url)
     let hasAuth = !!headers.Authorization
     if (!hasAuth && local) {
       // Local proxy in dev mode ignores Authorization but still
@@ -263,7 +265,7 @@ export class AiProxyClient {
     const url =
       `${endpoint}/v1/chat/turns/${encodeURIComponent(turnId)}/stream` +
       (sinceId > 0 ? `?since=${sinceId}` : '')
-    const headers = await this.opts.auth.getAiAuthHeaders()
+    const headers = await this.opts.auth.getAiAuthHeaders(url)
     if (!headers.Authorization && !apiBaseUrl && defaultEndpoint.local) {
       headers.Authorization = 'Bearer dev-local'
     }
@@ -388,7 +390,7 @@ export class AiProxyClient {
         ? apiBaseUrl.replace(/\/$/, '')
         : undefined
     const endpoint = scoped ?? defaultEndpoint.url
-    const headers = await this.getAuthHeaders()
+    const headers = await this.getAuthHeaders(endpoint)
     if (!headers.Authorization) {
       throw new AiProxyError(
         'No Legalese Cloud session found. Sign in from the sidebar to use dictation.',
@@ -440,7 +442,7 @@ export class AiProxyClient {
    */
   async summarizeTitle(firstUserMessage: string): Promise<string | null> {
     const url = `${this.getEndpoint().url}/v1/chat/completions`
-    const headers = await this.getAuthHeaders()
+    const headers = await this.getAuthHeaders(url)
     const body = {
       model: 'legalese-summize-4',
       messages: [
@@ -488,7 +490,7 @@ export class AiProxyClient {
    */
   async describeIntendedUse(functionsJson: string): Promise<string | null> {
     const url = `${this.getEndpoint().url}/v1/chat/completions`
-    const headers = await this.getAuthHeaders()
+    const headers = await this.getAuthHeaders(url)
     const body = {
       model: 'legalese-summize-4',
       messages: [

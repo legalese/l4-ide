@@ -20,8 +20,10 @@ interface ImportMetaEnv {
   readonly VITE_WASM_VERSION?: string
   /** Set to 'true' to prefer WASM over WebSocket */
   readonly VITE_PREFER_WASM?: string
-  /** Session persistence service URL */
+  /** Session persistence service URL; Share is hidden without it */
   readonly VITE_SESSION_URL?: string
+  /** Cloudflare Turnstile site key the session service checks shares against */
+  readonly VITE_TURNSTILE_SITE_KEY?: string
 }
 
 interface ImportMeta {

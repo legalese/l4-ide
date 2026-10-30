@@ -61,7 +61,7 @@ export class ServiceClient {
       : path
     const url = `${apiBase.replace(/\/$/, '')}${effectivePath}`
 
-    const headers = await this.auth.getAuthHeaders()
+    const headers = await this.auth.getAuthHeaders(url)
     return fetch(url, {
       ...init,
       headers: {
@@ -250,10 +250,9 @@ export class ServiceClient {
         'No service URL configured. Set jl4.serviceUrl in settings.'
       )
     }
-    const headers = await this.auth.getAuthHeaders()
-    const resp = await fetch(`${serviceUrl.replace(/\/$/, '')}/health`, {
-      headers,
-    })
+    const url = `${serviceUrl.replace(/\/$/, '')}/health`
+    const headers = await this.auth.getAuthHeaders(url)
+    const resp = await fetch(url, { headers })
     if (!resp.ok) await throwWithBody(resp, 'GET /health')
     return (await resp.json()) as ServiceHealth
   }
@@ -276,10 +275,10 @@ export class ServiceClient {
     if (!slug) {
       throw new Error('Plugin install requires a Legalese Cloud session.')
     }
-    const headers = await this.auth.getAuthHeaders()
     const url = `https://mcp.${LEGALESE_CLOUD_DOMAIN}/${slug}/${encodeURIComponent(
       deploymentId
     )}/.plugin`
+    const headers = await this.auth.getAuthHeaders(url)
     const resp = await fetch(url, { headers })
     if (!resp.ok) await throwWithBody(resp, `GET ${url}`)
     const ab = await resp.arrayBuffer()

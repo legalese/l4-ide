@@ -8,6 +8,10 @@ import {
   parseAuthCallback,
   parsePendingLogin,
 } from './auth-handoff.js'
+import {
+  LEGALESE_CLOUD_DOMAIN,
+  isLegaleseCloudUrl,
+} from './legalese-cloud-url.js'
 
 type ConnectionStatus = 'connected' | 'not-configured' | 'connecting' | 'error'
 
@@ -18,7 +22,7 @@ export interface ConnectionState {
   error?: string
 }
 
-export const LEGALESE_CLOUD_DOMAIN = 'legalese.cloud'
+export { LEGALESE_CLOUD_DOMAIN, isLegaleseCloudUrl }
 /** Where sign-in starts: the console confirms account and org. */
 export const LEGALESE_CONSOLE_URL = 'https://legalese.com/console'
 const SECRET_KEY_SESSION = 'l4.sessionToken'
@@ -119,12 +123,20 @@ export class AuthManager {
     return !this.getServiceUrl()
   }
 
-  async getAuthHeaders(): Promise<Record<string, string>> {
+  /**
+   * Auth headers for a request to `url` (jl4-service, its MCP endpoint).
+   * The configured `jl4.serviceApiKey` goes with any of them; the
+   * browser-login session only to Legalese Cloud
+   * ({@link isLegaleseCloudUrl}), so a `jl4.serviceUrl` pointing
+   * elsewhere (from a workspace's settings, say) never receives it.
+   */
+  async getAuthHeaders(url: string): Promise<Record<string, string>> {
     // Use API key if explicitly configured in settings
     const apiKey = this.getApiKeyFromSettings()
     if (apiKey) return { Authorization: `Bearer ${apiKey}` }
 
     // Otherwise use session token (for Legalese Cloud browser login)
+    if (!isLegaleseCloudUrl(url)) return {}
     const session = await this.secrets.get(SECRET_KEY_SESSION)
     if (session) return { Authorization: `Bearer ${session}` }
 
@@ -132,17 +144,20 @@ export class AuthManager {
   }
 
   /**
-   * Auth headers for the Legalese AI proxy.
+   * Auth headers for a request to the Legalese AI proxy at `url`.
    * Prefers `legaleseAi.apiKey` when set; otherwise falls back to the
    * shared flow (jl4 service API key, then browser-login session).
    * Keeping this distinct from `getAuthHeaders` lets users mix a
    * self-hosted jl4 service (with `jl4.serviceApiKey`) and a separate
-   * Legalese AI key — neither setting clobbers the other.
+   * Legalese AI key — neither setting clobbers the other. Nothing is
+   * sent to a `url` that isn't Legalese Cloud (a local proxy in local
+   * mode gets the client's dev stand-in instead).
    */
-  async getAiAuthHeaders(): Promise<Record<string, string>> {
+  async getAiAuthHeaders(url: string): Promise<Record<string, string>> {
+    if (!isLegaleseCloudUrl(url)) return {}
     const aiKey = this.getAiApiKeyFromSettings()
     if (aiKey) return { Authorization: `Bearer ${aiKey}` }
-    return this.getAuthHeaders()
+    return this.getAuthHeaders(url)
   }
 
   /**
@@ -478,12 +493,12 @@ export class AuthManager {
     const minDelay = new Promise((r) => setTimeout(r, 1000))
 
     try {
-      const headers = await this.getAuthHeaders()
       // Legalese Cloud: check health on the service domain (org may be idle/suspended).
       // Direct jl4-service connection: use /health.
       const healthUrl = this.isLegaleseCloudSession()
         ? `https://${LEGALESE_CLOUD_DOMAIN}/service/health?org=${encodeURIComponent(this.cloudOrgSlug!)}`
         : `${serviceUrl.replace(/\/$/, '')}/health`
+      const headers = await this.getAuthHeaders(healthUrl)
       const [resp] = await Promise.all([
         fetch(healthUrl, {
           headers,

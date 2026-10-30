@@ -50,6 +50,7 @@ import {
   attachmentNames,
   checkAddFilesSizes,
   checkAttachmentSizes,
+  checkSeedFiles,
   checkSeedSize,
   contentHash,
   contentTypeFor,
@@ -134,6 +135,17 @@ export interface SessionFilesRecord {
   sent: Record<string, string>
   /** Absolute path of the local folder chosen for `seedBase.workspaceFolder`. */
   localFolder?: string
+  /** The MCP servers credentials may go to (§6.4): those passed when the
+   *  session was created here, or listed in `session.json` when this
+   *  machine first opened it. A task can edit `session.json`; a server
+   *  added there later gets nothing. */
+  mcp?: McpServerRef[]
+}
+
+/** An MCP server of a session: its `session.json` name and URL. */
+export interface McpServerRef {
+  name: string
+  url: string
 }
 
 export interface SessionFilesStore {
@@ -218,8 +230,8 @@ interface Tracked {
   mcpSent: Map<string, string>
   /** Session names of the servers that need a sign-in here, sorted. */
   mcpSignIn: string[]
-  /** MCP server names in `session.json`. */
-  mcpNames?: string[]
+  /** MCP servers in `session.json`. */
+  mcpServers?: McpServerRef[]
   /** Turn started with `runInCloud`, until the session is live. */
   startingTurn?: string
   /** `session.json` `seedBase`; `null` = known to be absent. */
@@ -231,8 +243,10 @@ interface Tracked {
    *  last one ended. */
   resuming: number
   lastStartAt: number
-  /** When a start was last queued for a session parked mid-turn. */
+  /** When a start was last queued for a session parked mid-turn, and
+   *  how many since the user last sent a message. */
   lastParkedRestartAt: number
+  parkedRestarts: number
 }
 
 /** A sent message the harness hasn't picked up yet. */
@@ -269,9 +283,16 @@ export const AUTO_RESUME_DELAYS_MS: readonly number[] = [
  *  say `sleeping` this soon after a start don't count against it. */
 export const START_SETTLE_MS = 10_000
 
-/** A session parked mid-turn is started again at most this often, so a
- *  key chain refused right after each start can't loop. */
+/** A session parked mid-turn is started again at most this often, and
+ *  at most {@link MAX_PARKED_RESTARTS} times per message the user sends,
+ *  so a key chain refused right after each start can't loop, and a turn
+ *  that never ends doesn't get a new chain every 24 hours. */
 export const PARKED_RESTART_GAP_MS = 10 * 60_000
+export const MAX_PARKED_RESTARTS = 1
+
+function mcpServerRefs(info: GetSessionResponse): McpServerRef[] {
+  return info.session.mcpServers.map(({ name, url }) => ({ name, url }))
+}
 
 function headersHash(headers: Record<string, string>): string {
   return contentHash(new TextEncoder().encode(JSON.stringify(headers)))
@@ -305,6 +326,8 @@ export class CloudSessionManager {
   private readonly credentialJobs = new Map<string, Promise<void>>()
   private readonly files: SessionFilesStore
   private readonly now: () => number
+  /** The session the view shows, if any (see {@link setViewing}). */
+  private viewing: string | undefined
 
   constructor(private readonly deps: CloudSessionManagerDeps) {
     this.files = deps.files ?? memoryFilesStore()
@@ -361,6 +384,7 @@ export class CloudSessionManager {
         resuming: 0,
         lastStartAt: -Infinity,
         lastParkedRestartAt: -Infinity,
+        parkedRestarts: 0,
       }
       this.sessions.set(sid, t)
     }
@@ -378,6 +402,7 @@ export class CloudSessionManager {
     if (t.state === state) return
     t.state = state
     this.deps.listener.state?.(sid, state)
+    if (state === 'sleeping' || state === 'parked') this.releaseIfIdle(sid)
     if (t.startingTurn && LIVE_STATES.has(state)) {
       this.deps.listener.progress?.({
         turnId: t.startingTurn,
@@ -440,7 +465,9 @@ export class CloudSessionManager {
         ? a.contentType
         : 'application/octet-stream',
     }))
-    const gz = seed.files.length > 0 ? createSeedTarGz(seed.files) : undefined
+    checkSeedFiles(seed.files)
+    const gz =
+      seed.files.length > 0 ? await createSeedTarGz(seed.files) : undefined
     if (gz) checkSeedSize(gz, seed.files)
 
     const mcp = this.deps.mcp
@@ -481,7 +508,11 @@ export class CloudSessionManager {
     this.byTurn.set(turnId, sid)
     const sent: Record<string, string> = {}
     for (const f of seed.files) sent[`data/${f.path}`] = contentHash(f.bytes)
-    this.files.set(sid, { sent })
+    const mcpRefs = (mcp?.configs ?? []).map(({ name, url }) => ({
+      name,
+      url,
+    }))
+    this.files.set(sid, { sent, mcp: mcpRefs })
     const seeded = new Set(Object.keys(sent))
     const inSeed = (abs: string | undefined): string | undefined => {
       if (!abs || !seed.root) return undefined
@@ -496,7 +527,8 @@ export class CloudSessionManager {
     )
     const t = this.track(sid)
     t.seedBase = seedBase ?? null
-    t.mcpNames = (mcp?.configs ?? []).map((c) => c.name)
+    t.mcpServers = mcpRefs
+    this.setViewing(sid)
     try {
       this.deps.listener.progress?.({
         turnId,
@@ -624,10 +656,12 @@ export class CloudSessionManager {
   async open(sid: string): Promise<GetSessionResponse> {
     const info = await this.deps.api.getSession(sid)
     const t = this.track(sid)
+    this.setViewing(sid)
     if (info.session.conversationId) {
       this.setConversation(sid, info.session.conversationId)
     }
-    t.mcpNames = info.session.mcpServers.map((s) => s.name)
+    t.mcpServers = mcpServerRefs(info)
+    this.trustedMcpServers(sid, t.mcpServers)
     t.seedBase = info.session.seedBase ?? null
     t.replaying = true
     t.lastSeq = 0
@@ -709,7 +743,29 @@ export class CloudSessionManager {
     this.deps.listener.mcpSignIn?.(sid, this.mcpServerLabels(next))
   }
 
-  /** Stop following a session (the view closed it). */
+  /**
+   * The session the view shows (undefined: none). Only that one is
+   * started again by itself after parking mid-turn. The others stay
+   * watched while they run (for a question, or the end of the turn) and
+   * are let go once they sleep or park.
+   */
+  setViewing(sid: string | undefined): void {
+    const prev = this.viewing
+    this.viewing = sid
+    if (prev !== undefined && prev !== sid) this.releaseIfIdle(prev)
+  }
+
+  /** Let go of a session out of view with nothing left to do for it. */
+  private releaseIfIdle(sid: string): void {
+    const t = this.sessions.get(sid)
+    if (!t || sid === this.viewing || !this.poller.isWatching(sid)) return
+    if (t.state !== 'sleeping' && t.state !== 'parked') return
+    if (t.resuming > 0) return
+    if ([...t.unanswered.values()].some((m) => !m.spent)) return
+    this.close(sid)
+  }
+
+  /** Stop following a session. */
   close(sid: string): void {
     this.poller.unwatch(sid)
     const t = this.sessions.get(sid)
@@ -794,7 +850,7 @@ export class CloudSessionManager {
             if (event.server) t.mcpReported.add(event.server)
           }
         } else if (!t.replaying && t.state === 'busy') {
-          this.restartParked(t)
+          this.restartParked(sid, t)
         }
         break
     }
@@ -809,13 +865,25 @@ export class CloudSessionManager {
   /**
    * The key chain ended mid-turn (the 24-hour cap, …) and the session
    * parks: once it has, start it again with a new chain so the turn
-   * goes on, as for a sent message (autoResume). Not again within
-   * {@link PARKED_RESTART_GAP_MS}.
+   * goes on, as for a sent message (autoResume). Only the session in
+   * view, and not more than {@link MAX_PARKED_RESTARTS} times per message
+   * or within {@link PARKED_RESTART_GAP_MS}; otherwise it waits for the
+   * user's next message.
    */
-  private restartParked(t: Tracked): void {
+  private restartParked(sid: string, t: Tracked): void {
     const now = this.now()
-    if (now < t.lastParkedRestartAt + PARKED_RESTART_GAP_MS) return
+    if (
+      sid !== this.viewing ||
+      t.parkedRestarts >= MAX_PARKED_RESTARTS ||
+      now < t.lastParkedRestartAt + PARKED_RESTART_GAP_MS
+    ) {
+      this.deps.logger.info(
+        `cloud-sessions: ${sid} parked mid-turn; it starts again with the next message`
+      )
+      return
+    }
     t.lastParkedRestartAt = now
+    t.parkedRestarts++
     t.unanswered.set(`parked:${now}`, {
       sent: true,
       autoResumes: 0,
@@ -836,15 +904,20 @@ export class CloudSessionManager {
     const job = (async () => {
       t.credentialsSentTo = key
       try {
-        let names = t.mcpNames
-        if (!names) {
-          const info = await this.deps.api.getSession(sid)
-          names = t.mcpNames = info.session.mcpServers.map((s) => s.name)
+        let listed = t.mcpServers
+        if (!listed) {
+          listed = t.mcpServers = mcpServerRefs(
+            await this.deps.api.getSession(sid)
+          )
         }
-        if (names.length === 0) return
+        const trusted = this.trustedMcpServers(sid, listed)
+        const servers = listed.filter((s) =>
+          trusted.some((x) => x.name === s.name && x.url === s.url)
+        )
+        if (servers.length === 0) return
         const { credentials, unauthorized } = await collectMcpCredentials(
           this.deps.mcp!,
-          names
+          servers
         )
         // Headers the harness turned down, with nothing fresher here:
         // a sign-in, like a server without one.
@@ -864,17 +937,20 @@ export class CloudSessionManager {
             `cloud-sessions: MCP server(s) need a sign-in before the cloud session can use them: ${signIn.join(', ')}`
           )
         }
-        const servers = credentials.servers.filter(
+        const send = credentials.servers.filter(
           (s) => !rejected.includes(s.name)
         )
-        if (servers.length === 0) return
+        if (send.length === 0) return
         await this.deps.api.postCommand(sid, {
           type: 'mcp-credentials',
-          sealed: sealMcpCredentials(key, sid, { ...credentials, servers }),
+          sealed: sealMcpCredentials(key, sid, {
+            ...credentials,
+            servers: send,
+          }),
         })
-        for (const s of servers) t.mcpSent.set(s.name, headersHash(s.headers))
+        for (const s of send) t.mcpSent.set(s.name, headersHash(s.headers))
         this.deps.logger.info(
-          `cloud-sessions: sent sealed credentials for ${servers.length} MCP server(s)`
+          `cloud-sessions: sent sealed credentials for ${send.length} MCP server(s)`
         )
       } catch (err) {
         t.credentialsSentTo = undefined
@@ -885,6 +961,19 @@ export class CloudSessionManager {
     })().finally(() => this.credentialJobs.delete(sid))
     this.credentialJobs.set(sid, job)
     return job
+  }
+
+  /** The servers credentials may go to ({@link SessionFilesRecord.mcp});
+   *  `listed` becomes that set the first time this machine sees the
+   *  session. */
+  private trustedMcpServers(
+    sid: string,
+    listed: McpServerRef[]
+  ): McpServerRef[] {
+    const rec = this.files.get(sid)
+    if (rec?.mcp) return rec.mcp
+    void this.files.set(sid, { sent: {}, ...rec, mcp: listed })
+    return listed
   }
 
   // ── Commands ────────────────────────────────────────────────────────
@@ -925,6 +1014,7 @@ export class CloudSessionManager {
     command: Extract<ClientCommandPayload, { type: 'message' }>
   ): Promise<PostCommandResponse> {
     const t = this.track(sid)
+    t.parkedRestarts = 0
     const m: Unanswered = {
       sent: false,
       autoResumes: 0,
