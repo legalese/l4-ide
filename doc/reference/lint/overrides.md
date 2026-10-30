@@ -79,7 +79,7 @@ For every decision in the file, the lint reads three places where the statute's 
 3. **The quoted text in its body**: the words in quotation marks that [inert style](../../concepts/reviewing/reviewing-encoded-law.md) keeps verbatim beside the logic, such as `"Subject to section 3,"` above.
 
 The third is an extension of the ruling, which names only the first two.
-It is there because the inert style keeps the statute's words in the body: of the 11 mentions the lint finds in the encodings under `jl4/examples/canon` (measured 2026-10-30), 6 are read from the body text and nowhere else.
+It is there because the inert style keeps the statute's words in the body: of the 12 mentions the lint finds in the encodings under `jl4/examples/canon` (measured 2026-10-30), 7 are read from the body text and nowhere else.
 
 It does **not** read comments (the lines beginning `--`).
 A comment is the encoder talking to the next encoder; it makes no commitment that the code could break.

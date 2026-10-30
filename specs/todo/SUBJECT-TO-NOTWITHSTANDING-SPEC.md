@@ -1532,14 +1532,14 @@ does not rule the syntax, and under Meng's note above it cannot.
 `jl4/tests-cli/CliTest/Lint.hs`, `etc/verify-branch.sh --quick` green at 945e84ba7, and two positive
 controls (deleting the `s 6(1)` call from a copy of the witness below gives `missing-conjunct`; deleting
 the `s 13(2)` call from a copy of `wills-act.l4` gives `override-unwired`). Run over the 61-file canon
-mirror it reports 11 mentions and no finding; the counts for the other trees, and a summary of the
+mirror it reports 12 mentions and no finding; the counts for the other trees, and a summary of the
 20-result hand check, are in the PR body.
 
 **What §12.1 rules, and what the build chose.** The ruling is the lint and its oracle (the `@ref`
 prose and the identifier names); it is silent on how the lint is invoked. These were chosen in the
 build and are **assumed, not ruled**: the verb `l4 lint` and its flags (`--all`, `--json`,
 `--strict`; advisory by default, exit 0 whenever the lint ran, exit 1 whenever a file could not be
-checked); reading the quoted text in the decision's body as a third source (6 of the canon mirror's 11
+checked); reading the quoted text in the decision's body as a third source (7 of the canon mirror's 12
 mentions can be read nowhere else); requiring a provision, written with its number, to be named in the
 same clause as the phrase (straight after it, after a few joining words, or up to ten words on after a
 description that opens with "the" or "this"); setting aside a decision whose whole body is one string

@@ -20,7 +20,7 @@
 -- the inert-style encodings quote the provision in the body and hang the logic
 -- off it (@"Subject to section 6,"@ in §12.1's own witness). Over the canon
 -- mirror (@jl4\/examples\/canon@, 61 files, measured 2026-10-30), the lint finds
--- 11 mentions; 6 of them are read from the body text and nowhere else. Reading
+-- 12 mentions; 7 of them are read from the body text and nowhere else. Reading
 -- the third source is an extension of the ruling, not part of it.
 --
 -- It does not read comments. Over the commons checkout (5,974 files, a looser
