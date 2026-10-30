@@ -4,7 +4,7 @@ As built on `unstable` by the pull request that adds this page.
 Source spec: none.
 The behaviour began on `unstable` with legalese/l4-ide#152 (`5a51f825d`): `a4471aeb6` made the type `EVENT` and the constructor `EVENT` both resolvable (smucclaw/l4-ide#915), and `daa7ee180` removed the follow-on errors of a failed name from the finished error list, in `suppressResolutionCascade` (smucclaw/l4-ide#920).
 This change keeps the first and replaces the second: the unifier lets a type that stands for a name that did not resolve match anything, so the follow-on errors are never raised, and the filter and its two helpers are deleted.
-The same change is open for `main` as legalese/l4-ide#769, which had not merged when this page was written; the page that PR adds describes what `main` has.
+The same change is on `main` as legalese/l4-ide#769 (merged 2026-10-30 as `7a997532c`); the page that PR adds describes what `main` has, and its unifier guard is the same code as here.
 Line numbers are in this change's tree, `unstable` at `bcbec1419` with this change on it.
 
 Scope: the unifier (`jl4-core/src/L4/TypeCheck/Unify.hs`), the sentinel helpers and `getEntityInfo` (`jl4-core/src/L4/TypeCheck/Types.hs`), the type-mismatch messages and the arity check (`jl4-core/src/L4/TypeCheck.hs`), the refusal of an `EVENT` in an `@export` (`jl4-core/src/L4/Export.hs`), the Blawx step-over (`jl4/app/L4/Cli/Blawx.hs`) and the deploy gate in `jl4-service/src/Compiler.hs`.
