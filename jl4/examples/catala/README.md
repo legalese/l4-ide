@@ -9,8 +9,13 @@ carrying no exported decision. `not-ok/` holds eight sources that `l4 export cat
 **refuses**, each because emitting it would have made the Catala say something
 other than the L4 says; `tests-cli` pins the refusals.
 
-Every golden here has been run through the real toolchain (catala 1.2.1). The
-repeatable way to do that is the R9 harness, which finds the toolchain on PATH,
+Every golden here has been run through the real toolchain: Catala 1.3.0, and before that Catala built from upstream commit `fdf4ccd5`, which reports itself as 1.2.1 and which 1.3.0 contains.
+It is not the 1.2.1 release.
+On the release, `clerk test` fails 41 of the 83 tests, because the release prints JSON numbers as decimals (`0.25`) where the goldens' `catala-test-cli` blocks hold exact fractions (`"1/4"`), and it crashes on a result that holds an enumerated value.
+`doc/exports/catala.md`, "Which Catala to check it with", has the install route and the numbers.
+The remarks in these sources and in `jl4-core/src/L4/Catala/` about what Catala accepts or refuses (module names, lines that start with `>`, fieldless structures, scope calls outside a scope) give the same result on the 1.2.1 release as on that commit, checked 2026-10-30, though the wording of the fieldless-structure error differs.
+The remarks about JSON output in `jl4/app/L4/Cli/Catala.hs` are the ones that differ.
+The repeatable way to do that is the R9 harness, which finds the toolchain on PATH,
 in `CATALA_EXE`/`CLERK_EXE`, or in an opam switch, and skips with one line when
 it finds none:
 
