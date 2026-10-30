@@ -336,7 +336,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
               { program = rprog
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
-              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs)
+              , errors = substErrs ++ moreErrs ++ exportErrs ++ implicitErrs
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -347,62 +347,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , mixfixRegistry = combinedMixfixRegistry
               , sectionPaths = s'.sectionPaths
               }
-
--- | Drop diagnostics that are pure fallout from a name-resolution failure that
--- has already been reported (issue #920).
---
--- When 'resolveType' \/ 'resolveTerm'' cannot pick a binding, they report the
--- real error ('OutOfScopeError', 'AmbiguousTermError', 'AmbiguousTypeError')
--- and hand back an 'OutOfScope' sentinel so that checking can continue. Any
--- type built on such a sentinel is poisoned: it unifies with nothing, so every
--- 'expect' against it fails and emits a 'TypeMismatch' that tells the user
--- nothing they were not already told — classically rendered as the useless
--- "must match ... namely Verdict but is here of type Verdict".
---
--- Why filter here, at the boundary, instead of not raising the error in
--- 'expect'? Because @addError@ is what makes a candidate of the backtracking
--- 'Check' monad a failure. Silencing 'expect' would turn failing overload
--- candidates into successes, and a set of poisoned candidates that all succeed
--- is reported as 'InternalAmbiguityError' — trading one internal-error-grade
--- message for another. Filtering the finished list leaves resolution, pruning
--- and overload selection bit-for-bit unchanged and only removes the message.
---
--- Two properties keep this from hiding genuine errors:
---
--- * We only drop a 'TypeMismatch' that a sentinel /accounts for/: one whose two
---   sides agree everywhere except at or under a sentinel
---   ('sameModuloOutOfScope'). Merely /mentioning/ a sentinel is not enough, and
---   deliberately so. @GIVEN xs IS A LIST OF Typo@ \/ @GIVETH A NUMBER@ \/
---   @h MEANS xs@ mismatches NUMBER against @LIST OF ⊥@; both heads are
---   resolved, they genuinely differ, and that error survives verbatim once
---   @Typo@ is declared — so it is news, and it stays. Likewise
---   @FUNCTION FROM ⊥ TO BOOLEAN@ against @FUNCTION FROM ⊥ TO NUMBER@: the
---   poisoned argument matches, the BOOLEAN\/NUMBER return does not, and the
---   mismatch is reported. What we drop is only the contentless kind: @⊥@
---   against anything, @LIST OF ⊥@ against @LIST OF NUMBER@.
---
--- * We only filter at all when a resolution failure is present in the same
---   list, and resolution failures are themselves never dropped. So the error
---   list can never be emptied by this function: a file that failed to check
---   still fails to check, and still says why.
-suppressResolutionCascade :: [CheckErrorWithContext] -> [CheckErrorWithContext]
-suppressResolutionCascade errs
-  | any (isResolutionFailure . (.kind)) errs = filter (not . isCascade . (.kind)) errs
-  | otherwise                                = errs
-  where
-    isResolutionFailure :: CheckError -> Bool
-    isResolutionFailure = \ case
-      OutOfScopeError    {} -> True
-      AmbiguousTermError {} -> True
-      AmbiguousTypeError {} -> True
-      _                     -> False
-
-    isCascade :: CheckError -> Bool
-    isCascade = \ case
-      TypeMismatch _ec expected given ->
-        (mentionsOutOfScope expected || mentionsOutOfScope given)
-          && sameModuloOutOfScope expected given
-      _ -> False
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
@@ -2373,7 +2317,11 @@ inferType g = softprune $ do
     Type ann -> pure (Type ann)
     TyApp ann n ts -> do
       (rn, kind) <- resolveType n
-      checkKind kind ts
+      -- A name that failed to resolve has no kind to count the arguments
+      -- against: 'resolveType' hands back kind 0 for it so that checking can
+      -- go on, and comparing the arguments with that would report "expected 0
+      -- arguments" for a type that takes two. The failure has been reported.
+      unless (isOutOfScope rn) $ checkKind kind ts
       rts <- traverse inferType ts
       pure (TyApp ann rn rts)
     Fun ann onts t -> do
@@ -9060,10 +9008,9 @@ standardTypeMismatch prefix expected given =
 -- user-defined names it is built from were declared. Predefined names carry no
 -- range and are skipped, so @LIST OF Verdict@ is annotated with @Verdict@ only;
 -- if nothing can be said we fall back to the plain rendering rather than emit
--- an empty parenthesis. Sentinels from failed resolution are skipped too: their
--- 'getOriginal' is the *reference* site, so labelling it "defined at" would lie
--- (those mismatches are normally suppressed by 'suppressResolutionCascade'
--- anyway).
+-- an empty parenthesis. Placeholders from failed resolution are skipped too:
+-- their 'getOriginal' is the *reference* site, so labelling it "defined at"
+-- would lie.
 prettyMismatchedTypes :: Type' Resolved -> Type' Resolved -> (Text, Text)
 prettyMismatchedTypes expected given
   | e /= g    = (e, g)
