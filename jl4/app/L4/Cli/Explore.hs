@@ -61,20 +61,34 @@
 -- With @--emit@, a file that could not be written, or could not be written
 -- faithfully (an @.aut@ label mCRL2 would merge with another), makes the
 -- status 1; the other files are written all the same.
+--
+-- An executable built with "L4.Cli.Extensions" can add files to what @--emit@
+-- writes: each 'EmitTarget' is given the same 'EmitInput' as the built-in
+-- emitters and its files follow theirs, written, reported and counted in the
+-- exit status in the same way. A file name already written is refused.
 module L4.Cli.Explore
   ( ExploreCliOptions (..)
+  , PropertyFlag (..)
   , exploreOptionsParser
   , exploreCmd
+    -- * For an extension that runs its own checks over an explored graph
+  , requestsOf
+  , statusOf
+  , importedModules
   ) where
 
 import Base (catMaybes, for, for_, unless, when)
+import Control.Exception (IOException, SomeAsyncException (..), SomeException, displayException, evaluate, fromException, throwIO, try)
+import Control.Monad (foldM)
 import Data.Char (isDigit)
 import Data.Either (lefts, rights)
+import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty as AesonPretty
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.List as List
 import qualified Data.Text.IO as TIO
 import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
@@ -96,6 +110,7 @@ import L4.Lts.WhatIf (Rig (..))
 import L4.Syntax (Module, Resolved)
 
 import L4.Cli.Common
+import L4.Cli.Extensions (EmitTarget (..), TargetOptions, emitNameProblem)
 
 ----------------------------------------------------------------------------
 -- Options
@@ -119,6 +134,11 @@ data ExploreCliOptions = ExploreCliOptions
   , exEmit      :: Maybe FilePath
   , exFair      :: [Text.Text]
   , exFixedNow  :: FixedNowOpt
+  , exTargets   :: [Text.Text]
+    -- ^ @--target@: the extension targets whose files @--emit@ writes; none
+    -- named is all of them. Always empty without extension targets.
+  , exTargetOpts :: [(Text.Text, Text.Text, Text.Text)]
+    -- ^ @--target-opt NAME.KEY=VALUE@, as (NAME, KEY, VALUE)
   }
 
 -- | One property flag, in the order given: an @--if-always@ is the premise
@@ -127,8 +147,9 @@ data PropertyFlag
   = FlagProperty PropertyKind Text.Text
   | FlagIfAlways Text.Text
 
-exploreOptionsParser :: Parser ExploreCliOptions
-exploreOptionsParser = ExploreCliOptions
+-- | The targets are those of the executable's 'Extensions', for @--emit@'s help.
+exploreOptionsParser :: [EmitTarget] -> Parser ExploreCliOptions
+exploreOptionsParser targets = ExploreCliOptions
   <$> strArgument (metavar "FILE" <> help "Path to the .l4 file")
   <*> many (strOption
         ( long "contract"
@@ -206,7 +227,8 @@ exploreOptionsParser = ExploreCliOptions
   <*> optional (strOption
         ( long "emit"
         <> metavar "DIR"
-        <> help "Write the graph into DIR for other tools: <base>.aut (mCRL2), <base>.tla with <base>.cfg and one cfg per property (TLC), <base>.smv (NuSMV), <base>.dot, <base>.pnml; the properties named become the models' predicates and properties"
+        <> help ("Write the graph into DIR for other tools: <base>.aut (mCRL2), <base>.tla with <base>.cfg and one cfg per property (TLC), <base>.smv (NuSMV), <base>.dot, <base>.pnml; the properties named become the models' predicates and properties"
+             <> extensionFiles)
         ))
   <*> many (strOption
         ( long "fair"
@@ -214,6 +236,32 @@ exploreOptionsParser = ExploreCliOptions
         <> help "With --emit: give weak fairness, in the TLA+ and NuSMV models, to every act of this actor that moves (a party, an act's constructor, or the first words of a constructor's name, as Alice in `Alice buys dinner`). No other act is fair; repeatable"
         ))
   <*> fixedNowParser
+  -- the flags exist only where there is a target to choose, so that the
+  -- community edition's help is the same as before they were added
+  <*> (if null targets then pure [] else many (strOption
+        ( long "target"
+        <> metavar "NAME"
+        <> help ("With --emit: write only the files of this extension target, not every target's (" <> names <> "); repeatable")
+        )))
+  <*> (if null targets then pure [] else many (option (eitherReader targetOptReader)
+        ( long "target-opt"
+        <> metavar "NAME.KEY=VALUE"
+        <> help "With --emit: give the extension target NAME the option KEY with value VALUE; repeatable"
+        )))
+  where
+    names = List.intercalate ", " [ t.etName | t <- targets ]
+    -- empty in the community build, where the help is the built-in files alone
+    extensionFiles = case targets of
+      [] -> ""
+      _ -> "; and, in this edition, the files of: " <> names
+
+-- | @NAME.KEY=VALUE@: the name ends at the first dot, the key at the first
+-- equals sign after it, and the value is the rest.
+targetOptReader :: String -> Either String (Text.Text, Text.Text, Text.Text)
+targetOptReader s = case break (== '=') s of
+  (lhs, '=' : val) | (name, '.' : key) <- break (== '.') lhs, not (null name), not (null key) ->
+    Right (Text.pack name, Text.pack key, Text.pack val)
+  _ -> Left ("expected NAME.KEY=VALUE, got " <> s)
 
 -- | A number as a @#TRACE@ writes one: digits, an optional fraction.
 rationalReader :: ReadM Rational
@@ -229,8 +277,8 @@ rationalReader = eitherReader \ s -> case break (== '.') s of
 -- Entry point
 ----------------------------------------------------------------------------
 
-exploreCmd :: ExploreCliOptions -> IO ()
-exploreCmd opts = do
+exploreCmd :: [EmitTarget] -> ExploreCliOptions -> IO ()
+exploreCmd targets opts = do
   when (opts.exJson && opts.exDot) do
     hPutStrLn stderr "--json and --dot are two renderings of one graph: choose one"
     exitWith (ExitFailure 1)
@@ -239,6 +287,7 @@ exploreCmd opts = do
       hPutStrLn stderr "--fair says which acts the emitted models assume fair, so it needs --emit DIR"
       exitWith (ExitFailure 1)
     _ -> pure ()
+  selected <- selectTargets targets opts
   evalConfig <- makeEvalConfig opts.exFixedNow
   (errs, mLoaded) <- runOneshot evalConfig opts.exFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
@@ -349,19 +398,44 @@ exploreCmd opts = do
         for_ checked \ (g, rs, _) -> do
           unless (null rs) $ TIO.hPutStrLn stderr (checksSummary rs)
           TIO.hPutStrLn stderr (coverageLine g.gCoverage)
-      emitted <- maybe (pure True) (\ dir -> emitAll dir opts props checked) opts.exEmit
+      emitted <- maybe (pure True) (\ dir -> emitAll selected dir opts props checked) opts.exEmit
       exitWith if emitted
         then statusOf (length graphs < length starts) [ (g.gCoverage, map (.crVerdict) rs) | (g, rs, _) <- checked ]
         else ExitFailure 1
 
+-- | The extension targets this run writes the files of, each with its options.
+-- A @--target@ or @--target-opt@ that cannot be honoured is refused, exit 1:
+-- a name that is no target would otherwise leave a typo silently unwritten.
+selectTargets :: [EmitTarget] -> ExploreCliOptions -> IO [(EmitTarget, TargetOptions)]
+selectTargets targets opts = do
+  let refuse why = hPutStrLn stderr why >> exitWith (ExitFailure 1)
+      known = [ Text.pack t.etName | t <- targets ]
+      listed = Text.unpack (Text.intercalate ", " known)
+      chosen n = null opts.exTargets || n `elem` opts.exTargets
+  when ((not (null opts.exTargets) || not (null opts.exTargetOpts)) && null opts.exEmit) $
+    refuse "--target and --target-opt choose among the files --emit writes, so they need --emit DIR"
+  for_ opts.exTargets \ n -> unless (n `elem` known) $
+    refuse ("--target " <> Text.unpack n <> ": names no emit target; this edition has: " <> listed)
+  for_ (zip [0 :: Int ..] opts.exTargetOpts) \ (i, (n, k, v)) -> do
+    let shown = "--target-opt " <> Text.unpack n <> "." <> Text.unpack k <> "=" <> Text.unpack v <> ": "
+    unless (n `elem` known) $ refuse (shown <> "names no emit target; this edition has: " <> listed)
+    unless (chosen n) $ refuse (shown <> "--target leaves out " <> Text.unpack n <> ", so the option would be ignored")
+    when (any (\ (n', k', _) -> n' == n && k' == k) (take i opts.exTargetOpts)) $
+      refuse (shown <> "this option is given twice")
+  pure [ (t, Map.fromList [ (k, v) | (n, k, v) <- opts.exTargetOpts, n == Text.pack t.etName ])
+       | t <- targets, chosen (Text.pack t.etName) ]
+
 -- | Write every emitted file of every graph into the directory, and say on
 -- stderr what was written and what was not. 'False' when a file was not.
-emitAll :: FilePath -> ExploreCliOptions -> [Property] -> [(Graph, [CheckResult], Labels)] -> IO Bool
-emitAll dir opts props checked = do
+-- A built-in emitter's file that cannot be written ends the run with the
+-- exception, as it always has; an extension target's is reported with the
+-- target and the file named, and the other files are still written.
+emitAll :: [(EmitTarget, TargetOptions)] -> FilePath -> ExploreCliOptions -> [Property] -> [(Graph, [CheckResult], Labels)] -> IO Bool
+emitAll selected dir opts props checked = do
   createDirectoryIfMissing True dir
   let stem = Text.pack (takeBaseName opts.exFile)
-  results <- for (zip [1 ..] checked) \ (k, (g, _, labels)) -> do
-    let files = emitFiles MkEmitInput
+  (oks, _) <- foldM (\ (acc, taken) (k, (g, _, labels)) -> do
+    let input = MkEmitInput
           { eiBase = emitBase stem (length checked) k
           , eiSource = Text.pack (takeFileName opts.exFile)
           , eiGraph = g
@@ -369,12 +443,100 @@ emitAll dir opts props checked = do
           , eiLabels = labels
           , eiFair = opts.exFair
           }
-    for_ (rights files) \ (name, text) -> TIO.writeFile (dir </> Text.unpack name) text
-    for_ (lefts files) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
-    unless (null (rights files)) $
-      TIO.hPutStrLn stderr ("Emitted to " <> Text.pack dir <> ": " <> Text.intercalate ", " (map fst (rights files)))
-    pure (null (lefts files))
-  pure (and results)
+        builtin = emitFiles input
+    for_ (rights builtin) \ (name, text) -> TIO.writeFile (dir </> Text.unpack name) text
+    for_ (lefts builtin) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
+    made <- for selected \ (t, o) -> do
+      files <- settle (t.etFiles o input)
+      pure (t.etName, files)
+    let (extra, taken') = withTargets taken builtin made
+    wrote <- for extra \case
+      Left why -> pure (Left why)
+      Right (who, name, text) -> writeTargetFile dir who name text
+    for_ (lefts wrote) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
+    let written = map fst (rights builtin) <> rights wrote
+    unless (null written) $
+      TIO.hPutStrLn stderr ("Emitted to " <> Text.pack dir <> ": " <> Text.intercalate ", " written)
+    pure ((null (lefts builtin) && null (lefts wrote)) : acc, taken')) ([], []) (zip [1 ..] checked)
+  pure (and oks)
+
+-- | Write a target's file, or say why not: the refusal names the target and the file.
+writeTargetFile :: FilePath -> String -> Text.Text -> Text.Text -> IO (Either Text.Text Text.Text)
+writeTargetFile dir who name text =
+  try (TIO.writeFile (dir </> Text.unpack name) text) >>= \case
+    Left (e :: IOException) -> pure (Left (targetLabel who <> ": file `" <> name <> "`: " <> Text.pack (show e)))
+    Right () -> pure (Right name)
+
+targetLabel :: String -> Text.Text
+targetLabel who = "target " <> Text.pack who
+
+-- | What a target made, with every part of it evaluated, so that an
+-- exception raised while it is computed (an @error@ in a pure function, say)
+-- is caught here, and not later, while a file is being written. A file name or
+-- contents that raises becomes a refusal ('withTargets' puts the target's name
+-- in front of it) that names the file where the name is known, and the files
+-- after it are still taken. A list that raises before its end is taken to
+-- where it raised. (An asynchronous exception, such as an interrupt, is not
+-- caught.)
+settle :: [Either Text.Text (Text.Text, Text.Text)] -> IO [Either Text.Text (Text.Text, Text.Text)]
+settle = go
+  where
+    go rs = attempt Nothing (evaluate rs) >>= \case
+      Left refusal -> pure [Left refusal]
+      Right [] -> pure []
+      Right (r : rest) -> (:) <$> item r <*> go rest
+    item r = attempt Nothing (evaluate r) >>= \case
+      Left refusal -> pure (Left refusal)
+      Right (Left why) -> fmap (Left . either id id) (attempt Nothing (evaluate why))
+      Right (Right pair) -> attempt Nothing (evaluate pair) >>= \case
+        Left refusal -> pure (Left refusal)
+        Right (n, t) -> attempt Nothing (evaluate n) >>= \case
+          Left refusal -> pure (Left refusal)
+          Right name -> either Left (\ t' -> Right (name, t')) <$> attempt (Just name) (evaluate t)
+    attempt :: Maybe Text.Text -> IO a -> IO (Either Text.Text a)
+    attempt file act = try act >>= \case
+      Right a -> pure (Right a)
+      Left (e :: SomeException)
+        | Just (SomeAsyncException _) <- fromException e -> throwIO e
+        | otherwise -> pure (Left (maybe "" (\ f -> "file `" <> f <> "`: ") file
+            <> Text.takeWhile (/= '\n') (Text.pack (displayException e))))
+
+-- | The file names written so far in a run: case-folded, with the name as it
+-- was written and who wrote it.
+type Taken = [(Text.Text, (Text.Text, Text.Text))]
+
+-- | The built-in files, then the selected extension targets' (see
+-- "L4.Cli.Extensions"): what the selected targets made, each with the name it
+-- is given, as the files to write (with the target that made each) or the
+-- reasons they are not to be. A target's file is refused, with the target and
+-- file named, and not written if its name cannot be written into the
+-- directory ('emitNameProblem') or is the same file, ignoring case, as one
+-- written earlier in the run by a built-in emitter or another target (the
+-- file systems of macOS and Windows do not tell them apart). With no targets
+-- there is nothing to write beyond the built-in files.
+withTargets
+  :: Taken
+  -> [Either Text.Text (Text.Text, Text.Text)]
+  -> [(String, [Either Text.Text (Text.Text, Text.Text)])]
+  -> ([Either Text.Text (String, Text.Text, Text.Text)], Taken)
+withTargets taken0 builtin targets = (extra, taken')
+  where
+    (extra, taken') = go ([ (Text.toCaseFold n, (n, "a built-in emitter")) | (n, _) <- rights builtin ] <> taken0)
+                         [ (who, r) | (who, rs) <- targets, r <- rs ]
+    go taken [] = ([], taken)
+    go taken ((who, r) : rest) =
+      let here = targetLabel who
+          refused why = let (more, t) = go taken rest in (Left (here <> ": " <> why) : more, t)
+      in case r of
+        Left why -> refused why
+        Right (name, text)
+          | Just why <- emitNameProblem name -> refused ("file `" <> name <> "`: " <> why <> "; not written")
+          | Just (_, (earlier, by)) <- List.find ((== Text.toCaseFold name) . fst) taken ->
+              refused ("file `" <> name <> "` is the same file as `" <> earlier <> "`, written by " <> by
+                <> " (names are compared without regard to case); not written over it")
+          | otherwise ->
+              let (more, t) = go ((Text.toCaseFold name, (name, here)) : taken) rest
+              in (Right (who, name, text) : more, t)
 
 -- | Run a @#TRACE@, given as source, appended to the file explored: a
 -- virtual file beside it, so that its imports resolve as the file's own do,
