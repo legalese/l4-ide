@@ -51,4 +51,17 @@
       <version>${dmncheck.version}</version>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <!-- The plugin run.sh invokes, pinned so that "mvn dependency:build-classpath"
+           does not mean a different plugin on every machine. 3.7.0 is what
+           resolved on 2026-10-30. Its jars run BEFORE jars.sha256 is checked, so this
+           is a version pin and not a checksum pin; README, "What is not verified". -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.7.0</version>
+      </plugin>
+    </plugins>
+  </build>
 </project>

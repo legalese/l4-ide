@@ -8,21 +8,38 @@
 #   etc/dmn-check/run.sh --corpus [ROOT ...]          # ROOT defaults to jl4/examples of this checkout
 #
 # OPTIONAL EVIDENCE, NOT A GATE. Nothing in .github/workflows runs this, and
-# nothing in etc/verify-branch.sh does. When Maven, a JDK 21+, the pinned jars (or,
-# with --corpus, an `l4`) are not there it prints ONE line starting `skipped:` and
-# exits 0, and prints no VERDICT banner, so a skip cannot be mistaken for a pass.
-# Set DMN_CHECK_REQUIRED=1 to make that skip an exit 1 (the same switch the
-# sibling harnesses have: CAMUNDA_CHECK_REQUIRED, KIE_CHECK_REQUIRED).
+# nothing in etc/verify-branch.sh does. It prints ONE line starting `skipped:` and
+# exits 0, and prints no VERDICT banner (so a skip cannot be mistaken for a pass),
+# when the toolchain is not there:
+#   * no Maven on PATH;
+#   * no JDK 21 or later (see DMN_CHECK_JAVA_HOME below: JAVA_HOME and a `java` on
+#     PATH are NOT consulted);
+#   * neither shasum nor sha256sum on PATH, so the jar pin cannot be checked;
+#   * dmn-check cannot be resolved from Maven (offline, or the first-run download
+#     failed);
+#   * with --corpus, no `l4`.
+# A defect in the repo or in the resolved jars is NOT a skip: it is `BROKEN` on
+# stderr and exit 1 (a pom Maven cannot read, a jar that is not the pinned one, a
+# classpath with an empty entry, a driver that does not compile).
+# Set DMN_CHECK_REQUIRED=1 to make a skip an exit 1 (the same switch the sibling
+# harnesses have: CAMUNDA_CHECK_REQUIRED, KIE_CHECK_REQUIRED).
 #
 # ZERO-INSTALL, like etc/camunda-dmn-check: Maven resolves the classpath into
-# $DMN_CHECK_WORKDIR (default $TMPDIR/l4-dmn-check), nothing is written into the
-# repo, and package.json and the lockfile are untouched.
+# $DMN_CHECK_WORKDIR (default $TMPDIR/l4-dmn-check-<uid>), nothing is written into
+# the repo, and package.json and the lockfile are untouched. The FIRST run
+# downloads dmn-check and its dependencies from Maven Central (about 18 jars).
 #
 # Environment:
-#   DMN_CHECK_JAVA_HOME     a JDK 21+. Else the first usable candidate below. CI
-#                           for the Camunda leg runs 21; pin this to a 21 if you
-#                           want your result to mean what that one means.
+#   DMN_CHECK_JAVA_HOME     a JDK 21+. Else the first usable candidate below.
+#                           JAVA_HOME and a `java` on PATH are IGNORED, on purpose
+#                           (assumed, not ruled; README, "Which JDK"): on the machine this was
+#                           built on they are a JDK 26 for other work, and a result
+#                           should not change with the shell it was run from. CI for
+#                           the Camunda leg runs 21; pin this to a 21 if you want
+#                           your result to mean what that one means.
 #   DMN_CHECK_WORKDIR       where the classpath, classes and corpus export go.
+#                           Made absolute before use; a relative one is taken
+#                           relative to the caller's directory.
 #   DMN_CHECK_L4            the `l4` for --corpus. Else `l4` on PATH. Put YOUR
 #                           worktree's binary first: an `l4` older than the
 #                           corpus misreads newer syntax (CLAUDE.md section 3.1).
@@ -34,8 +51,8 @@
 # crashed a validator; 1 otherwise (WARNINGs do not fail the run unless
 # --fail-on-warning). That is dmn-check's own rule, and the Camunda leg's.
 #
-# Everything before the first skip uses only bash builtins, so selftest.sh can
-# test the skip paths with an empty PATH.
+# Everything before the Maven check uses only bash builtins, so selftest.sh can
+# test that skip with an empty PATH.
 set -euo pipefail
 
 case "${BASH_SOURCE[0]}" in */*) here="${BASH_SOURCE[0]%/*}" ;; *) here=. ;; esac
@@ -71,6 +88,13 @@ if [ "$corpus" = 0 ] && [ "${#roots[@]}" = 0 ]; then
   echo "usage: run.sh [--tsv F] [--fail-on-warning] FILE.dmn ...   |   run.sh --corpus [ROOT ...]" >&2
   exit 2
 fi
+# --corpus passes its own --tsv to the driver, and a second one would win and make
+# the kinds table vanish without a word.
+if [ "$corpus" = 1 ] && [ "${#passthru[@]}" -gt 0 ]; then
+  for a in "${passthru[@]}"; do
+    [ "$a" = "--tsv" ] && { echo "run.sh: --tsv cannot be combined with --corpus (it writes <workdir>/corpus/findings.tsv itself)" >&2; exit 2; }
+  done
+fi
 
 command -v mvn >/dev/null 2>&1 || skip "mvn not on PATH (brew install maven)"
 
@@ -88,13 +112,13 @@ if [ -z "${DMN_CHECK_JAVA_HOME:-}" ]; then
   done
 fi
 [ -n "${DMN_CHECK_JAVA_HOME:-}" ] && [ -x "$DMN_CHECK_JAVA_HOME/bin/java" ] \
-  || skip "no JDK 21+ found (set DMN_CHECK_JAVA_HOME); dmn-check 1.4.0 needs class file 65"
+  || skip "no JDK 21+ found (JAVA_HOME and PATH java are not consulted; set DMN_CHECK_JAVA_HOME); dmn-check 1.4.0 needs class file 65"
 export JAVA_HOME="$DMN_CHECK_JAVA_HOME"
 
 major="$("$JAVA_HOME/bin/java" -XshowSettings:properties -version 2>&1 \
   | sed -n 's/.*java\.specification\.version = \([0-9][0-9]*\).*/\1/p' | head -1)"
 [ -n "$major" ] && [ "$major" -ge 21 ] \
-  || skip "JAVA_HOME is Java ${major:-?}; dmn-check 1.4.0 needs 21+"
+  || skip "DMN_CHECK_JAVA_HOME ($JAVA_HOME) is Java ${major:-?}; dmn-check 1.4.0 needs 21+"
 
 # ---- the l4 (corpus mode only) -----------------------------------------------
 if [ "$corpus" = 1 ]; then
@@ -110,36 +134,73 @@ if [ "$corpus" = 1 ]; then
   esac
 fi
 
+# ---- the sha tool ------------------------------------------------------------
+# Before anything is downloaded: the pin below cannot be checked without one, and
+# a skip that has already fetched 18 jars is a worse skip.
+if command -v shasum >/dev/null 2>&1; then sha() { shasum -a 256 "$1"; }
+elif command -v sha256sum >/dev/null 2>&1; then sha() { sha256sum "$1"; }
+else skip "neither shasum nor sha256sum on PATH, so the jar pin cannot be checked"
+fi
+sha_of() { sha "$1" | cut -d' ' -f1; }
+
+# ---- the work directory ------------------------------------------------------
+# Absolute BEFORE any use: mvn resolves a relative -Dmdep.outputFile against the pom's
+# directory (so a relative workdir wrote cp.txt into the repo and then skipped for
+# an "empty classpath"), and the corpus branch changes directory.
+if [ -n "${DMN_CHECK_WORKDIR:-}" ]; then
+  out="$DMN_CHECK_WORKDIR"
+  mkdir -p "$out"
+else
+  # Per user: /tmp is shared on Linux, and a directory another user can write to
+  # holds a classpath and classes this script would run.
+  out="${TMPDIR:-/tmp}/l4-dmn-check-$(id -u)"
+  mkdir -p "$out"
+  [ -O "$out" ] || broken "$out exists and is not owned by you; set DMN_CHECK_WORKDIR"
+fi
+out="$(cd "$out" && pwd)"
+
 # ---- the classpath -----------------------------------------------------------
-out="${DMN_CHECK_WORKDIR:-${TMPDIR:-/tmp}/l4-dmn-check}"
-mkdir -p "$out"
+[ -f "$here/pom.xml" ] || broken "$here/pom.xml is missing"
 cp="$out/cp.txt"
-# Keyed on pom.xml's mtime, so bumping the pin cannot leave the old classpath behind.
-if [ ! -s "$cp" ] || [ "$here/pom.xml" -nt "$cp" ]; then
-  rm -f "$cp"
+# Keyed on the pom's hash, not its mtime: two checkouts sharing a workdir, or a
+# checkout switched to another branch, can each have the newer file.
+pomsha="$(sha_of "$here/pom.xml")"
+if [ ! -s "$cp" ] || [ "$(cat "$out/cp.pom.sha256" 2>/dev/null || true)" != "$pomsha" ]; then
+  rm -f "$cp" "$out/cp.pom.sha256"
   # Nothing is printed before this can skip: a skip is ONE line.
-  mvn -q -B -f "$here/pom.xml" -Dmdep.outputFile="$cp" dependency:build-classpath \
-    > "$out/mvn.log" 2>&1 \
-    || skip "could not resolve dmn-check from Maven (offline? see $out/mvn.log)"
+  if ! mvn -q -B -f "$here/pom.xml" -Dmdep.outputFile="$cp" dependency:build-classpath \
+      > "$out/mvn.log" 2>&1; then
+    # A pom Maven cannot read is this repo's defect, whatever machine it is on.
+    # Everything else Maven can fail at (resolving, downloading) is the machine's.
+    if grep -qE 'The build could not read|Non-parseable POM|Malformed POM' "$out/mvn.log"; then
+      broken "Maven cannot read $here/pom.xml (see $out/mvn.log)"
+    fi
+    skip "could not resolve dmn-check from Maven (offline? see $out/mvn.log)"
+  fi
   echo "# resolved de.redsix:dmn-check-cli into $out (first run only)" >&2
+  if [ -s "$cp" ]; then printf '%s\n' "$pomsha" > "$out/cp.pom.sha256"; fi
 fi
 [ -s "$cp" ] || skip "empty classpath after dependency:build-classpath (see $out/mvn.log)"
+
+# Read ONCE and used for javac and java alike, so what was checked is what runs.
+classpath="$(cat "$cp")"
+# An empty entry is the current directory to Java. `read -a` drops a trailing one,
+# so the jar loop below could not see it.
+case "$classpath" in
+  ''|:*|*:|*::*) broken "the classpath in $cp has an empty entry, which Java reads as the current directory" ;;
+esac
 
 # ---- the checksum pin --------------------------------------------------------
 # Maven checks a jar against the checksum the SAME repository publishes, which
 # stops a corrupt download and nothing else. jars.sha256 is the pin: one
 # `sha256  file-name` line per jar on the classpath, sorted.
-if command -v shasum >/dev/null 2>&1; then sha() { shasum -a 256 "$1"; }
-elif command -v sha256sum >/dev/null 2>&1; then sha() { sha256sum "$1"; }
-else skip "neither shasum nor sha256sum on PATH, so the jar pin cannot be checked"
-fi
 actual="$out/jars.actual"
 : > "$actual"
-# cp.txt has no trailing newline, so read returns 1 at EOF having filled the array
-IFS=: read -r -a jars < "$cp" || true
+IFS=: read -r -a jars <<< "$classpath"
 for jar in "${jars[@]}"; do
+  case "$jar" in /*) ;; *) broken "classpath entry '$jar' is not an absolute path" ;; esac
   [ -f "$jar" ] || broken "classpath names $jar, which is not a file"
-  printf '%s  %s\n' "$(sha "$jar" | cut -d' ' -f1)" "${jar##*/}" >> "$actual"
+  printf '%s  %s\n' "$(sha_of "$jar")" "${jar##*/}" >> "$actual"
 done
 LC_ALL=C sort -o "$actual" "$actual"
 if ! diff -u "$here/jars.sha256" "$actual" > "$out/jars.diff"; then
@@ -151,11 +212,35 @@ fi
 # `--release 21` so the cached class loads on every JDK this script accepts. The
 # Camunda leg compiles without it, and its README records the stale-cache trap
 # that follows; this harness does not inherit that trap.
+#
+# classes/ is first on the classpath, so whatever sits in it runs ahead of the
+# pinned jars. It is therefore trusted only while classes.stamp, written next to
+# it, still describes it exactly: the hash of the driver source, the hash of
+# jars.sha256 (the driver is compiled against those jars), and the hash of every
+# file under classes/. Anything else (an edited source, a bumped pin, a planted or
+# altered .class, an added file, a symlink) wipes classes/ and compiles afresh.
 src="$here/src/main/java/DmnCheckRun.java"
-if [ ! -s "$out/classes/DmnCheckRun.class" ] || [ "$src" -nt "$out/classes/DmnCheckRun.class" ]; then
-  mkdir -p "$out/classes"
-  "$JAVA_HOME/bin/javac" --release 21 -nowarn -cp "$(cat "$cp")" -d "$out/classes" "$src" \
+classes="$out/classes"
+stamp="$out/classes.stamp"
+srcsha="$(sha_of "$src" 2>/dev/null || true)"
+[ -n "$srcsha" ] || broken "cannot read $src"
+pinsha="$(sha_of "$here/jars.sha256")"
+snapshot() {
+  echo "source $srcsha"
+  echo "pin $pinsha"
+  [ -d "$classes" ] || return 0
+  ( cd "$classes"
+    if [ -n "$(find . ! -type d ! -type f -print)" ]; then echo "NOT-A-REGULAR-FILE"; fi
+    find . -type f | LC_ALL=C sort | while IFS= read -r f; do
+      printf '%s  %s\n' "$(sha_of "$f")" "$f"
+    done )
+}
+if [ ! -f "$stamp" ] || [ "$(snapshot)" != "$(cat "$stamp")" ]; then
+  rm -rf "$classes" "$stamp"
+  mkdir -p "$classes"
+  "$JAVA_HOME/bin/javac" --release 21 -nowarn -cp "$classpath" -d "$classes" "$src" \
     || broken "javac failed on $src (see above)"
+  snapshot > "$stamp"
 fi
 
 # The pin, read out of the pom rather than duplicated here, and handed to the
@@ -163,16 +248,12 @@ fi
 pinned="$(sed -n 's/.*<dmncheck\.version>\(.*\)<\/dmncheck\.version>.*/\1/p' "$here/pom.xml" | head -1)"
 [ -n "$pinned" ] || broken "no <dmncheck.version> in $here/pom.xml"
 
-run_driver() {
-  "$JAVA_HOME/bin/java" -Dorg.slf4j.simpleLogger.defaultLogLevel=off \
-    -Dl4.dmncheck.version.expected="$pinned" \
-    -cp "$out/classes:$(cat "$cp")" DmnCheckRun "$@"
-}
+jcmd=("$JAVA_HOME/bin/java" -Dorg.slf4j.simpleLogger.defaultLogLevel=off
+  -Dl4.dmncheck.version.expected="$pinned" -cp "$classes:$classpath" DmnCheckRun)
+run_driver() { "${jcmd[@]}" "$@"; }
 
 if [ "$corpus" = 0 ]; then
-  exec "$JAVA_HOME/bin/java" -Dorg.slf4j.simpleLogger.defaultLogLevel=off \
-    -Dl4.dmncheck.version.expected="$pinned" \
-    -cp "$out/classes:$(cat "$cp")" DmnCheckRun ${passthru[@]+"${passthru[@]}"} "${roots[@]}"
+  exec "${jcmd[@]}" ${passthru[@]+"${passthru[@]}"} "${roots[@]}"
 fi
 
 # ---- corpus mode -------------------------------------------------------------
