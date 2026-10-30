@@ -23,15 +23,6 @@ under a `WHERE` — Appendix A's `benefit amount` — still emits in Mode A).
 §10's P1/P2/P3/P4 remain the sequencing; **P1 and P2 are met** on the exhibit corpus, P3 is met in
 form (`statute.l4`) but not on a real statute, and P4 is untouched._
 
-> **Correction, 2026-10-30.**
-> Wherever this spec says "catala 1.2.1" or "`catala`/`clerk` 1.2.1" it means Catala built from upstream commit `fdf4ccd5` (master of 2026-07-30, which reports itself as 1.2.1), not the 1.2.1 release tarball.
-> `d37aca74`, the checkout commit named below, is `fdf4ccd5` plus one added `CLAUDE.md`.
-> On the release, `catala typecheck` and `catala proof` pass on the twelve goldens and `clerk test` fails 41 of 83 tests, because the release's `catala interpret -F json` writes `0.25` and `500.0` where the goldens' `catala-test-cli` blocks hold `"1/4"` and `"500"`, and it crashes on a result that holds an enumerated value (legalese/l4-ide Actions run 41010257517, reproduced on macOS).
-> The refusals quoted in this spec (a module name that does not match its file name, a line that starts with `>`, a structure with no fields, a scope call outside a scope) give the same result on the release.
-> The wording differs for the structure with no fields: the release says "The struct Empty does not have any fields; give it some for Catala to be able to accept it", where the quotation in §8.11 is the commit's.
-> Catala 1.3.0 (released 2026-09-30) contains `fdf4ccd5`; `clerk test` passes all 83 tests on it, measured 2026-10-30 on the goldens as legalese/l4-ide#786 (draft, not landed) leaves them.
-> The install route is in `doc/exports/catala.md`, "Which Catala to check it with".
-
 _Review round, 2026-08-16 (same day, second session). What review changed: (a) a working
 `catala`/`clerk` 1.2.1 toolchain now exists on this machine, built from the cited checkout commit,
 so Appendix A and the Mode B fragment are **executed**, not believed — the worked example
@@ -119,6 +110,15 @@ binaries at `~/.opam/catala/bin`; recipe in §8.9) — so Appendix A and the Mod
 **[E]**: `catala typecheck` green, `clerk test` green, values recorded below. The z3-backed
 `catala-proof` plugin is a separate opam package (`catala-proof.opam`) and is installed the same
 way when P4 needs it.
+
+> **Correction, 2026-10-30.**
+> Wherever this spec says "catala 1.2.1" or "`catala`/`clerk` 1.2.1" it means Catala built from upstream commit `fdf4ccd5` (master of 2026-07-30, which reports itself as 1.2.1), not the 1.2.1 release tarball.
+> `d37aca74`, the checkout commit named in the paragraph above, is `fdf4ccd5` plus one added `CLAUDE.md`.
+> On the release, `catala typecheck` and `catala proof` pass on the twelve goldens and `clerk test` fails 41 of 83 tests, because the release's `catala interpret -F json` writes `0.25` and `500.0` where the goldens' `catala-test-cli` blocks hold `"1/4"` and `"500"`, and it crashes on a result that holds an enumerated value (legalese/l4-ide Actions run 41010257517, reproduced on macOS).
+> The refusals quoted in this spec (a module name that does not match its file name, a line that starts with `>`, a structure with no fields, a scope call outside a scope) give the same result on the release.
+> The wording differs for the structure with no fields: the release says "The struct Empty does not have any fields; give it some for Catala to be able to accept it", where the quotation in §8.11 is the commit's.
+> Catala 1.3.0 (released 2026-09-30) contains `fdf4ccd5`; `clerk test` passes all 83 tests on it, measured 2026-10-30 on the goldens as legalese/l4-ide#786 (draft, not landed) leaves them.
+> The install route is in `doc/exports/catala.md`, "Which Catala to check it with".
 
 ---
 
