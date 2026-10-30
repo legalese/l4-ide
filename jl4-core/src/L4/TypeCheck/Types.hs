@@ -115,6 +115,11 @@ data CheckError =
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | ExportEventType (Maybe SrcRange) Resolved (Maybe Resolved)
+    -- ^ An @export-decorated DECIDE takes or returns an EVENT (see
+    -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
+    -- the exported function's name, and the input's name (Nothing when it is
+    -- the result).
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -308,6 +313,7 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
+  rangeOf (ExportEventType r _ _)           = r
   rangeOf (CheckInfo _ mr)                  = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
@@ -715,6 +721,32 @@ ambiguousType n xs = do
   u <- newUnique
   pure (OutOfScope u n)
 
+-- | Is this 'Resolved' the sentinel that 'outOfScope', 'ambiguousTerm' and
+-- 'ambiguousType' mint to make progress after a name-resolution failure?
+--
+-- Such a sentinel is only ever created *after* the corresponding
+-- 'OutOfScopeError' \/ 'AmbiguousTermError' \/ 'AmbiguousTypeError' has been
+-- reported, and its 'Unique' is deliberately never registered in the
+-- 'EntityInfo'. Anything we subsequently derive from it is therefore known
+-- garbage, and diagnostics about that garbage are cascade, not news.
+isOutOfScope :: Resolved -> Bool
+isOutOfScope OutOfScope{} = True
+isOutOfScope _            = False
+
+-- | Every 'Resolved' occurring in head (type constructor \/ type variable)
+-- position within a type, outermost first.
+--
+-- Deliberately hand-written rather than derived via @gplate@: we want exactly
+-- the names the type is *built from*, not whatever 'Resolved's may additionally
+-- be squirrelled away inside 'Anno' payloads.
+typeHeads :: Type' Resolved -> [Resolved]
+typeHeads (Type _)        = []
+typeHeads (TyApp _ n ts)  = n : concatMap typeHeads ts
+typeHeads (Fun _ onts t)  =
+  concatMap (typeHeads . optionallyNamedTypeType) onts ++ typeHeads t
+typeHeads (Forall _ _ t)  = typeHeads t
+typeHeads (InfVar _ _ _)  = []
+
 -- ----------------------------------------------------------------------------
 -- Info Map
 -- ----------------------------------------------------------------------------
@@ -891,15 +923,30 @@ type ToResolved = Optics.GPlate Resolved
 toResolved :: ToResolved a => a -> [Resolved]
 toResolved = Optics.toListOf Optics.gplate
 
--- | Should never return 'Nothing' if our system is OK.
+-- | Look up the entity a 'Resolved' refers to.
+--
+-- Returns 'Nothing' for an 'OutOfScope' sentinel *without* complaining: those
+-- 'Unique's are minted fresh by 'outOfScope' \/ 'ambiguousTerm' \/
+-- 'ambiguousType' and are deliberately never registered in the 'EntityInfo', so
+-- a miss is expected error recovery after an already-reported name-resolution
+-- failure — not an invariant violation. Reporting 'MissingEntityInfo' for them
+-- turned every unresolved or ambiguous name into a spurious "this is an error
+-- in this system and should be reported as a bug" (issue #920).
+--
+-- For every other 'Resolved' a miss really is an internal invariant violation
+-- ('extendEnv' registers 'environment' and 'entityInfo' together, so every
+-- 'Ref' \/ 'Def' unique has an entry), and we keep reporting it. After this
+-- change, 'MissingEntityInfo' means what its message claims.
 getEntityInfo :: Resolved -> Check (Maybe CheckEntity)
 getEntityInfo r = do
   ei <- asks (.entityInfo)
   case Map.lookup (getUnique r) ei of
-    Nothing       -> do
-      addError (MissingEntityInfo r)
-      pure Nothing
     Just (_n, ce) -> pure (Just ce)
+    Nothing
+      | isOutOfScope r -> pure Nothing
+      | otherwise      -> do
+          addError (MissingEntityInfo r)
+          pure Nothing
 
 -- | Given a substitution from uniques to types, substitute
 -- all occurrences of the given uniques. There's no scoping
