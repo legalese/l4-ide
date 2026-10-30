@@ -9,11 +9,7 @@
 import { stat } from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import {
-  McpToolClient,
-  type AuthProvider,
-  type Logger,
-} from '@repo/legalese-agent'
+import { McpToolClient, type Logger } from '@repo/legalese-agent'
 import {
   ConfigError,
   DEV_USAGE,
@@ -119,7 +115,9 @@ async function runSession(
     `harness ${HARNESS_VERSION} starting (mode=${cfg.mode}, task=${taskId})`
   )
 
-  let auth: AuthProvider
+  // The concrete providers: their headers don't depend on the request's
+  // URL (the key goes only to the configured origins, authRetryingFetch).
+  let auth: KeyChainAuth | DevAuth
   if (keyChain) {
     // Renew and retry once when ai-proxy or MCP answer 401 (or ai-proxy
     // answers 403 invalid-credentials).
