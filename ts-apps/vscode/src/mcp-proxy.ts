@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import * as vscode from 'vscode'
-import type { AuthManager } from './auth.js'
+import { type AuthManager, isLegaleseCloudUrl } from './auth.js'
 import { showTimedWarningMessage } from './notifications.js'
 import { installL4Cli } from './install-cli.js'
 
@@ -183,7 +183,7 @@ export class McpProxy implements vscode.Disposable {
 
     let resp: Response
     try {
-      const headers = await this.auth.getAuthHeaders()
+      const headers = await this.auth.getAuthHeaders(mcpUrl)
       resp = await fetch(mcpUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
@@ -200,7 +200,7 @@ export class McpProxy implements vscode.Disposable {
       )
     }
 
-    await this.captureRefreshedSession(resp)
+    if (isLegaleseCloudUrl(mcpUrl)) await this.captureRefreshedSession(resp)
 
     if (resp.status === 401 || resp.status === 403) {
       const preview = await resp.text().catch(() => '')

@@ -22,8 +22,9 @@
   import { LadderApiForMonaco } from '$lib/ladder-api-for-monaco'
   import { MonacoErrorLens } from '@ym-han/monaco-error-lens'
 
-  import { defaultExample, type LegalExample } from '$lib/legal-examples'
-  import ExampleSelector from '$lib/components/example-selector.svelte'
+  // Kept with the test corpus, so CI keeps it compiling
+  import starterProgram from '../../../../jl4/examples/legal/library-card.l4?raw'
+  import { getTurnstileToken } from '$lib/turnstile'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import {
     EvalDirectiveResultRequestType,
@@ -53,7 +54,8 @@
   // `persistSession` does not need to be reactive
   let persistSession: undefined | (() => Promise<string | undefined>) =
     undefined
-  const sessionUrl = import.meta.env.VITE_SESSION_URL || 'http://localhost:5008'
+  const sessionUrl = import.meta.env.VITE_SESSION_URL
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
 
   let currentFunctionName: string | null = $state(null)
   let currentVerDocId: { uri: string; version: number } | null = null
@@ -68,10 +70,14 @@
   const ownUrl = new URL(window.location.href)
 
   let showFrame = $state(!ownUrl.searchParams.has('standalone'))
-  let showExamples = $state(!ownUrl.searchParams.has('no-examples'))
-  let showSidebar = $state(
-    window.innerWidth < 1024 ? false : !ownUrl.searchParams.has('no-examples')
-  )
+  // `no-examples` predates the docs sidebar; existing embeds use it to hide the sidebar
+  const showDocsToggle = !ownUrl.searchParams.has('no-examples')
+  const docsUrl = 'https://legalese.com/l4'
+  const docsOrigin = new URL(docsUrl).origin
+  let showSidebar = $state(false)
+  // The docs iframe stays mounted once opened, so reopening keeps the reader's place
+  let docsOpened = $state(false)
+  let docsFrame: HTMLIFrameElement | undefined = $state(undefined)
   let showVisualizer = $state(false)
   let rightPaneView: 'ladder' | 'inspector' = $state('ladder')
   let inspectorPanel: InspectorPanel | undefined = $state(undefined)
@@ -174,6 +180,7 @@
   let monacoErrorLens: MonacoErrorLens | undefined
   let lspConnection: LspConnectionResult | undefined
   let renderResultCommandDisposable: vscode.Disposable | undefined
+  let lirSubscription: ReturnType<LirRegistry['subscribe']> | undefined
 
   function bindingsKey(bindings: Record<string, boolean>) {
     const entries = Object.entries(bindings).sort(([a], [b]) =>
@@ -351,7 +358,7 @@
       })
 
       editor = monaco.editor.create(editorElement, {
-        value: defaultExample.content,
+        value: starterProgram,
         language: 'jl4',
         automaticLayout: true,
         wordBasedSuggestions: 'currentDocument',
@@ -462,18 +469,34 @@
       )
 
       const sessionid: string | null = ownUrl.searchParams.get('id')
-      if (sessionid) {
-        const response = await fetch(`${sessionUrl}?id=${sessionid}`)
-        logger.debug('sent GET for session')
-        if (response.ok) {
-          const prog = await response.json()
-          if (prog) {
-            editor.setValue(prog)
+      if (sessionid && sessionUrl) {
+        // A failed load must not keep the LSP below from starting
+        try {
+          const response = await fetch(
+            `${sessionUrl}?id=${encodeURIComponent(sessionid)}`
+          )
+          logger.debug('sent GET for session')
+          if (response.ok) {
+            const prog = await response.json()
+            if (prog) {
+              editor.setValue(prog)
+            }
+          } else if (response.status === 404 || response.status === 400) {
+            logger.debug('no such session - deleting search param')
+            ownUrl.searchParams.delete('id')
+            history.pushState(null, '', ownUrl)
+          } else {
+            // Throttled or a server error: keep the id so a reload can retry
+            logger.error(
+              `could not load session ${sessionid}, status ${response.status}`
+            )
+            toast.push(
+              'Could not load the shared program. Reload to try again.'
+            )
           }
-        } else {
-          logger.debug('response was not okay - deleting search param')
-          ownUrl.searchParams.delete('id')
-          history.pushState(null, '', ownUrl)
+        } catch (e) {
+          logger.error(`could not load session ${sessionid}, error: ${e}`)
+          toast.push('Could not load the shared program. Reload to try again.')
         }
       }
 
@@ -489,21 +512,43 @@
         history.replaceState(null, '', ownUrl)
       }
 
+      const fragmentProgram = programFromFragment(ownUrl)
+      if (fragmentProgram !== undefined) {
+        editor.setValue(fragmentProgram)
+        clearProgramFragment()
+      }
+
       persistSession = async () => {
-        if (!editor) return undefined
+        if (!editor || !sessionUrl) return undefined
         const bufferContent: string = editor.getValue()
-        const response = await fetch(sessionUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bufferContent),
-        })
-        logger.debug('sent POST for session')
-        const newSessionId: string = await response.json()
-        if (newSessionId) {
-          logger.debug(`new session id: ${newSessionId}`)
-          return newSessionId
-        } else {
-          logger.error(`response was not present`)
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          }
+          if (turnstileSiteKey) {
+            headers['X-Turnstile-Token'] =
+              await getTurnstileToken(turnstileSiteKey)
+          }
+          const response = await fetch(sessionUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(bufferContent),
+          })
+          logger.debug('sent POST for session')
+          if (!response.ok) {
+            logger.error(`session POST failed with status ${response.status}`)
+            return undefined
+          }
+          const newSessionId: string = await response.json()
+          if (newSessionId) {
+            logger.debug(`new session id: ${newSessionId}`)
+            return newSessionId
+          } else {
+            logger.error(`response was not present`)
+            return undefined
+          }
+        } catch (e) {
+          logger.error(`could not persist session, error: ${e}`)
           return undefined
         }
       }
@@ -809,16 +854,18 @@
     await runClient()
     console.log('✅ runClient() completed')
 
-    const sub = lirRegistry.subscribe((_ctx, id) => {
+    // Unsubscribed in onDestroy below: lifecycle functions can't be called after an await
+    lirSubscription = lirRegistry.subscribe((_ctx, id) => {
       if (!currentLadderGraphId) return
       if (!id.isEqualTo(currentLadderGraphId)) return
       scheduleQueryPlanRefresh()
     })
-
-    onDestroy(() => sub.unsubscribe())
   })
 
   onDestroy(() => {
+    lirSubscription?.unsubscribe()
+    lirSubscription = undefined
+
     renderResultCommandDisposable?.dispose()
     renderResultCommandDisposable = undefined
 
@@ -875,28 +922,102 @@
       window.history.pushState(null, '', shareUrl)
 
       if (navigator.share) {
-        navigator.share({
-          url: shareUrl,
-          text: 'L4 document',
-        })
+        navigator
+          .share({
+            url: shareUrl,
+            text: 'L4 document',
+          })
+          .catch(() => {})
       }
 
-      await navigator.clipboard.writeText(shareUrl)
-      toast.push('Link copied to clipboard.', { duration: 4000 })
+      // The Turnstile check and the POST can outlast the click's user
+      // activation, and then the browser refuses the clipboard write
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        toast.push('Link copied to clipboard.', { duration: 4000 })
+      } catch {
+        toast.push(`Share link (also in the address bar): ${shareUrl}`, {
+          duration: 15000,
+        })
+      }
     } else {
       toast.push('Could not persist the file to generate a share link.')
     }
   }
 
-  function handleExampleSelect(example: LegalExample) {
-    if (showExamples && editor) {
-      editor.setValue(example.content)
-      inspectorPanel?.clear()
+  function toggleSidebar() {
+    showSidebar = !showSidebar
+    docsOpened ||= showSidebar
+  }
 
-      if (window.innerWidth <= 1023) {
-        showSidebar = false
-      }
+  // The docs in the sidebar ask whether they're in the editor (l4-docs-hello).
+  // Once told, their "Run code" buttons send the example here
+  // (l4-open-program) instead of opening a new tab.
+  function handleDocsMessage(event: MessageEvent) {
+    if (event.origin !== docsOrigin) return
+    if (!docsFrame || event.source !== docsFrame.contentWindow) return
+    if (event.data?.type === 'l4-docs-hello') {
+      docsFrame.contentWindow?.postMessage(
+        { type: 'l4-editor-host' },
+        docsOrigin
+      )
+    } else if (
+      event.data?.type === 'l4-open-program' &&
+      typeof event.data.program === 'string'
+    ) {
+      openDocsExample(event.data.program)
     }
+  }
+
+  function openDocsExample(program: string) {
+    const model = editor?.getModel()
+    if (!editor || !model) return
+    // An edit rather than setValue, so undo brings back the previous program
+    editor.pushUndoStop()
+    editor.executeEdits('docs-example', [
+      { range: model.getFullModelRange(), text: program },
+    ])
+    editor.pushUndoStop()
+    editor.setPosition({ lineNumber: 1, column: 1 })
+    editor.revealLine(1)
+    inspectorPanel?.clear()
+    // Below 1024px the sidebar covers the editor
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      showSidebar = false
+    }
+    toast.push('Opened the example. Undo brings back your program.', {
+      duration: 6000,
+    })
+  }
+
+  // A program too long for CloudFront's 8 KB URL limit comes in the fragment,
+  // which never leaves the browser: #program=<encodeURIComponent(program)>
+  function programFromFragment(url: URL): string | undefined {
+    const encoded = url.hash.match(/^#program=(.*)$/)?.[1]
+    if (encoded === undefined) return undefined
+    try {
+      return decodeURIComponent(encoded)
+    } catch (e) {
+      console.error(`could not decode program from url fragment, error: ${e}`)
+      return undefined
+    }
+  }
+
+  function clearProgramFragment() {
+    const url = new URL(window.location.href)
+    url.hash = ''
+    history.replaceState(null, '', url)
+  }
+
+  // The docs open examples in a tab named l4-code. When that tab already
+  // shows the editor, a new #program= changes only the fragment, so the page
+  // doesn't load again.
+  function handleHashChange() {
+    if (!editor) return
+    const program = programFromFragment(new URL(window.location.href))
+    if (program === undefined) return
+    clearProgramFragment()
+    openDocsExample(program)
   }
 
   function handleLoadFile() {
@@ -1017,16 +1138,19 @@
   }
 </script>
 
+<svelte:window onmessage={handleDocsMessage} onhashchange={handleHashChange} />
+
 {#if showFrame}
   <div class="top-bar">
     <div>
       <h3>L4 Editor</h3>
     </div>
-    {#if showExamples}
+    {#if showDocsToggle}
       <button
         class="fab fab-sidebar {showSidebar ? 'open' : ''}"
-        onclick={() => (showSidebar = !showSidebar)}
-        aria-label="Toggle sidebar"
+        onclick={toggleSidebar}
+        aria-label="Toggle the L4 documentation"
+        title="L4 documentation"
       >
         <svg
           width="22"
@@ -1141,38 +1265,48 @@
         Inspector
       </button>
     {/if}
-    <button
-      class="fab fab-share"
-      onclick={handleShare}
-      aria-label="Share the current file"
-      title="Share the current file"
-      disabled={persistButtonBlocked}
-    >
-      <svg
-        width="20"
-        height="20"
-        style="font-size: 24px; vertical-align: middle; margin-right: 0.2em;"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        stroke-width="1.3"
-        ><path
-          d="M6.99609 9L11.9961 4L16.9961 9M6.99609 9M12 16V4"
-          stroke="currentColor"
-        ></path><path
-          d="M4 15V16C4 18.2091 5.79086 20 8 20H16C18.2091 20 20 18.2091 20 16V15"
-          stroke="currentColor"
-        ></path></svg
+    {#if sessionUrl}
+      <button
+        class="fab fab-share"
+        onclick={handleShare}
+        aria-label="Share the current file"
+        title="Share the current file"
+        disabled={persistButtonBlocked}
       >
-      Share
-    </button>
+        <svg
+          width="20"
+          height="20"
+          style="font-size: 24px; vertical-align: middle; margin-right: 0.2em;"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          stroke-width="1.3"
+          ><path
+            d="M6.99609 9L11.9961 4L16.9961 9M6.99609 9M12 16V4"
+            stroke="currentColor"
+          ></path><path
+            d="M4 15V16C4 18.2091 5.79086 20 8 20H16C18.2091 20 20 18.2091 20 16V15"
+            stroke="currentColor"
+          ></path></svg
+        >
+        Share
+      </button>
+    {/if}
   </div>
-  {#if showExamples && showSidebar}
-    <div class="sidebar">
-      <ExampleSelector onExampleSelect={handleExampleSelect} />
+  {#if showDocsToggle && docsOpened}
+    <div class="sidebar" class:hidden-pane={!showSidebar}>
+      <!-- No allow-top-navigation: the docs can't navigate the editor away -->
+      <iframe
+        bind:this={docsFrame}
+        class="docs-frame"
+        src={docsUrl}
+        title="L4 documentation"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        referrerpolicy="strict-origin-when-cross-origin"
+      ></iframe>
     </div>
   {/if}
-  <div class="panes">
+  <div class="panes" class:with-sidebar={showSidebar}>
     <Resizable.PaneGroup direction="horizontal" bind:this={paneGroup}>
       <Resizable.Pane defaultSize={showVisualizer ? 50 : 100}>
         <div id="jl4-editor" class="h-full" bind:this={editorElement}></div>
@@ -1274,12 +1408,23 @@
   .spacer {
     flex: 1;
   }
+  :root {
+    --sidebar-width: max(30%, 380px);
+  }
   .sidebar {
-    width: max(20%, 250px);
+    width: var(--sidebar-width);
     position: absolute;
     top: 42px;
     height: calc(100dvh - 42px);
     left: 0;
+    background: white;
+    /* Continues the editor's top border (style.css) under the header */
+    border-top: 1px solid grey;
+  }
+  .docs-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
   }
   .panes {
     position: absolute;
@@ -1289,8 +1434,8 @@
     right: 0;
     height: calc(100dvh - 42px);
   }
-  .sidebar + .panes {
-    left: max(20%, 250px);
+  .panes.with-sidebar {
+    left: var(--sidebar-width);
   }
   h3 {
     font-size: 1.4rem;
@@ -1326,7 +1471,7 @@
   }
   .fab-sidebar.open {
     position: absolute;
-    left: calc(max(20%, 250px) + 0.5rem);
+    left: calc(var(--sidebar-width) + 0.5rem);
   }
   .fab-sidebar.open .arrow-right,
   .fab-sidebar:not(.open) .arrow-left {
@@ -1345,14 +1490,13 @@
   }
 
   @media (max-width: 1023px) {
-    .sidebar + .panes {
+    .panes.with-sidebar {
       left: 0;
     }
     .sidebar {
       position: fixed;
       z-index: 10;
       width: 100vw;
-      backdrop-filter: blur(4px);
     }
     .fab-sidebar {
       position: relative !important;
