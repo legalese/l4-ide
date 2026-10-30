@@ -41,6 +41,8 @@ module L4.EvaluateLazy
 , safePostprocessTrace
 , tracePostprocessFailed
 , prettyLedger
+, ShownValue (..)
+, LedgerDisplay (..)
   -- * Ledger substrate (M0). Exposed for the test suite; not part of the
   -- stable public API.
 , Eval
@@ -67,8 +69,10 @@ import L4.EvaluateLazy.Trace
 import L4.Evaluate.Ledger
   ( EventRoute (..)
   , Ledger
-  , LedgerEvent (..)
-  , LedgerStore (..)
+  , LedgerEvent
+  , LedgerEvent' (..)
+  , LedgerStore
+  , LedgerStore' (..)
   , Path
   , Provenance (..)
   , emptyStore
@@ -128,7 +132,19 @@ data EvalConfig = EvalConfig
     -- module as a Shake rule) must say so here, because GHC's allocation
     -- counter belongs to a thread and the rule runs on another one than the
     -- caller's: a limit set on the caller never sees it.
+  , ledgerDisplay :: !LedgerDisplay
+    -- ^ Whether each directive's ledger is also forced for display
+    -- ('EvalDirectiveResult.shownLedger'). 'ShowLedger' by default. A
+    -- surface that never prints the ledger (jl4-service, the WASM API) says
+    -- 'LedgerNotShown' and spares itself the forcing, which can be as
+    -- expensive as the recorded value is deep.
   }
+
+-- | Whether a directive's ledger is forced to normal form for display.
+-- Which surfaces skip it is assumed, not ruled: the ones that never print
+-- a ledger row.
+data LedgerDisplay = ShowLedger | LedgerNotShown
+  deriving stock (Eq, Show, Generic)
 
 -- | A cap, in bytes, on what an evaluation may allocate.
 -- Exceeding it raises 'AllocationLimitExceeded' out of the evaluation, and
@@ -145,7 +161,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing ShowLedger)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -259,6 +275,9 @@ runConfig = \ case
     -- UNKNOWN-EVALUATION-SPEC §4.5: every step counts once the counter has
     -- started, and none before
     tickUnknownSteps
+    -- and against the display budget while a ledger row is being forced
+    -- for display (LED)
+    tickDisplaySteps
     runConfigStep config
 
 runConfigStep :: Config -> Eval WHNF
@@ -286,16 +305,16 @@ runConfigStep = \ case
 
 -- | Evaluate an EVAL directive. For this, we evaluate to normal form,
 -- not just WHNF.
-nfDirective :: EvalDirective -> Eval EvalDirectiveResult
-nfDirective d = fst <$> nfDirectiveWith False d
+nfDirective :: LedgerDisplay -> EvalDirective -> Eval EvalDirectiveResult
+nfDirective disp d = fst <$> nfDirectiveWith disp False d
 
 -- | 'nfDirective', optionally with the deontic step log captured for the
 -- directive (P2b). The log is switched on around the evaluation only — the
 -- normal-form pass runs inside it too, because forcing the residual can run
 -- nothing regulative — and it is off again before the ledger is snapshotted.
 -- With the flag off this IS 'nfDirective': the same code path, an empty list.
-nfDirectiveWith :: Bool -> EvalDirective -> Eval (EvalDirectiveResult, [DeonticStep])
-nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ do
+nfDirectiveWith :: LedgerDisplay -> Bool -> EvalDirective -> Eval (EvalDirectiveResult, [DeonticStep])
+nfDirectiveWith disp withSteps (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ do
   -- T6: open a fresh, directive-local context-read span. (Exceptional
   -- unwinding closes spans as it pops UpdateThunk frames — see
   -- 'unwindFrame' — but a successful directive legitimately leaves its own
@@ -410,8 +429,61 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- pending Meng's review).
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
-  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
+  -- The ledger as the reader will see it: every stored value forced to
+  -- normal form, for display only. A RECORD stores its value at WHNF, so a
+  -- constructor's fields and a list's cells are still heap references at the
+  -- write, and a reference prints as @&n\@file@. This pass runs LAST, after
+  -- the verdict, the trace, the deontic steps, the notes, the presumed log
+  -- and the reached inputs have all been taken: forcing can raise, refuse,
+  -- take a default, start the unknown-step counter, or even append a row
+  -- (a RECORD nested in a recorded value), and none of that may reach the
+  -- directive's result. The appended row would land in the live store, not
+  -- in the snapshot traversed here, and the store is discarded on exit.
+  --
+  -- Each row is forced under the temporal context its write was made in
+  -- ('Provenance.writeCtx'), not the directive's root context: a part of the
+  -- value that reads the context (a @RECALL@ of a dated cell, a @TODAY@)
+  -- was written to mean what it means there. Forced at the root, a row
+  -- written under @EVAL UNDER VALID TIME d@ showed a @RECALL@ as of today
+  -- while the same @#EVAL@ returned the value as of @d@ — a quiet wrong
+  -- answer, measured on @ok/ledger/record-temporal-context.l4@.
+  shownLedger <- case disp of
+    LedgerNotShown -> pure Nothing
+    ShowLedger     -> Just <$> showStore directiveLedger
+  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed shownLedger, steps)
   where
+    showStore :: LedgerStore -> Eval (LedgerStore' ShownValue)
+    showStore store =
+      MkLedgerStore
+        <$> traverse (traverse showEvent) store.ownLedgers
+        <*> traverse showEvent store.officialLedger
+
+    -- Per row, so that one field that cannot be evaluated hides its own
+    -- row's value and nothing else. The catch is at the directive boundary,
+    -- after the verdict is fixed: nothing resumes evaluation with a value in
+    -- a refusal's place (see 'refuseWith'). The context the row was written
+    -- under is in force for the row and restored after it whether the force
+    -- returned or raised; 'tryEval' turns the raise into a value here, so
+    -- the restore is unconditional.
+    --
+    -- Each row has its own step budget, 'maximumDisplaySteps' (LED, ruled
+    -- 2026-10-24: showing the ledger must not change whether a run ends).
+    -- A recorded value the program never forced may not terminate, and the
+    -- directive's own verdict is already in hand; a row whose value takes
+    -- more steps than the budget prints the budget wording in its value
+    -- column and the run goes on to the next row. The budget is a separate
+    -- counter from the directive's unknown-step counter (C4), which this
+    -- pass does not touch.
+    showEvent :: LedgerEvent -> Eval (LedgerEvent' ShownValue)
+    showEvent (Assign path v prov) = do
+      ambient <- getTemporalContext
+      putTemporalContext prov.writeCtx
+      startDisplayBudget
+      shown <- either Unshown Shown <$> tryEval (nf v)
+      stopDisplayBudget
+      putTemporalContext ambient
+      pure (Assign path shown prov)
+
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
     captureSteps
       | withSteps = captureDeonticSteps
@@ -487,7 +559,9 @@ data EvalDirectiveResult =
       -- captured before 'withFreshLedger' discarded the per-directive store.
       -- Newest-last within each ledger. Empty for a directive that wrote nothing
       -- (pure reads / ordinary expressions) — rendered as nothing in that case
-      -- so reads do not clutter the output.
+      -- so reads do not clutter the output. The values are the machine's own
+      -- 'WHNF's, whose fields are heap references: inspect them, but print
+      -- 'shownLedger'.
     , notes :: ![Text]
       -- ^ what the run REPORTED without failing while producing the value
       -- ('L4.EvaluateLazy.Machine.tellNote'; EVERY-EACH-QUANTIFIER-SPEC
@@ -501,7 +575,27 @@ data EvalDirectiveResult =
       -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). Not rendered by the
       -- printers here; @l4 batch@ and @jl4-service@ turn it into their
       -- @presumed@ list.
+    , shownLedger :: !(Maybe (LedgerStore' ShownValue))
+      -- ^ 'ledger' as the reader sees it: the same rows, each value forced to
+      -- normal form (or the reason it could not be) while the directive's
+      -- heap was still alive, under the temporal context of its own write.
+      -- This is what every printer renders; a 'WHNF' prints its fields as
+      -- @&n\@file@ references, which is what the reader used to see for any
+      -- RECORD of a record or a list. 'Nothing' when the run was told not to
+      -- force it ('EvalConfig.ledgerDisplay'), on a surface that prints no
+      -- ledger; the printers here then print none.
     }
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | A ledger row's value as the reader sees it: the stored value in normal
+-- form, or the exception that forcing it for display raised. The row's
+-- write happened either way — the value is the machine's, this is only how
+-- far the printer could follow it — and the directive's own verdict was
+-- settled before the attempt ('nfDirectiveWith').
+data ShownValue =
+    Shown NF
+  | Unshown EvalException
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -601,7 +695,7 @@ prettyReductionOutcome (ReducedUndetermined ns) =
 -- >   RECORD `freezing point of water` IS 273.15   [party=Alice, source=RECORD, at=...]
 -- > Official record:
 -- >   COMMIT `fp` IS 273.15   [party=Court, source=COMMIT, at=...]
-prettyLedger :: LedgerStore -> Text
+prettyLedger :: LedgerStore' ShownValue -> Text
 prettyLedger store =
   Text.concat (ownBlocks <> [officialBlock])
   where
@@ -623,9 +717,9 @@ prettyLedger store =
         []     -> Text.empty
         events -> "\n" <> header <> ":\n" <> Text.intercalate "\n" (map prettyLedgerEvent events)
 
-prettyLedgerEvent :: LedgerEvent -> Text
+prettyLedgerEvent :: LedgerEvent' ShownValue -> Text
 prettyLedgerEvent (Assign path val prov) =
-  "  " <> verb <> " " <> renderPath path <> " IS " <> prettyLayout val
+  "  " <> verb <> " " <> renderPath path <> " IS " <> prettyShownValue val
     <> "   " <> renderProvenance prov
   where
     -- The provenance source distinguishes RECORD (own ledger) from
@@ -633,6 +727,24 @@ prettyLedgerEvent (Assign path val prov) =
     verb = case prov.source of
       "COMMIT" -> "COMMIT"
       _        -> "RECORD"
+
+-- | The value column of a ledger row. A value that could not be forced for
+-- display says so in the angle-bracket form the printer uses for anything
+-- that is not a printable value (@<function>@, @<environment>@), with the
+-- reason on the same line so the row stays one line. A refusal is named as
+-- one, as every other surface names it: it is not an error.
+prettyShownValue :: ShownValue -> Text
+prettyShownValue = \ case
+  Shown v                        -> prettyLayout v
+  Unshown (RefusalException ref) -> "<refused: " <> ref.message <> ">"
+  -- The row's own budget ran out (LED): say so in the row's own words, so
+  -- a reader can tell a value that could not be shown from one that could
+  -- not be computed.
+  Unshown (UserEvalException DisplayBudgetExhausted) ->
+    "<could not be evaluated: showing this value took more than "
+      <> Text.pack (show maximumDisplaySteps) <> " steps>"
+  Unshown exc                    ->
+    "<could not be evaluated: " <> Text.unwords (map Text.strip (prettyEvalException exc)) <> ">"
 
 -- | Render a cell 'Path' back to its backtick surface form, e.g.
 -- @`freezing point of water`@. M1/M1.5 cells are single-segment; nested
@@ -658,10 +770,10 @@ renderProvenance prov =
 -- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace _ledger ns _presumed shown) =
    prettyEvalDirectiveValue res
    <> prettyNotes ns
-   <> prettyLedger led
+   <> foldMap prettyLedger shown
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -669,10 +781,10 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presu
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace _ledger ns _presumed shown) =
    prettyEvalDirectiveValueWithFields fields res
    <> prettyNotes ns
-   <> prettyLedger led
+   <> foldMap prettyLedger shown
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
@@ -687,7 +799,7 @@ prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
 -- ----------------------------------------------------------------------------
 
 instance Aeson.ToJSON EvalDirectiveResult where
-  toJSON (MkEvalDirectiveResult _range res _trace _ledger ns _presumed) = Aeson.object $
+  toJSON (MkEvalDirectiveResult _range res _trace _ledger ns _presumed _shown) = Aeson.object $
     [ "result" Aeson..= res
     , "trace"  Aeson..= Aeson.Null
     ]
@@ -839,7 +951,7 @@ evalAndNF d r = do
 -- the results of the (L)EVAL directives in this module.
 --
 execEvalModuleWithEnv :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
-execEvalModuleWithEnv = execEvalModuleWith nfDirective
+execEvalModuleWithEnv evalConfig = execEvalModuleWith (nfDirective evalConfig.ledgerDisplay) evalConfig
 
 -- | LTS-VISUALISER §4.3 (P2b): 'execEvalModuleWithEnv' with the deontic step
 -- log switched on for every directive, returning each directive's steps
@@ -851,7 +963,7 @@ execEvalModuleWithEnv = execEvalModuleWith nfDirective
 -- This is the library seam P2c (the marking and the enabled set) and P2a′
 -- (the list) build on; it is deliberately not a CLI.
 execEvalModuleWithDeonticLog :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [(EvalDirectiveResult, [DeonticStep])])
-execEvalModuleWithDeonticLog = execEvalModuleWith (nfDirectiveWith True)
+execEvalModuleWithDeonticLog evalConfig = execEvalModuleWith (nfDirectiveWith evalConfig.ledgerDisplay True) evalConfig
 
 execEvalModuleWith :: (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
 execEvalModuleWith = execEvalModuleWithDefaults noRootFills []
@@ -863,7 +975,7 @@ execEvalModuleWith = execEvalModuleWithDefaults noRootFills []
 -- their inputs this way.
 execEvalModuleWithEnvAndImports :: EvalConfig -> EntityInfo -> Environment -> [Declare Resolved] -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
 execEvalModuleWithEnvAndImports evalConfig entityInfo env imported =
-  execEvalModuleWithDefaults noRootFills imported nfDirective evalConfig entityInfo env
+  execEvalModuleWithDefaults noRootFills imported (nfDirective evalConfig.ledgerDisplay) evalConfig entityInfo env
 
 -- | Definitions a caller filled with a @TYPICALLY@ default at the root, keyed
 -- by the 'Unique' of the 0-ary definition holding the default. Forcing one
@@ -923,13 +1035,15 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   -- UNKNOWN-EVALUATION-SPEC §4.5: stopped until a directive's first term
   unknownSteps   <- newIORef (-1)
   unknownReached <- newIORef []
+  -- LED: the display pass's own budget, stopped until it forces a row
+  displaySteps   <- newIORef (-1)
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
-    , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog
+    , reofferedEvents, notes, unknownSteps, displaySteps, unknownReached, deonticLog
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
@@ -1121,8 +1235,8 @@ forEachDirectiveFreshHeap prepare runDirective baseEnv m n =
 -- JSON keys are matched to ASSUME'd L4 variables by name.
 -- The approach: first evaluate the module normally (which pre-allocates References),
 -- then write JSON values into the References for ASSUME'd variables.
-evalModuleAndDirectivesWithJSON :: Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
-evalModuleAndDirectivesWithJSON json env m = do
+evalModuleAndDirectivesWithJSON :: LedgerDisplay -> Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
+evalModuleAndDirectivesWithJSON disp json env m = do
   ienv <- initialEnvironment
   let baseEnv = env <> ienv
   -- First pass: get moduleEnv (exports) and the directive count for the return value.
@@ -1131,7 +1245,7 @@ evalModuleAndDirectivesWithJSON json env m = do
   -- 'prepare' hook re-applies the JSON ASSUME bindings to EACH fresh heap's
   -- combined environment — otherwise the freshly re-thunked References would lack
   -- the JSON-provided values.
-  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) nfDirective baseEnv m (length dirs0)
+  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) (nfDirective disp) baseEnv m (length dirs0)
   pure (moduleEnv, results)
 
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
@@ -1143,7 +1257,7 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
   let st = withDefaultsKnown evalConfig noRootFills m0 [] st0
-  r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
+  r <- try (runEval st (evalModuleAndDirectivesWithJSON evalConfig.ledgerDisplay json emptyEnvironment m))
   case r of
     Left exc -> do
       hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -1176,7 +1290,7 @@ execEvalExprInContextOfModuleWith evalConfig entityInfo rootFills imported expr 
     -- because making the import requires a Resolved.
     -- Filter directives recursively (including in nested sections)
     moduleWithoutDirectives = filterDirectivesFromModule m
-  (_, res) <- execEvalModuleWithDefaults rootFills imported nfDirective evalConfig entityInfo env (evalExprDirective `prependToModule` moduleWithoutDirectives)
+  (_, res) <- execEvalModuleWithDefaults rootFills imported (nfDirective evalConfig.ledgerDisplay) evalConfig entityInfo env (evalExprDirective `prependToModule` moduleWithoutDirectives)
   case res of
     [result] -> pure (Just result)
     _        -> pure Nothing

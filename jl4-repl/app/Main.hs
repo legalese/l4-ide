@@ -646,7 +646,7 @@ formatResults results = Text.unlines $ map formatResult results
 -- one @NOTE:@ line each, as they do in every other renderer; nothing when
 -- there are none.
 formatResult :: EvalDirectiveResult -> Text
-formatResult (MkEvalDirectiveResult _range res _trace _ledger ns _) = (<> prettyNotes ns) case res of
+formatResult (MkEvalDirectiveResult _range res _trace _ledger ns _ _) = (<> prettyNotes ns) case res of
   Assertion Holds            -> "True (assertion passed)"
   Assertion Fails            -> "False (assertion failed)"
   Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"
@@ -763,7 +763,7 @@ formatAsciiTraceResults :: [EvalDirectiveResult] -> Text
 formatAsciiTraceResults results = Text.unlines $ map formatAsciiTraceResult results
 
 formatAsciiTraceResult :: EvalDirectiveResult -> Text
-formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger _notes _) =
+formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger _notes _ _) =
   let resultText = case res of
         Assertion Holds              -> "Result: True (assertion passed)"
         Assertion Fails              -> "Result: False (assertion failed)"
@@ -790,12 +790,12 @@ formatTraceResults st exprText actualExpr mModule results = do
       pure $ Text.unlines messages
 
 formatTraceResult :: Module Resolved -> EvalDirectiveResult -> Text
-formatTraceResult mModule (MkEvalDirectiveResult _range _res mtrace _ledger _notes _) = case mtrace of
+formatTraceResult mModule (MkEvalDirectiveResult _range _res mtrace _ledger _notes _ _) = case mtrace of
   Nothing -> "(no trace available)"
   Just tr -> GraphViz.traceToGraphViz GraphViz.defaultGraphVizOptions (Just mModule) tr
 
 saveTraceResult :: ReplState -> Text -> Text -> Module Resolved -> TraceSink -> EvalDirectiveResult -> IO Text
-saveTraceResult st exprText actualExpr mModule sink result@(MkEvalDirectiveResult _ _ mtrace _ledger _notes _) =
+saveTraceResult st exprText actualExpr mModule sink result@(MkEvalDirectiveResult _ _ mtrace _ledger _notes _ _) =
   case mtrace of
     Nothing -> pure "(no trace available)"
     Just tr -> do
@@ -845,7 +845,7 @@ inlineSingleLine txt =
        else Text.intercalate " " nonEmpty
 
 summarizeEvalResult :: EvalDirectiveResult -> Text
-summarizeEvalResult (MkEvalDirectiveResult _range res _trace _ledger _notes _) = case res of
+summarizeEvalResult (MkEvalDirectiveResult _range res _trace _ledger _notes _ _) = case res of
   Assertion Holds              -> "True (assertion passed)"
   Assertion Fails              -> "False (assertion failed)"
   Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"

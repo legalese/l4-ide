@@ -247,7 +247,10 @@ l4Eval source =
             ]
         else do
           -- First, evaluate all imported modules to build up the evaluation environment
-          evalConfig <- EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True  -- safe mode = True
+          evalConfig0 <- EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True  -- safe mode = True
+          -- This surface prints no ledger row (see 'evalResultToJson'), so it
+          -- does not force the rows for display. Assumed, not ruled.
+          let evalConfig = evalConfig0 { EL.ledgerDisplay = EL.LedgerNotShown }
           
           -- Evaluate each import and collect their environments
           -- We evaluate in order (dependencies first)
@@ -284,18 +287,20 @@ l4EvalDirective source line col directiveType =
       pure $ encodeJson $ Aeson.object
         [ "error" .= ("Parse/import errors prevent evaluation" :: Text) ]
     Right result -> do
-      evalConfig <- EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True
+      evalConfig0 <- EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True
+      -- Likewise no ledger row is printed here; see 'l4Eval'.
+      let evalConfig = evalConfig0 { EL.ledgerDisplay = EL.LedgerNotShown }
       importEnv <- evaluateImports evalConfig result.tcdResolvedImports
       (_env, results) <- EL.execEvalModuleWithEnv evalConfig result.tcdEntityInfo importEnv result.tcdModule
       let conFields = extractConstructorFieldNames result.tcdEntityInfo
           targetPos = MkSrcPos line col
-          matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _ _) = fmap (.start) rng == Just targetPos
+          matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _ _ _) = fmap (.start) rng == Just targetPos
           matchingResult = List.find matchesPos results
       case matchingResult of
         Nothing ->
           pure $ encodeJson $ Aeson.object
             [ "error" .= ("No directive result found at the given position" :: Text) ]
-        Just (EL.MkEvalDirectiveResult mRange res _mtrace _ledger _notes _) ->
+        Just (EL.MkEvalDirectiveResult mRange res _mtrace _ledger _notes _ _) ->
           -- `range` mirrors the LSP-server shape: 1-indexed SrcPos
           -- objects {line, column}. The WASM eval path never lacks
           -- a range in practice (we matched on it above), but we

@@ -68,7 +68,7 @@ checkPassAndPrint pass printer src = do
       (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment (pass r.tcdModule)
       pure (printer r, map answer results)
   where
-    answer (MkEvalDirectiveResult _ v _ l n p) = prettyEvalDirectiveResult (MkEvalDirectiveResult Nothing v Nothing l n p)
+    answer (MkEvalDirectiveResult _ v _ l n p s) = prettyEvalDirectiveResult (MkEvalDirectiveResult Nothing v Nothing l n p s)
 
 -- | The source without its @#EVAL@ lines, and those lines.
 splitEvals :: Text.Text -> (Text.Text, Text.Text)

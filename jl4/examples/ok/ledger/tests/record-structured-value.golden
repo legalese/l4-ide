@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+record-structured-value.l4:36:1-61:
+  Purchase OF 2, (LIST Item OF "Lozenges", 3, Item OF "Syrup", 12)
+  Ledger:
+    RECORD `orders` IS Purchase OF 2, (LIST Item OF "Lozenges", 3, Item OF "Syrup", 12)   [source=RECORD, at=2025-01-31T15:45:30Z]
+record-structured-value.l4:39:1-39:
+  LIST Item OF "Lozenges", 3
+  Ledger:
+    RECORD `cart` IS LIST Item OF "Lozenges", 3   [source=RECORD, at=2025-01-31T15:45:30Z]
+record-structured-value.l4:40:1-28:
+  Agent
+  Ledger:
+    RECORD `who` IS Agent   [source=RECORD, at=2025-01-31T15:45:30Z]
+record-structured-value.l4:50:1-51:38:
+  FULFILLED
+  Ledger (Agent):
+    RECORD `orders` IS Purchase OF 2, (LIST Item OF "Lozenges", 3, Item OF "Syrup", 12)   [party=Agent, source=RECORD, at=2025-01-31T15:45:30Z]
+record-structured-value.l4:57:1-53:
+  15
+record-structured-value.l4:69:1-70:38:
+  FULFILLED
+  Ledger (Agent):
+    RECORD `orders` IS <could not be evaluated: Division by zero in the operation: DIVIDED BY>   [party=Agent, source=RECORD, at=2025-01-31T15:45:30Z]
+record-structured-value.l4:79:1-80:38:
+  FULFILLED
+  Ledger (Agent):
+    RECORD `orders` IS <refused: the day is not known>   [party=Agent, source=RECORD, at=2025-01-31T15:45:30Z]

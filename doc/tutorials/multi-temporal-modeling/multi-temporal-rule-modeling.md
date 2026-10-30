@@ -352,6 +352,12 @@ Three things worth knowing before you reach for it:
 - **A plain `RECORD`, with no valid time in scope, is stamped with the
   transaction day.** A read at an earlier valid time will not see it. If a
   fact began before today, say so when you write it.
+- **The `Ledger:` block shows each recorded value worked out in full**, as of
+  the time it was written. Working a value out for display has a budget of
+  its own; a value that would take longer shows
+  `<could not be evaluated: showing this value took more than … steps>` in
+  its place, and the run still finishes. The value itself, and the answer
+  the directive gave, are not affected.
 
 ### Both axes at once
 

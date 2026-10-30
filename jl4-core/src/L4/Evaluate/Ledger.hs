@@ -22,11 +22,20 @@
 -- the value the evaluator actually produces, with no lossy wrapper. This
 -- does not create an import cycle: 'L4.Evaluate.ValueLazy' does not depend
 -- on this module (and 'Data.Time' is an external package).
+--
+-- The event, ledger and store types are parametrised over the value they
+-- hold ('LedgerEvent'', 'Ledger'', 'LedgerStore''), with the machine's own
+-- 'WHNF' instantiation under the plain names. The machine only ever uses the
+-- plain names; the parameter exists so that a directive can hand its event
+-- store to a printer with every value forced to normal form ('traverse'),
+-- since a 'WHNF' constructor's fields are heap references and print as such.
 module L4.Evaluate.Ledger
   ( Path
   , Provenance (..)
   , effectiveVt
-  , LedgerEvent (..)
+  , LedgerEvent' (..)
+  , LedgerEvent
+  , Ledger'
   , Ledger
   , emptyLedger
   , snapshot
@@ -36,7 +45,8 @@ module L4.Evaluate.Ledger
   , readCellBitemporal
   , readCellAllBitemporal
     -- * Per-party store (M4)
-  , LedgerStore (..)
+  , LedgerStore' (..)
+  , LedgerStore
   , emptyStore
   , anonymousParty
   , EventRoute (..)
@@ -52,6 +62,7 @@ import qualified Base.Map as Map
 import Data.Time (Day, UTCTime, utctDay)
 
 import L4.Evaluate.ValueLazy (WHNF)
+import L4.TemporalContext (TemporalContext)
 
 -- | The address of a cell in the ledger. A list of path segments, e.g.
 -- @["account", "balance"]@. Kept structural (rather than a single 'Text')
@@ -79,6 +90,14 @@ data Provenance =
       -- @EVAL UNDER VALID TIME@) — a backdated\/dated assertion; 'Nothing'
       -- for a contemporaneous write, whose effective valid-from defaults to
       -- the 'txTime' day (see 'effectiveVt').
+    , writeCtx :: !TemporalContext
+      -- ^ the whole temporal context in force at the write: every axis an
+      -- enclosing @EVAL UNDER \/ AS OF@ clause had pinned, 'vtFrom' among
+      -- them. A stored value is a 'WHNF' whose parts are still unevaluated
+      -- at the write, and a part that reads the context (a @RECALL@, a
+      -- @TODAY@) must be forced under the context the write was made in to
+      -- mean what the writer's @#EVAL@ meant; the display pass in
+      -- 'L4.EvaluateLazy.nfDirectiveWith' forces each row under this.
     }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -93,10 +112,14 @@ effectiveVt prov = fromMaybe (utctDay prov.txTime) prov.vtFrom
 --
 -- Only 'Assign' exists at M0. The type is intentionally a sum so that later
 -- milestones can add @Obliged@, @Breach@, etc. without disturbing callers.
-data LedgerEvent =
-    Assign !Path !WHNF !Provenance
-  deriving stock (Show, Generic)
-  deriving anyclass NFData
+data LedgerEvent' v =
+    Assign !Path !v !Provenance
+  deriving stock (Show, Generic, Functor, Foldable, Traversable)
+
+deriving anyclass instance NFData v => NFData (LedgerEvent' v)
+
+-- | The event log's own entries: the value as the machine stored it.
+type LedgerEvent = LedgerEvent' WHNF
 
 -- | The event log itself.
 --
@@ -104,7 +127,9 @@ data LedgerEvent =
 -- 'DList' appended to with 'snoc' so that the log is /newest-last/. 'DList'
 -- gives O(1) append, which matters because every ledger write happens on the
 -- hot evaluation path; reconstructing a snapshot is comparatively rare.
-type Ledger = DList LedgerEvent
+type Ledger' v = DList (LedgerEvent' v)
+
+type Ledger = Ledger' WHNF
 
 -- | The empty ledger.
 emptyLedger :: Ledger
@@ -231,15 +256,19 @@ readCellAllBitemporal txBound p l =
 --
 -- A @RECORD@ fired with no enclosing party (a top-level @#EVAL RECORD@) routes
 -- to the own ledger keyed by 'anonymousParty' (the empty string).
-data LedgerStore =
+data LedgerStore' v =
   MkLedgerStore
-    { ownLedgers     :: !(Map Text Ledger)
+    { ownLedgers     :: !(Map Text (Ledger' v))
       -- ^ per-party private ledgers, keyed by the rendered acting party
-    , officialLedger :: !Ledger
+    , officialLedger :: !(Ledger' v)
       -- ^ the single shared record (COMMIT/ATTEST target)
     }
-  deriving stock (Show, Generic)
-  deriving anyclass NFData
+  deriving stock (Show, Generic, Functor, Foldable, Traversable)
+
+deriving anyclass instance NFData v => NFData (LedgerStore' v)
+
+-- | The store as the machine keeps it: every value a 'WHNF'.
+type LedgerStore = LedgerStore' WHNF
 
 -- | The empty store: no party has recorded anything, and the official record
 -- is empty.

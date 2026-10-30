@@ -139,7 +139,7 @@ evalDirectiveToResult
   -> SrcRange
   -> EL.EvalDirectiveResult
   -> DirectiveResult
-evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led _notes _) =
+evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led _notes _ _) =
   DirectiveResult
     { directiveType = dirType
     , prettyText = EL.prettyEvalDirectiveResultWithFields fields evalRes
@@ -295,7 +295,7 @@ evalDirectiveToUpdateItem
   -> (Int -> Int -> Text)   -- ^ slice raw source lines, inclusive 1-indexed [startLine, endLine]
   -> EL.EvalDirectiveResult
   -> Maybe DirectiveUpdateItem
-evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led _notes _) =
+evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led _notes _ _) =
   Just DirectiveUpdateItem
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
     , prettyText  = EL.prettyEvalDirectiveResultWithFields fields evalRes

@@ -1,0 +1,43 @@
+IMPORT prelude
+-- Showing the ledger must not change whether a run ends (LED, ruled
+-- 2026-10-24). A RECORD stores its value unevaluated; the program here never
+-- forces the `price` field, so the #TRACE finishes with FULFILLED. The
+-- "Ledger:" block then works each recorded value out for display, and this
+-- one never ends (`loop n MEANS loop (n PLUS 1)` grows no stack, so no depth
+-- cutoff stops it). The display pass gives each row its own step budget: the
+-- row shows the budget wording in its value column, the verdict above it
+-- stands, and the run ends.
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+TIMEZONE IS "Etc/UTC"
+
+DECLARE Item
+  HAS name  IS A STRING
+      price IS A NUMBER
+
+DECLARE Person IS ONE OF Agent
+DECLARE Act IS ONE OF `check out`
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+loop n MEANS loop (n PLUS 1)
+
+`records a diverging field` MEANS
+  PARTY Agent MUST `check out` WITHIN 10
+  HENCE RECORD `basket` IS (Item "endless" (loop 0))
+  HENCE FULFILLED
+
+#TRACE `records a diverging field` AT 0 WITH
+  (PARTY Agent DOES `check out` AT 1)
+
+-- A row that converges beside one that does not: the budget is per row, so
+-- the second row prints its value.
+`records both` MEANS
+  PARTY Agent MUST `check out` WITHIN 10
+  HENCE RECORD `basket` IS (Item "endless" (loop 0))
+  HENCE RECORD `receipt` IS (Item "paid" 3)
+  HENCE FULFILLED
+
+#TRACE `records both` AT 0 WITH
+  (PARTY Agent DOES `check out` AT 1)
