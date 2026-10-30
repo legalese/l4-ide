@@ -1,10 +1,10 @@
 # The export boundary: which types an `@export` may take and give back (as built)
 
-Status: built on the branch `carve/export-boundary`, a draft pull request stacked on `carve/resolution-diagnostics-v2` (legalese/l4-ide#769); not on `main` or `unstable`.
+Status: built on the branch `carve/export-boundary`, the draft pull request legalese/l4-ide#779 against `main`; it follows legalese/l4-ide#769, which merged into `main` on 2026-10-30; not on `main` or `unstable` yet.
 Source spec: none.
 The shape of the change is the second part of the review of legalese/l4-ide#738 (serrynaimo, 2026-10-29, sections 3 and 4), which Meng ruled to build as specified on 2026-10-30.
 This page describes what the branch has.
-Reading the inputs of an exported rule from its signature, with a record of which assumptions each definition reaches (the review's section 4), is not in this commit: it is proposed, not landed, and is listed under "Not here".
+Reading the inputs of an exported rule from its signature, with a record of which assumptions each definition reaches (the review's section 4), is not in this change: it is proposed, not landed, and is listed under "Not here".
 
 Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the editor's rule `ExportCheck` (`jl4-lsp/src/LSP/L4/Rules.hs`), the commands `l4 check` and `l4 deploy`, the sidebar's list of exports, and the deploy gate in `jl4-service/src/Compiler.hs`.
 
