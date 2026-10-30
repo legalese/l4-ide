@@ -19,6 +19,7 @@ Describe the things your rules talk about: people, contracts, amounts, dates. Th
 | ------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | [DECLARE](types/DECLARE.md)     | Records with HAS, enumerations with ONE OF, computed fields, type synonyms, parameterised types, A and AN |
 | [ASSUME](types/ASSUME.md)       | A name with a type but no value, for facts supplied from outside; how it works with `@export`             |
+| [TYPICALLY](types/TYPICALLY.md) | A usual value written beside a field, an input or an ASSUME: stored and checked, not applied              |
 | [FOR ALL](types/for-all.md)     | Functions that work for values of any type                                                                |
 | [Coercions](types/coercions.md) | Converting between NUMBER, STRING, DATE and other types                                                   |
 

@@ -31,6 +31,7 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 | **OF**                       | Applies a type or a constructor to its arguments: `LIST OF NUMBER`, `PAIR OF x, y` | [DECLARE](types/DECLARE.md)     |
 | **WITH**                     | Builds a record by field name: `Person WITH name IS "Ann"`                         | [DECLARE](types/DECLARE.md)     |
 | **ASSUME**                   | Declares a name with a type but no definition                                      | [ASSUME](types/ASSUME.md)       |
+| **TYPICALLY**                | A usual value beside a field, input or ASSUME; stored and checked, not applied     | [TYPICALLY](types/TYPICALLY.md) |
 | **TYPE**                     | The type of types, for type inputs: `GIVEN a IS A TYPE`                            | [FOR ALL](types/for-all.md)     |
 | **FOR ALL**                  | Introduces type variables in a type                                                | [FOR ALL](types/for-all.md)     |
 | **FUNCTION FROM** ... **TO** | A function type: `FUNCTION FROM NUMBER TO BOOLEAN`                                 | [Types](types/README.md)        |

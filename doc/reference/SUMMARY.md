@@ -9,6 +9,7 @@
 - [Types](types/README.md)
   - [DECLARE](types/DECLARE.md)
   - [ASSUME](types/ASSUME.md)
+  - [TYPICALLY](types/TYPICALLY.md)
   - [FOR ALL](types/for-all.md)
   - [Coercions](types/coercions.md)
 - [Functions](functions/README.md)

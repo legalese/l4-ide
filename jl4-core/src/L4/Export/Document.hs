@@ -319,7 +319,7 @@ booleanFields mods = Set.fromList
   [ getUnique n
   | m <- mods
   , Declare _ (MkDeclare _ _ _ (RecordDecl _ _ fields)) <- topDeclsRec m
-  , MkTypedName _ n ty _ <- fields
+  , MkTypedName _ n ty _ _ <- fields
   , typeNameText ty == "BOOLEAN"
   ]
 
@@ -338,7 +338,7 @@ mapUnitBody f u = case u.uDecl of
 -- 'Unique' of its own; the type checker records it in the 'RecordDecl'.
 recordCtorFields :: [Module Resolved] -> Map.Map Unique [Resolved]
 recordCtorFields mods = Map.fromList
-  [ (getUnique con, [ n | MkTypedName _ n _ _ <- fields ])
+  [ (getUnique con, [ n | MkTypedName _ n _ _ _ <- fields ])
   | m <- mods
   , Declare _ (MkDeclare _ _ _ (RecordDecl _ (Just con) fields)) <- topDeclsRec m
   ]
@@ -421,7 +421,7 @@ sentenceSlots sig = Map.fromList
 inputSlots :: TypeSig Resolved -> [(Resolved, Text)]
 inputSlots sig@(MkTypeSig _ (MkGivenSig _ names) _) =
   [ (r, phrase)
-  | MkOptionallyTypedName _ r mty <- names
+  | MkOptionallyTypedName _ r mty _ <- names
   , let phrase = case (mty >>= userTypeName, Map.lookup (getUnique r) (paramSubst sig)) of
           (Just _, Just p) -> p
           _                -> blank (resolvedText r)
@@ -443,7 +443,7 @@ declareApp :: Declare Resolved -> Resolved
 declareApp (MkDeclare _ _ (MkAppForm _ n _ _) _) = n
 
 assumeApp :: Assume Resolved -> Resolved
-assumeApp (MkAssume _ _ (MkAppForm _ n _ _) _) = n
+assumeApp (MkAssume _ _ (MkAppForm _ n _ _) _ _) = n
 
 definedIn :: UnitDecl -> Set.Set Unique
 definedIn = collectUniques (\case Def{} -> True; _ -> False)
@@ -813,7 +813,7 @@ isExportUnit u = case u.uDecl of
 isComputedSelector :: Unit -> Bool
 isComputedSelector u = case u.uDecl of
   UDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ params) _) _ _) ->
-    any (\(MkOptionallyTypedName _ r _) -> nameToText (getActual r) == "_self") params
+    any (\(MkOptionallyTypedName _ r _ _) -> nameToText (getActual r) == "_self") params
   _ -> False
 
 -- ----------------------------------------------------------------------------
@@ -1063,7 +1063,7 @@ localDefClause reading calls outerSubst = \case
 paramSubst :: TypeSig Resolved -> Map.Map Unique Text
 paramSubst (MkTypeSig _ (MkGivenSig _ names) _) =
   let params = [ (getUnique r, nameToText (getActual r), mty >>= userTypeName)
-               | MkOptionallyTypedName _ r mty <- names ]
+               | MkOptionallyTypedName _ r mty _ <- names ]
       dupTypes = Map.fromListWith (+) [ (tn, 1 :: Int) | (_, _, Just tn) <- params ]
       phraseOf pname = \case
         Just tn
@@ -1228,8 +1228,8 @@ declareClause = \case
   EnumDecl _ cons       -> CLeaf ("one of " <> oxford "or" (map conName cons))
   SynonymDecl _ ty      -> CLeaf (typeText ty)
  where
-  recordField (MkTypedName _ n ty Nothing)     = (resolvedText n, typeText ty)
-  recordField (MkTypedName _ n ty (Just expr)) =
+  recordField (MkTypedName _ n ty _mTypically Nothing)     = (resolvedText n, typeText ty)
+  recordField (MkTypedName _ n ty _mTypically (Just expr)) =
     (resolvedText n, typeText ty <> ", computed as " <> leafText expr)
   conName (MkConDecl _ n _) = spaceCamel (resolvedText n)
 
@@ -1928,7 +1928,7 @@ booleanFieldPhrase rd a n
 scalarInputs :: TypeSig Resolved -> Set.Set Text
 scalarInputs (MkTypeSig _ (MkGivenSig _ names) _) = Set.fromList
   [ spaceCamel (cleanParam (resolvedText r))
-  | MkOptionallyTypedName _ r mty <- names, isNothing (mty >>= userTypeName) ]
+  | MkOptionallyTypedName _ r mty _ <- names, isNothing (mty >>= userTypeName) ]
 
 interleaveMixfix :: Reading -> Resolved -> [Expr Resolved] -> Maybe Text
 interleaveMixfix rd n args =

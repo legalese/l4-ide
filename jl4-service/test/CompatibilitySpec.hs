@@ -23,7 +23,7 @@ import ControlPlane (nextDeploymentVersion, parseVersionCounts)
 
 -- | A primitive (scalar) parameter of the given JSON type.
 prim :: Text -> Parameter
-prim t = Parameter t Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing
+prim t = Parameter t Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing
 
 -- | A string parameter constrained to an enum.
 enumP :: [Text] -> Parameter

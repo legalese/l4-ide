@@ -481,10 +481,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
     -- have: what is indented past the declaration's start describes the
     -- ASSUME. Nothing after the head is traversed, so without this the head
     -- reaches down to the next declaration.
-    MkAssume ann tySig appFormAka order -> do
+    MkAssume ann tySig appFormAka order mTypically -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlgAppFormWhere claims appFormAka
-      pure $ MkAssume ann tySig' appFormAka' order
+      pure $ MkAssume ann tySig' appFormAka' order mTypically
      where
       headEnds = [ (fromSrcRange r).end | Just r <- [rangeOf appFormAka, order >>= rangeOf] ]
       belowHead w = not (null headEnds) && all (\ e -> w.range.start.line > e.line) headEnds
@@ -678,10 +678,10 @@ addNlgTypedName claimsBelow a = extendNlgA a $ case a of
     -- column of things rather than a sequence of declarations, and all three
     -- independently generated Hebrew encodings measured in 2026-09 annotate
     -- fields this way — 100 heralds, every one below its field.
-    MkTypedName ann n ty mExpr -> do
+    MkTypedName ann n ty mTypically mExpr -> do
       n' <- addNlgWhere claims n
       ty' <- unclaimedSignatureType ty
-      pure $ MkTypedName ann n' ty' mExpr
+      pure $ MkTypedName ann n' ty' mTypically mExpr
    where
     claims w
       | startsBelow a w = claimsBelow w
@@ -806,10 +806,10 @@ addNlgInput ::
   (HasSrcRange n, HasNlg n) =>
   (NlgWithSpan -> Bool) -> OptionallyTypedName n -> NlgA (OptionallyTypedName n)
 addNlgInput claimsBelow o = extendNlgA o $ case o of
-  MkOptionallyTypedName ann n mty -> do
+  MkOptionallyTypedName ann n mty mTypically -> do
     n' <- addNlgWhere claims n
     tys' <- traverse unclaimedSignatureType mty
-    pure $ MkOptionallyTypedName ann n' tys'
+    pure $ MkOptionallyTypedName ann n' tys' mTypically
    where
     claims w
       | startsBelow o w = claimsBelow w
@@ -1291,12 +1291,13 @@ claimLaterClauseDescs ann = case view annPmMatrix ann of
   _ -> pure ann
 
 instance HasDesc (Assume n) where
-  addDesc asm@(MkAssume ann tySig appForm mType) = do
+  addDesc asm@(MkAssume ann tySig appForm mType mTypically) = do
     ann' <- attachLeadingDesc asm ann
     tySig' <- addDesc tySig
     app' <- addDesc appForm
     mType' <- traverse addDesc mType
-    pure $ MkAssume ann' tySig' app' mType'
+    mTypically' <- traverse addDesc mTypically
+    pure $ MkAssume ann' tySig' app' mType' mTypically'
 
 instance HasDesc (Directive n) where
   addDesc = \ case
@@ -1319,10 +1320,11 @@ instance HasDesc (GivenSig n) where
     MkGivenSig ann <$> traverse addDesc names
 
 instance HasDesc (OptionallyTypedName n) where
-  addDesc name@(MkOptionallyTypedName ann n mType) = do
+  addDesc name@(MkOptionallyTypedName ann n mType mTypically) = do
     mType' <- traverse addDesc mType
+    mTypically' <- traverse addDesc mTypically
     ann' <- attachLeadingOrInlineDesc name ann
-    pure $ MkOptionallyTypedName ann' n mType'
+    pure $ MkOptionallyTypedName ann' n mType' mTypically'
 
 instance HasDesc (GivethSig n) where
   addDesc (MkGivethSig ann ty) = do
@@ -1343,10 +1345,11 @@ instance HasDesc (ConDecl n) where
     MkConDecl ann name <$> traverse addDesc names
 
 instance HasDesc (TypedName n) where
-  addDesc name@(MkTypedName ann n ty mExpr) = do
+  addDesc name@(MkTypedName ann n ty mTypically mExpr) = do
     ty' <- addDesc ty
+    mTypically' <- traverse addDesc mTypically
     ann' <- attachLeadingOrInlineDesc name ann
-    pure $ MkTypedName ann' n ty' mExpr
+    pure $ MkTypedName ann' n ty' mTypically' mExpr
 
 instance HasDesc (Type' n) where
   addDesc = pure
@@ -1755,12 +1758,13 @@ instance (HasSrcRange n, HasRef n) => HasRef (Decide n) where
     pure $ MkDecide ann' tySig' appForm' expr'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Assume n) where
-  addRef a@(MkAssume ann tySig appForm order) = do
+  addRef a@(MkAssume ann tySig appForm order typically) = do
     ann' <- attachRef a ann
     tySig' <- addRef tySig
     appForm' <- addRef appForm
     order' <- traverse addRef order
-    pure $ MkAssume ann' tySig' appForm' order'
+    typically' <- traverse addRef typically
+    pure $ MkAssume ann' tySig' appForm' order' typically'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Directive n) where
   addRef a = case a of
@@ -1797,12 +1801,13 @@ instance (HasSrcRange n, HasRef n) => HasRef (TypeDecl n) where
       SynonymDecl ann' <$> addRef ty
 
 instance (HasSrcRange n, HasRef n) => HasRef (TypedName n) where
-  addRef a@(MkTypedName ann n ty mExpr) = do
+  addRef a@(MkTypedName ann n ty mExpr typically) = do
     ann' <- attachRef a ann
     n' <- addRef n
     ty' <- addRef ty
     mExpr' <- traverse addRef mExpr
-    pure $ MkTypedName ann' n' ty' mExpr'
+    typically' <- traverse addRef typically
+    pure $ MkTypedName ann' n' ty' mExpr' typically'
 
 instance (HasSrcRange n, HasRef n) => HasRef (ConDecl n) where
   addRef a@(MkConDecl ann n typedNames) = do
@@ -1825,11 +1830,12 @@ instance (HasSrcRange n, HasRef n) => HasRef (GivenSig n) where
     pure $ MkGivenSig ann' tys'
 
 instance (HasSrcRange n, HasRef n) => HasRef (OptionallyTypedName n) where
-  addRef a@(MkOptionallyTypedName ann n mty) = do
+  addRef a@(MkOptionallyTypedName ann n mty typically) = do
     ann' <- attachRef a ann
     n' <- addRef n
     mty' <- traverse addRef mty
-    pure $ MkOptionallyTypedName ann' n' mty'
+    typically' <- traverse addRef typically
+    pure $ MkOptionallyTypedName ann' n' mty' typically'
 
 instance (HasSrcRange n, HasRef n) => HasRef (GivethSig n) where
   addRef a@(MkGivethSig ann mty) = do

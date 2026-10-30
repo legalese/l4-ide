@@ -110,6 +110,7 @@ export const L4_KEYWORDS: ReadonlySet<string> = new Set([
   'TIMES',
   'TO',
   'TYPE',
+  'TYPICALLY',
   'UNLESS',
   'WHEN',
   'WHERE',

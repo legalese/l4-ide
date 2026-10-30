@@ -968,7 +968,8 @@ assume sig = do
       <$> annoHole (pure sig)
       <*  annoLexeme (spacedKeyword_ TKAssume)
       <*> annoHole appForm
-      <*> optional (annoLexeme (spacedKeyword_ TKIs) *> {- optional article *> -} annoHole (indented type' current))
+      <*> optionalHole (annoLexeme (spacedKeyword_ TKIs) *> {- optional article *> -} annoHole (indented type' current))
+      <*> optionalHole (annoLexeme (spacedKeyword_ TKTypically) *> annoHole atomicExpr')
 
 declare :: TypeSig Name -> Parser (Declare Name)
 declare sig =
@@ -1503,7 +1504,7 @@ givenTermNames = map fst . givenTermParams
 -- a type.
 givenTermParams :: TypeSig Name -> [(Name, Bool)]
 givenTermParams (MkTypeSig _ (MkGivenSig _ otns) _) =
-  [ (n, isJust mt) | MkOptionallyTypedName _ n mt <- otns, notTypeParam mt ]
+  [ (n, isJust mt) | MkOptionallyTypedName _ n mt _ <- otns, notTypeParam mt ]
   where
     notTypeParam (Just (Type _)) = False
     notTypeParam _               = True
@@ -1933,14 +1934,16 @@ reqParam = do
       <*  annoLexeme separator
 --      <*  optional article
       <*> annoHole type'
-      <*> optional (annoLexeme (spacedKeyword_ TKMeans) *> annoHole (indentedExpr current))
+      <*> optionalHole (annoLexeme (spacedKeyword_ TKTypically) *> annoHole atomicExpr')
+      <*> optionalHole (annoLexeme (spacedKeyword_ TKMeans) *> annoHole (indentedExpr current))
 
 param :: Parser (OptionallyTypedName Name)
 param =
   attachAnno $
     MkOptionallyTypedName emptyAnno
       <$> annoHole name
-      <*> optional (annoLexeme separator *> {- optional article *> -} annoHole type')
+      <*> optionalHole (annoLexeme separator *> {- optional article *> -} annoHole type')
+      <*> optionalHole (annoLexeme (spacedKeyword_ TKTypically) *> annoHole atomicExpr')
 
 -- |
 -- An expression is a base expression followed by

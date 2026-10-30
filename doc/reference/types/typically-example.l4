@@ -1,0 +1,21 @@
+-- TYPICALLY: metadata-only default values (rebuttable presumptions)
+
+-- Record fields with defaults
+DECLARE Person HAS
+  name IS A STRING
+  has_capacity IS A BOOLEAN TYPICALLY TRUE
+  is_under_duress IS A BOOLEAN TYPICALLY FALSE
+  jurisdiction IS A STRING TYPICALLY "Singapore"
+
+-- Assumed external values with defaults
+ASSUME `applicable law` IS A STRING TYPICALLY "Singapore"
+
+-- Function parameters with defaults
+GIVEN
+  age IS A NUMBER TYPICALLY 18
+  married IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+DECIDE `may purchase alcohol` IF age >= 18
+
+-- Defaults do not change evaluation: all arguments are still required.
+#EVAL `may purchase alcohol` 21 FALSE

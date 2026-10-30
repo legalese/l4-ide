@@ -44,7 +44,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 
 `<kind>` is one of:
 
-- A keyword, spelled as the language spells it, such as `parse/unexpected-WITH`: `A`, `ABOVE`, `AKA`, `ALL`, `AN`, `AND`, `AS`, `ASSUME`, `AT`, `BE`, `BECAUSE`, `BELOW`, `BRANCH`, `BREACH`, `BY`, `CONCAT`, `CONSIDER`, `DECIDE`, `DECLARE`, `DIVIDED`, `DO`, `DOES`, `ELSE`, `ENV`, `EQUALS`, `EXACTLY`, `FETCH`, `FOLLOWED`, `FOR`, `FROM`, `FUNCTION`, `GIVEN`, `GIVES`, `GIVETH`, `GREATER`, `HAS`, `HENCE`, `IF`, `IMPLIES`, `IMPORT`, `IN`, `IS`, `LEAST`, `LESS`, `LEST`, `LET`, `LIST`, `MAY`, `MEAN`, `MEANS`, `MINUS`, `MODULO`, `MOST`, `MUST`, `NOT`, `OF`, `ONE`, `OR`, `OTHERWISE`, `PARTY`, `PLUS`, `POST`, `PROVIDED`, `RAND`, `ROR`, `SHANT`, `STARTING`, `THAN`, `THE`, `THEN`, `TIMES`, `TO`, `TYPE`, `UNLESS`, `WHEN`, `WHERE`, `WITH`, `WITHIN`, `YIELD`.
+- A keyword, spelled as the language spells it, such as `parse/unexpected-WITH`: `A`, `ABOVE`, `AKA`, `ALL`, `AN`, `AND`, `AS`, `ASSUME`, `AT`, `BE`, `BECAUSE`, `BELOW`, `BRANCH`, `BREACH`, `BY`, `CONCAT`, `CONSIDER`, `DECIDE`, `DECLARE`, `DIVIDED`, `DO`, `DOES`, `ELSE`, `ENV`, `EQUALS`, `EXACTLY`, `FETCH`, `FOLLOWED`, `FOR`, `FROM`, `FUNCTION`, `GIVEN`, `GIVES`, `GIVETH`, `GREATER`, `HAS`, `HENCE`, `IF`, `IMPLIES`, `IMPORT`, `IN`, `IS`, `LEAST`, `LESS`, `LEST`, `LET`, `LIST`, `MAY`, `MEAN`, `MEANS`, `MINUS`, `MODULO`, `MOST`, `MUST`, `NOT`, `OF`, `ONE`, `OR`, `OTHERWISE`, `PARTY`, `PLUS`, `POST`, `PROVIDED`, `RAND`, `ROR`, `SHANT`, `STARTING`, `THAN`, `THE`, `THEN`, `TIMES`, `TO`, `TYPE`, `TYPICALLY`, `UNLESS`, `WHEN`, `WHERE`, `WITH`, `WITHIN`, `YIELD`.
 - One of these words:
   - values: `identifier`, `number`, `string`, `genitive` (`'s`);
   - layout and the rest: `annotation`, `caret`, `comment`, `directive`, `end-of-input`, `symbol`, `whitespace`;
@@ -76,6 +76,9 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/supplied-computed-field`      | A record constructor supplies a computed field.                    |
 | `check/type-mismatch`                | A value has another type than the place it is in requires.         |
 | `check/type-synonym-chain-too-long`  | A chain of type synonyms is too long to follow.                    |
+| `check/typically-not-a-literal`      | A TYPICALLY value is not a literal.                                |
+| `check/typically-on-type`            | A TYPICALLY default sits on a type, which holds no value.          |
+| `check/typically-without-type`       | A TYPICALLY default sits on a rule's input that has no type.       |
 | `check/unknown-identifier`           | Nothing in scope defines this name.                                |
 | `check/wrong-argument-count`         | A function is applied to the wrong number of arguments.            |
 | `check/wrong-type-argument-count`    | A type is applied to the wrong number of arguments.                |

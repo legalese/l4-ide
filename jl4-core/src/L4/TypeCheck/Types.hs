@@ -120,6 +120,15 @@ data CheckError =
     -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
     -- the exported function's name, and the input's name (Nothing when it is
     -- the result).
+  | TypicallyValueNotALiteral Name
+    -- ^ The TYPICALLY default value must be a literal (a compile-time
+    -- constant): a number or string literal, or a nullary constructor.
+  | TypicallyRequiresType Name
+    -- ^ A TYPICALLY default was written on a binder with no explicit type, so
+    -- the default cannot be type-checked. Require an explicit type annotation.
+  | TypicallyOnTypeVariable Name
+    -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
+    -- a default value is meaningless.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -229,6 +238,7 @@ data ExpectationContext =
   | ExpectPostBodyContext -- body argument of POST
   | ExpectConcatArgumentContext -- argument of CONCAT
   | ExpectAsStringArgumentContext -- argument of AS STRING
+  | ExpectTypicallyValueContext Name -- TYPICALLY value must match the declared type
   | ExpectBreachReasonContext -- reason argument of BREACH
   | ExpectRefuseMessageContext -- message argument of REFUSE
   | ExpectAssertRefusedBecauseContext -- the BECAUSE literal of #ASSERT REFUSED
@@ -319,6 +329,9 @@ checkErrorCode = \ case
   SuppliedComputedField {}       -> "check/supplied-computed-field"
   ExportFunctionTypeInput {}     -> "check/export-function-input"
   ExportEventType {}             -> "check/export-event-type"
+  TypicallyValueNotALiteral {}   -> "check/typically-not-a-literal"
+  TypicallyRequiresType {}       -> "check/typically-without-type"
+  TypicallyOnTypeVariable {}     -> "check/typically-on-type"
 
 -- | The code of a checker warning. See 'checkErrorCode'.
 checkWarningCode :: CheckWarning -> Text
@@ -878,7 +891,7 @@ isTopLevelBindingInSection u (MkSection _a  _mn _maka decls) = any (elem u . map
   relevantResolveds = \ case
     Declare _ (MkDeclare _ _ af _) -> appFormHeads af
     Decide _ (MkDecide _ _ af _) -> appFormHeads af
-    Assume _ (MkAssume _ _ af _) -> appFormHeads af
+    Assume _ (MkAssume _ _ af _ _) -> appFormHeads af
     Directive _ _ -> []
     Import _ _ -> []
     Timezone _ _ -> []
