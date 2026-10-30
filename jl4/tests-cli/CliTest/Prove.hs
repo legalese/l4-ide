@@ -22,15 +22,16 @@ import Test.Hspec
 
 import CliTest.Common
 
-numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, assumedFixture :: FilePath
+numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, assumedFixture :: FilePath
 numbersFixture       = fixtureDir </> "prove" </> "numbers.l4"
 recordsFixture       = fixtureDir </> "prove" </> "records.l4"
 outOfFragmentFixture = fixtureDir </> "prove" </> "out-of-fragment.l4"
 defectFixture        = fixtureDir </> "prove" </> "defect.l4"
+integersFixture      = fixtureDir </> "prove" </> "integers.l4"
 assumedFixture       = fixtureDir </> "assert-assumed.l4"
 
 fixtures :: [FilePath]
-fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, assumedFixture]
+fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, assumedFixture]
 
 -- | Run the body only when a solver can be found, as @l4 prove@ itself finds
 -- one (@Z3_EXE@, then @z3@ on @PATH@).
@@ -118,6 +119,16 @@ spec bin = describe "l4 prove" $ do
     verdictOf 13 sout `shouldBe` "ENCODING"
     unwords (rowFor 13 sout) `shouldSatisfy` ("fails at p = 0, but the evaluator says it holds there" `isInfixOf`)
 
+  -- Soundness: a guard such as IS INTEGER is a hypothesis of its own
+  -- obligation and never changes a NUMBER's sort, or the unguarded assertion
+  -- below would be "proved" over the integers.
+  it "keeps a NUMBER Real whatever guard an assertion carries" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", integersFixture]
+    code `shouldBe` ExitFailure 2
+    verdictOf 7 sout `shouldBe` "refuted"
+    unwords (rowFor 7 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
+    verdictOf 10 sout `shouldBe` "proved"
+
   it "fails with a named reason when Z3_EXE names a file that does not exist" $ do
     Output code _ serr <- runL4WithEnvExtra [("Z3_EXE", "/nonexistent/z3")] bin ["prove", assumedFixture]
     code `shouldBe` ExitFailure 1
@@ -139,5 +150,8 @@ spec bin = describe "l4 prove" $ do
       -- no solver-specific options or tactics
       pi' `shouldNotSatisfy` (":timeout" `isInfixOf`)
       pi' `shouldNotSatisfy` ("check-sat-using" `isInfixOf`)
+      -- the header names the #ASSERT the script came from, so a second
+      -- solver's answer maps back to file:line
+      pi' `shouldSatisfy` ("; l4 prove: the negation of the #ASSERT at numbers.l4:22:" `isPrefixOf`)
       twice <- readFile (dir </> "numbers-12.smt2")
       twice `shouldSatisfy` ("(define-fun |l4_twice|" `isInfixOf`)
