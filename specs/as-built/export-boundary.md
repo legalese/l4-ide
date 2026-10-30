@@ -54,6 +54,20 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   The tests that deployed a contract rule are removed with the path they exercised: "deontic evaluation", "deontic answers spell a party and an action one way", "deontic evaluation with record-typed parties", the contract cases of the MAYBE-input bundle, and the missing-input case of a deontic rule.
   The path's code is still there.
 
+## Measured
+
+`l4 check` with a build of this branch against a build of legalese/l4-ide#769's head (`3a5e280db`), on 2026-10-30, over the files that contain `@export`.
+
+- This repository, 71 `.l4` files outside test directories: the same exit code and diagnostics, except the new fixture and the two files that gain the untyped-`GIVEN` warning (`ok/desc.l4`, `ok/pattern-matching-overloads-own-annotations.l4`).
+- `legalese/commons` at `798b51452`, 943 files, 675 of which check today: five fail with this change, and each exports a rule that returns a `DEONTIC`.
+  They are `bdm-registration.l4`, `cta-community.l4`, `sta-strata.l4` and `aa-estates.l4` (Western Australia) and `pb2-seat.l4` (Brazil).
+  Nothing else among the files that check changes.
+- Four Jersey charities files (`g6-art17-after-deregistration.l4`, `g6-art18-governor-duties.l4`, `g6-art20-court-orders.l4`, `g7-art24-25-powers.l4`) already fail on a build of `main` (they use `TYPICALLY`) and carry 18 more `DEONTIC` export errors between them.
+- Untyped-`GIVEN` warnings: none in `legalese/commons`, three in this repository (the two files above and the fixture).
+- Refusing `EITHER` was measured first and broke one file in each of the two (the reason it is not refused, under "Limits").
+- Not measured: stored deployments, which this session cannot count.
+  Meng gave the count of those that export a `DEONTIC` result as 0 on 2026-10-30.
+
 ## Revisit
 
 The refusal of an `@export` on a rule that returns a `DEONTIC` is provisional.
