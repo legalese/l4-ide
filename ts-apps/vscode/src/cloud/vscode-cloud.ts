@@ -5,13 +5,16 @@
  * servers and chat-event path.
  *
  * Everything is behind `legaleseAi.cloudSessions.enabled` and a
- * non-empty `legaleseAi.cloudSessions.apiUrl` (§15.5).
+ * `legaleseAi.cloudSessions.apiUrl` on `https://*.legalese.cloud`
+ * (§15.5).
  */
 import * as vscode from 'vscode'
+import { realpath } from 'node:fs/promises'
 import { GetExportedFunctionsRequestType } from 'jl4-client-rpc'
 import type { AiChatStartParams } from 'jl4-client-rpc'
 import type { ChatServiceEvent, Logger } from '@repo/legalese-agent'
 import { LEGALESE_CLOUD_DOMAIN, type AuthManager } from '../auth.js'
+import { isLegaleseCloudUrl } from '../legalese-cloud-url.js'
 import { EMBEDDED_LIBRARY_SCHEME } from '../embedded-library.js'
 import type { VSCodeL4LanguageClient } from '../vscode-l4-language-client.js'
 import {
@@ -28,7 +31,13 @@ import {
   type SessionFilesStore,
 } from './cloud-session-manager.js'
 import type { McpServerSource } from './mcp-transfer.js'
-import { layoutSeed, type SeedSource, type WorkspaceFolderRef } from './seed.js'
+import {
+  isSecretFile,
+  isUnder,
+  layoutSeed,
+  type SeedSource,
+  type WorkspaceFolderRef,
+} from './seed.js'
 import { SessionsApiClient } from './sessions-api.js'
 
 export const CLOUD_SESSIONS_ENABLED_SETTING = 'legaleseAi.cloudSessions.enabled'
@@ -42,13 +51,14 @@ export function cloudSessionsApiUrl(): string {
   ).trim()
 }
 
-/** The feature flag: enabled and an API URL configured. */
+/** The feature flag: enabled and a Legalese Cloud API URL configured
+ *  (the access token goes nowhere else; see {@link SessionsApiClient}). */
 export function isCloudSessionsEnabled(): boolean {
   return (
     vscode.workspace
       .getConfiguration()
       .get<boolean>(CLOUD_SESSIONS_ENABLED_SETTING) === true &&
-    cloudSessionsApiUrl() !== ''
+    isLegaleseCloudUrl(cloudSessionsApiUrl())
   )
 }
 
@@ -163,6 +173,43 @@ async function collectPromptSources(
   }
 }
 
+/** `path` (a file URI's path) with symlinks resolved; itself when it
+ *  can't be resolved (not on disk: nothing to follow). */
+async function realPath(path: string): Promise<string> {
+  try {
+    return vscode.Uri.file(await realpath(vscode.Uri.file(path).fsPath)).path
+  } catch {
+    return path
+  }
+}
+
+/**
+ * Leave out files that hold credentials ({@link isSecretFile}), and
+ * files under a root whose real path isn't: a symlink in the workspace
+ * mustn't upload what it points to elsewhere. (Files outside the roots
+ * are for the caller to place or leave out.)
+ */
+async function screenSources(
+  sources: SeedSource[],
+  roots: string[]
+): Promise<{ sources: SeedSource[]; skipped: string[] }> {
+  const realRoots = await Promise.all(roots.map(realPath))
+  const kept: SeedSource[] = []
+  const skipped: string[] = []
+  for (const s of sources) {
+    const real = await realPath(s.path)
+    const linkedOut =
+      roots.some((r) => isUnder(s.path, r)) &&
+      !realRoots.some((r) => isUnder(real, r))
+    if (isSecretFile(s.path) || isSecretFile(real) || linkedOut) {
+      skipped.push(s.path)
+    } else {
+      kept.push(s)
+    }
+  }
+  return { sources: kept, skipped }
+}
+
 function workspaceFolders(): WorkspaceFolderRef[] {
   return (vscode.workspace.workspaceFolders ?? [])
     .filter((f) => f.uri.scheme === 'file')
@@ -210,25 +257,27 @@ export async function pickLocalFolder(
  * transitive imports (from the language server), and @-mentioned
  * files, laid out relative to their common ancestor; plus the prompt
  * attachments. Files outside the workspace folders (and the active
- * file's own directory) are left out and logged.
+ * file's own directory), also through a symlink, and credentials files
+ * are left out and logged.
  */
 export async function gatherCloudSeed(
   params: PromptParams,
   client: VSCodeL4LanguageClient,
   logger: Logger
 ): Promise<CloudSeed & { root: string; skipped: string[] }> {
-  const { sources, unreadable, activeFile, mentions } =
-    await collectPromptSources(params, client, logger)
+  const collected = await collectPromptSources(params, client, logger)
+  const { unreadable, activeFile, mentions } = collected
   const folders = workspaceFolders()
   const roots = [
     ...folders.map((f) => f.path),
     ...(activeFile ? [activeFile.replace(/\/[^/]*$/, '')] : []),
   ]
-  const { files, root, skipped } = layoutSeed(sources, roots)
-  const allSkipped = [...skipped, ...unreadable]
+  const screened = await screenSources(collected.sources, roots)
+  const { files, root, skipped } = layoutSeed(screened.sources, roots)
+  const allSkipped = [...screened.skipped, ...skipped, ...unreadable]
   if (allSkipped.length > 0) {
     logger.info(
-      `cloud-sessions: left ${allSkipped.length} file(s) out of the seed (outside the workspace, unreadable or unsafe names): ${allSkipped.join(', ')}`
+      `cloud-sessions: left ${allSkipped.length} file(s) out of the seed (outside the workspace, credentials, unreadable or unsafe names): ${allSkipped.join(', ')}`
     )
   }
   return {
@@ -252,18 +301,28 @@ export async function gatherPromptFiles(
   client: VSCodeL4LanguageClient,
   logger: Logger
 ): Promise<PromptFiles> {
-  const { sources, unreadable, activeFile, mentions } =
-    await collectPromptSources(params, client, logger)
+  const collected = await collectPromptSources(params, client, logger)
+  const { unreadable, activeFile, mentions } = collected
   if (unreadable.length > 0) {
     logger.info(
       `cloud-sessions: could not read ${unreadable.length} file(s): ${unreadable.join(', ')}`
+    )
+  }
+  const folders = workspaceFolders()
+  const { sources, skipped } = await screenSources(
+    collected.sources,
+    folders.map((f) => f.path)
+  )
+  if (skipped.length > 0) {
+    logger.info(
+      `cloud-sessions: not sending ${skipped.length} file(s) (outside the workspace or credentials): ${skipped.join(', ')}`
     )
   }
   return {
     sources,
     ...(activeFile ? { activeFile } : {}),
     mentions,
-    workspaceFolders: workspaceFolders(),
+    workspaceFolders: folders,
   }
 }
 

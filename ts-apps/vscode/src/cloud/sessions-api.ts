@@ -7,6 +7,7 @@
  */
 import {
   ProtocolError,
+  ULID_RE,
   addFilesRequest,
   addFilesResponse,
   apiError,
@@ -34,6 +35,7 @@ import {
   type PresignedUpload,
   type SessionState,
 } from '@repo/legalese-agent/protocol'
+import { isLegaleseCloudUrl } from '../legalese-cloud-url.js'
 import type { FetchFn } from './auth-proxy.js'
 
 export class SessionsApiError extends Error {
@@ -87,6 +89,18 @@ export function describeSessionsApiError(status: number, code: string): string {
   }
 }
 
+/** The `legaleseAi.cloudSessions.apiUrl` setting points elsewhere. */
+export const CLOUD_API_URL_MESSAGE =
+  'Cloud sessions are off: legaleseAi.cloudSessions.apiUrl must be an https://….legalese.cloud URL.'
+
+/** An id for a URL path: a ULID, as every id the API hands out. */
+function pathId(sid: string): string {
+  if (!ULID_RE.test(sid)) {
+    throw new SessionsApiError(0, 'not_found', NOT_FOUND_MESSAGE)
+  }
+  return sid
+}
+
 export interface SessionsApiDeps {
   /** The `legaleseAi.cloudSessions.apiUrl` setting; '' = off. */
   baseUrl: () => string
@@ -130,7 +144,9 @@ export class SessionsApiClient implements SessionsApi {
     this.fetchFn = deps.fetch ?? fetch
   }
 
-  /** Base URL without a trailing slash; throws when the feature is off. */
+  /** Base URL without a trailing slash; throws when the feature is off,
+   *  or the URL isn't Legalese Cloud: the access token goes only to
+   *  `https://*.legalese.cloud`, whatever the setting says. */
   base(): string {
     const url = this.deps.baseUrl().trim().replace(/\/+$/, '')
     if (!url)
@@ -139,12 +155,14 @@ export class SessionsApiClient implements SessionsApi {
         'disabled',
         'Cloud sessions are not configured.'
       )
+    if (!isLegaleseCloudUrl(url))
+      throw new SessionsApiError(0, 'disabled', CLOUD_API_URL_MESSAGE)
     return url
   }
 
   /** `<apiUrl>/git/<sid>.git` (§9.2). */
   gitUrl(sid: string): string {
-    return `${this.base()}/git/${sid}.git`
+    return `${this.base()}/git/${pathId(sid)}.git`
   }
 
   private async request<T>(
@@ -227,7 +245,7 @@ export class SessionsApiClient implements SessionsApi {
     return (
       await this.request(
         'POST',
-        `/sessions/${sid}/init`,
+        `/sessions/${pathId(sid)}/init`,
         sessionStateResponse,
         {}
       )
@@ -239,14 +257,14 @@ export class SessionsApiClient implements SessionsApi {
   }
 
   async getSession(sid: string): Promise<GetSessionResponse> {
-    return this.request('GET', `/sessions/${sid}`, getSessionResponse)
+    return this.request('GET', `/sessions/${pathId(sid)}`, getSessionResponse)
   }
 
   async startSession(sid: string, agentKey: string): Promise<SessionState> {
     return (
       await this.request(
         'POST',
-        `/sessions/${sid}/start`,
+        `/sessions/${pathId(sid)}/start`,
         sessionStateResponse,
         {
           agentKey,
@@ -261,7 +279,7 @@ export class SessionsApiClient implements SessionsApi {
   ): Promise<PostCommandResponse> {
     return this.request(
       'POST',
-      `/sessions/${sid}/commands`,
+      `/sessions/${pathId(sid)}/commands`,
       postCommandResponse,
       clientCommand(command, 'command')
     )
@@ -270,7 +288,7 @@ export class SessionsApiClient implements SessionsApi {
   async addFiles(sid: string, req: AddFilesRequest): Promise<AddFilesResponse> {
     return this.request(
       'POST',
-      `/sessions/${sid}/files`,
+      `/sessions/${pathId(sid)}/files`,
       addFilesResponse,
       addFilesRequest(req, 'request')
     )
@@ -282,7 +300,7 @@ export class SessionsApiClient implements SessionsApi {
   ): Promise<PostCommandResponse> {
     return this.request(
       'POST',
-      `/sessions/${sid}/files/${batchId}/commit`,
+      `/sessions/${pathId(sid)}/files/${pathId(batchId)}/commit`,
       postCommandResponse
     )
   }
@@ -291,7 +309,7 @@ export class SessionsApiClient implements SessionsApi {
     return (
       await this.request(
         'POST',
-        `/sessions/${sid}/stop`,
+        `/sessions/${pathId(sid)}/stop`,
         sessionStateResponse,
         {}
       )
@@ -299,7 +317,7 @@ export class SessionsApiClient implements SessionsApi {
   }
 
   async deleteSession(sid: string): Promise<void> {
-    await this.request('DELETE', `/sessions/${sid}`, null)
+    await this.request('DELETE', `/sessions/${pathId(sid)}`, null)
   }
 
   /**

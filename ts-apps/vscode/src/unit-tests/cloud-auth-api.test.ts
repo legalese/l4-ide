@@ -7,6 +7,7 @@ import {
   type AuthProxyDeps,
 } from '../cloud/auth-proxy.js'
 import {
+  CLOUD_API_URL_MESSAGE,
   NOT_FOUND_MESSAGE,
   NO_COMMITS_YET_MESSAGE,
   SessionsApiClient,
@@ -110,6 +111,32 @@ describe('AccessTokenManager', () => {
     assert.equal(calls.length, 1)
   })
 
+  test('a refresh that straddles an account switch hands out the new token', async () => {
+    let release!: () => void
+    const firstHeld = new Promise<void>((r) => (release = r))
+    const { fetch, calls } = fakeFetch(async (_url, init) => {
+      const who = header(init, 'Authorization')
+      if (who === 'Bearer sealed-1') await firstHeld
+      return json(200, {
+        accessToken: who === 'Bearer sealed-1' ? 'jwt-old-org' : 'jwt-new-org',
+        expiresAt: Date.now() + 300_000,
+      })
+    })
+    const deps = authDeps(fetch)
+    const tokens = new AccessTokenManager(deps)
+    const before = tokens.get()
+    await new Promise((r) => setTimeout(r, 0))
+    // Organisation switch while the first refresh is in flight.
+    deps.signIn('sealed-other')
+    tokens.invalidate()
+    const after = tokens.get()
+    release()
+    assert.equal(await after, 'jwt-new-org')
+    assert.equal(await before, 'jwt-new-org')
+    assert.equal(await tokens.get(), 'jwt-new-org')
+    assert.equal(calls.length, 2)
+  })
+
   test('drops a rotation once the stored session has changed', async () => {
     const { fetch } = fakeFetch(() => {
       // Another sign-in while the request is in flight.
@@ -192,7 +219,7 @@ describe('SessionsApiClient', () => {
     const { fetch, calls } = fakeFetch(handler)
     const forced: boolean[] = []
     const api = new SessionsApiClient({
-      baseUrl: () => 'https://sessions.example/',
+      baseUrl: () => 'https://sessions.legalese.cloud/',
       getAccessToken: async (o) => {
         forced.push(Boolean(o?.force))
         return o?.force ? 'jwt-new' : 'jwt-old'
@@ -211,7 +238,7 @@ describe('SessionsApiClient', () => {
     )
     assert.deepEqual(await api.listSessions(), { sessions: [] })
     assert.deepEqual(forced, [false, true])
-    assert.equal(calls[0]!.url, 'https://sessions.example/sessions')
+    assert.equal(calls[0]!.url, 'https://sessions.legalese.cloud/sessions')
     assert.equal(header(calls[1]!.init, 'Authorization'), 'Bearer jwt-new')
   })
 
@@ -241,7 +268,10 @@ describe('SessionsApiClient', () => {
     const { api, calls } = client(() => new Response(null, { status: 204 }))
     await api.deleteSession(SID)
     assert.equal(calls[0]!.init.method, 'DELETE')
-    assert.equal(calls[0]!.url, `https://sessions.example/sessions/${SID}`)
+    assert.equal(
+      calls[0]!.url,
+      `https://sessions.legalese.cloud/sessions/${SID}`
+    )
   })
 
   test('off while the API URL is empty', async () => {
@@ -250,6 +280,42 @@ describe('SessionsApiClient', () => {
       getAccessToken: async () => 'jwt',
     })
     await assert.rejects(api.listSessions(), SessionsApiError)
+  })
+
+  // A workspace's settings can set the URL: the token goes nowhere but
+  // Legalese Cloud.
+  test('sends nothing to an API URL outside https://*.legalese.cloud', async () => {
+    for (const baseUrl of [
+      'https://attacker.example',
+      'http://sessions.legalese.cloud',
+      'https://sessions.legalese.cloud.attacker.example',
+    ]) {
+      const { fetch, calls } = fakeFetch(() => json(200, { sessions: [] }))
+      let asked = 0
+      const api = new SessionsApiClient({
+        baseUrl: () => baseUrl,
+        getAccessToken: async () => {
+          asked++
+          return 'jwt'
+        },
+        fetch,
+      })
+      await assert.rejects(api.listSessions(), (err: unknown) => {
+        assert.ok(err instanceof SessionsApiError)
+        assert.equal(err.message, CLOUD_API_URL_MESSAGE)
+        return true
+      })
+      assert.throws(() => api.gitUrl(SID), SessionsApiError)
+      assert.equal(calls.length, 0)
+      assert.equal(asked, 0)
+    }
+  })
+
+  test('refuses a session id that is not a ULID', async () => {
+    const { api, calls } = client(() => json(200, {}))
+    await assert.rejects(api.getSession('../events?s=x'), SessionsApiError)
+    assert.throws(() => api.gitUrl('a/b'), SessionsApiError)
+    assert.equal(calls.length, 0)
   })
 
   test('validates commands before sending', async () => {
@@ -262,7 +328,7 @@ describe('SessionsApiClient', () => {
     )
     assert.equal(
       calls[0]!.url,
-      `https://sessions.example/sessions/${SID}/commands`
+      `https://sessions.legalese.cloud/sessions/${SID}/commands`
     )
     await assert.rejects(
       api.postCommand(SID, { type: 'apply-bundle', file: 'x' } as never)
@@ -331,7 +397,7 @@ describe('SessionsApiClient', () => {
     ])
     assert.equal(
       calls[0]!.url,
-      `https://sessions.example/events?s=${SID}%3A0&s=01K6B8Z6X9Q4M2N7P3R5T8V0WB%3A2%3A5`
+      `https://sessions.legalese.cloud/events?s=${SID}%3A0&s=01K6B8Z6X9Q4M2N7P3R5T8V0WB%3A2%3A5`
     )
     const first = res.streams[0]!
     assert.ok(!('error' in first))

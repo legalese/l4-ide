@@ -92,22 +92,22 @@ export function cloudMcpServers(servers: LocalMcpServer[]): {
 }
 
 /**
- * Collect credentials for the session's servers (`names`, as in its
- * `session.json`). Servers that need no headers are left out; servers
- * needing a sign-in are reported in `unauthorized`.
+ * Collect credentials for the session's servers (name and URL, as in
+ * its `session.json`). Only a local server with the same name and the
+ * same URL gets its credentials sent: they are for that URL. Servers
+ * that need no headers are left out; servers needing a sign-in are
+ * reported in `unauthorized`.
  */
 export async function collectMcpCredentials(
   source: McpServerSource,
-  names: string[],
-  only?: string
+  sessionServers: Array<{ name: string; url: string }>
 ): Promise<{ credentials: McpCredentials; unauthorized: string[] }> {
-  const { ids } = cloudMcpServers(source.enabledServers())
+  const { configs, ids } = cloudMcpServers(source.enabledServers())
   const servers: McpCredentials['servers'] = []
   const unauthorized: string[] = []
-  for (const name of names) {
-    if (only !== undefined && name !== only) continue
+  for (const { name, url } of sessionServers) {
     const id = ids.get(name)
-    if (!id) continue
+    if (!id || configs.find((c) => c.name === name)?.url !== url) continue
     const headers = await source.headersFor(id)
     if (headers === null) {
       unauthorized.push(name)

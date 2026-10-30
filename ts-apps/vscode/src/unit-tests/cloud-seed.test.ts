@@ -5,6 +5,7 @@ import {
   SeedLimitError,
   attachmentNames,
   checkAttachmentSizes,
+  checkSeedFiles,
   checkSeedSize,
   checkAddFilesSizes,
   commonAncestor,
@@ -14,6 +15,7 @@ import {
   seedBaseLocalPath,
   createSeedTarGz,
   createTar,
+  isSecretFile,
   layoutSeed,
 } from '../cloud/seed.js'
 
@@ -109,7 +111,7 @@ describe('seed layout', () => {
 })
 
 describe('seed tarball', () => {
-  test('round-trips short, long and non-ASCII paths', () => {
+  test('round-trips short, long and non-ASCII paths', async () => {
     const long = `${'d'.repeat(60)}/${'e'.repeat(60)}/file.l4`
     const files = [
       { path: 'main.l4', bytes: enc('hello') },
@@ -123,7 +125,7 @@ describe('seed tarball', () => {
       { path: 'Verträge/§ 1.l4', data: 'umlaut' },
       { path: 'empty.l4', data: '' },
     ])
-    const gz = createSeedTarGz(files)
+    const gz = await createSeedTarGz(files)
     assert.equal(readTar(gunzipSync(gz)).length, 4)
   })
 })
@@ -230,5 +232,48 @@ describe('seed base', () => {
       seedBaseLocalPath({ workspaceFolder: 'ws', path: '' }, '/h/ws'),
       '/h/ws'
     )
+  })
+})
+
+describe('isSecretFile', () => {
+  test('credentials files and folders', () => {
+    for (const p of [
+      '/ws/.env',
+      '/ws/.env.local',
+      '/ws/certs/server.pem',
+      '/ws/tls.key',
+      '/home/u/.ssh/config',
+      '/ws/.aws/credentials',
+      '/ws/id_ed25519',
+      '/ws/.npmrc',
+      '/ws/secrets.yaml',
+    ]) {
+      assert.equal(isSecretFile(p), true, p)
+    }
+  })
+
+  test('ordinary files', () => {
+    for (const p of [
+      '/ws/main.l4',
+      '/ws/environment.l4',
+      '/ws/keys.md',
+      '/ws/docs/secret-rules.l4',
+      '/ws/README.md',
+    ]) {
+      assert.equal(isSecretFile(p), false, p)
+    }
+  })
+})
+
+describe('checkSeedFiles', () => {
+  test('declines a file over 10 MB before packing', () => {
+    assert.throws(
+      () =>
+        checkSeedFiles([
+          { path: 'big.pdf', bytes: new Uint8Array(10 * 1024 * 1024 + 1) },
+        ]),
+      SeedLimitError
+    )
+    checkSeedFiles([{ path: 'ok.l4', bytes: new Uint8Array(1024) }])
   })
 })

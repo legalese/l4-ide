@@ -76,6 +76,9 @@ async function errorCode(res: Response): Promise<string | undefined> {
 export class AccessTokenManager {
   private cached: { token: string; expiresAt: number } | undefined
   private inflight: Promise<string> | undefined
+  /** Bumped by {@link invalidate}: a refresh started before it hands
+   *  out nothing it got. */
+  private generation = 0
   private readonly fetchFn: FetchFn
   private readonly now: () => number
 
@@ -95,18 +98,32 @@ export class AccessTokenManager {
       return this.cached.token
     }
     if (opts.force) this.cached = undefined
-    this.inflight ??= this.refresh().finally(() => {
-      this.inflight = undefined
-    })
+    if (!this.inflight) {
+      const p = this.refresh(this.generation).finally(() => {
+        if (this.inflight === p) this.inflight = undefined
+      })
+      this.inflight = p
+    }
     return this.inflight
   }
 
-  /** Forget the cached token (sign-out, account switch). */
+  /** Forget the cached token (sign-out, account or organisation
+   *  switch), and any refresh still running for the old session. */
   invalidate(): void {
+    this.generation++
     this.cached = undefined
+    this.inflight = undefined
   }
 
-  private async refresh(): Promise<string> {
+  private async refresh(generation: number): Promise<string> {
+    const token = await this.fetchToken()
+    // The account changed meanwhile: callers get the new one's token.
+    if (generation !== this.generation) return this.get()
+    this.cached = token
+    return token.token
+  }
+
+  private async fetchToken(): Promise<{ token: string; expiresAt: number }> {
     const session = await this.deps.getSessionToken()
     if (!session) throw new NotSignedInError()
     const base = this.deps.authBaseUrl().replace(/\/$/, '')
@@ -140,8 +157,7 @@ export class AccessTokenManager {
       // or the next refresh would present a spent refresh token.
       await this.deps.storeSessionToken(body.token, session)
     }
-    this.cached = { token: body.accessToken, expiresAt: body.expiresAt }
-    return body.accessToken
+    return { token: body.accessToken, expiresAt: body.expiresAt }
   }
 }
 
