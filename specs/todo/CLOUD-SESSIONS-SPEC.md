@@ -469,11 +469,21 @@ token (a JWT valid for about 5 minutes) from the user's session.
   Terraform defaults are those. Expecting our own session issuer also refuses
   tokens WorkOS issues to third-party OAuth apps. It takes `sub` as the user
   id and `org_id` as the organisation.
-- It requires the permission `required_permission` names (default `ai:chat`)
-  in the token's `permissions` claim, an array of permission slugs. During the
-  beta prod requires `ai:cloud-sessions`, a WorkOS permission only staff roles
-  carry.
-- The sealed session never leaves the extension and jl4-auth-proxy.
+- It requires the permission `required_permission` names (default
+  `ai:cloud-sessions`, so an unset value fails closed) in the token's
+  `permissions` claim, an array of permission slugs. During the beta that
+  WorkOS permission is carried only by staff roles.
+- The extension sends the access token only to a Sessions API URL on
+  `https://*.legalese.cloud` (default port, no userinfo). The `apiUrl` setting
+  can come from a workspace's `.vscode/settings.json`, so any other URL turns
+  cloud sessions off instead. Git gets the token the same way, and only over
+  https. The same rule holds for every Legalese Cloud credential the
+  extension sends: the sign-in session, the access token and Legalese AI keys
+  (l4-ide #777).
+- The sealed session never leaves the extension and jl4-auth-proxy. Its
+  `wos-session` cookie is scoped to `.legalese.cloud`, so a browser also sends
+  it to `sessions.legalese.cloud`: CloudFront doesn't forward cookies to the
+  Sessions API, and the Lambda drops any it gets.
 
 ### 6.2 Agent key chains
 
@@ -485,9 +495,17 @@ itself while it runs, for up to 24 hours, and ends it when it stops (§6.3).
 
 - `POST /auth/agent-token { purpose: "cloud-session", sessionId }`, with the
   sealed session as today.
+- It requires the cloud-sessions permission (`CLOUD_SESSIONS_PERMISSION`,
+  default `ai:cloud-sessions`), as the Sessions API does.
 - The key is named `cloud-session:<sid>:<chainStartEpoch>`, has permissions
   `{ai:chat, l4:rules, l4:evaluate, l4:read}` intersected with the user's, and
   expires in 15 minutes.
+- It deletes the user's other keys of that session whose chain started more
+  than 2 minutes earlier, best effort: starting a session again ends a chain
+  someone else kept renewing (Properties). Chains started within 2 minutes of
+  each other are two near-simultaneous starts (two windows, or a start before
+  ECS lists the one before); the Sessions API ends the key of the start that
+  starts nothing.
 - The extension passes it to `POST /sessions/:sid/start`. The Sessions API
   hands it to `RunTask` as `AGENT_KEY`.
 
@@ -497,10 +515,12 @@ itself while it runs, for up to 24 hours, and ends it when it stops (§6.3).
 1. validates the key with WorkOS: it must be valid, user-scoped, and named
    `cloud-session:…`;
 2. refuses with `chain_expired` if the chain start in the name is more than 24
-   hours ago (a per-organisation setting can only shorten this);
+   hours ago (a per-organisation setting can only shorten this; if that
+   setting can't be read, it answers `502` before touching the key);
 3. refuses with `not_a_member` if the user is no longer an active member of
-   the organisation, and with `forbidden` if none of the key's permissions
-   remain in the agent set ∩ the user's current role;
+   the organisation, and with `forbidden` if the user's role no longer has the
+   cloud-sessions permission or none of the key's permissions remain in the
+   agent set ∩ the user's current role;
 4. **deletes the presented key first**. If WorkOS says it's already gone,
    another renewal won and it refuses with `chain_forked`;
 5. mints the successor with the same name, the key's permissions ∩ the agent
@@ -508,17 +528,28 @@ itself while it runs, for up to 24 hours, and ends it when it stops (§6.3).
    `{ token, id, expiresAt }`. The last key may outlive the 24-hour cap by up
    to 15 minutes: the harness renews with 5 minutes left, so a shorter last
    key would be renewed in a loop until `chain_expired`.
+   - A failed mint (timeout, network error, `5xx`, `408`, `429`) is retried up
+     to 3 times within the request: the old key is gone, and an orphaned new
+     key's value was never handed out. If every try fails it answers
+     `410 chain_lost`, which the harness parks on.
+   - Every WorkOS call times out after 4 s, so a renewal answers within 15 s,
+     inside the harness's 20 s client timeout. A renewal with no time left
+     for the delete and one mint answers `502` before deleting, so the
+     harness's retry still has a valid key.
 
 The harness renews on `401`, and on ai-proxy's `403` whose body says
-`invalid-credentials` (how ai-proxy answers an expired or deleted key).
+`invalid-credentials` (how ai-proxy answers an expired or deleted key), at
+most once a minute: a `401` sooner fails that request, and one renewal is
+made when the minute is up.
 
 How the harness treats renewal answers:
 
 - `5xx` (jl4-auth-proxy answers `502 upstream_unavailable` when WorkOS
   fails), `429` and network errors are retried with backoff while the key
   lives.
-- Any other `4xx` ends the chain: the harness parks the session (§5.4) with
-  the error code as the reason, or `invalid_key` for a code it doesn't know.
+- Any other `4xx`, and `chain_lost` with any status, ends the chain: the
+  harness parks the session (§5.4) with the error code as the reason, or
+  `invalid_key` for a code it doesn't know.
   An unknown code is never retried, so a new refusal can't turn into a
   renewal loop.
 
@@ -534,8 +565,9 @@ deletes it.
 - At most one key per chain is valid. A stolen key either dies at the next
   renewal, or — if the thief renews first — breaks the real task's chain within
   minutes: the real task's key no longer exists, so its next renewal fails
-  validation (`invalid_key` → parked + `auth-required`). `chain_forked` only
-  shows when two renewals race.
+  validation (`invalid_key` → parked + `auth-required`). Starting the session
+  again then deletes the thief's chain (Mint). `chain_forked` only shows when
+  two renewals race.
 - Chains are stateless; there is no store. A user who creates an API key
   themselves could give it a chain name, but renewal narrows it to the agent
   set ∩ their current role, so it can't carry more than a minted chain.
@@ -599,6 +631,12 @@ the session starts.
   runs the sign-in that Start in the server's settings menu runs, and the
   extension sends the new credentials at once. Only these servers are shown:
   a token refreshed silently needs nothing from the user.
+- **Which URL.** Credentials are for the URL of the user's local server. The
+  extension sends a server's credentials only when its `session.json` name
+  and URL match a local server, and only for the servers passed when the
+  session was created on this machine (or listed in `session.json` when this
+  machine first opened it). A task can edit `session.json` (§4.3): a server
+  it adds or points elsewhere gets nothing.
 - **Permissions.** No approvals: the MCP servers passed at start count as
   approved by the user, and their tools run without asking (§11).
 
@@ -787,6 +825,14 @@ same event schema. The file log stays the record of the session.
   served from there with `git http-backend`.
   - The scratch repository's config and hooks belong to the Lambda.
   - A push may update only `refs/heads/local`; anything else is rejected.
+  - A push may not add a symlink or a submodule entry, merges included.
+    Every repository (the session's, the scratch ones) has
+    `core.symlinks=false`, and the harness runs git with it too, so a symlink
+    that got in some other way is checked out as a plain file. Otherwise
+    `data/g -> ../.git` would let a turn write `.git/config` (a filter runs
+    as the task at the next commit). The harness also checks `.git` and the
+    writable `data/` and `tmp/` on each path's real path, and refuses writes
+    and deletes through a symlinked folder.
 - After an accepted push, the Sessions API writes the new commits as
   `state/git/incoming/<ulid>.bundle` (exclusive create) and queues an
   `apply-bundle` command.
@@ -941,9 +987,13 @@ built-in Git extension, which runs the user's installed `git`.
    base relative to it (`''` for the folder root). A local file
    `<folder>/<path>/<rel>` is `data/<rel>` in the session.
 
-2. **Check sizes.** Decline anything over the limits before uploading, with a
-   message naming the files: attachments over 10 MB (today's harness limit),
-   or a seed over 50 MB. Git LFS can lift this later (§18). A seed well
+2. **Check files and sizes.** Leave out credentials files (`.env`, keys,
+   `.ssh/`, `.aws/`, …) and files a symlink takes out of the workspace, and
+   log them. Decline anything over the limits before uploading, with a
+   message naming the files: a file or attachment over 10 MB (today's
+   harness limit), more than the Sessions API unpacks (20,000 files,
+   200 MB), or a seed over 50 MB compressed (packed off the extension host's
+   main thread). Git LFS can lift this later (§18). A seed well
    under 50 MB can still pack larger than the clone limit (§9.3): the session
    runs, but can't be cloned during the beta.
 3. `POST /sessions` with the attachment list and the user's HTTP MCP servers
@@ -1108,14 +1158,25 @@ cloud folder instead of on their machine:
 - **@-mentions in later prompts.** Mentioned files not yet in the session are
   uploaded before the message is sent (§10).
 - **Notifications.** A background cloud session that asks a question raises a
-  notification. There are no approvals in cloud sessions.
+  notification, with fixed text ("A cloud session has a question for you.")
+  and Open: VS Code renders `[label](command:…)` in a notification as a link
+  that runs the command, and a session's text can come from a prompt
+  injection. Other notifications carry session text (file names) only
+  without link syntax. There are no approvals in cloud sessions.
+- **Deleting** a cloud session from the history asks first, in a modal: its
+  files go for good once the sweep empties the trash.
 - **Parked sessions.** A session's key chain doesn't run out while the user
   works with it. A message, answer or other command to a parked session
   starts it with a new chain, as for a sleeping one. One that parked
   mid-turn (the 24-hour cap, …) is started again as soon as it has parked,
-  so the turn goes on; at most once every 10 minutes, so a chain refused
-  after each start can't loop. If that start fails, the conversation says
-  so.
+  so the turn goes on: only the session on screen, at most once per message
+  the user sends and once every 10 minutes, so a chain refused after each
+  start can't loop and a turn that never ends doesn't get a new chain every
+  24 hours. Otherwise it waits for the next message. If that start fails,
+  the conversation says so.
+- **Sessions out of view** (the webview reports the one on screen,
+  `AiCloudViewing`) stay watched while they run, for a question or the end
+  of the turn, and are let go once they sleep or park.
 - **Where polling runs.** In the extension host: the webview's content
   security policy only allows `https://legalese.com`
   (`ts-apps/vscode/src/webview-panel.ts:177`).
@@ -1124,7 +1185,9 @@ cloud folder instead of on their machine:
 
 - The harness and the Sessions API log to CloudWatch
   `/legalese/cloud-sessions/<env>` with 30-day retention.
-  - Logged: ids, tool names, durations and errors.
+  - Logged: ids, tool names, durations and errors. A failed tool call logs
+    its name and an errno code at most: MCP and L4 error text can quote
+    personal data.
   - **Not logged:** prompt text, model output or file content. The logger
     drops content fields in production.
 - `cloud-sessions-log-reader` role: reads logs only. Requires MFA, and use
@@ -1158,7 +1221,9 @@ cloud folder instead of on their machine:
   `CLOUD_SESSIONS_DEPLOY_ROLE_ARN`), which trusts only jobs in the
   cloud-sessions repo's `prod` environment, so the approval gate is enforced
   by AWS, not just by GitHub, and no other repository's workflows can assume
-  it.
+  it. Only the deploying jobs get `id-token: write`: install, tests and lint
+  run in a job without it (`npm ci --ignore-scripts`), so a compromised dev
+  dependency can't assume the role. Actions are pinned to commit SHAs.
 - **Upgrades.** On `start`, the Sessions API compares the user's task
   definition with that digest and registers a new revision if they differ
   (§4.4). Running sessions keep their image until they sleep.
@@ -1231,7 +1296,21 @@ Tracking rules:
 - [ ] `fs-copy-file` (base `main`) ([PR #770](https://github.com/legalese/l4-ide/pull/770)) — `fs__copy_file`
       (`overwrite`, `deleteSource` for a move) for both hosts, from the first
       prod session: a scratch draft took 18 `fs__edit_file` calls to bring
-      back.
+      back. A call needs the permissions of what it does (create; edit with
+      `overwrite`; delete for a move), and a move onto the same file under
+      another spelling is refused.
+- [ ] `webview-token-hardening` (base `main`) ([PR #777](https://github.com/legalese/l4-ide/pull/777)) —
+      from the 2026-10-30 review: Legalese Cloud credentials only to
+      `https://*.legalese.cloud` (§6.1); assistant markdown rendered inertly
+      and scripts by nonce only in the webview's CSP.
+- Review fixes of 2026-10-30, on the PRs above: tokens only to Legalese
+  Cloud, parked restarts capped, MCP credentials by name and URL, seed
+  screening (#510, #511); fixed notification text, delete confirmation,
+  `AiCloudViewing` (#512); symlink checks on real paths,
+  `core.symlinks=false`, `tool/failed` redaction, a minimum renewal interval
+  (#513). jl4-auth-proxy [#18](https://github.com/legalese/jl4-auth-proxy/pull/18)
+  and cloud-sessions [#1](https://github.com/legalese/cloud-sessions/pull/1)
+  carry the server side (§6.2, §9.1, §14).
 
 ### 15.2 ai-proxy
 
