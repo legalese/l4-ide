@@ -20,6 +20,7 @@
     AiCloudConfig,
     AiCloudEvent,
     AiCloudMcpSignInNeeded,
+    AiMcpServersChanged,
     AiCloudProgress,
     AiCloudReveal,
     AiCloudState,
@@ -148,6 +149,7 @@
     m.onNotification(AiCloudState, (p) => store.onCloudState(p))
     m.onNotification(AiCloudProgress, (p) => store.onCloudProgress(p))
     m.onNotification(AiCloudMcpSignInNeeded, (p) => store.onCloudMcpSignIn(p))
+    m.onNotification(AiMcpServersChanged, (p) => store.onMcpServersChanged(p))
     m.onNotification(AiCloudReveal, (p) => {
       historyOpen = false
       store.onCloudReveal(p)

@@ -16,6 +16,14 @@ import type { AiLogger } from './logger.js'
  *
  * One instance serves all servers; tokens and client registrations are
  * keyed by the server URL.
+ *
+ * The OS hands the browser's redirect to whichever VS Code window it
+ * likes, so a sign-in in progress is kept in SecretStorage (shared by
+ * every window), not in memory: the window that receives the redirect
+ * exchanges the code and stores the tokens, and the window that started
+ * the sign-in waits for them there. One sign-in and one refresh run per
+ * server at a time (servers that rotate refresh tokens would otherwise
+ * invalidate the sign-in).
  */
 
 interface TokenSet {
@@ -37,21 +45,31 @@ interface AuthServerMetadata {
   scopes_supported?: string[]
 }
 
-interface PendingFlow {
-  resolve: (tokens: TokenSet) => void
-  reject: (err: Error) => void
+/** A browser sign-in in progress, in SecretStorage under its `state`.
+ *  The window that receives the redirect sets `done` or `error`. */
+interface PendingSignIn {
+  serverUrl: string
   verifier: string
   clientId: string
   tokenEndpoint: string
   resource: string
-  timeout: NodeJS.Timeout
+  createdAt: number
+  done?: boolean
+  error?: string
 }
 
 const FLOW_TIMEOUT_MS = 5 * 60 * 1000
+/** How often the starting window looks for the outcome, besides
+ *  SecretStorage's change event (which may not cross windows). */
+const FLOW_POLL_MS = 2000
+
+/** What became of an `/mcp-oauth` redirect. */
+export type McpOAuthCallbackResult = 'completed' | 'failed' | 'unknown'
 
 export class McpOAuthManager {
-  /** state → in-flight browser flow. */
-  private pending = new Map<string, PendingFlow>()
+  /** Sign-ins and refreshes in progress, by server. */
+  private readonly authorizing = new Map<string, Promise<string>>()
+  private readonly refreshing = new Map<string, Promise<string | null>>()
 
   constructor(
     private readonly secrets: vscode.SecretStorage,
@@ -83,15 +101,40 @@ export class McpOAuthManager {
     return this.refresh(serverUrl, tokens)
   }
 
+  /** Refresh now, even before expiry (a server turned the token down).
+   *  Null when there is no stored auth or the refresh fails. */
+  async refreshNow(serverUrl: string): Promise<string | null> {
+    const tokens = await this.loadTokens(serverUrl)
+    return tokens ? this.refresh(serverUrl, tokens) : null
+  }
+
   /**
    * Interactive authorization: discovery → client registration →
    * browser consent → code exchange. Resolves with a fresh access
-   * token; rejects on timeout/denial. `wwwAuthenticate` is the 401's
-   * challenge header, used to locate the resource metadata.
+   * token; rejects on timeout/denial/cancellation (`vscode.
+   * CancellationError`). `wwwAuthenticate` is the 401's challenge
+   * header, used to locate the resource metadata. A second call for the
+   * same server while one runs joins it: one browser tab per sign-in.
    */
-  async authorize(
+  authorize(
     serverUrl: string,
-    wwwAuthenticate?: string
+    wwwAuthenticate?: string,
+    cancel?: vscode.CancellationToken
+  ): Promise<string> {
+    const key = canonicalResource(serverUrl)
+    const running = this.authorizing.get(key)
+    if (running) return running
+    const flow = this.runAuthorize(serverUrl, wwwAuthenticate, cancel).finally(
+      () => this.authorizing.delete(key)
+    )
+    this.authorizing.set(key, flow)
+    return flow
+  }
+
+  private async runAuthorize(
+    serverUrl: string,
+    wwwAuthenticate?: string,
+    cancel?: vscode.CancellationToken
   ): Promise<string> {
     const meta = await this.discover(serverUrl, wwwAuthenticate)
     if (!meta.authorization_endpoint || !meta.token_endpoint) {
@@ -119,59 +162,120 @@ export class McpOAuthManager {
       authUrl.searchParams.set('scope', meta.scopes_supported.join(' '))
     }
 
-    const tokens = await new Promise<TokenSet>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pending.delete(state)
-        reject(new Error('Sign-in timed out — no browser callback received.'))
-      }, FLOW_TIMEOUT_MS)
-      this.pending.set(state, {
-        resolve,
-        reject,
-        verifier,
-        clientId,
-        tokenEndpoint: meta.token_endpoint!,
-        resource,
-        timeout,
-      })
+    const pending: PendingSignIn = {
+      serverUrl,
+      verifier,
+      clientId,
+      tokenEndpoint: meta.token_endpoint,
+      resource,
+      createdAt: Date.now(),
+    }
+    await this.secrets.store(pendingKey(state), JSON.stringify(pending))
+    try {
+      return await this.waitForSignIn(state, serverUrl, authUrl, cancel)
+    } finally {
+      await this.secrets.delete(pendingKey(state))
+    }
+  }
+
+  /** Open the browser and wait until some window has finished the
+   *  sign-in for `state` (or it fails, times out or is cancelled). */
+  private waitForSignIn(
+    state: string,
+    serverUrl: string,
+    authUrl: URL,
+    cancel?: vscode.CancellationToken
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      let settled = false
+      const subscriptions: vscode.Disposable[] = []
+      const finish = (outcome: { token: string } | { error: Error }): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        clearInterval(poll)
+        for (const d of subscriptions) d.dispose()
+        if ('token' in outcome) resolve(outcome.token)
+        else reject(outcome.error)
+      }
+      const check = async (): Promise<void> => {
+        const p = parsePending(await this.secrets.get(pendingKey(state)))
+        if (!p) {
+          finish({ error: new Error('The sign-in was abandoned.') })
+        } else if (p.error) {
+          finish({ error: new Error(p.error) })
+        } else if (p.done) {
+          const tokens = await this.loadTokens(serverUrl)
+          if (tokens) finish({ token: tokens.accessToken })
+          else finish({ error: new Error('The sign-in stored no token.') })
+        }
+      }
+      const timeout = setTimeout(
+        () =>
+          finish({
+            error: new Error(
+              'Sign-in timed out: the browser never came back to VS Code.'
+            ),
+          }),
+        FLOW_TIMEOUT_MS
+      )
+      const poll = setInterval(() => void check(), FLOW_POLL_MS)
+      subscriptions.push(
+        this.secrets.onDidChange((e) => {
+          if (e.key === pendingKey(state)) void check()
+        })
+      )
+      if (cancel) {
+        subscriptions.push(
+          cancel.onCancellationRequested(() =>
+            finish({ error: new vscode.CancellationError() })
+          )
+        )
+      }
       void vscode.env.openExternal(vscode.Uri.parse(authUrl.toString()))
       this.logger.info(`mcp-oauth: opened browser for ${serverUrl}`)
     })
-    await this.storeTokens(serverUrl, tokens)
-    return tokens.accessToken
   }
 
   /**
-   * Route a `vscode://…/mcp-oauth?code=…&state=…` callback to its
-   * pending flow. Returns true when the URI belonged to us.
+   * Finish a `vscode://…/mcp-oauth?code=…&state=…` redirect, in
+   * whichever window received it: exchange the code with the sign-in
+   * stored under its `state`, store the tokens and mark the sign-in
+   * done (or failed), for the window that started it. `unknown` when no
+   * sign-in is waiting for that `state` (expired, cancelled, used).
    */
-  handleCallback(uri: vscode.Uri): boolean {
+  async handleCallback(uri: vscode.Uri): Promise<McpOAuthCallbackResult> {
     const params = new URLSearchParams(uri.query)
     const state = params.get('state')
-    if (!state) return false
-    const flow = this.pending.get(state)
-    if (!flow) return false
-    this.pending.delete(state)
-    clearTimeout(flow.timeout)
+    if (!state) return 'unknown'
+    const pending = parsePending(await this.secrets.get(pendingKey(state)))
+    if (!pending || pending.done || pending.error) return 'unknown'
+    if (Date.now() - pending.createdAt > FLOW_TIMEOUT_MS) return 'unknown'
+    const settle = async (outcome: Partial<PendingSignIn>): Promise<void> => {
+      await this.secrets.store(
+        pendingKey(state),
+        JSON.stringify({ ...pending, ...outcome })
+      )
+    }
 
     const error = params.get('error')
     const code = params.get('code')
     if (error || !code) {
-      flow.reject(
-        new Error(
-          `Sign-in ${error ? `failed: ${error}` : 'returned no authorization code'}${
-            params.get('error_description')
-              ? ` (${params.get('error_description')})`
-              : ''
-          }`
-        )
-      )
-      return true
+      const description = params.get('error_description')
+      await settle({
+        error: `Sign-in ${error ? `failed: ${error}` : 'returned no authorization code'}${description ? ` (${description})` : ''}`,
+      })
+      return 'failed'
     }
-    void this.exchangeCode(flow, code).then(
-      (tokens) => flow.resolve(tokens),
-      (err) => flow.reject(err instanceof Error ? err : new Error(String(err)))
-    )
-    return true
+    try {
+      const tokens = await this.exchangeCode(pending, code)
+      await this.storeTokens(pending.serverUrl, tokens)
+      await settle({ done: true })
+      return 'completed'
+    } catch (err) {
+      await settle({ error: err instanceof Error ? err.message : String(err) })
+      return 'failed'
+    }
   }
 
   /** Forget stored tokens + client registration for a server. */
@@ -273,7 +377,7 @@ export class McpOAuthManager {
   // ── Token handling ────────────────────────────────────────────────
 
   private async exchangeCode(
-    flow: PendingFlow,
+    flow: PendingSignIn,
     code: string
   ): Promise<TokenSet> {
     const body = new URLSearchParams({
@@ -311,7 +415,33 @@ export class McpOAuthManager {
     }
   }
 
-  private async refresh(
+  /** One refresh per server at a time; the others join it. */
+  private refresh(serverUrl: string, tokens: TokenSet): Promise<string | null> {
+    const key = tokenKey(serverUrl)
+    const running = this.refreshing.get(key)
+    if (running) return running
+    const job = this.doRefresh(serverUrl, tokens).finally(() =>
+      this.refreshing.delete(key)
+    )
+    this.refreshing.set(key, job)
+    return job
+  }
+
+  private async doRefresh(
+    serverUrl: string,
+    tokens: TokenSet
+  ): Promise<string | null> {
+    const fresh = await this.doRefreshOnce(serverUrl, tokens)
+    if (fresh) return fresh
+    // Another window may have refreshed (and rotated the refresh token)
+    // meanwhile: its tokens are in SecretStorage.
+    const stored = await this.loadTokens(serverUrl)
+    return stored && stored.accessToken !== tokens.accessToken
+      ? stored.accessToken
+      : null
+  }
+
+  private async doRefreshOnce(
     serverUrl: string,
     tokens: TokenSet
   ): Promise<string | null> {
@@ -383,6 +513,26 @@ function tokenKey(serverUrl: string): string {
 
 function clientKey(serverUrl: string): string {
   return `legaleseAi.mcpOAuth.client:${canonicalResource(serverUrl)}`
+}
+
+function pendingKey(state: string): string {
+  return `legaleseAi.mcpOAuth.pending:${state}`
+}
+
+function parsePending(raw: string | undefined): PendingSignIn | null {
+  if (!raw) return null
+  try {
+    const p = JSON.parse(raw) as PendingSignIn
+    return typeof p.serverUrl === 'string' &&
+      typeof p.verifier === 'string' &&
+      typeof p.clientId === 'string' &&
+      typeof p.tokenEndpoint === 'string' &&
+      typeof p.createdAt === 'number'
+      ? p
+      : null
+  } catch {
+    return null
+  }
 }
 
 /** RFC 8707 canonical resource: scheme + host + path, no trailing `/`. */
