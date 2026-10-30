@@ -251,8 +251,7 @@ checkedSubparser :: String -> Mod CommandFields a -> Parser a
 checkedSubparser what m = case [ n | n <- names, length (filter (== n) names) > 1 ] of
   [] -> subparser m
   n : _ -> errorWithoutStackTrace
-    ("two " <> what <> "s are named `" <> n <> "`: a " <> what
-      <> " added by an extension cannot share its name with a built-in one or with another extension's")
+    ("two " <> what <> "s are named `" <> n <> "`: a name added by an extension cannot be one that a built-in or another extension already has")
   where
     names = map fst (snd (mkCommand m))
 
