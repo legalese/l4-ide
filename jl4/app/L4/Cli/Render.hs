@@ -37,6 +37,7 @@ import L4.Lexer (LangTag (..))
 import L4.Syntax (defaultModuleLang)
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser as Parser
+import L4.Print (mixfixCanonicalByUnique)
 import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
 
 import L4.Cli.Common
@@ -137,6 +138,7 @@ renderCmd opts = do
       let cfg = defaultExportConfig
                   { dropUnused = not opts.renderIncludeUnused
                   , mixfixHeadings = mixfixHeadingsFromRegistry tc.mixfixRegistry
+                  , mixfixCanonical = mixfixCanonicalByUnique tc.mixfixRegistry
                   }
           -- The language the document SAYS it is in, in one place: the one
           -- asked for, else the one the module declares, else @en@ (R-M2). The

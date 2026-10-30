@@ -494,6 +494,12 @@ nlgMixfixLocalFixture  = fixtureDir </> "nlg-mixfix-local.l4"
 nlgMixfixImportFixture = fixtureDir </> "nlg-mixfix-import.l4"
 nlgMixfixImportLib     = fixtureDir </> "nlg-mixfix-import-lib.l4"
 
+-- The example the syntax reference links for this: one mixfix function with a
+-- herald, and a rule that calls it. The test that reads it pins the page's
+-- claim, not just the output.
+nlgMixfixDocExample :: FilePath
+nlgMixfixDocExample = "../doc/reference/syntax/nlg-mixfix-example.l4"
+
 -- The reference page whose placement table describes that fixture row by row.
 -- The test that reads it pins the page, not just the output.
 placementReadme :: FilePath
@@ -624,7 +630,7 @@ coreFixtures =
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
-  , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib
+  , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3569,6 +3575,41 @@ spec bin = do
     it "fills the herald's slots at a call across an IMPORT" $ do
       rows <- nlgLines nlgMixfixImportFixture
       rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith]
+
+    -- The other reader of a herald at a call site: `l4 render`, for a call in the
+    -- body of another rule. The fixtures end in one rule per call shape, named
+    -- "render ...". A rule's bullet is "• Render lower means ..."; the bullet is
+    -- not what is being tested, so the row is the text after it.
+    let renderRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ drop 1 (dropWhile (/= ' ') l)
+               | l <- map (filter (/= '\r')) (lines sout)
+               , " Render " `isInfixOf` l ]
+        expectedRenderRows =
+          [ "Render lower means the smaller of n and 100."
+          , "Render exceeds means the amount by which n exceeds 100."
+          , "Render shortfall means 100 less n."
+          , "Render plus means n and 100 together."
+          , "Render first means the first of n with 100."
+          , "Render bare means the bare n and 100."
+          , "Render greater means the greater of n and 100."
+          , "Render nested means the smaller of the smaller of n and 100 and 200."
+          , "Render of means the smaller of n and 100."
+          ]
+
+    it "is read by l4 render at a call in the body of another rule" $ do
+      rows <- renderRows nlgMixfixLocalFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render at such a call across an IMPORT" $ do
+      rows <- renderRows nlgMixfixImportFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render in the example the syntax reference links" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgMixfixDocExample]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy` ("The price we charge means the smaller of price and 100." `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

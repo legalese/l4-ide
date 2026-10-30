@@ -77,3 +77,42 @@ GIVETH A NUMBER
 #EVAL `the amount by which` OF 840, 160
 #EVAL `the lower of` WITH a IS 840, b IS 160
 #EVAL `the amount by which` WITH a IS 840, b IS 160
+
+-- Render rows. `l4 nlg` prints directives only, so these add nothing to the
+-- output above; they give `l4 render` a call to each function inside the body
+-- of another rule, which is the other place a herald is read at a call site.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render lower` n MEANS `the lower of` n `and` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render exceeds` n MEANS `the amount by which` n `exceeds` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render shortfall` n MEANS `the shortfall of` n `against` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render plus` n MEANS n `plus` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render first` n MEANS `the first of` n `then` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render bare` n MEANS `the bare` n `and` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render greater` n MEANS `the greater` n 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render nested` n MEANS `the lower of` (`the lower of` n `and` 100) `and` 200
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render of` n MEANS `the lower of` OF n, 100

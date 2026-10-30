@@ -76,6 +76,13 @@ data ExportConfig = MkExportConfig
     -- function's 'Unique'. Name resolution discards the mixfix pattern, so
     -- these are derived from the typechecker's 'MixfixRegistry' (via
     -- 'mixfixHeadingsFromRegistry') and threaded in by the caller.
+  , mixfixCanonical    :: !(Map.Map Unique RawName)
+    -- ^ The canonical pattern (@the lower of _ and _@) of each mixfix
+    -- function's head, keyed by 'Unique'
+    -- ('L4.Print.mixfixCanonicalByUnique' of the typechecker's
+    -- 'MixfixRegistry'). A mixfix call resolves to the pattern while its
+    -- definition keeps only the first keyword, so without this a call is not
+    -- found by its @\@nlg@ sentence. Empty finds only prefix and @OF@ calls.
   }
   deriving stock (Show, Generic)
 
@@ -85,6 +92,7 @@ defaultExportConfig = MkExportConfig
   , moduleDispositions = Map.empty
   , unitDispositions   = Map.empty
   , mixfixHeadings     = Map.empty
+  , mixfixCanonical    = Map.empty
   }
 
 -- ----------------------------------------------------------------------------
@@ -233,14 +241,10 @@ extractUnits (MkModule _ _ section) = goSection section
 
 -- | All renderable units across the open module and its dependencies, with
 -- mixfix headings fixed up and @\@nlg@ calls expanded.
-allUnits :: Map.Map Unique Text -> Module Resolved -> [Module Resolved] -> [Unit]
-allUnits headings mainModule deps =
+allUnits :: Map.Map Unique Text -> Map.Map Unique RawName -> Module Resolved -> [Module Resolved] -> [Unit]
+allUnits headings canonical mainModule deps =
   let mods  = mainModule : deps
-      -- No canonical mixfix names, so this table is exactly the one it always
-      -- was: a mixfix call in a rule body is not looked up by its pattern here.
-      -- Whether @l4 render@ should read the herald at such a call, as @l4 nlg@
-      -- now does, has not been ruled.
-      info  = nlgFnInfo Map.empty mods
+      info  = nlgFnInfo canonical mods
       ctors = recordCtorFields mods
   in map (substNlgInUnit info . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings)
        (extractUnits mainModule <> concatMap extractUnits deps)
@@ -448,7 +452,7 @@ buildDocument cfg mainModule0 deps0 =
   deps       = map stripSectionBinderElaborations deps0
   (title, bodySection) = documentTitleAndBody mainModule
   mainUri = moduleUri' mainModule
-  units   = allUnits cfg.mixfixHeadings mainModule deps
+  units   = allUnits cfg.mixfixHeadings cfg.mixfixCanonical mainModule deps
   graph   = buildGraph mainUri units
   reach   = reachableUnits graph
   ranks   = rankByBlockId graph
@@ -1452,7 +1456,7 @@ buildPlan cfg mainModule0 deps0 =
   mainModule = stripSectionBinderElaborations mainModule0
   deps       = map stripSectionBinderElaborations deps0
   mainUri = moduleUri' mainModule
-  units   = allUnits cfg.mixfixHeadings mainModule deps
+  units   = allUnits cfg.mixfixHeadings cfg.mixfixCanonical mainModule deps
   graph   = buildGraph mainUri units
   reach   = reachableUnits graph
   indexed = Map.toList graph.ugUnits

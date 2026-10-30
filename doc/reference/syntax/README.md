@@ -223,9 +223,7 @@ In [nlg-mixfix-example.l4](nlg-mixfix-example.l4), `` `the lower of` a `and` b `
 It does so whether the function is defined in the same file or in a module that file imports.
 The sentence can follow the last input, as the prelude writes it for `` `is in` ``, or sit on a line of its own above the head.
 
-**A limit.** `l4 render` does not do this for a mixfix call.
-It writes the call, inside the body of another rule, as the function's own words: for `` `the price we charge` `` in the example, "the lower of price and 100" and not "the smaller of price and 100".
-The function's own entry in the rendered document does show its sentence.
+`l4 render` reads the sentence at such a call too, inside the body of another rule: for `` `the price we charge` `` in the example it writes "the smaller of price and 100".
 
 `l4 nlg` writes a date given as literals as a date: `YMD 2025 7 16` and `Date 16 7 2025` both read `16 July 2025`.
 That covers only daydate's own `YMD` and `Date`, only when all three arguments are whole numbers, and only when they name a real day.
