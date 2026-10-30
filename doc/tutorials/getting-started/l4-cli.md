@@ -576,7 +576,9 @@ A cases file or a rules file that does not exist ends the command with the opera
 ### `l4 lint` — does the encoding keep its "subject to"?
 
 `l4 lint myfile.l4` reads the statute's own words in your file (the `@ref` citations, the decision names and the quoted text in the bodies) and checks that a provision that says "subject to section 6" actually asks the decision for section 6.
-It prints what it finds and exits 0 whatever the result; `--strict` makes a finding exit 1.
+It prints what it finds and exits 0 whatever it finds; `--strict` makes a finding exit 1.
+A file it cannot check (missing, unreadable, or one that does not type-check) is named on standard error and counted in the last line, the other files are still reported, and the command then exits 1 with or without `--strict`, because nothing was verified for that file.
+A directory stands for the `.l4` files under it.
 See [Does the encoding keep its "subject to"?](../../reference/lint/overrides.md).
 
 ### `l4 ast` — the parsed syntax tree

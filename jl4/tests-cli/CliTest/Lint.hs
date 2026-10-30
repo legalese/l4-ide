@@ -5,13 +5,18 @@
 -- The shapes of the text it reads, and each verdict of the call-graph half, are
 -- pinned in @jl4-core/test/OverrideLintSpec.hs@. What only the binary can show
 -- is the contract a reader of the output depends on: a finding names the file,
--- the line and the decision; a satisfied prose says nothing unless asked; and
--- the exit status is 0 for a lint that ran, whatever it found, until @--strict@.
+-- the line and the decision; a satisfied prose says nothing unless asked; the
+-- exit status is 0 for a lint that ran, whatever it found, until @--strict@;
+-- and a file the lint could not check is named on stderr, counted in the
+-- summary, recorded in @--json@ and makes the run exit 1, without hiding the
+-- files that were checked.
 module CliTest.Lint (spec, fixtures) where
 
 import Data.List (isInfixOf)
+import System.Directory (copyFile, createDirectoryIfMissing)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
+import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 
 import CliTest.Common
@@ -82,5 +87,48 @@ spec bin = do
       show env `shouldSatisfy` ("\"outcome\",String \"missing-conjunct\"" `isInfixOf`)
       show env `shouldSatisfy` ("\"finding\",Bool True" `isInfixOf`)
 
-    it "fails on a file that does not typecheck" $
-      expectFail bin ["lint", errorFixture]
+    it "fails on a file that does not typecheck, and counts it in the summary" $ do
+      Output code sout _ <- runL4 bin ["lint", errorFixture]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("l4 lint: 1 file, 1 could not be checked;" `isInfixOf`)
+
+    it "reports the files it can when another argument does not exist, naming the one it cannot read" $ do
+      let missing = fixtureDir </> "no-such-file.l4"
+      Output code sout serr <- runL4 bin ["lint", subjectToMissing, missing, subjectToWired]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("lint-subject-to-missing.l4:11: missing-conjunct: `s 8(3)" `isInfixOf`)
+      sout `shouldSatisfy` ("l4 lint: 3 files, 1 could not be checked; findings: 1 missing-conjunct" `isInfixOf`)
+      length (filter ("no-such-file.l4" `isInfixOf`) (lines serr)) `shouldBe` 1
+      serr `shouldSatisfy` (not . ("CallStack" `isInfixOf`))
+
+    it "lints the .l4 files under a directory, however deep, and ignores the rest" $
+      withSystemTempDirectory "l4-cli-test-lint" \tmp -> do
+        createDirectoryIfMissing True (tmp </> "sub")
+        copyFile subjectToMissing (tmp </> "sub" </> "deep.l4")
+        copyFile subjectToWired (tmp </> "top.l4")
+        writeFile (tmp </> "notes.txt") "not an l4 file"
+        Output code sout _ <- runL4 bin ["lint", tmp]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("deep.l4:11: missing-conjunct: `s 8(3)" `isInfixOf`)
+        sout `shouldSatisfy` ("l4 lint: 2 files; findings: 1 missing-conjunct" `isInfixOf`)
+
+    it "says so, on one line, when a directory holds no .l4 file" $
+      withSystemTempDirectory "l4-cli-test-lint-empty" \tmp -> do
+        Output code sout serr <- runL4 bin ["lint", tmp]
+        code `shouldBe` ExitFailure 1
+        length (filter (tmp `isInfixOf`) (lines serr)) `shouldBe` 1
+        sout `shouldSatisfy` ("could not be checked" `isInfixOf`)
+
+    it "never lets an empty --json array stand for a run that checked nothing" $ do
+      let missing = fixtureDir </> "no-such-file.l4"
+      env <- jsonEnvelope bin ["lint", "--json", missing]
+      show env `shouldSatisfy` ("\"status\",String \"unchecked\"" `isInfixOf`)
+      show env `shouldSatisfy` ("no-such-file.l4" `isInfixOf`)
+      Output code _ _ <- runL4 bin ["lint", "--json", missing]
+      code `shouldBe` ExitFailure 1
+
+    it "gives each unchecked file a record in --json beside the records of the files it checked" $ do
+      env <- jsonEnvelope bin ["lint", "--json", subjectToMissing, fixtureDir </> "no-such-file.l4"]
+      show env `shouldSatisfy` ("\"outcome\",String \"missing-conjunct\"" `isInfixOf`)
+      show env `shouldSatisfy` ("\"status\",String \"unchecked\"" `isInfixOf`)
+      show env `shouldSatisfy` ("\"status\",String \"checked\"" `isInfixOf`)
