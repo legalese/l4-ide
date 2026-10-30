@@ -40,11 +40,12 @@ export interface Logger {
 // ── AuthProvider ──────────────────────────────────────────────────────
 
 export interface AuthProvider {
-  /** Headers attached to every ai-proxy request. Return `{}` when no
-   *  credential is available; the client then fails fast with
-   *  `unauthenticated` (or stamps a dev token in local mode). Extra
-   *  headers (e.g. `X-Legalese-Session`) may ride along. */
-  getAiAuthHeaders(): Promise<Record<string, string>>
+  /** Headers attached to an ai-proxy request to `url`. Return `{}`
+   *  when no credential is available, or none may go to `url`; the
+   *  client then fails fast with `unauthenticated` (or stamps a dev
+   *  token in local mode). Extra headers (e.g. `X-Legalese-Session`)
+   *  may ride along. */
+  getAiAuthHeaders(url: string): Promise<Record<string, string>>
   /** The user's jl4-service URL, surfaced to the model in the first-turn
    *  `<session-context>` message. Empty/undefined when not signed in. */
   getEffectiveServiceUrl(): string | undefined

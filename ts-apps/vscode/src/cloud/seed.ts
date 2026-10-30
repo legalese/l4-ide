@@ -12,7 +12,8 @@
  * VS Code side (vscode-cloud.ts) reads the files.
  */
 import { createHash } from 'node:crypto'
-import { gzipSync } from 'node:zlib'
+import { promisify } from 'node:util'
+import { gzip } from 'node:zlib'
 import {
   FILE_NAME_RE,
   MAX_ATTACHMENT_BYTES,
@@ -188,6 +189,56 @@ export function checkAttachmentSizes(attachments: SeedAttachment[]): void {
   )
 }
 
+/** What the Sessions API unpacks from a seed at most. */
+export const MAX_SEED_UNPACKED_BYTES = 200 * 1024 * 1024
+export const MAX_SEED_FILES = 20_000
+
+/**
+ * Before packing: each file at most 10 MB (as attachments and added
+ * files), and no more than the API unpacks. Declines naming the files.
+ */
+export function checkSeedFiles(files: SeedFile[]): void {
+  const over = files.filter((f) => f.bytes.byteLength > MAX_ATTACHMENT_BYTES)
+  if (over.length > 0) {
+    throw new SeedLimitError(
+      `Files over ${formatSize(MAX_ATTACHMENT_BYTES)} can't go to a cloud session: ` +
+        over
+          .map((f) => `${f.path} (${formatSize(f.bytes.byteLength)})`)
+          .join(', ') +
+        '.',
+      over.map((f) => f.path)
+    )
+  }
+  const total = files.reduce((n, f) => n + f.bytes.byteLength, 0)
+  if (total > MAX_SEED_UNPACKED_BYTES || files.length > MAX_SEED_FILES) {
+    const largest = [...files]
+      .sort((a, b) => b.bytes.byteLength - a.bytes.byteLength)
+      .slice(0, 5)
+    throw new SeedLimitError(
+      `The files for this cloud session (${files.length}, ${formatSize(total)}) are more than it can take: at most ${MAX_SEED_FILES} files and ${formatSize(MAX_SEED_UNPACKED_BYTES)}. Largest: ` +
+        largest
+          .map((f) => `${f.path} (${formatSize(f.bytes.byteLength)})`)
+          .join(', ') +
+        '.',
+      largest.map((f) => f.path)
+    )
+  }
+}
+
+// Files that hold credentials, by name, and folders that do: never
+// uploaded, even when mentioned or open.
+const SECRET_FILE_RE =
+  /^(?:\.env(?:\..*)?|.*\.(?:pem|key|p12|pfx|jks|keystore|kdbx|ppk|asc|gpg)|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|\.npmrc|\.pypirc|\.netrc|_netrc|\.git-credentials|\.htpasswd|credentials(?:\.json)?|secrets?\.(?:json|ya?ml|toml))$/i
+const SECRET_DIRS = new Set(['.ssh', '.aws', '.gnupg', '.docker', '.kube'])
+
+/** Whether `path` (absolute or relative) looks like a credentials file. */
+export function isSecretFile(path: string): boolean {
+  const parts = path.split(/[/\\]/).filter(Boolean)
+  const name = parts[parts.length - 1] ?? ''
+  if (SECRET_FILE_RE.test(name)) return true
+  return parts.slice(0, -1).some((d) => SECRET_DIRS.has(d.toLowerCase()))
+}
+
 /** Decline a compressed seed over 50 MB, naming the largest files. */
 export function checkSeedSize(gz: Uint8Array, files: SeedFile[]): void {
   if (gz.byteLength <= MAX_SEED_BYTES) return
@@ -282,8 +333,11 @@ export function createTar(files: SeedFile[], mtimeSeconds = 0): Buffer {
   return Buffer.concat(parts)
 }
 
-export function createSeedTarGz(files: SeedFile[]): Buffer {
-  return gzipSync(createTar(files, Math.floor(Date.now() / 1000)))
+const gzipAsync = promisify(gzip)
+
+/** The seed tarball, gzipped off the extension host's main thread. */
+export function createSeedTarGz(files: SeedFile[]): Promise<Buffer> {
+  return gzipAsync(createTar(files, Math.floor(Date.now() / 1000)))
 }
 
 // ── Files added mid-session (§10) ────────────────────────────────────

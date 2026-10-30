@@ -19,7 +19,7 @@ import {
   CloudSessionManager,
   START_SETTLE_MS,
 } from '../cloud/cloud-session-manager.js'
-import type { McpServerSource } from '../cloud/mcp-transfer.js'
+import type { LocalMcpServer, McpServerSource } from '../cloud/mcp-transfer.js'
 import { SeedLimitError } from '../cloud/seed.js'
 import { SessionsApiError, type SessionsApi } from '../cloud/sessions-api.js'
 import { FakeClock, MemoryLogger, SID } from './cloud-fakes.js'
@@ -37,7 +37,8 @@ class FakeApi implements SessionsApi {
   pending: CloudEvent[] = []
   failInit = false
   conversationId: string | undefined
-  mcpNames: string[] = []
+  /** `session.json` MCP servers. */
+  mcpServers: Array<{ name: string; url: string }> = []
   seedBase: { workspaceFolder: string; path: string } | undefined
 
   async createSession(req: CreateSessionRequest) {
@@ -86,10 +87,7 @@ class FakeApi implements SessionsApi {
         created: 1,
         lastActivity: 1,
         status: 'sleeping' as const,
-        mcpServers: this.mcpNames.map((name) => ({
-          name,
-          url: `https://${name}.example/mcp`,
-        })),
+        mcpServers: this.mcpServers,
         ...(this.conversationId ? { conversationId: this.conversationId } : {}),
         ...(this.seedBase ? { seedBase: this.seedBase } : {}),
       },
@@ -603,6 +601,39 @@ describe('CloudSessionManager: a session whose key chain ends', () => {
     assert.equal(starts(s.api), 1)
   })
 
+  test('mid-turn, at most once per message: a turn that never ends waits for the user', async () => {
+    const s = setup()
+    await parks(s, 'busy')
+    assert.equal(starts(s.api), 1)
+    // Running again, and parked mid-turn again well after the gap.
+    s.api.state = 'busy'
+    await s.clock.advance(30 * 60_000)
+    s.api.pending = [ev({ type: 'auth-required', reason: 'chain_expired' })]
+    await s.clock.advance(1000)
+    s.api.state = 'parked'
+    await s.clock.advance(30 * 60_000)
+    assert.equal(starts(s.api), 1)
+    // The user's next message starts it.
+    s.api.commandState = 'parked'
+    await s.manager.sendMessage(SID, 'turn-2', 'go on')
+    assert.equal(starts(s.api), 2)
+  })
+
+  test('mid-turn but not in view: it waits for the next message', async () => {
+    const s = setup()
+    s.api.state = 'busy'
+    await s.manager.open(SID)
+    await s.clock.advance(0)
+    s.manager.setViewing(undefined)
+    s.api.pending = [ev({ type: 'auth-required', reason: 'chain_expired' })]
+    await s.clock.advance(1000)
+    s.api.state = 'parked'
+    await s.clock.advance(5000)
+    assert.equal(starts(s.api), 0)
+    // Parked and out of view: no longer watched.
+    assert.equal(s.manager.isWatching(SID), false)
+  })
+
   test('while idle: it waits for the next message, which starts it', async () => {
     const s = setup()
     await parks(s, 'running')
@@ -620,6 +651,31 @@ describe('CloudSessionManager: a session whose key chain ends', () => {
     await s.manager.open(SID)
     await s.clock.advance(60_000)
     assert.equal(starts(s.api), 0)
+  })
+})
+
+describe('CloudSessionManager: sessions out of view', () => {
+  test('a running one stays watched until it sleeps, then is let go', async () => {
+    const s = setup()
+    s.api.state = 'running'
+    await s.manager.open(SID)
+    await s.clock.advance(0)
+    s.manager.setViewing(undefined)
+    await s.clock.advance(5000)
+    assert.equal(s.manager.isWatching(SID), true)
+    s.api.state = 'sleeping'
+    await s.clock.advance(5000)
+    assert.equal(s.manager.isWatching(SID), false)
+  })
+
+  test('a sleeping one is let go when the view moves on', async () => {
+    const s = setup()
+    s.api.state = 'sleeping'
+    await s.manager.open(SID)
+    await s.clock.advance(0)
+    assert.equal(s.manager.isWatching(SID), true)
+    s.manager.setViewing(undefined)
+    assert.equal(s.manager.isWatching(SID), false)
   })
 })
 
@@ -641,7 +697,7 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
     }
     let tokens = 0
     const { api, clock, manager } = setup({ mcp })
-    api.mcpNames = ['Docs_Server']
+    api.mcpServers = [{ name: 'Docs_Server', url: 'https://docs.example/mcp' }]
     api.state = 'running'
     api.pending = [
       ev({
@@ -692,7 +748,9 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
   async function docsSession(mcp: McpServerSource) {
     const signIns: string[][] = []
     const s = setup({ mcp, onMcpSignIn: (servers) => signIns.push(servers) })
-    s.api.mcpNames = ['Docs_Server']
+    s.api.mcpServers = [
+      { name: 'Docs_Server', url: 'https://docs.example/mcp' },
+    ]
     s.api.state = 'running'
     s.api.pending = [
       ev({
@@ -752,6 +810,84 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
       /consent denied/
     )
     assert.deepEqual(s.manager.mcpSignInNeeded(SID), ['Docs Server'])
+  })
+
+  // The credentials are for the local server's URL: a `session.json`
+  // entry of the same name with another URL (edited by a task, or
+  // another server of that name) gets nothing.
+  test('only to a server whose name and URL both match', async () => {
+    const mcp: McpServerSource = {
+      enabledServers: () => [...docs],
+      headersFor: async () => ({ Authorization: 'Bearer secret' }),
+    }
+    const s = setup({ mcp })
+    s.api.mcpServers = [
+      { name: 'Docs_Server', url: 'https://attacker.example/mcp' },
+    ]
+    s.api.state = 'running'
+    s.api.pending = [
+      ev({
+        type: 'session-state',
+        state: 'running',
+        publicKey: generateSealingKeyPair().publicKey,
+      }),
+    ]
+    await s.manager.open(SID)
+    await s.clock.advance(0)
+    assert.equal(
+      s.api.commands.filter((c) => c.type === 'mcp-credentials').length,
+      0
+    )
+  })
+
+  test('not to servers added to session.json after the session was created', async () => {
+    const keyPair = generateSealingKeyPair()
+    const mail = {
+      id: 'Mail',
+      url: 'https://mail.example/mcp',
+      transport: 'http',
+    } as const
+    let enabled: LocalMcpServer[] = [...docs]
+    const mcp: McpServerSource = {
+      enabledServers: () => enabled,
+      headersFor: async (id) => ({ Authorization: `Bearer ${id}` }),
+    }
+    const s = setup({ mcp })
+    // Created here while only Docs was enabled…
+    await s.manager.runInCloud({
+      turnId: 't',
+      text: 'x',
+      seed: { files: [], attachments: [] },
+    })
+    // …then Mail is enabled, and a task adds it to session.json.
+    enabled = [...docs, mail]
+    s.api.mcpServers = [
+      { name: 'Docs_Server', url: 'https://docs.example/mcp' },
+      { name: 'Mail', url: 'https://mail.example/mcp' },
+    ]
+    s.api.state = 'running'
+    s.api.pending = [
+      ev({
+        type: 'session-state',
+        state: 'running',
+        publicKey: keyPair.publicKey,
+      }),
+    ]
+    await s.manager.open(SID)
+    await s.clock.advance(0)
+    const sent = s.api.commands.filter((c) => c.type === 'mcp-credentials')
+    assert.equal(sent.length, 1)
+    const plain = JSON.parse(
+      openSealed(
+        keyPair,
+        (sent[0] as { sealed: string }).sealed,
+        mcpCredentialsContext(SID)
+      ).toString('utf8')
+    )
+    assert.deepEqual(
+      plain.servers.map((x: { name: string }) => x.name),
+      ['Docs_Server']
+    )
   })
 
   test('passes only https HTTP/SSE servers in POST /sessions', async () => {

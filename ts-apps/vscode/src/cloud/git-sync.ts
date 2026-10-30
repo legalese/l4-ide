@@ -24,6 +24,7 @@
  * `vscode` import and can be unit-tested with fakes.
  */
 import { ULID_RE, type SessionSummary } from '@repo/legalese-agent/protocol'
+import { isLegaleseCloudUrl } from '../legalese-cloud-url.js'
 import { NO_COMMITS_YET_MESSAGE } from './sessions-api.js'
 
 // ── Git extension API subset (git.d.ts, API version 1) ────────────────
@@ -252,12 +253,11 @@ export interface CloudGitSyncDeps<U extends GitUri> {
 }
 
 /** The Sessions API host (`host[:port]`), or '' when unset/invalid. */
+/** The Sessions API's host, or '' when the URL is unset, invalid, or
+ *  not Legalese Cloud: git gets the token for Legalese Cloud only. */
 export function apiHost(apiUrl: string): string {
-  try {
-    return apiUrl.trim() ? new URL(apiUrl.trim()).host.toLowerCase() : ''
-  } catch {
-    return ''
-  }
+  if (!isLegaleseCloudUrl(apiUrl.trim())) return ''
+  return new URL(apiUrl.trim()).host.toLowerCase()
 }
 
 /**
@@ -418,7 +418,13 @@ export class CloudGitSync<U extends GitUri> {
       api.registerCredentialsProvider({
         getCredentials: async (host) => {
           const ours = apiHost(this.deps.apiUrl())
-          if (!ours || host.authority.toLowerCase() !== ours) return undefined
+          if (
+            !ours ||
+            host.scheme !== 'https' ||
+            host.authority.toLowerCase() !== ours
+          ) {
+            return undefined
+          }
           // VS Code usually passes only the host; when the session is
           // known from the path, refuse before its first commit.
           const m = SESSION_GIT_PATH_RE.exec(host.path ?? '')

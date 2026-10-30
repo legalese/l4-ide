@@ -42,9 +42,6 @@ export interface LspConnectionResult {
   dispose: () => Promise<void>
 }
 
-/** Cache name for WASM binaries */
-const WASM_CACHE_NAME = 'l4-wasm-cache-v1'
-
 /**
  * Check if WASM is available and can be used
  */
@@ -53,24 +50,6 @@ export function isWasmAvailable(): boolean {
     typeof WebAssembly !== 'undefined' &&
     typeof WebAssembly.instantiateStreaming === 'function'
   )
-}
-
-/**
- * Clear old WASM versions from cache
- */
-export async function clearOldWasmCache(currentVersion: string): Promise<void> {
-  const cache = await caches.open(WASM_CACHE_NAME)
-  const keys = await cache.keys()
-
-  const currentKey = `l4-wasm-${currentVersion}`
-
-  for (const request of keys) {
-    // Keep current version, delete others
-    if (!request.url.endsWith(currentKey)) {
-      console.log(`[L4 WASM] Clearing old cache: ${request.url}`)
-      await cache.delete(request)
-    }
-  }
 }
 
 /**
