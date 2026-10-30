@@ -1153,8 +1153,13 @@ Two also gain a provision (`doc/reference/libraries/sets-example.l4` and `jl4/ex
 That follows from `isInstanceValueUnit`, which takes a no-input rule whose body is a call to be a fixture and drops it when only directives use it; a body that has become a herald is no longer a call.
 A heralded PREFIX call already behaved so: with the 2026-10-28 `l4`, `x MEANS max 3 4` renders and `x MEANS plain 3 4`, with no herald, is dropped.
 No page under `doc/` quotes a render that moves.
-Found and not fixed: a `WITH` call across an `IMPORT` to a rule whose herald follows its last input prints that herald again as the gloss of the last input (``the amount by which `a` exceeds `b` where `a` is 840 and the amount by which `a` exceeds `b` is 160``).
-It is the same for a prefix function, so it is not about mixfix.
+
+A `WITH` call across an `IMPORT` to a rule whose herald follows its last input printed that herald a second time, as the label of the last input (``the amount by which `a` exceeds `b` where `a` is 840 and the amount by which `a` exceeds `b` is 160``).
+A prefix function did the same, so it was not about mixfix.
+`promoteHeadInputNlg` decides from the rules of the module it is given, and the importing module holds a copy of the imported input taken before any promotion, so nothing cleared the herald from it.
+`promoteHeadInputNlgWith` decides from the dependencies' rules as well, and `linearizeDirectivesIn` uses it for the module being read.
+It matches by `Unique`: the input names of an imported rule keep the dependency's `Unique`s in the importing module, which this change relies on and which the import fixture tests.
+With it, the full `jl4-test` suite gives 4830 examples and 0 failures against the five goldens above, so no other golden moves.
 
 ## 9. Reproducing the measurements
 

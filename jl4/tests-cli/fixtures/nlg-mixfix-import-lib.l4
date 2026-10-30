@@ -42,3 +42,9 @@ GIVEN a IS A NUMBER
 GIVETH A NUMBER
 @nlg the greater of %a% and %b%
 `the greater` a b MEANS IF a AT LEAST b THEN a ELSE b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the gap` a b @nlg the gap between %a% and %b%
+  MEANS a MINUS b

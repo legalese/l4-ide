@@ -8,6 +8,7 @@ module L4.Nlg (
   decideNlg,
   decideNlgSite,
   promoteHeadInputNlg,
+  promoteHeadInputNlgWith,
   carriesLanguage,
   Linearize (..),
   lin,
@@ -353,11 +354,30 @@ decideNlg mouter d = case decideNlgSite mouter d of
 --   * A collision — two heralds in one language on one input — attaches neither,
 --     so there is nothing to find and nothing to move.
 promoteHeadInputNlg :: Module Resolved -> Module Resolved
-promoteHeadInputNlg m
+promoteHeadInputNlg = promoteHeadInputNlgWith []
+
+-- | 'promoteHeadInputNlg' for a module that imports others: the promotion is
+-- decided by the rules of the given dependencies as well as by the module's own,
+-- and applied to this module's tree only.
+--
+-- __Why a module needs its dependencies' rules.__ A call to an imported rule
+-- carries a copy of the imported name, and of each of its inputs (a @WITH@
+-- call's labels are the inputs), taken when the reference was resolved —
+-- before any promotion. 'promoteHeadInputNlg' on the importing module sees
+-- none of the imported rules, so it left the herald on the copy of the input
+-- the author had written it after. A @WITH@ call then printed that sentence a
+-- second time as the label of the input (@the gap between `a` and `b` where `a`
+-- is 840 and the gap between `a` and `b` is 160@), which the same rule called
+-- from its own module does not.
+--
+-- The dependencies themselves are not rewritten here: 'nlgFnInfo' reads each
+-- one through its own 'promoteHeadInputNlg'.
+promoteHeadInputNlgWith :: [Module Resolved] -> Module Resolved -> Module Resolved
+promoteHeadInputNlgWith deps m
   | Map.null promote = m
   | otherwise        = over (gplate @Resolved) fixup m
  where
-  (promote, suppress) = foldTopLevelDecides collect m
+  (promote, suppress) = foldMap (foldTopLevelDecides collect) (m : deps)
 
   collect :: Decide Resolved -> (Map Unique (Nlg, [Nlg]), Set Unique)
   collect d@(MkDecide _ _ (MkAppForm _ headName _ _) _) =
@@ -435,7 +455,10 @@ linearizeDirectivesIn mlang mixfixCanon mod'' deps'' =
   )
  where
   prepare    = selectLanguage mlang . promoteHeadInputNlg
-  mod'       = prepare mod''
+  -- The module being read also learns which of its dependencies' inputs were
+  -- carrying a herald, so a call to one of those rules is labelled as a call to
+  -- a rule of its own would be.
+  mod'       = selectLanguage mlang (promoteHeadInputNlgWith deps'' mod'')
   heralds    = nlgFnInfo mixfixCanon (mod' : map prepare deps'')
   directives = toListOf (gplate @(Directive Resolved)) mod'
 
@@ -1025,11 +1048,13 @@ spaced p = text " " <> p <> text " "
 -- sentence and its GIVEN parameter uniques (in order), so a call's positional
 -- arguments can be matched to the sentence's @%parameter%@ slots.
 --
--- Keyed by @(function name, arity)@ rather than 'Unique': a call site in the
--- importing module and the definition in a dependency module do not share
--- 'Unique's (each module is resolved independently), so a unique-based key
--- would never match across an @IMPORT@. The inner @%param%@ substitution stays
--- 'Unique'-based — those refs are self-consistent within the defining module.
+-- Keyed by @(function name, arity)@, a name's text and not a 'Unique', so the
+-- key does not depend on a call site in the importing module carrying the
+-- 'Unique' of the definition in a dependency module. (The INPUT names of an
+-- imported rule do keep the dependency's 'Unique's in the importing module:
+-- 'promoteHeadInputNlgWith' relies on it. Whether the head's do was not tested,
+-- so the key stays text.) The inner @%param%@ substitution is 'Unique'-based:
+-- those refs are self-consistent within the defining module.
 --
 -- __A mixfix definition is entered under two names.__ Its head keyword (@the
 -- lower of@), which is how the definition is written once the type checker has

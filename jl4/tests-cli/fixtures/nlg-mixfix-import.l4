@@ -2,11 +2,6 @@
 -- The definitions are in nlg-mixfix-import-lib.l4; the calls are the same, row
 -- for row, as nlg-mixfix-local.l4's, so the two outputs can be read side by
 -- side. See that file for what each row is.
---
--- One row of that file is left out: a WITH call to `the amount by which`, whose
--- herald trails its last input. Across an IMPORT that call prints the herald
--- as the gloss of `b` as well, for a prefix function just the same, and it is
--- not what this file is about.
 
 IMPORT `nlg-mixfix-import-lib`
 
@@ -23,6 +18,10 @@ IMPORT `nlg-mixfix-import-lib`
 #EVAL `the lower of` OF 840, 160
 #EVAL `the amount by which` OF 840, 160
 #EVAL `the lower of` WITH a IS 840, b IS 160
+#EVAL `the amount by which` WITH a IS 840, b IS 160
+
+#EVAL `the gap` 840 160
+#EVAL `the gap` WITH a IS 840, b IS 160
 
 -- Render rows. `l4 nlg` prints directives only, so these add nothing to the
 -- output above; they give `l4 render` a call to each function inside the body

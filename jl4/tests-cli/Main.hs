@@ -3567,14 +3567,21 @@ spec bin = do
           ]
         lowerWith = "the smaller of `a` and `b` where `a` is 840 and `b` is 160"
         exceedsWith = "the amount by which `a` exceeds `b` where `a` is 840 and `b` is 160"
+        -- The prefix control with its herald after the last input: positional,
+        -- then WITH. Across an IMPORT the WITH call used to print the herald a
+        -- second time, as the label of `b`.
+        gapRows =
+          [ "the gap between 840 and 160"
+          , "the gap between `a` and `b` where `a` is 840 and `b` is 160"
+          ]
 
     it "fills the herald's slots at a call in the same module" $ do
       rows <- nlgLines nlgMixfixLocalFixture
-      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith]
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
 
     it "fills the herald's slots at a call across an IMPORT" $ do
       rows <- nlgLines nlgMixfixImportFixture
-      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith]
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
 
     -- The other reader of a herald at a call site: `l4 render`, for a call in the
     -- body of another rule. The fixtures end in one rule per call shape, named
