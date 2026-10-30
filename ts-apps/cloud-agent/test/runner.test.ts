@@ -454,6 +454,46 @@ describe('Runner', () => {
     )
   })
 
+  // The turn is off the queue but its plugin hooks still run: an abort
+  // in that window used to find nothing to stop, and the turn ran.
+  test('aborts a turn taken off the queue before it reaches the model', async () => {
+    let release!: () => void
+    const hook = new Promise<void>((r) => (release = r))
+    let inHook = false
+    proxy.scripts.push([metadata('conv5'), chunk({}, 'stop')])
+    const runner = build({
+      plugins: [
+        {
+          name: 'slow',
+          beforeTurn: async () => {
+            inHook = true
+            await hook
+            return undefined
+          },
+        },
+      ],
+    })
+    const done = runner.run()
+    await sendCommand(root, SID, { type: 'message', turnId: 't1', text: 'one' })
+    await waitUntil(() => inHook)
+    await sendCommand(root, SID, { type: 'abort', turnId: 't1' })
+    await waitUntil(
+      async () =>
+        (await readFile(path.join(stateDir, 'commands.done'), 'utf8')) === '2\n'
+    )
+    release()
+    await waitUntil(async () =>
+      (await readEvents(stateDir)).some(
+        (e) =>
+          e.type === 'done' &&
+          (e as { finishReason: string }).finishReason === 'aborted'
+      )
+    )
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+    assert.equal(proxy.chatRequests().length, 0)
+  })
+
   test('deletes run without approval; the model recovers from tmp/deleted and keeps notes in tmp', async () => {
     const repo = path.join(sessionDir, 'repo')
     await writeFile(path.join(repo, 'data', 'keep.l4'), 'precious\n')

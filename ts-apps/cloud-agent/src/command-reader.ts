@@ -21,6 +21,25 @@ const MAX_COMMAND_BYTES = 1_100_000
  *  unreadable (not visible yet, or half written) before it's skipped. */
 export const COMMAND_GRACE_MS = 15_000
 
+/** How long a command may stay unreadable through errors the mount
+ *  reports for a while and then not (a stale handle, a brief outage)
+ *  before it's skipped. */
+export const COMMAND_TRANSIENT_GRACE_MS = 60_000
+
+/** Errors of a network file system that pass: the read is tried again. */
+const TRANSIENT_ERRNOS = new Set([
+  'ESTALE',
+  'EIO',
+  'EAGAIN',
+  'EBUSY',
+  'EINTR',
+  'ETIMEDOUT',
+  'ENOTCONN',
+  'EHOSTDOWN',
+  'EHOSTUNREACH',
+  'ECONNRESET',
+])
+
 /** Harness-owned progress marker: the highest command number handled. */
 export const COMMANDS_DONE_FILE = 'commands.done'
 
@@ -45,8 +64,11 @@ export const COMMANDS_DONE_FILE = 'commands.done'
  *   the session slept.
  * - **Grace.** A number `commands.seq` announced but whose file can't
  *   be opened or parsed yet (a writer between create and write) is
- *   retried for {@link COMMAND_GRACE_MS}, then skipped with a warning.
- *   An invalid command is skipped at once.
+ *   retried for {@link COMMAND_GRACE_MS}, then skipped with a warning;
+ *   one the mount fails to read with a passing error (`ESTALE`, `EIO`,
+ *   …) for {@link COMMAND_TRANSIENT_GRACE_MS}. An invalid command, or
+ *   one that can't be read for another reason (too large, a symlink),
+ *   is skipped at once.
  * - At start, `commands.seq` is created as `0` with an exclusive create
  *   if it doesn't exist yet, so the harness never polls a missing name.
  */
@@ -61,13 +83,19 @@ export class CommandReader {
   private stuckSince: { n: number; at: number } | null = null
   private writing: Promise<void> = Promise.resolve()
   private readonly now: () => number
+  private readonly readText: typeof readKnownText
 
   constructor(
     private readonly stateDir: string,
     private readonly logger: Logger,
-    opts: { now?: () => number } = {}
+    opts: {
+      now?: () => number
+      /** Tests inject read errors here. */
+      readText?: typeof readKnownText
+    } = {}
   ) {
     this.now = opts.now ?? Date.now
+    this.readText = opts.readText ?? readKnownText
   }
 
   private get seqPath(): string {
@@ -172,11 +200,16 @@ export class CommandReader {
   private async read(n: number): Promise<CloudCommand | 'wait' | 'skip'> {
     let text: string | null
     try {
-      text = await readKnownText(this.commandPath(n), MAX_COMMAND_BYTES)
+      text = await this.readText(this.commandPath(n), MAX_COMMAND_BYTES)
     } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code && TRANSIENT_ERRNOS.has(code)) {
+        return this.stuck(n, COMMAND_TRANSIENT_GRACE_MS, `unreadable (${code})`)
+      }
       this.logger.warn(
         `command ${n} unreadable (${(err as Error).message}); skipping`
       )
+      this.stuckSince = null
       return 'skip'
     }
     if (text !== null) {
@@ -204,13 +237,19 @@ export class CommandReader {
       }
     }
     // Not there yet, or half written: wait out the grace period.
+    return this.stuck(n, COMMAND_GRACE_MS, 'never became readable')
+  }
+
+  /** Wait for command `n` up to `graceMs` from its first failed read,
+   *  then skip it with a warning. */
+  private stuck(n: number, graceMs: number, why: string): 'wait' | 'skip' {
     const now = this.now()
     if (!this.stuckSince || this.stuckSince.n !== n) {
       this.stuckSince = { n, at: now }
       return 'wait'
     }
-    if (now - this.stuckSince.at < COMMAND_GRACE_MS) return 'wait'
-    this.logger.warn(`command ${n} never became readable; skipping`)
+    if (now - this.stuckSince.at < graceMs) return 'wait'
+    this.logger.warn(`command ${n} ${why}; skipping`)
     this.stuckSince = null
     return 'skip'
   }

@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
-import { CommandReader, COMMAND_GRACE_MS } from '../src/command-reader.js'
+import type { CloudEventPayload } from '@repo/legalese-agent/protocol'
+import {
+  CommandReader,
+  COMMAND_GRACE_MS,
+  COMMAND_TRANSIENT_GRACE_MS,
+} from '../src/command-reader.js'
 import { EventLog, DELTA_COALESCE_MS } from '../src/event-log.js'
+import { CloudInteraction, MAX_TOOL_EVENT_TEXT } from '../src/interaction.js'
 import { Lease, LeaseHeldError } from '../src/lease.js'
-import { readKnownFile } from '../src/safe-fs.js'
+import { appendToFile, readKnownFile, readKnownText } from '../src/safe-fs.js'
 import { SessionJson } from '../src/session-file.js'
 import { initSessionFolder, sendCommand } from '../src/dev.js'
 import {
@@ -114,6 +120,127 @@ describe('EventLog', () => {
         [3, 'running'],
       ]
     )
+  })
+
+  test('a failed write keeps its events and later writes go on, seq contiguous', async () => {
+    let fail = false
+    const log = new EventLog(dir, silent, {
+      retryDelaysMs: [60_000],
+      append: async (file, data) => {
+        if (fail) {
+          // Half of it reaches the file, then the mount errors.
+          await appendToFile(file, String(data).slice(0, 10))
+          throw Object.assign(new Error('stale handle'), { code: 'ESTALE' })
+        }
+        await appendToFile(file, data)
+      },
+    })
+    await log.open()
+    log.emit({ type: 'session-state', state: 'running' })
+    await log.flush()
+    fail = true
+    log.emit({ type: 'session-state', state: 'busy' })
+    await assert.rejects(log.flush(), /stale handle/)
+    assert.equal(log.lastSeq, 1)
+    fail = false
+    log.emit({ type: 'session-state', state: 'waiting' })
+    await log.flush()
+    const events = await readEvents(dir)
+    assert.deepEqual(
+      events.map((e) => [e.seq, (e as { state?: string }).state]),
+      [
+        [1, 'running'],
+        [2, 'busy'],
+        [3, 'waiting'],
+      ]
+    )
+    // The torn bytes of the failed attempt are gone.
+    const head = JSON.parse(await readFile(path.join(dir, 'head.json'), 'utf8'))
+    const seg = await readFile(path.join(dir, 'events', '1.jsonl'))
+    assert.equal(seg.length, head.length)
+  })
+
+  test('recovers when the segment was briefly unwritable, retrying on its own', async () => {
+    const log = new EventLog(dir, silent, { retryDelaysMs: [20] })
+    await log.open()
+    log.emit({ type: 'session-state', state: 'running' })
+    await log.flush()
+    const seg = path.join(dir, 'events', '1.jsonl')
+    const published = await readFile(seg)
+    // The segment turns into something that can't be appended to.
+    await rm(seg)
+    await mkdir(seg)
+    log.emit({ type: 'session-state', state: 'busy' })
+    await assert.rejects(log.flush())
+    await rm(seg, { recursive: true })
+    await writeFile(seg, published)
+    // No new emit or flush: the retry timer writes the kept event.
+    await waitUntil(async () => (await readEvents(dir)).length === 2, 5_000)
+    log.emit({ type: 'session-state', state: 'waiting' })
+    await log.flush()
+    assert.deepEqual(
+      (await readEvents(dir)).map((e) => e.seq),
+      [1, 2, 3]
+    )
+  })
+
+  test('cuts an oversized field down instead of dropping the event', async () => {
+    const log = new EventLog(dir, silent)
+    await log.open()
+    log.emit({
+      type: 'tool-call',
+      conversationId: 'c',
+      callId: 'call-1',
+      name: 'fs__read_file',
+      argsJson: '{}',
+      status: 'done',
+      result: 'x'.repeat(1_200_000),
+    })
+    await log.flush()
+    const [event] = await readEvents(dir)
+    const result = (event as { result: string }).result
+    assert.equal(event?.type, 'tool-call')
+    assert.ok(result.length <= 1_000_000)
+    assert.match(result, /…\[truncated \d+ chars\]$/)
+    const dropped = Number(/truncated (\d+) chars/.exec(result)![1])
+    assert.equal(dropped + result.indexOf('…'), 1_200_000)
+  })
+
+  test('opens when head.json is ahead of its segment, continuing in a new one', async () => {
+    const a = new EventLog(dir, silent)
+    await a.open()
+    a.emit({ type: 'session-state', state: 'running' })
+    a.emit({ type: 'session-state', state: 'busy' })
+    await a.flush()
+    // The segment lost its last bytes; head.json kept the longer length.
+    const seg = path.join(dir, 'events', '1.jsonl')
+    const text = await readFile(seg, 'utf8')
+    await writeFile(seg, text.slice(0, text.indexOf('\n') + 1))
+    const b = new EventLog(dir, silent)
+    await b.open()
+    assert.equal(b.lastSeq, 1)
+    b.emit({ type: 'session-state', state: 'waiting' })
+    await b.flush()
+    const head = JSON.parse(await readFile(path.join(dir, 'head.json'), 'utf8'))
+    assert.equal(head.segment, 2)
+    // A restart before anything else was written still continues.
+    const c = new EventLog(dir, silent)
+    await c.open()
+    assert.equal(c.lastSeq, 2)
+  })
+
+  test('a fresh head segment with nothing in it keeps seq', async () => {
+    const a = new EventLog(dir, silent)
+    await a.open()
+    a.emit({ type: 'session-state', state: 'running' })
+    await a.flush()
+    await writeFile(
+      path.join(dir, 'head.json'),
+      JSON.stringify({ segment: 2, length: 0 }) + '\n'
+    )
+    const b = new EventLog(dir, silent)
+    await b.open()
+    assert.equal(b.lastSeq, 1)
   })
 
   test('starts a new segment past 1 MB', async () => {
@@ -236,6 +363,60 @@ describe('CommandReader', () => {
       [2]
     )
     assert.ok(logger.has('warn', /command 1 never became readable/))
+  })
+
+  test('retries a command the mount fails to read for a while, then skips it', async () => {
+    let now = 1_000
+    let failing = new Set([1, 2])
+    const logger = new MemoryLogger()
+    const reader = new CommandReader(stateDir, logger, {
+      now: () => now,
+      readText: async (file, max) => {
+        const n = Number(path.basename(file, '.json'))
+        if (failing.has(n)) {
+          throw Object.assign(new Error('stale file handle'), {
+            code: 'ESTALE',
+          })
+        }
+        return readKnownText(file, max)
+      },
+    })
+    await reader.open()
+    await writeCommand(1, { id: 1, ts: 1, type: 'abort', turnId: 'a' })
+    await writeCommand(2, { id: 2, ts: 1, type: 'abort', turnId: 'b' })
+    await setSeq(2)
+    // Past the half-written grace, still within the transient one.
+    assert.deepEqual(await reader.poll(), [])
+    now += COMMAND_GRACE_MS + 1
+    assert.deepEqual(await reader.poll(), [])
+    // The mount recovers for command 1: it's delivered, not lost.
+    failing = new Set([2])
+    assert.deepEqual(
+      (await reader.poll()).map((c) => c.id),
+      [1]
+    )
+    await reader.markHandled(1)
+    // Command 2 keeps failing: skipped once the transient grace is over.
+    assert.deepEqual(await reader.poll(), [])
+    now += COMMAND_TRANSIENT_GRACE_MS + 1
+    assert.deepEqual(await reader.poll(), [])
+    assert.ok(logger.has('warn', /command 2 unreadable \(ESTALE\); skipping/))
+    assert.equal(reader.handled, 2)
+  })
+
+  test('skips at once a command that fails to read for another reason', async () => {
+    const logger = new MemoryLogger()
+    const reader = new CommandReader(stateDir, logger, {
+      readText: async () => {
+        throw new Error('file too large: 1.json')
+      },
+    })
+    await reader.open()
+    await writeCommand(1, { id: 1, ts: 1, type: 'abort', turnId: 'a' })
+    await setSeq(1)
+    assert.deepEqual(await reader.poll(), [])
+    assert.equal(reader.handled, 1)
+    assert.ok(logger.has('warn', /command 1 unreadable \(file too large/))
   })
 
   test('recovers a half-written command that completes in time', async () => {
@@ -409,5 +590,26 @@ describe('SessionJson and safe reads', () => {
     } finally {
       await cleanup()
     }
+  })
+})
+
+describe('CloudInteraction', () => {
+  test('caps the tool text it puts in events', () => {
+    const sent: CloudEventPayload[] = []
+    const interaction = new CloudInteraction((p) => sent.push(p))
+    const ctx = { conversationId: 'c', turnId: 't' }
+    interaction.notifyToolStatus(
+      'call-1',
+      'done',
+      { result: 'r'.repeat(MAX_TOOL_EVENT_TEXT + 500) },
+      ctx
+    )
+    const result = (sent[0] as { result: string }).result
+    assert.equal(
+      result,
+      'r'.repeat(MAX_TOOL_EVENT_TEXT) + '…[truncated 500 chars]'
+    )
+    interaction.notifyToolStatus('call-2', 'done', { result: 'short' }, ctx)
+    assert.equal((sent[1] as { result: string }).result, 'short')
   })
 })

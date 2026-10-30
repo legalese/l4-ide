@@ -46,8 +46,12 @@ import { SessionJson } from './session-file.js'
 export const IDLE_EXIT_MS = 10 * 60 * 1000
 /** `commands.seq` is polled this often (§8). */
 export const COMMAND_POLL_MS = 1_000
-/** SIGTERM gives 30 s before SIGKILL (§5.1); leave a margin. */
-export const SHUTDOWN_BUDGET_MS = 25_000
+/** SIGTERM gives 30 s before SIGKILL (the task definition's
+ *  `stopTimeout`, §5.1): the whole shutdown fits in this, with a margin. */
+export const SHUTDOWN_BUDGET_MS = 20_000
+/** Kept for the last steps (session.json, the event flush, the lease,
+ *  the key chain, jl4-lsp), each bounded; earlier steps leave it. */
+export const FINAL_STEPS_MS = 9_000
 /** How long a parked harness lets the current turn finish its step. */
 export const PARK_TURN_GRACE_MS = 60_000
 /** How long an exit waits for `POST /auth/agent-token/end`. */
@@ -65,7 +69,9 @@ export const CLOUD_PERMISSIONS: Record<PermissionCategory, PermissionValue> =
     PERMISSION_CATEGORIES.map((c) => [c, 'always' as const])
   ) as Record<PermissionCategory, PermissionValue>
 
-export type ExitReason = 'idle' | 'stop' | 'sigterm' | 'parked'
+/** `error`: something nothing handled (main.ts); exit as cleanly as
+ *  the budget allows. */
+export type ExitReason = 'idle' | 'stop' | 'sigterm' | 'parked' | 'error'
 
 /** What plugins (git sync, MCP servers) get to work with. */
 export interface RunnerContext {
@@ -202,6 +208,12 @@ export class Runner {
   private queue: CloudCommand[] = []
   private working: Promise<void> | null = null
   private activeTurn: string | null = null
+  /** A turn taken off the queue but not yet handed to the chat service
+   *  (attachments, plugin hooks): an abort for it is kept here. */
+  private starting: { turnId: string; aborted: boolean } | null = null
+  /** Aborted after it was handed over, possibly before the chat service
+   *  could take an abort: repeated once it reports `started`. */
+  private abortRequested: string | null = null
   private conversationId: string | undefined
   private lastActivity: number
   private pollTimer: NodeJS.Timeout | null = null
@@ -245,7 +257,12 @@ export class Runner {
       logger: opts.logger,
       endpoint: () => opts.aiEndpoint,
     })
-    this.interaction.onEvent((event) => this.reply.observe(event))
+    this.interaction.onEvent((event) => {
+      this.reply.observe(event)
+      if (event.kind === 'started' && event.turnId === this.abortRequested) {
+        this.chat.abort(event.turnId)
+      }
+    })
     this.chat = new ChatService({
       auth: opts.auth,
       store,
@@ -344,6 +361,12 @@ export class Runner {
   /** SIGTERM: exit like an idle exit, within the stop timeout. */
   terminate(): void {
     void this.shutdown('sigterm')
+  }
+
+  /** An error nothing handled (main.ts): the normal shutdown, so the
+   *  lease, session.json and the key chain are left in order. */
+  fail(): Promise<ExitReason> {
+    return this.shutdown('error')
   }
 
   /** The key chain ended (renew refused, or 5xx / network failures
@@ -463,10 +486,22 @@ export class Runner {
         conversationId: this.conversationId ?? turnId,
         finishReason: 'aborted',
       })
-      if (cmd) void this.commands.markHandled(cmd.id)
+      if (cmd) {
+        this.commands
+          .markHandled(cmd.id)
+          .catch((err) =>
+            this.opts.logger.error(`command ${cmd.id}: markHandled failed`, err)
+          )
+      }
+      return
+    }
+    if (this.starting?.turnId === turnId) {
+      // Not handed to the chat service yet: it won't be.
+      this.starting.aborted = true
       return
     }
     this.interaction.pending.cancelTurn(turnId)
+    if (this.activeTurn === turnId) this.abortRequested = turnId
     this.chat.abort(turnId)
   }
 
@@ -597,6 +632,7 @@ export class Runner {
     cmd: Extract<CloudCommand, { type: 'message' }>
   ): Promise<void> {
     const { logger } = this.opts
+    this.starting = { turnId: cmd.turnId, aborted: false }
     const turn: TurnInfo = {
       turnId: cmd.turnId,
       prompt: cmd.text,
@@ -635,29 +671,42 @@ export class Runner {
       .update({ lastActivity: this.now() })
       .catch((err) => logger.warn(`session.json update failed: ${String(err)}`))
     const started = this.now()
+    // Aborted while it was being prepared (or the harness is stopping).
+    const abortedEarly = this.starting?.aborted === true
+    this.starting = null
     this.reply.begin()
     try {
-      await this.chat.start({
-        conversationId: this.conversationId,
-        turnId: cmd.turnId,
-        text: prefix + cmd.text,
-        mentions: (cmd.context?.mentions ?? []).map((label) => ({
-          kind: 'file' as const,
-          label,
-        })),
-        attachments: loaded.map((a) => a.attachment),
-        includeActiveFile: !!cmd.context?.activeFile,
-        ...(cmd.context?.activeFile
-          ? {
-              activeFile: {
-                path: cmd.context.activeFile,
-                name: path.posix.basename(cmd.context.activeFile),
-              },
-            }
-          : {}),
-      })
+      if (abortedEarly) {
+        logger.info(`turn ${cmd.turnId} aborted before it started`)
+        this.events.emit({
+          type: 'done',
+          conversationId: this.conversationId ?? cmd.turnId,
+          finishReason: 'aborted',
+        })
+      } else {
+        await this.chat.start({
+          conversationId: this.conversationId,
+          turnId: cmd.turnId,
+          text: prefix + cmd.text,
+          mentions: (cmd.context?.mentions ?? []).map((label) => ({
+            kind: 'file' as const,
+            label,
+          })),
+          attachments: loaded.map((a) => a.attachment),
+          includeActiveFile: !!cmd.context?.activeFile,
+          ...(cmd.context?.activeFile
+            ? {
+                activeFile: {
+                  path: cmd.context.activeFile,
+                  name: path.posix.basename(cmd.context.activeFile),
+                },
+              }
+            : {}),
+        })
+      }
     } finally {
       this.activeTurn = null
+      this.abortRequested = null
       logger.info(`turn ${cmd.turnId} finished in ${this.now() - started} ms`)
     }
     turn.conversationId = this.conversationId
@@ -748,30 +797,42 @@ export class Runner {
     return this.stopped
   }
 
+  /**
+   * The shutdown, within {@link SHUTDOWN_BUDGET_MS} (a parked harness first
+   * gives the current turn {@link PARK_TURN_GRACE_MS}; nobody is waiting on
+   * it). The running turn and the plugins (git commits what changed) get
+   * what is left before {@link FINAL_STEPS_MS}; the last steps — status,
+   * events, lease, key chain, jl4-lsp — are each bounded, the lease
+   * released as soon as nothing writes any more.
+   */
   private async finish(reason: ExitReason): Promise<void> {
     const { logger } = this.opts
     this.phase = 'stopping'
     this.exitReason = reason
     logger.info(`shutting down (${reason})`)
-    const deadline = this.now() + SHUTDOWN_BUDGET_MS
     if (this.pollTimer) clearInterval(this.pollTimer)
     this.pollTimer = null
     this.opts.chain?.stopTimer()
     // Nothing new starts; queued commands stay unhandled for the next
     // start (except after `stop`, which cleared them).
     this.queue = []
+    if (this.starting) this.starting.aborted = true
     const working = this.working
+    if (working && reason === 'parked') {
+      // Let the current step finish: model calls fail fast now, so the
+      // turn ends on its own; abort it if it doesn't.
+      await waitFor(working, PARK_TURN_GRACE_MS)
+    }
+    const deadline = this.now() + SHUTDOWN_BUDGET_MS
+    const left = (reserve: number): number =>
+      Math.max(0, deadline - this.now() - reserve)
     if (working) {
-      if (reason === 'parked') {
-        // Let the current step finish: model calls fail fast now, so the
-        // turn ends on its own; abort it if it doesn't.
-        await waitFor(working, PARK_TURN_GRACE_MS)
-      }
       if (this.activeTurn) {
         this.interaction.pending.cancelTurn(this.activeTurn)
         this.chat.abort(this.activeTurn)
       }
-      await waitFor(working, Math.max(0, deadline - this.now() - 10_000))
+      // Leave the plugins at least 4 s to commit.
+      await waitFor(working, left(FINAL_STEPS_MS + 4_000))
     }
     this.interaction.pending.cancelAll()
     // Only plugins that started (the chain can end before they do).
@@ -780,32 +841,41 @@ export class Runner {
       try {
         await waitFor(
           p.beforeExit(reason, this.ctx),
-          Math.max(1_000, deadline - this.now() - 5_000)
+          Math.max(1_000, left(FINAL_STEPS_MS))
         )
       } catch (err) {
         logger.error(`plugin ${p.name} beforeExit failed`, err)
       }
     }
-    if (reason !== 'parked' && this.opts.chain) {
-      await waitFor(this.opts.chain.end(), CHAIN_END_WAIT_MS)
-    }
     const status = reason === 'parked' ? 'parked' : 'sleeping'
-    await this.session
-      .update({
-        status,
-        parkedReason:
-          reason === 'parked' ? (this.parkedReason ?? 'invalid_key') : null,
-        lastActivity: this.now(),
-      })
-      .catch((err) => logger.error('session.json status update failed', err))
+    await waitFor(
+      this.session
+        .update({
+          status,
+          parkedReason:
+            reason === 'parked' ? (this.parkedReason ?? 'invalid_key') : null,
+          lastActivity: this.now(),
+        })
+        .catch((err) => logger.error('session.json status update failed', err)),
+      2_000
+    )
     this.announceState(status)
-    await this.events
-      .flush()
-      .catch((err) => logger.error('event flush failed', err))
-    await this.lease
-      .release()
-      .catch((err) => logger.error('lease release failed', err))
-    await waitFor(this.opts.l4.dispose?.() ?? Promise.resolve(), 3_000)
+    await waitFor(
+      this.events
+        .flush()
+        .catch((err) => logger.error('event flush failed', err)),
+      3_000
+    )
+    await waitFor(
+      this.lease
+        .release()
+        .catch((err) => logger.error('lease release failed', err)),
+      2_000
+    )
+    if (reason !== 'parked' && this.opts.chain) {
+      await waitFor(this.opts.chain.end(), 1_500)
+    }
+    await waitFor(this.opts.l4.dispose?.() ?? Promise.resolve(), 500)
     this.phase = 'stopped'
     logger.info(`stopped (${reason})`)
     this.resolveStopped(reason)

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
+import { EventEmitter } from 'node:events'
 import * as path from 'node:path'
 import {
   ConfigError,
@@ -10,8 +11,21 @@ import {
 } from '../src/config.js'
 import { initSessionFolder } from '../src/dev.js'
 import { JsonLogger, redact } from '../src/logger.js'
-import { main, runHarness } from '../src/main.js'
-import { SID, silent, tempDir, writeFakeLsp } from './helpers.js'
+import { Jl4Lsp } from '../src/jl4-lsp.js'
+import {
+  childEnv,
+  installFatalHandlers,
+  main,
+  runHarness,
+} from '../src/main.js'
+import {
+  HOST_PATH,
+  MemoryLogger,
+  SID,
+  silent,
+  tempDir,
+  writeFakeLsp,
+} from './helpers.js'
 
 const good = {
   SESSION_ID: SID,
@@ -224,5 +238,106 @@ describe('JsonLogger', () => {
       'jl4-lsp stderr: [redacted]'
     )
     assert.equal(redact('tool/unknown: fs__nope'), 'tool/unknown: fs__nope')
+  })
+
+  test('drops text= and body= tails', () => {
+    assert.equal(
+      redact('chat/request conv=c1 text=Draft the lease for Jane Doe'),
+      'chat/request conv=c1 [redacted]'
+    )
+    assert.equal(
+      redact('proxy/error status=500 body={"error":"quote: Acme Ltd"}'),
+      'proxy/error status=500 [redacted]'
+    )
+  })
+})
+
+describe('child processes', () => {
+  const parent: NodeJS.ProcessEnv = {
+    PATH: '/usr/bin',
+    HOME: '/home/agent',
+    TMPDIR: '/tmp/agent',
+    AGENT_KEY: 'sk_live_abcdefgh12345',
+    AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: '/v2/credentials/x',
+    AI_PROXY_URL: 'https://ai.legalese.cloud',
+  }
+
+  test('childEnv keeps only PATH, HOME, TMPDIR and a locale', () => {
+    assert.deepEqual(childEnv(parent), {
+      LANG: 'C.UTF-8',
+      PATH: '/usr/bin',
+      HOME: '/home/agent',
+      TMPDIR: '/tmp/agent',
+    })
+  })
+
+  test('the language server gets exactly that environment', async () => {
+    const { dir, cleanup } = await tempDir()
+    try {
+      const out = path.join(dir, 'env.json')
+      const fake = await writeFakeLsp(dir)
+      // The fake records its environment first (into a fixed path: the
+      // environment can't carry one).
+      const script = await readFile(fake, 'utf8')
+      const [shebang, ...rest] = script.split('\n')
+      await writeFile(
+        fake,
+        [
+          shebang,
+          `require('node:fs').writeFileSync(${JSON.stringify(out)}, JSON.stringify(process.env))`,
+          ...rest,
+        ].join('\n')
+      )
+      const lsp = await Jl4Lsp.spawn({
+        command: fake,
+        root: dir,
+        logger: silent,
+        env: childEnv({ ...parent, PATH: HOST_PATH }),
+      })
+      await lsp.dispose(1_000)
+      const env = JSON.parse(await readFile(out, 'utf8')) as Record<
+        string,
+        string
+      >
+      // macOS adds __CF_USER_TEXT_ENCODING to every process.
+      delete env.__CF_USER_TEXT_ENCODING
+      assert.deepEqual(Object.keys(env).sort(), [
+        'HOME',
+        'LANG',
+        'PATH',
+        'TMPDIR',
+      ])
+      assert.ok(!JSON.stringify(env).includes('sk_live'))
+    } finally {
+      await cleanup()
+    }
+  })
+})
+
+describe('installFatalHandlers', () => {
+  test('an unhandled rejection runs the shutdown once, then exits non-zero', async () => {
+    const proc = new EventEmitter() as EventEmitter & {
+      exit: (c: number) => void
+    }
+    const exits: number[] = []
+    proc.exit = (c) => exits.push(c)
+    let failed = 0
+    const logger = new MemoryLogger()
+    const handlers = installFatalHandlers(
+      { fail: async () => (failed++, 'error' as const) },
+      logger,
+      proc as unknown as Parameters<typeof installFatalHandlers>[2],
+      10
+    )
+    proc.emit('unhandledRejection', new Error('EIO on commands.done'))
+    proc.emit('uncaughtException', new Error('second'))
+    assert.equal(failed, 1)
+    assert.equal(handlers.fired(), true)
+    assert.ok(logger.has('error', /unhandled error; shutting down/))
+    await new Promise((r) => setTimeout(r, 30))
+    assert.deepEqual(exits, [1])
+    handlers.remove()
+    assert.equal(proc.listenerCount('unhandledRejection'), 0)
+    assert.equal(proc.listenerCount('uncaughtException'), 0)
   })
 })

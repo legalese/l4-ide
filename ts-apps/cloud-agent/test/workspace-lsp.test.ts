@@ -6,13 +6,13 @@ import { PassThrough } from 'node:stream'
 import rpc from 'vscode-jsonrpc/node.js'
 import type { MessageConnection } from 'vscode-jsonrpc'
 import { Git } from '../src/git.js'
-import { Jl4Lsp } from '../src/jl4-lsp.js'
+import { Jl4Lsp, type LspSpawner } from '../src/jl4-lsp.js'
 import {
   NodeWorkspace,
   uriForPath,
   type WorkspaceChangeListener,
 } from '../src/node-workspace.js'
-import { HOST_PATH, silent, tempDir } from './helpers.js'
+import { HOST_PATH, MemoryLogger, silent, tempDir } from './helpers.js'
 
 class RecordingListener implements WorkspaceChangeListener {
   readonly writes: Array<[string, string, boolean]> = []
@@ -38,6 +38,23 @@ describe('NodeWorkspace', () => {
     await writeFile(path.join(dir, 'secret.txt'), 'outside')
   })
   afterEach(() => cleanup())
+
+  test('imports added files up to 10 MB and skips larger ones', async () => {
+    const ws = new NodeWorkspace(repo)
+    const limit = 10 * 1024 * 1024
+    await writeFile(path.join(dir, 'fits.bin'), Buffer.alloc(limit, 1))
+    await writeFile(path.join(dir, 'over.bin'), Buffer.alloc(limit + 1, 1))
+    assert.equal(
+      await ws.importFile(path.join(dir, 'fits.bin'), 'data/fits.bin'),
+      true
+    )
+    assert.equal((await stat(path.join(repo, 'data', 'fits.bin'))).size, limit)
+    assert.equal(
+      await ws.importFile(path.join(dir, 'over.bin'), 'data/over.bin'),
+      false
+    )
+    await assert.rejects(stat(path.join(repo, 'data', 'over.bin')))
+  })
 
   test('resolves paths inside the repo and refuses everything else', () => {
     const ws = new NodeWorkspace(repo)
@@ -409,6 +426,88 @@ describe('Jl4Lsp', () => {
     assert.equal(fns[0]?.name, 'x')
     client.dispose()
     server.dispose()
+  })
+
+  /** Fake servers that publish one diagnostic naming themselves, and a
+   *  spawner handing them out; `exit(i)` makes server i die. */
+  function restartable(opts: { failAfter?: number } = {}) {
+    const servers: Array<
+      ReturnType<typeof fakeServer> & { exit?: (d: string) => void }
+    > = []
+    const spawner: LspSpawner = async () => {
+      if (opts.failAfter !== undefined && servers.length >= opts.failAfter) {
+        throw new Error('spawn failed')
+      }
+      const f = fakeServer()
+      const index = servers.length + 1
+      f.server.onNotification(
+        'textDocument/didOpen',
+        (p: { textDocument: { uri: string } }) => {
+          f.received.push({ method: 'textDocument/didOpen', params: p })
+          void f.server.sendNotification('textDocument/publishDiagnostics', {
+            uri: p.textDocument.uri,
+            diagnostics: [
+              {
+                range: {
+                  start: { line: 0, character: 0 },
+                  end: { line: 0, character: 1 },
+                },
+                severity: 1,
+                message: `from server ${index}`,
+              },
+            ],
+          })
+        }
+      )
+      const entry = Object.assign(f, {}) as (typeof servers)[number]
+      servers.push(entry)
+      return {
+        connection: f.client,
+        onExit: (listener) => {
+          entry.exit = listener
+        },
+      }
+    }
+    const exit = (i: number): void => {
+      const s = servers[i]!
+      s.client.dispose()
+      s.server.dispose()
+      s.exit?.('code=1, signal=null')
+    }
+    return { servers, spawner, exit }
+  }
+
+  test('starts the server again after it dies and re-sends open documents', async () => {
+    const uri = uriForPath(path.join(dir, 'a.l4'))
+    const { servers, spawner, exit } = restartable()
+    const lsp = await Jl4Lsp.start(spawner, uriForPath(dir), silent, [0])
+    assert.equal((await lsp.getDiagnostics(uri))[0]?.message, 'from server 1')
+    exit(0)
+    // Not the dead server's cached answer: the new one's.
+    assert.equal((await lsp.getDiagnostics(uri))[0]?.message, 'from server 2')
+    assert.equal(servers.length, 2)
+    assert.ok(
+      servers[1]!.received.some(
+        (r) =>
+          r.method === 'textDocument/didOpen' &&
+          (r.params as { textDocument: { uri: string } }).textDocument.uri ===
+            uri
+      )
+    )
+    assert.equal(lsp.running, true)
+    await lsp.dispose(10)
+  })
+
+  test('fails L4 calls with a clear error once restarts are used up', async () => {
+    const uri = uriForPath(path.join(dir, 'a.l4'))
+    const { spawner, exit } = restartable({ failAfter: 1 })
+    const logger = new MemoryLogger()
+    const lsp = await Jl4Lsp.start(spawner, uriForPath(dir), logger, [0, 0])
+    await lsp.getDiagnostics(uri)
+    exit(0)
+    await assert.rejects(lsp.getDiagnostics(uri), /could not be restarted/)
+    assert.ok(logger.has('error', /not restarted again/))
+    assert.equal(lsp.getDirectiveResults(uri), undefined)
   })
 })
 

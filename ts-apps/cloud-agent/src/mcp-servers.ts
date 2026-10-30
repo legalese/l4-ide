@@ -17,6 +17,36 @@ import { SessionJson } from './session-file.js'
 export const USER_MCP_PREFIX = 'vsmcp__'
 const RPC_TIMEOUT_MS = 60_000
 const PROTOCOL_VERSION = '2025-03-26'
+/** Largest MCP response read; a longer one fails the call. */
+export const MAX_MCP_RESPONSE_BYTES = 10 * 1024 * 1024
+
+/** An HTTP header name (RFC 9110 token). */
+const HEADER_NAME_RE = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
+/** A header value: visible characters, spaces and tabs; no CR, LF, NUL. */
+const HEADER_VALUE_RE = /^[\t\x20-\x7e\x80-\xff]*$/
+/** Headers the harness sets itself, or that only the transport may. */
+const RESERVED_HEADERS = new Set([
+  'accept',
+  'content-type',
+  'content-length',
+  'host',
+  'connection',
+  'transfer-encoding',
+  'mcp-session-id',
+  'mcp-protocol-version',
+])
+
+/** Whether sealed credential headers can be sent as they are. */
+export function validCredentialHeaders(
+  headers: Record<string, string>
+): boolean {
+  return Object.entries(headers).every(
+    ([name, value]) =>
+      HEADER_NAME_RE.test(name) &&
+      !RESERVED_HEADERS.has(name.toLowerCase()) &&
+      HEADER_VALUE_RE.test(value)
+  )
+}
 
 class McpHttpError extends Error {
   constructor(
@@ -156,6 +186,13 @@ export class McpServers implements RunnerPlugin, ToolProvider {
     for (const entry of creds.servers) {
       const server = this.servers.get(entry.name)
       if (!server) continue
+      if (!validCredentialHeaders(entry.headers)) {
+        // Never log the values.
+        this.logger.warn(
+          `mcp: credentials for ${server.config.name} refused (invalid header)`
+        )
+        continue
+      }
       server.headers = { ...entry.headers }
       server.expiresAt = entry.expiresAt
       server.generation++
@@ -236,39 +273,56 @@ export class McpServers implements RunnerPlugin, ToolProvider {
 
   // ── Connection ─────────────────────────────────────────────────────
 
+  /**
+   * Connect with the current credentials. New ones that arrive while a
+   * connect runs (`generation` moves) are picked up by connecting again
+   * once it's done, so the server isn't left unlisted.
+   */
   private connect(server: Server): Promise<void> {
     if (server.connecting) return server.connecting
-    const generation = server.generation
     server.connecting = (async () => {
       try {
-        await this.rpc(server, 'initialize', {
-          protocolVersion: PROTOCOL_VERSION,
-          capabilities: { tools: {} },
-          clientInfo: { name: 'legalese-cloud-agent', version: '0.1.0' },
-        })
-        void this.rpc(server, 'notifications/initialized', {}, true).catch(
-          () => undefined
-        )
-        const listed = await this.rpc<{ tools?: McpToolDef[] }>(
-          server,
-          'tools/list',
-          {}
-        )
-        if (server.generation !== generation) return
-        server.tools = Array.isArray(listed?.tools) ? listed.tools : []
-        server.initialized = true
-        this.logger.info(
-          `mcp: ${server.config.name} connected (${server.tools.length} tools)`
-        )
-      } catch (err) {
-        this.logger.warn(
-          `mcp: ${server.config.name} failed to connect: ${err instanceof McpHttpError ? `HTTP ${err.status}` : (err as Error).name}`
-        )
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const generation = server.generation
+          await this.connectOnce(server, generation)
+          if (server.generation === generation) return
+          // Started with the old credentials: its session isn't ours.
+          server.sessionId = undefined
+          server.initialized = false
+        }
       } finally {
         server.connecting = null
       }
     })()
     return server.connecting
+  }
+
+  private async connectOnce(server: Server, generation: number): Promise<void> {
+    try {
+      await this.rpc(server, 'initialize', {
+        protocolVersion: PROTOCOL_VERSION,
+        capabilities: { tools: {} },
+        clientInfo: { name: 'legalese-cloud-agent', version: '0.1.0' },
+      })
+      void this.rpc(server, 'notifications/initialized', {}, true).catch(
+        () => undefined
+      )
+      const listed = await this.rpc<{ tools?: McpToolDef[] }>(
+        server,
+        'tools/list',
+        {}
+      )
+      if (server.generation !== generation) return
+      server.tools = Array.isArray(listed?.tools) ? listed.tools : []
+      server.initialized = true
+      this.logger.info(
+        `mcp: ${server.config.name} connected (${server.tools.length} tools)`
+      )
+    } catch (err) {
+      this.logger.warn(
+        `mcp: ${server.config.name} failed to connect: ${err instanceof McpHttpError ? `HTTP ${err.status}` : (err as Error).name}`
+      )
+    }
   }
 
   private async rpc<T>(
@@ -316,7 +370,7 @@ export class McpServers implements RunnerPlugin, ToolProvider {
       await res.body?.cancel().catch(() => undefined)
       return null
     }
-    const text = await res.text()
+    const text = await readCapped(res, MAX_MCP_RESPONSE_BYTES)
     if (!text) return null
     const raw = (res.headers.get('Content-Type') ?? '').includes(
       'text/event-stream'
@@ -363,6 +417,25 @@ export class McpServers implements RunnerPlugin, ToolProvider {
       server: server.config.name,
     })
   }
+}
+
+/** The body as text, failing once it passes `maxBytes`. */
+async function readCapped(res: Response, maxBytes: number): Promise<string> {
+  if (!res.body) return ''
+  const reader = res.body.getReader()
+  const parts: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined)
+      throw new Error(`MCP response larger than ${maxBytes} bytes`)
+    }
+    parts.push(value)
+  }
+  return Buffer.concat(parts).toString('utf8')
 }
 
 /** The JSON-RPC response for `id` in an SSE body. */

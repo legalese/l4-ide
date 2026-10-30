@@ -278,6 +278,42 @@ describe('KeyChainAuth', () => {
   })
 })
 
+describe('KeyChainAuth and the wrapped global fetch', () => {
+  // main.ts builds the chain, then replaces the global fetch with
+  // authRetryingFetch. If renewals went through the wrapper, a 401 from
+  // the renew route on a wrapped origin would wait on its own renewal.
+  test('renews with the fetch it was built with, not a later global one', async () => {
+    const realFetch = globalThis.fetch
+    const proxy = authProxy([{ status: 401, body: { error: 'invalid_key' } }])
+    globalThis.fetch = proxy.fetch
+    let ended: ChainEnded | undefined
+    try {
+      const auth = new KeyChainAuth({
+        authUrl: 'https://ai.legalese.cloud/',
+        sessionId: SID,
+        initialKey: KEY0,
+        logger: silent,
+        onEnded: (e) => (ended = e),
+        retryDelaysMs: [1],
+        minRenewIntervalMs: 10,
+      })
+      // Same origin as the auth URL, as a misconfiguration could make it.
+      globalThis.fetch = authRetryingFetch(proxy.fetch, auth, [
+        'https://ai.legalese.cloud',
+      ])
+      const started = await Promise.race([
+        auth.start(),
+        sleep(2_000).then(() => 'hung' as const),
+      ])
+      assert.equal(started, false)
+      assert.equal(ended?.reason, 'invalid_key')
+      assert.equal(proxy.calls.length, 1)
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+})
+
 describe('authRetryingFetch', () => {
   test('renews and retries once on a 401 from ai-proxy', async () => {
     const renew = authProxy([

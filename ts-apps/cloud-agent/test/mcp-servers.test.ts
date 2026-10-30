@@ -198,6 +198,97 @@ describe('McpServers', () => {
     )
   })
 
+  test('fails a call whose response is over the size cap', async () => {
+    const base = mcpFetch()
+    const huge = (async (input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method: string }
+      if (body.method !== 'tools/call') return base.fetch(input, init)
+      // A body that never ends: the cap stops reading it.
+      let sent = 0
+      const stream = new ReadableStream<Uint8Array>({
+        pull(c) {
+          sent += 1024 * 1024
+          c.enqueue(new Uint8Array(1024 * 1024).fill(32))
+          if (sent > 64 * 1024 * 1024) c.close()
+        },
+      })
+      return new Response(stream, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }) as typeof fetch
+    const mcp = new McpServers({ fetch: huge })
+    await mcp.start(ctx)
+    await mcp.handleCommand(
+      sealed(mcp.sessionStateFields().publicKey!, {
+        servers: [{ name: 'docs', headers: {} }],
+      })
+    )
+    await mcp.listTools()
+    await assert.rejects(
+      mcp.callTool('vsmcp__docs_search_docs', '{"q":"x"}'),
+      /larger than 10485760 bytes/
+    )
+  })
+
+  test('refuses credentials whose headers could not be sent as they are', async () => {
+    const f = mcpFetch()
+    const mcp = new McpServers({ fetch: f.fetch })
+    await mcp.start(ctx)
+    await mcp.handleCommand(
+      sealed(mcp.sessionStateFields().publicKey!, {
+        servers: [
+          { name: 'docs', headers: { Authorization: 'Bearer a\r\nX-Evil: 1' } },
+          { name: 'crm', headers: { 'Mcp-Session-Id': 'forced' } },
+        ],
+      })
+    )
+    assert.deepEqual(await mcp.listTools(), [])
+    assert.equal(f.seen.length, 0)
+    assert.ok(logger.has('warn', /credentials for docs refused/))
+    assert.ok(logger.has('warn', /credentials for crm refused/))
+    assert.ok(!logger.lines.some((l) => l.message.includes('Bearer a')))
+  })
+
+  test('credentials that arrive while a connect runs are used, not lost', async () => {
+    const base = mcpFetch()
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let first = true
+    const slow = (async (input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method: string }
+      if (body.method === 'initialize' && first) {
+        first = false
+        await held
+      }
+      return base.fetch(input, init)
+    }) as typeof fetch
+    const mcp = new McpServers({ fetch: slow })
+    await mcp.start(ctx)
+    const key = mcp.sessionStateFields().publicKey!
+    await mcp.handleCommand(
+      sealed(key, {
+        servers: [{ name: 'docs', headers: { Authorization: 'Bearer old' } }],
+      })
+    )
+    // New credentials while the first connect is still in flight.
+    await mcp.handleCommand(
+      sealed(key, {
+        servers: [{ name: 'docs', headers: { Authorization: 'Bearer new' } }],
+      })
+    )
+    release()
+    const tools = await mcp.listTools()
+    assert.deepEqual(
+      tools.map((t) => t.function.name),
+      ['vsmcp__docs_search_docs']
+    )
+    assert.equal(
+      await mcp.callTool('vsmcp__docs_search_docs', '{"q":"y"}'),
+      'found y'
+    )
+    assert.equal(base.seen.at(-1)!.auth, 'Bearer new')
+  })
+
   test('ignores credentials sealed for another session or key', async () => {
     const mcp = new McpServers({ fetch: mcpFetch().fetch })
     await mcp.start(ctx)

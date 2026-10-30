@@ -9,6 +9,18 @@ import {
   chatEventToPayload,
   type CloudEventPayload,
 } from '@repo/legalese-agent/protocol'
+import { truncationNote } from './event-log.js'
+
+/** Longest tool arguments, result or error text put in an event: the
+ *  model got the whole result; the view only shows it. */
+export const MAX_TOOL_EVENT_TEXT = 100_000
+
+function capText(s: string): string {
+  return s.length > MAX_TOOL_EVENT_TEXT
+    ? s.slice(0, MAX_TOOL_EVENT_TEXT) +
+        truncationNote(s.length - MAX_TOOL_EVENT_TEXT)
+    : s
+}
 
 /**
  * {@link UserInteraction} over the file relay (spec §8, §11):
@@ -96,10 +108,12 @@ export class CloudInteraction implements UserInteraction {
       conversationId: meta?.conversationId ?? ctx.conversationId,
       callId,
       name: meta?.name ?? '',
-      argsJson: meta?.argsJson ?? '{}',
+      argsJson: capText(meta?.argsJson ?? '{}'),
       status,
-      ...(detail?.result !== undefined ? { result: detail.result } : {}),
-      ...(detail?.error !== undefined ? { error: detail.error } : {}),
+      ...(detail?.result !== undefined
+        ? { result: capText(detail.result) }
+        : {}),
+      ...(detail?.error !== undefined ? { error: capText(detail.error) } : {}),
     })
     if (status === 'done' || status === 'error') this.calls.delete(callId)
   }

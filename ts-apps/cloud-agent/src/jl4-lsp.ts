@@ -27,6 +27,24 @@ const DIAGNOSTICS_TIMEOUT_MS = 20_000
 const DIAGNOSTICS_SETTLE_MS = 300
 const REQUEST_TIMEOUT_MS = 60_000
 
+/** After jl4-lsp dies it's started again after these delays; once they
+ *  are used up, L4 tools fail with a clear error instead of answering
+ *  from what the dead server last said. */
+export const LSP_RESTART_DELAYS_MS: readonly number[] = [1_000, 5_000, 15_000]
+/** A server that ran this long gets the full set of restarts again. */
+const LSP_HEALTHY_MS = 10 * 60_000
+
+/** A running jl4-lsp: its connection, its process when there is one. */
+export interface LspChannel {
+  connection: MessageConnection
+  process?: ChildProcess
+  /** Called once, when the server goes away. */
+  onExit(listener: (description: string) => void): void
+}
+
+/** Starts a jl4-lsp (at first, and again after it died). */
+export type LspSpawner = () => Promise<LspChannel>
+
 interface LspDiagnostic {
   range: { start: LspPosition; end: LspPosition }
   severity?: number
@@ -62,9 +80,13 @@ interface DiagnosticsEntry {
  *   requests; the semantic-token legend comes from `initialize`.
  * - Server-to-client requests (`client/registerCapability`,
  *   `workspace/configuration`, progress) get empty answers.
+ * - If the server dies, its diagnostics and results are dropped and it
+ *   is started again ({@link LSP_RESTART_DELAYS_MS}) with every open
+ *   document re-sent; calls meanwhile wait for it. Once the restarts are
+ *   used up, calls fail with an error saying so.
  */
 export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
-  private readonly directives = new DirectiveResultsCache()
+  private directives = new DirectiveResultsCache()
   private readonly open = new Map<string, OpenDoc>()
   private readonly diagnostics = new Map<string, DiagnosticsEntry>()
   private readonly diagnosticWaiters = new Map<string, Array<() => void>>()
@@ -73,19 +95,32 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
   private tokenTypes: string[] = []
   private exited = false
   private disposing = false
+  /** No more restarts: calls fail. */
+  private failed = false
+  private restarts = 0
+  private restarting: Promise<void> | null = null
+  /** Ends a restart delay early (dispose). */
+  private wake: (() => void) | null = null
+  /** Bumped on every (re)start, so a call can tell its answer is gone. */
+  private epoch = 0
+  private startedAt = 0
+  private connection!: MessageConnection
+  private process?: ChildProcess
   /** Change notifications go out in order. */
   private notifying: Promise<void> = Promise.resolve()
 
   private constructor(
-    private readonly connection: MessageConnection,
     private readonly logger: Logger,
-    private readonly process?: ChildProcess
+    private readonly rootUri: string,
+    private readonly spawner: LspSpawner | undefined,
+    private readonly restartDelays: readonly number[]
   ) {}
 
   /**
    * Spawn `command --cwd <root>` and initialise it. `env` is the child's
    * whole environment: pass a minimal one, never the harness's own
-   * (which held `AGENT_KEY`).
+   * (which held `AGENT_KEY`). The same command starts it again if it
+   * dies.
    */
   static async spawn(opts: {
     command: string
@@ -93,56 +128,141 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
     logger: Logger
     env: NodeJS.ProcessEnv
     args?: string[]
+    restartDelaysMs?: readonly number[]
   }): Promise<Jl4Lsp> {
-    const child = spawn(
-      opts.command,
-      [...(opts.args ?? []), '--cwd', opts.root],
-      {
-        cwd: opts.root,
-        env: opts.env,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }
+    return Jl4Lsp.start(
+      () => spawnChannel(opts),
+      uriForPath(opts.root),
+      opts.logger,
+      opts.restartDelaysMs
     )
-    const spawned = new Promise<void>((resolve, reject) => {
-      child.once('spawn', () => resolve())
-      child.once('error', reject)
-    })
-    await spawned
-    child.stderr?.setEncoding('utf8')
-    child.stderr?.on('data', (chunk: string) => {
-      // jl4-lsp logs diagnostics about the user's files: debug only,
-      // and the logger redacts the text (logger.ts).
-      opts.logger.debug(`jl4-lsp stderr: ${chunk.slice(0, 200).trim()}`)
-    })
-    const connection = rpc.createMessageConnection(
-      new rpc.StreamMessageReader(child.stdout!),
-      new rpc.StreamMessageWriter(child.stdin!)
-    )
-    const lsp = new Jl4Lsp(connection, opts.logger, child)
-    child.once('exit', (code, signal) => {
-      lsp.exited = true
-      const msg = `jl4-lsp exited (code=${code}, signal=${signal})`
-      if (lsp.disposing) opts.logger.info(msg)
-      else opts.logger.warn(msg)
-      connection.dispose()
-    })
-    await lsp.initialize(uriForPath(opts.root))
+  }
+
+  /** Start one with `spawner`, which also restarts it (tests). */
+  static async start(
+    spawner: LspSpawner,
+    rootUri: string,
+    logger: Logger,
+    restartDelaysMs: readonly number[] = LSP_RESTART_DELAYS_MS
+  ): Promise<Jl4Lsp> {
+    const lsp = new Jl4Lsp(logger, rootUri, spawner, restartDelaysMs)
+    await lsp.attach(await spawner())
     return lsp
   }
 
-  /** Wrap an existing connection (tests). */
+  /** Wrap an existing connection, never restarted (tests). */
   static async connect(
     connection: MessageConnection,
     rootUri: string,
     logger: Logger
   ): Promise<Jl4Lsp> {
-    const lsp = new Jl4Lsp(connection, logger)
-    await lsp.initialize(rootUri)
+    const lsp = new Jl4Lsp(logger, rootUri, undefined, [])
+    await lsp.attach({ connection, onExit: () => undefined })
     return lsp
   }
 
   get running(): boolean {
     return !this.exited
+  }
+
+  private async attach(channel: LspChannel): Promise<void> {
+    this.connection = channel.connection
+    this.process = channel.process
+    this.exited = false
+    this.epoch++
+    this.startedAt = Date.now()
+    channel.onExit((description) => this.onExit(channel, description))
+    await this.initialize(this.rootUri)
+  }
+
+  /** The server went away: drop what it said, and start it again. */
+  private onExit(channel: LspChannel, description: string): void {
+    if (channel.connection !== this.connection) return
+    this.exited = true
+    const msg = `jl4-lsp exited (${description})`
+    if (this.disposing) {
+      this.logger.info(msg)
+      return
+    }
+    this.logger.warn(msg)
+    this.diagnostics.clear()
+    this.changedAt.clear()
+    this.directives = new DirectiveResultsCache()
+    // Calls waiting for diagnostics see the exit now, not at a timeout.
+    for (const waiters of this.diagnosticWaiters.values()) {
+      for (const w of waiters) w()
+    }
+    this.diagnosticWaiters.clear()
+    if (Date.now() - this.startedAt >= LSP_HEALTHY_MS) this.restarts = 0
+    if (!this.restarting) {
+      this.restarting = this.restartLoop().finally(() => {
+        this.restarting = null
+      })
+    }
+  }
+
+  private async restartLoop(): Promise<void> {
+    while (!this.disposing) {
+      const delay = this.restartDelays[this.restarts]
+      if (!this.spawner || delay === undefined) {
+        this.failed = true
+        this.logger.error(
+          'jl4-lsp: not restarted again; L4 tools fail from now on'
+        )
+        return
+      }
+      this.restarts++
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, delay)
+        this.wake = () => {
+          clearTimeout(t)
+          resolve()
+        }
+      })
+      this.wake = null
+      if (this.disposing) return
+      let channel: LspChannel | undefined
+      try {
+        channel = await this.spawner()
+        if (this.disposing) {
+          channel.process?.kill('SIGKILL')
+          channel.connection.dispose()
+          return
+        }
+        await this.attach(channel)
+        await this.reopenAll()
+        this.logger.info(`jl4-lsp restarted (attempt ${this.restarts})`)
+        return
+      } catch (err) {
+        this.exited = true
+        channel?.process?.kill('SIGKILL')
+        this.logger.warn(
+          `jl4-lsp: restart failed: ${err instanceof Error ? err.message : String(err)}`
+        )
+      }
+    }
+  }
+
+  /** After a restart: the new server gets every open document again. */
+  private async reopenAll(): Promise<void> {
+    for (const [key, doc] of this.open) {
+      this.changedAt.set(key, 0)
+      const { version, text } = doc
+      this.enqueue(
+        () =>
+          this.connection.sendNotification('textDocument/didOpen', {
+            textDocument: { uri: key, languageId: 'l4', version, text },
+          }),
+        'reopen'
+      )
+    }
+    await this.notifying
+  }
+
+  /** Wait out a restart in progress; throw when there is no server. */
+  private async ready(): Promise<void> {
+    if (this.restarting) await this.restarting
+    this.assertRunning()
   }
 
   private async initialize(rootUri: string): Promise<void> {
@@ -227,11 +347,11 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
     uri: string
   ): Promise<{ lineCount: number; version: number }> {
     const key = normalizeFileUri(uri)
+    await this.ready()
     const existing = this.open.get(key)
     if (existing) {
       return { lineCount: existing.lineCount, version: existing.version }
     }
-    this.assertRunning()
     const text = await fs.readFile(new URL(key), 'utf8')
     const doc = { version: 1, lineCount: lineCount(text), text }
     this.open.set(key, doc)
@@ -247,15 +367,23 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
     return { lineCount: doc.lineCount, version: doc.version }
   }
 
-  async getDiagnostics(uri: string): Promise<L4Diagnostic[]> {
+  async getDiagnostics(uri: string, retry = true): Promise<L4Diagnostic[]> {
     const key = normalizeFileUri(uri)
     await this.openDocument(key)
+    const epoch = this.epoch
     const since = this.changedAt.get(key) ?? 0
     if ((this.diagnostics.get(key)?.generation ?? 0) <= since) {
       await this.waitForDiagnostics(key, DIAGNOSTICS_TIMEOUT_MS)
     }
     // Let a follow-up publish (type check after parse) land.
     await this.waitForDiagnostics(key, DIAGNOSTICS_SETTLE_MS)
+    if (this.exited || this.epoch !== epoch) {
+      // The server died meanwhile: ask the restarted one (once), never
+      // answer from nothing.
+      if (retry) return this.getDiagnostics(key, false)
+      this.assertRunning()
+      throw new Error('The L4 language server restarted; try again')
+    }
     return (this.diagnostics.get(key)?.diagnostics ?? []).map((d) => ({
       severity: severityName(d.severity),
       line: d.range?.start?.line ?? 0,
@@ -328,7 +456,8 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
    * seeing the old version otherwise.
    */
   onDidWrite(uri: string, text: string, created: boolean): void {
-    if (this.exited) return
+    // While the server is down only the bookkeeping changes: a restart
+    // sends every open document as it is then.
     const key = normalizeFileUri(uri)
     this.changedAt.set(key, this.diagnostics.get(key)?.generation ?? 0)
     const isL4 = key.toLowerCase().endsWith('.l4')
@@ -360,6 +489,7 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
         { changes: [{ uri: key, type: created ? 1 : 2 }] }
       )
     }
+    if (this.exited) return
     this.enqueue(send, 'change')
     if (isL4) this.refreshImporters(key)
   }
@@ -390,10 +520,10 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
   }
 
   onDidDelete(uri: string): void {
-    if (this.exited) return
     const key = normalizeFileUri(uri)
     const wasOpen = this.open.delete(key)
     this.diagnostics.delete(key)
+    if (this.exited) return
     const send = async (): Promise<void> => {
       if (wasOpen) {
         await this.connection.sendNotification('textDocument/didClose', {
@@ -415,7 +545,6 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
    * server doesn't re-read modules from disk), and close deleted ones.
    */
   async resync(changedUris: string[]): Promise<void> {
-    if (this.exited) return
     for (const u of changedUris) {
       const key = normalizeFileUri(u)
       let text: string | null
@@ -433,6 +562,8 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
   /** `shutdown` + `exit`, then kill the process if it lingers. */
   async dispose(timeoutMs = 3_000): Promise<void> {
     this.disposing = true
+    this.wake?.()
+    if (this.restarting) await this.restarting
     if (!this.exited) {
       try {
         await Promise.race([
@@ -469,6 +600,11 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
   }
 
   private assertRunning(): void {
+    if (this.failed) {
+      throw new Error(
+        'The L4 language server stopped and could not be restarted; L4 checks are unavailable in this session'
+      )
+    }
     if (this.exited) throw new Error('The L4 language server is not running')
   }
 
@@ -511,6 +647,49 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
         }
       )
     })
+  }
+}
+
+/** Spawn `command --cwd <root>` as a channel (see {@link Jl4Lsp.spawn}). */
+async function spawnChannel(opts: {
+  command: string
+  root: string
+  logger: Logger
+  env: NodeJS.ProcessEnv
+  args?: string[]
+}): Promise<LspChannel> {
+  const child = spawn(
+    opts.command,
+    [...(opts.args ?? []), '--cwd', opts.root],
+    {
+      cwd: opts.root,
+      env: opts.env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }
+  )
+  await new Promise<void>((resolve, reject) => {
+    child.once('spawn', () => resolve())
+    child.once('error', reject)
+  })
+  child.stderr?.setEncoding('utf8')
+  child.stderr?.on('data', (chunk: string) => {
+    // jl4-lsp logs diagnostics about the user's files: debug only,
+    // and the logger redacts the text (logger.ts).
+    opts.logger.debug(`jl4-lsp stderr: ${chunk.slice(0, 200).trim()}`)
+  })
+  const connection = rpc.createMessageConnection(
+    new rpc.StreamMessageReader(child.stdout!),
+    new rpc.StreamMessageWriter(child.stdin!)
+  )
+  return {
+    connection,
+    process: child,
+    onExit: (listener) => {
+      child.once('exit', (code, signal) => {
+        connection.dispose()
+        listener(`code=${code}, signal=${signal}`)
+      })
+    },
   }
 }
 

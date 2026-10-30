@@ -98,7 +98,10 @@ export class KeyChainAuth implements AuthProvider {
 
   constructor(private readonly opts: KeyChainOptions) {
     this.key = opts.initialKey
-    this.fetchImpl = opts.fetch ?? ((...a) => fetch(...a))
+    // Captured now: main.ts later replaces the global fetch with
+    // authRetryingFetch, and a renewal must never go through that (a 401
+    // from the renew route would wait on its own renewal).
+    this.fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis)
     this.now = opts.now ?? Date.now
     this.expiresAt = this.now() + AGENT_KEY_LIFETIME_MS
     this.retryDelays = opts.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS

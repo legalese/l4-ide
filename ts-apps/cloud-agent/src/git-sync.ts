@@ -325,7 +325,8 @@ export class GitSync implements RunnerPlugin {
     if (committed) {
       this.ctx.logger.info('git: committed leftover changes before exit')
     }
-    if (reason === 'sigterm') return
+    // No time for gc when stopped from outside or after an error.
+    if (reason === 'sigterm' || reason === 'error') return
     const r = await this.git.run(['gc', '--quiet'], {
       timeoutMs: GC_TIMEOUT_MS,
     })

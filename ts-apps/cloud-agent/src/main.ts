@@ -28,6 +28,7 @@ import { ensureDirNoFollow } from './safe-fs.js'
 import {
   CHAIN_END_WAIT_MS,
   Runner,
+  SHUTDOWN_BUDGET_MS,
   waitFor,
   type RunnerPlugin,
 } from './runner.js'
@@ -40,13 +41,45 @@ export function defaultPlugins(env: NodeJS.ProcessEnv): RunnerPlugin[] {
 }
 
 /** The child's whole environment: nothing from the harness's own. */
-function childEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function childEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = { LANG: 'C.UTF-8' }
   for (const k of ['PATH', 'HOME', 'TMPDIR']) {
     const v = env[k]
     if (v) out[k] = v
   }
   return out
+}
+
+/**
+ * A rejection nothing handled, or a throw outside every try (Node would
+ * otherwise exit at once, with the lease still live, session.json saying
+ * running and the key chain open): log it and run the runner's normal
+ * shutdown. If that hangs, exit anyway once its budget is over. Returns
+ * whether it fired, and a function removing the handlers.
+ */
+export function installFatalHandlers(
+  runner: Pick<Runner, 'fail'>,
+  logger: Logger,
+  proc: Pick<NodeJS.Process, 'on' | 'off' | 'exit'> = process,
+  graceMs = SHUTDOWN_BUDGET_MS + 5_000
+): { fired: () => boolean; remove: () => void } {
+  let fired = false
+  const onFatal = (err: unknown): void => {
+    logger.error('unhandled error; shutting down', err)
+    if (fired) return
+    fired = true
+    void runner.fail()
+    setTimeout(() => proc.exit(1), graceMs).unref()
+  }
+  proc.on('unhandledRejection', onFatal)
+  proc.on('uncaughtException', onFatal)
+  return {
+    fired: () => fired,
+    remove: () => {
+      proc.off('unhandledRejection', onFatal)
+      proc.off('uncaughtException', onFatal)
+    },
+  }
 }
 
 async function taskIdFrom(cfg: HarnessConfig): Promise<string> {
@@ -81,6 +114,8 @@ export async function runHarness(
           authUrl: cfg.authUrl!,
           sessionId: cfg.sessionId,
           initialKey: cfg.agentKey!,
+          // The plain fetch, before runSession wraps the global one.
+          fetch: globalThis.fetch.bind(globalThis),
           logger,
           onEnded: (e) => holder.runner?.onChainEnded(e.reason),
         })
@@ -180,6 +215,7 @@ async function runSession(
   }
   process.once('SIGTERM', () => onSignal('SIGTERM'))
   process.once('SIGINT', () => onSignal('SIGINT'))
+  const fatal = installFatalHandlers(r, logger)
 
   try {
     const reason = await r.run()
@@ -187,11 +223,13 @@ async function runSession(
       await lsp.dispose()
       logger.info('another harness holds the lease; exiting')
     }
-    return 0
+    return fatal.fired() ? 1 : 0
   } catch (err) {
     logger.error('harness failed', err)
     await lsp.dispose().catch(() => undefined)
     return 1
+  } finally {
+    fatal.remove()
   }
 }
 
