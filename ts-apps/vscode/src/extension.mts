@@ -711,7 +711,7 @@ export async function activate(context: ExtensionContext) {
   })
 
   // Cloud sessions (specs/todo/CLOUD-SESSIONS-SPEC.md): inert until
-  // `legaleseAi.cloudSessions.enabled` is on and an API URL is set —
+  // `legaleseAi.cloudSessions.enabled` is on —
   // nothing polls or calls out before a session is started or opened.
   // Their chat events take the same path as the local chat service's.
   const cloudSessions = createCloudSessions({

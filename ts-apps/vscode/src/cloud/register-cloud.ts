@@ -44,7 +44,6 @@ import { SeedLimitError } from './seed.js'
 import { SessionsApiError } from './sessions-api.js'
 import { mergeConflictMessage } from './notification-text.js'
 import {
-  CLOUD_SESSIONS_API_URL_SETTING,
   CLOUD_SESSIONS_ENABLED_SETTING,
   type CloudSessions,
 } from './vscode-cloud.js'
@@ -121,12 +120,7 @@ export function registerCloudHandlers(deps: {
     })
   }
   const configSub = vscode.workspace.onDidChangeConfiguration((e) => {
-    if (
-      e.affectsConfiguration(CLOUD_SESSIONS_ENABLED_SETTING) ||
-      e.affectsConfiguration(CLOUD_SESSIONS_API_URL_SETTING)
-    ) {
-      pushConfig()
-    }
+    if (e.affectsConfiguration(CLOUD_SESSIONS_ENABLED_SETTING)) pushConfig()
   })
   messenger.onNotification(WebviewFrontendIsReadyNotification, pushConfig)
   pushConfig()

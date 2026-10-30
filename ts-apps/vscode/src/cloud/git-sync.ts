@@ -228,7 +228,7 @@ export function proactiveAuthKey(apiUrl: string): string | undefined {
 
 export interface CloudGitSyncDeps<U extends GitUri> {
   getGitApi(): Promise<GitApiResult<U>>
-  /** `legaleseAi.cloudSessions.apiUrl`; '' = off. */
+  /** The Sessions API's URL; '' while cloud sessions are off. */
   apiUrl(): string
   listSessions(): Promise<SessionSummary[]>
   getAccessToken(): Promise<string>
