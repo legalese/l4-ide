@@ -8,7 +8,7 @@ Where a sentence describes what the tree does today it says _today_ and cites a 
 
 **Who this is for.** Anyone implementing an evaluator that answers requests (jl4-core, jl4-service, `l4 batch`, jl4-mlir, the ladder) or an exporter that projects L4 into another system.
 The ladder diagram is the reference **model** for what an assertion and a presumption are: §2 maps every concept here onto the ladder's own, and says which parts of the ladder are semantics and which are only drawing.
-The ladder is not the authority on **values**: U10b (`UNKNOWN-EVALUATION-SPEC.md:1260`) holds the ladder's `nodeValue` to the Haskell evaluator and lists where they diverge, and this document keeps that.
+The ladder is not the authority on **values**: U10b (`UNKNOWN-EVALUATION-SPEC.md:1294`) holds the ladder's `nodeValue` to the Haskell evaluator and lists where they diverge, and this document keeps that.
 
 **Owning documents this touches.** `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (T1, T3, T4, T6, TU-wire-b), `IMPLICIT-PROPS-DESIGN.md` §11.5 (R8), `SURFACE-SUGAR-CLUSTER-2026-09.md` (D7.3), `UNKNOWN-EVALUATION-SPEC.md` (§5, U8, U9, U10), `UNKNOWNS-BACKEND-CONTRACT.md` (a description of the tree), `RUNTIME-INPUT-STATE-SPEC.md`, `ladder-diagrams-2026/DESIGN.md` (§19, §22, §26, §27), `WHERE-INLINING-SPEC.md` (§7, §10).
 §12 lists which of their sentences this document supersedes.
