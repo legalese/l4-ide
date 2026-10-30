@@ -149,6 +149,8 @@ user documentation, `doc/tutorials/refuse/when-a-rule-cannot-answer.md`.
 
 **Isomorphic encoding** — match the logical shape of the source text. If legislation has sections numbered 1.1 / 1.2 / 1.3 with three clauses joined by AND, your L4 should have three conjuncts in the same order. This keeps the rule auditable against the statute.
 
+In inert style, also consider **field opening** (a bare `building` for `f's building` inside a rule whose input is a record). It is experimental: it is on `unstable` and in the prerelease `l4` binaries, but not in the VS Code extension's, so check the binary first. See "Field opening" in [references/drafting-patterns.md](references/drafting-patterns.md).
+
 For formalizing legislation specifically — proviso/negative/gate limbs, enumerated cases, statutory tables as data, leap-safe date windows, and mandatory-vs-discretionary outcomes — see [references/drafting-patterns.md](references/drafting-patterns.md), a catalogue of "when the statute says… → the L4 shape" idioms.
 
 ```l4
