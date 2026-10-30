@@ -68,6 +68,8 @@ import { VsCodeL4Language } from './ai/vscode-l4-language.js'
 import { VsCodeEditorContext } from './ai/editor-context.js'
 import { SettingsPermissionPolicy } from './ai/vscode-permissions.js'
 import { WebviewUserInteraction } from './ai/vscode-user-interaction.js'
+import { createCloudSessions } from './cloud/vscode-cloud.js'
+import { registerCloudHandlers } from './cloud/register-cloud.js'
 
 /***********************************************
      decode for RenderAsLadderInfo
@@ -708,6 +710,21 @@ export async function activate(context: ExtensionContext) {
     extensionVersion,
   })
 
+  // Cloud sessions (spec: legalese/cloud-sessions, spec/): inert until
+  // `legaleseAi.cloudSessions.enabled` is on —
+  // nothing polls or calls out before a session is started or opened.
+  // Their chat events take the same path as the local chat service's.
+  const cloudSessions = createCloudSessions({
+    auth,
+    client,
+    mcp: vsMcpTools,
+    emitChat: (event) => aiInteraction.emit(event),
+    logger: aiLogger,
+    storage: context.globalState,
+    summarizeTitle: (text) => aiProxy.summarizeTitle(text),
+  })
+  context.subscriptions.push(cloudSessions)
+
   // Instantiate the sidebar provider BEFORE wiring AI chat handlers
   // so the handlers can subscribe to its visibility event and buffer
   // chat events while the webview is hidden. The provider itself
@@ -738,6 +755,27 @@ export async function activate(context: ExtensionContext) {
       vsMcp: vsMcpTools,
       serviceClient,
       extensionPath: context.extensionPath,
+    })
+  )
+
+  context.subscriptions.push(
+    registerCloudHandlers({
+      messenger: sidebarMessenger,
+      frontend: sidebarWebviewFrontend,
+      cloud: cloudSessions,
+      logger: aiLogger,
+      storage: context.globalState,
+      account: () => {
+        const user = auth.getUserId()
+        const org = auth.getCloudOrgSlug()
+        return user && org ? `${user}:${org}` : undefined
+      },
+      visibility: sidebarProvider,
+      reveal: async () => {
+        await sidebarProvider.revealSidebar()
+        await sidebarProvider.waitUntilReady()
+        sidebarProvider.switchToTab('ai-chat')
+      },
     })
   )
 

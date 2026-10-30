@@ -1,0 +1,713 @@
+/**
+ * Clone and sync a cloud session's files through VS Code's built-in Git
+ * extension (spec §9.3). There is no git implementation here: the Git
+ * extension runs the user's installed `git`, and this module only
+ *
+ * - answers the Git extension's credential requests for the Sessions API
+ *   host with a fresh WorkOS access token (any username, the JWT as the
+ *   password — §9.2);
+ * - lists cloud sessions in VS Code's "Git: Clone" picker;
+ * - keeps the token out of system credential helpers (the keychain)
+ *   for the host, and has git send it with the first request
+ *   (`http.proactiveAuth`): in the config git reads from the extension
+ *   host's environment, which the Git extension passes to every git it
+ *   runs (so also a first clone), and in each clone's own config;
+ * - clones with the Git API's `clone(url, { parentPath, postCloneAction:
+ *   'none' })`, the URL ending in the session title so that names the
+ *   folder, and configures the clone: pushes go to `refs/heads/local`,
+ *   no stored credential helper for the host, credentials sent up
+ *   front, a 5 MB post buffer;
+ * - syncs with `pull()` then `push()`, and reports ahead / behind.
+ *
+ * The Git API types are a structural subset of VS Code's `git.d.ts`
+ * (API version 1), generic over the Uri type so this module has no
+ * `vscode` import and can be unit-tested with fakes.
+ */
+import { ULID_RE, type SessionSummary } from '@repo/legalese-agent/protocol'
+import { isLegaleseCloudUrl } from '../legalese-cloud-url.js'
+import { NO_COMMITS_YET_MESSAGE } from './sessions-api.js'
+
+// ── Git extension API subset (git.d.ts, API version 1) ────────────────
+
+export interface Disposable {
+  dispose(): unknown
+}
+
+export type GitEvent<T> = (listener: (e: T) => unknown) => Disposable
+
+export interface GitUri {
+  readonly scheme: string
+  readonly authority: string
+  readonly path: string
+  readonly fsPath: string
+  toString(): string
+}
+
+export interface GitBranch {
+  readonly name?: string
+  readonly upstream?: { readonly remote: string; readonly name: string }
+  readonly ahead?: number
+  readonly behind?: number
+}
+
+export interface GitRemote {
+  readonly name: string
+  readonly fetchUrl?: string
+  readonly pushUrl?: string
+}
+
+export interface GitRepository<U extends GitUri = GitUri> {
+  readonly rootUri: U
+  readonly state: {
+    readonly HEAD: GitBranch | undefined
+    readonly remotes: GitRemote[]
+    readonly onDidChange: GitEvent<void>
+  }
+  getConfig(key: string): Promise<string>
+  setConfig(key: string, value: string): Promise<string>
+  pull(unshallow?: boolean): Promise<void>
+  push(remoteName?: string, branchName?: string): Promise<void>
+}
+
+export interface GitCredentialsProvider<U extends GitUri = GitUri> {
+  getCredentials(
+    host: U
+  ):
+    | { username: string; password: string }
+    | undefined
+    | Promise<{ username: string; password: string } | undefined>
+}
+
+export interface GitRemoteSourceProvider {
+  readonly name: string
+  readonly icon?: string
+  readonly supportsQuery?: boolean
+  getRemoteSources(
+    query?: string
+  ): Promise<Array<{ name: string; description?: string; url: string }>>
+}
+
+export interface GitApi<U extends GitUri = GitUri> {
+  /** The git the Git extension runs. */
+  readonly git?: { readonly path: string }
+  readonly repositories: GitRepository<U>[]
+  readonly onDidOpenRepository: GitEvent<GitRepository<U>>
+  clone(
+    uri: U,
+    options?: { parentPath?: U; postCloneAction?: 'none' }
+  ): Promise<U | null>
+  openRepository(root: U): Promise<GitRepository<U> | null>
+  registerCredentialsProvider(provider: GitCredentialsProvider<U>): Disposable
+  registerRemoteSourceProvider(provider: GitRemoteSourceProvider): Disposable
+}
+
+/** The Git API, or why it can't be used. */
+export type GitApiResult<U extends GitUri> =
+  | { api: GitApi<U> }
+  | { unavailable: string }
+
+// ── Sync ──────────────────────────────────────────────────────────────
+
+/** `http.postBuffer`: pushes go out as one request, not chunked (§9.3). */
+export const GIT_POST_BUFFER = '5242880'
+/** The push refspec: the user's `main` lands on the session's `local`. */
+export const GIT_PUSH_REFSPEC = 'refs/heads/main:refs/heads/local'
+
+export const CLONES_STORAGE_KEY = 'legaleseAi.cloudSessions.clones'
+
+/** After a clone, how long to wait for the Git extension to open the
+ *  repository before giving up. */
+export const OPEN_WAIT_MS = 10_000
+
+/** Tries of a repository option that hits the Git extension's own
+ *  config lock ("could not lock config file"). */
+const CONFIG_TRIES = 3
+/** Sessions known to have a first commit (a `git-committed` event was
+ *  seen, live or replayed). */
+export const COMMITTED_STORAGE_KEY = 'legaleseAi.cloudSessions.committed'
+
+/** Why Clone / Sync aren't offered yet (§9.3). */
+export const NOT_READY_MESSAGE = NO_COMMITS_YET_MESSAGE
+
+const SESSION_GIT_PATH_RE = /\/git\/([0-9A-Z]{26})(?:\/[^/]+)?\.git(?:\/|$)/
+
+export interface CloneRecord {
+  /** Absolute path of the clone. */
+  folder: string
+  /** A push succeeded; its commits wait in `local` until the harness
+   *  merges them (pending while the session sleeps). */
+  pushed?: boolean
+}
+
+export interface KeyValueStorage {
+  get<T>(key: string): T | undefined
+  update(key: string, value: unknown): PromiseLike<void>
+}
+
+export type SyncStatus =
+  | { kind: 'unavailable'; message: string }
+  /** The session has no commit yet (no `git-committed` event seen):
+   *  there is nothing to clone. */
+  | { kind: 'not-ready'; message: string }
+  | { kind: 'not-cloned' }
+  | {
+      kind: 'cloned'
+      folder: string
+      ahead: number
+      behind: number
+      /** Pushed commits not yet merged by the session (§9.3 "pending
+       *  until the session runs" while it sleeps). */
+      pending: boolean
+    }
+
+export class GitSyncError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'GitSyncError'
+  }
+}
+
+/** The variables git reads extra config from (git 2.31 and later):
+ *  `GIT_CONFIG_COUNT` and `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>`. */
+export type GitConfigEnv = Record<string, string | undefined>
+
+/**
+ * Add `key = value` to the config git takes from `env`, unless it's
+ * there already. Entries put there by others are kept; a malformed
+ * `GIT_CONFIG_COUNT` is left alone.
+ */
+export function addGitEnvConfig(
+  env: GitConfigEnv,
+  key: string,
+  value: string
+): void {
+  const raw = env.GIT_CONFIG_COUNT
+  const count = raw === undefined || raw === '' ? 0 : Number(raw)
+  if (!Number.isInteger(count) || count < 0) return
+  for (let i = 0; i < count; i++) {
+    if (
+      env[`GIT_CONFIG_KEY_${i}`] === key &&
+      env[`GIT_CONFIG_VALUE_${i}`] === value
+    ) {
+      return
+    }
+  }
+  env[`GIT_CONFIG_KEY_${count}`] = key
+  env[`GIT_CONFIG_VALUE_${count}`] = value
+  env.GIT_CONFIG_COUNT = String(count + 1)
+}
+
+/** `credential.<scheme>://<host>.helper` for the Sessions API, or
+ *  undefined when the URL is unset or invalid. */
+export function credentialHelperKey(apiUrl: string): string | undefined {
+  try {
+    const url = new URL(apiUrl.trim())
+    return `credential.${url.protocol}//${url.host}.helper`
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * `http.<scheme>://<host>/.proactiveAuth` for the Sessions API, or
+ * undefined when the URL is unset or invalid. Git (curl) sends
+ * credentials only in answer to a `WWW-Authenticate` challenge, and
+ * Lambda function URLs rename that header in a 401
+ * (`x-amzn-Remapped-WWW-Authenticate`), so git would never send them.
+ * `basic` (git 2.46 and later) asks for them before the first request
+ * and sends them with it.
+ */
+export function proactiveAuthKey(apiUrl: string): string | undefined {
+  try {
+    const url = new URL(apiUrl.trim())
+    return `http.${url.protocol}//${url.host}/.proactiveAuth`
+  } catch {
+    return undefined
+  }
+}
+
+export interface CloudGitSyncDeps<U extends GitUri> {
+  getGitApi(): Promise<GitApiResult<U>>
+  /** The Sessions API's URL; '' while cloud sessions are off. */
+  apiUrl(): string
+  listSessions(): Promise<SessionSummary[]>
+  getAccessToken(): Promise<string>
+  storage: KeyValueStorage
+  parseUri(url: string): U
+  fileUri(fsPath: string): U
+  logger: { info(m: string): void; warn(m: string): void }
+  /** The environment the Git extension runs git with: the extension
+   *  host's (`process.env`, the default). */
+  gitEnv?: GitConfigEnv
+  /** `git -C folder config --local --replace-all key value` with the
+   *  Git extension's git: the Git API's setConfig drops an empty value.
+   *  Without it, the Git API is used (tests). */
+  writeConfig?(
+    gitPath: string,
+    folder: string,
+    key: string,
+    value: string
+  ): Promise<void>
+  /** {@link OPEN_WAIT_MS} (tests). */
+  openWaitMs?: number
+}
+
+/** The Sessions API host (`host[:port]`), or '' when unset/invalid. */
+/** The Sessions API's host, or '' when the URL is unset, invalid, or
+ *  not Legalese Cloud: git gets the token for Legalese Cloud only. */
+export function apiHost(apiUrl: string): string {
+  if (!isLegaleseCloudUrl(apiUrl.trim())) return ''
+  return new URL(apiUrl.trim()).host.toLowerCase()
+}
+
+/**
+ * A clone folder name from a session title: letters (accents folded),
+ * digits, `.`, `_` and `-`; runs of anything else become `-`; at most
+ * 60 characters, ending at a word where it can. '' when nothing usable
+ * is left.
+ */
+export function titleSlug(title: string | undefined): string {
+  const slug = (title ?? '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+  if (slug.length <= 60) return slug
+  // Too long: end at a word boundary, unless that loses most of it.
+  const cut = slug.slice(0, 61)
+  const end = cut.lastIndexOf('-')
+  return (end >= 30 ? cut.slice(0, end) : cut.slice(0, 60)).replace(
+    /[-.]+$/,
+    ''
+  )
+}
+
+/**
+ * `<apiUrl>/git/<sid>.git`, or `<apiUrl>/git/<sid>/<title>.git` with a
+ * title: VS Code names a clone's folder after the URL's last segment.
+ */
+export function sessionGitUrl(
+  apiUrl: string,
+  sid: string,
+  title?: string
+): string {
+  const base = `${apiUrl.trim().replace(/\/+$/, '')}/git/${sid}`
+  const slug = titleSlug(title)
+  return slug ? `${base}/${slug}.git` : `${base}.git`
+}
+
+/** The session id in a Sessions API git URL, or undefined. */
+export function sessionIdFromGitUrl(
+  url: string | undefined,
+  apiUrl: string
+): string | undefined {
+  if (!url) return undefined
+  const prefix = `${apiUrl.trim().replace(/\/+$/, '')}/git/`
+  if (!apiUrl.trim() || !url.startsWith(prefix)) return undefined
+  const m = /^([0-9A-Z]{26})(?:\/[^/]+)?\.git\/?$/.exec(
+    url.slice(prefix.length)
+  )
+  return m && ULID_RE.test(m[1]!) ? m[1] : undefined
+}
+
+/** A push over the Sessions API's request limit (413). */
+export const PUSH_TOO_LARGE_MESSAGE =
+  'This push is too large for a cloud session (about 4.5 MB per push). Push fewer or smaller changes at a time.'
+
+/** A clone, pull or fetch whose answer is over the Sessions API's
+ *  response limit (413). */
+export const HISTORY_TOO_LARGE_MESSAGE =
+  "This cloud session's history is too large to clone or pull during the beta (the limit is about 4.5 MB)."
+
+/** Turn a failed clone/pull/push into a message a user can act on. A
+ *  pull's fetch fails as the pull. */
+export function describeGitError(
+  err: unknown,
+  op: 'pull' | 'push' | 'clone'
+): string {
+  const text = err instanceof Error ? err.message : String(err)
+  const detail = [
+    text,
+    (err as { stderr?: unknown })?.stderr,
+    (err as { gitErrorCode?: unknown })?.gitErrorCode,
+  ]
+    .filter((x) => typeof x === 'string')
+    .join('\n')
+  // The Sessions API answers 409 `no_commits_yet` before the first turn
+  // is committed (nothing to clone or pull yet).
+  if (/no_commits_yet|\b409\b/i.test(detail)) return NOT_READY_MESSAGE
+  // 413: a request or a response over about 4.5 MB (the Sessions API's
+  // Lambda limit, during the beta).
+  if (
+    /\b413\b|too_large|Request Entity Too Large|body.*too large/i.test(detail)
+  ) {
+    return op === 'push' ? PUSH_TOO_LARGE_MESSAGE : HISTORY_TOO_LARGE_MESSAGE
+  }
+  if (/AuthenticationFailed|Authentication failed|\b401\b/i.test(detail)) {
+    return 'Git could not authenticate to the cloud session. Sign in to Legalese Cloud and try again.'
+  }
+  if (/Conflict|CONFLICT|merge/i.test(detail) && op === 'pull') {
+    return 'Pulling from the cloud session produced merge conflicts. Resolve them in the editor, commit, then sync again.'
+  }
+  return op === 'clone'
+    ? `Cloning the cloud session failed: ${text}`
+    : `Git ${op} failed: ${text}`
+}
+
+export class CloudGitSync<U extends GitUri> {
+  private registrations: Disposable[] = []
+  /** Configurations running, by repository folder. */
+  private readonly configuring = new Map<string, Promise<void>>()
+
+  constructor(private readonly deps: CloudGitSyncDeps<U>) {}
+
+  private clones(): Record<string, CloneRecord> {
+    return (
+      this.deps.storage.get<Record<string, CloneRecord>>(CLONES_STORAGE_KEY) ??
+      {}
+    )
+  }
+
+  private async saveClone(sid: string, rec: CloneRecord | undefined) {
+    const next = { ...this.clones() }
+    if (rec) next[sid] = rec
+    else delete next[sid]
+    await this.deps.storage.update(CLONES_STORAGE_KEY, next)
+  }
+
+  cloneOf(sid: string): CloneRecord | undefined {
+    return this.clones()[sid]
+  }
+
+  /** Has the session's first turn been committed (a `git-committed`
+   *  event seen, live or replayed)? A clone implies it. */
+  hasFirstCommit(sid: string): boolean {
+    const committed =
+      this.deps.storage.get<Record<string, true>>(COMMITTED_STORAGE_KEY) ?? {}
+    return committed[sid] === true || this.cloneOf(sid) !== undefined
+  }
+
+  /** Record a `git-committed` event for `sid`. */
+  async markCommitted(sid: string): Promise<void> {
+    if (this.hasFirstCommit(sid)) return
+    const committed =
+      this.deps.storage.get<Record<string, true>>(COMMITTED_STORAGE_KEY) ?? {}
+    await this.deps.storage.update(COMMITTED_STORAGE_KEY, {
+      ...committed,
+      [sid]: true,
+    })
+  }
+
+  private requireFirstCommit(sid: string): void {
+    if (!this.hasFirstCommit(sid)) throw new GitSyncError(NOT_READY_MESSAGE)
+  }
+
+  /**
+   * Register the credentials and remote-source providers, and configure
+   * clones VS Code opens (also those made through "Git: Clone"). Returns
+   * a message when the Git extension can't be used.
+   */
+  async register(): Promise<string | undefined> {
+    this.unregister()
+    const git = await this.deps.getGitApi()
+    if ('unavailable' in git) return git.unavailable
+    const { api } = git
+    // Also for clones made through "Git: Clone".
+    this.configureGitEnv()
+    this.registrations.push(
+      api.registerCredentialsProvider({
+        getCredentials: async (host) => {
+          const ours = apiHost(this.deps.apiUrl())
+          if (
+            !ours ||
+            host.scheme !== 'https' ||
+            host.authority.toLowerCase() !== ours
+          ) {
+            return undefined
+          }
+          // VS Code usually passes only the host; when the session is
+          // known from the path, refuse before its first commit.
+          const m = SESSION_GIT_PATH_RE.exec(host.path ?? '')
+          if (m && !this.hasFirstCommit(m[1]!)) {
+            this.deps.logger.info(`cloud-sessions: ${NOT_READY_MESSAGE}`)
+            return undefined
+          }
+          // Any username; the JWT is the password (§9.2). Fetched per
+          // git operation, so an expired token is never reused.
+          return {
+            username: 'legalese',
+            password: await this.deps.getAccessToken(),
+          }
+        },
+      }),
+      api.registerRemoteSourceProvider({
+        name: 'Legalese Cloud sessions',
+        icon: 'cloud',
+        getRemoteSources: async () => {
+          const apiUrl = this.deps.apiUrl()
+          if (!apiUrl) return []
+          const sessions = await this.deps.listSessions()
+          // Only sessions with a committed first turn can be cloned.
+          return sessions
+            .filter((s) => this.hasFirstCommit(s.sessionId))
+            .map((s) => ({
+              name: s.title || s.sessionId,
+              description: s.state,
+              url: sessionGitUrl(apiUrl, s.sessionId, s.title),
+            }))
+        },
+      }),
+      api.onDidOpenRepository((repo) => {
+        void this.adopt(repo).catch((err) =>
+          this.deps.logger.warn(
+            `cloud-sessions: could not configure clone: ${err instanceof Error ? err.message : String(err)}`
+          )
+        )
+      })
+    )
+    for (const repo of api.repositories) void this.adopt(repo).catch(() => {})
+    return undefined
+  }
+
+  unregister(): void {
+    for (const d of this.registrations) d.dispose()
+    this.registrations = []
+  }
+
+  /** A repository whose origin is a cloud session: configure it once
+   *  and remember where it is. */
+  private async adopt(repo: GitRepository<U>): Promise<void> {
+    const origin = repo.state.remotes.find((r) => r.name === 'origin')
+    const sid = sessionIdFromGitUrl(
+      origin?.fetchUrl ?? origin?.pushUrl,
+      this.deps.apiUrl()
+    )
+    if (!sid) return
+    let push = ''
+    try {
+      push = await repo.getConfig('remote.origin.push')
+    } catch {
+      // unset: getConfig fails with exit code 1
+    }
+    if (push.trim() !== GIT_PUSH_REFSPEC) await this.configureOnce(repo)
+    const rec = this.cloneOf(sid)
+    if (rec?.folder !== repo.rootUri.fsPath) {
+      await this.saveClone(sid, { folder: repo.rootUri.fsPath })
+    }
+  }
+
+  /**
+   * For the Sessions API host, in the config git reads from the
+   * environment the Git extension runs it with (a clone runs before its
+   * repository config exists):
+   * - an empty credential helper list: otherwise a system helper (the OS
+   *   keychain) stores the short-lived token, and a later clone from the
+   *   same host presents it expired;
+   * - `proactiveAuth = basic`: otherwise git never sends the token (see
+   *   {@link proactiveAuthKey}).
+   */
+  private configureGitEnv(): void {
+    const env = this.deps.gitEnv ?? process.env
+    const helper = credentialHelperKey(this.deps.apiUrl())
+    if (helper) addGitEnvConfig(env, helper, '')
+    const auth = proactiveAuthKey(this.deps.apiUrl())
+    if (auth) addGitEnvConfig(env, auth, 'basic')
+  }
+
+  /** The repository options of §9.3. */
+  async configure(repo: GitRepository<U>): Promise<void> {
+    const key = credentialHelperKey(this.deps.apiUrl())
+    if (!key) throw new GitSyncError('Cloud sessions are not configured.')
+    await this.setOption(repo, 'remote.origin.push', GIT_PUSH_REFSPEC)
+    // Empty helper list for this host: git asks VS Code every time
+    // instead of reusing an expired token from the system keychain.
+    await this.setOption(repo, key, '')
+    // Send the token with the first request, also for git run outside
+    // the extension host (VS Code's terminal answers through the same
+    // askpass); its only remote is the session.
+    await this.setOption(repo, 'http.proactiveAuth', 'basic')
+    await this.setOption(repo, 'http.postBuffer', GIT_POST_BUFFER)
+  }
+
+  /** A fresh clone is configured twice at once (VS Code reports it as
+   *  opened, and the clone configures it): once is enough. */
+  private configureOnce(repo: GitRepository<U>): Promise<void> {
+    const key = repo.rootUri.fsPath
+    let running = this.configuring.get(key)
+    if (!running) {
+      running = this.configure(repo).finally(() => this.configuring.delete(key))
+      this.configuring.set(key, running)
+    }
+    return running
+  }
+
+  /**
+   * One repository option. The Git API's setConfig drops an empty value
+   * (git then fails with "wrong number of arguments"), so that one is
+   * written with git itself; a config lock held by the Git extension's
+   * own writes is waited out.
+   */
+  private async setOption(
+    repo: GitRepository<U>,
+    key: string,
+    value: string
+  ): Promise<void> {
+    if (value === '' && this.deps.writeConfig) {
+      const git = await this.deps.getGitApi()
+      const gitPath = 'api' in git ? git.api.git?.path : undefined
+      if (gitPath) {
+        await this.deps.writeConfig(gitPath, repo.rootUri.fsPath, key, value)
+        return
+      }
+    }
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await repo.setConfig(key, value)
+        return
+      } catch (err) {
+        const locked = /could not lock config file/i.test(
+          String((err as { stderr?: unknown })?.stderr ?? err)
+        )
+        if (!locked || attempt >= CONFIG_TRIES) throw err
+        await new Promise((r) => setTimeout(r, 100 * attempt))
+      }
+    }
+  }
+
+  /**
+   * The repository at `folder`, once the Git extension has it. A clone
+   * into an open workspace folder is opened by the extension on its
+   * own, and openRepository answers null while that runs.
+   */
+  private async openedRepository(
+    api: GitApi<U>,
+    folder: U
+  ): Promise<GitRepository<U> | null> {
+    const find = (): GitRepository<U> | undefined =>
+      api.repositories.find((r) => r.rootUri.fsPath === folder.fsPath)
+    const now = (await api.openRepository(folder)) ?? find()
+    if (now) return now
+    return new Promise((resolve) => {
+      const sub = api.onDidOpenRepository((repo) => {
+        if (repo.rootUri.fsPath === folder.fsPath) finish(repo)
+      })
+      const timer = setTimeout(() => {
+        void api
+          .openRepository(folder)
+          .catch(() => null)
+          .then((repo) => finish(repo ?? find() ?? null))
+      }, this.deps.openWaitMs ?? OPEN_WAIT_MS)
+      function finish(repo: GitRepository<U> | null): void {
+        clearTimeout(timer)
+        sub.dispose()
+        resolve(repo)
+      }
+    })
+  }
+
+  private async api(): Promise<GitApi<U>> {
+    const git = await this.deps.getGitApi()
+    if ('unavailable' in git) throw new GitSyncError(git.unavailable)
+    return git.api
+  }
+
+  private async repository(sid: string): Promise<GitRepository<U> | null> {
+    const rec = this.cloneOf(sid)
+    if (!rec) return null
+    const api = await this.api()
+    const uri = this.deps.fileUri(rec.folder)
+    return (
+      api.repositories.find((r) => r.rootUri.fsPath === rec.folder) ??
+      (await api.openRepository(uri))
+    )
+  }
+
+  /** Button state: Clone / Sync with ahead and behind (§9.3). */
+  async status(sid: string): Promise<SyncStatus> {
+    const git = await this.deps.getGitApi()
+    if ('unavailable' in git) {
+      return { kind: 'unavailable', message: git.unavailable }
+    }
+    const rec = this.cloneOf(sid)
+    if (!rec && !this.hasFirstCommit(sid)) {
+      return { kind: 'not-ready', message: NOT_READY_MESSAGE }
+    }
+    if (!rec) return { kind: 'not-cloned' }
+    const repo = await this.repository(sid)
+    if (!repo) {
+      // The folder was deleted or moved: offer a fresh clone.
+      await this.saveClone(sid, undefined)
+      return { kind: 'not-cloned' }
+    }
+    const ahead = repo.state.HEAD?.ahead ?? 0
+    const behind = repo.state.HEAD?.behind ?? 0
+    return {
+      kind: 'cloned',
+      folder: rec.folder,
+      ahead,
+      behind,
+      pending: Boolean(rec.pushed) && ahead > 0,
+    }
+  }
+
+  /** The session's title, or undefined if it can't be listed. */
+  private async titleOf(sid: string): Promise<string | undefined> {
+    try {
+      return (await this.deps.listSessions()).find((s) => s.sessionId === sid)
+        ?.title
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Clone into `parentPath/<session title>` (or `<sid>` without a
+   *  title) and configure it. Returns the folder. */
+  async clone(sid: string, parentPath: U): Promise<U> {
+    const apiUrl = this.deps.apiUrl()
+    if (!apiUrl) throw new GitSyncError('Cloud sessions are not configured.')
+    this.requireFirstCommit(sid)
+    const api = await this.api()
+    this.configureGitEnv()
+    const url = sessionGitUrl(apiUrl, sid, await this.titleOf(sid))
+    let folder: U | null
+    try {
+      folder = await api.clone(this.deps.parseUri(url), {
+        parentPath,
+        postCloneAction: 'none',
+      })
+    } catch (err) {
+      throw new GitSyncError(describeGitError(err, 'clone'))
+    }
+    if (!folder)
+      throw new GitSyncError('Cloning the cloud session was cancelled.')
+    const repo = await this.openedRepository(api, folder)
+    if (!repo) {
+      throw new GitSyncError('VS Code could not open the cloned repository.')
+    }
+    await this.configureOnce(repo)
+    await this.saveClone(sid, { folder: folder.fsPath })
+    this.deps.logger.info(`cloud-sessions: cloned ${sid} to ${folder.fsPath}`)
+    return folder
+  }
+
+  /** Pull, then push (§9.3). Conflicts are left for VS Code's merge editor. */
+  async sync(sid: string): Promise<SyncStatus> {
+    this.requireFirstCommit(sid)
+    const repo = await this.repository(sid)
+    if (!repo) throw new GitSyncError('Clone the cloud session first.')
+    try {
+      await repo.pull()
+    } catch (err) {
+      throw new GitSyncError(describeGitError(err, 'pull'))
+    }
+    if ((repo.state.HEAD?.ahead ?? 0) > 0) {
+      try {
+        await repo.push()
+      } catch (err) {
+        throw new GitSyncError(describeGitError(err, 'push'))
+      }
+      await this.saveClone(sid, { ...this.cloneOf(sid)!, pushed: true })
+    }
+    return this.status(sid)
+  }
+}

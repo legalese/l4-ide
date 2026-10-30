@@ -7,7 +7,9 @@
     RenderedTurn,
     RenderedToolCall,
     PendingQuestion,
+    RollbackOffer,
   } from '$lib/stores/ai-chat.svelte'
+  import type { CloudToolChip } from '$lib/stores/cloud-chat'
 
   import type { Messenger } from 'vscode-messenger-webview'
 
@@ -23,6 +25,11 @@
     onAnswerQuestion,
     onOpenFile,
     onOpenFileDiff,
+    filesOpenable = true,
+    tools = [],
+    onToolSignIn,
+    rollbackOfferAt,
+    onRollback,
   }: {
     turns: RenderedTurn[]
     /** True while the current conversation has an open stream. Drives
@@ -49,7 +56,29 @@
     onAnswerQuestion: (answer: string) => void
     onOpenFile: (callId: string) => void
     onOpenFileDiff: (callId: string) => void
+    /** False when the conversation's files aren't on this machine
+     *  (cloud sessions): file paths render as plain text. */
+    filesOpenable?: boolean
+    /** Cloud conversations: the MCP servers passed to the session, shown
+     *  with the first prompt; a click on one needing a sign-in runs it. */
+    tools?: CloudToolChip[]
+    onToolSignIn?: (server: string) => void
+    /** Cloud conversations (§9.4): the rollback offer for the turn at
+     *  an index, and what to do when it's clicked. It shows on the
+     *  prompt the turn answered. */
+    rollbackOfferAt?: (index: number) => RollbackOffer | null
+    onRollback?: (offer: RollbackOffer) => void
   } = $props()
+
+  /** Index of the assistant turn answering the user turn at `i`: the
+   *  next turn, when it is an assistant turn. */
+  function answerIndex(i: number): number {
+    return turns[i + 1]?.role === 'assistant' ? i + 1 : -1
+  }
+
+  /** Rolled-back turns the user expanded (by turn id); collapsed by
+   *  default. */
+  let rolledBackOpen = $state<Record<string, boolean>>({})
 
   let scrollEl = $state<HTMLDivElement>()
   let stickToBottom = $state(true)
@@ -155,26 +184,75 @@
       {@const userIndex =
         turns.slice(0, i + 1).filter((t) => t.role === 'user').length - 1}
       {@const pending = !!turn.injectionId}
+      {@const answer = answerIndex(i)}
+      {@const offer = answer >= 0 ? (rollbackOfferAt?.(answer) ?? null) : null}
       <UserMessage
         content={turn.content}
         chips={turn.chips}
         shouldStick={!pending && stickyUserIndex === userIndex}
         {userIndex}
         {pending}
+        tools={userIndex === 0 ? tools : []}
+        {onToolSignIn}
+        rollback={offer
+          ? {
+              title:
+                offer.label === 'Roll back'
+                  ? 'Roll back: undo the file changes made for this prompt'
+                  : 'Restore the files to how they were before this prompt (undoes later turns too)',
+              onClick: () => onRollback?.(offer),
+            }
+          : null}
       />
+      {#if turn.filesAdded?.length}
+        <div class="files-added" title={turn.filesAdded.join('\n')}>
+          Added to the session: {turn.filesAdded.join(', ')}
+        </div>
+      {/if}
     {:else}
-      <AssistantMessage
-        content={turn.content}
-        streaming={!!turn.streaming}
-        {pipelineActive}
-        error={turn.error}
-        blocks={turn.blocks}
-        usage={turn.usage}
-        {messenger}
-        {onRetry}
-        {onOpenFile}
-        {onOpenFileDiff}
-      />
+      {@const open = !turn.rolledBack || !!rolledBackOpen[turn.id]}
+      {#if turn.rolledBack}
+        <!-- A rolled-back turn collapses to this line under its prompt;
+             the chevron shows the turn again (dimmed) and hides it. -->
+        <div class="rolled-back-row">
+          <button
+            type="button"
+            class="rolled-back-toggle"
+            aria-expanded={open}
+            title={open ? 'Hide this turn' : 'Show this turn'}
+            onclick={() => (rolledBackOpen[turn.id] = !open)}
+          >
+            This turn was rolled back
+            <svg class="chev" class:open viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M4.5 6.25 8 9.75l3.5-3.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      {/if}
+      {#if open}
+        <div class="assistant-turn" class:rolled-back={turn.rolledBack}>
+          <AssistantMessage
+            content={turn.content}
+            streaming={!!turn.streaming}
+            {pipelineActive}
+            error={turn.error}
+            blocks={turn.blocks}
+            usage={turn.usage}
+            {messenger}
+            {onRetry}
+            {onOpenFile}
+            {onOpenFileDiff}
+            {filesOpenable}
+          />
+        </div>
+      {/if}
     {/if}
   {/each}
   <!-- Question card for an active meta__ask_user. Rendered above the
@@ -238,6 +316,44 @@
        rather than the viewport, since the AI chat lives in a sidebar
        whose height is independent of `vh`. */
     container-type: size;
+  }
+  .files-added {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin: -2px 0 8px;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .assistant-turn.rolled-back {
+    opacity: 0.55;
+  }
+  .rolled-back-row {
+    display: flex;
+    justify-content: center;
+    margin: 4px 0 10px;
+  }
+  .rolled-back-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 4px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+  }
+  .rolled-back-toggle:hover {
+    color: var(--vscode-foreground);
+  }
+  .rolled-back-toggle .chev {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.15s ease-out;
+  }
+  .rolled-back-toggle .chev.open {
+    transform: rotate(180deg);
   }
   .bottom-spinner {
     display: flex;

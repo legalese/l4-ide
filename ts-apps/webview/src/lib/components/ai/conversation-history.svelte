@@ -1,30 +1,36 @@
 <script lang="ts">
-  import type { AiConversationSummary } from 'jl4-client-rpc'
+  import type { HistoryEntry } from '$lib/stores/cloud-chat'
+  import CloudStatusIcon from './cloud-status-icon.svelte'
 
   let {
     items,
     currentId,
     streamingIds,
+    waitingIds,
     onLoad,
     onDelete,
     onClose,
   }: {
-    items: AiConversationSummary[]
+    /** Local and cloud conversations, most recent first (§12.1). */
+    items: HistoryEntry[]
     currentId: string | null
     /** Ids of conversations currently attached to a live stream. The
      *  row for each shows a small spinner so the user can see which
      *  chats are burning tokens in the background — a defence against
      *  silent ghost-sessions. */
     streamingIds: string[]
+    /** Local conversations waiting for the user (an approval or a
+     *  question): an amber dot. */
+    waitingIds: string[]
     onLoad: (id: string) => void
     onDelete: (id: string) => void
     onClose: () => void
   } = $props()
 
   const streamingSet = $derived(new Set(streamingIds))
+  const waitingSet = $derived(new Set(waitingIds))
 
-  function relativeTime(iso: string): string {
-    const d = new Date(iso).getTime()
+  function relativeTime(d: number): string {
     const now = Date.now()
     const diff = Math.floor((now - d) / 1000)
     if (diff < 60) return 'just now'
@@ -34,22 +40,29 @@
     return new Date(d).toLocaleDateString()
   }
 
-  function groupKey(iso: string): string {
-    const d = new Date(iso)
+  const monthLabel = new Intl.DateTimeFormat('en', {
+    month: 'long',
+    year: 'numeric',
+  })
+
+  /** Today, Yesterday, Earlier this week, This month (the calendar
+   *  month), then one group per month: "September 2026". */
+  function groupKey(ms: number): string {
+    const d = new Date(ms)
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const yesterday = new Date(today.getTime() - 86_400_000)
     if (d >= today) return 'Today'
     if (d >= yesterday) return 'Yesterday'
     if (now.getTime() - d.getTime() < 7 * 86_400_000) return 'Earlier this week'
-    if (now.getTime() - d.getTime() < 30 * 86_400_000) return 'This month'
-    return 'Older'
+    if (d >= new Date(now.getFullYear(), now.getMonth(), 1)) return 'This month'
+    return monthLabel.format(d)
   }
 
   const grouped = $derived.by(() => {
-    const groups = new Map<string, AiConversationSummary[]>()
+    const groups = new Map<string, HistoryEntry[]>()
     for (const item of items) {
-      const key = groupKey(item.lastActiveAt)
+      const key = groupKey(item.lastActivity)
       let bucket = groups.get(key)
       if (!bucket) {
         bucket = []
@@ -81,27 +94,45 @@
             >
               <span class="row-text">
                 <span class="row-title">
-                  {#if streamingSet.has(item.id)}
-                    <span
-                      class="streaming-dot"
-                      aria-label="Streaming"
-                      title="A turn is still running in this conversation"
-                    ></span>
-                  {/if}
+                  <!-- One slot for every row, so titles line up: a cloud
+                       session's state as its cloud; a local chat's dot
+                       (crimson, fading in and out, while a turn runs; amber
+                       while it waits for the user), or nothing. -->
+                  <span class="row-lead">
+                    {#if item.kind === 'cloud'}
+                      <CloudStatusIcon state={item.state} size={13} />
+                    {:else if waitingSet.has(item.id)}
+                      <span
+                        class="dot waiting"
+                        role="img"
+                        aria-label="Waiting for you"
+                        title="Waiting for you: an approval or a question"
+                      ></span>
+                    {:else if streamingSet.has(item.id)}
+                      <span
+                        class="dot streaming"
+                        role="img"
+                        aria-label="Running"
+                        title="A turn is still running in this conversation"
+                      ></span>
+                    {/if}
+                  </span>
                   <span class="row-title-text">{item.title || 'Untitled'}</span>
                 </span>
-                {#if item.deploymentId}
+                {#if item.kind === 'local' && item.deploymentId}
                   <span class="row-subtitle" title="Deployment chat"
                     >{item.deploymentId}</span
                   >
                 {/if}
               </span>
-              <span class="row-meta">{relativeTime(item.lastActiveAt)}</span>
+              <span class="row-meta">{relativeTime(item.lastActivity)}</span>
             </button>
             <button
               class="row-delete"
               onclick={() => onDelete(item.id)}
-              title="Delete conversation"
+              title={item.kind === 'cloud'
+                ? 'Delete cloud session and its files'
+                : 'Delete conversation'}
               aria-label="Delete conversation">🗑</button
             >
           </div>
@@ -204,6 +235,9 @@
     gap: 3px;
   }
   .row-subtitle {
+    /* Under the title, past the leading slot (13px) and its gap (6px). */
+    padding-left: 19px;
+    margin-top: 1px;
     font-size: 10px;
     color: var(--vscode-descriptionForeground);
     overflow: hidden;
@@ -233,13 +267,29 @@
      active-tab underline, so a streaming chat in the history list
      reads as "live" without needing a label. Kept small and
      non-interactive; users still click the row to open it. */
-  .streaming-dot {
+  .row-lead {
     flex-shrink: 0;
+    width: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
+  }
+  .dot.streaming {
     background: #c8376a;
     animation: streaming-pulse 1.2s ease-in-out infinite;
+  }
+  .dot.waiting {
+    background: var(--vscode-editorWarning-foreground, #cca700);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dot.streaming {
+      animation: none;
+    }
   }
   @keyframes streaming-pulse {
     0%,
