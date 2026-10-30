@@ -4,9 +4,7 @@
  * {@link CloudSessionManager} on top of the extension's auth, MCP
  * servers and chat-event path.
  *
- * Everything is behind `legaleseAi.cloudSessions.enabled` and a
- * `legaleseAi.cloudSessions.apiUrl` on `https://*.legalese.cloud`
- * (§15.5).
+ * Everything is behind `legaleseAi.cloudSessions.enabled` (§15.5).
  */
 import * as vscode from 'vscode'
 import { realpath } from 'node:fs/promises'
@@ -14,7 +12,6 @@ import { GetExportedFunctionsRequestType } from 'jl4-client-rpc'
 import type { AiChatStartParams } from 'jl4-client-rpc'
 import type { ChatServiceEvent, Logger } from '@repo/legalese-agent'
 import { LEGALESE_CLOUD_DOMAIN, type AuthManager } from '../auth.js'
-import { isLegaleseCloudUrl } from '../legalese-cloud-url.js'
 import { EMBEDDED_LIBRARY_SCHEME } from '../embedded-library.js'
 import type { VSCodeL4LanguageClient } from '../vscode-l4-language-client.js'
 import {
@@ -41,24 +38,21 @@ import {
 import { SessionsApiClient } from './sessions-api.js'
 
 export const CLOUD_SESSIONS_ENABLED_SETTING = 'legaleseAi.cloudSessions.enabled'
-export const CLOUD_SESSIONS_API_URL_SETTING = 'legaleseAi.cloudSessions.apiUrl'
+
+/** The Sessions API. Fixed, not a setting: the access token goes to it,
+ *  and a workspace's settings could point a setting elsewhere. */
+export const SESSIONS_API_URL = `https://sessions.${LEGALESE_CLOUD_DOMAIN}`
 
 export function cloudSessionsApiUrl(): string {
-  return (
-    vscode.workspace
-      .getConfiguration()
-      .get<string>(CLOUD_SESSIONS_API_URL_SETTING) ?? ''
-  ).trim()
+  return SESSIONS_API_URL
 }
 
-/** The feature flag: enabled and a Legalese Cloud API URL configured
- *  (the access token goes nowhere else; see {@link SessionsApiClient}). */
+/** The feature flag. */
 export function isCloudSessionsEnabled(): boolean {
   return (
     vscode.workspace
       .getConfiguration()
-      .get<boolean>(CLOUD_SESSIONS_ENABLED_SETTING) === true &&
-    isLegaleseCloudUrl(cloudSessionsApiUrl())
+      .get<boolean>(CLOUD_SESSIONS_ENABLED_SETTING) === true
   )
 }
 
