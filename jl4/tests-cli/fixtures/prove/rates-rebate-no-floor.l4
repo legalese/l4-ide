@@ -15,9 +15,9 @@
 -- fixture.
 -- The assertion that does find the bug is the ceiling, last in this file.
 --
--- The helpers are top-level rules and not WHERE bindings on purpose: at the
--- commit this was written, `l4 prove` crashed on a WHERE binding that takes no
--- parameters.
+-- The helpers are top-level rules, one for each clause of the rule as the
+-- deck words it (written when `l4 prove` still crashed on a WHERE binding
+-- that takes no parameters; #784 has since fixed that).
 IMPORT prelude
 
 GIVETH A NUMBER

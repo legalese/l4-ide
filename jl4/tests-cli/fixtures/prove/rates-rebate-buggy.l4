@@ -13,10 +13,10 @@
 -- The outer `max 0` follows the deck's later charts and the OpenFisca code's
 -- `clip(rebate, 0, ...)`; the deck's L4 fragment has none.
 --
--- The helpers are top-level rules and not WHERE bindings on purpose: at the
--- commit this was written, `l4 prove` crashed on a WHERE binding that takes no
--- parameters.
--- Do not tidy them into a WHERE until that is fixed.
+-- The helpers are top-level rules, one for each clause of the rule as the
+-- deck words it.
+-- (Written when `l4 prove` still crashed on a WHERE binding that takes no
+-- parameters; #784 has since fixed that, and the helpers stay as they are.)
 IMPORT prelude
 
 GIVETH A NUMBER
