@@ -230,6 +230,11 @@ data CheckError =
     -- as a module-level ASSUME it (or a helper it reaches) reads. Both
     -- would be one JSON property, so a request could not supply them
     -- separately. Arguments: exported-function name, the clashing GIVEN.
+  | ExportEventType (Maybe SrcRange) Resolved (Maybe Resolved)
+    -- ^ An @export-decorated DECIDE takes or returns an EVENT (see
+    -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
+    -- the exported function's name, and the input's name (Nothing when it is
+    -- the result).
   | ActionPatternReference Name Name
     -- ^ R5 of @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@: a bare name in an
     -- ARGUMENT slot of a regulative action was read as a reference (R1) to
@@ -810,8 +815,9 @@ checkDirectiveResults = filter isCheckResult
 -- | Does this diagnostic refuse an @\@export@ for a reason that belongs to the
 -- __JSON publication boundary alone__?
 --
--- Both of these say the same thing: a request carries values, and one of this
--- export's inputs is a /rule/, so no request can ever supply it.
+-- The first two say the same thing: a request carries values, and one of this
+-- export's inputs is a /rule/, so no request can ever supply it. The third,
+-- 'ExportEventType', says that an EVENT has no form in a request either.
 -- 'ExportFunctionTypeInput' catches the arrow spelling
 -- (@ASSUME f IS A FUNCTION FROM Person TO BOOLEAN@) and
 -- 'ExportAssumeArityInput' the app-form one
@@ -834,6 +840,7 @@ isExportPublicationRefusal :: CheckError -> Bool
 isExportPublicationRefusal = \ case
   ExportFunctionTypeInput {}  -> True
   ExportAssumeArityInput {}   -> True
+  ExportEventType {}          -> True
   _                           -> False
 
 -- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
@@ -894,6 +901,7 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
+  rangeOf (ExportEventType r _ _)           = r
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
@@ -1510,66 +1518,6 @@ typeHeads (Fun _ onts t)  =
   concatMap (typeHeads . optionallyNamedTypeType) onts ++ typeHeads t
 typeHeads (Forall _ _ t)  = typeHeads t
 typeHeads (InfVar _ _ _)  = []
-
--- | Does this type mention a name-resolution failure sentinel anywhere?
--- Such a type is poisoned: we do not know what it was supposed to be.
-mentionsOutOfScope :: Type' Resolved -> Bool
-mentionsOutOfScope = any isOutOfScope . typeHeads
-
--- | Are these two types the same once every name-resolution sentinel is read as
--- a wildcard matching anything?
---
--- This is the test for \"the mismatch between them is /caused by/ a resolution
--- failure\", and it is much stronger than \"one of them /mentions/ a resolution
--- failure somewhere\" — which is all 'mentionsOutOfScope' can say, being a
--- whole-type predicate. A single poisoned sub-term is not licence to delete a
--- diagnostic whose actual discrepancy lies between two types we did resolve:
---
--- @
---   GIVEN xs IS A LIST OF Typo   -- Typo undeclared: LIST OF ⊥
---   GIVETH A NUMBER
---   h MEANS xs
--- @
---
--- reports both the undeclared @Typo@ /and/ NUMBER-versus-LIST, and the latter
--- is a genuine second defect: it survives verbatim once @Typo@ is declared. So
--- @NUMBER@ vs @LIST OF ⊥@ is not compatible here (the heads differ, and neither
--- head is a sentinel), whereas @⊥@ vs @Verdict@, @LIST OF ⊥@ vs
--- @LIST OF NUMBER@ and @FUNCTION FROM ⊥ TO NUMBER@ vs
--- @FUNCTION FROM Verdict TO NUMBER@ all are.
---
--- Conservative in the direction that matters: anything we cannot show to be
--- pure fallout (differing arities, differing shapes, 'Forall's we do not
--- alpha-rename) compares unequal, and the diagnostic is kept.
-sameModuloOutOfScope :: Type' Resolved -> Type' Resolved -> Bool
-sameModuloOutOfScope t1 t2
-  | poisonedHead t1 || poisonedHead t2 = True
-  | otherwise = case (t1, t2) of
-      (Type _, Type _) -> True
-      (TyApp _ r1 as1, TyApp _ r2 as2) ->
-        getUnique r1 == getUnique r2
-          && length as1 == length as2
-          && and (zipWith sameModuloOutOfScope as1 as2)
-      (Fun _ onts1 res1, Fun _ onts2 res2) ->
-        length onts1 == length onts2
-          && and
-               ( zipWith
-                   sameModuloOutOfScope
-                   (optionallyNamedTypeType <$> onts1)
-                   (optionallyNamedTypeType <$> onts2)
-               )
-          && sameModuloOutOfScope res1 res2
-      (Forall _ vs1 body1, Forall _ vs2 body2) ->
-        length vs1 == length vs2 && sameModuloOutOfScope body1 body2
-      (InfVar _ _ i1, InfVar _ _ i2) -> i1 == i2
-      _ -> False
-  where
-    -- Only a 'TyApp' can be headed by a sentinel: 'outOfScope' \/
-    -- 'ambiguousType' hand back a 'Resolved', and the only way one enters a
-    -- type is in type-constructor position.
-    poisonedHead :: Type' Resolved -> Bool
-    poisonedHead (TyApp _ r _) = isOutOfScope r
-    poisonedHead _             = False
 
 -- ----------------------------------------------------------------------------
 -- Info Map

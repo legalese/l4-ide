@@ -4922,6 +4922,102 @@ spec = describe "integration" do
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
 
+    -- A type name nothing declares is reported as an out-of-scope error whose
+    -- type is TYPE, and the deploy must refuse it with that error. The deploy
+    -- tolerates out-of-scope errors for names that an @export reads without
+    -- declaring them (they become implicit inputs), and that tolerance must
+    -- not reach a type name: an undeclared result type was once refused only
+    -- because the checker went on to report a second, internal error about it.
+    it "rejects an @export whose result type was never declared" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badreturn.l4" $ Text.unlines
+        [ "@export Double a number"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Numbr"
+        , "`double it` MEANS n * 2"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input type was never declared, even if the body never uses it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badinput.l4" $ Text.unlines
+        [ "@export Add one"
+        , "GIVEN n IS A Numbr"
+        , "GIVETH A NUMBER"
+        , "`add one` MEANS 1"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "still publishes an input the module never declared as a name, not as a type" do
+      -- The same out-of-scope error, raised for a name an expression reads:
+      -- the deploy turns it into an input (here `flag`), as it always did.
+      logger <- newLogger False
+      result <- compileBundle logger "test" (Map.singleton "flag.l4" implicitFlagJL4)
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+            `shouldBe` [["flag", "threshold"]]
+    -- An EVENT cannot be supplied by a request, and was published as an input
+    -- typed "object" (`typeToParameter` has no declaration for it). Since
+    -- the EVENT type resolves, nothing else stops it, so the deploy refuses it,
+    -- as an input and as a result.
+    it "rejects an @export that takes an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventin.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , ""
+        , "@export Who acted"
+        , "GIVEN e IS AN EVENT Party Act"
+        , "GIVETH A Party"
+        , "`who acted` MEANS"
+        , "  CONSIDER e"
+        , "  WHEN EVENT p a n THEN p"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as an input yet"
+          err `shouldSatisfy` Text.isInfixOf "who acted"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export that returns an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventout.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , ""
+        , "@export Make an event"
+        , "GIVEN p IS A Party"
+        , "GIVETH AN EVENT Party Act"
+        , "`make event` MEANS EVENT p ping 0"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as a result yet"
+          err `shouldSatisfy` Text.isInfixOf "make event"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published "
+              <> show [fs.fsName | fs <- meta.metaFunctions]
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed
