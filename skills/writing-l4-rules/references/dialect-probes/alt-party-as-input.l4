@@ -9,7 +9,7 @@ DECLARE Action IS ONE OF
 
 GIVEN t IS AN Actor
 GIVETH A DEONTIC Actor Action
-`a tenant signs` t MEANS
+`a tenant signs` MEANS
     PARTY t
         MUST   Sign signer PROVIDED signer EQUALS t
         WITHIN 14

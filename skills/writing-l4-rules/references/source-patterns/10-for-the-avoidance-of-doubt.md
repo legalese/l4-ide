@@ -50,7 +50,7 @@ directive stays on one line.
 @ref Charitable Fundraising Act s 4(1)
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-DECIDE `eligible to register` a IF
+DECIDE `eligible to register` IF
         a's `aged 18 or over`
     AND a's `resident in Singapore`
 
@@ -127,7 +127,7 @@ boundary case the failing assertion did not cover.
 @ref Charitable Fundraising Act s 4(1), s 4(4)
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-DECIDE `eligible to register` a IF
+DECIDE `eligible to register` IF
         a's `aged 18 or over`
     AND a's `resident in Singapore`
     AND "(4)" ... a's `months of residence in Singapore` AT LEAST 6
@@ -202,7 +202,7 @@ assert that it answers the same way whichever way that field goes.
 @ref Consultancy Agreement cl 11.4
 GIVEN e IS AN Engagement
 GIVETH A BOOLEAN
-DECIDE `the Company may terminate for material breach` e IF
+DECIDE `the Company may terminate for material breach` IF
     "11.4" ... e's `the Consultant is in material breach`
 
 #ASSERT `the Company may terminate for material breach` `in breach, notice period running`

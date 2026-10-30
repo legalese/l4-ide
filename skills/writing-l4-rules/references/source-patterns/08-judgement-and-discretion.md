@@ -40,7 +40,7 @@ DECLARE Purpose HAS
 -- decided the analogy; it does not decide it.
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
-`(p) -- any other analogous purpose` purpose MEANS
+`(p) -- any other analogous purpose` MEANS
     purpose's `reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)`
 ```
 
@@ -61,7 +61,7 @@ DECLARE Purpose HAS
 
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
-`(p) -- any other analogous purpose` purpose MEANS
+`(p) -- any other analogous purpose` MEANS
         purpose's `the number of beneficiaries` AT LEAST 100
     AND (purpose's `the advancement of animal welfare` OR purpose's `the advancement of education`)
 ```
@@ -103,7 +103,7 @@ DECLARE `Grounds recorded by the authorised person` HAS
 
 GIVEN g IS A `Grounds recorded by the authorised person`
 GIVETH A BOOLEAN
-DECIDE `the section 43(1) grounds are made out on` g IF
+DECIDE `the section 43(1) grounds are made out on` IF
         "(a)" ... g's `satisfied on reasonable grounds that the conduct is having a detrimental effect, of a persistent or continuing nature, on the quality of life of those in the locality`
     AND "(b)" ... g's `satisfied on reasonable grounds that the conduct is unreasonable`
 ```
@@ -155,7 +155,7 @@ DECLARE Intermediary HAS
 
 GIVEN i IS AN Intermediary
 GIVETH A BOOLEAN
-DECIDE `Rule 303(b)(1) is satisfied by` i IF
+DECIDE `Rule 303(b)(1) is satisfied by` IF
     i's `the intermediary has a reasonable basis for believing that the investor satisfies the investment limitations`
 ```
 
@@ -168,7 +168,7 @@ DECLARE Investor HAS
 
 GIVEN inv IS AN Investor
 GIVETH A BOOLEAN
-DECIDE `Rule 303(b)(1) is satisfied for` inv IF
+DECIDE `Rule 303(b)(1) is satisfied for` IF
     inv's `annual income` AT LEAST 124000 OR inv's `net worth` AT LEAST 124000
 ```
 
@@ -213,7 +213,7 @@ DECLARE PublicBenefitFinding HAS
 
 GIVEN f IS A PublicBenefitFinding
 GIVETH A BOOLEAN
-`the public benefit determination was properly made` f MEANS
+`the public benefit determination was properly made` MEANS
         f's `regard had to the comparison required by Article 7(2)(a)`
     AND NOT f's `a particular charitable purpose presumed to be for the public benefit`
 ```
@@ -230,7 +230,7 @@ DECLARE Entity HAS
 
 GIVEN e IS AN Entity
 GIVETH A BOOLEAN
-`the public benefit determination was properly made` e MEANS
+`the public benefit determination was properly made` MEANS
     e's `the Registrar is satisfied that the entity provides public benefit`
 ```
 
@@ -264,7 +264,7 @@ nothing in the instrument from which an answer could be derived.
 -- s 18(4)(b) puts that squarely in the court's discretion.
 GIVEN candidates IS A LIST OF Applicant
 GIVETH A LIST OF Applicant
-`those the court may grant to under section 18(4)(a)-(b) among` candidates MEANS
+`those the court may grant to under section 18(4)(a)-(b) among` MEANS
     filter (GIVEN p YIELD (p's `the husband or widow or next of kin`)
                       AND (p's `an applicant for the grant`)) candidates
 ```
@@ -277,7 +277,7 @@ the order the court made as a field, and let later rules read it. What you must 
 ```l4
 GIVEN candidates IS A LIST OF Applicant
 GIVETH AN Applicant
-`the person to whom the court grants letters of administration among` candidates MEANS
+`the person to whom the court grants letters of administration among` MEANS
     at (filter (GIVEN p YIELD (p's `the husband or widow or next of kin`)
                           AND (p's `an applicant for the grant`)) candidates) 0
 ```
@@ -327,7 +327,7 @@ sufficient reason" is the drafter saying so explicitly — and so has no content
 -- actual order overrides the number below.
 GIVEN a IS AN Administration
 GIVETH A NUMBER
-`the number of sureties required in` a MEANS
+`the number of sureties required in` MEANS
   BRANCH
     IF NOT a's `security for the due administration of the estate is required` THEN 0
     IF a's `the administrator is entitled to the whole of the estate after payment of the debts` THEN 0
@@ -387,7 +387,7 @@ actually acted, and the third is what a projection draws as a decision point in 
 -- (a) ELIGIBILITY is a rule, and it is computable: 160 is a number in the text.
 GIVEN m IS A `Month of the engagement`
 GIVETH A BOOLEAN
-DECIDE `clause 4(3) is engaged for` m IF
+DECIDE `clause 4(3) is engaged for` IF
     m's `hours worked` ABOVE 160
 
 -- (b) THE EXERCISE is a fact, and it is an input. The encoding does not decide
@@ -395,14 +395,14 @@ DECIDE `clause 4(3) is engaged for` m IF
 --     Company acted.
 GIVEN m IS A `Month of the engagement`
 GIVETH A BOOLEAN
-DECIDE `the hours above 160 are rejected in` m IF
+DECIDE `the hours above 160 are rejected in` IF
         `clause 4(3) is engaged for` m
     AND m's `the Company rejected the hours above 160`
 
 -- (c) THE POWER is a DEONTIC, and it is a MAY: a permission of a named actor.
 GIVEN m IS A `Month of the engagement`
 GIVETH A DEONTIC Party Act
-`clause 4(3) -- the Company may reject the hours above 160, for` m MEANS
+`clause 4(3) -- the Company may reject the hours above 160, for` MEANS
     IF   `clause 4(3) is engaged for` m
     THEN PARTY `the Company` MAY `reject the hours above 160` WITHIN 30 HENCE FULFILLED
     ELSE FULFILLED

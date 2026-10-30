@@ -1,4 +1,4 @@
 GIVEN a IS A BOOLEAN
 GIVETH A BOOLEAN
 @nonassertable
-`offence` a MEANS a
+`offence` MEANS a

@@ -105,7 +105,7 @@ DECLARE Notice HAS
 
 GIVEN n IS A Notice
 GIVETH A BOOLEAN
-DECIDE `the notice contains the particulars subsection (2) requires` n IF
+DECIDE `the notice contains the particulars subsection (2) requires` IF
         isJust (n's `the name of the licensee`)
     AND isJust (n's `the address of the premises`)
     AND isJust (n's `the date of the change`)
@@ -191,7 +191,7 @@ DECLARE Person IS ONE OF
 
 GIVEN p IS A Person
 GIVETH A BOOLEAN
-`s 6(1) -- old enough for a licence` p MEANS
+`s 6(1) -- old enough for a licence` MEANS
     CONSIDER p
     WHEN `an individual` i    THEN i's `age in years` AT LEAST 18
     WHEN `a body corporate` b THEN TRUE
@@ -210,7 +210,7 @@ DECLARE Person HAS
 
 GIVEN p IS A Person
 GIVETH A BOOLEAN
-`s 6(1) -- old enough for a licence` p MEANS
+`s 6(1) -- old enough for a licence` MEANS
     IF   p's `the person is a body corporate`
     THEN TRUE
     ELSE p's `age in years` AT LEAST 18
@@ -252,7 +252,7 @@ DECLARE Executor HAS
 
 GIVEN executors IS A LIST OF Executor
 GIVETH A BOOLEAN
-`s 13(1)(b) -- every executor appointed by the will has renounced` executors MEANS
+`s 13(1)(b) -- every executor appointed by the will has renounced` MEANS
     all (GIVEN p YIELD p's `renounced the right to such grant`) executors
 ```
 
@@ -313,7 +313,7 @@ DECLARE Person HAS
 
 GIVEN people IS A LIST OF Person
 GIVETH A BOOLEAN
-`any of the issue survived the intestate` people MEANS
+`any of the issue survived the intestate` MEANS
     any (GIVEN p YIELD p's `survived the deceased`) people
 ```
 
@@ -360,7 +360,7 @@ DECLARE Person HAS
 GIVEN a IS A Person
       b IS A Person
 GIVETH A BOOLEAN
-`the same person as` a b MEANS
+`the same person as` MEANS
     a's `the reference for this person` EQUALS b's `the reference for this person`
 ```
 
@@ -407,7 +407,7 @@ residue its own number rather than treating it as an error.
 ```l4
 GIVEN p IS AN Applicant
 GIVETH A NUMBER
-`the section 13(2) rank of` p MEANS
+`the section 13(2) rank of` MEANS
   BRANCH
     IF p's `a universal or residuary legatee`       THEN 1
     IF p's `a legatee having a beneficial interest` THEN 4
@@ -416,7 +416,7 @@ GIVETH A NUMBER
 
 GIVEN candidates IS A LIST OF Applicant
 GIVETH A LIST OF Applicant
-`those with a prior right under section 13(2) among` candidates MEANS
+`those with a prior right under section 13(2) among` MEANS
     filter (GIVEN p YIELD `the section 13(2) rank of` p EQUALS best) candidates
     WHERE
       best MEANS minimum1 6 (map (GIVEN p YIELD `the section 13(2) rank of` p) candidates)
@@ -525,7 +525,7 @@ DECLARE Matter HAS
 --  any of the powers conferred upon the court ..."
 GIVEN m IS A Matter
 GIVETH A DEONTIC Actor Action
-`s 69 -- the registrar may exercise the court's powers in` m MEANS
+`s 69 -- the registrar may exercise the court's powers in` MEANS
     IF   m's `the matter is uncontested`
     THEN PARTY `the registrar` MAY `make the grant` WITHIN 30
     ELSE PARTY `the court`     MAY `make the grant` WITHIN 30

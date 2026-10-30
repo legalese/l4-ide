@@ -195,7 +195,7 @@ DECLARE Estate HAS
 @ref Intestate Succession Act 1967 s 7 rule 3
 GIVEN e IS AN Estate
 GIVETH A NUMBER
-`the portion distributable among the issue of` e MEANS
+`the portion distributable among the issue of` MEANS
     e's `the net value of the estate`
     MINUS
     CONSIDER e's `the share of the surviving spouse`
@@ -384,7 +384,7 @@ GIVETH A NUMBER
 
 GIVEN y IS A NUMBER
 GIVETH A NUMBER
-`offering maximum in a 12-month period, in year` y MEANS
+`offering maximum in a 12-month period, in year` MEANS
     BRANCH IF y AT LEAST 2021 THEN 5000000
            IF y AT LEAST 2016 THEN 1000000
            OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
@@ -775,7 +775,7 @@ DECLARE Renewal HAS
 -- 7.4 Failing agreement, the renewal fee is the fee for the preceding year.
 GIVEN r IS A Renewal
 GIVETH A NUMBER
-`clause 7.4 — the renewal fee` r MEANS
+`clause 7.4 — the renewal fee` MEANS
     CONSIDER r's `the sum agreed by the parties`
     WHEN JUST s  THEN s
     WHEN NOTHING THEN `the fee for the preceding year`
