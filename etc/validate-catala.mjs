@@ -3,10 +3,32 @@
 // This is R9 of specs/todo/CATALA-EXPORT-SPEC.md: **optional when present,
 // never a build dependency**. Catala is an OCaml toolchain that has to be built
 // from source on macOS arm64 (upstream ships Linux amd64 .deb only), so it is
-// not on CI runners and must not be made a merge-queue requirement — the same
-// posture etc/validate-dmn.mjs takes toward dmnmd. When the binaries are absent
-// this script prints one clear SKIP line and exits 0. It exits non-zero only
-// for a real failure: a golden the toolchain rejects.
+// on no runner unless a job installs it (the catala-validate job in
+// .github/workflows/pr-checks.yml does, when its `catala` paths filter matches)
+// and must not be made a merge-queue requirement — the same posture
+// etc/validate-dmn.mjs takes toward dmnmd. When the binaries are absent this
+// script prints one clear SKIP line and exits 0. It exits non-zero only for a
+// real failure: a golden the toolchain rejects.
+//
+// WHICH CATALA. The supported release is Catala 1.3.0 (2026-09-30), and the
+// catala-validate job in .github/workflows/pr-checks.yml installs exactly that.
+// The goldens were first checked with upstream commit fdf4ccd5 (master of
+// 2026-07-30, which reports itself as "1.2.1"); 1.3.0 contains that commit.
+// NOT the 1.2.1 release tarball: on it `catala typecheck` and `catala proof`
+// pass on all 12 goldens and `clerk test` fails 41 of 83 tests (legalese/l4-ide
+// run 41010257517), because the release's `catala interpret -F json`
+// pretty-prints and renders rationals as floats, where the goldens'
+// catala-test-cli blocks hold the compact exact-rational form, and it crashes
+// on an enum value. clerk's diff, Reference on the left and Result on the right
+// (the box clips long lines):
+//
+//     {"result":"1/4"}        ╳{ "result": 0.25 }
+//     {"result":"500"}        ╳{ "result": 500.0 }
+//     Unexpected error: Invalid_argument of non exhaustive Json_encoding.st
+//     'Upper'                 (imports.catala_en:87, #return code 125#)
+//
+// Layer 3 below reads both clerk summaries: the `files`/`tests` banner of
+// fdf4ccd5 and 1.2.1, and 1.3.0's `Interpreted` row, which has no `tests` row.
 //
 // THREE LAYERS, and they are not the same claim:
 //
@@ -39,14 +61,20 @@
 // Layer 3 is why this harness exists at all. §10.3 records the ladder-direction
 // bug that `catala typecheck` was green on and `clerk test` caught. Note that
 // `clerk test` prints its ALL TESTS PASSED banner over ZERO tests and exits 0,
-// so the banner alone is not evidence; the counts are parsed below and a run
-// that executed nothing is a failure.
+// and over a run that left a file out, so the banner alone is not evidence.
+// The run is checked against the goldens instead: every staged file must be
+// listed as run, with exactly as many tests as its golden declares (its
+// catala-test-cli blocks plus its #[test] scopes), and the summary banner's
+// total must be their sum.
 //
 // USAGE
 //
 //   node etc/validate-catala.mjs                  # every golden under
 //                                                 # jl4/examples/catala/expected/
 //   node etc/validate-catala.mjs FILE...          # just these
+//   node etc/validate-catala.mjs --selftest       # the clerk-output checks
+//                                                 # against canned output; needs
+//                                                 # no toolchain
 //
 // FINDING THE TOOLCHAIN, in order:
 //
@@ -126,6 +154,237 @@ function discover(tool, envVar) {
   }
 
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Reading `clerk test`
+// ---------------------------------------------------------------------------
+//
+// Three facts about clerk's output decide what this can trust, and each was
+// measured on 2026-10-30 against fdf4ccd5, 1.2.1 and 1.3.0:
+//
+//   * `clerk test -v` prints one line per file it ran (fdf4ccd5 and 1.3.0; the
+//     1.2.1 release prints the same lines for a plain `clerk test`):
+//       __ 02-bands/Bands.catala_en: 10 / 10 tests passed
+//     A file that is not listed was not run.
+//   * The summary banner differs. fdf4ccd5 and 1.2.1 print a `files` row and a
+//     `tests` row. 1.3.0 prints one row per backend (`Interpreted 0 75 75`) and
+//     no `tests` row, so a parser that looks only for `tests` reads 0 from a
+//     run in which every test passed.
+//   * `ALL TESTS PASSED` is printed over zero tests, and over a run that left a
+//     file out. Neither is a pass, so the count is checked against the goldens,
+//     not against what clerk says about itself.
+//
+// What a golden declares: each ```catala-test-cli block is one test, and so is
+// each `#[test]` scope. The counts add up to what clerk runs on every golden
+// in the tree (12 files, 83 tests on 2026-10-30), so a difference is a finding.
+
+const stripAnsi = (s) => s.replace(/\u001b\[[0-9;]*m/g, "");
+
+function expectedTests(text) {
+  const blocks = (text.match(/^```catala-test-cli/gm) ?? []).length;
+  const scopes = (text.match(/^#\[test\]/gm) ?? []).length;
+  return { blocks, scopes, total: blocks + scopes };
+}
+
+function perFileResults(clean) {
+  const seen = new Map();
+  for (const m of clean.matchAll(
+    /^__ (\S+): (\d+) \/ (\d+) tests passed\s*$/gm,
+  )) {
+    seen.set(m[1], { passed: Number(m[2]), total: Number(m[3]) });
+  }
+  return seen;
+}
+
+// `tests` row (fdf4ccd5, 1.2.1) or `Interpreted` row (1.3.0): FAILED PASSED TOTAL.
+function bannerTotals(clean) {
+  const m = /^[\s┃|]*(tests|Interpreted)\s+(\d+)\s+(\d+)\s+(\d+)/m.exec(clean);
+  return m
+    ? {
+        row: m[1],
+        failed: Number(m[2]),
+        passed: Number(m[3]),
+        total: Number(m[4]),
+      }
+    : null;
+}
+
+// `staged`: [{ golden, name, dir, blocks, scopes, expected }]. Returns every
+// way the run disagrees with the goldens, so one failure names all of them.
+function checkClerk(out, status, staged) {
+  const clean = stripAnsi(out);
+  const problems = [];
+  if (status !== 0) problems.push(`clerk test exited ${status}`);
+  if (!/ALL TESTS PASSED/.test(clean)) {
+    problems.push("clerk test did not print ALL TESTS PASSED");
+  }
+  const seen = perFileResults(clean);
+  let expectedSum = 0;
+  for (const s of staged) {
+    expectedSum += s.expected;
+    if (s.expected === 0) {
+      problems.push(
+        `${s.golden}: no catala-test-cli block and no #[test] scope; an ` +
+          `emitted module with no test proves nothing`,
+      );
+      continue;
+    }
+    const key = `${s.dir}/${s.name}`;
+    const r = seen.get(key);
+    if (!r) {
+      problems.push(
+        `${s.golden}: clerk did not run it (no \`__ ${key}\` line)`,
+      );
+      continue;
+    }
+    seen.delete(key);
+    if (r.total !== s.expected) {
+      problems.push(
+        `${s.golden}: clerk ran ${r.total} test(s) but the golden declares ` +
+          `${s.expected} (${s.blocks} catala-test-cli block(s) + ${s.scopes} ` +
+          `#[test] scope(s))`,
+      );
+    }
+    if (r.passed !== r.total) {
+      problems.push(`${s.golden}: ${r.passed} of ${r.total} tests passed`);
+    }
+  }
+  for (const key of seen.keys()) {
+    problems.push(`clerk ran ${key}, which this run did not stage`);
+  }
+  const banner = bannerTotals(clean);
+  if (!banner) {
+    problems.push(
+      "could not read the summary banner: looked for a `tests` row " +
+        "(fdf4ccd5, 1.2.1) and an `Interpreted` row (1.3.0)",
+    );
+  } else {
+    if (banner.failed !== 0) {
+      problems.push(`the ${banner.row} row reports ${banner.failed} failed`);
+    }
+    if (banner.total !== expectedSum) {
+      problems.push(
+        `the ${banner.row} row totals ${banner.total} test(s) but the ` +
+          `goldens declare ${expectedSum}`,
+      );
+    }
+  }
+  return { problems, ran: banner ? banner.total : null, expected: expectedSum };
+}
+
+if (process.argv.includes("--selftest")) {
+  const row = (label, f, p) =>
+    `┃   ${label.padEnd(14)}${String(f).padStart(5)}${String(p).padStart(11)}${String(f + p).padStart(11)}   ${f ? "  0" : "100"} %  ┃`;
+  const oldBanner = (n) =>
+    [
+      "┏━  ALL TESTS PASSED  ━┓",
+      row("files", 0, 2),
+      row("tests", 0, n),
+      "┗━━┛",
+    ].join("\n");
+  const newBanner = (n) =>
+    ["┏━  ALL TESTS PASSED  ━┓", row("Interpreted", 0, n), "┗━━┛"].join("\n");
+  const line = (key, p, t) => `__ ${key}: ${p} / ${t} tests passed`;
+  const file = (n, name) => ({
+    golden: `${name}.catala_en`,
+    name: `${name}.catala_en`,
+    dir: name,
+    blocks: n / 2,
+    scopes: n / 2,
+    expected: n,
+  });
+  const a = file(4, "a");
+  const b = file(2, "b");
+  const both = [a, b];
+  const ok = [line("a/a.catala_en", 4, 4), line("b/b.catala_en", 2, 2)];
+  const cases = [
+    // [label, output, status, staged, substrings every problem list must have, or [] for none]
+    ["the old banner, every file run", [...ok, oldBanner(6)], 0, both, []],
+    ["1.3.0's banner, every file run", [...ok, newBanner(6)], 0, both, []],
+    [
+      "1.3.0's banner, a file left out",
+      [line("a/a.catala_en", 4, 4), newBanner(4)],
+      0,
+      both,
+      [
+        "b.catala_en: clerk did not run it",
+        "totals 4 test(s) but the goldens declare 6",
+      ],
+    ],
+    [
+      "a count that differs from the golden",
+      [line("a/a.catala_en", 3, 3), line("b/b.catala_en", 2, 2), newBanner(5)],
+      0,
+      both,
+      ["clerk ran 3 test(s) but the golden declares 4"],
+    ],
+    [
+      "a failing test",
+      [
+        line("a/a.catala_en", 3, 4),
+        line("b/b.catala_en", 2, 2),
+        oldBanner(6).replace("ALL TESTS PASSED", "TESTS FAILED"),
+      ],
+      1,
+      both,
+      [
+        "clerk test exited 1",
+        "did not print ALL TESTS PASSED",
+        "3 of 4 tests passed",
+      ],
+    ],
+    [
+      "a banner in neither layout",
+      [...ok, "┏━  ALL TESTS PASSED  ━┓"],
+      0,
+      both,
+      ["could not read the summary banner"],
+    ],
+    [
+      "ANSI colour around the lines",
+      ok.map((l) => `\u001b[32m${l}\u001b[0m`).concat(newBanner(6)),
+      0,
+      both,
+      [],
+    ],
+    [
+      "a golden with no tests",
+      [...ok, newBanner(6)],
+      0,
+      [...both, { ...file(2, "c"), blocks: 0, scopes: 0, expected: 0 }],
+      ["c.catala_en: no catala-test-cli block"],
+    ],
+  ];
+  let bad = 0;
+  for (const [label, lines, status, staged, wanted] of cases) {
+    const { problems } = checkClerk(lines.join("\n"), status, staged);
+    const joined = problems.join("\n");
+    const good =
+      wanted.length === 0
+        ? problems.length === 0
+        : wanted.every((w) => joined.includes(w));
+    console.log(`${good ? "ok  " : "FAIL"}  ${label}`);
+    if (!good) {
+      bad++;
+      console.log(
+        `      wanted ${wanted.length ? JSON.stringify(wanted) : "no problems"}`,
+      );
+      console.log(`      got    ${JSON.stringify(problems)}`);
+    }
+  }
+  const et = expectedTests(
+    "```catala-test-cli\nx\n```\n#[test] declaration scope T:\n```catala-test-cli\n",
+  );
+  const etGood = et.blocks === 2 && et.scopes === 1 && et.total === 3;
+  console.log(
+    `${etGood ? "ok  " : "FAIL"}  expectedTests counts blocks and #[test] scopes`,
+  );
+  if (!etGood) bad++;
+  console.log(
+    bad ? `\nselftest: ${bad} failed` : "\nselftest: all checks passed",
+  );
+  process.exit(bad ? 1 : 0);
 }
 
 const catala = discover("catala", "CATALA_EXE");
@@ -250,16 +509,34 @@ try {
       failed++;
       continue;
     }
-    // One subdirectory per golden. Two goldens can legitimately declare the
-    // same module -- `bands.catala_en` and `bands-boolean-only.catala_en` are
-    // two renderings of one L4 source and both say `> Module Bands` -- and
-    // staging them flat would have one silently overwrite the other. `clerk
-    // test` walks the tree from the directory it is started in, so a single
-    // `clerk start` at the top still covers all of them.
-    const dir = basename(golden).replace(/\.catala_en$/, "");
+    // One subdirectory per golden, so that two goldens whose staged names
+    // collide cannot silently overwrite one another. `clerk test` walks the
+    // tree from the directory it is started in, so a single `clerk start` at
+    // the top still covers all of them.
+    //
+    // The directory is numbered, and that is not decoration. 1.3.0's clerk
+    // silently skips a directory named like another staged directory plus a
+    // dash and a suffix: staged as `bands` and `bands-boolean-only`, it lists
+    // and runs only `bands`, and still prints ALL TESTS PASSED (measured
+    // 2026-10-30; `bands2`, `bandsx`, `xbands` and `bands_boolean_only` beside
+    // `bands` are all run, and so are `01-bands` and `02-bands-boolean-only`).
+    // Layer 3 notices a file clerk did not run, and names it.
+    //
+    // Two goldens that declare the same `> Module` name are a different
+    // failure and a loud one: clerk 1.3.0 stops with "Conflicting module name".
+    // So each golden's module name must be its own.
+    const dir = `${String(staged.length).padStart(2, "0")}-${basename(golden).replace(/\.catala_en$/, "")}`;
     await mkdir(join(work, dir), { recursive: true });
     await copyFile(golden, join(work, dir, name));
-    staged.push({ golden, name, dir });
+    const declared = expectedTests(await readFile(golden, "utf8"));
+    staged.push({
+      golden,
+      name,
+      dir,
+      blocks: declared.blocks,
+      scopes: declared.scopes,
+      expected: declared.total,
+    });
   }
 
   // Layer 1: typecheck, per file, so a failure names the file.
@@ -339,33 +616,23 @@ try {
     process.exit(1);
   }
 
-  // Layer 3: one `clerk test` over the whole directory.
-  const test = run(clerk, ["test"], { cwd: work });
+  // Layer 3: one `clerk test` over the whole directory. `-v` is what makes
+  // clerk list every file it ran, which is how a file it left out is seen.
+  const test = run(clerk, ["test", "-v"], { cwd: work });
   const out = `${test.stdout ?? ""}${test.stderr ?? ""}`;
-  const tail = out.trim().split("\n").slice(-12).join("\n");
-  if (test.status !== 0 || !/ALL TESTS PASSED/.test(out)) {
-    console.error(`FAIL  clerk test\n${tail}`);
-    process.exit(1);
-  }
-  // `clerk test` prints ALL TESTS PASSED over an empty directory, so the banner
-  // is not the evidence -- the count is. A run that executed nothing means the
-  // R7 blocks vanished (fillTests drops a block whose oracle has no value), and
-  // that must not read as a pass.
-  const counts = /tests\s+(\d+)\s+(\d+)\s+(\d+)/.exec(
-    out.replace(/\u001b\[[0-9;]*m/g, ""),
-  );
-  const ran = counts ? Number(counts[3]) : 0;
-  if (ran < staged.length) {
+  const tail = stripAnsi(out).trim().split("\n").slice(-12).join("\n");
+  const verdict = checkClerk(out, test.status, staged);
+  if (verdict.problems.length > 0) {
     console.error(
-      `FAIL  clerk test ran ${ran} test(s) across ${staged.length} file(s); ` +
-        `expected at least one per file. An emitted module with no ` +
-        `\`\`\`catala-test-cli block proves nothing, and ALL TESTS PASSED over ` +
-        `zero tests is not a pass.\n${tail}`,
+      `FAIL  clerk test\n` +
+        verdict.problems.map((p) => `       ${p}`).join("\n") +
+        `\n${tail}`,
     );
     process.exit(1);
   }
   console.log(
-    `\nOK    clerk test over ${staged.length} file(s), ${ran} test(s)\n${tail}`,
+    `\nOK    clerk test over ${staged.length} file(s), ${verdict.ran} test(s): ` +
+      `every file ran, and each ran as many tests as its golden declares\n${tail}`,
   );
 } finally {
   await rm(work, { recursive: true, force: true });

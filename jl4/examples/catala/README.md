@@ -55,12 +55,14 @@ The module name Catala sees comes from the **output file's** basename, with its
 first letter capitalised — not a CamelCasing of it, so no file named
 `flat-tax.catala_en` can host any module at all. These goldens are named after
 their L4 sources, so the harness stages each one, under the name its own
-`> Module` line claims, in its own scratch subdirectory (`flat-tax.catala_en`
-declares `Module FlatTax`, and is staged as `flat-tax/FlatTax.catala_en`). Each
-golden keeps its own directory because two goldens may legitimately declare the
-same module — `bands.catala_en` and `bands-boolean-only.catala_en` are two
-renderings of one source and both say `> Module Bands`. The goldens themselves
-are compared against stdout, where the module name comes from the L4 basename.
+`> Module` line claims, in its own numbered scratch subdirectory
+(`flat-tax.catala_en` declares `Module FlatTax`, and is staged as
+`06-flat-tax/FlatTax.catala_en`).
+Each golden keeps its own directory so that two staged files can never overwrite one another.
+The number matters: Catala 1.3.0's `clerk test` silently skips a directory whose name is another staged directory's name plus a dash and a suffix, as `bands-boolean-only` is of `bands`.
+No two goldens may declare the same module, because 1.3.0's clerk stops with "Conflicting module name".
+`bands.catala_en` and `bands-boolean-only.catala_en` are two renderings of one source, so the second is generated with `-o bands_boolean_only.catala_en` and says `> Module Bands_boolean_only`.
+The other goldens are compared against stdout, where the module name comes from the L4 basename.
 
 `l4 export catala -o` rejects an output basename that cannot be a Catala module name,
 rather than writing a file the toolchain will refuse.

@@ -1170,12 +1170,14 @@ directory, ran **no Catala-aware job** — only the four unfiltered ones (`chang
 then failing on somebody else's branch. Same failure class as the corpus-goldens job, and the
 filter is the fix.
 
-A `catala-validate` job now runs `node etc/validate-catala.mjs` under that filter. **State plainly
-what it is worth today:** ubuntu-latest has no OCaml `catala`, so the step prints SKIP and exits 0,
-and a green tick there is _not_ evidence that Catala accepted anything. Only a run with
-`CATALA_CHECK_REQUIRED=1` — a self-hosted runner, or a developer machine — means that. The job
-header says so, so the tick cannot be misread. The paths filter is the half that is load-bearing
-immediately; the job is the seam that makes the rest one env var away.
+A `catala-validate` job runs `node etc/validate-catala.mjs` under that filter.
+**State plainly what it is worth.**
+Written first, the job ran on ubuntu-latest with no OCaml `catala`: the step printed SKIP and exited 0, and a green tick was _not_ evidence that Catala accepted anything.
+With legalese/l4-ide#786 the job installs Catala 1.3.0 and `catala-proof` through opam (cached by version) and sets `CATALA_CHECK_REQUIRED=1` whenever the `catala` filter matches: the emitter under `jl4-core/src/L4/Catala/`, `jl4/app/L4/Cli/Catala.hs`, `jl4/tests-cli/CliTest/Catala.hs`, `jl4/examples/catala/**`, the harness, or the workflow file.
+On such a PR a green tick means every golden passed `catala typecheck` and `catala proof`, and `clerk test` ran every test the goldens declare and passed them.
+A missing toolchain, or a test count that differs from the goldens', is a failure there, not a SKIP.
+A PR that matches only the `haskell` filter still runs the job, installs nothing, and the harness prints SKIP; that tick is not evidence about Catala.
+The job header in `.github/workflows/pr-checks.yml` says which Catala and why it is not the 1.2.1 release.
 
 ### 8.10 R10 — `TYPICALLY` on an exported decision's parameter becomes `context`
 
