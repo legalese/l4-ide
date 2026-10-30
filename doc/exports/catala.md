@@ -143,12 +143,7 @@ Both pins say `1.2.1` because that is the version the commit reports.
 The second pin is only for `catala proof`, and it builds the Z3 solver, which is most of the build time.
 `etc/validate-catala.mjs` finds a switch named `catala` by itself.
 
-Catala 1.3.0, released 2026-09-30, contains that commit.
-By hand, it type-checks all twelve examples and its `clerk test` passes.
-Two limits keep it from being the route above.
-`etc/validate-catala.mjs` does not understand its test summary, which has a different layout.
-Its `clerk` also does not run `bands-boolean-only`, which declares the same module name as `bands`, so 75 tests run instead of 83.
-`catala proof` was not tried on it.
+Catala 1.3.0, released 2026-09-30, contains that commit and its `clerk test` passes by hand, but it is not the route above, because `etc/validate-catala.mjs` cannot read its test-summary banner and its `clerk` does not run `bands-boolean-only`, which declares the same module name as `bands`.
 
 ## Where to look
 
