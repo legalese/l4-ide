@@ -725,8 +725,9 @@ export class CloudSessionManager {
     if (!name) {
       throw new Error(`${label} is not one of your enabled MCP servers.`)
     }
-    const res = await mcp.signIn(label)
-    if (!res.ok) throw new Error(res.error ?? `Signing in to ${label} failed.`)
+    // A sign-in that fails or is cancelled is the MCP layer's to report
+    // (a VS Code notification); the server's chip stays amber.
+    if (!(await mcp.signIn(label)).ok) return
     const t = this.track(sid)
     t.mcpSent.delete(name)
     this.setMcpSignIn(
@@ -919,14 +920,17 @@ export class CloudSessionManager {
           trusted.some((x) => x.name === s.name && x.url === s.url)
         )
         if (servers.length === 0) return
-        const { credentials, unauthorized } = await collectMcpCredentials(
-          this.deps.mcp!,
-          servers
-        )
-        // Headers the harness turned down, with nothing fresher here:
-        // a sign-in, like a server without one.
+        // Servers the harness reported (`auth-required`): their tokens
+        // are refreshed before they expire.
         const reported = t.mcpReported
         t.mcpReported = new Set()
+        const { credentials, unauthorized, withoutHeaders } =
+          await collectMcpCredentials(this.deps.mcp!, servers, {
+            refresh: reported,
+          })
+        // A reported server needs a sign-in when there is nothing to
+        // send, or only the headers it turned down (the refresh changed
+        // nothing).
         const rejected = credentials.servers
           .filter(
             (s) =>
@@ -934,7 +938,11 @@ export class CloudSessionManager {
               t.mcpSent.get(s.name) === headersHash(s.headers)
           )
           .map((s) => s.name)
-        const signIn = [...unauthorized, ...rejected]
+        const signIn = [
+          ...unauthorized,
+          ...withoutHeaders.filter((n) => reported.has(n)),
+          ...rejected,
+        ]
         this.setMcpSignIn(sid, t, signIn)
         if (signIn.length > 0) {
           this.deps.logger.warn(

@@ -7,6 +7,7 @@ import type { AiLogger } from './logger.js'
 import type { AiProxyTool, ToolProvider } from '@repo/legalese-agent'
 import type { McpOAuthManager } from './mcp-oauth.js'
 import type { LocalMcpServer, McpServerSource } from '../cloud/mcp-transfer.js'
+import { notificationText } from '../cloud/notification-text.js'
 
 /**
  * MCP servers for the Legalese AI sidebar.
@@ -26,9 +27,15 @@ import type { LocalMcpServer, McpServerSource } from '../cloud/mcp-transfer.js'
  *
  * Lifecycle: enabled servers auto-connect once a usable Legalese AI
  * session exists (boot or login). Interactive actions (toggle-on,
- * menu Start, import) may kick off a browser sign-in for OAuth
- * servers; background auto-connects never do — they surface a
- * "sign-in required" state instead.
+ * Sign in, Reconnect, add, import) may kick off a browser sign-in for
+ * OAuth servers; background auto-connects never do — they surface a
+ * "sign-in required" state instead. One connect runs per server at a
+ * time; a second one joins it.
+ *
+ * Problems are VS Code notifications, never text in the sidebar: a
+ * connect the user asked for that fails, and a server that was signed
+ * in and now needs a new sign-in. The settings UI shows states only,
+ * pushed through {@link onDidChange}.
  *
  * The built-in "L4 Rules" proxy is excluded from the catalog — its
  * tools already reach the model via the `l4-rules__` path and it has
@@ -79,8 +86,6 @@ export interface VsCodeMcpServerInfo {
   detail?: string
   enabled: boolean
   status: McpServerStatus
-  /** Human-readable connection failure, when status === 'error'. */
-  error?: string
   tools: VsCodeMcpToolInfo[]
 }
 
@@ -101,12 +106,11 @@ export interface AddServerInput {
   /** Optional bearer token for http/sse servers — stored as an
    *  `Authorization: Bearer …` header on the entry. */
   bearerToken?: string
-  /** Replace an existing entry with the same name instead of failing.
-   *  Set by the UI after the user confirmed the override. */
-  overwrite?: boolean
 }
 
-export type McpServerAction = 'start' | 'stop' | 'refresh' | 'remove'
+/** `connect`: (re)connect, with a browser sign-in when needed (the
+ *  Sign in / retry badge and the menu's Reconnect). */
+export type McpServerAction = 'connect' | 'remove'
 
 /** Server config entry — same shape as VS Code's mcp.json entries so
  *  imports are verbatim copies. */
@@ -153,8 +157,21 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
   readonly prefix = VSCODE_MCP_PREFIX
 
   private connections = new Map<string, Connection>()
+  /** Connects in progress: a second start joins the first. */
+  private readonly connecting = new Map<
+    string,
+    Promise<{ ok: boolean; error?: string }>
+  >()
+  /** Servers already told the user they need a new sign-in (once per
+   *  window until they are signed in again). */
+  private readonly signInNoticeShown = new Set<string>()
   /** wire name → (server, tool). Rebuilt on every listTools(). */
   private wireMap = new Map<string, { serverId: string; toolName: string }>()
+  private readonly changed = new vscode.EventEmitter<void>()
+  /** Fires whenever {@link listServers} / {@link listCandidates} may
+   *  have changed. */
+  readonly onDidChange = this.changed.event
+  private readonly configSub: vscode.Disposable
 
   constructor(
     /** VS Code per-user data dir containing `mcp.json` — the import
@@ -168,10 +185,16 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     private readonly memento: vscode.Memento,
     /** OAuth client for protected servers. */
     private readonly oauth?: McpOAuthManager
-  ) {}
+  ) {
+    this.configSub = vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('legaleseAi.mcp')) this.changed.fire()
+    })
+  }
 
   dispose(): void {
     for (const id of [...this.connections.keys()]) this.stop(id)
+    this.configSub.dispose()
+    this.changed.dispose()
   }
 
   // ── Our server list ───────────────────────────────────────────────
@@ -243,11 +266,34 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     id: string,
     opts: { interactive: boolean }
   ): Promise<{ ok: boolean; error?: string }> {
+    const running = this.connecting.get(id)
+    if (running) {
+      const res = await running
+      // A background connect that hit a sign-in wall: the user asked
+      // for this one, so run it with the sign-in.
+      return opts.interactive &&
+        this.connections.get(id)?.status === 'unauthorized'
+        ? this.start(id, opts)
+        : res
+    }
+    const job = this.connect(id, opts).finally(() => {
+      this.connecting.delete(id)
+      this.changed.fire()
+    })
+    this.connecting.set(id, job)
+    return job
+  }
+
+  private async connect(
+    id: string,
+    opts: { interactive: boolean }
+  ): Promise<{ ok: boolean; error?: string }> {
     const entry = this.ownServers()[id]
     if (!entry) return { ok: false, error: `Unknown server: ${id}` }
     this.stopStdio(id)
     const conn: Connection = { status: 'connecting', tools: [] }
     this.connections.set(id, conn)
+    this.changed.fire()
     try {
       if (isHttpEntry(entry)) {
         await this.connectHttp(id, entry, conn, opts.interactive)
@@ -258,50 +304,95 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
       }
       conn.status = 'connected'
       conn.error = undefined
+      this.signInNoticeShown.delete(id)
       this.logger.info(
         `vscode-mcp: connected to "${id}" (${conn.tools.length} tools)`
       )
       return { ok: true }
     } catch (err) {
+      conn.tools = []
+      this.stopStdio(id)
+      if (err instanceof vscode.CancellationError) {
+        conn.status = 'unauthorized'
+        return { ok: false, error: 'Sign-in cancelled.' }
+      }
       if (err instanceof SignInRequired) {
         conn.status = 'unauthorized'
-        conn.error =
-          'Sign-in required — choose Start in the server menu to authorize.'
+        conn.error = 'Sign-in required.'
+        if (err.signedInBefore) void this.notifySignInAgain(id)
         return { ok: false, error: conn.error }
       }
       const msg = err instanceof Error ? err.message : String(err)
       conn.status = 'error'
       conn.error = msg
-      conn.tools = []
-      this.stopStdio(id)
       this.logger.warn(`vscode-mcp: connect "${id}" failed: ${msg}`)
+      if (opts.interactive) void this.notifyFailure(id, msg)
       return { ok: false, error: msg }
     }
+  }
+
+  /** A connect the user asked for failed. */
+  private async notifyFailure(id: string, message: string): Promise<void> {
+    const retry = 'Retry'
+    const log = 'Show log'
+    const pick = await vscode.window.showErrorMessage(
+      `Couldn't connect to the MCP server "${notificationText(id, 60)}": ${notificationText(message, 200)}`,
+      retry,
+      log
+    )
+    if (pick === retry) void this.start(id, { interactive: true })
+    else if (pick === log) this.logger.show()
+  }
+
+  /** A server that was signed in needs a new sign-in (its token was
+   *  refused and couldn't be refreshed). Once per window. */
+  private async notifySignInAgain(id: string): Promise<void> {
+    if (this.signInNoticeShown.has(id)) return
+    this.signInNoticeShown.add(id)
+    const signIn = 'Sign in'
+    const pick = await vscode.window.showWarningMessage(
+      `The MCP server "${notificationText(id, 60)}" needs you to sign in again.`,
+      signIn
+    )
+    if (pick === signIn) void this.start(id, { interactive: true })
+  }
+
+  /** The browser sign-in, behind a cancellable progress notification. */
+  private signInWithProgress(
+    id: string,
+    url: string,
+    challenge: string | undefined
+  ): Thenable<string> {
+    return vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Signing in to "${notificationText(id, 60)}" in your browser…`,
+        cancellable: true,
+      },
+      (_progress, cancel) => this.oauth!.authorize(url, challenge, cancel)
+    )
   }
 
   stop(id: string): void {
     this.stopStdio(id)
     this.connections.set(id, { status: 'stopped', tools: [] })
+    this.changed.fire()
   }
 
   private stopStdio(id: string): void {
     this.connections.get(id)?.stdio?.kill()
   }
 
-  /** Dispatch a three-dot-menu action from the settings UI. */
-  async runAction(
-    id: string,
-    action: McpServerAction
-  ): Promise<{ ok: boolean; error?: string }> {
+  /** An action from the settings UI. Its outcome shows as the server's
+   *  state and, on failure, a notification. */
+  async runAction(id: string, action: McpServerAction): Promise<void> {
     switch (action) {
-      case 'start':
-      case 'refresh':
-        return this.start(id, { interactive: true })
-      case 'stop':
-        this.stop(id)
-        return { ok: true }
+      case 'connect':
+        await this.start(id, { interactive: true })
+        return
       case 'remove':
-        return this.removeServer(id)
+        await this.removeServer(id)
+        return
     }
   }
 
@@ -315,6 +406,8 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
   ): Promise<void> {
     const url = entry.url as string
     const hasStaticAuth = Boolean(entry.headers?.['Authorization'])
+    const signedIn =
+      !hasStaticAuth && this.oauth ? await this.oauth.hasAuth(url) : false
     if (!hasStaticAuth && this.oauth) {
       conn.bearer = (await this.oauth.getAccessToken(url)) ?? undefined
     }
@@ -326,10 +419,10 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
         err instanceof HttpStatusError &&
         (err.status === 401 || err.status === 403)
       if (!unauthorized || hasStaticAuth || !this.oauth) throw err
-      if (!interactive) throw new SignInRequired()
+      if (!interactive) throw new SignInRequired(signedIn)
       // Interactive path: run the full browser authorization, then
       // retry the handshake once with the fresh token.
-      conn.bearer = await this.oauth.authorize(url, err.wwwAuthenticate)
+      conn.bearer = await this.signInWithProgress(id, url, err.wwwAuthenticate)
       conn.sessionId = undefined
       await this.httpHandshake(url, entry, conn)
     }
@@ -423,6 +516,7 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
           conn.status = 'error'
           conn.error = reason
           conn.tools = []
+          this.changed.fire()
         }
       }
     )
@@ -496,7 +590,6 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
         detail: describeEntry(entry),
         enabled: !disabledServers.has(name),
         status: conn?.status ?? 'stopped',
-        error: conn?.error,
         tools: (conn?.tools ?? []).map((t) => ({
           name: t.name,
           description: t.description,
@@ -535,6 +628,33 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     return out
   }
 
+  /** Pick servers from VS Code's mcp.json and import them, one after
+   *  the other (so at most one browser sign-in opens at a time). */
+  async importFromVsCode(): Promise<void> {
+    const candidates = this.listCandidates()
+    if (candidates.length === 0) {
+      void vscode.window.showInformationMessage(
+        "VS Code's mcp.json has no MCP servers that Legalese AI doesn't use already."
+      )
+      return
+    }
+    const picked = await vscode.window.showQuickPick(
+      candidates.map((c) => ({
+        label: c.name,
+        description: c.transport,
+        detail: c.detail,
+        id: c.id,
+      })),
+      {
+        canPickMany: true,
+        title: 'Import MCP servers from VS Code',
+        placeHolder:
+          "Legalese AI keeps its own copy; VS Code's mcp.json stays as it is",
+      }
+    )
+    for (const p of picked ?? []) await this.importCandidate(p.id)
+  }
+
   /** Copy an mcp.json server into our list and start it. The original
    *  entry is left untouched — from here on we run our own copy. */
   async importCandidate(id: string): Promise<{ ok: boolean; error?: string }> {
@@ -547,6 +667,7 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     if (!own[id]) {
       await this.saveOwnServers({ ...own, [id]: entry })
       this.logger.info(`vscode-mcp: imported "${id}" from VS Code mcp.json`)
+      this.changed.fire()
     }
     // The import gesture is an explicit enable.
     const disabled = getDisabledServers()
@@ -599,21 +720,29 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     return out
   }
 
-  /** Headers a cloud session needs for one server: the entry's static
-   *  headers, or a fresh OAuth access token. `null` when an OAuth
-   *  server has no stored sign-in. */
-  async headersFor(id: string): Promise<Record<string, string> | null> {
+  /**
+   * Headers a cloud session needs for one server, from what is stored
+   * (not from this window's connection, which may not have run): the
+   * entry's static headers, or its static headers plus a fresh OAuth
+   * access token when there is a stored sign-in. `null` when a stored
+   * sign-in no longer works (a new sign-in is needed). With nothing
+   * stored, just the static headers: whether the server wants a
+   * sign-in shows when the session reports it. `refresh` refreshes the
+   * token even before it expires (the session turned it down).
+   */
+  async headersFor(
+    id: string,
+    opts: { refresh?: boolean } = {}
+  ): Promise<Record<string, string> | null> {
     const entry = this.ownServers()[id]
     if (!entry || !isHttpEntry(entry)) return {}
     const headers = { ...(entry.headers ?? {}) }
     if (headers['Authorization'] || !this.oauth) return headers
     const url = entry.url as string
-    if (!(await this.oauth.hasAuth(url))) {
-      return this.connections.get(id)?.status === 'unauthorized'
-        ? null
-        : headers
-    }
-    const token = await this.oauth.getAccessToken(url)
+    if (!(await this.oauth.hasAuth(url))) return headers
+    const token = opts.refresh
+      ? await this.oauth.refreshNow(url)
+      : await this.oauth.getAccessToken(url)
     if (!token) return null
     return { ...headers, Authorization: `Bearer ${token}` }
   }
@@ -720,11 +849,14 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
           conn.bearer &&
           this.oauth
         ) {
-          const fresh = await this.oauth.getAccessToken(url)
+          const fresh = await this.oauth.refreshNow(url)
           if (!fresh) {
             conn.status = 'unauthorized'
+            conn.tools = []
+            this.changed.fire()
+            void this.notifySignInAgain(serverId)
             throw new Error(
-              `Sign-in to ${serverId} expired — restart it from the Legalese AI settings.`
+              `Sign-in to ${serverId} expired; the user has been asked to sign in again.`
             )
           }
           conn.bearer = fresh
@@ -749,13 +881,15 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
   // ── Add / remove ──────────────────────────────────────────────────
 
   /**
-   * Add a server to OUR list and connect it. A name collision returns
-   * `exists: true` so the settings UI can offer to replace the entry
-   * (confirmed resubmit carries `overwrite: true`).
+   * Add a server to OUR list and connect it in the background (its
+   * outcome shows as its state, and a failure as a notification). A
+   * name that exists already asks, in a dialog, whether to replace it.
+   * Invalid input answers `ok: false` with an `error` for a
+   * notification (the settings form doesn't submit invalid input).
    */
   async addServer(
     input: AddServerInput
-  ): Promise<{ ok: boolean; error?: string; exists?: boolean }> {
+  ): Promise<{ ok: boolean; error?: string; cancelled?: boolean }> {
     const name = input.name.trim()
     if (!name) return { ok: false, error: 'Server name is required.' }
     if (BUILTIN_SERVER_KEYS.has(name)) {
@@ -784,12 +918,14 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     }
 
     const own = this.ownServers()
-    if (own[name] && !input.overwrite) {
-      return {
-        ok: false,
-        exists: true,
-        error: `A server named "${name}" already exists.`,
-      }
+    if (own[name]) {
+      const replace = 'Replace'
+      const pick = await vscode.window.showWarningMessage(
+        `An MCP server named "${notificationText(name, 60)}" exists already. Replace it?`,
+        { modal: true },
+        replace
+      )
+      if (pick !== replace) return { ok: false, cancelled: true }
     }
     const replacing = Boolean(own[name])
     if (replacing) this.stop(name)
@@ -797,26 +933,42 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     this.logger.info(
       `vscode-mcp: ${replacing ? 'replaced' : 'added'} server "${name}"`
     )
-    if (!this.isAiUsable()) return { ok: true }
-    return this.start(name, { interactive: true })
+    this.changed.fire()
+    if (this.isAiUsable()) void this.start(name, { interactive: true })
+    return { ok: true }
   }
 
-  /** Remove a server from OUR list (mcp.json is never touched) and
-   *  forget any OAuth tokens we hold for it. */
-  private removeServer(id: string): { ok: boolean; error?: string } {
+  /** Remove a server from OUR list (mcp.json is never touched), after
+   *  asking, and forget its toggles and any OAuth tokens we hold. */
+  private async removeServer(id: string): Promise<void> {
     const own = this.ownServers()
     const entry = own[id]
-    if (!entry) return { ok: false, error: `Unknown server: ${id}` }
-    this.stop(id)
+    if (!entry) return
+    const remove = 'Remove'
+    const pick = await vscode.window.showWarningMessage(
+      `Remove the MCP server "${notificationText(id, 60)}"?`,
+      {
+        modal: true,
+        detail: 'Legalese AI forgets it and its sign-in.',
+      },
+      remove
+    )
+    if (pick !== remove) return
+    this.stopStdio(id)
     this.connections.delete(id)
+    this.connecting.delete(id)
     const next = { ...own }
     delete next[id]
-    void this.saveOwnServers(next)
+    await this.saveOwnServers(next)
+    await removeFromSetting(DISABLED_SERVERS_SETTING, (s) => s === id)
+    await removeFromSetting(DISABLED_TOOLS_SETTING, (s) =>
+      s.startsWith(`${id}::`)
+    )
     if (isHttpEntry(entry) && this.oauth) {
-      void this.oauth.clearAuth(entry.url as string)
+      await this.oauth.clearAuth(entry.url as string)
     }
     this.logger.info(`vscode-mcp: removed server "${id}"`)
-    return { ok: true }
+    this.changed.fire()
   }
 
   // ── VS Code mcp.json (import catalog only) ────────────────────────
@@ -840,9 +992,10 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
   }
 }
 
-/** Thrown internally when a background connect hits an OAuth wall. */
+/** Thrown internally when a background connect hits an OAuth wall.
+ *  `signedInBefore`: there was a stored sign-in, now refused. */
 class SignInRequired extends Error {
-  constructor() {
+  constructor(readonly signedInBefore = false) {
     super('Sign-in required')
   }
 }
@@ -1007,6 +1160,19 @@ function getDisabledServers(): Set<string> {
 
 function getDisabledTools(): Set<string> {
   return readStringSetSetting(DISABLED_TOOLS_SETTING)
+}
+
+/** Drop the entries `drop` matches from a string-list setting. */
+async function removeFromSetting(
+  setting: string,
+  drop: (s: string) => boolean
+): Promise<void> {
+  const current = [...readStringSetSetting(setting)]
+  const next = current.filter((s) => !drop(s))
+  if (next.length === current.length) return
+  await vscode.workspace
+    .getConfiguration()
+    .update(setting, next.sort(), vscode.ConfigurationTarget.Global)
 }
 
 function readStringSetSetting(setting: string): Set<string> {

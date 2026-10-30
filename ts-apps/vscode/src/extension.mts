@@ -62,7 +62,7 @@ import { registerChatParticipant } from './chat-participant.js'
 import { registerAiChatHandlers } from './ai/register.js'
 import { commandRenameIdentifier } from './ai/rename-command.js'
 import { VsCodeMcpTools } from './ai/vscode-mcp.js'
-import { McpOAuthManager } from './ai/mcp-oauth.js'
+import { McpOAuthManager, type McpOAuthCallbackResult } from './ai/mcp-oauth.js'
 import { VsCodeWorkspace } from './ai/vscode-workspace.js'
 import { VsCodeL4Language } from './ai/vscode-l4-language.js'
 import { VsCodeEditorContext } from './ai/editor-context.js'
@@ -541,16 +541,24 @@ export async function activate(context: ExtensionContext) {
     )
   )
 
-  // Register the extension's single URI handler. `/mcp-oauth` routes
-  // to the MCP OAuth client (created further down — late-bound ref);
-  // everything else is the legalese.cloud login callback.
-  const mcpOAuthRef: { handleCallback: (uri: vscode.Uri) => boolean } = {
-    handleCallback: () => false,
-  }
+  // Register the extension's single URI handler. `/mcp-oauth` goes to
+  // the MCP OAuth client (created further down — late-bound ref), and
+  // only there: it carries a `code` the legalese.cloud login would take
+  // for its own. Everything else is the legalese.cloud login callback.
+  const mcpOAuthRef: {
+    handleCallback: (uri: vscode.Uri) => Promise<McpOAuthCallbackResult>
+  } = { handleCallback: async () => 'unknown' }
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri: (uri: vscode.Uri) => {
-        if (uri.path === '/mcp-oauth' && mcpOAuthRef.handleCallback(uri)) {
+        if (uri.path === '/mcp-oauth') {
+          void mcpOAuthRef.handleCallback(uri).then((result) => {
+            if (result === 'unknown') {
+              void vscode.window.showWarningMessage(
+                'This MCP sign-in link has expired or was used already. Sign in again from the Legalese AI settings.'
+              )
+            }
+          })
           return
         }
         void auth.handleAuthCallback(uri)

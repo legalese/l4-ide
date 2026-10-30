@@ -49,8 +49,7 @@ import {
   type AiCloudSessionSummary,
   type AiCloudStartPhase,
   type AiChatAttachment,
-  type AiMcpCandidateInfo,
-  type AiMcpServerInfo,
+  type AiMcpServersState,
   type AiConversation,
   type AiConversationSummary,
   type AiChatMessage,
@@ -1935,65 +1934,71 @@ export function createAiChatStore(
     m?.sendNotification(AiPermissionsSet, HOST_EXTENSION, { category, value })
   }
 
-  async function getMcpServers(): Promise<{
-    servers: AiMcpServerInfo[]
-    candidates: AiMcpCandidateInfo[]
-    allEnabled: boolean
-  }> {
+  /** The MCP servers section's state, pushed by the extension on every
+   *  change ({@link onMcpServersChanged}); null until first loaded. */
+  let mcp = $state<AiMcpServersState | null>(null)
+
+  async function refreshMcpServers(): Promise<void> {
     const m = getMessenger()
-    if (!m) return { servers: [], candidates: [], allEnabled: true }
+    if (!m) return
     try {
-      return await m.sendRequest(
+      mcp = await m.sendRequest(
         AiMcpServersGet,
         HOST_EXTENSION,
         undefined as never
       )
     } catch {
-      return { servers: [], candidates: [], allEnabled: true }
+      // keep the last state
     }
   }
 
-  async function importMcpServer(
-    id: string
-  ): Promise<{ ok: boolean; error?: string }> {
+  function onMcpServersChanged(state: AiMcpServersState): void {
+    mcp = state
+  }
+
+  /** "Import from VS Code…": a pick list in VS Code. */
+  async function importMcpServers(): Promise<void> {
     const m = getMessenger()
-    if (!m) return { ok: false, error: 'Not connected to the extension.' }
+    if (!m) return
     try {
-      return await m.sendRequest(AiMcpServerImport, HOST_EXTENSION, { id })
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-      }
+      await m.sendRequest(AiMcpServerImport, HOST_EXTENSION, undefined as never)
+    } catch {
+      // the extension reports failures as notifications
     }
   }
 
   function setMcpAllEnabled(enabled: boolean): void {
-    const m = getMessenger()
-    m?.sendNotification(AiMcpAllSetEnabled, HOST_EXTENSION, { enabled })
+    if (mcp) mcp.allEnabled = enabled
+    getMessenger()?.sendNotification(AiMcpAllSetEnabled, HOST_EXTENSION, {
+      enabled,
+    })
   }
 
   function setMcpServerEnabled(id: string, enabled: boolean): void {
-    const m = getMessenger()
-    m?.sendNotification(AiMcpServerSetEnabled, HOST_EXTENSION, { id, enabled })
+    // Shown at once; the extension's push brings the connect's outcome.
+    const server = mcp?.servers.find((s) => s.id === id)
+    if (server) {
+      server.enabled = enabled
+      server.status = enabled ? 'connecting' : 'stopped'
+    }
+    getMessenger()?.sendNotification(AiMcpServerSetEnabled, HOST_EXTENSION, {
+      id,
+      enabled,
+    })
   }
 
+  /** `connect`: Sign in / retry / Reconnect; `remove` asks first. The
+   *  outcome arrives as a pushed state, failures as notifications. */
   async function mcpServerAction(
     id: string,
-    action: 'start' | 'stop' | 'refresh' | 'remove'
-  ): Promise<{ ok: boolean; error?: string }> {
+    action: 'connect' | 'remove'
+  ): Promise<void> {
     const m = getMessenger()
-    if (!m) return { ok: false, error: 'Not connected to the extension.' }
+    if (!m) return
     try {
-      return await m.sendRequest(AiMcpServerAction, HOST_EXTENSION, {
-        id,
-        action,
-      })
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-      }
+      await m.sendRequest(AiMcpServerAction, HOST_EXTENSION, { id, action })
+    } catch {
+      // the extension reports failures as notifications
     }
   }
 
@@ -2002,31 +2007,32 @@ export function createAiChatStore(
     toolName: string,
     enabled: boolean
   ): void {
-    const m = getMessenger()
-    m?.sendNotification(AiMcpToolSetEnabled, HOST_EXTENSION, {
+    const tool = mcp?.servers
+      .find((s) => s.id === serverId)
+      ?.tools.find((t) => t.name === toolName)
+    if (tool) tool.enabled = enabled
+    getMessenger()?.sendNotification(AiMcpToolSetEnabled, HOST_EXTENSION, {
       serverId,
       toolName,
       enabled,
     })
   }
 
+  /** Add a server; true once it is added (it then connects in the
+   *  background). A name in use asks in a VS Code dialog. */
   async function addMcpServer(input: {
     name: string
     transport: 'http' | 'sse' | 'stdio'
     url?: string
     command?: string
     bearerToken?: string
-    overwrite?: boolean
-  }): Promise<{ ok: boolean; error?: string; exists?: boolean }> {
+  }): Promise<boolean> {
     const m = getMessenger()
-    if (!m) return { ok: false, error: 'Not connected to the extension.' }
+    if (!m) return false
     try {
-      return await m.sendRequest(AiMcpServerAdd, HOST_EXTENSION, input)
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-      }
+      return (await m.sendRequest(AiMcpServerAdd, HOST_EXTENSION, input)).ok
+    } catch {
+      return false
     }
   }
 
@@ -2815,8 +2821,12 @@ export function createAiChatStore(
     answerQuestion,
     getPermissions,
     setPermission,
-    getMcpServers,
-    importMcpServer,
+    get mcp() {
+      return mcp
+    },
+    refreshMcpServers,
+    onMcpServersChanged,
+    importMcpServers,
     setMcpServerEnabled,
     setMcpAllEnabled,
     mcpServerAction,
@@ -2945,18 +2955,13 @@ export type AiChatStore = {
     category: AiPermissionCategory,
     value: AiPermissionValue
   ) => void
-  getMcpServers: () => Promise<{
-    servers: AiMcpServerInfo[]
-    candidates: AiMcpCandidateInfo[]
-    allEnabled: boolean
-  }>
-  importMcpServer: (id: string) => Promise<{ ok: boolean; error?: string }>
+  readonly mcp: AiMcpServersState | null
+  refreshMcpServers: () => Promise<void>
+  onMcpServersChanged: (state: AiMcpServersState) => void
+  importMcpServers: () => Promise<void>
   setMcpServerEnabled: (id: string, enabled: boolean) => void
   setMcpAllEnabled: (enabled: boolean) => void
-  mcpServerAction: (
-    id: string,
-    action: 'start' | 'stop' | 'refresh' | 'remove'
-  ) => Promise<{ ok: boolean; error?: string }>
+  mcpServerAction: (id: string, action: 'connect' | 'remove') => Promise<void>
   setMcpToolEnabled: (
     serverId: string,
     toolName: string,
@@ -2968,8 +2973,7 @@ export type AiChatStore = {
     url?: string
     command?: string
     bearerToken?: string
-    overwrite?: boolean
-  }) => Promise<{ ok: boolean; error?: string; exists?: boolean }>
+  }) => Promise<boolean>
   refreshHistory: () => Promise<void>
   loadConversation: (id: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>

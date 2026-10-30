@@ -805,11 +805,50 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
     await s.clock.advance(5000)
     assert.equal(s.sends(), 1)
     assert.deepEqual(s.signIns, [['Docs Server']])
-    await assert.rejects(
-      s.manager.signInMcp(SID, 'Docs Server'),
-      /consent denied/
-    )
+    // The failed sign-in was reported by the MCP layer; the chip stays.
+    await s.manager.signInMcp(SID, 'Docs Server')
     assert.deepEqual(s.manager.mcpSignInNeeded(SID), ['Docs Server'])
+  })
+
+  // Nothing stored here for the server (this window never signed in to
+  // it): nothing is sent, and once the session reports it, it needs a
+  // sign-in — whether or not this window's own connection ran.
+  test('a reported server with nothing stored here needs a sign-in', async () => {
+    const mcp: McpServerSource = {
+      enabledServers: () => [...docs],
+      headersFor: async () => ({}),
+    }
+    const s = await docsSession(mcp)
+    assert.equal(s.sends(), 0)
+    assert.deepEqual(s.signIns, [])
+    s.api.pending = [
+      ev({ type: 'auth-required', reason: 'mcp', server: 'Docs_Server' }),
+    ]
+    await s.clock.advance(5000)
+    assert.equal(s.sends(), 0)
+    assert.deepEqual(s.signIns, [['Docs Server']])
+  })
+
+  test('a turned-down token is refreshed before asking for a sign-in', async () => {
+    const refreshed: boolean[] = []
+    const mcp: McpServerSource = {
+      enabledServers: () => [...docs],
+      headersFor: async (_id, opts) => {
+        refreshed.push(opts?.refresh ?? false)
+        return {
+          Authorization: opts?.refresh ? 'Bearer fresh' : 'Bearer stale',
+        }
+      },
+    }
+    const s = await docsSession(mcp)
+    assert.equal(s.sends(), 1)
+    s.api.pending = [
+      ev({ type: 'auth-required', reason: 'mcp', server: 'Docs_Server' }),
+    ]
+    await s.clock.advance(5000)
+    assert.deepEqual(refreshed, [false, true])
+    assert.equal(s.sends(), 2)
+    assert.deepEqual(s.signIns, [])
   })
 
   // The credentials are for the local server's URL: a `session.json`

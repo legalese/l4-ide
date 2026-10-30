@@ -38,7 +38,9 @@ import {
   AiMcpServerAdd,
   AiMcpServerImport,
   AiMcpServerSetEnabled,
+  AiMcpServersChanged,
   AiMcpServersGet,
+  type AiMcpServersState,
   AiMcpToolSetEnabled,
   AiMentionSearch,
   AiPermissionsGet,
@@ -658,7 +660,9 @@ export function registerAiChatHandlers(deps: {
   })
 
   // ── MCP servers (sidebar settings section) ──────────────────────
-  messenger.onRequest(AiMcpServersGet, async () => {
+  // States only: why something failed is a VS Code notification
+  // (vscode-mcp.ts), never text in the sidebar.
+  const mcpState = (): AiMcpServersState => {
     try {
       return {
         servers: vsMcp.listServers(),
@@ -671,14 +675,26 @@ export function registerAiChatHandlers(deps: {
       )
       return { servers: [], candidates: [], allEnabled: true }
     }
+  }
+  messenger.onRequest(AiMcpServersGet, async () => mcpState())
+  // Push every change; a burst (connect start + end) sends once.
+  let mcpPush: ReturnType<typeof setTimeout> | undefined
+  const mcpChangeSub = vsMcp.onDidChange(() => {
+    if (mcpPush) return
+    mcpPush = setTimeout(() => {
+      mcpPush = undefined
+      messenger.sendNotification(AiMcpServersChanged, frontend, mcpState())
+    }, 50)
   })
-  messenger.onRequest(AiMcpServerImport, async ({ id }) => {
+  messenger.onRequest(AiMcpServerImport, async () => {
     try {
-      return await vsMcp.importCandidate(id)
+      await vsMcp.importFromVsCode()
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      logger.warn(`mcp-servers/import ${id} failed: ${msg}`)
-      return { ok: false, error: msg }
+      logger.warn(`mcp-servers/import failed: ${msg}`)
+      void vscode.window.showErrorMessage(
+        `Importing MCP servers failed: ${msg}`
+      )
     }
   })
   messenger.onNotification(AiMcpAllSetEnabled, ({ enabled }) => {
@@ -701,11 +717,11 @@ export function registerAiChatHandlers(deps: {
   })
   messenger.onRequest(AiMcpServerAction, async ({ id, action }) => {
     try {
-      return await vsMcp.runAction(id, action)
+      await vsMcp.runAction(id, action)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn(`mcp-servers/action ${action} ${id} failed: ${msg}`)
-      return { ok: false, error: msg }
+      void vscode.window.showErrorMessage(`MCP server action failed: ${msg}`)
     }
   })
   messenger.onNotification(
@@ -725,12 +741,17 @@ export function registerAiChatHandlers(deps: {
       const res = await vsMcp.addServer(input)
       if (res.ok) {
         logger.info(`mcp-servers/add: added "${input.name}"`)
+      } else if (res.error) {
+        void vscode.window.showErrorMessage(res.error)
       }
-      return res
+      return { ok: res.ok, ...(res.cancelled ? { cancelled: true } : {}) }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn(`mcp-servers/add failed: ${msg}`)
-      return { ok: false, error: msg }
+      void vscode.window.showErrorMessage(
+        `Adding the MCP server failed: ${msg}`
+      )
+      return { ok: false }
     }
   })
 
@@ -1113,6 +1134,8 @@ export function registerAiChatHandlers(deps: {
       if (usageTimer) clearInterval(usageTimer)
       dictation.cancel()
       dictationVisibilitySub.dispose()
+      mcpChangeSub.dispose()
+      if (mcpPush) clearTimeout(mcpPush)
       authSub.dispose()
       aiKeyConfigSub.dispose()
       activeFileSub.dispose()
