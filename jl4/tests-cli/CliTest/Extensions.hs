@@ -89,8 +89,12 @@ explored = "examples" </> "explore" </> "brief" </> "d1-naive.l4"
 exploreInto :: FilePath -> [String] -> [String]
 exploreInto dir extra = ["explore", explored, "--until", "75600", "--emit", dir] <> extra
 
--- | The exit status and stderr of an explore run, in a fresh directory that
--- the action is also given.
+-- | Output without the carriage returns that Windows text mode adds.
+noCR :: String -> String
+noCR = filter (/= '\r')
+
+-- | Run the action with an output directory inside a fresh temporary one. The
+-- directory itself does not exist yet: @--emit@ makes it.
 withOut :: (FilePath -> IO a) -> IO a
 withOut act = withSystemTempDirectory "l4-ext-test" \ tmp -> act (tmp </> "out")
 
@@ -107,7 +111,7 @@ spec = describe "extension hook (L4.Cli.Extensions)" do
       mapM_ (\ needle -> x.outStdout `shouldSatisfy` (needle `isInfixOf`)) ["--target NAME", "--target-opt NAME.KEY=VALUE", "alpha, beta"]
       v <- probe "all" ["--version"]
       v.outExit `shouldBe` ExitSuccess
-      v.outStdout `shouldSatisfy` (" (probe edition)\n" `isSuffixOf`)
+      noCR v.outStdout `shouldSatisfy` (" (probe edition)\n" `isSuffixOf`)
     it "adds nothing to an executable without extensions" do
       x <- probe "none" ["explore", "--help"]
       x.outStdout `shouldSatisfy` (not . ("--target" `isInfixOf`))
@@ -117,7 +121,7 @@ spec = describe "extension hook (L4.Cli.Extensions)" do
   describe "running" do
     it "runs an extension command" do
       o <- probe "all" ["probe-cmd"]
-      (o.outExit, o.outStdout) `shouldBe` (ExitSuccess, "probe command ran\n")
+      (o.outExit, noCR o.outStdout) `shouldBe` (ExitSuccess, "probe command ran\n")
     it "runs an extension export format, which reads its file with the shared loader" do
       o <- probe "all" ["export", "probe-fmt", explored]
       o.outExit `shouldBe` ExitSuccess
@@ -127,7 +131,7 @@ spec = describe "extension hook (L4.Cli.Extensions)" do
         let bad = tmp </> "bad.l4"
         writeFile bad "this is not L4\n"
         o <- probe "all" ["export", "probe-fmt", bad]
-        o.outStdout `shouldBe` "not loaded\n"
+        noCR o.outStdout `shouldBe` "not loaded\n"
     it "writes every target's file beside the built-in ones" do
       withOut \ dir -> do
         o <- probe "all" (exploreInto dir [])
