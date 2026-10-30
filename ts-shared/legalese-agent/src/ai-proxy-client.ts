@@ -238,7 +238,7 @@ export class AiProxyClient {
         // ignore
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
-      const code = extractErrorCode(body) ?? httpStatusToCode(res.status)
+      const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
       throw new AiProxyError(message, code, res.status)
     }
     yield* parseSse(res.body, this.opts.logger, cursor)
@@ -300,7 +300,7 @@ export class AiProxyClient {
         // ignore
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
-      const code = extractErrorCode(body) ?? httpStatusToCode(res.status)
+      const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
       throw new AiProxyError(message, code, res.status)
     }
     yield* parseSse(res.body, this.opts.logger, cursor)
@@ -428,7 +428,7 @@ export class AiProxyClient {
         // ignore
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
-      const code = extractErrorCode(body) ?? httpStatusToCode(res.status)
+      const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
       throw new AiProxyError(message, code, res.status)
     }
     const json = (await res.json()) as { text?: unknown }
@@ -476,6 +476,52 @@ export class AiProxyClient {
     } catch (err) {
       this.opts.logger.warn(
         `Title generation failed: ${err instanceof Error ? err.message : String(err)}`
+      )
+      return null
+    }
+  }
+
+  /**
+   * One stateless call to the summize pipeline (model
+   * `legalese-summize-4`, no conversationId, so no conversation file is
+   * created server-side) — the generic form of {@link summarizeTitle}.
+   * Returns the trimmed text, or `null` on any failure: no credential,
+   * an HTTP error, an empty answer, or `signal` aborting (callers pass
+   * `AbortSignal.timeout(…)` for a hard time limit). Never throws.
+   */
+  async summize(
+    messages: Array<{ role: 'system' | 'user'; content: string }>,
+    opts: { signal?: AbortSignal } = {}
+  ): Promise<string | null> {
+    try {
+      const url = `${this.getEndpoint().url}/v1/chat/completions`
+      const headers = await this.getAuthHeaders()
+      if (!headers.Authorization) return null
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify({ model: 'legalese-summize-4', messages }),
+        signal: opts.signal,
+      })
+      if (!res.ok || !res.body) {
+        await res.body?.cancel().catch(() => undefined)
+        return null
+      }
+      let text = ''
+      for await (const ev of parseSse(res.body)) {
+        if (ev.kind === 'text-delta') text += ev.text
+        if (ev.kind === 'error') return null
+        if (ev.kind === 'done') break
+      }
+      text = text.trim()
+      return text.length > 0 ? text : null
+    } catch (err) {
+      this.opts.logger.warn(
+        `summize failed: ${err instanceof Error ? err.name : 'error'}`
       )
       return null
     }
@@ -576,9 +622,24 @@ function sameOrigin(a: string, b: string): boolean {
   }
 }
 
-function httpStatusToCode(status: number): string {
+/**
+ * Does an ai-proxy error body say the credential itself was refused?
+ * ai-proxy answers a key or session it no longer accepts (expired,
+ * revoked, replaced by a renewal) with `403` and the message
+ * `Authentication failed: invalid-credentials`, not `401`, which it
+ * keeps for a request with no credential at all. That 403 means "sign
+ * in again / renew the key"; every other 403 (origin, scope) is a real
+ * refusal.
+ */
+export function isInvalidCredentialsBody(body: string): boolean {
+  return body.includes('invalid-credentials')
+}
+
+function httpStatusToCode(status: number, body = ''): string {
   if (status === 401) return 'unauthenticated'
-  if (status === 403) return 'forbidden'
+  if (status === 403) {
+    return isInvalidCredentialsBody(body) ? 'unauthenticated' : 'forbidden'
+  }
   if (status === 404) return 'not_found'
   if (status === 429) return 'rate_limited'
   if (status >= 500) return 'upstream_error'

@@ -5,7 +5,6 @@ import {
   ProtocolError,
   agentKeyName,
   chatEventToPayload,
-  ABANDONED_TMP_DAYS,
   addFilesRequest,
   addFilesResponse,
   SESSIONS_API_DETAIL_CODES,
@@ -37,7 +36,10 @@ import {
   parseEventChunk,
   parseEventsQuery,
   parseHeadFile,
-  parseLeaseFile,
+  parseRunLeaseFile,
+  parseRunRecordFile,
+  RUN_RE,
+  isRunNumber,
   parseSessionFile,
   seal,
   sessionPaths,
@@ -108,13 +110,36 @@ describe('session files', () => {
     )
   })
 
-  test('lease, head and commands.seq', () => {
+  test('run records, run leases, head and commands.seq', () => {
     assert.deepEqual(
-      parseLeaseFile(
-        '{"taskId":"abc123","state":"busy","turnId":"t1","expiresAt":5}'
+      parseRunLeaseFile(
+        '{"run":3,"taskId":"abc123","state":"busy","turnId":"t1","expiresAt":5}',
+        3
       ),
-      { taskId: 'abc123', state: 'busy', turnId: 't1', expiresAt: 5 }
+      { run: 3, taskId: 'abc123', state: 'busy', turnId: 't1', expiresAt: 5 }
     )
+    assert.equal(
+      parseRunLeaseFile(
+        '{"run":3,"taskId":"sessions-api","state":"starting","expiresAt":5}',
+        3
+      ).state,
+      'starting'
+    )
+    // Another run's lease, or a run number out of range, is invalid.
+    assert.throws(() =>
+      parseRunLeaseFile(
+        '{"run":2,"taskId":"a","state":"running","expiresAt":5}',
+        3
+      )
+    )
+    assert.deepEqual(parseRunRecordFile('{"run":1,"createdAt":7}', 1), {
+      run: 1,
+      createdAt: 7,
+    })
+    assert.throws(() => parseRunRecordFile('{"run":0,"createdAt":7}', 0))
+    assert.throws(() => parseRunRecordFile('{"run":2,"createdAt":7}', 1))
+    assert.ok(RUN_RE.test('12') && !RUN_RE.test('012') && !RUN_RE.test('0'))
+    assert.equal(isRunNumber(1_000_000_000), false)
     assert.deepEqual(parseHeadFile('{"segment":2,"length":10}'), {
       segment: 2,
       length: 10,
@@ -136,6 +161,9 @@ describe('session files', () => {
     assert.throws(() => p.attachment('../secret'))
     assert.throws(() => p.incomingBundle('x.bundle'))
     assert.throws(() => p.command(-1))
+    assert.equal(p.runRecord(2), `sessions/${SID}/state/runs/2.json`)
+    assert.equal(p.runLease(2), `sessions/${SID}/state/runs/2.lease.json`)
+    assert.throws(() => p.runRecord(0))
   })
 
   test('repo layout: data/, tmp/, deleted copies, writable paths', () => {
@@ -163,7 +191,6 @@ describe('session files', () => {
     assert.equal(isModelWritableRepoPath('.git/config'), false)
     assert.equal(isModelWritableRepoPath('data/../x'), false)
     assert.equal(isModelWritableRepoPath('/data/x'), false)
-    assert.equal(ABANDONED_TMP_DAYS, 30)
   })
 
   test('cursors', () => {
@@ -232,6 +259,36 @@ describe('events', () => {
       /unknown type/
     )
     assert.throws(() => parseCloudEvent({ seq: 0, ts: 1, type: 'stop' }))
+  })
+
+  test('git-committed carries an optional one-line summary', () => {
+    const base = {
+      seq: 1,
+      ts: 1,
+      type: 'git-committed',
+      turnId: 't1',
+      sha: 'a'.repeat(40),
+      parent: 'b'.repeat(40),
+    }
+    // Optional: older harnesses don't send it.
+    assert.equal(
+      (parseCloudEvent(base) as { summary?: string }).summary,
+      undefined
+    )
+    const withSummary = parseCloudEvent({
+      ...base,
+      summary: 'Add a late fee rule to the tenancy contract',
+    })
+    assert.deepEqual(withSummary, {
+      ...base,
+      summary: 'Add a late fee rule to the tenancy contract',
+    })
+    assert.throws(() => parseCloudEvent({ ...base, summary: '' }), /summary/)
+    assert.throws(
+      () => parseCloudEvent({ ...base, summary: 'x'.repeat(201) }),
+      /summary/
+    )
+    assert.throws(() => parseCloudEvent({ ...base, summary: 7 }), /summary/)
   })
 
   test('JSONL chunks: complete lines only, invalid lines skipped', () => {
@@ -559,6 +616,22 @@ describe('Sessions API and agent keys', () => {
     assert.equal(parseAgentKeyName('cloud-session:x:1'), null)
     assert.equal(parseAgentKeyError({ error: 'chain_forked' }), 'chain_forked')
     assert.equal(parseAgentKeyError({ error: 'toString' }), null)
+    // Other refusals end the chain by status, not by name.
+    assert.equal(parseAgentKeyError({ error: 'not_a_member' }), null)
+  })
+
+  test('inactive is no longer a chain failure', () => {
+    assert.equal(parseAgentKeyError({ error: 'inactive' }), null)
+    assert.throws(
+      () =>
+        parseCloudEvent({
+          seq: 1,
+          ts: 1,
+          type: 'auth-required',
+          reason: 'inactive',
+        }),
+      /reason/
+    )
   })
 })
 
