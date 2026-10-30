@@ -18,12 +18,13 @@
 #
 # Writes under <outdir>:
 #   dmn/<path of the .l4, .l4 replaced by .dmn>   one per exported file
+#   dmn/<same path, .fidelity.txt for .dmn>       what the exporter itself says it lost,
+#                                                 to read a dmn-check finding against
 #   exported.txt                                  those paths, sorted, one per line
 #   export-status.tsv                             src, status, exit, seconds, reason
 # and prints a summary. Status is one of
 #   exported   exit 0, a non-empty file with <definitions>
-#   refused    non-zero exit; the reason is the first line of stderr that is not
-#              the exporter's own one-line tally
+#   refused    non-zero exit; the reason is the last non-blank line of stderr
 #   timeout    killed after DMN_CHECK_EXPORT_TIMEOUT seconds (default 180)
 #   empty      exit 0 but no <definitions> (the exporter wrote nothing usable)
 set -euo pipefail
@@ -37,7 +38,7 @@ if [ "${1:-}" = "--one" ]; then
   start=$SECONDS
   set +e
   perl -e 'alarm shift; exec @ARGV or exit 127' "$tmo" \
-    "$l4bin" export dmn "$src" -o "$dest" > /dev/null 2> "$dest.err"
+    "$l4bin" export dmn "$src" -o "$dest" --fidelity-report > /dev/null 2> "$dest.err"
   rc=$?
   set -e
   secs=$((SECONDS - start))
@@ -51,9 +52,11 @@ if [ "${1:-}" = "--one" ]; then
     fi
   else
     status=refused
-    # The exporter's own tally line starts with a count; the refusal is the first
-    # other non-blank line. Tabs and digits are flattened so reasons group.
-    reason="$(grep -v '^[[:space:]]*$' "$dest.err" | head -3 | tr '\t\n' '  ' | cut -c1-300)"
+    # The refusal is the LAST non-blank line of stderr. The first lines can be the
+    # engine's own diagnostics dump (measured: 13 of 85 refusals on 2026-10-30
+    # begin with a multi-line `Info | updateFileDiagnostics` block), and the
+    # exporter says why it stopped last.
+    reason="$(grep -v '^[[:space:]]*$' "$dest.err" | tail -1 | tr '\t' ' ' | cut -c1-200)"
   fi
   if [ "$status" != exported ]; then rm -f "$dest"; fi
   printf '%s\t%s\t%s\t%s\t%s\n' "$src" "$status" "$rc" "$secs" "$reason"
@@ -101,6 +104,6 @@ LC_ALL=C sort -o "$outdir/exported.txt" "$outdir/exported.txt"
 echo
 echo "EXPORT SUMMARY (l4 export dmn over $n file(s))"
 awk -F'\t' 'NR > 1 { c[$2]++ } END { for (k in c) printf "  %-9s %6d\n", k, c[k] }' "$status" | LC_ALL=C sort
-echo "  refusals by reason (first line of stderr, numbers and quoted names flattened):"
+echo "  refusals by reason (last line of stderr, numbers and quoted names flattened):"
 awk -F'\t' 'NR > 1 && $2 != "exported" { r = $5; gsub(/[0-9]+/, "N", r); gsub(/\x27[^\x27]*\x27/, "\x27..\x27", r); gsub(/`[^`]*`/, "`..`", r); c[$2 ": " substr(r, 1, 110)]++ }
             END { for (k in c) printf "  %6d  %s\n", c[k], k }' "$status" | LC_ALL=C sort -rn | head -25

@@ -196,5 +196,7 @@ run_driver --tsv "$work/findings.tsv" ${passthru[@]+"${passthru[@]}"} "${files[@
 rc=$?
 set -e
 sed -n '/^BY VALIDATOR/,$p' "$work/report.txt"
+echo
+"$here/summarise.sh" "$work" || true
 echo "# full report: $work/report.txt   findings: $work/findings.tsv   exports: $work/export-status.tsv"
 exit "$rc"

@@ -7,9 +7,10 @@
 # It is not wired into CI or into etc/verify-branch.sh, for the same reason
 # run.sh is not: dmn-check is optional evidence here (README, "Policy").
 #
-# Seven checks. The first three need Java 21+ and Maven and are skipped, loudly
-# and with exit 0, on a machine that has neither; the other four need only bash.
+# Eight checks (0 to 7). Checks 1 to 3 need Java 21+ and Maven and are skipped, loudly
+# and with exit 0, on a machine that has neither; the others need only bash.
 #
+#   0  Every script parses (`bash -n`), including the branches no other check reaches.
 #   1  POSITIVE CONTROL. fixtures/clean.dmn is reported as checked, with no
 #      findings. A harness that cannot say "nothing found" cannot be believed
 #      when it says "found".
@@ -25,7 +26,7 @@
 #   6  DMN_CHECK_REQUIRED=1 turns that skip into exit 1, still with one line.
 #   7  SKIP, corpus mode without an `l4`. Same.
 #
-# Checks 3-6 look at the WHOLE of the output, not at a grep for the word: "one
+# Checks 4-7 look at the WHOLE of the output, not at a grep for the word: "one
 # line" is the contract, and a skip that also prints a Maven stack trace is not it.
 set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,6 +44,17 @@ one_skipped_line() {
   [ "$(printf '%s\n' "$got" | wc -l | tr -d ' ')" = 1 ] \
     && printf '%s\n' "$got" | grep -q '^skipped: '
 }
+
+# ---- 0: the scripts parse -----------------------------------------------------
+# bash reads a script as it runs it, so a syntax error in the corpus branch of
+# run.sh stays hidden until someone reaches it (an apostrophe inside a quoted
+# ${var:-...} did exactly that). `bash -n` reads all of it, under the stock macOS
+# bash 3.2 when that is what /bin/bash is.
+syntax_ok=1
+for f in run.sh export-corpus.sh summarise.sh selftest.sh; do
+  /bin/bash -n "$here/$f" 2>/dev/null || { fail "0 syntax: $f does not parse under /bin/bash"; syntax_ok=0; }
+done
+[ "$syntax_ok" = 1 ] && ok "0 syntax: run.sh, export-corpus.sh, summarise.sh, selftest.sh parse under /bin/bash"
 
 # ---- 1 and 2 -----------------------------------------------------------------
 go "$run" "$here/fixtures/clean.dmn"

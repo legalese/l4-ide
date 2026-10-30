@@ -390,3 +390,9 @@ The worked example is `jl4/examples/dmn/refuse.l4` — one of each position a re
 - **Evidence:** the DMN goldens are executed in CI against **two independent engines**, KIE and
   Camunda, and the BPMN output is checked for soundness — so the exports are validated against
   real implementations rather than against our reading of the standard.
+
+A further, optional check is [dmn-check](https://github.com/red6/dmn-check) 1.4.0 (Apache-2.0), a linter that reads a DMN file's structure, such as duplicate or shadowed rules, missing types and the shape of the decision graph, and never runs it.
+Run `etc/dmn-check/run.sh FILE.dmn` on one export, or `etc/dmn-check/run.sh --corpus` to export every L4 file under `jl4/examples` and check the ones that export.
+It needs Maven and a JDK 21, prints one `skipped:` line and exits 0 when either is missing, and is not run in CI.
+Read what it says as evidence and not as a score: it speaks Camunda 7's vocabulary, so on the 2026-10-30 run about 85% of its 5,675 findings on 487 exported files were dmn-check disagreeing with DMN 1.3 (it cannot parse the type `number`, a function call or a `decisionService` input) and not a problem in the rules.
+`etc/dmn-check/README.md` sorts every kind of finding into real, exporter and dmn-check, with the evidence for each.
