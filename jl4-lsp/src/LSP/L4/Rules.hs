@@ -1166,7 +1166,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
       Nothing -> pure ([], Just [])
       Just tcRes -> do
         let declares = foldMap (Shape.moduleDeclares . (.module')) (tcRes : transitiveDependencies tcRes)
-            errs = Export.checkExports (Shape.shapeEnvFromDeclares declares tcRes.entityInfo) tcRes.module'
+            errs = Export.checkExports (Shape.shapeEnvFromDeclares declares tcRes.entityInfo) (map (.module') (transitiveDependencies tcRes)) tcRes.module'
         pure (map (mkSimpleFileDiagnostic f . exportErrorToDiagnostic) errs, Just errs)
 
   -- Callers build this key with a call stack ('EvaluateLazy' below, @l4 lts@,
