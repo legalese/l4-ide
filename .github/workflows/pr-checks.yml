@@ -196,8 +196,17 @@ jobs:
             # the emitter also shows up under 'haskell', but the goldens are
             # .catala_en and the sources are .l4 — neither matches any other
             # filter, so a hand-edited golden reaches no job at all without this.
+            #
+            # THIS FILTER, not 'haskell', decides whether the catala-validate
+            # job installs the toolchain and requires it (see that job). That is
+            # why the CLI module and its test are listed here: they are .hs, so
+            # before the toolchain was installed they reached the job through
+            # 'haskell' alone, and a PR touching only them would now get the
+            # SKIP path with a green tick.
             catala:
               - 'jl4-core/src/L4/Catala/**'
+              - 'jl4/app/L4/Cli/Catala.hs'
+              - 'jl4/tests-cli/CliTest/Catala.hs'
               - 'jl4/examples/catala/**'
               - 'etc/validate-catala.mjs'
               # See the note on the haskell filter.
@@ -211,40 +220,168 @@ jobs:
   # byte-for-byte to the emitter by `expectGolden` in l4-cli-test, so running
   # Catala over them IS running Catala over emitted output.
   #
-  # BE HONEST ABOUT WHAT THIS JOB DOES TODAY. Catala is an OCaml toolchain with
-  # no macOS/arm64 binary release and no apt package on ubuntu-latest, and R9 is
-  # explicit that it must never become a build dependency — so on a hosted
-  # runner this step prints one SKIP line and exits 0. It is NOT yet a merge
-  # gate, and nobody should read a green tick here as "Catala accepted the
-  # output"; only a run with CATALA_CHECK_REQUIRED=1 means that.
+  # WHAT A GREEN TICK HERE MEANS DEPENDS ON WHICH FILTER MATCHED.
   #
-  # It is wired up anyway, for three reasons. The paths filter above is the part
-  # that was actually missing: before it, a hand-edited .catala_en golden or a
-  # new .l4 under jl4/examples/catala/ matched NO filter in this file, so such a
-  # PR ran no Catala-aware job and merged green — the same failure class as the corpus
-  # goldens above. Second, the moment a runner has the toolchain (a self-hosted
-  # box, or an install step added here) this becomes a real gate by setting one
-  # env var. Third, on a developer machine that HAS catala — which is where this
-  # harness is actually run — the command is now discoverable from CI rather
-  # than from a spec footnote.
+  #   `catala` filter matched (the emitter, its CLI module and test, the corpus
+  #   and goldens, the harness, or this file): the toolchain below is installed
+  #   and CATALA_CHECK_REQUIRED=1 is set, so a toolchain that is missing or
+  #   broken, or a golden it rejects, is a RED job. A green tick means Catala
+  #   accepted the goldens.
   #
-  # Node-only, no npm package, no build: validate-catala.mjs imports node
-  # builtins only.
+  #   only `haskell` matched: the job still runs but installs nothing and sets
+  #   nothing, so the harness prints one SKIP line and exits 0. A green tick
+  #   there says nothing about Catala, exactly as before the toolchain was wired
+  #   in. Every step that installs, restores or requires the toolchain is gated
+  #   on the `catala` filter alone, so a Haskell-only PR pays none of its cost.
+  #
+  # R9 still holds in the form it was written: the harness itself is optional
+  # when the toolchain is absent (a laptop with no OCaml skips). What changed is
+  # that this job no longer lets a runner that is MEANT to have it go without.
+  #
+  # THE TOOLCHAIN: catala 1.2.1 and catala-proof 1.2.1 on OCaml 5.2.1, in an opam
+  # switch named `catala` — the name validate-catala.mjs looks for with no
+  # configuration (`opam exec --switch catala --`), and the route that puts
+  # `ocamlc` on PATH for `clerk`. The two versions are written once, in the env
+  # below, and everything that needs them (the cache key, the pin URL, the
+  # version checks) reads them from there.
+  #   * catala comes from opam-repository: the 1.2.1 release tarball, with its
+  #     checksum.
+  #   * catala-proof (the plugin behind `catala proof`, layer 2 of the harness)
+  #     is NOT in opam-repository, so it is pinned from the same tag's tarball.
+  #     The version is spelled `catala-proof.1.2.1` on purpose: that tag's
+  #     catala-proof.opam says `version: "1.2.0"` and requires catala at its OWN
+  #     version, so pinned without the suffix it asks for catala 1.2.0 and
+  #     conflicts with the release installed beside it.
+  #   * Everything else is whatever opam-repository resolves on the day of a
+  #     cold build and is then frozen by the cache. The `opam list` the verify
+  #     step prints is the record of what was resolved.
+  #
+  # THE CACHE: ~/.opam, restored whole and saved whole. Same restore/save split
+  # as the dmn-engines job, and for the reason given at the l4-engines-m2 step
+  # of the BPMN job: no save on merge_group, because a queue run writes into a
+  # ref that is deleted with the queue entry. By the cache scoping that note
+  # records, a merge_group run reads only its own ref and the default branch,
+  # so it restores nothing that a pull_request or a push to unstable saved.
+  # Two choices that differ from those jobs:
+  #   * There is NO `restore-keys`. A cache entry for some other catala or OCaml
+  #     version is not a toolchain we can use, and a prefix match would restore
+  #     it and then fail, or worse, run the wrong version.
+  #   * The save comes BEFORE the harness, and only after the smoke test passes,
+  #     so a golden Catala rejects does not throw away the build, and a
+  #     half-built switch is never cached under a key that would be trusted
+  #     forever.
+  # System packages are not in ~/.opam, so a warm run on a fresh runner needs
+  # the ones `clerk` calls at run time (ninja) installed again: that is why the
+  # apt step runs on a hit too.
+  #
+  # Node-only for the harness itself: validate-catala.mjs imports node builtins
+  # only.
   catala-validate:
-    name: Catala Toolchain Validation (skips without catala)
+    name: Catala Toolchain Validation
     needs: changes
     if: needs.changes.outputs.catala == 'true' || needs.changes.outputs.haskell == 'true'
     runs-on: ubuntu-latest
+    env:
+      CATALA_RELEASE: "1.2.1"
+      CATALA_OCAML: "5.2.1"
+      # Non-interactive opam: answer yes, and let it install the system
+      # packages a library needs (libgmp for zarith, ninja for clerk).
+      OPAMYES: "1"
+      OPAMCONFIRMLEVEL: unsafe-yes
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: "24.x"
-      # No CATALA_CHECK_REQUIRED here, deliberately: setting it would turn every
-      # run on a hosted runner red, since the toolchain genuinely is absent. Set
-      # it on a runner that has catala installed, and the skip becomes exit 1.
+
+      - name: Install opam and ninja
+        if: needs.changes.outputs.catala == 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq opam ninja-build
+          opam --version
+
+      # What the cache key must tell apart besides the two versions: the
+      # compiled switch is a set of native binaries and C libraries, so it is
+      # only valid on the distribution it was built on.
+      - name: Identify the runner image
+        id: image
+        if: needs.changes.outputs.catala == 'true'
+        run: echo "distro=$(. /etc/os-release && echo "${ID}-${VERSION_ID}")" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the opam root (OCaml, catala, catala-proof)
+        id: opam-root
+        if: needs.changes.outputs.catala == 'true'
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.opam
+          key: catala-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.distro }}-catala-${{ env.CATALA_RELEASE }}-ocaml-${{ env.CATALA_OCAML }}-v1
+
+      - name: Create the OCaml switch (cache miss only)
+        if: needs.changes.outputs.catala == 'true' && steps.opam-root.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          opam init --bare --disable-sandboxing --no-setup
+          opam switch create catala "$CATALA_OCAML"
+
+      - name: Install catala (cache miss only)
+        if: needs.changes.outputs.catala == 'true' && steps.opam-root.outputs.cache-hit != 'true'
+        run: opam install --switch catala "catala.$CATALA_RELEASE"
+
+      - name: Install catala-proof and z3 (cache miss only)
+        if: needs.changes.outputs.catala == 'true' && steps.opam-root.outputs.cache-hit != 'true'
+        run: |
+          opam pin add --switch catala "catala-proof.$CATALA_RELEASE" \
+            "https://github.com/CatalaLang/catala/archive/refs/tags/$CATALA_RELEASE.tar.gz"
+
+      # Runs on a hit as well as a miss, and is the gate on both: the key says
+      # which toolchain SHOULD be here, this says which one IS. `catala proof
+      # --help` is there because a switch with catala and no plugin is the
+      # failure the cache cannot see.
+      - name: Verify the toolchain
+        if: needs.changes.outputs.catala == 'true'
+        run: |
+          set -euo pipefail
+          opam exec --switch catala -- catala --version | tee catala-version.txt
+          grep -qF "$CATALA_RELEASE" catala-version.txt
+          opam exec --switch catala -- clerk --version
+          opam exec --switch catala -- catala proof --help > /dev/null
+          opam list --switch catala --installed | grep -E '^(catala|catala-proof|z3|ocaml-base-compiler|dune|menhir) '
+          du -sh ~/.opam
+
+      - name: Trim what a run never reads (cache miss only)
+        if: needs.changes.outputs.catala == 'true' && steps.opam-root.outputs.cache-hit != 'true'
+        run: |
+          rm -rf ~/.opam/download-cache ~/.opam/log
+          du -sh ~/.opam
+
+      # `success()`, not the `!cancelled()` the save steps elsewhere use: those
+      # save after the checks, to keep a cache a failing check did not spoil;
+      # this one saves before the check, so the only thing it must not do is
+      # save the product of a failed build.
+      - name: Save the opam root
+        if: ${{ success() && needs.changes.outputs.catala == 'true' && github.event_name != 'merge_group' && steps.opam-root.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.opam
+          key: ${{ steps.opam-root.outputs.cache-primary-key }}
+
+      # The expression is the empty string unless the `catala` filter matched,
+      # and the harness reads "1" and nothing else as "required", so a
+      # Haskell-only run keeps the skip it always had. The grep pins the
+      # version the harness OBSERVED, the same way the DMN steps pin theirs:
+      # the key and the verify step say which toolchain should be here, this
+      # line is the log evidence about which one looked at the goldens.
       - name: catala typecheck / proof / clerk test over the emitted goldens
-        run: node etc/validate-catala.mjs
+        env:
+          CATALA_CHECK_REQUIRED: ${{ needs.changes.outputs.catala == 'true' && '1' || '' }}
+        run: |
+          set -euo pipefail
+          node etc/validate-catala.mjs | tee catala.log
+          if [ "${CATALA_CHECK_REQUIRED:-}" = 1 ]; then
+            grep -qF "catala: opam switch 'catala' ($CATALA_RELEASE)" catala.log
+          fi
 
   # ============================================
   # BPMN interchange: soundness gate over the emitted fixtures
