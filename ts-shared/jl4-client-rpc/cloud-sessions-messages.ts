@@ -1,6 +1,6 @@
 /**
  * Messages between the VS Code extension and the sidebar webview for
- * cloud sessions (specs/todo/CLOUD-SESSIONS-SPEC.md §12). Everything
+ * cloud sessions (spec §12, in legalese/cloud-sessions). Everything
  * here is only used while `legaleseAi.cloudSessions.enabled` is on.
  *
  * Chat events of a cloud session reuse the ordinary `AiChat*`
