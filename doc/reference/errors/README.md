@@ -1013,15 +1013,14 @@ GIVETH A Party
 That works for a `NUMBER`, a `BOOLEAN`, a `STRING`, a `DATE`, a `TIME`, a `DATETIME`, a `LIST OF` or a `MAYBE` of those, and a type that you declare as a record or as an enumeration of those.
 It does not work yet for these, so an `@export` of a rule that takes or returns one is an error, reported at the `@export` line:
 
-| the input or result is...                                             | the error says                                        |
-| --------------------------------------------------------------------- | ----------------------------------------------------- |
-| an [EVENT](../regulative/EVENT.md)                                    | `an EVENT`                                            |
-| a `DEONTIC`, which is what a contract rule gives back                 | `a DEONTIC, a contract rule`                          |
-| a `FUNCTION FROM ... TO ...`                                          | `a function`                                          |
-| a type variable, in a rule that works for any type                    | `of the type variable ...`                            |
-| a type with constructors that carry fields, such as `payment HAS ...` | `of the type ..., which has constructors with fields` |
-| any other type that has no JSON form yet, such as `EITHER`            | `of the type ...`                                     |
-| a record with a field of one of those types                           | `of a record type ... whose field ... is ...`         |
+| the input or result is...                                  | the error says                                |
+| ---------------------------------------------------------- | --------------------------------------------- |
+| an [EVENT](../regulative/EVENT.md)                         | `an EVENT`                                    |
+| a `DEONTIC`, which is what a contract rule gives back      | `a DEONTIC, a contract rule`                  |
+| a `FUNCTION FROM ... TO ...`                               | `a function`                                  |
+| a type variable, in a rule that works for any type         | `of the type variable ...`                    |
+| any other type that has no JSON form yet, such as `EITHER` | `of the type ...`                             |
+| a record with a field of one of those types                | `of a record type ... whose field ... is ...` |
 
 The same goes for an `EVENT` or a function inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
 A rule that builds or reads an `EVENT` inside its body, and does not name one in its inputs or its result, is published as usual.

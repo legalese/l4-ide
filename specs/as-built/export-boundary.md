@@ -12,8 +12,8 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 - One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:133`), decides whether a type has a form in JSON, and says why when it has none.
   The table is the header comment of that module.
-  `NUMBER`, `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, `LIST OF`, `MAYBE`, a record, an enumeration whose constructors carry no fields, a synonym and a type with parameters have a shape.
-  A function, an `EVENT`, a `DEONTIC`, a type variable, a type with constructors that carry fields (`DECLARE Pay IS ONE OF cash, card HAS number`), `EITHER` and any other built-in type that nobody gave a row have none.
+  `NUMBER`, `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, `LIST OF`, `MAYBE`, a record, an enumeration, a synonym and a type with parameters have a shape.
+  A function, an `EVENT`, a `DEONTIC`, a type variable, `EITHER` and any other built-in type that nobody gave a row have none.
 - `checkExports` (`jl4-core/src/L4/Export.hs:492`) asks it about every input and the result of every `@export`.
   An input is a `GIVEN`, or an `ASSUME` of the module that the body of the rule reads itself.
   The result is the written `GIVETH`, or the inferred type when there is none.
@@ -43,8 +43,8 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 ## How it is pinned
 
 - `jl4-core/test/ExportValidationSpec.hs` is rewritten around `checkExports`.
-  It refuses a function-typed `GIVEN`, an `ASSUME` of function type that the body reads, and a function inside `MAYBE OF` or behind a synonym; an `EVENT` input, a written and an inferred `EVENT` result, an `EVENT` in `LIST OF`, `MAYBE OF`, behind a synonym or in an `ASSUME` that the body reads; a `DEONTIC` result (and the file still type-checks) and a `DEONTIC` input; a record with a function among its fields (and says which); an enumeration whose constructors have fields; and `EITHER`.
-  It accepts value-typed inputs, a record, an enumeration, a `LIST OF`, a `MAYBE OF` and a `DATE`, a record that contains itself, an `EVENT` that the body builds but the signature does not name, an `EVENT` in a rule that is not `@export`, a type of the user's own called `EVENT`, and a function-typed `ASSUME` that no export reads.
+  It refuses a function-typed `GIVEN`, an `ASSUME` of function type that the body reads, and a function inside `MAYBE OF` or behind a synonym; an `EVENT` input, a written and an inferred `EVENT` result, an `EVENT` in `LIST OF`, `MAYBE OF`, behind a synonym or in an `ASSUME` that the body reads; a `DEONTIC` result (and the file still type-checks) and a `DEONTIC` input; a record with a function among its fields (and says which); and `EITHER`.
+  It accepts value-typed inputs, a record, an enumeration, a `LIST OF`, a `MAYBE OF` and a `DATE`, a record that contains itself, an `EVENT` that the body builds but the signature does not name, an `EVENT` in a rule that is not `@export`, a type of the user's own called `EVENT`, an enumeration whose constructors carry fields, and a function-typed `ASSUME` that no export reads.
   It warns about a `GIVEN` with no written type, and does not refuse it.
 - `jl4/examples/not-ok/export-unsendable-types.l4` and its goldens: one error for each rule that cannot be sent (an `EVENT` input, an `EVENT` result, a `DEONTIC` result, a function input), one warning for the `GIVEN` with no written type, and nothing for the rule that publishes and the rule that only builds an `EVENT` in its body.
   The golden harness (`jl4/tests/Main.hs`) prints the export errors after the type-check errors, with the prefix `[export error]` or `[export warning]`, and the `#EVAL` at the end of the file still has its result there.
@@ -71,9 +71,10 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 - The schema is still produced by `typeToParameter` (`jl4-core/src/L4/FunctionSchema.hs`), which falls back to `object` for a type it has no declaration for; it does not render a `JsonShape`.
   So `jsonShape` and the schema can disagree for a type that `typeToParameter` handles differently, and `jl4-schema` still writes a schema for a default export that the check refuses.
   Making the schema render the shape, and the service's decoder follow it, is not done.
-- A constructor that carries fields is refused as a whole (`UConstructorFields`).
-  The review asked for it to be decided: a tagged shape or a refusal; this change refuses it, because no other part (schema, decoder) can carry one yet.
-  That choice is assumed, not ruled.
+- A constructor that carries fields has the shape of an enumeration of the constructors' names, which is what the schema publishes today, and is not refused.
+  The review asked for it to be decided: a tagged shape or a refusal.
+  It is not refused because `jl4-service-test` deploys a function whose result is such a type (smucclaw/l4-ide#1003, `wireProbeJL4`), and the wire-form bench (`l4-wire-form-1015`, card J1, open) counts 8 to 11 of 3,006 exports that take one.
+  A tagged shape is that bench's to rule, not this change's.
 - A built-in type nobody gave a row to is refused, as the review asked.
   `EITHER` is one.
 - An `ASSUME` is looked at only when the body of the exported rule reads it itself; an `ASSUME` that the body reaches through a helper or an import is not looked at.

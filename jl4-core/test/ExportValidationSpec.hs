@@ -388,7 +388,7 @@ spec = do
               ]
         problems src `shouldBe` Right [(Just 5, "name", Just "r", "of a record type Rule whose field test is a function")]
 
-      it "refuses an enumeration whose constructors have fields" $ do
+      it "accepts an enumeration whose constructors have fields, as published until now" $ do
         let src = Text.unlines
               [ "DECLARE Action IS ONE OF"
               , "  delivery"
@@ -399,7 +399,7 @@ spec = do
               , "GIVETH A BOOLEAN"
               , "`is it a payment` MEANS TRUE"
               ]
-        problems src `shouldBe` Right [(Just 5, "is it a payment", Just "a", "of the type Action, which has constructors with fields (payment)")]
+        problems src `shouldBe` Right []
 
       it "refuses EITHER, which has no shape yet" $ do
         let src = Text.unlines

@@ -213,15 +213,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , severity e == SError
           , not (isOutOfScope kind)
           ]
-    if not (null exportFnTypeErrs)
-      then do
-        logWarn logger "Deploy rejected: an @export has an input or result that cannot be sent"
-          [ ("deploymentId", toJSON deployId)
-          , ("file", toJSON filepath)
-          , ("errors", toJSON exportFnTypeErrs)
-          ]
-        pure (filepath, Left (Text.intercalate "; " exportFnTypeErrs))
-      else if not (null blockingErrs)
+    if not (null blockingErrs)
       then do
         logWarn logger "Deploy rejected: module has type errors"
           [ ("deploymentId", toJSON deployId)
@@ -229,6 +221,18 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("errors", toJSON blockingErrs)
           ]
         pure (filepath, Left (Text.intercalate "\n" blockingErrs))
+      -- Only a module that type-checks is asked what its exports take and give
+      -- back, as in the editor: on one that does not, an input or result may
+      -- still be an unsolved inference variable, and the type error already
+      -- says what is wrong.
+      else if not (null exportFnTypeErrs)
+      then do
+        logWarn logger "Deploy rejected: an @export has an input or result that cannot be sent"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON filepath)
+          , ("errors", toJSON exportFnTypeErrs)
+          ]
+        pure (filepath, Left (Text.intercalate "; " exportFnTypeErrs))
       else if null exports
       then pure (filepath, Right [])
       else do

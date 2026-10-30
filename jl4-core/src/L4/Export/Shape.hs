@@ -19,7 +19,8 @@
 -- > MAYBE a                        JOptional (shape a)       (may be left out or null)
 -- > DECLARE T HAS ...              JRecord                   (fields in declaration order)
 -- > DECLARE T IS ONE OF a, b       JEnum                     (the constructors' names)
--- > DECLARE T IS ONE OF a, b HAS … no shape yet: UConstructorFields
+-- > DECLARE T IS ONE OF a, b HAS … JEnum                     (the constructors' names; the fields are not part of
+--  >                                                          the shape: how they are written is not decided)
 -- > DECLARE T IS A type            the shape of that type
 -- > a type with parameters         the shape of its body, parameters replaced
 -- > a record that contains itself  JRecursive               (expansion stops there)
@@ -46,7 +47,6 @@ module L4.Export.Shape (
 import Base
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 
 import L4.Syntax
 import L4.TypeCheck.Environment (
@@ -97,8 +97,6 @@ data Unsendable
     UPolymorphic Text
   | -- | A type that is not known, or a built-in type that has no shape yet, by name.
     UUnknownType Text
-  | -- | A type with constructors that carry fields: the type and those constructors.
-    UConstructorFields Text [Text]
   | -- | The record, the field, and why the field's type has no shape.
     UInField Text Text Unsendable
   deriving stock (Eq, Show, Generic)
@@ -171,11 +169,10 @@ jsonShape env = go Set.empty
          in
           case body of
             SynonymDecl _ inner -> go seen' (substitute sub inner)
-            EnumDecl _ cons
-              | null withFields -> Right (JEnum (nameText name) [nameText c | MkConDecl _ c _ <- cons])
-              | otherwise -> Left (UConstructorFields (nameText name) [nameText c | MkConDecl _ c _ <- withFields])
-             where
-              withFields = [con | con@(MkConDecl _ _ (_ : _)) <- cons]
+            -- A constructor that carries fields is shaped by its name alone, as
+            -- the schema has published it until now; how its fields are
+            -- written is open (the wire form of sums), so not refused here.
+            EnumDecl _ cons -> Right (JEnum (nameText name) [nameText c | MkConDecl _ c _ <- cons])
             RecordDecl _ _ fields -> do
               shaped <- traverse (field seen' sub name) fields
               Right (JRecord (nameText name) shaped)
@@ -220,7 +217,6 @@ unsendableWhat = \case
   UEvent -> "an EVENT"
   UPolymorphic v -> "of the type variable " <> v
   UUnknownType t -> "of the type " <> t
-  UConstructorFields t cs -> "of the type " <> t <> ", which has constructors with fields (" <> Text.intercalate ", " cs <> ")"
   UInField r f why -> "of a record type " <> r <> " whose field " <> f <> " is " <> unsendableWhat why
 
 -- | One line on what to do about it.
@@ -231,5 +227,4 @@ unsendableHint = \case
   UEvent -> "Take the party, the action and the time as separate inputs, and build the event inside the rule."
   UPolymorphic _ -> "Write the type the rule is used at in its GIVEN or GIVETH."
   UUnknownType _ -> "Use a NUMBER, BOOLEAN, STRING, DATE, TIME, DATETIME, a LIST or MAYBE of those, or a record or enumeration of them."
-  UConstructorFields _ _ -> "Use an enumeration whose constructors have no fields, or take the fields as separate inputs."
   UInField _ _ why -> unsendableHint why
