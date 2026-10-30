@@ -1,0 +1,79 @@
+-- An @nlg on a MIXFIX definition, read at a call site in the SAME module.
+-- The harness is `l4 nlg` (jl4/tests-cli/Main.hs, "an @nlg on a mixfix
+-- definition"); this file is outside the golden globs on purpose, and
+-- nlg-mixfix-import.l4 makes the same calls across an IMPORT.
+--
+-- A mixfix call resolves to the operator's CANONICAL name, the slot/keyword
+-- pattern `the lower of _ and _`, while the definition's head keeps only the
+-- first keyword. The herald table used to be keyed on the head alone, so none
+-- of the interleaved calls below found their herald.
+
+-- Keyword-first, two keywords, herald on its own line above the head.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the smaller of %a% and %b%
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+-- Keyword-first, herald trailing the last input: the placement the prelude's
+-- `the amount by which` is written in (#788). The herald lands on `b` and is
+-- moved to the rule.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the amount by which` a `exceeds` b @nlg the amount by which %a% exceeds %b%
+  MEANS a MINUS b
+
+-- The herald names the slots in the OTHER order: a slot is filled by the input
+-- it names, not by where it sits in the sentence.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg %b% less %a%
+`the shortfall of` a `against` b MEANS b MINUS a
+
+-- Param-first infix.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg %a% and %b% together
+a `plus` b MEANS a PLUS b
+
+-- A herald that never mentions %b%: the argument is appended, not dropped.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the first of %a%
+`the first of` a `then` b MEANS a
+
+-- No herald: the call keeps the linearizer's reading.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the bare` a `and` b MEANS a PLUS b
+
+-- Control: a PREFIX function with a herald, which has always worked.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the greater of %a% and %b%
+`the greater` a b MEANS IF a AT LEAST b THEN a ELSE b
+
+-- The interleaved spelling, one call per row above.
+#EVAL `the lower of` 840 `and` 160
+#EVAL `the amount by which` 840 `exceeds` 160
+#EVAL `the shortfall of` 160 `against` 840
+#EVAL 840 `plus` 160
+#EVAL `the first of` 840 `then` 160
+#EVAL `the bare` 840 `and` 160
+#EVAL `the greater` 3 4
+
+-- Nested: the inner call is expanded first.
+#EVAL `the lower of` (`the lower of` 5 `and` 6) `and` 7
+
+-- The OF spelling resolves to the head keyword alone, and a WITH call to the
+-- head name. Neither goes through the canonical name, and neither may change.
+#EVAL `the lower of` OF 840, 160
+#EVAL `the amount by which` OF 840, 160
+#EVAL `the lower of` WITH a IS 840, b IS 160
+#EVAL `the amount by which` WITH a IS 840, b IS 160

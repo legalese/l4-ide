@@ -218,6 +218,15 @@ in any of its formats. Both take `--lang`.
 In both, a call to a rule that carries a herald reads as that herald with the call's arguments in its `%slots%`: `#EVAL `is large` 150` linearizes as `the amount 150 is large`.
 An argument the herald does not mention is not dropped; it follows the sentence as `with …`, so a herald written without slots still shows every value the call supplied.
 
+A function written in mixfix form, with the words of its name between its inputs, reads the same way at a call written in that form.
+In [nlg-mixfix-example.l4](nlg-mixfix-example.l4), `` `the lower of` a `and` b `` carries the sentence "the smaller of %a% and %b%", and `l4 nlg` linearizes ``#EVAL `the lower of` 840 `and` 160`` as `the smaller of 840 and 160`.
+It does so whether the function is defined in the same file or in a module that file imports.
+The sentence can follow the last input, as the prelude writes it for `` `is in` ``, or sit on a line of its own above the head.
+
+**A limit.** `l4 render` does not do this for a mixfix call.
+It writes the call, inside the body of another rule, as the function's own words: for `` `the price we charge` `` in the example, "the lower of price and 100" and not "the smaller of price and 100".
+The function's own entry in the rendered document does show its sentence.
+
 `l4 nlg` writes a date given as literals as a date: `YMD 2025 7 16` and `Date 16 7 2025` both read `16 July 2025`.
 That covers only daydate's own `YMD` and `Date`, only when all three arguments are whole numbers, and only when they name a real day.
 Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.

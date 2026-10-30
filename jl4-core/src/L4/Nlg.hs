@@ -416,8 +416,8 @@ unslot = \ case
 -- the arguments in the @%slots%@ ('substituteNlgDirective'). The table is built
 -- over the dependencies too — prepared the same way, since a rule a directive
 -- calls can live in an imported module and its sentence is read from there.
-linearizeDirectives :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> [Text]
-linearizeDirectives mlang mod'' deps'' = fst (linearizeDirectivesIn mlang mod'' deps'')
+linearizeDirectives :: Maybe LangTag -> Map.Map Unique RawName -> Module Resolved -> [Module Resolved] -> [Text]
+linearizeDirectives mlang mixfixCanon mod'' deps'' = fst (linearizeDirectivesIn mlang mixfixCanon mod'' deps'')
 
 -- | 'linearizeDirectives', plus the English frame words the language's
 -- phrasebook had no entry for ('localize'). The set is empty for 'Nothing',
@@ -428,15 +428,15 @@ linearizeDirectives mlang mod'' deps'' = fst (linearizeDirectivesIn mlang mod'' 
 -- words cannot be seen there. The unspliced directive has the same frame
 -- words, plus the "with", "and" and "where" of the calls themselves, and those
 -- are all in every phrasebook, so the two sets of misses are equal.
-linearizeDirectivesIn :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> ([Text], Set.Set Text)
-linearizeDirectivesIn mlang mod'' deps'' =
+linearizeDirectivesIn :: Maybe LangTag -> Map.Map Unique RawName -> Module Resolved -> [Module Resolved] -> ([Text], Set.Set Text)
+linearizeDirectivesIn mlang mixfixCanon mod'' deps'' =
   ( fmap (fst . simpleLinearizerIn mlang . substituteNlgDirectiveIn mlang heralds) directives
   , foldMap (snd . simpleLinearizerIn mlang) directives
   )
  where
   prepare    = selectLanguage mlang . promoteHeadInputNlg
   mod'       = prepare mod''
-  heralds    = nlgFnInfo (mod' : map prepare deps'')
+  heralds    = nlgFnInfo mixfixCanon (mod' : map prepare deps'')
   directives = toListOf (gplate @(Directive Resolved)) mod'
 
 -- | Does any rendering in this module name this language?
@@ -1030,11 +1030,33 @@ spaced p = text " " <> p <> text " "
 -- 'Unique's (each module is resolved independently), so a unique-based key
 -- would never match across an @IMPORT@. The inner @%param%@ substitution stays
 -- 'Unique'-based — those refs are self-consistent within the defining module.
+--
+-- __A mixfix definition is entered under two names.__ Its head keyword (@the
+-- lower of@), which is how the definition is written once the type checker has
+-- restructured it and how a prefix @OF@ call, @the lower of OF 840, 160@,
+-- names it. And its CANONICAL pattern (@the lower of _ and _@), which is the
+-- name an interleaved call, @the lower of 840 and 160@, resolves to: the
+-- pattern is dropped from the definition's 'AppForm' but kept in the
+-- 'L4.TypeCheck.Types.MixfixRegistry'. The first argument is the part of that
+-- registry this needs, the canonical name of each mixfix definition's head
+-- by 'Unique' ('L4.Print.mixfixCanonicalByUnique'). A definition's own 'Unique'
+-- is looked up in it — within the module that defines it, where 'Unique's are
+-- consistent — and only the resulting TEXT is used as the key, which is what
+-- carries across an @IMPORT@. The registry the main module hands out is the
+-- union of its imports', so one map covers a dependency's definitions too.
+--
+-- The head-keyword entry is kept rather than replaced because the @OF@ call
+-- and the @WITH@ call resolve to it. Two operators that share a head keyword
+-- and an arity still collide on it, as they did before; the canonical entries
+-- do not.
+--
+-- An empty map gives the head-keyword table alone, which is every prefix
+-- function's entry and was every mixfix function's.
 type NlgFnInfo = Map.Map (Text, Int) (Nlg, [Unique])
 
-nlgFnInfo :: [Module Resolved] -> NlgFnInfo
-nlgFnInfo mods = Map.fromList
-  [ ((resolvedText name, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
+nlgFnInfo :: Map.Map Unique RawName -> [Module Resolved] -> NlgFnInfo
+nlgFnInfo mixfixCanon mods = Map.fromList
+  [ ((key, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
     -- Value parameters are the appform arguments, not the GIVEN names: a
     -- polymorphic function (@GIVEN a IS A TYPE@) lists its type parameter in
     -- GIVEN but never in the appform, so keying arity off GIVEN would not match
@@ -1044,6 +1066,9 @@ nlgFnInfo mods = Map.fromList
   , Just nlg <- [ decideNlg Nothing d ]
     -- Every spelling of the head: a call through an @AKA@ name is the same rule.
   , name <- appFormHeads appForm
+    -- The head's own text, then the canonical pattern when it is a mixfix's.
+  , key <- resolvedText name
+             : [ rawNameToText canon | Just canon <- [Map.lookup (getUnique name) mixfixCanon] ]
   ]
 
 -- | Replace a call to an @\@nlg@-annotated function with its authored sentence,

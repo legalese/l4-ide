@@ -1129,6 +1129,26 @@ One residue it also pins, not a #979 defect: hovering a `GIVEN` type variable pr
 `l4 render` handles that, and it needs a different key to do it: `L4.Export.Document.nlgFnInfo` is keyed by `(name, arity)` rather than by `Unique` precisely because each module is resolved independently and a call site does not share a `Unique` with its definition.
 Extending the promotion across imports therefore means a second mechanism, and it would move goldens wherever a directive calls a prelude function — measured as zero of the 10 changed goldens above, because every heralded rule the corpus reaches is defined in the module that calls it.
 
+### 8a.4 A mixfix definition's herald at its call sites (in a draft PR, not landed)
+
+A mixfix call resolves to the operator's canonical pattern name (`the lower of _ and _`), while the definition's head keeps only its first keyword (`the lower of`).
+`nlgFnInfo` was keyed on the head alone, so an interleaved call never found its herald.
+Measured on `unstable` at `bcbec1419`: at a call in the same module `l4 nlg` printed the pattern with the arguments after it (`` `the lower of _ and _` with 840 and 160 ``) or, where the herald followed the last input, the herald with its slots unfilled (``the amount by which `a` exceeds `b` with 840 and 160``); across an `IMPORT` it printed the pattern in every case.
+The `OF` spelling and a `WITH` call resolve to the head keyword, and read the herald already.
+
+The change keys a heralded mixfix definition under both its head keyword and its canonical pattern.
+The canonical name comes from the type checker's `MixfixRegistry` by the `Unique` of the definition's head, looked up inside the module that defines it; only the resulting text is the key, so the property above, that nothing depends on `Unique`s matching across an `IMPORT`, is kept.
+The main module's registry is the union of its imports', so the one map covers a dependency's definitions.
+The slots are filled by position: the call's arguments are the definition's inputs in the order the pattern lists them.
+
+Measured over the whole `jl4-test` suite on `lhs`, 2026-10-30: 4830 examples, 5 failures, all of them `.nlg.golden` files under `jl4/examples/ok/tests/`, none in the canon mirror.
+The five are the prelude's own set operators (`is in`, `set equals`, `is subset of`, `UNION`, `INTERSECT`, `LESS`, `WITHOUT`), which carry heralds (`jl4-core/libraries/prelude.l4:1209` for `is in`) that had never reached a call in `l4 nlg`.
+The changes are of two kinds: a call to an operator that has a herald now reads as that herald (`` `_ is in _` with 3 and `SET` ... `` becomes ``3 is one of `SET` ...``), and an operator with no herald (`LOCALOP` in `infix-under-connective-imported.l4`) reads as it did.
+
+Not done, and not ruled: `l4 render` still reads a mixfix call in a rule's body as the function's own words, because `L4.Export.Document` builds its table with no canonical names.
+Found and not fixed: a `WITH` call across an `IMPORT` to a rule whose herald follows its last input prints that herald again as the gloss of the last input (``the amount by which `a` exceeds `b` where `a` is 840 and the amount by which `a` exceeds `b` is 160``).
+It is the same for a prefix function, so it is not about mixfix.
+
 ## 9. Reproducing the measurements
 
 All inputs are already deposited; nothing needs re-fetching.

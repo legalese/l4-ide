@@ -54,6 +54,8 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Lexer (LangTag (..))
 import qualified L4.Nlg as Nlg
+import L4.Print (mixfixCanonicalByUnique)
+import L4.TypeCheck.Types (MixfixRegistry)
 import L4.Syntax
 
 import L4.Cli.Common
@@ -101,7 +103,7 @@ nlgCmd opts = do
       exitFailure
     Just tc -> do
       putDiagnostics errs
-      let (payload, misses) = linearizeModule opts.nlgLang tc.module' (dedupModules (transitiveDeps tc))
+      let (payload, misses) = linearizeModule opts.nlgLang tc.mixfixRegistry tc.module' (dedupModules (transitiveDeps tc))
       reportMisses opts.nlgLang misses
       case opts.nlgOutput of
         Just f  -> Text.writeFile f payload
@@ -113,10 +115,13 @@ nlgCmd opts = do
 -- so that holds by construction rather than by care.
 --
 -- The dependencies ride along because a heralded call in a directive can name
--- a rule an imported module defines ('Nlg.linearizeDirectives').
-linearizeModule :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> (Text, Set.Set Text)
-linearizeModule mlang mod' deps =
-  first Text.unlines (Nlg.linearizeDirectivesIn mlang mod' deps)
+-- a rule an imported module defines ('Nlg.linearizeDirectives'). So does the
+-- mixfix registry, which is how a heralded mixfix definition is found from a
+-- call that names it by its pattern: the main module's registry is the union of
+-- its imports', so it covers the dependencies' definitions too.
+linearizeModule :: Maybe LangTag -> MixfixRegistry -> Module Resolved -> [Module Resolved] -> (Text, Set.Set Text)
+linearizeModule mlang reg mod' deps =
+  first Text.unlines (Nlg.linearizeDirectivesIn mlang (mixfixCanonicalByUnique reg) mod' deps)
 
 -- | Say, once, which frame words stayed English because the language's
 -- phrasebook has no entry for them ('L4.Nlg.localize'). A gap is reported

@@ -1,0 +1,25 @@
+-- An @nlg on a MIXFIX definition, read at a call site in ANOTHER module.
+-- The definitions are in nlg-mixfix-import-lib.l4; the calls are the same, row
+-- for row, as nlg-mixfix-local.l4's, so the two outputs can be read side by
+-- side. See that file for what each row is.
+--
+-- One row of that file is left out: a WITH call to `the amount by which`, whose
+-- herald trails its last input. Across an IMPORT that call prints the herald
+-- as the gloss of `b` as well, for a prefix function just the same, and it is
+-- not what this file is about.
+
+IMPORT `nlg-mixfix-import-lib`
+
+#EVAL `the lower of` 840 `and` 160
+#EVAL `the amount by which` 840 `exceeds` 160
+#EVAL `the shortfall of` 160 `against` 840
+#EVAL 840 `plus` 160
+#EVAL `the first of` 840 `then` 160
+#EVAL `the bare` 840 `and` 160
+#EVAL `the greater` 3 4
+
+#EVAL `the lower of` (`the lower of` 5 `and` 6) `and` 7
+
+#EVAL `the lower of` OF 840, 160
+#EVAL `the amount by which` OF 840, 160
+#EVAL `the lower of` WITH a IS 840, b IS 160

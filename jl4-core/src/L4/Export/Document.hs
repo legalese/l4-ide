@@ -236,7 +236,11 @@ extractUnits (MkModule _ _ section) = goSection section
 allUnits :: Map.Map Unique Text -> Module Resolved -> [Module Resolved] -> [Unit]
 allUnits headings mainModule deps =
   let mods  = mainModule : deps
-      info  = nlgFnInfo mods
+      -- No canonical mixfix names, so this table is exactly the one it always
+      -- was: a mixfix call in a rule body is not looked up by its pattern here.
+      -- Whether @l4 render@ should read the herald at such a call, as @l4 nlg@
+      -- now does, has not been ruled.
+      info  = nlgFnInfo Map.empty mods
       ctors = recordCtorFields mods
   in map (substNlgInUnit info . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings)
        (extractUnits mainModule <> concatMap extractUnits deps)

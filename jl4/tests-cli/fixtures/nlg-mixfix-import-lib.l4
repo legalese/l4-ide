@@ -1,0 +1,44 @@
+-- The DEFINITIONS for nlg-mixfix-import.l4, which calls them across an IMPORT.
+-- The same shapes, in the same order, as nlg-mixfix-local.l4: see there for
+-- why each is here.
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the smaller of %a% and %b%
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the amount by which` a `exceeds` b @nlg the amount by which %a% exceeds %b%
+  MEANS a MINUS b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg %b% less %a%
+`the shortfall of` a `against` b MEANS b MINUS a
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg %a% and %b% together
+a `plus` b MEANS a PLUS b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the first of %a%
+`the first of` a `then` b MEANS a
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the bare` a `and` b MEANS a PLUS b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the greater of %a% and %b%
+`the greater` a b MEANS IF a AT LEAST b THEN a ELSE b

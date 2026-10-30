@@ -485,6 +485,15 @@ nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
 
+-- An @nlg on a MIXFIX definition, read at a call site in the same module, and
+-- across an IMPORT. The importing fixture makes the same calls, row for row,
+-- as the local one (less one row it says it leaves out), so one expected list
+-- serves both.
+nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib :: FilePath
+nlgMixfixLocalFixture  = fixtureDir </> "nlg-mixfix-local.l4"
+nlgMixfixImportFixture = fixtureDir </> "nlg-mixfix-import.l4"
+nlgMixfixImportLib     = fixtureDir </> "nlg-mixfix-import-lib.l4"
+
 -- The reference page whose placement table describes that fixture row by row.
 -- The test that reads it pins the page, not just the output.
 placementReadme :: FilePath
@@ -615,6 +624,7 @@ coreFixtures =
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
+  , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3514,6 +3524,51 @@ spec bin = do
       Output _ renOut _ <- renderOf
       nlgOut `shouldSatisfy` ("row seventeen saw 200\n" `isInfixOf`)
       renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
+
+  -- An @nlg on a MIXFIX definition, read at its call sites. A mixfix call
+  -- resolves to the operator's canonical name (`the lower of _ and _`), while the
+  -- herald table was keyed on the definition's head keyword alone (`the lower
+  -- of`), so an interleaved call never found its herald and printed the pattern
+  -- with the arguments after it, or, where the herald sat on the head, with its
+  -- slots unfilled. The `OF` spelling and a `WITH` call resolve to the head
+  -- keyword and always worked; they are rows here so a repair that keys on the
+  -- canonical name ONLY would fail them.
+  --
+  -- Whole-output equality, not `isInfixOf`: the failure being guarded is a line
+  -- that reads plausibly and is wrong, and an infix test would not see a wrong
+  -- line sitting beside a right one.
+  describe "an @nlg on a mixfix definition" $ do
+    let -- Lines of `l4 nlg`'s output with any carriage return dropped, as the house idiom does.
+        nlgLines fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        -- One line per #EVAL in the fixtures, in order. The first seven are the
+        -- interleaved calls, then the nested one, then the OF and WITH calls.
+        interleaved =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          , "840 less 160"
+          , "840 and 160 together"
+          , "the first of 840 with 160"
+          , "`the bare _ and _` with 840 and 160"
+          , "the greater of 3 and 4"
+          , "the smaller of the smaller of 5 and 6 and 7"
+          ]
+        ofCalls =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          ]
+        lowerWith = "the smaller of `a` and `b` where `a` is 840 and `b` is 160"
+        exceedsWith = "the amount by which `a` exceeds `b` where `a` is 840 and `b` is 160"
+
+    it "fills the herald's slots at a call in the same module" $ do
+      rows <- nlgLines nlgMixfixLocalFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith]
+
+    it "fills the herald's slots at a call across an IMPORT" $ do
+      rows <- nlgLines nlgMixfixImportFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith]
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
