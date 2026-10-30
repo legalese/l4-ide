@@ -185,9 +185,19 @@ jointly (timed reachability over `DO`/`HENCE`/`LEST` choice points — the lette
 search) **[E]**. Its two motivating case studies (the regulatory double-bind, the payout leak) are
 the programme's founding war stories.
 
-#### 2.5.1 Where verification code lives, and the restricted-licence rule (V1, ruled 2026-10-30)
+#### 2.5.1 V1: where verification code lives, and the restricted-licence rule (decision record, 2026-10-30)
 
-**RULED 2026-10-30 by Meng**, in session explore-verify, on a proposal from that session: _"let’s close the work as you proposed into l4-verify as a private repo … the apache code that is already in l4-ide can stay there."_
+**Status: RULED 2026-10-30 by Meng**, in session explore-verify, on a proposal from that session: _"let’s close the work as you proposed into l4-verify as a private repo … the apache code that is already in l4-ide can stay there."_
+
+**This is a decision record, and it is meant to be reopened.**
+Each decision below names the facts it rests on and the change that should send us back to it.
+Meng, 2026-10-30: _"if any of the packages gain capabilities in future we should reconsider our decisions, not stick to them because “that’s the way we’ve always done it”."_
+A decision whose premise has changed is reopened, not defended; the "reopen when" lines are the premises.
+
+**Context.** The facts about external tools come from a docs-only survey on 2026-10-30: project pages, release APIs and source files were read, and nothing was installed or run.
+Each fact is a reading of a page on that date, so the source is given beside it; re-read the source before relying on the fact.
+
+##### Decision 1: the repository split
 
 **Stays in this repository, under Apache-2.0:** every emitter to an external format (`L4.Lts.Explore.Emit` and its successors), `l4 explore`, `l4 prove`, the `l4 export` targets for provers and model finders (Lean, F\*, Alloy), and harness wiring for tools whose licences allow commercial use.
 The code already landed here (#759 and earlier) stays as it is.
@@ -195,13 +205,49 @@ The code already landed here (#759 and earlier) stays as it is.
 **Goes to `legalese/l4-verify`, a private repository:** runs of restricted-licence tools, cross-validation orchestration and dashboards, counterexample explanation for lawyers, LLM-in-the-loop formalisation, investor-facing capability comparisons, and any hosted verification service.
 As of 2026-10-30 that repository does not exist yet; this is proposed, not landed, until it is created.
 
-**The restricted-licence rule.** Writing an emitter to a tool's input format is not restricted, so emitters to any format may live here.
-A tool whose licence restricts commercial or company use is never run in this repository's CI or shipped artifacts, is documented only here, and is run only in `legalese/l4-verify`, and only after its vendor has confirmed evaluation terms in writing.
-At 2026-10-30 that covers nuXmv, UPPAAL, CADP, FDR4, MathSAT and Alt-Ergo's default licence (a docs-only survey of the licence pages, not legal advice).
-Meng deferred the requests for evaluation terms "until the rest of the system is built", so until then those tools are documented only, in both repositories.
+**Reasons.**
 
-**Why the line falls here.** The emitters are coupled to the type-checked core and to the evaluator, which is every backend's oracle of record (VERIFICATION-BACKEND-LOWERING-SPEC R-V5), so separating them would mean chasing an unstable internal API; and public emitters are the evidence a technical reviewer can check.
-The layer that turns verdicts into a product (orchestration, explanation, hosting) is the commercial layer around the open core.
+1. The emitters are coupled to the type-checked core and to the evaluator, which is every backend's oracle of record (VERIFICATION-BACKEND-LOWERING-SPEC R-V5); jl4-core has no stable, versioned API, so emitters kept elsewhere would chase its internal changes.
+2. Public emitters are evidence a technical reviewer can check for themselves.
+3. The layer that turns verdicts into a product (orchestration, explanation, hosting) is the commercial layer around the open core.
+
+**Reopen when** jl4-core publishes a stable, versioned API for the typed core (reason 1 then falls); or a component placed in `l4-verify` turns out to be needed by open users or by the core's own correctness checks; or the open-core boundary is redrawn for business reasons.
+
+##### Decision 2: the restricted-licence rule
+
+Writing an emitter to a tool's input format is not restricted, so emitters to any format may live here.
+A tool whose licence restricts commercial or company use is never run in this repository's CI or shipped artifacts, is documented only here, and is run only in `legalese/l4-verify`, and only after its vendor has confirmed evaluation terms in writing.
+Meng deferred the requests for evaluation terms "until the rest of the system is built", so until then these tools are documented only, in both repositories.
+
+**Reasons.** These licences turn on who the user is or what the use is for, not on whether the user has revenue, so "pre-revenue" does not bring Legalese inside them; and every one has an open substitute in the plan.
+The readings below are of licence pages on 2026-10-30, not legal advice.
+
+| tool     | licence reading (2026-10-30)                                                                            | open substitute in the plan   | source                                                                    |
+| -------- | ------------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------- |
+| UPPAAL   | free for "non-commercial applications for academic institutions that deliver academic degrees"          | TAPAAL, IMITATOR (dense time) | https://uppaal.org/downloads/                                             |
+| nuXmv    | "for non-commercial or academic purposes"; no modification or redistribution                            | NuSMV                         | https://nuxmv.fbk.eu/license.html                                         |
+| CADP     | free licence for universities and public research centres; companies need a commercial licence          | mCRL2                         | https://cadp.inria.fr/ (unreachable 2026-10-30; read via secondary pages) |
+| FDR4     | "only freely available for academic teaching and research purposes"                                     | mCRL2                         | https://cocotec.io/fdr/                                                   |
+| MathSAT  | "research and evaluation purposes only"; not "in a commercial environment … without written permission" | Z3, cvc5                      | https://mathsat.fbk.eu/download.html                                      |
+| Alt-Ergo | default OCamlPro-Non-Commercial-License; a CeCILL-C `-free` release exists                              | Z3, cvc5                      | https://github.com/OCamlPro/alt-ergo                                      |
+
+**Reopen when** a vendor grants written evaluation terms (its tool may then run in `l4-verify`) or relicenses under terms that allow commercial use (it may then run here); or a restricted tool turns out to answer a question none of the open tools can (candidates to watch: nuXmv's SMT-based infinite-state checking, UPPAAL's priced and stochastic timed automata, CADP's LNT toolchain); or an open substitute is abandoned.
+
+##### Tool limitations the current plan rests on
+
+Each row is a fact about a tool's capability on 2026-10-30, the choice made because of it, and the change in the tool that would reopen the choice.
+"Ruled" rows were confirmed by Meng on 2026-10-30; "assumed" rows are design choices of the explore-verify session, not ruled, and are expected to be revisited by whoever builds against the tool.
+
+| tool            | limitation (2026-10-30)                                                                                                                                                        | choice made because of it                                                                                    | status  | reopen when                                                                                         | source                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `catala proof`  | checks only `NoEmptyError` and `NoOverlappingExceptions`; scope assertions enter as hypotheses; reports findings with exit 0; its Z3 encoding has no structs                   | not an oracle for `l4 prove`; the jl4 evaluator is (R-V5, and VERIFICATION-BACKEND-LOWERING-SPEC.md:210-215) | ruled   | it proves user assertions as goals, encodes structs, and exits non-zero on a finding                | `compiler/verification/conditions.mli` in CatalaLang/catala; CATALA-EXPORT-SPEC.md:1004-1015 |
+| Apalache        | no `WF`/`SF`/`ENABLED`; checks `Init`/`Next`, not `Spec`                                                                                                                       | judges safety properties only, run with `--init --next`                                                      | ruled   | its docs list fairness as supported                                                                 | `docs/src/apalache/features.md` in apalache-mc/apalache                                      |
+| Spin            | fairness is one global weak switch (`pan -f`); none per action                                                                                                                 | per-action fairness is written as assumptions inside the LTL property                                        | assumed | Spin documents per-action or per-process fairness                                                   | https://spinroot.com/spin/Man/Pan.html                                                       |
+| NuSMV, nuXmv    | `JUSTICE`/`COMPASSION` are global state predicates, ignored for invariants                                                                                                     | every liveness verdict comparison names the fairness notion each tool applied                                | assumed | the harness's fairness encoding changes                                                             | NuSMV 2.7 user manual                                                                        |
+| Alloy 6.2.0 CLI | writes txt, md, json, xml only (no pictures); no documented way to select the unbounded-temporal (Electrod) solvers; `-t table` blanks rows (issue #336, fixed only on master) | pictures are drawn by us from the XML or JSON instance; unbounded temporal checks are not relied on          | assumed | an Alloy release with CLI image output or documented solver selection (no release since 2025-01-09) | `org.alloytools.alloy.cli/.../CLI.java` on master                                            |
+| TAPAAL GUI      | contacts `versioncheck.tapaal.net` over plain HTTP at every launch with no opt-out; draws nets only in the GUI                                                                 | only the engines (`verifypn`) run in automation                                                              | assumed | an opt-out, or engine-level drawing                                                                 | `VersionChecker.java` in TAPAAL/tapaal-gui                                                   |
+| F\*             | pins Z3 5.3.0 while `l4 prove` would use the current Z3                                                                                                                        | the harness carries two Z3s and every verdict names its Z3                                                   | assumed | F\*'s default Z3 matches the one `l4 prove` pins                                                    | `src/basic/FStarC.Options.fst` in FStarLang/FStar                                            |
+| Lean 4          | `omega` covers linear integer and natural arithmetic only; Mathlib builds on a release-candidate toolchain                                                                     | rational or nonlinear `#ASSERT`s are reported unproved rather than importing Mathlib                         | assumed | core gains such a tactic, or Mathlib builds on the stable toolchain we pin                          | `src/Init/Tactics.lean` in leanprover/lean4; Reservoir                                       |
 
 ### 2.6 Documentation
 
