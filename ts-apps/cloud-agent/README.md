@@ -1,7 +1,7 @@
 # cloud-agent
 
 The Legalese AI harness, headless, for one cloud session
-([cloud-sessions spec](../../specs/todo/CLOUD-SESSIONS-SPEC.md) §5.4, §6.2,
+([cloud-sessions spec](https://github.com/legalese/cloud-sessions/blob/main/spec/CLOUD-SESSIONS-SPEC.md) §5.4, §6.2,
 §8, §11). It runs the same agent core as the VS Code extension
 (`@repo/legalese-agent`) against a session folder on the S3 Files mount, with
 `jl4-lsp` over stdio as the language server.
