@@ -457,7 +457,7 @@ DECIDE `is old enough` IF age >= 18
 ```
 
 `@export default` marks the file's main entry point among its exports.
-A function written as [several clauses](../functions/DECIDE.md#several-clauses) needs a `GIVEN` to be exported, and a function-typed input cannot be exported ([ASSUME](../types/ASSUME.md#function-typed-inputs-are-not-supported-for-export)).
+A function written as [several clauses](../functions/DECIDE.md#several-clauses) needs a `GIVEN` to be exported, and a function-typed input cannot be exported ([ASSUME](../types/ASSUME.md#function-typed-inputs-are-not-supported-yet-for-export)).
 How to deploy: [Deploy your rules](../../tutorials/deploying-rules/exporting-rules-for-deployment.md).
 
 **Example:** [annotation-example.l4](annotation-example.l4)
