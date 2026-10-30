@@ -502,6 +502,13 @@ nlgTransTop  = fixtureDir </> "nlg-trans-top.l4"
 nlgTransMid  = fixtureDir </> "nlg-trans-mid.l4"
 nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
 
+-- A herald belongs to the definition a call resolved to. The main module reuses
+-- the names of definitions that carry heralds, in the library next to it and in
+-- the prelude, for definitions of its own.
+nlgOwnerMain, nlgOwnerLib :: FilePath
+nlgOwnerMain = fixtureDir </> "nlg-owner-main.l4"
+nlgOwnerLib  = fixtureDir </> "nlg-owner-lib.l4"
+
 -- The example the syntax reference links for this: one mixfix function with a
 -- herald, and a rule that calls it. The test that reads it pins the page's
 -- claim, not just the output.
@@ -640,6 +647,7 @@ coreFixtures =
   , nlgHeadPlacementSource, placementReadme
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
+  , nlgOwnerMain, nlgOwnerLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3657,6 +3665,25 @@ spec bin = do
     it "reads the same when the top module is the one rendered" $ do
       rows <- midRows nlgTransTop
       rows `shouldBe` expected
+
+  -- A herald is found by the definition a call resolved to. It used to be found
+  -- by the call's name and its number of arguments, so any definition with the
+  -- same name read the herald of another one: a record, a rule of the drafter's
+  -- own beside an imported one, a library function reused for something else.
+  describe "a herald belongs to the definition the call resolved to" $ do
+    let renderedRows fixture needle = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ dropWhile (not . isAlpha) l
+               | l <- map (filter (/= '\r')) (lines sout)
+               , needle `isInfixOf` l ]
+
+    it "reads a WITH body that builds a record as a record, not as a call to a rule named like it" $ do
+      rows <- renderedRows nlgOwnerMain "Own "
+      rows `shouldBe`
+        [ "Own origin shift is a Pt with:"
+        , "Own band around is a range with:"
+        ]
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

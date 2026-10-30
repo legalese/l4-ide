@@ -213,11 +213,10 @@ data Unit = MkUnit
   , uDefs    :: !(Set.Set Unique)
   , uRefs    :: !(Set.Set Unique)
   , uDecl    :: !UnitDecl
-  , uCalls   :: !(Set.Set (Text, Int))
-    -- ^ The (name, argument count) of every rule that has a herald, as
-    -- 'nlgFnInfo' keys them: a named-argument call to one of these is a call,
-    -- not a record construction ('decideRendering'). Empty until 'allUnits'
-    -- fills it.
+  , uCalls   :: !(Set.Set Unique)
+    -- ^ The head of every rule that has a herald: a named-argument call to one of
+    -- these is a call, not a record construction ('decideRendering'). Empty until
+    -- 'allUnits' fills it.
   }
 
 extractUnits :: Module Resolved -> [Unit]
@@ -253,7 +252,16 @@ allUnits headings canonical mainModule deps =
       info  = nlgFnInfo canonical mods
       ctors = recordCtorFields mods
       rules = Set.map fst (Map.keysSet info)
-  in map (substNlgInUnit info . mapUnitBody (plainSelectors rules) . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings)
+      -- Told apart from a record's constructor by what the head resolved to, not
+      -- by its name: a record can be named like a rule that has a herald.
+      calls = Set.fromList
+        [ getUnique name
+        | m <- mods
+        , d@(MkDecide _ _ appForm _) <- foldTopLevelDecides (: []) m
+        , Just _ <- [decideNlg d]
+        , name <- appFormHeads appForm
+        ]
+  in map (\u -> (substNlgInUnit info . mapUnitBody (plainSelectors rules) . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u) { uCalls = calls })
        (extractUnits mainModule <> concatMap extractUnits deps)
 
 -- | Apply a transform to a unit's DECIDE body (a no-op for other units).
@@ -321,12 +329,10 @@ decideNlg :: Decide Resolved -> Maybe Nlg
 decideNlg = Nlg.decideNlg Nothing
 
 substNlgInUnit :: NlgFnInfo -> Unit -> Unit
-substNlgInUnit info u0 = case u.uDecl of
+substNlgInUnit info u = case u.uDecl of
   UDecide (MkDecide a t af body) ->
     u { uDecl = UDecide (MkDecide a t af (substituteNlgCalls info body)) }
   _ -> u
- where
-  u = u0 { uCalls = Map.keysSet info }
 
 -- | Replace a mixfix function's heading with its precomputed prose form
 -- (e.g. "a Person buyer may trade with a Person seller"). The map is keyed by
@@ -762,7 +768,7 @@ unitRendering u = case u.uDecl of
   longEnum cons =
     length cons > 5 || any (\c -> Text.length (conName c) > 24) cons
 
-decideRendering :: Set.Set (Text, Int) -> TypeSig Resolved -> Expr Resolved -> (Text, Clause)
+decideRendering :: Set.Set Unique -> TypeSig Resolved -> Expr Resolved -> (Text, Clause)
 decideRendering calls tysig body
   | Just t <- nlgOf body =
       (connectorFor tysig body, CLeaf t)   -- an authored @nlg sentence wins
@@ -777,11 +783,12 @@ decideRendering calls tysig body
   -- construction and is not one: it reads as the herald with its arguments in a
   -- @where@ clause, as @l4 nlg@ prints it ('substituteNlgCalls' has put the herald
   -- on its head), not as "is a the gap with" and a list of fields. Told apart by
-  -- the rule's name and argument count, not by a herald on the head, because a
-  -- record type can carry a herald of its own and its literal is still a record.
-  -- A call to a rule WITHOUT a herald still reads as a construction.
+  -- what the head resolved to, not by its name or a herald on it: a record can be
+  -- named like a rule that has a herald, and can carry a herald of its own, and
+  -- its literal is still a record. A call to a rule WITHOUT a herald still reads
+  -- as a construction.
   | Just (ctor, fields) <- bodyAsRecordLiteral body
-  , (ctor, length fields) `Set.notMember` calls =
+  , not (isRuleCall calls body) =
       ("is a " <> ctor <> " with", CFields (map fieldPair fields))
   | Just c <- arithChainClause body =
       ("equals", c)
@@ -864,7 +871,7 @@ peelWhere = \case
 -- | Render one local @WHERE@/@LET@ binding as a (heading, connector, body)
 -- triple. The enclosing rule's GIVEN parameters are in scope inside the binding,
 -- so its parameter substitution is threaded in alongside the binding's own.
-localDefClause :: Set.Set (Text, Int) -> Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
+localDefClause :: Set.Set Unique -> Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
 localDefClause calls outerSubst = \case
   LocalDecide _ d@(MkDecide _ ltysig _ lbody) ->
     let subst          = Map.union (paramSubst ltysig) outerSubst
@@ -936,6 +943,12 @@ typeNameText :: Type' Resolved -> Text
 typeNameText = \case
   TyApp _ n _ -> nameToText (getActual n)
   _           -> ""
+
+-- | Is this a named-argument call to one of these rules?
+isRuleCall :: Set.Set Unique -> Expr Resolved -> Bool
+isRuleCall calls = \case
+  AppNamed _ n _ _ -> getUnique n `Set.member` calls
+  _                -> False
 
 bodyAsRecordLiteral :: Expr Resolved -> Maybe (Text, [NamedExpr Resolved])
 bodyAsRecordLiteral = \case

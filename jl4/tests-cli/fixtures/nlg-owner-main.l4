@@ -1,0 +1,19 @@
+-- A herald belongs to the definition a call resolved to. Nothing here uses a
+-- definition of the same name from nlg-owner-lib.l4 or the prelude except where
+-- a row says so: each rule below builds or calls something of its own.
+IMPORT prelude
+IMPORT `nlg-owner-lib`
+
+-- Records named like a heralded function: `Pt` in nlg-owner-lib.l4, `range` in
+-- the prelude. A WITH body that builds one is a record literal, not a call.
+DECLARE Pt HAS x IS A NUMBER, y IS A NUMBER
+
+DECLARE range HAS low IS A NUMBER, high IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A Pt
+`own origin shift` n MEANS Pt WITH x IS n, y IS 100
+
+GIVEN n IS A NUMBER
+GIVETH A range
+`own band around` n MEANS range WITH low IS n, high IS 100

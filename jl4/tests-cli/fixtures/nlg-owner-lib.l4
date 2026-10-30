@@ -1,0 +1,10 @@
+-- Definitions that nlg-owner-main.l4 imports. Each has a herald; the main module
+-- reuses their names for definitions of its own, and a call must read the herald
+-- of the definition it resolved to, not of one that has the same name.
+
+-- A prefix function. The main module has a RECORD of the same name.
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+@nlg the distance from %x% to %y%
+`Pt` x y MEANS y MINUS x
