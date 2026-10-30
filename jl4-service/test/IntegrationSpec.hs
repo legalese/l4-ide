@@ -2583,6 +2583,32 @@ spec = describe "integration" do
             "Expected rejection, but published "
               <> show [fs.fsName | fs <- meta.metaFunctions]
 
+    -- The service binds the ASSUMEs it publishes around the call of the exported
+    -- rule, so a helper's read of one is not bound: the call failed on every
+    -- request with an assumed term. The deploy refuses it instead.
+    it "rejects an @export that reaches an ASSUME through a helper" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "reach.l4" $ Text.unlines
+        [ "ASSUME rate IS A NUMBER"
+        , ""
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`scaled` n MEANS n TIMES rate"
+        , ""
+        , "@export Scaled again"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`scaled again` n MEANS `scaled` n"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "it reaches the ASSUME `rate` through `scaled`"
+          err `shouldSatisfy` Text.isInfixOf "scaled again"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published "
+              <> show [fs.fsName | fs <- meta.metaFunctions]
+
     -- A rule that returns a DEONTIC is a contract. The service used to take a
     -- startTime and the events so far for it; no deployment of one is stored
     -- (Meng, 2026-10-30: the count is 0), and the export check refuses it, so

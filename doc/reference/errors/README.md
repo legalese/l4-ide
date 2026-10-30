@@ -58,6 +58,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
 - [An @export with an input or result that cannot be sent yet](#an-export-with-an-input-or-result-that-cannot-be-sent-yet)
+- [An @export that reaches an ASSUME it cannot be given](#an-export-that-reaches-an-assume-it-cannot-be-given)
 
 ---
 
@@ -1055,3 +1056,59 @@ GIVETH A NUMBER
 
 For a function, pass the values it would work on, and apply the function inside the rule.
 For a contract rule, remove the `@export`.
+
+---
+
+### An @export that reaches an ASSUME it cannot be given
+
+**Error:**
+
+```
+`scaled again` is published with @export, but it reaches the ASSUME `rate` through `scaled`.
+@export takes only the ASSUMEs that its own body reads. Pass `rate` in as a GIVEN.
+```
+
+When the `ASSUME` is further away, the first line names the functions in order: "through `middle`, then `inner`".
+When the exported function itself reads an `ASSUME` that an imported file declares, the first line says "it reads the ASSUME `rate`, which an imported module declares".
+
+**What you wrote:**
+
+```l4
+ASSUME rate IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`scaled` n MEANS n TIMES rate
+
+@export Scaled again
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`scaled again` n MEANS `scaled` n
+```
+
+**What went wrong:** an `ASSUME` is a value that a rule is told, not one it defines.
+`@export` publishes each `ASSUME` that the exported rule reads itself as an input, and a request supplies it.
+The service hands those values to the exported rule when it calls it, and not to the rules that one calls.
+So `rate` is not an input of `scaled again`, and `scaled` would stop with "I needed to know the value of … but it is an assumed term" on every request.
+The same holds for an `ASSUME` in an imported file.
+An `@export` of such a rule is an error, reported at the `@export` line, and only the `@export` is refused: the file still checks and its rules still evaluate where you write them.
+`l4 check` and `l4 deploy` exit 1, and the editor shows the error with the source `export`.
+
+A rule that reads an `ASSUME` itself and also reaches it through another rule is refused in the same way, because the second read fails.
+
+**How to fix it:** Pass the value in as a `GIVEN`, to the exported rule and to each rule between it and the place that needs the value:
+
+```l4
+GIVEN n IS A NUMBER
+      rate IS A NUMBER
+GIVETH A NUMBER
+`scaled` n rate MEANS n TIMES rate
+
+@export Scaled again
+GIVEN n IS A NUMBER
+      rate IS A NUMBER
+GIVETH A NUMBER
+`scaled again` n rate MEANS `scaled` n rate
+```
+
+Or remove the `@export`, if the rule is not meant to be published.

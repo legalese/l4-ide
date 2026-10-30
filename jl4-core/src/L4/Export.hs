@@ -440,6 +440,11 @@ data ExportError
   | -- | A GIVEN of an exported rule with no written type: the range of the
     -- @\@export@, the rule, and the input.
     ExportUntypedGiven (Maybe SrcRange) Resolved Resolved
+  | -- | An ASSUME that an exported rule reaches and cannot be given: the range
+    -- of the @\@export@, the rule, the ASSUME, and the rules it is reached
+    -- through, outermost first. No rule: the exported rule itself reads an
+    -- ASSUME that an imported module declares.
+    ExportAssumeReached (Maybe SrcRange) Resolved Resolved [Resolved]
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -447,12 +452,14 @@ exportErrorRange :: ExportError -> Maybe SrcRange
 exportErrorRange = \case
   ExportUnsendable r _ _ _ -> r
   ExportUntypedGiven r _ _ -> r
+  ExportAssumeReached r _ _ _ -> r
 
 -- | The exported rule the error is about.
 exportErrorFunction :: ExportError -> Resolved
 exportErrorFunction = \case
   ExportUnsendable _ f _ _ -> f
   ExportUntypedGiven _ f _ -> f
+  ExportAssumeReached _ f _ _ -> f
 
 -- | A missing type is a warning for now; anything else that cannot be sent is
 -- an error.
@@ -460,6 +467,7 @@ exportErrorSeverity :: ExportError -> Severity
 exportErrorSeverity = \case
   ExportUnsendable{} -> SError
   ExportUntypedGiven{} -> SWarn
+  ExportAssumeReached{} -> SError
 
 prettyExportError :: ExportError -> [Text]
 prettyExportError = \case
@@ -470,6 +478,13 @@ prettyExportError = \case
   ExportUntypedGiven _ fn input ->
     [ quoted fn <> " is published with @export, but its input " <> quoted input <> " has no written type."
     , "Write one in the GIVEN, so that the schema says what to send."
+    ]
+  ExportAssumeReached _ fn assume via ->
+    [ quoted fn <> " is published with @export, but "
+        <> (case via of
+              [] -> "it reads the ASSUME " <> quoted assume <> ", which an imported module declares."
+              _ -> "it reaches the ASSUME " <> quoted assume <> " through " <> Text.intercalate ", then " (map quoted via) <> ".")
+    , "@export takes only the ASSUMEs that its own body reads. Pass " <> quoted assume <> " in as a GIVEN."
     ]
  where
   quoted r = "`" <> resolvedToText r <> "`"
@@ -484,16 +499,30 @@ prettyExportError = \case
 -- not, so an @\@export@ of a rule with one is refused, at the @\@export@. A
 -- GIVEN with no written type is a warning.
 --
+-- An exported rule takes only the ASSUMEs that its own body reads, in its own
+-- module. An ASSUME that it reaches through another rule (its own module's or an
+-- imported one's), or reads itself but an imported module declares, is refused
+-- too: the service binds the ASSUMEs it publishes around the call of the
+-- exported rule, and a helper's read of one is not bound, so the call fails with
+-- an assumed term. The modules given are the ones the module imports,
+-- transitively.
+--
 -- This is its own pass, not a part of type checking: the errors of a type check
 -- stop the file from evaluating, and a refused @\@export@ is no reason to stop
 -- evaluating the contract rules in the same file. The result of a definition
 -- with no GIVETH comes from the entity info of the 'ShapeEnv', which must have
 -- the final substitution applied.
-checkExports :: ShapeEnv -> Module Resolved -> [ExportError]
-checkExports env mod' =
-  concatMap (checkOneExport env assumes) (collectExportedDecides mod')
+checkExports :: ShapeEnv -> [Module Resolved] -> Module Resolved -> [ExportError]
+checkExports env imported mod' =
+  concatMap (checkOneExport env assumes rules allAssumes) (collectExportedDecides mod')
  where
   assumes = allAssumesFromModule mod'
+  allAssumes = Map.unions (map allAssumesFromModule (mod' : imported))
+  rules = Map.fromList
+    [ (getUnique name, d)
+    | m <- mod' : imported
+    , d@(MkDecide _ _ (MkAppForm _ name _ _) _) <- allDecidesFromModule m
+    ]
 
 -- | The exported rules that 'checkExports' does not refuse (a warning does not
 -- refuse): the ones that can be published.
@@ -536,12 +565,58 @@ allAssumesFromModule (MkModule _ _ section) =
     Section _ sub -> collectSection sub
     _ -> []
 
+-- | Every DECIDE of a module, in sections too.
+allDecidesFromModule :: Module Resolved -> [Decide Resolved]
+allDecidesFromModule (MkModule _ _ section) = collectSection section
+ where
+  collectSection (MkSection _ _ _ decls) = decls >>= collectDecl
+  collectDecl = \case
+    Decide _ d -> [d]
+    Section _ sub -> collectSection sub
+    _ -> []
+
+-- | The ASSUMEs that a rule reaches, each with the rules it reaches it
+-- through, outermost first: none for an ASSUME its own body reads. Rules are
+-- followed breadth first, so the path is a shortest one, and a rule is followed
+-- once. An ASSUME that the body reads and a helper also reads is in the result
+-- twice, once with each path.
+assumeReach
+  :: Map.Map Unique (Decide Resolved)
+  -> Map.Map Unique (Assume Resolved)
+  -> Decide Resolved
+  -> [(Assume Resolved, [Resolved])]
+assumeReach rules allAssumes (MkDecide _ _ (MkAppForm _ self _ _) body) =
+  go (Set.singleton (getUnique self)) Set.empty [([], body)]
+ where
+  go _ _ [] = []
+  go seen found ((path, expr) : queue) =
+    hits ++ go seen' found' (queue ++ next)
+   where
+    refs = Set.toList (collectReferencedUniques expr)
+    hits =
+      [ (a, path)
+      | u <- refs
+      , Just a <- [Map.lookup u allAssumes]
+      , (u, null path) `Set.notMember` found
+      ]
+    found' = found <> Set.fromList [(u, null path) | u <- refs, Map.member u allAssumes]
+    helpers =
+      [ d
+      | u <- refs
+      , u `Set.notMember` seen
+      , Just d <- [Map.lookup u rules]
+      ]
+    seen' = seen <> Set.fromList [getUnique n | MkDecide _ _ (MkAppForm _ n _ _) _ <- helpers]
+    next = [(path ++ [n], b) | MkDecide _ _ (MkAppForm _ n _ _) b <- helpers]
+
 checkOneExport
   :: ShapeEnv
   -> Map.Map Unique (Assume Resolved)
+  -> Map.Map Unique (Decide Resolved)
+  -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [ExportError]
-checkOneExport env assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) body) =
+checkOneExport env assumes rules allAssumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) body) =
   concat
     [ case mty of
         Nothing -> [ExportUntypedGiven exportAt fnName paramName]
@@ -557,6 +632,10 @@ checkOneExport env assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ n
     [ unsendable ExportResult ty
     | Just ty <- [extractReturnType tySig <|> inferredReturnType env.entities fnName]
     ]
+  ++ [ ExportAssumeReached exportAt fnName assumeName via
+     | (MkAssume _ _ (MkAppForm _ assumeName _ _) _, via) <- assumeReach rules allAssumes decide
+     , not (null via) || getUnique assumeName `Map.notMember` assumes
+     ]
  where
   exportAt = getAnno decide ^. annDesc >>= rangeOf
   unsendable site ty = either (\why -> [ExportUnsendable exportAt fnName site why]) (const []) (jsonShape env ty)

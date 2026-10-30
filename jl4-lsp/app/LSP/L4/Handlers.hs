@@ -903,7 +903,7 @@ handlers evalConfig recorder =
                     summaries =
                       concatMap
                         (\tc ->
-                          let exportErrs = Export.checkExports (Shape.shapeEnvFromDeclares shapeDeclares tc.entityInfo) tc.module'
+                          let exportErrs = Export.checkExports (Shape.shapeEnvFromDeclares shapeDeclares tc.entityInfo) (map (.module') uniqueTcs) tc.module'
                           in map (Inspector.exportedFunctionToSummary allDeclares)
                                ( Export.withoutRefused exportErrs
                                $ Export.enrichReturnTypes tc.entityInfo

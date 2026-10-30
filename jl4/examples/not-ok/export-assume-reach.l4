@@ -1,0 +1,28 @@
+-- An @export is given the ASSUMEs that its own body reads, and no others: a
+-- request supplies them to the exported rule, and the rules it calls do not
+-- see them.
+-- So `via` is an error at its @export, because the ASSUME `rate` reaches it
+-- only through `scaled`; `direct` reads `rate` itself and is published.
+-- The error is reported by the export check, not the type check, so the file
+-- still checks and the #EVAL at the end still runs.
+ASSUME rate IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`scaled` n MEANS n TIMES rate
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`plain` n MEANS n PLUS 1
+
+@export Read it directly
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`direct` n MEANS `plain` n PLUS rate
+
+@export Reach it through a helper
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`via` n MEANS `scaled` n
+
+#EVAL `plain` 3
