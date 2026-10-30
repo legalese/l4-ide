@@ -479,8 +479,11 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
     -- BELOW it is the next declaration's, as it is below a DECIDE. The test is
     -- the one the last input of a GIVEN list and the last field of a record
     -- have: what is indented past the declaration's start describes the
-    -- ASSUME. Nothing after the head is traversed, so without this the head
-    -- reaches down to the next declaration.
+    -- ASSUME. That keeps a TYPICALLY default on a line of its own, with a gloss
+    -- trailing it, the assumption's, and a TYPICALLY default takes no
+    -- annotation (see 'addNlgInput'), so adding one moves nothing. Nothing after
+    -- the head is traversed, so without this the head reaches down to the next
+    -- declaration.
     MkAssume ann tySig appFormAka order mTypically -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlgAppFormWhere claims appFormAka
@@ -681,6 +684,10 @@ addNlgTypedName claimsBelow a = extendNlgA a $ case a of
     MkTypedName ann n ty mTypically mExpr -> do
       n' <- addNlgWhere claims n
       ty' <- unclaimedSignatureType ty
+      -- The field's TYPICALLY default takes no annotation (see 'addNlgInput'):
+      -- traversing it made it a sibling whose span cut the name off from the
+      -- line below, so an own-line herald under a field with a default went to
+      -- the NEXT field, or to nothing (smucclaw/l4-ide#997).
       pure $ MkTypedName ann n' ty' mTypically mExpr
    where
     claims w
@@ -802,6 +809,20 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (OptionallyTypedName n) where
 -- lines, plus whatever on a LATER line @claimsBelow@ accepts: everything,
 -- for an input with another after it; only what is indented past the GIVEN
 -- keyword, for the last (see the 'GivenSig' instance).
+--
+-- __A TYPICALLY default takes no annotation.__ It is a value the author
+-- supplies, not a thing the author describes, and nothing reads a gloss on
+-- it. So it is not traversed, registers no span, and the input behaves as if
+-- it were not there: a gloss trailing @b IS A NUMBER TYPICALLY 5@, or
+-- trailing @a IS A BOOLEAN TYPICALLY TRUE@, describes the input, and so does
+-- one on the line below. The test for this is metamorphic: adding or removing
+-- a TYPICALLY clause must not change where any annotation lands.
+--
+-- A default that was traversed claimed whatever trailed it when it was a name
+-- (@TRUE@, @Red@). That annotation attached to a node nothing renders, so the
+-- gloss vanished with no diagnostic (smucclaw/l4-ide#994). A literal claims
+-- nothing, which is why the same gloss behind @TYPICALLY 5@ always reached the
+-- input.
 addNlgInput ::
   (HasSrcRange n, HasNlg n) =>
   (NlgWithSpan -> Bool) -> OptionallyTypedName n -> NlgA (OptionallyTypedName n)
@@ -811,9 +832,14 @@ addNlgInput claimsBelow o = extendNlgA o $ case o of
     tys' <- traverse unclaimedSignatureType mty
     pure $ MkOptionallyTypedName ann n' tys' mTypically
    where
+    -- Below the input's name and type, not below its default: an annotation
+    -- written between the type and a TYPICALLY on a later line is not below
+    -- the input, whether or not the default is there.
+    headEnds = [ (fromSrcRange r).end | Just r <- [rangeOf n, mty >>= rangeOf] ]
+    belowHead w = not (null headEnds) && all (\ e -> w.range.start.line > e.line) headEnds
     claims w
-      | startsBelow o w = claimsBelow w
-      | otherwise       = True
+      | belowHead w = claimsBelow w
+      | otherwise   = True
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivethSig n) where
   addNlg a = extendNlgA a $ case a of
