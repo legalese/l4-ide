@@ -169,9 +169,14 @@ export class FileConversationStore implements ConversationStore {
     return conv
   }
 
-  async setTitle(id: string, title: string): Promise<void> {
+  async setTitle(
+    id: string,
+    title: string,
+    opts: { replacing?: string } = {}
+  ): Promise<void> {
     const conv = await this.load(id)
     if (!conv) return
+    if (opts.replacing !== undefined && conv.title !== opts.replacing) return
     conv.title = title
     await this.save(conv)
   }

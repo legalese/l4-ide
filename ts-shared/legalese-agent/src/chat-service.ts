@@ -1155,7 +1155,10 @@ export class ChatService {
       .summarizeTitle(firstUserMessage)
       .then(async (title) => {
         if (!title) return
-        await this.opts.store.setTitle(conversationId, title)
+        // Not over a title the user gave it meanwhile.
+        await this.opts.store.setTitle(conversationId, title, {
+          replacing: titleFromUserMessage(firstUserMessage),
+        })
       })
       .catch(() => undefined)
   }

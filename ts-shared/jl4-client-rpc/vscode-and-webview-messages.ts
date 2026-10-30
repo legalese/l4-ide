@@ -1364,6 +1364,15 @@ export const AiConversationDelete: RequestType<
   method: 'aiConversationDelete',
 }
 
+/** Webview renames a local conversation (its title, at most 80
+ *  characters; an automatic title no longer replaces it). */
+export const AiConversationRename: RequestType<
+  { id: string; title: string },
+  { ok: boolean }
+> = {
+  method: 'aiConversationRename',
+}
+
 /** Webview asks for a fresh conversation id (drops local state; starts
  * blank). Currently a notification because no response is needed —
  * state transitions happen in the webview's own store. */

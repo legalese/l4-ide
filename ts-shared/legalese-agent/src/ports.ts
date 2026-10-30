@@ -297,7 +297,13 @@ export interface ConversationStore {
     deploymentId?: string,
     apiBaseUrl?: string
   ): Promise<AiConversation>
-  setTitle(id: string, title: string): Promise<void>
+  /** Set the title; with `replacing`, only while the title is still
+   *  that (an automatic title doesn't overwrite one the user chose). */
+  setTitle(
+    id: string,
+    title: string,
+    opts?: { replacing?: string }
+  ): Promise<void>
 }
 
 // ── Extra tool sources (MCP) ──────────────────────────────────────────

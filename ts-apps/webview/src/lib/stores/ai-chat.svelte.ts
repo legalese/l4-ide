@@ -9,6 +9,7 @@ import {
   AiChatPreviewAttachment,
   AiChatStart,
   AiConversationDelete,
+  AiConversationRename,
   AiConversationList,
   AiConversationLoad,
   AiDictationCancel,
@@ -616,6 +617,38 @@ export function createAiChatStore(
       syncDeploymentBinding(state)
     } catch {
       // ignore
+    }
+  }
+
+  /** The current conversation's name for its header: its title, else
+   *  the history's (an automatic title reaches only the history). */
+  function currentTitle(): string {
+    const conv = getConversation()
+    if (!conv) return ''
+    return (
+      conv.title ||
+      history.find((h) => h.id === conv.id)?.title ||
+      'New conversation'
+    )
+  }
+
+  /** Rename a local conversation (cloud sessions keep their title). */
+  async function renameConversation(id: string, title: string): Promise<void> {
+    const next = title.trim().slice(0, 80)
+    const m = getMessenger()
+    if (!m || !next || cloudSessionIdOf(id)) return
+    const conv = conversations[id]
+    if (conv) conv.title = next
+    const item = history.find((h) => h.id === id)
+    if (item) item.title = next
+    try {
+      const res = await m.sendRequest(AiConversationRename, HOST_EXTENSION, {
+        id,
+        title: next,
+      })
+      if (!res.ok) await refreshHistory()
+    } catch {
+      await refreshHistory()
     }
   }
 
@@ -2836,6 +2869,10 @@ export function createAiChatStore(
     refreshHistory,
     loadConversation,
     deleteConversation,
+    renameConversation,
+    get currentTitle() {
+      return currentTitle()
+    },
     newConversation,
     startDeploymentChat,
     send,
@@ -2977,6 +3014,8 @@ export type AiChatStore = {
   refreshHistory: () => Promise<void>
   loadConversation: (id: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
+  renameConversation: (id: string, title: string) => Promise<void>
+  readonly currentTitle: string
   newConversation: () => void
   startDeploymentChat: (
     deploymentId: string,

@@ -39,7 +39,7 @@
   import ConversationHistory from './conversation-history.svelte'
   import SettingsPanel from './settings-panel.svelte'
   import DeploymentBanner from './deployment-banner.svelte'
-  import CloudBanner from './cloud-banner.svelte'
+  import ConversationHeader from './conversation-header.svelte'
   import CloudUpsell from '../cloud-upsell.svelte'
 
   let {
@@ -285,14 +285,23 @@
          shared Legalese Cloud promo so the two tabs read the same. -->
     <CloudUpsell context="ai" onSignIn={signIn} />
   {:else}
-    {#if showChat && store.current?.cloud}
-      <CloudBanner
-        cloud={store.current.cloud}
-        title={store.current.title}
-        git={store.cloudGitStatus}
-        gitReady={store.cloudGitReady}
+    {#if showChat && store.current}
+      {@const conv = store.current}
+      {@const id = conv.id}
+      <ConversationHeader
+        cloud={conv.cloud ?? null}
+        title={store.currentTitle}
+        running={conv.streaming}
+        waiting={!!(store.pendingApproval || store.pendingQuestion)}
+        git={conv.cloud ? store.cloudGitStatus : null}
+        gitReady={conv.cloud ? store.cloudGitReady : false}
         onStop={() => void store.stopCloud()}
         onGit={() => store.cloudGitAction()}
+        onDelete={() =>
+          id ? void store.deleteConversation(id) : store.newConversation()}
+        onRename={conv.cloud || !id
+          ? undefined
+          : (title) => void store.renameConversation(id, title)}
       />
     {/if}
     {#if showEmptyState}

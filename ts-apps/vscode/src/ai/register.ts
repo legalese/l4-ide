@@ -26,6 +26,7 @@ import {
   AiConversationList,
   AiConversationLoad,
   AiConversationNew,
+  AiConversationRename,
   AiDictationCancel,
   AiDictationStart,
   AiDictationStatus,
@@ -575,6 +576,19 @@ export function registerAiChatHandlers(deps: {
     return { conversation }
   })
 
+  messenger.onRequest(AiConversationRename, async ({ id, title }) => {
+    const next = title.trim().slice(0, 80)
+    if (!next) return { ok: false }
+    try {
+      await store.setTitle(id, next)
+      return { ok: true }
+    } catch (err) {
+      logger.warn(
+        `conversations/rename failed: ${err instanceof Error ? err.message : String(err)}`
+      )
+      return { ok: false }
+    }
+  })
   messenger.onRequest(AiConversationDelete, async ({ id }) => {
     const localOk = await store.delete(id)
     // Server-side delete is best-effort; the UI doesn't block on it.
