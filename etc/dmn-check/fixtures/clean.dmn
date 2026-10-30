@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Positive control for etc/dmn-check/selftest.sh: a small decision table that
+  dmn-check 1.4.0 has nothing to say about. If this file ever produces a finding,
+  the harness has changed what it reports, and the overlap fixture's findings
+  stop meaning anything.
+
+  It declares its numbers as typeRef="integer" on purpose. That is the numeric
+  vocabulary dmn-check 1.4.0 knows (integer, long, double); it does not know the
+  DMN 1.3 name "number", which is what `l4 export dmn` writes. number-type.dmn
+  pins that.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_clean" name="clean" namespace="https://legalese.com/l4/dmn/fixture/clean">
+  <inputData id="input_colour" name="colour">
+    <variable id="input_colour_var" name="colour" typeRef="string"/>
+  </inputData>
+  <decision id="decision_score" name="score">
+    <variable id="decision_score_var" name="score" typeRef="integer"/>
+    <informationRequirement id="decision_score_ir1">
+      <requiredInput href="#input_colour"/>
+    </informationRequirement>
+    <decisionTable id="decision_score_table" hitPolicy="UNIQUE">
+      <input id="decision_score_i1" label="colour">
+        <inputExpression id="decision_score_i1_expr" typeRef="string">
+          <text>colour</text>
+        </inputExpression>
+      </input>
+      <output id="decision_score_o1" name="score" typeRef="integer"/>
+      <rule id="decision_score_r1">
+        <inputEntry id="decision_score_r1_i1">
+          <text>"red"</text>
+        </inputEntry>
+        <outputEntry id="decision_score_r1_o1">
+          <text>1</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_score_r2">
+        <inputEntry id="decision_score_r2_i1">
+          <text>"blue"</text>
+        </inputEntry>
+        <outputEntry id="decision_score_r2_o1">
+          <text>2</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>
