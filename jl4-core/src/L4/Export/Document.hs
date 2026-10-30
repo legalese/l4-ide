@@ -213,6 +213,11 @@ data Unit = MkUnit
   , uDefs    :: !(Set.Set Unique)
   , uRefs    :: !(Set.Set Unique)
   , uDecl    :: !UnitDecl
+  , uCalls   :: !(Set.Set (Text, Int))
+    -- ^ The (name, argument count) of every rule that has a herald, as
+    -- 'nlgFnInfo' keys them: a named-argument call to one of these is a call,
+    -- not a record construction ('decideRendering'). Empty until 'allUnits'
+    -- fills it.
   }
 
 extractUnits :: Module Resolved -> [Unit]
@@ -237,6 +242,7 @@ extractUnits (MkModule _ _ section) = goSection section
       , uDefs    = definedIn decl
       , uRefs    = referencedIn decl
       , uDecl    = decl
+      , uCalls   = Set.empty
       }
 
 -- | All renderable units across the open module and its dependencies, with
@@ -313,10 +319,12 @@ decideNlg :: Decide Resolved -> Maybe Nlg
 decideNlg = Nlg.decideNlg Nothing
 
 substNlgInUnit :: NlgFnInfo -> Unit -> Unit
-substNlgInUnit info u = case u.uDecl of
+substNlgInUnit info u0 = case u.uDecl of
   UDecide (MkDecide a t af body) ->
     u { uDecl = UDecide (MkDecide a t af (substituteNlgCalls info body)) }
   _ -> u
+ where
+  u = u0 { uCalls = Map.keysSet info }
 
 -- | Replace a mixfix function's heading with its precomputed prose form
 -- (e.g. "a Person buyer may trade with a Person seller"). The map is keyed by
@@ -730,8 +738,8 @@ unitRendering u = case u.uDecl of
     | otherwise ->
         let subst              = paramSubst tysig
             (inner, locals)    = peelWhere (clauseLayout body)
-            (conn, mainClause) = decideRendering tysig (rewriteExpr (substParams subst inner))
-        in case mapMaybe (localDefClause subst) locals of
+            (conn, mainClause) = decideRendering u.uCalls tysig (rewriteExpr (substParams subst inner))
+        in case mapMaybe (localDefClause u.uCalls subst) locals of
              []   -> (conn, mainClause)
              defs -> (conn, CWhere mainClause defs)
   UAssume _ -> ("is assumed to be given", CLeaf "")
@@ -752,8 +760,8 @@ unitRendering u = case u.uDecl of
   longEnum cons =
     length cons > 5 || any (\c -> Text.length (conName c) > 24) cons
 
-decideRendering :: TypeSig Resolved -> Expr Resolved -> (Text, Clause)
-decideRendering tysig body
+decideRendering :: Set.Set (Text, Int) -> TypeSig Resolved -> Expr Resolved -> (Text, Clause)
+decideRendering calls tysig body
   | Just t <- nlgOf body =
       (connectorFor tysig body, CLeaf t)   -- an authored @nlg sentence wins
   | Regulative _ deon <- body =
@@ -763,7 +771,15 @@ decideRendering tysig body
       , tableClause cols rows )
   | Just items <- bodyAsValueList body =
       ("means", CChain "a list of the following" items)
-  | Just (ctor, fields) <- bodyAsRecordLiteral body =
+  -- A named-argument call to a rule that has a herald has the shape of a record
+  -- construction and is not one: it reads as the herald with its arguments in a
+  -- @where@ clause, as @l4 nlg@ prints it ('substituteNlgCalls' has put the herald
+  -- on its head), not as "is a the gap with" and a list of fields. Told apart by
+  -- the rule's name and argument count, not by a herald on the head, because a
+  -- record type can carry a herald of its own and its literal is still a record.
+  -- A call to a rule WITHOUT a herald still reads as a construction.
+  | Just (ctor, fields) <- bodyAsRecordLiteral body
+  , (ctor, length fields) `Set.notMember` calls =
       ("is a " <> ctor <> " with", CFields (map fieldPair fields))
   | Just c <- arithChainClause body =
       ("equals", c)
@@ -846,11 +862,11 @@ peelWhere = \case
 -- | Render one local @WHERE@/@LET@ binding as a (heading, connector, body)
 -- triple. The enclosing rule's GIVEN parameters are in scope inside the binding,
 -- so its parameter substitution is threaded in alongside the binding's own.
-localDefClause :: Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
-localDefClause outerSubst = \case
+localDefClause :: Set.Set (Text, Int) -> Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
+localDefClause calls outerSubst = \case
   LocalDecide _ d@(MkDecide _ ltysig _ lbody) ->
     let subst          = Map.union (paramSubst ltysig) outerSubst
-        (conn, clause) = decideRendering ltysig (rewriteExpr (substParams subst lbody))
+        (conn, clause) = decideRendering calls ltysig (rewriteExpr (substParams subst lbody))
     in Just (resolvedText (decideApp d), conn, clause)
   LocalAssume{} -> Nothing
 

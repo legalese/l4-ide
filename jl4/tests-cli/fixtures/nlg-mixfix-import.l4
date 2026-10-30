@@ -91,3 +91,28 @@ GIVETH A NUMBER
 GIVEN s IS A Span
 GIVETH A NUMBER
 `render third selector` s MEANS s's size's third
+
+-- A WITH call as the WHOLE body of a rule. It is a call, not a record
+-- construction, so it reads as the function's herald with the arguments in a
+-- where clause, as `l4 nlg` prints it, and not as "is a the gap with" and a list
+-- of fields. `Pt`, a record that carries a herald of its own, is the control: its
+-- literal is still a record literal.
+DECLARE Pt @nlg a point
+  HAS x IS A NUMBER
+      y IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render exceeds direct` n MEANS `the amount by which` WITH a IS n, b IS 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render gap direct` n MEANS `the gap` WITH a IS n, b IS 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render lower direct` n MEANS `the lower of` WITH a IS n, b IS 100
+
+GIVEN n IS A NUMBER
+GIVETH A Pt
+`render point` n MEANS Pt WITH x IS n, y IS 100

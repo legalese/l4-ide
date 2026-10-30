@@ -3608,6 +3608,10 @@ spec bin = do
           , "Render lower with equals the smaller of a and b where a is n and b is 100 + 1."
           , "Render half selector means the span's size's half."
           , "Render third selector means the span's size's third."
+          , "Render exceeds direct means the amount by which a exceeds b where a is n and b is 100."
+          , "Render gap direct means the gap between a and b where a is n and b is 100."
+          , "Render lower direct means the smaller of a and b where a is n and b is 100."
+          , "Render point is a Pt with:"
           ]
 
     it "is read by l4 render at a call in the body of another rule" $ do
