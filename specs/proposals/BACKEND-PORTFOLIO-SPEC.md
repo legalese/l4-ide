@@ -434,6 +434,9 @@ sign-off from both sides' specs in their next revision.
   §8.4's witness gap. Footnote technologies: CUTECat (ESOP 2025) checks assertions as _goals_ via
   concolic execution, but is an unmerged fork pinned to Catala 0.10.0 with lists and month/year
   dates silently falling back to concrete; DateSAT is the candidate date-encoding fix.
+  Updated 2026-10-30: route 1 is built on draft PR legalese/l4-ide#784 (`l4 prove`), not yet merged into `unstable`.
+  That PR also closes §8.4's witness gap as a design: `l4 export catala` writes one test scope per realisable combination of a ladder's conditions, calling the real emitted scope with a witness the evaluator checks; z3 only proves combinations impossible or finds a witness when the fixed candidate set has none.
+  Running those tests needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`), so the gap is closed where catala runs and stays open in CI until catala is installed there (SLOWCOOKER).
 - **S4 — prose, two producers.** Logical English (#258, a surface over the Prolog image) vs.
   TNR/NLG round-trip (branch `nlg-roundtrip`). Different fidelity contracts (executable surface
   vs. drafting prose); both stand; cross-cite.
