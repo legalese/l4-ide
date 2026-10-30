@@ -1,6 +1,6 @@
 GIVEN y IS A NUMBER
 GIVETH A MAYBE NUMBER
-`the fee in year` y MEANS
+`the fee in year` MEANS
     IF y AT LEAST 2000
     THEN JUST 100
     ELSE NOTHING

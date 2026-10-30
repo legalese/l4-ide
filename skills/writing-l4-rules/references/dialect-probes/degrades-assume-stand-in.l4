@@ -2,6 +2,6 @@ ASSUME `set size` IS A FUNCTION FROM LIST OF STRING TO NUMBER
 
 GIVEN xs IS A LIST OF STRING
 GIVETH A BOOLEAN
-`has two` xs MEANS `set size` xs EQUALS 2
+`has two` MEANS `set size` xs EQUALS 2
 
 #ASSERT `has two` (LIST "a", "b")

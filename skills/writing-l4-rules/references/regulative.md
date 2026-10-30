@@ -442,7 +442,7 @@ For recurring payments (loans, subscriptions, installments), define a function t
 
 ```l4
 GIVEN remainingBalance IS A NUMBER
-`monthly payments` remainingBalance MEANS
+`monthly payments` MEANS
     IF remainingBalance GREATER THAN 0
     THEN PARTY `The Borrower`
          MUST pay `monthly installment`

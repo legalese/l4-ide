@@ -6,4 +6,4 @@ DECLARE Body HAS
 
 GIVEN b IS A Body
 GIVETH A BOOLEAN
-`is alpha` b MEANS b's kind EQUALS Alpha
+`is alpha` MEANS b's kind EQUALS Alpha

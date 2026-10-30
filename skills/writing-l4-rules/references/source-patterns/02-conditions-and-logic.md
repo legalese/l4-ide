@@ -25,7 +25,7 @@ all rather than by a `MAY`" (`:2716-2717`).
 @ref Probate and Administration Act 1934 s 28(1), s 28(2)
 GIVEN gr IS A Grantee
 GIVETH A DEONTIC Grantee `An act under the Probate and Administration Act`
-`s 28 — the grantee shall take an oath` gr MEANS
+`s 28 — the grantee shall take an oath` MEANS
     IF   `s 28(2) — the grantee is the Public Trustee or a trust company` gr
     THEN FULFILLED
     ELSE PARTY gr
@@ -72,7 +72,7 @@ this:
 @ref Wills Act 1838 s 27(1), s 4, s 6
 GIVEN w IS A Will
 GIVETH A BOOLEAN
-`the will is formally valid` w MEANS
+`the will is formally valid` MEANS
   BRANCH
     IF   w's `made by a soldier in actual military service or a mariner at sea`
     THEN TRUE
@@ -111,7 +111,7 @@ GIVETH A BOOLEAN
 ```l4
 GIVEN w IS A Will
 GIVETH A BOOLEAN
-`a grant of probate may issue on the will` w MEANS
+`a grant of probate may issue on the will` MEANS
     `the will is formally valid` w
     UNLESS `a caveat is in force against the estate`
     WHERE `a caveat is in force against the estate` MEANS FALSE
@@ -229,14 +229,14 @@ conditions — so that clause is _subtracting_, and it is an `UNLESS`.
 @ref Wills Act 1838 s 6(1) — "No will shall be valid unless it is in writing and executed in the manner mentioned in subsection (2)"
 GIVEN w IS A Will
 GIVETH A BOOLEAN
-`the will is in writing and executed in the manner mentioned in subsection (2)` w MEANS
+`the will is in writing and executed in the manner mentioned in subsection (2)` MEANS
         w's `in writing`
     AND `the will is executed in the manner mentioned in subsection (2)` w
 
 @ref Wills Act 1838 s 6(2)
 GIVEN w IS A Will
 GIVETH A BOOLEAN
-`the will is executed in the manner mentioned in subsection (2)` w MEANS
+`the will is executed in the manner mentioned in subsection (2)` MEANS
         w's `signed at the foot or end by the testator`
     AND w's `the signature was made or acknowledged before 2 witnesses present at the same time`
 ```
@@ -287,7 +287,7 @@ scopes a whole list and De Morgan's law is the thing to get right.
 @ref 17 CFR 227.100(a)(1)-(3)
 GIVEN issuer IS AN IssuerProfile
 GIVETH A BOOLEAN
-`the issuer may rely on section 4(a)(6)` issuer MEANS
+`the issuer may rely on section 4(a)(6)` MEANS
         "(a) Exemption. An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933, provided that:"
     ... "(1)" ... issuer's `the aggregate amount sold in the preceding 12 months is within the limit`
     ... "(2)" ... issuer's `each investor's aggregate purchases are within the investor limit`
@@ -303,7 +303,7 @@ clause** (`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:1769-1777`):
 @ref 17 CFR 227.201(t)(1)-(3) — the (t)(3) proviso is tested before the (t)(3) main clause
 GIVEN issuer IS AN IssuerProfile
 GIVETH A `financial statement requirement`
-DECIDE `the financial statements required` issuer IS
+DECIDE `the financial statements required` IS
     BRANCH IF issuer's `the aggregate target offering amount` AT MOST 124000
            THEN `tax return information certified by the principal executive officer`
            IF issuer's `the aggregate target offering amount` AT MOST 618000
@@ -348,7 +348,7 @@ navigates back to the source, and it belongs in the encoding.
 @ref 17 CFR 227.501(a)(1)-(3)
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
-`transfer falls within an exception in Rule 501(a)` transfer MEANS
+`transfer falls within an exception in Rule 501(a)` MEANS
         "unless such securities are transferred:"
     ..  "(1)" ... transfer's `to the issuer of the securities`
     ..  "(2)" ... transfer's `to an accredited investor`
@@ -366,7 +366,7 @@ rather than reading fields off it.
 @ref 17 CFR 227.304(b) — the conjunctive conditions on an early close
 GIVEN offering IS AN OfferingProfile
 GIVETH A BOOLEAN
-DECIDE `the issuer may close the offering early` offering IF
+DECIDE `the issuer may close the offering early` IF
         offering's `sum of the investment commitments` AT LEAST offering's `target offering amount`
     AND offering's `new offering deadline` LESS THAN offering's `deadline identified in the issuer's offering materials`
     AND `304(b)(1) — the offering remained open for at least 21 days` offering
@@ -426,7 +426,7 @@ DECLARE Transfer HAS
 
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
-`the transferee is a member of the family of the purchaser or the equivalent` transfer MEANS
+`the transferee is a member of the family of the purchaser or the equivalent` MEANS
         "(c)"
     ..  transfer's `the transferee is a child of the purchaser`
     ..  transfer's `the transferee is a grandchild of the purchaser`
@@ -486,7 +486,7 @@ written `UNION`:
 -- recorded because the source does not settle it.
 GIVEN purpose IS A Purpose
 GIVETH A BOOLEAN
-`(h) — the advancement of public participation in sport` purpose MEANS
+`(h) — the advancement of public participation in sport` MEANS
         "(h)" ... purpose's `the advancement of public participation in sport`
     ... "(2)(c)" ... purpose's `sport that involves physical skill and exertion`
 
@@ -602,7 +602,7 @@ rule states, with the rule's own words in a comment above it:
 @ref Intestate Succession Act 1967 s 7 rules 1, 2 and 4 — "the following rules shall be observed"
 GIVEN c IS A Case
 GIVETH A NUMBER
-`the spouse's share under section 7` c MEANS
+`the spouse's share under section 7` MEANS
   BRANCH
     -- Rule 1: "If an intestate dies leaving a surviving spouse, no issue and
     -- no parent, the spouse shall be entitled to the whole of the estate."
@@ -633,7 +633,7 @@ other layout puts the first `IF` on the `BRANCH` line itself:
 ```l4
 GIVEN hours IS A NUMBER
 GIVETH A STRING
-`the band for` hours MEANS
+`the band for` MEANS
   BRANCH IF hours AT MOST 0  THEN "no hours"
          IF hours AT MOST 40 THEN "first band only"
          OTHERWISE "both bands"
@@ -696,7 +696,7 @@ say what. Getting it wrong is not a type error: the two bracketings are both boo
 ```l4
 GIVEN claim IS A Claim
 GIVETH A BOOLEAN
-`a ground for possession is made out` claim MEANS
+`a ground for possession is made out` MEANS
             claim's `the tenant is in arrears`
         AND claim's `the arrears exceed two months rent`
     OR      claim's `the tenant has abandoned the premises`
