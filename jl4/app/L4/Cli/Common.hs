@@ -24,6 +24,7 @@ module L4.Cli.Common
   , runOneshotWithDiagnostics
   , runOneshotVerbose
   , LoadedModule(..)
+  , Rules.TypeCheckResult(..)
   , loadChecked
   , transitiveDeps
   , dedupModules
@@ -483,7 +484,9 @@ putDiagnostics = mapM_ (hPutStrLn stderr . Text.unpack)
 diagnosticsToJson :: [Text] -> Aeson.Value
 diagnosticsToJson = Aeson.toJSON
 
--- | A file that type-checked, with the modules it imports.
+-- | A file that type-checked, with the modules it imports. ('Rules.TypeCheckResult'
+-- is exported from here, so that a package that only reads it need not depend
+-- on @jl4-lsp@; its fields have types of @jl4-core@.)
 data LoadedModule = MkLoadedModule
   { lmCheck   :: Rules.TypeCheckResult
     -- ^ the result of checking the file; its @module'@ is the module itself

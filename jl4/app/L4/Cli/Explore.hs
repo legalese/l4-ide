@@ -78,6 +78,7 @@ module L4.Cli.Explore
   ) where
 
 import Base (catMaybes, for, for_, unless, when)
+import Control.Exception (IOException, SomeAsyncException (..), SomeException, displayException, evaluate, fromException, throwIO, try)
 import Control.Monad (foldM)
 import Data.Char (isDigit)
 import Data.Either (lefts, rights)
@@ -426,6 +427,9 @@ selectTargets targets opts = do
 
 -- | Write every emitted file of every graph into the directory, and say on
 -- stderr what was written and what was not. 'False' when a file was not.
+-- A built-in emitter's file that cannot be written ends the run with the
+-- exception, as it always has; an extension target's is reported with the
+-- target and the file named, and the other files are still written.
 emitAll :: [(EmitTarget, TargetOptions)] -> FilePath -> ExploreCliOptions -> [Property] -> [(Graph, [CheckResult], Labels)] -> IO Bool
 emitAll selected dir opts props checked = do
   createDirectoryIfMissing True dir
@@ -439,37 +443,89 @@ emitAll selected dir opts props checked = do
           , eiLabels = labels
           , eiFair = opts.exFair
           }
-        (files, taken') = withTargets taken (emitFiles input) [ (t.etName, t.etFiles o input) | (t, o) <- selected ]
-    for_ (rights files) \ (name, text) -> TIO.writeFile (dir </> Text.unpack name) text
-    for_ (lefts files) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
-    unless (null (rights files)) $
-      TIO.hPutStrLn stderr ("Emitted to " <> Text.pack dir <> ": " <> Text.intercalate ", " (map fst (rights files)))
-    pure (null (lefts files) : acc, taken')) ([], []) (zip [1 ..] checked)
+        builtin = emitFiles input
+    for_ (rights builtin) \ (name, text) -> TIO.writeFile (dir </> Text.unpack name) text
+    for_ (lefts builtin) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
+    made <- for selected \ (t, o) -> do
+      files <- settle (t.etFiles o input)
+      pure (t.etName, files)
+    let (extra, taken') = withTargets taken builtin made
+    wrote <- for extra \case
+      Left why -> pure (Left why)
+      Right (who, name, text) -> writeTargetFile dir who name text
+    for_ (lefts wrote) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
+    let written = map fst (rights builtin) <> rights wrote
+    unless (null written) $
+      TIO.hPutStrLn stderr ("Emitted to " <> Text.pack dir <> ": " <> Text.intercalate ", " written)
+    pure ((null (lefts builtin) && null (lefts wrote)) : acc, taken')) ([], []) (zip [1 ..] checked)
   pure (and oks)
+
+-- | Write a target's file, or say why not: the refusal names the target and the file.
+writeTargetFile :: FilePath -> String -> Text.Text -> Text.Text -> IO (Either Text.Text Text.Text)
+writeTargetFile dir who name text =
+  try (TIO.writeFile (dir </> Text.unpack name) text) >>= \case
+    Left (e :: IOException) -> pure (Left (targetLabel who <> ": file `" <> name <> "`: " <> Text.pack (show e)))
+    Right () -> pure (Right name)
+
+targetLabel :: String -> Text.Text
+targetLabel who = "target " <> Text.pack who
+
+-- | What a target made, with every part of it evaluated, so that an
+-- exception raised while it is computed (an @error@ in a pure function, say)
+-- is caught here, and not later, while a file is being written. A file name or
+-- contents that raises becomes a refusal ('withTargets' puts the target's name
+-- in front of it) that names the file where the name is known, and the files
+-- after it are still taken. A list that raises before its end is taken to
+-- where it raised. (An asynchronous exception, such as an interrupt, is not
+-- caught.)
+settle :: [Either Text.Text (Text.Text, Text.Text)] -> IO [Either Text.Text (Text.Text, Text.Text)]
+settle = go
+  where
+    go rs = attempt Nothing (evaluate rs) >>= \case
+      Left refusal -> pure [Left refusal]
+      Right [] -> pure []
+      Right (r : rest) -> (:) <$> item r <*> go rest
+    item r = attempt Nothing (evaluate r) >>= \case
+      Left refusal -> pure (Left refusal)
+      Right (Left why) -> fmap (Left . either id id) (attempt Nothing (evaluate why))
+      Right (Right pair) -> attempt Nothing (evaluate pair) >>= \case
+        Left refusal -> pure (Left refusal)
+        Right (n, t) -> attempt Nothing (evaluate n) >>= \case
+          Left refusal -> pure (Left refusal)
+          Right name -> either Left (\ t' -> Right (name, t')) <$> attempt (Just name) (evaluate t)
+    attempt :: Maybe Text.Text -> IO a -> IO (Either Text.Text a)
+    attempt file act = try act >>= \case
+      Right a -> pure (Right a)
+      Left (e :: SomeException)
+        | Just (SomeAsyncException _) <- fromException e -> throwIO e
+        | otherwise -> pure (Left (maybe "" (\ f -> "file `" <> f <> "`: ") file
+            <> Text.takeWhile (/= '\n') (Text.pack (displayException e))))
 
 -- | The file names written so far in a run: case-folded, with the name as it
 -- was written and who wrote it.
 type Taken = [(Text.Text, (Text.Text, Text.Text))]
 
 -- | The built-in files, then the selected extension targets' (see
--- "L4.Cli.Extensions"), each target's results after its name. A target's file
--- is refused, with the target and file named, and not written if its name
--- could leave the directory ('emitNameProblem') or is the same file, ignoring
--- case, as one written earlier in the run by a built-in emitter or another
--- target (the file systems of macOS and Windows do not tell them apart). With
--- no targets the files are the built-in ones unchanged.
+-- "L4.Cli.Extensions"): what the selected targets made, each with the name it
+-- is given, as the files to write (with the target that made each) or the
+-- reasons they are not to be. A target's file is refused, with the target and
+-- file named, and not written if its name cannot be written into the
+-- directory ('emitNameProblem') or is the same file, ignoring case, as one
+-- written earlier in the run by a built-in emitter or another target (the
+-- file systems of macOS and Windows do not tell them apart). With no targets
+-- there is nothing to write beyond the built-in files.
 withTargets
   :: Taken
   -> [Either Text.Text (Text.Text, Text.Text)]
   -> [(String, [Either Text.Text (Text.Text, Text.Text)])]
-  -> ([Either Text.Text (Text.Text, Text.Text)], Taken)
-withTargets taken0 builtin targets = (builtin <> extra, taken')
+  -> ([Either Text.Text (String, Text.Text, Text.Text)], Taken)
+withTargets taken0 builtin targets = (extra, taken')
   where
     (extra, taken') = go ([ (Text.toCaseFold n, (n, "a built-in emitter")) | (n, _) <- rights builtin ] <> taken0)
                          [ (who, r) | (who, rs) <- targets, r <- rs ]
     go taken [] = ([], taken)
     go taken ((who, r) : rest) =
-      let here = "target " <> Text.pack who
+      let here = targetLabel who
           refused why = let (more, t) = go taken rest in (Left (here <> ": " <> why) : more, t)
       in case r of
         Left why -> refused why
@@ -480,7 +536,7 @@ withTargets taken0 builtin targets = (builtin <> extra, taken')
                 <> " (names are compared without regard to case); not written over it")
           | otherwise ->
               let (more, t) = go ((Text.toCaseFold name, (name, here)) : taken) rest
-              in (Right (name, text) : more, t)
+              in (Right (who, name, text) : more, t)
 
 -- | Run a @#TRACE@, given as source, appended to the file explored: a
 -- virtual file beside it, so that its imports resolve as the file's own do,

@@ -22,11 +22,15 @@
 --   @--target-opt NAME.KEY=VALUE@ (passed to that target as a map). With none
 --   it gains neither, and its help is the community edition's.
 -- * 'extEdition': the name of the edition. @l4 --version@ appends it, and a
---   message that names the extension says it.
+--   message that names the extension says it. Editions that are combined with
+--   '<>' are joined with @+@, each name once, in the order first met.
 --
 -- A subcommand is a name and an @optparse-applicative@ 'ParserInfo' whose
 -- parser yields the action to run. An export format that reads an L4 file
--- can use 'L4.Cli.Common.loadChecked'. An emit target is a function of its
+-- can use 'L4.Cli.Common.loadChecked', which gives back the checked module and
+-- its imports; 'L4.Cli.Common' exports the type they come in, so the package
+-- needs @jl4-lsp@ only if it runs the pipeline itself, and @jl4-core@
+-- ("L4.Syntax") to look inside the syntax tree. An emit target is a function of its
 -- options and the 'EmitInput' that the built-in emitters are built from: the
 -- explored graph (@eiGraph@), the properties and their labels, and @--fair@.
 -- For the shape the built-in Tla, Smv and Pnml emitters read, apply
@@ -49,8 +53,14 @@
 -- written at all):
 --
 -- * A 'Left' from a target.
--- * A file name with a path separator, a colon or @..@ in it, or an empty one.
---   Nothing is written outside the @--emit@ directory.
+-- * An exception raised while a target's files are computed, or while one is
+--   written (a directory of that name is in the way, say). The files of the
+--   target that come before and after it are still written, unless the list
+--   itself could not be read to its end, and so are the other targets'.
+-- * A file name that 'emitNameProblem' refuses: empty, @.@, a path separator,
+--   a colon, @..@, a control character, longer than 255 bytes in UTF-8, or a
+--   device name that Windows reserves. Nothing is written outside the @--emit@
+--   directory.
 -- * A file name that is the same as one already written, by a built-in
 --   emitter or an earlier target. Names are compared case-folded, because
 --   APFS and HFS+ as they are usually set up would treat them as one file.
@@ -66,6 +76,9 @@
 -- * A target that @--target@ leaves out is not run, so a fault in it is not
 --   found by that run.
 -- * An option a target does not read is passed to it and ignored by it.
+-- * Of the Windows rules for file names, only the reserved device names are
+--   checked: a name that ends in a dot or a space, or a device name with a
+--   superscript digit, is not refused here.
 module L4.Cli.Extensions
   ( Extensions (..)
   , ExtCommand (..)
@@ -80,7 +93,8 @@ module L4.Cli.Extensions
 import Base.Text (Text)
 import qualified Base.Map as Map
 import qualified Base.Text as Text
-import Data.List (group, sort)
+import Data.Char (isControl)
+import Data.List (group, intercalate, nub, sort)
 import Options.Applicative (ParserInfo)
 
 import L4.Lts.Explore.Emit.Model (EmitInput)
@@ -100,9 +114,9 @@ data Extensions = MkExtensions
 instance Semigroup Extensions where
   a <> b = MkExtensions
     { extEdition = case (a.extEdition, b.extEdition) of
-        (Just x, Just y) | x /= y -> Just (x <> "+" <> y)
+        (Just x, Just y) -> Just (joinEditions x y)
         (Nothing, y) -> y
-        (x, _) -> x
+        (x, Nothing) -> x
     , extCommands = a.extCommands <> b.extCommands
     , extExports = a.extExports <> b.extExports
     , extEmitTargets = a.extEmitTargets <> b.extEmitTargets
@@ -110,6 +124,16 @@ instance Semigroup Extensions where
 
 instance Monoid Extensions where
   mempty = noExtensions
+
+-- | The names between the plus signs of both, each once, in the order first
+-- met, so that combining editions is associative: @A <> A <> B@ is @A+B@
+-- however it is bracketed. (A name with a plus sign in it is two names.)
+joinEditions :: String -> String -> String
+joinEditions x y = intercalate "+" (nub (names x <> names y))
+  where
+    names s = case break (== '+') s of
+      (name, []) -> [name]
+      (name, _ : rest) -> name : names rest
 
 -- | A subcommand: @l4 NAME ...@, or @l4 export NAME ...@. Build the
 -- 'ParserInfo' as the built-in ones are built, @info (helper <*> parser)
@@ -164,13 +188,41 @@ extensionLabel :: Extensions -> String
 extensionLabel exts = maybe "an extension" (\ e -> "the " <> e <> " extension") exts.extEdition
 
 -- | Why a file name given by an emit target cannot be written into the
--- @--emit@ directory, or 'Nothing' if it can: it is empty, or has a path
--- separator, a colon (a drive, or a stream on Windows) or @..@ in it. An
--- absolute name has a separator.
+-- @--emit@ directory, or 'Nothing' if it can. It is refused if it is empty or
+-- @.@; has a path separator (so an absolute name is refused), a colon (a
+-- drive, or a stream on Windows), @..@ or a control character, NUL included,
+-- in it; is longer than 255 bytes in UTF-8, which is as long as a name can be
+-- on the usual file systems; or is a device name that Windows reserves
+-- (@CON@, @PRN@, @AUX@, @NUL@, @COM1@ to @COM9@, @LPT1@ to @LPT9@), as it
+-- stands or before its first dot, in any case.
 emitNameProblem :: Text -> Maybe Text
 emitNameProblem name
   | Text.null name = Just "the name is empty"
+  | name == "." = Just "the name is `.`, the directory itself"
   | Text.any (\ c -> c == '/' || c == '\\') name = Just "the name has a path separator in it"
   | Text.any (== ':') name = Just "the name has a colon in it"
   | ".." `Text.isInfixOf` name = Just "the name has `..` in it"
+  | Text.any isControl name = Just "the name has a control character in it"
+  | utf8Length name > 255 = Just "the name is longer than 255 bytes in UTF-8"
+  | Just device <- reservedDevice name = Just ("the name is `" <> device <> "`, a device name that Windows reserves")
   | otherwise = Nothing
+
+-- | The length of the text in UTF-8, in bytes.
+utf8Length :: Text -> Int
+utf8Length = Text.foldl' (\ n c -> n + width c) 0
+  where
+    width c
+      | c < '\x80' = 1
+      | c < '\x800' = 2
+      | c < '\x10000' = 3
+      | otherwise = 4
+
+-- | The Windows device that the name stands for, if it does: the text before
+-- its first dot, compared without regard to case.
+reservedDevice :: Text -> Maybe Text
+reservedDevice name
+  | stem `elem` devices = Just (Text.toUpper stem)
+  | otherwise = Nothing
+  where
+    stem = Text.toCaseFold (Text.takeWhile (/= '.') name)
+    devices = ["con", "prn", "aux", "nul"] <> [ d <> Text.pack (show n) | d <- ["com", "lpt"], n <- [1 .. 9 :: Int] ]

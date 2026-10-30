@@ -12,18 +12,18 @@ module CliTest.Extensions (spec, probeMain, probeEnv) where
 
 import qualified Base.Map as Map
 import Data.List (isInfixOf, isSuffixOf)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Options.Applicative (helper, info, progDesc, strArgument, metavar)
-import System.Directory (doesDirectoryExist, doesFileExist)
+import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist)
 import System.Environment (getEnvironment, getExecutablePath)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 
-import L4.Cli.Common (FixedNowOpt (..), LoadedModule (..), loadChecked, makeEvalConfig)
+import L4.Cli.Common (FixedNowOpt (..), LoadedModule (..), TypeCheckResult (..), loadChecked, makeEvalConfig)
 import L4.Cli.Extensions
 import L4.Cli.Main (mainWith)
 import L4.Lts.Explore.Emit.Model (EmitInput (..))
@@ -42,6 +42,11 @@ probeExtensions :: String -> Extensions
 probeExtensions = \ case
   "none" -> noExtensions
   "all" -> good { extEmitTargets = [alpha, beta] }
+  "sharp-s" -> good { extEmitTargets = [target "alpha" \ _ -> [Right ("STRASSE.TXT", "a\n"), Right ("straße.txt", "b\n")]] }
+  "bad-names" -> good { extEmitTargets = [target "alpha" \ _ -> [Right (".", "x"), Right ("CON.txt", "x"), Right ("ok.txt", "x\n")]] }
+  "write-fails" -> good { extEmitTargets = [target "alpha" \ _ -> [Right ("blocked.txt", "x"), Right ("after.txt", "y\n")]] }
+  "text-error" -> good { extEmitTargets = [alpha, target "gamma" \ _ -> [Right ("t1.txt", error "boom"), Right ("t2.txt", "fine\n")]] }
+  "spine-error" -> good { extEmitTargets = [alpha, target "delta" \ _ -> Right ("s1.txt", "one\n") : error "spine boom"] }
   "case-clash" -> good { extEmitTargets = [target "alpha" \ ei -> [Right (T.toUpper ei.eiBase <> ".DOT", "x\n"), Right ("x.txt", "x\n")]] }
   "path" -> good { extEmitTargets = [target "alpha" \ _ -> [Right ("sub/a.txt", "x"), Right ("../a.txt", "x"), Right ("a:b.txt", "x"), Right ("ok.txt", "x\n")]] }
   "same-twice" -> good { extEmitTargets = [target "alpha" \ ei -> [Right (ei.eiBase <> ".same.txt", "a\n")], target "beta" \ ei -> [Right (ei.eiBase <> ".same.txt", "b\n")]] }
@@ -67,7 +72,7 @@ probeExtensions = \ case
       (_, loaded) <- loadChecked cfg fp
       case loaded of
         Nothing -> putStrLn "not loaded"
-        Just lm -> putStrLn ("loaded: " <> show (length lm.lmImports) <> " imports")
+        Just lm -> putStrLn ("loaded: " <> show lm.lmCheck.success <> ", " <> show (length lm.lmImports) <> " imports")
     target n f = MkEmitTarget { etName = n, etFiles = \ _ ei -> f ei }
     alpha = MkEmitTarget
       { etName = "alpha"
@@ -183,6 +188,36 @@ spec = describe "extension hook (L4.Cli.Extensions)" do
         doesFileExist (dir </> "ok.txt") `shouldReturn` True
         doesDirectoryExist (dir </> "sub") `shouldReturn` False
         doesFileExist (tmp </> "a.txt") `shouldReturn` False
+    it "refuses names that differ only as ß and SS do, which only full case folding sees" $
+      refuses "sharp-s" [] \ dir err -> do
+        err `shouldSatisfy` ("target alpha: file `straße.txt` is the same file as `STRASSE.TXT`, written by target alpha" `isInfixOf`)
+        doesFileExist (dir </> "STRASSE.TXT") `shouldReturn` True
+        TIO.readFile (dir </> "STRASSE.TXT") `shouldReturn` "a\n"
+    it "refuses a name that is the directory or a Windows device, naming the target and the file, and writes the rest" $
+      refuses "bad-names" [] \ dir err -> do
+        err `shouldSatisfy` ("target alpha: file `.`: the name is `.`, the directory itself; not written" `isInfixOf`)
+        err `shouldSatisfy` ("target alpha: file `CON.txt`: the name is `CON`, a device name that Windows reserves; not written" `isInfixOf`)
+        TIO.readFile (dir </> "ok.txt") `shouldReturn` "x\n"
+    it "reports a file that cannot be written with the target and the file named, and writes the others" $
+      withOut \ dir -> do
+        createDirectoryIfMissing True (dir </> "blocked.txt")
+        o <- probe "write-fails" (exploreInto dir [])
+        o.outExit `shouldBe` ExitFailure 1
+        o.outStderr `shouldSatisfy` ("--emit: not written: target alpha: file `blocked.txt`: " `isInfixOf`)
+        TIO.readFile (dir </> "after.txt") `shouldReturn` "y\n"
+        doesFileExist (dir </> "d1_naive.dot") `shouldReturn` True
+        o.outStderr `shouldSatisfy` ("after.txt" `isInfixOf`)
+    it "reports an exception raised while a file's contents are computed, with the target and the file, and writes the rest" $
+      refuses "text-error" [] \ dir err -> do
+        err `shouldSatisfy` ("--emit: not written: target gamma: file `t1.txt`: boom" `isInfixOf`)
+        doesFileExist (dir </> "t1.txt") `shouldReturn` False
+        TIO.readFile (dir </> "t2.txt") `shouldReturn` "fine\n"
+        doesFileExist (dir </> "d1_naive.alpha.txt") `shouldReturn` True
+    it "reports an exception raised while a target's list is read, with the target, and keeps what came before it" $
+      refuses "spine-error" [] \ dir err -> do
+        err `shouldSatisfy` ("--emit: not written: target delta: spine boom" `isInfixOf`)
+        TIO.readFile (dir </> "s1.txt") `shouldReturn` "one\n"
+        doesFileExist (dir </> "d1_naive.alpha.txt") `shouldReturn` True
     it "refuses a file another target wrote first, naming both" $
       refuses "same-twice" [] \ dir err -> do
         err `shouldSatisfy` ("target beta: file `d1_naive.same.txt` is the same file as `d1_naive.same.txt`, written by target alpha" `isInfixOf`)
@@ -196,6 +231,44 @@ spec = describe "extension hook (L4.Cli.Extensions)" do
         o.outStderr `shouldSatisfy` (not . ("gamma" `isInfixOf`))
       -- the baseline is not a failure by luck: it must not be exit 1
       baseline.outExit `shouldNotBe` ExitFailure 1
+
+  describe "emitNameProblem" do
+    let longAscii = T.replicate 255 "a"
+        twoByte = T.replicate 127 "\233" <> "a"
+    it "accepts ordinary names, 255 bytes, and the near misses of the device names" $
+      mapM_ (\ n -> (n, emitNameProblem n) `shouldBe` (n, Nothing))
+        ["a.txt", "d1_naive.dot", ".hidden", "CONSOLE", "con-sole.txt", "COM0", "COM10", "NULL.txt", "xCON", "LPT", longAscii, twoByte]
+    it "refuses the directory itself, control characters including NUL, and names over 255 bytes" $
+      mapM_ (\ (n, why) -> (n, fmap (why `T.isInfixOf`) (emitNameProblem n)) `shouldBe` (n, Just True))
+        [ (".", "the directory itself")
+        , (T.pack ['a', '\0', 'b'], "control character")
+        , ("a\nb", "control character")
+        , ("a\DELb", "control character")
+        , (longAscii <> "a", "255 bytes")
+        , (T.replicate 128 "\233", "255 bytes")
+        ]
+    it "refuses Windows device names as they stand and before the first dot, in any case" $
+      mapM_ (\ (n, device) -> (n, fmap (device `T.isInfixOf`) (emitNameProblem n)) `shouldBe` (n, Just True))
+        [("CON", "`CON`"), ("con", "`CON`"), ("Nul.txt", "`NUL`"), ("com1.tar.gz", "`COM1`"), ("LPT9.x", "`LPT9`"), ("aux.", "`AUX`"), ("PRN", "`PRN`")]
+    it "still refuses the names it refused before" $
+      mapM_ (\ n -> (n, isJust (emitNameProblem n)) `shouldBe` (n, True))
+        ["", "sub/a.txt", "..\\a.txt", "../a.txt", "a:b.txt", "/abs.txt", "a..b"]
+
+  describe "combining extensions" do
+    let ed n = noExtensions { extEdition = Just n }
+        a = ed "A"
+        b = ed "B"
+    it "reads a repeated edition once, in the order first met, however the editions are bracketed" $ do
+      (a <> a <> b).extEdition `shouldBe` Just "A+B"
+      ((a <> a) <> b).extEdition `shouldBe` Just "A+B"
+      (a <> (a <> b)).extEdition `shouldBe` Just "A+B"
+      ((a <> b) <> (b <> a)).extEdition `shouldBe` Just "A+B"
+      (b <> a <> a).extEdition `shouldBe` Just "B+A"
+    it "keeps the one edition there is, and has noExtensions as its identity" $ do
+      (mempty <> a).extEdition `shouldBe` Just "A"
+      (a <> mempty).extEdition `shouldBe` Just "A"
+      (a <> a).extEdition `shouldBe` Just "A"
+      (mempty :: Extensions).extEdition `shouldBe` Nothing
 
   describe "faults of the extensions stop the program before an argument is read" do
     let stops variant message = do
