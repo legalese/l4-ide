@@ -106,7 +106,10 @@ data Command
 
 commandParser :: Extensions -> Parser Command
 commandParser exts =
-      checkedSubparser "command" subcommandSet
+      -- The export formats are read only by `l4 export`; forcing them here
+      -- makes a name clash among them stop every invocation, as one among the
+      -- commands does.
+      exportFormats `seq` checkedSubparser "command" subcommandSet
   -- Backward-compat fallthrough: `l4 foo.l4 [--flags]` = `l4 run foo.l4 [--flags]`.
   -- Must come after `subparser` so a well-typed subcommand name wins.
   <|> (CmdRun <$> runOptionsParser)
@@ -245,8 +248,9 @@ extensionCommand c = command c.ecName (CmdExtension <$> c.ecInfo)
 -- | 'subparser', except that a name given twice is an error. With optparse-
 -- applicative's own rule, the first of two commands of one name wins and the
 -- other is unreachable without a word, which is how an extension would lose
--- to a built-in. The error is raised when the parser is first run, which is
--- every invocation. @what@ names the kind of thing, for the message.
+-- to a built-in. The error is raised when the parser is first read, which
+-- 'commandParser' does for both lists on every invocation. @what@ names the
+-- kind of thing, for the message.
 checkedSubparser :: String -> Mod CommandFields a -> Parser a
 checkedSubparser what m = case [ n | n <- names, length (filter (== n) names) > 1 ] of
   [] -> subparser m
