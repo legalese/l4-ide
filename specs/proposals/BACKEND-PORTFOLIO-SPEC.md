@@ -35,13 +35,14 @@ a draft and never updated after its final rebase (corrected 2026-08-28).
 
 ## 0. Ruling status
 
-| ruling | state        | detail                                                    |
-| ------ | ------------ | --------------------------------------------------------- |
-| P1     | **PROPOSED** | this doc owns cross-backend invariants; specs cite it, §4 |
-| P2     | **PROPOSED** | six-family taxonomy, §1.1                                 |
-| P3     | **PROPOSED** | one shared exportable-core definition in code, §5         |
-| P4     | **PROPOSED** | double-covered seams S1–S5 assigned owners, §7            |
-| P5     | **PROPOSED** | collision & sequencing protocol, §8                       |
+| ruling | state                | detail                                                                                                             |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| P1     | **PROPOSED**         | this doc owns cross-backend invariants; specs cite it, §4                                                          |
+| P2     | **PROPOSED**         | six-family taxonomy, §1.1                                                                                          |
+| P3     | **PROPOSED**         | one shared exportable-core definition in code, §5                                                                  |
+| P4     | **PROPOSED**         | double-covered seams S1–S5 assigned owners, §7                                                                     |
+| P5     | **PROPOSED**         | collision & sequencing protocol, §8                                                                                |
+| V1     | **RULED 2026-10-30** | verification code split between l4-ide and a private `legalese/l4-verify`, and the restricted-licence rule, §2.5.1 |
 
 ## 1. The thesis
 
@@ -172,16 +173,35 @@ Blawx did consume it as a fifth consumer rather than growing a lowering of its o
 
 ### 2.5 Verification
 
-| target                                                                        | state                                                                        | owning artifact                                                                               |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Z3, Alloy 6, TLA+/Apalache, NuSMV/nuXmv, UPPAAL, TAPAAL, SPIN/Promela, Maude  | **PROPOSED** — fan-out design, phased Z3 → Alloy → timed → unbounded **[E]** | `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` (elaborates BOUNDED-DEONTICS Phase 2) |
-| Lean, F\*                                                                     | **FUTURE** — named here, no spec                                             | this document, §7 S5                                                                          |
-| L4-native: `#CHECK`, exhaustiveness oracle, ROBDD, `l4 state-graph`, `#TRACE` | **SHIPPED**                                                                  | in-tree                                                                                       |
+| target                                                                           | state                                                                           | owning artifact                                                                               |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Z3, Alloy 6, TLA+/Apalache, NuSMV/nuXmv, UPPAAL, TAPAAL, SPIN/Promela, Maude     | **PROPOSED** — fan-out design, phased Z3 → Alloy → timed → unbounded **[E]**    | `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` (elaborates BOUNDED-DEONTICS Phase 2) |
+| TLA+ (TLC), NuSMV, mCRL2 (`.aut`), PNML, Graphviz, from the explicit state graph | **SHIPPED** on `unstable`: `l4 explore --emit`, #759, merged 2026-10-27 **[E]** | `specs/proposals/REGULATIVE-LOWERING-SPEC.md` §6; `jl4-core/src/L4/Lts/Explore/Emit/`         |
+| Lean, F\*                                                                        | **FUTURE** — named here, no spec                                                | this document, §7 S5                                                                          |
+| L4-native: `#CHECK`, exhaustiveness oracle, ROBDD, `l4 state-graph`, `#TRACE`    | **SHIPPED**                                                                     | in-tree                                                                                       |
 
 The verification family is the **only** family that consumes the regulative and temporal layers
 jointly (timed reachability over `DO`/`HENCE`/`LEST` choice points — the letter/spirit gap
 search) **[E]**. Its two motivating case studies (the regulatory double-bind, the payout leak) are
 the programme's founding war stories.
+
+#### 2.5.1 Where verification code lives, and the restricted-licence rule (V1, ruled 2026-10-30)
+
+**RULED 2026-10-30 by Meng**, in session explore-verify, on a proposal from that session: _"let’s close the work as you proposed into l4-verify as a private repo … the apache code that is already in l4-ide can stay there."_
+
+**Stays in this repository, under Apache-2.0:** every emitter to an external format (`L4.Lts.Explore.Emit` and its successors), `l4 explore`, `l4 prove`, the `l4 export` targets for provers and model finders (Lean, F\*, Alloy), and harness wiring for tools whose licences allow commercial use.
+The code already landed here (#759 and earlier) stays as it is.
+
+**Goes to `legalese/l4-verify`, a private repository:** runs of restricted-licence tools, cross-validation orchestration and dashboards, counterexample explanation for lawyers, LLM-in-the-loop formalisation, investor-facing capability comparisons, and any hosted verification service.
+As of 2026-10-30 that repository does not exist yet; this is proposed, not landed, until it is created.
+
+**The restricted-licence rule.** Writing an emitter to a tool's input format is not restricted, so emitters to any format may live here.
+A tool whose licence restricts commercial or company use is never run in this repository's CI or shipped artifacts, is documented only here, and is run only in `legalese/l4-verify`, and only after its vendor has confirmed evaluation terms in writing.
+At 2026-10-30 that covers nuXmv, UPPAAL, CADP, FDR4, MathSAT and Alt-Ergo's default licence (a docs-only survey of the licence pages, not legal advice).
+Meng deferred the requests for evaluation terms "until the rest of the system is built", so until then those tools are documented only, in both repositories.
+
+**Why the line falls here.** The emitters are coupled to the type-checked core and to the evaluator, which is every backend's oracle of record (VERIFICATION-BACKEND-LOWERING-SPEC R-V5), so separating them would mean chasing an unstable internal API; and public emitters are the evidence a technical reviewer can check.
+The layer that turns verdicts into a product (orchestration, explanation, hosting) is the commercial layer around the open core.
 
 ### 2.6 Documentation
 
