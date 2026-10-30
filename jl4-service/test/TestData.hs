@@ -22,6 +22,9 @@ module TestData (
   deonticRecordPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
+  missingBooleanJL4,
+  assumeBooleanJL4,
+  deonticBooleanJL4,
   importedRecordDeclJL4,
   importedRecordMainJL4,
   partialClausesJL4,
@@ -1369,4 +1372,56 @@ GIVEN `a b` IS A NUMBER
       `a-b` IS A NUMBER
 GIVETH A NUMBER
 DECIDE clash IS `a b` PLUS `a-b`
+|]
+
+-- | Three BOOLEAN inputs, one of which the rule never reads. A @{}@ on any of
+-- them sends the request through the generated wrapper, which read every
+-- missing BOOLEAN as FALSE until smucclaw/l4-ide#992.
+missingBooleanJL4 :: Text
+missingBooleanJL4 =
+  [i|
+@export default eligible
+GIVEN `has criminal record` IS A BOOLEAN
+      `is resident`         IS A BOOLEAN
+      `unused flag`         IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible MEANS `is resident` AND NOT `has criminal record`
+|]
+
+-- | A BOOLEAN that is an ASSUME rather than a GIVEN, which the wrapper binds
+-- with a LET around the call.
+assumeBooleanJL4 :: Text
+assumeBooleanJL4 =
+  [i|
+ASSUME `has criminal record` IS A BOOLEAN
+
+@export default eligible
+GIVEN `is resident` IS A BOOLEAN
+GIVETH A BOOLEAN
+eligible MEANS `is resident` AND NOT `has criminal record`
+|]
+
+-- | A deontic rule that branches on a BOOLEAN input. Deontic functions always
+-- take the wrapper path, so a missing input used to take the ELSE branch.
+deonticBooleanJL4 :: Text
+deonticBooleanJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver        IS A Driver
+      `is motorway` IS A BOOLEAN
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    IF      `is motorway`
+    THEN    PARTY driver
+            MUST `wear seatbelt`
+            WITHIN 1
+    ELSE    PARTY driver
+            MAY `drive`
 |]
