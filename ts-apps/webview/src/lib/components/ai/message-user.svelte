@@ -1,6 +1,7 @@
 <script lang="ts">
   // import CopyButton from './copy-button.svelte'
   import type { UserTurnChip } from '$lib/stores/ai-chat.svelte'
+  import type { CloudToolChip } from '$lib/stores/cloud-chat'
 
   let {
     content,
@@ -8,6 +9,9 @@
     shouldStick = false,
     userIndex = -1,
     pending = false,
+    tools = [],
+    onToolSignIn,
+    rollback = null,
   }: {
     content: string
     chips?: UserTurnChip[]
@@ -21,8 +25,32 @@
      *  scroll-sticky header set (the data-pending attribute below
      *  is read by message-list's offset collector). */
     pending?: boolean
+    /** Cloud conversations: MCP servers passed to the session (on its
+     *  first prompt), as chips after the files. One that needs a
+     *  sign-in here is amber, and a click on it signs in (§6.4). */
+    tools?: CloudToolChip[]
+    onToolSignIn?: (server: string) => void
+    /** Cloud conversations (§9.4): roll the files back to before this
+     *  prompt. A subtle icon in the bubble's top right corner. */
+    rollback?: { title: string; onClick: () => void } | null
   } = $props()
 </script>
+
+{#snippet toolIcon()}
+  <svg
+    class="chip-icon"
+    viewBox="0 0 16 16"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.4"
+    stroke-linejoin="round"
+  >
+    <path
+      d="M10.6 2.2a3.2 3.2 0 0 0-3.1 4.2L2.6 11.3a1.5 1.5 0 0 0 2.1 2.1l4.9-4.9a3.2 3.2 0 0 0 4.2-3.1l-2 2-1.9-.5-.5-1.9z"
+    />
+  </svg>
+{/snippet}
 
 <div
   class="user-row user-message-wrapper"
@@ -31,13 +59,35 @@
   data-user-index={userIndex}
   data-pending={pending ? 'true' : 'false'}
 >
-  <div class="user-bubble">
-    {#if chips && chips.length > 0}
+  <div class="user-bubble" class:has-action={!!rollback}>
+    {#if rollback}
+      <button
+        type="button"
+        class="rollback-btn"
+        title={rollback.title}
+        aria-label={rollback.title}
+        onclick={rollback.onClick}
+      >
+        <svg
+          viewBox="0 0 16 16"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3.67 6A5 5 0 1 1 3.08 9.37" />
+          <path d="M3.4 2.9V6.2H6.7" />
+        </svg>
+      </button>
+    {/if}
+    {#if (chips && chips.length > 0) || tools.length > 0}
       <!-- Echo the staged-context chips captured at submit time. Same
            mild gray fill / layout as the input strip so the bubble
            reads as "this is what I sent you". -->
       <div class="user-chips" role="list" aria-label="Attached context">
-        {#each chips as chip, i (i)}
+        {#each chips ?? [] as chip, i (i)}
           <span
             class="user-chip"
             role="listitem"
@@ -78,6 +128,33 @@
               </span>
             {/if}
           </span>
+        {/each}
+        {#each tools as tool (tool.name)}
+          {#if tool.needsSignIn}
+            <span class="chip-slot" role="listitem">
+              <button
+                type="button"
+                class="user-chip tool sign-in"
+                disabled={tool.signingIn}
+                title={tool.signingIn
+                  ? `Signing in to ${tool.name}…`
+                  : `Sign in to ${tool.name}: the cloud session can't use its tools until you do`}
+                onclick={() => onToolSignIn?.(tool.name)}
+              >
+                {@render toolIcon()}
+                <span class="chip-name">{tool.name}</span>
+              </button>
+            </span>
+          {:else}
+            <span
+              class="user-chip tool"
+              role="listitem"
+              title={`MCP server passed to the cloud session: ${tool.name}. Its tools run there without approval.`}
+            >
+              {@render toolIcon()}
+              <span class="chip-name">{tool.name}</span>
+            </span>
+          {/if}
         {/each}
       </div>
     {/if}
@@ -161,6 +238,28 @@
     color: var(--vscode-descriptionForeground);
     max-width: 220px;
   }
+  /* MCP servers: like a file chip, without the fill. */
+  .user-chip.tool {
+    background: transparent;
+    padding-left: 2px;
+  }
+  .chip-slot {
+    display: contents;
+  }
+  /* One that needs a sign-in here (§6.4): amber, and a button. */
+  .user-chip.tool.sign-in {
+    border: none;
+    font-family: inherit;
+    color: var(--vscode-editorWarning-foreground, #cca700);
+    cursor: pointer;
+  }
+  .user-chip.tool.sign-in:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+  .user-chip.tool.sign-in:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
   .chip-icon {
     width: 12px;
     height: 12px;
@@ -202,4 +301,39 @@
     top: 2px;
     right: 2px;
   } */
+  .user-bubble.has-action {
+    padding-right: 28px;
+  }
+  .rollback-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.6;
+    cursor: pointer;
+  }
+  .user-bubble:hover .rollback-btn,
+  .rollback-btn:focus-visible {
+    opacity: 1;
+  }
+  .rollback-btn:hover {
+    color: var(--vscode-foreground);
+    background: var(
+      --vscode-toolbar-hoverBackground,
+      rgba(128, 128, 128, 0.15)
+    );
+  }
+  .rollback-btn svg {
+    width: 13px;
+    height: 13px;
+  }
 </style>

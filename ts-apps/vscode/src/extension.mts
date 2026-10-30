@@ -69,6 +69,7 @@ import { VsCodeEditorContext } from './ai/editor-context.js'
 import { SettingsPermissionPolicy } from './ai/vscode-permissions.js'
 import { WebviewUserInteraction } from './ai/vscode-user-interaction.js'
 import { createCloudSessions } from './cloud/vscode-cloud.js'
+import { registerCloudHandlers } from './cloud/register-cloud.js'
 
 /***********************************************
      decode for RenderAsLadderInfo
@@ -709,8 +710,8 @@ export async function activate(context: ExtensionContext) {
     extensionVersion,
   })
 
-  // Cloud sessions (specs/todo/CLOUD-SESSIONS-SPEC.md): inert until
-  // `legaleseAi.cloudSessions.enabled` is on and an API URL is set —
+  // Cloud sessions (spec: legalese/cloud-sessions, spec/): inert until
+  // `legaleseAi.cloudSessions.enabled` is on —
   // nothing polls or calls out before a session is started or opened.
   // Their chat events take the same path as the local chat service's.
   const cloudSessions = createCloudSessions({
@@ -754,6 +755,27 @@ export async function activate(context: ExtensionContext) {
       vsMcp: vsMcpTools,
       serviceClient,
       extensionPath: context.extensionPath,
+    })
+  )
+
+  context.subscriptions.push(
+    registerCloudHandlers({
+      messenger: sidebarMessenger,
+      frontend: sidebarWebviewFrontend,
+      cloud: cloudSessions,
+      logger: aiLogger,
+      storage: context.globalState,
+      account: () => {
+        const user = auth.getUserId()
+        const org = auth.getCloudOrgSlug()
+        return user && org ? `${user}:${org}` : undefined
+      },
+      visibility: sidebarProvider,
+      reveal: async () => {
+        await sidebarProvider.revealSidebar()
+        await sidebarProvider.waitUntilReady()
+        sidebarProvider.switchToTab('ai-chat')
+      },
     })
   )
 

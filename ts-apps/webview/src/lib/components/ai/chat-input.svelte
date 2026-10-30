@@ -188,6 +188,19 @@
     store.abort()
   }
 
+  /** "Run in cloud" (§12.2): the same input, sent as the first prompt
+   *  of a new cloud session instead of a local turn. */
+  function submitCloud(): void {
+    const trimmed = text.trim()
+    if (!trimmed || disabled || store.pendingQuestion) return
+    void store.sendCloud(trimmed, stagedMentions)
+    stagedMentions = []
+    text = ''
+    store.setDraft('')
+    mentionState = null
+    void tick().then(() => autoresize())
+  }
+
   // Attachment picker state. `attachBusy` guards against double-clicks
   // while the native dialog is open; `attachNote` surfaces soft warnings
   // ("this PDF might eat a lot of context") and rejection reasons from
@@ -683,6 +696,38 @@
           </svg>
         </button>
       {:else}
+        {#if store.canRunInCloud && !store.pendingQuestion}
+          <!-- Run in cloud (§12.2): same prompt, new cloud session.
+               Outlined, beside the solid Send. -->
+          <button
+            class="submit-btn cloud"
+            onclick={submitCloud}
+            disabled={disabled || !text.trim()}
+            title="Send as cloud session"
+            aria-label="Send as cloud session"
+          >
+            <!-- Cloud symmetric about x = 8 (three lobes, open at the
+                 bottom for the arrow); the glyph is centred in the box. -->
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M5.75 11.25H4.75A2.75 2.75 0 0 1 4.535 5.758A3.5 3.5 0 0 1 11.465 5.758A2.75 2.75 0 0 1 11.25 11.25H10.25"
+                stroke="currentColor"
+                stroke-width="1.4"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8 13.5V6.5M6 8.5L8 6.5l2 2"
+                stroke="currentColor"
+                stroke-width="1.6"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        {/if}
         <button
           class="submit-btn"
           onclick={submit}
@@ -1058,6 +1103,57 @@
   .submit-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+  /* Neutral secondary of Send, which stays the one crimson button: gray
+     outline and glyph (both currentColor), white on hover; light themes
+     take their foreground instead. border-box keeps it 28×28 next to
+     Send. */
+  /* Tucked 4px under Send (past the row's 2px gap) with no right border,
+     so it reads as Send extended to the left: a second way to send. A
+     pixel smaller than Send at the top, bottom and left (the row centres
+     it on Send); the extra 4px keep the icon centred in the 27px that
+     show. */
+  .submit-btn.cloud {
+    box-sizing: border-box;
+    width: 31px;
+    height: 26px;
+    padding-right: 4px;
+    margin-right: -6px;
+    background: transparent;
+    color: var(--vscode-descriptionForeground, #9d9d9d);
+    border: 1px solid currentColor;
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+    transition:
+      color 0.1s ease-out,
+      opacity 0.1s ease-out;
+  }
+  .submit-btn.cloud + .submit-btn {
+    position: relative;
+    z-index: 1;
+  }
+  /* Disabled, Send is dimmed with solid colours (40% over the input's
+     background, as the opacity elsewhere): see-through, it would show
+     the cloud button's outline running under it. */
+  .submit-btn.cloud + .submit-btn:disabled {
+    opacity: 1;
+    background: color-mix(
+      in srgb,
+      #c8376a 40%,
+      var(--vscode-input-background, #3c3c3c)
+    );
+    color: color-mix(
+      in srgb,
+      #fff 40%,
+      var(--vscode-input-background, #3c3c3c)
+    );
+  }
+  .submit-btn.cloud:hover:not(:disabled) {
+    background: transparent;
+    color: #fff;
+  }
+  :global(body.vscode-light) .submit-btn.cloud:hover:not(:disabled) {
+    color: var(--vscode-foreground);
   }
   /* Streaming state: darker tint of the same crimson so it reads as
      "same affordance, different mode" rather than a new color. */

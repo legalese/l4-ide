@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import type { Messenger } from 'vscode-messenger'
 import type { WebviewTypeMessageParticipant } from 'vscode-messenger-common'
 import {
+  cloudSessionIdOf,
   AiActiveFile,
   AiAuthStatus,
   AiChatAbort,
@@ -499,7 +500,9 @@ export function registerAiChatHandlers(deps: {
   // landed yet the file won't exist; we silently no-op in that case.
   messenger.onNotification(AiFileOpen, async ({ callId }) => {
     const meta = callArgs.get(callId)
-    if (!meta) return
+    // A cloud session's paths name files in the cloud, not here (the
+    // webview renders them as plain text).
+    if (!meta || cloudSessionIdOf(meta.conversationId)) return
     try {
       const uri = dispatcher.resolveFile({
         callId,
@@ -520,6 +523,7 @@ export function registerAiChatHandlers(deps: {
   // reflects the actual delta the tool wrote to disk, not a
   // speculative preview.
   messenger.onNotification(AiFileOpenDiff, async ({ callId }) => {
+    if (cloudSessionIdOf(callArgs.get(callId)?.conversationId)) return
     const snapshot = dispatcher.snapshotFor(callId)
     if (!snapshot) {
       // Fallback: no snapshot means the tool didn't run (yet). Just

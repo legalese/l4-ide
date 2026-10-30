@@ -23,6 +23,7 @@
     onRetry,
     onOpenFile,
     onOpenFileDiff,
+    filesOpenable = true,
   }: {
     content: string
     streaming: boolean
@@ -42,6 +43,9 @@
     onRetry?: () => void
     onOpenFile: (callId: string) => void
     onOpenFileDiff: (callId: string) => void
+    /** False when the turn's files aren't on this machine (cloud
+     *  sessions): paths render as plain text. */
+    filesOpenable?: boolean
   } = $props()
 
   // Token badge — "• 1.2k in / 380 out" at the bottom of a
@@ -307,6 +311,7 @@
             {messenger}
             {onOpenFile}
             onOpenDiff={onOpenFileDiff}
+            {filesOpenable}
           />
         {:else if block.kind === 'thinking' && aiPrefs.showReasoning}
           <!-- Collapsed-by-default reasoning block. Chevron flips when
@@ -344,6 +349,7 @@
             {messenger}
             {onOpenFile}
             onOpenDiff={onOpenFileDiff}
+            {filesOpenable}
           />
         {:else if block.kind === 'tool-activity' && block.activity.tool === 'web_search'}
           <!-- Web-search activities carry the URL citations the
@@ -409,17 +415,21 @@
                 <span class="review-action review-action-{change.action}"
                   >{change.action}</span
                 >
-                <button
-                  type="button"
-                  class="review-path"
-                  onclick={() =>
-                    change.action === 'edited'
-                      ? onOpenFileDiff(change.callId)
-                      : onOpenFile(change.callId)}
-                  title={change.action === 'edited'
-                    ? 'Open applied diff'
-                    : 'Open file'}>{change.path}</button
-                >
+                {#if filesOpenable}
+                  <button
+                    type="button"
+                    class="review-path"
+                    onclick={() =>
+                      change.action === 'edited'
+                        ? onOpenFileDiff(change.callId)
+                        : onOpenFile(change.callId)}
+                    title={change.action === 'edited'
+                      ? 'Open applied diff'
+                      : 'Open file'}>{change.path}</button
+                  >
+                {:else}
+                  <span class="review-path plain">{change.path}</span>
+                {/if}
               </li>
             {/each}
           </ul>
@@ -703,6 +713,12 @@
   }
   .review-path:hover {
     text-decoration: underline;
+  }
+  .review-path.plain {
+    cursor: default;
+  }
+  .review-path.plain:hover {
+    text-decoration: none;
   }
   /* Sources sub-header — when stacked under the files list, give it
      a little breathing room so the two sections read as separate

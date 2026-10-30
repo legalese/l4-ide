@@ -36,6 +36,7 @@
     messenger,
     onOpenFile,
     onOpenDiff,
+    filesOpenable = true,
   }: {
     call: RenderedToolCall
     /** Webview→extension messenger; used to fetch render metadata
@@ -49,6 +50,9 @@
     /** Applied-diff open: shows the before/after of a completed edit
      *  in the diff editor with red/green change markers. */
     onOpenDiff: (callId: string) => void
+    /** False when the call's paths aren't on this machine (cloud
+     *  sessions): the target renders as plain text. */
+    filesOpenable?: boolean
   } = $props()
 
   // Best-effort arg parse; keep going even if the JSON is malformed
@@ -70,7 +74,10 @@
    *     to done / error ("Edit"). Pairs with the chevron that opens
    *     the result / diff.
    */
-  const view = $derived.by(() => viewFor(call.name, args))
+  const view = $derived.by(() => {
+    const v = viewFor(call.name, args)
+    return filesOpenable ? v : { ...v, click: null }
+  })
 
   function viewFor(
     name: string,

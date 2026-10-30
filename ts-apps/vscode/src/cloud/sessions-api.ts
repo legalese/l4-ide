@@ -89,9 +89,9 @@ export function describeSessionsApiError(status: number, code: string): string {
   }
 }
 
-/** The `legaleseAi.cloudSessions.apiUrl` setting points elsewhere. */
+/** A base URL that isn't Legalese Cloud (the client refuses it). */
 export const CLOUD_API_URL_MESSAGE =
-  'Cloud sessions are off: legaleseAi.cloudSessions.apiUrl must be an https://….legalese.cloud URL.'
+  'Cloud sessions only talk to Legalese Cloud (https://….legalese.cloud).'
 
 /** An id for a URL path: a ULID, as every id the API hands out. */
 function pathId(sid: string): string {
@@ -102,7 +102,7 @@ function pathId(sid: string): string {
 }
 
 export interface SessionsApiDeps {
-  /** The `legaleseAi.cloudSessions.apiUrl` setting; '' = off. */
+  /** The Sessions API's base URL; '' = off. */
   baseUrl: () => string
   /** WorkOS access token; `force` bypasses the cache. */
   getAccessToken: (opts?: { force?: boolean }) => Promise<string>
@@ -160,7 +160,7 @@ export class SessionsApiClient implements SessionsApi {
     return url
   }
 
-  /** `<apiUrl>/git/<sid>.git` (§9.2). */
+  /** `<Sessions API>/git/<sid>.git` (§9.2). */
   gitUrl(sid: string): string {
     return `${this.base()}/git/${pathId(sid)}.git`
   }
