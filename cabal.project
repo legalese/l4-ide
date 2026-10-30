@@ -9,6 +9,12 @@ packages:
   ./jl4-service
   ./jl4-proleg
 
+-- A package cloned into etc/verify/ is built with the rest; with the directory
+-- absent this line names nothing and cabal says nothing (cabal-install
+-- 3.16.0.0). It is gitignored, and extends the `l4` command line through
+-- L4.Cli.Extensions (AGENTS.md, "Extending the l4 command line").
+optional-packages: etc/verify/*.cabal
+
 index-state: 2025-03-31T10:46:26Z
 
 allow-newer: all

@@ -61,6 +61,11 @@
 -- With @--emit@, a file that could not be written, or could not be written
 -- faithfully (an @.aut@ label mCRL2 would merge with another), makes the
 -- status 1; the other files are written all the same.
+--
+-- An executable built with "L4.Cli.Extensions" can add files to what @--emit@
+-- writes: each 'EmitTarget' is given the same 'EmitInput' as the built-in
+-- emitters and its files follow theirs, written, reported and counted in the
+-- exit status in the same way. A file name already written is refused.
 module L4.Cli.Explore
   ( ExploreCliOptions (..)
   , exploreOptionsParser
@@ -75,6 +80,7 @@ import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty as AesonPretty
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.List as List
 import qualified Data.Text.IO as TIO
 import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
@@ -96,6 +102,7 @@ import L4.Lts.WhatIf (Rig (..))
 import L4.Syntax (Module, Resolved)
 
 import L4.Cli.Common
+import L4.Cli.Extensions (EmitTarget (..))
 
 ----------------------------------------------------------------------------
 -- Options
@@ -127,8 +134,9 @@ data PropertyFlag
   = FlagProperty PropertyKind Text.Text
   | FlagIfAlways Text.Text
 
-exploreOptionsParser :: Parser ExploreCliOptions
-exploreOptionsParser = ExploreCliOptions
+-- | The targets are those of the executable's 'Extensions', for @--emit@'s help.
+exploreOptionsParser :: [EmitTarget] -> Parser ExploreCliOptions
+exploreOptionsParser targets = ExploreCliOptions
   <$> strArgument (metavar "FILE" <> help "Path to the .l4 file")
   <*> many (strOption
         ( long "contract"
@@ -206,7 +214,8 @@ exploreOptionsParser = ExploreCliOptions
   <*> optional (strOption
         ( long "emit"
         <> metavar "DIR"
-        <> help "Write the graph into DIR for other tools: <base>.aut (mCRL2), <base>.tla with <base>.cfg and one cfg per property (TLC), <base>.smv (NuSMV), <base>.dot, <base>.pnml; the properties named become the models' predicates and properties"
+        <> help ("Write the graph into DIR for other tools: <base>.aut (mCRL2), <base>.tla with <base>.cfg and one cfg per property (TLC), <base>.smv (NuSMV), <base>.dot, <base>.pnml; the properties named become the models' predicates and properties"
+             <> extensionFiles)
         ))
   <*> many (strOption
         ( long "fair"
@@ -214,6 +223,11 @@ exploreOptionsParser = ExploreCliOptions
         <> help "With --emit: give weak fairness, in the TLA+ and NuSMV models, to every act of this actor that moves (a party, an act's constructor, or the first words of a constructor's name, as Alice in `Alice buys dinner`). No other act is fair; repeatable"
         ))
   <*> fixedNowParser
+  where
+    -- empty in the community build, where the help is the built-in files alone
+    extensionFiles = case targets of
+      [] -> ""
+      _ -> "; and, in this edition, the files of: " <> List.intercalate ", " [ t.etName | t <- targets ]
 
 -- | A number as a @#TRACE@ writes one: digits, an optional fraction.
 rationalReader :: ReadM Rational
@@ -229,8 +243,8 @@ rationalReader = eitherReader \ s -> case break (== '.') s of
 -- Entry point
 ----------------------------------------------------------------------------
 
-exploreCmd :: ExploreCliOptions -> IO ()
-exploreCmd opts = do
+exploreCmd :: [EmitTarget] -> ExploreCliOptions -> IO ()
+exploreCmd targets opts = do
   when (opts.exJson && opts.exDot) do
     hPutStrLn stderr "--json and --dot are two renderings of one graph: choose one"
     exitWith (ExitFailure 1)
@@ -349,19 +363,19 @@ exploreCmd opts = do
         for_ checked \ (g, rs, _) -> do
           unless (null rs) $ TIO.hPutStrLn stderr (checksSummary rs)
           TIO.hPutStrLn stderr (coverageLine g.gCoverage)
-      emitted <- maybe (pure True) (\ dir -> emitAll dir opts props checked) opts.exEmit
+      emitted <- maybe (pure True) (\ dir -> emitAll targets dir opts props checked) opts.exEmit
       exitWith if emitted
         then statusOf (length graphs < length starts) [ (g.gCoverage, map (.crVerdict) rs) | (g, rs, _) <- checked ]
         else ExitFailure 1
 
 -- | Write every emitted file of every graph into the directory, and say on
 -- stderr what was written and what was not. 'False' when a file was not.
-emitAll :: FilePath -> ExploreCliOptions -> [Property] -> [(Graph, [CheckResult], Labels)] -> IO Bool
-emitAll dir opts props checked = do
+emitAll :: [EmitTarget] -> FilePath -> ExploreCliOptions -> [Property] -> [(Graph, [CheckResult], Labels)] -> IO Bool
+emitAll targets dir opts props checked = do
   createDirectoryIfMissing True dir
   let stem = Text.pack (takeBaseName opts.exFile)
   results <- for (zip [1 ..] checked) \ (k, (g, _, labels)) -> do
-    let files = emitFiles MkEmitInput
+    let input = MkEmitInput
           { eiBase = emitBase stem (length checked) k
           , eiSource = Text.pack (takeFileName opts.exFile)
           , eiGraph = g
@@ -369,12 +383,25 @@ emitAll dir opts props checked = do
           , eiLabels = labels
           , eiFair = opts.exFair
           }
+        files = withTargets (emitFiles input) (concatMap (\ t -> t.etFiles input) targets)
     for_ (rights files) \ (name, text) -> TIO.writeFile (dir </> Text.unpack name) text
     for_ (lefts files) \ why -> TIO.hPutStrLn stderr ("--emit: not written: " <> why)
     unless (null (rights files)) $
       TIO.hPutStrLn stderr ("Emitted to " <> Text.pack dir <> ": " <> Text.intercalate ", " (map fst (rights files)))
     pure (null (lefts files))
   pure (and results)
+
+-- | The built-in files, then the extension targets' (see "L4.Cli.Extensions").
+-- A target's file whose name is already taken is refused, not written over
+-- the other; with no targets this is the built-in files unchanged.
+withTargets :: [Either Text.Text (Text.Text, Text.Text)] -> [Either Text.Text (Text.Text, Text.Text)] -> [Either Text.Text (Text.Text, Text.Text)]
+withTargets builtin = (builtin <>) . go (map fst (rights builtin))
+  where
+    go _ [] = []
+    go taken (Left why : rest) = Left why : go taken rest
+    go taken (Right (name, text) : rest)
+      | name `elem` taken = Left (name <> ": a file of this name was already written by another target; not written over it") : go taken rest
+      | otherwise = Right (name, text) : go (name : taken) rest
 
 -- | Run a @#TRACE@, given as source, appended to the file explored: a
 -- virtual file beside it, so that its imports resolve as the file's own do,

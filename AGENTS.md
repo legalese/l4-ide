@@ -38,6 +38,14 @@ Coding guidelines for AI agents working in this repository.
 | `specs/`      | Development specs (`todo/`, `done/`, `roadmap/`)           |
 | `*/README.md` | Component-specific setup and usage                         |
 
+### Extending the `l4` command line
+
+The `l4` command table is a library, the `l4-cli` sublibrary of `jl4` (`mainWith` in `jl4/app/L4/Cli/Main.hs`), and `executable l4` is `mainWith noExtensions`.
+Another package can depend on that library and build an executable of its own that adds top-level subcommands, `l4 export` formats and `l4 explore --emit` targets.
+`L4.Cli.Extensions` (`jl4/app/L4/Cli/Extensions.hs`) defines what can be added, and its header says how each addition fails.
+A package cloned into `etc/verify/`, which is gitignored, is built with the rest by `cabal build all` through `optional-packages:` in `cabal.project`.
+With that directory absent, nothing changes, and nothing in this repository depends on such a package.
+
 ## Essential Commands
 
 ```bash
