@@ -28,10 +28,13 @@
 -- the assertion RAISES is a counterexample too, and the evaluator's replay of
 -- it is expected to raise.
 --
--- Constructor arguments are treated as strict: a record built from an argument
--- that raises is undefined here even when nothing reads that field. That can
--- only make the encoding report a counterexample the evaluator rejects, which
--- R-V5's replay reports loudly as an encoding defect; it cannot hide one.
+-- A field read straight out of a constructor needs only that field defined,
+-- as in L4. A record that reaches a projection any other way (passed to
+-- another rule, say) is treated as if every field were read: a record built
+-- from an argument that raises is undefined there even when nothing reads that
+-- field. That can only make the encoding report a counterexample the
+-- evaluator rejects, which R-V5's replay reports loudly as an encoding defect;
+-- it cannot hide one.
 module L4.Prove.Lower
   ( ProveEnv
   , mkProveEnv
@@ -185,7 +188,26 @@ definedSymbol = "|l4.defined|"
 -- The lowering monad
 ----------------------------------------------------------------------------
 
-data Term = Term { val :: !SExpr, def :: !SExpr, srt :: !Sort }
+-- | A lowered term: its value, whether evaluating it raises ('def', which
+-- for a record means every field is defined, as a strict reading would have
+-- it), and, for a term known to be built by one constructor, whether its head
+-- is reached ('hdef') and each field's own definedness ('fdefs'). L4 evaluates
+-- only the fields it reads, so a projection out of a known constructor needs
+-- only its own field defined (STARGAZY audit of #784: `(R x (1 DIVIDED BY
+-- 0))'s a` was undefined here, and a true assertion could not be proved).
+-- Where the constructor is not known, 'fdefs' is 'Nothing' and a projection
+-- falls back to 'def', which can only make the encoding more cautious.
+data Term = TermF
+  { val   :: !SExpr
+  , def   :: !SExpr
+  , srt   :: !Sort
+  , hdef  :: !SExpr
+  , fdefs :: !(Maybe (Text, [SExpr]))
+  }
+
+-- | A term with nothing known about its fields.
+term :: SExpr -> SExpr -> Sort -> Term
+term v d s = TermF v d s d Nothing
 
 data LState = LState
   { lsSymbols   :: !(Map Unique Text)
@@ -307,7 +329,7 @@ lowerAtoms env params atoms = do
         srt' <- sortOf env ty
         sym <- symbolFor "l4_" r
         modify \st -> st { lsFree = FreeVar (getUnique r) (nameOf r) srt' sym : st.lsFree }
-        pure [ (getUnique r', LTerm (Term (Atom sym) tru srt')) | r' <- rs ]
+        pure [ (getUnique r', LTerm (term (Atom sym) tru srt')) | r' <- rs ]
     ts <- for atoms (lowerExpr env (Ctx (Map.fromList (concat bound)) Set.empty))
     unless (all ((== SBool) . (.srt)) ts) $ refuse "out of fragment: a ladder condition that is not BOOLEAN"
     pure ts
@@ -430,20 +452,20 @@ lowerExpr :: ProveEnv -> Ctx -> Expr Resolved -> L Term
 lowerExpr env cx = \case
   And _ a b -> do
     ta <- bool a; tb <- bool b
-    pure (Term (SList [Atom "and", ta.val, tb.val]) (sAnd [ta.def, sImplies ta.val tb.def]) SBool)
+    pure (term (SList [Atom "and", ta.val, tb.val]) (sAnd [ta.def, sImplies ta.val tb.def]) SBool)
   Or _ a b -> do
     ta <- bool a; tb <- bool b
-    pure (Term (SList [Atom "or", ta.val, tb.val]) (sAnd [ta.def, sOr ta.val tb.def]) SBool)
+    pure (term (SList [Atom "or", ta.val, tb.val]) (sAnd [ta.def, sOr ta.val tb.def]) SBool)
   Implies _ a b -> do
     ta <- bool a; tb <- bool b
-    pure (Term (SList [Atom "=>", ta.val, tb.val]) (sAnd [ta.def, sImplies ta.val tb.def]) SBool)
+    pure (term (SList [Atom "=>", ta.val, tb.val]) (sAnd [ta.def, sImplies ta.val tb.def]) SBool)
   Not _ a -> do
     ta <- bool a
-    pure (Term (SList [Atom "not", ta.val]) ta.def SBool)
+    pure (term (SList [Atom "not", ta.val]) ta.def SBool)
   Equals _ a b -> do
     ta <- go a; tb <- go b
     when (ta.srt /= tb.srt) $ refuse "out of fragment: EQUALS between two different types"
-    pure (Term (SList [Atom "=", ta.val, tb.val]) (sAnd [ta.def, tb.def]) SBool)
+    pure (term (SList [Atom "=", ta.val, tb.val]) (sAnd [ta.def, tb.def]) SBool)
   Leq _ a b -> compareOp "<=" a b
   Geq _ a b -> compareOp ">=" a b
   Lt  _ a b -> compareOp "<" a b
@@ -454,39 +476,46 @@ lowerExpr env cx = \case
     ta <- real a; tb <- real b
     unless (isConstant ta.val || isConstant tb.val) $
       modify \st -> st { lsNonLinear = st.lsNonLinear <|> Just "a product of two non-constant terms" }
-    pure (Term (SList [Atom "*", ta.val, tb.val]) (sAnd [ta.def, tb.def]) SReal)
+    pure (term (SList [Atom "*", ta.val, tb.val]) (sAnd [ta.def, tb.def]) SReal)
   DividedBy _ a b -> do
     ta <- real a; tb <- real b
     unless (isConstant tb.val) $
       modify \st -> st { lsNonLinear = st.lsNonLinear <|> nonConstantDivisor ta }
-    pure (Term (SList [Atom "/", ta.val, tb.val])
+    pure (term (SList [Atom "/", ta.val, tb.val])
                 (sAnd [ta.def, tb.def, nonZero tb.val]) SReal)
   Modulo _ a b -> do
     ta <- real a; tb <- real b
     -- floor-modulo, sign follows the divisor, as Haskell's 'mod' (R-V7)
     let q = SList [Atom "to_real", SList [Atom "to_int", SList [Atom "/", ta.val, tb.val]]]
-    pure (Term (SList [Atom "-", ta.val, SList [Atom "*", tb.val, q]])
+    pure (term (SList [Atom "-", ta.val, SList [Atom "*", tb.val, q]])
                 (sAnd [ta.def, tb.def, isInt ta.val, isInt tb.val, nonZero tb.val]) SReal)
   Percent _ a -> do
     ta <- real a
-    pure (Term (SList [Atom "/", ta.val, realLit 100]) ta.def SReal)
+    pure (term (SList [Atom "/", ta.val, realLit 100]) ta.def SReal)
   Lit _ (NumericLit _ r) -> do
     modify \st -> st { lsLiterals = Set.insert r st.lsLiterals }
-    pure (Term (realLit r) tru SReal)
+    pure (term (realLit r) tru SReal)
   Lit _ (StringLit _ _) -> refuse "out of fragment: a STRING literal"
   -- statute text kept beside the logic: the identity of the connective it sits
   -- in, as the evaluator reads it
-  Inert _ _ ctx -> pure (Term (case ctx of InertCtxOr -> fls; _ -> tru) tru SBool)
+  Inert _ _ ctx -> pure (term (case ctx of InertCtxOr -> fls; _ -> tru) tru SBool)
   IfThenElse _ c t e -> do
     tc <- bool c; tt <- go t; te <- go e
     when (tt.srt /= te.srt) $ refuse "out of fragment: IF arms of different types"
-    pure (Term (sIte tc.val tt.val te.val) (sAnd [tc.def, sIte tc.val tt.def te.def]) tt.srt)
+    let whole = sAnd [tc.def, sIte tc.val tt.def te.def]
+    pure case (tt.fdefs, te.fdefs) of
+      -- both arms build the same constructor: keep each field's definedness
+      (Just (c1, f1), Just (c2, f2)) | c1 == c2, length f1 == length f2 ->
+        TermF (sIte tc.val tt.val te.val) whole tt.srt
+              (sAnd [tc.def, sIte tc.val tt.hdef te.hdef])
+              (Just (c1, zipWith (sIte tc.val) f1 f2))
+      _ -> term (sIte tc.val tt.val te.val) whole tt.srt
   MultiWayIf _ guards dflt -> do
     td <- go dflt
     foldrM (\(MkGuardedExpr _ c e) acc -> do
               tc <- bool c; te <- go e
               when (te.srt /= acc.srt) $ refuse "out of fragment: BRANCH arms of different types"
-              pure (Term (sIte tc.val te.val acc.val) (sAnd [tc.def, sIte tc.val te.def acc.def]) te.srt))
+              pure (term (sIte tc.val te.val acc.val) (sAnd [tc.def, sIte tc.val te.def acc.def]) te.srt))
            td guards
   Consider _ scrut branches -> lowerConsider env cx scrut branches
   Where _ body locals -> withLocals locals body
@@ -502,7 +531,11 @@ lowerExpr env cx = \case
             let tester = case ctors of
                   [_] -> tru
                   _   -> SList [SList [Atom "_", Atom "is", Atom cd.cdSymbol], te.val]
-            pure (Term (SList [Atom (cd.cdSelectors !! i), te.val]) (sAnd [te.def, tester]) (cd.cdFields !! i))
+                fieldDef = case te.fdefs of
+                  Just (c, fds) | c == cd.cdSymbol, i < length fds -> sAnd [te.hdef, fds !! i]
+                  Just _ -> fls
+                  Nothing -> sAnd [te.def, tester]
+            pure (term (SList [Atom (cd.cdSelectors !! i), te.val]) fieldDef (cd.cdFields !! i))
           _ -> refuse ("out of fragment: the field `" <> nameOf f <> "`")
       _ -> refuse ("out of fragment: the field `" <> nameOf f <> "`")
   App _ r args -> lowerApp env cx r args
@@ -533,10 +566,10 @@ lowerExpr env cx = \case
     if t.srt == SReal then pure t else refuse "out of fragment: arithmetic on a non-NUMBER"
   compareOp op a b = do
     ta <- real a; tb <- real b
-    pure (Term (SList [Atom op, ta.val, tb.val]) (sAnd [ta.def, tb.def]) SBool)
+    pure (term (SList [Atom op, ta.val, tb.val]) (sAnd [ta.def, tb.def]) SBool)
   arith op a b = do
     ta <- real a; tb <- real b
-    pure (Term (SList [Atom op, ta.val, tb.val]) (sAnd [ta.def, tb.def]) SReal)
+    pure (term (SList [Atom op, ta.val, tb.val]) (sAnd [ta.def, tb.def]) SReal)
   nonZero x = SList [Atom "not", SList [Atom "=", x, realLit 0]]
   isInt x = SList [Atom "is_int", x]
   nonConstantDivisor _ = Just "a division by a non-constant term"
@@ -575,15 +608,15 @@ lowerConsider env cx scrut branches = do
     ((_, t0) : _) -> do
       unless (all ((== t0.srt) . (.srt) . snd) arms) $ refuse "out of fragment: CONSIDER branches of different types"
       -- no branch matched: the value is immaterial, and evaluation raises
-      let unmatched = Term t0.val fls t0.srt
-          step (test, tb) acc = Term (sIte test tb.val acc.val) (sIte test tb.def acc.def) tb.srt
+      let unmatched = term t0.val fls t0.srt
+          step (test, tb) acc = term (sIte test tb.val acc.val) (sIte test tb.def acc.def) tb.srt
           folded = foldr step unmatched arms
-      pure (Term folded.val (sAnd [ts.def, folded.def]) folded.srt)
+      pure (term folded.val (sAnd [ts.def, folded.def]) folded.srt)
 
 -- | A pattern's test on the scrutinee, and what it binds.
 lowerPattern :: ProveEnv -> SExpr -> Sort -> Pattern Resolved -> L (SExpr, [(Unique, Term)])
 lowerPattern env s srt' = \case
-  PatVar _ r -> pure (tru, [(getUnique r, Term s tru srt')])
+  PatVar _ r -> pure (tru, [(getUnique r, term s tru srt')])
   PatApp _ c []
     | getUnique c == TC.trueUnique, srt' == SBool -> pure (s, [])
     | getUnique c == TC.falseUnique, srt' == SBool -> pure (SList [Atom "not", s], [])
@@ -614,8 +647,8 @@ lowerApp env cx r args
             refuse ("out of fragment: the local definition `" <> nameOf r <> "` refers to itself")
         | otherwise ->
             lowerExpr env Ctx { cxLocals = env', cxExpanding = Set.insert u cx.cxExpanding } e
-  | u == TC.trueUnique, null args = pure (Term tru tru SBool)
-  | u == TC.falseUnique, null args = pure (Term fls tru SBool)
+  | u == TC.trueUnique, null args = pure (term tru tru SBool)
+  | u == TC.falseUnique, null args = pure (term fls tru SBool)
   | Just a <- Map.lookup u env.peAssumes = freeVar a
   | Just (tyU, c, _) <- Map.lookup u env.peCtors = construct tyU c
   | Just _ <- Map.lookup u env.peSels, [e] <- args = lowerExpr env cx (Proj emptyAnno e r)
@@ -633,7 +666,7 @@ lowerApp env cx r args
     known <- gets (any ((== u) . (.fvUnique)) . (.lsFree))
     unless known $
       modify \st -> st { lsFree = FreeVar u (nameOf ar) s sym : st.lsFree }
-    pure (Term (Atom sym) tru s)
+    pure (term (Atom sym) tru s)
 
   construct tyU c = do
     srt' <- case Map.lookup tyU env.peTypes of
@@ -647,7 +680,10 @@ lowerApp env cx r args
         ts <- traverse (lowerExpr env cx) args
         unless (map (.srt) ts == cd.cdFields) $
           refuse ("out of fragment: `" <> nameOf c <> "` applied to fields of the wrong type")
-        pure (Term (sApp cd.cdSymbol (map (.val) ts)) (sAnd (map (.def) ts)) srt')
+        -- building a record never raises; reading a field raises only if that
+        -- field's own expression does
+        pure (TermF (sApp cd.cdSymbol (map (.val) ts)) (sAnd (map (.def) ts)) srt'
+                    tru (Just (cd.cdSymbol, map (.def) ts)))
       _ -> refuse ("out of fragment: the constructor `" <> nameOf c <> "`")
 
   callDecide d@(MkDecide _ _ (MkAppForm _ dr params _) _) = do
@@ -656,7 +692,7 @@ lowerApp env cx r args
               <> " of its " <> Text.pack (show (length params)) <> " parameters")
     (sym, dsym, _, resSort) <- defineDecide env d
     ts <- traverse (lowerExpr env cx) args
-    pure (Term (sApp sym (map (.val) ts)) (sApp dsym (map (.val) ts <> map (.def) ts)) resSort)
+    pure (term (sApp sym (map (.val) ts)) (sApp dsym (map (.val) ts <> map (.def) ts)) resSort)
 
   -- The checker resolves an infix operator to a call of its built-in; read it
   -- back as the operator, so there is one lowering of each.
@@ -674,7 +710,7 @@ lowerApp env cx r args
     | [x] <- args, u == TC.isIntegerUnique = do
         t <- lowerExpr env cx x
         unless (t.srt == SReal) $ refuse "out of fragment: IS INTEGER of a non-NUMBER"
-        pure (Term (SList [Atom "is_int", t.val]) t.def SBool)
+        pure (term (SList [Atom "is_int", t.val]) t.def SBool)
     | u `elem` transcendental =
         refuse ("out of fragment: the transcendental function `" <> nameOf r <> "` (R-V7 refuses it by name)")
     | otherwise = refuse ("out of fragment: a call to `" <> nameOf r <> "`")
@@ -682,7 +718,7 @@ lowerApp env cx r args
   unary x f = do
     t <- lowerExpr env cx x
     unless (t.srt == SReal) $ refuse ("out of fragment: `" <> nameOf r <> "` of a non-NUMBER")
-    pure (Term (f t.val) t.def SReal)
+    pure (term (f t.val) t.def SReal)
 
   -- Haskell 'round': half to even. f = floor (x + 1/2) is right except at an
   -- exact half whose upper neighbour is odd, where the even one is f - 1.
@@ -730,7 +766,7 @@ defineDecide env (MkDecide _ _ (MkAppForm _ dr params _) body) = do
       let psyms = [ userSymbol "l4p_" (nameOf p) | p <- params ]
           pdsyms = [ userSymbol "l4pd_" (nameOf p) | p <- params ]
           locals = Map.fromList
-            [ (getUnique p, LTerm (Term (Atom ps) (Atom pd) s))
+            [ (getUnique p, LTerm (term (Atom ps) (Atom pd) s))
             | (p, ps, pd, s) <- zip4 params psyms pdsyms sorts ]
       modify \st -> st { lsActive = u : st.lsActive }
       t <- lowerExpr env (Ctx locals Set.empty) body

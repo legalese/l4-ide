@@ -22,7 +22,7 @@ import Test.Hspec
 import CliTest.Common
 
 numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture,
-  collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture :: FilePath
+  collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture :: FilePath
 numbersFixture       = fixtureDir </> "prove" </> "numbers.l4"
 recordsFixture       = fixtureDir </> "prove" </> "records.l4"
 outOfFragmentFixture = fixtureDir </> "prove" </> "out-of-fragment.l4"
@@ -33,12 +33,13 @@ localsFixture        = fixtureDir </> "prove" </> "locals.l4"
 decidedFailFixture   = fixtureDir </> "prove" </> "decided-fail.l4"
 exactFixture         = fixtureDir </> "prove" </> "exact.l4"
 hashNameFixture      = fixtureDir </> "prove" </> "hash-name.l4"
+lazyFieldFixture     = fixtureDir </> "prove" </> "lf2.l4"
 sameLineFixture      = fixtureDir </> "prove" </> "same-line.l4"
 assumedFixture       = fixtureDir </> "assert-assumed.l4"
 
 fixtures :: [FilePath]
 fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture
-           , collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture]
+           , collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture]
 
 -- | The lines of a run's report that belong to the @#ASSERT@ on this line of
 -- the fixture: its verdict line, and the indented lines under it.
@@ -97,13 +98,14 @@ spec bin = describe "l4 prove" $ do
     unwords (rowFor 6 sout) `shouldSatisfy` ("out of fragment: STRING" `isInfixOf`)
 
   -- The positive control for R-V5's sat half: the encoding is known to be
-  -- wrong at p = 0 (constructor fields are lowered as strict), and the replay
-  -- must say so instead of reporting a counterexample.
+  -- wrong at p = 0 (a record passed to another rule is lowered as if every
+  -- field were read), and the replay must say so instead of reporting a
+  -- counterexample.
   it "reports a model the evaluator rejects as an ENCODING DEFECT, never as refuted, and exits 4" $ withZ3 $ do
     Output code sout _ <- runL4 bin ["prove", defectFixture]
     code `shouldBe` ExitFailure 4
-    verdictOf 13 sout `shouldBe` "ENCODING"
-    unwords (rowFor 13 sout) `shouldSatisfy` ("fails at p = 0, but the evaluator says it holds there" `isInfixOf`)
+    verdictOf 17 sout `shouldBe` "ENCODING"
+    unwords (rowFor 17 sout) `shouldSatisfy` ("fails at p = 0, but the evaluator says it holds there" `isInfixOf`)
 
   -- Soundness: a guard such as IS INTEGER is a hypothesis of its own
   -- obligation and never changes a NUMBER's sort, or the unguarded assertion
@@ -209,3 +211,10 @@ spec bin = describe "l4 prove" $ do
     code `shouldBe` ExitFailure 2
     verdictOf 15 sout `shouldBe` "refuted"
     unwords (rowFor 15 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
+
+  -- STARGAZY audit of #784: a projection out of a constructor needs only its
+  -- own field defined, as L4 evaluates only the fields it reads.
+  it "proves an assertion that reads one field of a record whose other field would raise" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", lazyFieldFixture]
+    code `shouldBe` ExitSuccess
+    verdictOf 16 sout `shouldBe` "proved"
