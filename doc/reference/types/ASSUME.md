@@ -45,6 +45,11 @@ DECIDE `the applicant is an adult` IF `the applicant's age` >= 18
 
 Here `` `the applicant's age` `` is an input of `` `the applicant is an adult` ``; `` `an unused fact` `` is not.
 
+Only an `ASSUME` that the exported function reads itself, and that its own file declares, becomes an input.
+A request supplies the inputs to the exported function when it calls it, and not to the functions it calls.
+So an `ASSUME` that the exported function reaches only through another function, or reads from an imported file, would fail when evaluated with "I needed to know the value of … but it is an assumed term", and `@export` refuses it; see [An @export that reaches an ASSUME it cannot be given](../errors/README.md#an-export-that-reaches-an-assume-it-cannot-be-given).
+The fix is to pass the value in as a `GIVEN`.
+
 ### Function-typed inputs are not supported yet for `@export`
 
 An exported function cannot take an input of function type yet, whether it is a `GIVEN` input or an `ASSUME` it uses:

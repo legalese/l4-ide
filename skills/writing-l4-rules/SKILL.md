@@ -307,10 +307,16 @@ The description is the single highest-value sentence in the whole file: it is wh
 
 ### ASSUMEs as export parameters
 
-Module-level `ASSUME`s that an `@export` function references are promoted to
-parameters of that function and must be supplied by the caller — they behave
-just like `GIVEN` parameters at the API boundary. ASSUMEs not referenced by
-any exported function remain internal assumptions.
+Module-level `ASSUME`s that an `@export` function's own body reads, and that
+its own file declares, are promoted to parameters of that function and must be
+supplied by the caller — they behave just like `GIVEN` parameters at the API
+boundary. ASSUMEs that no exported function reads remain internal assumptions.
+The caller's values reach the exported function and not the functions it calls,
+so an `ASSUME` that the exported function reaches only through a helper (or
+reads from an imported file) would fail on every request with a stuck "assumed
+term" error. The `@export` is an error ("it reaches the ASSUME `x` through
+`helper`"): pass the value in as a `GIVEN` to the helper and the exported
+function.
 
 **Only a type with a JSON form can cross the `@export` boundary.** Every
 input (a `GIVEN`, or a referenced `ASSUME`) and the result must be a `NUMBER`,
