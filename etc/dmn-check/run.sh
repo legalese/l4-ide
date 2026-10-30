@@ -102,6 +102,12 @@ if [ "$corpus" = 1 ]; then
   [ -n "$l4bin" ] || l4bin="$(command -v l4 2>/dev/null || true)"
   [ -n "$l4bin" ] && [ -x "$l4bin" ] \
     || skip "--corpus needs an l4 (put one on PATH or set DMN_CHECK_L4)"
+  # Absolute, because the default root below changes directory.
+  case "$l4bin" in
+    /*) ;;
+    */*) l4bin="$(cd "${l4bin%/*}" && pwd)/${l4bin##*/}" ;;
+    *) l4bin="$(pwd)/$l4bin" ;;
+  esac
 fi
 
 # ---- the classpath -----------------------------------------------------------
