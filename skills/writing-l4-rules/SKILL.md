@@ -413,7 +413,7 @@ Just enough to write most rules without a round-trip. Anything not here, check <
 `TODAY` returns `DATE`. `CURRENTTIME` returns `TIME`. Both need e.g. `TIMEZONE IS "America/New_York"` in scope to return a value.
 `NOW` returns `DATETIME` and defaults to `"Etc/UTC"`.
 
-Construct literals (after `IMPORT daydate`) with `Date day month year` — e.g. `Date 15 1 2025`, **not** `DATE 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
+Construct literals (after `IMPORT daydate`) with `YMD year month day` — e.g. `YMD 2025 1 15`, which stops evaluation when the month or day does not exist — or with `Date day month year` — e.g. `Date 15 1 2025`, which rolls a part that does not exist forward — **not** `DATE 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
 
 ### Operators
 

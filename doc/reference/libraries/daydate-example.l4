@@ -8,6 +8,12 @@ DECIDE `New Year 2025` IS Date 1 1 2025
 #EVAL `Christmas 2024`
 #EVAL `New Year 2025`
 
+-- Date construction in ISO 8601 order (year month day), bounds-checked:
+-- an out-of-range component such as YMD 2023 2 29 stops evaluation
+DECIDE `Christmas 2024 by YMD` IS YMD 2024 12 25
+#EVAL `Christmas 2024 by YMD`  -- DATE OF 25, 12, 2024
+#EVAL `Christmas 2024 by YMD` EQUALS `Christmas 2024`  -- TRUE
+
 -- Date from ISO string (returns MAYBE DATE, ignores time/timezone if present)
 DECIDE `from iso date` IS Date "2025-06-15"
 DECIDE `from iso datetime` IS Date "2025-06-15T10:30:00Z"

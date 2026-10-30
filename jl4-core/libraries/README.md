@@ -85,7 +85,8 @@ The current naming conflates type constructors and value constructors, which is 
 **Current (confusing):**
 
 - `DATE` - the type (builtin)
-- `Date` - value constructor (recommended, in daydate.l4)
+- `YMD` - value constructor, year month day, recommended (in daydate.l4)
+- `Date` - value constructor, day month year (in daydate.l4)
 - `DATE` - value constructor (legacy compat, in date-compat.l4)
 
 **Proposed (clearer):**
@@ -108,9 +109,13 @@ L4 distinguishes between **type constructors** and **value constructors** (data 
 
 #### Value Constructors (Data Constructors)
 
-- **`Date` function** (in `daydate.l4`) - **Recommended** way to construct DATE values
+- **`YMD` function** (in `daydate.l4`) - **Recommended** way to construct a DATE from its parts
 
-  - `Date 15 3 1990` - from day, month, year
+  - `YMD 1990 3 15` - from year, month, day; stops evaluation if the month or day does not exist
+
+- **`Date` function** (in `daydate.l4`) - constructs a DATE from its parts, or from a serial number
+
+  - `Date 15 3 1990` - from day, month, year; a part that does not exist rolls forward
   - `Date 738000` - from serial number
   - `Date someDate` - identity/normalization
 
@@ -168,7 +173,8 @@ The naming is potentially confusing because:
 
 3. **Post-migration L4**: We have:
    - `DATE` - the type (builtin, uppercase)
-   - `Date` - recommended value constructor (function, titlecase)
+   - `YMD` - recommended value constructor from year, month, day (function, uppercase)
+   - `Date` - value constructor (function, titlecase)
    - `DATE` - legacy value constructor (function in date-compat.l4, uppercase)
 
 ### Recommendations
