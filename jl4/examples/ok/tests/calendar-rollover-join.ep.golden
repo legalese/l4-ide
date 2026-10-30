@@ -1,0 +1,91 @@
+-- Business-day rolls counted from THE JOIN and THE ARMING (calendar library).
+--
+-- STATUS: draft (2026-10-24). specs/todo/ACT-TIME-GUARD-SPEC.md.
+--
+-- The companion of calendar-rollover.l4, written with the lifecycle nouns as
+-- values instead of a day the act carries. That needs ruling B1
+-- (EVERY-EACH-QUANTIFIER-SPEC.md §2.6), which is BUILT IN PART on
+-- lang/lifecycle-values (2026-10-24) and NOT MERGED to unstable. This file is
+-- kept apart so that the library and calendar-rollover.l4 do not depend on B1.
+--
+-- Dates, October and November 2026: Mon 26 Oct, Wed 28 Oct, Fri 30 Oct,
+-- Sat 31 Oct, Mon 2 Nov, Tue 3 Nov, Thu 5 Nov.
+
+IMPORT prelude
+IMPORT daydate
+IMPORT calendar
+
+DECLARE Party IS ONE OF Seller, Buyer, Landlord
+
+DECLARE Action IS ONE OF
+    notify
+    pay
+    serve HAS day IS A NUMBER
+
+GIVETH A NUMBER
+`Wed 21 Oct` MEANS DATE_SERIAL (YMD 2026 10 21)
+
+GIVETH A NUMBER
+`Mon 26 Oct` MEANS DATE_SERIAL (YMD 2026 10 26)
+
+GIVETH A NUMBER
+`Fri 30 Oct` MEANS DATE_SERIAL (YMD 2026 10 30)
+
+GIVETH A NUMBER
+`Sat 31 Oct` MEANS DATE_SERIAL (YMD 2026 10 31)
+
+GIVETH A NUMBER
+`Mon 2 Nov` MEANS DATE_SERIAL (YMD 2026 11 2)
+
+GIVETH A NUMBER
+`Tue 3 Nov` MEANS DATE_SERIAL (YMD 2026 11 3)
+
+
+-- §1 Reading (b), counted from the notice itself. THE JOIN is the time the
+-- notice was given (its AT stamp), so the notice carries no day of its own.
+
+GIVETH A DEONTIC Party Action
+`pay within five days of notice, rolled` MEANS
+    PARTY Seller MUST notify WITHIN 10
+    HENCE PARTY Buyer MUST pay WITHIN 0 OF (`next business day on or after` `weekdays only` (THE JOIN PLUS 5))
+
+-- notice Mon 26 Oct: the fifth day, Sat 31 Oct, rolls to Mon 2 Nov
+#TRACE `pay within five days of notice, rolled` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify AT `Mon 26 Oct`
+  PARTY Buyer DOES pay AT `Mon 2 Nov`
+
+#TRACE `pay within five days of notice, rolled` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify AT `Mon 26 Oct`
+  PARTY Buyer DOES pay AT `Tue 3 Nov`
+
+
+-- §2 (a) and (b) together, counted from the obligation's own arming: THE
+-- ARMING on a top-level obligation is when it was entered.
+
+GIVETH A DEONTIC Party Action
+`serve on a business day within ten days, rolled` MEANS
+    PARTY Landlord MUST serve d PROVIDED `is a business day` `weekdays only` d
+    WITHIN 0 OF (`next business day on or after` `weekdays only` (THE ARMING PLUS 10))
+
+-- entered Wed 21 Oct: ten days end on Sat 31 Oct, rolled to Mon 2 Nov
+#TRACE `serve on a business day within ten days, rolled` AT `Wed 21 Oct` WITH
+  PARTY Landlord DOES serve `Sat 31 Oct` AT `Sat 31 Oct`
+  PARTY Landlord DOES serve `Mon 2 Nov` AT `Mon 2 Nov`
+
+
+-- §3 A TRAP, pinned. THE JOIN in a continuation's PROVIDED is the PREVIOUS
+-- act, not the act being tested. The guard below reads as "the payment must
+-- be made on a business day", and what it tests is the notice's day. Notice
+-- on Fri 30 Oct (a business day), payment on Sat 31 Oct: the payment counts.
+-- To guard the payment's own day, the payment has to carry it (as in
+-- calendar-rollover.l4 §2); no noun names the act under test.
+
+GIVETH A DEONTIC Party Action
+`pay on a business day, written wrongly` MEANS
+    PARTY Seller MUST notify WITHIN 10
+    HENCE PARTY Buyer MUST pay PROVIDED `is a business day` `weekdays only` THE JOIN
+          WITHIN 5
+
+#TRACE `pay on a business day, written wrongly` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify AT `Fri 30 Oct`
+  PARTY Buyer DOES pay AT `Sat 31 Oct`

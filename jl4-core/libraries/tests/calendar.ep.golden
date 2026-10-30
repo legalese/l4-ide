@@ -1,0 +1,419 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Business-day calendars and roll conventions`
+
+-- STATUS: draft. The function names were ruled on 2026-10-24 (card CAL, option
+-- A as revised, recorded in specs/todo/ACT-TIME-GUARD-SPEC.md §7): plain
+-- English that says whether the day itself counts, and no aliases. The ISDA
+-- vocabulary (`following business day`, `preceding business day`, ...) is not
+-- used, because it reads as "strictly after" to anyone who takes "following"
+-- in its English sense; for that sense, count one business day with
+-- `add business days`. The rest of the design (a calendar as a TRUE-means-open
+-- function, the 365 refusal, the 366-day search bound, `business days between`
+-- leaving out the first day) is assumed, not ruled.
+--
+-- WHAT THIS IS FOR. A deadline written "within five business days", or "if the
+-- day falls on a Saturday, Sunday or public holiday, the next business day",
+-- is a calendar question. The language does not answer it: `WITHIN` counts
+-- days on the trace's clock and knows nothing about weekends. Ruling B6
+-- (2026-09-21, EVERY-EACH-QUANTIFIER-SPEC.md §2.6) puts the calendar in a
+-- library: compute the day here, and anchor the deadline on it with
+-- `WITHIN 0 OF <that day>`.
+--
+-- THE SCALE. Every function takes a day as a NUMBER: the day number that
+-- `Day 30 10 2026` and `DATE_SERIAL (YMD 2026 10 30)` both give, which counts
+-- days from 1 January 0000 and is 740283 for Friday 30 October 2026. A
+-- `#TRACE ... AT` on dates is placed on the same scale. Each roll function
+-- also has a DATE twin. Every entry point refuses a day number below 365: that
+-- is a count of days from some starting point (a trace that begins `AT 0`),
+-- not a calendar date, and no weekday can be read off it. A fractional day
+-- number is rounded down to its day, so an event at noon is read as its day;
+-- one placed in hours is not a calendar date and is not caught.
+--
+-- THIS IS NOT EXCEL'S SCALE, and nothing refuses a number from the wrong one.
+-- `excelSerial1900` (excel-date.l4) is 693958 smaller than the day number for
+-- every date from 1 March 1900: Excel's 46325 is Friday 30 October 2026, the
+-- day number here is 740283, and 46325 passes the 365 test. Read as a day
+-- number, 46325 is a Saturday, and every Excel weekday reads as the next one.
+-- Add 693958 to an Excel serial first (for dates from 1 March 1900), or work
+-- with DATE values and the DATE twins.
+--
+-- A CALENDAR is a function from a day number to BOOLEAN, TRUE meaning "this is
+-- a business day": `weekdays only` below, the calendar `weekdays except`
+-- returns for a holiday list, or a top-level function of your own with a
+-- declared `GIVEN d IS A NUMBER`. Two calendars combine with AND: a day is a
+-- business day for two places only if it is one at both. That is the shape of
+-- BGB s 193, which rolls a day that is a holiday at the place of declaration
+-- OR the place of performance, and why feiertage.l4 takes a list of Länder. The
+-- weekend `weekdays only` and `weekdays except` take is Saturday and Sunday; a
+-- Friday-Saturday weekend needs a calendar of your own.
+--
+-- WHAT IS NOT HERE. No jurisdiction's public holidays: those are data with
+-- their own provenance and go one per module, on the template of
+-- jl4/examples/ok/closing-the-loop/feiertage.l4, which also shows the one
+-- honest way to handle a holiday table that runs out (a coverage window
+-- that says so). A calendar here is total over BOOLEAN, so a stale holiday
+-- list answers silently. Excel's WORKDAY and NETWORKDAYS, weekends plus a
+-- holiday list and no roll conventions, are in excel-date.
+--
+-- The ISDA convention names cited below (Following, Modified Following,
+-- Preceding; 2006 ISDA Definitions s 4.12) are cited from memory, not
+-- re-read. The ACTUS data dictionary (actusfrf/actus-dictionary, version 1.4,
+-- term businessDayConvention, read 2026-10-25) names nine conventions: NOS,
+-- SCF, SCMF, CSF, CSMF, SCP, SCMP, CSP and CSMP, which keep "shift, then
+-- calculate" apart from "calculate, then shift". (It prints SCMP a second time
+-- for the last one, Calculate-Shift Modified-Preceding.) L4's actus-core.l4
+-- does not match them: its `Business Day Convention` declares SCR, SCRF, SCRP,
+-- SCRMF and SCRMP, computes none of them, and this file does not wire them up
+-- either.
+
+
+§§ `Refusals`
+
+-- Named refusals, on the daydate pattern (daydate.l4, `YMD refused an
+-- out-of-range month or day`): evaluation that reaches one stops with its
+-- reason, and nothing can turn it back into a day.
+
+GIVETH A NUMBER
+`calendar refused a day number below 365` MEANS
+    REFUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+
+GIVETH A NUMBER
+`calendar found no business day within 366 days` MEANS
+    REFUSE "calendar found no business day within 366 days: the calendar says no day is a business day"
+
+GIVETH A NUMBER
+`calendar refused a negative or fractional count of business days` MEANS
+    REFUSE "calendar refused a negative or fractional count of business days"
+
+GIVETH A NUMBER
+`calendar refused a span that ends before it starts` MEANS
+    REFUSE "calendar refused a span that ends before it starts"
+
+@desc The day number a calendar function works on: the input rounded down to its day, or a refusal below 365.
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`the calendar day of` d MEANS
+    IF   FLOOR d LESS THAN 365
+    THEN `calendar refused a day number below 365`
+    ELSE FLOOR d
+
+
+§§ `Calendars`
+
+@desc A calendar on which every Monday to Friday is a business day and no Saturday or Sunday is.
+GIVEN d IS A NUMBER
+GIVETH A BOOLEAN
+`weekdays only` d MEANS
+    `is weekday` d
+
+-- L4 has no partial application: a function of two inputs given one is a
+-- check error. So a calendar built from a holiday list is a function that
+-- RETURNS the calendar, and `weekdays except` holidays is a whole calendar.
+
+-- A day, and each listed day, is rounded down to its day before they are
+-- compared: a holiday given at noon is still that holiday.
+
+@desc The calendar on which Monday to Friday are business days except the listed days, given as day numbers.
+GIVEN holidays IS A LIST OF NUMBER
+GIVETH A FUNCTION FROM NUMBER TO BOOLEAN
+`weekdays except` holidays MEANS
+    GIVEN d YIELD `is weekday` d AND NOT elem (FLOOR d) (map FLOOR holidays)
+
+@desc The calendar on which Monday to Friday are business days except the listed dates.
+GIVEN holidays IS A LIST OF DATE
+GIVETH A FUNCTION FROM NUMBER TO BOOLEAN
+`weekdays except the dates` holidays MEANS
+    `weekdays except` (map Day holidays)
+
+
+§§ `Asking a calendar`
+
+-- The first conjunct is TRUE for every day that gets past `the calendar day
+-- of`, and is there to make that refusal happen: a calendar that ignores its
+-- input (GIVEN d YIELD TRUE) would otherwise never ask for the day, and a day
+-- number of 5 would be answered TRUE rather than refused.
+
+@desc TRUE when the day is a business day on the calendar. Refuses a day number below 365, even for a calendar that would not have looked at the day.
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A NUMBER
+GIVETH A BOOLEAN
+`is a business day` calendar d MEANS
+    day AT LEAST 365 AND calendar day
+    WHERE
+        day MEANS `the calendar day of` d
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A DATE
+GIVETH A BOOLEAN
+`is a business day` calendar d MEANS
+    `is a business day` calendar (Day d)
+
+
+§§ `Rolling a day onto a business day`
+
+-- The searches. `tries` counts the days already looked at; after 366 of them
+-- in a row with no business day, the calendar is refused rather than searched
+-- for ever. The count is tested BEFORE the day is looked at, so a business day
+-- 365 days away is found and one 366 days away is refused.
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A NUMBER
+      tries    IS A NUMBER
+GIVETH A NUMBER
+`the first business day searching forward from` calendar d tries MEANS
+    BRANCH IF tries AT LEAST 366      THEN `calendar found no business day within 366 days`
+           IF calendar d              THEN d
+           OTHERWISE                       `the first business day searching forward from` calendar (d PLUS 1) (tries PLUS 1)
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A NUMBER
+      tries    IS A NUMBER
+GIVETH A NUMBER
+`the first business day searching backward from` calendar d tries MEANS
+    BRANCH IF tries AT LEAST 366      THEN `calendar found no business day within 366 days`
+           IF calendar d              THEN d
+           OTHERWISE                       `the first business day searching backward from` calendar (d MINUS 1) (tries PLUS 1)
+
+@desc The day itself if it is a business day, otherwise the first business day after it. This is the ISDA "Following" convention. It is NOT "the following business day" in the ordinary English sense, which is strictly after: for that, use `add business days` with a count of 1.
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A NUMBER
+GIVETH A NUMBER
+`next business day on or after` calendar d MEANS
+    `the first business day searching forward from` calendar (`the calendar day of` d) 0
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A DATE
+GIVETH A DATE
+`next business day on or after` calendar d MEANS
+    Date (`next business day on or after` calendar (Day d))
+
+@desc The day itself if it is a business day, otherwise the last business day before it. This is the ISDA "Preceding" convention.
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A NUMBER
+GIVETH A NUMBER
+`previous business day on or before` calendar d MEANS
+    `the first business day searching backward from` calendar (`the calendar day of` d) 0
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A DATE
+GIVETH A DATE
+`previous business day on or before` calendar d MEANS
+    Date (`previous business day on or before` calendar (Day d))
+
+@desc The ISDA "Modified Following" convention, a term of art with no plain-English equivalent: the day itself if it is a business day; otherwise the next business day, unless that falls in the next calendar month, in which case the last business day before the day.
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A NUMBER
+GIVETH A NUMBER
+`modified following business day` calendar d MEANS
+    IF       DATE_YEAR  (Date following) EQUALS DATE_YEAR  (Date day)
+         AND DATE_MONTH (Date following) EQUALS DATE_MONTH (Date day)
+    THEN following
+    ELSE `previous business day on or before` calendar day
+    WHERE
+        day       MEANS `the calendar day of` d
+        following MEANS `next business day on or after` calendar day
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      d        IS A DATE
+GIVETH A DATE
+`modified following business day` calendar d MEANS
+    Date (`modified following business day` calendar (Day d))
+
+
+§§ `Counting business days`
+
+-- The count stops at `n AT MOST 0`, not at `n EQUALS 0`: a negative or
+-- fractional count that got past the guard below would otherwise count down
+-- for ever, where this way it returns a day and the assertions notice.
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      n        IS A NUMBER
+      d        IS A NUMBER
+GIVETH A NUMBER
+`add business days, counting from a checked day` calendar n d MEANS
+    IF   n AT MOST 0
+    THEN d
+    ELSE `add business days, counting from a checked day` calendar (n MINUS 1) (`the first business day searching forward from` calendar (d PLUS 1) 0)
+
+@desc The day that is n business days after the day: the day itself is not counted, and the n-th business day after it is the answer. With n = 1 that is "the following business day" in the ordinary English sense, strictly after the day whether or not the day is itself a business day. With n = 0 the day comes back unchanged, rolled or not; to roll it, use `next business day on or after`. Refuses a negative or fractional n.
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      n        IS A NUMBER
+      d        IS A NUMBER
+GIVETH A NUMBER
+`add business days` calendar n d MEANS
+    IF   n LESS THAN 0 OR NOT n EQUALS FLOOR n
+    THEN `calendar refused a negative or fractional count of business days`
+    ELSE `add business days, counting from a checked day` calendar n (`the calendar day of` d)
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      n        IS A NUMBER
+      d        IS A DATE
+GIVETH A DATE
+`add business days` calendar n d MEANS
+    Date (`add business days` calendar n (Day d))
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      from     IS A NUMBER
+      to       IS A NUMBER
+GIVETH A NUMBER
+`business days between, counting from a checked day` calendar from to MEANS
+    IF   from AT LEAST to
+    THEN 0
+    ELSE (IF calendar (from PLUS 1) THEN 1 ELSE 0)
+         PLUS `business days between, counting from a checked day` calendar (from PLUS 1) to
+
+@desc How many business days fall after the first day and on or before the second: the first day is not counted and the last is, the counting rule WITHIN uses. So `business days between` cal d (`add business days` cal n d) is n. This is NOT Excel's NETWORKDAYS, which counts both ends. Refuses a span that ends before it starts.
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      a        IS A NUMBER
+      b        IS A NUMBER
+GIVETH A NUMBER
+`business days between` calendar a b MEANS
+    IF   `the calendar day of` b LESS THAN `the calendar day of` a
+    THEN `calendar refused a span that ends before it starts`
+    ELSE `business days between, counting from a checked day` calendar (`the calendar day of` a) (`the calendar day of` b)
+
+GIVEN calendar IS A FUNCTION FROM NUMBER TO BOOLEAN
+      a        IS A DATE
+      b        IS A DATE
+GIVETH A NUMBER
+`business days between` calendar a b MEANS
+    `business days between` calendar (Day a) (Day b)
+
+
+§§ `Checks`
+
+-- Each convention is pinned in both directions: it moves a day that should
+-- move, and leaves alone a day that should not. The dates are written out
+-- rather than named, so that importing this library adds no names for them.
+-- 2026-10-31 is a Saturday, and the first two checks say so.
+
+#ASSERT `Weekday of` (Day 31 10 2026) EQUALS Saturday
+#ASSERT `Weekday of` (Day 2 11 2026) EQUALS Monday
+
+-- Following: a Saturday rolls forward to the Monday; a business day stays.
+#ASSERT `next business day on or after` `weekdays only` (Day 31 10 2026) EQUALS (Day 2 11 2026)
+#ASSERT `next business day on or after` `weekdays only` (Day 2 11 2026) EQUALS (Day 2 11 2026)
+
+-- Strictly after, which is a count of one: a business day moves too, a
+-- Saturday to the Monday.
+#ASSERT `add business days` `weekdays only` 1 (Day 2 11 2026) EQUALS (Day 3 11 2026)
+#ASSERT `add business days` `weekdays only` 1 (Day 31 10 2026) EQUALS (Day 2 11 2026)
+#ASSERT `add business days` `weekdays only` 1 (Day 30 10 2026) EQUALS (Day 2 11 2026)
+
+-- Preceding: a Saturday rolls back to the Friday; a business day stays.
+#ASSERT `previous business day on or before` `weekdays only` (Day 31 10 2026) EQUALS (Day 30 10 2026)
+#ASSERT `previous business day on or before` `weekdays only` (Day 30 10 2026) EQUALS (Day 30 10 2026)
+
+-- Modified Following: Sat 31 Oct would follow into November, so it goes back
+-- to Fri 30 Oct. Sat 7 Nov follows to Mon 9 Nov in the same month and does.
+#ASSERT `modified following business day` `weekdays only` (Day 31 10 2026) EQUALS (Day 30 10 2026)
+#ASSERT `modified following business day` `weekdays only` (Day 7 11 2026) EQUALS (Day 9 11 2026)
+#ASSERT `modified following business day` `weekdays only` (Day 30 10 2026) EQUALS (Day 30 10 2026)
+
+-- A listed holiday is skipped like a weekend; an unlisted weekday is not. A
+-- holiday listed at noon is still that holiday.
+#ASSERT `next business day on or after` (`weekdays except` (LIST Day 2 11 2026)) (Day 31 10 2026) EQUALS (Day 3 11 2026)
+#ASSERT `is a business day` (`weekdays except` (LIST Day 2 11 2026)) (Day 3 11 2026)
+#ASSERT NOT `is a business day` (`weekdays except` (LIST Day 2 11 2026)) (Day 2 11 2026)
+#ASSERT NOT `is a business day` (`weekdays except` (LIST ((Day 2 11 2026) PLUS 0.5))) (Day 2 11 2026)
+#ASSERT NOT `is a business day` (`weekdays except the dates` (LIST (Date 2 11 2026))) (Day 2 11 2026)
+
+-- Adding business days: three after Fri 30 Oct, across the weekend and the
+-- holiday on Mon 2 Nov, is Thu 5 Nov; with no holiday, Wed 4 Nov.
+#ASSERT `add business days` (`weekdays except` (LIST Day 2 11 2026)) 3 (Day 30 10 2026) EQUALS Day 5 11 2026
+#ASSERT `add business days` `weekdays only` 3 (Day 30 10 2026) EQUALS Day 4 11 2026
+#ASSERT `add business days` `weekdays only` 0 (Day 31 10 2026) EQUALS (Day 31 10 2026)
+
+-- Counting excludes the first day and includes the last, so it undoes adding.
+#ASSERT `business days between` `weekdays only` (Day 30 10 2026) (Day 6 11 2026) EQUALS 5
+#ASSERT `business days between` `weekdays only` (Day 30 10 2026) (`add business days` `weekdays only` 7 (Day 30 10 2026)) EQUALS 7
+#ASSERT `business days between` `weekdays only` (Day 31 10 2026) (Day 31 10 2026) EQUALS 0
+
+-- The first day is not counted and the last is. These two differ from a count
+-- that includes the first day and not the last: Fri to Sat has only Sat to
+-- count, which is not a business day; Sat to Mon has only Mon, which is.
+#ASSERT `business days between` `weekdays only` (Day 30 10 2026) (Day 31 10 2026) EQUALS 0
+#ASSERT `business days between` `weekdays only` (Day 31 10 2026) (Day 2 11 2026) EQUALS 1
+
+-- A fractional day number is read as its day at every entry point: noon on
+-- Mon 2 Nov is Mon 2 Nov (and so is 0.9 of the way through it, which a
+-- rounding-to-nearest would call Tuesday), and noon on Sat 31 Oct rolls to
+-- Mon 2 Nov, with no fraction left on the answer.
+#ASSERT `next business day on or after` `weekdays only` ((Day 2 11 2026) PLUS 0.5) EQUALS (Day 2 11 2026)
+#ASSERT `next business day on or after` `weekdays only` ((Day 2 11 2026) PLUS 0.9) EQUALS (Day 2 11 2026)
+#ASSERT `next business day on or after` `weekdays only` ((Day 31 10 2026) PLUS 0.5) EQUALS (Day 2 11 2026)
+#ASSERT `add business days` `weekdays only` 1 ((Day 30 10 2026) PLUS 0.5) EQUALS (Day 2 11 2026)
+#ASSERT `previous business day on or before` `weekdays only` ((Day 31 10 2026) PLUS 0.5) EQUALS (Day 30 10 2026)
+#ASSERT `modified following business day` `weekdays only` ((Day 31 10 2026) PLUS 0.5) EQUALS (Day 30 10 2026)
+#ASSERT `add business days` `weekdays only` 0 ((Day 31 10 2026) PLUS 0.5) EQUALS (Day 31 10 2026)
+#ASSERT `add business days` `weekdays only` 3 ((Day 30 10 2026) PLUS 0.5) EQUALS (Day 4 11 2026)
+#ASSERT `is a business day` `weekdays only` ((Day 2 11 2026) PLUS 0.5)
+
+-- Two counts where a fraction left on either end would change the answer: Sat
+-- 7 Nov at 0.2 to Sun 8 Nov at 0.5 holds no business day, but a count that
+-- kept the 0.5 would reach Mon 9 Nov; and a calendar that only knows Mon 2 Nov
+-- as a whole number is shown whole numbers, never Fri 30 Oct at noon plus one.
+#ASSERT `business days between` `weekdays only` ((Day 7 11 2026) PLUS 0.2) ((Day 8 11 2026) PLUS 0.5) EQUALS 0
+#ASSERT `business days between` (GIVEN d YIELD d EQUALS (Day 2 11 2026)) ((Day 30 10 2026) PLUS 0.5) ((Day 2 11 2026) PLUS 0.5) EQUALS 1
+#ASSERT `is a business day` (GIVEN d YIELD d EQUALS (Day 2 11 2026)) ((Day 2 11 2026) PLUS 0.5)
+
+-- Each DATE twin is checked on a day where it differs from its nearest
+-- sibling, and agrees with the day-number form.
+#ASSERT `next business day on or after` `weekdays only` (Date 31 10 2026) EQUALS Date 2 11 2026
+#ASSERT `next business day on or after` `weekdays only` (Date 2 11 2026) EQUALS (Date 2 11 2026)
+#ASSERT `add business days` `weekdays only` 1 (Date 30 10 2026) EQUALS (Date 2 11 2026)
+#ASSERT `previous business day on or before` `weekdays only` (Date 31 10 2026) EQUALS (Date 30 10 2026)
+#ASSERT `previous business day on or before` `weekdays only` (Date 30 10 2026) EQUALS (Date 30 10 2026)
+#ASSERT `modified following business day` `weekdays only` (Date 31 10 2026) EQUALS Date 30 10 2026
+#ASSERT `modified following business day` `weekdays only` (Date 7 11 2026) EQUALS Date 9 11 2026
+#ASSERT `add business days` `weekdays only` 3 (Date 30 10 2026) EQUALS (Date 4 11 2026)
+#ASSERT `business days between` `weekdays only` (Date 30 10 2026) (Date 6 11 2026) EQUALS 5
+#ASSERT `is a business day` `weekdays only` (Date 30 10 2026)
+#ASSERT NOT `is a business day` `weekdays only` (Date 31 10 2026)
+
+-- The refusals are asserted, not just displayed: each stops evaluation with
+-- its reason, and each assertion fails if the entry point ever returns a day.
+-- Every entry point refuses a day number below 365, whatever the calendar: day
+-- number 5 would otherwise roll somewhere and be believed. 364.9 rounds down
+-- to 364, still below.
+#ASSERT REFUSED (`next business day on or after` `weekdays only` 5) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`add business days` `weekdays only` 1 5) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`previous business day on or before` `weekdays only` 5) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`modified following business day` `weekdays only` 5) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`add business days` `weekdays only` 0 5) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`add business days` `weekdays only` 2 5) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`business days between` `weekdays only` 5 10) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`business days between` `weekdays only` (Day 30 10 2026) 5) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT REFUSED (`is a business day` `weekdays only` 364.9) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+
+-- The edge is 365, and it is pinned on both sides on calendars that say TRUE
+-- for everything, which would answer TRUE for 5 if nothing refused it first.
+#ASSERT REFUSED (`is a business day` (GIVEN d YIELD TRUE) 364) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT `is a business day` (GIVEN d YIELD TRUE) 365
+#ASSERT REFUSED (`next business day on or after` (GIVEN d YIELD TRUE) 364) BECAUSE "calendar refused a day number below 365: that is a count of days, not a calendar date, and has no weekday; give a date, for example Day 31 10 2026"
+#ASSERT `next business day on or after` (GIVEN d YIELD TRUE) 365 EQUALS 365
+
+-- Counts and spans that make no sense are refused rather than corrected.
+#ASSERT REFUSED (`add business days` `weekdays only` (0 MINUS 1) (Day 30 10 2026)) BECAUSE "calendar refused a negative or fractional count of business days"
+#ASSERT REFUSED (`add business days` `weekdays only` 1.5 (Day 30 10 2026)) BECAUSE "calendar refused a negative or fractional count of business days"
+#ASSERT REFUSED (`business days between` `weekdays only` (Day 2 11 2026) (Day 30 10 2026)) BECAUSE "calendar refused a span that ends before it starts"
+
+-- A calendar with no business day stops, in both directions, and the bound is
+-- exact: a lone business day 365 days away is found, 366 days away is refused.
+-- `add business days` by one starts a day later than `on or after`, so its lone
+-- day is found at 366 and refused at 367.
+#ASSERT REFUSED (`next business day on or after` (GIVEN d YIELD FALSE) (Day 30 10 2026)) BECAUSE "calendar found no business day within 366 days: the calendar says no day is a business day"
+#ASSERT REFUSED (`previous business day on or before` (GIVEN d YIELD FALSE) (Day 30 10 2026)) BECAUSE "calendar found no business day within 366 days: the calendar says no day is a business day"
+#ASSERT `next business day on or after` (GIVEN d YIELD d EQUALS (Day 30 10 2026) PLUS 365) (Day 30 10 2026) EQUALS (Day 30 10 2026) PLUS 365
+#ASSERT REFUSED (`next business day on or after` (GIVEN d YIELD d EQUALS (Day 30 10 2026) PLUS 366) (Day 30 10 2026)) BECAUSE "calendar found no business day within 366 days: the calendar says no day is a business day"
+#ASSERT `add business days` (GIVEN d YIELD d EQUALS (Day 30 10 2026) PLUS 366) 1 (Day 30 10 2026) EQUALS (Day 30 10 2026) PLUS 366
+#ASSERT REFUSED (`add business days` (GIVEN d YIELD d EQUALS (Day 30 10 2026) PLUS 367) 1 (Day 30 10 2026)) BECAUSE "calendar found no business day within 366 days: the calendar says no day is a business day"
+#ASSERT `previous business day on or before` (GIVEN d YIELD d EQUALS (Day 30 10 2026) MINUS 365) (Day 30 10 2026) EQUALS (Day 30 10 2026) MINUS 365
+#ASSERT REFUSED (`previous business day on or before` (GIVEN d YIELD d EQUALS (Day 30 10 2026) MINUS 366) (Day 30 10 2026)) BECAUSE "calendar found no business day within 366 days: the calendar says no day is a business day"
+
+-- Modified Following compares the month AND the year: here the next business
+-- day is 15 Jan 2027, the same month number a year on, which is not "the same
+-- month", so the answer goes back to 14 Jan 2026.
+#ASSERT `modified following business day` (GIVEN d YIELD d EQUALS (Day 14 1 2026) OR d EQUALS (Day 15 1 2027)) (Day 15 1 2026) EQUALS (Day 14 1 2026)

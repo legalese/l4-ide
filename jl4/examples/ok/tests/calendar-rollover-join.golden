@@ -1,0 +1,23 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+calendar-rollover-join.l4:53:1-55:38:
+  FULFILLED
+calendar-rollover-join.l4:57:1-59:38:
+  DEONTIC BREACHED:
+    party
+      Buyer
+    who did action
+      pay
+    at
+      740287
+    surpassed the deadline of party
+      Buyer
+    who had to do obligatory action
+      MUST pay
+    before their deadline, which was at
+      740286
+calendar-rollover-join.l4:71:1-73:55:
+  FULFILLED
+calendar-rollover-join.l4:89:1-91:39:
+  FULFILLED
