@@ -401,14 +401,23 @@ spec = do
               ]
         problems src `shouldBe` Right []
 
-      it "refuses EITHER, which has no shape yet" $ do
+      it "accepts an EITHER whose two sides have shapes, as published until now" $ do
         let src = Text.unlines
               [ "@export Pick"
               , "GIVEN e IS AN EITHER STRING NUMBER"
+              , "GIVETH AN EITHER STRING NUMBER"
+              , "pick MEANS e"
+              ]
+        problems src `shouldBe` Right []
+
+      it "refuses an EITHER with a function on one side" $ do
+        let src = Text.unlines
+              [ "@export Pick"
+              , "GIVEN e IS AN EITHER STRING (FUNCTION FROM NUMBER TO NUMBER)"
               , "GIVETH A BOOLEAN"
               , "pick MEANS TRUE"
               ]
-        problems src `shouldBe` Right [(Just 1, "pick", Just "e", "of the type EITHER")]
+        problems src `shouldBe` Right [(Just 1, "pick", Just "e", "a function")]
 
       it "warns about a GIVEN with no written type, and does not refuse it" $ do
         let src = Text.unlines

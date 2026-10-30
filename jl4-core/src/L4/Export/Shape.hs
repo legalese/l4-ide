@@ -28,8 +28,10 @@
 -- > EVENT party action             no shape yet: UEvent
 -- > FUNCTION FROM a TO b           no shape yet: UFunction
 -- > a type variable                no shape: UPolymorphic
--- > EITHER, and any built-in type not listed above, or a type not found
---                                  no shape yet: UUnknownType
+-- > EITHER a b                     JEither (shape a) (shape b) (the service writes it as it does today; the
+-- >                                                          form is open)
+-- > any built-in type not listed above, or a type not found
+-- >                                no shape yet: UUnknownType
 --
 -- A new built-in type has no shape until someone adds a row here.
 module L4.Export.Shape (
@@ -54,6 +56,7 @@ import L4.TypeCheck.Environment (
   contractUnique,
   dateUnique,
   datetimeUnique,
+  eitherUnique,
   eventUnique,
   listUnique,
   maybeUnique,
@@ -79,6 +82,8 @@ data JsonShape
     JRecursive Text
   | JArray JsonShape
   | JOptional JsonShape
+  | -- | The shapes of the two sides. How an EITHER is written is not decided.
+    JEither JsonShape JsonShape
   deriving stock (Eq, Show)
 
 data JsonField = JsonField
@@ -149,6 +154,7 @@ jsonShape env = go Set.empty
     | u == datetimeUnique, null args = Right JDateTime
     | u == listUnique, [a] <- args = JArray <$> go seen a
     | u == maybeUnique, [a] <- args = JOptional <$> go seen a
+    | u == eitherUnique, [a, b] <- args = JEither <$> go seen a <*> go seen b
     | u == contractUnique = Left UDeontic
     | u == eventUnique = Left UEvent
     | Just d <- Map.lookup u env.declared = declaredType seen u d args
