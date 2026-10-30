@@ -573,6 +573,12 @@ A cases file or a rules file that does not exist ends the command with the opera
 - `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT. With `--dominators` it prints, instead, the acts every path to `FULFILLED` and to `BREACH` must pass through; with `--dominators --dot` it keeps the DOT and draws those acts heavy. See [State graph and `--dominators`](../../reference/regulative/STATE-GRAPH.md).
 - `l4 lts myfile.l4` reads every `#TRACE` out as a plain list: what is owed now, what would discharge it, what would put someone in breach, and the next deadline (`--steps` for the history, `--json` for a program). See [What is owed now](../../reference/regulative/lts-list.md).
 
+### `l4 lint` — does the encoding keep its "subject to"?
+
+`l4 lint myfile.l4` reads the statute's own words in your file (the `@ref` citations, the decision names and the quoted text in the bodies) and checks that a provision that says "subject to section 6" actually asks the decision for section 6.
+It prints what it finds and exits 0 whatever the result; `--strict` makes a finding exit 1.
+See [Does the encoding keep its "subject to"?](../../reference/lint/overrides.md).
+
 ### `l4 ast` — the parsed syntax tree
 
 `l4 ast myfile.l4` dumps the parsed AST. You will rarely need it unless you are debugging L4 tooling itself.

@@ -1,0 +1,23 @@
+-- The same made-up Licensing Act as overrides-forgotten.l4, this time with
+-- section 5 honouring its own opening words: it calls the decision that
+-- encodes section 3, negated, because it may trade only where section 3's
+-- bar does not apply.
+
+GIVEN metres IS A NUMBER
+GIVETH A BOOLEAN
+`s 3 — the premises are within 100 metres of a school` metres MEANS
+    metres LESS THAN 100
+
+@ref Licensing Act s 5 — "Subject to section 3, a licensee may trade between 8am and 10pm."
+GIVEN hour IS A NUMBER, metres IS A NUMBER
+GIVETH A BOOLEAN
+`s 5 — a licensee may trade` hour metres MEANS
+        "Subject to section 3,"
+    ... NOT (`s 3 — the premises are within 100 metres of a school` metres)
+    ... "a licensee may trade between 8am and 10pm."
+    ... hour AT LEAST 8 AND hour AT MOST 22
+
+-- Noon, 50 metres from a school. Section 3 bars it, and now section 5 agrees.
+#EVAL `s 5 — a licensee may trade` 12 50
+-- Noon, 500 metres from a school. Nothing bars it.
+#EVAL `s 5 — a licensee may trade` 12 500

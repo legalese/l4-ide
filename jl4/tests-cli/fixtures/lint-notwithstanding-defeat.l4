@@ -1,0 +1,14 @@
+-- l4 lint fixture: the same prose as lint-notwithstanding-unwired.l4, written in
+-- the two-layer defeat idiom: section 7 yields by calling the prevailing
+-- section 9, negated. No finding.
+@ref Act s 9 — "Notwithstanding section 7, the Director may grant extensions."
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`s 9 — extensions may be granted` n MEANS
+    n GREATER THAN 1
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`s 7 — extensions are barred` n MEANS
+        n GREATER THAN 10
+    AND NOT (`s 9 — extensions may be granted` n)

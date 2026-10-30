@@ -1,0 +1,12 @@
+-- l4 lint fixture: section 9 prevails over section 7 and nothing joins the two:
+-- neither calls the other and no third decision calls both. A finding.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`s 7 — extensions are barred` n MEANS
+    n GREATER THAN 10
+
+@ref Act s 9 — "Notwithstanding section 7, the Director may grant extensions."
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`s 9 — extensions may be granted` n MEANS
+    n GREATER THAN 1
