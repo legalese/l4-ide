@@ -25,7 +25,7 @@ tsv="$dir/findings.tsv"
 [ -s "$tsv" ] || { echo "summarise.sh: no $tsv" >&2; exit 2; }
 
 echo "FINDING KINDS"
-awk -F'\t' '
+awk -F'\t' -v pre="$dir/dmn/" '
   NR == 1 { next }
   {
     m = $8
@@ -40,7 +40,8 @@ awk -F'\t' '
     n[k]++
     if (!((k SUBSEP $1) in seen)) { seen[k, $1] = 1; f[k]++ }
     if (!(k in ex)) {
-      p = $1; sub(/^.*\/dmn\//, "", p)
+      p = $1
+      if (index(p, pre) == 1) p = substr(p, length(pre) + 1)
       ex[k] = p " | " $6 " | " $7
     }
   }
