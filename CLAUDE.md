@@ -234,6 +234,11 @@ Rebuild, or drop the pin.
 `git diff <binary's commit> HEAD -- jl4-core/libraries/` is a cheap check for the prelude, but **read the diff rather than its exit code**: deleted comment lines are safe, an added annotation is not.
 How many errors a stale binary invents depends on both the binary and the corpus, so treat the count as a symptom to read, never a constant to memorise.
 
+**Editing `jl4-core/libraries/*.l4` in a tree that is already built does not re-embed it, and a test that pins `JL4_LIBRARY_PATH` cannot tell.**
+Measured 2026-10-30 on `prelude.l4`: after the edit, `cabal test l4-cli-test`, and then a `touch` of `jl4-core/src/L4/API/EmbeddedLibraries.hs` followed by `cabal build l4`, both left the binary with the OLD prelude (`env -u JL4_LIBRARY_PATH l4 check` on a file using the new function: `I could not find a definition`), while every test passed on the pinned path.
+Appending a line to `EmbeddedLibraries.hs` and building did re-embed it (the same check: `Check succeeded.`); revert the line afterwards.
+Check the embedded copy with `env -u JL4_LIBRARY_PATH` before you hand a binary to `doc/test-docs.sh` or to anyone else.
+
 ### 3.1.1 A golden that captures an absolute path cannot fail locally
 
 **Before blessing a new golden, grep it for an absolute path.** `grep -c /Users/ <golden>` is the

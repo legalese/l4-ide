@@ -65,13 +65,14 @@ In the tables, `a`, `b`, `c`, `k`, `v` and `r` stand for any type, as in `GIVEN 
 | `product`  | `list`: LIST OF NUMBER              | NUMBER  | The product (1 for an empty list)             |
 | `max`      | `x`, `y`: NUMBER                    | NUMBER  | The greater of the two                        |
 | `min`      | `x`, `y`: NUMBER                    | NUMBER  | The lesser of the two                         |
-| `` `the amount by which` a `exceeds` b `` | `a`, `b`: NUMBER | NUMBER | How far `a` is above `b`, and 0 when it is not ([below](#the-amount-by-which-one-figure-exceeds-another)) |
 | `maximum`  | `list`: LIST OF NUMBER              | NUMBER  | The largest item; an error for an empty list  |
 | `minimum`  | `list`: LIST OF NUMBER              | NUMBER  | The smallest item; an error for an empty list |
 | `maximum1` | `x`: NUMBER, `list`: LIST OF NUMBER | NUMBER  | The largest of `x` and the items              |
 | `minimum1` | `x`: NUMBER, `list`: LIST OF NUMBER | NUMBER  | The smallest of `x` and the items             |
 | `even`     | `x`: NUMBER                         | BOOLEAN | TRUE if `x` is even                           |
 | `odd`      | `x`: NUMBER                         | BOOLEAN | TRUE if `x` is odd                            |
+
+`` `the amount by which` a `exceeds` b `` is a function of two NUMBERs too, and has its own section, [below](#the-amount-by-which-one-figure-exceeds-another).
 
 `max`, `min`, `maximum`, `minimum`, `maximum1` and `minimum1` also accept MAYBE NUMBER values. `NOTHING` counts as absent: the other value wins, and only when every value is `NOTHING`, or the list is empty, is the result `NOTHING`.
 
@@ -115,6 +116,9 @@ With rates of 1000, income of 20000 and no dependants, the code gave 630 where t
 - "Exceeds" as a yes-or-no question ("income exceeds the threshold") is a comparison, `income GREATER THAN threshold`, not this function.
 - An input that is itself a function call needs parentheses: `` `the amount by which` income `exceeds` (FLOOR threshold) ``.
   Without them, L4 reads `FLOOR` and `threshold` as two more inputs and reports that the function "expects 2 inputs, but here it is given 4 inputs".
+- The sentence that `l4 nlg` writes for an `#EVAL` or `#ASSERT` shows a call to this function as `` `the amount by which _ exceeds _` with 840 and 160 ``.
+  The `@nlg` sentence on its definition is not spliced into a call to a mixfix function.
+  `l4 render` writes the same call as the phrase, "the amount by which income exceeds the threshold".
 - A module that imports the prelude and defines its own function with the same words gets "There are multiple definitions for the identifier", as it would for its own `max`.
 
 ## MAYBE values
