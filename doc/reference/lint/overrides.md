@@ -79,7 +79,7 @@ For every decision in the file, the lint reads three places where the statute's 
 3. **The quoted text in its body**: the words in quotation marks that [inert style](../../concepts/reviewing/reviewing-encoded-law.md) keeps verbatim beside the logic, such as `"Subject to section 3,"` above.
 
 The third is an extension of the ruling, which names only the first two.
-It is there because that is where most of the statute's wording sits.
+It is there because the inert style keeps the statute's words in the body: of the 11 mentions the lint finds in the encodings under `jl4/examples/canon` (measured 2026-10-30), 6 are read from the body text and nowhere else.
 
 It does **not** read comments (the lines beginning `--`).
 A comment is the encoder talking to the next encoder; it makes no commitment that the code could break.
@@ -96,16 +96,16 @@ Name your decisions that way and the lint can follow them; if you do not, it has
 Only the first two lines of this table are findings.
 The rest are shown with `--all`, and counted at the foot of every run.
 
-| what the report says  | what it means                                                                                                                                                                                             |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `missing-conjunct`    | **Finding.** "Subject to X" is in the decision's words. Decisions for X exist in this file. This decision reaches none of them, and none of them reaches it.                                             |
-| `override-unwired`    | **Finding.** "Notwithstanding X" (or "despite X") is in the decision's words. Decisions for X exist. Neither side calls the other, and no third decision calls both.                                      |
-| `wired (…)`           | The edge is there: a direct call, a call through a helper decision, a call the other way round (the provision being overridden calls the prevailing one), or a third decision that calls both.            |
-| `target-not-encoded`  | No decision in this file is named for X, so there was nothing to call. Usually a choice of scope. Not a finding.                                                                                          |
-| `self-reference`      | X is the provision this decision itself encodes ("this section is subject to section 114" inside section 114(4)).                                                                                         |
-| `unresolved-relative` | "Subsection (8)" or "paragraph (a)" of a decision whose name carries no provision number, so there is no section to read it against. The lint does not guess.                                             |
-| `external-instrument` | The provision is another instrument's ("section 15(d) of the Exchange Act"). Its decision, if there is one, is in another file.                                                                           |
-| `range`               | "Sections 6 to 8". Which of them the author meant is not the lint's to guess.                                                                                                                             |
+| what the report says  | what it means                                                                                                                                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `missing-conjunct`    | **Finding.** "Subject to X" is in the decision's words. Decisions for X exist in this file. This decision reaches none of them, and none of them reaches it.                                                                                       |
+| `override-unwired`    | **Finding.** "Notwithstanding X" (or "despite X") is in the decision's words. Decisions for X exist. Neither side calls the other, and no third decision calls both.                                                                               |
+| `wired (…)`           | The edge is there: a direct call, a call through a helper decision, a call the other way round (the provision being overridden calls the prevailing one), or a third decision that calls both.                                                     |
+| `target-not-encoded`  | No decision in this file is named for X, so there was nothing to call. Usually a choice of scope. Not a finding.                                                                                                                                   |
+| `self-reference`      | X is the provision this decision itself encodes ("this section is subject to section 114" inside section 114(4)).                                                                                                                                  |
+| `unresolved-relative` | "Subsection (8)" or "paragraph (a)" of a decision whose name carries no provision number, so there is no section to read it against. The lint does not guess.                                                                                      |
+| `external-instrument` | The provision is another instrument's ("section 15(d) of the Exchange Act"). Its decision, if there is one, is in another file.                                                                                                                    |
+| `range`               | "Sections 6 to 8". Which of them the author meant is not the lint's to guess.                                                                                                                                                                      |
 | `open-class`          | "Notwithstanding any other provision of this Act". No provision is named, so no call could be checked. [SUBJECT-TO-NOTWITHSTANDING-SPEC §12.1](../../../specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md) records that no static check reaches these. |
 
 "Subject to" and "except as provided in" look forward: the provision yields, so its own body should ask the other.
@@ -115,11 +115,11 @@ Statute's own drafting leaves it open, and so does the lint: the overridden prov
 
 ## Options
 
-| option     | what it does                                                                                                    |
-| ---------- | --------------------------------------------------------------------------------------------------------------- |
-| `--all`    | list every mention found, not only the findings                                                                 |
-| `--json`   | print one JSON array of every mention (file, line, decision, phrase, target, where read, verdict, candidates)   |
-| `--strict` | exit 1 when there is a finding. Without it the exit status is 0 whenever the lint ran, whatever it found.      |
+| option     | what it does                                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| `--all`    | list every mention found, not only the findings                                                               |
+| `--json`   | print one JSON array of every mention (file, line, decision, phrase, target, where read, verdict, candidates) |
+| `--strict` | exit 1 when there is a finding. Without it the exit status is 0 whenever the lint ran, whatever it found.     |
 
 A file that does not type-check cannot be linted; the command says so and exits 1 with or without `--strict`.
 
@@ -132,4 +132,5 @@ A file that does not type-check cannot be linted; the command says so and exits 
 - **It cannot reach the shapes §12.1 calls out of reach of any static check.** "Notwithstanding any other provision" names no target; a comparative override is not an edge.
 - **Two instruments in one file can be confused.** If a file encodes two Acts that both have a section 6, a call to either satisfies "subject to section 6".
 - **A paragraph is not resolved inside a section.** "Paragraph (a)" of a section is relative to a subsection the lint does not track. In an article, regulation, rule or clause, "paragraph (2)" is read as that provision's own subdivision.
+- **It can raise a finding that is not a defect.** The priority may be settled by a decision in another file that calls both provisions, or the other provision's test may be written out inside this decision instead of called. The lint sees neither; the finding is a prompt to look, not a verdict.
 - **A clean report is not a faithful encoding.** It says the encoding is not silently dropping the effect of the phrases it can see. Whether the encoding says what the law says remains the reviewer's judgement.

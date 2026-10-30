@@ -17,13 +17,19 @@
 --
 -- §12.1 names two: the @\@ref@ citations and the identifier names. This module
 -- reads a third, the string literals in the decision's body ('SrcText'), because
--- that is where the corpus keeps most of the statutory wording: the inert-style
--- encodings quote the provision in the body and hang the logic off it
--- (@"Subject to section 6,"@ in §12.1's own witness). Measured on 2026-10-30,
--- over the commons checkout, 10 lines of @\@ref@ prose and 22 definition names
--- carry a phrase followed by a provision number, against 526 lines of string
--- literals. Reading the third source is an extension of the ruling, not part of
--- it.
+-- the inert-style encodings quote the provision in the body and hang the logic
+-- off it (@"Subject to section 6,"@ in §12.1's own witness). Over the canon
+-- mirror (@jl4\/examples\/canon@, 61 files, measured 2026-10-30), the lint finds
+-- 11 mentions; 6 of them are read from the body text and nowhere else. Reading
+-- the third source is an extension of the ruling, not part of it.
+--
+-- It does not read comments. Over the commons checkout (5,974 files, a looser
+-- regular expression than this module's matcher, 2026-10-30) a phrase followed
+-- by a provision number sits on 1,650 comment lines, against 11 @\@ref@ lines,
+-- 37 string-literal lines and 288 lines inside a backticked name (definitions
+-- and the places that call them). The commons style keeps the statute's
+-- words in comments, where they bind nothing, so most of its phrases are out of
+-- this lint's reach by construction.
 --
 -- = What is a mention, and what is not
 --
@@ -439,7 +445,8 @@ externalAfter (o : more) | lw o == "of" = case dropThe more of
  where
   dropThe (x : xs) | lw x == "the" = xs
   dropThe xs = xs
-  startsUpper w = maybe False (isUpper . fst) (Text.uncons w)
+  -- a proper name ("the Wills Act") or a year-led title ("the 2008 Regulations")
+  startsUpper w = maybe False (\c -> isUpper c || isDigit c) (fmap fst (Text.uncons w))
 externalAfter _ = False
 
 -- | "notwithstanding any other provision", "subject to the provisions of this

@@ -74,6 +74,7 @@ spec = do
       readMentions "except where the will provides" `shouldBe` []
     it "sets aside a provision of another instrument" do
       readMentions "subject to section 15(d) of the Exchange Act" `shouldBe` ["subject to: external section 15(d)"]
+      readMentions "a claimant subject to regulation 2(3) of the 2008 Regulations" `shouldBe` ["subject to: external regulation 2(3)"]
       readMentions "subject to the Land Titles Act, section 12 of that Act" `shouldBe` ["subject to: no provision"]
     it "does not set aside 'of this Act'" do
       readMentions "subject to section 6 of this Act" `shouldBe` ["subject to: linted section 6"]
@@ -119,6 +120,9 @@ spec = do
     it "does not flag the same prose when the body calls the section 6 decision" do
       fs <- findingsOf satisfied
       map summary fs `shouldBe` ["s 8(3) — probate may be granted / subject to / s 6 / wired (direct call)"]
+    it "does not take a call to another subsection of the section for the one named" do
+      fs <- findingsOf subPartMismatch
+      map summary fs `shouldBe` ["s 8(3) — probate may be granted / subject to / s 6(2) / missing-conjunct"]
     it "follows a call through a helper" do
       fs <- findingsOf viaHelper
       map summary fs `shouldBe` ["s 8(3) — probate may be granted / subject to / s 6 / wired (through a helper)"]
@@ -190,6 +194,25 @@ satisfied = preamble <> Text.unlines
   , "GIVETH A BOOLEAN"
   , "`s 8(3) — probate may be granted` n MEANS"
   , "        \"Subject to section 6,\""
+  , "    ... NOT (`s 6(1) — granted to more than 4 persons` n)"
+  , "    ... n GREATER THAN 1"
+  ]
+
+-- | "Subject to section 6(2)", and the body asks section 6(1) only.
+subPartMismatch :: Text
+subPartMismatch = Text.unlines
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 6(1) — granted to more than 4 persons` n MEANS n GREATER THAN 4"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 6(2) — the grant is limited` n MEANS n EQUALS 0"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 8(3) — probate may be granted` n MEANS"
+  , "        \"Subject to section 6(2),\""
   , "    ... NOT (`s 6(1) — granted to more than 4 persons` n)"
   , "    ... n GREATER THAN 1"
   ]

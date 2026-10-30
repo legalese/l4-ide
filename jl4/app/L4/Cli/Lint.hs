@@ -118,7 +118,10 @@ renderFinding fp f = Text.unlines (headLine : detail)
     _ ->
       [ "    " <> said <> " (" <> readIn <> ")"
       ]
-  names = Text.intercalate ", " . map (\ n -> "`" <> n <> "`")
+  -- a section can have a dozen decisions; the first few are enough to find it
+  names ns =
+    Text.intercalate ", " [ "`" <> n <> "`" | n <- take 4 ns ]
+      <> (if length ns > 4 then " and " <> Text.pack (show (length ns - 4)) <> " more" else "")
   -- "subsection (8)" names no provision until it is read against the
   -- decision's own section; say which one it was read as.
   relativeAs w mr = case mr of
