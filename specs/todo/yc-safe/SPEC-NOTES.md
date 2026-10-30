@@ -1,7 +1,10 @@
 # YC SAFE as executable configuration — notes toward a spec
 
-Status: **notes**, not yet a spec. Captured 2026-07-27.
-Branch: `docs/yc-safe-spec`. Worktree: `~/src/legalese/l4wt/yc-safe`.
+Status: **notes**, captured 2026-07-27. **Superseded in part on 2026-09-04 by `SPEC.md`
+beside this file**, which promotes §7 (open questions) and §8 (next actions) into rulings
+and a build; §1–§6 here (the arc, the prior art, the findings D1–D10, the L4 fit, the PDF
+carrier, the research angle) remain authoritative and are cited from there.
+Branch at that date: `mengwong/yc-safe`. Worktree: `~/src/legalese/l4wt/yc-safe`.
 
 ---
 
