@@ -3,7 +3,7 @@
 **Status:** Proposal. **Phase 1 is ruled, and partly built on a branch not yet merged.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
 `l4 prove` is built on `feat/l4-prove`, draft legalese/l4-ide#784 (2026-10-30), not merged into `unstable`; until it merges, `l4 prove` does not exist in the tree, and this document's present-tense mentions of it are still plans.
 What #784 builds, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its `deferred` outcome, its `l4 run` exit-code change, its CI coverage check or its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`; R-V8.
-**R-V10 is not discharged**: nothing in #784 touches the Catala Mode A/B gate, so CATALA-EXPORT-SPEC §8.4's disclosed-open item stays open.
+**R-V10 is discharged as a design** in #784 (2026-10-30): the Mode A/B gate now calls the real emitted scope at a witness per realisable combination; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`). See CATALA-EXPORT-SPEC §8.4's discharge note.
 R-V3's `deferred` outcome conflicts with UNKNOWN-EVALUATION-SPEC's later U1b ("an undetermined `#ASSERT` exits 1", `specs/todo/UNKNOWN-EVALUATION-SPEC.md:589`); whether U1b supersedes it is Meng's to say.
 **Author:** Meng Wong
 **Date:** 2026-06-29 (Phase 1 rulings appended 2026-09-07)
@@ -491,6 +491,10 @@ three-band rate table that `catala typecheck` was green on.
 
 When this lands, `CATALA-EXPORT-SPEC.md` §8.4's disclosed-open item is discharged **in the same PR**
 or it is not discharged.
+
+**Built 2026-10-30 in legalese/l4-ide#784 (draft, not merged), as a design: the gate now calls the real emitted scope; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`).**
+`l4 export catala` replaces the grid of each ladder with one `#[test]` scope per realisable combination of its atoms, calling the emitted scope at a witness input and expecting L4's value there; z3 only proves the other combinations impossible, or finds a witness the fixed candidates miss.
+The grid's cap of 8 does not bind a gated ladder. The measurements (all goldens pass; a flipped consequence that the grid passes now fails; a nine-atom ladder gated) are in CATALA-EXPORT-SPEC §8.4's discharge note, which is the record.
 
 ## Deferred obligations
 
