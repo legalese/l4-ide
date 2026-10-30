@@ -22,7 +22,7 @@ import {
 } from '../cloud/git-sync.js'
 import { SID } from './cloud-fakes.js'
 
-const API = 'https://sessions.example/'
+const API = 'https://sessions.legalese.cloud/'
 
 function uri(s: string): GitUri {
   const u = new URL(s)
@@ -193,11 +193,20 @@ describe('CloudGitSync', () => {
     const { git, sync } = setup()
     await sync.register()
     assert.deepEqual(
-      await git.credentials!.getCredentials(uri('https://sessions.example')),
+      await git.credentials!.getCredentials(
+        uri('https://sessions.legalese.cloud')
+      ),
       { username: 'legalese', password: 'jwt-fresh' }
     )
     assert.equal(
       await git.credentials!.getCredentials(uri('https://github.com')),
+      undefined
+    )
+    // Not in cleartext, even to the right host.
+    assert.equal(
+      await git.credentials!.getCredentials(
+        uri('http://sessions.legalese.cloud')
+      ),
       undefined
     )
     sync.unregister()
@@ -214,7 +223,7 @@ describe('CloudGitSync', () => {
       {
         name: 'Lease review',
         description: 'sleeping',
-        url: `https://sessions.example/git/${SID}/Lease-review.git`,
+        url: `https://sessions.legalese.cloud/git/${SID}/Lease-review.git`,
       },
     ])
   })
@@ -227,14 +236,14 @@ describe('CloudGitSync', () => {
     assert.equal(folder.fsPath, '/home/u/src/Lease-review')
     assert.deepEqual(git.cloned, [
       {
-        url: `https://sessions.example/git/${SID}/Lease-review.git`,
+        url: `https://sessions.legalese.cloud/git/${SID}/Lease-review.git`,
         parent: '/home/u/src',
         action: 'none',
       },
     ])
     assert.deepEqual(Object.fromEntries(git.repositories[0]!.config), {
       'remote.origin.push': 'refs/heads/main:refs/heads/local',
-      'credential.https://sessions.example.helper': '',
+      'credential.https://sessions.legalese.cloud.helper': '',
       'http.proactiveAuth': 'basic',
       'http.postBuffer': '5242880',
     })
@@ -257,7 +266,10 @@ describe('CloudGitSync', () => {
     await sync.markCommitted(SID)
     const folder = await sync.clone(SID, fileUri('/w'))
     assert.equal(folder.fsPath, `/w/${SID}`)
-    assert.equal(git.cloned[0]!.url, `https://sessions.example/git/${SID}.git`)
+    assert.equal(
+      git.cloned[0]!.url,
+      `https://sessions.legalese.cloud/git/${SID}.git`
+    )
   })
 
   test('waits for the Git extension to open a fresh clone itself', async () => {
@@ -299,7 +311,7 @@ describe('CloudGitSync', () => {
     await new Promise((r) => setImmediate(r))
     assert.deepEqual(repo.sets, [
       'remote.origin.push',
-      'credential.https://sessions.example.helper',
+      'credential.https://sessions.legalese.cloud.helper',
       'http.proactiveAuth',
       'http.postBuffer',
     ])
@@ -319,13 +331,13 @@ describe('CloudGitSync', () => {
       [
         '/usr/bin/git',
         '/w/Lease-review',
-        'credential.https://sessions.example.helper',
+        'credential.https://sessions.legalese.cloud.helper',
         '',
       ],
     ])
     assert.ok(
       !git.repositories[0]!.sets.includes(
-        'credential.https://sessions.example.helper'
+        'credential.https://sessions.legalese.cloud.helper'
       )
     )
   })
@@ -375,9 +387,9 @@ describe('CloudGitSync', () => {
       GIT_CONFIG_COUNT: '3',
       GIT_CONFIG_KEY_0: 'user.name',
       GIT_CONFIG_VALUE_0: 'Someone',
-      GIT_CONFIG_KEY_1: 'credential.https://sessions.example.helper',
+      GIT_CONFIG_KEY_1: 'credential.https://sessions.legalese.cloud.helper',
       GIT_CONFIG_VALUE_1: '',
-      GIT_CONFIG_KEY_2: 'http.https://sessions.example/.proactiveAuth',
+      GIT_CONFIG_KEY_2: 'http.https://sessions.legalese.cloud/.proactiveAuth',
       GIT_CONFIG_VALUE_2: 'basic',
     })
     // Once only, also across registrations (for Git: Clone).
@@ -392,9 +404,9 @@ describe('CloudGitSync', () => {
     await sync.register()
     assert.deepEqual(git.env, {
       GIT_CONFIG_COUNT: '2',
-      GIT_CONFIG_KEY_0: 'credential.https://sessions.example.helper',
+      GIT_CONFIG_KEY_0: 'credential.https://sessions.legalese.cloud.helper',
       GIT_CONFIG_VALUE_0: '',
-      GIT_CONFIG_KEY_1: 'http.https://sessions.example/.proactiveAuth',
+      GIT_CONFIG_KEY_1: 'http.https://sessions.legalese.cloud/.proactiveAuth',
       GIT_CONFIG_VALUE_1: 'basic',
     })
   })
@@ -449,7 +461,7 @@ describe('CloudGitSync', () => {
     await sync.register()
     const repo = new FakeRepo(
       fileUri('/x/lease'),
-      `https://sessions.example/git/${SID}.git`
+      `https://sessions.legalese.cloud/git/${SID}.git`
     )
     for (const l of git.openListeners) l(repo)
     await new Promise((r) => setImmediate(r))
@@ -487,19 +499,21 @@ describe('Clone and Sync wait for the first commit (§9.3)', () => {
     // (what VS Code usually passes) still gets a token.
     assert.equal(
       await git.credentials!.getCredentials(
-        uri(`https://sessions.example/git/${SID}.git`)
+        uri(`https://sessions.legalese.cloud/git/${SID}.git`)
       ),
       undefined
     )
     assert.ok(
-      await git.credentials!.getCredentials(uri('https://sessions.example'))
+      await git.credentials!.getCredentials(
+        uri('https://sessions.legalese.cloud')
+      )
     )
 
     await sync.markCommitted(SID)
     assert.deepEqual(await sync.status(SID), { kind: 'not-cloned' })
     assert.ok(
       await git.credentials!.getCredentials(
-        uri(`https://sessions.example/git/${SID}.git`)
+        uri(`https://sessions.legalese.cloud/git/${SID}.git`)
       )
     )
   })
@@ -508,12 +522,15 @@ describe('Clone and Sync wait for the first commit (§9.3)', () => {
 describe('git helpers', () => {
   test('session id from a git URL', () => {
     assert.equal(
-      sessionIdFromGitUrl(`https://sessions.example/git/${SID}.git`, API),
+      sessionIdFromGitUrl(
+        `https://sessions.legalese.cloud/git/${SID}.git`,
+        API
+      ),
       SID
     )
     assert.equal(
       sessionIdFromGitUrl(
-        `https://sessions.example/git/${SID}/Lease-review.git`,
+        `https://sessions.legalese.cloud/git/${SID}/Lease-review.git`,
         API
       ),
       SID
@@ -523,11 +540,11 @@ describe('git helpers', () => {
       undefined
     )
     assert.equal(
-      sessionIdFromGitUrl('https://sessions.example/git/nope.git', API),
+      sessionIdFromGitUrl('https://sessions.legalese.cloud/git/nope.git', API),
       undefined
     )
     assert.equal(
-      sessionIdFromGitUrl(`https://sessions.example/git/${SID}.git`, ''),
+      sessionIdFromGitUrl(`https://sessions.legalese.cloud/git/${SID}.git`, ''),
       undefined
     )
   })
@@ -548,11 +565,11 @@ describe('git helpers', () => {
     )
     assert.equal(
       sessionGitUrl(API, SID, 'Lease review'),
-      `https://sessions.example/git/${SID}/Lease-review.git`
+      `https://sessions.legalese.cloud/git/${SID}/Lease-review.git`
     )
     assert.equal(
       sessionGitUrl(API, SID, '漢字'),
-      `https://sessions.example/git/${SID}.git`
+      `https://sessions.legalese.cloud/git/${SID}.git`
     )
   })
 
