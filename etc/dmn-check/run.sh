@@ -117,10 +117,11 @@ cp="$out/cp.txt"
 # Keyed on pom.xml's mtime, so bumping the pin cannot leave the old classpath behind.
 if [ ! -s "$cp" ] || [ "$here/pom.xml" -nt "$cp" ]; then
   rm -f "$cp"
-  echo "# resolving de.redsix:dmn-check-cli into $out (first run only)" >&2
+  # Nothing is printed before this can skip: a skip is ONE line.
   mvn -q -B -f "$here/pom.xml" -Dmdep.outputFile="$cp" dependency:build-classpath \
     > "$out/mvn.log" 2>&1 \
     || skip "could not resolve dmn-check from Maven (offline? see $out/mvn.log)"
+  echo "# resolved de.redsix:dmn-check-cli into $out (first run only)" >&2
 fi
 [ -s "$cp" ] || skip "empty classpath after dependency:build-classpath (see $out/mvn.log)"
 

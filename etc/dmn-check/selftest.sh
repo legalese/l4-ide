@@ -7,7 +7,7 @@
 # It is not wired into CI or into etc/verify-branch.sh, for the same reason
 # run.sh is not: dmn-check is optional evidence here (README, "Policy").
 #
-# Eight checks (0 to 7). Checks 1 to 3 need Java 21+ and Maven and are skipped, loudly
+# Nine checks (0 to 8). Checks 1 to 3 need Java 21+ and Maven and are skipped, loudly
 # and with exit 0, on a machine that has neither; the others need only bash.
 #
 #   0  Every script parses (`bash -n`), including the branches no other check reaches.
@@ -25,8 +25,10 @@
 #   5  SKIP, no JDK 21+. Same.
 #   6  DMN_CHECK_REQUIRED=1 turns that skip into exit 1, still with one line.
 #   7  SKIP, corpus mode without an `l4`. Same.
+#   8  SKIP, dmn-check cannot be resolved (Maven offline, empty local repository,
+#      fresh work directory). Same, and nothing else printed before it.
 #
-# Checks 4-7 look at the WHOLE of the output, not at a grep for the word: "one
+# Checks 4-8 look at the WHOLE of the output, not at a grep for the word: "one
 # line" is the contract, and a skip that also prints a Maven stack trace is not it.
 set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -112,6 +114,13 @@ if [ "$rc" = 1 ] && one_skipped_line; then ok "6 DMN_CHECK_REQUIRED=1 makes the 
 go env DMN_CHECK_L4=/nonexistent/l4 "$run" --corpus
 if [ "$rc" = 0 ] && one_skipped_line; then ok "7 skip, corpus mode without an l4: $got"; else
   fail "7 skip, corpus mode without an l4 (exit $rc)"; printf '%s\n' "$got" | sed 's/^/      /'; fi
+
+# ---- 8: dmn-check absent ------------------------------------------------------
+repo="$(mktemp -d)"; wd="$(mktemp -d)"
+go env MAVEN_ARGS="-o -Dmaven.repo.local=$repo" DMN_CHECK_WORKDIR="$wd" "$run" "$here/fixtures/clean.dmn"
+if [ "$rc" = 0 ] && one_skipped_line; then ok "8 skip, dmn-check not resolvable: ${got%%(*}"; else
+  fail "8 skip, dmn-check not resolvable (exit $rc)"; printf '%s\n' "$got" | sed 's/^/      /'; fi
+rm -rf "$repo" "$wd"
 
 if [ "$fails" = 0 ]; then echo "selftest: all checks passed"; exit 0; fi
 echo "selftest: $fails check(s) FAILED"
