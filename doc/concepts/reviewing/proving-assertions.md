@@ -106,6 +106,78 @@ The name carries only the file's base name, so give each source file its own `DI
 Within one run, two scripts that would land on one name stop the run with an error and write neither.
 The files are standard SMT-LIB2, the solvers' common text format, so any SMT-LIB2 solver can read them; every name from your file is prefixed (`|l4_price|`), so none can collide with a name the solver reserves for itself, such as `pi`.
 
+## A worked example: a rebate that pays too much to the poor
+
+New Zealand's rates rebate gives a ratepayer on a low income some of their council rates back.
+A 2019 conference deck, "Multilateral Isomorphism in L4", encodes it in L4 and prints the rule in words.
+The deck's rendering, with its spacing tidied, is:
+
+> so much of the rates payable for that rating year in respect of the property as represents two-thirds of the amount by which those rates exceed 160.00 reduced by $1 for each $8 by which the ratepayer's income for the preceding tax year exceeded 25180.00, that last-mentioned amount being increased by 500.00 in respect of each person who was a dependant of the ratepayer; or 630.00, whichever amount is smaller
+
+The rule in this example, and every number in it, is the deck's.
+The wording above has not been checked against the Act, so no section of the Act is named here.
+
+The deck starts from code that had a bug, which it found by charting the rule's output.
+You can see the bug in one clause of that wording: "reduced by $1 for each $8 by which the income _exceeded_ 25180".
+A ratepayer with an income of 20000 has not exceeded 25180, so nothing should be taken off.
+The buggy code took off a _negative_ amount, which adds to the rebate:
+
+```l4
+-- the buggy rule: the income excess is a bare MINUS
+`income excess` income dependants MEANS
+  FLOOR ((income MINUS `allowable income` dependants) DIVIDED BY 8)
+```
+
+At rates of 1000, an income of 20000 and no dependants, the income excess comes out as -648.
+Two-thirds of the 840 by which the rates exceed 160 is 560, and taking off -648 makes 1208, which the maximum of 630 then cuts down.
+So the buggy rule pays 630, where the right answer is 560.
+A test at that one input finds the bug, if you happen to test it; the hard part is knowing which input to try.
+
+Write that wording down as an assertion about _any_ ratepayer, by making the rates, the income and the number of dependants section `GIVEN`s:
+
+```l4
+§ `Any ratepayer`
+    GIVEN rates      IS A NUMBER
+          income     IS A NUMBER
+          dependants IS A NUMBER
+
+-- "two-thirds of the amount by which those rates exceed 160, reduced by ..."
+-- so the reduction cannot lift the rebate above two-thirds of the rates excess
+#ASSERT `rebate` rates income dependants AT MOST (2 TIMES `rates excess` rates) DIVIDED BY 3
+```
+
+Then one command, `l4 prove rates-rebate-buggy.l4`, a file in L4's own tests (`jl4/tests-cli/fixtures/prove/`):
+
+```
+  refuted  rates-rebate-buggy.l4:76:1-93  #ASSERT (rebate OF rates, income, dependants) AT MOST ((2 TIMES (`rates excess` OF rates)) DIVIDED BY 3)
+      counterexample: rates = 160.25, income = 23898, dependants = 0
+      the evaluator agrees: the assertion is FALSE there
+```
+
+Read the counterexample as a case to try.
+The rates are 160.25, which is 25 cents over the 160, so two-thirds of the excess is about 17 cents.
+The income of 23898 is below 25180, so the excess is -161 and the rule adds 161 to the 17 cents.
+The rule never pays more than the rates themselves, so the rebate is 160.25: the whole of the rates, where the rule's words allow 17 cents.
+The line "the evaluator agrees" means the same evaluator that `l4 run` uses was given these three values and also found the assertion false, so the case is a real one for the rule as written, not an artefact of the translation.
+The solver chooses the values it reports: another version of z3 may report different ones, and a free choice can be an odd one (a negative number of dependants, say), which is a reason to read a counterexample and not only count it.
+
+The fixed rule clamps the income excess at zero before it divides, so a low income earns no bonus (`max 0 x` is the larger of 0 and x):
+
+```l4
+`income excess` income dependants MEANS
+  FLOOR ((max 0 (income MINUS `allowable income` dependants)) DIVIDED BY 8)
+```
+
+Run `l4 prove` on `rates-rebate-fixed.l4`, which has the same assertion, and the verdict is `proved`: no rates, income or number of dependants makes the rebate exceed its ceiling.
+At rates of 1000 and an income of 20000 the fixed rule pays 560, the figure above.
+
+A proof answers the question you asked, and only that.
+The assertion most people write first is "the rebate never rises when income rises".
+It is true of the buggy rule as well, so `l4 prove` proves it of both, and it could not have found this bug.
+The reason is that income reaches the rebate only through the income excess, and a larger income never makes that excess smaller; the buggy rule's mistake is that the excess can be negative, which makes the rebate too _large_ for a low income, and not that the rebate moves the wrong way.
+(`rates-rebate-no-floor.l4` shows it, with the rounding-down taken out of the income excess; see the limits below for why.)
+The assertion that found the bug is the one that restates the rule's own words: the property to assert is the sentence of the rule, not an intuition about how the outcome should behave.
+
 ## Limits
 
 These are stated here because you would otherwise find them out from a wrong conclusion.
@@ -118,4 +190,10 @@ These are stated here because you would otherwise find them out from a wrong con
 - **Rules from other files are followed but not pre-checked.** A safety check that runs before the solver (for side effects, refusals and the like) sees only the file you named; when a proof relies on rules from an imported file, the report names them.
 - **A counterexample that needs an irrational number** (for `x TIMES x EQUALS 2`, say) cannot be given as an L4 value, so the verdict is `unknown (model value not a rational: …)`, even though the assertion is refutable.
 - **Arithmetic that multiplies two unknowns together** is harder for any solver; z3 often still decides it, and when it does not the verdict is `unknown` with that reason.
+- **Rounding down (`FLOOR`) across two unknown inputs can defeat the solver, even for a true statement.**
+  In the worked example above, "the buggy rebate never rises when income rises" is true.
+  With z3 4.16.0, `l4 prove` returns `unknown (timeout)` for it, after 10 seconds (the default) and after 120 seconds (`--timeout 120`).
+  The same question about the fixed rule is proved in under a second, and the question about both rules is proved in a fraction of a second once the `FLOOR` is taken out.
+  `unknown` is the honest answer, and it is not a counterexample.
+  Treat it as "not decided": say so, or restate the question without the rounding.
 - **A record built from a value that would raise, and then passed to another rule,** is treated as raising, even when that rule never reads the field. L4 itself is lazier than that. (A field read straight out of the record needs only that field to be defined, as in L4.) The replay catches the difference and reports it as an `ENCODING DEFECT` rather than a counterexample, so it can cost you a verdict but cannot give you a wrong one.

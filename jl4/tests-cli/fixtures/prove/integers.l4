@@ -8,3 +8,18 @@
 
 -- proved: under the guard, and only there
 #ASSERT `IS INTEGER` x IMPLIES x EQUALS FLOOR x
+
+-- Two more guards, neither of which is a sort either.
+
+-- proved: `x EQUALS FLOOR x` is another way to say "whole", and as a
+-- hypothesis it makes x PLUS 1 whole too
+#ASSERT x EQUALS FLOOR x IMPLIES x PLUS 1 EQUALS FLOOR (x PLUS 1)
+
+-- refuted: without that hypothesis x may be a fraction
+#ASSERT x PLUS 1 EQUALS FLOOR (x PLUS 1)
+
+-- proved: a bound is a hypothesis, and gives what it says
+#ASSERT x AT LEAST 0 AND x LESS THAN 1 IMPLIES FLOOR x EQUALS 0
+
+-- refuted: a bound does not make x whole, so x may be a fraction inside it
+#ASSERT x AT LEAST 0 AND x LESS THAN 1 IMPLIES x EQUALS 0
