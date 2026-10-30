@@ -3,10 +3,29 @@
 // This is R9 of specs/todo/CATALA-EXPORT-SPEC.md: **optional when present,
 // never a build dependency**. Catala is an OCaml toolchain that has to be built
 // from source on macOS arm64 (upstream ships Linux amd64 .deb only), so it is
-// not on CI runners and must not be made a merge-queue requirement — the same
-// posture etc/validate-dmn.mjs takes toward dmnmd. When the binaries are absent
-// this script prints one clear SKIP line and exits 0. It exits non-zero only
-// for a real failure: a golden the toolchain rejects.
+// on no runner unless a job installs it (the catala-validate job in
+// .github/workflows/pr-checks.yml does, when its `catala` paths filter matches)
+// and must not be made a merge-queue requirement — the same posture
+// etc/validate-dmn.mjs takes toward dmnmd. When the binaries are absent this
+// script prints one clear SKIP line and exits 0. It exits non-zero only for a
+// real failure: a golden the toolchain rejects.
+//
+// WHICH CATALA. The goldens need catala built from upstream commit fdf4ccd5
+// (master of 2026-07-30, which reports version "1.2.1"), NOT the 1.2.1 release
+// tarball. On the release, `catala typecheck` and `catala proof` pass on all 12
+// goldens and `clerk test` fails 41 of 83 tests (legalese/l4-ide run
+// 41010257517): the release's `catala interpret -F json` pretty-prints and
+// renders rationals as floats, where the goldens' catala-test-cli blocks hold
+// the compact exact-rational form, and it crashes on an enum value. clerk's
+// diff, Reference on the left and Result on the right (the box clips long
+// lines):
+//
+//     {"result":"1/4"}        ╳{ "result": 0.25 }
+//     {"result":"500"}        ╳{ "result": 500.0 }
+//     Unexpected error: Invalid_argument of non exhaustive Json_encoding.st
+//     'Upper'                 (imports.catala_en:87, #return code 125#)
+//
+// The catala-validate job pins the commit; the comment above it says so too.
 //
 // THREE LAYERS, and they are not the same claim:
 //

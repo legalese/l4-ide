@@ -360,6 +360,7 @@ jobs:
           opam exec --switch catala -- clerk --version
           opam exec --switch catala -- catala proof --help > /dev/null
           opam list --switch catala --installed | tee opam-list.txt | grep -E '^(catala|catala-proof|z3|ocaml-base-compiler|dune|menhir) '
+          echo "TOOLCHAIN: catala $CATALA_RELEASE built from upstream commit $CATALA_COMMIT, NOT the $CATALA_RELEASE release tarball"
           for p in catala catala-proof; do grep -E "^$p " opam-list.txt | grep -qF "$CATALA_COMMIT"; done
           du -sh ~/.opam
 
@@ -391,6 +392,9 @@ jobs:
           CATALA_CHECK_REQUIRED: ${{ needs.changes.outputs.catala == 'true' && '1' || '' }}
         run: |
           set -euo pipefail
+          if [ "${CATALA_CHECK_REQUIRED:-}" = 1 ]; then
+            echo "::notice title=Catala toolchain::catala $CATALA_RELEASE built from upstream commit $CATALA_COMMIT, not the $CATALA_RELEASE release tarball (the release fails clerk test: see the comment above this job)"
+          fi
           node etc/validate-catala.mjs | tee catala.log
           if [ "${CATALA_CHECK_REQUIRED:-}" = 1 ]; then
             grep -qF "catala: opam switch 'catala' ($CATALA_RELEASE)" catala.log
