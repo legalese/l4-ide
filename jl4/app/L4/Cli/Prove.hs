@@ -230,7 +230,8 @@ proveCmd opts = do
           outcomes = Map.fromList [ (r, d.result) | d <- evals, Just r <- [d.range] ]
           safety = safetyIssues tc
           ownDecides = Set.fromList [ getUnique r | MkDecide _ _ (MkAppForm _ r _ _) _ <- foldTopLevelDecides (: []) tc.module' ]
-          lowered = [ (r, e, classify env outcomes safety r e) | (r, e) <- asserts ]
+          MkModule _ entryUri _ = tc.module'
+          lowered = [ (r, e, classify entryUri env outcomes safety r e) | (r, e) <- asserts ]
       case opts.proveEmitSmt of
         Just dir -> do
           createDirectoryIfMissing True dir
@@ -269,16 +270,19 @@ proveCmd opts = do
 
 -- | Is this @#ASSERT@ an obligation, and if so, its lowering.
 classify
-  :: ProveEnv -> Map SrcRange EvalDirectiveValue -> Map Unique [Safety.SafetyIssue]
+  :: NormalizedUri -> ProveEnv -> Map SrcRange EvalDirectiveValue -> Map Unique [Safety.SafetyIssue]
   -> Maybe SrcRange -> Expr Resolved -> Either Verdict Obligation
-classify env outcomes safety mr e = case outcome of
+classify entryUri env outcomes safety mr e = case outcome of
   Just (Assertion Holds) -> Left (Decided "by evaluation: assertion satisfied")
   Just (Assertion Fails) -> Left (Decided "by evaluation: assertion failed")
   Just (Assertion a@(FailsBecause _)) -> Left (Decided ("by evaluation: " <> oneLine (prettyAssertionOutcome a)))
   Just (Assertion (Refused r)) -> Left (Decided ("by evaluation: refused: " <> oneLine (Text.unlines (prettyRefusal r))))
-  Just (Assertion (Errored exc))
-    | null reads' -> Left (Decided ("not an obligation: the evaluator reports an error and the assertion reads no section GIVEN: "
-                                    <> oneLine (Text.unlines (prettyEvalException exc))))
+  -- An error that is not "waiting for an input" is the evaluator's answer
+  -- whatever the assertion reads (R-V3: every other way of being stuck stays
+  -- Errored), so it is not re-proved.
+  Just (Assertion (Errored exc)) ->
+    Left (Decided ("not an obligation: the evaluator reports an error: "
+                   <> oneLine (Text.unlines (prettyEvalException exc))))
   Just (Assertion _)
     | null reads' -> Left (Unknown "the evaluator could not decide it, and it reads no section GIVEN")
     | otherwise -> lowerChecked
@@ -289,9 +293,15 @@ classify env outcomes safety mr e = case outcome of
   reads' = assumesReadBy env e
   lowerChecked = case lowerObligation env e of
     Left why -> Left (Unknown why)
-    Right ob -> case refusalsIn ob of
+    Right ob -> case refusalsIn ob <> importedBinders ob of
       (why : _) -> Left (Unknown why)
       [] -> Right ob
+  -- The replay rebinds the entry module's ASSUMEs only, so a binder another
+  -- module declares could not be given its model value: refuse it here
+  -- rather than report the replay's failure as an encoding defect.
+  importedBinders ob =
+    [ "out of fragment: `" <> fv.fvName <> "` is a section GIVEN of an imported module"
+    | fv <- ob.obFree, fv.fvUnique.moduleUri /= entryUri ]
   -- R-V4: analyzeSafety's clauses are side conditions where the lowering
   -- already encodes them as definedness (division, MODULO, a CONSIDER with no
   -- matching branch, and the TOTAL a caller inherits from one), and named

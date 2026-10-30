@@ -51,7 +51,7 @@ This is the report for `assert-raises.l4`, a file in L4's own test corpus whose 
 ```
 l4 prove: examples/ok/assert-raises.l4
   decided  assert-raises.l4:7:1-34  #ASSERT (1 DIVIDED BY 0) EQUALS 1
-      not an obligation: the evaluator reports an error and the assertion reads no section GIVEN: Division by zero in the operation: DIVIDED BY
+      not an obligation: the evaluator reports an error: Division by zero in the operation: DIVIDED BY
   ...
   refuted  assert-raises.l4:11:1-19  #ASSERT x EQUALS 1
       counterexample: x = 0
@@ -75,7 +75,7 @@ Each `#ASSERT` gets one line.
 - **`proved`**: no value of what the assertion reads makes it false, or makes it raise an error. The line also says at how many sample points the ordinary evaluator was asked and agreed (see below).
 - **`refuted`**: here are values at which it is false, or at which evaluating it raises an error (a division by zero, say). A point where the assertion _raises_ counts against it: an assertion that crashes for some input does not hold for that input.
 - **`unknown`**: no verdict, with the reason. Usually `out of fragment: …`, naming what `l4 prove` cannot reason about (see the limits below); sometimes a timeout, or the solver itself saying it does not know.
-- **`decided`**: not sent to the solver at all. Either `l4 run` could already decide it (it reads no section `GIVEN`, or its answer does not depend on one, like `TRUE OR x EQUALS 1`), or it raises with no input involved. These are counted, and not proved again.
+- **`decided`**: not sent to the solver at all. Either `l4 run` could already decide it (it reads no section `GIVEN`, or its answer does not depend on one, like `TRUE OR x EQUALS 1`), or evaluating it raised an error for a reason other than a missing input. These are counted, and not proved again.
 - **`ENCODING DEFECT`**: the solver and the evaluator disagree. That is a bug in `l4 prove`, not a fact about your rules, and it is printed loudly so that nobody reads it as either.
 
 The last lines say what was covered: how many assertions, how many the evaluator decided, and the count of each verdict; what was not attempted; and the solver's version.
@@ -110,6 +110,7 @@ These are stated here because you would otherwise find them out from a wrong con
 - **What is in range.** True-or-false values, numbers (exactly, as fractions, never rounded), records and choices (`DECLARE … HAS` and `IS ONE OF`), `IF`, `BRANCH`, `CONSIDER`, the arithmetic and comparison operators, `MODULO`, `ROUND`, `FLOOR` and `CEILING` (all exact, with L4's own rounding: `ROUND` rounds a half to the even neighbour), local `WHERE` / `LET` names, and calls to other rules, in this file or one it imports, which are followed all the way down.
 - **What is refused,** as `unknown (out of fragment: …)`: text (`STRING`), dates, lists, `MAYBE` and other types that take a parameter, rules that call themselves, functions passed as values, local definitions with parameters, `SQRT`, `LN` and the other functions with irrational results, and obligations, permissions and the rest of the regulative layer.
 - **Only assertions.** It proves what you asserted. It does not, on its own, look for divisions that can divide by zero or `CONSIDER`s that miss a case anywhere else in the file.
+- **Only this file's section `GIVEN`s.** An assertion that reads a section `GIVEN` declared in an imported file is `unknown`, because its counterexample could not be checked against the evaluator.
 - **Only this file's assertions.** The `#ASSERT`s of imported files are not attempted, and neither are `#ASSERT REFUSED` lines.
 - **Rules from other files are followed but not pre-checked.** A safety check that runs before the solver (for side effects, refusals and the like) sees only the file you named; when a proof relies on rules from an imported file, the report names them.
 - **Arithmetic that multiplies two unknowns together** is harder for any solver; z3 often still decides it, and when it does not the verdict is `unknown` with that reason.
