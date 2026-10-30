@@ -110,8 +110,8 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
     await spawned
     child.stderr?.setEncoding('utf8')
     child.stderr?.on('data', (chunk: string) => {
-      // jl4-lsp logs diagnostics about the user's files; keep it at
-      // debug and short.
+      // jl4-lsp logs diagnostics about the user's files: debug only,
+      // and the logger redacts the text (logger.ts).
       opts.logger.debug(`jl4-lsp stderr: ${chunk.slice(0, 200).trim()}`)
     })
     const connection = rpc.createMessageConnection(

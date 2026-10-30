@@ -1,4 +1,4 @@
-import { constants, promises as fs, realpathSync } from 'node:fs'
+import { constants, promises as fs, lstatSync, realpathSync } from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import type {
@@ -63,10 +63,16 @@ const TURN_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/
  * - Paths resolve against the repo root; anything outside it is refused,
  *   including through symlinks (the nearest existing ancestor's real
  *   path must stay inside the root) and `..`.
- * - `.git` is off limits at any depth: the harness runs git in this
- *   repo, so the agent must not reach hooks or config.
- * - The model may write only inside `data/` and `tmp/`; anything else at
- *   the repo root is platform metadata: readable, not writable.
+ * - `.git` is off limits at any depth, by name and by real path (a
+ *   pushed `data/g -> ../.git` must not reach it): the harness runs git
+ *   in this repo, so the agent must not reach hooks or config.
+ * - The model may write only inside `data/` and `tmp/`, checked on the
+ *   path as given and on its real path; anything else at the repo root
+ *   is platform metadata: readable, not writable.
+ * - Writes and deletes never go through a symlink at any depth (an
+ *   `lstat` walk; `O_NOFOLLOW` only guards the last component). Git
+ *   checks symlinks out as plain files (`core.symlinks=false`), so none
+ *   should exist; this covers any that do.
  * - Writes go straight to disk (there is no editor) with `O_NOFOLLOW`,
  *   and the {@link WorkspaceChangeListener} tells the language server.
  * - Deletes remove the file (`'deleted'`); there is no Trash. Before a
@@ -121,12 +127,12 @@ export class NodeWorkspace implements Workspace {
         `Path is outside the session workspace: ${p}. fs tools only operate on files inside the session's repository (${DATA_DIR}/, ${TMP_DIR}/).`
       )
     }
-    if (rel.split(path.sep).some((part) => part.toLowerCase() === '.git')) {
+    if (rel.split(path.sep).some(isGitDir)) {
       throw new Error(
         `Path is inside .git, which the agent may not touch: ${p}`
       )
     }
-    this.assertRealPathInside(absolute, p)
+    this.realRelative(absolute, p)
     return {
       relative: rel || path.basename(absolute),
       uri: uriForPath(absolute),
@@ -159,7 +165,7 @@ export class NodeWorkspace implements Workspace {
     this.assertInside(fsPath)
     const entries = await fs.readdir(fsPath, { withFileTypes: true })
     return entries
-      .filter((e) => e.name.toLowerCase() !== '.git')
+      .filter((e) => !isGitDir(e.name))
       .map((e) => ({
         name: e.name,
         isDirectory: e.isDirectory(),
@@ -193,7 +199,7 @@ export class NodeWorkspace implements Workspace {
   async createFile(target: ResolvedPath, content: string): Promise<void> {
     this.assertWritable(target.fsPath)
     await ensureDirNoFollow(this.root, path.dirname(target.fsPath))
-    this.assertRealPathInside(target.fsPath, target.relative)
+    this.assertWritable(target.fsPath)
     const handle = await fs.open(
       target.fsPath,
       O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW,
@@ -249,7 +255,8 @@ export class NodeWorkspace implements Workspace {
   }
 
   async deleteFile(target: ResolvedPath): Promise<'trashed' | 'deleted'> {
-    this.assertWritable(target.fsPath)
+    // `unlink` removes a link itself, so the file may be one.
+    this.assertWritable(target.fsPath, true)
     const st = await fs.lstat(target.fsPath)
     if (st.isDirectory()) {
       throw new Error(`Refusing to delete a directory: ${target.relative}`)
@@ -287,7 +294,7 @@ export class NodeWorkspace implements Workspace {
         await src.close()
       }
       await ensureDirNoFollow(this.root, path.dirname(dest))
-      this.assertRealPathInside(dest, rel)
+      this.assertWritable(dest)
       // A copy from an earlier run of the same turn wins too.
       const h = await fs.open(
         dest,
@@ -320,7 +327,7 @@ export class NodeWorkspace implements Workspace {
    */
   async importFile(sourcePath: string, repoRelPath: string): Promise<boolean> {
     const dest = path.join(this.root, ...repoRelPath.split('/'))
-    this.assertInside(dest)
+    this.assertWritable(dest)
     let bytes: Buffer
     const src = await fs
       .open(sourcePath, O_RDONLY | O_NOFOLLOW)
@@ -336,7 +343,7 @@ export class NodeWorkspace implements Workspace {
     const existing = await fs.lstat(dest).catch(() => null)
     if (existing && !existing.isFile()) return false
     await ensureDirNoFollow(this.root, path.dirname(dest))
-    this.assertRealPathInside(dest, repoRelPath)
+    this.assertWritable(dest)
     const h = await fs.open(
       dest,
       O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW,
@@ -359,60 +366,103 @@ export class NodeWorkspace implements Workspace {
     return path.relative(this.root, fsPath) || path.basename(fsPath)
   }
 
-  /** Lexical check for paths handed back by the core. */
-  private assertInside(fsPath: string): void {
+  /** Paths handed back by the core: inside the root and not in `.git`,
+   *  lexically and by real path. Returns the real repo-relative path. */
+  private assertInside(fsPath: string): string {
     const rel = path.relative(this.root, path.resolve(fsPath))
     if (
       rel.startsWith('..') ||
       path.isAbsolute(rel) ||
-      rel.split(path.sep).some((part) => part.toLowerCase() === '.git')
+      rel.split(path.sep).some(isGitDir)
     ) {
       throw new Error('Path is outside the session workspace')
     }
-    this.assertRealPathInside(fsPath, rel || '.')
+    return this.realRelative(fsPath, rel || '.')
   }
 
   /** The model may write only inside `data/` and `tmp/`; everything
-   *  else at the repo root is platform metadata. */
-  private assertWritable(fsPath: string): void {
-    this.assertInside(fsPath)
-    const rel = path
-      .relative(this.root, path.resolve(fsPath))
-      .split(path.sep)
-      .join('/')
-    if (!isModelWritableRepoPath(rel)) {
+   *  else at the repo root is platform metadata. Checked on the path as
+   *  given and where it really is, and never through a symlink
+   *  (`linkAtEnd`: the file itself may be one). */
+  private assertWritable(fsPath: string, linkAtEnd = false): void {
+    const absolute = path.resolve(fsPath)
+    const real = this.assertInside(absolute)
+    const rel = path.relative(this.root, absolute).split(path.sep).join('/')
+    this.assertNoLinks(
+      linkAtEnd ? path.dirname(absolute) : absolute,
+      rel || '.'
+    )
+    if (!isModelWritableRepoPath(rel) || !isModelWritableRepoPath(real)) {
       throw new Error(
         `${rel || '.'} can't be changed: you may only create, edit or delete files inside ${DATA_DIR}/ (the session files) and ${TMP_DIR}/ (your scratch space). Everything else in the repository is platform metadata.`
       )
     }
   }
 
-  /** The nearest existing ancestor (or the file itself) must resolve,
-   *  through symlinks, to a place inside the root. */
-  private assertRealPathInside(absolute: string, display: string): void {
+  /** No component below the root, down to `absolute`, is a symlink. */
+  private assertNoLinks(absolute: string, display: string): void {
+    let cur = this.root
+    for (const part of path
+      .relative(this.root, absolute)
+      .split(path.sep)
+      .filter(Boolean)) {
+      cur = path.join(cur, part)
+      let isLink: boolean
+      try {
+        isLink = lstatSync(cur).isSymbolicLink()
+      } catch (err) {
+        if (isErrno(err, 'ENOENT') || isErrno(err, 'ENOTDIR')) return
+        throw err
+      }
+      if (isLink) {
+        throw new Error(
+          `Path goes through a symbolic link, which the agent may not write through: ${display}`
+        )
+      }
+    }
+  }
+
+  /**
+   * Where `absolute` really is, relative to the real root and
+   * `/`-separated: the real path of its nearest existing ancestor (the
+   * file itself when it exists) plus the components that don't exist
+   * yet. Throws when that leaves the root or lands in `.git`.
+   */
+  private realRelative(absolute: string, display: string): string {
     let probe = path.resolve(absolute)
+    const missing: string[] = []
     for (;;) {
       let real: string
       try {
         real = realpathSync(probe)
       } catch (err) {
-        const code = (err as NodeJS.ErrnoException).code
-        if (code === 'ENOENT' || code === 'ENOTDIR') {
+        if (isErrno(err, 'ENOENT') || isErrno(err, 'ENOTDIR')) {
           const parent = path.dirname(probe)
           if (parent === probe) break
+          missing.unshift(path.basename(probe))
           probe = parent
           continue
         }
         throw err
       }
-      const rel = path.relative(this.realRoot, real)
+      const rel = path.relative(this.realRoot, path.join(real, ...missing))
       if (rel.startsWith('..') || path.isAbsolute(rel)) {
         throw new Error(
           `Path leaves the session workspace through a link: ${display}`
         )
       }
-      return
+      const parts = rel.split(path.sep).filter(Boolean)
+      if (parts.some(isGitDir)) {
+        throw new Error(
+          `Path is inside .git, which the agent may not touch: ${display}`
+        )
+      }
+      return parts.join('/')
     }
     throw new Error(`Path is outside the session workspace: ${display}`)
   }
+}
+
+function isGitDir(part: string): boolean {
+  return part.toLowerCase() === '.git'
 }

@@ -34,9 +34,24 @@ export interface KeyChainOptions {
   now?: () => number
   /** Backoff between retries of a transient renew failure. */
   retryDelaysMs?: number[]
+  /** Least time between two renewals ({@link MIN_RENEW_INTERVAL_MS}). */
+  minRenewIntervalMs?: number
 }
 
 const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000]
+
+/**
+ * Least time between two successful renewals: a key that comes back
+ * short-lived (or with a bad expiry), or a server that keeps answering
+ * 401, can't make the harness delete and mint WorkOS keys in a loop.
+ * jl4-auth-proxy issues full 15-minute keys up to the chain's cap, so a
+ * healthy chain renews every 10 minutes and never waits on this.
+ */
+export const MIN_RENEW_INTERVAL_MS = 60_000
+
+/** jl4-auth-proxy deleted the old key, then couldn't mint its successor:
+ *  final whatever the status, since a retry would present a dead key. */
+const CHAIN_LOST = 'chain_lost'
 
 /**
  * {@link AuthProvider} over an agent key chain (spec §6.2, §15.5).
@@ -46,10 +61,14 @@ const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000]
  * - After that it renews when 5 minutes of the 15 are left, and when a
  *   request made with the current key comes back 401, or 403
  *   `invalid-credentials` from ai-proxy ({@link renewAfterUnauthorized}).
+ *   Successful renewals are at least {@link MIN_RENEW_INTERVAL_MS}
+ *   apart: a 401 sooner than that after one fails the request and
+ *   renews once the interval is up.
  * - Any 4xx from renew ends the chain at once. `401 invalid_key`,
  *   `403 chain_expired` and `409 chain_forked` keep their reason; any
- *   other (`403 not_a_member`, `403 forbidden`, …) ends it as
- *   `invalid_key`.
+ *   other (`403 not_a_member`, `403 forbidden`, `chain_lost`, …) ends it
+ *   as `invalid_key`. `chain_lost` (the old key was deleted, the
+ *   successor couldn't be minted) is final even with a 5xx status.
  * - 5xx (`502 upstream_unavailable`), 429, network errors and a 200 that
  *   doesn't parse are retried with backoff (`retryDelaysMs`, five tries
  *   over about a minute by default), each only if it starts before the
@@ -70,9 +89,12 @@ export class KeyChainAuth implements AuthProvider {
   private renewing: Promise<boolean> | null = null
   private timer: NodeJS.Timeout | null = null
   private stopped = false
+  /** Epoch ms of the last successful renewal. */
+  private lastRenewedAt: number | null = null
   private readonly fetchImpl: typeof fetch
   private readonly now: () => number
   private readonly retryDelays: number[]
+  private readonly minInterval: number
 
   constructor(private readonly opts: KeyChainOptions) {
     this.key = opts.initialKey
@@ -80,6 +102,7 @@ export class KeyChainAuth implements AuthProvider {
     this.now = opts.now ?? Date.now
     this.expiresAt = this.now() + AGENT_KEY_LIFETIME_MS
     this.retryDelays = opts.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS
+    this.minInterval = opts.minRenewIntervalMs ?? MIN_RENEW_INTERVAL_MS
   }
 
   // ── AuthProvider ───────────────────────────────────────────────────
@@ -125,13 +148,19 @@ export class KeyChainAuth implements AuthProvider {
    * A request made with `usedAuthorization` came back 401 (or ai-proxy's
    * 403 `invalid-credentials`, see {@link authRetryingFetch}). Renew unless
    * a renewal already replaced that key; resolves true when a newer key
-   * is available to retry with.
+   * is available to retry with. Within the minimum interval of the last
+   * renewal it resolves false and renews as soon as the interval is up,
+   * so a key that really was revoked still ends the chain promptly.
    */
   async renewAfterUnauthorized(usedAuthorization: string): Promise<boolean> {
     if (this.ended) return false
     if (!this.isCurrent(usedAuthorization)) {
       if (this.renewing) await this.renewing
       return !this.ended
+    }
+    if (this.untilRenewAllowed() > 0) {
+      this.schedule(true)
+      return false
     }
     return this.renew('unauthorized')
   }
@@ -163,18 +192,33 @@ export class KeyChainAuth implements AuthProvider {
     this.timer = null
   }
 
-  private schedule(): void {
+  /** Renew when 5 minutes of the key are left, or (`soon`) as early as
+   *  the minimum interval allows. */
+  private schedule(soon = false): void {
     this.stopTimer()
     if (this.ended || this.stopped) return
-    const due = Math.max(
-      1_000,
-      this.expiresAt - AGENT_KEY_RENEW_BEFORE_MS - this.now()
-    )
+    const earliest = Math.max(this.untilRenewAllowed(), 0)
+    const due = soon
+      ? earliest
+      : Math.max(
+          earliest,
+          this.expiresAt - AGENT_KEY_RENEW_BEFORE_MS - this.now()
+        )
     this.timer = setTimeout(() => {
       this.timer = null
-      void this.renew('scheduled').then(() => this.schedule())
+      void this.renew(soon ? 'unauthorized' : 'scheduled').then(() =>
+        this.schedule()
+      )
     }, due)
     this.timer.unref()
+  }
+
+  /** Milliseconds until the minimum interval since the last renewal is
+   *  up (≤ 0 when a renewal may run now). */
+  private untilRenewAllowed(): number {
+    return this.lastRenewedAt === null
+      ? 0
+      : this.lastRenewedAt + this.minInterval - this.now()
   }
 
   private renew(why: string): Promise<boolean> {
@@ -241,7 +285,14 @@ export class KeyChainAuth implements AuthProvider {
       }
       this.key = parsed.value.token
       this.expiresAt = parsed.value.expiresAt
+      this.lastRenewedAt = this.now()
       return 'ok'
+    }
+    if ((body as { error?: unknown } | null)?.error === CHAIN_LOST) {
+      this.opts.logger.warn(
+        `agent key renewal refused: ${res.status} ${CHAIN_LOST}`
+      )
+      return 'invalid_key'
     }
     if (res.status >= 500 || res.status === 429) {
       // 502 upstream_unavailable, other server errors, and rate limiting

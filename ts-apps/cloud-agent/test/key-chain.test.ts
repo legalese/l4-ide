@@ -40,7 +40,8 @@ function authProxy(
 function chain(
   f: typeof fetch,
   onEnded: (e: ChainEnded) => void = () => undefined,
-  now = (): number => 1_000_000
+  now = (): number => 1_000_000,
+  minRenewIntervalMs = 10
 ): KeyChainAuth {
   return new KeyChainAuth({
     authUrl: 'https://legalese.cloud/',
@@ -51,8 +52,12 @@ function chain(
     fetch: f,
     now,
     retryDelaysMs: [1, 1, 1],
+    minRenewIntervalMs,
   })
 }
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((r) => setTimeout(r, ms))
 
 describe('KeyChainAuth', () => {
   test('renews at start, replacing the key from the environment', async () => {
@@ -98,6 +103,19 @@ describe('KeyChainAuth', () => {
     test(`${status} ${error ?? '(no body)'} ends the chain as invalid_key, without retrying`, async () => {
       const ended: ChainEnded[] = []
       const proxy = authProxy([{ status, body: error ? { error } : undefined }])
+      const auth = chain(proxy.fetch, (e) => ended.push(e))
+      assert.equal(await auth.start(), false)
+      assert.equal(proxy.calls.length, 1)
+      assert.deepEqual(ended, [{ reason: 'invalid_key', fromServer: true }])
+    })
+  }
+
+  // jl4-auth-proxy deleted the key and couldn't mint its successor: a
+  // retry would only present the dead key.
+  for (const status of [410, 502]) {
+    test(`${status} chain_lost ends the chain at once`, async () => {
+      const ended: ChainEnded[] = []
+      const proxy = authProxy([{ status, body: { error: 'chain_lost' } }])
       const auth = chain(proxy.fetch, (e) => ended.push(e))
       assert.equal(await auth.start(), false)
       assert.equal(proxy.calls.length, 1)
@@ -164,13 +182,51 @@ describe('KeyChainAuth', () => {
     ])
     const auth = chain(proxy.fetch, undefined, () => now)
     await auth.start()
-    // The timer is due in max(1 s, 30 ms) = 1 s.
+    // The timer is due in max(10 ms interval, 30 ms) = 30 ms.
     now += 1_000
     await new Promise((r) => setTimeout(r, 1_100))
     auth.stopTimer()
     assert.equal(proxy.calls.length, 2)
     assert.equal(proxy.calls[1]!.auth, `Bearer ${key(1)}`)
     assert.equal(auth.isCurrent(`Bearer ${key(2)}`), true)
+  })
+
+  test('leaves the minimum interval between renewals, even for a key that comes back expired', async () => {
+    const proxy = authProxy([
+      { status: 200, body: { token: key(1), id: 'k1', expiresAt: 1 } },
+      { status: 200, body: { token: key(2), id: 'k2', expiresAt: 1_900_000 } },
+    ])
+    const auth = chain(proxy.fetch, undefined, undefined, 300)
+    await auth.start()
+    await sleep(100)
+    assert.equal(proxy.calls.length, 1)
+    await sleep(400)
+    auth.stopTimer()
+    assert.equal(proxy.calls.length, 2)
+    assert.equal(auth.isCurrent(`Bearer ${key(2)}`), true)
+  })
+
+  test('a 401 right after a renewal fails the request, then renews once the interval is up', async () => {
+    let now = 1_000_000
+    const proxy = authProxy([
+      { status: 200, body: { token: key(1), id: 'k1', expiresAt: 1_900_000 } },
+      { status: 200, body: { token: key(2), id: 'k2', expiresAt: 1_900_000 } },
+      { status: 200, body: { token: key(3), id: 'k3', expiresAt: 1_900_000 } },
+    ])
+    const auth = chain(proxy.fetch, undefined, () => now, 200)
+    await auth.start()
+    assert.equal(await auth.renewAfterUnauthorized(`Bearer ${key(1)}`), false)
+    assert.equal(await auth.renewAfterUnauthorized(`Bearer ${key(1)}`), false)
+    assert.equal(proxy.calls.length, 1)
+    await sleep(400)
+    assert.equal(proxy.calls.length, 2)
+    assert.equal(auth.isCurrent(`Bearer ${key(2)}`), true)
+    // Once the interval is up, a 401 renews at once.
+    now += 200
+    assert.equal(await auth.renewAfterUnauthorized(`Bearer ${key(2)}`), true)
+    auth.stopTimer()
+    assert.equal(proxy.calls.length, 3)
+    assert.equal(auth.isCurrent(`Bearer ${key(3)}`), true)
   })
 
   test('concurrent renewals share one request', async () => {

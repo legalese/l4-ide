@@ -20,10 +20,13 @@ const MAX_MESSAGE = 500
  *
  * Logs carry ids, tool names, durations and errors — never prompt
  * text, model output or file content. The agent core logs a few lines
- * with tool arguments (`tool/dispatch … args=…`); {@link redact} drops
- * those tails, and every message is capped at {@link MAX_MESSAGE}
- * characters so an error that quotes content can't leak much of it.
- * `LOG_LEVEL=debug` keeps the same redaction.
+ * with tool arguments (`tool/dispatch … args=…`) or a tool's error
+ * text (`tool/failed <tool>: …`, which can quote an MCP result or an
+ * evaluation's inputs), and jl4-lsp's stderr talks about the user's
+ * files; {@link redact} drops those tails (keeping an errno code), and
+ * every message is capped at {@link MAX_MESSAGE} characters so an error
+ * that quotes content can't leak much of it. `LOG_LEVEL=debug` keeps
+ * the same redaction.
  */
 export class JsonLogger implements Logger {
   constructor(
@@ -66,12 +69,22 @@ export class JsonLogger implements Logger {
   }
 }
 
+/** Errno codes kept from a redacted error: they say what failed
+ *  without quoting anything. */
+const ERRNO_RE =
+  /\b(ENOENT|EEXIST|EACCES|EPERM|ELOOP|EISDIR|ENOTDIR|ENOTEMPTY|EFBIG|ENOSPC|EMFILE|ETIMEDOUT|ECONNREFUSED|ECONNRESET|EPIPE)\b/
+
 /** Strip content-bearing tails and cap the length. */
 export function redact(message: string): string {
   let m = message.replace(
     /\s(?:args|argsJson|text|body)=[\s\S]*$/,
     ' [redacted]'
   )
+  const tail = /^(tool\/failed [^\s:]+:|jl4-lsp stderr:)\s[\s\S]*$/.exec(m)
+  if (tail) {
+    const code = ERRNO_RE.exec(m)?.[1]
+    m = `${tail[1]} [redacted]${code ? ` (${code})` : ''}`
+  }
   if (m.length > MAX_MESSAGE) m = m.slice(0, MAX_MESSAGE) + '…'
   return m
 }

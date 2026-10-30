@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  lstat,
+  mkdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import * as path from 'node:path'
 import type { CloudEventPayload } from '@repo/legalese-agent/protocol'
 import {
@@ -360,6 +369,28 @@ describe('GitSync', () => {
       sh(client, 'rev-parse', 'refs/remotes/origin/main'),
       merged.sha
     )
+  })
+
+  // A pushed symlink (data/g -> ../.git) would let the agent's file
+  // tools reach git's config; it arrives as a plain file instead.
+  test('checks a pushed symlink out as a plain file', async () => {
+    const g = git()
+    await write('a.l4', 'x\n')
+    await g.start(ctx)
+    const client = cloneBundle()
+    sh(client, 'checkout', '-q', '-b', 'local')
+    await mkdir(path.join(client, 'data'), { recursive: true })
+    await symlink('../.git', path.join(client, 'data', 'g'))
+    sh(client, 'add', '-A')
+    sh(client, 'commit', '-q', '-m', 'Add a link')
+    sh(client, 'bundle', 'create', '-q', incoming(), 'local', '^main')
+
+    await g.handleCommand({ id: 1, ts: 1, type: 'apply-bundle', file: BUNDLE })
+    assert.equal((events.at(-1) as { type: string }).type, 'local-merged')
+    const st = await lstat(path.join(repo, 'data', 'g'))
+    assert.equal(st.isSymbolicLink(), false)
+    assert.equal(st.isFile(), true)
+    assert.equal(await read('data/g'), '../.git')
   })
 
   test('aborts a conflicting merge and reports the files', async () => {

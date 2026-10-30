@@ -1,17 +1,18 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import { PassThrough } from 'node:stream'
 import rpc from 'vscode-jsonrpc/node.js'
 import type { MessageConnection } from 'vscode-jsonrpc'
+import { Git } from '../src/git.js'
 import { Jl4Lsp } from '../src/jl4-lsp.js'
 import {
   NodeWorkspace,
   uriForPath,
   type WorkspaceChangeListener,
 } from '../src/node-workspace.js'
-import { silent, tempDir } from './helpers.js'
+import { HOST_PATH, silent, tempDir } from './helpers.js'
 
 class RecordingListener implements WorkspaceChangeListener {
   readonly writes: Array<[string, string, boolean]> = []
@@ -61,6 +62,105 @@ describe('NodeWorkspace', () => {
     assert.throws(() => ws.resolvePath('escape/new-file.txt'), /link/)
     await symlink(path.join(dir, 'secret.txt'), path.join(repo, 'leak.txt'))
     assert.throws(() => ws.resolvePath('leak.txt'), /link/)
+  })
+
+  test('refuses .git and writes reached through a directory symlink', async () => {
+    await writeFile(path.join(repo, '.git', 'config'), '[core]\n')
+    await writeFile(path.join(repo, 'session.json'), '{}')
+    await mkdir(path.join(repo, 'tmp'))
+    await symlink('../.git', path.join(repo, 'data', 'g'))
+    await symlink('..', path.join(repo, 'data', 'r'))
+    await symlink('sub', path.join(repo, 'data', 'alias'))
+    const ws = new NodeWorkspace(repo)
+    const inData = (...p: string[]): string => path.join(repo, 'data', ...p)
+
+    // data/g -> ../.git: nothing in .git, by any route.
+    assert.throws(() => ws.resolvePath('data/g/config'), /\.git/)
+    assert.throws(() => ws.resolvePath('data/g'), /\.git/)
+    assert.throws(() => ws.resolvePath('data/r/.git/config'), /\.git/)
+    await assert.rejects(ws.readFile(inData('g', 'config')), /\.git/)
+    await assert.rejects(ws.readDirectory(inData('g')), /\.git/)
+    await assert.rejects(
+      ws.applyEdits([
+        {
+          uri: uriForPath(inData('g', 'config')),
+          startOffset: 0,
+          endOffset: 0,
+          newText: '[filter "x"]\n',
+        },
+      ]),
+      /\.git/
+    )
+
+    // data/r -> ..: platform metadata stays readable, nothing is
+    // written or deleted through the link (not even into tmp/).
+    const meta = ws.resolvePath('data/r/session.json')
+    assert.equal(await ws.readFile(meta.fsPath), '{}')
+    await assert.rejects(
+      ws.applyEdits([
+        { uri: meta.uri, startOffset: 0, endOffset: 2, newText: '[]' },
+      ]),
+      /symbolic link/
+    )
+    await assert.rejects(ws.deleteFile(meta), /symbolic link/)
+    await assert.rejects(
+      ws.createFile(ws.resolvePath('data/r/tmp/x.l4'), 'x'),
+      /symbolic link/
+    )
+    // A link that stays inside data/ reads fine but isn't written through.
+    await writeFile(inData('sub', 'b.l4'), 'b')
+    assert.equal(
+      await ws.readFile(ws.resolvePath('data/alias/b.l4').fsPath),
+      'b'
+    )
+    await assert.rejects(
+      ws.createFile(ws.resolvePath('data/alias/new.l4'), 'x'),
+      /symbolic link/
+    )
+    assert.equal(await readFile(path.join(repo, 'session.json'), 'utf8'), '{}')
+    assert.equal(
+      await readFile(path.join(repo, '.git', 'config'), 'utf8'),
+      '[core]\n'
+    )
+    await assert.rejects(stat(path.join(repo, 'tmp', 'x.l4')))
+    await assert.rejects(stat(inData('sub', 'new.l4')))
+  })
+
+  // The review's repro: a symlink to .git in data/, an edit of
+  // data/g/config adding a clean filter, a .gitattributes using it, then
+  // the turn-end `git add -A`.
+  test("a symlink to .git can't be used to plant a git filter", async () => {
+    const work = path.join(dir, 'work')
+    await mkdir(path.join(work, 'data'), { recursive: true })
+    await mkdir(path.join(work, 'tmp'))
+    const git = new Git(work, { PATH: HOST_PATH, HOME: dir })
+    await git.ok(['init', '-q', '-b', 'main'])
+    await writeFile(path.join(work, 'data', 'a.l4'), 'x\n')
+    await symlink('../.git', path.join(work, 'data', 'g'))
+    await git.ok(['add', '-A'])
+    await git.ok(['commit', '-q', '-m', 'seed'])
+    const config = path.join(work, '.git', 'config')
+    const before = await readFile(config, 'utf8')
+    const marker = path.join(dir, 'PWNED')
+
+    const ws = new NodeWorkspace(work)
+    assert.throws(() => ws.resolvePath('data/g/config'), /\.git/)
+    await assert.rejects(
+      ws.applyEdits([
+        {
+          uri: uriForPath(path.join(work, 'data', 'g', 'config')),
+          startOffset: before.length,
+          endOffset: before.length,
+          newText: `[filter "x"]\n\tclean = touch ${marker} && cat\n`,
+        },
+      ]),
+      /\.git/
+    )
+    await ws.createFile(ws.resolvePath('data/.gitattributes'), '* filter=x\n')
+    await writeFile(path.join(work, 'data', 'a.l4'), 'y\n')
+    await git.ok(['add', '-A'])
+    assert.equal(await readFile(config, 'utf8'), before)
+    await assert.rejects(stat(marker))
   })
 
   test('hides .git from listings', async () => {

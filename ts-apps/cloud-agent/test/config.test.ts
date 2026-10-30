@@ -205,4 +205,24 @@ describe('JsonLogger', () => {
     assert.ok(second.err.length <= 501)
     assert.equal(redact('ok'), 'ok')
   })
+
+  test("drops a failed tool's error text and jl4-lsp's stderr, keeping an errno code", () => {
+    assert.equal(
+      redact(
+        'tool/failed mcp__crm__lookup: MCP tool error: Record for Jane Doe, DOB 1980-01-02 not found'
+      ),
+      'tool/failed mcp__crm__lookup: [redacted]'
+    )
+    assert.equal(
+      redact(
+        "tool/failed fs__read_file: ENOENT: no such file or directory, open '/s/repo/data/Client X.l4'"
+      ),
+      'tool/failed fs__read_file: [redacted] (ENOENT)'
+    )
+    assert.equal(
+      redact('jl4-lsp stderr: parse error in Client X.l4 near `the client`'),
+      'jl4-lsp stderr: [redacted]'
+    )
+    assert.equal(redact('tool/unknown: fs__nope'), 'tool/unknown: fs__nope')
+  })
 })
