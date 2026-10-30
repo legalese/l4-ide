@@ -1,0 +1,34 @@
+-- The amount by which one figure exceeds another.
+-- Needs `IMPORT prelude`: the prelude is not loaded automatically.
+IMPORT prelude
+
+-- How far the first figure is above the second, and 0 when it is not above.
+#EVAL `the amount by which` 840 `exceeds` 160       -- 680
+#EVAL `the amount by which` 20000 `exceeds` 25180   -- 0: income is below the threshold
+#EVAL `the amount by which` 25180 `exceeds` 25180   -- 0: equal is not above
+
+-- Plain subtraction says something else when the first figure is below.
+#EVAL 20000 MINUS 25180                              -- -5180
+
+-- A rates rebate that shrinks by 1 for each 8 by which income exceeds a threshold.
+-- The 560 is two thirds of the rates above the initial contribution, when the rates are 1000.
+`rebate before reduction` MEANS 560
+`income threshold`        MEANS 25180
+`maximum rebate`          MEANS 630
+
+-- Written with MINUS. Below the threshold the "excess" is negative,
+-- taking it off the rebate ADDS to the rebate, and the cap hides the mistake.
+GIVEN income IS A NUMBER
+GIVETH A NUMBER
+`rebate by subtraction` MEANS
+  min `maximum rebate` (`rebate before reduction` MINUS (FLOOR ((income MINUS `income threshold`) / 8)))
+
+-- Written as the statute words it.
+GIVEN income IS A NUMBER
+GIVETH A NUMBER
+`rebate` MEANS
+  min `maximum rebate` (`rebate before reduction` MINUS (FLOOR ((`the amount by which` income `exceeds` `income threshold`) / 8)))
+
+#EVAL `rebate by subtraction` 20000   -- 630: wrong
+#EVAL `rebate` 20000                  -- 560
+#EVAL `rebate` 26000                  -- 458: above the threshold the two agree

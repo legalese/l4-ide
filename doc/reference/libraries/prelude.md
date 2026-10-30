@@ -65,6 +65,7 @@ In the tables, `a`, `b`, `c`, `k`, `v` and `r` stand for any type, as in `GIVEN 
 | `product`  | `list`: LIST OF NUMBER              | NUMBER  | The product (1 for an empty list)             |
 | `max`      | `x`, `y`: NUMBER                    | NUMBER  | The greater of the two                        |
 | `min`      | `x`, `y`: NUMBER                    | NUMBER  | The lesser of the two                         |
+| `` `the amount by which` a `exceeds` b `` | `a`, `b`: NUMBER | NUMBER | How far `a` is above `b`, and 0 when it is not ([below](#the-amount-by-which-one-figure-exceeds-another)) |
 | `maximum`  | `list`: LIST OF NUMBER              | NUMBER  | The largest item; an error for an empty list  |
 | `minimum`  | `list`: LIST OF NUMBER              | NUMBER  | The smallest item; an error for an empty list |
 | `maximum1` | `x`: NUMBER, `list`: LIST OF NUMBER | NUMBER  | The largest of `x` and the items              |
@@ -75,6 +76,46 @@ In the tables, `a`, `b`, `c`, `k`, `v` and `r` stand for any type, as in `GIVEN 
 `max`, `min`, `maximum`, `minimum`, `maximum1` and `minimum1` also accept MAYBE NUMBER values. `NOTHING` counts as absent: the other value wins, and only when every value is `NOTHING`, or the list is empty, is the result `NOTHING`.
 
 With the prelude imported, `<`, `<=`, `>` and `>=` (and `LESS THAN`, `AT MOST`, `GREATER THAN`, `AT LEAST`) also compare two MAYBE NUMBER values. The comparison is FALSE when either side is `NOTHING`.
+
+### The amount by which one figure exceeds another
+
+Statutes often fix an amount by "the amount by which" one figure "exceeds" another.
+A rebate, for example, may shrink by one dollar for each eight dollars by which income exceeds a threshold.
+Read literally, that is how far the first figure is above the second, and nothing at all when it is not above it.
+
+Subtraction does not say that.
+When the first figure is below the second, `income MINUS threshold` is negative, and a rule that takes a negative amount off something adds it back.
+
+The prelude has the statutory phrase as a function, so the rule can be written the way the statute words it:
+
+```l4
+`the amount by which` income `exceeds` threshold
+```
+
+It means `max 0 (a MINUS b)`.
+
+| `a`   | `b`   | `` `the amount by which` a `exceeds` b `` | `a MINUS b` |
+| ----- | ----- | ----------------------------------------- | ----------- |
+| 840   | 160   | 680                                       | 680         |
+| 20000 | 25180 | 0                                         | -5180       |
+| 25180 | 25180 | 0                                         | 0           |
+
+**A worked example.**
+The 2019 OpenFisca code for the New Zealand rates rebate wrote "the amount by which income exceeds the threshold" as plain subtraction.
+Below the threshold the difference was negative, so taking it off the rebate raised the rebate, and the final clip to the maximum rebate hid the error.
+With rates of 1000, income of 20000 and no dependants, the code gave 630 where the correct answer is 560.
+[prelude-exceeds-example.l4](prelude-exceeds-example.l4) has both versions, with the phrase written as the function above in the correct one.
+
+**Limits.**
+
+- The result is never negative.
+  Where a negative difference is the point, such as a ledger balance or a change in value, use `MINUS`.
+- Both inputs are NUMBERs.
+  The function does not take MAYBE NUMBER values, as `max` and `min` do.
+- "Exceeds" as a yes-or-no question ("income exceeds the threshold") is a comparison, `income GREATER THAN threshold`, not this function.
+- An input that is itself a function call needs parentheses: `` `the amount by which` income `exceeds` (FLOOR threshold) ``.
+  Without them, L4 reads `FLOOR` and `threshold` as two more inputs and reports that the function "expects 2 inputs, but here it is given 4 inputs".
+- A module that imports the prelude and defines its own function with the same words gets "There are multiple definitions for the identifier", as it would for its own `max`.
 
 ## MAYBE values
 

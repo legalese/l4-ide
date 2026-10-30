@@ -4,8 +4,10 @@
 -- A CLI fixture and not a corpus example for the reason state-graph-captions.l4
 -- gives: tests-cli/fixtures is in no goldened glob, so this ships no tests/
 -- directory. `l4 batch` over it is the guard for the printer (CLAUDE.md
--- 3.2.2): an operator imported from the prelude prints back in its `OF`
--- spelling, and the answer must survive the re-print.
+-- 3.2.2): it re-prints the module and re-runs it per row, and an operator
+-- imported from the prelude is printed in a different spelling from the one
+-- written here (jl4-core/src/L4/Print.hs, `mixfixHeadKeyword`), so the answer
+-- has to survive the re-print.
 IMPORT prelude
 
 -- The operator on its own: the margin when there is one, zero when there is
@@ -17,10 +19,11 @@ IMPORT prelude
 #ASSERT `the amount by which` (0 MINUS 5) `exceeds` (0 MINUS 8) EQUALS 3
 #ASSERT `the amount by which` (0 MINUS 8) `exceeds` (0 MINUS 5) EQUALS 0
 
--- A 2019 New Zealand rates-rebate implementation (the "Semantics of Excess"
--- slides) coded "the amount by which income exceeds [the threshold]" as plain
--- subtraction. Below the threshold the difference is negative, subtracting it
--- ADDS to the rebate, and the final cap at the maximum rebate hid the error.
+-- The 2019 OpenFisca code for the New Zealand rates rebate (the "A Wild Bug
+-- Appears!" slides of the "Semantics of Excess" deck) coded "the amount by
+-- which income exceeds [the threshold]" as plain subtraction. Below the
+-- threshold the difference is negative, subtracting it ADDS to the rebate, and
+-- the final clip to the maximum rebate hid the error.
 -- The figures are the deck's: initial contribution 160, income threshold
 -- 25180 plus 500 per dependant, maximum rebate 630, one dollar of rebate
 -- lost for each 8 of excess income, two thirds of the rates above the initial
