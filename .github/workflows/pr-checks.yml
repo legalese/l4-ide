@@ -256,8 +256,7 @@ jobs:
   #     because its `catala interpret -F json` prints `{ "result": 0.25 }` where
   #     the goldens' catala-test-cli blocks hold the compact exact-rational
   #     `{"result":"1/4"}`. The goldens were first checked with upstream commit
-  #     fdf4ccd5 (it reports 1.2.1; the "Evidence legend" paragraph near the top of
-  #     specs/todo/CATALA-EXPORT-SPEC.md names the checkout it was built from),
+  #     fdf4ccd5 (it reports 1.2.1; specs/todo/CATALA-EXPORT-SPEC.md:107-109),
   #     and 1.3.0 contains that commit.
   #   * Everything else is whatever opam-repository resolves on the day of a
   #     cold build and is then frozen by the cache. The `opam list` the verify
