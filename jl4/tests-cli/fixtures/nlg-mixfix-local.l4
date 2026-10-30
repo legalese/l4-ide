@@ -128,3 +128,46 @@ GIVETH A NUMBER
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 `render of` n MEANS `the lower of` OF n, 100
+
+-- A WITH call inside another rule's body. The herald of `the amount by which`
+-- and `the gap` follows their last input, so it used to be read a second time as
+-- the label of that input; the herald of `the lower of` sits above its head and
+-- never was.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render exceeds with` n MEANS (`the amount by which` WITH a IS n, b IS 100) PLUS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render gap with` n MEANS (`the gap` WITH a IS n, b IS 100) PLUS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render lower with` n MEANS (`the lower of` WITH a IS n, b IS 100) PLUS 1
+
+-- Two prefix functions used as a projection's selector (`s's size's half`): the
+-- herald of one follows its input, the other's sits above its head. The same two
+-- are in nlg-mixfix-import-lib.l4.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`half` x @nlg half of %x%
+  MEANS x DIVIDED BY 2
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg the third of %x%
+`third` x MEANS x DIVIDED BY 3
+
+-- A function used as a projection's selector keeps its plain name: "the span's
+-- size's half", not "the span's size's half of x". A herald that follows the
+-- input is moved onto the rule before a call is read (see `render exceeds with`
+-- above), which gives the name a herald; only a call should read it.
+DECLARE Span HAS size IS A NUMBER
+
+GIVEN s IS A Span
+GIVETH A NUMBER
+`render half selector` s MEANS s's size's half
+
+GIVEN s IS A Span
+GIVETH A NUMBER
+`render third selector` s MEANS s's size's third

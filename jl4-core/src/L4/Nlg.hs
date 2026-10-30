@@ -9,6 +9,8 @@ module L4.Nlg (
   decideNlgSite,
   promoteHeadInputNlg,
   promoteHeadInputNlgWith,
+  prepareModules,
+  plainName,
   carriesLanguage,
   Linearize (..),
   lin,
@@ -410,6 +412,11 @@ overBothNames f = \ case
   Ref r u o      -> Ref (f r) u (f o)
   OutOfScope u n -> OutOfScope u (f n)
 
+-- | A name with no herald and none of its other-language renderings, so it
+-- linearizes as its own words.
+plainName :: Resolved -> Resolved
+plainName = overBothNames (annoOf %~ (annNlg .~ Nothing) . (annNlgAlts .~ []))
+
 -- | Clear the annotations on a sentence's own @%slot%@ references.
 --
 -- A slot names an input, and the sentence being moved is the one that input was
@@ -454,13 +461,28 @@ linearizeDirectivesIn mlang mixfixCanon mod'' deps'' =
   , foldMap (snd . simpleLinearizerIn mlang) directives
   )
  where
-  prepare    = selectLanguage mlang . promoteHeadInputNlg
-  -- The module being read also learns which of its dependencies' inputs were
-  -- carrying a herald, so a call to one of those rules is labelled as a call to
-  -- a rule of its own would be.
-  mod'       = selectLanguage mlang (promoteHeadInputNlgWith deps'' mod'')
-  heralds    = nlgFnInfo mixfixCanon (mod' : map prepare deps'')
-  directives = toListOf (gplate @(Directive Resolved)) mod'
+  (mod', deps') = prepareModules mlang mod'' deps''
+  heralds       = nlgFnInfo mixfixCanon (mod' : deps')
+  directives    = toListOf (gplate @(Directive Resolved)) mod'
+
+-- | A module and its dependencies, ready to have their heralds read: a herald
+-- written after a rule's last input moved onto the rule ('promoteHeadInputNlg'),
+-- then a language chosen ('selectLanguage'), in that order (see
+-- 'linearizeDirectives').
+--
+-- The module being read also learns which of its dependencies' inputs were
+-- carrying a herald, so a call to one of those rules is labelled as a call to a
+-- rule of its own would be ('promoteHeadInputNlgWith').
+--
+-- Shared by @l4 nlg@ and @l4 render@, which read a call's herald alike. A reader
+-- that skips it still finds the rule's herald, because 'nlgFnInfo' looks
+-- wherever it landed, but it also prints the herald a second time as the label
+-- of the last input at a @WITH@ call.
+prepareModules :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> (Module Resolved, [Module Resolved])
+prepareModules mlang m deps =
+  ( selectLanguage mlang (promoteHeadInputNlgWith deps m)
+  , map (selectLanguage mlang . promoteHeadInputNlg) deps
+  )
 
 -- | Does any rendering in this module name this language?
 --

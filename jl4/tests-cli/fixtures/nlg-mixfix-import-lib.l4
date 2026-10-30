@@ -48,3 +48,16 @@ GIVEN a IS A NUMBER
 GIVETH A NUMBER
 `the gap` a b @nlg the gap between %a% and %b%
   MEANS a MINUS b
+
+-- Two prefix functions used as a projection's selector in nlg-mixfix-import.l4
+-- (`s's size's half`): the herald of one follows its input, the other's sits
+-- above its head.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`half` x @nlg half of %x%
+  MEANS x DIVIDED BY 2
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg the third of %x%
+`third` x MEANS x DIVIDED BY 3

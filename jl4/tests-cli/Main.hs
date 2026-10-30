@@ -3603,6 +3603,11 @@ spec bin = do
           , "Render greater means the greater of n and 100."
           , "Render nested means the smaller of the smaller of n and 100 and 200."
           , "Render of means the smaller of n and 100."
+          , "Render exceeds with equals the amount by which a exceeds b where a is n and b is 100 + 1."
+          , "Render gap with equals the gap between a and b where a is n and b is 100 + 1."
+          , "Render lower with equals the smaller of a and b where a is n and b is 100 + 1."
+          , "Render half selector means the span's size's half."
+          , "Render third selector means the span's size's third."
           ]
 
     it "is read by l4 render at a call in the body of another rule" $ do
