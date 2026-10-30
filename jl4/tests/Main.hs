@@ -41,6 +41,7 @@ import qualified System.OsPath as OsPath
 import LSP.L4.Rules
 
 import qualified Hover
+import qualified KeywordList
 import qualified SemanticTokens
 
 main :: IO ()
@@ -107,6 +108,7 @@ main = do
       tests evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
+    KeywordList.keywordListTests dataDir
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

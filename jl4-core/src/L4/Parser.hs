@@ -809,7 +809,10 @@ withTypeSig p = do
   p sig
 
 directive :: Parser (Directive Name)
-directive =
+directive = do
+  -- The column of the directive's first token. An #ASSERT REFUSED's BECAUSE
+  -- on a line of its own is measured against it ('assertRefusedReason').
+  current <- Lexer.indentLevel
   attachAnno $
     choice
       -- Use singleLineExpr for simple directives to make them line-oriented.
@@ -831,6 +834,26 @@ directive =
           <*> annoHole singleLineExpr
           <* annoLexeme (spacedKeyword_ TKWith)
           <*> contractEvents
+      -- #ASSERT REFUSED e [BECAUSE "message"].  'tryParser' is load-bearing:
+      -- this alternative consumes the #ASSERT token before it can discover
+      -- there is no REFUSED, and without backtracking the plain #ASSERT
+      -- alternative below would never be reached.
+      --
+      -- The BECAUSE payload is a LITERAL ('lit'), matching 'refuse' -- REFUSE's
+      -- own message is a literal for the same reason, and the two must agree.
+      -- The directive's job is to pin a refusal's reason, and the comparison is
+      -- decided statically in 'evalDirective' without evaluating the payload; a
+      -- payload the evaluator cannot read statically would silently degrade to
+      -- "no constraint", i.e. an assertion that holds for ANY refusal reason.
+      -- So a non-literal payload is a parse error, not a vacuous success, and
+      -- so is a BECAUSE that a BREACH in the expression would take as its own
+      -- ('assertRefusedSubject'): the directive would then name no reason.
+      , tryParser $
+          AssertRefused emptyAnno
+          <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
+          <* annoLexeme (spacedKeyword_ TKRefused)
+          <*> annoHole assertRefusedSubject
+          <*> optionalWithHole (assertRefusedReason current)
       , Assert emptyAnno
           <$ annoLexeme (spacedToken_ (TDirectives TAssertDirective))
           <*> annoHole singleLineExpr
@@ -838,6 +861,71 @@ directive =
 
 contractEvents :: AnnoParser [Expr Name]
 contractEvents = annoHole $ lmany (const expr)
+
+-- | The expression of an @#ASSERT REFUSED@.
+--
+-- A BECAUSE inside it can only be a BREACH's ('breach' reads one, and reads
+-- it greedily), and outside parentheses it reads as the directive's own: in
+-- @#ASSERT REFUSED IF c THEN REFUSE "a" ELSE BREACH BECAUSE "b"@ the reason
+-- "b" goes to the BREACH, the directive names no reason, and it holds for a
+-- refusal with any reason. So a BECAUSE outside every pair of parentheses in
+-- the expression is an error, at that BECAUSE.
+--
+-- The error is registered rather than raised, so that it is the directive's
+-- one error: a failure here would be caught by the 'tryParser' around the
+-- directive, and the line read again as a plain #ASSERT.
+assertRefusedSubject :: Parser (Expr Name)
+assertRefusedSubject = do
+  start <- getOffset
+  (toks, e) <- match singleLineExpr
+  for_ (unbracketedBecause toks) \ i ->
+    registerParseError $ FancyError (start + i) $ Set.singleton $ ErrorFail $ Text.unpack $ Text.unlines
+      [ "This BECAUSE belongs to the BREACH before it, and not to the #ASSERT REFUSED."
+      , "Inside an #ASSERT REFUSED, write a BREACH that has a BECAUSE in parentheses:"
+      , ""
+      , "  #ASSERT REFUSED (... BREACH BECAUSE \"...\")"
+      , ""
+      , "To name the reason the refusal must give, put the expression in parentheses, and the BECAUSE after them:"
+      , ""
+      , "  #ASSERT REFUSED (... BREACH) BECAUSE \"...\""
+      ]
+  pure e
+ where
+  -- the position, among the tokens, of the first BECAUSE outside every pair
+  -- of parentheses
+  unbracketedBecause :: [PosToken] -> Maybe Int
+  unbracketedBecause = go (0 :: Int) 0
+   where
+    go _ _ [] = Nothing
+    go depth i (t : ts) = case t.payload of
+      TSymbols TPOpen                     -> go (depth + 1) (i + 1) ts
+      TSymbols TPClose                    -> go (depth - 1) (i + 1) ts
+      TKeywords TKBecause | depth <= 0    -> Just i
+      _                                   -> go depth (i + 1) ts
+
+-- | The BECAUSE clause of an @#ASSERT REFUSED@, given the column of the
+-- directive's first token.
+--
+-- A BECAUSE on the directive's own line is always to the right of it. One
+-- that starts a line of its own continues the directive only when it starts
+-- at a column further right than the directive's. Columns are counted as
+-- everywhere in L4's layout, a tab bringing the indentation to the next
+-- multiple of eight and any other whitespace character adding one, and the
+-- service's text filter counts them the same way when it keeps a directive's
+-- lines together, so the two agree on whether a line is indented further
+-- than the directive. A BECAUSE further left is an error, at the BECAUSE,
+-- registered so that it is the directive's one error.
+assertRefusedReason :: Pos -> AnnoParser (Expr Name)
+assertRefusedReason current = wrapAnnoParser $ do
+  off <- getOffset
+  col <- Lexer.indentLevel
+  r <- unwrapAnnoParser (annoLexeme (spacedKeyword_ TKBecause) *> annoHole (lit <?> "String Literal"))
+  when (col <= current) $
+    registerParseError $ FancyError off $ Set.singleton $ ErrorFail $ Text.unpack $ Text.unlines
+      [ "A BECAUSE that starts a line belongs to the #ASSERT REFUSED above it only when it is indented further than the #ASSERT."
+      , "Indent this line, or move the BECAUSE onto the line of the #ASSERT."
+      ]
+  pure r
 
 import' :: Parser (Import Name)
 import' =
@@ -2404,6 +2492,7 @@ baseExpr' =
   <|> try event
   <|> regulative
   <|> breach
+  <|> refuse
   <|> lam
   <|> consider
   <|> try namedApp -- This is not nice
@@ -2723,6 +2812,22 @@ breach = do
       <$  annoLexeme (spacedKeyword_ TKBreach)
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBy) *> annoHole (indentedExpr current))
       <*> optionalWithHole (annoLexeme (spacedKeyword_ TKBecause) *> annoHole (indentedExpr current))
+
+-- | Parse @REFUSE "message"@.
+--
+-- The message is a LITERAL, not an arbitrary expression. That is deliberate:
+-- a refusal's reason is statically readable (so it can be reported without
+-- running the program), and a literal payload means 'Refuse' needs no machine
+-- 'Frame' to carry it. @REFUSE 42@ parses and is rejected by the type checker;
+-- @REFUSE (something computed)@ does not parse.
+--
+-- The label keeps the parse error to the one thing that works: without it the
+-- error lists the numeric literals too, which the type checker then refuses.
+refuse :: Parser (Expr Name)
+refuse = attachAnno $
+  Refuse emptyAnno
+    <$  annoLexeme (spacedKeyword_ TKRefuse)
+    <*> annoHole (lit <?> "String Literal")
 
 optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)

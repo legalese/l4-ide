@@ -384,14 +384,6 @@ handlers evalConfig recorder =
           -- adds codelenses to visualize DECIDE or MEANS clauses
           visualizeDecides :: [CodeLens] = decisionGraphCodeLenses verTextDocId typeCheck
 
-          directiveLabel :: Directive Resolved -> Text
-          directiveLabel = \case
-            LazyEval{}      -> "#EVAL"
-            LazyEvalTrace{} -> "#EVALTRACE"
-            Check{}         -> "#CHECK"
-            Contract{}      -> "#CHECK"
-            Assert{}        -> "#ASSERT"
-
           mkRenderResultCodeLens srcPos label = CodeLens
             { _command = Just Command
               { _title = "Track result"
@@ -527,14 +519,15 @@ handlers evalConfig recorder =
                 case rangeOfNode d of
                   Just rng ->
                     let lspRange = srcRangeToLspRange (Just rng)
-                        (label, dExpr) = case d of
-                          LazyEval _ e      -> ("#EVAL", e)
-                          LazyEvalTrace _ e -> ("#EVALTRACE", e)
-                          Check _ e         -> ("#CHECK", e)
-                          Contract _ e _ _  -> ("#CHECK", e)
-                          Assert _ e        -> ("#ASSERT", e)
+                        dExpr = case d of
+                          LazyEval _ e        -> e
+                          LazyEvalTrace _ e   -> e
+                          Check _ e           -> e
+                          Contract _ e _ _    -> e
+                          Assert _ e          -> e
+                          AssertRefused _ e _ -> e
                         detail = prettyLayout dExpr
-                    in [ mkSymbol label (Just detail) SymbolKind_Operator lspRange lspRange ]
+                    in [ mkSymbol (directiveLabel d) (Just detail) SymbolKind_Operator lspRange lspRange ]
                   Nothing -> []
 
               Import _ imp@(MkImport _ n _) ->
@@ -695,8 +688,12 @@ handlers evalConfig recorder =
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.QueryPlanMethodName) params ide $
           \(qpParams :: Ladder.QueryPlanRequestParams) _tcRes recentViz -> do
             let vizConfig = Ladder.getVizConfig recentViz.vizState
+            -- A rule that may refuse to answer gets no plan: the answer is the
+            -- decline decided when its decision graph was drawn.
             MkVizHandler $
-              case Ladder.doVisualize recentViz.decide vizConfig of
+              case recentViz.decline of
+               Just declined -> pure (Aeson.toJSON declined)
+               Nothing -> case Ladder.doVisualize recentViz.decide vizConfig of
                 Right (vizProgramInfo, vizState) ->
                   let paramsByUnique =
                         VizQueryPlan.buildParamsByUnique vizProgramInfo

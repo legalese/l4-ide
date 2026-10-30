@@ -1,0 +1,9 @@
+-- A definition that boolean-rules.l4 imports: it refuses to answer for a
+-- person who is not insured. A file of the agreement corpus with no
+-- "agreement:" line is read only by the files that import it.
+
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance is not modelled"

@@ -1,0 +1,43 @@
+-- Rules for the query planners: one that may refuse through a helper it
+-- imports, one that may also refuse with a reason of its own, one that cannot
+-- refuse, one that may refuse through a helper in this file, and two over a
+-- number, one of which may refuse.
+
+IMPORT helper
+
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE covered IF adult AND `the person is insured` applicant
+
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE checked IF
+    IF adult THEN `the person is insured` applicant
+    ELSE REFUSE "minors are not modelled"
+
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE planned IF adult AND resident
+
+-- A helper in this file that refuses for a person who is not resident.
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is resident` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "residence is not modelled"
+
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE settled IF adult AND `the person is resident` applicant
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+fee n MEANS IF n < 0 THEN REFUSE "a negative fee is not modelled" ELSE n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+charge n MEANS n

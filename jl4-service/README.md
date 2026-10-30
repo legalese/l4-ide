@@ -132,7 +132,7 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 - Zip uploads: max 2 MB (configurable), max 5096 files (configurable), no path traversal
 - If the `id` field is omitted, a UUID is generated automatically
 - Duplicate detection: if the uploaded sources match the deployment already registered under the requested id (by content hash), that deployment is returned, as `ready` with no `updateId`, instead of recompiling
-- **An upload without an `id` always compiles and takes a deployment slot.** It is given a new id, so it never matches an existing deployment, however identical its sources. A client that redeploys in a loop without an `id` therefore gains one deployment per upload, until the service reaches `--max-deployments` (default 1024) and refuses every new one with `400` `Maximum deployment limit reached`. To replace a deployment rather than add one, send the same `id` each time, or `PUT /deployments/{id}`. Until legalese/l4-ide#571, an upload whose sources matched any ready deployment got that deployment back, whatever id it asked for, and nothing was created
+- **An upload without an `id` always compiles and takes a deployment slot.** It is given a new id, so it never matches an existing deployment, however identical its sources. A client that redeploys in a loop without an `id` therefore gains one deployment per upload, until the service reaches `--max-deployments` (default 1024) and rejects every new one with `400` `Maximum deployment limit reached`. To replace a deployment rather than add one, send the same `id` each time, or `PUT /deployments/{id}`. Until legalese/l4-ide#571, an upload whose sources matched any ready deployment got that deployment back, whatever id it asked for, and nothing was created
 
 ### Data Plane
 
@@ -188,35 +188,40 @@ A record is an object keyed by its constructor's name, holding its fields: `{"Pa
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 
+A function that reaches a `REFUSE` gives no answer: it declines to, with its author's reason.
+The response is a `422`, as for an evaluation that stops with an error, with the body `{"tag": "Error", "contents": {"kind": "refused", "reason": "not modelled"}}`: its `contents` is the refusal, where an error's `contents` has a `tag` of its own.
+The reason is as the rule wrote it.
+
 The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
 
 #### Missing inputs
 
 An input left out of `arguments`, or sent as `null`, is missing.
-Most requests are evaluated directly, and a missing input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
+Most requests are evaluated directly, and a missing input that is not a `MAYBE` is rejected before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
 A synonym at the head of an input's type is read as the type it stands for.
 An input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
-On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is refused with the direct path's message.
+On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is rejected with the direct path's message.
 On both paths, an input declared through a synonym for a `MAYBE` is a `MAYBE`: it may be left out, or sent as `null` or `{}`.
 An input declared through any other synonym takes the values of the type the synonym stands for: a record's fields, one of an enum's names, a list, or a date, a time or a date and time as a string. So does a synonym below the head of a type, as in `MAYBE Hue`.
 A synonym that takes no type (`DECLARE Years IS A LIST OF Year`) is answered where the type written out is not: a required `LIST`, `TIME` or `DATETIME` input fails on this path (see the limits below), and a synonym for one does not.
 A synonym that takes a type (`DECLARE Many OF a IS A LIST OF a`, used as `Many OF NUMBER`) fails with a parser error.
 Two kinds of synonym differ from the type written out when the input is left out or the value is wrong; the limits below say how.
-A required `DATE` string that does not parse is refused with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
-A batch case refused this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
+A required `DATE` string that does not parse is rejected with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
+A batch case rejected this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
 
 Limits:
 
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
 - On the wrapper path, a function with a `MAYBE DATE` input fails the request, with an error about the generated code: `incorrect indentation (got 7, should be greater than 7)`, or, when another input is required, a type error about `TODATE`.
-- On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is refused with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out is `FALSE`.
-- On the wrapper path, an input declared through a synonym for a `DATE` whose string does not parse is refused with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD`, where a `DATE` written out is refused with `Parameter 'd': could not read "garbage" as a DATE`; a synonym for a `TIME` or a `DATETIME` is refused with `Could not parse time string …` or `Could not parse datetime string …`, and the type written out fails the wrapper with a type error.
-- On the direct path, a `DATE` string that does not parse is not refused: the rule receives the text.
-- A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
-  A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
+- On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is rejected with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out is `FALSE`.
+- On the wrapper path, an input declared through a synonym for a `DATE` whose string does not parse is rejected with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD`, where a `DATE` written out is rejected with `Parameter 'd': could not read "garbage" as a DATE`; a synonym for a `TIME` or a `DATETIME` is rejected with `Could not parse time string …` or `Could not parse datetime string …`, and the type written out fails the wrapper with a type error.
+- On the direct path, a `DATE` string that does not parse is not rejected: the rule receives the text.
+- A list answer of more than 200 elements comes back cut short and ending in two `null`s, with status 200, on the direct path, the wrapper path and in a batch alike.
+  Each constructor around the list takes one element of that depth: a list inside the rule's own `JUST`, or in a record's field, is cut one element sooner, and a list in a record inside a record two sooner.
+  So a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s.
 
 #### Trace Output
 
@@ -302,8 +307,9 @@ The response has one entry per case, in the order the cases were sent, each unde
 ```
 
 An answered case carries the function's result under `value`.
+A case that refused carries `@refused`, the refusal as a single request's `422` carries it, `{"kind": "refused", "reason": "…"}`, has no `value`, and is counted in `casesProcessed`: a refusal is how the rules answer that case.
 A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
-That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is refused in a batch and answered as text in a single request.
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is rejected in a batch and answered as text in a single request.
 A case that runs past `--eval-timeout` or `--max-eval-memory-mb` is not returned this way: it fails the whole batch with `500`, and no case comes back.
 Every case of a batch starts at once on one core, so each case's clock also counts the other cases' work, and a large batch of quick cases can fail this way: measured 2026-10-07 with `--eval-timeout 3`, 10 cases of a rule that answers a single request in about 0.12 s all answer, and 40 fail the batch.
 Unstable returns such a case with `@error` and `@limit` and keeps the others (legalese/l4-ide#549, commits `0765fef5d` and `a09544dd6`); this version does not carry that.
@@ -322,8 +328,23 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 
 Returns which inputs are still needed, ranked by impact on the outcome.
 
-A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
-There are three such answers.
+A rule that may refuse to answer is not planned, whatever inputs the request gives.
+It is answered with `400` and a body that says why:
+
+```json
+{
+  "error": "No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\".",
+  "kind": "declined",
+  "reasons": ["insurance is not modelled"],
+  "rule": "covered"
+}
+```
+
+`error` is one sentence that names the rule and every reason it may refuse with, `rule` names the rule, and `reasons` lists those reasons.
+A rule may refuse when a `REFUSE` is written in it, or in a definition it uses directly or through others, in its own file or in a file it imports, whether or not any input reaches that `REFUSE`.
+This answer comes before any of the ones below, so a rule that may refuse and does not return a boolean gets it too.
+
+Any other rule that cannot be planned is answered with `400` and `{"error": "…"}` alone.
 A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
 A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
 A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
@@ -389,6 +410,10 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
+
+A tool call whose function refuses answers with `isError: true`, as an error does, and its text is the refusal, the body a `422` of the evaluation endpoint carries: `{"tag":"Error","contents":{"kind":"refused","reason":"not modelled"}}`.
+The reason is as the rule wrote it, with no input name rewritten.
+A client that asks for a task while the deployment is still compiling gets that text as the task's result.
 
 #### MCP Schema Design
 

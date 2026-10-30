@@ -1,0 +1,9 @@
+-- A definition that two-hop-rules.l4 imports, which calls one that this
+-- file imports from residency.l4. A file of the agreement corpus with no
+-- "agreement:" line is read only by the files that import it.
+
+IMPORT residency
+
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person may vote` person MEANS `the person is resident` person

@@ -14,7 +14,9 @@
 --   already speaks the service protocol.
 --
 -- [@run FILE.wasm@]
---   Execute an exported function. The request body is a JSON document
+--   Execute an exported function, unless the schema marks it
+--   @\"supported\": false@: then it names the reason on stderr and exits 1,
+--   and runs nothing. The request body is a JSON document
 --   in the same shape the service expects (see 'FnArguments'):
 --   @{\"arguments\": {...}, \"startTime\": ..., \"events\": [...]}@.
 --   The response is a JSON document in the service's 'ResponseWithReason'
@@ -32,6 +34,7 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBSC
 import Data.FileEmbed (embedStringFile)
 import Data.List (isSuffixOf)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
@@ -212,6 +215,17 @@ runRunCmd opts = do
       mapM_ (\fe -> Text.IO.hPutStrLn stderr $ "  " <> fe.apiName) (bundle.brExports)
       exitFailure
     Just fe -> pure fe
+
+  -- An export the schema marks unsupported is not run: its compiled body
+  -- would answer where jl4-service does not (it may reach a REFUSE, or it
+  -- holds a construct the backend cannot compile). The runtime declines it
+  -- too, with the same message ('UnsupportedFunctionError').
+  unless funcExport.supported $ do
+    Text.IO.hPutStrLn stderr $
+      funcExport.apiName <> " is not evaluated by the WASM backend: "
+      <> fromMaybe "it is marked unsupported" funcExport.unsupportedReason
+      <> ". Evaluate it with jl4-service."
+    exitFailure
 
   requestJson <- case opts.runInputFile of
     Just path -> LBS.readFile path

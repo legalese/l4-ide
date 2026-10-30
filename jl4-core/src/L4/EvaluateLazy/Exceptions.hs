@@ -5,7 +5,11 @@ module L4.EvaluateLazy.Exceptions
 ( EvalException (..)
 , InternalEvalException (..)
 , UserEvalException (..)
+, Refusal (..)
 , prettyEvalException
+, prettyRefusal
+, refusalMarker
+, parseRefusalMarker
 , maximumStackSize
 , maximumFrameDepth
 )
@@ -14,6 +18,8 @@ where
 import Base
 import qualified Base.Text as Text
 import Control.Exception (Exception)
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
 import L4.Evaluate.ValueLazy
 import L4.Evaluate.Operators
 import L4.Print
@@ -24,8 +30,51 @@ import L4.Utils.Ratio
 data EvalException =
     InternalEvalException InternalEvalException
   | UserEvalException UserEvalException
+  | RefusalException Refusal
+    -- ^ The program REFUSED: it declined to answer, with the reason the author
+    -- wrote. This is a THIRD TOP-LEVEL ARM rather than another
+    -- 'UserEvalException' constructor, and deliberately so: it makes every
+    -- total match over 'EvalException' a compile error until it decides
+    -- whether a refusal is an error, and it keeps refusals out of
+    -- 'prettyEvalException'\'s internal-error banner. A refusal is not a
+    -- defect in the program and not an unknown fact the boundary can supply;
+    -- it is a determinate outcome of its own kind.
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The payload of a refusal: the author's reason for declining to answer.
+--
+-- The reason is a string literal in the source ('L4.Syntax.Refuse'), so it is
+-- statically known and can be reported without running the program.
+newtype Refusal =
+  MkRefusal
+    { message :: Text
+    }
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | Render a refusal for a user. Deliberately does NOT say "error". Every line
+-- of the reason is indented under the heading, and an empty reason is one
+-- line that holds only the indent.
+prettyRefusal :: Refusal -> [Text]
+prettyRefusal r = "The model refuses to answer:" : map indentSingle (Text.splitOn "\n" r.message)
+
+-- | A refusal as a JSON value, for a surface that reports one in the place of
+-- an answer or an error: @{"kind": "refused", "reason": ...}@. jl4-service
+-- writes this value at each of its three doors, so a client of the service
+-- reads a refusal the same way at each, and the ladder's evaluation carries
+-- it as the data of its error response. @l4 batch@ and @l4 run --json@ write
+-- a refusal in shapes of their own.
+refusalMarker :: Refusal -> Aeson.Value
+refusalMarker r = Aeson.object ["kind" Aeson..= ("refused" :: Text), "reason" Aeson..= r.message]
+
+-- | Read the value 'refusalMarker' writes.
+parseRefusalMarker :: Aeson.Value -> Aeson.Parser Refusal
+parseRefusalMarker = Aeson.withObject "refusal" \o -> do
+  kind <- o Aeson..: "kind"
+  if kind == ("refused" :: Text)
+    then MkRefusal <$> o Aeson..: "reason"
+    else fail ("expected a refusal, whose kind is \"refused\", got the kind " <> show kind)
 
 -- | Thrown as a (synchronous) IO exception by the evaluation machine and
 -- caught at directive boundaries; see 'L4.EvaluateLazy.Machine'.
@@ -54,6 +103,10 @@ data UserEvalException =
   | NotAnInteger BinOp Rational
   | Stuck Resolved -- ^ stores the term we got stuck on
   | UserError Text -- ^ general user-facing error (e.g. missing TIMEZONE declaration)
+  | ValueTooDeep
+    -- ^ An @#ASSERT REFUSED@ of a value that goes deeper than a directive
+    -- reads ('maximumStackSize'): whether it refuses below that depth is not
+    -- known, so the assertion is undecided.
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -63,6 +116,7 @@ prettyEvalException (InternalEvalException exc) = wrapInternal (prettyInternalEv
     wrapInternal :: [Text] -> [Text]
     wrapInternal msgs = [ "Internal error:" ] <> msgs <> [ "Please report this as a bug." ]
 prettyEvalException (UserEvalException exc)     = prettyUserEvalException exc
+prettyEvalException (RefusalException r)       = prettyRefusal r
 
 prettyInternalEvalException :: InternalEvalException -> [Text]
 prettyInternalEvalException = \ case
@@ -140,6 +194,8 @@ prettyUserEvalException = \ case
     <> [ "but it is an assumed term." ]
   UserError msg ->
     [ msg ]
+  ValueTooDeep ->
+    [ "The value goes deeper than a directive reads, so whether it refuses below that depth is not known." ]
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').

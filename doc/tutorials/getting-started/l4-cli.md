@@ -385,12 +385,13 @@ Every case that is run produces one line, or one item with `--format json` or `y
 - `status` says how the case went, as below.
 - `diagnostics` is the list of messages for a case that did not succeed, and `[]` for one that did.
 
-`status` is one of two words:
+`status` is one of three words:
 
 - `success`: the rules gave an answer.
 - `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, a CSV line has a different number of cells from the header, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+- `refused`: the rules declined to answer the case with a [`REFUSE`](../../reference/control-flow/REFUSE.md), which is not an error. The `result` is then an object holding the reason, `{"refused": {"reason": …}}`, and `diagnostics` gives the reason too. The batch goes on to the next case.
 
-The command exits with status 0 when every case was `success`, and 1 when any case was `error`, once every case that was going to run has run.
+The command exits with status 1 when any case was `error`, and 0 when none was, once every case that was going to run has run.
 
 #### Checking cases without running them
 

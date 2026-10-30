@@ -44,7 +44,9 @@ import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (severity, prettyCheckErrorWithContext, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext(..), Severity(..), Substitution)
 import L4.Print (prettyLayout, prettyLayoutNF, ConstructorFieldNames, extractConstructorFieldNames)
-import L4.Syntax (Info(..), Type'(..), Resolved, OptionallyNamedType(..), TopDecl(..), Directive(..), Module(..), Section(..))
+import L4.Syntax (Info(..), Type'(..), Resolved, OptionallyNamedType(..), TopDecl(..), Module(..), Section(..), directiveLabel)
+import L4.Diagnostic (evalResultSeverity, evalResultSuccess)
+import qualified L4.Diagnostic as Diagnostic
 import L4.Annotation (emptyAnno)
 import qualified L4.Utils.IntervalMap as IV
 import qualified L4.EvaluateLazy as EL
@@ -218,10 +220,16 @@ l4SemanticTokens source =
 --   {
 --     "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 10 } },
 --     "result": "42",
---     "success": true
+--     "success": true,
+--     "severity": 3
 --   }
 -- ]
 -- @
+--
+-- A result's @success@ is @true@ for an answer and a satisfied assertion,
+-- @false@ for a failed assertion and an evaluation that raised, and @null@
+-- for a refusal, which is neither. Its @severity@ is the one the editor shows
+-- it with ('evalResultSeverity'): 1=Error, 2=Warning, 3=Info.
 --
 -- If there are parse or type errors, returns diagnostics instead.
 l4Eval :: Text -> IO Text
@@ -265,12 +273,13 @@ l4Eval source =
 
 -- | Evaluate a specific directive at a given source position.
 --
--- Returns JSON-encoded DirectiveResult:
+-- Returns JSON-encoded DirectiveResult, whose @success@ is the one 'l4Eval'
+-- gives the directive:
 -- @
 -- {
 --   "directiveType": "#EVAL",
 --   "prettyText": "\"String\"",
---   "success": null,
+--   "success": true,
 --   "structuredValue": "String"
 -- }
 -- @
@@ -316,15 +325,16 @@ l4EvalDirective source line col directiveType =
           in pure $ encodeJson $ Aeson.object
             [ "directiveType" .= directiveType
             , "prettyText" .= prettyEvalResult conFields res
-            , "success" .= case res of
-                EL.Assertion (Right b) -> Aeson.toJSON b
-                EL.Assertion (Left _)  -> Aeson.toJSON False
-                EL.Reduction _ -> Aeson.Null
+            , "success" .= evalResultSuccess res
             , "structuredValue" .= case res of
-                EL.Assertion (Right b) -> Aeson.toJSON b
-                EL.Assertion (Left _)  -> Aeson.Null
-                EL.Reduction (Left _) -> Aeson.Null
-                EL.Reduction (Right nf) -> Aeson.toJSON (prettyLayoutNF conFields nf)
+                EL.Assertion EL.Holds               -> Aeson.toJSON True
+                EL.Assertion EL.Fails               -> Aeson.toJSON False
+                EL.Assertion (EL.FailsBecause _)    -> Aeson.toJSON False
+                EL.Assertion (EL.Refused _)         -> Aeson.Null
+                EL.Assertion (EL.Errored _)         -> Aeson.Null
+                EL.Reduction (EL.ReducedErrored _)  -> Aeson.Null
+                EL.Reduction (EL.ReducedRefused _)  -> Aeson.Null
+                EL.Reduction (EL.Reduced nf)        -> Aeson.toJSON (prettyLayoutNF conFields nf)
             , "range" .= rangeJson
             ]
 
@@ -555,22 +565,19 @@ typeFunction _ = error "Internal error: negative arity of type constructor"
 evalResultToJson :: ConstructorFieldNames -> EL.EvalDirectiveResult -> Aeson.Value
 evalResultToJson fields edr = Aeson.object $
   [ "result" .= prettyEvalResult fields edr.result
-  , "success" .= isSuccess edr.result
+  , "success" .= evalResultSuccess edr.result
+  , "severity" .= Diagnostic.severityToInt (evalResultSeverity edr.result)
   ] ++
   case edr.range of
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
-  where
-    isSuccess (EL.Assertion (Right b)) = b
-    isSuccess (EL.Assertion (Left _)) = False
-    isSuccess (EL.Reduction (Right _)) = True
-    isSuccess (EL.Reduction (Left _)) = False
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text
-prettyEvalResult _fields (EL.Assertion a)          = EL.prettyAssertionOutcome a
-prettyEvalResult _fields (EL.Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
-prettyEvalResult fields  (EL.Reduction (Right v))  = prettyLayoutNF fields v
+prettyEvalResult _fields (EL.Assertion a)                       = EL.prettyAssertionOutcome a
+prettyEvalResult _fields (EL.Reduction (EL.ReducedErrored exc)) = Text.unlines (prettyEvalException exc)
+prettyEvalResult _fields (EL.Reduction (EL.ReducedRefused r))   = Text.unlines (EL.prettyRefusal r)
+prettyEvalResult fields  (EL.Reduction (EL.Reduced v))          = prettyLayoutNF fields v
 
 -- | Generate ladder diagram visualization data for a specific DECIDE rule by name.
 --
@@ -669,14 +676,6 @@ l4CodeLenses source uriText version =
               ]
           ]
       ]
-
-    directiveLabel :: Directive Resolved -> Text
-    directiveLabel = \case
-      LazyEval{}      -> "#EVAL"
-      LazyEvalTrace{} -> "#EVALTRACE"
-      Check{}         -> "#CHECK"
-      Contract{}      -> "#CHECK"
-      Assert{}        -> "#ASSERT"
 
     directiveToCodeLens :: Text -> Int -> TopDecl Resolved -> [Aeson.Value]
     directiveToCodeLens uriTxt ver = \case

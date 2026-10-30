@@ -1217,6 +1217,9 @@ formulaText e
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)
     Inert _ t _     -> Just (4, t)   -- a substituted parameter phrase
+    -- A refusal has no arithmetic reading; rendering it as prose inside a
+    -- formula would read as a quantity. Bail out of formula mode entirely.
+    Refuse{}        -> Nothing
     Proj _ a nm     -> do (_, t) <- go a; Just (4, t <> "'s " <> resolvedText nm)
     -- A non-arithmetic operand (a function call, projection chain, parameter …)
     -- becomes an inline atom rendered as prose, so a formula that mixes

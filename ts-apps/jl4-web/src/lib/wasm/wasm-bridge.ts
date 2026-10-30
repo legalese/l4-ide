@@ -127,7 +127,8 @@ export interface L4WasmExports {
    * @param uri - document URI
    * @param functionName - the DECIDE function name
    * @param bindingsJson - JSON object of {label: boolean} bindings
-   * @returns JSON-encoded QueryPlanResponse or error object
+   * @returns JSON-encoded QueryPlanResponse, the decline for a rule that may
+   *   refuse to answer (QueryPlanDecline), or an error object
    */
   l4_query_plan(
     source: string,
@@ -532,7 +533,8 @@ export class L4WasmBridge {
    * @param uri - document URI
    * @param functionName - the DECIDE function name
    * @param bindingsJson - JSON object of {label: boolean} bindings
-   * @returns parsed QueryPlanResponse, or an error object
+   * @returns parsed QueryPlanResponse, the decline for a rule that may refuse
+   *   to answer (QueryPlanDecline), or an error object
    */
   async queryPlan(
     source: string,
@@ -647,6 +649,11 @@ export type EvalResult = EvalResultSuccess | EvalResultFailure
 
 export interface EvalDirectiveResult {
   result: string
-  success: boolean
+  /** True for an answer or a satisfied assertion, false for a failed
+   * assertion or an evaluation that raised, null for a refusal. */
+  success: boolean | null
+  /** The LSP severity the editor shows the result with: 1 Error, 2 Warning,
+   * 3 Information. */
+  severity: number
   range?: Range
 }

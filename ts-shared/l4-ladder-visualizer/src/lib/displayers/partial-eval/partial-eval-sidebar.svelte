@@ -69,42 +69,50 @@
   {#if !analysis}
     <div class="text-xs text-muted-foreground mt-2">No analysis yet.</div>
   {:else}
-    <div class="bucket">
-      <div class="bucket-title">Still Needed</div>
-      {#if analysis.stillNeeded.length === 0}
-        <div class="bucket-empty">
-          {analysis.isDetermined ? 'Result determined.' : 'None (yet).'}
-        </div>
-      {:else}
-        <ul class="bucket-list">
-          {#each analysis.ranked as unique (unique)}
-            <li class="bucket-item relevant">
-              <span class="param-name">{labelFor(unique)}</span>
-              <div class="quick-assign">
-                <button
-                  class="btn t"
-                  onclick={() => assign(unique, new TrueVal())}
-                >
-                  T
-                </button>
-                <button
-                  class="btn f"
-                  onclick={() => assign(unique, new FalseVal())}
-                >
-                  F
-                </button>
-                <button
-                  class="btn u"
-                  onclick={() => assign(unique, new UnknownVal())}
-                >
-                  ?
-                </button>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
+    {#if analysis.declined !== undefined}
+      <!-- The rule may refuse to answer, so there is no plan: say why. -->
+      <div class="bucket">
+        <div class="bucket-title">No query plan</div>
+        <div class="bucket-empty">{analysis.declined}</div>
+      </div>
+    {:else}
+      <div class="bucket">
+        <div class="bucket-title">Still Needed</div>
+        {#if analysis.stillNeeded.length === 0}
+          <div class="bucket-empty">
+            {analysis.isDetermined ? 'Result determined.' : 'None (yet).'}
+          </div>
+        {:else}
+          <ul class="bucket-list">
+            {#each analysis.ranked as unique (unique)}
+              <li class="bucket-item relevant">
+                <span class="param-name">{labelFor(unique)}</span>
+                <div class="quick-assign">
+                  <button
+                    class="btn t"
+                    onclick={() => assign(unique, new TrueVal())}
+                  >
+                    T
+                  </button>
+                  <button
+                    class="btn f"
+                    onclick={() => assign(unique, new FalseVal())}
+                  >
+                    F
+                  </button>
+                  <button
+                    class="btn u"
+                    onclick={() => assign(unique, new UnknownVal())}
+                  >
+                    ?
+                  </button>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    {/if}
 
     <div class="bucket">
       <div class="bucket-title">Not Asked</div>
@@ -141,32 +149,36 @@
       {/if}
     </div>
 
-    <div class="bucket">
-      <div class="bucket-title">Moot</div>
-      {#if analysis.dontCare.length === 0}
-        <div class="bucket-empty">None.</div>
-      {:else}
-        <ul class="bucket-list">
-          {#each analysis.dontCare as unique (unique)}
-            <li class="bucket-item irrelevant">
-              <span class="param-name line-through opacity-70"
-                >{labelFor(unique)}</span
-              >
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-
-    <div class="bucket">
-      <div class="bucket-title">Simplified</div>
-      <pre class="expr">{analysis.restrictedExprText}</pre>
-      <div class="result">
-        Result: <span class="font-semibold"
-          >{analysis.overallResult.toPretty()}</span
-        >
+    {#if analysis.declined === undefined}
+      <div class="bucket">
+        <div class="bucket-title">Moot</div>
+        {#if analysis.dontCare.length === 0}
+          <div class="bucket-empty">None.</div>
+        {:else}
+          <ul class="bucket-list">
+            {#each analysis.dontCare as unique (unique)}
+              <li class="bucket-item irrelevant">
+                <span class="param-name line-through opacity-70"
+                  >{labelFor(unique)}</span
+                >
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </div>
-    </div>
+    {/if}
+
+    {#if analysis.declined === undefined}
+      <div class="bucket">
+        <div class="bucket-title">Simplified</div>
+        <pre class="expr">{analysis.restrictedExprText}</pre>
+        <div class="result">
+          Result: <span class="font-semibold"
+            >{analysis.overallResult.toPretty()}</span
+          >
+        </div>
+      </div>
+    {/if}
   {/if}
 </aside>
 

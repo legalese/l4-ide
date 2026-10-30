@@ -19,14 +19,14 @@ Each row yields a result envelope; by default the envelopes stream out as NDJSON
 
 ## Where it lives
 
-- `jl4/app/L4/Cli/Batch.hs` (977 lines); wired as the `batch` command at `jl4/app/Main.hs:91-97` and dispatched at `:159`.
-- Options: `BatchOptions` and `batchOptionsParser` (`Batch.hs:101-169`); `OutputFormat` = `FmtNdjson | FmtJson | FmtCsv | FmtYaml` (`:93-99`).
-- Driver: `batchCmd` (`:175-246`); row loops `streamRows` (`:261-281`) and `bufferRows` (`:283-301`); per-row `processRow` (`:303-374`), whose first clause answers a refused CSV record (`:317`).
-- Input: `BatchRow` and `RowSource` (`:463-476`), `parseBatchInput` (`:478-515`), `declareInputs` with `declaredInputs`, `expandSynonyms`, `throughMaybe`, `typeSynonyms`, `moduleDeclares`, `allDependencies`, `jsonNumber` and `jsonBool` (`:517-628`), the CSV reader `CsvRow` and `csvRows` (`:630-721`) with `unclosedQuote` (`:723-760`), and `inferCsvCell` (`:762-785`).
+- `jl4/app/L4/Cli/Batch.hs`; wired as the `batch` command at `jl4/app/Main.hs:91-97` and dispatched at `:159`.
+- Options: `BatchOptions` and `batchOptionsParser`; `OutputFormat` = `FmtNdjson | FmtJson | FmtCsv | FmtYaml`.
+- Driver: `batchCmd`; row loops `streamRows` and `bufferRows`; per-row `processRow`, whose first clause answers a refused CSV record.
+- Input: `BatchRow` and `RowSource`, `parseBatchInput`, `declareInputs` with `declaredInputs`, `expandSynonyms`, `throughMaybe`, `typeSynonyms`, `moduleDeclares`, `allDependencies`, `jsonNumber` and `jsonBool`, the CSV reader `CsvRow` and `csvRows` with `unclosedQuote`, and `inferCsvCell`.
 - `jl4-core/src/L4/EvaluateLazy/Machine.hs:1548-1577`: `expandTypeSynonyms` and `substituteTypeParams`, which `jsonValueToWHNFTyped` (`:1384-1546`) calls for a type and for each record field, so that a synonym decodes as what it stands for (#646).
-- Validation: `validateRow`, `primKind`, `unwrapMaybe` (`:387-442`).
-- Output: `writeBuffered`, `encodeJsonArray`, `encodeCsv`, `orderedEnvCols`, `flattenEnvelope` (`:791-852`).
-- Wrapper generation: `generateBatchWrapper` and helpers (`:868-958`); the row's JSON is quoted into the wrapper by `escapeAsL4String` (`:916-935`), which `cli-quoting.md` describes; entrypoint choice `findExportFunction` (`:964-977`).
+- Validation: `validateRow`, `primKind`, `unwrapMaybe`.
+- Output: `writeBuffered`, `encodeJsonArray`, `encodeCsv`, `orderedEnvCols`, `flattenEnvelope`.
+- Wrapper generation: `generateBatchWrapper` and helpers; the row's JSON is quoted into the wrapper by `escapeAsL4String`, which `cli-quoting.md` describes; entrypoint choice `findExportFunction`.
 
 ## Behaviour and rules
 
@@ -58,12 +58,12 @@ Parameters: the export's GIVENs become call arguments.
 Evaluation pipeline, read in code: the checked module goes through `filterIdeDirectives` (dropping every `#EVAL`/`#ASSERT`) and is re-emitted as source by `prettyLayout` (`:218-219`).
 A string literal in that printed source has its line breaks, tabs and carriage returns written as escapes (`escapeSourceStringLiteral`, `jl4-core/src/L4/Print.hs:1017-1022`, used at `:701`), because a raw newline would become a layout line break that takes the body's indentation (smucclaw/l4-ide#1028, from #595).
 Per row, a generated wrapper is appended to that text: `DECLARE InputArgs HAS …`, a `decodeArgs` function using `JSONDECODE`, `DECIDE inputJson IS "<row JSON>"`, and one `#EVAL` of `CONSIDER decodeArgs inputJson` applying the export.
-The combined text is registered as the virtual file `<FILE>.batch<N>.l4`, next to FILE, and evaluated with `Rules.EvaluateLazy` in a fresh one-shot build (`:345-351`).
+The combined text is registered as the virtual file `<FILE>.batch<N>.l4`, next to FILE, and evaluated with `Rules.EvaluateLazy` in a fresh one-shot build (`processRow`).
 Envelope (evaluate mode): `{input, output, status, diagnostics}`; `output` is the array of directive results, e.g. `[{"result":20,"trace":null}]`.
-The status is `error` if the wrapper failed to check (then `output` is `null`) or any directive raised an evaluation exception, else `success` (`:352-370`).
+The status is `error` if the wrapper failed to check (then `output` is `null`) or any directive raised an evaluation exception other than a refusal, else `refused` if a directive refused (the reason under the result's `refused` and in `diagnostics`; `specs/as-built/refuse.md`), else `success` (`processRow`).
 Envelope (`--validate-only`, no evaluation): `{input, status: valid|invalid, errors}`.
 Validation checks, on the typed case, that each required (non-`MAYBE`) parameter is present and non-null, and that NUMBER, BOOLEAN and STRING values (after unwrapping `MAYBE`) have the right JSON kind; compound types are not judged.
-Failure and exit: a row with status `error` or `invalid` is a failure, and so is a refused CSV record (below); without `-c` the run stops after emitting that row; with `-c` every row is processed; the exit code is 1 if any row failed, else 0.
+Failure and exit: a row with status `error` or `invalid` is a failure, and so is a refused CSV record (below); a row with status `refused` is not; without `-c` the run stops after emitting a failing row; with `-c` every row is processed; the exit code is 1 if any row failed, else 0.
 Output: NDJSON is written and flushed row by row without keeping the list of envelopes; `json` is an array with one compact envelope per line; `yaml` is a YAML sequence; `csv` has sorted `input_<field>` columns, then `output`, `status`, `errors`, `diagnostics` where present, with compound cells encoded as compact JSON.
 
 ## Diagnostics
@@ -211,5 +211,4 @@ The command, the options it had, the output keys and `main`'s backtick-quoting o
 - #595: its change to the `Inert` arm of the printer is not here; `main` prints an inert string as `"..." <+> dquotes (pretty txt)` (`Print.hs:561-562`), which needs its own change first.
 - #328: read ASSUMEs are bound by name via `rewriteModuleAssumes`, not passed as positional arguments.
 - #330: an `#ASSERT` that raises counts as a row exception.
-- #334: the `refused` status, which neither fails nor stops the batch.
 - #440: `restoreMixfixPatterns` runs before printing, so operators sharing a head keyword survive the re-print.

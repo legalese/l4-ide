@@ -1,0 +1,100 @@
+-- #ASSERT REFUSED with its BECAUSE in each layout L4 reads, and reasons that
+-- hold an escaped quotation mark and an escaped line break. Every assertion
+-- here holds on every surface that reads a file's directives. The cases run
+-- the rules on every surface that takes a call, the service's generated
+-- wrapper among them, which evaluates the module with its directives taken
+-- out. See boolean-rules.l4 for what an "agreement:" line says, and for
+-- `pad`. The test runs a copy of this file whose lines end in CRLF as well.
+--
+-- agreement: also run with CRLF line endings
+--
+-- agreement: `the toll` may refuse with ["a \"free\" toll is not modelled"]
+-- agreement: `the toll` {"year": 1995} => refuses "a \"free\" toll is not modelled"
+-- agreement: `the toll` {"year": 2001} => answers 5
+--
+-- agreement: `the charge` may refuse with ["charges before 2000:\nnot encoded"]
+-- agreement: `the charge` {"year": 1985} => refuses "charges before 2000:\nnot encoded"
+-- agreement: `the charge` {"year": 2001} => answers 5
+--
+-- agreement: fee may refuse with ["not modelled"]
+-- agreement: fee {"y": 1999} => refuses "not modelled"
+-- agreement: fee {"y": 2001} => answers 100
+--
+-- agreement: sectioned may refuse with ["not modelled"]
+-- agreement: sectioned {"y": 1999} => refuses "not modelled"
+-- agreement: sectioned {"y": 2001} => answers 100
+
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "not modelled"
+
+@export the toll for a year
+GIVEN year IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`the toll` year pad MEANS
+  IF year AT LEAST 2000 THEN 5 ELSE REFUSE "a \"free\" toll is not modelled"
+
+@export the charge for a year
+GIVEN year IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+`the charge` year pad MEANS
+  IF year AT LEAST 2000 THEN 5 ELSE REFUSE "charges before 2000:\nnot encoded"
+
+@export the fee for a year
+GIVEN y IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+fee y pad MEANS
+    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`
+
+-- BECAUSE on the line of the #ASSERT.
+#ASSERT REFUSED `the toll` 1995 NOTHING BECAUSE "a \"free\" toll is not modelled"
+
+-- BECAUSE on a line of its own, indented by spaces.
+#ASSERT REFUSED `the charge` 1985 NOTHING
+  BECAUSE "charges before 2000:\nnot encoded"
+
+-- BECAUSE on a line of its own, indented by a tab.
+#ASSERT REFUSED fee 1999 NOTHING
+	BECAUSE "not modelled"
+
+-- BECAUSE after a blank line.
+#ASSERT REFUSED fee 1999 NOTHING
+
+  BECAUSE "not modelled"
+
+#ASSERT fee 2001 NOTHING EQUALS 100
+
+-- In a section whose items are indented by four spaces: BECAUSE indented by
+-- a tab, by spaces, and by spaces after a line of two spaces alone.
+§ `Spaces`
+    #ASSERT REFUSED fee 1999 NOTHING
+	BECAUSE "not modelled"
+
+    #ASSERT REFUSED fee 1999 NOTHING
+      BECAUSE "not modelled"
+
+    #ASSERT REFUSED fee 1999 NOTHING
+  
+      BECAUSE "not modelled"
+
+-- In a section whose items are indented by a tab: BECAUSE indented by two.
+§ `Tabs`
+	#ASSERT REFUSED fee 1999 NOTHING
+		BECAUSE "not modelled"
+
+-- In a section whose items are indented by eight spaces, and by two spaces
+-- and a tab, which reach the same column: the rule after the #ASSERT REFUSED
+-- is a rule of the section.
+§ `Columns`
+        #ASSERT REFUSED `not modelled` BECAUSE "not modelled"
+
+  	@export the fee for a year, in a section
+  	GIVEN y IS A NUMBER
+  	      pad IS A MAYBE NUMBER
+  	GIVETH A NUMBER
+  	sectioned y pad MEANS
+  	    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`
+
+  	#ASSERT sectioned 2001 NOTHING EQUALS 100

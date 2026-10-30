@@ -21,6 +21,7 @@ import L4.FindDefinition
 import L4.Lexer (annotations, directives, keywords)
 import L4.Parser.SrcSpan
 import L4.Print
+import L4.Refusal (PlanDecline, planDecline)
 import L4.Syntax
 import L4.TypeCheck
 import qualified L4.Evaluate.ValueLazy   as EL
@@ -136,24 +137,42 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
       let appExpr = evalAppMaker evalParams
       res <- liftIO $ EL.execEvalExprInContextOfModule evalConfig entityInfo appExpr contextModule
       case res of
-        Just evalRes -> Aeson.toJSON <$> evalResultToLadderEvalAppResult evalRes
+        Just (EL.MkEvalDirectiveResult _ v _mtrace) ->
+          either throwError (pure . Aeson.toJSON) (ladderEvalAppResult v)
         Nothing -> defaultResponseError "No eval result found"
-  where
-    evalResultToLadderEvalAppResult :: EL.EvalDirectiveResult -> ExceptT (TResponseError method) m EvalAppResult
-    evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace) = case res of
-      EL.Assertion (Right b)  -> pure $ EvalAppResult (toUBoolValue b)
-      EL.Assertion (Left err) -> defaultResponseError $ EL.prettyAssertionOutcome (Left err)
-      EL.Reduction v ->
-        case v of
-          Right (EL.MkNF val) ->
-            case EL.boolView val of
-              Just b  -> pure $ EvalAppResult (toUBoolValue b)
-              Nothing -> throwExpectBoolResultError
-          Right EL.Omitted   -> defaultResponseError "Evaluation exceeded maximum depth limit"
-          Left err           -> defaultResponseError $ Text.unlines $ EL.prettyEvalException err
 
-    throwExpectBoolResultError :: ExceptT (TResponseError method) m a
-    throwExpectBoolResultError = defaultResponseError "Ladder visualizer is expecting a boolean result (and it should be impossible to have got a fn with a non-bool return type in the first place)"
+-- | The ladder's answer to the evaluation of an application: a value, or the
+-- error response 'evalApp' answers with. A refusal is answered with an error
+-- response, as an evaluation that raises is, and the response's data is the
+-- refusal ('EL.refusalMarker'), so a client can tell the two apart. Every
+-- other error response carries no data.
+ladderEvalAppResult
+  :: EL.EvalDirectiveValue
+  -> Either (TResponseError ('Method_CustomMethod Ladder.EvalAppMethodName)) EvalAppResult
+ladderEvalAppResult = \case
+  -- evalApp evaluates its application as an #EVAL
+  -- ('EL.execEvalExprInContextOfModule'), whose value is a 'EL.Reduction', so
+  -- it does not reach the 'EL.Assertion' arms; they answer as the
+  -- 'EL.Reduction' arms do, for any other caller.
+  EL.Assertion EL.Holds   -> Right $ EvalAppResult (toUBoolValue True)
+  EL.Assertion EL.Fails   -> Right $ EvalAppResult (toUBoolValue False)
+  EL.Assertion a@(EL.FailsBecause _) -> noAnswer $ EL.prettyAssertionOutcome a
+  EL.Assertion a@(EL.Refused r)      -> refusedWith (EL.prettyAssertionOutcome a) r
+  EL.Assertion a@(EL.Errored _)      -> noAnswer $ EL.prettyAssertionOutcome a
+  EL.Reduction v ->
+    case v of
+      EL.Reduced (EL.MkNF val) ->
+        case EL.boolView val of
+          Just b  -> Right $ EvalAppResult (toUBoolValue b)
+          Nothing -> noAnswer "Ladder visualizer is expecting a boolean result (and it should be impossible to have got a fn with a non-bool return type in the first place)"
+      EL.Reduced EL.Omitted -> noAnswer "Evaluation exceeded maximum depth limit"
+      EL.ReducedRefused r   -> refusedWith (Text.unlines (EL.prettyRefusal r)) r
+      EL.ReducedErrored err -> noAnswer $ Text.unlines $ EL.prettyEvalException err
+  where
+    noAnswer _message =
+      Left TResponseError { _code = InL LSPErrorCodes_RequestFailed, _xdata = Nothing, _message }
+    refusedWith _message r =
+      Left TResponseError { _code = InL LSPErrorCodes_RequestFailed, _xdata = Just (EL.refusalMarker r), _message }
 
     toUBoolValue :: Bool -> Ladder.UBoolValue
     toUBoolValue b = if b then Ladder.TrueV else Ladder.FalseV
@@ -175,7 +194,7 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
   let uri = verTextDocId._uri
 
   -- Try to pinpoint a Decide (and VizConfig) based on how the command was issued (autorefresh vs code action/code lens)
-  mdecide :: Maybe (Decide Resolved, Ladder.VizConfig) <- case msrcPos of
+  mdecide :: Maybe (Decide Resolved, Ladder.VizConfig, Maybe PlanDecline) <- case msrcPos of
     -- a. the command was issued by autorefresh
     -- NOTE: when we get the typecheck results via autorefresh, we can be lenient about it, i.e. we return 'Nothing
     -- exits by returning Nothing instead of throwing an error
@@ -185,7 +204,7 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
       -- Since this is from autorefresh, we want to get the most up-to-date version of the Decide
       decide <- hoistMaybe $ (.getOne) $  foldTopLevelDecides (matchOnAvailableDecides recentlyVisualised) tcRes.module'
       let updatedVizConfig = updateVizConfig verTextDocId tcRes recentlyVisualised
-      pure (decide, updatedVizConfig)
+      pure (decide, updatedVizConfig, drawnDecline tcRes decide)
 
     -- b. the command was issued by a code action or codelens
     Just (srcPos, simp) -> do
@@ -196,29 +215,30 @@ visualise mtcRes (getRecVis, setRecVis) verTextDocId msrcPos = do
       case foldTopLevelDecides (\d -> [d | decideNodeStartsAtPos srcPos d]) tcRes.module' of
         [decide] ->
           let vizConfig = Ladder.mkVizConfig verTextDocId tcRes.module' tcRes.substitution simp
-          in pure $ Just (decide, vizConfig)
+          in pure $ Just (decide, vizConfig, drawnDecline tcRes decide)
         -- NOTE: if this becomes a problem, we should use
         -- https://hackage.haskell.org/package/lsp-types-2.3.0.1/docs/Language-LSP-Protocol-Types.html#t:VersionedTextDocumentIdentifier
         _ -> defaultResponseError "The program was changed in the time between pressing the code lens and rendering the program"
 
   -- Makes a 'RecentlyVisualised' iff the given 'Decide' has a valid range and a resolved type.
   -- Assumes the vizConfig in the given vizState is up-to-date.
-  let recentlyVisualisedDecide decide@(MkDecide Anno {range = Just range, extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} _tydec appform _expr) vizState
+  let recentlyVisualisedDecide decide@(MkDecide Anno {range = Just range, extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} _tydec appform _expr) vizState decline
         = Just RecentlyVisualised
           { pos = range.start
           , name = rawName $ getName appform
           , type' = applyFinalSubstitution (Ladder.getVizConfig vizState).substitution (Ladder.getVizConfig vizState).moduleUri ty
           , vizState = vizState
           , decide
+          , decline
           }
-      recentlyVisualisedDecide _ _ = Nothing
+      recentlyVisualisedDecide _ _ _ = Nothing
 
   case mdecide of
     Nothing -> pure (InR Null)
-    Just (decide, vizConfig) ->
+    Just (decide, vizConfig, decline) ->
       case Ladder.doVisualize decide vizConfig of
         Right (vizProgramInfo, vizState) -> do
-          traverse_ (lift . setRecVis) $ recentlyVisualisedDecide decide vizState
+          traverse_ (lift . setRecVis) $ recentlyVisualisedDecide decide vizState decline
           pure $ InL $ Aeson.toJSON (VizQueryPlan.annotateLadderWithAtomIds vizProgramInfo vizState)
         Left vizError ->
           defaultResponseError $ Text.unlines
@@ -270,6 +290,13 @@ decideNodeStartsAtPos :: SrcPos -> Decide Resolved -> Bool
 decideNodeStartsAtPos pos d = Just pos == do
   node <- rangeOfNode d
   pure node.start
+
+-- | The query planner's answer for a rule whose decision graph is drawn, in
+-- place of a plan, if the rule may refuse to answer ('planDecline'): read
+-- from the rule as the type check the graph is drawn from has it, through
+-- that type check's module and every module it imports.
+drawnDecline :: TypeCheckResult -> Decide Resolved -> Maybe PlanDecline
+drawnDecline tcRes = planDecline (tcRes.module' : map (.module') (transitiveDependencies tcRes))
 
 -- ----------------------------------------------------------------------------
 -- LSP Code Actions

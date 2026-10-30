@@ -1,0 +1,15 @@
+-- #ASSERT REFUSED, in each way it can come out other than satisfied.
+--
+-- 1. the expression answers, so nothing was refused
+-- 2. it refuses, for a different reason than the BECAUSE names
+-- 3. it raises an error, which is not a refusal
+
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "this case is not modelled"
+
+GIVETH A NUMBER
+`modelled` MEANS 1
+
+#ASSERT REFUSED `modelled`
+#ASSERT REFUSED `not modelled` BECAUSE "some other reason"
+#ASSERT REFUSED (1 DIVIDED BY 0)

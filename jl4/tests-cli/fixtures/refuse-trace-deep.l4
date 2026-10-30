@@ -1,0 +1,7 @@
+-- Typechecks cleanly. Each directive traces an expression whose answer
+-- refuses only below its head: inside a JUST, and at the end of a list.
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "not modelled"
+
+#EVALTRACE JUST `not modelled`
+#EVALTRACE LIST 1, 2, `not modelled`

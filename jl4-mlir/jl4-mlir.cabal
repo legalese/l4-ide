@@ -96,9 +96,15 @@ test-suite jl4-mlir-test
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
+  build-tool-depends:
+    jl4-mlir:jl4-mlir
   build-depends:
     aeson,
     bytestring,
+    directory,
+    filepath,
     jl4-core,
     jl4-mlir,
+    process,
+    temporary,
     text >= 2 && < 2.1.2,

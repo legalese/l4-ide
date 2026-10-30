@@ -33,11 +33,12 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException, prettyAssertionOutcome)
+import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyRefusal)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (replDefaultPolicy)
 import L4.DirectiveFilter (filterIdeDirectives)
+import L4.Refusal (declineMessage, planDecline)
 import qualified L4.Print as Print
 import L4.Syntax (Module (..), Resolved, RawName (..), Unique, rawName, rawNameToText, getActual, Name (..), Decide (..), TopDecl (..), Section (..), AppForm (..))
 import L4.Annotation (Anno_(..))
@@ -469,6 +470,12 @@ queryPlanCommand st fp argText = do
       case (selected, bindings) of
         (Left err, _) -> pure err
         (_, Left err) -> pure err
+        -- A rule that may refuse to answer gets no plan, whatever the inputs
+        -- given: the decline, read from what the rule and the definitions it
+        -- calls are written to do, through every module it imports, says why.
+        (Right (_, decide), Right _)
+          | Just declined <- planDecline (tc.module' : map (.module') (Rules.transitiveDependencies tc)) decide ->
+              pure (declineMessage declined)
         (Right (funName, decide), Right flattenedLabelBindings) -> do
           let contextUri = normalizedFilePathToUri (toNormalizedFilePath fp)
           let verDocId =
@@ -644,11 +651,23 @@ formatResults results = Text.unlines $ map formatResult results
 
 formatResult :: EvalDirectiveResult -> Text
 formatResult (MkEvalDirectiveResult _range res _trace) = case res of
-  Assertion (Right True)  -> "True (assertion passed)"
-  Assertion (Right False) -> "False (assertion failed)"
-  Assertion (Left err)    -> "Error: " <> prettyAssertionOutcome (Left err)
-  Reduction (Right nf) -> Print.prettyLayout nf
-  Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
+  Assertion Holds            -> "True (assertion passed)"
+  Assertion Fails            -> "False (assertion failed)"
+  Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"
+  -- A refusal is not an error: the model declined to answer and said why.
+  Assertion (Refused r)      -> refusedReply r
+  Assertion a@(Errored _)    -> "Error: " <> prettyAssertionOutcome a
+  Reduction (Reduced nf)     -> Print.prettyLayout nf
+  Reduction (ReducedRefused r) -> refusedReply r
+  Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
+
+-- | "Refused: " and the reason, every further line of a reason that runs over
+-- several lines standing under its first.
+refusedReply :: Refusal -> Text
+refusedReply r =
+  prefix <> Text.intercalate ("\n" <> Text.map (const ' ') prefix) (Text.splitOn "\n" r.message)
+  where
+    prefix = "Refused: "
 
 -- | Evaluate an expression and show its GraphViz trace
 evalWithTrace :: ReplState -> FilePath -> Text -> IO Text
@@ -755,11 +774,14 @@ formatAsciiTraceResults results = Text.unlines $ map formatAsciiTraceResult resu
 formatAsciiTraceResult :: EvalDirectiveResult -> Text
 formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace) =
   let resultText = case res of
-        Assertion (Right True)  -> "Result: True (assertion passed)"
-        Assertion (Right False) -> "Result: False (assertion failed)"
-        Assertion (Left err)    -> "Error: " <> prettyAssertionOutcome (Left err)
-        Reduction (Right nf) -> "Result: " <> Print.prettyLayout nf
-        Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
+        Assertion Holds              -> "Result: True (assertion passed)"
+        Assertion Fails              -> "Result: False (assertion failed)"
+        Assertion a@(FailsBecause _) -> "Result: False (" <> prettyAssertionOutcome a <> ")"
+        Assertion (Refused r)        -> refusedReply r
+        Assertion a@(Errored _)      -> "Error: " <> prettyAssertionOutcome a
+        Reduction (Reduced nf)         -> "Result: " <> Print.prettyLayout nf
+        Reduction (ReducedRefused r)   -> refusedReply r
+        Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
   in case mtrace of
     Nothing -> resultText <> "\n(no trace available)"
     Just tr -> resultText <> "\n\nTrace:\n" <> Print.prettyLayout tr
@@ -831,12 +853,15 @@ inlineSingleLine txt =
 
 summarizeEvalResult :: EvalDirectiveResult -> Text
 summarizeEvalResult (MkEvalDirectiveResult _range res _trace) = case res of
-  Assertion (Right True)  -> "True (assertion passed)"
-  Assertion (Right False) -> "False (assertion failed)"
-  Assertion (Left err)    ->
+  Assertion Holds              -> "True (assertion passed)"
+  Assertion Fails              -> "False (assertion failed)"
+  Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"
+  Assertion (Refused r)        -> Text.intercalate "; " ("Refused" : prettyRefusal r)
+  Assertion (Errored err)      ->
     Text.intercalate "; " ("Error" : "assertion could not be evaluated" : prettyEvalException err)
-  Reduction (Right nf) -> Print.prettyLayout nf
-  Reduction (Left err)  ->
+  Reduction (Reduced nf)         -> Print.prettyLayout nf
+  Reduction (ReducedRefused r)   -> Text.intercalate "; " ("Refused" : prettyRefusal r)
+  Reduction (ReducedErrored err) ->
     Text.intercalate "; " ("Error" : prettyEvalException err)
 
 -- | Get information about a name (type and definition)
@@ -1010,6 +1035,7 @@ helpText = Text.unlines
   , "  <expr>             Evaluate expression (implicit #EVAL)"
   , "  #EVAL <expr>       Evaluate expression and show result"
   , "  #ASSERT <expr>     Evaluate boolean expression, report pass/fail"
+  , "  #ASSERT REFUSED <expr> [BECAUSE \"reason\"]   Pass if the expression refuses (with that reason, if named)"
   , "  #EVALTRACE <expr>  Evaluate with trace output"
   , ""
   , "Trace visualization:"

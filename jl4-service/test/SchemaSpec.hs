@@ -79,6 +79,49 @@ spec = do
           [ "@id" Aeson..= (2 :: Int), "value" Aeson..= (8 :: Int) ]
       it "reads both back as they were written" do
         Aeson.fromJSON (Aeson.toJSON [errored, answered]) `shouldBe` Aeson.Success [errored, answered]
+      -- A case that refused carries the refusal under @refused, and is read
+      -- back as refused: not as an error, and not as an answer whose result
+      -- is named "@refused".
+      it "reads a refused case as neither an answer nor an error, and writes it back as it was" do
+        let refusedCase = Aeson.object
+              [ "@id" Aeson..= (3 :: Int)
+              , "@refused" Aeson..= refusal ]
+            isErrored = \case
+              CaseErrored _ -> True
+              _ -> False
+        case Aeson.fromJSON refusedCase :: Aeson.Result OutputCase of
+          Aeson.Success c -> do
+            (c.id, Map.null c.attributes, c.outcome == CaseAnswered, isErrored c.outcome)
+              `shouldBe` (3, True, False, False)
+            Aeson.toJSON c `shouldBe` refusedCase
+          Aeson.Error e -> expectationFailure e
+      -- Only a refusal is read as one: an @refused of another kind is no
+      -- case at all.
+      it "reads no case from an @refused whose kind is not \"refused\"" do
+        let otherKind = Aeson.object
+              [ "@id" Aeson..= (4 :: Int)
+              , "@refused" Aeson..= Aeson.object
+                  [ "kind" Aeson..= ("other" :: Text.Text)
+                  , "reason" Aeson..= ("not modelled" :: Text.Text) ] ]
+        case Aeson.fromJSON otherKind :: Aeson.Result OutputCase of
+          Aeson.Success c -> expectationFailure ("read a case: " <> show c)
+          Aeson.Error _ -> pure ()
+
+    -- A refusal is answered in the slot of an error, and written as the
+    -- refusal and its reason: in a 422's contents, as here, in a batch case's
+    -- @refused, and in an MCP tool result.
+    describe "a refusal in the place of an error" do
+      it "reads a refusal as an EvaluatorError and writes it back as it was" do
+        fmap Aeson.toJSON (Aeson.fromJSON refusal :: Aeson.Result EvaluatorError)
+          `shouldBe` Aeson.Success refusal
+      it "reads a response that refused and writes it back as it was" do
+        let body = Aeson.object ["tag" Aeson..= ("Error" :: Text.Text), "contents" Aeson..= refusal]
+        fmap Aeson.toJSON (Aeson.fromJSON body :: Aeson.Result SimpleResponse)
+          `shouldBe` Aeson.Success body
+ where
+  refusal = Aeson.object
+    [ "kind" Aeson..= ("refused" :: Text.Text)
+    , "reason" Aeson..= ("not modelled" :: Text.Text) ]
 
 -- ----------------------------------------------------------------------------
 -- Arbitrary instances
@@ -124,7 +167,7 @@ instance Arbitrary ResponseWithReason where
   arbitrary = ResponseWithReason <$> arbitrary <*> pure emptyTree <*> pure Nothing
 
 instance Arbitrary EvaluatorError where
-  arbitrary = Q.oneof [InterpreterError <$> arbitrary]
+  arbitrary = Q.oneof [InterpreterError <$> arbitrary, EvaluatorRefused <$> arbitrary]
 
 instance Arbitrary SimpleResponse where
   arbitrary =
@@ -207,7 +250,7 @@ instance Arbitrary OutputCase where
       <$> arbitrary
       <*> arbitrary
       <*> pure Nothing  -- Exclude GraphViz from QuickCheck
-      <*> Q.oneof [ pure CaseAnswered, CaseErrored <$> arbitrary ]
+      <*> Q.oneof [ pure CaseAnswered, CaseErrored <$> arbitrary, CaseRefused <$> arbitrary ]
 
 instance Arbitrary OutputSummary where
   arbitrary =

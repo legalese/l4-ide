@@ -1,0 +1,42 @@
+-- The agreement corpus: small programs that may refuse to answer, each line
+-- below that starts "agreement:" a verdict that every surface must give.
+-- jl4/tests-agreement runs each case through every surface and checks that
+-- it gives core's verdict, and that core gives the one written here.
+--
+-- Every rule takes an input `pad`, which it does not read. The test gives it
+-- a number to have the service evaluate a call on its direct path, and {} to
+-- have it evaluate the call through its generated wrapper.
+--
+-- Two rules that answer TRUE or FALSE and may refuse: one through a
+-- definition this file imports, one with a reason of its own as well. Every
+-- assignment of a rule's inputs is a case.
+--
+-- agreement: covered may refuse with ["insurance is not modelled"]
+-- agreement: covered {"adult": true, "applicant": true} => answers true
+-- agreement: covered {"adult": true, "applicant": false} => refuses "insurance is not modelled"
+-- agreement: covered {"adult": false, "applicant": true} => answers false
+-- agreement: covered {"adult": false, "applicant": false} => answers false
+--
+-- agreement: checked may refuse with ["insurance is not modelled", "minors are not modelled"]
+-- agreement: checked {"adult": true, "applicant": true} => answers true
+-- agreement: checked {"adult": true, "applicant": false} => refuses "insurance is not modelled"
+-- agreement: checked {"adult": false, "applicant": true} => refuses "minors are not modelled"
+-- agreement: checked {"adult": false, "applicant": false} => refuses "minors are not modelled"
+
+IMPORT insurance
+
+@export whether the applicant is covered
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE covered IF adult AND `the person is insured` applicant
+
+@export whether the applicant is checked
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE checked IF
+    IF adult THEN `the person is insured` applicant
+    ELSE REFUSE "minors are not modelled"

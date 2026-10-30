@@ -45,6 +45,7 @@ Choose between cases.
 | [IF](control-flow/IF.md)             | A choice between two values; several conditions                  |
 | [BRANCH](control-flow/BRANCH.md)     | Several conditions checked in order, with an OTHERWISE           |
 | [CONSIDER](control-flow/CONSIDER.md) | Choosing by the shape of a value; missing and redundant branches |
+| [REFUSE](control-flow/REFUSE.md)     | Declining to answer, with a reason; testing a refusal            |
 
 ### [Operators](operators/README.md)
 

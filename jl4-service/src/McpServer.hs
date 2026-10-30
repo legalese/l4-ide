@@ -45,7 +45,7 @@ import Control.Exception (SomeException, catch)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import System.Timeout (timeout)
 
-import Backend.Api (EvalBackend (..), FnLiteral (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
+import Backend.Api (EvalBackend (..), EvaluatorError (..), FnLiteral (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
 import Options (Options (..))
 
 -- ----------------------------------------------------------------------------
@@ -513,64 +513,52 @@ buildArgPairs reverseMap isDeontic arguments = case arguments of
         ]
   _ -> []
 
--- | Convert the synchronous evaluation result (Left err | Right resultText)
--- into the MCP @tools/call@ JSON-RPC response shape.
-evalResultToToolResponse :: Maybe Aeson.Value -> Map Text Text -> Either Text Text -> Aeson.Value
-evalResultToToolResponse reqId reverseMap = \case
-  Left errMsg ->
-    let sanitizedErr = sanitizeFieldNamesInText reverseMap errMsg
-    in jsonRpcResult reqId $ Aeson.object
-        [ "content" .= [ Aeson.object
-            [ "type" .= ("text" :: Text)
-            , "text" .= sanitizedErr
-            ]
-          ]
-        , "isError" .= True
-        ]
-  Right resultVal ->
-    jsonRpcResult reqId $ Aeson.object
-      [ "content" .= [ Aeson.object
-          [ "type" .= ("text" :: Text)
-          , "text" .= resultVal
-          ]
-        ]
-      ]
+-- | How an MCP evaluation came out: the encoded answer; the encoded
+-- refusal, the same JSON an evaluation request's 422 carries; or the message
+-- of an error.
+data ToolOutcome
+  = ToolAnswered Text
+  | ToolRefused Text
+  | ToolFailed Text
+
+-- | Convert the synchronous evaluation result into the MCP @tools/call@
+-- JSON-RPC response shape.
+evalResultToToolResponse :: Maybe Aeson.Value -> Map Text Text -> ToolOutcome -> Aeson.Value
+evalResultToToolResponse reqId reverseMap = jsonRpcResult reqId . evalResultToToolPayload reverseMap
 
 -- | Like 'evalResultToToolResponse' but produces ONLY the result body
 -- (omitting JSON-RPC envelope). Used to store completed-task payloads.
-evalResultToToolPayload :: Map Text Text -> Either Text Text -> Aeson.Value
+--
+-- A refusal is a result with @isError@, as an error is, and its text is the
+-- refusal as the service writes it everywhere, with the reason as its author
+-- wrote it. An error's message has the request's field names put back.
+evalResultToToolPayload :: Map Text Text -> ToolOutcome -> Aeson.Value
 evalResultToToolPayload reverseMap = \case
-  Left errMsg ->
-    let sanitizedErr = sanitizeFieldNamesInText reverseMap errMsg
-    in Aeson.object
-        [ "content" .= [ Aeson.object
-            [ "type" .= ("text" :: Text)
-            , "text" .= sanitizedErr
-            ]
-          ]
-        , "isError" .= True
-        ]
-  Right resultVal ->
-    Aeson.object
-      [ "content" .= [ Aeson.object
-          [ "type" .= ("text" :: Text)
-          , "text" .= resultVal
-          ]
+  ToolFailed errMsg -> toolBody (sanitizeFieldNamesInText reverseMap errMsg) True
+  ToolRefused refusal -> toolBody refusal True
+  ToolAnswered resultVal -> toolBody resultVal False
+ where
+  toolBody content flagged = Aeson.object $
+    [ "content" .= [ Aeson.object
+        [ "type" .= ("text" :: Text)
+        , "text" .= content
         ]
       ]
+    ]
+    <> [ "isError" .= True | flagged ]
 
 -- | Run evaluation for an MCP tool call.
-runMcpEvaluation :: ValidatedFunction -> [(Text, Maybe FnLiteral)] -> AppM (Either Text Text)
+runMcpEvaluation :: ValidatedFunction -> [(Text, Maybe FnLiteral)] -> AppM ToolOutcome
 runMcpEvaluation vf args = do
   cfg <- asks (.options)
   liftIO $ runMcpEvaluationIO cfg vf args
 
-runMcpEvaluationIO :: Options -> ValidatedFunction -> [(Text, Maybe FnLiteral)] -> IO (Either Text Text)
+runMcpEvaluationIO :: Options -> ValidatedFunction -> [(Text, Maybe FnLiteral)] -> IO ToolOutcome
 runMcpEvaluationIO cfg vf args = do
   let timeoutMicros = cfg.evalTimeout * 1_000_000
       memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
   case Map.lookup JL4 vf.fnEvaluator of
-    Nothing -> pure $ Left "No evaluator available"
+    Nothing -> pure $ ToolFailed "No evaluator available"
     Just runFn -> do
       mResult <- (timeout timeoutMicros $ do
           setAllocationCounter memLimitBytes
@@ -582,12 +570,16 @@ runMcpEvaluationIO cfg vf args = do
         ) `catch` \AllocationLimitExceeded ->
           pure Nothing
       case mResult of
-        Nothing -> pure $ Left "Evaluation resource limit exceeded"
+        Nothing -> pure $ ToolFailed "Evaluation resource limit exceeded"
+        Just (Left err@(EvaluatorRefused _)) ->
+          pure $ ToolRefused (encodeText (SimpleError err))
         Just (Left err) ->
-          pure $ Left (prettyEvaluatorError err)
+          pure $ ToolFailed (prettyEvaluatorError err)
         Just (Right rwr) ->
-          let encoded = Aeson.encode (SimpleResponse rwr)
-          in pure $ Right (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))
+          pure $ ToolAnswered (encodeText (SimpleResponse rwr))
+ where
+  encodeText :: SimpleResponse -> Text
+  encodeText = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode
 
 -- ----------------------------------------------------------------------------
 -- Tasks extension (2026-07-28)
@@ -658,16 +650,16 @@ runEvalWorker env cfg taskId did fnName reverseMap argPairs = do
     let deadlineMicros = cfg.compileTimeout * 1_000_000
     mFns <- pollForReady env did deadlineMicros
     case mFns of
-      Left err -> pure (Left err)
+      Left err -> pure (ToolFailed err)
       Right fns -> do
         atomically $ modifyTVar' env.mcpTasks $ Map.adjust
           (\t -> t { tsStatus = TaskWorking }) taskId
         case Map.lookup fnName fns of
-          Nothing -> pure $ Left ("Function not found: " <> fnName)
+          Nothing -> pure $ ToolFailed ("Function not found: " <> fnName)
           Just vf -> runMcpEvaluationIO cfg vf argPairs
 
   catchSomeException io = io `catch` \(e :: SomeException) ->
-    pure $ Left ("Task crashed: " <> Text.pack (show e))
+    pure $ ToolFailed ("Task crashed: " <> Text.pack (show e))
 
   finaliseTask appEnv tid result = do
     let payload = evalResultToToolPayload reverseMap result

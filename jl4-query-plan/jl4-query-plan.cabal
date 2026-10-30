@@ -44,6 +44,7 @@ library
     src
   exposed-modules:
     L4.Decision.BooleanDecisionQuery
+    L4.Decision.EditorQueryPlan
     L4.Decision.QueryPlan
   build-depends:
     aeson,

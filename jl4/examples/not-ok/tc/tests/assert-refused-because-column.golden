@@ -1,0 +1,15 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: assert-refused-because-column.l4
+  Hidden: no
+  Range: 14:1-14:1
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    14 | BECAUSE "the real reason"
+       | ^
+    A BECAUSE that starts a line belongs to the #ASSERT REFUSED above it only when it is indented further than the #ASSERT.
+    Indent this line, or move the BECAUSE onto the line of the #ASSERT.
+

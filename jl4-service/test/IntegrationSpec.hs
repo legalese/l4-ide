@@ -12,6 +12,7 @@ import Backend.Api
 import qualified BundleStore
 import BundleStore (initStore)
 import Compiler (compileBundle, computeVersion)
+import Shared (encodeMetadataCache)
 import qualified DeploymentLoader
 import qualified Version
 import ControlPlane (DeploymentStatusResponse (..))
@@ -22,9 +23,10 @@ import L4.FunctionSchema (Parameters (..))
 
 import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.STM (newTVarIO)
+import Control.Concurrent.STM (atomically, modifyTVar', newTVarIO)
 import Control.Exception (bracket, finally, try)
 import System.Timeout (timeout)
+import Data.Char (isSpace)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
@@ -746,6 +748,363 @@ spec = describe "integration" do
             batch.summary.casesProcessed `shouldBe` 10
             batch.summary.casesIgnored `shouldBe` 0
 
+    -- specs/as-built/service-wire-format.md states this shape for a case that
+    -- refuses; a change to it changes that page. The single request, the
+    -- batch case and the MCP tool result carry the same refusal, its reason
+    -- as the rule gives it: the reason names an input, and the MCP tool's name
+    -- for that input does not replace it.
+    it "returns a case that refuses as refused and processed, and every door carries the same refusal" do
+      let src = Text.unlines
+            [ "@export Whether a person qualifies"
+            , "GIVEN `age in years` IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "qualifies `age in years` MEANS"
+            , "  IF `age in years` >= 18 THEN TRUE ELSE REFUSE \"an age in years under 18 is not modelled\""
+            ]
+          reason = "an age in years under 18 is not modelled"
+      withServiceFromSources "refuse-batch" [("refuse.l4", src)] \baseUrl mgr -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/refuse-batch/functions/qualifies/evaluation/batch")
+          (Aeson.object
+            [ "outcomes" Aeson..= ([] :: [Text])
+            , "cases" Aeson..=
+                [ Aeson.object ["@id" Aeson..= (1 :: Int), "age in years" Aeson..= (10 :: Int)]
+                , Aeson.object ["@id" Aeson..= (2 :: Int), "age in years" Aeson..= (20 :: Int)]
+                ]
+            ])
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        wireAt resp ["summary", "casesIgnored"] `shouldBe` Right (Aeson.Number 0)
+        wireAt resp ["summary", "casesProcessed"] `shouldBe` Right (Aeson.Number 2)
+        caseKeys resp ["@id", "@error", "@refused", "value"] `shouldBe`
+          Just [ [Just (Aeson.Number 1), Nothing, Just (refusalOf reason), Nothing]
+               , [Just (Aeson.Number 2), Nothing, Nothing, Just (Aeson.Bool True)] ]
+        single <- evalFunction baseUrl mgr "refuse-batch" "qualifies"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["age in years" Aeson..= (10 :: Int)]])
+        single `shouldCarry` RefusedWith reason
+        mcpReq <- buildJsonPost (baseUrl <> "/deployments/refuse-batch/.mcp") $ Aeson.object
+          [ "jsonrpc" Aeson..= ("2.0" :: Text)
+          , "id" Aeson..= (1 :: Int)
+          , "method" Aeson..= ("tools/call" :: Text)
+          , "params" Aeson..= Aeson.object
+              [ "name" Aeson..= ("qualifies" :: Text)
+              , "arguments" Aeson..= Aeson.object ["age-in-years" Aeson..= (10 :: Int)]
+              ]
+          ]
+        mcp <- httpLbs mcpReq mgr
+        let toolResult = fmap (fmap (Aeson.decodeStrict . Text.Encoding.encodeUtf8)) (mcpToolText (responseBody mcp))
+        (statusCode' mcp, toolResult) `shouldBe`
+          (200, Just (True, Just (Aeson.object ["tag" Aeson..= ("Error" :: Text), "contents" Aeson..= refusalOf reason])))
+        -- the 422's body, as the MCP tool result carries it
+        Aeson.decode (responseBody single) `shouldBe` (snd =<< toolResult :: Maybe Aeson.Value)
+
+    -- A tool call that arrives while its deployment is still compiling, from a
+    -- client that asked for tasks, is answered with a task, which evaluates the
+    -- call once the deployment is compiled. The task's result is the text the
+    -- call answers: for a refusal, the 422's body, its reason as the rule gives
+    -- it, and for an answer, the 200's.
+    it "answers an MCP tool called as a task, while its deployment compiles, as a call is answered, a refusal among them" do
+      let src = Text.unlines
+            [ "@export Whether a person qualifies"
+            , "GIVEN `age in years` IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "qualifies `age in years` MEANS"
+            , "  IF `age in years` >= 18 THEN TRUE ELSE REFUSE \"an age in years under 18 is not modelled\""
+            ]
+          reason = "an age in years under 18 is not modelled"
+      withCompilingService "refuse-task" [("refuse.l4", src)] \baseUrl mgr compiling compiled -> do
+        let request :: Int -> IO (Response LBS.ByteString)
+            request age = evalFunction baseUrl mgr "refuse-task" "qualifies"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["age in years" Aeson..= age]])
+            asTask :: Int -> IO (Maybe (Bool, Text))
+            asTask age = mcpToolAsTask baseUrl mgr "refuse-task" "qualifies" compiling compiled
+              (Aeson.object ["age-in-years" Aeson..= age])
+        compiled
+        refused <- request 10
+        refused `shouldCarry` RefusedWith reason
+        answered <- request 20
+        answered `shouldCarry` Answers (Aeson.Bool True)
+        refusedTask <- asTask 10
+        answeredTask <- asTask 20
+        asJson refusedTask `shouldBe` Just (True, Aeson.decode (responseBody refused))
+        asJson answeredTask `shouldBe` Just (False, Aeson.decode (responseBody answered))
+
+  -- The wrapper path evaluates a module with its directives taken out line by
+  -- line, and a directive's lines end at the first line that is neither blank
+  -- nor indented further than the directive. A BECAUSE of an #ASSERT REFUSED
+  -- on a line of its own is indented further (the parser rejects one that is
+  -- not), so it is taken out with its directive, and the function answers on
+  -- both paths. Both measure indentation in columns, a tab reaching the next
+  -- multiple of eight, so they agree on a line indented by a tab as well.
+  -- A {} for a MAYBE input takes the wrapper, and a null stays direct.
+  describe "a module whose #ASSERT REFUSED has its BECAUSE on a line of its own" do
+    it "answers on the direct path and on the wrapper path" do
+      let src = Text.unlines
+            [ "GIVETH A NUMBER"
+            , "`not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "@export default the fee"
+            , "GIVEN y IS A NUMBER"
+            , "      pad IS A MAYBE NUMBER"
+            , "GIVETH A NUMBER"
+            , "fee y pad MEANS"
+            , "    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "#ASSERT REFUSED fee 1999 NOTHING"
+            , "  BECAUSE \"not modelled\""
+            , ""
+            , "#ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "because-line" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "because-line" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    it "answers on both paths in a section, for a BECAUSE indented by a tab and by spaces" do
+      let src = Text.unlines
+            [ "§ `Fees`"
+            , "    GIVETH A NUMBER"
+            , "    `not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "    @export default the fee"
+            , "    GIVEN y IS A NUMBER"
+            , "          pad IS A MAYBE NUMBER"
+            , "    GIVETH A NUMBER"
+            , "    fee y pad MEANS"
+            , "        IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "    #ASSERT REFUSED fee 1999 NOTHING"
+            , "\tBECAUSE \"not modelled\""
+            , ""
+            , "    #ASSERT REFUSED fee 1999 NOTHING"
+            , "      BECAUSE \"not modelled\""
+            , ""
+            , "    #ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "because-tab" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "because-tab" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    -- A line the filter keeps must not be read as a directive's continuation
+    -- either. Here the section's items stand at column 9, eight spaces in or
+    -- two spaces and a tab in, which the parser reads as the same column; the
+    -- function after the #ASSERT REFUSED is indented the second way, and the
+    -- filter keeps it, so the wrapper path finds the function.
+    it "answers on both paths in a section whose items are indented by spaces, and by spaces and a tab" do
+      let src = Text.unlines
+            [ "§ `Fees`"
+            , "        GIVETH A NUMBER"
+            , "        `not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "        #ASSERT REFUSED `not modelled` BECAUSE \"not modelled\""
+            , ""
+            , "  \t@export default the fee"
+            , "  \tGIVEN y IS A NUMBER"
+            , "  \t      pad IS A MAYBE NUMBER"
+            , "  \tGIVETH A NUMBER"
+            , "  \tfee y pad MEANS"
+            , "  \t    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "  \t#ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "items-tab" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "items-tab" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    -- The lexer takes every character that Data.Char.isSpace accepts as
+    -- whitespace, and a line of whitespace alone carries no token. So a
+    -- BECAUSE indented by two of any of them is indented further than the
+    -- #ASSERT, and the "\r" that is all a blank line of a CRLF file holds
+    -- makes a blank line; the filter reads both so, and both paths answer.
+    -- At the margin a "\r" line is indented further than the #ASSERT as
+    -- well, so the CRLF case runs in a section too, where only its being
+    -- blank keeps it in the directive, and so does a line of each other
+    -- whitespace character alone. A section indented by one tab, with a
+    -- BECAUSE indented by two, asks that a tab after a tab count to the next
+    -- multiple of eight as well.
+    let (feeHead, feeTail) =
+          ( [ "GIVETH A NUMBER"
+            , "`not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "@export default the fee"
+            , "GIVEN y IS A NUMBER"
+            , "      pad IS A MAYBE NUMBER"
+            , "GIVETH A NUMBER"
+            , "fee y pad MEANS"
+            , "    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "#ASSERT REFUSED fee 1999 NOTHING"
+            ]
+          , [ ""
+            , "#ASSERT fee 2001 NOTHING EQUALS 100"
+            ] )
+        feeModule becauseLines = feeHead <> becauseLines <> feeTail
+        -- the same module as a section whose items are indented by
+        -- @indent@; the BECAUSE lines are given as they stand
+        sectionFeeModule indent becauseLines =
+          let indented l = if Text.null l then l else indent <> l
+          in "§ `Fees`" : map indented feeHead <> becauseLines <> map indented feeTail
+        -- the direct path's outcome, then the wrapper path's
+        bothPaths deployId src = withServiceFromSources deployId [("fee.l4", src)] \baseUrl mgr ->
+          forM [Aeson.Null, Aeson.object []] \pad -> do
+            resp <- evalFunction baseUrl mgr deployId "fee"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+            pure (statusCode' resp, wireAt resp ["contents", "result", "value"])
+        answersOnBoth = replicate 2 (200, Right (Aeson.Number 100))
+
+    it "answers on both paths for a BECAUSE indented by two of any whitespace character but a newline" do
+      let whitespace = [ c | c <- [minBound .. maxBound], isSpace c, c /= '\n' ]
+      whitespace `shouldSatisfy` \cs -> all (`elem` cs) ("\t\v\f\r \x00A0\x2003\x3000" :: String)
+      outcomes <- forM whitespace \c ->
+        (,) c <$> bothPaths ("because-ws-" <> Text.pack (show (fromEnum c)))
+          (Text.unlines (feeModule [Text.pack [c, c] <> "BECAUSE \"not modelled\""]))
+      [ (c, outcome) | (c, outcome) <- outcomes, outcome /= answersOnBoth ] `shouldBe` []
+
+    it "answers on both paths for a BECAUSE after a blank line, in a file whose lines end in CRLF" do
+      outcome <- bothPaths "because-crlf"
+        (Text.concat [ l <> "\r\n" | l <- feeModule ["", "  BECAUSE \"not modelled\""] ])
+      outcome `shouldBe` answersOnBoth
+
+    it "answers on both paths in a section, for a BECAUSE after a blank line, in a file whose lines end in CRLF" do
+      outcome <- bothPaths "because-crlf-section"
+        (Text.concat [ l <> "\r\n" | l <- sectionFeeModule "    " ["", "      BECAUSE \"not modelled\""] ])
+      outcome `shouldBe` answersOnBoth
+
+    it "answers on both paths in a section, for a BECAUSE after a line of any one whitespace character but a newline" do
+      let whitespace = [ c | c <- [minBound .. maxBound], isSpace c, c /= '\n' ]
+      outcomes <- forM whitespace \c ->
+        (,) c <$> bothPaths ("blank-ws-" <> Text.pack (show (fromEnum c)))
+          (Text.unlines (sectionFeeModule "    " [Text.singleton c, "      BECAUSE \"not modelled\""]))
+      [ (c, outcome) | (c, outcome) <- outcomes, outcome /= answersOnBoth ] `shouldBe` []
+
+    it "answers on both paths in a section indented by a tab, for a BECAUSE indented by two" do
+      outcome <- bothPaths "because-tabs-section"
+        (Text.unlines (sectionFeeModule "\t" ["\t\tBECAUSE \"not modelled\""]))
+      outcome `shouldBe` answersOnBoth
+
+  -- A directive reads a list answer only so deep, so a REFUSE or a division by
+  -- zero at the end of a long list stops it for a short list and not for a
+  -- longer one. The direct path, the wrapper and the batch door read an answer
+  -- to the same depth, so they give the same verdict on each side of the depth
+  -- limit, and an answered list carries the same entries on each.
+  describe "answers read to the same depth on every path" do
+    let depthSource = Text.unlines
+          [ "@export the numbers, then a refusal as one more element"
+          , "GIVEN n IS A NUMBER"
+          , "      pad IS A MAYBE NUMBER"
+          , "GIVETH A LIST OF NUMBER"
+          , "`refusal in the list` n pad MEANS"
+          , "  IF n EQUALS 0 THEN LIST (REFUSE \"deep\") ELSE n FOLLOWED BY `refusal in the list` (n MINUS 1) pad"
+          , ""
+          , "@export the numbers, then a refusal as the rest of the list"
+          , "GIVEN n IS A NUMBER"
+          , "      pad IS A MAYBE NUMBER"
+          , "GIVETH A LIST OF NUMBER"
+          , "`refusal as the rest` n pad MEANS"
+          , "  IF n EQUALS 0 THEN REFUSE \"deep\" ELSE n FOLLOWED BY `refusal as the rest` (n MINUS 1) pad"
+          , ""
+          , "@export the numbers, then a division by zero as one more element"
+          , "GIVEN n IS A NUMBER"
+          , "      pad IS A MAYBE NUMBER"
+          , "GIVETH A LIST OF NUMBER"
+          , "`division in the list` n pad MEANS"
+          , "  IF n EQUALS 0 THEN LIST (1 DIVIDED BY 0) ELSE n FOLLOWED BY `division in the list` (n MINUS 1) pad"
+          , ""
+          , "@export the numbers, then a division by zero as the rest of the list"
+          , "GIVEN n IS A NUMBER"
+          , "      pad IS A MAYBE NUMBER"
+          , "GIVETH A LIST OF NUMBER"
+          , "`division as the rest` n pad MEANS"
+          , "  IF n EQUALS 0 THEN (IF 1 DIVIDED BY 0 EQUALS 0 THEN EMPTY ELSE EMPTY) ELSE n FOLLOWED BY `division as the rest` (n MINUS 1) pad"
+          , ""
+          , "@export the numbers in a MAYBE, then a refusal as one more element"
+          , "GIVEN n IS A NUMBER"
+          , "      pad IS A MAYBE NUMBER"
+          , "GIVETH A MAYBE (LIST OF NUMBER)"
+          , "`refusal in a MAYBE list` n pad MEANS JUST (`refusal in the list` n pad)"
+          , ""
+          , "DECLARE Box HAS items IS A LIST OF NUMBER"
+          , "DECLARE Outer HAS inner IS A Box"
+          , ""
+          , "@export the numbers in a record in a record, then a refusal as one more element"
+          , "GIVEN n IS A NUMBER"
+          , "      pad IS A MAYBE NUMBER"
+          , "GIVETH AN Outer"
+          , "`refusal in a record in a record` n pad MEANS Outer WITH inner IS (Box WITH items IS `refusal in the list` n pad)"
+          ]
+        -- each rule, the largest n at which a directive still reaches the end
+        -- of the list, what it says there, how many entries the list answered
+        -- one past that n carries, and where in the answer the list is. Each
+        -- constructor around the list takes a level: the rule's own JUST, so
+        -- a list inside it is reached one element sooner, and a record in a
+        -- record, so a list in its field is reached two sooner.
+        depthRules :: [(Text, Int, WireOutcome, Int, [Aeson.Key])]
+        depthRules =
+          [ ("refusal in the list", 200, RefusedWith "deep", 202, [])
+          , ("refusal as the rest", 201, RefusedWith "deep", 202, [])
+          , ("division in the list", 200, Refuses "Division by zero", 202, [])
+          , ("division as the rest", 201, Refuses "Division by zero", 202, [])
+          , ("refusal in a MAYBE list", 199, RefusedWith "deep", 201, [])
+          , ("refusal in a record in a record", 198, RefusedWith "deep", 200, ["Outer", "inner", "Box", "items"])
+          ]
+        -- a batch case's @error, @refused and value, for a case that stops as
+        -- the single request does
+        stoppedAs :: WireOutcome -> [Maybe Aeson.Value] -> Bool
+        stoppedAs stop keys = case (stop, keys) of
+          (RefusedWith reason, [Nothing, Just r, Nothing]) -> r == refusalOf reason
+          (Refuses message, [Just (Aeson.String e), Nothing, Nothing]) -> message `Text.isInfixOf` e
+          _ -> False
+        -- A pad of 1 keeps a request on the direct path and a pad of {} sends
+        -- it through the wrapper; in a batch case a null takes the wrapper too.
+        pads :: [(String, Aeson.Value)]
+        pads = [("direct", Aeson.Number 1), ("wrapper", Aeson.object [])]
+        args :: Int -> Aeson.Value -> Aeson.Value
+        args n pad = Aeson.object ["n" Aeson..= n, "pad" Aeson..= pad]
+        -- the number of entries of the list at a path in an answer
+        listEntries :: [Aeson.Key] -> Maybe Aeson.Value -> Maybe Int
+        listEntries at answer = case foldl (\mv k -> mv >>= \case Aeson.Object o -> Aeson.KeyMap.lookup k o; _ -> Nothing) answer at of
+          Just (Aeson.Array xs) -> Just (length xs)
+          _ -> Nothing
+    aroundAll (\k -> withServiceFromSources "depth" [("depth.l4", depthSource)] (curry k)) do
+      forM_ depthRules \(fn, limit, stop, entries, at) -> do
+        let path = Text.replace " " "%20" fn
+        forM_ pads \(padName, pad) ->
+          it (Text.unpack fn <> ", " <> padName <> ": stops at n = " <> show limit <> " and answers " <> show entries <> " entries at n = " <> show (limit + 1)) \(baseUrl, mgr) -> do
+            stopped <- evalFunction baseUrl mgr "depth" path (Aeson.object ["arguments" Aeson..= args limit pad])
+            stopped `shouldCarry` stop
+            answered <- evalFunction baseUrl mgr "depth" path (Aeson.object ["arguments" Aeson..= args (limit + 1) pad])
+            statusCode' answered `shouldBe` 200
+            listEntries at (either (const Nothing) Just (wireAt answered ["contents", "result", "value"])) `shouldBe` Just entries
+
+        it (Text.unpack fn <> ", batch: every case stops at n = " <> show limit <> " and answers alike at n = " <> show (limit + 1)) \(baseUrl, mgr) -> do
+          let cases = [ Aeson.object ["@id" Aeson..= (i :: Int), "n" Aeson..= n, "pad" Aeson..= pad]
+                      | (i, (n, pad)) <- zip [1 ..] [ (n, pad) | n <- [limit, limit + 1]
+                                                               , pad <- [Aeson.Number 1, Aeson.Null, Aeson.object []] ] ]
+          req <- buildJsonPost (baseUrl <> "/deployments/depth/functions/" <> Text.unpack path <> "/evaluation/batch")
+            (Aeson.object ["outcomes" Aeson..= ([] :: [Text]), "cases" Aeson..= cases])
+          resp <- httpLbs req mgr
+          statusCode' resp `shouldBe` 200
+          case caseKeys resp ["@error", "@refused", "value"] of
+            Just [s1, s2, s3, a1, a2, a3] -> do
+              let valueOf = \case
+                    [Nothing, Nothing, v] -> v
+                    _ -> Nothing
+              map (stoppedAs stop) [s1, s2, s3] `shouldBe` [True, True, True]
+              map (listEntries at . valueOf) [a1, a2, a3] `shouldBe` replicate 3 (Just entries)
+              a2 `shouldBe` a1
+              a3 `shouldBe` a1
+            other -> expectationFailure ("Expected six cases, got " <> take 300 (show other))
+
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
       withEmptyService \baseUrl mgr -> do
@@ -971,6 +1330,41 @@ spec = describe "integration" do
         resp <- queryPlan' baseUrl mgr "qp-404" "no_such_fn"
           (Aeson.object ["arguments" Aeson..= Aeson.object []])
         statusCode' resp `shouldBe` 404
+
+    -- A rule that may refuse to answer is not planned. The service answers 400
+    -- with the one value core gives for such a rule, which names the rule and
+    -- every reason it may refuse with, read from the rule as written and from
+    -- the definitions it calls, here in a file it imports.
+    describe "a rule that may refuse" do
+      let noArguments = Aeson.object ["arguments" Aeson..= Aeson.object []]
+          sources = [("helper.l4", mayRefuseHelperJL4), ("main.l4", mayRefuseMainJL4)]
+      it "is declined with a 400, also with an answer for every input, and a rule beside it is planned" do
+        withServiceFromSources "qp-may-refuse" sources \baseUrl mgr -> do
+          declined <- queryPlan' baseUrl mgr "qp-may-refuse" "covered" noArguments
+          statusCode' declined `shouldBe` 400
+          Aeson.decode (responseBody declined) `shouldBe` Just (Aeson.object
+            [ "error" Aeson..= ("No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\"." :: Text)
+            , "kind" Aeson..= ("declined" :: Text)
+            , "rule" Aeson..= ("covered" :: Text)
+            , "reasons" Aeson..= (["insurance is not modelled"] :: [Text])
+            ])
+          answered <- queryPlan' baseUrl mgr "qp-may-refuse" "covered"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["adult" Aeson..= False, "applicant" Aeson..= True]])
+          statusCode' answered `shouldBe` 400
+          responseBody answered `shouldBe` responseBody declined
+          planned <- queryPlan' baseUrl mgr "qp-may-refuse" "planned" noArguments
+          statusCode' planned `shouldBe` 200
+          lookupKey "determined" (decodeObject (responseBody planned)) `shouldBe` Just Aeson.Null
+      it "is declined with every reason it may refuse with, its own and a called definition's" do
+        withServiceFromSources "qp-may-refuse-both" sources \baseUrl mgr -> do
+          declined <- queryPlan' baseUrl mgr "qp-may-refuse-both" "checked" noArguments
+          statusCode' declined `shouldBe` 400
+          Aeson.decode (responseBody declined) `shouldBe` Just (Aeson.object
+            [ "error" Aeson..= ("No query plan for checked: it may refuse to answer, with the reason \"insurance is not modelled\" or \"minors are not modelled\"." :: Text)
+            , "kind" Aeson..= ("declined" :: Text)
+            , "rule" Aeson..= ("checked" :: Text)
+            , "reasons" Aeson..= (["insurance is not modelled", "minors are not modelled"] :: [Text])
+            ])
 
     -- A rule written as DECIDE clauses is the same rule as the CONSIDER it
     -- stands for, so its plan, with the ladder the plan carries, must be the
@@ -2924,6 +3318,45 @@ withNoLibraryOnTheHost act = bracket acquire release (\(_, _, empty) -> withCurr
 
 statusCode' :: Response a -> Int
 statusCode' = statusCode . responseStatus
+
+-- | A helper, in a file of its own, that refuses for a person who is not
+-- insured.
+mayRefuseHelperJL4 :: Text
+mayRefuseHelperJL4 = Text.unlines
+  [ "GIVEN person IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`the person is insured` person MEANS"
+  , "    IF person THEN TRUE"
+  , "    ELSE REFUSE \"insurance is not modelled\""
+  ]
+
+-- | Three published rules: one that may refuse through the imported helper,
+-- one that may also refuse with a reason of its own, and one that cannot
+-- refuse.
+mayRefuseMainJL4 :: Text
+mayRefuseMainJL4 = Text.unlines
+  [ "IMPORT helper"
+  , ""
+  , "@export Whether the applicant is covered"
+  , "GIVEN adult IS A BOOLEAN"
+  , "      applicant IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE covered IF adult AND `the person is insured` applicant"
+  , ""
+  , "@export Whether the applicant is checked"
+  , "GIVEN adult IS A BOOLEAN"
+  , "      applicant IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE checked IF"
+  , "    IF adult THEN `the person is insured` applicant"
+  , "    ELSE REFUSE \"minors are not modelled\""
+  , ""
+  , "@export Whether the applicant is planned for"
+  , "GIVEN adult IS A BOOLEAN"
+  , "      resident IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE planned IF adult AND resident"
+  ]
 -- | A clause group published with @export, under the given signature lines
 -- (none: no GIVEN at all).
 exportedSizeGroup :: [Text] -> Text
@@ -2944,10 +3377,20 @@ data WireOutcome
     -- ^ 200, with this JSON as the answer
   | Refuses Text
     -- ^ 422, with an error message that contains this text
+  | RefusedWith Text
+    -- ^ 422, with the refusal of this reason in place of an error
+
+-- | How the service writes a refusal wherever it answers one: in a 422's
+-- @contents@, in a batch case's @\@refused@, and in an MCP tool result.
+refusalOf :: Text -> Aeson.Value
+refusalOf reason = Aeson.object ["kind" Aeson..= ("refused" :: Text), "reason" Aeson..= reason]
 
 shouldCarry :: Response LBS.ByteString -> WireOutcome -> Expectation
 shouldCarry resp = \case
   Answers v -> (statusCode' resp, wireAt resp ["contents", "result", "value"]) `shouldBe` (200, Right v)
+  RefusedWith reason ->
+    (statusCode' resp, wireAt resp ["tag"], wireAt resp ["contents"])
+      `shouldBe` (422, Right (Aeson.String "Error"), Right (refusalOf reason))
   Refuses t -> do
     statusCode' resp `shouldBe` 422
     wireAt resp ["contents", "contents"] `shouldSatisfy` \case
@@ -3094,6 +3537,58 @@ withPendingServices' storeName deployments act = do
     result <- act baseUrl mgr
     cleanDir tmpPath
     pure result
+
+-- | Compile sources, and register the deployment as still compiling, with its
+-- metadata cached in the BundleStore, as a service has a deployment that it
+-- compiles after a restart. The test is given two actions: one marks the
+-- deployment as compiling, and one finishes its compilation. A request made
+-- between the two waits for the compilation, as it waits on a service.
+withCompilingService :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO () -> IO () -> IO a) -> IO a
+withCompilingService deployId sources act = do
+  resOrExc <- try (withCompilingService' deployId sources act)
+  case resOrExc of
+    Left ioe ->
+      if isPermissionError ioe
+        then pendingWith ("Skipping integration test (cannot bind sockets): " <> show ioe) >> pure undefined
+        else do
+          expectationFailure (show ioe)
+          pure undefined
+    Right result -> pure result
+
+withCompilingService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO () -> IO () -> IO a) -> IO a
+withCompilingService' deployId sources act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+  cleanDir tmpPath
+  store <- initStore tmpPath
+  logger <- newLogger False
+
+  let sourceMap = Map.fromList sources
+      storedMeta = BundleStore.StoredMetadata
+        { BundleStore.smVersion = computeVersion sourceMap
+        , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+        , BundleStore.smDescription = Nothing
+        , BundleStore.smServiceVersion = Nothing
+        , BundleStore.smDeploymentVersion = Nothing
+        }
+  result <- compileBundle logger "test" sourceMap
+  (fns, meta) <- case result of
+    Left err -> fail ("Test setup: compilation failed: " <> Text.unpack err)
+    Right (f, m) -> pure (f, m)
+  BundleStore.saveBundle store deployId sourceMap storedMeta
+  BundleStore.saveMetadataCache store deployId (encodeMetadataCache meta)
+
+  registry <- newTVarIO $ Map.singleton (DeploymentId deployId) DeploymentCompiling
+  let markAs st = atomically $ modifyTVar' registry (Map.insert (DeploymentId deployId) st)
+  pendingUpd <- newTVarIO Map.empty
+  tasksReg <- newTVarIO Map.empty
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+
+  mgr <- newManager defaultManagerSettings
+  testWithApplication (pure $ app env) \port -> do
+    let baseUrl = "http://localhost:" <> show port
+    r <- act baseUrl mgr (markAs DeploymentCompiling) (markAs (DeploymentReady fns meta))
+    cleanDir tmpPath
+    pure r
 
 -- | Save sources to disk and register as DeploymentFailed,
 -- simulating a deployment that failed to compile. Sources exist on disk.
@@ -3542,7 +4037,13 @@ lookupKey k = (>>= Aeson.KeyMap.lookup (Aeson.Key.fromText k))
 mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
 mcpToolText body = do
   Aeson.Object o <- Aeson.decode body
-  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  mcpPayloadText =<< Aeson.KeyMap.lookup "result" o
+
+-- | The text of an MCP tool result, and whether it is an error: the result of a
+-- tools/call, or of a task that has completed.
+mcpPayloadText :: Aeson.Value -> Maybe (Bool, Text)
+mcpPayloadText payload = do
+  Aeson.Object r <- pure payload
   Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
   Aeson.Object c : _ <- pure (toList cs)
   Aeson.String t <- Aeson.KeyMap.lookup "text" c
@@ -3550,6 +4051,54 @@ mcpToolText body = do
         Just (Aeson.Bool b) -> b
         _                   -> False
   pure (isErr, t)
+
+-- | One JSON-RPC request to a deployment's MCP endpoint, and its result.
+mcpRpc :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Maybe Aeson.Value)
+mcpRpc baseUrl mgr deployId method' params = do
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+    [ "jsonrpc" Aeson..= ("2.0" :: Text)
+    , "id" Aeson..= (1 :: Int)
+    , "method" Aeson..= method'
+    , "params" Aeson..= params
+    ]
+  resp <- httpLbs req mgr
+  statusCode' resp `shouldBe` 200
+  pure (lookupKey "result" (decodeObject (responseBody resp)))
+
+-- | An MCP tool's answer read as JSON, beside whether it is an error, to set
+-- against the body of an evaluation request.
+asJson :: Maybe (Bool, Text) -> Maybe (Bool, Maybe Aeson.Value)
+asJson = fmap (fmap (Aeson.decodeStrict . Text.Encoding.encodeUtf8))
+
+-- | The text of an MCP tool's answer to a call made as a task while the
+-- deployment compiles, polled for as a client polls for it, and whether it is
+-- an error. The two actions are 'withCompilingService''s.
+mcpToolAsTask :: String -> Manager -> Text -> Text -> IO () -> IO () -> Aeson.Value -> IO (Maybe (Bool, Text))
+mcpToolAsTask baseUrl mgr deployId toolName compiling compiled arguments = do
+  compiling
+  started <- mcpRpc baseUrl mgr deployId "tools/call" $ Aeson.object
+    [ "name" Aeson..= toolName
+    , "arguments" Aeson..= arguments
+    , "_meta" Aeson..= Aeson.object [ "io.modelcontextprotocol/tasks" Aeson..= Aeson.object [] ]
+    ]
+  compiled
+  case started of
+    Just (Aeson.Object h) | Just (Aeson.String taskId) <- Aeson.KeyMap.lookup "taskId" h ->
+      (>>= mcpPayloadText) <$> completed taskId (100 :: Int)
+    other -> do
+      expectationFailure ("Expected a task handle, got " <> show other)
+      pure Nothing
+  where
+    completed taskId tries = do
+      got <- mcpRpc baseUrl mgr deployId "tasks/get" (Aeson.object ["taskId" Aeson..= taskId])
+      case got of
+        Just (Aeson.Object t)
+          | Aeson.KeyMap.lookup "status" t == Just (Aeson.String "completed") ->
+              pure (Aeson.KeyMap.lookup "result" t)
+          | tries > 0 -> threadDelay 100_000 >> completed taskId (tries - 1)
+        other -> do
+          expectationFailure ("Expected a completed task, got " <> show other)
+          pure Nothing
 
 -- | Look up a JSON array in a Maybe Object, returning its length.
 lookupArrayLength :: Text -> Maybe Aeson.Object -> Maybe Int

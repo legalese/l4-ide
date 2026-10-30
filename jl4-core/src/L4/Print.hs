@@ -408,6 +408,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       map printWithLayout stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
+    -- An expression with an open tail is bracketed, so that a BECAUSE in it,
+    -- a BREACH's, is inside the brackets, where the parser reads it as the
+    -- BREACH's and not as the directive's.
+    AssertRefused _ e mmsg ->
+      "#ASSERT REFUSED" <+> parensIfOpenTailed e <>
+        maybe mempty (\m -> " BECAUSE" <+> printWithLayout m) mmsg
 
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
   printWithLayout = \ case
@@ -494,6 +500,11 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       parensIfNeeded e1 <+> "LESS THAN" <+> parensIfNeeded e2
     Gt         _ e1 e2 ->
       parensIfNeeded e1 <+> "GREATER THAN" <+> parensIfNeeded e2
+    -- The left of 's is an atom to the parser ('L4.Parser.projection' reads
+    -- it with 'atomicExpr'): a literal, a name or a bracketed expression.
+    -- A REFUSE is none of these, so it is bracketed here.
+    Proj       _ e1@Refuse{} n ->
+      surround (printWithLayout e1) "(" ")" <> "'s" <+> printWithLayout n
     Proj       _ e1 n ->
       parensIfNeeded e1 <> "'s" <+> printWithLayout n
     Var        _ n ->
@@ -576,6 +587,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "BREACH" <>
         maybe mempty (\p -> " BY" <+> printWithLayout p) mParty <>
         maybe mempty (\r -> " BECAUSE" <+> printWithLayout r) mReason
+    Refuse _ msg ->
+      "REFUSE" <+> printWithLayout msg
     Inert _ txt _ctx ->
       "..." <+> dquotes (pretty txt)
 
@@ -584,6 +597,10 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Lit{} -> printWithLayout e
     App _ _ [] -> printWithLayout e
     Var{} -> printWithLayout e
+    -- REFUSE and its literal read back as one operand wherever the parser
+    -- takes an expression ('L4.Parser.baseExpr'), so they need no brackets.
+    -- The left of 's takes an atom instead; the 'Proj' arm brackets it there.
+    Refuse{} -> printWithLayout e
     _ -> surround (printWithLayout e) "(" ")"
 
 -- | Bracket a conjunct of an @AND@/@OR@/@RAND@/@ROR@ chain, but only when its
@@ -657,6 +674,7 @@ parensIfOpenTailed e
       Lam{}         -> True  -- the YIELD body keeps consuming
       Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
       Breach{}      -> True  -- open BY/BECAUSE clauses
+      Refuse{}      -> False -- REFUSE plus a literal: no open tail
       -- `NOT` binds LOOSER than the connectives, not tighter: measured,
       -- `NOT TRUE AND FALSE` evaluates as `NOT (TRUE AND FALSE)`. So a negated
       -- conjunct is always bracketed — inheriting the operand's tail was not

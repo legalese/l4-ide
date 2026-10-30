@@ -10,12 +10,13 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
+import Control.Applicative ((<|>))
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (IOException, finally, throwIO, try)
-import Control.Monad (forM_, unless, void, when)
+import Control.Monad (forM, forM_, unless, void, when)
 import qualified Data.Char as Char
-import Data.Foldable (toList)
+import Data.Foldable (toList, traverse_)
 import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
@@ -29,6 +30,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
   ( canonicalizePath
+  , copyFile
   , createDirectoryIfMissing
   , createFileLink
   , doesFileExist
@@ -64,6 +66,8 @@ import Data.Aeson (toJSON)
 import Data.Char (isDigit)
 import System.IO (hPutStr)
 import System.IO.Temp (withSystemTempDirectory)
+import Data.IORef (atomicModifyIORef', newIORef)
+import qualified Language.LSP.Protocol.Types as LSP
 
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
@@ -368,6 +372,10 @@ expectMiddleLostInJson bin fixture messages = do
 
 fixtureDir :: FilePath
 fixtureDir = "tests-cli/fixtures"
+
+-- | Rules for the query planners, one of which reads a helper it imports.
+queryPlanDeclineDir :: FilePath
+queryPlanDeclineDir = fixtureDir </> "refuse-queryplan"
 
 -- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
 -- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
@@ -1125,6 +1133,71 @@ spec bin = do
       sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
       sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
 
+  -- doc/test-docs.sh runs doc/check-l4-run-output.sh on what `l4 run` prints
+  -- for each example under doc/, and fails an example for which it exits 1:
+  -- one with a diagnostic of error severity, or with a refused #ASSERT, whose
+  -- diagnostic is a warning. A refusing #EVAL passes, also when a later line
+  -- of its reason starts as a refused #ASSERT's result does, or is that
+  -- result's line exactly. It reads output whose lines end in CRLF as it reads
+  -- output whose lines end in LF.
+  describe "doc/check-l4-run-output.sh, on what l4 run prints" $ do
+    let posixOnly act
+          | Info.os == "mingw32" = pendingWith "needs a POSIX shell and awk"
+          | otherwise = act
+        checkRun fixture = do
+          (code, _, _) <- readCreateProcessWithExitCode
+            (proc "bash" ["-c", "\"$0\" run \"$1\" 2>&1 | bash \"$2\"", bin, fixtureDir </> fixture, checkRunOutputScript]) ""
+          pure code
+    it "passes a refusing #EVAL whose reason runs onto a line that starts \"assertion refused:\"" $ posixOnly $
+      checkRun "refuse-multiline-reason.l4" `shouldReturn` ExitSuccess
+    it "passes a refusing #EVAL whose reason has a line that holds only \"assertion refused:\"" $ posixOnly $
+      checkRun "refuse-reason-line-assertion-refused.l4" `shouldReturn` ExitSuccess
+    it "passes a refusing #EVAL beside a satisfied #ASSERT REFUSED" $ posixOnly $
+      checkRun "refuse-eval.l4" `shouldReturn` ExitSuccess
+    it "fails a refused #ASSERT" $ posixOnly $
+      checkRun "refuse-assert.l4" `shouldReturn` ExitFailure 1
+    it "fails a failed #ASSERT REFUSED, by its error diagnostic" $ posixOnly $
+      checkRun "assert-refused-fails.l4" `shouldReturn` ExitFailure 1
+    it "fails a refused #ASSERT when the lines end in CRLF" $ posixOnly $ do
+      (code, _, _) <- readCreateProcessWithExitCode
+        (proc "bash" [checkRunOutputScript])
+        "Result:\r\n  assertion refused:\r\n  not modelled\r\n"
+      code `shouldBe` ExitFailure 1
+
+    -- doc/test-docs.sh runs this check, and no other, over what `l4 run`
+    -- prints for each .l4 file under doc/ that it runs at exit 0: a refused
+    -- #ASSERT there fails the docs, at that file, though `l4 run` exits 0
+    -- for it, and a refusing #EVAL passes them, also when a line of its
+    -- reason reads as a refused #ASSERT's result. A copy of the script and
+    -- of the check, with one linked .l4 file beside them, is a doc/ of its
+    -- own; this build's l4 is first on its PATH.
+    let testDocsWith fixture = withSystemTempDirectory "l4-test-docs" \tmp -> do
+          let doc = tmp </> "doc"
+              binDir = tmp </> "bin"
+          forM_ [doc </> "courses", doc </> "reference", binDir] (createDirectoryIfMissing True)
+          forM_ ["test-docs.sh", "check-l4-run-output.sh"] \f ->
+            copyFile (".." </> "doc" </> f) (doc </> f)
+          copyFile (fixtureDir </> fixture) (doc </> "probe.l4")
+          writeFile (doc </> "README.md") "[the probe](probe.l4)\n"
+          createFileLink bin (binDir </> "l4")
+          parent <- getEnvironment
+          let path = binDir <> ":" <> fromMaybe "" (lookup "PATH" parent)
+              inherited = filter ((/= "PATH") . fst) parent
+          (code, out, err) <- readCreateProcessWithExitCode
+            (proc "bash" [doc </> "test-docs.sh"]) {env = Just (("PATH", path) : inherited)} ""
+          pure (code, out <> err)
+    it "fails doc/test-docs.sh at a file under doc/ that holds a refused #ASSERT" $ posixOnly $ do
+      (code, out) <- testDocsWith "refuse-assert.l4"
+      (code, "Validation failed: probe.l4" `isInfixOf` out) `shouldBe` (ExitFailure 1, True)
+    it "passes doc/test-docs.sh at a file under doc/ that holds a refusing #EVAL beside a satisfied #ASSERT REFUSED" $ posixOnly $ do
+      (code, out) <- testDocsWith "refuse-eval.l4"
+      (code, "Validation failed" `isInfixOf` out) `shouldBe` (ExitSuccess, False)
+    forM_ [ ("runs onto a line that starts", "refuse-multiline-reason.l4")
+          , ("has a line that holds only", "refuse-reason-line-assertion-refused.l4") ] \(how, fixture) ->
+      it ("passes doc/test-docs.sh at a file under doc/ that holds a refusing #EVAL whose reason " <> how <> " \"assertion refused:\"") $ posixOnly $ do
+        (code, out) <- testDocsWith fixture
+        (code, "Validation failed" `isInfixOf` out) `shouldBe` (ExitSuccess, False)
+
   -- A directive that cannot be evaluated is not always the same failure. A
   -- CONSIDER with no matching branch, a division by zero and an #ASSERT whose
   -- expression raises are caught for that one directive: the run fails, but the
@@ -1210,6 +1283,711 @@ spec bin = do
 
       it ("reports ok=false and all three results in JSON for a " <> verb <> " to an address that is not https") $
         expectMiddleLostInJson bin fixture messages
+
+  -- A REFUSE that a directive reaches stops that directive, which reports the
+  -- refusal and its reason. A refusal is an answer the program gives, not a
+  -- failure of the run, so the run exits 0, as it does for a failed #ASSERT;
+  -- an #ASSERT that RAISES still exits 1, and the two must not be conflated.
+  describe "l4 run on a directive that refuses" $ do
+    let refuseEvalFixture = fixtureDir </> "refuse-eval.l4"
+        refuseAssertFixture = fixtureDir </> "refuse-assert.l4"
+        refuseRunFixture = fixtureDir </> "refuse-run.l4"
+
+    it "reports an #EVAL that refuses with its reason, and exits 0" $ do
+      Output code sout _ <- runL4 bin ["run", refuseEvalFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("The model refuses to answer:" `isInfixOf`)
+      sout `shouldSatisfy` ("not modelled" `isInfixOf`)
+      sout `shouldNotSatisfy` ("evaluation exception" `isInfixOf`)
+
+    it "reports an #ASSERT that refuses as refused in either polarity, with the refusal, and exits 0" $ do
+      Output code sout _ <- runL4 bin ["run", refuseAssertFixture]
+      code `shouldBe` ExitSuccess
+      T.count "assertion refused:" (T.pack sout) `shouldBe` 2
+      T.count "The model refuses to answer:" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+    -- --json gives a refusing #EVAL its own kind, and a refused #ASSERT its
+    -- reason under "refused" rather than "error". A consumer that reads every
+    -- non-boolean assertion out of "error" would otherwise report a designed
+    -- outcome as a defect.
+    it "emits kind \"refused\" for a refusing #EVAL and a refused field for a refused #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> case foldr (:) [] v of
+          [ev, assertRefused, assertPlain] -> do
+            objField ev "kind"   `shouldBe` Just (String "refused")
+            objField ev "value"  `shouldBe` Just Null
+            objField ev "reason" `shouldBe` Just (String "this case is not modelled")
+            -- #ASSERT REFUSED holds: it is an ordinary satisfied assertion.
+            objField assertRefused "kind"  `shouldBe` Just (String "assertion")
+            objField assertRefused "value" `shouldBe` Just (Bool True)
+            -- A PLAIN #ASSERT whose expression refuses is neither true nor
+            -- false, and its reason is NOT under "error".
+            objField assertPlain "kind"  `shouldBe` Just (String "assertion")
+            objField assertPlain "value" `shouldBe` Just Null
+            objField assertPlain "error" `shouldBe` Nothing
+            case objField assertPlain "refused" of
+              Just r  -> objField r "reason" `shouldBe` Just (String "this case is not modelled")
+              other   -> expectationFailure ("Expected a refused object, got " ++ show other)
+          other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The editor's squiggles come from these diagnostics. A refusal is a
+    -- warning: not the error of a failed or a raising directive, and not the
+    -- information of an answer. A satisfied #ASSERT REFUSED is information.
+    it "publishes a refusing #EVAL and a refused #ASSERT as Warning diagnostics, and a satisfied #ASSERT REFUSED as Information" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s' | String s' <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "7" `shouldSatisfy` ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          at "7" `shouldSatisfy` ("The model refuses to answer:" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("assertion satisfied" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("assertion refused:" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+    -- #ASSERT REFUSED has three ways to come out other than satisfied, and
+    -- --json keeps them apart: an answer where a refusal was expected, and a
+    -- refusal for a different reason, are both a false assertion that says
+    -- why; an expression that raises is an assertion that could not be decided.
+    it "reports a failed #ASSERT REFUSED as false with its reason, and a raising one as undecided" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-refused-outcomes.l4", "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case foldr (:) [] v of
+          [answered, wrongReason, raised] -> do
+            objField answered "kind"  `shouldBe` Just (String "assertion")
+            objField answered "value" `shouldBe` Just (Bool False)
+            objField answered "error" `shouldBe`
+              Just (String "assertion failed: expected a refusal, but the expression produced a value")
+            objField wrongReason "kind"  `shouldBe` Just (String "assertion")
+            objField wrongReason "value" `shouldBe` Just (Bool False)
+            objField wrongReason "error" `shouldBe`
+              Just (String "assertion failed: expected the refusal \"some other reason\", got \"this case is not modelled\"")
+            objField raised "kind"  `shouldBe` Just (String "assertion")
+            objField raised "value" `shouldBe` Just Null
+            case objField raised "error" of
+              Just (String t) -> t `shouldSatisfy` T.isPrefixOf "assertion could not be evaluated:"
+              other           -> expectationFailure ("Expected an error text, got " ++ show other)
+          other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The editor's squiggles come from these diagnostics: a failed #ASSERT
+    -- REFUSED is an Error that says what failed, as a clean FALSE #ASSERT is.
+    it "publishes a failed #ASSERT REFUSED as an Error diagnostic that says why" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-refused-fails.l4", "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s | String s <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("expected a refusal, but the expression produced a value" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("expected the refusal \"some other reason\"" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+    -- A failed #ASSERT REFUSED is a verdict, as a clean FALSE #ASSERT is.
+    it "leaves a failed #ASSERT REFUSED at exit 0, with what failed and why" $ do
+      Output code sout _ <- runL4 bin ["run", fixtureDir </> "assert-refused-fails.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("assertion failed: expected a refusal, but the expression produced a value" `isInfixOf`)
+      sout `shouldSatisfy`
+        ("assertion failed: expected the refusal \"some other reason\", got \"this case is not modelled\"" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+  -- A refusing batch row has status "refused" and carries the reason under
+  -- its result. Unlike an erroring row it does NOT stop the batch (the row
+  -- after it is still processed, with no -c) and does not make the command
+  -- fail.
+  describe "l4 batch on a row that refuses" $
+    it "gives a refusing batch row the status refused, its reason under its result, and still processes the next row" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", fixtureDir </> "refuse-batch.l4", "--inputs", fixtureDir </> "refuse-batch.json"]
+      code `shouldBe` ExitSuccess
+      case filter (not . null) (lines sout) of
+        [refusedRow, answeredRow] -> do
+          refusedRow `shouldSatisfy` ("\"status\":\"refused\"" `isInfixOf`)
+          refusedRow `shouldSatisfy`
+            ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
+          -- the reason is also in the diagnostics, as an erroring row's message is
+          refusedRow `shouldSatisfy`
+            ("\"diagnostics\":[\"The model refuses to answer:\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"diagnostics\":[]" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"result\":100" `isInfixOf`)
+          -- the module's #ASSERT REFUSED directives are not run with a row
+          forM_ [refusedRow, answeredRow] $ \row ->
+            case eitherDecode (BSL8.pack row) :: Either String Value of
+              Right v | Just (Array outs) <- objField v "output" -> length outs `shouldBe` 1
+              other -> expectationFailure ("Expected a row with a list of outputs, got " ++ show other)
+        other -> expectationFailure ("Expected 2 rows, got " ++ show (length other))
+
+  -- The REPL says a refusal is one, with its reason, where it would say
+  -- "Error:" for an evaluation that raised: for an expression, for the same
+  -- expression traced, and for an #ASSERT. Its fixture carries an
+  -- #ASSERT REFUSED, which the REPL removes before it answers, so each exact
+  -- reply below is the query's alone.
+  describe "the REPL on an expression that refuses" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let refuseFile = fixtureDir </> "refuse-eval.l4"
+        -- one reply per query, loading the file first, in a directory of its own
+        -- because the REPL keeps a history file in the one it is in
+        replReplies repl queries = withSystemTempDirectory "l4-repl-refuse" \work ->
+          replRepliesIn work repl queries
+        replRepliesIn work repl queries = do
+          absFile <- makeAbsolute refuseFile
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          hPutStr hin (unlines (queries <> [":quit"]))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        withRepl act = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> act repl
+
+    it "answers Refused: and the reason, for an expression and an #ASSERT, plain and traced" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ "`not modelled` PLUS 1"
+        , ":traceascii `not modelled` PLUS 1"
+        , "#ASSERT `not modelled` EQUALS 1"
+        , ":traceascii #ASSERT `not modelled` EQUALS 1"
+        ]
+      case replies of
+        [plain, traced, asserted, tracedAsserted] -> do
+          plain `shouldBe` "Refused: not modelled"
+          traced `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          asserted `shouldBe` "Refused: not modelled"
+          tracedAsserted `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          forM_ replies $ \reply -> reply `shouldNotSatisfy` T.isInfixOf "Error"
+        other -> expectationFailure ("Expected 4 replies, got " ++ show other)
+
+    -- A reason that runs over several lines stands each later line under its
+    -- first, for an expression and an #ASSERT, plain and traced.
+    it "stands every line of a reason over several lines under the first" $ withRepl \repl -> do
+      let refusal = "REFUSE \"line one\\nline two\"" :: String
+      replies <- replReplies repl
+        [ refusal
+        , ":traceascii " <> refusal
+        , "#ASSERT " <> refusal
+        , ":traceascii #ASSERT " <> refusal
+        ]
+      -- the first two lines of each reply; :traceascii adds the trace below them
+      map (take 2 . T.lines) replies `shouldBe`
+        replicate 4 ["Refused: line one", "         line two"]
+
+    it "lists #ASSERT REFUSED in its :help" $ withRepl \repl -> do
+      replies <- replReplies repl [":help"]
+      map (T.isInfixOf "#ASSERT REFUSED <expr> [BECAUSE \"reason\"]") replies `shouldBe` [True]
+
+    -- A failed #ASSERT REFUSED is a false assertion that says why, plain and
+    -- under :traceascii, for an answer and for a refusal with another reason.
+    it "answers False and says why, for a failed #ASSERT REFUSED" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ "#ASSERT REFUSED 1"
+        , ":traceascii #ASSERT REFUSED 1"
+        , "#ASSERT REFUSED `not modelled` BECAUSE \"some other reason\""
+        ]
+      -- the first line of each reply; :traceascii adds the trace below it
+      map (T.takeWhile (/= '\n')) replies `shouldBe`
+        [ "False (assertion failed: expected a refusal, but the expression produced a value)"
+        , "Result: False (assertion failed: expected a refusal, but the expression produced a value)"
+        , "False (assertion failed: expected the refusal \"some other reason\", got \"not modelled\")"
+        ]
+
+    -- The root of a trace carries the directive's outcome, so a refusal met
+    -- only while the answer is read in full, below its head, is at the root,
+    -- in the text trace and in the graph, for an expression and for an
+    -- #ASSERT REFUSED that it satisfies.
+    it "puts a refusal met below the answer's head at the root of the trace" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ ":traceascii JUST `not modelled`"
+        , ":trace JUST `not modelled`"
+        , ":traceascii #ASSERT REFUSED JUST `not modelled`"
+        ]
+      case replies of
+        [ascii, dot, asserted] -> do
+          ascii `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          last (T.lines ascii) `shouldSatisfy` T.isSuffixOf "↯ refused: not modelled"
+          asserted `shouldSatisfy` T.isPrefixOf "Result: True (assertion passed)\n"
+          last (T.lines asserted) `shouldSatisfy` T.isSuffixOf "↯ refused: not modelled"
+          let root = fst (T.breakOn "style=filled" (snd (T.breakOn "0 [label=" dot)))
+          root `shouldSatisfy` T.isInfixOf "↯ refused: not modelled"
+          root `shouldSatisfy` T.isInfixOf "#ffcccc"
+        other -> expectationFailure ("Expected 3 replies, got " ++ show other)
+
+    -- A trace saved with :tracefile names its result in its header: a
+    -- refusal as one, not as an error, for an expression and for an #ASSERT,
+    -- and a failed #ASSERT REFUSED as a false assertion that says why.
+    it "names a refusal as one in the header of a trace saved with :tracefile" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-refuse" \work -> do
+        replies <- replRepliesIn work repl
+          [ ":tracefile " <> (work </> "trace")
+          , ":trace `not modelled` PLUS 1"
+          , ":trace #ASSERT `not modelled` EQUALS 1"
+          , ":trace #ASSERT REFUSED 1"
+          ]
+        length replies `shouldBe` 4
+        headers <- forM ["trace-01.dot", "trace-02.dot", "trace-03.dot"] \name -> do
+          saved <- TE.decodeUtf8Lenient <$> BS.readFile (work </> name)
+          pure [ l | l <- T.lines saved, "// Result: " `T.isPrefixOf` l ]
+        case headers of
+          [[expr], [asserted], [failed]] -> do
+            forM_ [expr, asserted] \resultLine -> do
+              resultLine `shouldSatisfy` T.isPrefixOf "// Result: Refused"
+              resultLine `shouldSatisfy` T.isInfixOf "not modelled"
+              resultLine `shouldNotSatisfy` T.isInfixOf "Error"
+            failed `shouldBe`
+              "// Result: False (assertion failed: expected a refusal, but the expression produced a value)"
+          other -> expectationFailure ("Expected one Result line in each of three traces, got " ++ show other)
+
+  -- A rule that may refuse to answer gets no query plan, from the REPL or from
+  -- the language server: each says why in the one sentence core gives, which
+  -- names the rule and every reason it may refuse with, read from the rule and
+  -- from the definitions it calls, in a file it imports or in its own. A rule
+  -- beside it is planned. The REPL declines a rule over a number that may
+  -- refuse, where the ladder would draw nothing. The language server answers
+  -- l4/queryPlan for the rule whose decision graph it drew last, and decides
+  -- the decline when it draws the graph.
+  describe "the query planners on a rule that may refuse" $ do
+    mRepl <- runIO locateReplBinary
+    mLsp <- runIO locateLspBinary
+    let mainFile = queryPlanDeclineDir </> "main.l4"
+        coveredDeclined :: T.Text
+        coveredDeclined = "No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\"."
+        checkedDeclined :: T.Text
+        checkedDeclined = "No query plan for checked: it may refuse to answer, with the reason \"insurance is not modelled\" or \"minors are not modelled\"."
+        settledDeclined :: T.Text
+        settledDeclined = "No query plan for settled: it may refuse to answer, with the reason \"residence is not modelled\"."
+        withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+        withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
+        -- Draw a rule's decision graph in the language server, from its lens,
+        -- the last one at or above the line that names it, and give back the
+        -- version of the document the graph is drawn from.
+        drawRule :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> IO (Maybe Value)
+        drawRule request uri source name = drawRuleAt request uri source name 0
+        -- The same, for the rule on the nth line, from 0, that names it.
+        drawRuleAt :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> Int -> IO (Maybe Value)
+        drawRuleAt request uri source name nth =
+          lensArgsAt request uri source name nth >>= \case
+            Just args@(verDocId : _) -> do
+              drawn <- request "workspace/executeCommand"
+                (Aeson.object ["command" Aeson..= ("l4.visualize" :: T.Text), "arguments" Aeson..= args])
+              (drawn >>= (`objField` "result")) `shouldSatisfy` maybe False (/= Null)
+              pure (Just verDocId)
+            _ -> pure Nothing
+        -- The arguments of the decision graph lens of the rule on the nth
+        -- line, from 0, that names it: the last lens at or above that line.
+        lensArgsAt :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> Int -> IO (Maybe [Value])
+        lensArgsAt request uri source name nth = do
+          lenses <- request "textDocument/codeLens" (Aeson.object ["textDocument" Aeson..= Aeson.object ["uri" Aeson..= uri]])
+          let graphLenses =
+                [ (line, args)
+                | Just (Array ls) <- [lenses >>= (`objField` "result")]
+                , lens <- toList ls
+                , Just (String "Show decision graph") <- [lens `objField` "command" >>= (`objField` "title")]
+                , Just (Number line) <- [lens `objField` "range" >>= (`objField` "start") >>= (`objField` "line")]
+                , Just (Array args) <- [lens `objField` "command" >>= (`objField` "arguments")]
+                ]
+              decideLines = [i | (i, l) <- zip [0 :: Int ..] (T.lines source), ("DECIDE " <> name <> " ") `T.isPrefixOf` l]
+              decideLine = case drop nth decideLines of
+                l : _ -> l
+                [] -> length (T.lines source)
+          case reverse [args | (line, args) <- graphLenses, line <= fromIntegral decideLine] of
+            args : _ | not (null args) -> pure (Just (toList args))
+            _ -> do
+              expectationFailure ("no decision graph lens for " <> T.unpack name <> " in " <> show lenses)
+              pure Nothing
+        -- Ask the language server for the plan of a rule, with an answer for
+        -- each input given and no other, giving the version of the document
+        -- its graph is drawn from: the result, or the error.
+        askPlanWith :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> [(T.Text, Bool)] -> Value -> IO (Maybe Value)
+        askPlanWith request name bindings verDocId = do
+          answer <- request "l4/queryPlan" (Aeson.object
+            [ "fnName" Aeson..= name
+            , "bindings" Aeson..= Aeson.object [Key.fromText input Aeson..= known | (input, known) <- bindings]
+            , "verDocId" Aeson..= verDocId
+            ])
+          pure (answer >>= \a -> a `objField` "result" <|> a `objField` "error")
+        -- The same, with no input known.
+        askPlan :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> Value -> IO (Maybe Value)
+        askPlan request name = askPlanWith request name []
+        -- The language server with the fixture open, and a way to ask it for
+        -- the plan of a rule: draw the rule's decision graph, then ask
+        -- l4/queryPlan with an answer for each input given.
+        withLspPlanner :: FilePath -> ((T.Text -> [(T.Text, Bool)] -> IO (Maybe Value)) -> IO ()) -> IO ()
+        withLspPlanner lsp act = do
+          source <- TE.decodeUtf8 <$> BS.readFile mainFile
+          withOpenDocument lsp mainFile \uri _notify request ->
+            act \name bindings -> drawRule request uri source name >>= maybe (pure Nothing) (askPlanWith request name bindings)
+        -- The language server with a file of the given text open, in a
+        -- directory of its own.
+        withRuleFile :: FilePath -> T.Text -> (T.Text -> (T.Text -> Value -> IO ()) -> (T.Text -> Value -> IO (Maybe Value)) -> IO ()) -> IO ()
+        withRuleFile lsp source act =
+          withSystemTempDirectory "l4-lsp-queryplan" \scratch -> do
+            work <- canonicalizePath scratch
+            let file = work </> "rule.l4"
+            BS.writeFile file (TE.encodeUtf8 source)
+            withOpenDocument lsp file act
+        -- Draw a decision graph with the given arguments of l4.visualize.
+        visualize :: (T.Text -> Value -> IO (Maybe Value)) -> [Value] -> IO (Maybe Value)
+        visualize request args = request "workspace/executeCommand"
+          (Aeson.object ["command" Aeson..= ("l4.visualize" :: T.Text), "arguments" Aeson..= args])
+        -- The label of every atom of every input a plan asks for, in its
+        -- order.
+        asksOf :: Maybe Value -> [T.Text]
+        asksOf plan =
+          [ label
+          | Just (Array asks) <- [plan >>= (`objField` "asks")]
+          , ask <- toList asks
+          , Just (Array atoms) <- [ask `objField` "atoms"]
+          , atom <- toList atoms
+          , Just (String label) <- [atom `objField` "label"]
+          ]
+        -- The unique of every node of a drawn graph that names the
+        -- definition and can be inlined.
+        inlinableUniques :: T.Text -> Value -> [Value]
+        inlinableUniques label = \case
+          Object o ->
+            [ u
+            | KeyMap.lookup "canInline" o == Just (Bool True)
+            , Just n <- [KeyMap.lookup "name" o]
+            , n `objField` "label" == Just (String label)
+            , Just u <- [n `objField` "unique"]
+            ]
+              <> concatMap (inlinableUniques label) (KeyMap.elems o)
+          Array a -> concatMap (inlinableUniques label) (toList a)
+          _ -> []
+        declinedWith :: T.Text -> T.Text -> [T.Text] -> Value
+        declinedWith rule sentence reasons = Aeson.object
+          [ "error" Aeson..= sentence
+          , "kind" Aeson..= ("declined" :: T.Text)
+          , "rule" Aeson..= rule
+          , "reasons" Aeson..= reasons
+          ]
+        didChange :: (T.Text -> Value -> IO ()) -> T.Text -> Int -> T.Text -> IO ()
+        didChange notify uri version text = notify "textDocument/didChange" (Aeson.object
+          [ "textDocument" Aeson..= Aeson.object ["uri" Aeson..= uri, "version" Aeson..= version]
+          , "contentChanges" Aeson..= [Aeson.object ["text" Aeson..= text]]
+          ])
+
+    it "the REPL's :queryplan says why it declines, with an answer for an input or without, and plans a rule beside it" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile
+          [ ":queryplan covered"
+          , ":queryplan covered adult=false"
+          , ":queryplan checked"
+          , ":queryplan planned"
+          , ":queryplan planned adult=false"
+          ]
+      case replies of
+        [covered, coveredAnswered, checked, planned, plannedAnswered] -> do
+          covered `shouldBe` coveredDeclined
+          coveredAnswered `shouldBe` coveredDeclined
+          checked `shouldBe` checkedDeclined
+          planned `shouldSatisfy` T.isPrefixOf "determined: Unknown\n"
+          plannedAnswered `shouldSatisfy` T.isPrefixOf "determined: False\n"
+        other -> expectationFailure ("Expected 5 replies, got " ++ show other)
+
+    it "the REPL's :queryplan declines a rule that refuses through a definition in its own file" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile [":queryplan settled"]
+      replies `shouldBe` [settledDeclined]
+
+    it "the REPL's :queryplan declines a rule over a number that may refuse, where the ladder would draw nothing" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile [":queryplan fee", ":queryplan charge"]
+      replies `shouldBe`
+        [ "No query plan for fee: it may refuse to answer, with the reason \"a negative fee is not modelled\"."
+        , "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+        ]
+
+    it "the language server's l4/queryPlan declines a rule whose REFUSE is its own, on every path, with an answer for an input or without" $ withLsp \lsp -> do
+      let source = T.unlines
+            [ "GIVEN resident IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF IF resident THEN REFUSE \"one\" ELSE REFUSE \"two\""
+            ]
+          declined = Just (declinedWith "target"
+            "No query plan for target: it may refuse to answer, with the reason \"one\" or \"two\"."
+            ["one", "two"])
+      withRuleFile lsp source \uri _notify request -> do
+        drawnAt <- drawRule request uri source "target"
+        let planWith bindings = maybe (pure Nothing) (askPlanWith request "target" bindings) drawnAt
+        planWith [] >>= (`shouldBe` declined)
+        planWith [("resident", True)] >>= (`shouldBe` declined)
+        planWith [("resident", False)] >>= (`shouldBe` declined)
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition it imports" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf -> do
+        planOf "covered" [] >>= (`shouldBe` Just (declinedWith "covered" coveredDeclined ["insurance is not modelled"]))
+        planOf "checked" [] >>= (`shouldBe` Just (declinedWith "checked" checkedDeclined ["insurance is not modelled", "minors are not modelled"]))
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition it imports, once the graph is drawn again on a change to the document" $ withLsp \lsp -> do
+      source <- TE.decodeUtf8 <$> BS.readFile mainFile
+      withOpenDocument lsp mainFile \uri notify request -> do
+        _ <- drawRule request uri source "covered"
+        didChange notify uri 2 (source <> "\n")
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        maybe (pure Nothing) (askPlan request "covered") redrawnAt
+          >>= (`shouldBe` Just (declinedWith "covered" coveredDeclined ["insurance is not modelled"]))
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition in its own file" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf ->
+        planOf "settled" [] >>= (`shouldBe` Just (declinedWith "settled" settledDeclined ["residence is not modelled"]))
+
+    it "the language server's l4/queryPlan plans a rule that cannot refuse, with an answer for an input or without" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf -> do
+        planned <- planOf "planned" []
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        (planned >>= (`objField` "determined")) `shouldBe` Just Null
+        asksOf planned `shouldBe` ["adult", "resident"]
+        answered <- planOf "planned" [("adult", False)]
+        (answered >>= (`objField` "determined")) `shouldBe` Just (Bool False)
+        asksOf answered `shouldBe` []
+
+    it "the language server's l4/queryPlan answers, of two rules with one name, for the one whose decision graph it drew, the plan and the decline alike" $ withLsp \lsp -> do
+      -- The first rule named target may refuse, through the helper, and the
+      -- second cannot.
+      let overloads = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS REFUSE \"the helper is not modelled\""
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            , ""
+            , "GIVEN a IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a > 1"
+            ]
+      withRuleFile lsp overloads \uri _notify request -> do
+        let planOfNth nth = drawRuleAt request uri overloads "target" nth >>= maybe (pure Nothing) (askPlan request "target")
+        second <- planOfNth 1
+        (second >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf second `shouldBe` ["a GREATER THAN 1"]
+        planOfNth 0 >>= (`shouldBe` Just (declinedWith "target"
+          "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+          ["the helper is not modelled"]))
+        secondAgain <- planOfNth 1
+        (secondAgain >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf secondAgain `shouldBe` ["a GREATER THAN 1"]
+
+    -- A client draws the decision graph again on a change to the document,
+    -- naming the document and its version only, as the VS Code extension
+    -- does; or from the rule's lens.
+    it "the language server's l4/queryPlan answers for the document as changed once the graph is drawn again, after an edit that adds a REFUSE and one that takes it away" $ withLsp \lsp -> do
+      let answers = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS TRUE"
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            ]
+          refuses = T.replace "helper MEANS TRUE" "helper MEANS REFUSE \"the helper is not modelled\"" answers
+      withRuleFile lsp answers \uri notify request -> do
+        planned <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf planned `shouldBe` ["a", "helper"]
+        didChange notify uri 2 refuses
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        declined <- maybe (pure Nothing) (askPlan request "target") redrawnAt
+        declined `shouldBe` Just (declinedWith "target"
+          "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+          ["the helper is not modelled"])
+        didChange notify uri 3 answers
+        redrawnAgain <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (3 :: Int)]]
+        let redrawnAgainAt = redrawnAgain >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAgainAt >>= (`objField` "version")) `shouldBe` Just (Number 3)
+        plannedOnChange <- maybe (pure Nothing) (askPlan request "target") redrawnAgainAt
+        (plannedOnChange >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf plannedOnChange `shouldBe` ["a", "helper"]
+        plannedAgain <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (plannedAgain >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf plannedAgain `shouldBe` ["a", "helper"]
+
+    it "the language server's l4/queryPlan declines a rule after an edit that adds a REFUSE to its own body, once the graph is drawn again on the change" $ withLsp \lsp -> do
+      let answers = T.unlines
+            [ "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a"
+            ]
+          refuses = T.replace "DECIDE target IF a" "DECIDE target IF IF a THEN REFUSE \"the rule is not modelled\" ELSE FALSE" answers
+      withRuleFile lsp answers \uri notify request -> do
+        planned <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf planned `shouldBe` ["a"]
+        didChange notify uri 2 refuses
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        maybe (pure Nothing) (askPlan request "target") redrawnAt
+          >>= (`shouldBe` Just (declinedWith "target"
+                "No query plan for target: it may refuse to answer, with the reason \"the rule is not modelled\"."
+                ["the rule is not modelled"]))
+
+    -- l4/inlineExprs draws the graph again with a definition's body in place
+    -- of its name.
+    it "the language server's l4/queryPlan keeps the decline of a decision graph that l4/inlineExprs draws again" $ withLsp \lsp -> do
+      let source = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS REFUSE \"the helper is not modelled\""
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            ]
+      withRuleFile lsp source \uri _notify request ->
+        lensArgsAt request uri source "target" 0 >>= traverse_ \args -> do
+          drawn <- visualize request args
+          let drawnAt = fromMaybe Null (drawn >>= (`objField` "result") >>= (`objField` "verDocId"))
+          case inlinableUniques "helper" =<< toList (drawn >>= (`objField` "result")) of
+            [helper] -> do
+              inlined <- request "l4/inlineExprs" (Aeson.object ["uniques" Aeson..= [helper], "verDocId" Aeson..= drawnAt])
+              (inlined >>= (`objField` "result")) `shouldSatisfy` maybe False (null . inlinableUniques "helper")
+              askPlan request "target" drawnAt >>= (`shouldBe` Just (declinedWith "target"
+                "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+                ["the helper is not modelled"]))
+            other -> expectationFailure ("expected one node naming the helper that can be inlined, got " <> show other)
+
+  -- A directive reads a list answer only so deep, so a REFUSE or a division by
+  -- zero at the end of a long list stops it for a short list and not for a
+  -- longer one. `l4 batch` reads each row's answer to the same depth as `l4 run`
+  -- reads an #EVAL, so the two give the same verdict for every n, including the
+  -- n on each side of the depth limit.
+  describe "l4 run and l4 batch read a long list answer to the same depth" $ do
+    let depthFixture = fixtureDir </> "refuse-depth.l4"
+        depthRows = fixtureDir </> "refuse-depth-rows.json"
+        verdictOf :: T.Text -> String
+        verdictOf t
+          | "The model refuses to answer:" `T.isInfixOf` t = "refuses"
+          | "Division by zero" `T.isInfixOf` t = "division by zero"
+          | otherwise = "answers"
+        runVerdictsOf fixture = do
+          Output _ sout _ <- runL4 bin ["run", fixture]
+          let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
+              result b = fst (T.breakOn "Trace:" (snd (T.breakOn "Result:" b)))
+          pure (map (verdictOf . result) blocks)
+        runVerdicts = runVerdictsOf depthFixture
+        batchRowsOf :: FilePath -> FilePath -> String -> IO [Value]
+        batchRowsOf fixture rowsFile entry = do
+          Output _ sout _ <- runL4 bin ["batch", "-c", fixture, "-i", rowsFile, "-e", entry]
+          pure [ row | l <- map (filter (/= '\r')) (lines sout)
+                     , Right row <- [eitherDecode (BSL8.pack l)] ]
+        batchRows = batchRowsOf depthFixture depthRows
+        maybeFixture = fixtureDir </> "refuse-depth-maybe.l4"
+        maybeRows = fixtureDir </> "refuse-depth-maybe-rows.json"
+        rowResult row = case objField row "output" of
+          Just (Array outs) | (o : _) <- toList outs -> objField o "result"
+          _ -> Nothing
+        batchVerdict :: Value -> String
+        batchVerdict row = case rowResult row of
+          Just (Object o)
+            | Just (Object _) <- KeyMap.lookup (Key.fromString "refused") o
+            , objField row "status" == Just (String "refused") -> "refuses"
+            | Just (String e) <- KeyMap.lookup (Key.fromString "error") o -> verdictOf e
+          Just (Array _) | objField row "status" == Just (String "success") -> "answers"
+          other -> "unexpected: " <> take 300 (show other)
+        -- each rule, with the verdicts `l4 run` gives for n = 200, 201, 202
+        expected :: [(String, [String])]
+        expected =
+          [ ("refusal in the list",  ["refuses", "answers", "answers"])
+          , ("refusal as the rest",  ["refuses", "refuses", "answers"])
+          , ("division in the list", ["division by zero", "answers", "answers"])
+          , ("division as the rest", ["division by zero", "division by zero", "answers"])
+          ]
+
+    it "l4 run reaches the end of the list for the smaller n and answers for the larger" $ do
+      verdicts <- runVerdicts
+      verdicts `shouldBe` concatMap snd expected
+
+    forM_ expected \(entry, verdicts) ->
+      it ("l4 batch gives the verdict l4 run gives for each n, for `" <> entry <> "`") $ do
+        rows <- batchRows entry
+        map batchVerdict rows `shouldBe` verdicts
+
+    -- An answered row carries the list as deep as the service's direct path
+    -- does: the numbers, then a null for the element and one for the rest of
+    -- the list that the depth limit leaves unprinted.
+    it "l4 batch answers a row past the limit with the numbers the depth limit reaches, then a null for the element and one for the rest" $ do
+      rows <- batchRows "refusal in the list"
+      case drop 1 rows of
+        (row : _) -> case rowResult row of
+          Just (Array xs) -> do
+            let entries = toList xs
+            length entries `shouldBe` 202
+            take 200 entries `shouldBe` map (Number . fromInteger) [201, 200 .. 2]
+            drop 200 entries `shouldBe` [Null, Null]
+          other -> expectationFailure ("Expected a list answer, got " <> take 300 (show other))
+        [] -> expectationFailure "Expected three rows"
+
+    -- The rule's own JUST takes a level on both paths, so the refusal at the
+    -- end of the list is reached one element sooner than in a bare list. l4
+    -- batch reads a function's answer inside a JUST of its own, and only that
+    -- outer JUST takes no level.
+    it "l4 run and l4 batch reach a refusal one element sooner in a list inside the rule's own JUST" $ do
+      runV <- runVerdictsOf maybeFixture
+      rows <- batchRowsOf maybeFixture maybeRows "refusal in a MAYBE list"
+      runV `shouldBe` ["refuses", "answers"]
+      map batchVerdict rows `shouldBe` ["refuses", "answers"]
+
+    it "l4 batch answers the row past that limit with the numbers one element sooner, then the two nulls" $ do
+      rows <- batchRowsOf maybeFixture maybeRows "refusal in a MAYBE list"
+      case drop 1 rows of
+        (row : _) -> case rowResult row of
+          Just (Array xs) -> do
+            let entries = toList xs
+            length entries `shouldBe` 201
+            take 199 entries `shouldBe` map (Number . fromInteger) [200, 199 .. 2]
+            drop 199 entries `shouldBe` [Null, Null]
+          other -> expectationFailure ("Expected a list answer, got " <> take 300 (show other))
+        [] -> expectationFailure "Expected two rows"
+
+    -- An export with no inputs is asked for bare, not inside a JUST, so a JUST
+    -- in its answer is the rule's own and takes a level, as it does for an
+    -- #EVAL of the export. The fixture's list ends in a refusal one level below
+    -- the depth read, so both answer.
+    it "l4 batch gives the verdict l4 run gives for an export with no inputs whose answer is in its own JUST" $ do
+      let fixture = fixtureDir </> "refuse-depth-no-inputs.l4"
+          rowsFile = fixtureDir </> "refuse-depth-no-inputs-rows.json"
+      Output _ rout _ <- runL4 bin ["run", fixture]
+      Output _ bout _ <- runL4 bin ["batch", "-c", fixture, "-i", rowsFile, "-e", "wrapped"]
+      let runResult = fst (T.breakOn "Trace:" (snd (T.breakOn "Result:" (T.pack (filter (/= '\r') rout)))))
+          rows = [ row | l <- map (filter (/= '\r')) (lines bout)
+                       , Right row <- [eitherDecode (BSL8.pack l)] ]
+      runResult `shouldSatisfy` T.isInfixOf "JUST OF (LIST 200, 199"
+      verdictOf runResult `shouldBe` "answers"
+      map batchVerdict rows `shouldBe` ["answers"]
 
   -- `@lang en` says what a module that declares nothing already is, so
   -- `l4 check` hints that the line can go. It is a HINT: the check still
@@ -1771,6 +2549,36 @@ spec bin = do
       -- it just produces no output but still exits 0.
       Output code _ _ <- runL4 bin ["trace", evalFixture]
       code `shouldBe` ExitSuccess
+
+    -- The graph says a refusal is one, with its reason, as the text trace
+    -- does, and does not label it as an error.
+    it "labels a refusal in the DOT graph with its reason, not as an error" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `isInfixOf`)
+      sout `shouldSatisfy` ("↯ refused: not modelled" `isInfixOf`)
+      sout `shouldNotSatisfy` ("<error>" `isInfixOf`)
+
+    -- The root of each graph carries the directive's outcome. A refusal met
+    -- only while the answer is read in full, below its head (inside a JUST,
+    -- or at the end of a list), is the directive's outcome, so the root is
+    -- labelled and filled as a refusal, and not as the answer's head.
+    it "labels and fills the root as a refusal when it is met below the answer's head" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace-deep.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      let roots = [ fst (T.breakOn "style=filled" (snd (T.breakOn "0 [label=" g)))
+                  | g <- drop 1 (T.splitOn "digraph {" (T.pack sout)) ]
+      length roots `shouldBe` 2
+      forM_ roots $ \root -> do
+        root `shouldSatisfy` T.isInfixOf "↯ refused: not modelled"
+        root `shouldSatisfy` T.isInfixOf "#ffcccc"
+
+    -- A reason is printed whole in the graph, every line of it, as it is in
+    -- the text form of the trace.
+    it "labels a refusal with every line of its reason" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace-lines.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("↯ refused: not modelled\\nfor this year" `isInfixOf`)
 
   describe "l4 state-graph" $ do
     it "fails on a file without regulative rules" $ do
@@ -2913,6 +3721,10 @@ buildIdentityScript, buildIdentityPackageJson :: FilePath
 buildIdentityScript      = "../etc/build-identity.sh"
 buildIdentityPackageJson = "../ts-apps/vscode/package.json"
 
+-- | doc/test-docs.sh's check of what @l4 run@ printed, relative to @jl4/@.
+checkRunOutputScript :: FilePath
+checkRunOutputScript = "../doc/check-l4-run-output.sh"
+
 -- | No white space at either end, and any run of it inside a single space: how
 -- the renderer treats each part, so a value with a line break in it still gives
 -- one line.
@@ -2953,6 +3765,86 @@ locateLspBinary = do
       let path = reverse (dropWhile Char.isSpace (reverse (dropWhile Char.isSpace out)))
       ok <- if code == ExitSuccess then doesFileExist path else pure False
       if ok then Just <$> makeAbsolute path else pure Nothing
+
+-- | Find the @jl4-repl@ binary: @L4_REPL_BIN@, else the one Cabal built for
+-- this test suite.
+locateReplBinary :: IO (Maybe FilePath)
+locateReplBinary = do
+  fromEnv <- lookupEnv "L4_REPL_BIN"
+  case fromEnv of
+    Just p -> do
+      ok <- doesFileExist p
+      pure (if ok then Just p else Nothing)
+    Nothing -> do
+      (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+      let path = takeWhile (`notElem` ("\r\n" :: String)) out
+      ok <- doesFileExist path
+      pure (if code == ExitSuccess && ok then Just path else Nothing)
+
+-- | The REPL's reply to each query, with the file loaded, run in @work@
+-- because the REPL keeps a history file in the directory it is in.
+replRepliesFor :: FilePath -> FilePath -> FilePath -> [String] -> IO [T.Text]
+replRepliesFor work repl file queries = do
+  absFile <- makeAbsolute file
+  (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+    { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+  hPutStr hin (unlines (queries <> [":quit"]))
+  hClose hin
+  hSetBinaryMode hout True
+  hSetBinaryMode herr True
+  soutBytes <- BS.hGetContents hout
+  _ <- BS.hGetContents herr
+  _ <- waitForProcess ph
+  let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+  pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+
+-- | Start @jl4-lsp@, initialize it and open the file in it, then hand the
+-- action the file's URI, a way to send a notification, and a way to send a
+-- request and wait for its answer, which is 'Nothing' if none came within two
+-- minutes. A request from the server in the meantime is answered with @null@.
+withOpenDocument :: FilePath -> FilePath -> (T.Text -> (T.Text -> Value -> IO ()) -> (T.Text -> Value -> IO (Maybe Value)) -> IO a) -> IO a
+withOpenDocument lsp file act = do
+  absFile <- makeAbsolute file
+  source <- TE.decodeUtf8 <$> BS.readFile absFile
+  let uri = LSP.getUri (LSP.filePathToUri absFile)
+  (Just hin, Just hout, Just herr, ph) <-
+    createProcess (proc lsp []) {std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
+  mapM_ (`hSetBinaryMode` True) [hin, hout, herr]
+  _ <- forkIO (void (BS.hGetContents herr))
+  nextId <- newIORef (1 :: Int)
+  let send v = do
+        let body = BSL8.toStrict (Aeson.encode v)
+        BS.hPut hin (BS8.pack ("Content-Length: " ++ show (BS.length body) ++ "\r\n\r\n") <> body)
+        hFlush hin
+      notify :: T.Text -> Value -> IO ()
+      notify method params =
+        send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "method" Aeson..= method, "params" Aeson..= params])
+      request :: T.Text -> Value -> IO (Maybe Value)
+      request method params = do
+        n <- atomicModifyIORef' nextId (\k -> (k + 1, k))
+        send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "id" Aeson..= n, "method" Aeson..= method, "params" Aeson..= params])
+        let await = readLspMessage hout >>= \case
+              Nothing -> pure Nothing
+              Just msg -> case Aeson.decodeStrict msg of
+                Just v
+                  | Just _ <- v `objField` "method", Just rid <- v `objField` "id" -> do
+                      send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "id" Aeson..= rid, "result" Aeson..= Null])
+                      await
+                  | Just rid <- v `objField` "id", rid == toJSON n -> pure (Just v)
+                _ -> await
+        fromMaybe Nothing <$> timeout 120000000 await
+      stop = do
+        terminateProcess ph
+        void (waitForProcess ph)
+        void (try (hClose hin) :: IO (Either IOException ()))
+  flip finally stop $ do
+    _ <- request "initialize" (Aeson.object ["processId" Aeson..= Null, "rootUri" Aeson..= Null, "capabilities" Aeson..= Aeson.object []])
+    notify "initialized" (Aeson.object [])
+    notify "textDocument/didOpen" (Aeson.object
+      [ "textDocument" Aeson..= Aeson.object
+          [ "uri" Aeson..= uri, "languageId" Aeson..= ("l4" :: T.Text), "version" Aeson..= (1 :: Int), "text" Aeson..= source ]
+      ])
+    act uri notify request
 
 -- | One @Content-Length@-framed LSP message from a handle, or 'Nothing' at end
 -- of input.

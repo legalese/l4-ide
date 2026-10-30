@@ -1,0 +1,73 @@
+-- The rules of boolean-rules.l4 and in-file-rules.l4 that may refuse, under
+-- the same names, with each REFUSE replaced by FALSE: what the surfaces do
+-- with these rules once the refusal is taken away. No rule here can refuse,
+-- so no query planner may decline one, and a planner that answers must give
+-- the answer the rule gives. See boolean-rules.l4 for what an "agreement:"
+-- line says, and for `pad`.
+--
+-- agreement: covered may refuse with []
+-- agreement: covered {"adult": true, "applicant": true} => answers true
+-- agreement: covered {"adult": true, "applicant": false} => answers false
+-- agreement: covered {"adult": false, "applicant": true} => answers false
+-- agreement: covered {"adult": false, "applicant": false} => answers false
+--
+-- agreement: checked may refuse with []
+-- agreement: checked {"adult": true, "applicant": true} => answers true
+-- agreement: checked {"adult": true, "applicant": false} => answers false
+-- agreement: checked {"adult": false, "applicant": true} => answers false
+-- agreement: checked {"adult": false, "applicant": false} => answers false
+--
+-- agreement: settled may refuse with []
+-- agreement: settled {"adult": true, "applicant": true} => answers true
+-- agreement: settled {"adult": true, "applicant": false} => answers false
+-- agreement: settled {"adult": false, "applicant": true} => answers false
+-- agreement: settled {"adult": false, "applicant": false} => answers false
+--
+-- agreement: eligible may refuse with []
+-- agreement: eligible is planned from its inputs
+-- agreement: eligible {"adult": true, "resident": true} => answers true
+-- agreement: eligible {"adult": true, "resident": false} => answers false
+-- agreement: eligible {"adult": false, "resident": true} => answers false
+-- agreement: eligible {"adult": false, "resident": false} => answers false
+
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE FALSE
+
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is resident` person MEANS
+    IF person THEN TRUE
+    ELSE FALSE
+
+@export whether the applicant is covered
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE covered IF adult AND `the person is insured` applicant
+
+@export whether the applicant is checked
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE checked IF
+    IF adult THEN `the person is insured` applicant
+    ELSE FALSE
+
+@export whether the applicant is settled
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE settled IF adult AND `the person is resident` applicant
+
+@export whether the applicant is eligible
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE eligible IF adult AND (resident OR FALSE)

@@ -1,0 +1,61 @@
+-- Rules that answer a list of n numbers whose end refuses, or raises a
+-- division by zero, either as one more element or as the rest of the list.
+-- A surface reads a list answer only so deep, so each case below is at the
+-- last n whose end it reaches, or at the n one past it, where every surface
+-- answers the list cut short. See boolean-rules.l4 for what an "agreement:"
+-- line says, and for `pad`.
+--
+-- agreement: `refusal in the list` may refuse with ["deep"]
+-- agreement: `refusal in the list` {"n": 200} => refuses "deep"
+-- agreement: `refusal in the list` {"n": 201} => answers cut short
+--
+-- agreement: `refusal as the rest` may refuse with ["deep"]
+-- agreement: `refusal as the rest` {"n": 201} => refuses "deep"
+-- agreement: `refusal as the rest` {"n": 202} => answers cut short
+--
+-- agreement: `division in the list` may refuse with []
+-- agreement: `division in the list` {"n": 200} => raises
+-- agreement: `division in the list` {"n": 201} => answers cut short
+--
+-- agreement: `division as the rest` may refuse with []
+-- agreement: `division as the rest` {"n": 201} => raises
+-- agreement: `division as the rest` {"n": 202} => answers cut short
+--
+-- agreement: `refusal in a list of maybes` may refuse with ["deep"]
+-- agreement: `refusal in a list of maybes` {"n": 199} => refuses "deep"
+-- agreement: `refusal in a list of maybes` {"n": 200} => answers cut short
+
+@export the numbers, then a refusal as one more element
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF NUMBER
+`refusal in the list` n pad MEANS
+  IF n EQUALS 0 THEN LIST (REFUSE "deep") ELSE n FOLLOWED BY `refusal in the list` (n MINUS 1) pad
+
+@export the numbers, then a refusal as the rest of the list
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF NUMBER
+`refusal as the rest` n pad MEANS
+  IF n EQUALS 0 THEN REFUSE "deep" ELSE n FOLLOWED BY `refusal as the rest` (n MINUS 1) pad
+
+@export the numbers, then a division by zero as one more element
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF NUMBER
+`division in the list` n pad MEANS
+  IF n EQUALS 0 THEN LIST (1 DIVIDED BY 0) ELSE n FOLLOWED BY `division in the list` (n MINUS 1) pad
+
+@export the numbers, then a division by zero as the rest of the list
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF NUMBER
+`division as the rest` n pad MEANS
+  IF n EQUALS 0 THEN (IF 1 DIVIDED BY 0 EQUALS 0 THEN EMPTY ELSE EMPTY) ELSE n FOLLOWED BY `division as the rest` (n MINUS 1) pad
+
+@export each number as a JUST, then a refusal as one more element
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A LIST OF MAYBE NUMBER
+`refusal in a list of maybes` n pad MEANS
+  IF n EQUALS 0 THEN LIST (JUST (REFUSE "deep")) ELSE JUST n FOLLOWED BY `refusal in a list of maybes` (n MINUS 1) pad
