@@ -2,8 +2,10 @@
 -- release can be sliced per backend.
 module CliTest.Catala (spec, fixtures) where
 
-import Data.List (isInfixOf, isPrefixOf)
+import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
+import System.Directory (listDirectory)
 import System.Exit (ExitCode(..))
+import System.FilePath ((</>))
 import Test.Hspec
 
 import CliTest.Common
@@ -25,9 +27,45 @@ spec bin = do
       expectGolden bin ["export", "catala", "examples/catala/benefit.l4"]
                        "examples/catala/expected/benefit.catala_en"
 
-    it "compiles a nested-guard rate table (the ladder-direction exhibit)" $
+    -- One of its four combinations (the higher band without the lower) is
+    -- impossible, and only a solver can say so, so this golden needs z3.
+    it "compiles a nested-guard rate table (the ladder-direction exhibit)" $ withZ3 $
       expectGolden bin ["export", "catala", "examples/catala/bands.l4"]
                        "examples/catala/expected/bands.catala_en"
+
+    -- §8.4 / R-V10: nine atomic conditions, past the grid's cap of eight, so
+    -- before the witness gate this ladder fell back to Mode A. Now it ships,
+    -- checked at the ten combinations an income realises; z3 proves the
+    -- other 502 impossible.
+    it "gates a ladder with more than eight atoms instead of falling back (R-V10)" $ withZ3 $ do
+      expectGolden bin ["export", "catala", "examples/catala/many-bands.l4"]
+                       "examples/catala/expected/many-bands.catala_en"
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/many-bands.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("label marginal_rate_r1 exception marginal_rate_r2" `isInfixOf`)
+      sout `shouldSatisfy` ("#[test] declaration scope MarginalRateWitness10:" `isInfixOf`)
+      sout `shouldSatisfy` ("502 combinations were proved impossible" `isInfixOf`)
+      sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
+
+    -- The golden fixtures' witnesses come from the fixed candidate set alone,
+    -- so the emitted text does not depend on which solver (or version) runs.
+    it "ships no golden whose witnesses needed a solver to find" $ do
+      files <- listDirectory ("examples" </> "catala" </> "expected")
+      let goldens = [ "examples" </> "catala" </> "expected" </> f | f <- files, ".catala_en" `isSuffixOf` f ]
+      length goldens `shouldSatisfy` (> 10)
+      for_ goldens \g -> do
+        txt <- readFile g
+        (g, "found by an SMT solver" `isInfixOf` txt) `shouldBe` (g, False)
+
+    -- Without a solver the witness gate cannot rule out the impossible
+    -- combination, so the ladder keeps today's grid and stderr says why.
+    it "keeps the exhaustive grid, and says why, when no solver is found" $ do
+      Output code sout serr <- runL4WithEnvExtra [("Z3_EXE", "/nonexistent/z3")] bin
+                                 ["export", "catala", "examples/catala/bands.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("#[test] declaration scope RateBandEqvGrid:" `isInfixOf`)
+      serr `shouldSatisfy` ("no witness gate for `rate band`" `isInfixOf`)
+      serr `shouldSatisfy` ("no SMT solver was found" `isInfixOf`)
 
     it "compiles the literate weave: § headings, inert law text, @ref, enums" $
       expectGolden bin ["export", "catala", "examples/catala/statute.l4"]
@@ -210,13 +248,15 @@ spec bin = do
       sout `shouldNotSatisfy` (" or " `isInfixOf`)
 
     -- R4: the exception ladder is the PRIMARY emission, and it never ships
-    -- without the apparatus that re-checks it.
-    it "emits Mode B ladders together with their equivalence grid" $ do
+    -- without the apparatus that re-checks it: since R-V10, test scopes that
+    -- call the emitted scope itself at a witness per realisable combination.
+    it "emits Mode B ladders together with their witness gate" $ withZ3 $ do
       Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/bands.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("label rate_band_r1 exception rate_band_r2" `isInfixOf`)
-      sout `shouldSatisfy` ("#[test] declaration scope RateBandEqvGrid:" `isInfixOf`)
-      sout `shouldSatisfy` ("{\"all_agree\":true}" `isInfixOf`)
+      sout `shouldSatisfy` ("(output of RateBand with { -- f: Filer { -- income: 50001.0 -- resident: true } }).rate_band" `isInfixOf`)
+      sout `shouldSatisfy` ("1 combination was proved impossible by an SMT solver" `isInfixOf`)
+      sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
 
     -- R7: the expected values come from L4's evaluator, not from
     -- `clerk test --reset`. 0.25 is L4's answer for a 60000 income, and Catala

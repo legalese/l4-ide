@@ -41,6 +41,10 @@ module L4.Catala.Lower
   , lowerModuleWith
   , LowerOptions (..)
   , defaultLowerOptions
+  , WitnessGate (..)
+  , WitnessRow (..)
+  , LadderTarget (..)
+  , ladderTargets
   , LowerError (..)
   , renderLowerError
   ) where
@@ -54,7 +58,7 @@ import qualified Data.Text as Text
 
 import Optics (cosmosOf, gplate, toListOf, (^.))
 
-import L4.Annotation (getAnno, rangeOf)
+import L4.Annotation (emptyAnno, getAnno, rangeOf)
 import L4.API.EmbeddedLibraries (embeddedLibraryNames)
 import L4.Catala.Emit (renderCatType)
 import L4.Catala.Equivalence (EqvUnit (..), equivalenceUnit)
@@ -249,6 +253,7 @@ data Ctx = Ctx
   , cxDecides  :: !(Map Unique DecideInfo)
   , cxNonexh   :: !Bool                       -- ^ the enclosing decision carries @\@nonexhaustive@
   , cxBoolOnly :: !Bool                       -- ^ @--boolean-only@: never emit a ladder (§8.4)
+  , cxGates    :: !(Map Unique WitnessGate)   -- ^ §8.4's witness gates, per exported decision
   }
 
 -- | The name Catala's @optional of@ enumeration answers to in 'cxCases'.
@@ -260,17 +265,105 @@ maybeEnum = "#optional"
 -- ---------------------------------------------------------------------------
 
 -- | Knobs the CLI exposes.
-newtype LowerOptions = LowerOptions
+data LowerOptions = LowerOptions
   { loBooleanOnly :: Bool
     -- ^ §8.4's escape flag: emit only the Mode A boolean rendering, and with it
     -- no exception ladders and none of the equivalence apparatus that exists to
     -- check them. The ladders are still /derived/ (so the fallback notes stay
     -- accurate); they are simply not what the artifact says.
+  , loWitnessGates :: Map Unique WitnessGate
+    -- ^ §8.4's witness gate, per exported decision, computed by the caller
+    -- (it needs the evaluator, and a solver for the impossible combinations,
+    -- neither of which this pure module can run). A decision with a gate gets
+    -- its ladder checked by test scopes that call the emitted scope itself, and
+    -- the exhaustive grid's cap does not apply to it. A decision without one is
+    -- lowered exactly as before.
   }
   deriving stock (Eq, Show)
 
 defaultLowerOptions :: LowerOptions
-defaultLowerOptions = LowerOptions { loBooleanOnly = False }
+defaultLowerOptions = LowerOptions { loBooleanOnly = False, loWitnessGates = Map.empty }
+
+-- | The witness gate for one exported decision's ladder (§8.4's disclosed-open
+-- item, discharged by VERIFICATION-BACKEND-LOWERING-SPEC R-V10).
+--
+-- One row per combination of truth values of the ladder's atomic conditions
+-- that some input realises: that input, and the value L4's evaluator computes
+-- there. The emitted test scopes call the REAL emitted scope at each input, so
+-- an edit to the shipped rule that changes its answer at a realisable
+-- combination fails @clerk test@, which the grid (built from its own copies of
+-- the ladder) could not see. A combination no input realises was proved so by a
+-- solver and is listed, untested. The caller passes a gate only when every
+-- combination is one or the other.
+data WitnessGate = WitnessGate
+  { wgRows      :: ![WitnessRow]
+  , wgImpossible :: ![[Bool]]
+  , wgAtomText  :: ![Text]
+    -- ^ each atom as L4 source, in the ladder's own order, for the prose
+  }
+  deriving stock (Eq, Show)
+
+data WitnessRow = WitnessRow
+  { wrAssignment :: ![Bool]
+  , wrArgs       :: ![Expr Resolved]
+    -- ^ the decision's arguments, as L4 values, in parameter order
+  , wrArgsText   :: ![Text]
+  , wrExpected   :: !Text
+    -- ^ the evaluator's answer, in @catala interpret -F json@'s rendering
+  , wrHuman      :: !Text
+  , wrFromSolver :: !Bool
+    -- ^ found by the solver because no candidate realised the combination
+  }
+  deriving stock (Eq, Show)
+
+-- | An exported decision whose body is a ladder shape, and the L4 atoms the
+-- ladder is built from, in the order 'modeBClauses' uses: the base and then
+-- the provisos of an @AND NOT@ chain, or the conditions of a cascade's arms.
+-- What the caller needs to look for a witness per combination.
+data LadderTarget = LadderTarget
+  { ltDecide :: !Unique
+  , ltName   :: !Resolved
+  , ltParams :: ![(Resolved, Maybe (Type' Resolved))]
+    -- ^ each parameter's binding occurrences (the GIVEN name, and the app-form
+    -- argument when it is a different 'Unique'), with its declared type
+  , ltAppArgs :: ![Resolved]
+  , ltAtoms  :: ![Expr Resolved]
+  , ltReadsAssumes :: !Bool
+  }
+
+-- | Every exported decision of this module whose body 'modeBClauses' would
+-- turn into a ladder.
+ladderTargets :: [Module Resolved] -> Module Resolved -> [LadderTarget]
+ladderTargets imports mod' =
+  [ LadderTarget
+      { ltDecide = di.diUnique
+      , ltName   = decideName ef.exportDecide
+      , ltParams = [ (givenName g, givenType g) | g <- di.diGivens ]
+      , ltAppArgs = di.diAppArgs
+      , ltAtoms  = atoms
+      , ltReadsAssumes = not (null (Map.findWithDefault [] di.diUnique assumeUse))
+      }
+  | ef <- getExportedFunctions mod'
+  , Just di <- [Map.lookup (getUnique (decideName ef.exportDecide)) decides]
+  , Just atoms <- [ladderAtoms (isBoolean di.diGiveth) di.diBody]
+  , not (null atoms)
+  ]
+ where
+  codeModules = mod' : filter (not . isLibraryModule) imports
+  decides = collectDecides codeModules
+  assumes = collectAssumes codeModules
+  assumeUse = assumeClosure decides assumes Map.empty
+                [ getUnique (decideName ef.exportDecide) | ef <- getExportedFunctions mod' ]
+  isBoolean = \case
+    Just (TyApp _ r []) -> getUnique r == TC.booleanUnique
+    _ -> False
+
+-- | The L4 atoms of the ladder 'modeBClauses' derives from a body, in its order.
+ladderAtoms :: Bool -> Expr Resolved -> Maybe [Expr Resolved]
+ladderAtoms isCondition body
+  | isCondition, Just (base, provisos) <- peelProvisos body = Just (base : provisos)
+  | Just (arms, _) <- cascadeArms body = Just (map fst arms)
+  | otherwise = Nothing
 
 lowerModule :: Module Resolved -> Either [LowerError] CatModule
 lowerModule = lowerModuleWith defaultLowerOptions []
@@ -521,11 +614,13 @@ buildModule opts imports mod' efs =
           , cxDecides  = decides
           , cxNonexh   = False
           , cxBoolOnly = opts.loBooleanOnly
+          , cxGates    = opts.loWitnessGates
           }
         modTitle = catUpper (dropExt (moduleSource mod'))
     in (\lowered tops ->
           let (tests, testNotes) = collectTests ctx decides mod'
               eqvs               = concatMap eqvUnitsOf lowered
+              wits               = concatMap (witnessBlockOf ctx) lowered
               tops'              = [ lenientDateTopdef | needsLenientDate ] <> tops
               notes = nub (  fieldNotes
                           <> Map.elems elided
@@ -536,7 +631,7 @@ buildModule opts imports mod' efs =
                , modSource   = moduleSource mod'
                , modWarnings = notes
                , modSegments = weave modTitle (moduleSource mod') notes structs enums
-                                     tops' lowered eqvs tests
+                                     tops' lowered eqvs wits tests
                })
        <$> vList [ lowerExport ctx assumes assumeUse decides sectionPaths ef | ef <- efs ]
        <*> vList [ lowerHelper ctx di | di <- helpers ]
@@ -556,6 +651,11 @@ buildModule opts imports mod' efs =
        [ ( catUpper ef.exportName <> "Eqv" <> sfx
          , "<generated equivalence scope for `" <> ef.exportName <> "`>" )
        | ef <- efs, sfx <- ["Row", "ModeA", "ModeB", "Agree", "Grid"] ]
+    <> [ ( catUpper ef.exportName <> "Witness" <> tshow k
+         , "<generated witness test scope " <> tshow k <> " for `" <> ef.exportName <> "`>" )
+       | ef <- efs
+       , Just g <- [Map.lookup (getUnique (decideName ef.exportDecide)) opts.loWitnessGates]
+       , k <- [1 .. length g.wgRows] ]
     <> [ ("Test" <> tshow i <> sfx, "<generated #EVAL test scope " <> tshow i <> ">")
        | i <- [1 .. length [ () | Directive _ _ <- topDecls mod' ]]
        , sfx <- ["", defaultTestSuffix] ]
@@ -796,9 +896,9 @@ paramsOf elided = \case
 weave
   :: Text -> Text -> [Text]
   -> [CatStruct] -> [CatEnum] -> [CatTopdef]
-  -> [LoweredScope] -> [(Text, EqvUnit)] -> [TestUnit]
+  -> [LoweredScope] -> [(Text, EqvUnit)] -> [(Text, WitnessBlock)] -> [TestUnit]
   -> [CatSegment]
-weave title source notes structs enums tops lowered eqvs tests =
+weave title source notes structs enums tops lowered eqvs wits tests =
      [ SegProse header ]
   <> [ SegProse noteBlock | not (null notes) ]
   <> [ SegMetadata metadata ]
@@ -824,6 +924,7 @@ weave title source notes structs enums tops lowered eqvs tests =
     <> map DEnum enums
     <> [ DScope ls.lsDecl | ls <- lowered ]
     <> concat [ eu.euDecls | (_, eu) <- eqvs ]
+    <> [ DScope t.tuDecl | (_, wb) <- wits, t <- wb.wbUnits ]
     <> [ DScope t.tuDecl | t <- tests ]
 
   -- Emit a heading for each newly entered § level, then the decision itself.
@@ -844,7 +945,12 @@ weave title source notes structs enums tops lowered eqvs tests =
           [ [ SegProse eu.euProse, SegCode eu.euItems, SegTestCli eu.euTest ]
           | (owner, eu) <- eqvs, owner == ls.lsBody.sbName
           ]
-    in (ls.lsPath, [ SegProse h | h <- newHeads ] <> body <> eqvBlocks)
+        witBlocks = concat
+          [ SegProse wb.wbProse
+            : concat [ [ SegCode [ItemScope t.tuBody], SegTestCli t.tuCli ] | t <- wb.wbUnits ]
+          | (owner, wb) <- wits, owner == ls.lsBody.sbName
+          ]
+    in (ls.lsPath, [ SegProse h | h <- newHeads ] <> body <> eqvBlocks <> witBlocks)
 
   heading n t = [ Text.replicate n "#" <> " " <> t ]
 
@@ -909,7 +1015,8 @@ inertTexts e =
 eqvUnitsOf :: LoweredScope -> [(Text, EqvUnit)]
 eqvUnitsOf ls =
   [ (ls.lsBody.sbName, eu)
-  | (i, rd) <- zip [0 :: Int ..] eqvRules
+  | isNothing ls.lsGate
+  , (i, rd) <- zip [0 :: Int ..] eqvRules
   , Just eqv <- [rd.rdEqv]
   , eu <- maybeToList (equivalenceUnit (base i) (human i rd) eqv)
   ]
@@ -917,6 +1024,98 @@ eqvUnitsOf ls =
   eqvRules  = [ rd | rd <- ls.lsBody.sbRules, isJust rd.rdEqv ]
   base i    = ls.lsBody.sbName <> "Eqv" <> (if i == 0 then "" else tshow i)
   human i rd = ls.lsL4 <> (if i == 0 then "" else " / " <> rd.rdVar)
+
+-- | A gated ladder's witness tests: prose, and one @#[test]@ scope per row.
+data WitnessBlock = WitnessBlock
+  { wbProse :: ![Text]
+  , wbUnits :: ![TestUnit]
+  }
+
+-- | The witness gate's apparatus for one scope (§8.4, R-V10).
+--
+-- Each test scope calls the emitted scope itself — @output of S with { … }@ at
+-- the row's input, lowered exactly as an R7 test's call is — and expects the
+-- value L4 computed there. A row whose call does not lower is a lowering bug
+-- and is reported in the prose rather than dropped.
+witnessBlockOf :: Ctx -> LoweredScope -> [(Text, WitnessBlock)]
+witnessBlockOf ctx ls = case ls.lsGate of
+  Nothing -> []
+  Just g  -> [(scope, WitnessBlock (prose g) (catMaybes (zipWith unit [1 :: Int ..] g.wgRows)))]
+ where
+  scope = ls.lsBody.sbName
+  unit k row = case runV (lowerExpr ctx { cxInScope = True } (App emptyAnno ls.lsDecide row.wrArgs)) of
+    Left _ -> Nothing
+    Right call ->
+      let nm = scope <> "Witness" <> tshow k
+      in Just TestUnit
+           { tuDecl = CatScopeDecl
+               { sdName   = nm
+               , sdL4     = nm
+               , sdDesc   = Just ("Witness " <> tshow k <> " for `" <> ls.lsL4 <> "`: "
+                                  <> combination row.wrAssignment <> ".")
+               , sdIsTest = True
+               , sdVars   = [ CatScopeVar "result" "result" VarOutput (ShContent ls.lsOutTy) Nothing ]
+               }
+           , tuBody = CatScopeBody nm
+               [ CatRuleDef
+                   { rdVar = "result"
+                   , rdModeA = [CatClause ClPlain Nothing (ConsEquals call)]
+                   , rdModeB = Nothing, rdEmitted = ModeA
+                   , rdFallback = Nothing, rdEqv = Nothing, rdNotes = [] } ]
+           -- See 'L4.Catala.Equivalence' for why @--disable-warnings@ is here.
+           , tuCli = CatTestCli ("catala test-scope " <> nm <> " --disable-warnings -F json")
+                       ["{\"result\":" <> row.wrExpected <> "}"] Nothing
+           }
+
+  combination bs = Text.intercalate ", " [ "p_" <> tshow i <> " " <> (if b then "TRUE" else "FALSE")
+                                         | (i, b) <- zip [0 :: Int ..] bs ]
+  bits bs = Text.pack [ if b then 'T' else 'F' | b <- bs ]
+  -- L4 names carry backticks, so a span that holds one needs a longer fence
+  code t
+    | "`" `Text.isInfixOf` t = "`` " <> t <> " ``"
+    | otherwise = "`" <> t <> "`"
+
+  prose g = let n = length g.wgAtomText in
+       [ "### Witness gate for `" <> ls.lsL4 <> "`"
+       , ""
+       , "The rule above is emitted as an exception ladder (Mode B). Each test scope below"
+       , "calls that scope, not a copy of it, at one concrete input, and expects the value"
+       , "L4's own evaluator computed there. The inputs are witnesses: each makes the " <> tshow n
+       , "atomic condition" <> (if n == 1 then "" else "s") <> " of the ladder take one combination of truth values, and every"
+       , "combination that some input realises has one. So an edit to the rule above that"
+       , "changes its answer on any realisable combination fails `clerk test` (R4, §8.4)."
+       , ""
+       , "The atoms, as L4 writes them:"
+       , ""
+       ]
+    <> [ "- `p_" <> tshow i <> "` is " <> code a | (i, a) <- zip [0 :: Int ..] g.wgAtomText ]
+    <> [ "" ]
+    <> concat
+         [ [ "- Witness " <> tshow k <> " (" <> bits row.wrAssignment <> "): "
+             <> Text.intercalate ", " (map code row.wrArgsText) <> "; L4 computes " <> code row.wrHuman
+             <> (if row.wrFromSolver
+                   then ". This input was found by an SMT solver, because no input from the fixed candidate set realises the combination."
+                   else ".") ]
+         | (k, row) <- zip [1 :: Int ..] g.wgRows ]
+    <> impossible g
+    <> [ ""
+       , "**What this does and does not establish.** It checks the emitted rule's own text"
+       , "at one input per realisable combination of its conditions, against L4. It does"
+       , "not check other inputs that realise the same combination, and it does not test"
+       , "a combination the solver proved impossible."
+       ]
+
+  impossible g = case g.wgImpossible of
+    [] -> []
+    bss ->
+      [ ""
+      , tshow (length bss) <> " combination" <> (if length bss == 1 then " was" else "s were")
+        <> " proved impossible by an SMT solver (no input realises "
+        <> (if length bss == 1 then "it" else "them") <> "), and so "
+        <> (if length bss == 1 then "is" else "are") <> " not tested: "
+        <> Text.intercalate ", " (map bits (take 32 bss))
+        <> (if length bss > 32 then ", and " <> tshow (length bss - 32) <> " more." else ".")
+      ]
 
 -- ---------------------------------------------------------------------------
 -- Tests (R7, §8.7)
@@ -1203,6 +1402,11 @@ data LoweredScope = LoweredScope
   , lsDesc  :: !(Maybe Text)
   , lsPath  :: ![Text]
   , lsLaw   :: ![Text]
+  , lsDecide :: !Resolved
+  , lsOutTy :: !CatType
+  , lsGate  :: !(Maybe WitnessGate)
+    -- ^ present exactly when the main rule is a ladder checked by its witness
+    -- gate rather than by the grid
   }
 
 lowerExport
@@ -1231,6 +1435,7 @@ lowerExportDi outer assumes assumeUse di ef path =
  where
   assumeUs = Map.findWithDefault [] di.diUnique assumeUse
   assumeVs = mapMaybe (`Map.lookup` assumes) assumeUs
+  gate     = Map.lookup di.diUnique outer.cxGates
 
   -- The scope's own variables share one Catala namespace, and 'catIdent' is not
   -- injective, so the parameters, the ASSUMEd inputs and the output name all go
@@ -1271,11 +1476,16 @@ lowerExportDi outer assumes assumeUse di ef path =
           , lsDesc  = desc
           , lsPath  = path
           , lsLaw   = lawText di
+          , lsDecide = decideName ef.exportDecide
+          , lsOutTy = retTy
+          , lsGate  = case (gate, mainRule.rdEmitted) of
+              (Just g, ModeB) -> Just g
+              _               -> Nothing
           })
        <$> vList (map scopeInput di.diGivens)
        <*> vList (map assumeInput assumeVs)
        <*> vList (map (typicallyDefault bodyCtx') di.diGivens)
-       <*> lowerRule bodyCtx' outName outShape di.diBody
+       <*> lowerRule bodyCtx' (isJust gate) outName outShape di.diBody
 
   checkGivenShape g = case givenType g of
     Nothing -> vBad [LowerError di.diName di.diRange
@@ -1386,8 +1596,8 @@ lowerHelper outer di = vIn di.diName $ case di.diGiveth of
 -- also carry the equivalence apparatus that re-checks it. Where it cannot, the
 -- boolean reference rendering is emitted and the reason is recorded — as a
 -- comment in the artifact and as a warning on stderr.
-lowerRule :: Ctx -> Text -> CatVarShape -> Expr Resolved -> V CatRuleDef
-lowerRule ctx var shape body =
+lowerRule :: Ctx -> Bool -> Text -> CatVarShape -> Expr Resolved -> V CatRuleDef
+lowerRule ctx gated var shape body =
   (\modeA modeB -> withNotes $ case modeB of
       -- No ladder was derivable, so nothing was fallen back /from/: this is an
       -- ordinary definition, and calling it a "Mode A fallback" in the artifact
@@ -1407,7 +1617,13 @@ lowerRule ctx var shape body =
         , rdEmitted = ModeA, rdEqv = Nothing, rdNotes = []
         , rdFallback = Just why
         }
+      -- §8.4's witness gate checks the emitted rule itself, at an input per
+      -- realisable combination, so the grid's cap does not bind it.
       Just (clauses, eqv)
+        | gated, eqvAtomCount eqv > 0 -> CatRuleDef
+            { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
+            , rdEmitted = ModeB, rdFallback = Nothing, rdEqv = Just eqv, rdNotes = []
+            }
         | n <- eqvAtomCount eqv, n > 0, n <= eqvRowLimit -> CatRuleDef
             { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
             , rdEmitted = ModeB, rdFallback = Nothing, rdEqv = Just eqv, rdNotes = []

@@ -40,6 +40,8 @@ module L4.Prove.Lower
   , CtorDef (..)
   , Obligation (..)
   , lowerObligation
+  , AtomSpace (..)
+  , lowerAtoms
   , assumesReadBy
   , liftModelValue
   , sampleValues
@@ -215,27 +217,8 @@ lowerObligation env goal = do
   (t, st) <- runStateT (lowerExpr env (Ctx Map.empty Set.empty) goal) emptyState
   when (t.srt /= SBool) $ Left "the assertion is not BOOLEAN"
   let free = reverse st.lsFree
-      tyOrder = reverse st.lsTypeOrder
-      datatypes = case tyOrder of
-        [] -> []
-        us ->
-          [ SList
-              [ Atom "declare-datatypes"
-              , SList [ SList [Atom (st.lsSymbols Map.! u), Atom "0"] | u <- us ]
-              , SList [ SList (map ctorDecl (Map.findWithDefault [] u st.lsTypes)) | u <- us ]
-              ]
-          ]
-      ctorDecl cd = case cd.cdFields of
-        [] -> SList [Atom cd.cdSymbol]
-        _  -> SList (Atom cd.cdSymbol : [ SList [Atom s, sortExpr st srt'] | (s, srt') <- zip cd.cdSelectors cd.cdFields ])
-      consts = [ SList [Atom "declare-const", Atom fv.fvSymbol, sortExpr st fv.fvSort] | fv <- free ]
       commands =
-        [ SList [Atom "set-option", Atom ":produce-models", Atom "true"]
-        , SList [Atom "set-logic", Atom "ALL"]
-        ]
-        <> datatypes
-        <> consts
-        <> reverse st.lsFuns
+        preamble st
         <> [ SList [Atom "define-fun", Atom goalSymbol, SList [], Atom "Bool", t.val]
            , SList [Atom "define-fun", Atom definedSymbol, SList [], Atom "Bool", t.def]
            , SList [Atom "assert", SList [Atom "not", SList [Atom "and", Atom definedSymbol, Atom goalSymbol]]]
@@ -250,8 +233,75 @@ lowerObligation env goal = do
     , obLiterals  = Set.toList st.lsLiterals
     , obReached   = Map.keysSet st.lsFunsDone
     }
+
+emptyState :: LState
+emptyState = LState Map.empty Map.empty [] Map.empty [] Map.empty [] [] Nothing Set.empty
+
+-- | Everything a script declares before its own assertions: options, logic,
+-- datatypes, the free constants, and the unfolded definitions.
+preamble :: LState -> [SExpr]
+preamble st =
+  [ SList [Atom "set-option", Atom ":produce-models", Atom "true"]
+  , SList [Atom "set-logic", Atom "ALL"]
+  ]
+  <> datatypes
+  <> [ SList [Atom "declare-const", Atom fv.fvSymbol, sortExpr st fv.fvSort] | fv <- reverse st.lsFree ]
+  <> reverse st.lsFuns
  where
-  emptyState = LState Map.empty Map.empty [] Map.empty [] Map.empty [] [] Nothing Set.empty
+  datatypes = case reverse st.lsTypeOrder of
+    [] -> []
+    us ->
+      [ SList
+          [ Atom "declare-datatypes"
+          , SList [ SList [Atom (st.lsSymbols Map.! u), Atom "0"] | u <- us ]
+          , SList [ SList (map ctorDecl (Map.findWithDefault [] u st.lsTypes)) | u <- us ]
+          ]
+      ]
+  ctorDecl cd = case cd.cdFields of
+    [] -> SList [Atom cd.cdSymbol]
+    _  -> SList (Atom cd.cdSymbol : [ SList [Atom s, sortExpr st srt'] | (s, srt') <- zip cd.cdSelectors cd.cdFields ])
+
+-- | A ladder's atoms over a decision's parameters, for §8.4's witness search
+-- (R-V10). The parameters are the free constants; everything else is
+-- 'lowerObligation''s lowering.
+data AtomSpace = AtomSpace
+  { asSpace  :: !Obligation
+    -- ^ 'obFree' holds the parameters, in order; the datatypes and literals
+    -- are what 'sampleValues' draws candidates from. Its commands are unused.
+  , asScript :: [Bool] -> Text
+    -- ^ the script whose models realise this combination of the atoms'
+    -- truth values, every atom defined: @unsat@ means no input does
+  }
+
+-- | Each parameter is given by its binding occurrences (a GIVEN name and an
+-- app-form argument can be two 'Unique's for one parameter) and its type.
+lowerAtoms :: ProveEnv -> [([Resolved], Type' Resolved)] -> [Expr Resolved] -> Either Text AtomSpace
+lowerAtoms env params atoms = do
+  (ts, st) <- runStateT go emptyState
+  let free = reverse st.lsFree
+      script bs =
+        renderScript $
+          preamble st
+          <> [ SList [Atom "assert", sAnd (map (.def) ts)] ]
+          <> [ SList [Atom "assert", if b then t.val else SList [Atom "not", t.val]] | (t, b) <- zip ts bs ]
+          <> [ SList [Atom "check-sat"]
+             , SList [Atom "get-value", SList (map (Atom . (.fvSymbol)) free)] ]
+  pure AtomSpace
+    { asSpace = Obligation [] free st.lsTypes st.lsNonLinear (Set.toList st.lsLiterals) (Map.keysSet st.lsFunsDone)
+    , asScript = script
+    }
+ where
+  go = do
+    bound <- for params \case
+      ([], _) -> refuse "out of fragment: a parameter with no name"
+      (rs@(r : _), ty) -> do
+        srt' <- sortOf env ty
+        sym <- symbolFor "l4_" r
+        modify \st -> st { lsFree = FreeVar (getUnique r) (nameOf r) srt' sym : st.lsFree }
+        pure [ (getUnique r', LTerm (Term (Atom sym) tru srt')) | r' <- rs ]
+    ts <- for atoms (lowerExpr env (Ctx (Map.fromList (concat bound)) Set.empty))
+    unless (all ((== SBool) . (.srt)) ts) $ refuse "out of fragment: a ladder condition that is not BOOLEAN"
+    pure ts
 
 sortExpr :: LState -> Sort -> SExpr
 sortExpr st = \case
@@ -414,6 +464,9 @@ lowerExpr env cx = \case
     modify \st -> st { lsLiterals = Set.insert r st.lsLiterals }
     pure (Term (realLit r) tru SReal)
   Lit _ (StringLit _ _) -> refuse "out of fragment: a STRING literal"
+  -- statute text kept beside the logic: the identity of the connective it sits
+  -- in, as the evaluator reads it
+  Inert _ _ ctx -> pure (Term (case ctx of InertCtxOr -> fls; _ -> tru) tru SBool)
   IfThenElse _ c t e -> do
     tc <- bool c; tt <- go t; te <- go e
     when (tt.srt /= te.srt) $ refuse "out of fragment: IF arms of different types"
@@ -714,7 +767,8 @@ sameSymbol a b = Text.dropAround (== '|') a == Text.dropAround (== '|') b
 
 -- | A small, deterministic set of values of a sort: both Booleans; for a
 -- number, each literal the obligation reaches, one either side of it, and 0;
--- for a datatype, every constructor over its fields' samples (to depth 2).
+-- for a datatype, every constructor over its fields' samples (to depth 2,
+-- every combination of them while there are at most 256).
 sampleValues :: Obligation -> Sort -> [Expr Resolved]
 sampleValues ob = goS (2 :: Int)
  where
@@ -728,12 +782,14 @@ sampleValues ob = goS (2 :: Int)
             [ map (App emptyAnno cd.cdResolved) (diagonal (map (goS (depth - 1)) cd.cdFields))
             | cd <- ctors u ]
   ctors u = Map.findWithDefault [] u ob.obDatatypes
-  -- one combination per sample of the longest field, each field shifted by
-  -- its position, so every sample of every field appears at least once
+  -- every combination of the fields' samples while there are at most 256;
+  -- past that, one per sample of the longest field, each field shifted by its
+  -- position, so that every sample of every field still appears
   diagonal [] = [[]]
   diagonal fields
     | any null fields = []
+    | product (map (toInteger . length) fields) <= 256 = sequence fields
     | otherwise =
         [ [ xs !! ((k + j) `mod` length xs) | (j, xs) <- zip [0 ..] fields ]
-        | k <- [0 .. min 8 (maximum (map length fields)) - 1] ]
+        | k <- [0 .. maximum (map length fields) - 1] ]
   numbers = nubOrd (0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ])

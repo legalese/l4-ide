@@ -63,6 +63,7 @@ executable l4
     L4.Cli.Batch
     L4.Cli.Blawx
     L4.Cli.Catala
+    L4.Cli.CatalaWitness
     L4.Cli.Check
     L4.Cli.Cloud
     L4.Cli.Common

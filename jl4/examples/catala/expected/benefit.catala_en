@@ -19,29 +19,21 @@ declaration scope BenefitAmount:
   input a content Applicant
   output benefit_amount content decimal
 
-#[description = "One row of the exhaustive truth table for `eligible for benefit`."]
-declaration structure EligibleForBenefitEqvRow:
-  data p_0 content boolean
-  data p_1 content boolean
+#[description = "Witness 1 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness1:
+  output result content boolean
 
-#[description = "Mode A (boolean reference) rendering of `eligible for benefit`."]
-declaration scope EligibleForBenefitEqvModeA:
-  input row content EligibleForBenefitEqvRow
-  output verdict condition
+#[description = "Witness 2 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness2:
+  output result content boolean
 
-#[description = "Mode B (exception ladder) rendering of `eligible for benefit`."]
-declaration scope EligibleForBenefitEqvModeB:
-  input row content EligibleForBenefitEqvRow
-  output verdict condition
+#[description = "Witness 3 for `eligible for benefit`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness3:
+  output result content boolean
 
-#[description = "True when both renderings agree on this row."]
-declaration scope EligibleForBenefitEqvAgree:
-  input row content EligibleForBenefitEqvRow
-  output agree content boolean
-
-#[description = "Exhaustive 4-row agreement grid for `eligible for benefit`."]
-#[test] declaration scope EligibleForBenefitEqvGrid:
-  output all_agree content boolean
+#[description = "Witness 4 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness4:
+  output result content boolean
 
 #[description = "Test 1, from the L4 directive at benefit.l4:26:1-87."]
 #[test] declaration scope Test1:
@@ -63,61 +55,76 @@ scope EligibleForBenefit:
     consequence not fulfilled
 ```
 
-### Equivalence check for `eligible for benefit`
+### Witness gate for `eligible for benefit`
 
-The rule above is emitted as an exception ladder (Mode B). The scopes below
-rebuild both renderings — the ladder and the boolean reference form Mode A —
-from the same ladder builders the rule above was built with, over every one of
-the 4 truth assignments to its 2 atomic conditions, and `EligibleForBenefitEqvGrid` fails
-if they ever disagree. The check is part of the artifact, so it re-runs on
-every validation (R4, §8.4).
+The rule above is emitted as an exception ladder (Mode B). Each test scope below
+calls that scope, not a copy of it, at one concrete input, and expects the value
+L4's own evaluator computed there. The inputs are witnesses: each makes the 2
+atomic conditions of the ladder take one combination of truth values, and every
+combination that some input realises has one. So an edit to the rule above that
+changes its answer on any realisable combination fails `clerk test` (R4, §8.4).
 
-**What this does and does not establish.** The atoms are lifted to boolean
-*inputs*, so the grid decides a question about control flow: that the ladder's
-priority order reproduces first-match for a rewrite of this shape and this
-arity. It does not evaluate the atom expressions themselves, so it cannot see
-a difference that lives inside one of them; and it exercises freshly built
-copies rather than the text of the rule above, so it does not detect an edit
-made to that text after emission. Those two claims belong to `catala
-typecheck` and to the `#[test]` scopes whose expected values L4 computed.
+The atoms, as L4 writes them:
 
-The atoms, as they appear in the emitted rule:
+- `p_0` is `(a's age) AT LEAST 65 OR a's isVeteran`
+- `p_1` is `(a's income) GREATER THAN 100000`
 
-- `p_0` stands for `(if (a.age >= 65.0) then true else a.is_veteran)`
-- `p_1` stands for `(a.income > 100000.0)`
+- Witness 1 (FF): `Applicant OF 0, 0, FALSE`; L4 computes `FALSE`.
+- Witness 2 (TF): `Applicant OF 0, 0, TRUE`; L4 computes `TRUE`.
+- Witness 3 (FT): `Applicant OF 0, 100001, FALSE`; L4 computes `FALSE`.
+- Witness 4 (TT): `Applicant OF 0, 100001, TRUE`; L4 computes `FALSE`.
+
+**What this does and does not establish.** It checks the emitted rule's own text
+at one input per realisable combination of its conditions, against L4. It does
+not check other inputs that realise the same combination, and it does not test
+a combination the solver proved impossible.
 
 ```catala
-scope EligibleForBenefitEqvModeA:
-  rule verdict
-    under condition
-      (if row.p_0 then (not row.p_1) else false)
-    consequence fulfilled
-
-scope EligibleForBenefitEqvModeB:
-  label verdict_p0 rule verdict
-    under condition
-      row.p_0
-    consequence fulfilled
-
-  exception verdict_p0 rule verdict
-    under condition
-      row.p_1
-    consequence not fulfilled
-
-scope EligibleForBenefitEqvAgree:
-  definition agree
+scope EligibleForBenefitWitness1:
+  definition result
     equals
-      ((output of EligibleForBenefitEqvModeA with { -- row: row }).verdict = (output of EligibleForBenefitEqvModeB with { -- row: row }).verdict)
-
-scope EligibleForBenefitEqvGrid:
-  definition all_agree
-    equals
-      (for all r among [ EligibleForBenefitEqvRow { -- p_0: false -- p_1: false }; EligibleForBenefitEqvRow { -- p_0: true -- p_1: false }; EligibleForBenefitEqvRow { -- p_0: false -- p_1: true }; EligibleForBenefitEqvRow { -- p_0: true -- p_1: true } ] we have (output of EligibleForBenefitEqvAgree with { -- row: r }).agree)
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 0.0 -- is_veteran: false } }).eligible_for_benefit
 ```
 
 ```catala-test-cli
-$ catala test-scope EligibleForBenefitEqvGrid --disable-warnings -F json
-{"all_agree":true}
+$ catala test-scope EligibleForBenefitWitness1 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness2:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 0.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness2 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness3:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100001.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness3 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness4:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100001.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness4 --disable-warnings -F json
+{"result":false}
 ```
 
 ## `benefit amount`

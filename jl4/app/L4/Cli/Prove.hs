@@ -29,6 +29,9 @@ module L4.Cli.Prove
   , proveOptionsParser
   , proveCmd
   , proveBound
+  , Solver (..)
+  , findZ3
+  , samplePointsUpTo
   ) where
 
 import Base
@@ -437,12 +440,14 @@ data EvalAt = EvTrue | EvFalse | EvRaised Text | EvOther Text
 -- | At most 64 points of the product of the sample sets: all of it when it is
 -- that small, otherwise a deterministic spread across it.
 samplePoints :: [(FreeVar, [Expr Resolved])] -> [[(FreeVar, Expr Resolved)]]
-samplePoints vars
+samplePoints = samplePointsUpTo 64
+
+samplePointsUpTo :: Integer -> [(FreeVar, [Expr Resolved])] -> [[(FreeVar, Expr Resolved)]]
+samplePointsUpTo limit vars
   | any (null . snd) vars = []
   | total <= limit = [ pick (mixedRadix k) | k <- [0 .. total - 1] ]
   | otherwise = nubOrdOn (map (prettyLayout . snd)) [ pick (spread k) | k <- [0 .. limit - 1] ]
  where
-  limit = 64 :: Integer
   sizes = [ toInteger (length xs) | (_, xs) <- vars ]
   total = product sizes
   pick ixs = [ (fv, xs !! fromInteger i) | ((fv, xs), i) <- zip vars ixs ]

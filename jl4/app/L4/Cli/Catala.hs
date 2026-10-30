@@ -53,7 +53,9 @@ import L4.Print (ConstructorFieldNames, extractConstructorFieldNames, prettyLayo
 import L4.Syntax (Module (..), Resolved, getUnique, rawName, rawNameToText, getOriginal)
 import qualified L4.TypeCheck.Environment as TC
 
+import L4.Cli.CatalaWitness (witnessGates)
 import L4.Cli.Common
+import L4.Cli.Prove (findZ3)
 
 data CatalaOptions = CatalaOptions
   { catFile        :: FilePath
@@ -82,12 +84,14 @@ catalaOptionsParser = CatalaOptions
 catalaCmd :: CatalaOptions -> IO ()
 catalaCmd opts = do
   evalConfig <- makeEvalConfig opts.catFixedNow
-  (errs, (mTc, mEval)) <- runOneshot evalConfig opts.catFile \nfp -> do
+  (errs, (mTc, mEval, importEnv)) <- runOneshot evalConfig opts.catFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     tc   <- Shake.use Rules.SuccessfulTypeCheck uri
     eval <- Shake.use Rules.EvaluateLazy uri
-    pure (tc, eval)
+    imports <- maybe [] id <$> Shake.use Rules.GetImports uri
+    deps <- Shake.uses Rules.GetLazyEvaluationDependenciesFile (map (.moduleUri) imports)
+    pure (tc, eval, mconcat [ fst d | Just d <- deps ])
 
   case mTc of
     Nothing -> do
@@ -97,7 +101,19 @@ catalaCmd opts = do
       -- Surface non-fatal diagnostics, but proceed: a clean type-check is the
       -- precondition that matters for lowering.
       putDiagnostics errs
-      let lowerOpts = LowerOptions { loBooleanOnly = opts.catBooleanOnly }
+      let fields = extractConstructorFieldNames tc.entityInfo
+      -- §8.4's witness gate (R-V10). The candidates and the evaluator decide
+      -- the witnesses; the solver only proves the remaining combinations
+      -- impossible, so without one a ladder that has any keeps the grid.
+      (gates, gateNotes) <-
+        if opts.catBooleanOnly
+          then pure (Map.empty, [])
+          else do
+            msolver <- either (const Nothing) Just <$> findZ3
+            witnessGates evalConfig tc importEnv msolver 10
+              (catalaJson fields) (Text.strip . prettyLayoutNF fields)
+      mapM_ (\w -> hPutStrLn stderr ("l4 export catala: " <> Text.unpack w)) gateNotes
+      let lowerOpts = LowerOptions { loBooleanOnly = opts.catBooleanOnly, loWitnessGates = gates }
       case lowerModuleWith lowerOpts (importClosure tc) tc.module' of
         Left lerrs -> do
           putDiagnostics
@@ -106,8 +122,7 @@ catalaCmd opts = do
             )
           exitFailure
         Right m0 -> do
-          let fields       = extractConstructorFieldNames tc.entityInfo
-              oracle       = evalOracle (fromMaybe [] mEval)
+          let oracle       = evalOracle (fromMaybe [] mEval)
               (m1, tNotes) = fillTests fields oracle m0
           case nameFor opts.catOutput m1 of
             Left err -> do
