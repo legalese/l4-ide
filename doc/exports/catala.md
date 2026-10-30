@@ -118,11 +118,44 @@ name has to be exported anyway — see
 `export-chain-*` under `jl4/examples/catala/not-ok/` are the two ways of getting it wrong, one of
 them through a rule handed to `map` rather than called directly.
 
+## Which Catala to check it with
+
+`l4 export catala` does not need Catala installed.
+You need Catala only to check the module it wrote, by running Catala's own `catala typecheck`, `catala proof` and `clerk test` over it.
+`node etc/validate-catala.mjs` runs all three over the examples.
+
+For that check, use Catala built from upstream commit `fdf4ccd5`, which reports itself as version 1.2.1.
+Do not use the 1.2.1 release.
+The generated tests expect numbers written as exact fractions, so a quarter is `"1/4"`.
+The 1.2.1 release writes a quarter as the decimal `0.25`, and it also crashes on a result that holds an enumerated value.
+Measured on 2026-10-30 over the examples in `jl4/examples/catala/`, `clerk test` fails 41 of 83 tests on the release and passes all 83 on `fdf4ccd5`.
+`catala typecheck` and `catala proof` pass on both.
+
+To install it with opam, the OCaml package manager:
+
+```
+opam switch create catala 5.2.1
+opam pin add --switch catala catala.1.2.1 https://github.com/CatalaLang/catala/archive/fdf4ccd54b9677b7b7b9ab7377201f3f7d1aadf7.tar.gz
+opam pin add --switch catala catala-proof.1.2.1 https://github.com/CatalaLang/catala/archive/fdf4ccd54b9677b7b7b9ab7377201f3f7d1aadf7.tar.gz
+```
+
+Both pins say `1.2.1` because that is the version the commit reports.
+The second pin is only for `catala proof`, and it builds the Z3 solver, which is most of the build time.
+`etc/validate-catala.mjs` finds a switch named `catala` by itself.
+
+Catala 1.3.0, released 2026-09-30, contains that commit.
+By hand, it type-checks all twelve examples and its `clerk test` passes.
+Two limits keep it from being the route above.
+`etc/validate-catala.mjs` does not understand its test summary, which has a different layout.
+Its `clerk` also does not run `bands-boolean-only`, which declares the same module name as `bands`, so 75 tests run instead of 83.
+`catala proof` was not tried on it.
+
 ## Where to look
 
 - **Worked examples:** `jl4/examples/catala/`, with byte-for-byte goldens pinned by the test suite
   and a `not-ok/` directory of deliberate refusals.
 - **Design and rulings:** `CATALA-EXPORT-SPEC.md` under `specs/`.
-- **Evidence:** the goldens have been run through the real toolchain at Catala 1.2.1 —
-  `catala typecheck`, `catala proof`, and `clerk test` — via `etc/validate-catala.mjs`, which skips
-  cleanly when no toolchain is installed.
+- **Evidence:** the goldens have been run through the real toolchain, Catala built from upstream
+  commit `fdf4ccd5` (see "Which Catala to check it with" above) — `catala typecheck`, `catala proof`,
+  and `clerk test` — via `etc/validate-catala.mjs`, which skips cleanly when no toolchain is
+  installed.
