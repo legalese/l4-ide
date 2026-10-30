@@ -170,6 +170,9 @@ spec = do
     it "says so when no decision encodes the target, and does not call it a finding" do
       fs <- findingsOf targetAbsent
       map (.outcome) fs `shouldBe` [TargetNotEncoded]
+    it "takes a name that ends 'within s N' as the provision the decision speaks from" do
+      fs <- findingsOf selfByTail
+      map (.outcome) fs `shouldBe` [SelfReference]
     it "treats the decision's own provision as no target" do
       fs <- findingsOf selfRef
       map (.outcome) fs `shouldBe` [SelfReference]
@@ -451,6 +454,18 @@ subjectToWrapperJoin = Text.unlines
   , "GIVETH A BOOLEAN"
   , "`extensions in the end` n MEANS"
   , "    IF `the s 9 grant` n THEN TRUE ELSE NOT (`s 7 — extensions are barred` n)"
+  ]
+
+-- | The commons' way of naming a decision's own provision: at the end.
+selfByTail :: Text
+selfByTail = Text.unlines
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 212(2) — the notice period has run` n MEANS n GREATER THAN 4"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`the Director may dissolve the corporation despite the rest of s 212 within s 212(3.1)` n MEANS n GREATER THAN 1"
   ]
 
 partMissing :: Text

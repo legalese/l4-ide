@@ -580,6 +580,22 @@ provKeyOfName t = case chunksOf (Text.take 120 t) of
     -> Just MkProvKey { unit = u, number = num, path = g }
   _ -> Nothing
 
+-- | The provision a name ends by saying it encodes: the commons' Canadian
+-- encodings end a decision name with @within s 212(3.1)@. Used only to
+-- recognise a decision speaking of its own section; it does not make the
+-- decision a target for other decisions' phrases.
+provKeyOfNameTail :: Text -> Maybe ProvKey
+provKeyOfNameTail t =
+  listToMaybe . reverse $
+    [ MkProvKey { unit = u, number = num, path = g }
+    | (w : n : b : _) <- tails (chunksOf t)
+    , lw w == "within"
+    , Just (u, an) <- [nounOf n.word]
+    , an /= Para
+    , not n.stop
+    , Just (Just num, g) <- [parseBody b.word]
+    ]
+
 -- | Does a decision named for @decl@ encode (some of) the provision @want@?
 -- Yes when they share a unit and a number and one path is a prefix of the
 -- other: a decision for @s 6@ covers @s 6(1)@ and a decision for @s 6(1)@
@@ -688,6 +704,8 @@ data Host = MkHost
   , uniq    :: Unique
   , range   :: Maybe SrcRange
   , key     :: Maybe ProvKey
+  , marked  :: Maybe ProvKey
+    -- ^ the provision the name ends by saying it encodes ('provKeyOfNameTail')
   , texts   :: [(Source, Text)]
   , callees :: Set Unique
   , calleeKeys :: [ProvKey]
@@ -738,9 +756,8 @@ lintModule m = sortOn order (concatMap hostFindings hosts)
     | null tgts = (TargetNotEncoded, [])
     | otherwise = (verdict, tgts)
    where
-    selfRef = case h.key of
-      Just hk -> hk.unit == k.unit && hk.number == k.number && k.path `isPrefixOf` hk.path
-      Nothing -> False
+    selfRef = any covers (catMaybes [h.key, h.marked])
+    covers hk = hk.unit == k.unit && hk.number == k.number && k.path `isPrefixOf` hk.path
     tgts = [ o | o <- hosts, o.uniq /= h.uniq, Just ok <- [o.key], keyMatches ok k ]
     tgtSet = Set.fromList (map (.uniq) tgts)
     direct = not (Set.null (Set.intersection (Map.findWithDefault Set.empty h.uniq graph) tgtSet))
@@ -842,6 +859,7 @@ mkHost outer (MkDecide inner _ (MkAppForm _ nm _ _) body) =
     , uniq    = getUnique nm
     , range   = (getAnno (getOriginal nm)).range
     , key     = provKeyOfName nm'
+    , marked  = provKeyOfNameTail nm'
     , texts   = concatMap refTexts [outer, inner]
                 <> [ (SrcName, nm') ]
                 <> [ (SrcText, s) | e <- universeExpr body, s <- stringsIn e ]
