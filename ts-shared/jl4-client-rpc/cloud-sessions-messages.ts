@@ -158,6 +158,8 @@ export interface AiCloudResult {
   ok: boolean
   error?: string
   state?: AiCloudSessionState
+  /** The user declined a confirmation: nothing to report. */
+  cancelled?: boolean
 }
 
 /** Webview → extension: open a cloud conversation; its event log is
@@ -175,6 +177,14 @@ export const AiCloudOpen: RequestType<
   }
 > = {
   method: 'aiCloudOpen',
+}
+
+/** Webview → extension: the cloud session the view shows now (null: a
+ *  local conversation, or none). Only that session is started again by
+ *  itself when its credentials end mid-turn; others wait for the
+ *  user's next message, and are no longer followed once they sleep. */
+export const AiCloudViewing: NotificationType<{ sessionId: string | null }> = {
+  method: 'aiCloudViewing',
 }
 
 /** Extension → webview: the session's MCP servers (their names here)

@@ -765,6 +765,11 @@ export async function activate(context: ExtensionContext) {
       cloud: cloudSessions,
       logger: aiLogger,
       storage: context.globalState,
+      account: () => {
+        const user = auth.getUserId()
+        const org = auth.getCloudOrgSlug()
+        return user && org ? `${user}:${org}` : undefined
+      },
       visibility: sidebarProvider,
       reveal: async () => {
         await sidebarProvider.revealSidebar()

@@ -625,7 +625,9 @@ export function createAiChatStore(
     if (!m) return
     const cloudSid = cloudSessionIdOf(id)
     if (cloudSid) {
-      let res: { ok: boolean; error?: string } = { ok: false }
+      let res: { ok: boolean; error?: string; cancelled?: boolean } = {
+        ok: false,
+      }
       try {
         res = await m.sendRequest(AiCloudDelete, HOST_EXTENSION, {
           sessionId: cloudSid,
@@ -634,7 +636,9 @@ export function createAiChatStore(
         res = { ok: false, error: err instanceof Error ? err.message : '' }
       }
       if (!res.ok) {
-        notifyCloudError(res.error || 'Deleting the cloud session failed.')
+        if (!res.cancelled) {
+          notifyCloudError(res.error || 'Deleting the cloud session failed.')
+        }
         return
       }
       cloudHistory = cloudHistory.filter((s) => s.sessionId !== cloudSid)

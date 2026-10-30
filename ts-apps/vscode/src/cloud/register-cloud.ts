@@ -2,8 +2,9 @@
  * Sidebar webview ⇄ cloud sessions (spec §12): the `AiCloud*` RPCs,
  * forwarding of cloud-only events, state and start progress, the
  * cached history list, Clone / Sync, and VS Code notifications when a
- * background cloud session asks a question or needs Resume (cloud
- * sessions never ask for tool approval).
+ * background cloud session asks a question (cloud sessions never ask
+ * for tool approval).
+ * Notification text is fixed, or plain (notification-text.ts).
  *
  * Chat events of cloud sessions don't pass through here: they take the
  * ordinary `AiChat*` path (see `createCloudSessions`).
@@ -28,6 +29,7 @@ import {
   AiCloudSessionList,
   AiCloudState,
   AiCloudStop,
+  AiCloudViewing,
   WebviewFrontendIsReadyNotification,
   cloudConversationId,
   type AiCloudEventPayload,
@@ -40,12 +42,16 @@ import { NotSignedInError, AuthProxyError } from './auth-proxy.js'
 import { GitSyncError } from './git-sync.js'
 import { SeedLimitError } from './seed.js'
 import { SessionsApiError } from './sessions-api.js'
+import { mergeConflictMessage } from './notification-text.js'
 import {
   CLOUD_SESSIONS_API_URL_SETTING,
   CLOUD_SESSIONS_ENABLED_SETTING,
   type CloudSessions,
 } from './vscode-cloud.js'
 
+/** The cached history list, per account and organisation (cloud
+ *  sessions belong to one organisation; titles mustn't show under
+ *  another). The key without a suffix is from before. */
 const LIST_CACHE_KEY = 'legaleseAi.cloudSessions.listCache'
 
 /** A user-facing message for anything the cloud path throws. */
@@ -62,19 +68,15 @@ export function cloudErrorMessage(err: unknown): string {
   return `Cloud session request failed: ${err instanceof Error ? err.message : String(err)}`
 }
 
-/** The notification for a `local-merge-conflict` (§9.1). */
-export function mergeConflictMessage(files: string[]): string {
-  const shown = files.slice(0, 3).join(', ')
-  const more = files.length > 3 ? ` and ${files.length - 3} more` : ''
-  return `Your synced changes conflict with the cloud session's and were not merged (${shown}${more}). Resolve the conflict in your clone, then sync again.`
-}
-
 export function registerCloudHandlers(deps: {
   messenger: Messenger
   frontend: WebviewTypeMessageParticipant
   cloud: CloudSessions
   logger: Logger
   storage: vscode.Memento
+  /** The signed-in account and organisation, for the history cache;
+   *  undefined: none (nothing cached). */
+  account(): string | undefined
   visibility: {
     isVisible(): boolean
     onDidChangeVisibility: vscode.Event<boolean>
@@ -86,6 +88,20 @@ export function registerCloudHandlers(deps: {
   const { manager } = cloud
   /** The session the webview shows, for notifications. */
   let viewedSession: string | undefined
+  // From before the cache was per account: whose it was is unknown.
+  void storage.update(LIST_CACHE_KEY, undefined)
+  const cacheKey = (): string | undefined => {
+    const account = deps.account()
+    return account ? `${LIST_CACHE_KEY}:${account}` : undefined
+  }
+  const cachedList = (): AiCloudSessionSummary[] => {
+    const key = cacheKey()
+    return key ? (storage.get<AiCloudSessionSummary[]>(key) ?? []) : []
+  }
+  const cacheList = async (items: AiCloudSessionSummary[]): Promise<void> => {
+    const key = cacheKey()
+    if (key) await storage.update(key, items)
+  }
 
   // Cloud-only notifications are queued while the view is hidden, like
   // chat events (register.ts ChatEventBuffer).
@@ -146,10 +162,8 @@ export function registerCloudHandlers(deps: {
     }
     const background = !visibility.isVisible() || viewedSession !== sessionId
     if (background && event.type === 'ask-user') {
-      void notify(
-        sessionId,
-        `A cloud session has a question: ${event.question}`
-      )
+      // The question itself stays in the sidebar (see the file comment).
+      void notify(sessionId, 'A cloud session has a question for you.')
     }
   }
   cloud.listener.mcpSignIn = (sessionId, servers) => {
@@ -256,6 +270,11 @@ export function registerCloudHandlers(deps: {
     })
   )
 
+  messenger.onNotification(AiCloudViewing, ({ sessionId }) => {
+    viewedSession = sessionId ?? undefined
+    manager.setViewing(viewedSession)
+  })
+
   messenger.onRequest(AiCloudMcpSignIn, ({ sessionId, server }) =>
     guard('MCP sign-in', async () => {
       await manager.signInMcp(sessionId, server)
@@ -317,11 +336,7 @@ export function registerCloudHandlers(deps: {
             { modal: true, detail },
             restore
           )
-          if (choice !== restore) {
-            return { ok: false, cancelled: true } as AiCloudResult & {
-              cancelled?: boolean
-            }
-          }
+          if (choice !== restore) return { ok: false, cancelled: true }
         }
         const res = await manager.rollback(sessionId, turnId)
         return { ok: true, state: manager.stateOf(sessionId) ?? res.state }
@@ -337,25 +352,34 @@ export function registerCloudHandlers(deps: {
 
   messenger.onRequest(AiCloudDelete, ({ sessionId }) =>
     guard('delete', async () => {
+      // The only copy of the session's files, unless it was cloned: the
+      // trash is emptied within minutes.
+      const del = 'Delete'
+      const choice = await vscode.window.showWarningMessage(
+        'Delete this cloud session and its files?',
+        {
+          modal: true,
+          detail:
+            'Its conversation and files are deleted for good. A clone you made keeps its copy.',
+        },
+        del
+      )
+      if (choice !== del) return { ok: false, cancelled: true }
       // 204 at once, also while the task still runs (cleaned up later).
       await manager.delete(sessionId)
-      const cached = storage.get<AiCloudSessionSummary[]>(LIST_CACHE_KEY) ?? []
-      await storage.update(
-        LIST_CACHE_KEY,
-        cached.filter((s) => s.sessionId !== sessionId)
-      )
+      await cacheList(cachedList().filter((s) => s.sessionId !== sessionId))
       if (viewedSession === sessionId) viewedSession = undefined
       return { ok: true }
     })
   )
 
   messenger.onRequest(AiCloudSessionList, async ({ refresh }) => {
-    const cached = storage.get<AiCloudSessionSummary[]>(LIST_CACHE_KEY) ?? []
+    const cached = cachedList()
     if (!cloud.isEnabled()) return { items: [] }
     if (!refresh) return { items: cached }
     try {
       const { sessions } = await manager.list()
-      await storage.update(LIST_CACHE_KEY, sessions)
+      await cacheList(sessions)
       return { items: sessions }
     } catch (err) {
       return { items: cached, error: cloudErrorMessage(err) }

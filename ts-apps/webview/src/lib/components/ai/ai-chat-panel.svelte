@@ -23,6 +23,7 @@
     AiCloudProgress,
     AiCloudReveal,
     AiCloudState,
+    AiCloudViewing,
     RequestOpenUrl,
     RequestSidebarLogin,
     cloudSessionIdOf,
@@ -165,6 +166,13 @@
     subscribed = true
     void store.refreshHistory()
     void store.refreshDictationStatus()
+  })
+
+  // Which cloud session is on screen: only that one starts again by
+  // itself when its credentials end mid-turn (§12.2).
+  $effect(() => {
+    const sessionId = cloudSessionIdOf(store.currentId)
+    messenger?.sendNotification(AiCloudViewing, HOST_EXTENSION, { sessionId })
   })
 
   onDestroy(() => {
