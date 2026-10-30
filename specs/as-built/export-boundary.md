@@ -10,7 +10,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 ## What it does
 
-- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:133`), decides whether a type has a form in JSON, and says why when it has none.
+- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:131`), decides whether a type has a form in JSON, and says why when it has none.
   The table is the header comment of that module.
   `NUMBER`, `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, `LIST OF`, `MAYBE`, a record, an enumeration, a synonym and a type with parameters have a shape.
   A function, an `EVENT`, a `DEONTIC`, a type variable, `EITHER` and any other built-in type that nobody gave a row have none.
@@ -29,7 +29,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   - the Deploy button refuses on them, because `isBlockingDiagnostic` (`jl4-lsp/src/LSP/L4/BlockingErrors.hs:40`) blocks on every error except those with the source `eval` or `import`, and `l4/getExportedFunctions` runs the check itself before it reads the diagnostics (`jl4-lsp/app/LSP/L4/Handlers.hs`);
   - the sidebar's list of exports leaves a refused rule out (`Export.withoutRefused`), so a contract rule is no longer listed with `isDeontic` set; the text test for "DEONTIC" in the printed return type (`Inspector.hs`) is gone;
   - `l4 check` and `l4 deploy` run the rule (`jl4/app/L4/Cli/Check.hs:55`, `jl4/app/L4/Cli/Deploy.hs:286`) and exit 1 on an error; `l4 run` and `l4 batch` do not run it, so they still run the file;
-  - `jl4-service` builds the same errors in its deploy gate (`jl4-service/src/Compiler.hs:190`) and refuses the bundle, with the same words.
+  - `jl4-service` builds the same errors in its deploy gate (`jl4-service/src/Compiler.hs:192`) and refuses the bundle, with the same words, once the module has no type errors: as in the editor, a module that does not type-check is not asked what its exports take and give back.
 - The two checks of the previous change, the function-typed input and the `EVENT`, are gone from the type check (`ExportFunctionTypeInput`, `ExportEventType`) and are cases of the one check.
   So a function-typed input no longer stops the file from checking either.
 
@@ -50,7 +50,9 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   The golden harness (`jl4/tests/Main.hs`) prints the export errors after the type-check errors, with the prefix `[export error]` or `[export warning]`, and the `#EVAL` at the end of the file still has its result there.
 - `jl4/examples/ok/tests/desc.golden` and `pattern-matching-overloads-own-annotations.golden` gained the warning for a `GIVEN` with no written type.
 - `jl4/examples/legal/ceo-performance-award.l4`: its `@export` on a rule that returns a `DEONTIC` became a comment, so that the file is not refused; see the revisit note below.
-- `jl4-service/test/IntegrationSpec.hs`: a bundle with an `@export` that takes or returns an `EVENT` is refused, with the new words.
+- `jl4-service/test/IntegrationSpec.hs`: a bundle with an `@export` that takes an `EVENT`, returns an `EVENT` or returns a `DEONTIC` is refused, with the new words.
+  The tests that deployed a contract rule are removed with the path they exercised: "deontic evaluation", "deontic answers spell a party and an action one way", "deontic evaluation with record-typed parties", the contract cases of the MAYBE-input bundle, and the missing-input case of a deontic rule.
+  The path's code is still there.
 
 ## Revisit
 
