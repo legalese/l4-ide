@@ -39,6 +39,15 @@ These built-in types take another type as a parameter.
 L4 has no null: a value that may be missing has a `MAYBE` type, and [CONSIDER](../control-flow/CONSIDER.md) handles both cases.
 Functions on these types, and the `PAIR` and `Dictionary` types, are in the [prelude](../libraries/prelude.md).
 
+## Events and regulative rules
+
+These built-in types take the type of the parties and the type of the actions as their two parameters.
+
+| Type                   | Values                                                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `DEONTIC party action` | a regulative rule: an obligation, permission or prohibition, or `FULFILLED` or `BREACH`; see [DEONTIC](../regulative/DEONTIC.md) |
+| `EVENT party action`   | that a party did an action at a time (a `NUMBER`): `EVENT Seller delivery 2`; see [EVENT](../regulative/EVENT.md)                |
+
 ## Records and enumerations
 
 A record has named fields; an enumeration has a fixed list of values, each of which can carry fields. Both are made with [DECLARE](DECLARE.md).
