@@ -678,14 +678,17 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
   it "7. a fork: each member's own continuation runs, independently" $ do
     rs <- runLogged forkSrc
     let ss = stepsOf 0 rs
-    -- Alice's continuation (the landlord's first obligation) runs to
-    -- completion before Bob's scan begins — that is what "on its own" means
-    -- — and the landlord's second obligation is a second activation of the
-    -- same continuation site.
+    -- Each member's continuation is its own: Alice's (the landlord's first
+    -- obligation) is armed by her act and Bob's by his, and the landlord's
+    -- second obligation is a second activation of the same continuation
+    -- site. A fork is a RAND of its members, so since N10's goal A
+    -- (NORM-LOG-SPEC §6.1) they run in lockstep: the rows come event by
+    -- event, each event's looks in member order. Until then Alice's whole
+    -- chain was logged before Bob's first look.
     map row ss `shouldBe`
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (ForkContinued 1 2))
-      , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 2) (Just 2) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 2) (Just 2) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 2) (Just 2) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 3) (Just 3) (Just (ForkContinued 2 2))
       , Row (Just "Landlord OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 4) (Just 4) Nothing

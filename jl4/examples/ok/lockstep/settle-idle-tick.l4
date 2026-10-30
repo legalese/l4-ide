@@ -1,0 +1,16 @@
+-- NORM-LOG N10 goal A: settling in effective order is independent of idle ticks (skeptic-design S2).
+-- Pass: all three traces FULFILLED (a's LEST writes waived at 5 before b's LEST reads it at 10).
+IMPORT prelude
+DECLARE Person IS ONE OF p, q
+DECLARE Action IS ONE OF x, y, cure
+-- a lapses at 5 and its LEST writes `waived`; b lapses at 10 and its LEST
+-- reads `waived`. In time, a's write (effective 5) precedes b's read (10).
+-- One event at 20 reveals both.
+GIVETH DEONTIC Person Action
+a MEANS PARTY p MUST x WITHIN 5 LEST RECORD `waived` IS TRUE HENCE FULFILLED
+GIVETH DEONTIC Person Action
+b MEANS PARTY q MUST y WITHIN 10 LEST (IF RECALL p's `waived` EQUALS JUST TRUE THEN FULFILLED ELSE (PARTY q MUST cure WITHIN 1))
+#TRACE a RAND b AT 0 WITH (`WAIT UNTIL` 20)
+#TRACE b RAND a AT 0 WITH (`WAIT UNTIL` 20)
+-- two events instead of one: the clock passes 5 before it passes 10
+#TRACE b RAND a AT 0 WITH (`WAIT UNTIL` 7)   (`WAIT UNTIL` 20)

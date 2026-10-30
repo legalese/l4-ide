@@ -1,0 +1,35 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+arming-read-p3b.l4:10:1-46:
+  DEONTIC BREACHED:
+    party
+      P
+    who did action
+      x
+    at
+      4
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      3
+  Ledger (P):
+    RECORD `waived` IS TRUE   [party=P, source=RECORD, at=2025-01-31T15:45:30Z]
+arming-read-p3b.l4:11:1-46:
+  DEONTIC BREACHED:
+    party
+      P
+    who did action
+      x
+    at
+      4
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      3
+  Ledger (P):
+    RECORD `waived` IS TRUE   [party=P, source=RECORD, at=2025-01-31T15:45:30Z]

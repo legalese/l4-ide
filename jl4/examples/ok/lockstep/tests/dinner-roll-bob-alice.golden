@@ -1,0 +1,50 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+dinner-roll-bob-alice.l4:56:1-58:49:
+  PARTY Bob MAY act WITHIN 10380 HENCE (after OF d, act) AND PARTY d MAY act WITHIN 0 OF closing HENCE (after OF d, act)
+  Ledger (Alice):
+    RECORD `entries read` IS 1   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS FALSE   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `entries read` IS 1   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS FALSE   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+  Official record:
+    COMMIT `dinner status record` IS opened   [source=COMMIT, at=2025-01-31T15:45:30Z]
+dinner-roll-bob-alice.l4:61:1-63:49:
+  PARTY d MAY act WITHIN 0 OF closing HENCE (after OF d, act) AND PARTY Alice MAY act WITHIN 5600 HENCE (after OF d, act)
+  Ledger (Alice):
+    RECORD `entries read` IS 1   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS FALSE   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+  Official record:
+    COMMIT `dinner status record` IS opened   [source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `dinner status record` IS taken   [party=Bob, source=COMMIT, at=2025-01-31T15:45:30Z]
+dinner-roll-bob-alice.l4:66:1-69:49:
+  PARTY Bob MAY act WITHIN 10380 HENCE (after OF d, act) AND PARTY d MAY act WITHIN 0 OF closing HENCE (after OF d, act)
+  Ledger (Alice):
+    RECORD `entries read` IS 1   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS FALSE   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `entries read` IS 2   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS TRUE   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+  Official record:
+    COMMIT `dinner status record` IS opened   [source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `dinner status record` IS taken   [party=Bob, source=COMMIT, at=2025-01-31T15:45:30Z]
+dinner-roll-bob-alice.l4:72:1-75:49:
+  PARTY Bob MAY act WITHIN 10380 HENCE (after OF d, act) AND PARTY d MAY act WITHIN 0 OF closing HENCE (after OF d, act)
+  Ledger (Alice):
+    RECORD `entries read` IS 1   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS FALSE   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `entries read` IS 2   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS TRUE   [party=Alice, source=NOTIFY, at=2025-01-31T15:45:30Z]
+  Official record:
+    COMMIT `dinner status record` IS opened   [source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `dinner status record` IS taken   [party=Alice, source=COMMIT, at=2025-01-31T15:45:30Z]
+dinner-roll-bob-alice.l4:78:1-81:49:
+  PARTY d MAY act WITHIN 0 OF closing HENCE (after OF d, act) AND PARTY Alice MAY act WITHIN 10380 HENCE (after OF d, act)
+  Ledger (Bob):
+    RECORD `entries read` IS 1   [party=Bob, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS FALSE   [party=Bob, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `entries read` IS 2   [party=Bob, source=NOTIFY, at=2025-01-31T15:45:30Z]
+    RECORD `taken seen` IS TRUE   [party=Bob, source=NOTIFY, at=2025-01-31T15:45:30Z]
+  Official record:
+    COMMIT `dinner status record` IS opened   [source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `dinner status record` IS taken   [party=Alice, source=COMMIT, at=2025-01-31T15:45:30Z]

@@ -1,0 +1,5 @@
+executing contract `the arrangement` at 64800 with the following events: party `Alice` did `reads the ledger` at 65100 party `Alice` did `reads the ledger` at 65220
+executing contract `the arrangement` at 64800 with the following events: party `Alice` did `reads the ledger` at 65100 party `Bob` did `buys dinner` at 70000
+executing contract `the arrangement` at 64800 with the following events: party `Alice` did `reads the ledger` at 65100 party `Bob` did `buys dinner` at 65160 party `Alice` did `reads the ledger` at 65220
+executing contract `the arrangement` at 64800 with the following events: party `Alice` did `reads the ledger` at 65100 party `Alice` did `buys dinner` at 65160 party `Alice` did `reads the ledger` at 65220
+executing contract `the arrangement` at 64800 with the following events: party `Bob` did `reads the ledger` at 65100 party `Alice` did `buys dinner` at 65160 party `Bob` did `reads the ledger` at 65220

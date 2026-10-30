@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+nested-continuation.l4:18:1-106:
+  FULFILLED
+  Official record:
+    COMMIT `seen` IS "b"   [party=Q, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS "d"   [party=S, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `seen` IS "c"   [party=R, source=COMMIT, at=2025-01-31T15:45:30Z]

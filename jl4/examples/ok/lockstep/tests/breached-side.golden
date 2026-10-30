@@ -1,0 +1,60 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+breached-side.l4:10:1-87:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      5
+    surpassed the deadline of party
+      alice
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      3
+  Ledger (bob):
+    RECORD `bobSigned` IS TRUE   [party=bob, source=RECORD, at=2025-01-31T15:45:30Z]
+breached-side.l4:11:1-87:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      5
+    surpassed the deadline of party
+      alice
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      3
+  Ledger (bob):
+    RECORD `bobSigned` IS TRUE   [party=bob, source=RECORD, at=2025-01-31T15:45:30Z]
+breached-side.l4:12:1-56:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      5
+    surpassed the deadline of party
+      alice
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      3
+    and the breach names, in order
+      alice
+        who had to do obligatory action
+          MUST Sign alice
+        before their deadline, which was at
+          3
+      bob
+        who had to do obligatory action
+          MUST Sign bob
+        before their deadline, which was at
+          9

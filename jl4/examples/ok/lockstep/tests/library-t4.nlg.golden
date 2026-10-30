@@ -1,0 +1,2 @@
+executing contract `loan` and `borrowing` at 0 with the following events: party `patron` did `borrow` at 20
+executing contract `borrowing` and `loan` at 0 with the following events: party `patron` did `borrow` at 20
