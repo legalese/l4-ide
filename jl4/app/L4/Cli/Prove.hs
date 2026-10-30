@@ -450,8 +450,21 @@ data EvalAt = EvTrue | EvFalse | EvRaised Text | EvOther Text
 
 -- | At most 64 points of the product of the sample sets: all of it when it is
 -- that small, otherwise a deterministic spread across it.
+-- | The proof check's points: all of the product when it is at most 64;
+-- otherwise first one point per position of the longest sample list, each
+-- variable taking its own k-th value (so every sample value of every variable
+-- appears at least once, the fractions that 'proofSampleValues' puts first
+-- among them), then the deterministic spread, up to 64 in all.
 samplePoints :: [(FreeVar, [Expr Resolved])] -> [[(FreeVar, Expr Resolved)]]
-samplePoints = samplePointsUpTo 64
+samplePoints vars
+  | any (null . snd) vars = []
+  | product [ toInteger (length xs) | (_, xs) <- vars ] <= 64 = samplePointsUpTo 64 vars
+  | otherwise = take 64 (nubOrdOn key (diagonal <> samplePointsUpTo 64 vars))
+ where
+  diagonal =
+    [ [ (fv, xs !! (k `mod` length xs)) | (fv, xs) <- vars ]
+    | k <- [0 .. maximum [ length xs | (_, xs) <- vars ] - 1] ]
+  key = map (prettyLayout . snd)
 
 samplePointsUpTo :: Integer -> [(FreeVar, [Expr Resolved])] -> [[(FreeVar, Expr Resolved)]]
 samplePointsUpTo limit vars

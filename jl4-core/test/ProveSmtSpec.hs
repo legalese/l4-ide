@@ -40,5 +40,7 @@ spec = describe "L4.Prove.Smt" $ do
     let ob = Obligation [] [] Map.empty Nothing [0, 10] Set.empty
         nums xs = [ r | Lit _ (NumericLit _ r) <- xs ]
         proofNums = nums (proofSampleValues ob SReal)
-    proofNums `shouldSatisfy` (\ns -> all (`elem` ns) [1 / 2, -1 / 2, 5, 0, 10, 9, 11, -1, 1])
+    proofNums `shouldSatisfy` (\ns -> all (`elem` ns) [1 / 2, -1 / 2, 21 / 2, 19 / 2, 5, 0, 10, 9, 11, -1, 1])
+    -- fractions first, so a capped product keeps them
+    take 5 proofNums `shouldBe` [1 / 2, -1 / 2, 10 + 1 / 2, 10 - 1 / 2, 5]
     nums (sampleValues ob SReal) `shouldBe` [0, -1, 1, 10, 9, 11]

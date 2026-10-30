@@ -798,19 +798,25 @@ exactValue = \case
 sampleValues :: Obligation -> Sort -> [Expr Resolved]
 sampleValues ob = samplesOver ob (nubOrd (0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ]))
 
--- | 'sampleValues' with numbers that are NOT whole as well: a half either side
--- of zero, and the midpoint of each pair of adjacent numbers in the set. For
--- @l4 prove@'s check of an @unsat@ answer, where an all-integer grid is blind
--- to a wrong encoding that an @IS INTEGER@ guard hides (audit of #784: with
--- only 0 and ±1, a wrong @proved@ survived the check). The Catala witness
--- search keeps 'sampleValues', so its witnesses, and the goldens built from
--- them, are unchanged.
+-- | 'sampleValues' with numbers that are NOT whole as well, FIRST: a half
+-- either side of zero, a half either side of each literal, and the midpoint of
+-- each pair of adjacent distinct literals; then the whole numbers
+-- 'sampleValues' uses. For @l4 prove@'s check of an @unsat@ answer, where an
+-- all-integer grid is blind to a wrong encoding that an @IS INTEGER@ guard
+-- hides (audit of #784: with only 0 and ±1, a wrong @proved@ survived the
+-- check). The fractions come first so that a capped product keeps them (see
+-- @samplePoints@ in "L4.Cli.Prove"). The Catala witness search keeps
+-- 'sampleValues', so its witnesses, and the goldens built from them, do not
+-- change.
 proofSampleValues :: Obligation -> Sort -> [Expr Resolved]
-proofSampleValues ob = samplesOver ob (nubOrd (base <> [1 / 2, -1 / 2] <> mids))
+proofSampleValues ob = samplesOver ob (nubOrd (fractions <> whole))
  where
-  base = 0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ]
-  sorted = Set.toAscList (Set.fromList base)
-  mids = zipWith (\a b -> (a + b) / 2) sorted (drop 1 sorted)
+  lits = Set.toAscList (Set.fromList ob.obLiterals)
+  fractions =
+    [1 / 2, -1 / 2]
+    <> concat [ [r + 1 / 2, r - 1 / 2] | r <- lits ]
+    <> zipWith (\a b -> (a + b) / 2) lits (drop 1 lits)
+  whole = 0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ]
 
 samplesOver :: Obligation -> [Rational] -> Sort -> [Expr Resolved]
 samplesOver ob numbers = goS (2 :: Int)
