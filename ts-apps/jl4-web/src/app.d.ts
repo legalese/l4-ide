@@ -12,14 +12,12 @@ declare global {
 
 // Vite environment variable types
 interface ImportMetaEnv {
-  /** WebSocket URL for LSP server (e.g., 'ws://localhost:5007') */
-  readonly VITE_SOCKET_URL?: string
-  /** URL to fetch L4 WASM binary (e.g., '/wasm/l4-core.wasm') */
+  /** URL to fetch L4 WASM binary (e.g., '/wasm/jl4-core.wasm') */
   readonly VITE_WASM_URL?: string
-  /** Version string for WASM binary caching */
+  /** URL to fetch the WASM JS FFI glue (e.g., '/wasm/jl4-core.mjs') */
+  readonly VITE_WASM_JS_URL?: string
+  /** The release the WASM came from, shown in load errors */
   readonly VITE_WASM_VERSION?: string
-  /** Set to 'true' to prefer WASM over WebSocket */
-  readonly VITE_PREFER_WASM?: string
   /** Session persistence service URL; Share is hidden without it */
   readonly VITE_SESSION_URL?: string
   /** Cloudflare Turnstile site key the session service checks shares against */

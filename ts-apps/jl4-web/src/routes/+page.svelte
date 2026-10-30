@@ -179,7 +179,6 @@
   let monacoL4LangClient: MonacoL4LanguageClient | undefined
   let monacoErrorLens: MonacoErrorLens | undefined
   let lspConnection: LspConnectionResult | undefined
-  let renderResultCommandDisposable: vscode.Disposable | undefined
   let lirSubscription: ReturnType<LirRegistry['subscribe']> | undefined
 
   function bindingsKey(bindings: Record<string, boolean>) {
@@ -291,7 +290,7 @@
     )
     const { ConsoleLogger } = await import('monaco-languageclient/tools')
 
-    // Get LSP connection configuration (supports WebSocket or WASM)
+    // Get the LSP connection configuration
     const lspConfig = getDefaultConfig()
 
     const runClient = async () => {
@@ -553,83 +552,29 @@
         }
       }
 
-      // Initialize LSP connection using the factory
-      // This abstracts over WebSocket vs WASM connection types
+      // Start the language server (WASM, in the browser)
       await initLspConnection(logger, lspConfig)
     }
 
     /**
-     * Initialize LSP connection using the connection factory.
-     * Supports both WebSocket (current) and WASM (future) connection types.
+     * Initialize the LSP connection using the connection factory.
      */
     const initLspConnection = async (
       logger: ConsoleLogger,
       config: ReturnType<typeof getDefaultConfig>
     ): Promise<void> => {
       try {
-        logger.info(
-          `[L4 LSP] Connecting with preferred type: ${config.preferredType}`
-        )
+        logger.info(`[L4 LSP] Connecting to WASM ${config.wasmVersion}`)
 
         lspConnection = await createLspConnection(config)
 
-        logger.info(`[L4 LSP] Connected via ${lspConnection.type}`)
+        logger.info('[L4 LSP] Connected via wasm')
 
         const languageClient = createLanguageClient(
           logger,
           lspConnection.transports
         )
         await languageClient.start()
-
-        // For websocket LSP: Haskell server doesn't declare executeCommandProvider,
-        // so l4.renderResult is never registered by the language client.
-        // Register it manually so codelens clicks work.
-        if (lspConnection.type === 'websocket') {
-          renderResultCommandDisposable = vscode.commands.registerCommand(
-            'l4.renderResult',
-            async (...args: unknown[]) => {
-              if (!monacoL4LangClient) return
-              const [verDocId, srcPos, directiveType] = args as [
-                { uri: string; version: number },
-                SrcPos,
-                string,
-              ]
-              try {
-                const result = await monacoL4LangClient.sendRequest(
-                  EvalDirectiveResultRequestType,
-                  { verDocId, srcPos, directiveType }
-                )
-                if (result) {
-                  rightPaneView = 'inspector'
-                  showVisualizer = true
-                  await tick()
-                  const directiveId = `${srcPos.line}:${srcPos.column}`
-                  // `body` is the directive's full source span — the
-                  // inclusive [range.start.line .. range.end.line]
-                  // slice joined by '\n', read from the live editor
-                  // model. Multi-line directives stay distinct from
-                  // visually identical leading lines.
-                  const directiveResult = result as DirectiveResult
-                  const body = sliceBodyFromModel(
-                    editor?.getModel() ?? null,
-                    directiveResult.range
-                  )
-                  const fileUri =
-                    editor?.getModel()?.uri.toString() ?? verDocId.uri
-                  inspectorPanel?.addOrScrollToResult(
-                    directiveId,
-                    srcPos,
-                    directiveResult,
-                    body,
-                    fileUri
-                  )
-                }
-              } catch (e) {
-                logger.error(`l4.renderResult failed: ${e}`)
-              }
-            }
-          )
-        }
 
         // Handle connection close
         lspConnection.transports.reader.onClose(() => {
@@ -865,9 +810,6 @@
   onDestroy(() => {
     lirSubscription?.unsubscribe()
     lirSubscription = undefined
-
-    renderResultCommandDisposable?.dispose()
-    renderResultCommandDisposable = undefined
 
     if (monacoErrorLens) {
       monacoErrorLens.dispose()
