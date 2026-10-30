@@ -23,6 +23,7 @@
 - [Libraries](reference/libraries/README.md)
 - [Patterns](tutorials/getting-started/common-patterns.md)
 - [Errors and Troubleshooting](reference/errors/README.md)
+- [Proving an assertion: `l4 prove`](concepts/reviewing/proving-assertions.md)
 
 ## Exports
 
