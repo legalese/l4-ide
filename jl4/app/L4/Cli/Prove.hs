@@ -110,8 +110,9 @@ proveBound =
     , "  module; the coverage line names them."
     , ""
     , "  Exit status: 0 every obligation proved; 1 the file, an option or the"
-    , "  solver could not be used; 2 an obligation refuted; 3 an obligation"
-    , "  unknown and none refuted; 4 an encoding defect."
+    , "  solver could not be used; 2 an obligation refuted, or an #ASSERT the"
+    , "  evaluator itself found FALSE or that raised; 3 an obligation unknown"
+    , "  and none of those; 4 an encoding defect."
     ]
 
 ----------------------------------------------------------------------------
@@ -191,7 +192,8 @@ data Verdict
   | Refuted [(Text, Text)] Text -- ^ the counterexample, and what the evaluator said there
   | Unknown Text
   | Defect Text
-  | Decided Text               -- ^ not an obligation: the evaluator's own answer
+  | Decided Bool Text          -- ^ not an obligation: the evaluator's own answer,
+                               -- and whether that answer fails the file (FALSE, or a raise)
 
 data Row = Row
   { rowRange  :: Maybe SrcRange
@@ -237,7 +239,11 @@ proveCmd opts = do
           lowered = [ (r, e, classify entryUri env outcomes safety r e) | (r, e) <- asserts ]
       case opts.proveEmitSmt of
         Just dir -> do
-          createDirectoryIfMissing True dir
+          let cannotWrite (e :: IOException) = do
+                Text.hPutStrLn stderr ("l4 prove: cannot write the scripts to " <> Text.pack dir <> ": "
+                                       <> oneLine (Text.pack (show e)))
+                exitWith (ExitFailure 1)
+          either cannotWrite pure =<< try (createDirectoryIfMissing True dir)
           -- Named by line AND column, since `;` puts two #ASSERTs on one line.
           -- A name this run has already written is a hard failure: a script
           -- silently overwritten is a question a second solver never sees.
@@ -249,7 +255,7 @@ proveCmd opts = do
                                    <> Text.intercalate ", " (map Text.pack clashes))
             exitWith (ExitFailure 1)
           written <- for targets \(f, r, ob) -> do
-            Text.writeFile f (scriptText r ob)
+            either cannotWrite pure =<< try (Text.writeFile f (scriptText r ob))
             pure f
           for_ written \f -> Text.putStrLn ("wrote " <> Text.pack f)
           Text.putStrLn (Text.pack (show (length written)) <> " obligation script(s) written; no solver was run")
@@ -283,15 +289,16 @@ classify
   :: NormalizedUri -> ProveEnv -> Map SrcRange EvalDirectiveValue -> Map Unique [Safety.SafetyIssue]
   -> Maybe SrcRange -> Expr Resolved -> Either Verdict Obligation
 classify entryUri env outcomes safety mr e = case outcome of
-  Just (Assertion Holds) -> Left (Decided "by evaluation: assertion satisfied")
-  Just (Assertion Fails) -> Left (Decided "by evaluation: assertion failed")
-  Just (Assertion a@(FailsBecause _)) -> Left (Decided ("by evaluation: " <> oneLine (prettyAssertionOutcome a)))
-  Just (Assertion (Refused r)) -> Left (Decided ("by evaluation: refused: " <> oneLine (Text.unlines (prettyRefusal r))))
+  Just (Assertion Holds) -> Left (Decided False "by evaluation: assertion satisfied")
+  Just (Assertion Fails) -> Left (Decided True "by evaluation: assertion failed")
+  Just (Assertion a@(FailsBecause _)) -> Left (Decided True ("by evaluation: " <> oneLine (prettyAssertionOutcome a)))
+  -- a refusal is a designed outcome, exit 0, as under `l4 run`
+  Just (Assertion (Refused r)) -> Left (Decided False ("by evaluation: refused: " <> oneLine (Text.unlines (prettyRefusal r))))
   -- An error that is not "waiting for an input" is the evaluator's answer
   -- whatever the assertion reads (R-V3: every other way of being stuck stays
   -- Errored), so it is not re-proved.
   Just (Assertion (Errored exc)) ->
-    Left (Decided ("not an obligation: the evaluator reports an error: "
+    Left (Decided True ("not an obligation: the evaluator reports an error: "
                    <> oneLine (Text.unlines (prettyEvalException exc))))
   Just (Assertion _)
     | null reads' -> Left (Unknown "the evaluator could not decide it, and it reads no section GIVEN")
@@ -303,9 +310,12 @@ classify entryUri env outcomes safety mr e = case outcome of
   reads' = assumesReadBy env e
   lowerChecked = case lowerObligation env e of
     Left why -> Left (Unknown why)
-    Right ob -> case refusalsIn ob <> importedBinders ob of
-      (why : _) -> Left (Unknown why)
-      [] -> Right ob
+    Right ob -> case (duplicateDeclarations ob.obCommands, refusalsIn ob <> importedBinders ob) of
+      -- a duplicate binder is shadowed silently by the solver, so it is a
+      -- defect in this command whatever the solver would answer
+      (ds@(_ : _), _) -> Left (Defect ("the emitted script declares " <> Text.intercalate ", " ds <> " twice"))
+      (_, why : _) -> Left (Unknown why)
+      ([], []) -> Right ob
   -- The replay rebinds the entry module's ASSUMEs only, so a binder another
   -- module declares could not be given its model value: refuse it here
   -- rather than report the replay's failure as an encoding defect.
@@ -384,7 +394,7 @@ solve opts evalConfig tc importEnv solver mr e ob = do
       Left why -> pure (Unknown why)
       Right binding -> do
         r <- evalAt binding
-        let shown = [ (fv.fvName, oneLine (prettyLayout x)) | (fv, x) <- binding ]
+        let shown = [ (fv.fvName, oneLine (prettyLayout (exactValue x))) | (fv, x) <- binding ]
         pure case r of
           EvFalse -> Refuted shown "the evaluator agrees: the assertion is FALSE there"
           EvRaised msg -> Refuted shown ("the evaluator agrees: the assertion raises there: " <> msg)
@@ -406,7 +416,7 @@ solve opts evalConfig tc importEnv solver mr e ob = do
   firstBad [] = pure Nothing
   firstBad (p : ps) = do
     r <- evalAt p
-    let shown = [ (fv.fvName, oneLine (prettyLayout x)) | (fv, x) <- p ]
+    let shown = [ (fv.fvName, oneLine (prettyLayout (exactValue x))) | (fv, x) <- p ]
     case r of
       EvTrue -> firstBad ps
       EvFalse -> pure (Just (shown, "says it is FALSE"))
@@ -486,7 +496,7 @@ render opts rows refusedCount crossNames mversion =
       , "      " <> said ]
     Unknown why -> [ line "unknown", "      " <> why ]
     Defect why -> [ line "ENCODING DEFECT", "      " <> why ]
-    Decided what -> [ line "decided", "      " <> what ]
+    Decided _ what -> [ line "decided", "      " <> what ]
    where
     line verdict = "  " <> verdict <> "  " <> maybe "?" prettySrcRange r.rowRange <> "  #ASSERT " <> r.rowText
   coverage =
@@ -495,7 +505,7 @@ render opts rows refusedCount crossNames mversion =
       <> tshow sent <> " obligation" <> plural sent <> ": "
       <> tshow proved <> " proved, " <> tshow refuted <> " refuted, " <> tshow unknown <> " unknown"
       <> (if defects > 0 then ", " <> tshow defects <> " ENCODING DEFECT" else "")
-  decided = count \case Decided _ -> True; _ -> False
+  decided = count \case Decided _ _ -> True; _ -> False
   proved  = count \case Proved _ -> True; _ -> False
   refuted = count \case Refuted _ _ -> True; _ -> False
   unknown = count \case Unknown _ -> True; _ -> False
@@ -509,6 +519,9 @@ exitFor :: [Row] -> ExitCode
 exitFor rows
   | has \case Defect _ -> True; _ -> False = ExitFailure 4
   | has \case Refuted _ _ -> True; _ -> False = ExitFailure 2
+  -- an #ASSERT the evaluator itself found FALSE, or that raised, fails the
+  -- file as a refutation does, so `l4 prove f && deploy` cannot pass it
+  | has \case Decided True _ -> True; _ -> False = ExitFailure 2
   | has \case Unknown _ -> True; _ -> False = ExitFailure 3
   | otherwise = ExitSuccess
  where

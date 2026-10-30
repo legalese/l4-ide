@@ -21,17 +21,23 @@ import Test.Hspec
 
 import CliTest.Common
 
-numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture :: FilePath
+numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture,
+  collideFixture, localsFixture, decidedFailFixture, exactFixture :: FilePath
 numbersFixture       = fixtureDir </> "prove" </> "numbers.l4"
 recordsFixture       = fixtureDir </> "prove" </> "records.l4"
 outOfFragmentFixture = fixtureDir </> "prove" </> "out-of-fragment.l4"
 defectFixture        = fixtureDir </> "prove" </> "defect.l4"
 integersFixture      = fixtureDir </> "prove" </> "integers.l4"
+collideFixture       = fixtureDir </> "prove" </> "collide.l4"
+localsFixture        = fixtureDir </> "prove" </> "locals.l4"
+decidedFailFixture   = fixtureDir </> "prove" </> "decided-fail.l4"
+exactFixture         = fixtureDir </> "prove" </> "exact.l4"
 sameLineFixture      = fixtureDir </> "prove" </> "same-line.l4"
 assumedFixture       = fixtureDir </> "assert-assumed.l4"
 
 fixtures :: [FilePath]
-fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture]
+fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture
+           , collideFixture, localsFixture, decidedFailFixture, exactFixture]
 
 -- | The lines of a run's report that belong to the @#ASSERT@ on this line of
 -- the fixture: its verdict line, and the indented lines under it.
@@ -146,3 +152,42 @@ spec bin = describe "l4 prove" $ do
       first `shouldSatisfy` ("(assert (not (and |l4.defined| |l4.goal|)))" `isInfixOf`)
       first `shouldSatisfy` ("(define-fun |l4.goal| () Bool |l4_b|)" `isInfixOf`)
       second `shouldSatisfy` ("(define-fun |l4.goal| () Bool (not |l4_b|))" `isInfixOf`)
+
+  -- Audit of #784, finding 1: two parameter names a lossy sanitiser mapped to
+  -- one symbol gave duplicate binders, and z3's shadowing turned a FALSE
+  -- assertion into "proved".
+  it "keeps two parameters whose names differ only in `|` and `_` apart" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", collideFixture]
+    code `shouldBe` ExitFailure 2
+    verdictOf 12 sout `shouldBe` "refuted"
+    unwords (rowFor 12 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
+
+  -- Finding 2: every zero-parameter WHERE or LET looped (<<loop>>).
+  it "lowers zero-parameter WHERE and LET locals, including one that reads another" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", localsFixture]
+    code `shouldBe` ExitFailure 2
+    verdictOf 14 sout `shouldBe` "proved"
+    verdictOf 17 sout `shouldBe` "proved"
+    verdictOf 20 sout `shouldBe` "refuted"
+
+  -- Finding 3: a decided FALSE, or a decided raise, is a failing file.
+  it "exits 2 when the evaluator decides an #ASSERT FALSE or it raises" $ do
+    Output code sout _ <- runL4 bin ["prove", decidedFailFixture]
+    code `shouldBe` ExitFailure 2
+    verdictOf 3 sout `shouldBe` "decided"
+    verdictOf 4 sout `shouldBe` "decided"
+
+  -- Finding 4: a counterexample prints exactly, so it reproduces under l4 run.
+  it "prints a counterexample that is not a whole number exactly" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", exactFixture]
+    code `shouldBe` ExitFailure 2
+    unwords (rowFor 6 sout) `shouldSatisfy` ("counterexample: x = 4 DIVIDED BY 3" `isInfixOf`)
+
+  -- Finding 6 (the audit's numbering): an unwritable --emit-smt directory is
+  -- a one-line refusal, not a raw exception.
+  it "refuses an --emit-smt directory it cannot create in one line, exit 1" $ do
+    Output code _ serr <- runL4 bin ["prove", numbersFixture, "--emit-smt", "/dev/null/x"]
+    code `shouldBe` ExitFailure 1
+    serr `shouldSatisfy` ("l4 prove: cannot write the scripts to /dev/null/x" `isInfixOf`)
+    serr `shouldNotSatisfy` ("CallStack" `isInfixOf`)
+    length (lines serr) `shouldBe` 1

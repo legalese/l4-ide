@@ -44,6 +44,7 @@ module L4.Prove.Lower
   , lowerAtoms
   , assumesReadBy
   , liftModelValue
+  , exactValue
   , sampleValues
   , goalSymbol
   , definedSymbol
@@ -54,6 +55,7 @@ import Base
 import Control.Applicative ((<|>))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Data.Ratio (denominator, numerator)
 import qualified Data.Text as Text
 
 import L4.Prove.Smt
@@ -205,7 +207,10 @@ refuse = lift . Left
 -- | What a name means inside the term being lowered.
 data Local
   = LTerm !Term
-  | LPending !(Map Unique Local) !(Expr Resolved)   -- a 0-ary WHERE / LET binding
+  | LPending (Map Unique Local) !(Expr Resolved)   -- a 0-ary WHERE / LET binding
+    -- The map is LAZY on purpose: it is the binding group itself, tied in a
+    -- knot ('withLocals'), and a strict field forced the knot and looped
+    -- (audit of #784, finding 2).
 
 data Ctx = Ctx
   { cxLocals    :: !(Map Unique Local)
@@ -278,6 +283,9 @@ data AtomSpace = AtomSpace
 lowerAtoms :: ProveEnv -> [([Resolved], Type' Resolved)] -> [Expr Resolved] -> Either Text AtomSpace
 lowerAtoms env params atoms = do
   (ts, st) <- runStateT go emptyState
+  case duplicateDeclarations (preamble st) of
+    [] -> pure ()
+    ds -> Left ("encoding defect: the script would declare " <> Text.intercalate ", " ds <> " twice")
   let free = reverse st.lsFree
       script bs =
         renderScript $
@@ -328,7 +336,8 @@ symbolFor prefix r = do
     Nothing -> do
       let spelling = prefix <> nameOf r
           n = Map.findWithDefault 0 spelling st.lsSpellings + 1
-          s = userSymbol prefix (nameOf r <> (if n == 1 then "" else "#" <> Text.pack (show n)))
+          -- '#' is escaped inside a name, so the suffix cannot collide with one
+          s = "|" <> prefix <> escapeName (nameOf r) <> (if n == 1 then "" else "#" <> Text.pack (show n)) <> "|"
       put st { lsSymbols = Map.insert u s st.lsSymbols
              , lsSpellings = Map.insert spelling n st.lsSpellings }
       pure s
@@ -374,7 +383,7 @@ datatypeSort env r (MkDeclare _ (MkTypeSig _ (MkGivenSig _ tparams) _) _ td) = d
         when (isJust computed) $
           refuse ("out of fragment: the computed field `" <> nameOf f <> "` of `" <> nameOf r <> "`")
         s <- sortOf env ty
-        pure (userSymbol "l4F_" (nameOf r <> "_" <> nameOf f), s)
+        pure ("|l4F_" <> escapeName (nameOf r) <> "#" <> escapeName (nameOf f) <> "|", s)
       pure (CtorDef c csym (map snd fsorts) (map fst fsorts))
     modify \st -> st { lsTypes = Map.insert u defs st.lsTypes }
     pure (SData u)
@@ -714,7 +723,8 @@ defineDecide env (MkDecide _ _ (MkAppForm _ dr params _) body) = do
         Just (_, KnownTerm _ _) | null params -> pure []
         _ -> refuse ("out of fragment: the definition `" <> nameOf dr <> "` has no known type")
       sym <- symbolFor "l4_" dr
-      let dsym = userSymbol "l4def_" (Text.dropAround (== '|') sym `stripPrefixOr` "l4_")
+      -- the companion's name is the definition's own, under its own prefix
+      let dsym = "|l4def_" <> fromMaybe sym (Text.stripPrefix "|l4_" sym)
       sorts <- traverse (sortOf env) paramTys
       let psyms = [ userSymbol "l4p_" (nameOf p) | p <- params ]
           pdsyms = [ userSymbol "l4pd_" (nameOf p) | p <- params ]
@@ -735,7 +745,6 @@ defineDecide env (MkDecide _ _ (MkAppForm _ dr params _) body) = do
       pure done
  where
   nameAt v = maybe "?" (\(MkDecide _ _ (MkAppForm _ r _ _) _) -> nameOf r) (Map.lookup v env.peDecides)
-  stripPrefixOr t p = fromMaybe t (Text.stripPrefix p t)
 
 ----------------------------------------------------------------------------
 -- From solver values back to L4, and sample points (R-V5)
@@ -764,6 +773,22 @@ liftModelValue ob = goV
 
 sameSymbol :: Text -> Text -> Bool
 sameSymbol a b = Text.dropAround (== '|') a == Text.dropAround (== '|') b
+
+-- | A value with every number that has no short decimal form written as a
+-- division, so that printing it with 'L4.Print.prettyLayout' gives L4 source
+-- that means exactly this value (@4 DIVIDED BY 3@, not @1.3333333333333333@)
+-- and a printed counterexample reproduces under @l4 run@ (audit of #784,
+-- finding 4). A number with at most six decimal places prints exactly as it is.
+exactValue :: Expr Resolved -> Expr Resolved
+exactValue = \case
+  Lit a (NumericLit b r)
+    | not (shortDecimal r) ->
+        DividedBy a (Lit a (NumericLit b (fromInteger (numerator r))))
+                    (Lit a (NumericLit b (fromInteger (denominator r))))
+  App a c args -> App a c (map exactValue args)
+  e -> e
+ where
+  shortDecimal r = any (\k -> denominator (r * 10 ^ k) == 1) [0 .. 6 :: Int]
 
 -- | A small, deterministic set of values of a sort: both Booleans; for a
 -- number, each literal the obligation reaches, one either side of it, and 0;

@@ -75,7 +75,7 @@ Each `#ASSERT` gets one line.
 - **`proved`**: no value of what the assertion reads makes it false, or makes it raise an error. The line also says at how many sample points the ordinary evaluator was asked and agreed (see below).
 - **`refuted`**: here are values at which it is false, or at which evaluating it raises an error (a division by zero, say). A point where the assertion _raises_ counts against it: an assertion that crashes for some input does not hold for that input.
 - **`unknown`**: no verdict, with the reason. Usually `out of fragment: …`, naming what `l4 prove` cannot reason about (see the limits below); sometimes a timeout, or the solver itself saying it does not know.
-- **`decided`**: not sent to the solver at all. Either `l4 run` could already decide it (it reads no section `GIVEN`, or its answer does not depend on one, like `TRUE OR x EQUALS 1`), or evaluating it raised an error for a reason other than a missing input. These are counted, and not proved again.
+- **`decided`**: not sent to the solver at all, but still counted in the exit status: if the evaluator found the assertion FALSE, or it raised, the file fails as a refutation does. Either `l4 run` could already decide it (it reads no section `GIVEN`, or its answer does not depend on one, like `TRUE OR x EQUALS 1`), or evaluating it raised an error for a reason other than a missing input. These are counted, and not proved again.
 - **`ENCODING DEFECT`**: the solver and the evaluator disagree. That is a bug in `l4 prove`, not a fact about your rules, and it is printed loudly so that nobody reads it as either.
 
 The last lines say what was covered: how many assertions, how many the evaluator decided, and the count of each verdict; what was not attempted; and the solver's version.
@@ -90,13 +90,13 @@ So it does not take the solver's word for anything:
 
 ### Exit status
 
-| status | meaning                                                         |
-| ------ | --------------------------------------------------------------- |
-| 0      | every assertion sent to the solver was proved, or none was sent |
-| 1      | the file did not check, an option was wrong, or no solver found |
-| 2      | at least one assertion was refuted                              |
-| 3      | at least one assertion is unknown, and none was refuted         |
-| 4      | an encoding defect (outranks the others)                        |
+| status | meaning                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------- |
+| 0      | every assertion sent to the solver was proved, or none was sent                             |
+| 1      | the file did not check, an option was wrong, or no solver found                             |
+| 2      | at least one assertion was refuted, or the evaluator itself found one FALSE or saw it raise |
+| 3      | at least one assertion is unknown, and none of the above                                    |
+| 4      | an encoding defect (outranks the others)                                                    |
 
 ### Seeing what was sent to the solver
 
@@ -116,5 +116,6 @@ These are stated here because you would otherwise find them out from a wrong con
 - **Only this file's section `GIVEN`s.** An assertion that reads a section `GIVEN` declared in an imported file is `unknown`, because its counterexample could not be checked against the evaluator.
 - **Only this file's assertions.** The `#ASSERT`s of imported files are not attempted, and neither are `#ASSERT REFUSED` lines.
 - **Rules from other files are followed but not pre-checked.** A safety check that runs before the solver (for side effects, refusals and the like) sees only the file you named; when a proof relies on rules from an imported file, the report names them.
+- **A counterexample that needs an irrational number** (for `x TIMES x EQUALS 2`, say) cannot be given as an L4 value, so the verdict is `unknown (model value not a rational: …)`, even though the assertion is refutable.
 - **Arithmetic that multiplies two unknowns together** is harder for any solver; z3 often still decides it, and when it does not the verdict is `unknown` with that reason.
 - **A record built from a value that would raise** is treated as raising, even when nothing reads that field. L4 itself is lazier than that. The replay catches the difference and reports it as an `ENCODING DEFECT` rather than a counterexample, so it can cost you a verdict but cannot give you a wrong one.

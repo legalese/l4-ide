@@ -15,6 +15,8 @@ module L4.Prove.Smt
   , renderSExpr
   , renderScript
   , userSymbol
+  , escapeName
+  , duplicateDeclarations
   , realLit
   , readRational
   , parseSExprs
@@ -25,6 +27,7 @@ module L4.Prove.Smt
 import Base
 import qualified Data.Char as Char
 import Data.Ratio (denominator, numerator, (%))
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 
 -- | An s-expression. An 'Atom' is printed exactly as it is held, so a quoted
@@ -43,12 +46,51 @@ renderSExpr = \case
 renderScript :: [SExpr] -> Text
 renderScript = Text.unlines . map renderSExpr
 
--- | A quoted symbol for an L4 name: @|<prefix><name>|@.
---
--- The two characters a quoted symbol cannot hold, @|@ and @\\@, become @_@.
+-- | A quoted symbol for an L4 name: @|<prefix><name>|@, the name escaped by
+-- 'escapeName'.
 userSymbol :: Text -> Text -> Text
-userSymbol prefix name =
-  "|" <> prefix <> Text.map (\c -> if c == '|' || c == '\\' then '_' else c) name <> "|"
+userSymbol prefix name = "|" <> prefix <> escapeName name <> "|"
+
+-- | Escape an L4 name for the inside of a quoted symbol, INJECTIVELY.
+--
+-- A quoted symbol cannot hold @|@ or @\\@, so they must change; mapping both
+-- to @_@ (as the first version did) made @a|b@ and @a_b@ one symbol, and two
+-- parameters so named became duplicate binders that z3 accepts, the inner
+-- shadowing the outer: a wrong @proved@ (audit of #784, finding 1). Here @_@
+-- is the escape character and always starts a pair: @__@ is @_@, @_p@ is @|@,
+-- @_b@ is @\\@ and @_h@ is @#@, so @#@ is free to join a symbol's parts and
+-- to number a shadowed name, and the escaped text decodes left to right in
+-- exactly one way.
+escapeName :: Text -> Text
+escapeName = Text.concatMap \case
+  '_'  -> "__"
+  '|'  -> "_p"
+  '\\' -> "_b"
+  '#'  -> "_h"
+  c    -> Text.singleton c
+
+-- | Every symbol a script declares more than once at top level (constants,
+-- functions, sorts, constructors, selectors), and every one bound twice in a
+-- single @define-fun@'s parameter list. A solver may accept a duplicate binder
+-- and shadow one with the other, so a non-empty answer is an encoding defect
+-- however the solver answers.
+duplicateDeclarations :: [SExpr] -> [Text]
+duplicateDeclarations cmds = dups topLevel <> concatMap dups binderLists
+ where
+  topLevel = concatMap declared cmds
+  declared = \case
+    SList [Atom "declare-const", Atom n, _] -> [n]
+    SList (Atom "define-fun" : Atom n : _) -> [n]
+    SList [Atom "declare-datatypes", SList sorts, SList bodies] ->
+      [ n | SList (Atom n : _) <- sorts ]
+      <> [ n | SList ctors <- bodies, ctor <- ctors, n <- ctorNames ctor ]
+    _ -> []
+  ctorNames = \case
+    Atom c -> [c]
+    SList (Atom c : fields) -> c : [ f | SList [Atom f, _] <- fields ]
+    _ -> []
+  binderLists = [ [ p | SList [Atom p, _] <- params ] | SList (Atom "define-fun" : _ : SList params : _) <- cmds ]
+  dups xs = [ x | (x, k) <- Map.toList (Map.fromListWith (+) [ (x, 1 :: Int) | x <- xs ]), k > 1 ]
 
 -- | A rational as an SMT-LIB @Real@ term: @3.0@, @(/ 1.0 3.0)@, @(- 2.0)@.
 realLit :: Rational -> SExpr
