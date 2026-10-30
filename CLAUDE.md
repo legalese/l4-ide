@@ -197,7 +197,7 @@ Generate goldens by running `cabal test jl4-test` once (it creates them and fail
 Read them before committing: blessing output you have not looked at is how a wrong answer becomes the expected answer.
 
 **The canon glob is the one exception to that procedure, and it is a prohibition.**
-`jl4/examples/canon/` is a VENDORED MIRROR of blessed directories in `legalese/canon`, at the SHA
+`jl4/examples/canon/` is a VENDORED MIRROR of blessed directories in `legalese/commons` (GitHub redirects the old name `legalese/canon`), at the SHA
 in `etc/canon-pin.json`. Do not edit it, and **do not bless its goldens by the procedure above** —
 deleting the stale golden and running the suite twice is right everywhere else and is exactly the
 wrong move here, because it makes this repository's copy disagree with canon silently. Edit the

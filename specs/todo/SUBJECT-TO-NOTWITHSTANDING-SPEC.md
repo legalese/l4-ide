@@ -10,7 +10,8 @@
 >   related work are temporary and that he expects actual keywords in the long run. What was ruled
 >   is that the **first build is a derivation lint over the existing call graph, not syntax**; five
 >   of §6.1's eight constructs are declined on measurement; and §10.8 S3 is narrowed by §12.2. The
->   lint is **ruled and not built**.
+>   lint is **built** (2026-10-30, as `l4 lint`, draft PR legalese/l4-ide#785 into `unstable`, not
+>   merged when this was written; see the status line at §12.1).
 > - §12.3 (posed 2026-09-11 as a §11 on a branch, landed here after `unstable` grew its own §11 and §12)
 >   records rulings **A1–A5**, the five the corpus survey forces. **All five ANSWERED** — A1–A4 on
 >   2026-09-15, A5 on 2026-09-16 — on the APPLIES bench and in chat; the marks are in §12.3.3.
@@ -1524,16 +1525,33 @@ change, zero migration.** Then rule the syntax on what the lint reports.
 **This partially answers §8 item 2 ("Propose concrete syntax").** It rules the _first_ build. It
 does not rule the syntax, and under Meng's note above it cannot.
 
-**Status: ruled 2026-09-05; NOT BUILT.** No such lint exists. What would make it true: a pass that
-walks each decision's body for calls to section-named decisions, joins them against the override
-phrases carried in `@ref` annotations and in identifier names, and reports the mismatches.
+**Status: ruled 2026-09-05; BUILT 2026-10-30 as `l4 lint FILE...`, in draft PR legalese/l4-ide#785
+(into `unstable`; not merged when this was written).** The pass is
+`jl4-core/src/L4/Lint/Override.hs`, the verb `jl4/app/L4/Cli/Lint.hs`, the page for readers
+`doc/reference/lint/overrides.md`. How it was checked: `jl4-core/test/OverrideLintSpec.hs` and
+`jl4/tests-cli/CliTest/Lint.hs`, `etc/verify-branch.sh --quick` green at 945e84ba7, and two positive
+controls (deleting the `s 6(1)` call from a copy of the witness below gives `missing-conjunct`; deleting
+the `s 13(2)` call from a copy of `wills-act.l4` gives `override-unwired`). Run over the 61-file canon
+mirror it reports 12 mentions and no finding; the counts for the other trees, and a summary of the
+20-result hand check, are in the PR body.
+
+**What §12.1 rules, and what the build chose.** The ruling is the lint and its oracle (the `@ref`
+prose and the identifier names); it is silent on how the lint is invoked. These were chosen in the
+build and are **assumed, not ruled**: the verb `l4 lint` and its flags (`--all`, `--json`,
+`--strict`; advisory by default, exit 0 whenever the lint ran, exit 1 whenever a file could not be
+checked); reading the quoted text in the decision's body as a third source (7 of the canon mirror's 12
+mentions can be read nowhere else); requiring a provision, written with its number, to be named in the
+same clause as the phrase (straight after it, after a few joining words, or up to ten words on after a
+description that opens with "the" or "this"); setting aside a decision whose whole body is one string
+literal; and accepting a third decision that combines the two sides as a discharge (directly for "subject
+to", through helpers for "notwithstanding" and "despite").
 
 **What decided it.** The prior recommendation — add an `@subject-to` annotation — rests on the
 premise that the override edge is invisible. **The tree says otherwise.** The witness, read
 2026-09-05:
 
 ```l4
--- jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:898-900
+-- jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:898-900
 `s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` d g MEANS
         "Subject to section 6,"
     ... NOT (`s 6(1) — granted to more than 4 persons in respect of the same property` g)
@@ -1545,7 +1563,8 @@ taken 2026-09-05:
 
 - **The machine-readable surface already exists.** `181` distinct section-named identifiers of the
   form `` `s N(...) — …` `` occur `1072` times across the six `.l4` files of
-  `jl4/examples/legal/sg-succession/cleanroom-2026-08/`. (The card reported 187 distinct / 991
+  `jl4/examples/legal/sg-succession/cleanroom-2026-08/` (now `jl4/examples/canon/sg/succession/cleanroom/`,
+  six `.l4` files; the counts were not re-taken). (The card reported 187 distinct / 991
   occurrences over "the four cleanroom files"; that is a different regex over a different file set,
   and neither figure is load-bearing — what matters is that the population is in the hundreds and
   the calls in the thousands.)
@@ -1641,7 +1660,7 @@ and can say when the `@ref` prose promises an edge the body does not make, but i
 the role, and neither can anything else in the tree today.
 
 **The bug class this idiom produces is already documented in the corpus**, which is why the lint
-pays for itself: `probate-administration-act.l4:893-895` records an earlier draft that quoted the
+pays for itself: `probate-administration-act.l4:892-895` records an earlier draft that quoted the
 "Subject to section 6" words in an inert string and tested only the conjuncts either side of them,
 so the decision answered `TRUE` of a sole-executor will — "a subsection reporting itself satisfied
 where its own opening words do not reach". An `@ref` promising an override over a body that calls
