@@ -93,7 +93,7 @@ export const BUILTIN_TOOLS: AiProxyTool[] = [
     function: {
       name: 'fs__delete_file',
       description:
-        'Moves the file to the system Trash (recoverable). Requires user confirmation by default.',
+        'Delete a file. It stays recoverable, and the user may be asked to confirm.',
       parameters: {
         type: 'object',
         additionalProperties: false,
@@ -101,6 +101,34 @@ export const BUILTIN_TOOLS: AiProxyTool[] = [
           path: { type: 'string', description: 'Workspace path.' },
         },
         required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'fs__copy_file',
+      description:
+        'Copy a text file to another path in one step. `overwrite` replaces an existing file at `to`; `deleteSource` removes `from` afterwards, making it a move.',
+      parameters: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          from: { type: 'string', description: 'Workspace path to copy.' },
+          to: {
+            type: 'string',
+            description: 'Workspace path of the copy.',
+          },
+          overwrite: {
+            type: 'boolean',
+            description: 'Replace `to` if it exists. Default false.',
+          },
+          deleteSource: {
+            type: 'boolean',
+            description: 'Delete `from` after copying. Default false.',
+          },
+        },
+        required: ['from', 'to'],
       },
     },
   },

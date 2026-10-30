@@ -7,13 +7,16 @@ import type {
   UserInteraction,
 } from './ports.js'
 import {
+  categoriesForCall,
   categoryForTool,
+  strictestPermission,
   type PermissionCategory,
   type PermissionValue,
 } from './permissions.js'
 import { BUILTIN_TOOLS } from './tool-registry.js'
 import { metaAskUser } from './tools/ask-user.js'
 import type { BuiltinTools } from './tools/builtin-tools.js'
+import type { FsCopyArgs } from './tools/fs.js'
 import type { L4RefactorArgs } from './tools/refactor.js'
 
 /** Result returned to the proxy as the content of a `role:"tool"` message. */
@@ -77,23 +80,28 @@ export class ToolDispatcher {
   }
 
   /** Resolve a tool-call's target file to its current URI. Read /
-   *  create / edit / delete all take `{ path }`. */
+   *  create / edit / delete take `{ path }`; copy targets `to`. */
   resolveFile(call: ToolCall): string | null {
     try {
-      const args = JSON.parse(call.argsJson || '{}') as { path?: string }
-      if (!args.path) return null
-      return this.opts.tools.resolveFileUri(args.path)
+      const p = targetPath(call.name, JSON.parse(call.argsJson || '{}'))
+      if (!p) return null
+      return this.opts.tools.resolveFileUri(p)
     } catch {
       return null
     }
   }
 
-  /** The permission that currently applies to a tool, or null for an
-   *  unknown tool. Lets the chat service render a tool row in its real
-   *  initial state (pending-approval vs running). */
-  permissionFor(name: string): PermissionValue | null {
-    const category = categoryForTool(name)
-    return category ? this.opts.permissions.getPermission(category) : null
+  /** The permission that currently applies to a call (by its
+   *  arguments, when known), or null for an unknown tool. Lets the chat
+   *  service render a tool row in its real initial state
+   *  (pending-approval vs running). */
+  permissionFor(name: string, argsJson = ''): PermissionValue | null {
+    return (
+      strictestPermission(
+        this.opts.permissions,
+        categoriesForCall(name, argsOrNull(argsJson))
+      )?.permission ?? null
+    )
   }
 
   /** Category for a tool name, or null for an unknown tool. */
@@ -164,16 +172,20 @@ export class ToolDispatcher {
         error: `Unknown tool: ${call.name}`,
       }
     }
-    const permission = this.opts.permissions.getPermission(category)
+    // The strictest of what the call needs (a move also deletes).
+    const { category: deciding, permission } = strictestPermission(
+      this.opts.permissions,
+      categoriesForCall(call.name, argsOrNull(call.argsJson))
+    ) ?? { category, permission: this.opts.permissions.getPermission(category) }
     this.opts.logger.info(
-      `tool/dispatch ${call.name} (category=${category}, permission=${permission}) args=${call.argsJson}`
+      `tool/dispatch ${call.name} (category=${deciding}, permission=${permission}) args=${call.argsJson}`
     )
     if (permission === 'never') {
       notifyStatus('error', { error: 'Denied by user settings' })
       return {
         ok: false,
         code: 'denied',
-        error: `User has disallowed the "${category}" category. Update the setting in the Legalese AI settings to enable it.`,
+        error: `User has disallowed the "${deciding}" category. Update the setting in the Legalese AI settings to enable it.`,
       }
     }
     if (permission === 'ask') {
@@ -216,10 +228,14 @@ export class ToolDispatcher {
     call: ToolCall,
     args: unknown
   ): Promise<void> {
-    if (call.name !== 'fs__edit_file' && call.name !== 'fs__create_file') {
+    if (
+      call.name !== 'fs__edit_file' &&
+      call.name !== 'fs__create_file' &&
+      call.name !== 'fs__copy_file'
+    ) {
       return
     }
-    const { path: p } = args as { path?: string }
+    const p = targetPath(call.name, args)
     if (!p) return
     const tools = this.opts.tools
     const uri = tools.resolveFileUri(p)
@@ -260,6 +276,8 @@ export class ToolDispatcher {
         )
       case 'fs__delete_file':
         return tools.deleteFile(args as { path: string })
+      case 'fs__copy_file':
+        return tools.copyFile(args as FsCopyArgs, ctx)
       case 'l4__evaluate':
         return tools.evaluate(
           args as {
@@ -284,6 +302,23 @@ export class ToolDispatcher {
       default:
         throw new Error(`No executor for tool: ${name}`)
     }
+  }
+}
+
+/** The file a tool call writes or names: `to` for a copy, else `path`. */
+function targetPath(name: string, args: unknown): string | undefined {
+  const a = (args ?? {}) as { path?: unknown; to?: unknown }
+  const p = name === 'fs__copy_file' ? a.to : a.path
+  return typeof p === 'string' && p ? p : undefined
+}
+
+/** The call's arguments, or null when they don't parse (the call then
+ *  fails when it runs). */
+function argsOrNull(json: string): unknown {
+  try {
+    return parseArgs(json)
+  } catch {
+    return null
   }
 }
 

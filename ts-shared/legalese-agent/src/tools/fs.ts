@@ -768,6 +768,81 @@ export async function fsDeleteFile(
     : `Deleted ${r.relative}`
 }
 
+export interface FsCopyArgs {
+  from: string
+  to: string
+  /** Replace `to` when it exists. Default: fail instead. */
+  overwrite?: boolean
+  /** Delete `from` afterwards, making the copy a move. */
+  deleteSource?: boolean
+}
+
+/**
+ * Copy a text file in one step, optionally over an existing file and
+ * removing the source (a move), instead of rebuilding it with
+ * `fs__create_file` and many `fs__edit_file` calls.
+ *
+ * The source is read as the editor sees it (unsaved changes included).
+ * A new target goes through {@link Workspace.createFile}; an existing
+ * one is replaced in one {@link Workspace.applyEdits} change, so in VS
+ * Code it joins the undo stack and the language server sees it like
+ * any edit. The source goes through {@link Workspace.deleteFile}, which
+ * keeps it recoverable.
+ */
+export async function fsCopyFile(
+  ctx: FsToolContext,
+  args: FsCopyArgs
+): Promise<string> {
+  if (typeof args.from !== 'string' || typeof args.to !== 'string') {
+    throw new Error("fs__copy_file: 'from' and 'to' are required paths.")
+  }
+  const from = ctx.workspace.resolvePath(args.from)
+  const to = ctx.workspace.resolvePath(args.to)
+  if (from.fsPath === to.fsPath) {
+    throw new Error(`${from.relative} is both the source and the target.`)
+  }
+  const src = await ctx.workspace.stat(from.fsPath)
+  if (!src) throw new Error(`File not found: ${from.relative}`)
+  if (!src.isFile) throw new Error(`Not a file: ${from.relative}`)
+  const { text } = await ctx.workspace.readDocument(from.uri)
+  if (text.includes('\u0000')) {
+    throw new Error(`${from.relative} is not a text file.`)
+  }
+  const dest = await ctx.workspace.stat(to.fsPath)
+  if (dest && !dest.isFile) throw new Error(`Not a file: ${to.relative}`)
+  // "Contract.l4" → "contract.l4" on macOS or Windows is one file:
+  // replacing it and then deleting the source would delete it.
+  if (dest && (await ctx.workspace.sameFile?.(from.fsPath, to.fsPath))) {
+    throw new Error(
+      `${from.relative} and ${to.relative} are the same file on disk (the file system ignores case, or a link joins them); fs__copy_file can't copy or move a file onto itself.`
+    )
+  }
+  if (dest && !args.overwrite) {
+    throw new Error(
+      `File already exists: ${to.relative}. Set overwrite to replace it.`
+    )
+  }
+  if (dest) {
+    const current = await ctx.workspace.readDocument(to.uri)
+    await ctx.workspace.applyEdits([
+      {
+        uri: to.uri,
+        startOffset: 0,
+        endOffset: current.text.length,
+        newText: text,
+      },
+    ])
+  } else {
+    await ctx.workspace.createFile(to, text)
+  }
+  let body = `${args.deleteSource ? 'Moved' : 'Copied'} ${from.relative} to ${to.relative}${dest ? ' (replaced the existing file)' : ''}`
+  if (args.deleteSource) {
+    const how = await ctx.workspace.deleteFile(from)
+    if (how === 'trashed') body += `; ${from.relative} is in the trash`
+  }
+  return appendL4Diagnostics(ctx, to, body)
+}
+
 function countOccurrences(haystack: string, needle: string): number {
   if (!needle) return 0
   let count = 0

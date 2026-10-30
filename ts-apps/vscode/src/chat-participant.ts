@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import type { AuthManager } from './auth.js'
 import {
   BUILTIN_TOOLS,
-  categoryForTool,
+  categoriesForCall,
+  strictestPermission,
   type AiProxyClient,
   type AiProxyTool,
   type BuiltinTools,
@@ -358,11 +359,13 @@ async function runBuiltin(
     return 'meta__ask_user is not yet supported in @legalese — ask the user directly in your reply, or use the sidebar chat.'
   }
 
-  const category = categoryForTool(name)
-  if (category) {
-    const perm = permissions.getPermission(category)
-    if (perm === 'never') {
-      return `User has disallowed the "${category}" category. Update the setting in the Legalese AI settings to enable it.`
+  const decided = strictestPermission(
+    permissions,
+    categoriesForCall(name, args)
+  )
+  if (decided) {
+    if (decided.permission === 'never') {
+      return `User has disallowed the "${decided.category}" category. Update the setting in the Legalese AI settings to enable it.`
     }
     // `ask` is treated as `always` here — the chat panel doesn't have
     // an inline approval surface yet. The proxy-side L4 rule tools
@@ -379,6 +382,8 @@ async function runBuiltin(
       return tools.editFile(args as Parameters<BuiltinTools['editFile']>[0])
     case 'fs__delete_file':
       return tools.deleteFile(args as Parameters<BuiltinTools['deleteFile']>[0])
+    case 'fs__copy_file':
+      return tools.copyFile(args as Parameters<BuiltinTools['copyFile']>[0])
     case 'l4__evaluate':
       return tools.evaluate(args as Parameters<BuiltinTools['evaluate']>[0])
     default:

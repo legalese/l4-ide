@@ -106,6 +106,19 @@ export class VsCodeWorkspace implements Workspace {
     }
   }
 
+  async sameFile(a: string, b: string): Promise<boolean> {
+    try {
+      const [x, y] = await Promise.all([
+        fs.stat(a, { bigint: true }),
+        fs.stat(b, { bigint: true }),
+      ])
+      // Some file systems (FAT) have no inode numbers: 0 for every file.
+      return x.ino !== 0n && x.dev === y.dev && x.ino === y.ino
+    } catch {
+      return false
+    }
+  }
+
   async readDirectory(fsPath: string): Promise<WorkspaceDirEntry[]> {
     const entries = await fs.readdir(fsPath, { withFileTypes: true })
     return entries.map((e) => ({

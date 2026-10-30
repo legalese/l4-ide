@@ -111,6 +111,95 @@ describe('fs tools over the Workspace port', () => {
     assert.equal(await tools.deleteFile({ path: 'a.txt' }), 'Deleted a.txt')
     assert.deepEqual(ws.deleted, ['a.txt'])
   })
+
+  test('copy_file copies, replaces only when asked, and moves', async () => {
+    const { ws, tools } = session({
+      'tmp/draft.txt': 'new\n',
+      'data/a.txt': 'old\n',
+    })
+    assert.equal(
+      await tools.copyFile({ from: 'tmp/draft.txt', to: 'data/b.txt' }),
+      'Copied tmp/draft.txt to data/b.txt'
+    )
+    assert.equal(ws.get('data/b.txt'), 'new\n')
+    assert.deepEqual(ws.created, ['data/b.txt'])
+    await assert.rejects(
+      tools.copyFile({ from: 'tmp/draft.txt', to: 'data/a.txt' }),
+      /File already exists: data\/a.txt\. Set overwrite/
+    )
+    assert.equal(ws.get('data/a.txt'), 'old\n')
+    assert.equal(
+      await tools.copyFile({
+        from: 'tmp/draft.txt',
+        to: 'data/a.txt',
+        overwrite: true,
+        deleteSource: true,
+      }),
+      'Moved tmp/draft.txt to data/a.txt (replaced the existing file)'
+    )
+    assert.equal(ws.get('data/a.txt'), 'new\n')
+    assert.equal(ws.get('tmp/draft.txt'), undefined)
+    assert.deepEqual(ws.deleted, ['tmp/draft.txt'])
+  })
+
+  test('copy_file refuses what it cannot copy', async () => {
+    const { tools } = session({
+      'a.txt': 'x',
+      'dir/b.txt': '',
+      'bin.dat': 'a\u0000b',
+    })
+    await assert.rejects(
+      tools.copyFile({ from: 'nope.txt', to: 'c.txt' }),
+      /File not found: nope\.txt/
+    )
+    await assert.rejects(
+      tools.copyFile({ from: 'dir', to: 'c.txt' }),
+      /Not a file: dir/
+    )
+    await assert.rejects(
+      tools.copyFile({ from: 'a.txt', to: 'dir', overwrite: true }),
+      /Not a file: dir/
+    )
+    await assert.rejects(
+      tools.copyFile({ from: 'a.txt', to: './a.txt' }),
+      /both the source and the target/
+    )
+    await assert.rejects(
+      tools.copyFile({ from: 'bin.dat', to: 'c.dat' }),
+      /not a text file/
+    )
+  })
+
+  // macOS and Windows: "Contract.txt" and "contract.txt" are one file.
+  // Replacing it and deleting the source would leave nothing.
+  test('copy_file refuses a target that is the source under another name', async () => {
+    const { ws, tools } = session({
+      'Contract.txt': 'terms',
+      'contract.txt': '',
+    })
+    ws.sameFile = async (a, b) => a.toLowerCase() === b.toLowerCase()
+    await assert.rejects(
+      tools.copyFile({
+        from: 'Contract.txt',
+        to: 'contract.txt',
+        overwrite: true,
+        deleteSource: true,
+      }),
+      /the same file on disk/
+    )
+    assert.equal(ws.get('Contract.txt'), 'terms')
+    assert.deepEqual(ws.deleted, [])
+  })
+
+  test('copy_file into an .l4 file reports its diagnostics', async () => {
+    const { l4, tools } = session({ 'tmp/a.l4': 'DECIDE x IS' })
+    l4.diagnostics.set(uriOf('/ws/data/a.l4'), [
+      { severity: 'error', line: 0, message: 'boom', source: 'jl4' },
+    ])
+    const out = await tools.copyFile({ from: 'tmp/a.l4', to: 'data/a.l4' })
+    assert.match(out, /^Copied tmp\/a.l4 to data\/a.l4\n/)
+    assert.match(out, /error 1 → boom \[jl4\]/)
+  })
 })
 
 describe('l4__evaluate', () => {

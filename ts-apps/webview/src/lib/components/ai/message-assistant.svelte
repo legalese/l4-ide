@@ -187,45 +187,63 @@
        *  ordering the user saw the tool rows in. */
       order: number
     }
+    type Touch = { path: string; kind: 'created' | 'edited' | 'deleted' }
+    /** The files a finished call changed: one `path` for create / edit
+     *  / delete; a copy's `to`, and for a move also its `from`. */
+    function touches(name: string, argsJson: string): Touch[] {
+      let a: {
+        path?: string
+        from?: string
+        to?: string
+        overwrite?: boolean
+        deleteSource?: boolean
+      }
+      try {
+        a = JSON.parse(argsJson)
+      } catch {
+        return []
+      }
+      const one = (kind: Touch['kind']): Touch[] =>
+        a.path ? [{ path: a.path, kind }] : []
+      if (name === 'fs__edit_file') return one('edited')
+      if (name === 'fs__create_file') return one('created')
+      if (name === 'fs__delete_file') return one('deleted')
+      if (name !== 'fs__copy_file' || !a.to) return []
+      const out: Touch[] = [
+        { path: a.to, kind: a.overwrite ? 'edited' : 'created' },
+      ]
+      if (a.deleteSource && a.from) out.push({ path: a.from, kind: 'deleted' })
+      return out
+    }
     const byPath = new Map<string, PathState>()
     let nextOrder = 0
     for (const b of blocks) {
       if (b.kind !== 'tool-call' || b.call.status !== 'done') continue
       const call = b.call
-      let kind: 'created' | 'edited' | 'deleted' | null = null
-      if (call.name === 'fs__edit_file') kind = 'edited'
-      else if (call.name === 'fs__create_file') kind = 'created'
-      else if (call.name === 'fs__delete_file') kind = 'deleted'
-      if (!kind) continue
-      let path: string | undefined
-      try {
-        path = (JSON.parse(call.argsJson) as { path?: string }).path
-      } catch {
-        continue
-      }
-      if (!path) continue
-      let state = byPath.get(path)
-      if (!state) {
-        state = {
-          created: false,
-          edited: false,
-          deleted: false,
-          firstCreateId: null,
-          firstEditId: null,
-          firstDeleteId: null,
-          order: nextOrder++,
+      for (const { path, kind } of touches(call.name, call.argsJson)) {
+        let state = byPath.get(path)
+        if (!state) {
+          state = {
+            created: false,
+            edited: false,
+            deleted: false,
+            firstCreateId: null,
+            firstEditId: null,
+            firstDeleteId: null,
+            order: nextOrder++,
+          }
+          byPath.set(path, state)
         }
-        byPath.set(path, state)
-      }
-      if (kind === 'created') {
-        state.created = true
-        if (!state.firstCreateId) state.firstCreateId = call.callId
-      } else if (kind === 'edited') {
-        state.edited = true
-        if (!state.firstEditId) state.firstEditId = call.callId
-      } else {
-        state.deleted = true
-        if (!state.firstDeleteId) state.firstDeleteId = call.callId
+        if (kind === 'created') {
+          state.created = true
+          if (!state.firstCreateId) state.firstCreateId = call.callId
+        } else if (kind === 'edited') {
+          state.edited = true
+          if (!state.firstEditId) state.firstEditId = call.callId
+        } else {
+          state.deleted = true
+          if (!state.firstDeleteId) state.firstDeleteId = call.callId
+        }
       }
     }
     const rows: Array<FileChange & { order: number }> = []

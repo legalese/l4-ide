@@ -121,6 +121,13 @@ export interface Workspace {
   /** Delete a file. VS Code moves it to the Trash (`'trashed'`); a
    *  headless host removes it (`'deleted'`). */
   deleteFile(target: ResolvedPath): Promise<'trashed' | 'deleted'>
+  /**
+   * Whether two existing paths are one file on disk (a case-insensitive
+   * file system, other Unicode normalisation, a symlink or hard link).
+   * A host where only equal paths can be (case-sensitive, no symlinks
+   * followed) may leave it out.
+   */
+  sameFile?(a: string, b: string): Promise<boolean>
 }
 
 // ── L4Language ────────────────────────────────────────────────────────
