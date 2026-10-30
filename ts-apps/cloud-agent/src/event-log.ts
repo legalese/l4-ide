@@ -70,6 +70,8 @@ export class EventLog {
   private failures = 0
   /** A write failed after it may have appended: truncate before the next. */
   private unclean = false
+  /** {@link close}d: nothing is written any more. */
+  private closed = false
   private writing: Promise<void> = Promise.resolve()
   private readonly now: () => number
   private readonly retryDelays: readonly number[]
@@ -170,8 +172,28 @@ export class EventLog {
     return 0
   }
 
+  /**
+   * Stop writing (at shutdown, before the lease is released): timers
+   * are cancelled and nothing queued after this is written. A write
+   * already running can't be called back.
+   */
+  close(): void {
+    this.closed = true
+    for (const t of [this.flushTimer, this.retryTimer, this.deltaTimer]) {
+      if (t) clearTimeout(t)
+    }
+    this.flushTimer = this.retryTimer = this.deltaTimer = null
+    const unwritten = this.pending.length + (this.delta ? 1 : 0)
+    if (unwritten > 0) {
+      this.logger.warn(`event-log: ${unwritten} event(s) not written at exit`)
+    }
+    this.pending = []
+    this.delta = null
+  }
+
   /** Queue an event. Returns once it's queued, not written. */
   emit(payload: CloudEventPayload): void {
+    if (this.closed) return
     if (payload.type === 'text-delta' || payload.type === 'thinking-delta') {
       if (
         this.delta &&
@@ -218,6 +240,7 @@ export class EventLog {
       .then(async () => {
         // Taken when it's this write's turn, so a retry also carries
         // whatever was queued meanwhile, in order.
+        if (this.closed) return
         const batch = this.pending
         this.pending = []
         if (batch.length === 0) return
@@ -226,7 +249,7 @@ export class EventLog {
         } catch (err) {
           this.pending = [...batch, ...this.pending]
           this.unclean = true
-          this.scheduleRetry()
+          if (!this.closed) this.scheduleRetry()
           throw err
         }
         this.failures = 0

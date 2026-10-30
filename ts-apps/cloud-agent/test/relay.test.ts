@@ -184,6 +184,29 @@ describe('EventLog', () => {
     )
   })
 
+  test('writes nothing once closed, not even a pending retry', async () => {
+    let fail = true
+    let appends = 0
+    const log = new EventLog(dir, silent, {
+      retryDelaysMs: [10],
+      append: async (file, data) => {
+        appends++
+        if (fail) throw Object.assign(new Error('EIO'), { code: 'EIO' })
+        await appendToFile(file, data)
+      },
+    })
+    await log.open()
+    log.emit({ type: 'session-state', state: 'running' })
+    await assert.rejects(log.flush())
+    log.close()
+    fail = false
+    log.emit({ type: 'session-state', state: 'busy' })
+    await new Promise((r) => setTimeout(r, 50))
+    await log.flush()
+    assert.equal(appends, 1)
+    assert.deepEqual(await readEvents(dir), [])
+  })
+
   test('cuts an oversized field down instead of dropping the event', async () => {
     const log = new EventLog(dir, silent)
     await log.open()

@@ -49,8 +49,9 @@ export const COMMAND_POLL_MS = 1_000
 /** SIGTERM gives 30 s before SIGKILL (the task definition's
  *  `stopTimeout`, §5.1): the whole shutdown fits in this, with a margin. */
 export const SHUTDOWN_BUDGET_MS = 20_000
-/** Kept for the last steps (session.json, the event flush, the lease,
- *  the key chain, jl4-lsp), each bounded; earlier steps leave it. */
+/** Kept for the last steps (the key chain, jl4-lsp, session.json, the
+ *  event flush, then the lease release, last), each bounded; earlier
+ *  steps leave it. */
 export const FINAL_STEPS_MS = 9_000
 /** How long a parked harness lets the current turn finish its step. */
 export const PARK_TURN_GRACE_MS = 60_000
@@ -801,9 +802,9 @@ export class Runner {
    * The shutdown, within {@link SHUTDOWN_BUDGET_MS} (a parked harness first
    * gives the current turn {@link PARK_TURN_GRACE_MS}; nobody is waiting on
    * it). The running turn and the plugins (git commits what changed) get
-   * what is left before {@link FINAL_STEPS_MS}; the last steps — status,
-   * events, lease, key chain, jl4-lsp — are each bounded, the lease
-   * released as soon as nothing writes any more.
+   * what is left before {@link FINAL_STEPS_MS}; the last steps — key
+   * chain, jl4-lsp, status, events, lease — are each bounded. Releasing
+   * the lease is the very last write: nothing is written after it.
    */
   private async finish(reason: ExitReason): Promise<void> {
     const { logger } = this.opts
@@ -847,6 +848,10 @@ export class Runner {
         logger.error(`plugin ${p.name} beforeExit failed`, err)
       }
     }
+    if (reason !== 'parked' && this.opts.chain) {
+      await waitFor(this.opts.chain.end(), 1_500)
+    }
+    await waitFor(this.opts.l4.dispose?.() ?? Promise.resolve(), 500)
     const status = reason === 'parked' ? 'parked' : 'sleeping'
     await waitFor(
       this.session
@@ -866,16 +871,14 @@ export class Runner {
         .catch((err) => logger.error('event flush failed', err)),
       3_000
     )
+    // Last: after this the harness writes nothing to the session.
+    this.events.close()
     await waitFor(
       this.lease
         .release()
         .catch((err) => logger.error('lease release failed', err)),
       2_000
     )
-    if (reason !== 'parked' && this.opts.chain) {
-      await waitFor(this.opts.chain.end(), 1_500)
-    }
-    await waitFor(this.opts.l4.dispose?.() ?? Promise.resolve(), 500)
     this.phase = 'stopped'
     logger.info(`stopped (${reason})`)
     this.resolveStopped(reason)
