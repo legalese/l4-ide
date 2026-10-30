@@ -269,9 +269,11 @@ mapUnitBody f u = case u.uDecl of
 -- size's half of x" says a thing the author did not write. A herald that follows
 -- the rule's last input is moved onto the rule before the document is built
 -- ('L4.Nlg.prepareModules'), and that gives the name a herald, so the selector
--- would otherwise print it. One written above the head already did. A field's
--- own gloss is kept: only a name that is the head of a rule with a herald is
--- cleared.
+-- would otherwise print it. One written above the head already did.
+--
+-- Matched by name, not by 'Unique': a selector whose text is the name of any rule
+-- with a herald is cleared, so a record field that shares such a name loses its
+-- own gloss too. Any other field keeps its gloss.
 plainSelectors :: Set.Set Text -> Expr Resolved -> Expr Resolved
 plainSelectors rules = transformOf (gplate @(Expr Resolved)) $ \case
   Proj ann e sel | resolvedText sel `Set.member` rules -> Proj ann e (plainName sel)
