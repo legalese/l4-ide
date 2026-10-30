@@ -17,11 +17,12 @@ import {
   parseDevArgs,
   type HarnessConfig,
 } from './config.js'
-import { initSessionFolder, sendCommand } from './dev.js'
+import { claimDevRun, initSessionFolder, sendCommand } from './dev.js'
 import { GitSync } from './git-sync.js'
 import { McpServers } from './mcp-servers.js'
 import { Jl4Lsp } from './jl4-lsp.js'
 import { DevAuth, KeyChainAuth, authRetryingFetch } from './key-chain.js'
+import { checkRun } from './lease.js'
 import { JsonLogger } from './logger.js'
 import { DATA_DIR, NodeWorkspace, TMP_DIR } from './node-workspace.js'
 import { ensureDirNoFollow } from './safe-fs.js'
@@ -145,10 +146,22 @@ async function runSession(
     logger.error('session folder does not exist; exiting')
     return 1
   }
+  const run = cfg.run
+  if (run === undefined) {
+    logger.error('no run number; exiting')
+    return 1
+  }
   const taskId = await taskIdFrom(cfg)
   logger.info(
-    `harness ${HARNESS_VERSION} starting (mode=${cfg.mode}, task=${taskId})`
+    `harness ${HARNESS_VERSION} starting (mode=${cfg.mode}, run=${run}, task=${taskId})`
   )
+  // Before anything is created or started (§7.3): a harness that isn't
+  // the session's current run writes nothing.
+  const verdict = await checkRun(path.join(sessionDir, 'state'), run)
+  if (!verdict.ok) {
+    logger.warn(`superseded: ${verdict.why}; exiting without writing`)
+    return 0
+  }
 
   // The concrete providers: their headers don't depend on the request's
   // URL (the key goes only to the configured origins, authRetryingFetch).
@@ -196,6 +209,7 @@ async function runSession(
 
   const r = new Runner({
     sessionId: cfg.sessionId,
+    run,
     sessionDir,
     taskId,
     logger,
@@ -220,9 +234,11 @@ async function runSession(
   try {
     const reason = await r.run()
     if (reason === null) {
+      // Superseded before it started (logged): nothing was written.
       await lsp.dispose()
-      logger.info('another harness holds the lease; exiting')
+      return 0
     }
+    if (reason === 'superseded') return 1
     return fatal.fired() ? 1 : 0
   } catch (err) {
     logger.error('harness failed', err)
@@ -254,9 +270,18 @@ export async function main(
     if (argv.includes('--dev')) {
       const args = parseDevArgs(argv)
       if (args.init) await initSessionFolder(args.root, args.sessionId)
+      // Play the Sessions API's start: claim the next run, run as it
+      // (only in a session folder that exists; runHarness reports one
+      // that doesn't).
+      const root = path.resolve(args.root)
+      const folder = await stat(path.join(root, 'sessions', args.sessionId))
+        .then((st) => st.isDirectory())
+        .catch(() => false)
+      const run = folder ? await claimDevRun(root, args.sessionId) : undefined
       cfg = {
         mode: 'dev',
         sessionId: args.sessionId,
+        ...(run !== undefined ? { run } : {}),
         root: path.resolve(args.root),
         aiProxyUrl: args.aiProxyUrl,
         aiLocal: true,

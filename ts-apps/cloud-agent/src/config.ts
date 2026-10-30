@@ -1,4 +1,4 @@
-import { AGENT_KEY_RE, ULID_RE } from '@repo/legalese-agent/protocol'
+import { AGENT_KEY_RE, RUN_RE, ULID_RE } from '@repo/legalese-agent/protocol'
 import { LOCAL_AI_ENDPOINT } from '@repo/legalese-agent'
 import { parseLogLevel, type LogLevel } from './logger.js'
 
@@ -13,6 +13,9 @@ export const WORKSPACE_ROOT = '/workspace'
 export interface HarnessConfig {
   mode: 'cloud' | 'dev'
   sessionId: string
+  /** The run this harness is (`SESSION_RUN`, §7.3). In `--dev` the
+   *  harness claims the next run itself. */
+  run?: number
   /** `AGENT_KEY`; absent in `--dev`. */
   agentKey?: string
   /** The user folder: `/workspace` in the cloud, `--root` in dev. */
@@ -39,8 +42,8 @@ export class ConfigError extends Error {
 
 /**
  * The environment the harness accepts (spec §5.1): the static
- * task-definition variables plus `SESSION_ID` and `AGENT_KEY` from the
- * `RunTask` override. Everything is validated by pattern; the image's
+ * task-definition variables plus `SESSION_ID`, `SESSION_RUN` and
+ * `AGENT_KEY` from the `RunTask` override. Everything is validated by pattern; the image's
  * entry point (cloud-sessions repo, `agent-image/`) already
  * dropped everything else, and this re-checks so the harness never trusts
  * its caller.
@@ -51,7 +54,7 @@ export const STATIC_ENV = [
   'AUTH_URL',
   'LOG_LEVEL',
 ] as const
-export const OVERRIDE_ENV = ['SESSION_ID', 'AGENT_KEY'] as const
+export const OVERRIDE_ENV = ['SESSION_ID', 'SESSION_RUN', 'AGENT_KEY'] as const
 
 /** An `https://` URL without credentials, query or fragment. */
 export function checkHttpsUrl(name: string, raw: string | undefined): string {
@@ -78,6 +81,10 @@ export function parseCloudEnv(env: NodeJS.ProcessEnv): HarnessConfig {
   const sessionId = env.SESSION_ID ?? ''
   if (!ULID_RE.test(sessionId))
     throw new ConfigError('SESSION_ID must be a ULID')
+  const runText = env.SESSION_RUN ?? ''
+  if (!RUN_RE.test(runText)) {
+    throw new ConfigError('SESSION_RUN must be a run number (1, 2, …)')
+  }
   const agentKey = env.AGENT_KEY ?? ''
   if (!AGENT_KEY_RE.test(agentKey)) {
     throw new ConfigError('AGENT_KEY must be an sk_ key')
@@ -88,6 +95,7 @@ export function parseCloudEnv(env: NodeJS.ProcessEnv): HarnessConfig {
   return {
     mode: 'cloud',
     sessionId,
+    run: Number(runText),
     agentKey,
     root: WORKSPACE_ROOT,
     aiProxyUrl: checkHttpsUrl('AI_PROXY_URL', env.AI_PROXY_URL),

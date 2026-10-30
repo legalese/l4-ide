@@ -13,6 +13,7 @@ import type {
 } from '@repo/legalese-agent'
 import type { CloudEvent } from '@repo/legalese-agent/protocol'
 import { DirectiveResultsCache } from '@repo/legalese-agent'
+import type { WriteFence } from '../src/lease.js'
 
 export const SID = '01J9Z3K4M5N6P7Q8R9S0T1V2W3'
 
@@ -246,3 +247,6 @@ export class FakeAiProxy {
     await new Promise<void>((r) => this.server?.close(() => r()) ?? r())
   }
 }
+
+/** A write fence that never refuses (plugin tests without run records). */
+export const OPEN_FENCE: WriteFence = { check: () => undefined }

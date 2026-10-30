@@ -31,7 +31,13 @@ import { CommandReader } from './command-reader.js'
 import { SessionConversationStore } from './conversation-store.js'
 import { EventLog } from './event-log.js'
 import { CloudInteraction } from './interaction.js'
-import { Lease, LeaseHeldError } from './lease.js'
+import {
+  Fence,
+  RunLease,
+  SupersededError,
+  checkRun,
+  type WriteFence,
+} from './lease.js'
 import {
   DATA_DIR,
   DELETED_DIR,
@@ -71,8 +77,15 @@ export const CLOUD_PERMISSIONS: Record<PermissionCategory, PermissionValue> =
   ) as Record<PermissionCategory, PermissionValue>
 
 /** `error`: something nothing handled (main.ts); exit as cleanly as
- *  the budget allows. */
-export type ExitReason = 'idle' | 'stop' | 'sigterm' | 'parked' | 'error'
+ *  the budget allows. `superseded`: a newer run exists, or this run's
+ *  lease couldn't be kept (§7.3); stopped without writing. */
+export type ExitReason =
+  | 'idle'
+  | 'stop'
+  | 'sigterm'
+  | 'parked'
+  | 'error'
+  | 'superseded'
 
 /** What plugins (git sync, MCP servers) get to work with. */
 export interface RunnerContext {
@@ -83,6 +96,8 @@ export interface RunnerContext {
   readonly stateDir: string
   readonly logger: Logger
   readonly l4: L4Language
+  /** Checked before every write (§7.3); plugins check it too. */
+  readonly fence: WriteFence
   /** Append an event to the log. */
   emit(payload: CloudEventPayload): void
   /** Emit `session-state` for the current state (e.g. after a plugin
@@ -159,6 +174,8 @@ export interface ChainControl {
 
 export interface RunnerOptions {
   sessionId: string
+  /** The run this harness is (`SESSION_RUN`, §7.3). */
+  run: number
   sessionDir: string
   taskId: string
   logger: Logger
@@ -177,22 +194,30 @@ export interface RunnerOptions {
   extensionVersion: string
   idleExitMs?: number
   pollMs?: number
+  /** Lease renewal interval (tests). */
+  leaseRenewMs?: number
+  /** The write fence (tests observe it); one is made otherwise. */
+  fence?: Fence
   now?: () => number
 }
 
 type Phase = 'new' | 'running' | 'stopping' | 'stopped'
 
 /**
- * The cloud harness main loop (spec §5.4, §8, §11): take the lease,
- * renew the key chain, read commands every second, run turns one at a
- * time through the shared {@link ChatService}, append events, and exit
- * after 10 idle minutes, on `stop`, on SIGTERM, or when the chain can't
- * be renewed (parking).
+ * The cloud harness main loop (spec §5.4, §8, §11): check it is the
+ * session's current run and keep its lease (§7.3), renew the key chain,
+ * read commands every second, run turns one at a time through the shared
+ * {@link ChatService}, append events, and exit after 10 idle minutes, on
+ * `stop`, on SIGTERM, or when the chain can't be renewed (parking).
+ * Every write goes through one {@link Fence}; when it refuses one (a
+ * newer run, a lease that couldn't be kept) the runner stops at once,
+ * writing nothing more.
  */
 export class Runner {
   readonly events: EventLog
   readonly commands: CommandReader
-  readonly lease: Lease
+  readonly lease: RunLease
+  readonly fence: Fence
   readonly session: SessionJson
   readonly interaction: CloudInteraction
   readonly providers: ToolProvider[]
@@ -223,6 +248,8 @@ export class Runner {
   private parkedReason: AgentKeyFailure | undefined
   private stopped!: Promise<ExitReason>
   private resolveStopped!: (r: ExitReason) => void
+  /** Why the run was superseded, once it was. */
+  private supersededWhy: string | null = null
 
   constructor(private readonly opts: RunnerOptions) {
     this.now = opts.now ?? Date.now
@@ -230,12 +257,30 @@ export class Runner {
     this.pollMs = opts.pollMs ?? COMMAND_POLL_MS
     this.lastActivity = this.now()
     const stateDir = path.join(opts.sessionDir, 'state')
-    this.events = new EventLog(stateDir, opts.logger, { now: this.now })
-    this.commands = new CommandReader(stateDir, opts.logger, { now: this.now })
-    this.lease = new Lease(stateDir, opts.taskId, opts.logger, {
+    const fence = opts.fence ?? new Fence({ now: this.now })
+    fence.onViolation = (why) => this.supersede(why)
+    this.fence = fence
+    this.events = new EventLog(stateDir, opts.logger, { now: this.now, fence })
+    this.commands = new CommandReader(stateDir, opts.logger, {
       now: this.now,
+      fence,
     })
-    this.session = new SessionJson(opts.sessionDir)
+    this.lease = new RunLease(
+      stateDir,
+      opts.run,
+      opts.taskId,
+      fence,
+      opts.logger,
+      {
+        now: this.now,
+        ...(opts.leaseRenewMs ? { renewMs: opts.leaseRenewMs } : {}),
+        onSuperseded: (why) => this.supersede(why),
+      }
+    )
+    this.session = new SessionJson(opts.sessionDir, fence)
+    if (opts.workspace instanceof NodeWorkspace) {
+      opts.workspace.setFence(fence)
+    }
     this.plugins = opts.plugins ?? []
     this.providers = [...(opts.providers ?? [])]
     this.interaction = new CloudInteraction(
@@ -287,6 +332,7 @@ export class Runner {
       stateDir,
       logger: opts.logger,
       l4: opts.l4,
+      fence,
       emit: (p) => this.events.emit(p),
       announceState: () => this.announceState(),
       providers: this.providers,
@@ -304,7 +350,8 @@ export class Runner {
 
   /**
    * Run until the harness should exit. Resolves with the exit reason, or
-   * `null` when another harness holds the lease (nothing was touched).
+   * `null` when this harness isn't the session's current run (a newer
+   * run exists, or its lease ran out first): nothing was written.
    */
   async run(): Promise<ExitReason | null> {
     const { logger } = this.opts
@@ -312,15 +359,13 @@ export class Runner {
     if (!st?.isDirectory()) {
       throw new Error('session folder does not exist')
     }
-    try {
-      await this.lease.acquire()
-    } catch (err) {
-      if (err instanceof LeaseHeldError) {
-        logger.warn(err.message)
-        return null
-      }
-      throw err
+    const verdict = await checkRun(this.ctx.stateDir, this.opts.run, this.now())
+    if (!verdict.ok) {
+      logger.warn(`superseded: ${verdict.why}; exiting without writing`)
+      return null
     }
+    this.fence.renewed(verdict.validUntil)
+    await this.lease.start()
     this.phase = 'running'
     try {
       await this.events.open()
@@ -357,6 +402,38 @@ export class Runner {
     this.pollTimer = setInterval(() => void this.tick(), this.pollMs)
     void this.tick()
     return this.stopped
+  }
+
+  /**
+   * A newer run exists, or this run's lease lapsed (§7.3): stop at once.
+   * No flush, no final lease, no git, no session.json — nothing more is
+   * written; the key chain is ended (a network call) and jl4-lsp stopped.
+   */
+  private supersede(why: string): void {
+    if (this.supersededWhy !== null) return
+    this.supersededWhy = why
+    this.opts.logger.error(`superseded: ${why}; stopping without writing`)
+    this.fence.close()
+    this.events.close()
+    this.lease.stop()
+    if (this.pollTimer) clearInterval(this.pollTimer)
+    this.pollTimer = null
+    this.opts.chain?.stopTimer()
+    this.queue = []
+    if (this.starting) this.starting.aborted = true
+    if (this.activeTurn) {
+      this.interaction.pending.cancelTurn(this.activeTurn)
+      this.chat.abort(this.activeTurn)
+    }
+    this.interaction.pending.cancelAll()
+    this.phase = 'stopping'
+    this.exitReason = 'superseded'
+    void (async () => {
+      if (this.opts.chain) await waitFor(this.opts.chain.end(), 1_500)
+      await waitFor(this.opts.l4.dispose?.() ?? Promise.resolve(), 500)
+      this.phase = 'stopped'
+      this.resolveStopped('superseded')
+    })()
   }
 
   /** SIGTERM: exit like an idle exit, within the stop timeout. */
@@ -612,6 +689,7 @@ export class Runner {
         shas[path] ? { path, sha: shas[path] } : { path }
       ),
     })
+    this.fence.check('add-files')
     await fs.rm(batchDir, { recursive: true, force: true })
     logger.info(
       `add-files ${cmd.batchId}: ${added.length}/${cmd.files.length} file(s) added`
@@ -761,7 +839,13 @@ export class Runner {
     turnId?: string
   ): Promise<void> {
     const before = this.lease.current
-    await this.lease.set(state, turnId)
+    try {
+      await this.lease.set(state, turnId)
+    } catch (err) {
+      // Superseded: the runner is stopping already.
+      if (err instanceof SupersededError) return
+      throw err
+    }
     if (before.state !== state) this.announceState()
   }
 

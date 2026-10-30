@@ -13,6 +13,7 @@ import {
   readKnownText,
   writeAtomic,
 } from './safe-fs.js'
+import type { WriteFence } from './lease.js'
 
 /** Command files are small; a sealed MCP credential blob is the largest. */
 const MAX_COMMAND_BYTES = 1_100_000
@@ -92,11 +93,16 @@ export class CommandReader {
       now?: () => number
       /** Tests inject read errors here. */
       readText?: typeof readKnownText
+      /** Checked before every write (§7.3). */
+      fence?: WriteFence
     } = {}
   ) {
     this.now = opts.now ?? Date.now
     this.readText = opts.readText ?? readKnownText
+    this.fence = opts.fence
   }
+
+  private readonly fence: WriteFence | undefined
 
   private get seqPath(): string {
     return path.join(this.stateDir, 'commands.seq')
@@ -122,6 +128,7 @@ export class CommandReader {
 
   async open(): Promise<void> {
     try {
+      this.fence?.check('commands.seq')
       await createExclusive(this.seqPath, formatCommandSeq(0))
     } catch (err) {
       if (!isErrno(err, 'EEXIST')) throw err
@@ -193,7 +200,10 @@ export class CommandReader {
     // Writes go out one at a time, always with the latest value.
     this.writing = this.writing
       .catch(() => undefined)
-      .then(() => writeAtomic(this.donePath, formatCommandSeq(this.done)))
+      .then(() => {
+        this.fence?.check('commands.done')
+        return writeAtomic(this.donePath, formatCommandSeq(this.done))
+      })
     await this.writing
   }
 

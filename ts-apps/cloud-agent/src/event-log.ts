@@ -18,6 +18,7 @@ import {
   readKnownText,
   writeAtomic,
 } from './safe-fs.js'
+import type { WriteFence } from './lease.js'
 
 /** Deltas are coalesced for at least this long (§8). */
 export const DELTA_COALESCE_MS = 250
@@ -74,6 +75,7 @@ export class EventLog {
   private closed = false
   private writing: Promise<void> = Promise.resolve()
   private readonly now: () => number
+  private readonly fence: WriteFence | undefined
   private readonly retryDelays: readonly number[]
   private readonly append: typeof appendToFile
 
@@ -85,8 +87,11 @@ export class EventLog {
       retryDelaysMs?: readonly number[]
       /** Tests inject failures here. */
       append?: typeof appendToFile
+      /** Checked before every write (§7.3). */
+      fence?: WriteFence
     } = {}
   ) {
+    this.fence = opts.fence
     this.now = opts.now ?? Date.now
     this.retryDelays = opts.retryDelaysMs ?? WRITE_RETRY_DELAYS_MS
     this.append = opts.append ?? appendToFile
@@ -107,6 +112,7 @@ export class EventLog {
 
   /** Recover the head and the last `seq` from a previous run. */
   async open(): Promise<void> {
+    this.fence?.check('events')
     await fs.mkdir(path.join(this.stateDir, 'events'), { recursive: true })
     const text = await readKnownText(this.headPath, 4096)
     if (text === null) {
@@ -305,6 +311,7 @@ export class EventLog {
    * they were (the caller re-queues the batch).
    */
   private async write(batch: CloudEventPayload[]): Promise<void> {
+    this.fence?.check('events')
     if (this.unclean) {
       // The failed write may have appended past the published length.
       await truncateTo(this.segmentPath(this.head.segment), this.head.length)
@@ -323,6 +330,7 @@ export class EventLog {
     let chunk = ''
     const commit = async (): Promise<void> => {
       if (!chunk) return
+      this.fence?.check('events')
       await this.append(this.segmentPath(head.segment), chunk)
       head = {
         segment: head.segment,
@@ -343,6 +351,7 @@ export class EventLog {
       chunk += line
     }
     await commit()
+    this.fence?.check('head.json')
     await writeAtomic(this.headPath, JSON.stringify(head) + '\n')
     this.head = head
     this.seq = seq

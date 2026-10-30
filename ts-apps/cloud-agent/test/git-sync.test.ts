@@ -20,7 +20,14 @@ import {
   summaryMessages,
 } from '../src/git-sync.js'
 import type { RunnerContext } from '../src/runner.js'
-import { HOST_PATH, MemoryLogger, SID, StubL4, tempDir } from './helpers.js'
+import {
+  HOST_PATH,
+  MemoryLogger,
+  OPEN_FENCE,
+  SID,
+  StubL4,
+  tempDir,
+} from './helpers.js'
 
 const BUNDLE = '01J9Z3K4M5N6P7Q8R9S0T1V2W4.bundle'
 
@@ -73,6 +80,7 @@ describe('GitSync', () => {
       sessionDir,
       repoDir: repo,
       stateDir,
+      fence: OPEN_FENCE,
       logger,
       l4: new StubL4(),
       emit: (p) => events.push(p),

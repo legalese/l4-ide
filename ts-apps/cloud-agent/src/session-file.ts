@@ -7,6 +7,7 @@ import {
   type SessionFile,
   type SessionFileStatus,
 } from '@repo/legalese-agent/protocol'
+import type { WriteFence } from './lease.js'
 import { readKnownText, writeAtomic } from './safe-fs.js'
 
 const MAX_SESSION_JSON = 256 * 1024
@@ -30,7 +31,11 @@ export class SessionJson {
   /** Updates run one at a time, so concurrent ones don't lose writes. */
   private queue: Promise<unknown> = Promise.resolve()
 
-  constructor(private readonly sessionDir: string) {}
+  constructor(
+    private readonly sessionDir: string,
+    /** Checked before every write (§7.3); readers don't need one. */
+    private readonly fence?: WriteFence
+  ) {}
 
   private get file(): string {
     return path.join(this.sessionDir, 'session.json')
@@ -72,6 +77,7 @@ export class SessionJson {
     }
     // Validate what we're about to write.
     const checked = sessionFile(next, 'session.json')
+    this.fence?.check('session.json')
     await writeAtomic(this.file, JSON.stringify(next, null, 2) + '\n')
     return checked
   }

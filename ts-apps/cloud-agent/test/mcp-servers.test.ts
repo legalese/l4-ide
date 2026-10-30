@@ -15,7 +15,7 @@ import type { ToolProvider } from '@repo/legalese-agent'
 import { initSessionFolder } from '../src/dev.js'
 import { McpServers, wireName } from '../src/mcp-servers.js'
 import type { RunnerContext } from '../src/runner.js'
-import { MemoryLogger, SID, StubL4, tempDir } from './helpers.js'
+import { MemoryLogger, OPEN_FENCE, SID, StubL4, tempDir } from './helpers.js'
 
 interface Seen {
   url: string
@@ -114,6 +114,7 @@ describe('McpServers', () => {
       sessionId: SID,
       sessionDir,
       repoDir: path.join(sessionDir, 'repo'),
+      fence: OPEN_FENCE,
       stateDir: path.join(sessionDir, 'state'),
       logger,
       l4: new StubL4(),

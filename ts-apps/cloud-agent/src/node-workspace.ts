@@ -16,6 +16,7 @@ import {
   isModelWritableRepoPath,
 } from '@repo/legalese-agent/protocol'
 import { ensureDirNoFollow, isErrno } from './safe-fs.js'
+import type { WriteFence } from './lease.js'
 
 const { O_RDONLY, O_WRONLY, O_CREAT, O_EXCL, O_TRUNC, O_NOFOLLOW } = constants
 
@@ -104,6 +105,13 @@ export class NodeWorkspace implements Workspace {
   }
 
   /** Tool calls from now on belong to `turnId` (null between turns). */
+  /** Checked before every write and delete (§7.3); set by the runner. */
+  private fence: WriteFence | undefined
+
+  setFence(fence: WriteFence): void {
+    this.fence = fence
+  }
+
   setTurn(turnId: string | null): void {
     this.turn = turnId && TURN_ID_RE.test(turnId) ? turnId : null
   }
@@ -111,6 +119,7 @@ export class NodeWorkspace implements Workspace {
   /** Create `data/` and `tmp/` if they are missing (without following
    *  links), so a fresh or cleared session has both. */
   async ensureLayout(): Promise<void> {
+    this.fence?.check('workspace')
     await ensureDirNoFollow(this.root, this.dataDir)
     await ensureDirNoFollow(this.root, path.join(this.root, TMP_DIR))
   }
@@ -385,6 +394,7 @@ export class NodeWorkspace implements Workspace {
    *  given and where it really is, and never through a symlink
    *  (`linkAtEnd`: the file itself may be one). */
   private assertWritable(fsPath: string, linkAtEnd = false): void {
+    this.fence?.check('workspace')
     const absolute = path.resolve(fsPath)
     const real = this.assertInside(absolute)
     const rel = path.relative(this.root, absolute).split(path.sep).join('/')

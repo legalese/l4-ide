@@ -10,7 +10,7 @@ import {
 } from '../src/command-reader.js'
 import { EventLog, DELTA_COALESCE_MS } from '../src/event-log.js'
 import { CloudInteraction, MAX_TOOL_EVENT_TEXT } from '../src/interaction.js'
-import { Lease, LeaseHeldError } from '../src/lease.js'
+import { Fence, RunLease, SupersededError, checkRun } from '../src/lease.js'
 import { appendToFile, readKnownFile, readKnownText } from '../src/safe-fs.js'
 import { SessionJson } from '../src/session-file.js'
 import { initSessionFolder, sendCommand } from '../src/dev.js'
@@ -515,28 +515,75 @@ describe('CommandReader', () => {
   })
 })
 
-describe('Lease', () => {
+describe('Run records (§7.3)', () => {
   let dir: string
   let cleanup: () => Promise<void>
   beforeEach(async () => {
     ;({ dir, cleanup } = await tempDir())
+    await mkdir(path.join(dir, 'runs'), { recursive: true })
   })
   afterEach(() => cleanup())
 
-  const read = async (): Promise<Record<string, unknown>> =>
-    JSON.parse(await readFile(path.join(dir, 'lease.json'), 'utf8'))
+  /** Run n as the Sessions API's start leaves it. */
+  const claim = async (n: number, createdAt: number): Promise<void> => {
+    await writeFile(
+      path.join(dir, 'runs', `${n}.json`),
+      JSON.stringify({ run: n, createdAt })
+    )
+    await writeFile(
+      path.join(dir, 'runs', `${n}.lease.json`),
+      JSON.stringify({
+        run: n,
+        taskId: 'sessions-api',
+        state: 'starting',
+        expiresAt: createdAt + 180_000,
+      })
+    )
+  }
+  const read = async (n: number): Promise<Record<string, unknown>> =>
+    JSON.parse(
+      await readFile(path.join(dir, 'runs', `${n}.lease.json`), 'utf8')
+    )
 
-  test('takes the lease, tracks state and releases with an expired lease', async () => {
+  test('a run may start only while it is the latest, with time left on its lease', async () => {
+    await claim(1, 10_000)
+    assert.deepEqual(await checkRun(dir, 1, 20_000), {
+      ok: true,
+      validUntil: 190_000,
+    })
+    // Too close to the starting lease's end.
+    assert.equal((await checkRun(dir, 1, 180_000)).ok, false)
+    // A newer run exists.
+    await claim(2, 30_000)
+    assert.deepEqual(await checkRun(dir, 1, 40_000), {
+      ok: false,
+      why: 'run 2 exists',
+    })
+    assert.equal((await checkRun(dir, 2, 40_000)).ok, true)
+    // No record at all.
+    assert.equal((await checkRun(dir, 3, 40_000)).ok, false)
+  })
+
+  test('writes its lease at start, on state changes and expired last; the fence closes', async () => {
     let now = 10_000
-    const lease = new Lease(dir, 'task-a', silent, { now: () => now })
-    await lease.acquire()
-    assert.deepEqual(await read(), {
+    await claim(1, now)
+    const fence = new Fence({ now: () => now })
+    fence.renewed(
+      ((await checkRun(dir, 1, now)) as { validUntil: number }).validUntil
+    )
+    const lease = new RunLease(dir, 1, 'task-a', fence, silent, {
+      now: () => now,
+    })
+    await lease.start()
+    assert.deepEqual(await read(1), {
+      run: 1,
       taskId: 'task-a',
       state: 'running',
       expiresAt: 100_000,
     })
     await lease.set('busy', 'turn1')
-    assert.deepEqual(await read(), {
+    assert.deepEqual(await read(1), {
+      run: 1,
       taskId: 'task-a',
       state: 'busy',
       turnId: 'turn1',
@@ -544,21 +591,63 @@ describe('Lease', () => {
     })
     now = 20_000
     await lease.release()
-    assert.equal((await read()).expiresAt, 20_000)
+    assert.equal((await read(1)).expiresAt, 20_000)
+    assert.throws(() => fence.check('events'), SupersededError)
   })
 
-  test('refuses while another task holds a live lease, takes over a dead one', async () => {
+  test('a renewal that keeps failing refuses writes before the lease runs out', async () => {
     let now = 10_000
-    await writeFile(
-      path.join(dir, 'lease.json'),
-      JSON.stringify({ taskId: 'task-b', state: 'running', expiresAt: 50_000 })
+    await claim(1, now)
+    let failing = false
+    const violations: string[] = []
+    const fence = new Fence({
+      now: () => now,
+      onViolation: (why) => violations.push(why),
+    })
+    fence.renewed(
+      ((await checkRun(dir, 1, now)) as { validUntil: number }).validUntil
     )
-    const lease = new Lease(dir, 'task-a', silent, { now: () => now })
-    await assert.rejects(lease.acquire(), LeaseHeldError)
-    now = 60_000
-    await lease.acquire()
-    assert.equal((await read()).taskId, 'task-a')
-    await lease.release()
+    const lease = new RunLease(dir, 1, 'task-a', fence, silent, {
+      now: () => now,
+      writeFile: async (file, data) => {
+        if (failing) throw Object.assign(new Error('EIO'), { code: 'EIO' })
+        await writeFile(file, data)
+      },
+    })
+    await lease.start() // valid until 100_000
+    failing = true
+    now = 40_000
+    await lease.renew()
+    now = 70_000
+    await lease.renew()
+    // Writes still go while the last good lease has 15 s left…
+    now = 84_999
+    fence.check('events')
+    // …and stop from then on, before it runs out at 100 000.
+    now = 85_000
+    assert.throws(() => fence.check('events'), SupersededError)
+    assert.equal(violations.length, 1)
+    assert.match(violations[0]!, /lease is no longer valid/)
+  })
+
+  test('a renewal that finds a newer run stops the run without writing', async () => {
+    const now = 10_000
+    await claim(1, now)
+    const stopped: string[] = []
+    const fence = new Fence({ now: () => now })
+    fence.renewed(
+      ((await checkRun(dir, 1, now)) as { validUntil: number }).validUntil
+    )
+    const lease = new RunLease(dir, 1, 'task-a', fence, silent, {
+      now: () => now,
+      onSuperseded: (why) => stopped.push(why),
+    })
+    await lease.start()
+    const before = await read(1)
+    await claim(2, now)
+    await lease.renew()
+    assert.deepEqual(stopped, ['run 2 exists'])
+    assert.deepEqual(await read(1), before)
   })
 })
 

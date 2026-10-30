@@ -9,7 +9,7 @@ import {
   parseDevArgs,
   type HarnessConfig,
 } from '../src/config.js'
-import { initSessionFolder } from '../src/dev.js'
+import { claimDevRun, initSessionFolder } from '../src/dev.js'
 import { JsonLogger, redact } from '../src/logger.js'
 import { Jl4Lsp } from '../src/jl4-lsp.js'
 import {
@@ -29,6 +29,7 @@ import {
 
 const good = {
   SESSION_ID: SID,
+  SESSION_RUN: '7',
   AGENT_KEY: 'sk_live_abcdefgh12345',
   AI_PROXY_URL: 'https://ai.legalese.cloud/',
   MCP_URL: 'https://mcp.legalese.cloud',
@@ -43,6 +44,7 @@ describe('parseCloudEnv', () => {
       ECS_CONTAINER_METADATA_URI_V4: 'http://169.254.170.2/v4/abc-123',
     })
     assert.equal(cfg.mode, 'cloud')
+    assert.equal(cfg.run, 7)
     assert.equal(cfg.root, '/workspace')
     assert.equal(cfg.aiProxyUrl, 'https://ai.legalese.cloud')
     assert.equal(cfg.taskMetadataUri, 'http://169.254.170.2/v4/abc-123')
@@ -51,6 +53,11 @@ describe('parseCloudEnv', () => {
   for (const [name, value, re] of [
     ['SESSION_ID', 'not-a-ulid', /ULID/],
     ['SESSION_ID', '../../etc', /ULID/],
+    ['SESSION_RUN', undefined, /SESSION_RUN/],
+    ['SESSION_RUN', '0', /SESSION_RUN/],
+    ['SESSION_RUN', '07', /SESSION_RUN/],
+    ['SESSION_RUN', '1/../2', /SESSION_RUN/],
+    ['SESSION_RUN', '1234567890', /SESSION_RUN/],
     ['AGENT_KEY', 'pk_nope', /sk_/],
     ['AI_PROXY_URL', 'http://ai.legalese.cloud', /https/],
     ['MCP_URL', 'https://user:pw@mcp.legalese.cloud', /credentials/],
@@ -146,9 +153,10 @@ describe('runHarness ends the key chain on an early exit', () => {
     await cleanup()
   })
 
-  const cfg = (lspCommand: string): HarnessConfig => ({
+  const cfg = (lspCommand: string, run = 1): HarnessConfig => ({
     mode: 'cloud',
     sessionId: SID,
+    run,
     agentKey: good.AGENT_KEY,
     root,
     aiProxyUrl: 'https://ai.legalese.cloud',
@@ -163,22 +171,20 @@ describe('runHarness ends the key chain on an early exit', () => {
     assert.deepEqual(calls, [END])
   })
 
-  test('when another task holds the lease', async () => {
+  test('when a newer run exists, writing nothing', async () => {
     const sessionDir = await initSessionFolder(root, SID)
-    await writeFile(
-      path.join(sessionDir, 'state', 'lease.json'),
-      JSON.stringify({
-        taskId: 'other',
-        state: 'running',
-        expiresAt: Date.now() + 60_000,
-      })
-    )
+    await claimDevRun(root, SID)
+    await claimDevRun(root, SID)
+    const lease = path.join(sessionDir, 'state', 'runs', '1.lease.json')
+    const before = await readFile(lease, 'utf8')
     assert.equal(await runHarness(cfg(await writeFakeLsp(root)), {}, silent), 0)
     assert.deepEqual(calls, [END])
+    assert.equal(await readFile(lease, 'utf8'), before)
   })
 
   test('when the language server does not start', async () => {
     await initSessionFolder(root, SID)
+    await claimDevRun(root, SID)
     await assert.rejects(
       runHarness(cfg(path.join(root, 'no-such-lsp')), {}, silent)
     )
@@ -187,6 +193,7 @@ describe('runHarness ends the key chain on an early exit', () => {
 
   test('but not when the first renewal parks the session', async () => {
     const sessionDir = await initSessionFolder(root, SID)
+    await claimDevRun(root, SID)
     assert.equal(await runHarness(cfg(await writeFakeLsp(root)), {}, silent), 0)
     assert.deepEqual(
       calls.map((c) => c.url),
@@ -249,6 +256,41 @@ describe('JsonLogger', () => {
       redact('proxy/error status=500 body={"error":"quote: Acme Ltd"}'),
       'proxy/error status=500 [redacted]'
     )
+  })
+})
+
+describe('--dev runs (§7.3)', () => {
+  test('claims the next run as the Sessions API does', async () => {
+    const { dir: root, cleanup } = await tempDir()
+    try {
+      const sessionDir = await initSessionFolder(root, SID)
+      const runs = path.join(sessionDir, 'state', 'runs')
+      assert.equal(
+        await readFile(path.join(sessionDir, 'state', 'runs.seq'), 'utf8'),
+        '0\n'
+      )
+      assert.equal(await claimDevRun(root, SID, 5_000), 1)
+      assert.deepEqual(
+        JSON.parse(await readFile(path.join(runs, '1.json'), 'utf8')),
+        { run: 1, createdAt: 5_000 }
+      )
+      assert.deepEqual(
+        JSON.parse(await readFile(path.join(runs, '1.lease.json'), 'utf8')),
+        {
+          run: 1,
+          taskId: 'sessions-api',
+          state: 'starting',
+          expiresAt: 5_000 + 180_000,
+        }
+      )
+      assert.equal(await claimDevRun(root, SID, 6_000), 2)
+      assert.equal(
+        await readFile(path.join(sessionDir, 'state', 'runs.seq'), 'utf8'),
+        '2\n'
+      )
+    } finally {
+      await cleanup()
+    }
   })
 })
 

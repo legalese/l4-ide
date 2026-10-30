@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import type { WriteFence } from './lease.js'
 
 export class GitError extends Error {
   constructor(
@@ -38,7 +39,10 @@ export class Git {
   constructor(
     readonly repoDir: string,
     baseEnv: NodeJS.ProcessEnv,
-    private readonly timeoutMs = 120_000
+    private readonly timeoutMs = 120_000,
+    /** Checked before every git command (§7.3): a run that may not write
+     *  runs no git at all. */
+    private readonly fence?: WriteFence
   ) {
     const env: NodeJS.ProcessEnv = {
       GIT_CONFIG_NOSYSTEM: '1',
@@ -92,6 +96,7 @@ export class Git {
     opts: { input?: string; timeoutMs?: number } = {}
   ): Promise<GitResult> {
     return new Promise((resolve, reject) => {
+      this.fence?.check('git')
       const child = execFile(
         'git',
         this.args(args),

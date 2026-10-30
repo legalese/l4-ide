@@ -5,7 +5,8 @@ import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
 import { type AuthProvider } from '@repo/legalese-agent'
 import type { CloudEvent } from '@repo/legalese-agent/protocol'
-import { initSessionFolder, sendCommand } from '../src/dev.js'
+import { claimDevRun, initSessionFolder, sendCommand } from '../src/dev.js'
+import { Fence } from '../src/lease.js'
 import { NodeWorkspace } from '../src/node-workspace.js'
 import { GitSync } from '../src/git-sync.js'
 import { McpServers } from '../src/mcp-servers.js'
@@ -67,11 +68,14 @@ describe('Runner', () => {
   let logger: MemoryLogger
   let chain: FakeChain
   let l4: StubL4
+  let run: number
 
   beforeEach(async () => {
     ;({ dir: root, cleanup } = await tempDir())
     sessionDir = await initSessionFolder(root, SID, 1_000)
     stateDir = path.join(sessionDir, 'state')
+    // Run 1, as the Sessions API's start leaves it (§7.3).
+    run = await claimDevRun(root, SID)
     proxy = new FakeAiProxy()
     proxyUrl = await proxy.start()
     logger = new MemoryLogger()
@@ -88,10 +92,14 @@ describe('Runner', () => {
     opts: {
       idleExitMs?: number
       plugins?: RunnerPlugin[]
+      run?: number
+      leaseRenewMs?: number
+      fence?: Fence
     } = {}
   ): Runner {
     return new Runner({
       sessionId: SID,
+      run: opts.run ?? run,
       sessionDir,
       taskId: 'task-1',
       logger,
@@ -104,13 +112,17 @@ describe('Runner', () => {
       extensionVersion: 'test',
       idleExitMs: opts.idleExitMs ?? 60_000,
       pollMs: 20,
+      ...(opts.leaseRenewMs ? { leaseRenewMs: opts.leaseRenewMs } : {}),
+      ...(opts.fence ? { fence: opts.fence } : {}),
     })
   }
 
   const session = async (): Promise<Record<string, unknown>> =>
     JSON.parse(await readFile(path.join(sessionDir, 'session.json'), 'utf8'))
-  const lease = async (): Promise<Record<string, unknown>> =>
-    JSON.parse(await readFile(path.join(stateDir, 'lease.json'), 'utf8'))
+  const lease = async (n = run): Promise<Record<string, unknown>> =>
+    JSON.parse(
+      await readFile(path.join(stateDir, 'runs', `${n}.lease.json`), 'utf8')
+    )
   const types = (events: CloudEvent[]): string[] =>
     events.map((e) =>
       e.type === 'session-state'
@@ -341,20 +353,73 @@ describe('Runner', () => {
     assert.equal((await session()).status, 'sleeping')
   })
 
-  test('exits without touching anything when another task holds the lease', async () => {
-    await writeFile(
-      path.join(stateDir, 'lease.json'),
-      JSON.stringify({
-        taskId: 'other',
-        state: 'running',
-        expiresAt: Date.now() + 60_000,
-      })
-    )
-    const runner = build()
-    assert.equal(await runner.run(), null)
-    assert.equal((await lease()).taskId, 'other')
+  test('an older run exits at boot without writing when a newer one exists', async () => {
+    const newer = await claimDevRun(root, SID)
+    assert.equal(newer, run + 1)
+    const before = await lease(run)
+    const old = build({ run })
+    assert.equal(await old.run(), null)
+    assert.deepEqual(await lease(run), before)
     assert.equal(chain.started, 0)
     assert.deepEqual(await readEvents(stateDir), [])
+    assert.equal((await session()).status, 'new')
+    assert.ok(logger.has('warn', /superseded: run 2 exists/))
+    // The newer run starts.
+    const current = build({ run: newer })
+    const done = current.run()
+    await waitUntil(async () => (await lease(newer)).taskId === 'task-1')
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+  })
+
+  test('superseded mid-turn: stops at once and writes nothing more', async () => {
+    let release!: () => void
+    proxy.hold = new Promise((r) => (release = r))
+    proxy.scripts.push([metadata('conv6'), chunk({ content: 'hi' })])
+    const runner = build({ leaseRenewMs: 30 })
+    const done = runner.run()
+    await sendCommand(root, SID, { type: 'message', turnId: 't1', text: 'go' })
+    await waitUntil(() => proxy.requests.length > 0)
+    await waitUntil(async () => (await lease()).state === 'busy')
+    // A newer run is started (the API passed this one over).
+    await claimDevRun(root, SID)
+    assert.equal(await done, 'superseded')
+    const events = await readEvents(stateDir)
+    const leaseAfter = await lease()
+    const sessionAfter = await session()
+    release()
+    await new Promise((r) => setTimeout(r, 200))
+    // Nothing was written after the stop: no flush, no final lease, no
+    // session.json, no events.
+    assert.deepEqual(await readEvents(stateDir), events)
+    assert.deepEqual(await lease(), leaseAfter)
+    assert.ok((leaseAfter.expiresAt as number) > Date.now())
+    assert.deepEqual(await session(), sessionAfter)
+    assert.equal(sessionAfter.status, 'running')
+    assert.ok(logger.has('error', /superseded: run 2 exists/))
+    assert.equal(chain.ended, 1)
+  })
+
+  test('the shutdown writes the lease last, then nothing', async () => {
+    const order: string[] = []
+    class RecordingFence extends Fence {
+      override check(what: string): void {
+        super.check(what)
+        order.push(what)
+      }
+    }
+    const fence = new RecordingFence()
+    const runner = build({ fence })
+    const done = runner.run()
+    await waitUntil(async () => (await lease()).taskId === 'task-1')
+    order.length = 0
+    await sendCommand(root, SID, { type: 'stop' })
+    assert.equal(await done, 'stop')
+    assert.equal(order.at(-1), 'lease')
+    assert.ok(order.lastIndexOf('session.json') < order.lastIndexOf('lease'))
+    assert.ok(order.lastIndexOf('events') < order.lastIndexOf('lease'))
+    assert.ok(((await lease()).expiresAt as number) <= Date.now())
+    assert.throws(() => fence.check('events'))
   })
 
   test('parks at start when the first renewal fails', async () => {

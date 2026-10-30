@@ -179,7 +179,8 @@ export class GitSync implements RunnerPlugin {
 
   async start(ctx: RunnerContext): Promise<void> {
     this.ctx = ctx
-    this.git = new Git(ctx.repoDir, this.baseEnv)
+    this.git = new Git(ctx.repoDir, this.baseEnv, undefined, ctx.fence)
+    ctx.fence.check('git')
     await fs.mkdir(path.join(ctx.stateDir, 'git'), { recursive: true })
     const hasRepo = await fs
       .lstat(path.join(ctx.repoDir, '.git'))
@@ -395,6 +396,7 @@ export class GitSync implements RunnerPlugin {
     )
     try {
       await this.git.ok(['bundle', 'create', '-q', tmp, 'main'])
+      this.ctx.fence.check('git bundle')
       await fs.rename(tmp, this.bundlePath)
     } catch (err) {
       await fs.rm(tmp, { force: true }).catch(() => undefined)
@@ -481,6 +483,7 @@ export class GitSync implements RunnerPlugin {
    * bundle is gone.
    */
   private async removeIncoming(bundle: string): Promise<void> {
+    this.ctx.fence.check('git')
     await fs
       .rm(bundle, { force: true })
       .catch((err: unknown) =>
