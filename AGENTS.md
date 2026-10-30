@@ -45,6 +45,10 @@ Another package can depend on that library and build an executable of its own th
 `L4.Cli.Extensions` (`jl4/app/L4/Cli/Extensions.hs`) defines what can be added, and its header says how each addition fails.
 A package cloned into `etc/verify/`, which is gitignored, is built with the rest by `cabal build all` through `optional-packages:` in `cabal.project`.
 With that directory absent, nothing changes, and nothing in this repository depends on such a package.
+Cabal reads every package under `etc/verify/` when it plans a build, whatever you build.
+One whose `.cabal` file does not parse, or whose dependencies cannot be solved, fails every cabal command in the checkout, the community packages' too, and `etc/verify-branch.sh` with them (measured 2026-10-30: `Cabal-7107` for a dependency that cannot be solved, and `etc/verify/<file>.cabal: error` for a file with no `name`).
+One that plans but no longer compiles against this tree fails `cabal build all`, and so the gate, and not a build of a community target alone.
+To recover, move the directory out of the checkout (`mv etc/verify ../verify-aside`), which gives back the community build, then update or fix the package and move it back.
 
 ## Essential Commands
 
