@@ -12,7 +12,7 @@ module Main where
 
 import Control.Exception (finally)
 import Control.Monad (forM_, unless, when)
-import Data.Char (isDigit, isSpace)
+import Data.Char (isAlpha, isDigit, isSpace)
 import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, tails)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -494,6 +494,14 @@ nlgMixfixLocalFixture  = fixtureDir </> "nlg-mixfix-local.l4"
 nlgMixfixImportFixture = fixtureDir </> "nlg-mixfix-import.l4"
 nlgMixfixImportLib     = fixtureDir </> "nlg-mixfix-import-lib.l4"
 
+-- A rule imported through two levels: top imports mid, which imports deep.
+-- `mid rule` makes a WITH call to a function in deep and is shown in top's
+-- document under "Imported definitions".
+nlgTransTop, nlgTransMid, nlgTransDeep :: FilePath
+nlgTransTop  = fixtureDir </> "nlg-trans-top.l4"
+nlgTransMid  = fixtureDir </> "nlg-trans-mid.l4"
+nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
+
 -- The example the syntax reference links for this: one mixfix function with a
 -- herald, and a rule that calls it. The test that reads it pins the page's
 -- claim, not just the output.
@@ -631,6 +639,7 @@ coreFixtures =
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
+  , nlgTransTop, nlgTransMid, nlgTransDeep
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3626,6 +3635,28 @@ spec bin = do
       Output code sout _ <- runL4 bin ["render", "--format", "text", nlgMixfixDocExample]
       code `shouldBe` ExitSuccess
       filter (/= '\r') sout `shouldSatisfy` ("The price we charge means the smaller of price and 100." `isInfixOf`)
+
+  -- A rule shown under "Imported definitions" is rendered from its own module's
+  -- copy of the tree, so it must read as it does when that module is rendered on
+  -- its own. A WITH call made in the middle of a chain used to print the herald
+  -- of a function two modules down a second time, because only the module being
+  -- rendered had its heralds moved onto their rules.
+  describe "l4 render of a rule imported through two modules" $ do
+    let midRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ dropWhile (not . isAlpha) l
+               | l <- map (filter (/= '\r')) (lines sout)
+               , "Mid rule " `isInfixOf` l ]
+        expected = ["Mid rule equals the gap between a and b where a is n and b is 100 + 1."]
+
+    it "reads the same when the middle module is the one rendered" $ do
+      rows <- midRows nlgTransMid
+      rows `shouldBe` expected
+
+    it "reads the same when the top module is the one rendered" $ do
+      rows <- midRows nlgTransTop
+      rows `shouldBe` expected
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

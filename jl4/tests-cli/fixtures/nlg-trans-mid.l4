@@ -1,0 +1,6 @@
+-- The middle of the chain: a WITH call to the function in nlg-trans-deep.l4.
+IMPORT `nlg-trans-deep`
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`mid rule` n MEANS (`the gap` WITH a IS n, b IS 100) PLUS 1

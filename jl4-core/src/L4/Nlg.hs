@@ -470,9 +470,11 @@ linearizeDirectivesIn mlang mixfixCanon mod'' deps'' =
 -- then a language chosen ('selectLanguage'), in that order (see
 -- 'linearizeDirectives').
 --
--- The module being read also learns which of its dependencies' inputs were
--- carrying a herald, so a call to one of those rules is labelled as a call to a
--- rule of its own would be ('promoteHeadInputNlgWith').
+-- Each module also learns which of the others' inputs were carrying a herald, so
+-- a call to one of those rules is labelled as a call to a rule of its own would
+-- be ('promoteHeadInputNlgWith'). That holds for a dependency's own calls too: a
+-- rule in the middle of a chain of imports is shown, in the document of the
+-- module at the top, with the calls it makes to the module below it.
 --
 -- Shared by @l4 nlg@ and @l4 render@, which read a call's herald alike. A reader
 -- that skips it still finds the rule's herald, because 'nlgFnInfo' looks
@@ -481,7 +483,7 @@ linearizeDirectivesIn mlang mixfixCanon mod'' deps'' =
 prepareModules :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> (Module Resolved, [Module Resolved])
 prepareModules mlang m deps =
   ( selectLanguage mlang (promoteHeadInputNlgWith deps m)
-  , map (selectLanguage mlang . promoteHeadInputNlg) deps
+  , map (selectLanguage mlang . promoteHeadInputNlgWith deps) deps
   )
 
 -- | Does any rendering in this module name this language?
