@@ -2,8 +2,11 @@
 -- release can be sliced per backend.
 module CliTest.Catala (spec, fixtures) where
 
+import Control.Monad (unless)
 import Data.List (isInfixOf, isPrefixOf)
 import System.Exit (ExitCode(..))
+import System.FilePath ((</>))
+import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 
 import CliTest.Common
@@ -239,9 +242,31 @@ spec bin = do
     -- nothing re-ran its output through the toolchain. It has one now, and
     -- etc/validate-catala.mjs walks `expected/`, so the flag's output is under
     -- `catala typecheck`, `catala proof` and `clerk test` like everything else.
+    --
+    -- It is written with -o, to a basename of its own, because the module name
+    -- is the output file's basename capitalised (above) and Catala 1.3.0's
+    -- clerk stops with "Conflicting module name" on two modules of one name.
+    -- Written to stdout this golden said `> Module Bands`, like bands.catala_en;
+    -- with -o bands_boolean_only.catala_en it says `> Module Bands_boolean_only`.
+    -- The golden's own file name keeps its dashes: etc/validate-catala.mjs reads
+    -- the module name out of the file.
     it "pins the --boolean-only rendering as a golden the R9 harness checks" $
-      expectGolden bin ["export", "catala", "--boolean-only", "examples/catala/bands.l4"]
-                       "examples/catala/expected/bands-boolean-only.catala_en"
+      withSystemTempDirectory "l4-catala-boolean-only" \dir -> do
+        let out = dir </> "bands_boolean_only.catala_en"
+            goldenPath = "examples/catala/expected/bands-boolean-only.catala_en"
+        Output code _ serr <- runL4 bin
+          ["export", "catala", "--boolean-only", "examples/catala/bands.l4", "-o", out]
+        code `shouldBe` ExitSuccess
+        got <- readUtf8 out
+        golden <- readUtf8 goldenPath
+        unless (got == golden) $
+          expectationFailure $
+            "Generated output does not match golden " ++ goldenPath
+            ++ "\n(to update: l4 export catala --boolean-only examples/catala/bands.l4"
+            ++ " -o bands_boolean_only.catala_en, then copy it over the golden)"
+            ++ "\n--- stderr ---\n" ++ serr
+            ++ "\n--- got ---\n" ++ got
+            ++ "\n--- golden ---\n" ++ golden
 
     -- Catala wants the module name to be the file's basename with its first
     -- letter capitalised, so a basename it cannot spell is rejected here rather

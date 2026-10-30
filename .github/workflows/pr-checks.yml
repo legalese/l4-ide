@@ -238,28 +238,26 @@ jobs:
   # when the toolchain is absent (a laptop with no OCaml skips). What changed is
   # that this job no longer lets a runner that is MEANT to have it go without.
   #
-  # THE TOOLCHAIN: catala and catala-proof, both reporting version 1.2.1, built
-  # from upstream commit fdf4ccd5 on OCaml 5.2.1, in an opam switch named
-  # `catala` — the name validate-catala.mjs looks for with no configuration
-  # (`opam exec --switch catala --`), and the route that puts `ocamlc` on PATH
-  # for `clerk`. The versions and the commit are written once, in the env below,
-  # and everything that needs them (the cache key, the pin URLs, the checks)
-  # reads them from there.
-  #   * It is NOT the 1.2.1 release. fdf4ccd5 is upstream master of 2026-07-30,
-  #     93 commits after the tag `1.2.1`, and its opam files declare 1.2.1 (the
-  #     tag's say 1.2.0). The release was tried first and fails: `catala
-  #     typecheck` and `catala proof` pass on all 12 goldens, `clerk test` fails
-  #     41 of 83 tests (legalese/l4-ide run 41010257517, the first commit of
-  #     #786), because the release's `catala interpret -F json` prints
-  #     `{ "result": 0.25 }` where the goldens' catala-test-cli blocks hold the
-  #     compact exact-rational `{"result":"1/4"}`. The toolchain the spec's R9
-  #     was built from is d37aca74 (specs/todo/CATALA-EXPORT-SPEC.md:107-109),
-  #     which is this commit plus one added CLAUDE.md, and it passes all 83.
-  #   * Neither package is installed from opam-repository: both are pinned from
-  #     the commit's tarball. catala-proof (the plugin behind `catala proof`,
-  #     layer 2 of the harness) is not in opam-repository at all, and the
-  #     version is spelled `.1.2.1` on both pins so that catala-proof's
-  #     `catala = its own version` requirement is met by the catala beside it.
+  # THE TOOLCHAIN: Catala 1.3.0 and catala-proof 1.3.0 on OCaml 5.2.1, in an opam
+  # switch named `catala` — the name validate-catala.mjs looks for with no
+  # configuration (`opam exec --switch catala --`), and the route that puts
+  # `ocamlc` on PATH for `clerk`. The versions are written once, in the env
+  # below, and everything that needs them (the cache key, the pin URL, the
+  # checks) reads them from there.
+  #   * catala comes from opam-repository: the 1.3.0 release (2026-09-30).
+  #   * catala-proof (the plugin behind `catala proof`, layer 2 of the harness)
+  #     is not in opam-repository (there is no packages/catala-proof there,
+  #     checked 2026-10-30), so it is pinned from the same tag's tarball, with
+  #     the version spelled `catala-proof.1.3.0` so that its `catala = its own
+  #     version` requirement is met by the catala beside it.
+  #   * It is NOT the 1.2.1 release. On that release `catala typecheck` and
+  #     `catala proof` pass on all 12 goldens and `clerk test` fails 41 of 83
+  #     tests (legalese/l4-ide run 41010257517, the first commit of #786),
+  #     because its `catala interpret -F json` prints `{ "result": 0.25 }` where
+  #     the goldens' catala-test-cli blocks hold the compact exact-rational
+  #     `{"result":"1/4"}`. The goldens were first checked with upstream commit
+  #     fdf4ccd5 (it reports 1.2.1; specs/todo/CATALA-EXPORT-SPEC.md:107-109),
+  #     and 1.3.0 contains that commit.
   #   * Everything else is whatever opam-repository resolves on the day of a
   #     cold build and is then frozen by the cache. The `opam list` the verify
   #     step prints is the record of what was resolved.
@@ -269,7 +267,8 @@ jobs:
   # of the BPMN job: no save on merge_group, because a queue run writes into a
   # ref that is deleted with the queue entry. By the cache scoping that note
   # records, a merge_group run reads only its own ref and the default branch,
-  # so it restores nothing that a pull_request or a push to unstable saved.
+  # so it restores nothing that a pull_request or a push to unstable saved
+  # (it can restore an entry that `main` holds).
   # Two choices that differ from those jobs:
   #   * There is NO `restore-keys`. A cache entry for some other catala or OCaml
   #     version is not a toolchain we can use, and a prefix match would restore
@@ -290,9 +289,7 @@ jobs:
     if: needs.changes.outputs.catala == 'true' || needs.changes.outputs.haskell == 'true'
     runs-on: ubuntu-latest
     env:
-      # The version the compiler reports, not the release: see THE TOOLCHAIN.
-      CATALA_RELEASE: "1.2.1"
-      CATALA_COMMIT: fdf4ccd54b9677b7b7b9ab7377201f3f7d1aadf7
+      CATALA_RELEASE: "1.3.0"
       CATALA_OCAML: "5.2.1"
       # Non-interactive opam: answer yes, and let it install the system
       # packages a library needs (libgmp for zarith, ninja for clerk).
@@ -326,7 +323,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ~/.opam
-          key: catala-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.distro }}-catala-${{ env.CATALA_RELEASE }}-${{ env.CATALA_COMMIT }}-ocaml-${{ env.CATALA_OCAML }}-v1
+          key: catala-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.distro }}-catala-${{ env.CATALA_RELEASE }}-ocaml-${{ env.CATALA_OCAML }}-v1
 
       - name: Create the OCaml switch (cache miss only)
         if: needs.changes.outputs.catala == 'true' && steps.opam-root.outputs.cache-hit != 'true'
@@ -337,15 +334,13 @@ jobs:
 
       - name: Install catala (cache miss only)
         if: needs.changes.outputs.catala == 'true' && steps.opam-root.outputs.cache-hit != 'true'
-        run: |
-          opam pin add --switch catala "catala.$CATALA_RELEASE" \
-            "https://github.com/CatalaLang/catala/archive/$CATALA_COMMIT.tar.gz"
+        run: opam install --switch catala "catala.$CATALA_RELEASE"
 
       - name: Install catala-proof and z3 (cache miss only)
         if: needs.changes.outputs.catala == 'true' && steps.opam-root.outputs.cache-hit != 'true'
         run: |
           opam pin add --switch catala "catala-proof.$CATALA_RELEASE" \
-            "https://github.com/CatalaLang/catala/archive/$CATALA_COMMIT.tar.gz"
+            "https://github.com/CatalaLang/catala/archive/refs/tags/$CATALA_RELEASE.tar.gz"
 
       # Runs on a hit as well as a miss, and is the gate on both: the key says
       # which toolchain SHOULD be here, this says which one IS. `catala proof
@@ -360,8 +355,8 @@ jobs:
           opam exec --switch catala -- clerk --version
           opam exec --switch catala -- catala proof --help > /dev/null
           opam list --switch catala --installed | tee opam-list.txt | grep -E '^(catala|catala-proof|z3|ocaml-base-compiler|dune|menhir) '
-          echo "TOOLCHAIN: catala $CATALA_RELEASE built from upstream commit $CATALA_COMMIT, NOT the $CATALA_RELEASE release tarball"
-          for p in catala catala-proof; do grep -E "^$p " opam-list.txt | grep -qF "$CATALA_COMMIT"; done
+          for p in catala catala-proof; do grep -E "^$p +$CATALA_RELEASE " opam-list.txt > /dev/null; done
+          echo "TOOLCHAIN: catala and catala-proof $CATALA_RELEASE, OCaml $CATALA_OCAML"
           du -sh ~/.opam
 
       - name: Trim what a run never reads (cache miss only)
@@ -393,7 +388,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${CATALA_CHECK_REQUIRED:-}" = 1 ]; then
-            echo "::notice title=Catala toolchain::catala $CATALA_RELEASE built from upstream commit $CATALA_COMMIT, not the $CATALA_RELEASE release tarball (the release fails clerk test: see the comment above this job)"
+            echo "::notice title=Catala toolchain::catala and catala-proof $CATALA_RELEASE, OCaml $CATALA_OCAML (the 1.2.1 release fails clerk test: see the comment above this job)"
           fi
           node etc/validate-catala.mjs | tee catala.log
           if [ "${CATALA_CHECK_REQUIRED:-}" = 1 ]; then
