@@ -46,6 +46,7 @@ module L4.Prove.Lower
   , liftModelValue
   , exactValue
   , sampleValues
+  , proofSampleValues
   , goalSymbol
   , definedSymbol
   , sameSymbol
@@ -795,7 +796,24 @@ exactValue = \case
 -- for a datatype, every constructor over its fields' samples (to depth 2,
 -- every combination of them while there are at most 256).
 sampleValues :: Obligation -> Sort -> [Expr Resolved]
-sampleValues ob = goS (2 :: Int)
+sampleValues ob = samplesOver ob (nubOrd (0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ]))
+
+-- | 'sampleValues' with numbers that are NOT whole as well: a half either side
+-- of zero, and the midpoint of each pair of adjacent numbers in the set. For
+-- @l4 prove@'s check of an @unsat@ answer, where an all-integer grid is blind
+-- to a wrong encoding that an @IS INTEGER@ guard hides (audit of #784: with
+-- only 0 and ±1, a wrong @proved@ survived the check). The Catala witness
+-- search keeps 'sampleValues', so its witnesses, and the goldens built from
+-- them, are unchanged.
+proofSampleValues :: Obligation -> Sort -> [Expr Resolved]
+proofSampleValues ob = samplesOver ob (nubOrd (base <> [1 / 2, -1 / 2] <> mids))
+ where
+  base = 0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ]
+  sorted = Set.toAscList (Set.fromList base)
+  mids = zipWith (\a b -> (a + b) / 2) sorted (drop 1 sorted)
+
+samplesOver :: Obligation -> [Rational] -> Sort -> [Expr Resolved]
+samplesOver ob numbers = goS (2 :: Int)
  where
   goS depth = \case
     SBool -> [App emptyAnno TC.trueRef [], App emptyAnno TC.falseRef []]
@@ -817,4 +835,3 @@ sampleValues ob = goS (2 :: Int)
     | otherwise =
         [ [ xs !! ((k + j) `mod` length xs) | (j, xs) <- zip [0 ..] fields ]
         | k <- [0 .. maximum (map length fields) - 1] ]
-  numbers = nubOrd (0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ])

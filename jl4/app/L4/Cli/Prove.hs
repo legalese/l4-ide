@@ -100,8 +100,9 @@ proveBound =
     , ""
     , "  Every counterexample has been replayed through the evaluator, which"
     , "  agreed. Every proof has been spot-checked by the evaluator at up to"
-    , "  64 sample points. A disagreement in either direction is printed as an"
-    , "  ENCODING DEFECT: a bug in this command, not a fact about the rules."
+    , "  64 sample points, fractions among them. A disagreement in either"
+    , "  direction is printed as an ENCODING DEFECT: a bug in this command,"
+    , "  not a fact about the rules."
     , ""
     , "  Not attempted: the well-definedness obligations R-V2 generates with no"
     , "  #ASSERT (every division, every CONSIDER), the #ASSERTs of imported"
@@ -407,7 +408,7 @@ solve opts evalConfig tc importEnv solver mr e ob = do
   -- must say TRUE at every point it is asked about. A point where it does not
   -- is an over-constrained encoding, which would otherwise prove everything.
   sampleCheck = do
-    let points = samplePoints [ (fv, sampleValues ob fv.fvSort) | fv <- ob.obFree ]
+    let points = samplePoints [ (fv, proofSampleValues ob fv.fvSort) | fv <- ob.obFree ]
     bad <- firstBad points
     pure case bad of
       Nothing -> Proved (length points)

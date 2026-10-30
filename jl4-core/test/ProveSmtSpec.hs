@@ -9,7 +9,12 @@ import Data.List (nub)
 import qualified Data.Text as Text
 import Test.Hspec
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+
+import L4.Prove.Lower (Obligation (..), Sort (..), proofSampleValues, sampleValues)
 import L4.Prove.Smt
+import L4.Syntax (Expr (..), Lit (..))
 
 spec :: Spec
 spec = describe "L4.Prove.Smt" $ do
@@ -28,3 +33,12 @@ spec = describe "L4.Prove.Smt" $ do
     duplicateDeclarations [const' "|l4_x|", fun ["|l4p_a|", "|l4p_b|"]] `shouldBe` []
     duplicateDeclarations [fun ["|l4p_a_b|", "|l4p_a_b|"]] `shouldBe` ["|l4p_a_b|"]
     duplicateDeclarations [const' "|l4_x|", const' "|l4_x|"] `shouldBe` ["|l4_x|"]
+
+  -- Audit of #784: the unsat-side spot check sampled 0 and +-1 only, all
+  -- whole, so an encoding defect behind an IS INTEGER guard passed it.
+  it "samples fractions for the proof check, and keeps the Catala candidates whole" $ do
+    let ob = Obligation [] [] Map.empty Nothing [0, 10] Set.empty
+        nums xs = [ r | Lit _ (NumericLit _ r) <- xs ]
+        proofNums = nums (proofSampleValues ob SReal)
+    proofNums `shouldSatisfy` (\ns -> all (`elem` ns) [1 / 2, -1 / 2, 5, 0, 10, 9, 11, -1, 1])
+    nums (sampleValues ob SReal) `shouldBe` [0, -1, 1, 10, 9, 11]

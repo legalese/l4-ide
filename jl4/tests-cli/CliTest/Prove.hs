@@ -22,7 +22,7 @@ import Test.Hspec
 import CliTest.Common
 
 numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture,
-  collideFixture, localsFixture, decidedFailFixture, exactFixture :: FilePath
+  collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture :: FilePath
 numbersFixture       = fixtureDir </> "prove" </> "numbers.l4"
 recordsFixture       = fixtureDir </> "prove" </> "records.l4"
 outOfFragmentFixture = fixtureDir </> "prove" </> "out-of-fragment.l4"
@@ -32,12 +32,13 @@ collideFixture       = fixtureDir </> "prove" </> "collide.l4"
 localsFixture        = fixtureDir </> "prove" </> "locals.l4"
 decidedFailFixture   = fixtureDir </> "prove" </> "decided-fail.l4"
 exactFixture         = fixtureDir </> "prove" </> "exact.l4"
+hashNameFixture      = fixtureDir </> "prove" </> "hash-name.l4"
 sameLineFixture      = fixtureDir </> "prove" </> "same-line.l4"
 assumedFixture       = fixtureDir </> "assert-assumed.l4"
 
 fixtures :: [FilePath]
 fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture
-           , collideFixture, localsFixture, decidedFailFixture, exactFixture]
+           , collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture]
 
 -- | The lines of a run's report that belong to the @#ASSERT@ on this line of
 -- the fixture: its verdict line, and the indented lines under it.
@@ -191,3 +192,20 @@ spec bin = describe "l4 prove" $ do
     serr `shouldSatisfy` ("l4 prove: cannot write the scripts to /dev/null/x" `isInfixOf`)
     serr `shouldNotSatisfy` ("CallStack" `isInfixOf`)
     length (lines serr) `shouldBe` 1
+
+  -- The numbering suffix for a second binder of one spelling (`x#2`) must not
+  -- meet a binder whose own name is `x#2`: '#' is escaped inside names.
+  it "keeps a shadowed name's numbered symbol apart from a name spelled `x#2`" $
+    withSystemTempDirectory "l4-prove-smt" \dir -> do
+      Output code _ _ <- runL4 bin ["prove", hashNameFixture, "--emit-smt", dir]
+      code `shouldBe` ExitSuccess
+      script <- readFile (dir </> "hash-name-15-1.smt2")
+      script `shouldSatisfy` ("(declare-const |l4_x| Real)" `isInfixOf`)
+      script `shouldSatisfy` ("(declare-const |l4_x#2| Real)" `isInfixOf`)
+      script `shouldSatisfy` ("(declare-const |l4_x_h2| Real)" `isInfixOf`)
+
+  it "refutes an assertion over the three, the evaluator agreeing" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", hashNameFixture]
+    code `shouldBe` ExitFailure 2
+    verdictOf 15 sout `shouldBe` "refuted"
+    unwords (rowFor 15 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)

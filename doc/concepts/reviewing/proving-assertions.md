@@ -86,7 +86,7 @@ The last lines say what was covered: how many assertions, how many the evaluator
 So it does not take the solver's word for anything:
 
 - A **counterexample** is run back through the ordinary L4 evaluator, the same one `l4 run` uses, with the solver's values filled in. It is reported as `refuted` only if the evaluator agrees the assertion fails there.
-- A **proof** is spot-checked: the evaluator is run at up to 64 sample points (each number your rule mentions, one either side of it, and zero; both truth values; every option of a choice), and must say TRUE at each.
+- A **proof** is spot-checked: the evaluator is run at up to 64 sample points (each number your rule mentions, one either side of it, zero, a half either side of zero, and the midpoint between each two of those numbers, so that fractions are tried as well as whole numbers; both truth values; every option of a choice), and must say TRUE at each.
 
 ### Exit status
 
