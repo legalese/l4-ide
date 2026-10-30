@@ -1,0 +1,85 @@
+-- The New Zealand rates rebate as the deck "20190514 Multilateral Isomorphism
+-- in L4" encodes it: the FIXED form.
+-- It is rates-rebate-buggy.l4 with one change, the clamp on the income excess,
+-- which is the deck's "Bug fix by @Br3nda and @Verbman".
+-- No section of the Act is cited here, because none has been checked against
+-- the Act; the formula and the parameters are the deck's.
+--
+-- The deck's worked number: rates 1000, income 20000, no dependants pays 560
+-- here and 630 in the buggy form.
+--
+-- The outer `max 0` follows the deck's later charts and the OpenFisca code's
+-- `clip(rebate, 0, ...)`; the deck's L4 fragment has none.
+--
+-- The helpers are top-level rules and not WHERE bindings on purpose: at the
+-- commit this was written, `l4 prove` crashed on a WHERE binding that takes no
+-- parameters.
+-- Do not tidy them into a WHERE until that is fixed.
+IMPORT prelude
+
+GIVETH A NUMBER
+`income threshold` MEANS 25180
+
+GIVETH A NUMBER
+`additional per dependant` MEANS 500
+
+GIVETH A NUMBER
+`initial contribution` MEANS 160
+
+GIVETH A NUMBER
+`maximum allowable` MEANS 630
+
+GIVEN dependants IS A NUMBER
+GIVETH A NUMBER
+`allowable income` dependants MEANS
+  `income threshold` PLUS dependants TIMES `additional per dependant`
+
+GIVEN rates IS A NUMBER
+GIVETH A NUMBER
+`rates excess` rates MEANS max 0 (rates MINUS `initial contribution`)
+
+-- $1 for each $8 by which the income exceeds the allowable income.
+-- FIXED: clamped at 0 before the FLOOR, so a low income is not a bonus.
+GIVEN income     IS A NUMBER
+      dependants IS A NUMBER
+GIVETH A NUMBER
+`income excess` income dependants MEANS
+  FLOOR ((max 0 (income MINUS `allowable income` dependants)) DIVIDED BY 8)
+
+GIVEN rates      IS A NUMBER
+      income     IS A NUMBER
+      dependants IS A NUMBER
+GIVETH A NUMBER
+`rebate` rates income dependants MEANS
+  max 0
+    (min rates
+      (min (((2 TIMES `rates excess` rates) DIVIDED BY 3) MINUS `income excess` income dependants)
+           `maximum allowable`))
+
+-- decided by evaluation: the deck's worked number
+#ASSERT `rebate` 1000 20000 0 EQUALS 560
+
+-- decided by evaluation: a cell of the deck's chart above the allowable
+-- income, where the clamp does nothing, so both forms agree
+#ASSERT `rebate` 1000 26000 0 EQUALS 458
+
+§ `Any ratepayer`
+    GIVEN rates      IS A NUMBER
+          income     IS A NUMBER
+          dependants IS A NUMBER
+          later      IS A NUMBER
+
+-- proved: the rule's own words, as the deck renders them: "two-thirds of
+-- the amount by which the rates exceed $160, reduced by ...", so a
+-- reduction cannot lift the rebate above two-thirds of the rates excess
+#ASSERT `rebate` rates income dependants AT MOST (2 TIMES `rates excess` rates) DIVIDED BY 3
+
+-- proved: no bonus for a low income, so a ratepayer below the allowable
+-- income gets no more than one exactly at it
+#ASSERT income AT MOST `allowable income` dependants IMPLIES `rebate` rates income dependants AT MOST `rebate` rates (`allowable income` dependants) dependants
+
+-- proved: the rebate does not rise when income rises, `later` being any
+-- income at least as large as `income`
+-- The buggy form satisfies this as well, so it cannot find that bug: see
+-- rates-rebate-no-floor.l4.
+#ASSERT later AT LEAST income IMPLIES `rebate` rates later dependants AT MOST `rebate` rates income dependants

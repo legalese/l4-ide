@@ -1,0 +1,82 @@
+-- The New Zealand rates rebate of rates-rebate-buggy.l4 and
+-- rates-rebate-fixed.l4, both forms in one file, with the FLOOR taken out of
+-- the income excess: it is $1 for every $8, fractions included.
+-- The deck's own comment on the FLOOR in the OpenFisca code: "non legislative
+-- and only to conform output of variable with existing infrastracture".
+--
+-- Why this file exists: "the rebate does not rise when income rises" is the
+-- first assertion a tester would write, and it holds of the BUGGY form too, so
+-- it cannot find the bug.
+-- `l4 prove` says so here, with the FLOOR out, in a fraction of a second.
+-- With the FLOOR in, adding the same assertion to rates-rebate-buggy.l4 gives
+-- `unknown (timeout)` from z3 4.16.0, at the default 10 seconds and at
+-- `--timeout 120` alike, while the fixed form is proved in under a second.
+-- A test must not depend on a solver's patience, so that case is not a
+-- fixture.
+-- The assertion that does find the bug is the ceiling, last in this file.
+--
+-- The helpers are top-level rules and not WHERE bindings on purpose: at the
+-- commit this was written, `l4 prove` crashed on a WHERE binding that takes no
+-- parameters.
+IMPORT prelude
+
+GIVETH A NUMBER
+`income threshold` MEANS 25180
+
+GIVETH A NUMBER
+`additional per dependant` MEANS 500
+
+GIVETH A NUMBER
+`initial contribution` MEANS 160
+
+GIVETH A NUMBER
+`maximum allowable` MEANS 630
+
+GIVEN dependants IS A NUMBER
+GIVETH A NUMBER
+`allowable income` dependants MEANS
+  `income threshold` PLUS dependants TIMES `additional per dependant`
+
+GIVEN rates IS A NUMBER
+GIVETH A NUMBER
+`rates excess` rates MEANS max 0 (rates MINUS `initial contribution`)
+
+GIVEN rates      IS A NUMBER
+      income     IS A NUMBER
+      dependants IS A NUMBER
+GIVETH A NUMBER
+`buggy rebate` rates income dependants MEANS
+  max 0
+    (min rates
+      (min (((2 TIMES `rates excess` rates) DIVIDED BY 3)
+              MINUS ((income MINUS `allowable income` dependants) DIVIDED BY 8))
+           `maximum allowable`))
+
+GIVEN rates      IS A NUMBER
+      income     IS A NUMBER
+      dependants IS A NUMBER
+GIVETH A NUMBER
+`fixed rebate` rates income dependants MEANS
+  max 0
+    (min rates
+      (min (((2 TIMES `rates excess` rates) DIVIDED BY 3)
+              MINUS ((max 0 (income MINUS `allowable income` dependants)) DIVIDED BY 8))
+           `maximum allowable`))
+
+§ `Any ratepayer`
+    GIVEN rates      IS A NUMBER
+          income     IS A NUMBER
+          dependants IS A NUMBER
+          later      IS A NUMBER
+
+-- proved: the buggy form never pays more as income rises
+#ASSERT later AT LEAST income IMPLIES `buggy rebate` rates later dependants AT MOST `buggy rebate` rates income dependants
+
+-- proved: nor does the fixed form
+#ASSERT later AT LEAST income IMPLIES `fixed rebate` rates later dependants AT MOST `fixed rebate` rates income dependants
+
+-- refuted: the ceiling finds what monotonicity could not
+#ASSERT `buggy rebate` rates income dependants AT MOST (2 TIMES `rates excess` rates) DIVIDED BY 3
+
+-- proved
+#ASSERT `fixed rebate` rates income dependants AT MOST (2 TIMES `rates excess` rates) DIVIDED BY 3
