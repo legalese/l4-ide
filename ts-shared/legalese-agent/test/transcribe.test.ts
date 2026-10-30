@@ -85,6 +85,30 @@ describe('AiProxyClient.transcribe', () => {
     assert.equal(calls.length, 0)
   })
 
+  // The auth provider decides per destination (the extension sends its
+  // credentials only to Legalese Cloud), so it is told where each
+  // request goes.
+  test('asks for headers for the URL the request goes to', async () => {
+    const asked: string[] = []
+    const ai = new AiProxyClient({
+      auth: {
+        getAiAuthHeaders: async (url) => {
+          asked.push(url)
+          return { Authorization: 'Bearer token' }
+        },
+        getEffectiveServiceUrl: () => undefined,
+      },
+      logger: silentLogger,
+      endpoint: () => ({ url: 'https://ai.test', local: false }),
+    })
+    await ai.transcribe(wav, 'https://ai.test/acme/tenancy')
+    await ai.summarizeTitle('hello')
+    assert.deepEqual(asked, [
+      'https://ai.test/acme/tenancy',
+      'https://ai.test/v1/chat/completions',
+    ])
+  })
+
   test('local mode stands in a dev token', async () => {
     await client({ signedIn: false, local: true }).transcribe(wav)
     const headers = calls[0]!.init.headers as Record<string, string>
