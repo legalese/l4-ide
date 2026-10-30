@@ -320,7 +320,7 @@ So `b1 IMPLIES b2` is built whenever `b1` is a term, even when `b2` is a literal
 
 **The term language is kept close to SMT-LIB2.**
 That is the hedge D1 (§9) makes part of its ruling: the solver is bought for the planner and `l4 prove` (DU3b), and the lowering from this language to SMT-LIB2 is the one `l4 prove` already specified, so swapping z3 for cvc5 later, or adding a solver-aided tool, is a change to the lowering and not to the evaluator.
-The correspondence, with R-V7's encodings (`VERIFICATION-BACKEND-LOWERING-SPEC.md:398-437`, as numbered on this branch):
+The correspondence, with R-V7's encodings (`VERIFICATION-BACKEND-LOWERING-SPEC.md:410-449`, as numbered on this branch):
 
 | term                                         | SMT-LIB2                                                                                               |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -531,7 +531,7 @@ Three counts are kept from build step 4 (U3b, DU3b): conditions whose residual i
 Beside them the same two measurements are kept over root residuals, the root finite-domain and root numeric measurements, which rows 15 and 43 exercise (§8 step 4).
 
 **3. The solver boundary (D1).**
-Build the evaluator, buy the solver: the symbolic evaluator is this section, native in `jl4-core`, and the solver is z3 as a subprocess driven by SMT-LIB2, as R-V6 already ruled for `l4 prove` (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:370`), with R-V7's encodings (`:398`) and R-V8's verdicts (`:438`), as numbered on this branch.
+Build the evaluator, buy the solver: the symbolic evaluator is this section, native in `jl4-core`, and the solver is z3 as a subprocess driven by SMT-LIB2, as R-V6 already ruled for `l4 prove` (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:382`), with R-V7's encodings (`:410`) and R-V8's verdicts (`:450`), as numbered on this branch.
 One lowering, from the term language of §4.2 to SMT-LIB2, serves two consumers: the query planner's arithmetic atoms, and `l4 prove` / `l4 verify`.
 z3 decides for those two consumers only; the boundary decision of every evaluation stays §4.7.2's propositional supervaluation, so an `#EVAL`, a golden, the language server and the browser build never depend on a solver being installed (DU3b).
 
@@ -586,7 +586,7 @@ In `l4 batch` an undetermined row is a row status, not a failure, and never trip
 Lifting reaches `l4 batch` and the service at build step 3, because they run the same evaluator, so the row status and the stated report are owed from that step (§8 step 3).
 From that step a `Stuck` that reaches the directive boundary is this undetermined outcome on every surface, which is how U7b's default report renders a result not yet known: JSON kind "undetermined" with `needs` filled from the names the `Stuck` carries, batch status "undetermined", which never trips stop-on-error, and exit 1.
 `l4 batch` therefore runs every row and exits 1 at the end when any row is undetermined: its `finish` (`Batch.hs:265`), which today exits 1 only for an "error" row (`:378`), gains that condition.
-Exit codes: an undetermined `#ASSERT` exits 1, as a stuck one does today (U1b).
+Exit codes: an undetermined `#ASSERT` exits 1, as a stuck one does today (U1b). This supersedes in part VERIFICATION-BACKEND-LOWERING-SPEC R-V3 (2026-09-07), whose `deferred` outcome would have let an `#ASSERT` stuck only on section binders exit 0; Meng confirmed U1b over it by firing PECKINGORDER on 2026-10-30, and R-V3's note records which half stands (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md`, §R-V3).
 A refusal reached under no undetermined guard is a determinate refusal, exit 0, as today (`Run.hs:143-146`; row 75), and so is U13b's single refusal under every assignment; one reached only under an undetermined guard is undetermined, exit 1 (U13).
 An undetermined `#EVAL` under the default report exits 1: for one that is stuck today that is today's exit code (`Run.hs:139-152` counts a `ReducedErrored` as a crash), and for a bare unknown result, which exits 0 today (§2.4, row 52), it is a change.
 The ranking U7b asks for, against the 2026-08-01 ruling: that ruling covers only the crash, and the comment recording it counts `Stuck` as one (`Run.hs:78-94`).
@@ -1365,7 +1365,7 @@ Clause (2) narrows U13's clauses 2 and 3 for the case in which no assignment esc
 **RULED 2026-10-01 (HOMEBREW, in chat, 11:42Z).** The ruling, as stated when the word was fired:
 
 1. The symbolic evaluator is built natively in `jl4-core`; it is the lift §4 defines.
-2. The solver is bought: z3 as a subprocess, driven by SMT-LIB2, as R-V6 already decided for `l4 prove` (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:370`, "Emit SMT-LIB2 text; shell to a `z3` subprocess; no Haskell solver dependency").
+2. The solver is bought: z3 as a subprocess, driven by SMT-LIB2, as R-V6 already decided for `l4 prove` (`specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:382`, "Emit SMT-LIB2 text; shell to a `z3` subprocess; no Haskell solver dependency").
 3. One lowering, from the residual term language (§4.2) to SMT-LIB2, serves two consumers: the query planner's arithmetic atoms, and `l4 prove` / `l4 verify`.
 4. Rosette is not a backend; it is at most an optional cross-check oracle in testing, as `catala proof` is planned to be for `l4 prove`.
 

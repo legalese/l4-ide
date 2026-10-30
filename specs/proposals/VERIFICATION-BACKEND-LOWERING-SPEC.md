@@ -1,8 +1,10 @@
 # Verification Backend Lowering Specification
 
-**Status:** Proposal. **Phase 1 is ruled but not built** — R-V1–R-V10 were answered by Meng on
-2026-09-07 (§"Phase 1 rulings"); no prover exists in the tree as of that date, and `l4 prove` is
-named throughout this document as a thing to write, not a thing that runs.
+**Status:** Proposal. **Phase 1 is ruled, and partly built on a branch not yet merged.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
+`l4 prove` is built on `feat/l4-prove`, draft legalese/l4-ide#784 (2026-10-30), not merged into `unstable`; until it merges, `l4 prove` does not exist in the tree, and this document's present-tense mentions of it are still plans.
+What #784 builds, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`; R-V8.
+**R-V10 is discharged as a design** in #784 (2026-10-30): the Mode A/B gate now calls the real emitted scope at a witness per realisable combination; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`). See CATALA-EXPORT-SPEC §8.4's discharge note.
+R-V3's `deferred` outcome and its `l4 run` exit-code change are withdrawn: UNKNOWN-EVALUATION-SPEC U1b (ruled 2026-10-01) supersedes them, by Meng's firing of PECKINGORDER on 2026-10-30; see the note under R-V3.
 **Author:** Meng Wong
 **Date:** 2026-06-29 (Phase 1 rulings appended 2026-09-07)
 **Related:** [BOUNDED-DEONTICS-SPEC.md](../todo/BOUNDED-DEONTICS-SPEC.md), [ACTUS-L4-BRIDGE-SPEC.md](../done/ACTUS-L4-BRIDGE-SPEC.md), [DEONTIC-TRACE-API-SPEC.md](../done/DEONTIC-TRACE-API-SPEC.md), [PROHIBITION-BREACH-SPEC.md](../done/PROHIBITION-BREACH-SPEC.md)
@@ -239,6 +241,14 @@ already rejects every cycle in the reachable call graph, naming the cycle path �
 than writing a second one.
 
 ### R-V3 — No new directive. `l4 prove` discharges the `#ASSERT`s that already cannot be decided. ANSWERED 2026-09-07. **Diverges from the recommendation.**
+
+**SUPERSEDED IN PART 2026-10-30** by UNKNOWN-EVALUATION-SPEC U1b (ruled 2026-10-01), by Meng's firing of PECKINGORDER on 2026-10-30.
+An undetermined `#ASSERT` exits 1 (`specs/todo/UNKNOWN-EVALUATION-SPEC.md:589`), as implemented at `jl4/app/L4/Cli/Run.hs:164-168`.
+The `deferred` outcome below, and its `l4 run` exit-code change, are withdrawn.
+R-V3's selection of obligations stands: `l4 prove` discharges the `#ASSERT`s the evaluator cannot decide, and there is no new directive.
+The CI coverage check below ("The safety net is CI, not the exit code") was justified by the `deferred` outcome; with that withdrawn its premise no longer holds, and whether it is still wanted is not ruled.
+The reword of the non-ground diagnostic is not withdrawn by this, and is not built.
+The rest of this section is the 2026-09-07 record, unedited.
 
 An `#ASSERT` whose free variables are section binders is already a universally quantified statement
 that the evaluator cannot decide, and the tree already treats it as undecidable-on-purpose. `l4
@@ -489,6 +499,10 @@ three-band rate table that `catala typecheck` was green on.
 
 When this lands, `CATALA-EXPORT-SPEC.md` §8.4's disclosed-open item is discharged **in the same PR**
 or it is not discharged.
+
+**Built 2026-10-30 in legalese/l4-ide#784 (draft, not merged), as a design: the gate now calls the real emitted scope; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`).**
+`l4 export catala` replaces the grid of each ladder with `#[test]` scopes that call the emitted scope at witness inputs (up to eight per realisable combination of its atoms) and expect L4's value there; z3 only proves the other combinations impossible, or finds a witness the fixed candidates miss.
+The grid's cap of 8 does not bind a gated ladder. The measurements (all goldens pass; a flipped consequence that the grid passes now fails; a nine-atom ladder gated) are in CATALA-EXPORT-SPEC §8.4's discharge note, which is the record.
 
 ## Deferred obligations
 

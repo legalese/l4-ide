@@ -1,0 +1,6 @@
+-- A counterexample that is not a whole number must print exactly, so that
+-- pasting it back reproduces the failure.
+§ `Thirds`
+    GIVEN x IS A NUMBER
+
+#ASSERT NOT (x TIMES 3 EQUALS 4)

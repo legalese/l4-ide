@@ -1,0 +1,17 @@
+-- A deliberate ENCODING DEFECT, kept as the positive control for R-V5's replay.
+-- A record passed to another rule is lowered as if every field were read, so
+-- the encoding believes the call below raises when p is 0. The evaluator is
+-- lazy, never reads that field, and says TRUE there. `l4 prove` must report
+-- the disagreement as a defect in itself, never as a counterexample.
+DECLARE Item
+  HAS price IS A NUMBER
+      paid  IS A BOOLEAN
+
+GIVEN i IS AN Item
+GIVETH A BOOLEAN
+`is paid` i MEANS i's paid
+
+§ `Lazy fields`
+    GIVEN p IS A NUMBER
+
+#ASSERT p GREATER THAN 0 OR `is paid` (Item OF (1 DIVIDED BY p), p AT MOST 0)

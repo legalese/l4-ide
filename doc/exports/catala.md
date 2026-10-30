@@ -37,6 +37,21 @@ high-fidelity — and unusually useful as a cross-check.
   than either being self-consistent.
 - **Catala's prover can inspect the ladder.** `catala proof` verifies that no two rungs of an
   exception ladder can fire simultaneously.
+- **Every exception ladder is checked against L4 on the scope you ship.** Rewriting an `UNLESS`
+  or a `BRANCH` as a ladder is a change of shape, so each ladder carries a _witness gate_: test
+  scopes that call the emitted scope at concrete inputs and expect the value L4 computed there.
+  The inputs come from a fixed set of candidates: each number the conditions mention, one either
+  side of it, zero, both truth values, and every option of a choice. Every combination of the
+  ladder's conditions that some candidate produces is tested at up to eight of the candidates that
+  produce it, so an inequality is tested exactly at its threshold as well as either side of it.
+  An edit to the shipped rule that changes its answer at any of those inputs fails `clerk test`;
+  that includes changing `>` to `>=` on a threshold the rule compares with. An edit that changes the
+  answer only at inputs outside the candidate set is not caught.
+  An SMT solver, [z3](https://github.com/Z3Prover/z3), is used only to show that the remaining
+  combinations are impossible (a higher income band without the lower one, say), and to find a
+  witness when no candidate produces a combination; the file says so when it does. Unless a
+  witness had to come from the solver, the emitted file does not depend on which solver is
+  installed.
 
 ## The command
 
@@ -46,10 +61,16 @@ l4 export catala FILE
 
 Compiles the constitutive subset of `FILE` to a literate Catala module, printed to standard output.
 
-| Flag             | Effect                                                                             |
-| ---------------- | ---------------------------------------------------------------------------------- |
-| `--output FILE`  | write the generated `.catala_en` to `FILE` instead of stdout                       |
-| `--boolean-only` | emit only the plain boolean rendering — no exception ladders, no equivalence grids |
+| Flag             | Effect                                                                                              |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| `--output FILE`  | write the generated `.catala_en` to `FILE` instead of stdout                                        |
+| `--boolean-only` | emit only the plain boolean rendering — no exception ladders, no witness gates or equivalence grids |
+
+If z3 is not installed (it is found through `Z3_EXE`, then `PATH`), a ladder whose conditions have any impossible combination cannot be gated.
+It then keeps the older check, an exhaustive grid that re-runs a freshly built copy of the ladder over every combination of its conditions; that grid does not look at the rule you ship, and it stops at eight conditions, past which the rule is emitted in the plain boolean rendering instead.
+The command says which ladders fell back, and why, on standard error.
+Ladders with more than twelve conditions are not gated either.
+Executing any of these checks needs Catala itself (`clerk test`); `l4 export catala` only writes them.
 
 One sharp edge worth knowing before it bites: Catala takes a module's name from the **output
 file's** basename, capitalised — not CamelCased. A file named `flat-tax.catala_en` therefore

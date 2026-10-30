@@ -1,6 +1,6 @@
 # `l4 export catala` exhibits
 
-Eleven L4 sources and the literate Catala they compile to, plus the
+Twelve L4 sources and the literate Catala they compile to, plus the
 `--boolean-only` rendering of one of them. The goldens under `expected/` are
 byte-for-byte what `l4 export catala <file>.l4` prints, and `jl4/tests-cli/Main.hs`
 pins them. A twelfth source, `imported-domain.l4`, is never compiled on its
@@ -26,8 +26,9 @@ ladder builder started emitting siblings instead of a linear chain; its
 structures and reports false positives (see the header of the harness, and
 §8.4). `clerk test` is the interesting one: it re-runs each `#[test]`
 scope and compares the ` ```catala-test-cli ` blocks, whose expected values were
-computed by **L4's** evaluator, along with the Mode A/B equivalence grids
-emitted under R4. A green `clerk test` is therefore evidence that the two
+computed by **L4's** evaluator, along with each exception ladder's witness
+gate (R4, §8.4): test scopes that call the emitted scope itself at up to
+eight inputs per realisable combination of the ladder's conditions. A green `clerk test` is therefore evidence that the two
 languages agree on those points — the middle tier of the OpenFisca doc's
 three-tier claim ladder (golden / executed round-trip / law-validated), never
 the third.
@@ -36,6 +37,7 @@ the third.
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `benefit.l4`   | spec Appendix A: `UNLESS` proviso → exception ladder, `WHERE` → `let … in`, a cross-decision call, one `#EVAL`                            |
 | `bands.l4`     | a three-band rate table with nested guards — the case that pins the ladder's priority direction — plus `#ASSERT`                          |
+| `many-bands.l4` | a nine-band rate table: nine atomic conditions, past the old grid's cap of eight, gated at the ten combinations an income realises (R-V10) |
 | `statute.l4`   | the R8 weave: `§`/`§§` headings, inert scaffolding as law text, `@ref` citations, `@export <desc>` → `#[description]`, an enum + `CONSIDER` |
 | `flat-tax.l4`  | a port of `../openfisca/flat-tax.l4`: R11 elides the never-inspected `period` string                                                     |
 | `household.l4` | a port of `../openfisca/household.l4`: `LIST OF` group entity, `sum`∘`map` absorbed by R5, two R11 elisions                              |

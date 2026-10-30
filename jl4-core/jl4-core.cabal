@@ -200,6 +200,8 @@ library
     L4.ParserCombinators
     L4.Presumption
     L4.Print
+    L4.Prove.Lower
+    L4.Prove.Smt
     L4.Print.Columnar
     L4.SmartPunctuation
     L4.Syntax
@@ -265,6 +267,7 @@ test-suite jl4-core-test
     ExportValidationSpec
     NonassertableSpec
     CatalaLowerSpec
+    ProveSmtSpec
     DisambiguationWarningsSpec
     NumberLiteralSpec
     NlgLangTagSpec
