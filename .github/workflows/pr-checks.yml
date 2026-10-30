@@ -252,9 +252,9 @@ jobs:
   #     41 of 83 tests (legalese/l4-ide run 41010257517, the first commit of
   #     #786), because the release's `catala interpret -F json` prints
   #     `{ "result": 0.25 }` where the goldens' catala-test-cli blocks hold the
-  #     compact exact-rational `{"result":"1/4"}`. The goldens were blessed
-  #     against d37aca74, which is this commit plus one added CLAUDE.md
-  #     (specs/todo/CATALA-EXPORT-SPEC.md, evidence legend).
+  #     compact exact-rational `{"result":"1/4"}`. The toolchain the spec's R9
+  #     was built from is d37aca74 (specs/todo/CATALA-EXPORT-SPEC.md:107-109),
+  #     which is this commit plus one added CLAUDE.md, and it passes all 83.
   #   * Neither package is installed from opam-repository: both are pinned from
   #     the commit's tarball. catala-proof (the plugin behind `catala proof`,
   #     layer 2 of the harness) is not in opam-repository at all, and the
