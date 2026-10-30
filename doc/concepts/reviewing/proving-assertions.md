@@ -101,7 +101,9 @@ So it does not take the solver's word for anything:
 ### Seeing what was sent to the solver
 
 `l4 prove FILE --emit-smt DIR` writes the formula for each assertion to `DIR`, one `.smt2` file each, and stops without running a solver.
-Each file is named after the source file and the assertion's line (`refunds-8.smt2`), starts with a comment naming the assertion's position, and is the same text, byte for byte, that `l4 prove` sends to z3 when it does run one, so a second solver can be given exactly the same question.
+Each file is named after the source file and the assertion's line and column (`refunds-8-1.smt2`), starts with a comment naming the assertion's position, and is the same text, byte for byte, that `l4 prove` sends to z3 when it does run one, so a second solver can be given exactly the same question.
+The name carries only the file's base name, so give each source file its own `DIR`: a second run over another `refunds.l4` would overwrite the first run's files.
+Within one run, two scripts that would land on one name stop the run with an error and write neither.
 The files are standard SMT-LIB2, the solvers' common text format, so any SMT-LIB2 solver can read them; every name from your file is prefixed (`|l4_price|`), so none can collide with a name the solver reserves for itself, such as `pi`.
 
 ## Limits

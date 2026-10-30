@@ -12,7 +12,7 @@
 -- "goldens over the emitted SMT-LIB2 run with no solver installed").
 module CliTest.Prove (spec, fixtures) where
 
-import Data.List (isInfixOf, isPrefixOf)
+import Data.List (isInfixOf, isPrefixOf, sort)
 import System.Directory (findExecutable, listDirectory)
 import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode (..))
@@ -22,16 +22,17 @@ import Test.Hspec
 
 import CliTest.Common
 
-numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, assumedFixture :: FilePath
+numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture :: FilePath
 numbersFixture       = fixtureDir </> "prove" </> "numbers.l4"
 recordsFixture       = fixtureDir </> "prove" </> "records.l4"
 outOfFragmentFixture = fixtureDir </> "prove" </> "out-of-fragment.l4"
 defectFixture        = fixtureDir </> "prove" </> "defect.l4"
 integersFixture      = fixtureDir </> "prove" </> "integers.l4"
+sameLineFixture      = fixtureDir </> "prove" </> "same-line.l4"
 assumedFixture       = fixtureDir </> "assert-assumed.l4"
 
 fixtures :: [FilePath]
-fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, assumedFixture]
+fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture]
 
 -- | Run the body only when a solver can be found, as @l4 prove@ itself finds
 -- one (@Z3_EXE@, then @z3@ on @PATH@).
@@ -141,7 +142,7 @@ spec bin = describe "l4 prove" $ do
       sout `shouldSatisfy` ("no solver was run" `isInfixOf`)
       files <- listDirectory dir
       length files `shouldBe` 5
-      pi' <- readFile (dir </> "numbers-22.smt2")
+      pi' <- readFile (dir </> "numbers-22-1.smt2")
       -- `pi` is a theory symbol in some solvers; the user's must not be it
       pi' `shouldSatisfy` ("(declare-const |l4_pi| Real)" `isInfixOf`)
       pi' `shouldNotSatisfy` ("(declare-const pi " `isInfixOf`)
@@ -153,5 +154,17 @@ spec bin = describe "l4 prove" $ do
       -- the header names the #ASSERT the script came from, so a second
       -- solver's answer maps back to file:line
       pi' `shouldSatisfy` ("; l4 prove: the negation of the #ASSERT at numbers.l4:22:" `isPrefixOf`)
-      twice <- readFile (dir </> "numbers-12.smt2")
+      twice <- readFile (dir </> "numbers-12-1.smt2")
       twice `shouldSatisfy` ("(define-fun |l4_twice|" `isInfixOf`)
+
+  it "gives two #ASSERTs on one source line two scripts, named by line and column" $
+    withSystemTempDirectory "l4-prove-smt" \dir -> do
+      Output code _ _ <- runL4 bin ["prove", sameLineFixture, "--emit-smt", dir]
+      code `shouldBe` ExitSuccess
+      files <- listDirectory dir
+      sort files `shouldBe` ["same-line-6-1.smt2", "same-line-6-13.smt2"]
+      first <- readFile (dir </> "same-line-6-1.smt2")
+      second <- readFile (dir </> "same-line-6-13.smt2")
+      first `shouldSatisfy` ("(assert (not (and |l4.defined| |l4.goal|)))" `isInfixOf`)
+      first `shouldSatisfy` ("(define-fun |l4.goal| () Bool |l4_b|)" `isInfixOf`)
+      second `shouldSatisfy` ("(define-fun |l4.goal| () Bool (not |l4_b|))" `isInfixOf`)

@@ -235,12 +235,19 @@ proveCmd opts = do
       case opts.proveEmitSmt of
         Just dir -> do
           createDirectoryIfMissing True dir
-          written <- fmap catMaybes $ for lowered \case
-            (r, _, Right ob) -> do
-              let f = dir </> (takeBaseName opts.proveFile <> "-" <> lineOf r <> ".smt2")
-              Text.writeFile f (scriptText r ob)
-              pure (Just f)
-            _ -> pure Nothing
+          -- Named by line AND column, since `;` puts two #ASSERTs on one line.
+          -- A name this run has already written is a hard failure: a script
+          -- silently overwritten is a question a second solver never sees.
+          let targets = [ (dir </> (takeBaseName opts.proveFile <> "-" <> posOf r <> ".smt2"), r, ob)
+                        | (r, _, Right ob) <- lowered ]
+              clashes = [ f | (f, n) <- Map.toList (Map.fromListWith (+) [ (f, 1 :: Int) | (f, _, _) <- targets ]), n > 1 ]
+          unless (null clashes) $ do
+            Text.hPutStrLn stderr ("l4 prove: two obligations would be written to the same file, so neither was written: "
+                                   <> Text.intercalate ", " (map Text.pack clashes))
+            exitWith (ExitFailure 1)
+          written <- for targets \(f, r, ob) -> do
+            Text.writeFile f (scriptText r ob)
+            pure f
           for_ written \f -> Text.putStrLn ("wrote " <> Text.pack f)
           Text.putStrLn (Text.pack (show (length written)) <> " obligation script(s) written; no solver was run")
         Nothing -> do
@@ -266,7 +273,7 @@ proveCmd opts = do
     _ -> exitWith (ExitFailure 1)
  where
   isRight' = \case Right _ -> True; Left _ -> False
-  lineOf = maybe "0" (\rg -> show rg.start.line)
+  posOf = maybe "0-0" (\rg -> show rg.start.line <> "-" <> show rg.start.column)
 
 -- | Is this @#ASSERT@ an obligation, and if so, its lowering.
 classify
