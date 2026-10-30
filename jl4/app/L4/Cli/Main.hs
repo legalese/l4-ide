@@ -11,6 +11,7 @@
 module L4.Cli.Main (mainWith) where
 
 import Control.Applicative ((<|>))
+import Control.Exception (evaluate)
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import Options.Applicative
   ( CommandFields
@@ -32,8 +33,11 @@ import Options.Applicative
   , showHelpOnEmpty
   , subparser
   )
+import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Options.Applicative as Options
+-- An internal module; the same signature of 'mkCommand' is exported by
+-- optparse-applicative 0.18.1.0 and 0.19.0.0 (read in both, 2026-10-30).
 import Options.Applicative.Builder.Internal (mkCommand)
 import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
@@ -61,7 +65,7 @@ import L4.Cli.Deploy
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Explore (ExploreCliOptions, exploreCmd, exploreOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
-import L4.Cli.Extensions (ExtCommand (..), Extensions (..))
+import L4.Cli.Extensions (ExtCommand (..), Extensions (..), checkExtensions, extensionLabel)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
 import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
@@ -106,14 +110,16 @@ data Command
 
 commandParser :: Extensions -> Parser Command
 commandParser exts =
-      -- The export formats are read only by `l4 export`; forcing them here
-      -- makes a name clash among them stop every invocation, as one among the
-      -- commands does.
-      exportFormats `seq` checkedSubparser "command" subcommandSet
+  -- Forcing `checked` forces the name checks of both lists. The export formats
+  -- are otherwise read only by `l4 export`, and a clash among them would stop
+  -- only that.
+  checked `seq`
+      (checked
   -- Backward-compat fallthrough: `l4 foo.l4 [--flags]` = `l4 run foo.l4 [--flags]`.
   -- Must come after `subparser` so a well-typed subcommand name wins.
-  <|> (CmdRun <$> runOptionsParser)
+  <|> (CmdRun <$> runOptionsParser))
   where
+    checked = exportFormats `seq` checkedSubparser (extensionLabel exts) "command" subcommandSet
     subcommandSet =
          command "run"
            (info (helper <*> (CmdRun <$> runOptionsParser))
@@ -191,7 +197,7 @@ commandParser exts =
     -- Adding a backend adds one entry here, and `l4 export --help` is the
     -- catalogue of every notation L4 can write.
     exportFormats =
-      checkedSubparser "export format"
+      checkedSubparser (extensionLabel exts) "export format"
         (  metavar "FORMAT"
         <> commandGroup "Formats:"
         <> command "dmn"
@@ -249,18 +255,18 @@ extensionCommand c = command c.ecName (CmdExtension <$> c.ecInfo)
 -- applicative's own rule, the first of two commands of one name wins and the
 -- other is unreachable without a word, which is how an extension would lose
 -- to a built-in. The error is raised when the parser is first read, which
--- 'commandParser' does for both lists on every invocation. @what@ names the
--- kind of thing, for the message.
-checkedSubparser :: String -> Mod CommandFields a -> Parser a
-checkedSubparser what m = case [ n | n <- names, length (filter (== n) names) > 1 ] of
+-- 'mainWith' does before it reads an argument. @who@ names the extension and
+-- @what@ the kind of thing, for the message.
+checkedSubparser :: String -> String -> Mod CommandFields a -> Parser a
+checkedSubparser who what m = case [ n | n <- names, length (filter (== n) names) > 1 ] of
   [] -> subparser m
   n : _ -> errorWithoutStackTrace
-    ("two " <> what <> "s are named `" <> n <> "`: a name added by an extension cannot be one that a built-in or another extension already has")
+    ("two " <> what <> "s are named `" <> n <> "`: a name added by " <> who <> " cannot be one that a built-in or another extension already has")
   where
     names = map fst (snd (mkCommand m))
 
 commandInfo :: Extensions -> ParserInfo Command
-commandInfo exts = info (helper <*> versionOption <*> commandParser exts)
+commandInfo exts = info (helper <*> versionOption exts <*> commandParser exts)
   ( fullDesc
   <> header "l4 — the L4 computational-law CLI"
   <> progDesc "Typecheck, evaluate, format, visualize and deploy .l4 files, and export them to (or import them from) other notations. Run `l4 <command> --help` for per-command options."
@@ -270,10 +276,11 @@ commandInfo exts = info (helper <*> versionOption <*> commandParser exts)
 -- | @l4 --version@: one line naming the build, @dev@ for a local build
 -- ("LSP.L4.BuildInfo"). It is an option of @l4@ itself and not a subcommand,
 -- because @l4 version@ already means the file called @version@ (the
--- fall-through to @l4 run@ above).
-versionOption :: Parser (a -> a)
-versionOption =
-  Options.infoOption (Text.unpack buildInfoLine)
+-- fall-through to @l4 run@ above). An extension's edition follows the line,
+-- as in @dev (enterprise edition)@, so that its executable says which it is.
+versionOption :: Extensions -> Parser (a -> a)
+versionOption exts =
+  Options.infoOption (Text.unpack buildInfoLine <> maybe "" (\ e -> " (" <> e <> " edition)") exts.extEdition)
     (Options.long "version" <> Options.help "Print the version of this build and exit")
 
 -- | Run the command line: the built-in commands, and the 'Extensions' added to them.
@@ -298,6 +305,14 @@ mainWith exts = do
   hSetEncoding stdin  utf8
   hSetEncoding stdout utf8
   hSetEncoding stderr utf8
+
+  -- The faults of the extensions stop the program before an argument is read,
+  -- so that `--version` and `--help` stop too (L4.Cli.Extensions). The second
+  -- reads the parser, which holds the check against the built-in names.
+  case checkExtensions exts of
+    [] -> pure ()
+    problems -> errorWithoutStackTrace (List.intercalate "\n" problems)
+  _ <- evaluate (commandParser exts)
 
   cmd <- customExecParser (prefs showHelpOnEmpty) (commandInfo exts)
   case cmd of

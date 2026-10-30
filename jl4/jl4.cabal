@@ -190,6 +190,7 @@ test-suite l4-cli-test
     CliTest.Docassemble
     CliTest.Ledger
     CliTest.Explore
+    CliTest.Extensions
     CliTest.OpenFisca
     CliTest.Yscript
     Paths_jl4
@@ -200,12 +201,14 @@ test-suite l4-cli-test
     jl4-lsp:jl4-lsp,
     jl4-repl:jl4-repl
   build-depends:
+    jl4:l4-cli,
     aeson,
     bytestring,
     directory,
     filepath,
     hspec,
     jl4-core,
+    optparse-applicative,
     process,
     temporary,
     text,

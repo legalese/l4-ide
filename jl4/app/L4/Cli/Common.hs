@@ -23,6 +23,8 @@ module L4.Cli.Common
   , runOneshot
   , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , LoadedModule(..)
+  , loadChecked
   , transitiveDeps
   , dedupModules
   , hasBlockingError
@@ -68,7 +70,8 @@ import LSP.Logger
   , makeRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
+import qualified LSP.Core.Shake as Shake
+import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..), normalizedFilePathToUri)
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -479,6 +482,31 @@ putDiagnostics = mapM_ (hPutStrLn stderr . Text.unpack)
 -- JSON envelope quotes the already-prettified LSP log text.
 diagnosticsToJson :: [Text] -> Aeson.Value
 diagnosticsToJson = Aeson.toJSON
+
+-- | A file that type-checked, with the modules it imports.
+data LoadedModule = MkLoadedModule
+  { lmCheck   :: Rules.TypeCheckResult
+    -- ^ the result of checking the file; its @module'@ is the module itself
+  , lmImports :: [Module Resolved]
+    -- ^ every module it imports, transitively, once each ('transitiveDeps')
+  }
+
+-- | The loading that @l4 export@ does, for a command that reads a whole
+-- checked module (an export format added through "L4.Cli.Extensions", for
+-- one): run the pipeline on the file, and give back the module with its
+-- imports if it type-checked. The diagnostics come first, warnings among
+-- them; print them as an export does, since the output is handed to someone
+-- else. 'Nothing' means there is no successful type check, and the caller says
+-- so and fails.
+loadChecked :: EvalConfig -> FilePath -> IO ([Text], Maybe LoadedModule)
+loadChecked evalConfig fp = do
+  (errs, mTc) <- runOneshot evalConfig fp \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.SuccessfulTypeCheck uri
+  pure case mTc of
+    Just tc | tc.success -> (errs, Just (MkLoadedModule {lmCheck = tc, lmImports = transitiveDeps tc}))
+    _ -> (errs, Nothing)
 
 -- | Every module the checked one reaches through @IMPORT@, transitively, once
 -- each, in the order a depth-first walk of the imports first meets it
