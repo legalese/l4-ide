@@ -25,8 +25,36 @@ declaration scope AllowanceFor:
 #[test] declaration scope AllowanceForWitness1:
   output result content decimal
 
-#[description = "Witness 2 for `allowance for`: p_0 TRUE."]
+#[description = "Witness 2 for `allowance for`: p_0 FALSE."]
 #[test] declaration scope AllowanceForWitness2:
+  output result content decimal
+
+#[description = "Witness 3 for `allowance for`: p_0 FALSE."]
+#[test] declaration scope AllowanceForWitness3:
+  output result content decimal
+
+#[description = "Witness 4 for `allowance for`: p_0 FALSE."]
+#[test] declaration scope AllowanceForWitness4:
+  output result content decimal
+
+#[description = "Witness 5 for `allowance for`: p_0 FALSE."]
+#[test] declaration scope AllowanceForWitness5:
+  output result content decimal
+
+#[description = "Witness 6 for `allowance for`: p_0 FALSE."]
+#[test] declaration scope AllowanceForWitness6:
+  output result content decimal
+
+#[description = "Witness 7 for `allowance for`: p_0 TRUE."]
+#[test] declaration scope AllowanceForWitness7:
+  output result content decimal
+
+#[description = "Witness 8 for `allowance for`: p_0 TRUE."]
+#[test] declaration scope AllowanceForWitness8:
+  output result content decimal
+
+#[description = "Witness 9 for `allowance for`: p_0 TRUE."]
+#[test] declaration scope AllowanceForWitness9:
   output result content decimal
 
 #[description = "Test 1, from the L4 directive at fixtures.l4:61:1-60."]
@@ -74,26 +102,39 @@ scope AllowanceFor:
       (120.0 + (40.0 * h.children))
 ```
 
+## Witness gates
+
 ### Witness gate for `allowance for`
 
-The rule above is emitted as an exception ladder (Mode B). Each test scope below
+The rule of `allowance for` is emitted as an exception ladder (Mode B). Each test scope below
 calls that scope, not a copy of it, at one concrete input, and expects the value
 L4's own evaluator computed there. The inputs are witnesses: each makes the 1
-atomic condition of the ladder take one combination of truth values, and every
-combination that some input realises has one. So an edit to the rule above that
-changes its answer on any realisable combination fails `clerk test` (R4, §8.4).
+atomic condition of the ladder take one combination of truth values. They are drawn
+from a fixed candidate set (each number the conditions mention, one either side
+of it, zero, both truth values, every constructor), and every combination some
+candidate realises is tested at up to eight of the candidates that realise it.
+So an edit to that rule that changes its answer at any of these inputs,
+including one exactly at a number a condition compares with, fails `clerk test`
+(R4, §8.4).
 
 The atoms, as L4 writes them:
 
 - `p_0` is `(h's children) GREATER THAN 0`
 
 - Witness 1 (F): `Household OF 0, 0`; L4 computes `120`.
-- Witness 2 (T): `Household OF 0, 1`; L4 computes `160`.
+- Witness 2 (F): `Household OF 0, -1`; L4 computes `120`.
+- Witness 3 (F): `Household OF -1, 0`; L4 computes `120`.
+- Witness 4 (F): `Household OF -1, -1`; L4 computes `120`.
+- Witness 5 (F): `Household OF 1, 0`; L4 computes `120`.
+- Witness 6 (F): `Household OF 1, -1`; L4 computes `120`.
+- Witness 7 (T): `Household OF 0, 1`; L4 computes `160`.
+- Witness 8 (T): `Household OF -1, 1`; L4 computes `160`.
+- Witness 9 (T): `Household OF 1, 1`; L4 computes `160`.
 
 **What this does and does not establish.** It checks the emitted rule's own text
-at one input per realisable combination of its conditions, against L4. It does
-not check other inputs that realise the same combination, and it does not test
-a combination the solver proved impossible.
+against L4 at the inputs listed above. An edit that changes the answer only at
+other inputs is not caught, and a combination the solver proved impossible is
+not tested.
 
 ```catala
 scope AllowanceForWitness1:
@@ -111,11 +152,95 @@ $ catala test-scope AllowanceForWitness1 --disable-warnings -F json
 scope AllowanceForWitness2:
   definition result
     equals
-      (output of AllowanceFor with { -- h: Household { -- adults: 0.0 -- children: 1.0 } }).allowance_for
+      (output of AllowanceFor with { -- h: Household { -- adults: 0.0 -- children: -1.0 } }).allowance_for
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceForWitness2 --disable-warnings -F json
+{"result":"120"}
+```
+
+```catala
+scope AllowanceForWitness3:
+  definition result
+    equals
+      (output of AllowanceFor with { -- h: Household { -- adults: -1.0 -- children: 0.0 } }).allowance_for
+```
+
+```catala-test-cli
+$ catala test-scope AllowanceForWitness3 --disable-warnings -F json
+{"result":"120"}
+```
+
+```catala
+scope AllowanceForWitness4:
+  definition result
+    equals
+      (output of AllowanceFor with { -- h: Household { -- adults: -1.0 -- children: -1.0 } }).allowance_for
+```
+
+```catala-test-cli
+$ catala test-scope AllowanceForWitness4 --disable-warnings -F json
+{"result":"120"}
+```
+
+```catala
+scope AllowanceForWitness5:
+  definition result
+    equals
+      (output of AllowanceFor with { -- h: Household { -- adults: 1.0 -- children: 0.0 } }).allowance_for
+```
+
+```catala-test-cli
+$ catala test-scope AllowanceForWitness5 --disable-warnings -F json
+{"result":"120"}
+```
+
+```catala
+scope AllowanceForWitness6:
+  definition result
+    equals
+      (output of AllowanceFor with { -- h: Household { -- adults: 1.0 -- children: -1.0 } }).allowance_for
+```
+
+```catala-test-cli
+$ catala test-scope AllowanceForWitness6 --disable-warnings -F json
+{"result":"120"}
+```
+
+```catala
+scope AllowanceForWitness7:
+  definition result
+    equals
+      (output of AllowanceFor with { -- h: Household { -- adults: 0.0 -- children: 1.0 } }).allowance_for
+```
+
+```catala-test-cli
+$ catala test-scope AllowanceForWitness7 --disable-warnings -F json
+{"result":"160"}
+```
+
+```catala
+scope AllowanceForWitness8:
+  definition result
+    equals
+      (output of AllowanceFor with { -- h: Household { -- adults: -1.0 -- children: 1.0 } }).allowance_for
+```
+
+```catala-test-cli
+$ catala test-scope AllowanceForWitness8 --disable-warnings -F json
+{"result":"160"}
+```
+
+```catala
+scope AllowanceForWitness9:
+  definition result
+    equals
+      (output of AllowanceFor with { -- h: Household { -- adults: 1.0 -- children: 1.0 } }).allowance_for
+```
+
+```catala-test-cli
+$ catala test-scope AllowanceForWitness9 --disable-warnings -F json
 {"result":"160"}
 ```
 

@@ -27,8 +27,8 @@ structures and reports false positives (see the header of the harness, and
 §8.4). `clerk test` is the interesting one: it re-runs each `#[test]`
 scope and compares the ` ```catala-test-cli ` blocks, whose expected values were
 computed by **L4's** evaluator, along with each exception ladder's witness
-gate (R4, §8.4): test scopes that call the emitted scope itself at one input
-per realisable combination of the ladder's conditions. A green `clerk test` is therefore evidence that the two
+gate (R4, §8.4): test scopes that call the emitted scope itself at up to
+eight inputs per realisable combination of the ladder's conditions. A green `clerk test` is therefore evidence that the two
 languages agree on those points — the middle tier of the OpenFisca doc's
 three-tier claim ladder (golden / executed round-trip / law-validated), never
 the third.

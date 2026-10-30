@@ -23,16 +23,104 @@ declaration scope BenefitAmount:
 #[test] declaration scope EligibleForBenefitWitness1:
   output result content boolean
 
-#[description = "Witness 2 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 2 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
 #[test] declaration scope EligibleForBenefitWitness2:
   output result content boolean
 
-#[description = "Witness 3 for `eligible for benefit`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 3 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
 #[test] declaration scope EligibleForBenefitWitness3:
   output result content boolean
 
-#[description = "Witness 4 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[description = "Witness 4 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
 #[test] declaration scope EligibleForBenefitWitness4:
+  output result content boolean
+
+#[description = "Witness 5 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness5:
+  output result content boolean
+
+#[description = "Witness 6 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness6:
+  output result content boolean
+
+#[description = "Witness 7 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness7:
+  output result content boolean
+
+#[description = "Witness 8 for `eligible for benefit`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness8:
+  output result content boolean
+
+#[description = "Witness 9 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness9:
+  output result content boolean
+
+#[description = "Witness 10 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness10:
+  output result content boolean
+
+#[description = "Witness 11 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness11:
+  output result content boolean
+
+#[description = "Witness 12 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness12:
+  output result content boolean
+
+#[description = "Witness 13 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness13:
+  output result content boolean
+
+#[description = "Witness 14 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness14:
+  output result content boolean
+
+#[description = "Witness 15 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness15:
+  output result content boolean
+
+#[description = "Witness 16 for `eligible for benefit`: p_0 TRUE, p_1 FALSE."]
+#[test] declaration scope EligibleForBenefitWitness16:
+  output result content boolean
+
+#[description = "Witness 17 for `eligible for benefit`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness17:
+  output result content boolean
+
+#[description = "Witness 18 for `eligible for benefit`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness18:
+  output result content boolean
+
+#[description = "Witness 19 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness19:
+  output result content boolean
+
+#[description = "Witness 20 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness20:
+  output result content boolean
+
+#[description = "Witness 21 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness21:
+  output result content boolean
+
+#[description = "Witness 22 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness22:
+  output result content boolean
+
+#[description = "Witness 23 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness23:
+  output result content boolean
+
+#[description = "Witness 24 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness24:
+  output result content boolean
+
+#[description = "Witness 25 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness25:
+  output result content boolean
+
+#[description = "Witness 26 for `eligible for benefit`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope EligibleForBenefitWitness26:
   output result content boolean
 
 #[description = "Test 1, from the L4 directive at benefit.l4:26:1-87."]
@@ -55,14 +143,29 @@ scope EligibleForBenefit:
     consequence not fulfilled
 ```
 
+## `benefit amount`
+
+```catala
+scope BenefitAmount:
+  definition benefit_amount
+    equals
+      (let bonus equals (if a.is_veteran then 250.0 else 0.0) in (if (output of EligibleForBenefit with { -- a: a }).eligible_for_benefit then (1000.0 + bonus) else 0.0))
+```
+
+## Witness gates
+
 ### Witness gate for `eligible for benefit`
 
-The rule above is emitted as an exception ladder (Mode B). Each test scope below
+The rule of `eligible for benefit` is emitted as an exception ladder (Mode B). Each test scope below
 calls that scope, not a copy of it, at one concrete input, and expects the value
 L4's own evaluator computed there. The inputs are witnesses: each makes the 2
-atomic conditions of the ladder take one combination of truth values, and every
-combination that some input realises has one. So an edit to the rule above that
-changes its answer on any realisable combination fails `clerk test` (R4, §8.4).
+atomic conditions of the ladder take one combination of truth values. They are drawn
+from a fixed candidate set (each number the conditions mention, one either side
+of it, zero, both truth values, every constructor), and every combination some
+candidate realises is tested at up to eight of the candidates that realise it.
+So an edit to that rule that changes its answer at any of these inputs,
+including one exactly at a number a condition compares with, fails `clerk test`
+(R4, §8.4).
 
 The atoms, as L4 writes them:
 
@@ -70,14 +173,36 @@ The atoms, as L4 writes them:
 - `p_1` is `(a's income) GREATER THAN 100000`
 
 - Witness 1 (FF): `Applicant OF 0, 0, FALSE`; L4 computes `FALSE`.
-- Witness 2 (TF): `Applicant OF 0, 0, TRUE`; L4 computes `TRUE`.
-- Witness 3 (FT): `Applicant OF 0, 100001, FALSE`; L4 computes `FALSE`.
-- Witness 4 (TT): `Applicant OF 0, 100001, TRUE`; L4 computes `FALSE`.
+- Witness 2 (FF): `Applicant OF 0, 65, FALSE`; L4 computes `FALSE`.
+- Witness 3 (FF): `Applicant OF 0, 64, FALSE`; L4 computes `FALSE`.
+- Witness 4 (FF): `Applicant OF 0, 66, FALSE`; L4 computes `FALSE`.
+- Witness 5 (FF): `Applicant OF 0, 100000, FALSE`; L4 computes `FALSE`.
+- Witness 6 (FF): `Applicant OF 0, 99999, FALSE`; L4 computes `FALSE`.
+- Witness 7 (FF): `Applicant OF 64, 0, FALSE`; L4 computes `FALSE`.
+- Witness 8 (FF): `Applicant OF 64, 65, FALSE`; L4 computes `FALSE`.
+- Witness 9 (TF): `Applicant OF 0, 0, TRUE`; L4 computes `TRUE`.
+- Witness 10 (TF): `Applicant OF 0, 65, TRUE`; L4 computes `TRUE`.
+- Witness 11 (TF): `Applicant OF 0, 64, TRUE`; L4 computes `TRUE`.
+- Witness 12 (TF): `Applicant OF 0, 66, TRUE`; L4 computes `TRUE`.
+- Witness 13 (TF): `Applicant OF 0, 100000, TRUE`; L4 computes `TRUE`.
+- Witness 14 (TF): `Applicant OF 0, 99999, TRUE`; L4 computes `TRUE`.
+- Witness 15 (TF): `Applicant OF 65, 0, TRUE`; L4 computes `TRUE`.
+- Witness 16 (TF): `Applicant OF 65, 0, FALSE`; L4 computes `TRUE`.
+- Witness 17 (FT): `Applicant OF 0, 100001, FALSE`; L4 computes `FALSE`.
+- Witness 18 (FT): `Applicant OF 64, 100001, FALSE`; L4 computes `FALSE`.
+- Witness 19 (TT): `Applicant OF 0, 100001, TRUE`; L4 computes `FALSE`.
+- Witness 20 (TT): `Applicant OF 65, 100001, TRUE`; L4 computes `FALSE`.
+- Witness 21 (TT): `Applicant OF 65, 100001, FALSE`; L4 computes `FALSE`.
+- Witness 22 (TT): `Applicant OF 64, 100001, TRUE`; L4 computes `FALSE`.
+- Witness 23 (TT): `Applicant OF 66, 100001, TRUE`; L4 computes `FALSE`.
+- Witness 24 (TT): `Applicant OF 66, 100001, FALSE`; L4 computes `FALSE`.
+- Witness 25 (TT): `Applicant OF 100000, 100001, TRUE`; L4 computes `FALSE`.
+- Witness 26 (TT): `Applicant OF 100000, 100001, FALSE`; L4 computes `FALSE`.
 
 **What this does and does not establish.** It checks the emitted rule's own text
-at one input per realisable combination of its conditions, against L4. It does
-not check other inputs that realise the same combination, and it does not test
-a combination the solver proved impossible.
+against L4 at the inputs listed above. An edit that changes the answer only at
+other inputs is not caught, and a combination the solver proved impossible is
+not tested.
 
 ```catala
 scope EligibleForBenefitWitness1:
@@ -95,19 +220,19 @@ $ catala test-scope EligibleForBenefitWitness1 --disable-warnings -F json
 scope EligibleForBenefitWitness2:
   definition result
     equals
-      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 0.0 -- is_veteran: true } }).eligible_for_benefit
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 65.0 -- is_veteran: false } }).eligible_for_benefit
 ```
 
 ```catala-test-cli
 $ catala test-scope EligibleForBenefitWitness2 --disable-warnings -F json
-{"result":true}
+{"result":false}
 ```
 
 ```catala
 scope EligibleForBenefitWitness3:
   definition result
     equals
-      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100001.0 -- is_veteran: false } }).eligible_for_benefit
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 64.0 -- is_veteran: false } }).eligible_for_benefit
 ```
 
 ```catala-test-cli
@@ -119,7 +244,7 @@ $ catala test-scope EligibleForBenefitWitness3 --disable-warnings -F json
 scope EligibleForBenefitWitness4:
   definition result
     equals
-      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100001.0 -- is_veteran: true } }).eligible_for_benefit
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 66.0 -- is_veteran: false } }).eligible_for_benefit
 ```
 
 ```catala-test-cli
@@ -127,13 +252,268 @@ $ catala test-scope EligibleForBenefitWitness4 --disable-warnings -F json
 {"result":false}
 ```
 
-## `benefit amount`
+```catala
+scope EligibleForBenefitWitness5:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100000.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness5 --disable-warnings -F json
+{"result":false}
+```
 
 ```catala
-scope BenefitAmount:
-  definition benefit_amount
+scope EligibleForBenefitWitness6:
+  definition result
     equals
-      (let bonus equals (if a.is_veteran then 250.0 else 0.0) in (if (output of EligibleForBenefit with { -- a: a }).eligible_for_benefit then (1000.0 + bonus) else 0.0))
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 99999.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness6 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness7:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 64.0 -- income: 0.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness7 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness8:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 64.0 -- income: 65.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness8 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness9:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 0.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness9 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness10:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 65.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness10 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness11:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 64.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness11 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness12:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 66.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness12 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness13:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100000.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness13 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness14:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 99999.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness14 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness15:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 65.0 -- income: 0.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness15 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness16:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 65.0 -- income: 0.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness16 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope EligibleForBenefitWitness17:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100001.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness17 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness18:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 64.0 -- income: 100001.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness18 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness19:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 0.0 -- income: 100001.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness19 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness20:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 65.0 -- income: 100001.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness20 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness21:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 65.0 -- income: 100001.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness21 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness22:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 64.0 -- income: 100001.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness22 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness23:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 66.0 -- income: 100001.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness23 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness24:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 66.0 -- income: 100001.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness24 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness25:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 100000.0 -- income: 100001.0 -- is_veteran: true } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness25 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope EligibleForBenefitWitness26:
+  definition result
+    equals
+      (output of EligibleForBenefit with { -- a: Applicant { -- age: 100000.0 -- income: 100001.0 -- is_veteran: false } }).eligible_for_benefit
+```
+
+```catala-test-cli
+$ catala test-scope EligibleForBenefitWitness26 --disable-warnings -F json
+{"result":false}
 ```
 
 ## Tests

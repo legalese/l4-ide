@@ -3,9 +3,10 @@
 -- VERIFICATION-BACKEND-LOWERING-SPEC R-V10).
 --
 -- For each exported decision whose body the Catala lowering turns into an
--- exception ladder, find one concrete input per combination of truth values of
--- the ladder's atomic conditions, so that the emitted test scopes can call the
--- real emitted scope there and compare it with L4.
+-- exception ladder, find concrete inputs for each combination of truth values
+-- of the ladder's atomic conditions (up to 'perCombination' of them), so that
+-- the emitted test scopes can call the real emitted scope there and compare it
+-- with L4.
 --
 -- Two oracles, with fixed jobs, and neither is a second semantics of the rule:
 --
@@ -52,6 +53,14 @@ atomLimit = 12
 candidateLimit :: Integer
 candidateLimit = 4096
 
+-- | At most this many witnesses per combination, in candidate order. More
+-- than one, because the candidates for a number include the literal a
+-- condition compares with as well as one either side of it, and only a
+-- witness AT the literal shows an edit from @>@ to @>=@ (audit of #784,
+-- finding 7). (Assumed, not ruled.)
+perCombination :: Int
+perCombination = 8
+
 -- | The gates, keyed by decision, and a note per decision that has a ladder
 -- but no gate.
 witnessGates
@@ -63,13 +72,17 @@ witnessGates evalConfig tc importEnv msolver secs jsonOf humanOf = do
     r <- gateFor lt
     pure (lt, r)
   pure ( Map.fromList [ (lt.ltDecide, g) | (lt, Right g) <- results ]
-       , [ "no witness gate for `" <> nameOf' lt.ltName <> "` (" <> why <> "); its ladder keeps the exhaustive grid"
+       , [ "no witness gate for `" <> nameOf' lt.ltName <> "` (" <> why <> "); " <> fallback lt
          | (lt, Left why) <- results ] )
  where
   mods    = tc.module' : map (.module') (Rules.transitiveDependencies tc)
   env     = mkProveEnv mods (tc.entityInfo <> foldMap (.entityInfo) (Rules.transitiveDependencies tc))
   targets = ladderTargets (drop 1 mods) tc.module'
   nameOf' = nameToText . getOriginal
+  -- what the lowering does without a gate: the grid while it can, else Mode A
+  fallback lt
+    | length lt.ltAtoms <= 8 = "its ladder keeps the exhaustive grid"
+    | otherwise = "past the grid's cap of 8 it is emitted in the boolean rendering (Mode A)"
 
   gateFor lt
     | lt.ltReadsAssumes = pure (Left "it reads an ASSUME, which a witness input cannot supply")
@@ -91,12 +104,12 @@ witnessGates evalConfig tc importEnv msolver secs jsonOf humanOf = do
         cands = samplePointsUpTo candidateLimit [ (fv, sampleValues space.asSpace fv.fvSort) | fv <- free ]
         n = length lt.ltAtoms
     vectors <- atomVectors params lt.ltAtoms (map (map snd) cands)
-    let firstWitness = Map.fromListWith (\_ old -> old)
-          [ (bs, map snd c) | (c, Just bs) <- zip cands vectors ]
+    let witnessesOf = Map.map (take perCombination . reverse) $ Map.fromListWith (<>)
+          [ (bs, [map snd c]) | (c, Just bs) <- zip cands vectors ]
         combos = [ [ odd (k `div` (2 ^ i)) | i <- [0 .. n - 1] ] | k <- [0 .. (2 ^ n :: Integer) - 1] ]
-    decided <- for combos \bs -> case Map.lookup bs firstWitness of
-      Just args -> pure (Right (Left (bs, args, False)))
-      Nothing -> viaSolver params lt space bs
+    decided <- fmap concat $ for combos \bs -> case Map.lookup bs witnessesOf of
+      Just argss -> pure [ Right (Left (bs, args, False)) | args <- argss ]
+      Nothing -> (: []) <$> viaSolver params lt space bs
     case [ why | Left why <- decided ] of
       (why : _) -> pure (Left why)
       [] -> do
@@ -106,7 +119,7 @@ witnessGates evalConfig tc importEnv msolver secs jsonOf humanOf = do
             Just nf | Just j <- jsonOf nf ->
               Right WitnessRow
                 { wrAssignment = bs, wrArgs = args
-                , wrArgsText = map (oneLine . prettyLayout) args
+                , wrArgsText = map (oneLine . prettyLayout . exactValue) args
                 , wrExpected = j, wrHuman = humanOf nf, wrFromSolver = fromSolver }
             _ -> Left "L4 produced no Catala-renderable value at a witness"
         pure case [ why | Left why <- rows ] of

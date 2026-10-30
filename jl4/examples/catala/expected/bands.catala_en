@@ -23,12 +23,56 @@ declaration scope TaxDue:
 #[test] declaration scope RateBandWitness1:
   output result content decimal
 
-#[description = "Witness 2 for `rate band`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 2 for `rate band`: p_0 FALSE, p_1 FALSE."]
 #[test] declaration scope RateBandWitness2:
   output result content decimal
 
-#[description = "Witness 3 for `rate band`: p_0 TRUE, p_1 TRUE."]
+#[description = "Witness 3 for `rate band`: p_0 FALSE, p_1 FALSE."]
 #[test] declaration scope RateBandWitness3:
+  output result content decimal
+
+#[description = "Witness 4 for `rate band`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope RateBandWitness4:
+  output result content decimal
+
+#[description = "Witness 5 for `rate band`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope RateBandWitness5:
+  output result content decimal
+
+#[description = "Witness 6 for `rate band`: p_0 FALSE, p_1 FALSE."]
+#[test] declaration scope RateBandWitness6:
+  output result content decimal
+
+#[description = "Witness 7 for `rate band`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness7:
+  output result content decimal
+
+#[description = "Witness 8 for `rate band`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness8:
+  output result content decimal
+
+#[description = "Witness 9 for `rate band`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness9:
+  output result content decimal
+
+#[description = "Witness 10 for `rate band`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness10:
+  output result content decimal
+
+#[description = "Witness 11 for `rate band`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness11:
+  output result content decimal
+
+#[description = "Witness 12 for `rate band`: p_0 FALSE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness12:
+  output result content decimal
+
+#[description = "Witness 13 for `rate band`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness13:
+  output result content decimal
+
+#[description = "Witness 14 for `rate band`: p_0 TRUE, p_1 TRUE."]
+#[test] declaration scope RateBandWitness14:
   output result content decimal
 
 #[description = "Test 1, from the L4 directive at bands.l4:25:1-65."]
@@ -71,14 +115,29 @@ scope RateBand:
       0.25
 ```
 
+## `tax due`
+
+```catala
+scope TaxDue:
+  definition tax_due
+    equals
+      (f.income * (output of RateBand with { -- f: f }).rate_band)
+```
+
+## Witness gates
+
 ### Witness gate for `rate band`
 
-The rule above is emitted as an exception ladder (Mode B). Each test scope below
+The rule of `rate band` is emitted as an exception ladder (Mode B). Each test scope below
 calls that scope, not a copy of it, at one concrete input, and expects the value
 L4's own evaluator computed there. The inputs are witnesses: each makes the 2
-atomic conditions of the ladder take one combination of truth values, and every
-combination that some input realises has one. So an edit to the rule above that
-changes its answer on any realisable combination fails `clerk test` (R4, §8.4).
+atomic conditions of the ladder take one combination of truth values. They are drawn
+from a fixed candidate set (each number the conditions mention, one either side
+of it, zero, both truth values, every constructor), and every combination some
+candidate realises is tested at up to eight of the candidates that realise it.
+So an edit to that rule that changes its answer at any of these inputs,
+including one exactly at a number a condition compares with, fails `clerk test`
+(R4, §8.4).
 
 The atoms, as L4 writes them:
 
@@ -86,15 +145,26 @@ The atoms, as L4 writes them:
 - `p_1` is `(f's income) GREATER THAN 50000`
 
 - Witness 1 (FF): `Filer OF 0, TRUE`; L4 computes `0.1`.
-- Witness 2 (FT): `Filer OF 50001, TRUE`; L4 computes `0.25`.
-- Witness 3 (TT): `Filer OF 100001, TRUE`; L4 computes `0.4`.
+- Witness 2 (FF): `Filer OF 0, FALSE`; L4 computes `0.1`.
+- Witness 3 (FF): `Filer OF 50000, TRUE`; L4 computes `0.1`.
+- Witness 4 (FF): `Filer OF 50000, FALSE`; L4 computes `0.1`.
+- Witness 5 (FF): `Filer OF 49999, TRUE`; L4 computes `0.1`.
+- Witness 6 (FF): `Filer OF 49999, FALSE`; L4 computes `0.1`.
+- Witness 7 (FT): `Filer OF 50001, TRUE`; L4 computes `0.25`.
+- Witness 8 (FT): `Filer OF 50001, FALSE`; L4 computes `0.25`.
+- Witness 9 (FT): `Filer OF 100000, TRUE`; L4 computes `0.25`.
+- Witness 10 (FT): `Filer OF 100000, FALSE`; L4 computes `0.25`.
+- Witness 11 (FT): `Filer OF 99999, TRUE`; L4 computes `0.25`.
+- Witness 12 (FT): `Filer OF 99999, FALSE`; L4 computes `0.25`.
+- Witness 13 (TT): `Filer OF 100001, TRUE`; L4 computes `0.4`.
+- Witness 14 (TT): `Filer OF 100001, FALSE`; L4 computes `0.4`.
 
 1 combination was proved impossible by an SMT solver (no input realises it), and so is not tested: TF.
 
 **What this does and does not establish.** It checks the emitted rule's own text
-at one input per realisable combination of its conditions, against L4. It does
-not check other inputs that realise the same combination, and it does not test
-a combination the solver proved impossible.
+against L4 at the inputs listed above. An edit that changes the answer only at
+other inputs is not caught, and a combination the solver proved impossible is
+not tested.
 
 ```catala
 scope RateBandWitness1:
@@ -112,33 +182,156 @@ $ catala test-scope RateBandWitness1 --disable-warnings -F json
 scope RateBandWitness2:
   definition result
     equals
-      (output of RateBand with { -- f: Filer { -- income: 50001.0 -- resident: true } }).rate_band
+      (output of RateBand with { -- f: Filer { -- income: 0.0 -- resident: false } }).rate_band
 ```
 
 ```catala-test-cli
 $ catala test-scope RateBandWitness2 --disable-warnings -F json
-{"result":"1/4"}
+{"result":"1/10"}
 ```
 
 ```catala
 scope RateBandWitness3:
   definition result
     equals
-      (output of RateBand with { -- f: Filer { -- income: 100001.0 -- resident: true } }).rate_band
+      (output of RateBand with { -- f: Filer { -- income: 50000.0 -- resident: true } }).rate_band
 ```
 
 ```catala-test-cli
 $ catala test-scope RateBandWitness3 --disable-warnings -F json
+{"result":"1/10"}
+```
+
+```catala
+scope RateBandWitness4:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 50000.0 -- resident: false } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness4 --disable-warnings -F json
+{"result":"1/10"}
+```
+
+```catala
+scope RateBandWitness5:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 49999.0 -- resident: true } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness5 --disable-warnings -F json
+{"result":"1/10"}
+```
+
+```catala
+scope RateBandWitness6:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 49999.0 -- resident: false } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness6 --disable-warnings -F json
+{"result":"1/10"}
+```
+
+```catala
+scope RateBandWitness7:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 50001.0 -- resident: true } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness7 --disable-warnings -F json
+{"result":"1/4"}
+```
+
+```catala
+scope RateBandWitness8:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 50001.0 -- resident: false } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness8 --disable-warnings -F json
+{"result":"1/4"}
+```
+
+```catala
+scope RateBandWitness9:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 100000.0 -- resident: true } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness9 --disable-warnings -F json
+{"result":"1/4"}
+```
+
+```catala
+scope RateBandWitness10:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 100000.0 -- resident: false } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness10 --disable-warnings -F json
+{"result":"1/4"}
+```
+
+```catala
+scope RateBandWitness11:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 99999.0 -- resident: true } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness11 --disable-warnings -F json
+{"result":"1/4"}
+```
+
+```catala
+scope RateBandWitness12:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 99999.0 -- resident: false } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness12 --disable-warnings -F json
+{"result":"1/4"}
+```
+
+```catala
+scope RateBandWitness13:
+  definition result
+    equals
+      (output of RateBand with { -- f: Filer { -- income: 100001.0 -- resident: true } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness13 --disable-warnings -F json
 {"result":"2/5"}
 ```
 
-## `tax due`
-
 ```catala
-scope TaxDue:
-  definition tax_due
+scope RateBandWitness14:
+  definition result
     equals
-      (f.income * (output of RateBand with { -- f: f }).rate_band)
+      (output of RateBand with { -- f: Filer { -- income: 100001.0 -- resident: false } }).rate_band
+```
+
+```catala-test-cli
+$ catala test-scope RateBandWitness14 --disable-warnings -F json
+{"result":"2/5"}
 ```
 
 ## Tests

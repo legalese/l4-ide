@@ -38,15 +38,20 @@ high-fidelity — and unusually useful as a cross-check.
 - **Catala's prover can inspect the ladder.** `catala proof` verifies that no two rungs of an
   exception ladder can fire simultaneously.
 - **Every exception ladder is checked against L4 on the scope you ship.** Rewriting an `UNLESS`
-  or a `BRANCH` as a ladder is a change of shape, so each ladder carries a _witness gate_: one test
-  scope per combination of truth values of the ladder's conditions that some input can produce,
-  calling the emitted scope at that input and expecting the value L4 computed. Editing the shipped
-  rule so that it answers differently on any such combination fails `clerk test`.
-  The witnesses come from a fixed set of candidate values (each number the conditions mention, one
-  either side of it, zero, both truth values, every option of a choice), so unless a witness had
-  to come from the solver the emitted file does not depend on which solver is installed. An SMT solver, [z3](https://github.com/Z3Prover/z3), is
-  used only to show that the remaining combinations are impossible (a higher income band without
-  the lower one, say), and to find a witness the candidates miss; the file says so when it does.
+  or a `BRANCH` as a ladder is a change of shape, so each ladder carries a _witness gate_: test
+  scopes that call the emitted scope at concrete inputs and expect the value L4 computed there.
+  The inputs come from a fixed set of candidates: each number the conditions mention, one either
+  side of it, zero, both truth values, and every option of a choice. Every combination of the
+  ladder's conditions that some candidate produces is tested at up to eight of the candidates that
+  produce it, so an inequality is tested exactly at its threshold as well as either side of it.
+  An edit to the shipped rule that changes its answer at any of those inputs fails `clerk test`;
+  that includes changing `>` to `>=` on a threshold the rule compares with. An edit that changes the
+  answer only at inputs outside the candidate set is not caught.
+  An SMT solver, [z3](https://github.com/Z3Prover/z3), is used only to show that the remaining
+  combinations are impossible (a higher income band without the lower one, say), and to find a
+  witness when no candidate produces a combination; the file says so when it does. Unless a
+  witness had to come from the solver, the emitted file does not depend on which solver is
+  installed.
 
 ## The command
 

@@ -904,6 +904,7 @@ weave title source notes structs enums tops lowered eqvs wits tests =
   <> [ SegMetadata metadata ]
   <> [ SegCode (map (ItemDecl . DTopdef) tops) | not (null tops) ]
   <> concat (snd (mapAccumL scopeSegments [] lowered))
+  <> witnessSegments
   <> testSegments
  where
   header =
@@ -945,14 +946,24 @@ weave title source notes structs enums tops lowered eqvs wits tests =
           [ [ SegProse eu.euProse, SegCode eu.euItems, SegTestCli eu.euTest ]
           | (owner, eu) <- eqvs, owner == ls.lsBody.sbName
           ]
-        witBlocks = concat
-          [ SegProse wb.wbProse
-            : concat [ [ SegCode [ItemScope t.tuBody], SegTestCli t.tuCli ] | t <- wb.wbUnits ]
-          | (owner, wb) <- wits, owner == ls.lsBody.sbName
-          ]
-    in (ls.lsPath, [ SegProse h | h <- newHeads ] <> body <> eqvBlocks <> witBlocks)
+    in (ls.lsPath, [ SegProse h | h <- newHeads ] <> body <> eqvBlocks)
 
   heading n t = [ Text.replicate n "#" <> " " <> t ]
+
+  -- The witness gates go after EVERY scope, not beside the rule they check.
+  -- A `catala-test-cli` block runs against the document up to the block, so a
+  -- witness placed beside its rule called scopes defined further down as if
+  -- they had no rules at all (measured, catala 1.2.1: `statute`'s
+  -- `QualifiesWitness5` answered false there, true at the end). The grid it
+  -- replaces never noticed, because its scopes call nothing.
+  witnessSegments
+    | null wits = []
+    | otherwise =
+        SegProse [ "## Witness gates" ]
+        : concat
+            [ SegProse wb.wbProse
+              : concat [ [ SegCode [ItemScope t.tuBody], SegTestCli t.tuCli ] | t <- wb.wbUnits ]
+            | (_, wb) <- wits ]
 
   trimTrailingBlanks = reverse . dropWhile Text.null . reverse
 
@@ -1078,12 +1089,16 @@ witnessBlockOf ctx ls = case ls.lsGate of
   prose g = let n = length g.wgAtomText in
        [ "### Witness gate for `" <> ls.lsL4 <> "`"
        , ""
-       , "The rule above is emitted as an exception ladder (Mode B). Each test scope below"
+       , "The rule of `" <> ls.lsL4 <> "` is emitted as an exception ladder (Mode B). Each test scope below"
        , "calls that scope, not a copy of it, at one concrete input, and expects the value"
        , "L4's own evaluator computed there. The inputs are witnesses: each makes the " <> tshow n
-       , "atomic condition" <> (if n == 1 then "" else "s") <> " of the ladder take one combination of truth values, and every"
-       , "combination that some input realises has one. So an edit to the rule above that"
-       , "changes its answer on any realisable combination fails `clerk test` (R4, §8.4)."
+       , "atomic condition" <> (if n == 1 then "" else "s") <> " of the ladder take one combination of truth values. They are drawn"
+       , "from a fixed candidate set (each number the conditions mention, one either side"
+       , "of it, zero, both truth values, every constructor), and every combination some"
+       , "candidate realises is tested at up to eight of the candidates that realise it."
+       , "So an edit to that rule that changes its answer at any of these inputs,"
+       , "including one exactly at a number a condition compares with, fails `clerk test`"
+       , "(R4, §8.4)."
        , ""
        , "The atoms, as L4 writes them:"
        , ""
@@ -1100,9 +1115,9 @@ witnessBlockOf ctx ls = case ls.lsGate of
     <> impossible g
     <> [ ""
        , "**What this does and does not establish.** It checks the emitted rule's own text"
-       , "at one input per realisable combination of its conditions, against L4. It does"
-       , "not check other inputs that realise the same combination, and it does not test"
-       , "a combination the solver proved impossible."
+       , "against L4 at the inputs listed above. An edit that changes the answer only at"
+       , "other inputs is not caught, and a combination the solver proved impossible is"
+       , "not tested."
        ]
 
   impossible g = case g.wgImpossible of

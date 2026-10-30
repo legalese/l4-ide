@@ -45,6 +45,9 @@ spec bin = do
       sout `shouldSatisfy` ("label marginal_rate_r1 exception marginal_rate_r2" `isInfixOf`)
       sout `shouldSatisfy` ("#[test] declaration scope MarginalRateWitness10:" `isInfixOf`)
       sout `shouldSatisfy` ("502 combinations were proved impossible" `isInfixOf`)
+      -- Audit finding 7: a witness at each band's literal itself, so that an
+      -- edit from `>` to `>=` in the shipped rule changes a tested answer.
+      sout `shouldSatisfy` ("-- e: Earner { -- income: 500000.0 } }" `isInfixOf`)
       sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
 
     -- The golden fixtures' witnesses come from the fixed candidate set alone,
