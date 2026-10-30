@@ -1538,9 +1538,11 @@ mirror it reports 11 mentions and no finding; the counts for the other trees, an
 **What §12.1 rules, and what the build chose.** The ruling is the lint and its oracle (the `@ref`
 prose and the identifier names); it is silent on how the lint is invoked. These were chosen in the
 build and are **assumed, not ruled**: the verb `l4 lint` and its flags (`--all`, `--json`,
-`--strict`; advisory by default, exit 0 whenever the lint ran); reading the quoted text in the
-decision's body as a third source (6 of the canon mirror's 11 mentions can be read nowhere else);
-requiring a provision number behind a phrase; setting aside a decision whose whole body is one string
+`--strict`; advisory by default, exit 0 whenever the lint ran, exit 1 whenever a file could not be
+checked); reading the quoted text in the decision's body as a third source (6 of the canon mirror's 11
+mentions can be read nowhere else); requiring a provision, written with its number, to be named in the
+same clause as the phrase (straight after it, after a few joining words, or up to ten words on after a
+description that opens with "the" or "this"); setting aside a decision whose whole body is one string
 literal; and accepting a third decision that combines the two sides as a discharge (directly for "subject
 to", through helpers for "notwithstanding" and "despite").
 

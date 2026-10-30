@@ -99,7 +99,7 @@ Numbers are digits (`6`, `6A`, `76.21`); "Part III" is not read.
 
 The same words with no provision named after them are ordinary English, and the lint says nothing about them: "subject to tax", "subject to the process of the court", "despite reasonable efforts".
 It also says nothing when the words in between turn the section into something other than what the provision yields to: "subject to a trust under section 12" and "subject to tax imposed under section 12" (an indefinite thing that section 12 creates), "subject to the condition that section 6 is complied with" (a condition, not an override), and "subject to the requirement to file reports pursuant to section 13" (a duty to do something).
-Those words, when they cut a description short, are _a_, _an_, _any_, _such_, _no_, _each_, _every_, _that_, _which_, _who_, _if_, _where_, _unless_, _not_, _only_, and an infinitive _to_.
+Those words, when they cut a description short, are _a_, _an_, _any_, _such_, _no_, _each_, _every_, _that_, _which_, _who_, _if_, _where_, _unless_, _not_, _only_, _within_ (which some encodings use to name the provision the decision itself encodes: "despite the charter within s 268(2)"), and an infinitive _to_.
 The lint cannot tell what such a sentence means, so it stays silent rather than guess.
 
 To find the decision that encodes a provision, it reads the **name**.

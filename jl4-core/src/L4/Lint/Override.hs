@@ -33,11 +33,16 @@
 --
 -- = What is a mention, and what is not
 --
--- A phrase counts only when a provision follows it: @subject to section 6@,
--- @despite subsection (8)@, @notwithstanding anything in section 18(g)@. The
--- bare words are common English with no provision behind them (@subject to
--- tax@, @subject to the process of the court@, @despite reasonable efforts@),
--- and a lint that fired on them would be switched off in a day.
+-- A phrase counts when a provision, written with its number, is named in the
+-- same clause: straight after it (@subject to section 6@, @despite subsection
+-- (8)@, @subject to Part 3@), after a few joining words (@notwithstanding
+-- anything in section 18(g)@), or after a description that opens with "the" or
+-- "this" ('scanForTargets': @subject to the consent required by section 6@,
+-- @subject to this section and to section 6@). The bare words are common
+-- English with no provision behind them (@subject to tax@, @subject to the
+-- process of the court@, @despite reasonable efforts@), and a lint that fired
+-- on them would be switched off in a day; so is a section that only creates
+-- the thing the speaker is subject to (@subject to a trust under section 12@).
 --
 -- Three further shapes are recognised and set aside rather than judged:
 --
@@ -399,8 +404,9 @@ mkMention ph after =
 -- "subject to tax imposed under section 12" are not an override of section 12.
 -- The scan stops at a full stop, a semicolon or a dash, at a comma not followed
 -- by "and", "or", "including" or "in", after ten words, and at a word that
--- starts a relative clause, an indefinite phrase or a purpose ("the requirement
--- to file reports pursuant to section 13").
+-- starts a relative clause, an indefinite phrase, a purpose ("the requirement
+-- to file reports pursuant to section 13") or the name of the provision the
+-- decision encodes ("within").
 scanForTargets :: [Chunk] -> Maybe ([Target], Bool, [Chunk])
 scanForTargets after = case after of
   (c : _) | lw c `elem` ["the", "this", "these", "those"] -> go (10 :: Int) "" after
@@ -420,7 +426,10 @@ scanForTargets after = case after of
     | w == "to" = prev `notElem` ["and", "or"]
     | otherwise = w `elem`
         [ "a", "an", "any", "such", "no", "each", "every", "that", "which", "who", "whose"
-        , "if", "where", "when", "unless", "not", "than", "only" ]
+        , "if", "where", "when", "unless", "not", "than", "only"
+          -- "despite the charter within s 268(2)": the commons' way of naming
+          -- the provision the decision ENCODES, not one it overrides
+        , "within" ]
 
 -- | The targets that open a clause, whether a range ended the list, and what
 -- follows the list.

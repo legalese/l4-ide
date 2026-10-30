@@ -109,6 +109,7 @@ spec = do
       readMentions "the original is subject to a trust under section 12 of the Trustee Act" `shouldBe` ["subject to: no provision"]
       readMentions "Subject to the requirement to file reports pursuant to section 13" `shouldBe` ["subject to: no provision"]
       readMentions "subject to tax imposed under section 12" `shouldBe` ["subject to: no provision"]
+      readMentions "the directors may apply despite the charter within s 268(4)" `shouldBe` ["despite: no provision"]
       readMentions "Subject to the condition that section 6 is complied with, a person may inherit" `shouldBe` ["subject to: no provision"]
       readMentions "subject to the consent of the Minister under section 6 of the Wills Act" `shouldBe` ["subject to: external section 6"]
 
