@@ -263,6 +263,23 @@ export class AuthManager {
   }
 
   /**
+   * Keep a rotated sealed session (jl4-auth-proxy refreshed the WorkOS
+   * session, e.g. on GET /auth/access-token) in place of `replaces`, the
+   * one the request presented. Unlike {@link setSessionToken} it leaves the
+   * connection state alone: the sign-in is the same, and invalidating would
+   * drop a verify in flight and leave the sidebar on "Connecting...". A
+   * no-op once the stored session has changed (sign-out, another sign-in),
+   * so a late response can't bring the old sign-in back.
+   */
+  async storeRotatedSessionToken(
+    token: string,
+    replaces: string
+  ): Promise<void> {
+    if ((await this.secrets.get(SECRET_KEY_SESSION)) !== replaces) return
+    await this.secrets.store(SECRET_KEY_SESSION, token)
+  }
+
+  /**
    * Sign out (Legalese Cloud) or disconnect (configured service URL).
    * Clears session token. Never touches the serviceUrl setting.
    */
