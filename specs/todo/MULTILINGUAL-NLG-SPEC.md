@@ -1124,10 +1124,10 @@ Hover changes only at the definition, and that matches every other placement: th
 The same golden pins all three, with the head-name and declaration placements as controls that #979 does not move.
 One residue it also pins, not a #979 defect: hovering a `GIVEN` type variable prints `TYPE VAR` and drops its herald, because `LSP.L4.Actions.infoToHover` reads the nlg only in its `TypeInfo` branch; the gloss appears instead inside the rule's type, as `FOR ALL a [the kind of thing]`.
 
-**Still owed: the cross-module case.**
-`promoteHeadInputNlg` folds over the module it is given, so a call to a heralded rule defined in an IMPORTED module still prints the bare name — the prelude's 67 among them.
-`l4 render` handles that, and it needs a different key to do it: `L4.Export.Document.nlgFnInfo` is keyed by `(name, arity)` rather than by `Unique` precisely because each module is resolved independently and a call site does not share a `Unique` with its definition.
-Extending the promotion across imports therefore means a second mechanism, and it would move goldens wherever a directive calls a prelude function — measured as zero of the 10 changed goldens above, because every heralded rule the corpus reaches is defined in the module that calls it.
+**The cross-module case.**
+`promoteHeadInputNlg` folds over the module it is given.
+A positional call to a heralded rule defined in an imported module reads that rule's sentence all the same: `L4.Nlg.nlgFnInfo` builds one table of sentences over the module and its dependencies, keyed by `(name, arity)`, and `l4 nlg` (`linearizeDirectivesIn`) and `l4 render` (`L4.Export.Document.allUnits`) both read it.
+Measured on `jl4/tests-cli/fixtures/nlg-mixfix-import.l4`: across the `IMPORT`, `` `the greater` 3 4 `` reads "the greater of 3 and 4" and `` `the gap` 840 160 ``, a rule with its herald after its last input, reads "the gap between 840 and 160".
 
 ### 8a.4 A mixfix definition's herald at its call sites (draft PR #791, not landed)
 
