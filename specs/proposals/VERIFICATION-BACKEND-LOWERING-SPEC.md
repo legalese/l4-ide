@@ -1,8 +1,10 @@
 # Verification Backend Lowering Specification
 
-**Status:** Proposal. **Phase 1 is ruled but not built** — R-V1–R-V10 were answered by Meng on
-2026-09-07 (§"Phase 1 rulings"); no prover exists in the tree as of that date, and `l4 prove` is
-named throughout this document as a thing to write, not a thing that runs.
+**Status:** Proposal. **Phase 1 is ruled, and partly built on a branch not yet merged.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
+`l4 prove` is built on `feat/l4-prove`, draft legalese/l4-ide#784 (2026-10-30), not merged into `unstable`; until it merges, `l4 prove` does not exist in the tree, and this document's present-tense mentions of it are still plans.
+What #784 builds, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its `deferred` outcome, its `l4 run` exit-code change, its CI coverage check or its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`; R-V8.
+**R-V10 is not discharged**: nothing in #784 touches the Catala Mode A/B gate, so CATALA-EXPORT-SPEC §8.4's disclosed-open item stays open.
+R-V3's `deferred` outcome conflicts with UNKNOWN-EVALUATION-SPEC's later U1b ("an undetermined `#ASSERT` exits 1", `specs/todo/UNKNOWN-EVALUATION-SPEC.md:589`); whether U1b supersedes it is Meng's to say.
 **Author:** Meng Wong
 **Date:** 2026-06-29 (Phase 1 rulings appended 2026-09-07)
 **Related:** [BOUNDED-DEONTICS-SPEC.md](../todo/BOUNDED-DEONTICS-SPEC.md), [ACTUS-L4-BRIDGE-SPEC.md](../done/ACTUS-L4-BRIDGE-SPEC.md), [DEONTIC-TRACE-API-SPEC.md](../done/DEONTIC-TRACE-API-SPEC.md), [PROHIBITION-BREACH-SPEC.md](../done/PROHIBITION-BREACH-SPEC.md)
