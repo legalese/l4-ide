@@ -87,6 +87,7 @@ module L4.Lint.Override
   ) where
 
 import Base
+import Control.Applicative ((<|>))
 import Data.Char (isAlphaNum, isDigit, isUpper)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -143,6 +144,9 @@ data Unit
   | UArticle
   | UClause
   | USchedule
+  | UPart
+  | UDivision
+  | UChapter
   | UParagraph
     -- ^ resolved only for @paragraph (N)@ in an article, regulation, rule or
     -- clause, where it is that provision's own subdivision; in a section a
@@ -265,13 +269,16 @@ data NounKind = Plain | Sub | Para
 nounTable :: [(Text, (Unit, NounKind))]
 nounTable =
   [ (w, (USection, Plain))     | w <- ["section", "sections", "s", "ss", "sec", "secs", "§", "§§"] ] <>
-  [ (w, (USection, Sub))       | w <- ["subsection", "subsections"] ] <>
-  [ (w, (UParagraph, Para))    | w <- ["paragraph", "paragraphs", "para", "paras"] ] <>
+  [ (w, (USection, Sub))       | w <- ["subsection", "subsections", "sub-section", "sub-sections"] ] <>
+  [ (w, (UParagraph, Para))    | w <- ["paragraph", "paragraphs", "para", "paras", "subparagraph", "subparagraphs", "sub-paragraph", "sub-paragraphs"] ] <>
   [ (w, (URegulation, Plain))  | w <- ["regulation", "regulations", "reg", "regs"] ] <>
   [ (w, (URule, Plain))        | w <- ["rule", "rules"] ] <>
   [ (w, (UArticle, Plain))     | w <- ["article", "articles", "art", "arts"] ] <>
   [ (w, (UClause, Plain))      | w <- ["clause", "clauses", "cl"] ] <>
-  [ (w, (USchedule, Plain))    | w <- ["schedule", "schedules", "sch"] ]
+  [ (w, (USchedule, Plain))    | w <- ["schedule", "schedules", "sch"] ] <>
+  [ (w, (UPart, Plain))        | w <- ["part", "parts"] ] <>
+  [ (w, (UDivision, Plain))    | w <- ["division", "divisions"] ] <>
+  [ (w, (UChapter, Plain))     | w <- ["chapter", "chapters"] ]
 
 nounOf :: Text -> Maybe (Unit, NounKind)
 nounOf w = lookup (Text.toLower (Text.dropWhileEnd (== '.') w)) nounTable
@@ -279,7 +286,10 @@ nounOf w = lookup (Text.toLower (Text.dropWhileEnd (== '.') w)) nounTable
 -- | Is this (without its full stop) a noun, so that its full stop is the
 -- noun's own (@s.@, @art.@)?
 isNounWord :: Text -> Bool
-isNounWord w = isJust (nounOf w)
+isNounWord w = case nounOf w of
+  -- "in part." and "in this chapter." end a sentence; "s." and "art." do not
+  Just (u, _) -> u `notElem` [UPart, UDivision, UChapter]
+  Nothing     -> False
 
 -- | A provision number with its bracket groups: @6@, @6A(2)(b)@, @76.21(2)@,
 -- @(8)@. The number is 'Nothing' when only brackets are written.
@@ -337,6 +347,7 @@ findMentions = go . chunksOf
 phraseHead :: Chunk -> [Chunk] -> Maybe (Phrase, [Chunk])
 phraseHead c cs = case (lw c, cs) of
   ("subject", d : rest) | lw d == "to", not c.stop -> Just (PhSubjectTo, rest)
+  ("subject-to", _)                                -> Just (PhSubjectTo, cs)
   ("notwithstanding", _)                           -> Just (PhNotwithstanding, cs)
   ("despite", _)                                   -> Just (PhDespite, cs)
   ("except", d : _) | lw d `elem` exceptLeads, not c.stop -> Just (PhExcept, cs)
@@ -370,7 +381,7 @@ mkMention ph after =
     , klass   = classify
     }
  where
-  classify = case parseTargets (dropFiller 6 after) of
+  classify = case parseTargets (dropFiller 6 after) <|> scanForTargets after of
     Just (ts, ranged, rest)
       | ranged            -> Ranged ts
       | externalAfter rest -> External ts
@@ -379,6 +390,38 @@ mkMention ph after =
       | openClass after   -> OpenClass
       | otherwise         -> NoProvision
 
+-- | A provision named a few words on, after a definite description or a general
+-- reference: "the consent required by section 6", "the approval of the Court
+-- under section 6", "this section and to section 6", "the provisions of this
+-- Act, and in particular section 6". Tried only when the short filler list has
+-- not already found the provision, and only for a description that opens with
+-- "the", "this", "these" or "those": "subject to a trust under section 12" and
+-- "subject to tax imposed under section 12" are not an override of section 12.
+-- The scan stops at a full stop, a semicolon or a dash, at a comma not followed
+-- by "and", "or", "including" or "in", after ten words, and at a word that
+-- starts a relative clause, an indefinite phrase or a purpose ("the requirement
+-- to file reports pursuant to section 13").
+scanForTargets :: [Chunk] -> Maybe ([Target], Bool, [Chunk])
+scanForTargets after = case after of
+  (c : _) | lw c `elem` ["the", "this", "these", "those"] -> go (10 :: Int) "" after
+  _ -> Nothing
+ where
+  go _ _ [] = Nothing
+  go 0 _ _ = Nothing
+  go n prev cs@(c : rest)
+    | Just r <- parseTargets cs = Just r
+    | blocks prev (lw c) = Nothing
+    | c.hard = Nothing
+    | c.stop = case rest of
+        (nx : _) | lw nx `elem` ["and", "or", "including", "especially", "in"] -> go (n - 1) (lw c) rest
+        _ -> Nothing
+    | otherwise = go (n - 1) (lw c) rest
+  blocks prev w
+    | w == "to" = prev `notElem` ["and", "or"]
+    | otherwise = w `elem`
+        [ "a", "an", "any", "such", "no", "each", "every", "that", "which", "who", "whose"
+        , "if", "where", "when", "unless", "not", "than", "only" ]
+
 -- | The targets that open a clause, whether a range ended the list, and what
 -- follows the list.
 parseTargets :: [Chunk] -> Maybe ([Target], Bool, [Chunk])
@@ -386,8 +429,25 @@ parseTargets (n : b : rest)
   | Just (u, anchor) <- nounOf n.word
   , not n.stop
   , Just (mnum, grp) <- parseBody b.word
-  = Just (continueList [mkTarget u anchor n.word mnum grp] b rest)
+  = let t0 = mkTarget u anchor n.word mnum grp
+    in case reanchor t0 b rest of
+         Just (t1, endChunk, rest') -> Just (continueList [t1] endChunk rest')
+         Nothing                    -> Just (continueList [t0] b rest)
 parseTargets _ = Nothing
+
+-- | "subsection (2) of section 6" is section 6(2), not subsection (2) of the
+-- section the speaker is in.
+reanchor :: Target -> Chunk -> [Chunk] -> Maybe (Target, Chunk, [Chunk])
+reanchor t0 lastChunk (o : x : y : rest)
+  | t0.relative
+  , not lastChunk.stop
+  , lw o == "of"
+  , Just (u, an) <- nounOf x.word
+  , an == Plain
+  , Just (Just num, grp) <- parseBody y.word
+  = let t = mkTarget u an x.word (Just num) grp
+    in Just (MkTarget { unit = t.unit, noun = t.noun, number = t.number, path = t.path <> t0.path, relative = False }, y, rest)
+reanchor _ _ _ = Nothing
 
 mkTarget :: Unit -> NounKind -> Text -> Maybe Text -> [Text] -> Target
 mkTarget u anchor nounWord mnum grp = case (anchor, mnum) of
@@ -492,6 +552,9 @@ renderKey k = unitWord k.unit <> " " <> k.number <> Text.concat [ "(" <> g <> ")
     UArticle    -> "art"
     UClause     -> "clause"
     USchedule   -> "sch"
+    UPart       -> "part"
+    UDivision   -> "division"
+    UChapter    -> "chapter"
     UParagraph  -> "para"
 
 -- | The provision a decision's name starts with, if it starts with one. The
@@ -770,7 +833,7 @@ mkHost outer (MkDecide inner _ (MkAppForm _ nm _ _) body) =
     , uniq    = getUnique nm
     , range   = (getAnno (getOriginal nm)).range
     , key     = provKeyOfName nm'
-    , texts   = [ (SrcRef, refCitation r) | ann <- [outer, inner], r <- ann ^. annRefs ]
+    , texts   = concatMap refTexts [outer, inner]
                 <> [ (SrcName, nm') ]
                 <> [ (SrcText, s) | e <- universeExpr body, s <- stringsIn e ]
     , callees = Set.fromList [ u | Ref _ u _ <- toList body ]
@@ -779,6 +842,12 @@ mkHost outer (MkDecide inner _ (MkAppForm _ nm _ _) body) =
     }
  where
   nm' = nameToText (getOriginal nm)
+  -- A long citation is wrapped over several @\@ref@ lines, and the phrase can
+  -- end one line while its provision opens the next. Each line is read alone,
+  -- and so are all of them joined.
+  refTexts ann =
+    let rs = map refCitation (ann ^. annRefs)
+    in [ (SrcRef, r) | r <- rs ] <> [ (SrcRef, Text.unwords rs) | length rs > 1 ]
 
 -- | A body that is one string literal and nothing else. A string among
 -- AND/OR operands is 'Inert' and evaluates to the operator's identity, so a

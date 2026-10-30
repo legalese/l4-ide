@@ -68,6 +68,27 @@ spec = do
       readMentions "subject to sections 6 to 8" `shouldBe` ["subject to: range sections 6"]
     it "reads a bracketed phrase" do
       readMentions "the grant (subject to section 6) may be made" `shouldBe` ["subject to: linted section 6"]
+    it "reads a provision named after a definite description" do
+      readMentions "Subject to the exceptions in section 6, a person may inherit" `shouldBe` ["subject to: linted section 6"]
+      readMentions "Subject to the limit in section 6, a person may inherit" `shouldBe` ["subject to: linted section 6"]
+      readMentions "Subject to the consent required by section 6, a person may inherit" `shouldBe` ["subject to: linted section 6"]
+      readMentions "Subject to the approval of the Court under section 6, a person may inherit" `shouldBe` ["subject to: linted section 6"]
+    it "reads the hyphenated phrase" do
+      readMentions "Subject-to section 6, a person may inherit" `shouldBe` ["subject to: linted section 6"]
+    it "reads a Part, a Division or a Chapter as a provision" do
+      readMentions "Subject to Part 3, a person may inherit" `shouldBe` ["subject to: linted part 3"]
+      readMentions "notwithstanding Division 2A the Board may" `shouldBe` ["notwithstanding: linted division 2a"]
+      readMentions "subject to Chapter 4, the Registrar" `shouldBe` ["subject to: linted chapter 4"]
+    it "finds the provision a sentence names after a general reference" do
+      readMentions "Subject to this section and to section 6, a person may inherit" `shouldBe` ["subject to: linted section 6"]
+      readMentions "Subject to the provisions of this Act, and in particular section 6, a person may inherit" `shouldBe`
+        ["subject to: linted section 6"]
+    it "keeps a general reference general when the provision is not named after it" do
+      readMentions "Notwithstanding any other provision of this Act, section 6 applies" `shouldBe` ["notwithstanding: open-class"]
+      readMentions "Subject to this Act, the Minister may make rules under section 6" `shouldBe` ["subject to: open-class"]
+    it "reads a subsection of a named section as that section's subdivision" do
+      readMentions "Subject to subsection (2) of section 6, a person may inherit" `shouldBe` ["subject to: linted section 6(2)"]
+      readMentions "Subject to sub-section (2) of section 6, a person may inherit" `shouldBe` ["subject to: linted section 6(2)"]
     it "reads 'except' only with a lead that points at a provision" do
       readMentions "except as provided in section 5, a grant" `shouldBe` ["except: linted section 5"]
       readMentions "except that the grant may be limited" `shouldBe` []
@@ -87,6 +108,9 @@ spec = do
       readMentions "my employer cannot find me a suitable vacancy despite reasonable attempts" `shouldBe` ["despite: no provision"]
       readMentions "the original is subject to a trust under section 12 of the Trustee Act" `shouldBe` ["subject to: no provision"]
       readMentions "Subject to the requirement to file reports pursuant to section 13" `shouldBe` ["subject to: no provision"]
+      readMentions "subject to tax imposed under section 12" `shouldBe` ["subject to: no provision"]
+      readMentions "Subject to the condition that section 6 is complied with, a person may inherit" `shouldBe` ["subject to: no provision"]
+      readMentions "subject to the consent of the Minister under section 6 of the Wills Act" `shouldBe` ["subject to: external section 6"]
 
   describe "provKeyOfName" do
     it "reads the provision a decision is named for" do
@@ -164,6 +188,13 @@ spec = do
     it "does not let a wrapper join satisfy a 'subject to' the host itself leaves out" do
       fs <- findingsOf subjectToWrapperJoin
       map (.outcome) (filter ((== PhSubjectTo) . (.phrase)) fs) `shouldBe` [MissingConjunct]
+    it "judges a Part named after the phrase" do
+      fs <- findingsOf partMissing
+      map summary fs `shouldBe` ["s 12 — a person may inherit / subject to / part 3 / missing-conjunct"]
+    it "reads a phrase that a citation splits over two @ref lines" do
+      fs <- findingsOf splitRef
+      map (\f -> (summary f, f.sources)) fs `shouldBe`
+        [("s 9 — extensions may be granted / notwithstanding / s 7 / override-unwired", [SrcRef])]
     it "reports an open-class target and does not judge it" do
       fs <- findingsOf openClass
       map (.outcome) fs `shouldBe` [OpenClassTarget]
@@ -419,6 +450,33 @@ subjectToWrapperJoin = Text.unlines
   , "GIVETH A BOOLEAN"
   , "`extensions in the end` n MEANS"
   , "    IF `the s 9 grant` n THEN TRUE ELSE NOT (`s 7 — extensions are barred` n)"
+  ]
+
+partMissing :: Text
+partMissing = Text.unlines
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`Part 3 — the limit` n MEANS n GREATER THAN 4"
+  , ""
+  , "@ref Act s 12 — \"Subject to Part 3, a person may inherit\""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 12 — a person may inherit` n MEANS n GREATER THAN 2"
+  ]
+
+-- | A long citation wrapped over two @\@ref@ lines splits the phrase from its
+-- provision.
+splitRef :: Text
+splitRef = Text.unlines
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 7 — extensions are barred` n MEANS n GREATER THAN 10"
+  , ""
+  , "@ref Act s 9 — \"Notwithstanding"
+  , "@ref section 7, the Director may grant extensions.\""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A BOOLEAN"
+  , "`s 9 — extensions may be granted` n MEANS n GREATER THAN 1"
   ]
 
 openClass :: Text
