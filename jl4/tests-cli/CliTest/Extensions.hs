@@ -23,9 +23,10 @@ import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 
-import L4.Cli.Common (FixedNowOpt (..), LoadedModule (..), TypeCheckResult (..), loadChecked, makeEvalConfig)
+import L4.Cli.Common (FixedNowOpt (..), LoadedModule (..), TypeCheckResult (..), loadChecked, loadCheckedEvaluated, makeEvalConfig)
 import L4.Cli.Extensions
 import L4.Cli.Main (mainWith)
+import L4.EvaluateLazy (AssertionOutcome (..), EvalDirectiveResult (..), EvalDirectiveValue (..))
 import L4.Lts.Explore.Emit.Model (EmitInput (..))
 
 import CliTest.Common
@@ -59,13 +60,25 @@ probeExtensions = \ case
   "export-clash" -> good { extExports = [command "dmn" "shadow"] }
   v -> error ("no such probe variant: " <> v)
   where
-    good = noExtensions { extEdition = Just "probe", extCommands = [command "probe-cmd" "probe command ran"], extExports = [exportFormat] }
+    good = noExtensions { extEdition = Just "probe", extCommands = [command "probe-cmd" "probe command ran"], extExports = [exportFormat, evalFormat] }
     command n out = MkExtCommand { ecName = n, ecInfo = info (helper <*> pure (putStrLn out)) (progDesc ("test command " <> n)) }
     -- an export format that reads its file with the shared loader
     exportFormat = MkExtCommand
       { ecName = "probe-fmt"
       , ecInfo = info (helper <*> fmap load (strArgument (metavar "FILE"))) (progDesc "test export format")
       }
+    -- an export format that also needs the evaluator's verdicts
+    evalFormat = MkExtCommand
+      { ecName = "probe-eval"
+      , ecInfo = info (helper <*> fmap verdicts (strArgument (metavar "FILE"))) (progDesc "test export format with verdicts")
+      }
+    verdicts :: FilePath -> IO ()
+    verdicts fp = do
+      cfg <- makeEvalConfig (FixedNowOpt Nothing)
+      (_, loaded) <- loadCheckedEvaluated cfg fp
+      case loaded of
+        Nothing -> putStrLn "not loaded"
+        Just (_, rs) -> putStrLn (unwords [ case r.result of { Assertion Holds -> "holds"; Assertion Fails -> "fails"; _ -> "other" } | r <- rs ])
     load :: FilePath -> IO ()
     load fp = do
       cfg <- makeEvalConfig (FixedNowOpt Nothing)
@@ -133,6 +146,14 @@ spec = describe "extension hook (L4.Cli.Extensions)" do
         writeFile bad "this is not L4\n"
         o <- probe "all" ["export", "probe-fmt", bad]
         filter (/= '\r') o.outStdout `shouldBe` "not loaded\n"
+    it "gives an extension export format the evaluator's verdicts from the same load, and none for a file that does not check" do
+      ok <- probe "all" ["export", "probe-eval", "examples" </> "ok" </> "assert.l4"]
+      (ok.outExit, unwords (words ok.outStdout)) `shouldBe` (ExitSuccess, "holds fails")
+      withSystemTempDirectory "l4-ext-test" \ tmp -> do
+        let bad = tmp </> "bad.l4"
+        writeFile bad "this is not L4\n"
+        o <- probe "all" ["export", "probe-eval", bad]
+        unwords (words o.outStdout) `shouldBe` "not loaded"
     it "writes every target's file beside the built-in ones" do
       withOut \ dir -> do
         o <- probe "all" (exploreInto dir [])
