@@ -161,6 +161,12 @@ spec = do
     it "reports an open-class target and does not judge it" do
       fs <- findingsOf openClass
       map (.outcome) fs `shouldBe` [OpenClassTarget]
+    it "sets aside a decision whose whole body is one quotation: it computes nothing" do
+      fs <- findingsOf citationRow
+      map (.outcome) fs `shouldBe` [CitationOnly]
+    it "still flags a chain of quotations alone, which answers TRUE" do
+      fs <- findingsOf quotationsOnly
+      map (.outcome) fs `shouldBe` [MissingConjunct]
     it "stays silent on the same words with no provision behind them" do
       fs <- findingsOf plainEnglish
       fs `shouldBe` []
@@ -185,6 +191,23 @@ missing = preamble <> Text.unlines
   , "`s 8(3) — probate may be granted` n MEANS"
   , "        \"Subject to section 6,\""
   , "    ... n GREATER THAN 1"
+  ]
+
+-- | A citation row: the body is the statute's sentence and nothing else.
+citationRow :: Text
+citationRow = preamble <> Text.unlines
+  [ "GIVETH A STRING"
+  , "`s 8(3) — probate may be granted` MEANS"
+  , "    \"Probate is granted, subject to section 6.\""
+  ]
+
+-- | The quoted words alone, joined by @...@: they evaluate to the AND identity.
+quotationsOnly :: Text
+quotationsOnly = preamble <> Text.unlines
+  [ "GIVETH A BOOLEAN"
+  , "`s 8(3) — probate may be granted` MEANS"
+  , "        \"Subject to section 6,\""
+  , "    ... \"probate may be granted to one or more of the persons.\""
   ]
 
 satisfied :: Text

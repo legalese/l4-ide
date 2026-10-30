@@ -561,6 +561,9 @@ data Outcome
     -- edge joins the two in either direction and no decision calls both
   | TargetNotEncoded
     -- ^ no decision in the module is named for X: nothing for the body to call
+  | CitationOnly
+    -- ^ the decision's whole body is one quotation: it computes nothing, so it
+    -- cannot answer where the override should have changed the answer
   | SelfReference
     -- ^ X is the provision the decision itself encodes
   | UnresolvedRelative
@@ -580,6 +583,7 @@ outcomeText = \case
   MissingConjunct  -> "missing-conjunct"
   OverrideUnwired  -> "override-unwired"
   TargetNotEncoded -> "target-not-encoded"
+  CitationOnly     -> "citation-only"
   SelfReference    -> "self-reference"
   UnresolvedRelative -> "unresolved-relative"
   ExternalInstrument -> "external-instrument"
@@ -617,6 +621,9 @@ data Host = MkHost
   , calleeKeys :: [ProvKey]
     -- ^ the provision every name the body mentions is named for, including
     -- names imported from other modules, whose decisions the lint does not see
+  , citationOnly :: Bool
+    -- ^ the body is one string literal, so no call is missing from it: it
+    -- answers with the quotation and never with a verdict
   }
 
 -- | Lint every top-level decision of a type-checked module.
@@ -676,6 +683,7 @@ lintModule m = sortOn order (concatMap hostFindings hosts)
       | helper = Wired ViaHelper
       | fromTarget = Wired FromTarget
       | atJoin = Wired AtJoin
+      | h.citationOnly = CitationOnly
       | phraseDirection ph == Yields = MissingConjunct
       | otherwise = OverrideUnwired
 
@@ -758,9 +766,19 @@ mkHost outer (MkDecide inner _ (MkAppForm _ nm _ _) body) =
                 <> [ (SrcText, s) | e <- universeExpr body, s <- stringsIn e ]
     , callees = Set.fromList [ u | Ref _ u _ <- toList body ]
     , calleeKeys = mapMaybe (provKeyOfName . nameToText . getOriginal) [ r | r@Ref {} <- toList body ]
+    , citationOnly = isQuotation body
     }
  where
   nm' = nameToText (getOriginal nm)
+
+-- | A body that is one string literal and nothing else. A string among
+-- AND/OR operands is 'Inert' and evaluates to the operator's identity, so a
+-- chain of quotations alone answers @TRUE@; that is not a citation, and is
+-- exactly the failure the lint exists to catch.
+isQuotation :: Expr Resolved -> Bool
+isQuotation = \case
+  Lit _ (StringLit _ _) -> True
+  _                     -> False
 
 -- | The text of a string literal. The type checker turns a string that sits
 -- in an AND or OR chain into an 'Inert' node, so both shapes are read.
