@@ -115,6 +115,11 @@ data CheckError =
     -- ^ An @export-decorated DECIDE has a function-typed input (GIVEN or
     -- referenced ASSUME). Arguments: exported-function name, offending
     -- parameter/assume name.
+  | ExportEventType (Maybe SrcRange) Resolved (Maybe Resolved)
+    -- ^ An @export-decorated DECIDE takes or returns an EVENT (see
+    -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
+    -- the exported function's name, and the input's name (Nothing when it is
+    -- the result).
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -308,6 +313,7 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
+  rangeOf (ExportEventType r _ _)           = r
   rangeOf (CheckInfo _ mr)                  = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.

@@ -184,7 +184,12 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- Combine mixfix registry from imports with this module's local definitions
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
-                exportErrs = Export.validateExportInputs rprog
+                -- The entity info still holds the inference variables that the
+                -- substitution solves, and the result of a definition with no
+                -- GIVETH is one of them. Nothing is zonked unless an @export
+                -- has to read an inferred result.
+                exportErrs = Export.validateExportInputs
+                  (applyFinalSubstitution s'.substitution checkEnv.moduleUri env.entityInfo) rprog
             in MkCheckResult
               { program = rprog
               , errors = substErrs ++ moreErrs ++ exportErrs
@@ -4612,6 +4617,15 @@ prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   , "The parameter "
       <> quotedName (getActual paramName)
       <> " has a function type."
+  ]
+prettyCheckError (ExportEventType _ fnName (Just paramName)) =
+  [ quotedName (getActual fnName) <> " is published with @export, but its input "
+      <> quotedName (getActual paramName) <> " has a type that is or contains an EVENT."
+  , "@export does not support an EVENT as an input yet."
+  ]
+prettyCheckError (ExportEventType _ fnName Nothing) =
+  [ quotedName (getActual fnName) <> " is published with @export, but its result has a type that is or contains an EVENT."
+  , "@export does not support an EVENT as a result yet."
   ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.

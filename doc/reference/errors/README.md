@@ -57,6 +57,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Export**
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
+- [An @export that takes or returns an EVENT](#an-export-that-takes-or-returns-an-event)
 
 ---
 
@@ -978,4 +979,62 @@ DECIDE size Blue  n IS 0
 ```
 
 The rule is then published with the inputs `c` and `n`.
+Or remove the `@export`, if the rule is not meant to be published.
+
+---
+
+### An @export that takes or returns an EVENT
+
+**Error:**
+
+```
+`who acted` is published with @export, but its input `e` has a type that is or contains an EVENT.
+@export does not support an EVENT as an input yet.
+```
+
+For a result, the second line reads `@export does not support an EVENT as a result yet.`
+
+**What you wrote:**
+
+```l4
+DECLARE Party IS ONE OF alice, bob
+DECLARE Act IS ONE OF ping, pong
+
+@export Who acted
+GIVEN e IS AN EVENT Party Act
+GIVETH A Party
+`who acted` MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN p
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input as a value written in JSON.
+L4 has no JSON form for an [EVENT](../regulative/EVENT.md), so the input would be published as a bare `object`, and no request could give the rule an event.
+The same goes for a result, and for an `EVENT` inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
+So an `@export` of such a rule is an error, reported at the `@export` line.
+The error stops the whole file from checking: `l4 run` and `l4 batch` refuse the file, the `#EVAL`s of its other rules included, and jl4-service will not deploy it, until you remove the `@export` or the `EVENT`.
+A rule that builds or reads an `EVENT` inside its body, and does not name one in its inputs or its result, is published as usual.
+A record that you declare with an `EVENT` among its fields is not looked into, so a rule that takes such a record is not refused.
+
+**How to fix it:** Take the parts of the event as separate inputs, and build the event inside the rule if it needs one.
+A helper that is not published can still take an `EVENT`:
+
+```l4
+DECLARE Party IS ONE OF alice, bob
+DECLARE Act IS ONE OF ping, pong
+
+GIVEN e IS AN EVENT Party Act
+GIVETH A NUMBER
+`event time` MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN n
+
+@export When it happened
+GIVEN who IS A Party
+      what IS AN Act
+      time IS A NUMBER
+GIVETH A NUMBER
+`when it happened` MEANS `event time` (EVENT who what time)
+```
+
 Or remove the `@export`, if the rule is not meant to be published.

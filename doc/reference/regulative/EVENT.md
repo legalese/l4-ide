@@ -101,6 +101,13 @@ This gives `2`.
 
 A type of your own that is also called `EVENT` and takes two parameters is ambiguous with the built-in one wherever it is named; see [Several definitions with the same name](../errors/README.md#several-definitions-with-the-same-name).
 
+## EVENT and @export
+
+A rule published with `@export` cannot take an `EVENT` as an input or give one back as its result, because a request has no way to write one.
+The same goes for a `LIST OF` events or a `MAYBE OF` an event.
+`l4 check` reports an error at the `@export` line and the service will not deploy the file; see [An @export that takes or returns an EVENT](../errors/README.md#an-export-that-takes-or-returns-an-event).
+An `EVENT` that the rule builds or reads inside its body is not affected.
+
 ## Related pages
 
 - [DEONTIC](DEONTIC.md): the type of rules that events are matched against
