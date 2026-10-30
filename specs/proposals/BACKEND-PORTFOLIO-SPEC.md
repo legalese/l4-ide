@@ -35,14 +35,14 @@ a draft and never updated after its final rebase (corrected 2026-08-28).
 
 ## 0. Ruling status
 
-| ruling | state                | detail                                                                                                             |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| P1     | **PROPOSED**         | this doc owns cross-backend invariants; specs cite it, §4                                                          |
-| P2     | **PROPOSED**         | six-family taxonomy, §1.1                                                                                          |
-| P3     | **PROPOSED**         | one shared exportable-core definition in code, §5                                                                  |
-| P4     | **PROPOSED**         | double-covered seams S1–S5 assigned owners, §7                                                                     |
-| P5     | **PROPOSED**         | collision & sequencing protocol, §8                                                                                |
-| V1     | **RULED 2026-10-30** | verification code split between l4-ide and a private `legalese/l4-verify`, and the restricted-licence rule, §2.5.1 |
+| ruling | state                | detail                                                                                                                             |
+| ------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| P1     | **PROPOSED**         | this doc owns cross-backend invariants; specs cite it, §4                                                                          |
+| P2     | **PROPOSED**         | six-family taxonomy, §1.1                                                                                                          |
+| P3     | **PROPOSED**         | one shared exportable-core definition in code, §5                                                                                  |
+| P4     | **PROPOSED**         | double-covered seams S1–S5 assigned owners, §7                                                                                     |
+| P5     | **PROPOSED**         | collision & sequencing protocol, §8                                                                                                |
+| V1     | **RULED 2026-10-30** | community and enterprise editions (private `legalese/l4-verify` compiled in when present), and the restricted-licence rule, §2.5.1 |
 
 ## 1. The thesis
 
@@ -187,7 +187,9 @@ the programme's founding war stories.
 
 #### 2.5.1 V1: where verification code lives, and the restricted-licence rule (decision record, 2026-10-30)
 
-**Status: RULED 2026-10-30 by Meng**, in session explore-verify, on a proposal from that session: _"let’s close the work as you proposed into l4-verify as a private repo … the apache code that is already in l4-ide can stay there."_
+**Status: RULED 2026-10-30 by Meng**, in session explore-verify, on proposals from that session, in two steps the same day.
+First: _"let’s close the work as you proposed into l4-verify as a private repo … the apache code that is already in l4-ide can stay there."_
+Then, reopening Decision 1 under its own third reopen condition (the open-core boundary redrawn for business reasons): _"we want to reduce the amount of opensource material we expose in the l4-ide repo … when built with l4-verify present we produce an “enterprise edition” that has additional l4 verify/explore outputs"_, and, choosing among three partitions, _"okay, i take your recommendation A"_.
 
 **This is a decision record, and it is meant to be reopened.**
 Each decision below names the facts it rests on and the change that should send us back to it.
@@ -197,21 +199,30 @@ A decision whose premise has changed is reopened, not defended; the "reopen when
 **Context.** The facts about external tools come from a docs-only survey on 2026-10-30: project pages, release APIs and source files were read, and nothing was installed or run.
 Each fact is a reading of a page on that date, so the source is given beside it; re-read the source before relying on the fact.
 
-##### Decision 1: the repository split
+##### Decision 1: a community edition and an enterprise edition (partition A)
 
-**Stays in this repository, under Apache-2.0:** every emitter to an external format (`L4.Lts.Explore.Emit` and its successors), `l4 explore`, `l4 prove`, the `l4 export` targets for provers and model finders (Lean, F\*, Alloy), and harness wiring for tools whose licences allow commercial use.
-The code already landed here (#759 and earlier) stays as it is.
+**The community edition, built from this repository alone, under Apache-2.0:** `l4 verify`; `l4 explore` with the emitters already landed (TLA+, NuSMV, mCRL2 `.aut`, PNML, Graphviz; #759); `l4 prove` with Z3 and the jl4 evaluator as second oracle (VERIFICATION-BACKEND-LOWERING-SPEC Phase 1); and the cross-validation harness over those emitters, which is the test that they are faithful.
+Everything already landed here stays.
 
-**Goes to `legalese/l4-verify`, a private repository:** runs of restricted-licence tools, cross-validation orchestration and dashboards, counterexample explanation for lawyers, LLM-in-the-loop formalisation, investor-facing capability comparisons, and any hosted verification service.
-As of 2026-10-30 that repository does not exist yet; this is proposed, not landed, until it is created.
+**The enterprise edition, built when the private repository `legalese/l4-verify` is present:** every verification backend not yet built (Promela/Spin, Alloy, Maude, Lean, F\*, the cvc5 cross-check of `l4 prove`, the Model Checking Contest tools, Apalache and TAPAAL runs), and the product layer: running every installed checker on a user's rules and comparing verdicts, counterexample explanation for lawyers, LLM-in-the-loop formalisation, capability comparisons, and any hosted service.
+The design documents and user documentation for enterprise features live in `l4-verify`, not in this repository's public `specs/` and `doc/`.
+
+**Mechanism** (proposed, not landed; the repository and the hook do not exist on 2026-10-30):
+
+1. `l4`'s command table moves from the `l4` executable's private modules (`jl4/app/L4/Cli/*`, today `other-modules` of `executable l4` in `jl4/jl4.cabal`) into a library with an extension hook, so another package can add verbs and `--emit` targets. The community `l4` is that library with no extensions.
+2. `cabal.project` gains `optional-packages:` pointing at a gitignored clone of `l4-verify` (the way `etc/go/` holds `l4-pipeline`, `.gitignore:86`, except that `etc/go/` is not built: no tracked build file names it). Measured 2026-10-30 with cabal-install 3.16.0.0 on a two-package scratch project: with the directory absent the plan has only the base package and no error; with it present the plan adds the optional package and its executable.
+3. `l4-verify` provides an executable `l4-ee` (community commands plus its own), shipped as `l4` in the enterprise distribution; `l4 --version` names the edition.
+4. Because the enterprise code uses jl4-core internals that have no stable API, a refactor here can break the enterprise build while this repository's CI stays green. So `l4-verify`'s CI builds against every `unstable` head of this repository; that failure is otherwise silent from this side.
 
 **Reasons.**
 
-1. The emitters are coupled to the type-checked core and to the evaluator, which is every backend's oracle of record (VERIFICATION-BACKEND-LOWERING-SPEC R-V5); jl4-core has no stable, versioned API, so emitters kept elsewhere would chase its internal changes.
-2. Public emitters are evidence a technical reviewer can check for themselves.
-3. The layer that turns verdicts into a product (orchestration, explanation, hosting) is the commercial layer around the open core.
+1. Meng's business reason: expose less open-source material in this repository.
+2. The community edition still has to be a real core on its own: one prover and five model-checker formats, with a public test of their faithfulness, is a capability a technical reviewer can check; the breadth a due-diligence checklist ticks off is enterprise.
+3. Building both editions from one source tree keeps the enterprise code compiling against the same jl4-core, which answers the coupling cost that first argued for keeping all emitters here.
 
-**Reopen when** jl4-core publishes a stable, versioned API for the typed core (reason 1 then falls); or a component placed in `l4-verify` turns out to be needed by open users or by the core's own correctness checks; or the open-core boundary is redrawn for business reasons.
+**What the first version of this decision said, and why it changed.** The first ruling of the day kept every emitter and export target here and put only the product layer in `l4-verify`, for three reasons: coupling to jl4-core, public emitters as checkable evidence, and the product layer as the commercial layer. Reason 1 is now answered by building both editions together (mechanism 4 is the price); reason 2 is narrowed to the community edition; reason 3 stands.
+
+**Reopen when** jl4-core publishes a stable, versioned API (enterprise code could then build against releases instead of `unstable`); or an enterprise feature turns out to be needed by open users or by the core's own correctness checks (it then belongs in the community edition); or the cost of mechanism 4 (enterprise breakage found a build later) exceeds what the split saves; or the open-core boundary is redrawn again.
 
 ##### Decision 2: the restricted-licence rule
 
