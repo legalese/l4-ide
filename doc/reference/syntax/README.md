@@ -224,6 +224,7 @@ It does so whether the function is defined in the same file or in a module that 
 The sentence can follow the last input, as the prelude writes it for `` `is in` ``, or sit on a line of its own above the head.
 
 `l4 render` reads the sentence at such a call too, inside the body of another rule: for `` `the price we charge` `` in the example it writes "the smaller of price and 100".
+A call written with `WITH` reads the same way in `l4 render` as in `l4 nlg`: the sentence, then each argument under its name, so `` `the lower of` WITH a IS price, b IS 100 `` in the body of a rule reads "the smaller of a and b where a is price and b is 100".
 
 `l4 nlg` writes a date given as literals as a date: `YMD 2025 7 16` and `Date 16 7 2025` both read `16 July 2025`.
 That covers only daydate's own `YMD` and `Date`, only when all three arguments are whole numbers, and only when they name a real day.

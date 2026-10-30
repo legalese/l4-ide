@@ -1157,9 +1157,23 @@ No page under `doc/` quotes a render that moves.
 A `WITH` call across an `IMPORT` to a rule whose herald follows its last input printed that herald a second time, as the label of the last input (``the amount by which `a` exceeds `b` where `a` is 840 and the amount by which `a` exceeds `b` is 160``).
 A prefix function did the same, so it was not about mixfix.
 `promoteHeadInputNlg` decides from the rules of the module it is given, and the importing module holds a copy of the imported input taken before any promotion, so nothing cleared the herald from it.
-`promoteHeadInputNlgWith` decides from the dependencies' rules as well, and `linearizeDirectivesIn` uses it for the module being read.
+`promoteHeadInputNlgWith` decides from the dependencies' rules as well, and `prepareModules` (which `linearizeDirectivesIn` uses) applies it to the module being read.
 It matches by `Unique`: the input names of an imported rule keep the dependency's `Unique`s in the importing module, which this change relies on and which the import fixture tests.
 With it, the full `jl4-test` suite gives 4830 examples and 0 failures against the five goldens above, so no other golden moves.
+
+`l4 render` had the same fault, in one file as well as across an `IMPORT`: a `WITH` call in the body of another rule printed the herald a second time (`the gap between a and b where a is n and the gap between a and b is 100`), because render never moved a herald onto the rule.
+It now prepares its modules with `prepareModules`, as `l4 nlg` does, and so do the LSP's document and plan handlers.
+Moving the herald gives the rule's name the herald, so a rule used as a projection's selector (`startDate's day` in `excel-date.l4`) would read "startDate's the day of date".
+`plainSelectors` in `L4.Export.Document` keeps a selector's plain name.
+A rule whose herald sits above its head read that way already (measured with the binary built at `1683771d1`: "the span's size's the third of x"), and now reads plain.
+A `WITH` call that is the whole body of a rule rendered as "is a the gap with" and a field list, as though it built a record; `decideRendering` now reads it as the herald with its arguments in a `where` clause, as `l4 nlg` prints it.
+It tells a call from a construction by the rule's name and argument count, because a record type can carry a herald of its own (`Pt WITH x IS n, y IS 100` is still a record literal; a CLI test row).
+A named-argument call to a rule WITHOUT a herald still reads as a construction; that is not owed here.
+Measured by rendering the same 908 files with the binary before and after each of the two render commits: the first moves one render, `prelude.l4` (`MapPairs means fmap.` becomes `MapPairs means f applied to each item of list.`, the bare name of a rule with a herald reading as its herald, as one with the herald above its head already did), and the second moves none.
+
+Hover does not repeat the fault.
+`outputNlgMap` (`jl4-lsp/src/LSP/L4/Rules.hs`) also promotes per module, but hover reads the herald from the module's own range map, which is stamped at the definitions only, so a call site in another module shows the type and no sentence, on the rule's name and on the label of its last input.
+`jl4/examples/lsp/hover/nlg-site-hover-import.l4` pins it; it is a control, and passed the first time it was read.
 
 ## 9. Reproducing the measurements
 
