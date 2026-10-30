@@ -798,8 +798,8 @@ exactValue = \case
 sampleValues :: Obligation -> Sort -> [Expr Resolved]
 sampleValues ob = samplesOver ob (nubOrd (0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ]))
 
--- | 'sampleValues' with numbers that are NOT whole as well, FIRST: a half
--- either side of zero, a half either side of each literal, and the midpoint of
+-- | 'sampleValues' with numbers that are NOT whole as well, FIRST: a half, a
+-- third and a seventh either side of zero, a half either side of each literal, and the midpoint of
 -- each pair of adjacent distinct literals; then the whole numbers
 -- 'sampleValues' uses. For @l4 prove@'s check of an @unsat@ answer, where an
 -- all-integer grid is blind to a wrong encoding that an @IS INTEGER@ guard
@@ -813,7 +813,9 @@ proofSampleValues ob = samplesOver ob (nubOrd (fractions <> whole))
  where
   lits = Set.toAscList (Set.fromList ob.obLiterals)
   fractions =
-    [1 / 2, -1 / 2]
+    -- thirds and sevenths as well as halves: a bug behind `IS INTEGER (x
+    -- TIMES 2)` (or TIMES 4) passes every multiple of 1/2
+    [1 / 2, -1 / 2, 1 / 3, -1 / 3, 1 / 7, -1 / 7]
     <> concat [ [r + 1 / 2, r - 1 / 2] | r <- lits ]
     <> zipWith (\a b -> (a + b) / 2) lits (drop 1 lits)
   whole = 0 : concat [ [r, r - 1, r + 1] | r <- ob.obLiterals ]
