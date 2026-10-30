@@ -190,7 +190,7 @@ under the same `os/` path. Validation run performed by the researcher [E]:
 over `examples/{compactified,normalized}/*.lrml`, 30/30 pass.
 
 **Repo files, read directly [E]:** `specs/done/APP-LIBS-SPEC.md:360` (sole LegalRuleML mention, a
-"Related Work" bullet); `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:186`,
+"Related Work" bullet); `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md:188`,
 `paper/icail/l4-icail.bib:370`, `doc/concepts/legal-modeling/actor-actions.bib:286`,
 `jl4-proleg/docs/burden-of-proof.md:254` (all cite Governatori 2005 RuleML, not LegalRuleML);
 `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §5.2 and its status header confirming the
