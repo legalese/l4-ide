@@ -61,6 +61,7 @@ import { promises as fsPromises } from 'fs'
 import {
   AiProxyError,
   MCP_L4_RULES_PREFIX,
+  categoriesForCall,
   categoryForTool,
   type AiProxyClient,
   type AppliedEditSnapshot,
@@ -463,8 +464,18 @@ export function registerAiChatHandlers(deps: {
     if (decision === 'alwaysAllow') {
       const meta = callArgs.get(callId)
       if (meta) {
-        const category = categoryForTool(meta.name)
-        if (category) {
+        // The categories that asked. A move's delete isn't among them:
+        // deletes stay guarded unless allowed for fs__delete_file itself
+        // or in settings.
+        const asked = categoriesForCall(
+          meta.name,
+          argsOf(meta.argsJson)
+        ).filter(
+          (c) =>
+            permissions.getPermission(c) === 'ask' &&
+            (c !== 'fs.delete' || categoryForTool(meta.name) === 'fs.delete')
+        )
+        for (const category of asked) {
           void (
             permissions.setPermission?.(category, 'always') ?? Promise.resolve()
           ).catch((err) =>
@@ -1450,6 +1461,15 @@ async function previewAttachment(
       `attachment/preview: vscode.open failed, falling back to external: ${err instanceof Error ? err.message : String(err)}`
     )
     await vscode.env.openExternal(uri)
+  }
+}
+
+/** A tool call's arguments, or null when they don't parse. */
+function argsOf(json: string): unknown {
+  try {
+    return json.trim() ? JSON.parse(json) : {}
+  } catch {
+    return null
   }
 }
 

@@ -33,6 +33,8 @@ export class MemoryWorkspace implements Workspace {
   readonly files = new Map<string, string>()
   readonly created: string[] = []
   readonly deleted: string[] = []
+  /** Set by a test that needs one file under two names. */
+  sameFile?: (a: string, b: string) => Promise<boolean>
 
   constructor(files: Record<string, string> = {}) {
     for (const [rel, text] of Object.entries(files)) {

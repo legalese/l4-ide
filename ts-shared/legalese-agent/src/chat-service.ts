@@ -930,7 +930,10 @@ export class ChatService {
         // first frame (no merge race between the initial emit and the
         // dispatcher's later notifyStatus). `ask` → pending-approval so
         // the bottom Accept/Reject bar shows immediately.
-        const permission = this.opts.dispatcher.permissionFor(ev.name)
+        const permission = this.opts.dispatcher.permissionFor(
+          ev.name,
+          ev.argsJson
+        )
         const initialStatus: 'pending-approval' | 'running' =
           permission === 'ask' ? 'pending-approval' : 'running'
         // Re-emit on every frame — the webview's onToolCall merges by

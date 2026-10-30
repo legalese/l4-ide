@@ -75,9 +75,11 @@ describe('ToolDispatcher', () => {
     assert.equal((result as { code?: string }).code, 'denied')
   })
 
-  test('runs a copy as an edit, snapshots and opens its target', async () => {
+  test('runs a move, snapshots and opens its target', async () => {
     const { ws, dispatcher: d } = dispatcher({
       files: { 'tmp/a.txt': 'new', 'a.txt': 'old' },
+      // A move deletes its source: allowed here, asked by default.
+      permissions: { 'fs.delete': 'always' },
     })
     assert.equal(d.categoryFor('fs__copy_file'), 'fs.edit')
     const call = {
@@ -92,6 +94,55 @@ describe('ToolDispatcher', () => {
     // The applied-diff view's "before" side is the replaced target.
     assert.equal(d.snapshotFor('c1')?.before, 'old')
     assert.equal(d.resolveFile(call), 'file:///ws/a.txt')
+  })
+
+  // A copy creates (and with overwrite replaces), a move also deletes:
+  // each needs what the dedicated tool would.
+  test('a copy or move needs the permissions of what it does', async () => {
+    const move = {
+      callId: 'c1',
+      name: 'fs__copy_file',
+      argsJson: '{"from":"a.txt","to":"b.txt","deleteSource":true}',
+    }
+    // Deletes ask by default: so does a move.
+    const asked = dispatcher({ files: { 'a.txt': 'x' } })
+    asked.interaction.autoDecision = 'deny'
+    assert.equal(
+      asked.dispatcher.permissionFor(move.name, move.argsJson),
+      'ask'
+    )
+    assert.equal((await asked.dispatcher.run(move, ctxA)).ok, false)
+    assert.deepEqual(asked.interaction.approvalRequests, [
+      { callId: 'c1', ctx: ctxA },
+    ])
+    assert.equal(asked.ws.get('a.txt'), 'x')
+
+    const noDeletes = dispatcher({
+      files: { 'a.txt': 'x' },
+      permissions: { 'fs.delete': 'never' },
+    })
+    const denied = await noDeletes.dispatcher.run(move, ctxA)
+    assert.equal((denied as { code?: string }).code, 'denied')
+    assert.match((denied as { error: string }).error, /"fs\.delete"/)
+
+    const noCreates = dispatcher({
+      files: { 'a.txt': 'x' },
+      permissions: { 'fs.create': 'never' },
+    })
+    const copy = { ...move, argsJson: '{"from":"a.txt","to":"b.txt"}' }
+    assert.equal(
+      ((await noCreates.dispatcher.run(copy, ctxA)) as { code?: string }).code,
+      'denied'
+    )
+    assert.equal(noCreates.ws.get('b.txt'), undefined)
+
+    // A plain copy creates only: edits may be off.
+    const noEdits = dispatcher({
+      files: { 'a.txt': 'x' },
+      permissions: { 'fs.edit': 'never' },
+    })
+    assert.equal((await noEdits.dispatcher.run(copy, ctxA)).ok, true)
+    assert.equal(noEdits.ws.get('b.txt'), 'x')
   })
 
   test('asks before deleting (the default) and honours a deny', async () => {

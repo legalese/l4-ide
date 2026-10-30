@@ -810,6 +810,13 @@ export async function fsCopyFile(
   }
   const dest = await ctx.workspace.stat(to.fsPath)
   if (dest && !dest.isFile) throw new Error(`Not a file: ${to.relative}`)
+  // "Contract.l4" → "contract.l4" on macOS or Windows is one file:
+  // replacing it and then deleting the source would delete it.
+  if (dest && (await ctx.workspace.sameFile?.(from.fsPath, to.fsPath))) {
+    throw new Error(
+      `${from.relative} and ${to.relative} are the same file on disk (the file system ignores case, or a link joins them); fs__copy_file can't copy or move a file onto itself.`
+    )
+  }
   if (dest && !args.overwrite) {
     throw new Error(
       `File already exists: ${to.relative}. Set overwrite to replace it.`

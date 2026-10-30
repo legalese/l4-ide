@@ -170,6 +170,27 @@ describe('fs tools over the Workspace port', () => {
     )
   })
 
+  // macOS and Windows: "Contract.txt" and "contract.txt" are one file.
+  // Replacing it and deleting the source would leave nothing.
+  test('copy_file refuses a target that is the source under another name', async () => {
+    const { ws, tools } = session({
+      'Contract.txt': 'terms',
+      'contract.txt': '',
+    })
+    ws.sameFile = async (a, b) => a.toLowerCase() === b.toLowerCase()
+    await assert.rejects(
+      tools.copyFile({
+        from: 'Contract.txt',
+        to: 'contract.txt',
+        overwrite: true,
+        deleteSource: true,
+      }),
+      /the same file on disk/
+    )
+    assert.equal(ws.get('Contract.txt'), 'terms')
+    assert.deepEqual(ws.deleted, [])
+  })
+
   test('copy_file into an .l4 file reports its diagnostics', async () => {
     const { l4, tools } = session({ 'tmp/a.l4': 'DECIDE x IS' })
     l4.diagnostics.set(uriOf('/ws/data/a.l4'), [

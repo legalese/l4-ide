@@ -89,8 +89,8 @@ export function categoryForTool(toolName: string): PermissionCategory | null {
   if (toolName === 'fs__create_file') return 'fs.create'
   if (toolName === 'fs__edit_file') return 'fs.edit'
   if (toolName === 'fs__delete_file') return 'fs.delete'
-  // A copy or move keeps the content: like an edit, it may replace a
-  // file's text, and the source it removes stays recoverable.
+  // Its main category (for "always allow"); what a call needs depends on
+  // its arguments, see categoriesForCall.
   if (toolName === 'fs__copy_file') return 'fs.edit'
   if (toolName === 'l4__evaluate') return 'l4.evaluate'
   if (toolName === 'l4__refactor') return 'l4.refactor'
@@ -99,6 +99,56 @@ export function categoryForTool(toolName: string): PermissionCategory | null {
   if (toolName.startsWith('l4-rules__')) return 'mcp.l4Rules'
   if (toolName.startsWith('vsmcp__')) return 'mcp.vscode'
   return null
+}
+
+/**
+ * Every category a call needs, from its arguments: a copy creates its
+ * target, replaces it with `overwrite` (an edit), and deletes its
+ * source with `deleteSource` (a move). Read as the tool reads them
+ * (truthy), so a call can't do more than it was checked for.
+ */
+export function categoriesForCall(
+  toolName: string,
+  args: unknown
+): PermissionCategory[] {
+  if (toolName === 'fs__copy_file') {
+    const a = (args && typeof args === 'object' ? args : {}) as {
+      overwrite?: unknown
+      deleteSource?: unknown
+    }
+    return [
+      'fs.create',
+      ...(a.overwrite ? (['fs.edit'] as const) : []),
+      ...(a.deleteSource ? (['fs.delete'] as const) : []),
+    ]
+  }
+  const category = categoryForTool(toolName)
+  return category ? [category] : []
+}
+
+const STRICTNESS: Record<PermissionValue, number> = {
+  always: 0,
+  ask: 1,
+  never: 2,
+}
+
+/** The strictest permission among `categories`, with the category it
+ *  comes from (the first, on a tie). */
+export function strictestPermission(
+  policy: PermissionPolicy,
+  categories: readonly PermissionCategory[]
+): { category: PermissionCategory; permission: PermissionValue } | null {
+  let worst: {
+    category: PermissionCategory
+    permission: PermissionValue
+  } | null = null
+  for (const category of categories) {
+    const permission = policy.getPermission(category)
+    if (!worst || STRICTNESS[permission] > STRICTNESS[worst.permission]) {
+      worst = { category, permission }
+    }
+  }
+  return worst
 }
 
 /** A policy with fixed values, falling back to the defaults. The cloud

@@ -7,7 +7,9 @@ import type {
   UserInteraction,
 } from './ports.js'
 import {
+  categoriesForCall,
   categoryForTool,
+  strictestPermission,
   type PermissionCategory,
   type PermissionValue,
 } from './permissions.js'
@@ -89,12 +91,17 @@ export class ToolDispatcher {
     }
   }
 
-  /** The permission that currently applies to a tool, or null for an
-   *  unknown tool. Lets the chat service render a tool row in its real
-   *  initial state (pending-approval vs running). */
-  permissionFor(name: string): PermissionValue | null {
-    const category = categoryForTool(name)
-    return category ? this.opts.permissions.getPermission(category) : null
+  /** The permission that currently applies to a call (by its
+   *  arguments, when known), or null for an unknown tool. Lets the chat
+   *  service render a tool row in its real initial state
+   *  (pending-approval vs running). */
+  permissionFor(name: string, argsJson = ''): PermissionValue | null {
+    return (
+      strictestPermission(
+        this.opts.permissions,
+        categoriesForCall(name, argsOrNull(argsJson))
+      )?.permission ?? null
+    )
   }
 
   /** Category for a tool name, or null for an unknown tool. */
@@ -165,16 +172,20 @@ export class ToolDispatcher {
         error: `Unknown tool: ${call.name}`,
       }
     }
-    const permission = this.opts.permissions.getPermission(category)
+    // The strictest of what the call needs (a move also deletes).
+    const { category: deciding, permission } = strictestPermission(
+      this.opts.permissions,
+      categoriesForCall(call.name, argsOrNull(call.argsJson))
+    ) ?? { category, permission: this.opts.permissions.getPermission(category) }
     this.opts.logger.info(
-      `tool/dispatch ${call.name} (category=${category}, permission=${permission}) args=${call.argsJson}`
+      `tool/dispatch ${call.name} (category=${deciding}, permission=${permission}) args=${call.argsJson}`
     )
     if (permission === 'never') {
       notifyStatus('error', { error: 'Denied by user settings' })
       return {
         ok: false,
         code: 'denied',
-        error: `User has disallowed the "${category}" category. Update the setting in the Legalese AI settings to enable it.`,
+        error: `User has disallowed the "${deciding}" category. Update the setting in the Legalese AI settings to enable it.`,
       }
     }
     if (permission === 'ask') {
@@ -299,6 +310,16 @@ function targetPath(name: string, args: unknown): string | undefined {
   const a = (args ?? {}) as { path?: unknown; to?: unknown }
   const p = name === 'fs__copy_file' ? a.to : a.path
   return typeof p === 'string' && p ? p : undefined
+}
+
+/** The call's arguments, or null when they don't parse (the call then
+ *  fails when it runs). */
+function argsOrNull(json: string): unknown {
+  try {
+    return parseArgs(json)
+  } catch {
+    return null
+  }
 }
 
 function parseArgs(json: string): unknown {
