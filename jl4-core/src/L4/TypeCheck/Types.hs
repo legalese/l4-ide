@@ -230,6 +230,11 @@ data CheckError =
     -- as a module-level ASSUME it (or a helper it reaches) reads. Both
     -- would be one JSON property, so a request could not supply them
     -- separately. Arguments: exported-function name, the clashing GIVEN.
+  | ExportEventType (Maybe SrcRange) Resolved (Maybe Resolved)
+    -- ^ An @export-decorated DECIDE takes or returns an EVENT (see
+    -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
+    -- the exported function's name, and the input's name (Nothing when it is
+    -- the result).
   | ActionPatternReference Name Name
     -- ^ R5 of @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@: a bare name in an
     -- ARGUMENT slot of a regulative action was read as a reference (R1) to
@@ -810,8 +815,9 @@ checkDirectiveResults = filter isCheckResult
 -- | Does this diagnostic refuse an @\@export@ for a reason that belongs to the
 -- __JSON publication boundary alone__?
 --
--- Both of these say the same thing: a request carries values, and one of this
--- export's inputs is a /rule/, so no request can ever supply it.
+-- The first two say the same thing: a request carries values, and one of this
+-- export's inputs is a /rule/, so no request can ever supply it. The third,
+-- 'ExportEventType', says that an EVENT has no form in a request either.
 -- 'ExportFunctionTypeInput' catches the arrow spelling
 -- (@ASSUME f IS A FUNCTION FROM Person TO BOOLEAN@) and
 -- 'ExportAssumeArityInput' the app-form one
@@ -834,6 +840,7 @@ isExportPublicationRefusal :: CheckError -> Bool
 isExportPublicationRefusal = \ case
   ExportFunctionTypeInput {}  -> True
   ExportAssumeArityInput {}   -> True
+  ExportEventType {}          -> True
   _                           -> False
 
 -- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
@@ -894,6 +901,7 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
+  rangeOf (ExportEventType r _ _)           = r
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j

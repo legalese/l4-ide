@@ -286,7 +286,13 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
                 exportErrs =
-                  Export.validateExportInputs rprog
+                  -- The entity info still holds the inference variables that
+                  -- the substitution solves, and the result of a definition
+                  -- with no GIVETH is one of them. Nothing is zonked unless an
+                  -- @export has to read an inferred result.
+                  Export.validateExportInputs
+                    (applyFinalSubstitution s'.substitution checkEnv.moduleUri env.entityInfo)
+                    rprog
                   ++
                   -- §11.19 / OF-7: the refusal comes BEFORE the closure. An
                   -- export that reaches an imported reader validates rows it
@@ -8105,6 +8111,15 @@ prettyCheckError (ExportAssumeArityInput fnName paramName arity) =
   inputCount
     | arity == 1 = "1 input"
     | otherwise  = Text.pack (show arity) <> " inputs"
+prettyCheckError (ExportEventType _ fnName (Just paramName)) =
+  [ quotedName (getActual fnName) <> " is published with @export, but its input "
+      <> quotedName (getActual paramName) <> " has a type that is or contains an EVENT."
+  , "@export does not support an EVENT as an input yet."
+  ]
+prettyCheckError (ExportEventType _ fnName Nothing) =
+  [ quotedName (getActual fnName) <> " is published with @export, but its result has a type that is or contains an EVENT."
+  , "@export does not support an EVENT as a result yet."
+  ]
 prettyCheckError (ExportAssumeNameClash fnName paramName) =
   [ "The @export function " <> quotedName (getActual fnName)
       <> " has a GIVEN input " <> quotedName (getActual paramName)
