@@ -302,6 +302,15 @@ GIVETH A NUMBER
 max x y @nlg the greater of %x% and %y%
   MEANS IF x >= y THEN x ELSE y
 
+-- "The amount by which a exceeds b": how far a is above b, and 0 when it is not.
+-- Not `a MINUS b`, which goes negative when a is below b.
+GIVEN
+  a IS A NUMBER
+  b IS A NUMBER
+GIVETH A NUMBER
+`the amount by which` a `exceeds` b @nlg the amount by which %a% exceeds %b%
+  MEANS max 0 (a MINUS b)
+
 GIVEN
   x IS A NUMBER
   y IS A NUMBER

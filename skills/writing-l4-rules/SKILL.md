@@ -675,6 +675,11 @@ Full table at <https://legalese.com/l4/reference/GLOSSARY.md>. The ones used con
 - **List:** `LIST a, b, c`, `EMPTY`, `x FOLLOWED BY xs`
 - **Percent:** `%` is a postfix operator, not a literal suffix — `2%` is `0.02`, `100%` is `1`, and it applies to a name or a parenthesised expression (`n%`, `(1 PLUS 1)%`)
 
+**For "exceeds", "in excess of" and "the amount by which … exceeds …", write `` `the amount by which` a `exceeds` b `` (after `IMPORT prelude`), never bare `a MINUS b`.**
+It means `max 0 (a MINUS b)`; `MINUS` goes negative when `a` is below `b`, and a rule that then subtracts the negative adds it back.
+The 2019 OpenFisca code for the New Zealand rates rebate coded "the amount by which income exceeds [the threshold]" as `income MINUS threshold`: rates 1000, income 20000 and no dependants gave 630 where the right answer is 560, and a final clip hid it.
+Where a negative difference is the point (a ledger balance), use `MINUS`.
+
 ### Control flow
 
 ```l4
