@@ -173,9 +173,10 @@ At rates of 1000 and an income of 20000 the fixed rule pays 560, the figure abov
 
 A proof answers the question you asked, and only that.
 The assertion most people write first is "the rebate never rises when income rises".
-It is true of the buggy rule as well, because the bug is in the _size_ of the rebate and not in its direction, so `l4 prove` proves it of both, and it could not have found this bug.
+It is true of the buggy rule as well, so `l4 prove` proves it of both, and it could not have found this bug.
+The reason is that income reaches the rebate only through the income excess, and a larger income never makes that excess smaller; the buggy rule's mistake is that the excess can be negative, which makes the rebate too _large_ for a low income, and not that the rebate moves the wrong way.
 (`rates-rebate-no-floor.l4` shows it, with the rounding-down taken out of the income excess; see the limits below for why.)
-The assertion that found the bug is the one that restates the rule's own words.
+The assertion that found the bug is the one that restates the rule's own words: the property to assert is the sentence of the rule, not an intuition about how the outcome should behave.
 
 ## Limits
 
