@@ -1,14 +1,14 @@
-`_ is subset of _` with `education purposes` and `welfare purposes`
-the number of distinct elements of `_ INTERSECT _` with `education purposes` and `welfare purposes`
-the number of distinct elements of `_ UNION _` with `new yorkers` and `new jerseyans`
-the number of distinct elements of `_ INTERSECT _` with `new yorkers` and `new jerseyans`
-`_ is subset of _` with `home uses` and `sanctuary uses` and `_ is subset of _` with `sanctuary uses` and `home uses`
-the number of distinct elements of `_ INTERSECT _` with `charitable objects` and `benevolent objects`
-the number of distinct elements of `_ LESS _` with `all employees` and `on probation`
-the number of distinct elements of `_ WITHOUT _` with `all employees` and `on probation`
-`_ is in _` with `NY` and `eligible states`
-`_ is in _` with `CT` and `eligible states`
-the distinct elements of `_ WITHOUT _` with `the tri-state universe` and `eligible states`
-the number of distinct elements of `_ INTERSECT _` with `new yorkers` and `emptySet`
+every element of `education purposes` is also in `welfare purposes`
+the number of distinct elements of the elements common to `education purposes` and `welfare purposes`
+the number of distinct elements of the union of `new yorkers` and `new jerseyans`
+the number of distinct elements of the elements common to `new yorkers` and `new jerseyans`
+every element of `home uses` is also in `sanctuary uses` and every element of `sanctuary uses` is also in `home uses`
+the number of distinct elements of the elements common to `charitable objects` and `benevolent objects`
+the number of distinct elements of the elements of `all employees` not in `on probation`
+the number of distinct elements of the elements of `all employees` not in `on probation`
+`NY` is one of `eligible states`
+`CT` is one of `eligible states`
+the distinct elements of the elements of `the tri-state universe` not in `eligible states`
+the number of distinct elements of the elements common to `new yorkers` and `emptySet`
 the number of distinct elements of the set of the items of list of 1, 1, 2, 3, 3 and 3
 the distinct elements of `SET` with list of 5, 5 and 6

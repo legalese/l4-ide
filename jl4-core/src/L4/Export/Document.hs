@@ -205,6 +205,10 @@ data Unit = MkUnit
   , uDefs    :: !(Set.Set Unique)
   , uRefs    :: !(Set.Set Unique)
   , uDecl    :: !UnitDecl
+  , uCalls   :: !(Set.Set Unique)
+    -- ^ The head of every rule that has a herald: a named-argument call to one of
+    -- these is a call, not a record construction ('decideRendering'). Empty until
+    -- 'allUnits' fills it.
   }
 
 extractUnits :: Module Resolved -> [Unit]
@@ -229,6 +233,7 @@ extractUnits (MkModule _ _ section) = goSection section
       , uDefs    = definedIn decl
       , uRefs    = referencedIn decl
       , uDecl    = decl
+      , uCalls   = Set.empty
       }
 
 -- | All renderable units across the open module and its dependencies, with
@@ -238,7 +243,10 @@ allUnits headings mainModule deps =
   let mods  = mainModule : deps
       info  = nlgFnInfo mods
       ctors = recordCtorFields mods
-  in map (substNlgInUnit info . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings)
+      -- Told apart from a record's constructor by what the head resolved to, not
+      -- by its name: a record can be named like a rule that has a herald.
+      calls = Map.keysSet info
+  in map (\u -> (substNlgInUnit info . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u) { uCalls = calls })
        (extractUnits mainModule <> concatMap extractUnits deps)
 
 -- | Apply a transform to a unit's DECIDE body (a no-op for other units).
@@ -247,15 +255,18 @@ mapUnitBody f u = case u.uDecl of
   UDecide (MkDecide a t af body) -> u { uDecl = UDecide (MkDecide a t af (f body)) }
   _ -> u
 
--- | The field-name references of each record, keyed by record name, so a
--- positional construction (@Bullet "A" "B"@) can be matched up with its fields.
--- Keyed by name, not 'Unique': a record's constructor occurrence and its
--- declaring type name do not share a 'Unique'.
-recordCtorFields :: [Module Resolved] -> Map.Map Text [Resolved]
+-- | The field-name references of each record, keyed by the 'Unique' of its
+-- constructor, so a positional construction (@Bullet "A" "B"@) can be matched up
+-- with its fields.
+-- Keyed by the constructor and not by a name: a function can be named like a
+-- record (the prelude's @range@ beside a record @range@), and a call to it is not
+-- a construction. The constructor is not the declaring type name, which has a
+-- 'Unique' of its own; the type checker records it in the 'RecordDecl'.
+recordCtorFields :: [Module Resolved] -> Map.Map Unique [Resolved]
 recordCtorFields mods = Map.fromList
-  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ _ <- fields ])
+  [ (getUnique con, [ n | MkTypedName _ n _ _ _ <- fields ])
   | m <- mods
-  , Declare _ (MkDeclare _ _ (MkAppForm _ ctorName _ _) (RecordDecl _ _ fields)) <- topDeclsRec m
+  , Declare _ (MkDeclare _ _ _ (RecordDecl _ (Just con) fields)) <- topDeclsRec m
   ]
 
 -- | All top-level declarations of a module, descending through @SECTION@s.
@@ -268,12 +279,12 @@ topDeclsRec (MkModule _ _ sec) = go sec
 -- | Rewrite a positional record construction (@App ctor [a, b]@) into the named
 -- form (@AppNamed ctor [field IS a, …]@), so the table and record renderers —
 -- which key off field names — recognise it the same as a @WITH@ literal.
-normalizePositionalRecords :: Map.Map Text [Resolved] -> Expr Resolved -> Expr Resolved
+normalizePositionalRecords :: Map.Map Unique [Resolved] -> Expr Resolved -> Expr Resolved
 normalizePositionalRecords ctorFields
   | Map.null ctorFields = id
   | otherwise = transformOf (gplate @(Expr Resolved)) $ \case
       App ann ctor args
-        | Just fnames <- Map.lookup (resolvedText ctor) ctorFields
+        | Just fnames <- Map.lookup (getUnique ctor) ctorFields
         , length fnames == length args ->
             AppNamed ann ctor [ MkNamedExpr ann f a | (f, a) <- zip fnames args ] Nothing
       e -> e
@@ -706,8 +717,8 @@ unitRendering u = case u.uDecl of
     | otherwise ->
         let subst              = paramSubst tysig
             (inner, locals)    = peelWhere (clauseLayout body)
-            (conn, mainClause) = decideRendering tysig (rewriteExpr (substParams subst inner))
-        in case mapMaybe (localDefClause subst) locals of
+            (conn, mainClause) = decideRendering u.uCalls tysig (rewriteExpr (substParams subst inner))
+        in case mapMaybe (localDefClause u.uCalls subst) locals of
              []   -> (conn, mainClause)
              defs -> (conn, CWhere mainClause defs)
   UAssume _ -> ("is assumed to be given", CLeaf "")
@@ -728,8 +739,8 @@ unitRendering u = case u.uDecl of
   longEnum cons =
     length cons > 5 || any (\c -> Text.length (conName c) > 24) cons
 
-decideRendering :: TypeSig Resolved -> Expr Resolved -> (Text, Clause)
-decideRendering tysig body
+decideRendering :: Set.Set Unique -> TypeSig Resolved -> Expr Resolved -> (Text, Clause)
+decideRendering calls tysig body
   | Just t <- nlgOf body =
       (connectorFor tysig body, CLeaf t)   -- an authored @nlg sentence wins
   | Regulative _ deon <- body =
@@ -739,7 +750,16 @@ decideRendering tysig body
       , tableClause cols rows )
   | Just items <- bodyAsValueList body =
       ("means", CChain "a list of the following" items)
-  | Just (ctor, fields) <- bodyAsRecordLiteral body =
+  -- A named-argument call to a rule that has a herald has the shape of a record
+  -- construction and is not one: it reads as the herald with its arguments in a
+  -- @where@ clause, as @l4 nlg@ prints it ('substituteNlgCalls' has put the herald
+  -- on its head), not as "is a the gap with" and a list of fields. Told apart by
+  -- what the head resolved to, not by its name or a herald on it: a record can be
+  -- named like a rule that has a herald, and can carry a herald of its own, and
+  -- its literal is still a record. A call to a rule WITHOUT a herald still reads
+  -- as a construction.
+  | Just (ctor, fields) <- bodyAsRecordLiteral body
+  , not (isRuleCall calls body) =
       ("is a " <> ctor <> " with", CFields (map fieldPair fields))
   | Just c <- arithChainClause body =
       ("equals", c)
@@ -822,11 +842,11 @@ peelWhere = \case
 -- | Render one local @WHERE@/@LET@ binding as a (heading, connector, body)
 -- triple. The enclosing rule's GIVEN parameters are in scope inside the binding,
 -- so its parameter substitution is threaded in alongside the binding's own.
-localDefClause :: Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
-localDefClause outerSubst = \case
+localDefClause :: Set.Set Unique -> Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
+localDefClause calls outerSubst = \case
   LocalDecide _ d@(MkDecide _ ltysig _ lbody) ->
     let subst          = Map.union (paramSubst ltysig) outerSubst
-        (conn, clause) = decideRendering ltysig (rewriteExpr (substParams subst lbody))
+        (conn, clause) = decideRendering calls ltysig (rewriteExpr (substParams subst lbody))
     in Just (resolvedText (decideApp d), conn, clause)
   LocalAssume{} -> Nothing
 
@@ -894,6 +914,12 @@ typeNameText :: Type' Resolved -> Text
 typeNameText = \case
   TyApp _ n _ -> nameToText (getActual n)
   _           -> ""
+
+-- | Is this a named-argument call to one of these rules?
+isRuleCall :: Set.Set Unique -> Expr Resolved -> Bool
+isRuleCall calls = \case
+  AppNamed _ n _ _ -> getUnique n `Set.member` calls
+  _                -> False
 
 bodyAsRecordLiteral :: Expr Resolved -> Maybe (Text, [NamedExpr Resolved])
 bodyAsRecordLiteral = \case

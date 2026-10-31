@@ -140,7 +140,7 @@ renderCmd opts = do
                   }
           -- The language the document SAYS it is in, in one place: the one
           -- asked for, else the one the module declares, else @en@ (R-M2). The
-          -- same order 'localise' below effectively applies to the renderings
+          -- same order 'Nlg.prepareModules' below effectively applies to the renderings
           -- themselves — @--lang@ promotes a tagged herald, and with no flag the
           -- default herald is the one @\@lang@ stamped.
           declaredLanguage = fromMaybe defaultModuleLang
@@ -187,10 +187,12 @@ renderCmd opts = do
           --
           -- 'selectLanguage' 'Nothing' is the identity, so with no --lang the
           -- output is byte-for-byte what it was.
-          localise = Nlg.selectLanguage opts.renderLang
+          --
+          -- A herald written after a rule's last input is moved onto the rule
+          -- first, as 'l4 nlg' does ('Nlg.prepareModules'): left where it is it
+          -- also labels that input, and a call written with WITH printed it twice.
           rawDeps = dedupModules (transitiveDeps tc)
-          mainModule = localise tc.module'
-          depModules = map localise rawDeps
+          (mainModule, depModules) = Nlg.prepareModules opts.renderLang tc.module' rawDeps
           doc = buildDocument cfg mainModule depModules
       -- Said only for the formats that carry a document language, so that
       -- `--format text --lang zz` stays byte-identical on BOTH streams.

@@ -1,0 +1,29 @@
+-- A rule named but not called. The prelude's `filter`, `foldr`, `even`, `max` and
+-- `fmap` carry heralds whose slots (%x%, %list%) are bound only at a call; passed
+-- on as values, or named with no inputs, they read as their names.
+IMPORT prelude
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`own evens` xs MEANS filter even xs
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`own biggest` xs MEANS foldr max 0 xs
+
+`own mapper` MEANS fmap
+
+#EVAL filter even (LIST 1, 2, 4)
+#EVAL foldr max 0 (LIST 1, 5, 3)
+
+-- A projection's selector is a rule named, not called: `half` here.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`half` x @nlg half of %x%
+  MEANS x DIVIDED BY 2
+
+DECLARE Span HAS size IS A NUMBER
+
+`the span` MEANS Span WITH size IS 8
+
+#EVAL `the span`'s size's half

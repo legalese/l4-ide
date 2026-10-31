@@ -8,6 +8,8 @@ module L4.Nlg (
   decideNlg,
   decideNlgSite,
   promoteHeadInputNlg,
+  promoteHeadInputNlgWith,
+  prepareModules,
   carriesLanguage,
   Linearize (..),
   lin,
@@ -353,11 +355,30 @@ decideNlg mouter d = case decideNlgSite mouter d of
 --   * A collision — two heralds in one language on one input — attaches neither,
 --     so there is nothing to find and nothing to move.
 promoteHeadInputNlg :: Module Resolved -> Module Resolved
-promoteHeadInputNlg m
+promoteHeadInputNlg = promoteHeadInputNlgWith []
+
+-- | 'promoteHeadInputNlg' for a module that imports others: the promotion is
+-- decided by the rules of the given dependencies as well as by the module's own,
+-- and applied to this module's tree only.
+--
+-- __Why a module needs its dependencies' rules.__ A call to an imported rule
+-- carries a copy of the imported name, and of each of its inputs (a @WITH@
+-- call's labels are the inputs), taken when the reference was resolved —
+-- before any promotion. 'promoteHeadInputNlg' on the importing module sees
+-- none of the imported rules, so it left the herald on the copy of the input
+-- the author had written it after. A @WITH@ call then printed that sentence a
+-- second time as the label of the input (@the gap between `a` and `b` where `a`
+-- is 840 and the gap between `a` and `b` is 160@), which the same rule called
+-- from its own module does not.
+--
+-- The dependencies themselves are not rewritten here: 'nlgFnInfo' reads each
+-- one through its own 'promoteHeadInputNlg'.
+promoteHeadInputNlgWith :: [Module Resolved] -> Module Resolved -> Module Resolved
+promoteHeadInputNlgWith deps m
   | Map.null promote = m
   | otherwise        = over (gplate @Resolved) fixup m
  where
-  (promote, suppress) = foldTopLevelDecides collect m
+  (promote, suppress) = foldMap (foldTopLevelDecides collect) (m : deps)
 
   collect :: Decide Resolved -> (Map Unique (Nlg, [Nlg]), Set Unique)
   collect d@(MkDecide _ _ (MkAppForm _ headName _ _) _) =
@@ -389,6 +410,11 @@ overBothNames f = \ case
   Def u n        -> Def u (f n)
   Ref r u o      -> Ref (f r) u (f o)
   OutOfScope u n -> OutOfScope u (f n)
+
+-- | A name with no herald and none of its other-language renderings, so it
+-- linearizes as its own words.
+plainName :: Resolved -> Resolved
+plainName = overBothNames (annoOf %~ (annNlg .~ Nothing) . (annNlgAlts .~ []))
 
 -- | Clear the annotations on a sentence's own @%slot%@ references.
 --
@@ -434,10 +460,30 @@ linearizeDirectivesIn mlang mod'' deps'' =
   , foldMap (snd . simpleLinearizerIn mlang) directives
   )
  where
-  prepare    = selectLanguage mlang . promoteHeadInputNlg
-  mod'       = prepare mod''
-  heralds    = nlgFnInfo (mod' : map prepare deps'')
-  directives = toListOf (gplate @(Directive Resolved)) mod'
+  (mod', deps') = prepareModules mlang mod'' deps''
+  heralds       = nlgFnInfo (mod' : deps')
+  directives    = toListOf (gplate @(Directive Resolved)) mod'
+
+-- | A module and its dependencies, ready to have their heralds read: a herald
+-- written after a rule's last input moved onto the rule ('promoteHeadInputNlg'),
+-- then a language chosen ('selectLanguage'), in that order (see
+-- 'linearizeDirectives').
+--
+-- Each module also learns which of the others' inputs were carrying a herald, so
+-- a call to one of those rules is labelled as a call to a rule of its own would
+-- be ('promoteHeadInputNlgWith'). That holds for a dependency's own calls too: a
+-- rule in the middle of a chain of imports is shown, in the document of the
+-- module at the top, with the calls it makes to the module below it.
+--
+-- Shared by @l4 nlg@ and @l4 render@, which read a call's herald alike. A reader
+-- that skips it still finds the rule's herald, because 'nlgFnInfo' looks
+-- wherever it landed, but it also prints the herald a second time as the label
+-- of the last input at a @WITH@ call.
+prepareModules :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> (Module Resolved, [Module Resolved])
+prepareModules mlang m deps =
+  ( selectLanguage mlang (promoteHeadInputNlgWith deps m)
+  , map (selectLanguage mlang . promoteHeadInputNlgWith deps) deps
+  )
 
 -- | Does any rendering in this module name this language?
 --
@@ -1025,19 +1071,33 @@ spaced p = text " " <> p <> text " "
 -- sentence and its GIVEN parameter uniques (in order), so a call's positional
 -- arguments can be matched to the sentence's @%parameter%@ slots.
 --
--- Keyed by @(function name, arity)@ rather than 'Unique': a call site in the
--- importing module and the definition in a dependency module do not share
--- 'Unique's (each module is resolved independently), so a unique-based key
--- would never match across an @IMPORT@. The inner @%param%@ substitution stays
--- 'Unique'-based — those refs are self-consistent within the defining module.
-type NlgFnInfo = Map.Map (Text, Int) (Nlg, [Unique])
+-- __Keyed by the 'Unique' of the definition's head__, which is what a call
+-- resolved to, and not by the head's text. A name is not a definition: a
+-- record can be named like a rule, a drafter's rule can be named like an
+-- imported one, and two overloads of one pattern share a name, so a text key
+-- gave a call the sentence of whichever definition with that name was entered
+-- last, or was in a library. A call's head carries the 'Unique' of the
+-- definition it resolved to, also across an @IMPORT@ (the import fixtures of
+-- the CLI tests fail if it does not).
+--
+-- A mixfix call resolves to its pattern's canonical name (@the lower of _ and
+-- _@), which the type checker registers as an alias of the definition with the
+-- head's 'Unique' (@defAka@), so the interleaved, @OF@ and @WITH@ spellings find
+-- the same entry. So does a call through an @AKA@ name: every spelling of the
+-- head is entered, under the one 'Unique'.
+--
+-- A definition inside another one (@WHERE@, @LET@) is not entered: only
+-- top-level rules are, as before. The inner @%param%@ substitution is
+-- 'Unique'-based as well: those refs are self-consistent within the defining
+-- module.
+type NlgFnInfo = Map.Map Unique (Nlg, [Unique])
 
 nlgFnInfo :: [Module Resolved] -> NlgFnInfo
 nlgFnInfo mods = Map.fromList
-  [ ((resolvedText name, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
+  [ (getUnique name, (nlg, [ getUnique a | a <- appArgs ]))
     -- Value parameters are the appform arguments, not the GIVEN names: a
     -- polymorphic function (@GIVEN a IS A TYPE@) lists its type parameter in
-    -- GIVEN but never in the appform, so keying arity off GIVEN would not match
+    -- GIVEN but never in the appform, so counting GIVEN names would not match
     -- the call's positional argument count.
   | m <- mods
   , d@(MkDecide _ _ appForm@(MkAppForm _ _ appArgs _) _) <- foldTopLevelDecides (: []) m
@@ -1066,7 +1126,7 @@ substituteNlgCalls = substituteNlgCallsIn Nothing
 substituteNlgCallsIn :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
 substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
   App ann n args
-    | Just (nlg, params) <- Map.lookup (resolvedText n, length args) info
+    | Just (nlg, params) <- Map.lookup (getUnique n) info
     , length params == length args ->
         let bound    = zip params args
             leftover = [ a | (p, a) <- bound, p `notElem` nlgRefs nlg ]
@@ -1090,9 +1150,25 @@ substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
   -- expanded in the heading too it printed twice (row 13 of
   -- @jl4\/examples\/ok\/nlg-head-placement.l4@).
   AppNamed ann n es order
-    | Just (nlg, _) <- Map.lookup (resolvedText n, length es) info
+    | Just (nlg, params) <- Map.lookup (getUnique n) info
+    , length params == length es
     , not (carriesNlg (getActual n) || carriesNlg (getOriginal n)) ->
         AppNamed ann (overBothNames (annoOf % annNlg .~ Just (unslot nlg)) n) es order
+  -- A rule with inputs that is named but not called reads as its name. A herald
+  -- is the sentence for a call, and its slots are bound by the call's arguments:
+  -- passed to @filter@ or @foldr@, or given a second name, the rule has none, and
+  -- its name would read as the sentence with the slot names of its definition in
+  -- it ("for which x is even holds"). The herald is on the name because a herald
+  -- written after the last input is moved onto the rule ('promoteHeadInputNlg'),
+  -- and one written above the head always was. A rule with NO inputs has no slots
+  -- and keeps its herald: it is a phrase, not a sentence for a call.
+  Var ann n
+    | Just (_, _ : _) <- Map.lookup (getUnique n) info -> Var ann (plainName n)
+  -- A projection's selector is such a reference too: @startDate's day@ is a
+  -- call of @day@ on @startDate@, written the other way round, and reads as
+  -- written, not as "startDate's the day of date".
+  Proj ann e sel
+    | Just (_, _ : _) <- Map.lookup (getUnique sel) info -> Proj ann e (plainName sel)
   e -> e
  where
   word w = fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang)

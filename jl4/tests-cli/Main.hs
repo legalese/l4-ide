@@ -12,7 +12,7 @@ module Main where
 
 import Control.Exception (finally)
 import Control.Monad (forM_, unless, when)
-import Data.Char (isDigit, isSpace)
+import Data.Char (isAlpha, isDigit, isSpace)
 import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, tails)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -485,6 +485,48 @@ nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
 
+-- An @nlg on a MIXFIX definition, read at a call site in the same module, and
+-- across an IMPORT. The importing fixture makes the same calls, row for row,
+-- as the local one (less one row it says it leaves out), so one expected list
+-- serves both.
+nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib :: FilePath
+nlgMixfixLocalFixture  = fixtureDir </> "nlg-mixfix-local.l4"
+nlgMixfixImportFixture = fixtureDir </> "nlg-mixfix-import.l4"
+nlgMixfixImportLib     = fixtureDir </> "nlg-mixfix-import-lib.l4"
+
+-- A rule imported through two levels: top imports mid, which imports deep.
+-- `mid rule` makes a WITH call to a function in deep and is shown in top's
+-- document under "Imported definitions".
+nlgTransTop, nlgTransMid, nlgTransDeep :: FilePath
+nlgTransTop  = fixtureDir </> "nlg-trans-top.l4"
+nlgTransMid  = fixtureDir </> "nlg-trans-mid.l4"
+nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
+
+-- A herald belongs to the definition a call resolved to. The main module reuses
+-- the names of definitions that carry heralds, in the library next to it and in
+-- the prelude, for definitions of its own.
+-- A rule named but not called: passed on as a value, or named with no inputs.
+nlgBareReference :: FilePath
+nlgBareReference = fixtureDir </> "nlg-bare-reference.l4"
+
+nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
+nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
+nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
+nlgOwnerOverload = fixtureDir </> "nlg-owner-overload.l4"
+
+-- A positional call is a record construction only if its head is the record's
+-- constructor. The main module has records named like a function in the library
+-- (no herald) and like a function in the prelude (with one).
+nlgPositionalMain, nlgPositionalLib :: FilePath
+nlgPositionalMain = fixtureDir </> "nlg-positional-main.l4"
+nlgPositionalLib  = fixtureDir </> "nlg-positional-lib.l4"
+
+-- The example the syntax reference links for this: one mixfix function with a
+-- herald, and a rule that calls it. The test that reads it pins the page's
+-- claim, not just the output.
+nlgMixfixDocExample :: FilePath
+nlgMixfixDocExample = "../doc/reference/syntax/nlg-mixfix-example.l4"
+
 -- The reference page whose placement table describes that fixture row by row.
 -- The test that reads it pins the page, not just the output.
 placementReadme :: FilePath
@@ -615,6 +657,10 @@ coreFixtures =
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme
+  , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
+  , nlgTransTop, nlgTransMid, nlgTransDeep
+  , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
+  , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3514,6 +3560,242 @@ spec bin = do
       Output _ renOut _ <- renderOf
       nlgOut `shouldSatisfy` ("row seventeen saw 200\n" `isInfixOf`)
       renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
+
+  -- An @nlg on a MIXFIX definition, read at its call sites. A mixfix call
+  -- resolves to the operator's canonical name (`the lower of _ and _`), while the
+  -- herald table was keyed on the definition's head keyword alone (`the lower
+  -- of`), so an interleaved call never found its herald and printed the pattern
+  -- with the arguments after it, or, where the herald sat on the head, with its
+  -- slots unfilled. The `OF` spelling and a `WITH` call resolve to the head
+  -- keyword and always worked; they are rows here so a repair that keys on the
+  -- canonical name ONLY would fail them.
+  --
+  -- Whole-output equality, not `isInfixOf`: the failure being guarded is a line
+  -- that reads plausibly and is wrong, and an infix test would not see a wrong
+  -- line sitting beside a right one.
+  describe "an @nlg on a mixfix definition" $ do
+    let -- Lines of `l4 nlg`'s output with any carriage return dropped, as the house idiom does.
+        nlgLines fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        -- One line per #EVAL in the fixtures, in order. The first seven are the
+        -- interleaved calls, then the nested one, then the OF and WITH calls.
+        interleaved =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          , "840 less 160"
+          , "840 and 160 together"
+          , "the first of 840 with 160"
+          , "`the bare _ and _` with 840 and 160"
+          , "the greater of 3 and 4"
+          , "the smaller of the smaller of 5 and 6 and 7"
+          ]
+        ofCalls =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          ]
+        lowerWith = "the smaller of `a` and `b` where `a` is 840 and `b` is 160"
+        exceedsWith = "the amount by which `a` exceeds `b` where `a` is 840 and `b` is 160"
+        -- The prefix control with its herald after the last input: positional,
+        -- then WITH. Across an IMPORT the WITH call used to print the herald a
+        -- second time, as the label of `b`.
+        gapRows =
+          [ "the gap between 840 and 160"
+          , "the gap between `a` and `b` where `a` is 840 and `b` is 160"
+          ]
+
+    it "fills the herald's slots at a call in the same module" $ do
+      rows <- nlgLines nlgMixfixLocalFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
+
+    it "fills the herald's slots at a call across an IMPORT" $ do
+      rows <- nlgLines nlgMixfixImportFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
+
+    -- The other reader of a herald at a call site: `l4 render`, for a call in the
+    -- body of another rule. The fixtures end in one rule per call shape, named
+    -- "render ...". A rule's bullet is "• Render lower means ..."; the bullet is
+    -- not what is being tested, so the row is the text after it.
+    let renderRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ drop 1 (dropWhile (/= ' ') l)
+               | l <- map (filter (/= '\r')) (lines sout)
+               , " Render " `isInfixOf` l ]
+        expectedRenderRows =
+          [ "Render lower means the smaller of n and 100."
+          , "Render exceeds means the amount by which n exceeds 100."
+          , "Render shortfall means 100 less n."
+          , "Render plus means n and 100 together."
+          , "Render first means the first of n with 100."
+          , "Render bare means the bare n and 100."
+          , "Render greater means the greater of n and 100."
+          , "Render nested means the smaller of the smaller of n and 100 and 200."
+          , "Render of means the smaller of n and 100."
+          , "Render exceeds with equals the amount by which a exceeds b where a is n and b is 100 + 1."
+          , "Render gap with equals the gap between a and b where a is n and b is 100 + 1."
+          , "Render lower with equals the smaller of a and b where a is n and b is 100 + 1."
+          , "Render half selector means the span's size's half."
+          , "Render third selector means the span's size's third."
+          , "Render exceeds direct means the amount by which a exceeds b where a is n and b is 100."
+          , "Render gap direct means the gap between a and b where a is n and b is 100."
+          , "Render lower direct means the smaller of a and b where a is n and b is 100."
+          , "Render point is a Pt with:"
+          ]
+
+    it "is read by l4 render at a call in the body of another rule" $ do
+      rows <- renderRows nlgMixfixLocalFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render at such a call across an IMPORT" $ do
+      rows <- renderRows nlgMixfixImportFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render in the example the syntax reference links" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgMixfixDocExample]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy` ("The price we charge means the smaller of price and 100." `isInfixOf`)
+
+  -- A rule shown under "Imported definitions" is rendered from its own module's
+  -- copy of the tree, so it must read as it does when that module is rendered on
+  -- its own. A WITH call made in the middle of a chain used to print the herald
+  -- of a function two modules down a second time, because only the module being
+  -- rendered had its heralds moved onto their rules.
+  describe "l4 render of a rule imported through two modules" $ do
+    let midRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ dropWhile (not . isAlpha) l
+               | l <- map (filter (/= '\r')) (lines sout)
+               , "Mid rule " `isInfixOf` l ]
+        expected = ["Mid rule equals the gap between a and b where a is n and b is 100 + 1."]
+
+    it "reads the same when the middle module is the one rendered" $ do
+      rows <- midRows nlgTransMid
+      rows `shouldBe` expected
+
+    it "reads the same when the top module is the one rendered" $ do
+      rows <- midRows nlgTransTop
+      rows `shouldBe` expected
+
+  -- A herald is found by the definition a call resolved to. It used to be found
+  -- by the call's name and its number of arguments, so any definition with the
+  -- same name read the herald of another one: a record, a rule of the drafter's
+  -- own beside an imported one, a library function reused for something else.
+  describe "a herald belongs to the definition the call resolved to" $ do
+    let -- The rows of `l4 render` whose heading starts with one of these words.
+        renderedRows fixture needles = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ row
+               | l <- map (filter (/= '\r')) (lines sout)
+               , let row = dropWhile (not . isAlpha) l
+               , any (`isPrefixOf` row) needles ]
+        nlgRows fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads a WITH body that builds a record as a record, not as a call to a rule named like it" $ do
+      rows <- renderedRows nlgOwnerMain ["Own origin shift", "Own band around"]
+      rows `shouldBe`
+        [ "Own origin shift is a Pt with:"
+        , "Own band around is a range with:"
+        ]
+
+    -- The drafter's own `LESS`, `is in` and `sum` have no herald. The prelude's
+    -- do, on sets and lists; a call to the drafter's reads as an unheralded call.
+    it "gives a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- renderedRows nlgOwnerMain ["Own net price", "Own working age", "Own total"]
+      rows `shouldBe`
+        [ "Own net price means price LESS 20."
+        , "Own working age holds if age is in 65."
+        , "Own total means sum with total."
+        ]
+
+    it "gives a #EVAL of a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- nlgRows nlgOwnerMain
+      take 3 rows `shouldBe`
+        [ "`_ LESS _` with 100 and 20"
+        , "`_ is in _` with 5 and 10"
+        , "`sum` with 5"
+        ]
+
+    -- Same pattern, same name, different types, each with a herald: the call
+    -- reads the one it resolved to, from this module or from the library.
+    it "reads the herald of the overload a call resolved to, one in this module and one imported" $ do
+      rows <- renderedRows nlgOwnerMain ["Own first name", "Own cap", "Own first word", "Own floor"]
+      rows `shouldBe`
+        [ "Own first name means whichever of s and m comes first in the alphabet."
+        , "Own cap means the smaller of n and 100."
+        , "Own first word means whichever of s and m comes first in the alphabet, written plainly."
+        , "Own floor means the smaller number of n and 100."
+        ]
+
+    it "reads the herald of the overload a #EVAL resolved to, one in this module and one imported" $ do
+      rows <- nlgRows nlgOwnerMain
+      drop 3 rows `shouldBe`
+        [ "whichever of x and y comes first in the alphabet"
+        , "the smaller of 3 and 4"
+        , "whichever of x and y comes first in the alphabet, written plainly"
+        , "the smaller number of 3 and 4"
+        ]
+
+    -- The same, for two overloads of one mixfix pattern in a single module.
+    it "reads the herald of the overload a call resolved to, both written in one module" $ do
+      nlg <- nlgRows nlgOwnerOverload
+      nlg `shouldBe`
+        [ "the smaller number of 3 and 4"
+        , "whichever of x and y comes first in the alphabet"
+        ]
+      ren <- renderedRows nlgOwnerOverload ["Own cap", "Own first name"]
+      ren `shouldBe`
+        [ "Own cap means the smaller number of n and 100."
+        , "Own first name means whichever of s and m comes first in the alphabet."
+        ]
+
+    -- A positional call builds a record only if its head is the record's
+    -- constructor. These records share a name with a function that is not one:
+    -- the library's `Pt` and the prelude's `range`.
+    it "reads a positional call to a function named like a record as a call, not as building the record" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos shift", "Pos numbers"]
+      rows `shouldBe`
+        [ "Pos shift means Pt with n and 100."
+        , "Pos numbers means the whole numbers from 1 to n."
+        ]
+
+    it "still reads a positional call to the record's own constructor as building it" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos point", "Pos band"]
+      rows `shouldBe`
+        [ "Pos point is a Pt with:"
+        , "Pos band is a range with:"
+        ]
+
+  -- A herald is the sentence for a CALL: its slots are bound by the call's
+  -- arguments. A rule that is named but not called, passed to `filter` or
+  -- `foldr` or given a second name, has no arguments to bind them, and used to
+  -- read as its sentence with the slot names of its definition in it
+  -- ("for which x is even holds"), which says something the author did not write.
+  describe "a rule named but not called" $ do
+    it "reads as its name in l4 nlg" $ do
+      Output code sout _ <- runL4 bin ["nlg", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "the items of list of 1, 2 and 4 for which `even` holds"
+        , "the items of list of 1, 5 and 3 combined from the right with `max`, starting from 0"
+        , "`the span` 's `size` 's `half`"
+        ]
+
+    it "reads as its name in l4 render" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      [ dropWhile (not . isAlpha) l
+        | l <- map (filter (/= '\r')) (lines sout), "Own " `isInfixOf` l ] `shouldBe`
+        [ "Own evens means the items of xs for which even holds."
+        , "Own biggest means the items of xs combined from the right with max, starting from 0."
+        , "Own mapper means fmap."
+        ]
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
