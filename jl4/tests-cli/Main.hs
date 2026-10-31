@@ -171,14 +171,26 @@ runL4In mCwd mEnv bin args = do
   hClose hin
   hSetBinaryMode hout True
   hSetBinaryMode herr True
-  soutBytes <- BS.hGetContents hout
-  serrBytes <- BS.hGetContents herr
+  (soutBytes, serrBytes) <- readOutputs hout herr
   code <- waitForProcess ph
   pure Output
     { outExit   = code
     , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
+
+-- | Read a child's stdout and stderr to their ends at the same time. Reading
+-- them one after the other deadlocks as soon as the child fills the pipe that
+-- isn't being read: it waits for room there, and we wait for it to close the
+-- other one. How much a pipe holds differs by platform, so that can pass
+-- everywhere but Windows.
+readOutputs :: Handle -> Handle -> IO (BS.ByteString, BS.ByteString)
+readOutputs hout herr = do
+  errVar <- newEmptyMVar
+  _ <- forkIO (BS.hGetContents herr >>= putMVar errVar)
+  outBytes <- BS.hGetContents hout
+  errBytes <- takeMVar errVar
+  pure (outBytes, errBytes)
 
 -- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
 -- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports
@@ -818,6 +830,23 @@ spec bin = do
           Output code _ serr <- runL4 schema [dir </> file]
           code `shouldBe` ExitFailure 1
           serr `shouldSatisfy` ("Failed to parse or typecheck" `isInfixOf`)
+
+    -- More on stderr than any platform's pipe holds, and nothing on stdout. A
+    -- Windows pipe holds about 4 KB, so the ring above stopped the release build
+    -- there and passed everywhere else; this one would stop it everywhere.
+    it "jl4-schema refuses a ring too long for its log to fit in a pipe" $
+      withSystemTempDirectory "l4-long-ring" \dir -> do
+        let links = 100 :: Int
+            link i = "link" <> show (i `mod` links)
+        forM_ [1 .. links] \i ->
+          writeFile (dir </> link i <> ".l4") ("IMPORT " <> link (i + 1) <> "\n\nDECIDE `the rate` IS 2\n")
+        schema <- schemaGenerator
+        finished <- timeout 60000000 (runL4 schema [dir </> link 1 <> ".l4"])
+        case finished of
+          Nothing -> expectationFailure "jl4-schema did not finish within a minute"
+          Just (Output code _ serr) -> do
+            code `shouldBe` ExitFailure 1
+            length serr `shouldSatisfy` (> 65536)
 
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
@@ -1717,8 +1746,7 @@ spec bin = do
           hClose hin
           hSetBinaryMode hout True
           hSetBinaryMode herr True
-          soutBytes <- BS.hGetContents hout
-          _ <- BS.hGetContents herr
+          (soutBytes, _) <- readOutputs hout herr
           _ <- waitForProcess ph
           -- the banner, then one reply after each prompt, then the last prompt's goodbye
           let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
