@@ -1179,7 +1179,8 @@ A rule imported through two levels (`top` imports `mid` imports `deep`, `mid` ca
 A `WITH` call that is the whole body of a rule rendered as "is a the gap with" and a field list, as though it built a record; `decideRendering` now reads it as the herald with its arguments in a `where` clause, as `l4 nlg` prints it.
 A named-argument call to a rule WITHOUT a herald still reads as a construction; that is not owed here.
 Measured by rendering every `.l4` under `jl4/examples`, `doc` and `jl4-core/libraries` (909 files) before and after the whole of this round: the only render that moves relative to the head the audit read (`981e1b880`) is `jl4-core/libraries/prelude.l4`, `MapPairs means fmap.`, which that head had as "f applied to each item of list" and which reads `fmap` again.
-Relative to the base the renders that move are the four listed above.
+Rendering the same 909 files with the binary built from the base of this PR and with the binary built from this branch (2026-10-31), five renders move, none under `jl4/examples/canon/`, and no exit code or stderr differs: the four listed above, and the hover fixture `jl4/examples/lsp/hover/nlg-site-hover-import.l4` (added here), which the base prints as a record construction (`is a absNumber with:`) and this branch prints as the herald (`Size of loss means the absolute value of value where value is 5.`).
+At the same head the full `jl4-test` suite gives 4832 examples and 0 failures on `nye`, with six `.nlg.golden` files moved relative to the base (the five measured on `lhs` above and `pattern-matching-overloads-own-annotations`) and none in the canon mirror.
 
 Hover does not repeat the fault.
 `outputNlgMap` (`jl4-lsp/src/LSP/L4/Rules.hs`) also promotes per module, but hover reads the herald from the module's own range map, which is stamped at the definitions only, so a call site in another module shows the type and no sentence, on the rule's name and on the label of its last input.
