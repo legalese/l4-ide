@@ -10,7 +10,6 @@ module L4.Nlg (
   promoteHeadInputNlg,
   promoteHeadInputNlgWith,
   prepareModules,
-  plainName,
   carriesLanguage,
   Linearize (..),
   lin,
@@ -1155,6 +1154,21 @@ substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
     , length params == length es
     , not (carriesNlg (getActual n) || carriesNlg (getOriginal n)) ->
         AppNamed ann (overBothNames (annoOf % annNlg .~ Just (unslot nlg)) n) es order
+  -- A rule with inputs that is named but not called reads as its name. A herald
+  -- is the sentence for a call, and its slots are bound by the call's arguments:
+  -- passed to @filter@ or @foldr@, or given a second name, the rule has none, and
+  -- its name would read as the sentence with the slot names of its definition in
+  -- it ("for which x is even holds"). The herald is on the name because a herald
+  -- written after the last input is moved onto the rule ('promoteHeadInputNlg'),
+  -- and one written above the head always was. A rule with NO inputs has no slots
+  -- and keeps its herald: it is a phrase, not a sentence for a call.
+  Var ann n
+    | Just (_, _ : _) <- Map.lookup (getUnique n) info -> Var ann (plainName n)
+  -- A projection's selector is such a reference too: @startDate's day@ is a
+  -- call of @day@ on @startDate@, written the other way round, and reads as
+  -- written, not as "startDate's the day of date".
+  Proj ann e sel
+    | Just (_, _ : _) <- Map.lookup (getUnique sel) info -> Proj ann e (plainName sel)
   e -> e
  where
   word w = fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang)

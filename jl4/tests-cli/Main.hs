@@ -505,6 +505,10 @@ nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
 -- A herald belongs to the definition a call resolved to. The main module reuses
 -- the names of definitions that carry heralds, in the library next to it and in
 -- the prelude, for definitions of its own.
+-- A rule named but not called: passed on as a value, or named with no inputs.
+nlgBareReference :: FilePath
+nlgBareReference = fixtureDir </> "nlg-bare-reference.l4"
+
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
 nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
@@ -648,7 +652,7 @@ coreFixtures =
   , nlgHeadPlacementSource, placementReadme
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
-  , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload
+  , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3741,6 +3745,31 @@ spec bin = do
       ren `shouldBe`
         [ "Own cap means the smaller number of n and 100."
         , "Own first name means whichever of s and m comes first in the alphabet."
+        ]
+
+  -- A herald is the sentence for a CALL: its slots are bound by the call's
+  -- arguments. A rule that is named but not called, passed to `filter` or
+  -- `foldr` or given a second name, has no arguments to bind them, and used to
+  -- read as its sentence with the slot names of its definition in it
+  -- ("for which x is even holds"), which says something the author did not write.
+  describe "a rule named but not called" $ do
+    it "reads as its name in l4 nlg" $ do
+      Output code sout _ <- runL4 bin ["nlg", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "the items of list of 1, 2 and 4 for which `even` holds"
+        , "the items of list of 1, 5 and 3 combined from the right with `max`, starting from 0"
+        , "`the span` 's `size` 's `half`"
+        ]
+
+    it "reads as its name in l4 render" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      [ dropWhile (not . isAlpha) l
+        | l <- map (filter (/= '\r')) (lines sout), "Own " `isInfixOf` l ] `shouldBe`
+        [ "Own evens means the items of xs for which even holds."
+        , "Own biggest means the items of xs combined from the right with max, starting from 0."
+        , "Own mapper means fmap."
         ]
 
   -- The verifier footing. Every negative control asserts the finding KIND, not

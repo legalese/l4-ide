@@ -53,7 +53,7 @@ import L4.Annotation (emptyAnno)
 import L4.Desugar (carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
-import L4.Nlg (simpleLinearizer, NlgFnInfo, nlgFnInfo, plainName, substituteNlgCalls, renderNlgWith, normalizeWs, oxford)
+import L4.Nlg (simpleLinearizer, NlgFnInfo, nlgFnInfo, substituteNlgCalls, renderNlgWith, normalizeWs, oxford)
 import qualified L4.Nlg as Nlg
 import L4.Syntax
 import L4.Names (stripSectionBinderElaborations)
@@ -246,7 +246,7 @@ allUnits headings mainModule deps =
       -- Told apart from a record's constructor by what the head resolved to, not
       -- by its name: a record can be named like a rule that has a herald.
       calls = Map.keysSet info
-  in map (\u -> (substNlgInUnit info . mapUnitBody (plainSelectors calls) . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u) { uCalls = calls })
+  in map (\u -> (substNlgInUnit info . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u) { uCalls = calls })
        (extractUnits mainModule <> concatMap extractUnits deps)
 
 -- | Apply a transform to a unit's DECIDE body (a no-op for other units).
@@ -254,22 +254,6 @@ mapUnitBody :: (Expr Resolved -> Expr Resolved) -> Unit -> Unit
 mapUnitBody f u = case u.uDecl of
   UDecide (MkDecide a t af body) -> u { uDecl = UDecide (MkDecide a t af (f body)) }
   _ -> u
-
--- | A rule used as a projection's selector (@startDate's day@) reads as its own
--- name, never as its herald.
---
--- A herald is the sentence for a CALL, and a selector is not one: "the span's
--- size's half of x" says a thing the author did not write. A herald that follows
--- the rule's last input is moved onto the rule before the document is built
--- ('L4.Nlg.prepareModules'), and that gives the name a herald, so the selector
--- would otherwise print it. One written above the head already did.
---
--- Matched by the 'Unique' the selector resolved to: a field that shares a rule's
--- name keeps its own gloss.
-plainSelectors :: Set.Set Unique -> Expr Resolved -> Expr Resolved
-plainSelectors rules = transformOf (gplate @(Expr Resolved)) $ \case
-  Proj ann e sel | getUnique sel `Set.member` rules -> Proj ann e (plainName sel)
-  e -> e
 
 -- | The field-name references of each record, keyed by record name, so a
 -- positional construction (@Bullet "A" "B"@) can be matched up with its fields.
