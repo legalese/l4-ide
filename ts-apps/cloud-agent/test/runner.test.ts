@@ -28,7 +28,7 @@ import {
   type RunnerPlugin,
 } from '../src/runner.js'
 import {
-  FakeAiProxy,
+  FakeAiServer,
   HOST_PATH,
   MemoryLogger,
   SID,
@@ -68,8 +68,8 @@ describe('Runner', () => {
   let sessionDir: string
   let stateDir: string
   let cleanup: () => Promise<void>
-  let proxy: FakeAiProxy
-  let proxyUrl: string
+  let aiServer: FakeAiServer
+  let aiServerUrl: string
   let logger: MemoryLogger
   let chain: FakeChain
   let l4: StubL4
@@ -79,17 +79,17 @@ describe('Runner', () => {
     ;({ dir: root, cleanup } = await tempDir())
     sessionDir = await initSessionFolder(root, SID, 1_000)
     stateDir = path.join(sessionDir, 'state')
-    // Run 1, as the Sessions API's start leaves it (§7.3).
+    // Run 1, as the Sessions API's start leaves it.
     run = await claimDevRun(root, SID)
-    proxy = new FakeAiProxy()
-    proxyUrl = await proxy.start()
+    aiServer = new FakeAiServer()
+    aiServerUrl = await aiServer.start()
     logger = new MemoryLogger()
     chain = new FakeChain()
     l4 = new StubL4()
   })
 
   afterEach(async () => {
-    await proxy.stop()
+    await aiServer.stop()
     await cleanup()
   })
 
@@ -112,7 +112,7 @@ describe('Runner', () => {
       chain,
       workspace: new NodeWorkspace(path.join(sessionDir, 'repo')),
       l4,
-      aiEndpoint: { url: proxyUrl, local: false },
+      aiEndpoint: { url: aiServerUrl, local: false },
       plugins: opts.plugins,
       extensionVersion: 'test',
       idleExitMs: opts.idleExitMs ?? 60_000,
@@ -136,7 +136,7 @@ describe('Runner', () => {
     )
 
   test('runs a turn with a tool call, then sleeps when idle', async () => {
-    proxy.scripts.push(
+    aiServer.scripts.push(
       [
         metadata('conv1'),
         toolCall('call1', 'fs__create_file', { path: 'data/notes/a.l4' }),
@@ -178,8 +178,8 @@ describe('Runner', () => {
         )
       ).length > 0
     )
-    // ai-proxy saw the session header and the agent key.
-    const chats = proxy.chatRequests()
+    // The AI service saw the session header and the agent key.
+    const chats = aiServer.chatRequests()
     assert.equal(chats.length, 2)
     assert.equal(chats[0]!.headers['x-legalese-session'], SID)
     assert.equal(chats[0]!.headers.authorization, 'Bearer sk_test_key_123')
@@ -232,7 +232,7 @@ describe('Runner', () => {
   })
 
   test('asks the user through events and continues on an answer command', async () => {
-    proxy.scripts.push(
+    aiServer.scripts.push(
       [
         metadata('conv2'),
         toolCall('ask1', 'meta__ask_user', {
@@ -278,7 +278,7 @@ describe('Runner', () => {
       5_000,
       'done'
     )
-    const toolResult = proxy.chatRequests()[1]!.body.messages as Array<{
+    const toolResult = aiServer.chatRequests()[1]!.body.messages as Array<{
       role: string
       content: string
     }>
@@ -292,8 +292,8 @@ describe('Runner', () => {
 
   test('parks when the key chain ends, keeping queued commands for later', async () => {
     let release!: () => void
-    proxy.hold = new Promise((r) => (release = r))
-    proxy.scripts.push([
+    aiServer.hold = new Promise((r) => (release = r))
+    aiServer.scripts.push([
       metadata('conv3'),
       chunk({ content: 'hi' }),
       chunk({}, 'stop'),
@@ -302,7 +302,7 @@ describe('Runner', () => {
     const done = runner.run()
     await sendCommand(root, SID, { type: 'message', turnId: 't1', text: 'one' })
     await sendCommand(root, SID, { type: 'message', turnId: 't2', text: 'two' })
-    await waitUntil(() => proxy.requests.length > 0, 5_000, 'first request')
+    await waitUntil(() => aiServer.requests.length > 0, 5_000, 'first request')
     runner.onChainEnded('chain_forked')
     release()
     assert.equal(await done, 'parked')
@@ -339,7 +339,7 @@ describe('Runner', () => {
   })
 
   test('SIGTERM aborts the running turn and exits', async () => {
-    proxy.hold = new Promise(() => undefined) // never answers
+    aiServer.hold = new Promise(() => undefined) // never answers
     const runner = build()
     const done = runner.run()
     await sendCommand(root, SID, {
@@ -347,7 +347,7 @@ describe('Runner', () => {
       turnId: 't1',
       text: 'long',
     })
-    await waitUntil(() => proxy.requests.length > 0, 5_000, 'request')
+    await waitUntil(() => aiServer.requests.length > 0, 5_000, 'request')
     runner.terminate()
     assert.equal(await done, 'sigterm')
     const events = await readEvents(stateDir)
@@ -379,12 +379,12 @@ describe('Runner', () => {
 
   test('superseded mid-turn: stops at once and writes nothing more', async () => {
     let release!: () => void
-    proxy.hold = new Promise((r) => (release = r))
-    proxy.scripts.push([metadata('conv6'), chunk({ content: 'hi' })])
+    aiServer.hold = new Promise((r) => (release = r))
+    aiServer.scripts.push([metadata('conv6'), chunk({ content: 'hi' })])
     const runner = build({ leaseRenewMs: 30 })
     const done = runner.run()
     await sendCommand(root, SID, { type: 'message', turnId: 't1', text: 'go' })
-    await waitUntil(() => proxy.requests.length > 0)
+    await waitUntil(() => aiServer.requests.length > 0)
     await waitUntil(async () => (await lease()).state === 'busy')
     // A newer run is started (the API passed this one over).
     await claimDevRun(root, SID)
@@ -487,8 +487,8 @@ describe('Runner', () => {
 
   test('aborts a queued turn before it starts', async () => {
     let release!: () => void
-    proxy.hold = new Promise((r) => (release = r))
-    proxy.scripts.push([
+    aiServer.hold = new Promise((r) => (release = r))
+    aiServer.scripts.push([
       metadata('conv4'),
       chunk({ content: 'one' }),
       chunk({}, 'stop'),
@@ -497,7 +497,7 @@ describe('Runner', () => {
     const done = runner.run()
     await sendCommand(root, SID, { type: 'message', turnId: 't1', text: 'one' })
     await sendCommand(root, SID, { type: 'message', turnId: 't2', text: 'two' })
-    await waitUntil(() => proxy.requests.length > 0)
+    await waitUntil(() => aiServer.requests.length > 0)
     await sendCommand(root, SID, { type: 'abort', turnId: 't2' })
     await waitUntil(async () =>
       (await readEvents(stateDir)).some(
@@ -514,7 +514,7 @@ describe('Runner', () => {
     await sendCommand(root, SID, { type: 'stop' })
     assert.equal(await done, 'stop')
     // Only t1 reached the model.
-    assert.equal(proxy.chatRequests().length, 1)
+    assert.equal(aiServer.chatRequests().length, 1)
     const users = (await readEvents(stateDir)).filter(
       (e) => e.type === 'user-message'
     )
@@ -530,7 +530,7 @@ describe('Runner', () => {
     let release!: () => void
     const hook = new Promise<void>((r) => (release = r))
     let inHook = false
-    proxy.scripts.push([metadata('conv5'), chunk({}, 'stop')])
+    aiServer.scripts.push([metadata('conv5'), chunk({}, 'stop')])
     const runner = build({
       plugins: [
         {
@@ -561,13 +561,13 @@ describe('Runner', () => {
     )
     await sendCommand(root, SID, { type: 'stop' })
     assert.equal(await done, 'stop')
-    assert.equal(proxy.chatRequests().length, 0)
+    assert.equal(aiServer.chatRequests().length, 0)
   })
 
   test('deletes run without approval; the model recovers from tmp/deleted and keeps notes in tmp', async () => {
     const repo = path.join(sessionDir, 'repo')
     await writeFile(path.join(repo, 'data', 'keep.l4'), 'precious\n')
-    proxy.scripts.push(
+    aiServer.scripts.push(
       [
         metadata('conv8'),
         toolCall('d1', 'fs__delete_file', { path: 'data/keep.l4' }),
@@ -596,14 +596,14 @@ describe('Runner', () => {
     await sendCommand(root, SID, { type: 'stop' })
     assert.equal(await done, 'stop')
     // The standing note rides on the prompt.
-    const first = proxy.chatRequests()[0]!.body.messages as Array<{
+    const first = aiServer.chatRequests()[0]!.body.messages as Array<{
       role: string
       content: string
     }>
     assert.match(first.at(-1)!.content, /tmp\/deleted\/t-t1\//)
     assert.match(first.at(-1)!.content, /live in data\//)
     // The delete ran without asking, and was copied first.
-    const read = proxy.chatRequests()[2]!.body.messages as Array<{
+    const read = aiServer.chatRequests()[2]!.body.messages as Array<{
       content: string
     }>
     assert.match(read[0]!.content, /precious/)
@@ -695,7 +695,7 @@ describe('Runner', () => {
   })
 
   test('message context: the active file and mentions reach the model', async () => {
-    proxy.scripts.push([
+    aiServer.scripts.push([
       metadata('conv9'),
       chunk({ content: 'ok' }),
       chunk({}, 'stop'),
@@ -713,7 +713,7 @@ describe('Runner', () => {
     )
     await sendCommand(root, SID, { type: 'stop' })
     assert.equal(await done, 'stop')
-    const msgs = proxy.chatRequests()[0]!.body.messages as Array<{
+    const msgs = aiServer.chatRequests()[0]!.body.messages as Array<{
       role: string
       content: string
     }>
@@ -727,15 +727,15 @@ describe('Runner', () => {
   })
 
   test('commits each turn and rolls it back through commands (git plugin)', async () => {
-    proxy.scripts.push([
+    aiServer.scripts.push([
       metadata('conv5'),
       chunk({ content: 'Let me create it.' }),
       toolCall('c1', 'fs__create_file', { path: 'data/rule.l4' }),
       chunk({}, 'tool_calls'),
     ])
-    proxy.scripts.push([chunk({ content: 'Created.' }), chunk({}, 'stop')])
-    // The summize pipeline writes titles and commit subjects.
-    proxy.summize = (body) =>
+    aiServer.scripts.push([chunk({ content: 'Created.' }), chunk({}, 'stop')])
+    // The summize model writes titles and commit subjects.
+    aiServer.summize = (body) =>
       JSON.stringify(body).includes('Commit subject:')
         ? '"Create the rule file."'
         : 'A title'
@@ -787,7 +787,7 @@ describe('Runner', () => {
     // One stateless request with the session header: the user's own
     // prompt (not the standing note), the final reply (not the interim
     // text before the tool call) and the changed paths.
-    const asks = proxy
+    const asks = aiServer
       .summizeRequests()
       .filter((r) => JSON.stringify(r.body).includes('Commit subject:'))
     assert.equal(asks.length, 1)
@@ -837,7 +837,7 @@ describe('Runner', () => {
         }
       )
     }) as typeof fetch
-    proxy.scripts.push(
+    aiServer.scripts.push(
       [
         metadata('conv7'),
         toolCall('m1', 'vsmcp__docs_lookup', {}),
@@ -875,11 +875,11 @@ describe('Runner', () => {
     )
     await sendCommand(root, SID, { type: 'stop' })
     assert.equal(await done, 'stop')
-    const tools = proxy.chatRequests()[0]!.body.tools as Array<{
+    const tools = aiServer.chatRequests()[0]!.body.tools as Array<{
       function: { name: string }
     }>
     assert.ok(tools.some((t) => t.function.name === 'vsmcp__docs_lookup'))
-    const toolMsg = proxy.chatRequests()[1]!.body.messages as Array<{
+    const toolMsg = aiServer.chatRequests()[1]!.body.messages as Array<{
       content: string
     }>
     assert.equal(toolMsg[0]!.content, 'looked up')

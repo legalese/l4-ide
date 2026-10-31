@@ -1,8 +1,7 @@
 /**
- * jl4-auth-proxy calls a cloud session needs from the extension
- * (spec §6.1, §6.2, §15.5):
+ * Legalese Cloud API calls a cloud session needs from the extension:
  *
- * - `GET /auth/access-token` — the short-lived WorkOS JWT the Sessions
+ * - `GET /auth/access-token` — the short-lived JWT the Sessions
  *   API and git accept. Cached until shortly before it expires; a
  *   rotated sealed session in the response (`token`) is stored in place
  *   of the old one.
@@ -23,7 +22,7 @@ import {
 export type FetchFn = typeof fetch
 
 /** The user isn't signed in to Legalese Cloud (no sealed session, or
- *  jl4-auth-proxy rejected it). */
+ *  the server rejected it). */
 export class NotSignedInError extends Error {
   constructor(message = 'Sign in to Legalese Cloud to use cloud sessions.') {
     super(message)
@@ -31,19 +30,19 @@ export class NotSignedInError extends Error {
   }
 }
 
-/** A jl4-auth-proxy call failed with an HTTP error or a bad body. */
-export class AuthProxyError extends Error {
+/** A Legalese Cloud API call failed with an HTTP error or a bad body. */
+export class CloudApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly code?: string
   ) {
     super(message)
-    this.name = 'AuthProxyError'
+    this.name = 'CloudApiError'
   }
 }
 
-export interface AuthProxyDeps {
+export interface CloudApiDeps {
   /** e.g. `https://legalese.cloud` */
   authBaseUrl: () => string
   /** The stored sealed session, if any. */
@@ -70,7 +69,7 @@ async function errorCode(res: Response): Promise<string | undefined> {
 }
 
 /**
- * Hands out the WorkOS access token for the Sessions API. Concurrent
+ * Hands out the access token for the Sessions API. Concurrent
  * callers share one refresh.
  */
 export class AccessTokenManager {
@@ -82,7 +81,7 @@ export class AccessTokenManager {
   private readonly fetchFn: FetchFn
   private readonly now: () => number
 
-  constructor(private readonly deps: AuthProxyDeps) {
+  constructor(private readonly deps: CloudApiDeps) {
     this.fetchFn = deps.fetch ?? fetch
     this.now = deps.now ?? Date.now
   }
@@ -137,7 +136,7 @@ export class AccessTokenManager {
       )
     }
     if (!res.ok) {
-      throw new AuthProxyError(
+      throw new CloudApiError(
         `Could not get an access token (HTTP ${res.status}).`,
         res.status,
         await errorCode(res)
@@ -148,12 +147,12 @@ export class AccessTokenManager {
       body = accessTokenResponse(await res.json(), 'accessToken')
     } catch (err) {
       if (err instanceof ProtocolError || err instanceof SyntaxError) {
-        throw new AuthProxyError('Malformed access-token response.', res.status)
+        throw new CloudApiError('Malformed access-token response.', res.status)
       }
       throw err
     }
     if (body.token && body.token !== session) {
-      // jl4-auth-proxy refreshed the WorkOS session: keep the rotation,
+      // The server refreshed the session: keep the rotation,
       // or the next refresh would present a spent refresh token.
       await this.deps.storeSessionToken(body.token, session)
     }
@@ -161,9 +160,9 @@ export class AccessTokenManager {
   }
 }
 
-/** Mint the first key of a session's key chain (§6.2). */
+/** Mint the first key of a session's key chain. */
 export async function mintAgentKey(
-  deps: AuthProxyDeps,
+  deps: CloudApiDeps,
   sessionId: string
 ): Promise<MintAgentKeyResponse> {
   const session = await deps.getSessionToken()
@@ -181,7 +180,7 @@ export async function mintAgentKey(
   if (res.status === 401) throw new NotSignedInError()
   if (!res.ok) {
     const code = await errorCode(res)
-    throw new AuthProxyError(
+    throw new CloudApiError(
       res.status === 403
         ? 'Your account is not allowed to run cloud sessions.'
         : `Could not authorise the cloud session (HTTP ${res.status}${code ? `, ${code}` : ''}).`,
@@ -193,7 +192,7 @@ export async function mintAgentKey(
     return mintAgentKeyResponse(await res.json(), 'agentKey')
   } catch (err) {
     if (err instanceof ProtocolError || err instanceof SyntaxError) {
-      throw new AuthProxyError('Malformed agent-token response.', res.status)
+      throw new CloudApiError('Malformed agent-token response.', res.status)
     }
     throw err
   }

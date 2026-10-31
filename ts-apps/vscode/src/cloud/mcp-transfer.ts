@@ -1,5 +1,5 @@
 /**
- * The user's HTTP / SSE MCP servers in a cloud session (spec §6.4).
+ * The user's HTTP / SSE MCP servers in a cloud session.
  *
  * - Configuration (names, URLs, enabled tools — no secrets) goes into
  *   `POST /sessions` and from there into `session.json`.

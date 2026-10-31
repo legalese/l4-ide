@@ -37,7 +37,7 @@ async function throwWithBody(resp: Response, context: string): Promise<never> {
 }
 
 /**
- * REST client for jl4-service behind the auth proxy.
+ * REST client for jl4-service.
  *
  * All requests use the AuthManager for credentials and service URL resolution.
  * Dataplane callers pass canonical jl4-service paths (`/deployments/...`);
@@ -240,7 +240,7 @@ export class ServiceClient {
 
   /**
    * Health check. Targets the org subdomain (or self-hosted URL) directly —
-   * `/health` is an ALB-level probe with no `/{slug}` prefix, so it never
+   * `/health` is a host-level probe with no `/{slug}` prefix, so it never
    * routes through `api.legalese.cloud`.
    */
   async getHealth(): Promise<ServiceHealth> {

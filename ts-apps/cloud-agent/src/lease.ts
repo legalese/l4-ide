@@ -12,7 +12,7 @@ import type { Logger } from '@repo/legalese-agent'
 import { isErrno, readKnownText, writeAtomic } from './safe-fs.js'
 
 /**
- * Run records (spec §7.3). The Sessions API decides who runs a session:
+ * Run records. The Sessions API decides who runs a session:
  * its `start` exclusive-creates `state/runs/<n>.json` and writes run n's
  * lease as `starting`, then starts a task with `SESSION_RUN=<n>`. The
  * harness never decides; it only proves it is the current run, and stops
@@ -136,7 +136,7 @@ export async function newerRunExists(
 }
 
 /**
- * Whether this harness is run `run` and may start (§7.3): its record
+ * Whether this harness is run `run` and may start: its record
  * exists, no newer run's does, and the lease written for it (the Sessions
  * API's `starting` lease, or an earlier write) is still valid with the
  * margin. Writes nothing. Returns the lease's expiry to arm the fence
@@ -181,11 +181,10 @@ export type HarnessLeaseState = Exclude<RunLeaseFile['state'], 'starting'>
 
 /**
  * Run n's lease, `state/runs/<n>.lease.json { run, taskId, state,
- * turnId?, expiresAt }` (§7.3). Every write goes through the fence and
+ * turnId?, expiresAt }`. Every write goes through the fence and
  * re-arms it; a renewal first checks that no newer run exists and stops
  * the run (via `onSuperseded`) when one does. Releasing writes it expired
- * (the API reads it by name; a deleted name would be cached as missing),
- * then closes the fence.
+ * instead of deleting it, then closes the fence.
  */
 export class RunLease {
   private state: HarnessLeaseState = 'running'

@@ -31,7 +31,7 @@ const good = {
   SESSION_ID: SID,
   SESSION_RUN: '7',
   AGENT_KEY: 'sk_live_abcdefgh12345',
-  AI_PROXY_URL: 'https://ai.legalese.cloud/',
+  AI_URL: 'https://ai.legalese.cloud/',
   MCP_URL: 'https://mcp.legalese.cloud',
   AUTH_URL: 'https://legalese.cloud',
   LOG_LEVEL: 'info',
@@ -41,13 +41,13 @@ describe('parseCloudEnv', () => {
   test('accepts the documented environment', () => {
     const cfg = parseCloudEnv({
       ...good,
-      ECS_CONTAINER_METADATA_URI_V4: 'http://169.254.170.2/v4/abc-123',
+      TASK_ID: 'abc-123',
     })
     assert.equal(cfg.mode, 'cloud')
     assert.equal(cfg.run, 7)
     assert.equal(cfg.root, '/workspace')
-    assert.equal(cfg.aiProxyUrl, 'https://ai.legalese.cloud')
-    assert.equal(cfg.taskMetadataUri, 'http://169.254.170.2/v4/abc-123')
+    assert.equal(cfg.aiUrl, 'https://ai.legalese.cloud')
+    assert.equal(cfg.taskId, 'abc-123')
   })
 
   for (const [name, value, re] of [
@@ -59,7 +59,7 @@ describe('parseCloudEnv', () => {
     ['SESSION_RUN', '1/../2', /SESSION_RUN/],
     ['SESSION_RUN', '1234567890', /SESSION_RUN/],
     ['AGENT_KEY', 'pk_nope', /sk_/],
-    ['AI_PROXY_URL', 'http://ai.legalese.cloud', /https/],
+    ['AI_URL', 'http://ai.legalese.cloud', /https/],
     ['MCP_URL', 'https://user:pw@mcp.legalese.cloud', /credentials/],
     ['AUTH_URL', undefined, /required/],
     ['LOG_LEVEL', 'loud', /LOG_LEVEL/],
@@ -72,12 +72,12 @@ describe('parseCloudEnv', () => {
     })
   }
 
-  test('ignores a task metadata URI that is not the Fargate endpoint', () => {
+  test('ignores a TASK_ID that is not a plain id', () => {
     const cfg = parseCloudEnv({
       ...good,
-      ECS_CONTAINER_METADATA_URI_V4: 'http://evil.example/v4/x',
+      TASK_ID: '../x',
     })
-    assert.equal(cfg.taskMetadataUri, undefined)
+    assert.equal(cfg.taskId, undefined)
   })
 })
 
@@ -93,7 +93,7 @@ describe('parseDevArgs', () => {
     ])
     assert.equal(a.root, '/tmp/x')
     assert.equal(a.init, true)
-    assert.equal(a.aiProxyUrl, 'http://127.0.0.1:3000')
+    assert.equal(a.aiUrl, 'http://127.0.0.1:3000')
     assert.equal(a.lspCommand, 'jl4-lsp')
   })
   test('requires a ULID session', () => {
@@ -136,7 +136,7 @@ describe('runHarness ends the key chain on an early exit', () => {
   beforeEach(async () => {
     ;({ dir: root, cleanup } = await tempDir())
     calls = []
-    // jl4-auth-proxy: end answers 204, renew refuses the key.
+    // The server: end answers 204, renew refuses the key.
     globalThis.fetch = (async (input: string | URL | Request, init) => {
       const url = String(input)
       calls.push({ url, auth: new Headers(init?.headers).get('authorization') })
@@ -159,7 +159,7 @@ describe('runHarness ends the key chain on an early exit', () => {
     run,
     agentKey: good.AGENT_KEY,
     root,
-    aiProxyUrl: 'https://ai.legalese.cloud',
+    aiUrl: 'https://ai.legalese.cloud',
     aiLocal: false,
     authUrl: 'https://legalese.cloud',
     logLevel: 'info',
@@ -253,13 +253,13 @@ describe('JsonLogger', () => {
       'chat/request conv=c1 [redacted]'
     )
     assert.equal(
-      redact('proxy/error status=500 body={"error":"quote: Acme Ltd"}'),
-      'proxy/error status=500 [redacted]'
+      redact('ai/error status=500 body={"error":"quote: Acme Ltd"}'),
+      'ai/error status=500 [redacted]'
     )
   })
 })
 
-describe('--dev runs (§7.3)', () => {
+describe('--dev runs', () => {
   test('claims the next run as the Sessions API does', async () => {
     const { dir: root, cleanup } = await tempDir()
     try {
@@ -300,8 +300,8 @@ describe('child processes', () => {
     HOME: '/home/agent',
     TMPDIR: '/tmp/agent',
     AGENT_KEY: 'sk_live_abcdefgh12345',
-    AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: '/v2/credentials/x',
-    AI_PROXY_URL: 'https://ai.legalese.cloud',
+    CLOUD_CREDENTIALS_URI: '/credentials/x',
+    AI_URL: 'https://ai.legalese.cloud',
   }
 
   test('childEnv keeps only PATH, HOME, TMPDIR and a locale', () => {

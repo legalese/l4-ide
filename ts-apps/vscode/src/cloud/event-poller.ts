@@ -1,6 +1,5 @@
 /**
- * Polls `GET /events` for the cloud sessions this window watches
- * (spec §8, "Polling"):
+ * Polls `GET /events` for the cloud sessions this window watches:
  *
  * - every second while any watched session is `busy` (or `starting`,
  *   so a cold start shows up as soon as it's ready),
@@ -8,7 +7,7 @@
  * - not at all for `sleeping` / `parked` sessions until the user acts
  *   ({@link EventPoller.poke}); after an action a session is polled for
  *   a grace period whatever its state, since a start takes a moment to
- *   show up in ECS,
+ *   show up,
  * - immediately again when a response says `more`.
  *
  * Up to 10 sessions share one request; more are split across requests.

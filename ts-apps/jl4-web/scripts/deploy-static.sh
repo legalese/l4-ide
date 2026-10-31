@@ -1,7 +1,6 @@
 #!/bin/bash
-# Upload a jl4-web build to the S3 bucket behind play.legalese.com and refresh
-# CloudFront. main-tag.yml runs this after each release; the bucket and
-# distribution come from terraform/web-editor/ in legalese/jl4-auth-proxy.
+# Upload a jl4-web build for play.legalese.com and refresh the CDN.
+# main-tag.yml runs this after each release.
 #
 # Usage: ./scripts/deploy-static.sh <build-dir> <bucket> <distribution-id> [--dryrun]
 #
@@ -11,7 +10,7 @@
 # - Everything else (index.html, _app/version.json, ...) is revalidated on each
 #   load, replaced and invalidated, so the next load picks up the new release's
 #   file names.
-# - CloudFront only compresses files up to 10 MB, so larger ones are uploaded
+# - The CDN only compresses files up to 10 MB, so larger ones are uploaded
 #   as the brotli copy SvelteKit's precompress already made.
 
 set -euo pipefail
@@ -33,7 +32,7 @@ fi
 
 IMMUTABLE="public, max-age=31536000, immutable"
 REVALIDATE="public, max-age=0, must-revalidate, s-maxage=31536000"
-CLOUDFRONT_COMPRESS_LIMIT=10000000
+CDN_COMPRESS_LIMIT=10000000
 
 content_type() {
     case "$1" in
@@ -55,7 +54,7 @@ is_versioned() {
 
 cd "$BUILD_DIR"
 
-# 1. Files CloudFront won't compress, uploaded already brotli-encoded (or as
+# 1. Files the CDN won't compress, uploaded already brotli-encoded (or as
 # they are, if there is no brotli copy).
 EXCLUDE_BIG=()
 while IFS= read -r file; do
@@ -69,7 +68,7 @@ while IFS= read -r file; do
             --content-type "$(content_type "$key")" --cache-control "$cache"
     fi
     EXCLUDE_BIG+=(--exclude "$key")
-done < <(find . -type f ! -name '*.br' ! -name '*.gz' -size +"$CLOUDFRONT_COMPRESS_LIMIT"c)
+done < <(find . -type f ! -name '*.br' ! -name '*.gz' -size +"$CDN_COMPRESS_LIMIT"c)
 
 # 2. Versioned files: hashed names, so a matching size means the same file.
 aws s3 sync ${DRYRUN[@]+"${DRYRUN[@]}"} . "s3://$BUCKET/" --size-only \
@@ -85,7 +84,7 @@ while IFS= read -r file; do
     aws s3 cp ${DRYRUN[@]+"${DRYRUN[@]}"} "$key" "s3://$BUCKET/$key" \
         --content-type "$(content_type "$key")" --cache-control "$IMMUTABLE"
 done < <(find ./_app/immutable ./wasm -type f \( -name '*.mjs' -o -name '*.wasm' \) \
-    -size -"$((CLOUDFRONT_COMPRESS_LIMIT + 1))"c 2>/dev/null)
+    -size -"$((CDN_COMPRESS_LIMIT + 1))"c 2>/dev/null)
 
 # 3. Everything else, replaced on each deploy. wasm-test.html is a dev page that
 # loads unversioned WASM paths, so it isn't published. index.html goes last, once
@@ -100,7 +99,7 @@ aws s3 sync ${DRYRUN[@]+"${DRYRUN[@]}"} . "s3://$BUCKET/" --delete --no-progress
 aws s3 cp ${DRYRUN[@]+"${DRYRUN[@]}"} index.html "s3://$BUCKET/index.html" \
     --content-type "text/html" --cache-control "$REVALIDATE"
 
-# 4. Drop CloudFront's copies of what step 3 replaced or deleted. Only those: a
+# 4. Drop the CDN's copies of what step 3 replaced or deleted. Only those: a
 # blanket /* would also flush the edge copies of every share link and the WASM.
 PATHS=(/)
 while IFS= read -r file; do

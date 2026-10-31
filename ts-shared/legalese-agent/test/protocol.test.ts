@@ -430,7 +430,7 @@ describe('files added mid-session', () => {
         uploads: [
           {
             path: 'data/a.l4',
-            url: 'https://s3.example/x',
+            url: 'https://files.example/x',
             method: 'PUT',
             headers: {},
             maxBytes: 10,

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import {
-  AiProxyClient,
+  AiClient,
   BuiltinTools,
   ChatService,
   FileConversationStore,
@@ -19,7 +19,7 @@ import {
   silentLogger,
 } from './fakes.js'
 
-/** One scripted ai-proxy response: SSE frames. */
+/** One scripted AI server response: SSE frames. */
 type Script = string[]
 
 function sse(frames: Script): Response {
@@ -83,7 +83,7 @@ describe('ChatService with fake ports', () => {
     const l4 = new FakeL4Language(ws)
     const interaction = new RecordingInteraction()
     const store = new FileConversationStore(storeDir, silentLogger, () => 'u1')
-    const proxy = new AiProxyClient({
+    const aiClient = new AiClient({
       auth,
       logger: silentLogger,
       endpoint: () => ({ url: 'https://ai.test', local: false }),
@@ -97,7 +97,7 @@ describe('ChatService with fake ports', () => {
     const service = new ChatService({
       auth,
       store,
-      proxy,
+      aiClient,
       logger: silentLogger,
       dispatcher,
       interaction,
@@ -388,7 +388,7 @@ describe('ChatService with fake ports', () => {
     assert.equal(await store.load('conv1'), null)
   })
 
-  test('surfaces proxy errors as error events', async () => {
+  test('surfaces AI service errors as error events', async () => {
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({ error: { message: 'slow down', code: 'rate' } }),

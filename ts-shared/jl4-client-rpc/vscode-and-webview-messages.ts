@@ -340,7 +340,7 @@ export interface SidebarDeploymentInfo {
   description?: string
   functions: ExportedFunctionInfo[]
   /** True when the backend returned a non-empty `metadata.files` list.
-   * Empty/missing on a `ready` deployment indicates the proxy stripped
+   * Empty/missing on a `ready` deployment indicates the server stripped
    * the file list (read scope absent), so the Download action should
    * be hidden from the deployment menu. */
   hasFiles?: boolean
@@ -635,7 +635,7 @@ export const SidebarConnectionStatusChanged: NotificationType<GetSidebarConnecti
             Legalese AI chat tab messages
 **************************************************************/
 
-/** An OpenAI-shaped chat message. The server-side ai-proxy accepts the
+/** An OpenAI-shaped chat message. The AI service accepts the
  * standard OpenAI format including role "user" | "assistant" | "tool",
  * tool_calls on assistant, tool_call_id on tool. Phase 1 only exchanges
  * plain user/assistant text; later phases carry richer shapes.
@@ -645,7 +645,7 @@ export interface AiChatMessage {
   /** String for plain-text turns (the common case). When the turn
    *  carries multimodal attachments, a user message instead ships an
    *  OpenAI-shaped array of `content parts` (see `AiChatContentPart`)
-   *  that the ai-proxy translates to each provider's native block
+   *  that the AI service translates to each provider's native block
    *  shape. */
   content: string | AiChatContentPart[] | null
   tool_calls?: Array<{
@@ -688,7 +688,7 @@ export interface AiConversation {
    *  chat" from the Deployment tab). Stamped once at creation and
    *  never rewritten so follow-up turns — even after a webview reload
    *  or history reopen — keep routing to the same deployment endpoint
-   *  rather than the default Legalese AI proxy. */
+   *  rather than the default Legalese AI endpoint. */
   deploymentId?: string
   /** Resolved deployment-scoped OpenAI-compatible base URL
    *  (`https://ai.legalese.cloud/{orgSlug}/{deploymentId}`). Paired
@@ -733,7 +733,7 @@ export interface AiChatStartParams {
   /** Multimodal attachments assembled by the webview via
    * `AiChatPickAttachment`. The extension ships these as OpenAI-shaped
    * `image_url` / `file` content parts on the user message; the
-   * ai-proxy translates to the provider's native shape. `.docx` /
+   * AI service translates to the provider's native shape. `.docx` /
    * `.xlsx` are never shipped — they aren't native on either API, so
    * the picker nudges the user to save as PDF. */
   attachments: AiChatAttachment[]
@@ -838,7 +838,7 @@ export const AiChatAbort: NotificationType<{ turnId: string }> = {
  * (signalled via `AiChatTurnSpawn`) seeded with the drained user
  * text. When the prior sub-turn ended mid-tool-round, its leftover
  * `role:'tool'` results ride along on the new sub-turn's request so
- * the proxy commits a clean assistant(tool_calls) → tool(results)
+ * the AI service commits a clean assistant(tool_calls) → tool(results)
  * → user sequence; otherwise the new sub-turn just carries the
  * editor-context + user delta.
  *
@@ -1188,7 +1188,7 @@ export const AiToolRenderMeta: RequestType<
 }
 
 /** Extension → webview: a server-side tool activity event (from the
- * ai-proxy's backend tools like `search_l4_docs`). Deduped client-side
+ * AI service's tools like `search_l4_docs`). Deduped client-side
  * by `tool`+`status` so long sequences collapse into a single row. */
 export const AiChatToolActivity: NotificationType<{
   conversationId: string
@@ -1196,13 +1196,13 @@ export const AiChatToolActivity: NotificationType<{
   status: 'running' | 'done' | 'error'
   /** Bold action prefix the webview shows in front of `message`
    *  (e.g. "L4 Deployments", "Compacting...", "Legalesing...",
-   *  "L4 Rule"). Set by the proxy so the webview doesn't need a
+   *  "L4 Rule"). Set by the AI service so the webview doesn't need a
    *  per-tool name → label map. Absent on activities emitted by
-   *  older proxy builds — webview falls back to a sane default. */
+   *  older servers — webview falls back to a sane default. */
   label?: string
   message: string
   /** Verbatim model-supplied arguments — present only for L4 Rule
-   *  activities (the proxy emits this only when its descriptor is
+   *  activities (the AI service emits this only when its descriptor is
    *  `kind: "rule"`). Combined with `ruleId` (or `evaluate_rule`'s
    *  `input.function_name`), the webview renders this activity as an
    *  L4 Rule card identical to a client-side tool-call instead of the
@@ -1217,8 +1217,7 @@ export const AiChatToolActivity: NotificationType<{
   /** Error detail when status is `error`. */
   error?: string
   /** URL citations carried by a synthetic `web_search` activity — the
-   *  upstream provider ran a native web search (Anthropic's
-   *  `web_search_20250305` via OpenRouter) and the proxy aggregated
+   *  model provider ran a native web search and the AI service aggregated
    *  the resulting `url_citation` annotations into this list. Empty /
    *  absent on every other activity; the webview renders these as the
    *  "Sources:" section of the turn's review card. */
@@ -1309,7 +1308,7 @@ export const AiChatTextDelta: NotificationType<{
 
 /** Extension → webview: incremental reasoning / thinking text. Rendered
  * as a collapsed-by-default block that expands to show italic gray
- * text. Forwarded from the ai-proxy's `event: thinking_delta` SSE
+ * text. Forwarded from the AI service's `event: thinking_delta` SSE
  * frames. */
 export const AiChatThinkingDelta: NotificationType<{
   conversationId: string
@@ -1441,7 +1440,7 @@ export const AiUsageUpdate: NotificationType<{
  * Voice dictation for the chat input. The microphone lives on the host
  * side of the messenger: a VSCode webview can't open one, so the
  * extension records natively; the standalone web chat records in the
- * page. Either way the clip goes to the ai-proxy's speech-to-text
+ * page. Either way the clip goes to the AI service's speech-to-text
  * endpoint (`legalese-listen-4`) and the transcript comes back here for
  * the input to insert.
  */

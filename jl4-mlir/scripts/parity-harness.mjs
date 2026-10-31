@@ -54,7 +54,7 @@ if (files.length === 0) {
   // fixtures (simple cascade + record-typed parties + explicit
   // BREACH BY/BECAUSE).
   files.push(
-    path.join(REPO_ROOT, "..", "jl4-auth-proxy", "validation", "test.l4"),
+    path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "test.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-sale.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-seatbelt.l4"),
     path.join(REPO_ROOT, "jl4-mlir", "test", "fixtures", "deontic-breach.l4"),

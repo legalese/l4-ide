@@ -1,5 +1,5 @@
-// Bundle the harness into one CommonJS file for the cloud-agent image
-// (cloud-sessions spec §5.3, §11). Node built-ins stay external; every
+// Bundle the harness into one CommonJS file for the cloud-agent image.
+// Node built-ins stay external; every
 // npm dependency (the agent core, vscode-jsonrpc) is inlined, so the
 // image needs only `node` and this file.
 import esbuild from 'esbuild'

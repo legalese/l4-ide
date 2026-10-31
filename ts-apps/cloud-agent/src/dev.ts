@@ -1,9 +1,9 @@
 /**
  * `--dev` helpers: create a session folder the way `POST /sessions`
- * does, claim a run the way `POST /sessions/:sid/start` does (§7.3), and
+ * does, claim a run the way `POST /sessions/:sid/start` does, and
  * queue commands the way `POST /sessions/:sid/commands` does (exclusive
  * create of the next number, then rewrite `commands.seq`), so a scripted
- * session can run against a local folder and a local ai-proxy.
+ * session can run against a local folder and a local AI server.
  */
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
@@ -46,7 +46,7 @@ export async function initSessionFolder(
   ]) {
     await fs.mkdir(path.join(root, d), { recursive: true })
   }
-  // No run yet (§7.3), as `POST /sessions` writes it.
+  // No run yet, as `POST /sessions` writes it.
   try {
     await createExclusive(path.join(root, p.runsSeq), '0\n')
   } catch (err) {
@@ -73,8 +73,8 @@ export async function initSessionFolder(
 }
 
 /**
- * Claim the session's next run the way the Sessions API's `start` does
- * (§7.3): exclusive-create `runs/<n>.json` after the latest, write its
+ * Claim the session's next run the way the Sessions API's `start` does:
+ * exclusive-create `runs/<n>.json` after the latest, write its
  * `starting` lease, then `runs.seq`. Returns the run number. A harness
  * still running an earlier run sees the new record at its next renewal
  * and stops.

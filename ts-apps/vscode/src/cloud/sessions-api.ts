@@ -1,6 +1,6 @@
 /**
- * Client for the Sessions API (spec §7.1, §8, §15.5). Every call carries
- * the WorkOS access token; a 401 refreshes it once and retries. Errors
+ * Client for the Sessions API. Every call carries
+ * the access token; a 401 refreshes it once and retries. Errors
  * come back as {@link SessionsApiError} with the `{ error }` code.
  *
  * No `vscode` import (unit-tested with a stubbed fetch).
@@ -36,7 +36,7 @@ import {
   type SessionState,
 } from '@repo/legalese-agent/protocol'
 import { isLegaleseCloudUrl } from '../legalese-cloud-url.js'
-import type { FetchFn } from './auth-proxy.js'
+import type { FetchFn } from './cloud-api.js'
 
 export class SessionsApiError extends Error {
   constructor(
@@ -104,7 +104,7 @@ function pathId(sid: string): string {
 export interface SessionsApiDeps {
   /** The Sessions API's base URL; '' = off. */
   baseUrl: () => string
-  /** WorkOS access token; `force` bypasses the cache. */
+  /** Access token; `force` bypasses the cache. */
   getAccessToken: (opts?: { force?: boolean }) => Promise<string>
   fetch?: FetchFn
 }
@@ -162,7 +162,7 @@ export class SessionsApiClient implements SessionsApi {
     return url
   }
 
-  /** `<Sessions API>/git/<sid>.git` (§9.2). */
+  /** `<Sessions API>/git/<sid>.git`. */
   gitUrl(sid: string): string {
     return `${this.base()}/git/${pathId(sid)}.git`
   }

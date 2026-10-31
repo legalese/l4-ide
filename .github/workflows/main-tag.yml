@@ -438,9 +438,7 @@ jobs:
   # ============================================
 
   # The headless Legalese AI harness for cloud sessions. This repository only
-  # publishes it (with jl4-lsp-linux-arm64) as release assets; the image is
-  # built and deployed from the cloud-sessions repo
-  # (deploy-cloud-sessions-agent.yml).
+  # publishes it (with jl4-lsp-linux-arm64) as release assets.
   build-cloud-agent:
     name: Build cloud agent bundle
     runs-on: ubuntu-latest
@@ -869,8 +867,7 @@ jobs:
           fi
 
           # Collect the cloud agent bundle and its language server (linux-arm64),
-          # each with a SHA256, for the cloud-sessions repo's
-          # deploy-cloud-sessions-agent.yml
+          # each with a SHA256.
           cp artifacts/cloud-agent/cloud-agent.cjs release-artifacts/cloud-agent.cjs
           cp artifacts/cloud-agent/cloud-agent.cjs.sha256 release-artifacts/cloud-agent.cjs.sha256
           cp artifacts/jl4-lsp-linux-arm64/jl4-lsp release-artifacts/jl4-lsp-linux-arm64
@@ -992,9 +989,8 @@ jobs:
   # ============================================
   # Deploy the web editor (play.legalese.com)
   # ============================================
-  # Runs once the release exists, with that release's WASM. The bucket and
-  # distribution come from terraform/web-editor/ in legalese/jl4-auth-proxy;
-  # until its outputs are set as repository variables, the job is skipped.
+  # Runs once the release exists, with that release's WASM. Until its target
+  # is set as repository variables, the job is skipped.
 
   deploy-web-editor:
     name: Deploy Web Editor
@@ -1008,7 +1004,7 @@ jobs:
       url: https://play.legalese.com
     permissions:
       contents: read
-      id-token: write # OIDC → AWS role assumption
+      id-token: write # OIDC
     env:
       RELEASE_TAG: ${{ needs.create-tag.outputs.tag }}
     steps:
@@ -1057,13 +1053,13 @@ jobs:
       - name: Build web editor
         run: npx turbo build --filter=jl4-web
 
-      - name: Configure AWS credentials
+      - name: Configure credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
 
-      - name: Upload to S3 and invalidate CloudFront
+      - name: Publish the web editor
         run: >-
           ts-apps/jl4-web/scripts/deploy-static.sh ts-apps/jl4-web/build
           "${{ vars.WEB_EDITOR_BUCKET }}" "${{ vars.WEB_EDITOR_DISTRIBUTION_ID }}"

@@ -22,7 +22,7 @@ export interface SessionFileUpdate {
 }
 
 /**
- * `session.json` (spec §4.2): created by the Sessions API, updated by
+ * `session.json`: created by the Sessions API, updated by
  * the harness (status, conversation id, last activity, parked reason).
  * Updates are read-modify-write through a temp file + rename; fields
  * the harness doesn't know are kept as they are.
@@ -33,7 +33,7 @@ export class SessionJson {
 
   constructor(
     private readonly sessionDir: string,
-    /** Checked before every write (§7.3); readers don't need one. */
+    /** Checked before every write; readers don't need one. */
     private readonly fence?: WriteFence
   ) {}
 

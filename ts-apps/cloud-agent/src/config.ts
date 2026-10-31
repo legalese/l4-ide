@@ -3,34 +3,33 @@ import { LOCAL_AI_ENDPOINT } from '@repo/legalese-agent'
 import { parseLogLevel, type LogLevel } from './logger.js'
 
 /**
- * Where the image puts the language server (cloud-sessions repo,
- * `agent-image/`).
+ * Where the image puts the language server.
  */
 export const DEFAULT_LSP_COMMAND = '/app/bin/jl4-lsp'
-/** The session task's mount (spec §5.1). */
+/** The session task's mount. */
 export const WORKSPACE_ROOT = '/workspace'
 
 export interface HarnessConfig {
   mode: 'cloud' | 'dev'
   sessionId: string
-  /** The run this harness is (`SESSION_RUN`, §7.3). In `--dev` the
+  /** The run this harness is (`SESSION_RUN`). In `--dev` the
    *  harness claims the next run itself. */
   run?: number
   /** `AGENT_KEY`; absent in `--dev`. */
   agentKey?: string
   /** The user folder: `/workspace` in the cloud, `--root` in dev. */
   root: string
-  aiProxyUrl: string
-  /** The ai-proxy is a developer's local one (`Bearer dev-local`). */
+  aiUrl: string
+  /** The AI service is a developer's local one (`Bearer dev-local`). */
   aiLocal: boolean
   /** l4-rules MCP endpoint; absent in dev unless `--mcp-url`. */
   mcpUrl?: string
-  /** jl4-auth-proxy; absent in dev. */
+  /** The Legalese Cloud API; absent in dev. */
   authUrl?: string
   logLevel: LogLevel
   lspCommand: string
-  /** Fargate task metadata endpoint, for the lease's task id. */
-  taskMetadataUri?: string
+  /** The task running this session, for its lease. */
+  taskId?: string
 }
 
 export class ConfigError extends Error {
@@ -39,22 +38,6 @@ export class ConfigError extends Error {
     this.name = 'ConfigError'
   }
 }
-
-/**
- * The environment the harness accepts (spec §5.1): the static
- * task-definition variables plus `SESSION_ID`, `SESSION_RUN` and
- * `AGENT_KEY` from the `RunTask` override. Everything is validated by pattern; the image's
- * entry point (cloud-sessions repo, `agent-image/`) already
- * dropped everything else, and this re-checks so the harness never trusts
- * its caller.
- */
-export const STATIC_ENV = [
-  'AI_PROXY_URL',
-  'MCP_URL',
-  'AUTH_URL',
-  'LOG_LEVEL',
-] as const
-export const OVERRIDE_ENV = ['SESSION_ID', 'SESSION_RUN', 'AGENT_KEY'] as const
 
 /** An `https://` URL without credentials, query or fragment. */
 export function checkHttpsUrl(name: string, raw: string | undefined): string {
@@ -74,9 +57,16 @@ export function checkHttpsUrl(name: string, raw: string | undefined): string {
   return url.href.replace(/\/+$/, '')
 }
 
-/** Only the Fargate task-metadata endpoint (link-local) is accepted. */
-const TASK_METADATA_RE = /^http:\/\/169\.254\.170\.2\/v4\/[A-Za-z0-9-]+$/
+/** A task id that's safe in a lease and a log line. */
+const TASK_ID_RE = /^[A-Za-z0-9_.-]{1,128}$/
 
+/**
+ * The environment the harness accepts: `AI_URL`, `MCP_URL`, `AUTH_URL` and
+ * `LOG_LEVEL`, `SESSION_ID`, `SESSION_RUN` and `AGENT_KEY` for this run, and an
+ * optional `TASK_ID`. Everything is validated by pattern; the image's entry
+ * point already dropped everything else, and this re-checks so the harness
+ * never trusts its caller.
+ */
 export function parseCloudEnv(env: NodeJS.ProcessEnv): HarnessConfig {
   const sessionId = env.SESSION_ID ?? ''
   if (!ULID_RE.test(sessionId))
@@ -91,31 +81,31 @@ export function parseCloudEnv(env: NodeJS.ProcessEnv): HarnessConfig {
   }
   const logLevel = parseLogLevel(env.LOG_LEVEL)
   if (!logLevel) throw new ConfigError('LOG_LEVEL is invalid')
-  const meta = env.ECS_CONTAINER_METADATA_URI_V4
+  const taskId = env.TASK_ID
   return {
     mode: 'cloud',
     sessionId,
     run: Number(runText),
     agentKey,
     root: WORKSPACE_ROOT,
-    aiProxyUrl: checkHttpsUrl('AI_PROXY_URL', env.AI_PROXY_URL),
+    aiUrl: checkHttpsUrl('AI_URL', env.AI_URL),
     aiLocal: false,
     mcpUrl: checkHttpsUrl('MCP_URL', env.MCP_URL),
     authUrl: checkHttpsUrl('AUTH_URL', env.AUTH_URL),
     logLevel,
     lspCommand: DEFAULT_LSP_COMMAND,
-    ...(meta && TASK_METADATA_RE.test(meta) ? { taskMetadataUri: meta } : {}),
+    ...(taskId && TASK_ID_RE.test(taskId) ? { taskId } : {}),
   }
 }
 
 export const DEV_USAGE = `Usage:
   cloud-agent                                   (cloud: configured by the environment)
   cloud-agent --dev --root <dir> --session <ulid> [--init]
-              [--ai-proxy <url>] [--mcp-url <url>] [--lsp <path>] [--log-level <level>]
+              [--ai-url <url>] [--mcp-url <url>] [--lsp <path>] [--log-level <level>]
   cloud-agent send --root <dir> --session <ulid> '<command json>'
 
 --dev runs one session folder <dir>/sessions/<ulid> against a local
-ai-proxy (default ${LOCAL_AI_ENDPOINT}, no key chain). --init creates the
+AI server (default ${LOCAL_AI_ENDPOINT}, no key chain). --init creates the
 folder if it's missing. "send" queues a command the way the Sessions API
 does, e.g. '{"type":"message","turnId":"t1","text":"hello"}'.`
 
@@ -123,7 +113,7 @@ export interface DevArgs {
   root: string
   sessionId: string
   init: boolean
-  aiProxyUrl: string
+  aiUrl: string
   mcpUrl?: string
   lspCommand: string
   logLevel: LogLevel
@@ -161,10 +151,7 @@ export function parseDevArgs(argv: string[]): DevArgs {
     root,
     sessionId,
     init,
-    aiProxyUrl: (flags.get('--ai-proxy') ?? LOCAL_AI_ENDPOINT).replace(
-      /\/+$/,
-      ''
-    ),
+    aiUrl: (flags.get('--ai-url') ?? LOCAL_AI_ENDPOINT).replace(/\/+$/, ''),
     mcpUrl: flags.get('--mcp-url'),
     lspCommand: flags.get('--lsp') ?? 'jl4-lsp',
     logLevel,

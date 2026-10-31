@@ -4,7 +4,7 @@ import type {
   AiChatMessage,
   AiChatStartParams,
 } from 'jl4-client-rpc'
-import { AiProxyError, type AiProxyClient } from './ai-proxy-client.js'
+import { AiError, type AiClient } from './ai-client.js'
 import {
   buildEditorContextBlock,
   buildMentionContextBlock,
@@ -28,7 +28,7 @@ import type { ToolDispatcher } from './tool-dispatcher.js'
 export interface ChatServiceOptions {
   auth: AuthProvider
   store: ConversationStore
-  proxy: AiProxyClient
+  aiClient: AiClient
   logger: Logger
   /** Runs tool calls and owns the advertised tool list (built-ins plus
    *  every {@link ToolProvider}). */
@@ -95,7 +95,7 @@ export class ChatService {
    *  finishes naturally, or after the current tool round completes
    *  (whichever comes first). The drained messages seed a fresh
    *  sub-turn whose request body carries the leftover tool results
-   *  alongside the new user delta so the proxy commits a clean
+   *  alongside the new user delta so the AI service commits a clean
    *  assistant→tool→user sequence. Cleared on abort and on the
    *  turn's ultimate exit from `start()`. */
   private readonly injections = new Map<string, QueuedUserMessage[]>()
@@ -106,7 +106,7 @@ export class ChatService {
   /** The editor context last sent per conversation. It's only sent again
    *  when it changes, so an unchanged editor costs nothing and a turn that
    *  merely continues isn't redirected by it, and now and then anyway,
-   *  because compaction can drop the message that carried it. Bounded like
+   *  because the message that carried it can leave the model's context. Bounded like
    *  the tools' snapshot stores. */
   private readonly lastEditorContext = new Map<
     string,
@@ -159,7 +159,7 @@ export class ChatService {
    * Sub-turn loop: a single `start()` call may produce multiple
    * assistant turns when the user keeps submitting while the model
    * is working. Each iteration of the outer loop runs one
-   * tool-call-aware sub-turn against the proxy; whenever the queue
+   * tool-call-aware sub-turn against the AI service; whenever the queue
    * has at least one pending user message, the current sub-turn
    * ends at its next intersection — either a natural finish or a
    * tool-round boundary — and the loop spawns a follow-up sub-turn
@@ -196,16 +196,16 @@ export class ChatService {
     // Asked alongside the turn, so the chat has its name while the
     // answer streams.
     //
-    // Title generation goes through the default Legalese AI proxy's
-    // stateless summize pipeline regardless of where the turn itself
+    // Title generation goes through the default Legalese AI endpoint's
+    // stateless summize model regardless of where the turn itself
     // runs — deployment ("Use in chat") chats included. Anyone in an AI
     // chat already has AI access (the panel is gated on it), and the
-    // deployment's own endpoint only serves its comply model, not
-    // summize, so the default proxy is the correct target here.
+    // deployment's own endpoint doesn't serve summize, so the default
+    // endpoint is the correct target here.
     if (isNewConversation && params.text.trim()) {
       this.titles.set(
         turnId,
-        this.opts.proxy
+        this.opts.aiClient
           .summarizeTitle(params.text, {
             signal: AbortSignal.timeout(
               this.opts.titleTimeoutMs ?? TITLE_TIMEOUT_MS
@@ -230,7 +230,7 @@ export class ChatService {
     let activeParams: AiChatStartParams = params
     // Tool results carried over from the prior sub-turn when it ended
     // at a tool-round boundary because of mid-turn user input. We
-    // prepend these to the next sub-turn's request body so the proxy
+    // prepend these to the next sub-turn's request body so the AI service
     // sees a clean assistant(tool_calls) → tool(results) → user
     // sequence and commits the tool_use/tool_result pair to history
     // before the model's next response. Empty (or unset) on the first
@@ -284,7 +284,7 @@ export class ChatService {
           // Persist the queued user message locally so reload sees
           // the same transcript the live UI showed. The user-only
           // filter mirrors the iteration-0 save in
-          // `runStreamIteration` — the proxy still owns the
+          // `runStreamIteration` — the AI service still owns the
           // authoritative conversation state, this is just for
           // crash-recovery / offline replay.
           if (serverConversationId) {
@@ -362,7 +362,7 @@ export class ChatService {
         activeParams = mergeQueuedAsParams(activeParams, drained)
         // Carry over any tool results the prior sub-turn produced
         // mid-round so the next sub-turn's request body commits
-        // them to the proxy's history before the model's fresh
+        // them to the AI service's history before the model's fresh
         // response. Undefined when the prior sub-turn finished
         // naturally (no leftover tool round to wrap up).
         prependedToolResults = subTurnResult.leftoverToolMessages
@@ -370,7 +370,7 @@ export class ChatService {
       }
     } catch (err) {
       // Catch-all for anything not handled by `runSubTurn`. The
-      // sub-turn helper already maps abort + AiProxyError into
+      // sub-turn helper already maps abort + AiError into
       // proper events; this branch only fires on truly unexpected
       // throws (e.g. a bug in the persistence path).
       this.opts.logger.error('chat-service: unhandled pipeline error', err)
@@ -416,7 +416,7 @@ export class ChatService {
   }
 
   /**
-   * Run one sub-turn end-to-end: open the proxy stream, drive the
+   * Run one sub-turn end-to-end: open the AI service stream, drive the
    * tool-call loop, persist the assistant text, and emit `done`.
    * Returns a `terminate` flag the outer pipeline uses to decide
    * whether another sub-turn should be spawned from the queue or the
@@ -426,7 +426,7 @@ export class ChatService {
    * working) ends this sub-turn at the next tool-round boundary —
    * the leftover `toolMessages` come back as `leftoverToolMessages`
    * so the outer loop can prepend them to the next sub-turn's
-   * request and the proxy still sees a complete
+   * request and the AI service still sees a complete
    * assistant(tool_calls) → tool(results) → user sequence.
    */
   private async runSubTurn(opts: {
@@ -528,7 +528,7 @@ export class ChatService {
         if (finishReason !== 'tool_calls') {
           // Natural terminal state: stop, length, content_filter,
           // error, aborted. Persist the assistant turn locally
-          // (proxy already owns the authoritative copy server-side)
+          // (the AI service already owns the authoritative copy server-side)
           // and emit `done` for this sub-turn.
           if (finishReason !== 'aborted') {
             totalAssistantText += await this.appendTurnStatus(
@@ -630,7 +630,7 @@ export class ChatService {
         // pipeline drains the queue, emits `queue-consumed` +
         // `turn-spawn`, and seeds the next sub-turn with these
         // tool results prepended to the new user delta — the
-        // proxy gets a clean assistant(tool_calls) → tool(results)
+        // AI service gets a clean assistant(tool_calls) → tool(results)
         // → user sequence in one request. Folding the feedback
         // into the tool result's `content` (the previous design)
         // mis-encoded a user redirect as tool output and confused
@@ -657,7 +657,7 @@ export class ChatService {
         }
 
         // No queued user input — continue the inner loop with the
-        // tool results as the next request body. The proxy's stored
+        // tool results as the next request body. The AI service's stored
         // history already includes the assistant tool_calls so we
         // don't re-send them.
         nextMessages = [...toolMessages]
@@ -679,7 +679,7 @@ export class ChatService {
         })
         return { terminate: true, serverConversationId }
       }
-      if (err instanceof AiProxyError) {
+      if (err instanceof AiError) {
         this.emit({
           kind: 'error',
           conversationId: serverConversationId ?? turnId,
@@ -700,7 +700,7 @@ export class ChatService {
   }
 
   /**
-   * Run a single HTTP round-trip against the proxy and emit every SSE
+   * Run a single HTTP round-trip against the AI service and emit every SSE
    * event to the webview. Returns the terminal state:
    *  - `finishReason`: whatever the stream ended on; `tool_calls`
    *    means the caller should dispatch `pendingCalls` and loop again.
@@ -721,12 +721,12 @@ export class ChatService {
     blocks: PersistedBlock[]
     /** Deployment binding (plain-passthrough mode). When `apiBaseUrl`
      *  is set the request is POSTed there instead of the default
-     *  proxy, no client tools are advertised, and `deploymentId` is
+     *  AI service, no client tools are advertised, and `deploymentId` is
      *  stamped on the persisted conversation doc. */
     apiBaseUrl?: string
     deploymentId?: string
-    /** Pass `continueTurn: true` through to the server so it skips
-     *  extractDelta + appendMessages and runs another pass against
+    /** Pass `continueTurn: true` through to the server so it adds
+     *  no new message and runs another pass against
      *  the stored history. Only meaningful on iteration 0. */
     continueTurn: boolean
     inlineContext?: string
@@ -773,7 +773,7 @@ export class ChatService {
     // Merge the current MCP server's deployed rules into the tool list
     // alongside our built-in fs/lsp/l4/meta tools. The MCP list is
     // cached in-process for a few seconds so multi-iteration turns
-    // don't hit the local proxy every round.
+    // don't hit the local AI server every round.
     //
     // Deployment ("Use in chat") mode is a PLAIN PASSTHROUGH: the
     // deployment's own model owns rule evaluation, so we advertise no
@@ -782,7 +782,7 @@ export class ChatService {
     // wrong and confusing for a deployment-scoped chat.
     const tools = deploymentMode ? [] : await this.opts.dispatcher.listTools()
 
-    for await (const ev of this.opts.proxy.streamResilient(
+    for await (const ev of this.opts.aiClient.streamResilient(
       {
         messages,
         conversationId,
@@ -791,16 +791,16 @@ export class ChatService {
         tools,
         stream: true,
         // Explicit retry verb; see outer loop for why only iteration
-        // 0 may carry this. The proxy skips extractDelta on the
-        // server so no duplicate user message lands in the stored
+        // 0 may carry this. The AI service adds no new message,
+        // so no duplicate user message lands in the stored
         // transcript.
         ...(continueTurn ? { continueTurn: true } : {}),
         ...(inlineContext ? { inlineContext } : {}),
         // Deployment-scoped passthrough: POST against
         // `{apiBaseUrl}/v1/chat/completions` (and reattach there)
-        // instead of the default Legalese AI proxy.
+        // instead of the default Legalese AI endpoint.
         ...(apiBaseUrl ? { apiBaseUrl } : {}),
-        // Register this turn with the proxy's TurnRegistry so a
+        // Register this turn with the AI service so a
         // mid-stream transport drop auto-reattaches (since-cursor
         // protocol) and picks up the buffered frames without
         // re-running the turn.
@@ -953,12 +953,11 @@ export class ChatService {
         // this tool is a no-op that just returns "ok".
         if (ev.name === 'meta__post_status_update') {
           // Same dedupe story as the regular tool-call branch below:
-          // the proxy emits two SSE frames per call (early
+          // the AI service emits two SSE frames per call (early
           // `tool-input-start` + final `tool-call`). Without this
           // guard we'd push two pendingCalls with the same callId,
-          // POST two `role:"tool"` results to the proxy on the next
-          // turn, and Anthropic would reject with "each tool_use
-          // must have a single result". Also dedupe the inline-text
+          // POST two `role:"tool"` results to the AI service on the next
+          // turn, which the model provider rejects. Also dedupe the inline-text
           // emission so the user doesn't see the status sentence
           // twice.
           const existingCall = pendingCalls.find((c) => c.callId === ev.callId)
@@ -985,14 +984,14 @@ export class ChatService {
           })
           continue
         }
-        // Dedupe by callId: the proxy emits TWO tool_calls SSE chunks
+        // Dedupe by callId: the AI service emits TWO tool_calls SSE chunks
         // per call now (an early `tool-input-start` frame with empty
         // args so the webview can pop a pulsating-dot row immediately,
         // followed by a final `tool-call` frame with the parsed args).
         // Without dedup we'd end up running the tool twice — and the
         // dispatcher would POST two tool_result messages back to the
-        // proxy for the same toolCallId, which Anthropic rejects on
-        // the next turn ("each tool_use must have a single result").
+        // AI service for the same toolCallId, which the model provider
+        // rejects on the next turn.
         // Update the existing pendingCall / block in place when the
         // callId is already known; otherwise push a new entry as
         // before.
@@ -1011,7 +1010,7 @@ export class ChatService {
         // name + deployment from the MCP target map so the row can
         // display the unsanitised name instead of the wire-level
         // sanitised slug. listTools() ran earlier in this turn (the
-        // proxy received the tools array), so the map is populated.
+        // AI service received the tools array), so the map is populated.
         // For infra tools (list_files / read_file / etc.) and any
         // non-`l4-rules__` call this returns null and we leave the
         // fields undefined.
@@ -1101,9 +1100,9 @@ export class ChatService {
   }
 
   /**
-   * Assemble the message array we POST to the proxy: editor context +
+   * Assemble the message array we POST to the AI service: editor context +
    * (on first turn) workspace exports + prior local history + current
-   * user turn. The proxy handles compaction server-side, so for
+   * user turn. The server keeps the conversation, so for
    * follow-up turns we rely on its `conversationId` state and send
    * just the delta (editor context + new user text).
    */
@@ -1194,9 +1193,9 @@ export class ChatService {
     // Retry path: skip the user message entirely. The server's
     // explicit `continueTurn: true` flag (set in runStreamIteration
     // for iteration 0 when the outer loop was invoked via Retry)
-    // tells the proxy to bypass extractDelta and run another pass
+    // tells the AI service to add no new message and run another pass
     // against the stored history. body.messages can be empty — the
-    // proxy allows it when continueTurn is set, so we don't need
+    // AI service allows it when continueTurn is set, so we don't need
     // the old "continue" system-hint workaround.
     const done = (): {
       messages: AiChatMessage[]
@@ -1211,12 +1210,9 @@ export class ChatService {
 
     // Multimodal user content: when the webview has staged attachments,
     // ship them as OpenAI-shaped content parts alongside the text so
-    // the ai-proxy can pass them through to OpenAI as-is or translate
-    // to Anthropic's image/document block shape.
+    // the AI service can pass them through to the model provider.
     //
-    // Anthropic's ai-sdk adapter only accepts PDFs in `file` parts
-    // ("'Non-PDF files in user messages' functionality not
-    // supported."), so plain text / markdown attachments can't use
+    // `file` parts only accept PDFs, so plain text / markdown attachments can't use
     // the file block. Inline them as an additional `text` content
     // part wrapped with a filename marker instead — works across
     // every provider and keeps the source attribution visible to the
@@ -1420,8 +1416,7 @@ function extractStatusUpdateText(argsJson: string): string | null {
 
 /**
  * Media types we inline as a text content part instead of shipping
- * as a `file` block. Anthropic rejects non-PDF file blocks
- * ("'Non-PDF files in user messages' functionality not supported"),
+ * as a `file` block. Non-PDF file blocks are rejected,
  * so the only way to pass e.g. `.json` / `.yaml` / `.csv` through is
  * to decode as UTF-8 and wrap with `<attached-file>` markers in a
  * text content part. Covers `text/*` plus the `application/*` types

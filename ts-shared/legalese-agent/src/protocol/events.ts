@@ -1,7 +1,7 @@
 /**
  * Events: what a cloud session's harness appends to
  * `state/events/<n>.jsonl`, one JSON object per line, and what
- * `GET /events` returns (spec §8).
+ * `GET /events` returns.
  *
  * Every event is `{ seq, ts, type, … }`. The `type`s are the
  * {@link ChatServiceEvent} kinds (payload = the chat event minus `kind`)
@@ -83,7 +83,7 @@ export type CloudOnlyEventPayload =
       choices?: string[]
     }
   /** Lifecycle. While `running`, carries the sealing public key for
-   *  `mcp-credentials` (§6.4). */
+   *  `mcp-credentials`. */
   | {
       type: 'session-state'
       state: SessionState
@@ -104,7 +104,7 @@ export type CloudOnlyEventPayload =
   | { type: 'rolled-back'; turnId: string; sha: string }
   | { type: 'local-merged'; sha: string }
   | { type: 'local-merge-conflict'; files: string[] }
-  /** An `add-files` batch landed in `repo/` (§10). `sha` is the file's
+  /** An `add-files` batch landed in `repo/`. `sha` is the file's
    *  git blob id, when known. */
   | {
       type: 'files-added'

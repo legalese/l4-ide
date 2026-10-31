@@ -20,7 +20,7 @@ import {
 } from './safe-fs.js'
 import type { WriteFence } from './lease.js'
 
-/** Deltas are coalesced for at least this long (§8). */
+/** Deltas are coalesced for at least this long. */
 export const DELTA_COALESCE_MS = 250
 
 /** After a failed write, the batch is tried again after these delays
@@ -38,7 +38,7 @@ type DeltaPayload = Extract<
 >
 
 /**
- * The session's append-only event log (spec §8):
+ * The session's append-only event log:
  * `state/events/<n>.jsonl` segments of JSON lines `{ seq, ts, type, … }`
  * plus `state/head.json { segment, length }`, rewritten (temp file +
  * rename) after each batch. Readers only read a segment up to the
@@ -87,7 +87,7 @@ export class EventLog {
       retryDelaysMs?: readonly number[]
       /** Tests inject failures here. */
       append?: typeof appendToFile
-      /** Checked before every write (§7.3). */
+      /** Checked before every write. */
       fence?: WriteFence
     } = {}
   ) {

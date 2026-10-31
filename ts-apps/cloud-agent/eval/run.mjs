@@ -3,7 +3,7 @@
 // what the law says, and at what cost? See eval/README.md.
 //
 //   node eval/run.mjs --check-tasks --l4 l4
-//   node eval/run.mjs --ai-proxy http://localhost:3000 --lsp jl4-lsp --l4 l4
+//   node eval/run.mjs --ai-url http://localhost:3000 --lsp jl4-lsp --l4 l4
 //   node eval/run.mjs --compare before.json after.json
 
 import { execFile, spawn } from 'node:child_process'
@@ -185,8 +185,8 @@ async function runTask(task, opts) {
   try {
     const dev = [
       ...base,
-      '--ai-proxy',
-      opts['ai-proxy'],
+      '--ai-url',
+      opts['ai-url'],
       '--lsp',
       opts.lsp,
       '--log-level',
@@ -299,8 +299,8 @@ async function main() {
   if (opts.compare) return compare(opts.positional[0], opts.positional[1])
   opts.l4 ??= 'l4'
   if (opts['check-tasks']) return checkTasks(opts)
-  if (!opts['ai-proxy'] || !opts.lsp) {
-    throw new Error('--ai-proxy and --lsp are required to run tasks')
+  if (!opts['ai-url'] || !opts.lsp) {
+    throw new Error('--ai-url and --lsp are required to run tasks')
   }
   const rows = []
   for (const task of await loadTasks(opts.task, opts['tasks-dir'])) {

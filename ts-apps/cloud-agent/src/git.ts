@@ -20,14 +20,14 @@ export interface GitResult {
 
 /**
  * Runs `git` in the session repo with configuration the repository
- * can't override (spec §4.7, §9):
+ * can't override:
  *
  * - `core.hooksPath=/dev/null`: no hooks run, whatever `.git/hooks`
  *   holds; `core.fsmonitor=false`: no fsmonitor hook program.
  * - `core.symlinks=false`: symlinks (from a pushed bundle) are checked
  *   out as plain files holding the link text, so no link in the work
  *   tree can lead the agent's file tools into `.git` or out of `data/`.
- * - `core.createObject=rename` (S3 Files has no hard links),
+ * - `core.createObject=rename`,
  *   `gc.auto=0` (gc only on sleep), no GPG signing, a fixed identity.
  * - `safe.directory` for the repo (the mount's owner may differ).
  * - No system config, no terminal prompts, a minimal environment (never
@@ -40,7 +40,7 @@ export class Git {
     readonly repoDir: string,
     baseEnv: NodeJS.ProcessEnv,
     private readonly timeoutMs = 120_000,
-    /** Checked before every git command (§7.3): a run that may not write
+    /** Checked before every git command: a run that may not write
      *  runs no git at all. */
     private readonly fence?: WriteFence
   ) {

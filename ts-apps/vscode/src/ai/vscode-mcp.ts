@@ -6,7 +6,7 @@ import * as vscode from 'vscode'
 import type { AiLogger } from './logger.js'
 import {
   userMcpToolName,
-  type AiProxyTool,
+  type AiTool,
   type ToolProvider,
 } from '@repo/legalese-agent'
 import type { McpOAuthManager } from './mcp-oauth.js'
@@ -46,7 +46,7 @@ import { notificationText } from '../cloud/notification-text.js'
  * its own permission row.
  */
 
-/** Wire-name prefix for MCP tools advertised to the ai-proxy,
+/** Wire-name prefix for MCP tools advertised to the AI service,
  *  mirroring `l4-rules__` for the built-in server. Prefix-routing in
  *  the dispatcher and the permission gate key off it. */
 export const VSCODE_MCP_PREFIX = 'vsmcp__'
@@ -694,7 +694,7 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
     return this.start(id, { interactive: true })
   }
 
-  // ── Cloud sessions (spec §6.4) ────────────────────────────────────
+  // ── Cloud sessions ────────────────────────────────────
 
   /** Enabled servers, for passing to a cloud session. Tools the user
    *  switched off are left out of `enabledTools` (known only for
@@ -766,12 +766,12 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
 
   /** Advertise the enabled servers' enabled tools in OpenAI
    *  function-tool shape. */
-  listTools(): AiProxyTool[] {
+  listTools(): AiTool[] {
     this.wireMap.clear()
     if (!this.allEnabled()) return []
     const disabledServers = getDisabledServers()
     const disabledTools = getDisabledTools()
-    const out: AiProxyTool[] = []
+    const out: AiTool[] = []
     for (const [serverId, conn] of this.connections) {
       if (conn.status !== 'connected') continue
       if (disabledServers.has(serverId)) continue

@@ -1,6 +1,6 @@
 /**
- * HTTP contracts: the Sessions API (spec §7.1, §15.5) and the
- * jl4-auth-proxy access-token and agent-key routes (§6.1, §6.2, §15.5).
+ * HTTP contracts: the Sessions API and the
+ * access-token and agent-key routes.
  * `expiresAt` is epoch milliseconds everywhere.
  */
 import {
@@ -44,7 +44,7 @@ import {
 
 // ── Errors ────────────────────────────────────────────────────────────
 
-/** The §15.5 Sessions API error codes; the body is `{ error: code }`. */
+/** The Sessions API error codes; the body is `{ error: code }`. */
 export type SessionsApiErrorCode =
   | 'bad_request'
   | 'unauthenticated'
@@ -62,9 +62,8 @@ export const SESSIONS_API_ERROR_STATUS: Record<SessionsApiErrorCode, number> = {
   too_large: 413,
 }
 
-/** More specific codes the Sessions API also returns (cloud-sessions
- *  repo, `api/`). Clients branch on the HTTP status and treat
- *  these as detail. */
+/** More specific codes the Sessions API also returns. Clients branch on
+ *  the HTTP status and treat these as detail. */
 export type SessionsApiDetailCode =
   | 'not_initialized'
   | 'already_initialized'
@@ -73,7 +72,7 @@ export type SessionsApiDetailCode =
   | 'start_failed'
   | 'unavailable'
   | 'internal'
-  /** 409 on every git route (§9.2) until the harness's first commit has
+  /** 409 on every git route until the harness's first commit has
    *  written `state/git/main.bundle`. */
   | 'no_commits_yet'
 
@@ -125,7 +124,7 @@ export interface CreateSessionRequest {
    *  be size-bound. */
   seedSize?: number
   attachments?: AttachmentRef[]
-  /** Where the seed came from locally; stored in `session.json` (§10). */
+  /** Where the seed came from locally; stored in `session.json`. */
   seedBase?: SeedBase
 }
 
@@ -172,7 +171,7 @@ export const sessionStateResponse: Check<SessionStateResponse> = obj({
   state: sessionState,
 })
 
-/** A row of `GET /sessions` (the history view, §12.1). */
+/** A row of `GET /sessions` (the history view). */
 export interface SessionSummary {
   sessionId: string
   title: string
@@ -226,7 +225,7 @@ export const startSessionRequest: Check<StartSessionRequest> = obj({
 
 /**
  * `POST /sessions/:sid/files` — add files to a running or sleeping
- * session mid-conversation (e.g. @-mentioned in a later prompt, §10).
+ * session mid-conversation (e.g. @-mentioned in a later prompt).
  * `path` is repo-relative under `data/`. Same limits as seeding: 10 MB
  * per file, 50 MB per batch. The API answers with pre-signed PUTs into
  * `inbox/<sid>/files/<batchId>/…`.
@@ -427,14 +426,14 @@ export function parseEventStream(value: unknown): {
   return { stream: { ...stream, events }, dropped }
 }
 
-// ── jl4-auth-proxy: access token and agent keys (§6.1, §6.2) ─────────
+// ── Access token and agent keys ─────────
 
 /** `GET /auth/access-token` (sealed session) → 200. */
 export interface AccessTokenResponse {
-  /** WorkOS access token (JWT, ~5 minutes). */
+  /** Access token (JWT, ~5 minutes). */
   accessToken: string
   expiresAt: number
-  /** A rotated sealed session, when jl4-auth-proxy refreshed it; store
+  /** A rotated sealed session, when the server refreshed it; store
    *  it in place of the old one. */
   token?: string
 }
@@ -446,10 +445,10 @@ export const accessTokenResponse: Check<AccessTokenResponse> = obj({
 })
 
 export const AGENT_KEY_PURPOSE = 'cloud-session'
-/** Agent keys live 15 minutes; a chain at most 24 hours (§6.2). */
+/** Agent keys live 15 minutes; a chain at most 24 hours. */
 export const AGENT_KEY_LIFETIME_MS = 900_000
 export const AGENT_KEY_CHAIN_MAX_MS = 24 * 60 * 60 * 1000
-/** Renew when this much lifetime is left (§5.4). */
+/** Renew when this much lifetime is left. */
 export const AGENT_KEY_RENEW_BEFORE_MS = 5 * 60 * 1000
 /** Requested permissions (intersected with the user's). */
 export const AGENT_KEY_PERMISSIONS = [
@@ -458,7 +457,7 @@ export const AGENT_KEY_PERMISSIONS = [
   'l4:evaluate',
   'l4:read',
 ] as const
-/** Header the harness sends to ai-proxy on every request (§15.5). */
+/** Header the harness sends to the AI service on every request. */
 export const SESSION_HEADER = 'X-Legalese-Session'
 
 /** `POST /auth/agent-token` (sealed session). */
@@ -502,11 +501,11 @@ export const renewAgentKeyResponse: Check<RenewAgentKeyResponse> = obj({
 })
 
 /**
- * Renew / end errors the harness reports by name, and their statuses
- * (§15.5); `end` answers 204. Renew also refuses with
+ * Renew / end errors the harness reports by name, and their statuses;
+ * `end` answers 204. Renew also refuses with
  * `403 not_a_member` and `403 forbidden`: like any other 4xx, they end
- * the chain, reported as `invalid_key`. jl4-auth-proxy answers
- * `502 { error: "upstream_unavailable" }` when WorkOS fails (retried,
+ * the chain, reported as `invalid_key`. The server answers
+ * `502 { error: "upstream_unavailable" }` when an upstream fails (retried,
  * like any 5xx), and `400 invalid_session_id` / `unknown_purpose` on a
  * bad mint.
  */

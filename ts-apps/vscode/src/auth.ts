@@ -49,7 +49,7 @@ function sameState(
  *
  * Two modes:
  * 1. Self-hosted: User configures jl4.serviceUrl + optional jl4.serviceApiKey in settings
- * 2. Legalese Cloud: Browser-based login via WorkOS, token stored in SecretStorage
+ * 2. Legalese Cloud: Browser-based login, token stored in SecretStorage
  */
 export class AuthManager {
   private readonly onDidChangeEmitter =
@@ -144,13 +144,13 @@ export class AuthManager {
   }
 
   /**
-   * Auth headers for a request to the Legalese AI proxy at `url`.
+   * Auth headers for a request to the Legalese AI service at `url`.
    * Prefers `legaleseAi.apiKey` when set; otherwise falls back to the
    * shared flow (jl4 service API key, then browser-login session).
    * Keeping this distinct from `getAuthHeaders` lets users mix a
    * self-hosted jl4 service (with `jl4.serviceApiKey`) and a separate
    * Legalese AI key — neither setting clobbers the other. Nothing is
-   * sent to a `url` that isn't Legalese Cloud (a local proxy in local
+   * sent to a `url` that isn't Legalese Cloud (a local AI server in local
    * mode gets the client's dev stand-in instead).
    */
   async getAiAuthHeaders(url: string): Promise<Record<string, string>> {
@@ -180,7 +180,7 @@ export class AuthManager {
    * The effective service URL — the org subdomain in cloud mode, or the
    * user-configured URL in self-hosted mode.
    *
-   * Used for ALB-level endpoints that don't fit the consolidated api host:
+   * Used for host-level endpoints that don't fit the consolidated api host:
    * the `/health` connectivity ping and any UI surface that wants to show
    * the user where their data lives. Dataplane traffic (deployments / files /
    * functions / evaluation) should go through 'getApiBaseUrl' instead.
@@ -263,7 +263,7 @@ export class AuthManager {
   }
 
   /**
-   * Keep a rotated sealed session (jl4-auth-proxy refreshed the WorkOS
+   * Keep a rotated sealed session (the server refreshed the
    * session, e.g. on GET /auth/access-token) in place of `replaces`, the
    * one the request presented. Unlike {@link setSessionToken} it leaves the
    * connection state alone: the sign-in is the same, and invalidating would
@@ -304,9 +304,8 @@ export class AuthManager {
 
   /**
    * Filesystem-safe identity key for scoping local state (conversation
-   * history, per-user caches). Mirrors the ai-proxy's `creatorId` so
-   * the local layout matches the server: each api key gets its own
-   * silo, each WorkOS user gets theirs. Returns `undefined` when no
+   * history, per-user caches): each api key gets its own, each user gets
+   * theirs. Returns `undefined` when no
    * credential is available — callers should treat that as "no
    * history" rather than collapsing into a shared bucket.
    *
@@ -328,7 +327,7 @@ export class AuthManager {
     const id = this.cloudUserId
     if (!id) return undefined
     // Keep only characters we know are safe across macOS/Win/Linux
-    // filesystems. A WorkOS user id (`user_01H...`) already satisfies
+    // filesystems. A user id already satisfies
     // this, but the guard means any future identity shape can't inject
     // a path separator.
     const safe = id.replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -408,7 +407,7 @@ export class AuthManager {
       }
       this.outputChannel.appendLine('[auth] Received session via hand-off')
     } else if (callback.kind === 'token') {
-      // Legacy callback from a proxy without hand-off support.
+      // Legacy callback from a server without hand-off support.
       await this.secrets.delete(SECRET_KEY_PENDING_LOGIN)
       token = callback.token
       this.outputChannel.appendLine(

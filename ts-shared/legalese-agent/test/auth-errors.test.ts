@@ -1,38 +1,38 @@
 import { afterEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
 import {
-  AiProxyClient,
-  AiProxyError,
+  AiClient,
+  AiError,
   isInvalidCredentialsBody,
   type AuthProvider,
 } from '../src/index.js'
 import { silentLogger } from './fakes.js'
 
-// What ai-proxy answers a key or session it no longer accepts with
+// What the AI service answers a key or session it no longer accepts with
 // (src/index.ts: every reason but `no-credentials` is a 403).
 const INVALID_CREDENTIALS = {
   error: { message: 'Authentication failed: invalid-credentials' },
 }
 
-describe('ai-proxy auth errors', () => {
+describe('AI service auth errors', () => {
   const realFetch = globalThis.fetch
   afterEach(() => {
     globalThis.fetch = realFetch
   })
 
-  function client(): AiProxyClient {
+  function client(): AiClient {
     const auth: AuthProvider = {
       getAiAuthHeaders: async () => ({ Authorization: 'Bearer k' }),
       getEffectiveServiceUrl: () => undefined,
     }
-    return new AiProxyClient({
+    return new AiClient({
       auth,
       logger: silentLogger,
       endpoint: () => ({ url: 'https://ai.test', local: false }),
     })
   }
 
-  async function streamError(res: Response): Promise<AiProxyError> {
+  async function streamError(res: Response): Promise<AiError> {
     globalThis.fetch = (async () => res) as typeof fetch
     const events = client().stream(
       { messages: [{ role: 'user', content: 'hi' }], stream: true },
@@ -42,7 +42,7 @@ describe('ai-proxy auth errors', () => {
     await events.next().catch((err: unknown) => {
       caught = err
     })
-    assert.ok(caught instanceof AiProxyError, 'stream did not throw')
+    assert.ok(caught instanceof AiError, 'stream did not throw')
     return caught
   }
 

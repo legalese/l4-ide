@@ -5,8 +5,8 @@ import {
   BUILTIN_TOOLS,
   categoriesForCall,
   strictestPermission,
-  type AiProxyClient,
-  type AiProxyTool,
+  type AiClient,
+  type AiTool,
   type BuiltinTools,
   type PermissionPolicy,
 } from '@repo/legalese-agent'
@@ -17,12 +17,12 @@ import type { AiChatMessage } from 'jl4-client-rpc'
 /**
  * `@legalese` chat participant for Copilot Chat.
  *
- * Streams responses from the Legalese Cloud AI proxy (same backend the
+ * Streams responses from the Legalese AI service (same backend the
  * sidebar webview uses). Stateless per turn — VS Code's chat panel owns
- * the visible history; we translate it back into the proxy's message
+ * the visible history; we translate it back into the AI service's message
  * format on every request rather than maintaining a server-side
  * conversation id. This keeps the participant a thin shim over
- * `AiProxyClient` and avoids any cross-talk with the sidebar's
+ * `AiClient` and avoids any cross-talk with the sidebar's
  * `ChatService` / persistence layer.
  *
  * Exposes a unified tool list to the model:
@@ -43,14 +43,14 @@ import type { AiChatMessage } from 'jl4-client-rpc'
  *
  * Capped at {@link MAX_TOOL_ROUNDS} iterations as an infinite-loop guard.
  *
- * Tool activity emitted by the proxy (rule evaluations, doc search,
+ * Tool activity emitted by the AI service (rule evaluations, doc search,
  * compaction status) is surfaced inline: live status via `stream.progress`
  * while running, plus a persistent `> Label: message` line on done so the
  * final transcript still shows what happened.
  */
 export function registerChatParticipant(deps: {
   auth: AuthManager
-  proxy: AiProxyClient
+  aiClient: AiClient
   logger: AiLogger
   /** The participant's own built-in tool session (its directive
    *  snapshots are independent of the sidebar chat's). */
@@ -65,7 +65,7 @@ export function registerChatParticipant(deps: {
     token
   ) => {
     // Pre-flight auth check so we render a sign-in button instead of
-    // bubbling a 401 from the proxy. `isAiUsable()` is true when a
+    // bubbling a 401 from the AI service. `isAiUsable()` is true when a
     // verified Cloud session exists OR a `legaleseAi.apiKey` setting
     // is configured — matching the sidebar chat's gate.
     if (!deps.auth.isAiUsable()) {
@@ -100,7 +100,7 @@ export function registerChatParticipant(deps: {
         let assistantText = ''
         let finishReason = 'stop'
 
-        const events = deps.proxy.stream(
+        const events = deps.aiClient.stream(
           {
             messages,
             stream: true,
@@ -149,7 +149,7 @@ export function registerChatParticipant(deps: {
 
             case 'error':
               deps.logger.warn(
-                `chat-participant: proxy error ${ev.code ?? ''} ${ev.message}`
+                `chat-participant: AI service error ${ev.code ?? ''} ${ev.message}`
               )
               return { errorDetails: { message: ev.message } }
 
@@ -165,7 +165,7 @@ export function registerChatParticipant(deps: {
 
         // The assistant turn that paused on tool_calls has to go into
         // the next request as one message containing both the text
-        // (may be empty) and the tool_calls array. The proxy expects
+        // (may be empty) and the tool_calls array. The AI service expects
         // OpenAI shape.
         messages.push({
           role: 'assistant',
@@ -235,8 +235,8 @@ interface ToolCall {
   argsJson: string
 }
 
-/** Hard cap on assistant↔tool round-trips per user turn. Anthropic /
- *  OpenAI rarely chain more than 5 calls deep in practice; 10 is a
+/** Hard cap on assistant↔tool round-trips per user turn. Models rarely
+ *  chain more than 5 calls deep in practice; 10 is a
  *  generous ceiling that still terminates a runaway loop. */
 const MAX_TOOL_ROUNDS = 10
 
@@ -254,11 +254,11 @@ const BUILTIN_TOOL_NAMES: ReadonlySet<string> = new Set(
  * the model picks one.
  */
 function collectTools(): {
-  tools: AiProxyTool[]
+  tools: AiTool[]
   lmByWireName: Map<string, vscode.LanguageModelToolInformation>
 } {
   const lmByWireName = new Map<string, vscode.LanguageModelToolInformation>()
-  const out: AiProxyTool[] = [...BUILTIN_TOOLS]
+  const out: AiTool[] = [...BUILTIN_TOOLS]
   for (const t of vscode.lm.tools) {
     // Skip the lm tools we register ourselves (see lm-tools.ts): the
     // participant already ships the same capability as a built-in
@@ -277,7 +277,7 @@ function collectTools(): {
       function: {
         name: wireName,
         description: t.description || `Tool: ${t.name}`,
-        // VS Code's `inputSchema` is JSON Schema; the ai-proxy passes
+        // VS Code's `inputSchema` is JSON Schema; the AI service passes
         // it through to the provider verbatim. Some tools ship no
         // schema — default to an empty object schema so OpenAI accepts
         // the declaration.
@@ -368,7 +368,7 @@ async function runBuiltin(
       return `User has disallowed the "${decided.category}" category. Update the setting in the Legalese AI settings to enable it.`
     }
     // `ask` is treated as `always` here — the chat panel doesn't have
-    // an inline approval surface yet. The proxy-side L4 rule tools
+    // an inline approval surface yet. The server-side L4 rule tools
     // come through `vscode.lm.invokeTool` (above) and reuse VS Code's
     // own confirmation flow.
   }
@@ -403,7 +403,7 @@ function parseArgs(json: string): unknown {
 }
 
 /** Collapse a `LanguageModelToolResult` to a single string for the
- *  proxy's `role: 'tool'` content. Text parts are concatenated;
+ *  AI service's `role: 'tool'` content. Text parts are concatenated;
  *  non-text parts (prompt-tsx, future shapes) are skipped — they don't
  *  round-trip through the OpenAI-shaped wire format. */
 function stringifyLmResult(result: vscode.LanguageModelToolResult): string {
@@ -445,11 +445,11 @@ function truncate(s: string, n: number): string {
 
 /**
  * Translate VS Code's chat history + the current prompt + the current
- * turn's attachments into the OpenAI-shaped message list the ai-proxy
+ * turn's attachments into the OpenAI-shaped message list the AI service
  * expects.
  *
  * `ChatResponseTurn.response` is an array of response parts; we only
- * carry forward the markdown text parts because that's all the proxy
+ * carry forward the markdown text parts because that's all the AI service
  * can ingest as assistant context. Tool-call rendering, anchors, file
  * trees etc. don't round-trip — they were UI hints, not model state.
  *

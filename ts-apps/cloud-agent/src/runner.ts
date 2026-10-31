@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import {
   TURN_STATUS_HEADING,
-  AiProxyClient,
+  AiClient,
   BuiltinTools,
   ChatService,
   PERMISSION_CATEGORIES,
@@ -48,13 +48,12 @@ import {
 } from './node-workspace.js'
 import { SessionJson } from './session-file.js'
 
-/** Idle exit after this long with no running turn and no new command
- *  (spec §5.4). */
+/** Idle exit after this long with no running turn and no new command. */
 export const IDLE_EXIT_MS = 10 * 60 * 1000
-/** `commands.seq` is polled this often (§8). */
+/** `commands.seq` is polled this often. */
 export const COMMAND_POLL_MS = 1_000
-/** SIGTERM gives 30 s before SIGKILL (the task definition's
- *  `stopTimeout`, §5.1): the whole shutdown fits in this, with a margin. */
+/** SIGTERM gives 30 s before SIGKILL: the whole shutdown fits in this,
+ *  with a margin. */
 export const SHUTDOWN_BUDGET_MS = 20_000
 /** Kept for the last steps (the key chain, jl4-lsp, session.json, the
  *  event flush, then the lease release, last), each bounded; earlier
@@ -66,7 +65,7 @@ export const PARK_TURN_GRACE_MS = 60_000
 export const CHAIN_END_WAIT_MS = 5_000
 
 /**
- * Cloud tool policy (spec §11): cloud sessions never ask for tool
+ * Cloud tool policy: cloud sessions never ask for tool
  * approval. Every category — file and L4 tools (confined to `repo/`),
  * the l4-rules MCP tools and the user's MCP servers passed at start —
  * runs without a prompt. File changes are backed up per turn and
@@ -79,7 +78,7 @@ export const CLOUD_PERMISSIONS: Record<PermissionCategory, PermissionValue> =
 
 /** `error`: something nothing handled (main.ts); exit as cleanly as
  *  the budget allows. `superseded`: a newer run exists, or this run's
- *  lease couldn't be kept (§7.3); stopped without writing. */
+ *  lease couldn't be kept; stopped without writing. */
 export type ExitReason =
   | 'idle'
   | 'stop'
@@ -97,7 +96,7 @@ export interface RunnerContext {
   readonly stateDir: string
   readonly logger: Logger
   readonly l4: L4Language
-  /** Checked before every write (§7.3); plugins check it too. */
+  /** Checked before every write; plugins check it too. */
   readonly fence: WriteFence
   /** Append an event to the log. */
   emit(payload: CloudEventPayload): void
@@ -109,8 +108,8 @@ export interface RunnerContext {
   /** Files changed behind the language server's back (a merge or a
    *  rollback): absolute paths. */
   filesChanged(fsPaths: string[]): Promise<void>
-  /** One stateless call to ai-proxy's summize pipeline
-   *  (`AiProxyClient.summize`): the text, or `null` on any failure or
+  /** One stateless call to the AI service's summize model
+   *  (`AiClient.summize`): the text, or `null` on any failure or
    *  when `signal` aborts. Never throws. */
   summize(
     messages: Array<{ role: 'system' | 'user'; content: string }>,
@@ -175,7 +174,7 @@ export interface ChainControl {
 
 export interface RunnerOptions {
   sessionId: string
-  /** The run this harness is (`SESSION_RUN`, §7.3). */
+  /** The run this harness is (`SESSION_RUN`). */
   run: number
   sessionDir: string
   taskId: string
@@ -205,8 +204,8 @@ export interface RunnerOptions {
 type Phase = 'new' | 'running' | 'stopping' | 'stopped'
 
 /**
- * The cloud harness main loop (spec §5.4, §8, §11): check it is the
- * session's current run and keep its lease (§7.3), renew the key chain,
+ * The cloud harness main loop: check it is the
+ * session's current run and keep its lease, renew the key chain,
  * read commands every second, run turns one at a time through the shared
  * {@link ChatService}, append events, and exit after 10 idle minutes, on
  * `stop`, on SIGTERM, or when the chain can't be renewed (parking).
@@ -299,7 +298,7 @@ export class Runner {
       interaction: this.interaction,
       providers: this.providers,
     })
-    const proxy = new AiProxyClient({
+    const aiClient = new AiClient({
       auth: opts.auth,
       logger: opts.logger,
       endpoint: () => opts.aiEndpoint,
@@ -313,7 +312,7 @@ export class Runner {
     this.chat = new ChatService({
       auth: opts.auth,
       store,
-      proxy,
+      aiClient,
       logger: opts.logger,
       dispatcher,
       interaction: this.interaction,
@@ -340,7 +339,7 @@ export class Runner {
       filesChanged: async (fsPaths) => {
         await opts.l4.resync?.(fsPaths.map((p) => uriForPath(p)))
       },
-      summize: (messages, o) => proxy.summize(messages, o),
+      summize: (messages, o) => aiClient.summize(messages, o),
     }
     this.stopped = new Promise((r) => (this.resolveStopped = r))
   }
@@ -406,7 +405,7 @@ export class Runner {
   }
 
   /**
-   * A newer run exists, or this run's lease lapsed (§7.3): stop at once.
+   * A newer run exists, or this run's lease lapsed: stop at once.
    * No flush, no final lease, no git, no session.json — nothing more is
    * written; the key chain is ended (a network call) and jl4-lsp stopped.
    */
@@ -622,7 +621,7 @@ export class Runner {
   }
 
   /**
-   * `add-files` (§10): copy `incoming/files/<batchId>/<path>` into
+   * `add-files`: copy `incoming/files/<batchId>/<path>` into
    * `repo/<path>` (under `data/`), let plugins commit it ("Add files from
    * the user"), emit `files-added`, then remove the batch.
    */

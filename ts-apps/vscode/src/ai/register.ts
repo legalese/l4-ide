@@ -64,12 +64,12 @@ import * as nodePath from 'path'
 import * as os from 'os'
 import { promises as fsPromises } from 'fs'
 import {
-  AiProxyError,
+  AiError,
   MCP_L4_RULES_PREFIX,
   categoriesForCall,
   proposedChange,
   categoryForTool,
-  type AiProxyClient,
+  type AiClient,
   type AppliedEditSnapshot,
   type ChatService,
   type ChatServiceEvent,
@@ -114,7 +114,7 @@ export function registerAiChatHandlers(deps: {
   store: ConversationStore
   /** Stateless one-shot LLM calls (summize). Used here to draft the
    *  deployment "Intended use" text from the exported function schemas. */
-  proxy: AiProxyClient
+  aiClient: AiClient
   logger: AiLogger
   /** The chat service's UserInteraction port. We plug the webview
    *  senders into its sinks, and resolve / cancel its pending
@@ -152,7 +152,7 @@ export function registerAiChatHandlers(deps: {
     auth,
     service,
     store,
-    proxy,
+    aiClient,
     logger,
     interaction,
     permissions,
@@ -183,7 +183,7 @@ export function registerAiChatHandlers(deps: {
 
   /** Per-conversation set of "tool activity has fired this turn".
    *  Used to suppress `thinking-delta` events that arrive AFTER tool
-   *  activity in non-local mode — production OpenRouter presets emit
+   *  activity in non-local mode — production models emit
    *  reasoning blocks between every tool round, which clutters the
    *  chat log without adding insight (the model has already chosen
    *  its next move by the time the user reads the reasoning). Local
@@ -228,7 +228,7 @@ export function registerAiChatHandlers(deps: {
         // message-assistant.svelte.
         //
         // Suppress when we've already seen tool activity this turn
-        // and we're talking to the prod proxy — keeps the chat log
+        // and we're talking to the production service — keeps the chat log
         // focused on actions taken instead of running commentary
         // between tool rounds. Local mode (dev) bypasses the gate so
         // operators can inspect every reasoning chunk end-to-end.
@@ -627,7 +627,7 @@ export function registerAiChatHandlers(deps: {
     if (choice !== del) return { ok: false, cancelled: true }
     const localOk = await store.delete(id)
     // Server-side delete is best-effort; the UI doesn't block on it.
-    void deleteServerConversation(proxy, id, logger)
+    void deleteServerConversation(aiClient, id, logger)
     return { ok: localOk }
   })
 
@@ -643,7 +643,7 @@ export function registerAiChatHandlers(deps: {
       return { notSignedIn: true as const }
     }
     try {
-      const text = await proxy.describeIntendedUse(
+      const text = await aiClient.describeIntendedUse(
         JSON.stringify(functions, null, 2)
       )
       if (!text) {
@@ -993,7 +993,7 @@ export function registerAiChatHandlers(deps: {
   messenger.onRequest(AiDictationStop, async ({ apiBaseUrl }) => {
     try {
       const wav = await dictation.stop()
-      const text = await proxy.transcribe(wav, apiBaseUrl)
+      const text = await aiClient.transcribe(wav, apiBaseUrl)
       return { text }
     } catch (err) {
       return { error: dictationErrorMessage(err, logger) }
@@ -1012,13 +1012,13 @@ export function registerAiChatHandlers(deps: {
 
   // Usage polling. Subscribing starts a 30s timer that hits
   // /v1/usage and forwards the result to the webview. The server
-  // caches the result for 10s inside TokenQuota, so a 30s cadence
+  // caches the result briefly, so a 30s cadence
   // is cheap and catches bursts quickly enough for the gauge UX.
   let usageTimer: NodeJS.Timeout | undefined
   messenger.onNotification(AiUsageSubscribe, () => {
     if (usageTimer) return
     const tick = (): void =>
-      void fetchUsage(proxy, logger).then((u) => {
+      void fetchUsage(aiClient, logger).then((u) => {
         if (u) {
           messenger.sendNotification(AiUsageUpdate, frontend, u)
         }
@@ -1285,7 +1285,7 @@ export class ChatEventBuffer {
 }
 
 /**
- * Best-effort DELETE /v1/conversations/{id} on the ai-proxy. Errors are
+ * Best-effort DELETE /v1/conversations/{id} on the AI service. Errors are
  * logged but never surfaced — the UI already treats local delete as the
  * source of truth for display.
  */
@@ -1297,10 +1297,9 @@ export class ChatEventBuffer {
  *  Size caps are tighter than the providers' hard network limits
  *  because the real bottleneck is the model's context window, not the
  *  upload size:
- *   - Images: Anthropic's 5 MB per-image hard cap (OpenAI allows more).
+ *   - Images: a 5 MB per-image hard cap.
  *   - PDFs: hard cap 10 MB (providers accept up to 32 MB / 100 pages,
- *     but Anthropic's own token estimates are ~1500–3000 tokens per
- *     page — a 100-page PDF fills or blows through a 200k context).
+ *     but at ~1500–3000 tokens per page a 100-page PDF fills or blows through a 200k context).
  *     A soft warning fires past 2 MB to nudge the user toward
  *     splitting. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -1355,7 +1354,7 @@ function mediaTypeForExtension(ext: string): string | null {
     case 'html':
     case 'htm':
       return 'text/html'
-    // L4 source. Not an IANA type; the AI SDK's inline-text path in
+    // L4 source. Not an IANA type; the inline-text path in
     // chat-service classifies by `text/` prefix, so use `text/plain`
     // and let the filename attribute in the <attached-file> wrapper
     // tell the model it's L4.
@@ -1374,8 +1373,8 @@ function dictationErrorMessage(err: unknown, logger: AiLogger): string {
   const detail = err instanceof DictationError ? err.detail : undefined
   logger.warn(`dictation: ${detail ?? message}`)
   if (err instanceof DictationError) return message
-  if (err instanceof AiProxyError) {
-    if (err.code === 'network_error') return 'Couldn’t reach the AI proxy.'
+  if (err instanceof AiError) {
+    if (err.code === 'network_error') return 'Couldn’t reach the AI service.'
     if (err.status === 429) return 'Daily limit reached.'
     if (err.status === 413) return 'Keep it short.'
     if (err.status === 401 || err.status === 403) {
@@ -1480,7 +1479,7 @@ async function handlePickAttachment(
       note:
         kind === 'pdf'
           ? `${name} is ${sizeMb} MB — PDFs are capped at ${capMb} MB here so they don't blow through the model's context window. Split or compress first.`
-          : `${name} is ${sizeMb} MB — images are capped at ${capMb} MB (Anthropic's per-image limit). Resize or recompress first.`,
+          : `${name} is ${sizeMb} MB — images are capped at ${capMb} MB. Resize or recompress first.`,
     }
   }
   // Soft warning: big PDF still fits the hard cap but will chew up a
@@ -1550,14 +1549,14 @@ function argsOf(json: string): unknown {
 }
 
 async function deleteServerConversation(
-  proxy: AiProxyClient,
+  aiClient: AiClient,
   id: string,
   logger: AiLogger
 ): Promise<void> {
   try {
-    const headers = await proxy.getAuthHeaders()
+    const headers = await aiClient.getAuthHeaders()
     const res = await fetch(
-      `${proxy.getEndpoint().url}/v1/conversations/${id}`,
+      `${aiClient.getEndpoint().url}/v1/conversations/${id}`,
       {
         method: 'DELETE',
         headers,
@@ -1605,7 +1604,7 @@ async function searchMentions(query: string): Promise<AiMentionCandidate[]> {
 }
 
 /**
- * GET /v1/usage on the ai-proxy. Returns the calling org's
+ * GET /v1/usage on the AI service. Returns the calling org's
  * current-day token total, effective daily limit, and whether
  * blockOnOverage is set. Failures return null — the webview's
  * gauge gracefully sits at zero rather than disrupting the chat
@@ -1613,7 +1612,7 @@ async function searchMentions(query: string): Promise<AiMentionCandidate[]> {
  * refresh.
  */
 async function fetchUsage(
-  proxy: AiProxyClient,
+  aiClient: AiClient,
   logger: AiLogger
 ): Promise<{
   used: number
@@ -1621,9 +1620,9 @@ async function fetchUsage(
   blockOnOverage: boolean
 } | null> {
   try {
-    const headers = await proxy.getAuthHeaders()
+    const headers = await aiClient.getAuthHeaders()
     if (!headers.Authorization) return null
-    const res = await fetch(`${proxy.getEndpoint().url}/v1/usage`, {
+    const res = await fetch(`${aiClient.getEndpoint().url}/v1/usage`, {
       method: 'GET',
       headers,
       signal: AbortSignal.timeout(8000),

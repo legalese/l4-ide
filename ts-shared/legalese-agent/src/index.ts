@@ -13,8 +13,8 @@ export * from './chat-service.js'
 export * from './events.js'
 export * from './context-messages.js'
 
-// ai-proxy
-export * from './ai-proxy-client.js'
+// AI client
+export * from './ai-client.js'
 
 // Tools
 export * from './tool-dispatcher.js'

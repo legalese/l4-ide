@@ -15,7 +15,7 @@ import type {
   TurnInfo,
 } from './runner.js'
 
-/** Incoming bundles are capped at 100 MB (§9.3). */
+/** Incoming bundles are capped at 100 MB. */
 export const MAX_INCOMING_BUNDLE_BYTES = 100 * 1024 * 1024
 export const TURN_ID_TRAILER = 'Turn-Id'
 /** `git gc` gets at most this long on sleep. */
@@ -129,7 +129,7 @@ export function summaryMessages(
 }
 
 /**
- * Git sync for a cloud session (spec §4.7, §5.4, §9.1, §9.4). The
+ * Git sync for a cloud session. The
  * harness is the only process that runs git on `repo/`.
  *
  * - **Start.** `git init -b main` if there's no repository (dev mode;
@@ -137,7 +137,7 @@ export function summaryMessages(
  *   commits, then `state/git/main.bundle`.
  * - **Per turn.** If the turn changed anything: `git add -A`, then a
  *   commit whose subject is a one-line summary of the turn from
- *   ai-proxy's summize pipeline (≤ 5 s; on a timeout, error or unusable
+ *   the AI service's summize model (≤ 5 s; on a timeout, error or unusable
  *   answer: the prompt's first line), whose body is
  *   `Prompt: <first line of the prompt>`, with a `Turn-Id: <turnId>`
  *   trailer. Then rewrite `main.bundle` (temp file + rename) and emit

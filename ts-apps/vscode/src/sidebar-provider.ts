@@ -741,7 +741,7 @@ export function initializeSidebarMessenger(
           error: dep.error,
           description: dep.metadata?.description,
           // Backend omits `metadata.files` entirely when the read scope is
-          // absent (proxy strips it via X-Include-Files: false). A non-empty
+          // absent (the server strips it via X-Include-Files: false). A non-empty
           // list means the user is allowed to read sources — gate the
           // sidebar's Download action on this.
           hasFiles: (dep.metadata?.files?.length ?? 0) > 0,
@@ -1211,7 +1211,7 @@ export function initializeSidebarMessenger(
 
   // Install a per-deployment plugin bundle (SKILL.md + hosted MCP entry)
   // into either Claude Code or VS Code Chat. The bundle is downloaded
-  // from the auth-proxy's .plugin endpoint with the user's session token.
+  // from the .plugin endpoint with the user's session token.
   messenger.onNotification(
     RequestInstallDeploymentSkill,
     async ({ deploymentId, target }) => {

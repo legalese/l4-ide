@@ -149,7 +149,7 @@ describe('turns this webview did not start', () => {
   })
 })
 
-describe('rollback offers (§9.4)', () => {
+describe('rollback offers', () => {
   function withTurns(): CloudConversation {
     const c = conv()
     for (const id of ['t1', 't2']) {
@@ -209,7 +209,7 @@ describe('rollback offers (§9.4)', () => {
   })
 })
 
-describe('files added mid-session (§10)', () => {
+describe('files added mid-session', () => {
   test('files-added shows under the latest prompt and ends the progress', () => {
     const c = conv()
     c.cloud!.progress = 'adding-files'
@@ -237,7 +237,7 @@ describe('files added mid-session (§10)', () => {
   })
 })
 
-describe('Clone / Sync gating (§9.3)', () => {
+describe('Clone / Sync gating', () => {
   test('only after a git-committed event', () => {
     const c = conv()
     expect(canCloneOrSync(c.cloud)).toBe(false)

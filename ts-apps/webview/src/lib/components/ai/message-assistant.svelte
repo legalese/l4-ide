@@ -77,7 +77,7 @@
     return `tx:${i}`
   }
 
-  // Project an L4-rule tool-activity (the proxy ran a deployed rule
+  // Project an L4-rule tool-activity (the AI service ran a deployed rule
   // server-side) onto the SAME shape a client-side rule tool-call
   // uses, so it flows through the exact same <ToolCallRow> render
   // path — one source of truth for the INPUT/OUTPUT card, the L4
@@ -92,7 +92,7 @@
   // shows just the rule's inputs, identical to a direct rule call.
   // The server-side rule activity carries the *raw MCP CallToolResult*
   // as `output` (`{ content: [{ type: 'text', text: '<json>' }] }`),
-  // because the ai-proxy forwards the JSON-RPC `result` verbatim. A
+  // because the AI service forwards the JSON-RPC `result` verbatim. A
   // client-side rule tool-call, by contrast, has already been flattened
   // to just the joined text by the IDE's mcp-client. ToolCallRow's
   // INPUT/OUTPUT extraction (`extractRuleResultValue` / `returnL4`)
@@ -285,11 +285,9 @@
     return rows.map(({ path, action, callId }) => ({ path, action, callId }))
   })
 
-  // Turn-end review card: web-search citations the upstream provider
-  // attached to this turn (via Anthropic's native `web_search` tool,
-  // surfaced as `source` parts by the AI SDK and aggregated by the
-  // proxy into the `sources` field of a synthetic `web_search`
-  // activity). Deduped by URL across all activity blocks in case a
+  // Turn-end review card: web-search citations the model provider
+  // attached to this turn (aggregated by the AI service into the
+  // `sources` field of a synthetic `web_search` activity). Deduped by URL across all activity blocks in case a
   // single turn fired the search more than once.
   type Source = { url: string; title?: string }
   const sources = $derived.by<Source[]>(() => {
@@ -365,7 +363,7 @@
             {/if}
           </div>
         {:else if block.kind === 'tool-activity' && block.activity.ruleKey}
-          <!-- L4-rule activity: the proxy evaluated a deployed rule
+          <!-- L4-rule activity: the AI service evaluated a deployed rule
                server-side. Render it through the SAME ToolCallRow as
                a client-side rule call so the pulsating row, the
                auto-expanding INPUT/OUTPUT card and the L4 colorize
@@ -382,11 +380,11 @@
           <!-- Plain status activity (e.g. doc search, compaction,
                deployment browsing): bold action label + monospace
                message + pulsating-then-frozen dot. The label is
-               stamped on the event by the proxy ("L4 Deployments",
+               stamped on the event by the AI service ("L4 Deployments",
                "Compacting...", "Legalesing...") — no per-tool name
                mapping lives here, so adding a new server-emitted
                activity type doesn't require a webview change. Older
-               proxy builds may omit it; fall back to "Activity" so
+               older servers may omit it; fall back to "Activity" so
                the row still renders.
 
                The dot pulses iff this row is the trailing element
@@ -451,7 +449,7 @@
           </ul>
         {/if}
         {#if sources.length > 0}
-          <!-- Sources sub-section. Cites the URLs the upstream provider
+          <!-- Sources sub-section. Cites the URLs the model provider
                actually consulted via its native web_search tool — the
                evidence chain for whatever the assistant just wrote.
                Spacing above mirrors the gap between the file-changes

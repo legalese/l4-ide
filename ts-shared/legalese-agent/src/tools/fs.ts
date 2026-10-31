@@ -917,7 +917,7 @@ async function applyOneEdit(
   }
   // Whole-file replace is intentionally not supported. A single
   // tool_use carrying the entire file body is the classic max_tokens
-  // truncation trap — Anthropic cuts the args JSON mid-string,
+  // truncation trap — the provider cuts the args JSON mid-string,
   // toolCalls comes back empty, the edit silently never lands. For a
   // new file: pass `content` to fs__create_file; for an existing file:
   // replace surgical sections in multiple smaller edits.

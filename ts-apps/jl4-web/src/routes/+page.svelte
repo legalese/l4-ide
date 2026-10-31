@@ -1018,7 +1018,7 @@
     })
   }
 
-  // A program too long for CloudFront's 8 KB URL limit comes in the fragment,
+  // A program too long for an 8 KB URL limit comes in the fragment,
   // which never leaves the browser: #program=<encodeURIComponent(program)>
   function programFromFragment(url: URL): string | undefined {
     const encoded = url.hash.match(/^#program=(.*)$/)?.[1]

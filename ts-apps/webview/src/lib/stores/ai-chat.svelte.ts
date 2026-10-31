@@ -139,7 +139,7 @@ export interface RenderedTurn {
    *  as (matches the harness's `user-message` echo). */
   cloudTurnId?: string
   /** Cloud conversations, assistant turns: the commit the harness
-   *  made for this turn's file changes (§9.4). */
+   *  made for this turn's file changes. */
   cloudCommit?: { sha: string; parent: string }
   /** Cloud conversations, assistant turns: the changes were rolled
    *  back; the turn renders dimmed. */
@@ -180,8 +180,8 @@ export interface RenderedToolActivity {
   /** Most recent status across the merged run — `done`/`error` stick. */
   status: 'running' | 'done' | 'error'
   /** Bold action prefix the row shows in front of `message`. Stamped
-   *  by the proxy ("L4 Deployments", "Compacting...", "Legalesing...").
-   *  Absent for activities emitted by older proxy builds — the row
+   *  by the AI service ("L4 Deployments", "Compacting...", "Legalesing...").
+   *  Absent for activities emitted by older servers — the row
    *  falls back to a default label. */
   label?: string
   /** Most recent message; prior messages of the same run are dropped
@@ -215,9 +215,9 @@ export interface RenderedToolActivity {
  *  status tickers like `search_l4_docs`), which keep the minimal row.
  *
  *  Two shapes carry a rule:
- *    - direct MCP rule descriptors → `ruleId` is set by the proxy.
+ *    - direct MCP rule descriptors → `ruleId` is set by the AI service.
  *    - the generic `evaluate_rule` tool → rule name lives in
- *      `input.function_name` (proxy can't know it statically).
+ *      `input.function_name` (the server can't know it statically).
  *  Both must also carry `input` so there's something to render. */
 function ruleActivityIdentity(a: {
   tool: string
@@ -397,7 +397,7 @@ export function createAiChatStore(
 ): AiChatStore {
   // Server-assigned id of the conversation the user is currently
   // viewing, or null when they're composing a fresh chat that hasn't
-  // received its id from the proxy yet. Only ever holds real server
+  // received its id from the AI service yet. Only ever holds real server
   // ids — the not-yet-started state lives in `pendingConversation`
   // below.
   let currentId = $state<string | null>(null)
@@ -483,7 +483,7 @@ export function createAiChatStore(
   // successful dispatch (mirrors the stagedMentions flow). PDFs and
   // images only; the extension refuses spreadsheets.
   let stagedAttachments = $state<AiChatAttachment[]>([])
-  // Cloud sessions (spec §12), behind `legaleseAi.cloudSessions.enabled`
+  // Cloud sessions, behind `legaleseAi.cloudSessions.enabled`
   // — the extension says whether it's on (AiCloudConfig).
   let cloudEnabled = $state<boolean>(false)
   let cloudHistory = $state<AiCloudSessionSummary[]>([])
@@ -1053,11 +1053,11 @@ export function createAiChatStore(
     }
 
     // No server-assigned conversationId yet → the very first turn
-    // failed before the proxy emitted its `metadata` SSE frame, so
+    // failed before the AI service emitted its `metadata` SSE frame, so
     // there is no on-disk history to resume against. Fall back to
     // re-sending the last user message as a fresh request — same
     // effect as the user retyping it. Without this fallback Retry
-    // silently no-ops, which is the bug the user hit when the proxy
+    // silently no-ops, which is the bug the user hit when the AI service
     // crashed on their first prompt.
     if (!conv.id) {
       const lastUserTurn = [...conv.turns]
@@ -1532,7 +1532,7 @@ export function createAiChatStore(
     if (!turn || turn.role !== 'assistant') return
     if (!turn.blocks) turn.blocks = []
 
-    // L4-rule activities (the proxy ran a deployed rule on the
+    // L4-rule activities (the AI service ran a deployed rule on the
     // server) merge `running → done` into a SINGLE mutating row so
     // they read exactly like a client-side rule tool-call: the row
     // appears pulsating the moment the call lands, then swaps to the
@@ -2224,7 +2224,7 @@ export function createAiChatStore(
     }
   }
 
-  // ── Cloud sessions (spec §9.4, §12) ─────────────────────────────────
+  // ── Cloud sessions ─────────────────────────────────
 
   function newTurnId(): string {
     return `turn_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
@@ -2277,7 +2277,7 @@ export function createAiChatStore(
     return false
   }
 
-  /** A prompt in an existing cloud conversation (§12.2): a `message`
+  /** A prompt in an existing cloud conversation: a `message`
    *  command, or `inject` while a turn runs. */
   function sendToCloudSession(
     conv: ConversationState,
@@ -2291,7 +2291,7 @@ export function createAiChatStore(
       return
     }
     // The prompt's @-mentioned files (and the active file, when its
-    // chip is on) are added to the session first (§10).
+    // chip is on) are added to the session first.
     const withFile =
       includeActiveFile && activeFile.path && activeFile.name
         ? { name: activeFile.name, path: activeFile.path }
@@ -2367,7 +2367,7 @@ export function createAiChatStore(
     return !conv || conv.turns.length === 0 || (!!conv.cloud && !conv.streaming)
   }
 
-  /** "Run in cloud" (§10, §12.2): start a new cloud session with this
+  /** "Run in cloud": start a new cloud session with this
    *  prompt. The extension gathers the files, creates and starts the
    *  session, and reports progress; the conversation is keyed
    *  `cloud:<sessionId>` once the session exists. */
@@ -2485,7 +2485,7 @@ export function createAiChatStore(
   }
 
   /** Open a cloud conversation: its event log is replayed from the
-   *  start (§12.1), and polling continues while it runs. */
+   *  start, and polling continues while it runs. */
   async function loadCloudConversation(sessionId: string): Promise<void> {
     const m = getMessenger()
     if (!m) return
@@ -2619,7 +2619,7 @@ export function createAiChatStore(
     }
   }
 
-  /** Rollback / restore for the assistant turn at `index` (§9.4). */
+  /** Rollback / restore for the assistant turn at `index`. */
   function rollbackOfferAt(index: number): RollbackOffer | null {
     const conv = getConversation()
     return conv ? rollbackOffer(conv, index) : null
@@ -2674,7 +2674,7 @@ export function createAiChatStore(
   }
 
   /** Sign in to an MCP server of the current cloud session (an amber
-   *  chip, §6.4); the extension then sends the session the new
+   *  chip); the extension then sends the session the new
    *  credentials and reports the servers still needing one. */
   async function signInCloudMcp(server: string): Promise<void> {
     const m = getMessenger()
@@ -2720,7 +2720,7 @@ export function createAiChatStore(
     }
   }
 
-  /** The prompt field's Clone / Sync button (§9.3). */
+  /** The prompt field's Clone / Sync button. */
   /** The session whose Clone / Sync is running: one at a time, and its
    *  buttons (header, Files changed boxes) show it. */
   let cloudGitBusySession = $state<string | null>(null)
@@ -2845,7 +2845,7 @@ export function createAiChatStore(
     get canRunInCloud() {
       return canRunInCloud()
     },
-    /** Clone / Sync is available: the first turn is committed (§9.3). */
+    /** Clone / Sync is available: the first turn is committed. */
     get cloudGitBusy(): boolean {
       const sid = getConversation()?.cloud?.sessionId
       return !!sid && cloudGitBusySession === sid

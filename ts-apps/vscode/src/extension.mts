@@ -49,7 +49,7 @@ import {
 import { AuthManager } from './auth.js'
 import { ServiceClient } from './service-client.js'
 import {
-  AiProxyClient,
+  AiClient,
   BuiltinTools,
   ChatService,
   FileConversationStore,
@@ -612,11 +612,11 @@ export async function activate(context: ExtensionContext) {
   )
 
   // Legalese AI services — independent from the jl4 service URL flow.
-  // The proxy endpoint is hardcoded (see ai-proxy-client.ts) and only
+  // The endpoint is hardcoded (see ai-client.ts) and only
   // overridable via the LEGALESE_AI_ENDPOINT env var for local dev.
   const aiLogger = new AiLogger()
   context.subscriptions.push(aiLogger)
-  const aiProxy = new AiProxyClient({
+  const aiClient = new AiClient({
     auth,
     logger: aiLogger,
     endpoint: vscodeAiEndpoint,
@@ -685,7 +685,7 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(
     registerChatParticipant({
       auth,
-      proxy: aiProxy,
+      aiClient,
       logger: aiLogger,
       tools: new BuiltinTools(aiWorkspace, aiL4Language),
       permissions: aiPermissions,
@@ -710,7 +710,7 @@ export async function activate(context: ExtensionContext) {
   const chatService = new ChatService({
     auth,
     store: aiStore,
-    proxy: aiProxy,
+    aiClient,
     logger: aiLogger,
     dispatcher,
     interaction: aiInteraction,
@@ -721,7 +721,7 @@ export async function activate(context: ExtensionContext) {
     extensionVersion,
   })
 
-  // Cloud sessions (spec: legalese/cloud-sessions, spec/): inert until
+  // Cloud sessions: inert until
   // `legaleseAi.cloudSessions.enabled` is on —
   // nothing polls or calls out before a session is started or opened.
   // Their chat events take the same path as the local chat service's.
@@ -732,7 +732,7 @@ export async function activate(context: ExtensionContext) {
     emitChat: (event) => aiInteraction.emit(event),
     logger: aiLogger,
     storage: context.globalState,
-    summarizeTitle: (text) => aiProxy.summarizeTitle(text),
+    summarizeTitle: (text) => aiClient.summarizeTitle(text),
   })
   context.subscriptions.push(cloudSessions)
 
@@ -756,7 +756,7 @@ export async function activate(context: ExtensionContext) {
       auth,
       service: chatService,
       store: aiStore,
-      proxy: aiProxy,
+      aiClient,
       logger: aiLogger,
       interaction: aiInteraction,
       permissions: aiPermissions,

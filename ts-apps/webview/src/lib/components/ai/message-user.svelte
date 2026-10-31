@@ -27,10 +27,10 @@
     pending?: boolean
     /** Cloud conversations: MCP servers passed to the session (on its
      *  first prompt), as chips after the files. One that needs a
-     *  sign-in here is amber, and a click on it signs in (§6.4). */
+     *  sign-in here is amber, and a click on it signs in. */
     tools?: CloudToolChip[]
     onToolSignIn?: (server: string) => void
-    /** Cloud conversations (§9.4): roll the files back to before this
+    /** Cloud conversations: roll the files back to before this
      *  prompt. A subtle icon in the bubble's top right corner. */
     rollback?: { title: string; onClick: () => void } | null
   } = $props()
@@ -246,7 +246,7 @@
   .chip-slot {
     display: contents;
   }
-  /* One that needs a sign-in here (§6.4): amber, and a button. */
+  /* One that needs a sign-in here: amber, and a button. */
   .user-chip.tool.sign-in {
     border: none;
     font-family: inherit;

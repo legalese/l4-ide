@@ -6,10 +6,10 @@ import type {
 import type { ConversationStore } from '@repo/legalese-agent'
 
 /**
- * {@link ConversationStore} for a cloud session (spec §11:
- * "`session.json` + server-held conversation").
+ * {@link ConversationStore} for a cloud session: `session.json` plus a
+ * server-held conversation.
  *
- * The model context lives in ai-proxy's server-held conversation and
+ * The model context lives in the AI service's server-held conversation and
  * the transcript is the session's event log, so this store keeps no
  * messages. It remembers the one conversation's metadata in memory (so
  * the chat service's follow-up lookups work) and reports the

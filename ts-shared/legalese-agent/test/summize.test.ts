@@ -1,6 +1,6 @@
 import { afterEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { AiProxyClient, type AuthProvider } from '../src/index.js'
+import { AiClient, type AuthProvider } from '../src/index.js'
 import { silentLogger } from './fakes.js'
 
 const chunk = (delta: unknown, finish?: string): string =>
@@ -15,19 +15,19 @@ function sse(frames: string[]): Response {
   })
 }
 
-function client(headers: Record<string, string>): AiProxyClient {
+function client(headers: Record<string, string>): AiClient {
   const auth: AuthProvider = {
     getAiAuthHeaders: async () => ({ ...headers }),
     getEffectiveServiceUrl: () => undefined,
   }
-  return new AiProxyClient({
+  return new AiClient({
     auth,
     logger: silentLogger,
     endpoint: () => ({ url: 'https://ai.test', local: false }),
   })
 }
 
-describe('AiProxyClient.summize', () => {
+describe('AiClient.summize', () => {
   const realFetch = globalThis.fetch
   afterEach(() => {
     globalThis.fetch = realFetch

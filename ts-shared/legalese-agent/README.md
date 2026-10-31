@@ -1,10 +1,10 @@
 # @repo/legalese-agent
 
 The Legalese AI agent core, with no `vscode` import: the chat loop
-(`ChatService`), the ai-proxy client, the tool dispatcher and registry, the
+(`ChatService`), the AI service client, the tool dispatcher and registry, the
 built-in fs / L4 tools, the permission categories, and a file-backed
 conversation store. The VS Code extension runs it in the extension host; the
-cloud harness (`ts-apps/cloud-agent`, cloud-sessions spec §11) runs the same
+cloud harness (`ts-apps/cloud-agent`) runs the same
 code headless.
 
 ESM, built with `tsc` to `dist/`. Tests: `npm test` (plain `node --test`,
@@ -16,7 +16,7 @@ Everything platform-specific goes through the interfaces in `src/ports.ts`:
 
 | Port                | Used for                                                                                       | VS Code adapter (`ts-apps/vscode/src/ai/`)                      |
 | ------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `AuthProvider`      | ai-proxy auth headers; the deployment URL in `<session-context>`                               | `AuthManager` (`../auth.ts`)                                    |
+| `AuthProvider`      | AI service auth headers; the deployment URL in `<session-context>`                             | `AuthManager` (`../auth.ts`)                                    |
 | `Workspace`         | path resolution and confinement, reads, creates, multi-file edits, deletes                     | `VsCodeWorkspace` (`vscode-workspace.ts`)                       |
 | `L4Language`        | open document, diagnostics, directive results, references, semantic tokens, exported functions | `VsCodeL4Language` (`vscode-l4-language.ts`)                    |
 | `UserInteraction`   | chat events, tool approvals, `meta__ask_user`, tool status — all with a `ToolCallContext`      | `WebviewUserInteraction` (`vscode-user-interaction.ts`)         |
@@ -45,7 +45,7 @@ const dispatcher = new ToolDispatcher({
 const service = new ChatService({
   auth,
   store,
-  proxy: new AiProxyClient({ auth, logger, endpoint }),
+  aiClient: new AiClient({ auth, logger, endpoint }),
   logger,
   dispatcher,
   interaction,
@@ -90,8 +90,8 @@ told. Calls without a conversation use the instance's own stores.
 
 ## Cloud-session protocol (`@repo/legalese-agent/protocol`)
 
-The contracts between the cloud harness, the extension and the Sessions API
-(cloud-sessions spec §4.2, §6, §7.1, §8, §15.5), as TypeScript types plus
+The contracts between the cloud harness, the extension and the Sessions API,
+as TypeScript types plus
 hand-written runtime validators. A validator is a `Check<T>`
 (`(value, path) => T`) that returns a clean copy holding only the declared
 fields, or throws `ProtocolError`; `tryParse(check, value)` returns a result
@@ -106,5 +106,4 @@ instead.
 | `protocol/api.ts`      | Sessions API requests/responses (incl. `AddFilesRequest`/`AddFilesResponse`), `GET /events` query helpers, access-token and agent-key routes, key-name helpers, error codes                                                                                                             |
 | `protocol/sealed.ts`   | sealed secrets: `generateSealingKeyPair`, `seal`, `openSealed`, `encodeSealed`/`decodeSealed` (`v1.<epk>.<iv>.<ct>.<tag>`), `SealedEnvelope` (X25519 + HKDF-SHA256 + AES-256-GCM, context-bound)                                                                                        |
 
-The Sessions API (in the `cloud-sessions` repo) mirrors these shapes; this package is
-the reference.
+The Sessions API mirrors these shapes; this package is the reference.

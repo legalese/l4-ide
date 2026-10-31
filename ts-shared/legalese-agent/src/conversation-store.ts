@@ -9,16 +9,15 @@ import type { ConversationStore, Logger } from './ports.js'
 
 /**
  * File-backed local mirror of conversation state for UI restoration.
- * The ai-proxy owns the canonical LLM history; this store is just for
+ * The AI service owns the canonical LLM history; this store is just for
  * rendering and history navigation. Layout under `rootDir` (VS Code:
  * `{globalStorageUri}/ai/conversations`):
  *
  *   {rootDir}/{userKey}/{id}.json              — live
  *   {rootDir}/{userKey}/{id}.deleted-{ms}.json — tombstoned
  *
- * `userKey` mirrors the ai-proxy's `creatorId` (api-key hash or
- * WorkOS user id) so each silo on the server has a matching local
- * folder. When `getUserKey` returns undefined the store is disabled:
+ * `userKey` scopes local history per credential (api-key hash or
+ * user id). When `getUserKey` returns undefined the store is disabled:
  * reads return empty, writes are dropped with a warning. Chat is
  * gated on `isAiUsable()` upstream so this only fires on misuse.
  * Deletion renames; a future cleanup job reaps tombstones.

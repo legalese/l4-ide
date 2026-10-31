@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import {
-  AiProxyClient,
+  AiClient,
   BuiltinTools,
   ChatService,
   EditGuard,
@@ -1412,7 +1412,7 @@ describe('ChatService turn behaviour', () => {
     const service = new ChatService({
       auth,
       store,
-      proxy: new AiProxyClient({
+      aiClient: new AiClient({
         auth,
         logger: silentLogger,
         endpoint: () => ({ url: 'https://ai.test', local: false }),

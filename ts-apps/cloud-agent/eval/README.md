@@ -9,7 +9,7 @@ before and after a change that trades tokens against accuracy.
 node eval/run.mjs --check-tasks --l4 l4
 
 # Run against a local backend (npm run build first). This spends model tokens.
-node eval/run.mjs --ai-proxy http://localhost:3000 --lsp jl4-lsp --l4 l4 --out after.json
+node eval/run.mjs --ai-url http://localhost:3000 --lsp jl4-lsp --l4 l4 --out after.json
 
 node eval/run.mjs --compare before.json after.json
 ```
