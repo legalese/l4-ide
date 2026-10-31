@@ -6,7 +6,7 @@ File: computed-fields-type-mismatch.l4
   Range: 6:15-6:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The type of this definition must match its type signature at computed-fields-type-mismatch.l4:5:12-21, namely
 

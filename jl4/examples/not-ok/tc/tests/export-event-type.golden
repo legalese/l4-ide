@@ -6,7 +6,7 @@ File: export-event-type.l4
   Range: 12:1-12:18
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/export-event-type
   Message:
     `who acted` is published with @export, but its input `e` has a type that is or contains an EVENT.
     @export does not support an EVENT as an input yet.
@@ -16,7 +16,7 @@ File: export-event-type.l4
   Range: 19:1-19:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/export-event-type
   Message:
     `how many events` is published with @export, but its input `es` has a type that is or contains an EVENT.
     @export does not support an EVENT as an input yet.
@@ -26,7 +26,7 @@ File: export-event-type.l4
   Range: 24:1-24:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/export-event-type
   Message:
     `make event` is published with @export, but its result has a type that is or contains an EVENT.
     @export does not support an EVENT as a result yet.

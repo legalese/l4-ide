@@ -4,7 +4,7 @@ File: pattern-matching-mixfix-form-clause.l4
   Range: 11:1-11:1
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
        |
     11 | Red `costs` 0 MEANS 1

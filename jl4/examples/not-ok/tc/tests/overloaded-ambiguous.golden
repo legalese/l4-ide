@@ -6,7 +6,7 @@ File: overloaded-ambiguous.l4
   Range: 38:17-38:25
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -23,7 +23,7 @@ File: overloaded-ambiguous.l4
   Range: 39:17-39:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -40,7 +40,7 @@ File: overloaded-ambiguous.l4
   Range: 41:18-41:27
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -57,7 +57,7 @@ File: overloaded-ambiguous.l4
   Range: 42:18-42:23
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -74,7 +74,7 @@ File: overloaded-ambiguous.l4
   Range: 44:18-44:27
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -91,7 +91,7 @@ File: overloaded-ambiguous.l4
   Range: 45:18-45:23
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -108,7 +108,7 @@ File: overloaded-ambiguous.l4
   Range: 47:19-47:33
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -125,7 +125,7 @@ File: overloaded-ambiguous.l4
   Range: 48:19-48:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -142,7 +142,7 @@ File: overloaded-ambiguous.l4
   Range: 76:24-76:37
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -161,7 +161,7 @@ File: overloaded-ambiguous.l4
   Range: 77:24-77:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -180,7 +180,7 @@ File: overloaded-ambiguous.l4
   Range: 78:24-78:40
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -199,7 +199,7 @@ File: overloaded-ambiguous.l4
   Range: 79:24-79:36
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

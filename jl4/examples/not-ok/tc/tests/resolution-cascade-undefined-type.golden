@@ -6,7 +6,7 @@ File: resolution-cascade-undefined-type.l4
   Range: 15:19-15:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 

@@ -6,7 +6,7 @@ File: error-directive-ambiguity.l4
   Range: 9:7-9:15
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -23,14 +23,14 @@ File: error-directive-ambiguity.l4
   Range: 10:1-10:16
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: check/result
   Message: res12
 File: error-directive-ambiguity.l4
   Hidden: no
   Range: 10:8-10:16
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

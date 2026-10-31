@@ -14,7 +14,7 @@ import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
 import qualified L4.Lexer as Lexer
 import qualified L4.Parser as Parser
-import L4.Parser.AnnotationWarning (annotationWarningMessage, annotationWarningSpan)
+import L4.Parser.AnnotationWarning (annotationWarningCode, annotationWarningMessage, annotationWarningSpan)
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
 import L4.Syntax
@@ -155,13 +155,16 @@ pattern TypeCheck = AttachCallStack [] TypeCheckNoCallstack
 --
 -- Nothing is lost by dropping the stack from the recursion. Apart from passing
 -- it on, the only thing that read it was the cycle check in
--- 'defineWithCallStack', and an import cycle never reaches that check:
--- 'GetMixfixRegistry', keyed by file, recurses over the same imports first, and
--- hls-graph stops it with a 'StackException'. That is still what stops a
--- cycle, and hls-graph would stop a cycle through these per-file keys the same
--- way. The message on the IMPORT that names the files of the ring follows
+-- 'defineWithCallStack', and an import cycle never reaches that check: no rule
+-- follows an import that leads back to its file ('importsThatDoNotLeadBack').
+-- The message on the IMPORT that names the files of the ring follows
 -- 'GetImportEdges' ('firstImportCycleFrom'), which reads no typecheck and no
 -- call stack.
+--
+-- A module on a ring has no typecheck ('onImportRing'), like a module that does
+-- not parse. It would have to be checked with an import left out, and a result
+-- like that is not one to act on: a name from the module left out reads as
+-- undefined, which @jl4-service@ takes for an input the caller must supply.
 --
 -- What this rule says about an import ('importsOk', and the messages on the
 -- IMPORT lines) is computed from that import's own 'CheckModule' result, which
@@ -588,6 +591,43 @@ firstImportCycleFrom start = snd <$> go Set.empty [] start
           (done', found) <- foldM step (done, Nothing) targets
           pure (Set.insert u done', found)
 
+-- | The file and every module it imports, transitively, root first. Each module
+-- appears once. The walk follows 'GetImportEdges', which needs only a first
+-- parse of each module, so it reaches modules whose typecheck failed or that sit
+-- in a cycle. A module that does not parse is included but not walked further.
+importClosure :: NormalizedUri -> Action [NormalizedUri]
+importClosure root = reverse . snd <$> go (Set.empty, []) root
+  where
+    go acc@(seen, out) uri
+      | uri `Set.member` seen = pure acc
+      | otherwise = do
+          edges <- Maybe.fromMaybe [] <$> use GetImportEdges uri
+          foldM go (Set.insert uri seen, uri : out) (map snd edges)
+
+-- | Those of a file's imports that a rule may follow: the ones that do not lead
+-- back to the file.
+--
+-- Every rule that recurses over imports must go through this, because a ring
+-- of imports must never become a ring of Shake keys. hls-graph stops a key that
+-- waits on itself in one chain of calls, but not two threads that enter a ring
+-- at different files: each waits for the key the other is running, for ever,
+-- and nothing is reported, not even for an edit, which only starts it again.
+-- The language server does that as soon as two files of a ring are open, and
+-- a service that checks a whole bundle at once does too.
+-- 'GetImportEdges' does not recurse, so walking it is safe.
+importsThatDoNotLeadBack :: NormalizedUri -> [NormalizedUri] -> Action [NormalizedUri]
+importsThatDoNotLeadBack uri imported =
+  firstImportCycleFrom uri >>= \ case
+    Nothing -> pure imported
+    Just _ -> filterM (fmap (uri `notElem`) . importClosure) imported
+
+-- | Whether following IMPORT from a module leads back to it: it is on a ring of
+-- imports, or it imports itself. Such a module has no typecheck.
+onImportRing :: NormalizedUri -> Action Bool
+onImportRing uri = do
+  imported <- maybe [] (map snd) <$> use GetImportEdges uri
+  (/= imported) <$> importsThatDoNotLeadBack uri imported
+
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
 -- (typecheck-dependency resolution), so the two rules can never load different
@@ -785,7 +825,9 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
 -- 'GetImports' reports an unresolvable IMPORT as a diagnostic and gives it the
 -- importing file's own URI as its module, a placeholder that stands for nothing
 -- (see @mkImportUri@ there), whereas an IMPORT that resolved names another
--- file. So the unresolved ones are the results whose module is the importer.
+-- file, or this one if the file imports itself. So the unresolved ones are the
+-- results whose module is the importer, less the self-imports, which have an
+-- edge in 'GetImportEdges' and are reported there.
 -- The names are the ones 'GetImports' computed, so the two cannot disagree
 -- about which module an IMPORT names. A file that does not parse has no
 -- imports and yields @[]@: its own error is the one to read.
@@ -795,12 +837,15 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
 unresolvedImports :: NormalizedUri -> Action [Text]
 unresolvedImports uri = do
   mResolved <- use GetImports uri
+  edges <- Maybe.fromMaybe [] <$> use GetImportEdges uri
+  let selfImports = [range | (range, target) <- edges, target == uri]
   pure $ case mResolved of
     Just resolved ->
       List.nub
         [ moduleBaseName r.importName
         | r <- resolved
         , r.moduleUri == uri
+        , r.importRange `notElem` selfImports
         ]
     Nothing -> []
   where
@@ -824,9 +869,8 @@ unresolvedImports uri = do
 --
 -- This does not hide an import cycle. A file that really imports itself also
 -- resolves to its own URI and is dropped here too; 'GetImportEdges' reports it
--- on the IMPORT. And 'GetParsedAst' needs 'GetMixfixRegistry', which follows
--- the same imports file by file, so a cycle has stopped the engine there
--- before any caller reaches this list.
+-- on the IMPORT. And a module on a ring has no typecheck ('onImportRing'), so
+-- evaluating one stops there, before it follows any import.
 dependencyImports :: NormalizedUri -> Action [ImportResult]
 dependencyImports uri = filter (\r -> r.moduleUri /= uri) <$> use_ GetImports uri
 
@@ -858,7 +902,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         lift $ addVirtualFileFromFS file
 
     case mRope of
-      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
+      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "file/unreadable" (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
       Just rope -> do
         let contents = Rope.toText rope
         case Lexer.execLexer uri contents of
@@ -906,7 +950,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         resolvedUris <- catMaybes <$> traverse resolveImportUri importNames
 
         -- Recursively get mixfix hints from imported modules
-        importedHints <- mconcat . catMaybes <$> uses GetMixfixRegistry resolvedUris
+        importedHints <- mconcat . catMaybes <$> (uses GetMixfixRegistry =<< importsThatDoNotLeadBack uri resolvedUris)
 
         -- Combine local + imported hints
         let combinedHints = localHints <> importedHints
@@ -926,11 +970,9 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
               outcome <- resolveImport uri modName
               pure (fmap (\u -> (range, u)) outcome.importUri)
         edges <- catMaybes <$> traverse resolveEdge (foldTopDecls extractImport firstProg)
-        -- Reported here because this rule needs no full parse: a file that
-        -- imports itself never gets one.
         let selfImportDiags =
               [ mkSimpleFileDiagnostic uri
-                  (mkSimpleDiagnostic "import" "This IMPORT names the file it is in. A file cannot import itself." (fromSrcRange <$> range))
+                  (mkSimpleDiagnostic "import/self-import" "import" "This IMPORT names the file it is in. A file cannot import itself." (fromSrcRange <$> range))
               | (range, target) <- edges
               , target == uri
               ]
@@ -972,6 +1014,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
                  <> [renderEmbedStatus outcome.embedTried]
                 diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
+                    "import/module-not-found"
                     (fromNormalizedUri uri).getUri
                     (Text.unlines
                       [ "I could not find a module with this name: " <> Text.pack modName
@@ -999,13 +1042,13 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     -- ('GetImports' resolves those here, and reports them) or the file
     -- importing itself ('GetImportEdges' reports that). It is not typechecked:
     -- 'CheckModule' is keyed by file alone, so that would be the rule waiting
-    -- on itself, and the engine would stop with a 'StackException' instead of
-    -- the report above (see 'dependencyImports', which drops the same imports
-    -- from the evaluation). It is kept in the list, with no typecheck, so that
-    -- 'importsOk' counts it.
-    let others = filter ((/= uri) . (.moduleUri)) imports
-    results <- uses CheckModule (map (.moduleUri) others)
-    let byUri = Map.fromList (zip (map (.moduleUri) others) results)
+    -- on itself (see 'dependencyImports', which drops the same imports from the
+    -- evaluation). Nor is an import that leads back to this file
+    -- ('importsThatDoNotLeadBack'); 'CheckModule' reports that. Each is kept in
+    -- the list, with no typecheck, so that 'importsOk' counts it.
+    checkable <- importsThatDoNotLeadBack uri (filter (/= uri) (map (.moduleUri) imports))
+    results <- uses CheckModule checkable
+    let byUri = Map.fromList (zip checkable results)
         ress = [ (i, join (Map.lookup i.moduleUri byUri)) | i <- imports ]
     pure ([], Just ress)
 
@@ -1016,11 +1059,11 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     ([],) <$> use CheckModule uri
 
   define shakeRecorder $ \CheckModule uri -> do
-    -- Before the parse, which fails for a file that imports itself: this
-    -- publishes the error that says so.
+    -- This publishes the error for a file that imports itself.
     _            <- use GetImportEdges uri
     parsed       <- use_ GetParsedAst uri
     importResults <- use_ GetTypeCheckDependencies uri
+    onRing       <- onImportRing uri
     -- An import with no typecheck is usually in a ring of imports. Find it, so
     -- the message can name the files instead of the engine's rule names.
     rings <- traverse
@@ -1031,25 +1074,33 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     let (imported, dependencies) = unzip [ (i, tc) | (i, Just tc) <- importResults ]
         fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
         arrows = Text.intercalate " -> " . map fileName
-        -- What is wrong with an imported module, if anything. The error itself
-        -- is reported in that module; this points at it from the IMPORT.
-        importProblem :: ImportResult -> Maybe [NormalizedUri] -> Maybe TypeCheckResult -> Maybe Text
+        -- What is wrong with an imported module, if anything, as its diagnostic
+        -- code and message. The error itself is reported in that module; this
+        -- points at it from the IMPORT.
+        importProblem :: ImportResult -> Maybe [NormalizedUri] -> Maybe TypeCheckResult -> Maybe (Text, Text)
         importProblem imp ring = \case
           Nothing -> Just $ case ring of
             Just r
               | uri `elem` r ->
-                  "This IMPORT makes a ring of imports: " <> arrows (startingAt uri r)
+                  ( "import/cycle"
+                  , "This IMPORT makes a ring of imports: " <> arrows (startingAt uri r)
                     <> ". Files cannot import each other in a ring."
+                  )
               | otherwise ->
-                  "The imported module " <> modName <> " is in a ring of imports: " <> arrows r
+                  ( "import/cycle"
+                  , "The imported module " <> modName <> " is in a ring of imports: " <> arrows r
                     <> ". Files cannot import each other in a ring."
-            Nothing -> "The imported module " <> modName <> " could not be checked; see the errors in it."
+                  )
+            Nothing -> ("import/module-has-errors", "The imported module " <> modName <> " could not be checked; see the errors in it.")
           Just tc
             | e : _ <- tc.errors ->
-                Just $ "The imported module " <> modName <> " has errors"
-                  <> maybe "" (\r -> " (line " <> Text.pack (show r.start.line) <> ": " <> firstLine e <> ")") (rangeOf e)
-            | not tc.success -> Just $ "The imported module " <> modName <> " has errors."
-            | not tc.importsOk -> Just $ "The imported module " <> modName <> " imports a module with errors."
+                Just
+                  ( "import/module-has-errors"
+                  , "The imported module " <> modName <> " has errors"
+                      <> maybe "" (\r -> " (line " <> Text.pack (show r.start.line) <> ": " <> firstLine e <> ")") (rangeOf e)
+                  )
+            | not tc.success -> Just ("import/module-has-errors", "The imported module " <> modName <> " has errors.")
+            | not tc.importsOk -> Just ("import/module-has-errors", "The imported module " <> modName <> " imports a module with errors.")
             | otherwise -> Nothing
           where
             modName = rawNameToText (rawName imp.importName)
@@ -1058,12 +1109,12 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
               (before, after) -> after <> before <> take 1 after
             firstLine e = Text.strip $ Maybe.fromMaybe "" $ Maybe.listToMaybe $ concatMap Text.lines $ TypeCheck.prettyCheckError e.kind
         importDiags =
-          [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "import" msg (fromSrcRange <$> imp.importRange))
+          [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic code "import" msg (fromSrcRange <$> imp.importRange))
           | ((imp, mTc), ring) <- zip importResults rings
           -- An IMPORT that finds no module resolves to its own file, and
           -- 'GetImports' already reports it on that IMPORT.
           , imp.moduleUri /= uri
-          , Just msg <- [importProblem imp ring mTc]
+          , Just (code, msg) <- [importProblem imp ring mTc]
           ]
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
@@ -1092,7 +1143,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- All diagnostics are still published to the editor below regardless
         -- of this partition — it decides which go to 'infos' and which to 'errors'.
         (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
-    pure
+    pure $ if onRing then (importDiags, Nothing) else
       ( importDiags <> fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
       , Just TypeCheckResult
         { module' = result.program
@@ -1260,7 +1311,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     parsed <- use_ GetParsedAst f
     let pfp = (fromNormalizedUri f).getUri
     pure case ExactPrint.exactprint parsed of
-      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
+      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic "internal/exactprint-failed" pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
       Right ep'd -> ([], Just ep'd)
 
   where
@@ -1286,22 +1337,24 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         Diagnostic
           { _range = rangeOfResolveWarning warn
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode code
+          , _codeDescription = diagnosticCodeDescription code
           , _source = Just "parser"
           , _message = prettyNlgResolveWarning warn
           , _tags = Nothing
           , _relatedInformation = Nothing
           , _data_ = Nothing
           }
+      where
+        code = annotationWarningCode warn
 
     mkAndOrLintWarning :: Lint.AndOrWarning -> Diagnostic
     mkAndOrLintWarning warn =
         Diagnostic
           { _range = srcRangeToLspRange warn.warningRange
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode "lint/and-or-same-indentation"
+          , _codeDescription = diagnosticCodeDescription "lint/and-or-same-indentation"
           , _source = Just "linter"
           , _message = Text.pack $ "AND and OR operators appear at the same indentation level (column " <> show warn.conflictingColumn <> "). This may indicate a precedence error - please use indentation to clarify precedence; in a pinch, parentheses may also be used."
           , _tags = Nothing
@@ -1310,15 +1363,15 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
           }
 
     mkParseErrorDiagnostic :: PError -> Diagnostic
-    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.origin parseError.message (Just parseError.range)
+    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.code parseError.origin parseError.message (Just parseError.range)
 
-    mkSimpleDiagnostic :: Text -> Text -> Maybe SrcSpan -> Diagnostic
-    mkSimpleDiagnostic origin _message range =
+    mkSimpleDiagnostic :: Text -> Text -> Text -> Maybe SrcSpan -> Diagnostic
+    mkSimpleDiagnostic code origin _message range =
       Diagnostic
         { _range = srcSpanToLspRange range
         , _severity = Just LSP.DiagnosticSeverity_Error
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just origin
         , _message
         , _tags = Nothing
@@ -1334,8 +1387,8 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
       Diagnostic
         { _range = srcRangeToLspRange (Just range)
         , _severity = Just LSP.DiagnosticSeverity_Hint
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode "lint/redundant-lang-en"
+        , _codeDescription = diagnosticCodeDescription "lint/redundant-lang-en"
         , _source = Just "linter"
         , _message = "A module that declares nothing is English; this line can go."
         , _tags = Nothing
@@ -1353,28 +1406,32 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
               EvaluateLazy.Assertion (Left _)      -> Just LSP.DiagnosticSeverity_Error
               EvaluateLazy.Reduction (Left _)      -> Just LSP.DiagnosticSeverity_Error
               _                                    -> Just LSP.DiagnosticSeverity_Information
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "eval"
         , _message = EvaluateLazy.prettyEvalDirectiveResult r
         , _tags = Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = EvaluateLazy.evalDirectiveCode res
 
     checkErrorToDiagnostic :: CheckErrorWithContext -> Diagnostic
     checkErrorToDiagnostic checkError =
       Diagnostic
         { _range = srcRangeToLspRange (rangeOf checkError)
         , _severity = Just (translateSeverity (TypeCheck.severity checkError))
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "check"
         , _message = Text.unlines (TypeCheck.prettyCheckError checkError.kind)
         , _tags = Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = TypeCheck.checkErrorCode checkError.kind
 
 translateSeverity :: TypeCheck.Severity -> DiagnosticSeverity
 translateSeverity TypeCheck.SInfo  = LSP.DiagnosticSeverity_Information

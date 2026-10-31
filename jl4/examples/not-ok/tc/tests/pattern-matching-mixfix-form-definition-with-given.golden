@@ -5,7 +5,7 @@ File: pattern-matching-mixfix-form-definition-with-given.l4
   Range: 13:1-13:1
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
        |
     13 | Red `costs` n MEANS 1

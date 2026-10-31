@@ -5,7 +5,7 @@ File: parse-error4.l4
   Range: 8:18-8:18
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-MEANS
   Message:
       |
     8 | DECIDE factorial MEANS n

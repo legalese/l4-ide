@@ -252,8 +252,8 @@ runOneshot evalConfig fp act = do
 --
 -- The rendered @[Text]@ is still returned for display; the @[FileDiagnostic]@
 -- is what a caller consults for a verdict that knows severity. An import cycle
--- is the case that needs it: the engine attaches its error to a module that is
--- imported, so the entry file's own typecheck result can look successful.
+-- is the case that needs it: a module on a ring has no typecheck, so a file that
+-- imports one is checked without it, and its own result can look successful.
 runOneshotWithDiagnostics
   :: EvalConfig
   -> FilePath

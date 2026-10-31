@@ -6,7 +6,7 @@ File: computed-fields-cycle.l4
   Range: 3:9-3:12
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/cyclic-computed-fields
   Message:
     Circular dependency detected between computed fields:
 

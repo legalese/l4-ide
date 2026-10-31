@@ -268,6 +268,66 @@ severity (MkCheckErrorWithContext e _) =
     CheckWarning {} -> SWarn
     _               -> SError
 
+-- | The stable diagnostic code of a checker diagnostic.
+--
+-- A code is what tools match on instead of a message, so codes are API:
+--
+--   * A code is a descriptive slug, @area/what-happened@, not a number.
+--   * A code is never renamed casually and never reused for something else,
+--     even after its diagnostic is gone. Rewording a message does not change
+--     its code.
+--   * A code never contains anything the user wrote.
+--   * Add a new code to @jl4-lsp/DIAGNOSTIC-CODES.md@ when you add it here.
+--
+-- The area says what kind of finding it is, not which stage reported it, so a
+-- checker warning about code that is probably wrong is a @lint/@ code. Parse
+-- errors, evaluation results and annotation warnings have the same promise:
+-- 'L4.Lexer.parseErrorCode', 'L4.EvaluateLazy.evalDirectiveCode' and
+-- 'L4.Parser.AnnotationWarning.annotationWarningCode'.
+--
+-- This match has no wildcard on purpose, so that a new constructor stops the
+-- build here until it has a code.
+checkErrorCode :: CheckError -> Text
+checkErrorCode = \ case
+  OutOfScopeError {}             -> "check/unknown-identifier"
+  KindError {}                   -> "check/wrong-type-argument-count"
+  TypeMismatch {}                -> "check/type-mismatch"
+  InconsistentNameInSignature {} -> "check/name-not-in-definition"
+  InconsistentNameInAppForm {}   -> "check/name-not-in-signature"
+  ClausePatternCountMismatch {}  -> "check/clause-pattern-count"
+  ExportedClausesWithoutGiven {} -> "check/export-clauses-without-given"
+  NonDistinctError {}            -> "check/duplicate-name"
+  AmbiguousTermError {}          -> "check/ambiguous-identifier"
+  AmbiguousOperatorError {}      -> "check/ambiguous-operator"
+  AmbiguousTypeError {}          -> "check/ambiguous-type"
+  InternalAmbiguityError         -> "check/internal-error"
+  IncorrectArgsNumberApp {}      -> "check/wrong-argument-count"
+  IllegalApp {}                  -> "check/not-a-function"
+  IllegalAppNamed {}             -> "check/not-a-function"
+  IncompleteAppNamed {}          -> "check/missing-named-arguments"
+  CheckInfo {}                   -> "check/result"
+  CheckWarning w                 -> checkWarningCode w
+  IllegalTypeInKindSignature {}  -> "check/invalid-type-parameter"
+  MissingEntityInfo {}           -> "check/internal-error"
+  DesugarAnnoRewritingError {}   -> "check/internal-error"
+  MixfixMatchErrorCheck {}       -> "check/mixfix-mismatch"
+  CyclicComputedFields {}        -> "check/cyclic-computed-fields"
+  CyclicTypeSynonyms {}          -> "check/cyclic-type-synonyms"
+  SynonymExpansionLimit {}       -> "check/type-synonym-chain-too-long"
+  SuppliedComputedField {}       -> "check/supplied-computed-field"
+  ExportFunctionTypeInput {}     -> "check/export-function-input"
+  ExportEventType {}             -> "check/export-event-type"
+
+-- | The code of a checker warning. See 'checkErrorCode'.
+checkWarningCode :: CheckWarning -> Text
+checkWarningCode = \ case
+  PatternMatchRedundant {}    -> "lint/redundant-branch"
+  PatternMatchesMissing {}    -> "lint/non-exhaustive-match"
+  PatternClausesMissing {}    -> "lint/non-exhaustive-clauses"
+  PatternClauseUnreachable {} -> "lint/unreachable-clause"
+  ClauseAnnotationUnused {}   -> "lint/misplaced-clause-annotation"
+  ClauseArityChanged {}       -> "lint/clause-arity-changed"
+
 -- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
 -- a candidate. A warning attached along the way must NOT influence name
 -- resolution: with a purely structural test (any diagnostic = failure), a

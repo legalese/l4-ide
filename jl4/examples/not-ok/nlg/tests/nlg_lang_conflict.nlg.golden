@@ -5,7 +5,7 @@ File: nlg_lang_conflict.l4
   Range: 4:1-4:9
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/lang-overridden
   Message:
     This module declares two different languages with @lang: `en` here and `he` on line 5.
     L4 uses the last @lang in the file, so the module's language is `he` and this line has no effect. Keep one @lang line.

@@ -13,7 +13,7 @@
 -- deploy time is not part of it.
 --
 -- The assertions are on the log line, which is what an operator reads.
-module UnresolvedImportSpec (spec) where
+module UnresolvedImportSpec (spec, unresolvedLines, withLog) where
 
 import Test.Hspec
 
