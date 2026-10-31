@@ -39,6 +39,7 @@
   import ConversationHistory from './conversation-history.svelte'
   import SettingsPanel from './settings-panel.svelte'
   import DeploymentBanner from './deployment-banner.svelte'
+  import CloudGitButton from './cloud-git-button.svelte'
   import ConversationHeader from './conversation-header.svelte'
   import CloudUpsell from '../cloud-upsell.svelte'
 
@@ -279,6 +280,20 @@
   const showChat = $derived(store.signedIn && store.current !== null)
 </script>
 
+<!-- Clone / Sync: in a cloud session's header and on its Files changed
+     boxes. -->
+{#snippet cloudGitButton()}
+  {#if store.current?.cloud}
+    <CloudGitButton
+      state={store.current.cloud.state}
+      git={store.cloudGitStatus}
+      ready={store.cloudGitReady}
+      busy={store.cloudGitBusy}
+      onClick={() => void store.cloudGitAction()}
+    />
+  {/if}
+{/snippet}
+
 <div class="ai-panel">
   {#if showUnauth}
     <!-- Mirrors the Deployments tab signed-out state — both render the
@@ -293,15 +308,13 @@
         title={store.currentTitle}
         running={conv.streaming}
         waiting={!!(store.pendingApproval || store.pendingQuestion)}
-        git={conv.cloud ? store.cloudGitStatus : null}
-        gitReady={conv.cloud ? store.cloudGitReady : false}
+        action={conv.cloud ? cloudGitButton : undefined}
         onStop={() => void store.stopCloud()}
-        onGit={() => store.cloudGitAction()}
         onDelete={() =>
           id ? void store.deleteConversation(id) : store.newConversation()}
-        onRename={conv.cloud || !id
-          ? undefined
-          : (title) => void store.renameConversation(id, title)}
+        onRename={id
+          ? (title) => void store.renameConversation(id, title)
+          : undefined}
       />
     {/if}
     {#if showEmptyState}
@@ -329,6 +342,7 @@
         onOpenFile={(callId) => store.openFile(callId)}
         onOpenFileDiff={(callId) => store.openFileDiff(callId)}
         filesOpenable={!store.current.cloud}
+        filesAction={store.current.cloud ? cloudGitButton : undefined}
         tools={cloudToolChips(store.current.cloud)}
         onToolSignIn={(server) => void store.signInCloudMcp(server)}
         rollbackOfferAt={store.current.cloud

@@ -37,6 +37,7 @@ import {
   AiCloudGitStatusRequest,
   AiCloudMcpSignIn,
   AiCloudOpen,
+  AiCloudRename,
   AiCloudRollback,
   AiCloudRun,
   AiCloudSessionList,
@@ -632,12 +633,35 @@ export function createAiChatStore(
     )
   }
 
-  /** Rename a local conversation (cloud sessions keep their title). */
+  /** Rename a conversation: shown at once, put back if it fails. */
   async function renameConversation(id: string, title: string): Promise<void> {
     const next = title.trim().slice(0, 80)
     const m = getMessenger()
-    if (!m || !next || cloudSessionIdOf(id)) return
+    if (!m || !next) return
     const conv = conversations[id]
+    const cloudSid = cloudSessionIdOf(id)
+    if (cloudSid) {
+      const item = cloudHistory.find((s) => s.sessionId === cloudSid)
+      const before = conv?.title ?? null
+      const beforeItem = item?.title
+      if (conv) conv.title = next
+      if (item) item.title = next
+      let res: { ok: boolean; error?: string } = { ok: false }
+      try {
+        res = await m.sendRequest(AiCloudRename, HOST_EXTENSION, {
+          sessionId: cloudSid,
+          title: next,
+        })
+      } catch (err) {
+        res = { ok: false, error: err instanceof Error ? err.message : '' }
+      }
+      if (!res.ok) {
+        if (conv) conv.title = before
+        if (item && beforeItem !== undefined) item.title = beforeItem
+        notifyCloudError(res.error || 'Renaming the cloud session failed.')
+      }
+      return
+    }
     if (conv) conv.title = next
     const item = history.find((h) => h.id === id)
     if (item) item.title = next
@@ -679,7 +703,10 @@ export function createAiChatStore(
       return
     }
     try {
-      await m.sendRequest(AiConversationDelete, HOST_EXTENSION, { id })
+      const res = await m.sendRequest(AiConversationDelete, HOST_EXTENSION, {
+        id,
+      })
+      if (res.cancelled) return
     } catch {
       // ignore
     }
@@ -2694,15 +2721,20 @@ export function createAiChatStore(
   }
 
   /** The prompt field's Clone / Sync button (§9.3). */
+  /** The session whose Clone / Sync is running: one at a time, and its
+   *  buttons (header, Files changed boxes) show it. */
+  let cloudGitBusySession = $state<string | null>(null)
+
   async function cloudGitAction(): Promise<void> {
     const m = getMessenger()
     const conv = getConversation()
     const sessionId = conv?.cloud?.sessionId
     if (!m || !conv?.cloud || !sessionId) return
     // The button is disabled until then.
-    if (!canCloneOrSync(conv.cloud)) return
+    if (!canCloneOrSync(conv.cloud) || cloudGitBusySession) return
     const status = cloudGit[sessionId]
     const action = status?.kind === 'cloned' ? 'sync' : 'clone'
+    cloudGitBusySession = sessionId
     try {
       const res = await m.sendRequest(AiCloudGitAction, HOST_EXTENSION, {
         sessionId,
@@ -2712,6 +2744,8 @@ export function createAiChatStore(
       if (res.error) notifyCloudError(res.error)
     } catch (err) {
       notifyCloudError(err instanceof Error ? err.message : 'Git failed.')
+    } finally {
+      cloudGitBusySession = null
     }
   }
 
@@ -2812,6 +2846,10 @@ export function createAiChatStore(
       return canRunInCloud()
     },
     /** Clone / Sync is available: the first turn is committed (§9.3). */
+    get cloudGitBusy(): boolean {
+      const sid = getConversation()?.cloud?.sessionId
+      return !!sid && cloudGitBusySession === sid
+    },
     get cloudGitReady(): boolean {
       return canCloneOrSync(getConversation()?.cloud)
     },
@@ -2943,6 +2981,7 @@ export type AiChatStore = {
   readonly canRunInCloud: boolean
   readonly cloudGitStatus: AiCloudGitStatus | null
   readonly cloudGitReady: boolean
+  readonly cloudGitBusy: boolean
   sendCloud: (
     text: string,
     mentions?: AiChatStartParams['mentions']

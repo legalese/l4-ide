@@ -264,6 +264,17 @@ describe('SessionsApiClient', () => {
     })
   })
 
+  test('rename: PATCH with the title', async () => {
+    const { api, calls } = client(() => json(200, { title: 'Lease review' }))
+    await api.renameSession(SID, 'Lease review')
+    assert.equal(calls[0]!.init.method, 'PATCH')
+    assert.equal(
+      calls[0]!.url,
+      `https://sessions.legalese.cloud/sessions/${SID}`
+    )
+    assert.equal(calls[0]!.init.body, '{"title":"Lease review"}')
+  })
+
   test('DELETE: 204 with no body', async () => {
     const { api, calls } = client(() => new Response(null, { status: 204 }))
     await api.deleteSession(SID)

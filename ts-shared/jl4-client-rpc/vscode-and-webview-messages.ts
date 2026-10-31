@@ -1356,10 +1356,11 @@ export const AiConversationLoad: RequestType<
   method: 'aiConversationLoad',
 }
 
-/** Rename-delete locally + on the server. */
+/** Delete locally + on the server, after asking in a VS Code dialog
+ *  (`cancelled` when the user declined). */
 export const AiConversationDelete: RequestType<
   { id: string },
-  { ok: boolean }
+  { ok: boolean; cancelled?: boolean }
 > = {
   method: 'aiConversationDelete',
 }

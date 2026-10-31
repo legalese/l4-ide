@@ -127,6 +127,10 @@ class FakeApi implements SessionsApi {
     this.log.push('commit-files')
     return { commandId: 99, state: this.commandState }
   }
+  renamed: Array<{ sid: string; title: string }> = []
+  async renameSession(sid: string, title: string) {
+    this.renamed.push({ sid, title })
+  }
   async deleteSession() {
     this.log.push('delete')
   }

@@ -590,6 +590,13 @@ export function registerAiChatHandlers(deps: {
     }
   })
   messenger.onRequest(AiConversationDelete, async ({ id }) => {
+    const del = 'Delete'
+    const choice = await vscode.window.showWarningMessage(
+      'Delete this conversation?',
+      { modal: true, detail: "It can't be restored." },
+      del
+    )
+    if (choice !== del) return { ok: false, cancelled: true }
     const localOk = await store.delete(id)
     // Server-side delete is best-effort; the UI doesn't block on it.
     void deleteServerConversation(proxy, id, logger)

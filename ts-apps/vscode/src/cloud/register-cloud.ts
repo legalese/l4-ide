@@ -23,6 +23,7 @@ import {
   AiCloudMcpSignInNeeded,
   AiCloudOpen,
   AiCloudProgress,
+  AiCloudRename,
   AiCloudReveal,
   AiCloudRollback,
   AiCloudRun,
@@ -363,6 +364,18 @@ export function registerCloudHandlers(deps: {
       await manager.delete(sessionId)
       await cacheList(cachedList().filter((s) => s.sessionId !== sessionId))
       if (viewedSession === sessionId) viewedSession = undefined
+      return { ok: true }
+    })
+  )
+
+  messenger.onRequest(AiCloudRename, ({ sessionId, title }) =>
+    guard('rename', async () => {
+      await cloud.api.renameSession(sessionId, title)
+      await cacheList(
+        cachedList().map((s) =>
+          s.sessionId === sessionId ? { ...s, title } : s
+        )
+      )
       return { ok: true }
     })
   )

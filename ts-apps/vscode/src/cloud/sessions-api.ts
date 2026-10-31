@@ -132,6 +132,8 @@ export interface SessionsApi {
   /** `DELETE /sessions/:sid` answers 204 at once (the server cleans up
    *  later), also while the session's task is still running. */
   deleteSession(sid: string): Promise<void>
+  /** `PATCH /sessions/:sid`: a new title for the session. */
+  renameSession(sid: string, title: string): Promise<void>
   getEvents(
     streams: EventStreamRequest[]
   ): Promise<{ streams: Array<EventStreamResponse | EventStreamError> }>
@@ -314,6 +316,10 @@ export class SessionsApiClient implements SessionsApi {
         {}
       )
     ).state
+  }
+
+  async renameSession(sid: string, title: string): Promise<void> {
+    await this.request('PATCH', `/sessions/${pathId(sid)}`, null, { title })
   }
 
   async deleteSession(sid: string): Promise<void> {
