@@ -328,7 +328,7 @@
       // once the call settles (the MCP tool list may not have been
       // populated yet when the first row mounted on a streaming turn).
     } catch {
-      // Network / proxy hiccup — retry on the next effect tick.
+      // Network hiccup — retry on the next effect tick.
     } finally {
       renderMetaInFlight = false
     }
@@ -481,7 +481,7 @@
   // rows in message-assistant.svelte) — no chevron, not expandable,
   // dot pulsating. The instant the call resolves to `done` or
   // `error`, the row swaps to the standard chevron card so the user
-  // can expand the diff or the error message. The proxy now streams
+  // can expand the diff or the error message. The AI service now streams
   // partial tool-call frames as soon as the model commits to a tool
   // name (toolCallStreaming) so the pulsating dot appears
   // immediately — even before the args JSON has finished streaming.

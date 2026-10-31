@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { AiCloudSessionState } from 'jl4-client-rpc'
 
-  // A cloud session's state as its cloud outline (§12): a band sweeps
+  // A cloud session's state as its cloud outline: a band sweeps
   // along it while the view loads it (quickly), while its compute starts
   // (slowly) and, in crimson, while the agent works; it is white when
   // running, amber when the agent asked a question, gray asleep (or

@@ -15,8 +15,8 @@ const RANK: Record<LogLevel, number> = { error: 0, warn: 1, info: 2, debug: 3 }
 const MAX_MESSAGE = 500
 
 /**
- * Structured stdout logger for the harness (spec §13): one JSON object
- * per line, `{ ts, level, msg, sid, err? }`, picked up by `awslogs`.
+ * Structured stdout logger for the harness: one JSON object
+ * per line, `{ ts, level, msg, sid, err? }`.
  *
  * Logs carry ids, tool names, durations and errors — never prompt
  * text, model output or file content. The agent core logs a few lines

@@ -1,5 +1,5 @@
 import type {
-  AiProxyTool,
+  AiTool,
   Logger,
   PermissionPolicy,
   ToolCallContext,
@@ -26,7 +26,7 @@ import type { FsCopyArgs, FsCreateArgs, FsEditArgs } from './tools/fs.js'
 import { l4FileState } from './tools/lsp.js'
 import type { L4RefactorArgs } from './tools/refactor.js'
 
-/** Result returned to the proxy as the content of a `role:"tool"` message. */
+/** Result returned to the AI service as the content of a `role:"tool"` message. */
 export type ToolResult =
   | { ok: true; output: string }
   | { ok: false; error: string; code?: 'denied' | 'unknown_tool' | 'failed' }
@@ -38,14 +38,14 @@ export interface ToolCall {
 }
 
 /**
- * Front door for every tool_call that comes back from the proxy. It
+ * Front door for every tool_call that comes back from the AI service. It
  *  1. picks the right permission category,
  *  2. consults the {@link PermissionPolicy},
  *  3. either runs the tool, refuses it, or requests explicit approval
  *     through {@link UserInteraction} — scoped to the conversation and
  *     turn in the {@link ToolCallContext},
  *  4. returns a `ToolResult` that the chat-service folds into the
- *     follow-up request to the proxy.
+ *     follow-up request to the AI service.
  *
  * 'alwaysAllow' is handled by the host (it bumps the policy through
  * {@link PermissionPolicy.setPermission}, then resolves the approval as
@@ -150,8 +150,8 @@ export class ToolDispatcher {
    * provider's tools. A provider that fails to list contributes nothing
    * for this round.
    */
-  async listTools(): Promise<AiProxyTool[]> {
-    const tools: AiProxyTool[] = [...BUILTIN_TOOLS]
+  async listTools(): Promise<AiTool[]> {
+    const tools: AiTool[] = [...BUILTIN_TOOLS]
     for (const provider of this.providers) {
       try {
         tools.push(...(await provider.listTools()))

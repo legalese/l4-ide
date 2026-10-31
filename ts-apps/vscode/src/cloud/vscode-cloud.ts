@@ -1,10 +1,10 @@
 /**
  * VS Code side of cloud sessions: settings, seed gathering from the
- * editor and the language server (§10), and the wiring that builds the
+ * editor and the language server, and the wiring that builds the
  * {@link CloudSessionManager} on top of the extension's auth, MCP
  * servers and chat-event path.
  *
- * Everything is behind `legaleseAi.cloudSessions.enabled` (§15.5).
+ * Everything is behind `legaleseAi.cloudSessions.enabled`.
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -22,8 +22,8 @@ import type { VSCodeL4LanguageClient } from '../vscode-l4-language-client.js'
 import {
   AccessTokenManager,
   mintAgentKey,
-  type AuthProxyDeps,
-} from './auth-proxy.js'
+  type CloudApiDeps,
+} from './cloud-api.js'
 import {
   CloudSessionManager,
   type CloudSeed,
@@ -62,7 +62,7 @@ export function isCloudSessionsEnabled(): boolean {
   )
 }
 
-// ── Seed gathering (§10) ──────────────────────────────────────────────
+// ── Seed gathering ──────────────────────────────────────────────
 
 /** Resolve a chip / mention path (workspace-relative or absolute). */
 async function resolveUserPath(p: string): Promise<vscode.Uri | undefined> {
@@ -295,7 +295,7 @@ export async function gatherCloudSeed(
   }
 }
 
-/** The files a later prompt in a cloud session refers to (§10). */
+/** The files a later prompt in a cloud session refers to. */
 export async function gatherPromptFiles(
   params: PromptParams,
   client: VSCodeL4LanguageClient,
@@ -346,7 +346,7 @@ export function mementoFilesStore(memento: vscode.Memento): SessionFilesStore {
   }
 }
 
-// ── Git (§9.3) ────────────────────────────────────────────────────────
+// ── Git ────────────────────────────────────────────────────────
 
 /** The subset of `vscode.git`'s exports this extension uses. */
 interface GitExtensionExports {
@@ -380,14 +380,14 @@ export interface CloudSessions {
   gatherSeed(
     params: Parameters<typeof gatherCloudSeed>[0]
   ): ReturnType<typeof gatherCloudSeed>
-  /** Files a later prompt refers to (§10). */
+  /** Files a later prompt refers to. */
   gatherPromptFiles(
     params: Parameters<typeof gatherPromptFiles>[0]
   ): ReturnType<typeof gatherPromptFiles>
   /** Listeners for cloud-only events, state and progress (the webview
    *  UI plugs in here). */
   listener: Omit<CloudSessionListener, 'chat'>
-  /** Clone and sync through VS Code's Git extension (§9.3). */
+  /** Clone and sync through VS Code's Git extension. */
   git: CloudGitSync<vscode.Uri>
 }
 
@@ -408,7 +408,7 @@ export function createCloudSessions(deps: {
   /** AI titles for new sessions (the local chat's summize call). */
   summarizeTitle?: (text: string) => Promise<string | null>
 }): CloudSessions & vscode.Disposable {
-  const authDeps: AuthProxyDeps = {
+  const authDeps: CloudApiDeps = {
     authBaseUrl: () => `https://${LEGALESE_CLOUD_DOMAIN}`,
     getSessionToken: () => deps.auth.getSessionToken(),
     storeSessionToken: (token, replaces) =>
@@ -430,11 +430,11 @@ export function createCloudSessions(deps: {
     ...(deps.summarizeTitle ? { summarizeTitle: deps.summarizeTitle } : {}),
     listener: {
       // The webview keys a cloud conversation by its session
-      // (`cloud:<sid>`), not by the ai-proxy conversation id.
+      // (`cloud:<sid>`), not by the AI service conversation id.
       chat: (event, sid) =>
         deps.emitChat({ ...event, conversationId: cloudConversationId(sid) }),
       cloudEvent: (e) => {
-        // Clone / Sync open up once the first turn is committed (§9.3);
+        // Clone / Sync open up once the first turn is committed;
         // replayed events count, so reopening a session works.
         if (e.event.type === 'git-committed') {
           void git.markCommitted(e.sessionId)

@@ -218,7 +218,7 @@ renderExplorerPageBS registry = LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    });"
   , ""
   , "    var BASE_URL = window.location.origin;"
-  , "    // When the explorer is served via the consolidated proxy on a"
+  , "    // When the explorer is served via the consolidated API on a"
   , "    // *.legalese.cloud subdomain, the canonical MCP address lives on the"
   , "    // shared mcp.legalese.cloud host with the org slug in the path. Local"
   , "    // dev and other deployments keep the same-origin /.mcp address."

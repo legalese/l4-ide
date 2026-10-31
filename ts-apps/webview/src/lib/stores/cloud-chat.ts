@@ -1,5 +1,5 @@
 /**
- * Cloud-conversation logic of the AI chat store (spec §9.4, §12), kept
+ * Cloud-conversation logic of the AI chat store, kept
  * free of Svelte runes so it can be unit-tested: history merging,
  * cloud-only events, adopting turns this webview didn't start, and
  * which turns offer a rollback.
@@ -28,7 +28,7 @@ export interface CloudConversationInfo {
    *  merged after turn N sit at indices greater than N. */
   localMergesAt: number[]
   /** A `git-committed` event was seen (live or replayed): the session
-   *  has files to clone (§9.3). */
+   *  has files to clone. */
   committed: boolean
   /** MCP servers passed at the start (their tools run without
    *  approval in the cloud); chips on the first prompt. */
@@ -77,7 +77,7 @@ export interface CloudTurn {
   cloudCommit?: { sha: string; parent: string }
   /** Assistant turns: its file changes were rolled back. */
   rolledBack?: boolean
-  /** User turns: files added to the session for this prompt (§10). */
+  /** User turns: files added to the session for this prompt. */
   filesAdded?: string[]
 }
 
@@ -106,7 +106,7 @@ export function newCloudInfo(
   }
 }
 
-// ── History (§12.1) ───────────────────────────────────────────────────
+// ── History ───────────────────────────────────────────────────
 
 export type HistoryEntry =
   | {
@@ -293,7 +293,7 @@ export function applyCloudEvent(
   }
 }
 
-// ── Rollback (§9.4) ───────────────────────────────────────────────────
+// ── Rollback ───────────────────────────────────────────────────
 
 export interface RollbackOffer {
   turnId: string
@@ -339,7 +339,7 @@ export function rollbackOffer(
   }
 }
 
-/** Why the prompt field's Clone / Sync button is disabled (§9.3). */
+/** Why the prompt field's Clone / Sync button is disabled. */
 export const CLONE_NOT_READY = 'Available after the first turn'
 
 /** Clone / Sync is offered once the session's first turn is committed. */

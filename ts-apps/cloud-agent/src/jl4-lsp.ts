@@ -73,7 +73,7 @@ interface DiagnosticsEntry {
 
 /**
  * {@link L4Language} port over a `jl4-lsp` child process speaking LSP
- * over stdio (`vscode-jsonrpc/node`), spec §11.
+ * over stdio (`vscode-jsonrpc/node`).
  *
  * - Documents are opened with `didOpen` from disk; writes made through
  *   the workspace arrive via {@link WorkspaceChangeListener} and become

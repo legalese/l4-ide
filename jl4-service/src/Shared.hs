@@ -134,8 +134,8 @@ jsonError msg = Aeson.encode $ object ["error" .= msg]
 -- each function's @parameters@ and @returnSchema@ with @x-sanitized-name@ at
 -- compile time (via 'AnnotatedFunctionSummary'). jl4-service ignores the
 -- annotation when it reloads the cache (Parameter's FromJSON drops unknown
--- fields and the names are recomputed at response time), but the auth-proxy
--- reads the raw cache JSON and can serve the annotated function-schema
+-- fields and the names are recomputed at response time), but a reader of the
+-- raw cache JSON can serve the annotated function-schema
 -- endpoint — and derive the MCP sanitised-key schema — without
 -- re-implementing the sanitisation algorithm.
 encodeMetadataCache :: DeploymentMetadata -> LBS.ByteString

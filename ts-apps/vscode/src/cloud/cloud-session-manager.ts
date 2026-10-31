@@ -1,10 +1,10 @@
 /**
- * Cloud sessions from the extension host (spec §8, §10, §12):
+ * Cloud sessions from the extension host:
  *
  * - {@link CloudSessionManager.runInCloud} seeds and starts a new
- *   session with the user's first prompt (§10 steps 2–8);
+ *   session with the user's first prompt;
  * - {@link CloudSessionManager.open} replays a session's event log from
- *   the start and keeps polling while it runs (§12.1);
+ *   the start and keeps polling while it runs;
  * - commands (message, inject, abort, answer, rollback, stop); cloud
  *   sessions never ask for tool approval, so there is no `approve`
  *   are queued through the Sessions API; a command to a sleeping or
@@ -16,7 +16,7 @@
  *   events go to a separate listener with the conversation they belong
  *   to;
  * - when a session reports `session-state: running` with a public key,
- *   the user's MCP credentials are sealed to it and sent (§6.4); the
+ *   the user's MCP credentials are sealed to it and sent; the
  *   servers that need a sign-in here first are reported to the
  *   listener.
  *
@@ -67,7 +67,7 @@ import {
 } from './seed.js'
 import type { SessionsApi } from './sessions-api.js'
 
-/** Progress of {@link CloudSessionManager.runInCloud} (§12.2), and of
+/** Progress of {@link CloudSessionManager.runInCloud}, and of
  *  adding files before a later prompt (`adding-files`). */
 export type CloudStartPhase =
   | 'uploading'
@@ -105,7 +105,7 @@ export interface CloudSessionListener {
     mcpServers?: string[]
     /** With `adding-files`: how many files are being added. */
     fileCount?: number
-    /** With `starting`: the session's title (an AI title, §12). */
+    /** With `starting`: the session's title (an AI title). */
     title?: string
     turnId: string
     sessionId?: string
@@ -136,7 +136,7 @@ export interface SessionFilesRecord {
   sent: Record<string, string>
   /** Absolute path of the local folder chosen for `seedBase.workspaceFolder`. */
   localFolder?: string
-  /** The MCP servers credentials may go to (§6.4): those passed when the
+  /** The MCP servers credentials may go to: those passed when the
    *  session was created here, or listed in `session.json` when this
    *  machine first opened it. A task can edit `session.json`; a server
    *  added there later gets nothing. */
@@ -154,7 +154,7 @@ export interface SessionFilesStore {
   set(sid: string, record: SessionFilesRecord | undefined): unknown
 }
 
-/** Files referred to by a later prompt (§10): @-mentions and the active
+/** Files referred to by a later prompt: @-mentions and the active
  *  file, by absolute path, with their current bytes. */
 export interface PromptFiles {
   sources: SeedSource[]
@@ -175,7 +175,7 @@ function memoryFilesStore(): SessionFilesStore {
 
 export interface CloudSessionManagerDeps {
   api: SessionsApi
-  /** Mint the first key of a key chain for `sid` (jl4-auth-proxy). */
+  /** Mint the first key of a key chain for `sid`. */
   mintAgentKey(sid: string): Promise<{ token: string }>
   mcp?: McpServerSource
   /** Per-session sent-file hashes and folder choice (extension storage). */
@@ -187,7 +187,7 @@ export interface CloudSessionManagerDeps {
   logger: Logger
   /** Timer / clock overrides for the poller (tests). */
   poller?: Pick<PollerDeps, 'now' | 'setTimer' | 'clearTimer'>
-  /** An AI title for a first prompt (ai-proxy's summize pipeline, as
+  /** An AI title for a first prompt (the AI service's summize model, as
    *  local chats get), or null. Without one a session is named after
    *  the prompt's first line. */
   summarizeTitle?(text: string): Promise<string | null>
@@ -280,7 +280,7 @@ export const AUTO_RESUME_DELAYS_MS: readonly number[] = [
   0, 10_000, 20_000, 30_000,
 ]
 
-/** A started task takes a moment to show up in ECS: polls that still
+/** A started task takes a moment to show up: polls that still
  *  say `sleeping` this soon after a start don't count against it. */
 export const START_SETTLE_MS = 10_000
 
@@ -441,9 +441,9 @@ export class CloudSessionManager {
   }
 
   /**
-   * Seed a new session and run `text` as its first turn (§10). Throws
+   * Seed a new session and run `text` as its first turn. Throws
    * `SeedLimitError` before anything is uploaded when a limit is hit,
-   * and `SessionsApiError` / `NotSignedInError` / `AuthProxyError` on
+   * and `SessionsApiError` / `NotSignedInError` / `CloudApiError` on
    * failures; a session created before the failure is deleted again.
    */
   async runInCloud(input: {
@@ -707,7 +707,7 @@ export class CloudSessionManager {
   }
 
   /** The session's MCP servers (names here) that need a sign-in in
-   *  this window before it can use them (§6.4). */
+   *  this window before it can use them. */
   mcpSignInNeeded(sid: string): string[] {
     return this.mcpServerLabels(this.sessions.get(sid)?.mcpSignIn ?? [])
   }
@@ -898,7 +898,7 @@ export class CloudSessionManager {
     })
   }
 
-  /** Seal the user's MCP credentials to the running harness (§6.4). */
+  /** Seal the user's MCP credentials to the running harness. */
   private maybeSendCredentials(sid: string, t: Tracked): Promise<void> {
     const key = t.publicKey
     if (!this.deps.mcp || !key || t.credentialsSentTo === key) {
@@ -1047,7 +1047,7 @@ export class CloudSessionManager {
   }
 
   /**
-   * A later prompt (§10): add the @-mentioned files and the active file
+   * A later prompt: add the @-mentioned files and the active file
    * that are new or changed since they were last sent (a batch through
    * `POST /sessions/:sid/files`, pre-signed PUTs and a commit), then
    * send the message with `context` naming them by `data/` path.

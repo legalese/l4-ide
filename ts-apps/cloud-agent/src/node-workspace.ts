@@ -44,7 +44,7 @@ export function normalizeFileUri(uri: string): string {
   }
 }
 
-/** Repo layout (spec §4.2), from the protocol. */
+/** Repo layout, from the protocol. */
 export const DATA_DIR = REPO_DATA_DIR
 export const TMP_DIR = REPO_TMP_DIR
 export const DELETED_DIR = REPO_DELETED_DIR
@@ -57,7 +57,7 @@ const TURN_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/
 
 /**
  * {@link Workspace} port over Node's file system, confined to the
- * session's `repo/` (spec §4.2, §11). The repo root holds `data/` (the
+ * session's `repo/`. The repo root holds `data/` (the
  * session files; `jl4-lsp` runs there) and `tmp/` (the model's scratch
  * space, committed like everything else).
  *
@@ -105,7 +105,7 @@ export class NodeWorkspace implements Workspace {
   }
 
   /** Tool calls from now on belong to `turnId` (null between turns). */
-  /** Checked before every write and delete (§7.3); set by the runner. */
+  /** Checked before every write and delete; set by the runner. */
   private fence: WriteFence | undefined
 
   setFence(fence: WriteFence): void {
@@ -337,7 +337,7 @@ export class NodeWorkspace implements Workspace {
   }
 
   /**
-   * Copy a file the user added (`add-files`, §10) from outside the repo
+   * Copy a file the user added (`add-files`) from outside the repo
    * to `repoRelPath` (under `data/`), overwriting what is there. The
    * source must be a regular file (no symlink, ≤ 10 MB); the destination
    * is confined like any write, its directories created without

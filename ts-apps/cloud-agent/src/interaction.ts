@@ -23,7 +23,7 @@ function capText(s: string): string {
 }
 
 /**
- * {@link UserInteraction} over the file relay (spec §8, §11):
+ * {@link UserInteraction} over the file relay:
  *
  * - chat-service events are appended to the event log;
  * - there are no tool approvals in cloud sessions (the policy allows

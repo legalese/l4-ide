@@ -1,4 +1,4 @@
-import type { AiProxyTool, Logger, ToolProvider } from '@repo/legalese-agent'
+import type { AiTool, Logger, ToolProvider } from '@repo/legalese-agent'
 import { userMcpToolName } from '@repo/legalese-agent'
 import {
   generateSealingKeyPair,
@@ -88,7 +88,7 @@ export function wireName(server: string, tool: string): string {
 }
 
 /**
- * The user's HTTP MCP servers in a cloud session (spec §6.4).
+ * The user's HTTP MCP servers in a cloud session.
  *
  * - At start, an ephemeral X25519 key pair; the public key rides on
  *   every `session-state` event while running. The private key lives
@@ -203,8 +203,8 @@ export class McpServers implements RunnerPlugin, ToolProvider {
 
   // ── ToolProvider ───────────────────────────────────────────────────
 
-  async listTools(): Promise<AiProxyTool[]> {
-    const out: AiProxyTool[] = []
+  async listTools(): Promise<AiTool[]> {
+    const out: AiTool[] = []
     this.wire.clear()
     for (const server of this.servers.values()) {
       if (server.connecting) await server.connecting.catch(() => undefined)
@@ -381,7 +381,7 @@ export class McpServers implements RunnerPlugin, ToolProvider {
     return payload.result ?? null
   }
 
-  /** Ask for a fresh token when this one runs out (§6.4). */
+  /** Ask for a fresh token when this one runs out. */
   private watchExpiry(server: Server): void {
     if (server.expiryTimer) clearTimeout(server.expiryTimer)
     server.expiryTimer = undefined

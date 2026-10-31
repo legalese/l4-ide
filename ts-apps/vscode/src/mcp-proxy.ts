@@ -172,7 +172,7 @@ export class McpProxy implements vscode.Disposable {
    * it; otherwise return a local stub so the server stays registered.
    *
    * On each successful forward, ride any `Set-Cookie: wos-session=…` the
-   * auth proxy emits so our Bearer token rotates in lockstep with the
+   * server emits so our Bearer token rotates in lockstep with the
    * server's transparent refresh. On 401/403, re-verify connection state
    * (to clear a stale green dot) and prompt for re-login.
    */
@@ -230,7 +230,7 @@ export class McpProxy implements vscode.Disposable {
   }
 
   /**
-   * If the auth proxy rotated the sealed session, grab the new value from
+   * If the server rotated the sealed session, grab the new value from
    * Set-Cookie and persist it so the next request uses the refreshed token.
    */
   private async captureRefreshedSession(resp: Response): Promise<void> {

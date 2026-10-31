@@ -11,7 +11,7 @@
     onDelete,
     onClose,
   }: {
-    /** Local and cloud conversations, most recent first (§12.1). */
+    /** Local and cloud conversations, most recent first. */
     items: HistoryEntry[]
     currentId: string | null
     /** Ids of conversations currently attached to a live stream. The

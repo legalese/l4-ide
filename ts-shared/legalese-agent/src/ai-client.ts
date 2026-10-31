@@ -1,17 +1,17 @@
 import type { AiChatMessage } from 'jl4-client-rpc'
 import { buildCurrentTimeBlock } from './context-messages.js'
-import type { AiProxyTool, AuthProvider, Logger } from './ports.js'
+import type { AiTool, AuthProvider, Logger } from './ports.js'
 
-export type { AiProxyTool }
+export type { AiTool }
 
-export interface AiProxyChatRequest {
+export interface AiChatRequest {
   messages: AiChatMessage[]
-  tools?: AiProxyTool[]
+  tools?: AiTool[]
   conversationId?: string
   model?: string
   stream: true
-  /** Explicit retry/resume verb. When true the ai-proxy skips
-   *  extractDelta and runs another turn against the stored
+  /** Explicit retry/resume verb. When true the AI service
+   *  adds no new message and runs another turn against the stored
    *  conversation's existing history. Empty `messages` is allowed
    *  in this mode. */
   continueTurn?: boolean
@@ -27,15 +27,15 @@ export interface AiProxyChatRequest {
   /** Deployment-scoped base URL override
    *  (`https://ai.legalese.cloud/{orgSlug}/{deploymentId}`). When set,
    *  `stream()` / `reattach()` POST/GET against this instead of
-   *  the default endpoint. The deployment endpoint is the same ai-proxy
-   *  stack, path-scoped, so the SSE `metadata` frame and turn-reattach
+   *  the default endpoint. The deployment endpoint speaks the same
+   *  protocol, path-scoped, so the SSE `metadata` frame and turn-reattach
    *  protocol work identically. Local-mode is ignored when this is
    *  set (a deployment chat always needs real cloud auth). */
   apiBaseUrl?: string
 }
 
 /** Event union emitted by {@link streamChatCompletions} while parsing SSE. */
-export type AiProxyStreamEvent =
+export type AiStreamEvent =
   | {
       kind: 'metadata'
       conversationId: string
@@ -49,13 +49,13 @@ export type AiProxyStreamEvent =
       tool: string
       status: 'running' | 'done' | 'error'
       /** Bold action prefix the webview shows in front of `message`.
-       *  Stamped by the proxy so the client doesn't need a per-tool
-       *  name → label mapping. May be absent on older proxy events;
+       *  Stamped by the AI service so the client doesn't need a per-tool
+       *  name → label mapping. May be absent on older servers;
        *  the webview falls back to a sane default in that case. */
       label?: string
       message: string
       /** Verbatim model-supplied arguments. Present only for L4 Rule
-       *  activities (the proxy emits the structured payload only when
+       *  activities (the AI service emits the structured payload only when
        *  `kind === "rule"`); the webview uses this to render an L4
        *  Rule card identical to a client-side tool-call. */
       input?: unknown
@@ -68,7 +68,7 @@ export type AiProxyStreamEvent =
       /** Error detail when status is `error`. */
       error?: string
       /** URL citations carried by a synthetic `web_search` activity —
-       *  the proxy aggregates `source` parts from the upstream model's
+       *  the AI service aggregates `source` parts from the upstream model's
        *  provider-native web search and emits them on the terminal
        *  `done` event. Absent on every other activity. */
       sources?: Array<{ url: string; title?: string }>
@@ -89,7 +89,7 @@ export type AiProxyStreamEvent =
 /**
  * Mutable resume cursor shared with {@link parseSse}. Tracks the SSE
  * `id:` of the last frame fully delivered to the consumer so a
- * reattach after a mid-stream transport drop can ask the proxy to
+ * reattach after a mid-stream transport drop can ask the AI service to
  * replay strictly *after* it — no duplicate deltas. 0 = nothing
  * consumed yet (full replay on reattach).
  */
@@ -97,9 +97,9 @@ export interface SseCursor {
   lastEventId: number
 }
 
-/** Bounded reattach policy for {@link AiProxyClient.streamResilient}.
- *  A handful of quick retries covers laptop-lid / Wi-Fi-roam / ALB
- *  RST blips without spinning forever on a genuinely dead route. */
+/** Bounded reattach policy for {@link AiClient.streamResilient}.
+ *  A handful of quick retries covers laptop-lid / Wi-Fi-roam / connection-reset
+ *  blips without spinning forever on a genuinely dead route. */
 const MAX_REATTACHES = 5
 const REATTACH_BACKOFF_MS = [500, 1000, 2000, 4000, 8000]
 
@@ -121,7 +121,7 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Where requests go. `local` marks a developer's local ai-proxy, which
+ * Where requests go. `local` marks a developer's local AI server, which
  * ignores Authorization but still requires the header: the client
  * stamps `Bearer dev-local` when the auth provider has no credential.
  */
@@ -131,28 +131,28 @@ export interface AiEndpoint {
 }
 
 /**
- * Production ai-proxy URL. The `LEGALESE_AI_ENDPOINT` env var stays as
+ * Production AI service URL. The `LEGALESE_AI_ENDPOINT` env var stays as
  * an undocumented escape hatch for developers running on a non-default
  * port. VS Code users flip the `legaleseAi.localMode` setting instead,
- * which the extension passes in as {@link AiProxyClientOptions.endpoint}.
+ * which the extension passes in as {@link AiClientOptions.endpoint}.
  */
 export const PROD_AI_ENDPOINT = (
   process.env.LEGALESE_AI_ENDPOINT ?? 'https://ai.legalese.cloud'
 ).replace(/\/$/, '')
 
-/** Local ai-proxy URL used in local (developer) mode. */
+/** Local AI server URL used in local (developer) mode. */
 export const LOCAL_AI_ENDPOINT = 'http://127.0.0.1:3000'
 
-export interface AiProxyClientOptions {
+export interface AiClientOptions {
   auth: AuthProvider
   logger: Logger
-  /** Resolve the ai-proxy base URL. Called per request so a setting
+  /** Resolve the AI service base URL. Called per request so a setting
    *  toggle applies immediately. Defaults to {@link PROD_AI_ENDPOINT}. */
   endpoint?: () => AiEndpoint
 }
 
-export class AiProxyClient {
-  constructor(private readonly opts: AiProxyClientOptions) {}
+export class AiClient {
+  constructor(private readonly opts: AiClientOptions) {}
 
   /** The endpoint requests currently go to. */
   getEndpoint(): AiEndpoint {
@@ -178,10 +178,10 @@ export class AiProxyClient {
    * cancels the upstream request mid-stream.
    */
   async *stream(
-    request: AiProxyChatRequest,
+    request: AiChatRequest,
     abortSignal: AbortSignal,
     cursor?: SseCursor
-  ): AsyncGenerator<AiProxyStreamEvent> {
+  ): AsyncGenerator<AiStreamEvent> {
     const defaultEndpoint = this.getEndpoint()
     const endpoint = request.apiBaseUrl ?? defaultEndpoint.url
     const local = request.apiBaseUrl ? false : defaultEndpoint.local
@@ -189,7 +189,7 @@ export class AiProxyClient {
     const headers = await this.opts.auth.getAiAuthHeaders(url)
     let hasAuth = !!headers.Authorization
     if (!hasAuth && local) {
-      // Local proxy in dev mode ignores Authorization but still
+      // A local AI server in dev mode ignores Authorization but still
       // requires the header to exist. Stamp a synthetic value so the
       // request goes through without forcing a real sign-in.
       headers.Authorization = 'Bearer dev-local'
@@ -202,19 +202,19 @@ export class AiProxyClient {
       // Fail fast instead of hitting the server with empty
       // credentials — that would just return 401, but surfacing it
       // here with a clearer code/message is friendlier.
-      throw new AiProxyError(
+      throw new AiError(
         'No Legalese Cloud session found. Sign in from the sidebar to use AI chat.',
         'unauthenticated',
         401
       )
     }
     // Inline the current-time tag into the trailing user message
-    // (non-mutating clone) so the proxy sees wall-clock context on
+    // (non-mutating clone) so the AI service sees wall-clock context on
     // every turn. The local conversation store keeps the user's
     // original text — what the chat bubble shows on reload — while
     // the wire payload carries the timestamp. role:"system" wouldn't
-    // work here because the proxy's extractDelta filters system
-    // messages out of follow-up-turn deltas.
+    // work here because a system message only reaches the model on the
+    // first turn.
     const { inlineContext, ...body } = request
     const wireMessages = withContextOnLastUser(request.messages, inlineContext)
     const res = await fetch(url, {
@@ -243,7 +243,7 @@ export class AiProxyClient {
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
       const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
-      throw new AiProxyError(message, code, res.status)
+      throw new AiError(message, code, res.status)
     }
     yield* parseSse(res.body, this.opts.logger, cursor)
   }
@@ -252,8 +252,8 @@ export class AiProxyClient {
    * GET /v1/chat/turns/{turnId}/stream. Rebinds to an existing
    * server-side turn after a client disconnect and replays + tails
    * the SSE buffer. `sinceId` (the last fully-consumed SSE id) is
-   * sent as `Last-Event-ID` so the proxy replays strictly after it —
-   * no duplicate deltas. Throws AiProxyError on 404 (turn unknown or
+   * sent as `Last-Event-ID` so the AI service replays strictly after it —
+   * no duplicate deltas. Throws AiError on 404 (turn unknown or
    * reaped) so the caller can fall back to a fresh request.
    * Same SSE parse path as `stream()`.
    */
@@ -262,7 +262,7 @@ export class AiProxyClient {
     abortSignal: AbortSignal,
     cursor?: SseCursor,
     apiBaseUrl?: string
-  ): AsyncGenerator<AiProxyStreamEvent> {
+  ): AsyncGenerator<AiStreamEvent> {
     const defaultEndpoint = this.getEndpoint()
     const endpoint = apiBaseUrl ?? defaultEndpoint.url
     const sinceId = cursor?.lastEventId ?? 0
@@ -274,7 +274,7 @@ export class AiProxyClient {
       headers.Authorization = 'Bearer dev-local'
     }
     if (!headers.Authorization) {
-      throw new AiProxyError(
+      throw new AiError(
         'No Legalese Cloud session found. Sign in from the sidebar to use AI chat.',
         'unauthenticated',
         401
@@ -286,7 +286,7 @@ export class AiProxyClient {
       headers: {
         ...headers,
         Accept: 'text/event-stream',
-        // Standard SSE resume header; the proxy also accepts the
+        // Standard SSE resume header; the AI service also accepts the
         // `?since=` query above for belt-and-braces.
         ...(sinceId > 0 ? { 'Last-Event-ID': String(sinceId) } : {}),
       },
@@ -294,7 +294,7 @@ export class AiProxyClient {
     })
     this.opts.logger.info(`reattach response ${res.status} ${res.statusText}`)
     if (res.status === 404) {
-      throw new AiProxyError('Turn not found or expired', 'not_found', 404)
+      throw new AiError('Turn not found or expired', 'not_found', 404)
     }
     if (!res.ok || !res.body) {
       let body = ''
@@ -305,30 +305,30 @@ export class AiProxyClient {
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
       const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
-      throw new AiProxyError(message, code, res.status)
+      throw new AiError(message, code, res.status)
     }
     yield* parseSse(res.body, this.opts.logger, cursor)
   }
 
   /**
    * `stream()` with automatic reattach across transient transport
-   * drops (Wi-Fi roam, laptop lid, ALB RST during a long
-   * think/tool-execute gap). The proxy keeps running the turn and
+   * drops (Wi-Fi roam, laptop lid, a connection reset during a long
+   * think/tool-execute gap). The AI service keeps running the turn and
    * buffers every frame; on a network-level failure we GET the
    * reattach endpoint with the resume cursor and keep yielding into
    * the *same* consumer, so the caller sees one continuous event
    * stream and never has to re-run the turn.
    *
-   * NOT retried: user abort, and `AiProxyError` (a real HTTP/protocol
-   * outcome — 4xx/5xx, or the proxy's typed mid-stream `error` event
+   * NOT retried: user abort, and `AiError` (a real HTTP/protocol
+   * outcome — 4xx/5xx, or the AI service's typed mid-stream `error` event
    * which is yielded, not thrown). Those are terminal by design;
    * replaying the buffer would just hit the same wall.
    */
   async *streamResilient(
-    request: AiProxyChatRequest,
+    request: AiChatRequest,
     abortSignal: AbortSignal,
     turnId: string
-  ): AsyncGenerator<AiProxyStreamEvent> {
+  ): AsyncGenerator<AiStreamEvent> {
     const cursor: SseCursor = { lastEventId: 0 }
     let gen = this.stream(request, abortSignal, cursor)
     let reattaches = 0
@@ -338,7 +338,7 @@ export class AiProxyClient {
         return
       } catch (err) {
         if (abortSignal.aborted) throw err
-        if (err instanceof AiProxyError) throw err
+        if (err instanceof AiError) throw err
         if (reattaches >= MAX_REATTACHES) {
           this.opts.logger.warn(
             `stream interrupted and reattach budget exhausted (${reattaches}); surfacing error`
@@ -380,7 +380,7 @@ export class AiProxyClient {
    * the transcript, which may be empty when nothing intelligible was
    * said. `apiBaseUrl` routes a deployment-bound chat's dictation to
    * that deployment's endpoint, as {@link stream} does for its turns.
-   * Throws {@link AiProxyError} on auth, quota, or upstream failure,
+   * Throws {@link AiError} on auth, quota, or upstream failure,
    * with code `network_error` when the service couldn't be reached.
    */
   async transcribe(wav: Uint8Array, apiBaseUrl?: string): Promise<string> {
@@ -396,7 +396,7 @@ export class AiProxyClient {
     const endpoint = scoped ?? defaultEndpoint.url
     const headers = await this.getAuthHeaders(endpoint)
     if (!headers.Authorization) {
-      throw new AiProxyError(
+      throw new AiError(
         'No Legalese Cloud session found. Sign in from the sidebar to use dictation.',
         'unauthenticated',
         401
@@ -419,7 +419,7 @@ export class AiProxyClient {
     } catch (err) {
       // fetch only rejects when no HTTP response came back at all:
       // nothing listening, DNS, offline, or the timeout above.
-      throw new AiProxyError(
+      throw new AiError(
         `${endpoint}: ${err instanceof Error ? err.message : String(err)}`,
         'network_error'
       )
@@ -433,16 +433,16 @@ export class AiProxyClient {
       }
       const message = extractErrorMessage(body) ?? `HTTP ${res.status}`
       const code = extractErrorCode(body) ?? httpStatusToCode(res.status, body)
-      throw new AiProxyError(message, code, res.status)
+      throw new AiError(message, code, res.status)
     }
     const json = (await res.json()) as { text?: unknown }
     return typeof json.text === 'string' ? json.text : ''
   }
 
   /**
-   * Fire-and-forget title generation using the summize pipeline. Keeps
-   * the call stateless (no conversationId) so it doesn't create junk
-   * conversation files on the server.
+   * Fire-and-forget title generation using the summize model. Keeps
+   * the call stateless (no conversationId) so it doesn't create a
+   * conversation.
    */
   async summarizeTitle(
     firstUserMessage: string,
@@ -490,9 +490,9 @@ export class AiProxyClient {
   }
 
   /**
-   * One stateless call to the summize pipeline (model
-   * `legalese-summize-4`, no conversationId, so no conversation file is
-   * created server-side) — the generic form of {@link summarizeTitle}.
+   * One stateless call to the summize model (model
+   * `legalese-summize-4`, no conversationId, so no conversation is
+   * created) — the generic form of {@link summarizeTitle}.
    * Returns the trimmed text, or `null` on any failure: no credential,
    * an HTTP error, an empty answer, or `signal` aborting (callers pass
    * `AbortSignal.timeout(…)` for a hard time limit). Never throws.
@@ -537,9 +537,9 @@ export class AiProxyClient {
 
   /**
    * One-shot "intended use" description for a set of about-to-be-deployed
-   * functions, using the same stateless summize pipeline as
-   * {@link summarizeTitle} (no conversationId, so no junk conversation
-   * files server-side). Returns null on any failure — the caller
+   * functions, using the same stateless summize model as
+   * {@link summarizeTitle} (no conversationId, so no conversation
+   * is created). Returns null on any failure — the caller
    * surfaces a friendly message.
    */
   async describeIntendedUse(functionsJson: string): Promise<string | null> {
@@ -607,18 +607,18 @@ export class AiProxyClient {
 }
 
 /**
- * Error from the ai-proxy that carries a structured code / status so
+ * Error from the AI service that carries a structured code / status so
  * the UI can branch on it (`unauthenticated`, `daily_token_limit_exceeded`,
  * etc.).
  */
-export class AiProxyError extends Error {
+export class AiError extends Error {
   constructor(
     message: string,
     public readonly code: string,
     public readonly status?: number
   ) {
     super(message)
-    this.name = 'AiProxyError'
+    this.name = 'AiError'
   }
 }
 
@@ -631,8 +631,8 @@ function sameOrigin(a: string, b: string): boolean {
 }
 
 /**
- * Does an ai-proxy error body say the credential itself was refused?
- * ai-proxy answers a key or session it no longer accepts (expired,
+ * Does an AI service error body say the credential itself was refused?
+ * The AI service answers a key or session it no longer accepts (expired,
  * revoked, replaced by a renewal) with `403` and the message
  * `Authentication failed: invalid-credentials`, not `401`, which it
  * keeps for a request with no credential at all. That 403 means "sign
@@ -725,7 +725,7 @@ async function* parseSse(
   body: ReadableStream<Uint8Array>,
   logger?: Logger,
   cursor?: SseCursor
-): AsyncGenerator<AiProxyStreamEvent> {
+): AsyncGenerator<AiStreamEvent> {
   const reader = body.getReader()
   const decoder = new TextDecoder('utf-8')
   let buffer = ''
@@ -756,7 +756,7 @@ async function* parseSse(
       yield* interpretFrame(frame, logger)
       // Advance the resume cursor only AFTER the consumer has pulled
       // every event this frame produced — so a reattach asks the
-      // proxy to replay strictly after the last frame we fully
+      // AI service to replay strictly after the last frame we fully
       // handled, never re-delivering a partially-applied one.
       if (cursor && frame.id !== undefined) cursor.lastEventId = frame.id
     }
@@ -773,7 +773,7 @@ async function* parseSse(
 interface SseFrame {
   event?: string
   data: string
-  /** SSE `id:` field — monotonic per-turn sequence the proxy stamps
+  /** SSE `id:` field — monotonic per-turn sequence the AI service stamps
    *  on every event/data frame. Absent on keepalive comments. */
   id?: number
 }
@@ -800,7 +800,7 @@ function parseFrame(raw: string): SseFrame | null {
 function* interpretFrame(
   frame: SseFrame,
   logger?: Logger
-): Generator<AiProxyStreamEvent> {
+): Generator<AiStreamEvent> {
   logger?.debug(
     `frame event=${frame.event ?? '<default>'} data[0..80]=${frame.data.slice(0, 80)}`
   )
@@ -837,9 +837,9 @@ function* interpretFrame(
     return
   }
   if (frame.event === 'error') {
-    // The ai-proxy emits this after an SSE stream has already
+    // The AI service emits this after an SSE stream has already
     // started (headers sent) but the generate/stream pass threw —
-    // e.g. Anthropic returning a non-retryable error mid-turn.
+    // e.g. the model provider returning a non-retryable error mid-turn.
     // The webview's store handler maps this to `turn.error` and
     // the ErrorBubble component renders the user-facing message +
     // Retry button.

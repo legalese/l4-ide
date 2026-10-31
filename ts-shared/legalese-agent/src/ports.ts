@@ -40,7 +40,7 @@ export interface Logger {
 // ── AuthProvider ──────────────────────────────────────────────────────
 
 export interface AuthProvider {
-  /** Headers attached to an ai-proxy request to `url`. Return `{}`
+  /** Headers attached to an AI service request to `url`. Return `{}`
    *  when no credential is available, or none may go to `url`; the
    *  client then fails fast with `unauthenticated` (or stamps a dev
    *  token in local mode). Extra headers (e.g. `X-Legalese-Session`)
@@ -347,7 +347,7 @@ export interface ConversationStore {
 // ── Extra tool sources (MCP) ──────────────────────────────────────────
 
 /** A client-declared tool in the OpenAI function-tool shape. */
-export interface AiProxyTool {
+export interface AiTool {
   type: 'function'
   function: {
     name: string
@@ -364,7 +364,7 @@ export interface AiProxyTool {
 export interface ToolProvider {
   /** Tool-name prefix routed to this provider, e.g. `l4-rules__`. */
   readonly prefix: string
-  listTools(): Promise<AiProxyTool[]> | AiProxyTool[]
+  listTools(): Promise<AiTool[]> | AiTool[]
   callTool(name: string, argsJson: string): Promise<string>
   /** `(deployId, fnName)` for deployed-rule tools, for display. A generic
    *  tool like `evaluate` names its rule in `argsJson`. */

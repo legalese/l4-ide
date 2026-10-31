@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { AiProxyTool, Logger, ToolProvider } from './ports.js'
+import type { AiTool, Logger, ToolProvider } from './ports.js'
 
 /**
  * Thin MCP (streamable HTTP, JSON responses) client for the L4 Rules
@@ -71,7 +71,7 @@ interface RuleEntry {
 
 /** The discovery tools, named and shaped like a remote rules server's, so
  *  the system prompt needs one description of them for both. */
-const DISCOVERY_TOOLS: AiProxyTool[] = [
+const DISCOVERY_TOOLS: AiTool[] = [
   {
     type: 'function',
     function: {
@@ -138,7 +138,7 @@ export class McpToolClient implements ToolProvider {
 
   /** Short in-process cache so a chat turn's tools/list call doesn't
    *  hammer the proxy if several turns are fired in quick succession. */
-  private cache: { at: number; tools: AiProxyTool[] } | null = null
+  private cache: { at: number; tools: AiTool[] } | null = null
   /** sanitized-prefixed-name → original MCP rule name. Populated on
    *  every listTools(); consulted by callTool() to reverse the
    *  `[^a-zA-Z0-9_-]` sanitization we applied for OpenAI compliance. */
@@ -164,7 +164,7 @@ export class McpToolClient implements ToolProvider {
    * the user isn't connected (the proxy happily answers `tools/list`
    * with `[]` in that state — see its `handleLocally`).
    */
-  async listTools(): Promise<AiProxyTool[]> {
+  async listTools(): Promise<AiTool[]> {
     if (this.cache && Date.now() - this.cache.at < 3_000) {
       return this.cache.tools
     }
@@ -181,9 +181,9 @@ export class McpToolClient implements ToolProvider {
       ).length
       const discover = ruleCount > DIRECT_RULE_LIMIT
       const rules: RuleEntry[] = []
-      const tools: AiProxyTool[] = []
+      const tools: AiTool[] = []
       for (const t of listedTools) {
-        const tool = this.toAiProxyTool(t)
+        const tool = this.toAiTool(t)
         const target = parseToolDescriptionTarget(t.description)
         if (target && discover) {
           rules.push({
@@ -475,7 +475,7 @@ export class McpToolClient implements ToolProvider {
     return payload.result ?? null
   }
 
-  private toAiProxyTool(t: McpTool): AiProxyTool {
+  private toAiTool(t: McpTool): AiTool {
     // OpenAI function-tool schema wants `parameters` (not `inputSchema`).
     // MCP gives us a nearly-matching JSON schema; we shape it so the
     // provider accepts it even when a rule ships no schema at all.

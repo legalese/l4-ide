@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
-import { AiProxyClient, AiProxyError, type AuthProvider } from '../src/index.js'
+import { AiClient, AiError, type AuthProvider } from '../src/index.js'
 import { silentLogger } from './fakes.js'
 
-describe('AiProxyClient.transcribe', () => {
+describe('AiClient.transcribe', () => {
   const realFetch = globalThis.fetch
   let calls: Array<{ url: string; init: RequestInit }>
   let respond: () => Response | Promise<Response>
@@ -23,13 +23,13 @@ describe('AiProxyClient.transcribe', () => {
 
   function client(
     opts: { signedIn?: boolean; local?: boolean } = {}
-  ): AiProxyClient {
+  ): AiClient {
     const auth: AuthProvider = {
       getAiAuthHeaders: async (): Promise<Record<string, string>> =>
         opts.signedIn === false ? {} : { Authorization: 'Bearer token' },
       getEffectiveServiceUrl: () => undefined,
     }
-    return new AiProxyClient({
+    return new AiClient({
       auth,
       logger: silentLogger,
       endpoint: () => ({ url: 'https://ai.test', local: opts.local ?? false }),
@@ -80,7 +80,7 @@ describe('AiProxyClient.transcribe', () => {
   test('fails fast when signed out, without sending the clip', async () => {
     await assert.rejects(
       client({ signedIn: false }).transcribe(wav),
-      (err: unknown) => err instanceof AiProxyError && err.status === 401
+      (err: unknown) => err instanceof AiError && err.status === 401
     )
     assert.equal(calls.length, 0)
   })
@@ -90,7 +90,7 @@ describe('AiProxyClient.transcribe', () => {
   // request goes.
   test('asks for headers for the URL the request goes to', async () => {
     const asked: string[] = []
-    const ai = new AiProxyClient({
+    const ai = new AiClient({
       auth: {
         getAiAuthHeaders: async (url) => {
           asked.push(url)
@@ -121,8 +121,7 @@ describe('AiProxyClient.transcribe', () => {
     }
     await assert.rejects(
       client().transcribe(wav),
-      (err: unknown) =>
-        err instanceof AiProxyError && err.code === 'network_error'
+      (err: unknown) => err instanceof AiError && err.code === 'network_error'
     )
   })
 
@@ -135,7 +134,7 @@ describe('AiProxyClient.transcribe', () => {
     await assert.rejects(
       client().transcribe(wav),
       (err: unknown) =>
-        err instanceof AiProxyError &&
+        err instanceof AiError &&
         err.status === 413 &&
         err.code === 'audio_too_long'
     )

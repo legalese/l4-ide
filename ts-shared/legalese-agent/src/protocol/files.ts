@@ -1,5 +1,5 @@
 /**
- * Files in a session folder (spec §4.2, §7.3, §8).
+ * Files in a session folder.
  *
  *   sessions/<sid>/
  *     session.json                  SessionFile          (Sessions API creates; harness updates)
@@ -26,7 +26,7 @@
  *                                   Sessions API bookkeeping; the harness ignores them
  *
  * Readers only open known names built from validated parts; they never
- * list directories (§7.2, §8).
+ * list directories.
  */
 import {
   FILE_NAME_RE,
@@ -55,7 +55,7 @@ import {
 
 /**
  * What `session.json` says about the session's lifecycle. The state the
- * user sees is derived (§7.3); only `parked` here changes it.
+ * user sees is derived; only `parked` here changes it.
  *
  * - `new`      — written by `POST /sessions`; no harness has run yet
  * - `running`  — a harness runs the session (written by the harness)
@@ -64,7 +64,7 @@ import {
  */
 export type SessionFileStatus = 'new' | 'running' | 'sleeping' | 'parked'
 
-/** Why a session is parked or needs auth (renew errors, §15.5). */
+/** Why a session is parked or needs auth (renew errors). */
 export type AgentKeyFailure = 'invalid_key' | 'chain_expired' | 'chain_forked'
 
 export const AGENT_KEY_FAILURES: readonly AgentKeyFailure[] = [
@@ -75,10 +75,9 @@ export const AGENT_KEY_FAILURES: readonly AgentKeyFailure[] = [
 
 export interface SessionFile {
   sessionId: string
-  /** WorkOS user id of the owner; lets break-glass recovery attribute
-   *  a folder (§4.3). */
+  /** User id of the owner. */
   ownerUserId: string
-  /** WorkOS organisation of the owner at creation, when known
+  /** Organisation of the owner at creation, when known
    *  (`null` in the file reads as absent). */
   orgId?: string
   title: string
@@ -86,15 +85,15 @@ export interface SessionFile {
   created: number
   /** Epoch ms of the last command or turn activity. */
   lastActivity: number
-  /** ai-proxy conversation id, set once the first turn gets one. The
+  /** AI service conversation id, set once the first turn gets one. The
    *  Sessions API writes `null` until then, which reads as absent. */
   conversationId?: string
   status: SessionFileStatus
   /** Set with `status: 'parked'`. */
   parkedReason?: AgentKeyFailure
-  /** The user's HTTP/SSE MCP servers — names and URLs only (§6.4). */
+  /** The user's HTTP/SSE MCP servers — names and URLs only. */
   mcpServers: McpServerConfig[]
-  /** Where the seed came from locally (§10); later files map through
+  /** Where the seed came from locally; later files map through
    *  it on any machine. */
   seedBase?: SeedBase
 }
@@ -127,7 +126,7 @@ export const sessionFile: Check<SessionFile> = obj({
   },
 })
 
-// ── state/runs/ (§7.3): who runs a session ────────────────────────────
+// ── state/runs/: who runs a session ────────────────────────────
 
 /** A run number: 1, 2, … (as in `runs/<n>.json`, `SESSION_RUN`). */
 export const RUN_RE = /^[1-9][0-9]{0,8}$/
@@ -151,11 +150,11 @@ export type RunLeaseState = 'starting' | 'running' | 'busy' | 'waiting'
  * `state/runs/<n>.lease.json`: written by the Sessions API as `starting`
  * when it creates run n, then by run n's harness every 30 s with 90 s
  * validity (temp file + rename), and expired when that run ends (or
- * when `RunTask` fails).
+ * when starting the task fails).
  */
 export interface RunLeaseFile {
   run: number
-  /** ECS task id (`dev-…` in --dev mode; `sessions-api` while starting). */
+  /** Task id (`dev-…` in --dev mode; `sessions-api` while starting). */
   taskId: string
   /** `starting` is written by the Sessions API only. */
   state: RunLeaseState
@@ -195,7 +194,7 @@ export function isLeaseLive(lease: RunLeaseFile, now = Date.now()): boolean {
 
 // ── state/head.json and events ────────────────────────────────────────
 
-/** The harness starts a new event segment past this size (§8). */
+/** The harness starts a new event segment past this size. */
 export const EVENT_SEGMENT_MAX_BYTES = 1024 * 1024
 
 /** Event segments are `state/events/<n>.jsonl`, numbered from 1. */
@@ -214,7 +213,7 @@ export const headFile: Check<HeadFile> = obj({
 })
 
 /**
- * An event cursor, `<segment>:<byteOffset>` (§8). `0` (segment 0,
+ * An event cursor, `<segment>:<byteOffset>`. `0` (segment 0,
  * before the first segment) reads from the start: `GET /events?s=<sid>:0`.
  */
 export interface EventCursor {
@@ -380,7 +379,7 @@ export function sessionPaths(sid: string): {
   attachments: string
   attachment: (name: string) => string
   state: string
-  /** `state/runs/`, and run n's record and lease in it (§7.3). */
+  /** `state/runs/`, and run n's record and lease in it. */
   runs: string
   runRecord: (n: number) => string
   runLease: (n: number) => string

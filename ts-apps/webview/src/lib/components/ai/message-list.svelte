@@ -68,7 +68,7 @@
      *  with the first prompt; a click on one needing a sign-in runs it. */
     tools?: CloudToolChip[]
     onToolSignIn?: (server: string) => void
-    /** Cloud conversations (§9.4): the rollback offer for the turn at
+    /** Cloud conversations: the rollback offer for the turn at
      *  an index, and what to do when it's clicked. It shows on the
      *  prompt the turn answered. */
     rollbackOfferAt?: (index: number) => RollbackOffer | null

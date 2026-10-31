@@ -480,7 +480,7 @@ describe('CloudGitSync', () => {
   })
 })
 
-describe('Clone and Sync wait for the first commit (§9.3)', () => {
+describe('Clone and Sync wait for the first commit', () => {
   test('status, clone, sync and credentials refuse before it', async () => {
     const { git, sync } = setup()
     await sync.register()

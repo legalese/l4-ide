@@ -188,7 +188,7 @@
     store.abort()
   }
 
-  /** "Run in cloud" (§12.2): the same input, sent as the first prompt
+  /** "Run in cloud": the same input, sent as the first prompt
    *  of a new cloud session instead of a local turn. */
   function submitCloud(): void {
     const trimmed = text.trim()
@@ -697,7 +697,7 @@
         </button>
       {:else}
         {#if store.canRunInCloud && !store.pendingQuestion}
-          <!-- Run in cloud (§12.2): same prompt, new cloud session.
+          <!-- Run in cloud: same prompt, new cloud session.
                Outlined, beside the solid Send. -->
           <button
             class="submit-btn cloud"

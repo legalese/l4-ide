@@ -2,7 +2,7 @@
   "name": "cloud-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "Headless Legalese AI harness for cloud sessions: runs @repo/legalese-agent against a session folder on S3 Files, with jl4-lsp over stdio, the file relay, the lease and the agent key chain (cloud-sessions spec §5.4, §6.2, §8, §11)",
+  "description": "Headless Legalese AI harness for cloud sessions: runs @repo/legalese-agent against a session folder, with jl4-lsp over stdio, the file relay, the lease and the agent key chain",
   "type": "module",
   "bin": {
     "cloud-agent": "./dist/cloud-agent.cjs"

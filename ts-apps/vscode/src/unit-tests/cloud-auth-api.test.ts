@@ -4,8 +4,8 @@ import {
   AccessTokenManager,
   NotSignedInError,
   mintAgentKey,
-  type AuthProxyDeps,
-} from '../cloud/auth-proxy.js'
+  type CloudApiDeps,
+} from '../cloud/cloud-api.js'
 import {
   CLOUD_API_URL_MESSAGE,
   NOT_FOUND_MESSAGE,
@@ -49,7 +49,7 @@ function header(init: RequestInit, name: string): string | undefined {
 function authDeps(
   f: typeof fetch,
   opts: { session?: string; now?: () => number } = {}
-): AuthProxyDeps & { stored: string[]; signIn: (t: string) => void } {
+): CloudApiDeps & { stored: string[]; signIn: (t: string) => void } {
   const stored: string[] = []
   let session = opts.session ?? 'sealed-1'
   return {

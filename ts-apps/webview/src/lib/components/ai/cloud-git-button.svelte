@@ -5,7 +5,7 @@
     type CloudConversationInfo,
   } from '$lib/stores/cloud-chat'
 
-  // Clone / Sync for a cloud session's files (§9.3): in its header and
+  // Clone / Sync for a cloud session's files: in its header and
   // on the "Files changed" box of each turn.
   let {
     state,

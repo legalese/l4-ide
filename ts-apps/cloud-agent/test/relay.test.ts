@@ -515,7 +515,7 @@ describe('CommandReader', () => {
   })
 })
 
-describe('Run records (§7.3)', () => {
+describe('Run records', () => {
   let dir: string
   let cleanup: () => Promise<void>
   beforeEach(async () => {

@@ -7,7 +7,7 @@ import type { EditorContextInfo, L4Language } from './ports.js'
  * expected to call `fs__read_file` if it decides the body is worth reading.
  * Only built when the user has the "attach active file" chip enabled.
  *
- * It rides as text on the user message (see `AiProxyRequest.inlineContext`)
+ * It rides as text on the user message (see `AiChatRequest.inlineContext`)
  * because a `role:"system"` message only reaches the model on turn 1, and
  * the model would keep seeing that first file. Inlining at the tail doesn't
  * disturb the prompt cache.
@@ -62,11 +62,11 @@ export function buildEditorContextBlock(
  * facts the model otherwise has no way to know: the org-specific
  * deployment URL the user is signed in to, and the client build the
  * request is coming from. Sent as an additional system message so it
- * doesn't invalidate the ai-proxy's cached L4 prompt prefix, and only
+ * doesn't invalidate the prompt cache, and only
  * on the first turn of a conversation (matches workspace-exports).
  * Date/time/timezone are NOT here — those are inlined into the user
  * message every turn via {@link buildCurrentTimeBlock} so they stay
- * fresh on follow-ups (the proxy filters role:"system" out of the
+ * fresh on follow-ups (the AI service filters role:"system" out of the
  * per-turn delta).
  */
 export function buildSessionContextMessage(
@@ -111,8 +111,7 @@ export function buildMethodologyContextMessage(
 /**
  * Build the per-turn `<current-time>` block, inlined as a text content
  * part on the user message every turn. It rides inside the user
- * message (not as a `role:"system"` message) because the ai-proxy's
- * extractDelta filters system messages out of follow-up-turn deltas —
+ * message (not as a `role:"system"` message) because
  * a system message here would only land on turn 1. Inlining keeps the
  * timestamp fresh on every turn for "today" / "now" / relative-time
  * reasoning, in the user's IANA zone with a UTC fallback.
@@ -183,7 +182,7 @@ export function buildRuleIndexMessage(indexes: string[]): AiChatMessage | null {
 /**
  * Build the first-turn `<workspace-exports>` system message listing the
  * L4 functions the model should know about. Sent as a separate system
- * message so it doesn't invalidate the proxy's cached L4 reference.
+ * message so it doesn't invalidate the prompt cache.
  *
  * Narrow on purpose: the active L4 document's exports only (via the
  * language server). Expanding to a multi-file index can come later.

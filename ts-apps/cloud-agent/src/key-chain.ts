@@ -16,13 +16,13 @@ import {
 /** Why a chain ended, as the harness reports it. */
 export interface ChainEnded {
   reason: AgentKeyFailure
-  /** jl4-auth-proxy refused the renewal (vs. 5xx / network failures
+  /** The server refused the renewal (vs. 5xx / network failures
    *  that outlasted the retries or the key). */
   fromServer: boolean
 }
 
 export interface KeyChainOptions {
-  /** jl4-auth-proxy base URL (`AUTH_URL`). */
+  /** Legalese Cloud API base URL (`AUTH_URL`). */
   authUrl: string
   sessionId: string
   /** The key from `AGENT_KEY`. */
@@ -43,24 +43,24 @@ const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000]
 /**
  * Least time between two successful renewals: a key that comes back
  * short-lived (or with a bad expiry), or a server that keeps answering
- * 401, can't make the harness delete and mint WorkOS keys in a loop.
- * jl4-auth-proxy issues full 15-minute keys up to the chain's cap, so a
+ * 401, can't make the harness delete and mint keys in a loop.
+ * The server issues full 15-minute keys up to the chain's cap, so a
  * healthy chain renews every 10 minutes and never waits on this.
  */
 export const MIN_RENEW_INTERVAL_MS = 60_000
 
-/** jl4-auth-proxy deleted the old key, then couldn't mint its successor:
+/** The server retired the old key, then couldn't mint its successor:
  *  final whatever the status, since a retry would present a dead key. */
 const CHAIN_LOST = 'chain_lost'
 
 /**
- * {@link AuthProvider} over an agent key chain (spec §6.2, §15.5).
+ * {@link AuthProvider} over an agent key chain.
  *
  * - The key from `AGENT_KEY` is renewed immediately at start, which
- *   deletes it (it was visible in the `RunTask` overrides).
+ *   retires it.
  * - After that it renews when 5 minutes of the 15 are left, and when a
  *   request made with the current key comes back 401, or 403
- *   `invalid-credentials` from ai-proxy ({@link renewAfterUnauthorized}).
+ *   `invalid-credentials` from the AI service ({@link renewAfterUnauthorized}).
  *   Successful renewals are at least {@link MIN_RENEW_INTERVAL_MS}
  *   apart: a 401 sooner than that after one fails the request and
  *   renews once the interval is up.
@@ -74,12 +74,12 @@ const CHAIN_LOST = 'chain_lost'
  *   over about a minute by default), each only if it starts before the
  *   key expires. When the retries run out, or the key would expire
  *   first, the chain ends as `invalid_key` (not `fromServer`). If
- *   jl4-auth-proxy had already deleted the old key before WorkOS
+ *   the server had already retired the old key before minting
  *   failed, the retry answers `401 invalid_key` and the chain ends
  *   there.
  * - When the chain ends, headers become `{}` (requests fail fast as
  *   unauthenticated) and `onEnded` fires once; the runner parks.
- * - Every ai-proxy request carries `X-Legalese-Session: <sid>`.
+ * - Every AI request carries `X-Legalese-Session: <sid>`.
  */
 export class KeyChainAuth implements AuthProvider {
   private key: string
@@ -148,7 +148,7 @@ export class KeyChainAuth implements AuthProvider {
   }
 
   /**
-   * A request made with `usedAuthorization` came back 401 (or ai-proxy's
+   * A request made with `usedAuthorization` came back 401 (or the AI service's
    * 403 `invalid-credentials`, see {@link authRetryingFetch}). Renew unless
    * a renewal already replaced that key; resolves true when a newer key
    * is available to retry with. Within the minimum interval of the last
@@ -322,8 +322,8 @@ export class KeyChainAuth implements AuthProvider {
   }
 }
 
-/** `--dev`: no key chain; the local ai-proxy takes `Bearer dev-local`
- *  (stamped by the AiProxyClient in local mode). */
+/** `--dev`: no key chain; the local AI server takes `Bearer dev-local`
+ *  (stamped by the AiClient in local mode). */
 export class DevAuth implements AuthProvider {
   constructor(private readonly sessionId: string) {}
 
@@ -339,11 +339,11 @@ export class DevAuth implements AuthProvider {
 /**
  * Wrap `fetch` so a 401 from one of `origins` for a request that
  * carried the chain's current key triggers a renewal and one retry
- * with the new key (spec §5.4: renew "on 401"). ai-proxy answers a key
+ * with the new key. The AI service answers a key
  * it no longer accepts with `403` and `Authentication failed:
  * invalid-credentials` instead, so that 403 counts as a 401; any other
  * 403 is a real refusal and is returned as is. Bodies are strings in
- * both clients (ai-proxy, MCP), so the retry can resend them.
+ * both clients (AI, MCP), so the retry can resend them.
  */
 export function authRetryingFetch(
   base: typeof fetch,
@@ -388,7 +388,7 @@ export function authRetryingFetch(
   }
 }
 
-/** Is `res` (a 403) ai-proxy refusing the key itself? Reads a clone, so
+/** Is `res` (a 403) the AI service refusing the key itself? Reads a clone, so
  *  `res` can still be returned to the caller unread. */
 async function saysInvalidCredentials(res: Response): Promise<boolean> {
   try {

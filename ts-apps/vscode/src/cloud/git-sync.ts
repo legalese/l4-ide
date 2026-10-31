@@ -1,11 +1,11 @@
 /**
  * Clone and sync a cloud session's files through VS Code's built-in Git
- * extension (spec §9.3). There is no git implementation here: the Git
+ * extension. There is no git implementation here: the Git
  * extension runs the user's installed `git`, and this module only
  *
  * - answers the Git extension's credential requests for the Sessions API
- *   host with a fresh WorkOS access token (any username, the JWT as the
- *   password — §9.2);
+ *   host with a fresh access token (any username, the JWT as the
+ *   password);
  * - lists cloud sessions in VS Code's "Git: Clone" picker;
  * - keeps the token out of system credential helpers (the keychain)
  *   for the host, and has git send it with the first request
@@ -108,7 +108,7 @@ export type GitApiResult<U extends GitUri> =
 
 // ── Sync ──────────────────────────────────────────────────────────────
 
-/** `http.postBuffer`: pushes go out as one request, not chunked (§9.3). */
+/** `http.postBuffer`: pushes go out as one request, not chunked. */
 export const GIT_POST_BUFFER = '5242880'
 /** The push refspec: the user's `main` lands on the session's `local`. */
 export const GIT_PUSH_REFSPEC = 'refs/heads/main:refs/heads/local'
@@ -126,7 +126,7 @@ const CONFIG_TRIES = 3
  *  seen, live or replayed). */
 export const COMMITTED_STORAGE_KEY = 'legaleseAi.cloudSessions.committed'
 
-/** Why Clone / Sync aren't offered yet (§9.3). */
+/** Why Clone / Sync aren't offered yet. */
 export const NOT_READY_MESSAGE = NO_COMMITS_YET_MESSAGE
 
 const SESSION_GIT_PATH_RE = /\/git\/([0-9A-Z]{26})(?:\/[^/]+)?\.git(?:\/|$)/
@@ -155,8 +155,8 @@ export type SyncStatus =
       folder: string
       ahead: number
       behind: number
-      /** Pushed commits not yet merged by the session (§9.3 "pending
-       *  until the session runs" while it sleeps). */
+      /** Pushed commits not yet merged by the session: "pending until the
+       *  session runs" while it sleeps. */
       pending: boolean
     }
 
@@ -211,9 +211,9 @@ export function credentialHelperKey(apiUrl: string): string | undefined {
 /**
  * `http.<scheme>://<host>/.proactiveAuth` for the Sessions API, or
  * undefined when the URL is unset or invalid. Git (curl) sends
- * credentials only in answer to a `WWW-Authenticate` challenge, and
- * Lambda function URLs rename that header in a 401
- * (`x-amzn-Remapped-WWW-Authenticate`), so git would never send them.
+ * credentials only in answer to a `WWW-Authenticate` challenge, which
+ * the API's 401 doesn't carry in a usable form, so git would never send
+ * them.
  * `basic` (git 2.46 and later) asks for them before the first request
  * and sends them with it.
  */
@@ -336,8 +336,7 @@ export function describeGitError(
   // The Sessions API answers 409 `no_commits_yet` before the first turn
   // is committed (nothing to clone or pull yet).
   if (/no_commits_yet|\b409\b/i.test(detail)) return NOT_READY_MESSAGE
-  // 413: a request or a response over about 4.5 MB (the Sessions API's
-  // Lambda limit, during the beta).
+  // 413: a request or a response over the Sessions API's size limit.
   if (
     /\b413\b|too_large|Request Entity Too Large|body.*too large/i.test(detail)
   ) {
@@ -432,7 +431,7 @@ export class CloudGitSync<U extends GitUri> {
             this.deps.logger.info(`cloud-sessions: ${NOT_READY_MESSAGE}`)
             return undefined
           }
-          // Any username; the JWT is the password (§9.2). Fetched per
+          // Any username; the JWT is the password. Fetched per
           // git operation, so an expired token is never reused.
           return {
             username: 'legalese',
@@ -514,7 +513,7 @@ export class CloudGitSync<U extends GitUri> {
     if (auth) addGitEnvConfig(env, auth, 'basic')
   }
 
-  /** The repository options of §9.3. */
+  /** The repository options. */
   async configure(repo: GitRepository<U>): Promise<void> {
     const key = credentialHelperKey(this.deps.apiUrl())
     if (!key) throw new GitSyncError('Cloud sessions are not configured.')
@@ -622,7 +621,7 @@ export class CloudGitSync<U extends GitUri> {
     )
   }
 
-  /** Button state: Clone / Sync with ahead and behind (§9.3). */
+  /** Button state: Clone / Sync with ahead and behind. */
   async status(sid: string): Promise<SyncStatus> {
     const git = await this.deps.getGitApi()
     if ('unavailable' in git) {
@@ -690,7 +689,7 @@ export class CloudGitSync<U extends GitUri> {
     return folder
   }
 
-  /** Pull, then push (§9.3). Conflicts are left for VS Code's merge editor. */
+  /** Pull, then push. Conflicts are left for VS Code's merge editor. */
   async sync(sid: string): Promise<SyncStatus> {
     this.requireFirstCommit(sid)
     const repo = await this.repository(sid)

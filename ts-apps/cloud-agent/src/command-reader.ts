@@ -27,7 +27,7 @@ export const COMMAND_GRACE_MS = 15_000
  *  before it's skipped. */
 export const COMMAND_TRANSIENT_GRACE_MS = 60_000
 
-/** Errors of a network file system that pass: the read is tried again. */
+/** Errors that pass: the read is tried again. */
 const TRANSIENT_ERRNOS = new Set([
   'ESTALE',
   'EIO',
@@ -45,7 +45,7 @@ const TRANSIENT_ERRNOS = new Set([
 export const COMMANDS_DONE_FILE = 'commands.done'
 
 /**
- * Reads the command queue by known names (spec §8):
+ * Reads the command queue by known names:
  * `state/commands.seq` holds the highest number the Sessions API
  * issued; each command is `state/commands/<n>.json`. The directory is
  * never listed.
@@ -56,8 +56,7 @@ export const COMMANDS_DONE_FILE = 'commands.done'
  *   smaller number). The reader keeps the highest value it has seen
  *   and opens numbers up to that, so a regression never hides a
  *   command. It only opens a number once `commands.seq` has reached it
- *   at least once — never probing a name that may not exist yet, which
- *   the NFS client would cache as missing.
+ *   at least once — never probing a name that may not exist yet.
  * - **In order, once.** Commands are delivered in number order. The
  *   highest number handled is kept in `state/commands.done` (written by
  *   the harness only, temp file + rename), so a restarted harness picks
@@ -93,7 +92,7 @@ export class CommandReader {
       now?: () => number
       /** Tests inject read errors here. */
       readText?: typeof readKnownText
-      /** Checked before every write (§7.3). */
+      /** Checked before every write. */
       fence?: WriteFence
     } = {}
   ) {

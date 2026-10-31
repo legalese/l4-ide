@@ -1,9 +1,8 @@
 /**
- * File helpers for the session folder (spec §4.2, §7.2, §8).
+ * File helpers for the session folder.
  *
  * - Files are opened by known names only; the harness never lists a
- *   state directory to discover files (NFS caches listings and "not
- *   found" results, §8).
+ *   state directory to discover files.
  * - Opens use `O_NOFOLLOW` and require a regular file under a size cap.
  * - Files other processes read are replaced with a temp file + rename,
  *   so readers see the old or the new content, never a torn write.

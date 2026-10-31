@@ -145,7 +145,7 @@
     m.onNotification(AiActiveFile, (p) => store.onActiveFile(p))
     m.onNotification(AiChatAskUser, (p) => store.onAskUser(p))
     m.onNotification(AiChatSeedDraft, (p) => store.seedDraft(p.text))
-    // Cloud sessions (§12): config flag, cloud-only events, state,
+    // Cloud sessions: config flag, cloud-only events, state,
     // "Run in cloud" progress, and "Open" from a notification.
     m.onNotification(AiCloudConfig, (p) => store.onCloudConfig(p))
     m.onNotification(AiCloudEvent, (p) => store.onCloudEvent(p))
@@ -174,7 +174,7 @@
   })
 
   // Which cloud session is on screen: only that one starts again by
-  // itself when its credentials end mid-turn (§12.2).
+  // itself when its credentials end mid-turn.
   $effect(() => {
     const sessionId = cloudSessionIdOf(store.currentId)
     messenger?.sendNotification(AiCloudViewing, HOST_EXTENSION, { sessionId })
@@ -207,7 +207,7 @@
   }
 
   // The cloud part of the history is refetched every 30 s while the
-  // history is open (§12.1).
+  // history is open.
   $effect(() => {
     if (!historyOpen || !visible || !store.cloudEnabled) return
     const timer = setInterval(
@@ -265,10 +265,10 @@
   // Retry asks the server to run another turn against the existing
   // conversation state — no duplicated user message. The user's
   // original prompt is already persisted on disk from the aborted
-  // attempt (ai-proxy saves the conversation on create, before the
+  // attempt (the AI service saves the conversation on create, before the
   // stream starts), so the model has everything it needs to produce
   // a fresh response. The store's continueTurn() handles both the
-  // happy path (server-assigned conversationId exists → ask the proxy
+  // happy path (server-assigned conversationId exists → ask the AI service
   // to run another pass against stored history) and the
   // first-turn-error fallback (no id yet → re-send the last user
   // message as a fresh request). It also drops the trailing errored

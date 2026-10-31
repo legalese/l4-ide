@@ -1,9 +1,9 @@
-import type { AiProxyTool } from './ports.js'
+import type { AiTool } from './ports.js'
 
 /**
  * OpenAI function-tool declarations for the built-in client-side
- * tools. These ship to the ai-proxy in the `tools` field of the chat
- * request; the proxy passes them through to the provider and streams
+ * tools. These ship to the AI service in the `tools` field of the chat
+ * request; the AI service passes them through to the provider and streams
  * back tool_call deltas when the model invokes one.
  *
  * Names use `category__name` with a double-underscore separator so a
@@ -11,7 +11,7 @@ import type { AiProxyTool } from './ports.js'
  * MCP tools later namespace as `{serverId}__{toolName}` and land in
  * the same switch.
  */
-export const BUILTIN_TOOLS: AiProxyTool[] = [
+export const BUILTIN_TOOLS: AiTool[] = [
   {
     type: 'function',
     function: {

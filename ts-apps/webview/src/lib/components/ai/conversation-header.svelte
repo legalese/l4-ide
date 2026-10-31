@@ -3,7 +3,7 @@
   import type { CloudConversationInfo } from '$lib/stores/ai-chat.svelte'
   import CloudStatusIcon from './cloud-status-icon.svelte'
 
-  // Header of a conversation, local or cloud (§12.2): what it is (a
+  // Header of a conversation, local or cloud: what it is (a
   // cloud session's cloud, with its state and progress in the tooltip;
   // a local chat's dot while it runs or waits for you), its name (click
   // to rename), Clone / Sync for a cloud session, and the ⋯ menu. No

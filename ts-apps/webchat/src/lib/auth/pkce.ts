@@ -1,8 +1,7 @@
-// Sign-in without the session token in a URL (jl4-auth-proxy
-// `src/auth/handoff.ts`; same flow as the console's `lib/auth-login.ts`).
+// Sign-in without the session token in a URL.
 //
 // The login starts with a PKCE challenge (/auth/login?code_challenge=…), so
-// the proxy returns a short-lived code (?code=h1.…) instead of the session
+// the server returns a short-lived code (?code=h1.…) instead of the session
 // token. The app exchanges code + verifier at POST /auth/exchange. The
 // verifier stays in this tab's sessionStorage, so a code that leaks through
 // history or a screenshot is useless.

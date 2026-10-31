@@ -2,14 +2,13 @@
 //
 // The VSCode extension records in its host process because a webview can't
 // open a microphone; in the standalone web chat the page can, so the bridge
-// records here. Both hand the ai-proxy's speech-to-text endpoint the same
+// records here. Both hand the AI service's speech-to-text endpoint the same
 // thing: a 16 kHz mono 16-bit PCM WAV. MediaRecorder's own output (WebM/Opus
 // in Chrome and Firefox, MP4/AAC in Safari) is decoded and re-encoded on
 // stop — WAV is the one format every transcription provider accepts, and it
-// lets the proxy measure the clip itself.
+// lets the AI service measure the clip itself.
 
-/** Longest clip the input lets run. Matches the ai-proxy's default
- *  `listen.maxSeconds`; the proxy enforces its own copy server-side. */
+/** Longest clip the input lets run. The AI service enforces its own limit. */
 export const DICTATION_MAX_SECONDS = 120
 
 const WAV_SAMPLE_RATE = 16_000

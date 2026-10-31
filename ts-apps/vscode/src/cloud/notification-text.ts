@@ -16,7 +16,7 @@ export function notificationText(text: string, max = 80): string {
   return plain.length > max ? `${plain.slice(0, max - 1)}…` : plain
 }
 
-/** The notification for a `local-merge-conflict` (§9.1). */
+/** The notification for a `local-merge-conflict`. */
 export function mergeConflictMessage(files: string[]): string {
   const shown = files
     .slice(0, 3)

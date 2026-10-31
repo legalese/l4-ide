@@ -1,8 +1,8 @@
 /**
  * cloud-agent — the Legalese AI harness, headless, for one cloud
- * session (spec §5.4, §11).
+ * session.
  *
- *   cloud: SESSION_ID, AGENT_KEY, AI_PROXY_URL, MCP_URL, AUTH_URL,
+ *   cloud: SESSION_ID, AGENT_KEY, AI_URL, MCP_URL, AUTH_URL,
  *          LOG_LEVEL; the user's folder is mounted at /workspace.
  *   dev:   cloud-agent --dev --root <dir> --session <ulid> [...]
  */
@@ -36,7 +36,7 @@ import {
 
 export const HARNESS_VERSION = '0.1.0'
 
-/** The harness's plugins: git sync (§9) and the user's MCP servers (§6.4). */
+/** The harness's plugins: git sync and the user's MCP servers. */
 export function defaultPlugins(env: NodeJS.ProcessEnv): RunnerPlugin[] {
   return [new GitSync(env), new McpServers()]
 }
@@ -83,24 +83,14 @@ export function installFatalHandlers(
   }
 }
 
-async function taskIdFrom(cfg: HarnessConfig): Promise<string> {
-  const fallback =
+function taskIdFrom(cfg: HarnessConfig): string {
+  return (
+    cfg.taskId ??
     `${cfg.mode}-${os.hostname().replace(/[^A-Za-z0-9_.-]/g, '')}-${process.pid}`.slice(
       0,
       120
     )
-  if (!cfg.taskMetadataUri) return fallback
-  try {
-    const res = await fetch(`${cfg.taskMetadataUri}/task`, {
-      signal: AbortSignal.timeout(3_000),
-    })
-    const body = (await res.json()) as { TaskARN?: unknown }
-    const arn = typeof body.TaskARN === 'string' ? body.TaskARN : ''
-    const id = arn.split('/').pop() ?? ''
-    return /^[A-Za-z0-9_.-]{1,128}$/.test(id) ? id : fallback
-  } catch {
-    return fallback
-  }
+  )
 }
 
 export async function runHarness(
@@ -151,11 +141,11 @@ async function runSession(
     logger.error('no run number; exiting')
     return 1
   }
-  const taskId = await taskIdFrom(cfg)
+  const taskId = taskIdFrom(cfg)
   logger.info(
     `harness ${HARNESS_VERSION} starting (mode=${cfg.mode}, run=${run}, task=${taskId})`
   )
-  // Before anything is created or started (§7.3): a harness that isn't
+  // Before anything is created or started: a harness that isn't
   // the session's current run writes nothing.
   const verdict = await checkRun(path.join(sessionDir, 'state'), run)
   if (!verdict.ok) {
@@ -167,19 +157,19 @@ async function runSession(
   // URL (the key goes only to the configured origins, authRetryingFetch).
   let auth: KeyChainAuth | DevAuth
   if (keyChain) {
-    // Renew and retry once when ai-proxy or MCP answer 401 (or ai-proxy
+    // Renew and retry once when the AI service or MCP answer 401 (or the AI service
     // answers 403 invalid-credentials).
     globalThis.fetch = authRetryingFetch(
       globalThis.fetch.bind(globalThis),
       keyChain,
-      [cfg.aiProxyUrl, ...(cfg.mcpUrl ? [cfg.mcpUrl] : [])]
+      [cfg.aiUrl, ...(cfg.mcpUrl ? [cfg.mcpUrl] : [])]
     )
     auth = keyChain
   } else {
     auth = new DevAuth(cfg.sessionId)
   }
 
-  // One jl4-lsp, project root repo/data (spec §5.4), for every .l4 file
+  // One jl4-lsp, project root repo/data, for every .l4 file
   // in data/ and tmp/. `IMPORT name` looks in data/ first, then next to
   // the importing file: tmp/ drafts import data/ modules and their tmp/
   // siblings, but a tmp/ module can't shadow a data/ module of the same
@@ -217,7 +207,7 @@ async function runSession(
     chain: keyChain,
     workspace,
     l4: lsp,
-    aiEndpoint: { url: cfg.aiProxyUrl, local: cfg.aiLocal },
+    aiEndpoint: { url: cfg.aiUrl, local: cfg.aiLocal },
     providers,
     plugins: defaultPlugins(childEnv(env)),
     extensionVersion: `cloud-agent/${HARNESS_VERSION}`,
@@ -283,7 +273,7 @@ export async function main(
         sessionId: args.sessionId,
         ...(run !== undefined ? { run } : {}),
         root: path.resolve(args.root),
-        aiProxyUrl: args.aiProxyUrl,
+        aiUrl: args.aiUrl,
         aiLocal: true,
         mcpUrl: args.mcpUrl,
         logLevel: args.logLevel,

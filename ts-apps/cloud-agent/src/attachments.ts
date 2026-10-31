@@ -40,7 +40,7 @@ export interface LoadedAttachment {
 
 /**
  * Load prompt attachments named by a `message` command from the
- * session's `attachments/` folder (outside the repo, spec §4.2). Names
+ * session's `attachments/` folder (outside the repo). Names
  * are validated plain file names; files are opened without following
  * links and capped at 10 MB. Missing or unreadable files are reported
  * in `missing` and left out.

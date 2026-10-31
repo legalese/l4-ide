@@ -801,8 +801,8 @@ handleTasksCancel reqId params = case parseTaskId params of
 -- every deployment; on a scoped one (@/{id}/.mcp@) only the scope itself.
 --
 -- The file tools name their deployment in an argument, not in the route, so
--- they check it here: the auth proxy admits a caller with a grant for one
--- deployment to that deployment's route only, and an argument naming another
+-- they check it here: a caller with a grant for one deployment reaches that
+-- deployment's route only, and an argument naming another
 -- deployment must not reach past it. A deployment outside the scope is treated
 -- as one that does not exist.
 inScope :: Maybe Text -> Text -> Bool

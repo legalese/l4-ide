@@ -1,5 +1,5 @@
 /**
- * Sidebar webview ⇄ cloud sessions (spec §12): the `AiCloud*` RPCs,
+ * Sidebar webview ⇄ cloud sessions: the `AiCloud*` RPCs,
  * forwarding of cloud-only events, state and start progress, the
  * cached history list, Clone / Sync, and VS Code notifications when a
  * background cloud session asks a question (cloud sessions never ask
@@ -39,7 +39,7 @@ import {
   type AiCloudSessionSummary,
 } from 'jl4-client-rpc'
 import type { Logger } from '@repo/legalese-agent'
-import { NotSignedInError, AuthProxyError } from './auth-proxy.js'
+import { NotSignedInError, CloudApiError } from './cloud-api.js'
 import { GitSyncError } from './git-sync.js'
 import { SeedLimitError } from './seed.js'
 import { SessionsApiError } from './sessions-api.js'
@@ -59,7 +59,7 @@ export function cloudErrorMessage(err: unknown): string {
   if (
     err instanceof SeedLimitError ||
     err instanceof NotSignedInError ||
-    err instanceof AuthProxyError ||
+    err instanceof CloudApiError ||
     err instanceof SessionsApiError ||
     err instanceof GitSyncError
   ) {
@@ -281,7 +281,7 @@ export function registerCloudHandlers(deps: {
     guard(command.type, async () => {
       let res
       if (command.type === 'message' || command.type === 'inject') {
-        // Add the prompt's @-mentioned files and active file first (§10).
+        // Add the prompt's @-mentioned files and active file first.
         const files = await cloud.gatherPromptFiles({
           mentions: command.mentions ?? [],
           attachments: [],
@@ -393,7 +393,7 @@ export function registerCloudHandlers(deps: {
     }
   })
 
-  // ── Clone / Sync (§9.3) ─────────────────────────────────────────────
+  // ── Clone / Sync ─────────────────────────────────────────────
 
   messenger.onRequest(AiCloudGitStatusRequest, async ({ sessionId }) => {
     if (!cloud.isEnabled()) {

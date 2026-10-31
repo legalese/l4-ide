@@ -1,6 +1,6 @@
 /**
  * Messages between the VS Code extension and the sidebar webview for
- * cloud sessions (spec §12, in legalese/cloud-sessions). Everything
+ * cloud sessions. Everything
  * here is only used while `legaleseAi.cloudSessions.enabled` is on.
  *
  * Chat events of a cloud session reuse the ordinary `AiChat*`
@@ -188,7 +188,7 @@ export const AiCloudViewing: NotificationType<{ sessionId: string | null }> = {
 }
 
 /** Extension → webview: the session's MCP servers (their names here)
- *  that need a sign-in in this window before it can use them (§6.4);
+ *  that need a sign-in in this window before it can use them;
  *  `[]` once none do. */
 export const AiCloudMcpSignInNeeded: NotificationType<{
   sessionId: string
@@ -207,9 +207,9 @@ export const AiCloudMcpSignIn: RequestType<
   method: 'aiCloudMcpSignIn',
 }
 
-/** Commands a webview may send to a cloud session (§8). Cloud
+/** Commands a webview may send to a cloud session. Cloud
  *  sessions never ask for tool approval, so there is no `approve`. */
-/** What a prompt refers to, for adding files mid-session (§10): the
+/** What a prompt refers to, for adding files mid-session: the
  *  extension uploads new or changed files before the message. */
 export type AiCloudPromptRefs = Pick<
   AiChatStartParams,
@@ -234,7 +234,7 @@ export const AiCloudCommand: RequestType<
   method: 'aiCloudCommand',
 }
 
-/** Webview → extension: restore the files to before `turnId` (§9.4).
+/** Webview → extension: restore the files to before `turnId`.
  *  The extension confirms first when later turns (or merged local
  *  syncs) would be undone. */
 export const AiCloudRollback: RequestType<
@@ -277,10 +277,10 @@ export const AiCloudSessionList: RequestType<
   method: 'aiCloudSessionList',
 }
 
-/** Clone / Sync button state (§9.3). */
+/** Clone / Sync button state. */
 export type AiCloudGitStatus =
   | { kind: 'unavailable'; message: string }
-  /** No commit yet: Clone waits for the first turn (§9.3). */
+  /** No commit yet: Clone waits for the first turn. */
   | { kind: 'not-ready'; message: string }
   | { kind: 'not-cloned' }
   | {

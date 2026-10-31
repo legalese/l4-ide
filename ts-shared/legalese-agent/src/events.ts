@@ -101,7 +101,7 @@ export type PersistedBlock =
   // Server activities worth preserving across a history reload. Two
   // shapes share the variant:
   //
-  //  - L4 Rule activities (the proxy ran a deployed rule): `ruleId` +
+  //  - L4 Rule activities (the AI service ran a deployed rule): `ruleId` +
   //    `ruleKey` are both set; `ruleKey` mirrors the webview store's
   //    merge key so a `running → done` burst persists as ONE block.
   //  - Synthetic `web_search` activities: `tool === 'web_search'`,

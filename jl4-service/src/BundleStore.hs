@@ -75,8 +75,6 @@ initStore path = do
   pure (BundleStore path)
 
 -- | Clean up stale .tmp directories left behind by interrupted deploys.
--- NFS .nfs* files are not cleaned here — they disappear automatically
--- once the process holding the file handle restarts.
 cleanupStore :: Logger -> BundleStore -> IO ()
 cleanupStore logger (BundleStore root) = do
   exists <- doesDirectoryExist root
@@ -220,7 +218,7 @@ listDeployments (BundleStore root) = do
       pure (map Text.pack validEntries)
 
 -- | Delete a deployment's directory from the store.
--- Returns False if removal failed (e.g. EFS/NFS race with stale files).
+-- Returns False if removal failed (e.g. a race with stale files).
 deleteBundle :: BundleStore -> Text -> IO Bool
 deleteBundle (BundleStore root) deployId = do
   let deployDir = root </> Text.unpack deployId

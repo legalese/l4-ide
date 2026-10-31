@@ -220,7 +220,7 @@ function ev<T extends Omit<CloudEvent, 'seq' | 'ts'>>(e: T): CloudEvent {
 }
 
 describe('CloudSessionManager.runInCloud', () => {
-  test('seeds, queues the prompt, then mints a key and starts (§10)', async () => {
+  test('seeds, queues the prompt, then mints a key and starts', async () => {
     const { api, clock, manager, progress } = setup()
     const res = await manager.runInCloud({
       turnId: 'turn-1',
@@ -517,7 +517,7 @@ describe('CloudSessionManager: a message sent while the task shuts down', () => 
   test('polls that still say sleeping just after a start leave it be', async () => {
     const s = setup()
     // Sending to a sleeping session starts it; the new task takes a
-    // moment to show up in ECS, so the next polls still say sleeping.
+    // moment to show up, so the next polls still say sleeping.
     s.api.state = 'sleeping'
     s.api.commandState = 'sleeping'
     s.api.startNoop = true
@@ -683,7 +683,7 @@ describe('CloudSessionManager: sessions out of view', () => {
   })
 })
 
-describe('CloudSessionManager MCP credentials (§6.4)', () => {
+describe('CloudSessionManager MCP credentials', () => {
   test('seals credentials to the running harness key, once per key', async () => {
     const keyPair = generateSealingKeyPair()
     const mcp: McpServerSource = {
@@ -966,7 +966,7 @@ describe('CloudSessionManager MCP credentials (§6.4)', () => {
   })
 })
 
-describe('CloudSessionManager files in later prompts (§10)', () => {
+describe('CloudSessionManager files in later prompts', () => {
   const ws = '/ws'
   const folders = [{ name: 'ws', path: ws }]
   const file = (p: string, text: string) => ({ path: p, bytes: enc(text) })

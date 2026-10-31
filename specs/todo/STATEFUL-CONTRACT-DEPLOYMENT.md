@@ -417,7 +417,7 @@ Don't bother with exactly-once or ordered delivery. Consumers dedupe on `deliver
 
 ### 7.1 Technology choice
 
-**AWS RDS Postgres 16, Multi-AZ.** No reason to reach further. Workload is small-payload, transactional, query-shaped data — Postgres handles years before anything else is needed. Avoid bringing in DynamoDB, EventStoreDB, or Kafka for a workload that fits in Postgres.
+**Postgres 16.** No reason to reach further. Workload is small-payload, transactional, query-shaped data — Postgres handles years before anything else is needed. Avoid bringing in EventStoreDB or Kafka for a workload that fits in Postgres.
 
 ### 7.2 Schema
 
@@ -543,7 +543,7 @@ This keeps the read path simple, caps per-request latency, and lets the write ha
 
 ### 7.5 Scheduler & webhook delivery
 
-Both are **Postgres-as-queue** workers using `FOR UPDATE SKIP LOCKED`. No SQS or Kafka.
+Both are **Postgres-as-queue** workers using `FOR UPDATE SKIP LOCKED`. No separate queue.
 
 Deadline scheduler (single worker loop):
 
@@ -574,7 +574,7 @@ Attempt the HTTP POST, update `status` / `attempts` / `next_attempt_at`, commit.
 
 This pattern scales to thousands of operations per second on a single worker and remains correct under N parallel workers.
 
-### 7.6 RDS configuration
+### 7.6 Database configuration
 
 | Setting        | Value                                        | Why                                                   |
 | -------------- | -------------------------------------------- | ----------------------------------------------------- |
@@ -582,9 +582,9 @@ This pattern scales to thousands of operations per second on a single worker and
 | Instance class | `db.t4g.medium` or `db.r7g.large`            | Plenty for tens of thousands of instances             |
 | Storage        | gp3, 100 GB+, 3000 IOPS baseline             | gp3 lets you raise IOPS independently of size         |
 | Multi-AZ       | Yes (production)                             | This is your system of record for legal state         |
-| Pooling        | RDS Proxy _or_ PgBouncer in transaction mode | Service should never open raw connections per request |
+| Pooling        | PgBouncer in transaction mode                | Service should never open raw connections per request |
 | Backups        | Automated, 30-day retention, PITR enabled    | Long retention for legal artifacts                    |
-| Encryption     | At-rest (KMS) + TLS in-transit               | Standard for PII / legal data                         |
+| Encryption     | At-rest + TLS in-transit                     | Standard for PII / legal data                         |
 | Read replica   | One, when dashboards become a real read path | Writes stay on primary                                |
 
 ### 7.7 Performance principles, in order of impact
@@ -594,13 +594,13 @@ This pattern scales to thousands of operations per second on a single worker and
 3. **Auto-tick is its own small transaction**, not bundled into the read handler.
 4. **`FOR UPDATE SKIP LOCKED` for both scheduler and webhook workers.** Run N workers freely; never starve.
 5. **JSONB GIN index on `instance_key`** only if you start needing "find all instances where `instance_key.id = 'Alice'`" lookups.
-6. **Partition `events` by month** once it crosses ~10M rows. Detach old partitions to S3 for cold storage.
+6. **Partition `events` by month** once it crosses ~10M rows. Detach old partitions to object storage.
 
 ### 7.8 What you do NOT need
 
 - A separate event store (EventStoreDB, Kafka). The `events` table _is_ it, with ACID guarantees.
 - Redis. The hot row sits in Postgres's shared buffers.
-- A separate queue (SQS, RabbitMQ). Postgres-as-queue handles this scale.
+- A separate queue. Postgres-as-queue handles this scale.
 - Sharding. Single instance handles millions of contracts and tens of millions of events before this is a question.
 
 ---
@@ -694,7 +694,7 @@ These are intentionally not pinned in this spec; the implementer should raise th
 
 2. **Identity collisions across rules.** If two DEONTIC-returning rules in the same bundle have overlapping actor types (both accept `Person`), is the same actor value `"Alice"` the same Alice in both? Recommend: yes within a deployment, no across deployments. Document explicitly so authors design around it.
 
-3. **Retention of terminated instances.** How long do `FULFILLED` / `BREACHED` instances and their event histories remain query-able? Recommend: indefinitely by default for legal artifacts; offer a soft-delete / archive-to-S3 path.
+3. **Retention of terminated instances.** How long do `FULFILLED` / `BREACHED` instances and their event histories remain query-able? Recommend: indefinitely by default for legal artifacts; offer a soft-delete / archive path.
 
 4. **Authentication & authorization model.** Out of scope for this spec but blocking for production. Per-deployment API tokens at minimum; per-instance ACLs eventually.
 

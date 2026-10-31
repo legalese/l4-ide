@@ -1,5 +1,5 @@
 /**
- * Seeding a cloud session (spec §10): which files go in, where they
+ * Seeding a cloud session: which files go in, where they
  * land in the session's `repo/data/`, the size limits, and the
  * `seed.tar.gz` itself.
  *
@@ -340,7 +340,7 @@ export function createSeedTarGz(files: SeedFile[]): Promise<Buffer> {
   return gzipAsync(createTar(files, Math.floor(Date.now() / 1000)))
 }
 
-// ── Files added mid-session (§10) ────────────────────────────────────
+// ── Files added mid-session ────────────────────────────────────
 
 /** `p` relative to directory `root` (both absolute, `/`-separated), or
  *  null when it isn't inside it. */
@@ -434,7 +434,7 @@ export function checkAddFilesSizes(files: SeedFile[]): void {
   }
 }
 
-// ── Seed base (§10) ──────────────────────────────────────────────────
+// ── Seed base ──────────────────────────────────────────────────
 
 /** A workspace folder: its name and absolute `/`-separated path. */
 export interface WorkspaceFolderRef {

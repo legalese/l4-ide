@@ -125,8 +125,8 @@ export interface RenderedToolActivity {
   /** Most recent status across the merged run — `done`/`error` stick. */
   status: 'running' | 'done' | 'error'
   /** Bold action prefix the row shows in front of `message`. Stamped
-   *  by the proxy ("L4 Deployments", "Compacting...", "Legalesing...").
-   *  Absent for activities emitted by older proxy builds — the row
+   *  by the AI service ("L4 Deployments", "Compacting...", "Legalesing...").
+   *  Absent for activities emitted by older servers — the row
    *  falls back to a default label. */
   label?: string
   /** Most recent message; prior messages of the same run are dropped
@@ -160,9 +160,9 @@ export interface RenderedToolActivity {
  *  status tickers like `search_l4_docs`), which keep the minimal row.
  *
  *  Two shapes carry a rule:
- *    - direct MCP rule descriptors → `ruleId` is set by the proxy.
+ *    - direct MCP rule descriptors → `ruleId` is set by the AI service.
  *    - the generic `evaluate_rule` tool → rule name lives in
- *      `input.function_name` (proxy can't know it statically).
+ *      `input.function_name` (the server can't know it statically).
  *  Both must also carry `input` so there's something to render. */
 function ruleActivityIdentity(a: {
   tool: string
@@ -339,7 +339,7 @@ export function createAiChatStore(
 ): AiChatStore {
   // Server-assigned id of the conversation the user is currently
   // viewing, or null when they're composing a fresh chat that hasn't
-  // received its id from the proxy yet. Only ever holds real server
+  // received its id from the AI service yet. Only ever holds real server
   // ids — the not-yet-started state lives in `pendingConversation`
   // below.
   let currentId = $state<string | null>(null)
@@ -876,11 +876,11 @@ export function createAiChatStore(
     if (!m || !conv) return
 
     // No server-assigned conversationId yet → the very first turn
-    // failed before the proxy emitted its `metadata` SSE frame, so
+    // failed before the AI service emitted its `metadata` SSE frame, so
     // there is no on-disk history to resume against. Fall back to
     // re-sending the last user message as a fresh request — same
     // effect as the user retyping it. Without this fallback Retry
-    // silently no-ops, which is the bug the user hit when the proxy
+    // silently no-ops, which is the bug the user hit when the AI service
     // crashed on their first prompt.
     if (!conv.id) {
       const lastUserTurn = [...conv.turns]
@@ -1333,7 +1333,7 @@ export function createAiChatStore(
     if (!turn || turn.role !== 'assistant') return
     if (!turn.blocks) turn.blocks = []
 
-    // L4-rule activities (the proxy ran a deployed rule on the
+    // L4-rule activities (the AI service ran a deployed rule on the
     // server) merge `running → done` into a SINGLE mutating row so
     // they read exactly like a client-side rule tool-call: the row
     // appears pulsating the moment the call lands, then swaps to the

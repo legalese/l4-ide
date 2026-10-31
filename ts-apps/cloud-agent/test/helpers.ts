@@ -158,7 +158,7 @@ export class StubL4 implements L4Language {
   }
 }
 
-// ── A scripted ai-proxy ──────────────────────────────────────────────
+// ── A scripted AI server ──────────────────────────────────────────────
 
 export const chunk = (delta: unknown, finish?: string): string =>
   `data: ${JSON.stringify({
@@ -182,13 +182,13 @@ export interface ProxyRequest {
 }
 
 /**
- * A local HTTP ai-proxy: each chat request gets the next scripted SSE
+ * A local HTTP AI server: each chat request gets the next scripted SSE
  * response (or `status` for an error); title requests get a title.
  */
-export class FakeAiProxy {
+export class FakeAiServer {
   readonly requests: ProxyRequest[] = []
   readonly scripts: Array<string[] | { status: number; body: unknown }> = []
-  /** The summize pipeline's answer (titles, commit summaries); `null`
+  /** The summize model's answer (titles, commit summaries); `null`
    *  answers 503. */
   summize: (body: Record<string, unknown>) => string | null = () => 'A title'
   /** Resolves a held response when set (to test waiting). */

@@ -57,7 +57,7 @@ describe('GitSync', () => {
   let changed: string[][]
   let ctx: RunnerContext
   let logger: MemoryLogger
-  /** The fake summize pipeline; `null` = no summary (the default). */
+  /** The fake summize model; `null` = no summary (the default). */
   let summize: RunnerContext['summize']
   let summizeCalls: Array<{
     messages: Array<{ role: string; content: string }>
