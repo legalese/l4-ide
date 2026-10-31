@@ -1,0 +1,5 @@
+-- A function named like a record in nlg-positional-main.l4. It has no herald.
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`Pt` x y MEANS y MINUS x

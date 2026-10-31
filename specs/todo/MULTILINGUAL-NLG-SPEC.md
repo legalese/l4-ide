@@ -1153,6 +1153,12 @@ That gave the wrong sentence in four ways, all with exit 0 (`jl4/tests-cli/fixtu
   A bare reference to a rule with at least one input, and a projection's selector (`startDate's day`), read as the rule's name.
   A rule with no inputs has no slots and keeps its herald.
 
+A positional call was taken for building a record whenever its head had the text of a record's name, which is a fifth way and the same mistake: `normalizePositionalRecords` looked the head up by that text (`recordCtorFields` was keyed by name), so a function named like a record was read as constructing it (`jl4/tests-cli/fixtures/nlg-positional-main.l4`).
+A record `Pt` beside an imported function `Pt` with no herald read "is a Pt with:" for a call that returns a number.
+A record `range` with fields `start` and `finish` beside the prelude's `range` read "the whole numbers from low to high where start is 1 and finish is n" for `range 1 n`.
+`recordCtorFields` is keyed by the `Unique` of the record's constructor, the one the type checker stores in the `RecordDecl`, as `L4.Dmn.Lower` already does; the call reads "Pt with n and 100" and "the whole numbers from 1 to n", and a positional call to the record's own constructor still reads as building it.
+Rendering the 909 files with the binary before and after this one change moves none of them, because no file in the corpus has a record named like a function it also calls.
+
 Measured over the whole `jl4-test` suite on `lhs`, 2026-10-30: 4830 examples, 5 failures, all of them `.nlg.golden` files under `jl4/examples/ok/tests/`, none in the canon mirror.
 The five are the prelude's own set operators (`is in`, `set equals`, `is subset of`, `UNION`, `INTERSECT`, `LESS`, `WITHOUT`), which carry heralds (`jl4-core/libraries/prelude.l4:1209` for `is in`) that had never reached a call in `l4 nlg`.
 The changes are of two kinds: a call to an operator that has a herald now reads as that herald (`` `_ is in _` with 3 and `SET` ... `` becomes ``3 is one of `SET` ...``), and an operator with no herald (`LOCALOP` in `infix-under-connective-imported.l4`) reads as it did.

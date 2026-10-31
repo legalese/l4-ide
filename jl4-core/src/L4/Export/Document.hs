@@ -255,15 +255,18 @@ mapUnitBody f u = case u.uDecl of
   UDecide (MkDecide a t af body) -> u { uDecl = UDecide (MkDecide a t af (f body)) }
   _ -> u
 
--- | The field-name references of each record, keyed by record name, so a
--- positional construction (@Bullet "A" "B"@) can be matched up with its fields.
--- Keyed by name, not 'Unique': a record's constructor occurrence and its
--- declaring type name do not share a 'Unique'.
-recordCtorFields :: [Module Resolved] -> Map.Map Text [Resolved]
+-- | The field-name references of each record, keyed by the 'Unique' of its
+-- constructor, so a positional construction (@Bullet "A" "B"@) can be matched up
+-- with its fields.
+-- Keyed by the constructor and not by a name: a function can be named like a
+-- record (the prelude's @range@ beside a record @range@), and a call to it is not
+-- a construction. The constructor is not the declaring type name, which has a
+-- 'Unique' of its own; the type checker records it in the 'RecordDecl'.
+recordCtorFields :: [Module Resolved] -> Map.Map Unique [Resolved]
 recordCtorFields mods = Map.fromList
-  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ _ <- fields ])
+  [ (getUnique con, [ n | MkTypedName _ n _ _ _ <- fields ])
   | m <- mods
-  , Declare _ (MkDeclare _ _ (MkAppForm _ ctorName _ _) (RecordDecl _ _ fields)) <- topDeclsRec m
+  , Declare _ (MkDeclare _ _ _ (RecordDecl _ (Just con) fields)) <- topDeclsRec m
   ]
 
 -- | All top-level declarations of a module, descending through @SECTION@s.
@@ -276,12 +279,12 @@ topDeclsRec (MkModule _ _ sec) = go sec
 -- | Rewrite a positional record construction (@App ctor [a, b]@) into the named
 -- form (@AppNamed ctor [field IS a, …]@), so the table and record renderers —
 -- which key off field names — recognise it the same as a @WITH@ literal.
-normalizePositionalRecords :: Map.Map Text [Resolved] -> Expr Resolved -> Expr Resolved
+normalizePositionalRecords :: Map.Map Unique [Resolved] -> Expr Resolved -> Expr Resolved
 normalizePositionalRecords ctorFields
   | Map.null ctorFields = id
   | otherwise = transformOf (gplate @(Expr Resolved)) $ \case
       App ann ctor args
-        | Just fnames <- Map.lookup (resolvedText ctor) ctorFields
+        | Just fnames <- Map.lookup (getUnique ctor) ctorFields
         , length fnames == length args ->
             AppNamed ann ctor [ MkNamedExpr ann f a | (f, a) <- zip fnames args ] Nothing
       e -> e

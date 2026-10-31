@@ -1,0 +1,28 @@
+-- A positional call is a record construction only if its head is the record's
+-- constructor. A function that merely has the record's name is called, not built.
+-- `Pt` here is a record, and nlg-positional-lib.l4 has an unheralded function
+-- `Pt`; `range` here is a record, and the prelude has a heralded function `range`.
+IMPORT prelude
+IMPORT `nlg-positional-lib`
+
+DECLARE Pt HAS x IS A NUMBER, y IS A NUMBER
+
+DECLARE range HAS start IS A NUMBER, finish IS A NUMBER
+
+-- The function: the call must not be read as building the record.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`pos shift` n MEANS Pt n 100
+
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`pos numbers` n MEANS range 1 n
+
+-- The record: built positionally, it still reads as a record.
+GIVEN n IS A NUMBER
+GIVETH A Pt
+`pos point` n MEANS Pt n 100
+
+GIVEN n IS A NUMBER
+GIVETH A range
+`pos band` n MEANS range (n MINUS 1) (n PLUS 1)

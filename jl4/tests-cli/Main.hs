@@ -514,6 +514,13 @@ nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
 nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
 nlgOwnerOverload = fixtureDir </> "nlg-owner-overload.l4"
 
+-- A positional call is a record construction only if its head is the record's
+-- constructor. The main module has records named like a function in the library
+-- (no herald) and like a function in the prelude (with one).
+nlgPositionalMain, nlgPositionalLib :: FilePath
+nlgPositionalMain = fixtureDir </> "nlg-positional-main.l4"
+nlgPositionalLib  = fixtureDir </> "nlg-positional-lib.l4"
+
 -- The example the syntax reference links for this: one mixfix function with a
 -- herald, and a rule that calls it. The test that reads it pins the page's
 -- claim, not just the output.
@@ -653,6 +660,7 @@ coreFixtures =
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
+  , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3745,6 +3753,23 @@ spec bin = do
       ren `shouldBe`
         [ "Own cap means the smaller number of n and 100."
         , "Own first name means whichever of s and m comes first in the alphabet."
+        ]
+
+    -- A positional call builds a record only if its head is the record's
+    -- constructor. These records share a name with a function that is not one:
+    -- the library's `Pt` and the prelude's `range`.
+    it "reads a positional call to a function named like a record as a call, not as building the record" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos shift", "Pos numbers"]
+      rows `shouldBe`
+        [ "Pos shift means Pt with n and 100."
+        , "Pos numbers means the whole numbers from 1 to n."
+        ]
+
+    it "still reads a positional call to the record's own constructor as building it" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos point", "Pos band"]
+      rows `shouldBe`
+        [ "Pos point is a Pt with:"
+        , "Pos band is a range with:"
         ]
 
   -- A herald is the sentence for a CALL: its slots are bound by the call's
