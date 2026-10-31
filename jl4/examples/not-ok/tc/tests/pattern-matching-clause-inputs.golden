@@ -6,7 +6,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 16:8-16:27
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/clause-pattern-count
   Message:
     Each clause of `too many patterns` has 2 patterns, but its GIVEN names 1 input.
     A clause needs one pattern for each input the GIVEN names, in the same order.
@@ -16,7 +16,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 23:8-23:26
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/clause-pattern-count
   Message:
     Each clause of `too few patterns` has 1 pattern, but its GIVEN names 2 inputs.
     A clause needs one pattern for each input the GIVEN names, in the same order.
@@ -26,7 +26,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 35:31-35:32
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -43,7 +43,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 43:8-43:19
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/clause-pattern-count
   Message:
     Each clause of `type only` has 1 pattern, but its GIVEN names no inputs.
     A clause needs one pattern for each input the GIVEN names, in the same order.
@@ -53,7 +53,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 50:8-50:25
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/clause-pattern-count
   Message:
     Each clause of `reads the given` has 2 patterns, but its GIVEN names 1 input.
     A clause needs one pattern for each input the GIVEN names, in the same order.
@@ -63,7 +63,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 59:8-59:28
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/clause-pattern-count
   Message:
     Each clause of `misreads the given` has 2 patterns, but its GIVEN names 1 input.
     A clause needs one pattern for each input the GIVEN names, in the same order.
@@ -73,7 +73,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 59:42-59:45
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of '+' is expected to be of type
 
@@ -88,7 +88,7 @@ File: pattern-matching-clause-inputs.l4
   Range: 60:45-60:46
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The condition in IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs is expected to be of type
 

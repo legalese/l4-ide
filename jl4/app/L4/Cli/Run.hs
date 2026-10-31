@@ -89,8 +89,8 @@ runCmd opts = do
           _                  -> True)
         evalResults
       -- A module the file imports can be broken while the file's own typecheck
-      -- still reports success (an import cycle's error attaches to an imported
-      -- file), so also require that no blocking Error diagnostic was published
+      -- still reports success (a module on a ring of imports has no typecheck, so
+      -- its importer is checked without it), so also require that no blocking Error diagnostic was published
       -- anywhere in the import closure. 'hasBlockingError' leaves out the
       -- evaluator's own diagnostics (source "eval"), so a failed #ASSERT, which
       -- is published as one at Error severity, still exits 0; a directive that

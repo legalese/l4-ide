@@ -6,14 +6,14 @@ File: percent.l4
   Range: 3:1-3:15
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: check/result
   Message: NUMBER
 File: percent.l4
   Hidden: no
   Range: 3:8-3:13
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The argument of '%' is expected to be of type
 
@@ -28,7 +28,7 @@ File: percent.l4
   Range: 4:7-4:12
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The argument of '%' is expected to be of type
 
@@ -43,14 +43,14 @@ File: percent.l4
   Range: 9:1-9:26
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: check/result
   Message: MyType
 File: percent.l4
   Hidden: no
   Range: 9:19-9:23
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The argument of '%' is expected to be of type
 
@@ -65,7 +65,7 @@ File: percent.l4
   Range: 9:19-9:25
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of function 
 

@@ -5,7 +5,8 @@
 -- through the language server, and the web editor through 'L4.API.l4Check',
 -- which has no language server under it.
 module L4.Parser.AnnotationWarning
-  ( annotationWarningMessage
+  ( annotationWarningCode
+  , annotationWarningMessage
   , annotationWarningSpan
   ) where
 
@@ -19,6 +20,22 @@ import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
 import qualified L4.Print as Print
 import L4.Syntax
+
+-- | The stable diagnostic code of an annotation warning. See
+-- 'L4.TypeCheck.Types.checkErrorCode' for what a code promises. No wildcard, so
+-- that a new warning has to be given a code.
+annotationWarningCode :: Warning -> Text
+annotationWarningCode = \ case
+  NotAttached {}     -> "lint/annotation-not-attached"
+  UnknownLocation {} -> "lint/annotation-without-location"
+  EmptyNlg {}        -> "lint/empty-nlg"
+  Ambiguous {}       -> "lint/ambiguous-nlg"
+  LangOverridden {}  -> "lint/lang-overridden"
+  LoneLangTag {}     -> "lint/lone-lang-tag"
+  SpacedSlot {}      -> "lint/spaced-nlg-slot"
+  RefUnattached {}   -> "lint/ref-not-attached"
+  RefTrailing {}     -> "lint/ref-after-code"
+  RefNoLocation {}   -> "lint/annotation-without-location"
 
 annotationWarningMessage :: Warning -> Text
 annotationWarningMessage = \ case

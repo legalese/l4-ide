@@ -6,7 +6,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 15:8-15:26
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/unreachable-clause
   Message:
     This clause of `shadowed clauses` is never used, and neither is the clause after it.
     The clause above it matches every input, so `shadowed clauses` never gets this far.
@@ -17,7 +17,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 15:32-15:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The type of this definition must match its type signature at pattern-matching-clause-type-errors.l4:12:8-16, namely
 
@@ -32,7 +32,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 16:32-16:47
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -47,7 +47,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 22:33-22:39
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The type of this definition must match its type signature at pattern-matching-clause-type-errors.l4:20:8-16, namely
 
@@ -62,7 +62,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 29:24-29:28
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first input of `wrong pattern` is declared to be of type
 
@@ -77,7 +77,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 33:38-33:42
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     From looking at the context, I have inferred that the first input of `wrong pattern without given` is of type
 
@@ -92,7 +92,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 42:29-42:36
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     From looking at the context, I have inferred that the type of this definition must be
 
@@ -107,7 +107,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 48:27-48:31
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     From looking at the context, I have inferred that the first input of `odd last pattern` is of type
 
@@ -122,7 +122,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 58:29-58:59
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -137,7 +137,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 64:27-64:51
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -152,7 +152,7 @@ File: pattern-matching-clause-type-errors.l4
   Range: 65:8-65:19
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/unreachable-clause
   Message:
     This clause of `refs dead` is never used.
     The clause above it matches every input, so `refs dead` never gets this far.

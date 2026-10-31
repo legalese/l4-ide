@@ -5,7 +5,7 @@ File: parse-error1.l4
   Range: 12:1-12:1
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-GIVEN
   Message:
        |
     12 | GIVEN n IS A NUMBER

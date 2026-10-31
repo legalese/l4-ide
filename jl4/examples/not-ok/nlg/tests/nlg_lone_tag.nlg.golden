@@ -5,7 +5,7 @@ File: nlg_lone_tag.l4
   Range: 8:21-8:65
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/lone-lang-tag
   Message:
     `@nlg:the` tags the wording on `over limit` as language `the`, but it is `over limit`'s only wording, and nothing else in the module makes `the` a language: no `@lang the` line declares it, and nothing has a wording in it beside one in another language.
     A tag tells apart wordings of one rule in different languages. If `the` is the first word of the sentence, write `@nlg the …` with no colon. If the wording is in `the`, add `@lang the`, or give `over limit` a wording in another language too.

@@ -778,6 +778,47 @@ spec bin = do
   -- command line, and the verdict looked only at the named file's typecheck. A
   -- self-import is the exception: there the error lands on the entry file, so
   -- it already failed, which makes it the positive control for the rest.
+  describe "a file on a ring of imports is refused, not run with the import left out" $ do
+    let rule imports = unlines $
+          map ("IMPORT " <>) imports <>
+          [ ""
+          , "@export Doubles a number"
+          , "GIVEN x IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE doubled x IS x TIMES 2"
+          ]
+        withProject act = withSystemTempDirectory "l4-import-ring" \dir -> do
+          writeFile (dir </> "left.l4") (rule ["right"])
+          writeFile (dir </> "right.l4") "IMPORT left\n\nDECIDE `the rate` IS 2\n"
+          writeFile (dir </> "solo.l4") (rule ["solo"])
+          writeFile (dir </> "plain.l4") (rule [])
+          writeFile (dir </> "inputs.json") "[{\"x\": 1}]"
+          act dir
+        schemaGenerator =
+          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+
+    it "the same rule with no ring goes through both, which is what the rest refuses" $
+      withProject \dir -> do
+        Output batchCode _ _ <- runL4 bin ["batch", dir </> "plain.l4", "--inputs", dir </> "inputs.json"]
+        batchCode `shouldBe` ExitSuccess
+        schema <- schemaGenerator
+        Output schemaCode _ _ <- runL4 schema [dir </> "plain.l4"]
+        schemaCode `shouldBe` ExitSuccess
+
+    forM_ [("a ring of imports", "left.l4"), ("a self-import", "solo.l4")] \(what, file) -> do
+      it ("l4 batch refuses " <> what) $
+        withProject \dir -> do
+          Output code sout _ <- runL4 bin ["batch", dir </> file, "--inputs", dir </> "inputs.json"]
+          code `shouldBe` ExitFailure 1
+          sout `shouldSatisfy` ("type checking failed" `isInfixOf`)
+
+      it ("jl4-schema refuses " <> what) $
+        withProject \dir -> do
+          schema <- schemaGenerator
+          Output code _ serr <- runL4 schema [dir </> file]
+          code `shouldBe` ExitFailure 1
+          serr `shouldSatisfy` ("Failed to parse or typecheck" `isInfixOf`)
+
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
       it ("fails " <> cmd <> " on a 3-module import ring") $

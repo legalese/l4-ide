@@ -48,6 +48,7 @@ module LSP.Core.Shake(
     defineNoFile,
     getDiagnostics,
     getHiddenDiagnostics,
+    getFileDiagnostics,
     IsIdeGlobal, addIdeGlobal, addIdeGlobalExtras, getIdeGlobalState, getIdeGlobalAction,
     getIdeGlobalExtras,
     getIdeOptions,
@@ -119,6 +120,8 @@ import qualified Data.Vector as Vector
 import Development.IDE.Graph hiding (ShakeValue, action)
 import qualified Development.IDE.Graph as Graph
 import Development.IDE.Graph.Database (ShakeDatabase, shakeGetBuildStep, shakeGetDatabaseKeys, shakeNewDatabase, shakeProfileDatabase, shakeRunDatabaseForKeys)
+import Development.IDE.Graph.Internal.Database (incDatabase)
+import Development.IDE.Graph.Internal.Types (ShakeDatabase (..))
 import Development.IDE.Graph.Rule
 import qualified Focus
 import GHC.Stack (HasCallStack)
@@ -247,6 +250,10 @@ data ShakeExtras = ShakeExtras
       -- ^ Registry of global state used by rules.
       -- Small and immutable after startup, so not worth using an STM.Map.
     ,state :: Values
+    ,sessionGeneration :: TVar Int
+    -- ^ Odd from the start of a restart until the next session opens, and even
+    -- otherwise, which includes a one-shot run that has no session at all. See
+    -- 'stillInSession'.
     ,diagnostics :: STMDiagnosticStore
     ,hiddenDiagnostics :: STMDiagnosticStore
     ,publishedDiagnostics :: STM.Map NormalizedUri [FileDiagnostic]
@@ -697,6 +704,7 @@ shakeOpen recorder lspSink mClientCapabilities debouncer
     shakeExtras <- do
         globals <- newTVarIO HMap.empty
         state <- STM.newIO
+        sessionGeneration <- newTVarIO 0
         diagnostics <- STM.newIO
         hiddenDiagnostics <- STM.newIO
         publishedDiagnostics <- STM.newIO
@@ -827,11 +835,24 @@ shakeRestart recorder IdeState{..} vfs reason acts ioActionBetweenShakeSession =
         withMVar'
             shakeSession
             (\runner -> do
+                -- From here on nothing of this session may be stored, see 'stillInSession'.
+                atomically $ modifyTVar' (sessionGeneration shakeExtras) closedGeneration
                 (stopTime,()) <- duration $ logErrorAfter 10 $ cancelShakeSession runner
                 keys <- ioActionBetweenShakeSession
                 -- it is every important to update the dirty keys after we enter the critical section
                 -- see Note [Housekeeping rule cache and dirty key outside of hls-graph]
                 atomically $ modifyTVar' (dirtyKeys shakeExtras) $ \x -> foldl' (flip insertKeySet) x keys
+                -- Mark what changed before anything can read the new VFS, not
+                -- when the next session runs: a rule that outlived this session
+                -- would otherwise take old results for current ones in the new
+                -- one ('stillInSession'). Nothing can be stored until that opens.
+                IdeOptions{optRunSubset} <- getIdeOptionsIO shakeExtras
+                changed <-
+                    if optRunSubset
+                      then Just . toListKeySet <$> readTVarIO (dirtyKeys shakeExtras)
+                      else return Nothing
+                case shakeDb of
+                  ShakeDatabase _ _ db -> incDatabase db changed
                 res <- shakeDatabaseProfile shakeDb
                 backlog <- readTVarIO $ dirtyKeys shakeExtras
                 queue <- atomicallyNamed "actionQueue - peek" $ peekInProgress $ actionQueue shakeExtras
@@ -883,19 +904,17 @@ newSession
     -> ShakeDatabase
     -> [DelayedActionInternal]
     -> IO ShakeSession
-newSession recorder extras@ShakeExtras{..} vfsMod shakeDb acts = do
+newSession recorder ShakeExtras{..} vfsMod shakeDb acts = do
+
+    reenqueued <- atomicallyNamed "actionQueue - peek" $ peekInProgress actionQueue
 
     -- Take a new VFS snapshot
-    case vfsMod of
-      VFSUnmodified   -> pure ()
-      VFSModified vfs -> atomically $ writeTVar vfsVar vfs
+    atomically $ do
+      modifyTVar' sessionGeneration openGeneration
+      case vfsMod of
+        VFSUnmodified   -> pure ()
+        VFSModified vfs -> writeTVar vfsVar vfs
 
-    IdeOptions{optRunSubset} <- getIdeOptionsIO extras
-    reenqueued <- atomicallyNamed "actionQueue - peek" $ peekInProgress actionQueue
-    allPendingKeys <-
-        if optRunSubset
-          then Just <$> readTVarIO dirtyKeys
-          else return Nothing
     let
         -- A daemon-like action used to inject additional work
         -- Runs actions from the work queue sequentially
@@ -916,7 +935,9 @@ newSession recorder extras@ShakeExtras{..} vfsMod shakeDb acts = do
         workRun restore = do
           let keysActs = pumpActionThread : map run (reenqueued ++ acts)
           res <- try @SomeException $
-            restore $ shakeRunDatabaseForKeys (fmap toListKeySet allPendingKeys) shakeDb keysActs
+            -- 'shakeRestart' has marked what changed. No keys here: this only
+            -- moves the build step on.
+            restore $ shakeRunDatabaseForKeys (Just []) shakeDb keysActs
           return $ do
               -- Filter out AsyncCancelled - it's expected behavior when builds are cancelled,
               -- not an error worth logging (especially with GHC 9.10+ verbose backtraces)
@@ -967,6 +988,23 @@ getDiagnostics IdeState{shakeExtras = ShakeExtras{diagnostics}} = do
 getHiddenDiagnostics :: IdeState -> STM [FileDiagnostic]
 getHiddenDiagnostics IdeState{shakeExtras = ShakeExtras{hiddenDiagnostics}} = do
     getAllDiagnostics hiddenDiagnostics
+
+-- | The diagnostics stored for one file, every source together and in the order
+-- they are published, with the document version they were computed for
+-- ('Nothing' for a file that is not open, or when none are stored).
+--
+-- The two are read together because the store holds them together: writing
+-- diagnostics of a new version replaces those of the old one
+-- ('updateSTMDiagnostics'). So the store never claims a newer version than the
+-- diagnostics it holds, although it may hold only some of them while rules for
+-- that version are still running. Read it from an 'Action' that has waited for
+-- those rules: a later session cannot start while the action runs, so nothing
+-- of a newer version can be written before the read.
+getFileDiagnostics :: ShakeExtras -> NormalizedUri -> STM (Maybe Int32, [FileDiagnostic])
+getFileDiagnostics ShakeExtras{diagnostics} uri =
+    maybe (Nothing, []) versioned <$> STM.lookup uri diagnostics
+  where
+    versioned item@(StoreItem' ver _) = (ver, getDiagnosticsFromStore item)
 
 -- | Find and release old keys from the state Hashmap
 --   For the record, there are other state sources that this process does not release:
@@ -1072,9 +1110,9 @@ defineWithCallStack recorder op =
               , _message = "Your module depends on itself:"
               , _relatedInformation = Nothing
               , _data_ = Nothing
-              , _codeDescription = Nothing
+              , _codeDescription = diagnosticCodeDescription "import/self-dependency"
               , _tags = Nothing
-              , _code = Nothing
+              , _code = diagnosticCode "import/self-dependency"
               }
           , fdFilePath = v
           , fdShouldShowDiagnostic = ShowDiag
@@ -1095,9 +1133,9 @@ defineWithCallStack recorder op =
                         : map ((.getUri) . fromNormalizedUri) (reverse $ v : cs)
                     , _relatedInformation = Nothing
                     , _data_ = Nothing
-                    , _codeDescription = Nothing
+                    , _codeDescription = diagnosticCodeDescription "import/cycle"
                     , _tags = Nothing
-                    , _code = Nothing
+                    , _code = diagnosticCode "import/cycle"
                     }
                 , fdFilePath = v
                 , fdShouldShowDiagnostic = ShowDiag
@@ -1264,11 +1302,11 @@ defineEarlyCutoff
     -> Rules ()
 defineEarlyCutoff recorder (Rule op) = addRule $ \(Q (key, file)) (old :: Maybe BS.ByteString) mode -> do
     extras <- getShakeExtras
-    let diagnostics ver diags = do
-            updateFileDiagnostics recorder file ver (newKey key) extras diags
+    let diagnostics stillIn ver diags = do
+            updateFileDiagnostics recorder stillIn file ver (newKey key) extras diags
     defineEarlyCutoff' diagnostics (==) key file old mode $ const $ op key file
 defineEarlyCutoff recorder (RuleNoDiagnostics op) = addRule $ \(Q (key, file)) (old :: Maybe BS.ByteString) mode -> do
-    let diagnostics _ver diags = do
+    let diagnostics _stillIn _ver diags = do
             mapM_ (logWith recorder Warning . LogDefineEarlyCutoffRuleNoDiagHasDiag) diags
     defineEarlyCutoff' diagnostics (==) key file old mode $ const $ second (mempty,) <$> op key file
 
@@ -1279,7 +1317,8 @@ defineNoFile recorder f = defineNoDiagnostics recorder $ \k file -> do
 
 defineEarlyCutoff'
     :: forall k v. IdeRule k v
-    => (Maybe Int32 -> [FileDiagnostic] -> Action ()) -- ^ update diagnostics
+    => (STM () -> Maybe Int32 -> [FileDiagnostic] -> Action ())
+    -- ^ update diagnostics, if the given check passes in the same transaction
     -- | compare current and previous for freshness
     -> (BS.ByteString -> BS.ByteString -> Bool)
     -> k
@@ -1289,9 +1328,11 @@ defineEarlyCutoff'
     -> (Value v -> Action (Maybe BS.ByteString, IdeResult v))
     -> Action (RunResult (A (RuleResult k)))
 defineEarlyCutoff' doDiagnostics cmp key file mbOld mode action = do
-    ShakeExtras{state, progress, dirtyKeys} <- getShakeExtras
+    ShakeExtras{state, progress, dirtyKeys, sessionGeneration} <- getShakeExtras
     options <- getIdeOptions
+    startedIn <- liftIO $ readTVarIO sessionGeneration
     let trans g x =  withRunInIO $ \run -> g (run x)
+        stillIn = stillInSession sessionGeneration startedIn
     (if optSkipProgress options key then id else trans (inProgress progress file)) $ do
         val <- case mbOld of
             Just old | mode == RunDependenciesSame -> do
@@ -1299,10 +1340,15 @@ defineEarlyCutoff' doDiagnostics cmp key file mbOld mode action = do
                 case mbValue of
                     -- No changes in the dependencies and we have
                     -- an existing successful result.
-                    Just (v@(Succeeded _ x), diags) -> do
+                    Just (v@(Succeeded builtFor x), diags) -> do
                         ver <- estimateFileVersionUnsafely key (Just x) file
-                        doDiagnostics (vfsVersion =<< ver) $ Vector.toList diags
-                        return $ Just $ RunResult ChangedNothing old (A v) $ return ()
+                        -- A rule that outlived its session can get here in the
+                        -- next one, on a verdict from the last ('stillInSession').
+                        if ver /= builtFor
+                          then return Nothing
+                          else do
+                            doDiagnostics stillIn (vfsVersion =<< ver) $ Vector.toList diags
+                            return $ Just $ RunResult ChangedNothing old (A v) stillIn
                     _ -> return Nothing
             _ ->
                 -- assert that a "clean" rule is never a cache miss
@@ -1319,14 +1365,14 @@ defineEarlyCutoff' doDiagnostics cmp key file mbOld mode action = do
                 (mbBs, (diags, mbRes)) <- actionCatch
                     (do v <- action staleV; liftIO $ evaluate $ force v) $
                     \(e :: SomeException) -> do
-                        pure (Nothing, ([ideErrorText file (T.pack (show e)) | not $ isBadDependency e],Nothing))
+                        pure (Nothing, ([ideErrorText "internal/rule-exception" file (T.pack (show e)) | not $ isBadDependency e],Nothing))
 
                 ver <- estimateFileVersionUnsafely key mbRes file
                 (bs, res) <- case mbRes of
                     Nothing -> do
                         pure (toShakeValue ShakeStale mbBs, staleV)
                     Just v -> pure (maybe ShakeNoCutoff ShakeResult mbBs, Succeeded ver v)
-                doDiagnostics (vfsVersion =<< ver) diags
+                doDiagnostics stillIn (vfsVersion =<< ver) diags
                 let eq = case (bs, fmap decodeShakeValue mbOld) of
                         (ShakeResult a, Just (ShakeResult b)) -> cmp a b
                         (ShakeStale a, Just (ShakeStale b))   -> cmp a b
@@ -1339,6 +1385,7 @@ defineEarlyCutoff' doDiagnostics cmp key file mbOld mode action = do
                     (A res) $ do
                         -- this hook needs to be run in the same transaction as the key is marked clean
                         -- see Note [Housekeeping rule cache and dirty key outside of hls-graph]
+                        stillIn
                         setValues state key file res (Vector.fromList diags)
                         modifyTVar' dirtyKeys (deleteKeySet $ toKey key file)
   where
@@ -1362,6 +1409,39 @@ defineEarlyCutoff' doDiagnostics cmp key file mbOld mode action = do
         --  * creating a dependency: If everything depends on GetModificationTime, we lose early cutoff
         --  * creating bogus "file does not exists" diagnostics
         | otherwise = useWithoutDependency (GetModificationTime_ False) fp
+
+-- | Abandon a rule that outlived the session it started in.
+--
+-- Cancelling a session does not always stop every rule in it: under load, a rule
+-- can still be running when the next session starts, though nothing waits for it
+-- any more. What it computed is from the old document, but hls-graph would store
+-- it as built in the new session, so it counts as up to date, and the version it
+-- reports its diagnostics under is the new one. So after a burst of edits the
+-- server could report the diagnostics of an old version as those of the last
+-- one, until the next edit. Such a rule could also take its key off 'dirtyKeys',
+-- and leave the new session with the version of the old one. The key stays
+-- unfinished, so that the session computes it again.
+--
+-- 'sessionGeneration' moves twice in a restart: first of all, so that nothing of
+-- the session is stored from then on, and with the new VFS, when the next session
+-- opens. Nothing is stored in between: a rule that starts then has a mix of the
+-- two sessions to read.
+--
+-- Run this in the transaction that does the writing, both for the diagnostics
+-- and for the result. Checked before a separate write, a rule could be held up
+-- between the two and overwrite what the new session wrote, and since a write of
+-- another version replaces everything stored for the file, nothing would put it
+-- right.
+stillInSession :: TVar Int -> Int -> STM ()
+stillInSession generation startedIn = do
+    current <- readTVar generation
+    when (current /= startedIn || odd current) $ throwSTM AsyncCancelled
+
+-- | The next value of 'sessionGeneration' when a restart starts, and when a
+-- session opens. The first session opens with no restart before it.
+closedGeneration, openGeneration :: Int -> Int
+closedGeneration generation = if odd generation then generation + 2 else generation + 1
+openGeneration generation = if odd generation then generation + 1 else generation + 2
 
 -- Note [Housekeeping rule cache and dirty key outside of hls-graph]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1391,13 +1471,14 @@ defineEarlyCutoff' doDiagnostics cmp key file mbOld mode action = do
 
 updateFileDiagnostics :: MonadIO m
   => Recorder (WithPriority Log)
+  -> STM () -- ^ run in the transaction that writes, and may abort it
   -> NormalizedUri
   -> Maybe Int32
   -> Key
   -> ShakeExtras
   -> [FileDiagnostic] -- ^ current results
   -> m ()
-updateFileDiagnostics recorder uri ver k ShakeExtras{diagnostics, hiddenDiagnostics, publishedDiagnostics, debouncer, ideTesting, lspSink} current0 = do
+updateFileDiagnostics recorder mayWrite uri ver k ShakeExtras{diagnostics, hiddenDiagnostics, publishedDiagnostics, debouncer, ideTesting, lspSink} current0 = do
   liftIO $ do
     let (currentShown, currentHidden) = partition ((== ShowDiag) . fdShouldShowDiagnostic) current
         update :: [FileDiagnostic] -> STMDiagnosticStore -> STM [FileDiagnostic]
@@ -1408,8 +1489,10 @@ updateFileDiagnostics recorder uri ver k ShakeExtras{diagnostics, hiddenDiagnost
         -- published. Otherwise, we might never publish certain diagnostics if
         -- an exception strikes between modifyVar but before
         -- publishDiagnosticsNotification.
-        newDiags <- liftIO $ atomicallyNamed "diagnostics - update" $ update currentShown diagnostics
-        _ <- liftIO $ atomicallyNamed "diagnostics - hidden" $ update currentHidden hiddenDiagnostics
+        newDiags <- liftIO $ atomicallyNamed "diagnostics - update" $ do
+            mayWrite
+            _ <- update currentHidden hiddenDiagnostics
+            update currentShown diagnostics
         let delay = if null newDiags then 0.1 else 0
         registerEvent debouncer delay uri $ do
             join $ mask_ $ do

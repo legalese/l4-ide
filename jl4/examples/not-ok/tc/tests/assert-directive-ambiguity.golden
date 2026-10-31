@@ -6,7 +6,7 @@ File: assert-directive-ambiguity.l4
   Range: 12:9-12:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

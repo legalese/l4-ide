@@ -181,8 +181,10 @@ evaluatedOnce = describe "a module reached by more than one import path, when th
 
 cyclesAndMissingModules :: Spec
 cyclesAndMissingModules = describe "what the change leaves as it was" $ do
-  -- The engine stops an import cycle before any module in it is checked, and
-  -- publishes a StackException on one of the files in the ring.
+  -- No rule follows an import into a ring, so the engine never sees one: the
+  -- error is on the IMPORT, in words, and names the files of the ring. Before
+  -- that the engine stopped the ring and published a StackException on one of
+  -- its files, or, with two threads in the ring at once, hung.
   forM_
     [ ("a file that imports itself", "self", [("selfie", "IMPORT selfie\n\n" <> fun "f" "x")], "selfie")
     , ( "two files that import each other"
@@ -204,9 +206,10 @@ cyclesAndMissingModules = describe "what the change leaves as it was" $ do
       [ d
         | d <- diags
         , d.fdLspDiagnostic._severity == Just DiagnosticSeverity_Error
-        , "StackException" `T.isInfixOf` d.fdLspDiagnostic._message
+        , any (`T.isInfixOf` d.fdLspDiagnostic._message) ["ring of imports", "cannot import itself"]
         ]
         `shouldSatisfy` (not . null)
+      length [d | d <- diags, "StackException" `T.isInfixOf` d.fdLspDiagnostic._message] `shouldBe` 0
 
   it "reports an IMPORT that names no module as a missing module, not as a cycle" $ do
     -- GetImports gives an IMPORT that resolves to nothing the importing file's

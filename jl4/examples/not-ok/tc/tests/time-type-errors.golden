@@ -6,7 +6,7 @@ File: time-type-errors.l4
   Range: 4:36-4:42
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of function 
 
@@ -25,7 +25,7 @@ File: time-type-errors.l4
   Range: 7:32-7:36
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of function 
 
@@ -44,7 +44,7 @@ File: time-type-errors.l4
   Range: 10:36-10:38
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of function 
 

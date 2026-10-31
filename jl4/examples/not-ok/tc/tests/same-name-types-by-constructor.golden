@@ -6,7 +6,7 @@ File: same-name-types-by-constructor.l4
   Range: 26:33-26:38
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     From looking at the context, I have inferred that the type of this definition must be
 
@@ -21,7 +21,7 @@ File: same-name-types-by-constructor.l4
   Range: 30:9-30:14
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     From looking at the context, I have inferred that the first input of `score` is of type
 
