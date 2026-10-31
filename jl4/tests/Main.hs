@@ -24,7 +24,7 @@ import qualified L4.Nlg as Nlg
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.Parser (PError (..), execProgramParserWithHintPass, execProgramParserWithHintPassUnmemoised)
 import qualified L4.Parser.SrcSpan as JL4
-import L4.Print (mixfixCanonicalByUnique, prettyLayout, restoreMixfixPatterns)
+import L4.Print (prettyLayout, restoreMixfixPatterns)
 import L4.Syntax
 import qualified L4.TypeCheck as JL4
 
@@ -572,7 +572,7 @@ jl4NlgAnnotationsGolden memo evalConfig isOk dir inputFile = do
           -- a heralded call in a directive can name a rule an imported module
           -- defines, and its sentence is read from there.
           let deps = map (.module') (Rules.transitiveDependencies checkResult)
-          in Text.unlines $ Nlg.linearizeDirectives Nothing (mixfixCanonicalByUnique checkResult.mixfixRegistry) checkResult.module' deps
+          in Text.unlines $ Nlg.linearizeDirectives Nothing checkResult.module' deps
   -- Strip ANSI codes and normalize whitespace for cross-platform consistency
   let output = normalizeWhitespace $ stripAnsiCodes $
         if isOk

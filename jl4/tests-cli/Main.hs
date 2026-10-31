@@ -505,9 +505,10 @@ nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
 -- A herald belongs to the definition a call resolved to. The main module reuses
 -- the names of definitions that carry heralds, in the library next to it and in
 -- the prelude, for definitions of its own.
-nlgOwnerMain, nlgOwnerLib :: FilePath
-nlgOwnerMain = fixtureDir </> "nlg-owner-main.l4"
-nlgOwnerLib  = fixtureDir </> "nlg-owner-lib.l4"
+nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
+nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
+nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
+nlgOwnerOverload = fixtureDir </> "nlg-owner-overload.l4"
 
 -- The example the syntax reference links for this: one mixfix function with a
 -- herald, and a rule that calls it. The test that reads it pins the page's
@@ -647,7 +648,7 @@ coreFixtures =
   , nlgHeadPlacementSource, placementReadme
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
-  , nlgOwnerMain, nlgOwnerLib
+  , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
   , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
@@ -3671,18 +3672,75 @@ spec bin = do
   -- same name read the herald of another one: a record, a rule of the drafter's
   -- own beside an imported one, a library function reused for something else.
   describe "a herald belongs to the definition the call resolved to" $ do
-    let renderedRows fixture needle = do
+    let -- The rows of `l4 render` whose heading starts with one of these words.
+        renderedRows fixture needles = do
           Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
           code `shouldBe` ExitSuccess
-          pure [ dropWhile (not . isAlpha) l
+          pure [ row
                | l <- map (filter (/= '\r')) (lines sout)
-               , needle `isInfixOf` l ]
+               , let row = dropWhile (not . isAlpha) l
+               , any (`isPrefixOf` row) needles ]
+        nlgRows fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
 
     it "reads a WITH body that builds a record as a record, not as a call to a rule named like it" $ do
-      rows <- renderedRows nlgOwnerMain "Own "
+      rows <- renderedRows nlgOwnerMain ["Own origin shift", "Own band around"]
       rows `shouldBe`
         [ "Own origin shift is a Pt with:"
         , "Own band around is a range with:"
+        ]
+
+    -- The drafter's own `LESS`, `is in` and `sum` have no herald. The prelude's
+    -- do, on sets and lists; a call to the drafter's reads as an unheralded call.
+    it "gives a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- renderedRows nlgOwnerMain ["Own net price", "Own working age", "Own total"]
+      rows `shouldBe`
+        [ "Own net price means price LESS 20."
+        , "Own working age holds if age is in 65."
+        , "Own total means sum with total."
+        ]
+
+    it "gives a #EVAL of a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- nlgRows nlgOwnerMain
+      take 3 rows `shouldBe`
+        [ "`_ LESS _` with 100 and 20"
+        , "`_ is in _` with 5 and 10"
+        , "`sum` with 5"
+        ]
+
+    -- Same pattern, same name, different types, each with a herald: the call
+    -- reads the one it resolved to, from this module or from the library.
+    it "reads the herald of the overload a call resolved to, one in this module and one imported" $ do
+      rows <- renderedRows nlgOwnerMain ["Own first name", "Own cap", "Own first word", "Own floor"]
+      rows `shouldBe`
+        [ "Own first name means whichever of s and m comes first in the alphabet."
+        , "Own cap means the smaller of n and 100."
+        , "Own first word means whichever of s and m comes first in the alphabet, written plainly."
+        , "Own floor means the smaller number of n and 100."
+        ]
+
+    it "reads the herald of the overload a #EVAL resolved to, one in this module and one imported" $ do
+      rows <- nlgRows nlgOwnerMain
+      drop 3 rows `shouldBe`
+        [ "whichever of x and y comes first in the alphabet"
+        , "the smaller of 3 and 4"
+        , "whichever of x and y comes first in the alphabet, written plainly"
+        , "the smaller number of 3 and 4"
+        ]
+
+    -- The same, for two overloads of one mixfix pattern in a single module.
+    it "reads the herald of the overload a call resolved to, both written in one module" $ do
+      nlg <- nlgRows nlgOwnerOverload
+      nlg `shouldBe`
+        [ "the smaller number of 3 and 4"
+        , "whichever of x and y comes first in the alphabet"
+        ]
+      ren <- renderedRows nlgOwnerOverload ["Own cap", "Own first name"]
+      ren `shouldBe`
+        [ "Own cap means the smaller number of n and 100."
+        , "Own first name means whichever of s and m comes first in the alphabet."
         ]
 
   -- The verifier footing. Every negative control asserts the finding KIND, not

@@ -76,13 +76,6 @@ data ExportConfig = MkExportConfig
     -- function's 'Unique'. Name resolution discards the mixfix pattern, so
     -- these are derived from the typechecker's 'MixfixRegistry' (via
     -- 'mixfixHeadingsFromRegistry') and threaded in by the caller.
-  , mixfixCanonical    :: !(Map.Map Unique RawName)
-    -- ^ The canonical pattern (@the lower of _ and _@) of each mixfix
-    -- function's head, keyed by 'Unique'
-    -- ('L4.Print.mixfixCanonicalByUnique' of the typechecker's
-    -- 'MixfixRegistry'). A mixfix call resolves to the pattern while its
-    -- definition keeps only the first keyword, so without this a call is not
-    -- found by its @\@nlg@ sentence. Empty finds only prefix and @OF@ calls.
   }
   deriving stock (Show, Generic)
 
@@ -92,7 +85,6 @@ defaultExportConfig = MkExportConfig
   , moduleDispositions = Map.empty
   , unitDispositions   = Map.empty
   , mixfixHeadings     = Map.empty
-  , mixfixCanonical    = Map.empty
   }
 
 -- ----------------------------------------------------------------------------
@@ -246,22 +238,15 @@ extractUnits (MkModule _ _ section) = goSection section
 
 -- | All renderable units across the open module and its dependencies, with
 -- mixfix headings fixed up and @\@nlg@ calls expanded.
-allUnits :: Map.Map Unique Text -> Map.Map Unique RawName -> Module Resolved -> [Module Resolved] -> [Unit]
-allUnits headings canonical mainModule deps =
+allUnits :: Map.Map Unique Text -> Module Resolved -> [Module Resolved] -> [Unit]
+allUnits headings mainModule deps =
   let mods  = mainModule : deps
-      info  = nlgFnInfo canonical mods
+      info  = nlgFnInfo mods
       ctors = recordCtorFields mods
-      rules = Set.map fst (Map.keysSet info)
       -- Told apart from a record's constructor by what the head resolved to, not
       -- by its name: a record can be named like a rule that has a herald.
-      calls = Set.fromList
-        [ getUnique name
-        | m <- mods
-        , d@(MkDecide _ _ appForm _) <- foldTopLevelDecides (: []) m
-        , Just _ <- [decideNlg d]
-        , name <- appFormHeads appForm
-        ]
-  in map (\u -> (substNlgInUnit info . mapUnitBody (plainSelectors rules) . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u) { uCalls = calls })
+      calls = Map.keysSet info
+  in map (\u -> (substNlgInUnit info . mapUnitBody (plainSelectors calls) . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u) { uCalls = calls })
        (extractUnits mainModule <> concatMap extractUnits deps)
 
 -- | Apply a transform to a unit's DECIDE body (a no-op for other units).
@@ -279,12 +264,11 @@ mapUnitBody f u = case u.uDecl of
 -- ('L4.Nlg.prepareModules'), and that gives the name a herald, so the selector
 -- would otherwise print it. One written above the head already did.
 --
--- Matched by name, not by 'Unique': a selector whose text is the name of any rule
--- with a herald is cleared, so a record field that shares such a name loses its
--- own gloss too. Any other field keeps its gloss.
-plainSelectors :: Set.Set Text -> Expr Resolved -> Expr Resolved
+-- Matched by the 'Unique' the selector resolved to: a field that shares a rule's
+-- name keeps its own gloss.
+plainSelectors :: Set.Set Unique -> Expr Resolved -> Expr Resolved
 plainSelectors rules = transformOf (gplate @(Expr Resolved)) $ \case
-  Proj ann e sel | resolvedText sel `Set.member` rules -> Proj ann e (plainName sel)
+  Proj ann e sel | getUnique sel `Set.member` rules -> Proj ann e (plainName sel)
   e -> e
 
 -- | The field-name references of each record, keyed by record name, so a
@@ -484,7 +468,7 @@ buildDocument cfg mainModule0 deps0 =
   deps       = map stripSectionBinderElaborations deps0
   (title, bodySection) = documentTitleAndBody mainModule
   mainUri = moduleUri' mainModule
-  units   = allUnits cfg.mixfixHeadings cfg.mixfixCanonical mainModule deps
+  units   = allUnits cfg.mixfixHeadings mainModule deps
   graph   = buildGraph mainUri units
   reach   = reachableUnits graph
   ranks   = rankByBlockId graph
@@ -1503,7 +1487,7 @@ buildPlan cfg mainModule0 deps0 =
   mainModule = stripSectionBinderElaborations mainModule0
   deps       = map stripSectionBinderElaborations deps0
   mainUri = moduleUri' mainModule
-  units   = allUnits cfg.mixfixHeadings cfg.mixfixCanonical mainModule deps
+  units   = allUnits cfg.mixfixHeadings mainModule deps
   graph   = buildGraph mainUri units
   reach   = reachableUnits graph
   indexed = Map.toList graph.ugUnits

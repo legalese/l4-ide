@@ -17,3 +17,72 @@ GIVETH A Pt
 GIVEN n IS A NUMBER
 GIVETH A range
 `own band around` n MEANS range WITH low IS n, high IS 100
+
+-- Definitions of the drafter's own with NO herald, named like the prelude's
+-- heralded ones: the set operators `LESS` and `is in`, and the list function
+-- `sum`. A call reads as an unheralded call does, never as the prelude's sentence.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+a `LESS` b MEANS a MINUS b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A BOOLEAN
+a `is in` b MEANS a AT MOST b
+
+GIVEN c IS A NUMBER
+GIVETH A NUMBER
+`sum` c MEANS c
+
+#EVAL 100 `LESS` 20
+#EVAL 5 `is in` 10
+#EVAL `sum` 5
+
+GIVEN price IS A NUMBER
+GIVETH A NUMBER
+`own net price` price MEANS price `LESS` 20
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+`own working age` age MEANS age `is in` 65
+
+GIVEN total IS A NUMBER
+GIVETH A NUMBER
+`own total` total MEANS `sum` total
+
+-- Definitions of the same pattern and the same name as the library's, on STRINGs
+-- and with heralds of their own. A call reads the herald of the one it resolved
+-- to: this module's for strings, the library's for numbers.
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A STRING
+@nlg whichever of %a% and %b% comes first in the alphabet
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A STRING
+@nlg whichever of %a% and %b% comes first in the alphabet, written plainly
+`lower` a b MEANS IF a AT MOST b THEN a ELSE b
+
+#EVAL `the lower of` "x" `and` "y"
+#EVAL `the lower of` 3 `and` 4
+#EVAL `lower` "x" "y"
+#EVAL `lower` 3 4
+
+GIVEN s IS A STRING
+GIVETH A STRING
+`own first name` s MEANS `the lower of` s `and` "m"
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`own cap` n MEANS `the lower of` n `and` 100
+
+GIVEN s IS A STRING
+GIVETH A STRING
+`own first word` s MEANS `lower` s "m"
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`own floor` n MEANS `lower` n 100
