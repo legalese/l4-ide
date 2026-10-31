@@ -146,7 +146,7 @@ The same "multiple definitions" message appears with `__PLUS__` and other operat
 
 ### `@export` with a function-typed input
 
-A rule marked `@export` cannot take a function as an input, because a function cannot be sent as JSON. The error is "Function type inputs are not supported for @export". See [ASSUME and `@export`](../../reference/types/ASSUME.md#function-typed-inputs-are-not-supported-for-export).
+A rule marked `@export` cannot take a function as an input yet, because a function cannot be sent as JSON. The error says that the input is a function and that @export does not support that yet. See [ASSUME and `@export`](../../reference/types/ASSUME.md#function-typed-inputs-are-not-supported-yet-for-export).
 
 ---
 

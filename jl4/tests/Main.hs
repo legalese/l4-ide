@@ -374,9 +374,13 @@ checkFile evalConfig isOk file = do
       _        <- lift   $ Shake.addVirtualFileFromFS nfp
       _        <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
       checked  <- MaybeT $ Shake.use SuccessfulTypeCheck uri <* liftIO (Text.putStrLn "Typechecking successful")
+      -- The export check is a rule of its own, not part of the typecheck, so a
+      -- refused @export does not fail the typecheck above (see L4.Export).
+      exports  <- MaybeT $ Shake.use ExportCheck uri
       results' <- MaybeT $ Shake.use EvaluateLazy uri
       when (not (null results')) $ liftIO $ Text.putStrLn "Evaluation successful"
       let msgs  =    map typeErrorToMessage checked.infos
+                  <> map exportErrorToMessage exports
                   <> map evalLazyDirectiveResultToMessage results'
           formatted = foldMap (sanitizeFilePaths . renderMessage) $ sortOn fst msgs
       liftIO $ Text.putStr formatted
@@ -387,6 +391,18 @@ checkFile evalConfig isOk file = do
 
  where
   typeErrorToMessage err = (JL4.rangeOf err, JL4.prettyCheckErrorWithContext err)
+  -- The first line says which kind of problem it is, as the editor's
+  -- diagnostic source ("export") does.
+  exportErrorToMessage err =
+    ( Export.exportErrorRange err
+    , case Export.prettyExportError err of
+        l : ls -> (label <> l) : ls
+        [] -> []
+    )
+   where
+    label = case Export.exportErrorSeverity err of
+      JL4.SError -> "[export error] "
+      _ -> "[export warning] "
   evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _) =
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt

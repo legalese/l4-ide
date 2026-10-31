@@ -68,6 +68,7 @@ import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
 import qualified L4.Export as Export
+import qualified L4.Export.Shape as Shape
 import qualified L4.Export.Document as ExportDoc
 import qualified L4.Export.Render as ExportRender
 import qualified L4.FunctionSchema as FSchema
@@ -822,10 +823,13 @@ handlers evalConfig recorder =
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
 
+            -- ExportCheck is run here too, so that its diagnostics are among
+            -- the ones read below whether or not the editor has kicked it yet.
             (mTcResult, closure, cycles) <- liftIO $ runAction "l4/getExportedFunctions" _ide $
               (,,) <$> use TypeCheck nuri
                    <*> BlockingErrors.importClosure nuri
                    <*> BlockingErrors.importCycles nuri
+                   <* use ExportCheck nuri
             -- Read after the action: the rules it ran have published their
             -- diagnostics for every file in the closure by now.
             diags <- liftIO $ atomically $ getDiagnostics _ide
@@ -892,11 +896,18 @@ handlers evalConfig recorder =
                     uniqueTcs = snd (flatten Set.empty tcResult)
                     allDeclares =
                       foldMap (FSchema.declaresFromModule . (.module')) uniqueTcs
+                    -- An @export that cannot be published ("L4.Export".'Export.checkExports',
+                    -- the same check as the editor's diagnostics with the source
+                    -- "export") is left out of the list.
+                    shapeDeclares = foldMap (Shape.moduleDeclares . (.module')) uniqueTcs
                     summaries =
                       concatMap
-                        (\tc -> map (Inspector.exportedFunctionToSummary allDeclares)
-                                  ( Export.enrichReturnTypes tc.entityInfo
-                                  $ Export.getExportedFunctions tc.module' ))
+                        (\tc ->
+                          let exportErrs = Export.checkExports (Shape.shapeEnvFromDeclares shapeDeclares tc.entityInfo) tc.module'
+                          in map (Inspector.exportedFunctionToSummary allDeclares)
+                               ( Export.withoutRefused exportErrs
+                               $ Export.enrichReturnTypes tc.entityInfo
+                               $ Export.getExportedFunctions tc.module' ))
                         uniqueTcs
                     -- importUris excludes the root module (head of uniqueTcs).
                     importUris =

@@ -15,7 +15,14 @@ module L4.Export (
   extractAssumeParamResolveds,
   extractImplicitAssumeParams,
   hasTypeInferenceVars,
-  validateExportInputs,
+  checkExports,
+  ExportError (..),
+  ExportSite (..),
+  exportErrorRange,
+  exportErrorFunction,
+  exportErrorSeverity,
+  withoutRefused,
+  prettyExportError,
   isExportedDecide,
 ) where
 
@@ -33,8 +40,9 @@ import qualified Data.Set as Set
 import L4.Annotation (getAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
-import L4.TypeCheck.Environment (eventUnique, maybeUnique)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
+import L4.TypeCheck.Environment (maybeUnique)
+import L4.Export.Shape (ShapeEnv (..), Unsendable, jsonShape, unsendableHint, unsendableWhat)
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), EntityInfo, Severity (..))
 import Optics
 
 type TypeDescMap = Map.Map Unique Text
@@ -270,30 +278,10 @@ collectTypeSynonyms (MkModule _ _ section) =
 -- @\@export@ cannot accept any such parameter because functions can't be
 -- passed over JSON regardless of their wrapper.
 isFunctionTypeExpanded :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Bool
-isFunctionTypeExpanded = typeContains \case
-  Fun {} -> True
-  _      -> False
-
--- | Check if a type /contains/ the EVENT type anywhere, the same way:
--- expanding type synonyms and recursing into the arguments of a
--- parameterised type (@LIST OF EVENT …@). A type of the user's own that is
--- called EVENT is a different type and does not count. The fields of a
--- record type are not looked into.
-mentionsEvent :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Bool
-mentionsEvent = typeContains \case
-  TyApp _ name _ -> getUnique name == eventUnique
-  _              -> False
-
--- | Does any part of a type satisfy the predicate? The walk is shared by
--- 'isFunctionTypeExpanded' and 'mentionsEvent'.
-typeContains
-  :: (Type' Resolved -> Bool)
-  -> Map.Map Unique (Type' Resolved)
-  -> Type' Resolved
-  -> Bool
-typeContains p synonyms = go Set.empty
+isFunctionTypeExpanded synonyms = go Set.empty
  where
-  go visited ty = p ty || case ty of
+  go visited ty = case ty of
+    Fun {} -> True
     Forall _ _ inner -> go visited inner
     TyApp _ name args ->
       let u = getUnique name
@@ -435,21 +423,86 @@ extractImplicitAssumeParams errors =
     isFunctionType Fun{} = True
     isFunctionType _ = False
 
--- | Validate that no @export-decorated DECIDE has a function-typed input —
--- either a GIVEN parameter, or a module-level ASSUME the body calls.
--- Function-typed inputs can't be evaluated end-to-end: GIVENs can't be
--- passed over JSON, and function-typed ASSUMEs stay 'ValAssumed' at
--- runtime, causing a stuck "assumed term" error when the body invokes them.
+-- | Where in an exported rule a type that cannot cross the boundary was found.
+data ExportSite
+  = -- | An input: a GIVEN, or an ASSUME the body reads.
+    ExportInput Resolved
+  | ExportResult
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | A problem with an @\@export@, found by 'checkExports'. These are not type
+-- errors: the file still type-checks, so its @#EVAL@s still run.
+data ExportError
+  = -- | The range of the @\@export@, the exported rule, where, and why that type
+    -- has no JSON form (see "L4.Export.Shape").
+    ExportUnsendable (Maybe SrcRange) Resolved ExportSite Unsendable
+  | -- | A GIVEN of an exported rule with no written type: the range of the
+    -- @\@export@, the rule, and the input.
+    ExportUntypedGiven (Maybe SrcRange) Resolved Resolved
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+exportErrorRange :: ExportError -> Maybe SrcRange
+exportErrorRange = \case
+  ExportUnsendable r _ _ _ -> r
+  ExportUntypedGiven r _ _ -> r
+
+-- | The exported rule the error is about.
+exportErrorFunction :: ExportError -> Resolved
+exportErrorFunction = \case
+  ExportUnsendable _ f _ _ -> f
+  ExportUntypedGiven _ f _ -> f
+
+-- | A missing type is a warning for now; anything else that cannot be sent is
+-- an error.
+exportErrorSeverity :: ExportError -> Severity
+exportErrorSeverity = \case
+  ExportUnsendable{} -> SError
+  ExportUntypedGiven{} -> SWarn
+
+prettyExportError :: ExportError -> [Text]
+prettyExportError = \case
+  ExportUnsendable _ fn site why ->
+    [ quoted fn <> " is published with @export, but its " <> siteText site <> " is " <> unsendableWhat why <> ", and @export does not support that yet."
+    , unsendableHint why
+    ]
+  ExportUntypedGiven _ fn input ->
+    [ quoted fn <> " is published with @export, but its input " <> quoted input <> " has no written type."
+    , "Write one in the GIVEN, so that the schema says what to send."
+    ]
+ where
+  quoted r = "`" <> resolvedToText r <> "`"
+  siteText = \case
+    ExportInput n -> "input " <> quoted n
+    ExportResult -> "result"
+
+-- | Check every @\@export@ of a module against what can cross the boundary:
+-- each of its inputs (a GIVEN, or an ASSUME of the module that the body reads)
+-- and its result must have a JSON form ('jsonShape'). A function, an EVENT, a
+-- DEONTIC (a contract rule), a type variable and a type with no shape yet do
+-- not, so an @\@export@ of a rule with one is refused, at the @\@export@. A
+-- GIVEN with no written type is a warning.
 --
--- It also refuses an EVENT among the inputs or as the result: no request can
--- supply one, and the schema would publish it as a bare @object@. The type
--- checker's entity info supplies the result of a definition that has no
--- GIVETH.
-validateExportInputs :: EntityInfo -> Module Resolved -> [CheckErrorWithContext]
-validateExportInputs entInfo mod' =
-  let synonyms = collectTypeSynonyms mod'
-      assumes  = allAssumesFromModule mod'
-  in concatMap (checkOneExport entInfo synonyms assumes) (collectExportedDecides mod')
+-- This is its own pass, not a part of type checking: the errors of a type check
+-- stop the file from evaluating, and a refused @\@export@ is no reason to stop
+-- evaluating the contract rules in the same file. The result of a definition
+-- with no GIVETH comes from the entity info of the 'ShapeEnv', which must have
+-- the final substitution applied.
+checkExports :: ShapeEnv -> Module Resolved -> [ExportError]
+checkExports env mod' =
+  concatMap (checkOneExport env assumes) (collectExportedDecides mod')
+ where
+  assumes = allAssumesFromModule mod'
+
+-- | The exported rules that 'checkExports' does not refuse (a warning does not
+-- refuse): the ones that can be published.
+withoutRefused :: [ExportError] -> [ExportedFunction] -> [ExportedFunction]
+withoutRefused errs = filter \ef ->
+  let MkDecide _ _ (MkAppForm _ name _ _) _ = ef.exportDecide
+  in getUnique name `Set.notMember` refused
+ where
+  refused = Set.fromList [getUnique (exportErrorFunction e) | e <- errs, exportErrorSeverity e == SError]
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]
@@ -470,8 +523,8 @@ isExportedDecide decide =
     Just desc -> (parseDescText (getDesc desc)).flags.isExport
     Nothing   -> False
 
--- | Like 'assumesFromModule' but WITHOUT the function-type filter —
--- so the validator sees every ASSUME and can flag function-typed ones.
+-- | Like 'assumesFromModule' but WITHOUT the function-type filter, so that
+-- 'checkExports' sees every ASSUME.
 allAssumesFromModule :: Module Resolved -> Map.Map Unique (Assume Resolved)
 allAssumesFromModule (MkModule _ _ section) =
   Map.fromList (collectSection section)
@@ -484,78 +537,26 @@ allAssumesFromModule (MkModule _ _ section) =
     _ -> []
 
 checkOneExport
-  :: EntityInfo
-  -> Map.Map Unique (Type' Resolved)
+  :: ShapeEnv
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
-  -> [CheckErrorWithContext]
-checkOneExport entInfo synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
-  checkGivenFunctionInputs synonyms fnName tySig
-  ++ checkAssumeFunctionInputs synonyms assumes fnName decide
-  ++ checkEventTypes entInfo synonyms assumes decide
-
-checkGivenFunctionInputs
-  :: Map.Map Unique (Type' Resolved)
-  -> Resolved
-  -> TypeSig Resolved
-  -> [CheckErrorWithContext]
-checkGivenFunctionInputs synonyms fnName (MkTypeSig _ (MkGivenSig _ names) _) =
-  [ mkExportFunErr fnName paramName
-  | MkOptionallyTypedName _ paramName (Just ty) <- names
-  , isFunctionTypeExpanded synonyms ty
-  ]
-
-checkAssumeFunctionInputs
-  :: Map.Map Unique (Type' Resolved)
-  -> Map.Map Unique (Assume Resolved)
-  -> Resolved
-  -> Decide Resolved
-  -> [CheckErrorWithContext]
-checkAssumeFunctionInputs synonyms assumes fnName (MkDecide _ _ _ body) =
-  let referencedUniques = collectReferencedUniques body
-  in [ mkExportFunErr fnName paramName
-     | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
-     , Set.member uniq referencedUniques
-     , isFunctionTypeExpanded synonyms ty
-     ]
-
--- | An EVENT among the inputs (a GIVEN, or an ASSUME the body reads) or as the
--- result, one error each, at the @\@export@.
-checkEventTypes
-  :: EntityInfo
-  -> Map.Map Unique (Type' Resolved)
-  -> Map.Map Unique (Assume Resolved)
-  -> Decide Resolved
-  -> [CheckErrorWithContext]
-checkEventTypes entInfo synonyms assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) body) =
-  [ mkExportEventErr exportAt fnName (Just paramName)
-  | MkOptionallyTypedName _ paramName (Just ty) <- names
-  , mentionsEvent synonyms ty
-  ]
-  ++
-  [ mkExportEventErr exportAt fnName (Just paramName)
-  | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
-  , Set.member uniq (collectReferencedUniques body)
-  , mentionsEvent synonyms ty
-  ]
-  ++
-  [ mkExportEventErr exportAt fnName Nothing
-  | Just ty <- [extractReturnType tySig <|> inferredReturnType entInfo fnName]
-  , mentionsEvent synonyms ty
-  ]
+  -> [ExportError]
+checkOneExport env assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) body) =
+  concat
+    [ case mty of
+        Nothing -> [ExportUntypedGiven exportAt fnName paramName]
+        Just ty -> unsendable (ExportInput paramName) ty
+    | MkOptionallyTypedName _ paramName mty <- names
+    ]
+  ++ concat
+    [ unsendable (ExportInput paramName) ty
+    | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
+    , Set.member uniq (collectReferencedUniques body)
+    ]
+  ++ concat
+    [ unsendable ExportResult ty
+    | Just ty <- [extractReturnType tySig <|> inferredReturnType env.entities fnName]
+    ]
  where
   exportAt = getAnno decide ^. annDesc >>= rangeOf
-
-mkExportEventErr :: Maybe SrcRange -> Resolved -> Maybe Resolved -> CheckErrorWithContext
-mkExportEventErr exportAt fnName paramName =
-  MkCheckErrorWithContext
-    { kind    = ExportEventType exportAt fnName paramName
-    , context = WhileCheckingDecide (getActual fnName) None
-    }
-
-mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
-mkExportFunErr fnName paramName =
-  MkCheckErrorWithContext
-    { kind    = ExportFunctionTypeInput fnName paramName
-    , context = WhileCheckingDecide (getActual fnName) None
-    }
+  unsendable site ty = either (\why -> [ExportUnsendable exportAt fnName site why]) (const []) (jsonShape env ty)

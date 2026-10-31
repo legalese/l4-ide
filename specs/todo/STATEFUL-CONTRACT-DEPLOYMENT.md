@@ -2,6 +2,12 @@
 
 Architecture spec for turning jl4-service from a stateless DEONTIC calculator into a stateful contract execution platform with auto-deployed projection APIs, webhooks, and live wall-clock semantics.
 
+**Status (2026-10-30): proposed, not landed.**
+A reviewer asked (legalese/l4-ide#738, 2026-10-29, section 5) that exports of contract rules be specified for stream infrastructure, and Meng ruled on 2026-10-30 that the export boundary be built first.
+That change is the draft pull request from `carve/export-boundary` (not landed): it refuses an `@export` on a rule that returns a `DEONTIC`, with the words "not supported yet", while the rule still evaluates in the editor; see `specs/as-built/export-boundary.md` on that branch.
+Meng's note of the same day, which this spec is the place to answer: the refusal may be revisited when there is a better way of answering "here's a view of the residual, shortened to immediate next actions — immediate obligations on parties and deadlines, plus your MAY options, and your SHANT prohibitions".
+The sentence below that an `@export`ed function returning `DEONTIC` "is automatically a stateful contract" describes the design this spec proposes, not the behaviour of that change.
+
 **Audience:** an implementer with a working understanding of L4 (the `DEONTIC` type, `MUST`/`MAY`/`SHANT`, `WITHIN`, `HENCE`/`LEST`, the residual obligation model) and standard backend concepts (HTTP APIs, Postgres, webhooks).
 
 **Background reading:** [doc/concepts/legal-modeling/regulative-rules.md](../../doc/concepts/legal-modeling/regulative-rules.md) for the conceptual model. The mental model section is the load-bearing prerequisite.

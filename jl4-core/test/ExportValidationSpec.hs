@@ -7,40 +7,42 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
-import L4.Export (ExportedFunction(..), getExportedFunctions, enrichReturnTypes)
+import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, getExportedFunctions, enrichReturnTypes)
+import L4.Export.Shape (JsonField (..), JsonShape (..), Unsendable (..), jsonShape, moduleDeclares, shapeEnvFromDeclares, unsendableWhat)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
 import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (getActual, nameToText)
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), Severity(..))
+import L4.TypeCheck.Types (Severity(..))
 
--- | Run typecheck on a source snippet and return the list of
--- 'ExportFunctionTypeInput' errors that fired (or 'Left' on fatal failure).
-exportFnErrors :: Text -> Either [Text] [CheckErrorWithContext]
-exportFnErrors source =
+-- | The problems 'checkExports' finds in a snippet (or 'Left' on fatal failure).
+exportProblems :: Text -> Either [Text] [ExportError]
+exportProblems source =
   case checkWithImports emptyVFS source of
     Left errs -> Left errs
-    Right r -> Right
-      [ e
-      | e@MkCheckErrorWithContext{kind = ExportFunctionTypeInput _ _} <- r.tcdErrors
-      ]
+    Right r -> Right (checkExports (shapeEnvFromDeclares (moduleDeclares r.tcdModule) r.tcdEntityInfo) r.tcdModule)
 
--- | Run typecheck on a source snippet and return the 'ExportEventType'
--- errors that fired, each as the line of the @\@export@ it is reported at,
--- the exported function and the input (Nothing: the result).
-exportEventErrors :: Text -> Either [Text] [(Maybe Int, Text, Maybe Text)]
-exportEventErrors source =
-  case checkWithImports emptyVFS source of
-    Left errs -> Left errs
-    Right r -> Right
-      [ (fmap (\rg -> rg.start.line) range, nameToText (getActual fn), nameToText . getActual <$> param)
-      | MkCheckErrorWithContext{kind = ExportEventType range fn param} <- r.tcdErrors
-      ]
+-- | One problem as the line of the @\@export@ it is reported at, the exported
+-- rule, the input (Nothing: the result), and what is wrong. A missing type is
+-- "no written type".
+type Problem = (Maybe Int, Text, Maybe Text, Text)
 
--- | The messages of every error (not warning) a snippet gives. The tests that
--- expect no 'ExportEventType' read this too, so that a snippet that does not
--- check cannot pass them by giving no export errors at all.
+problems :: Text -> Either [Text] [Problem]
+problems = fmap (map summarise) . exportProblems
+ where
+  summarise = \case
+    ExportUnsendable range fn site why ->
+      (line range, nameToText (getActual fn), siteName site, unsendableWhat why)
+    ExportUntypedGiven range fn input ->
+      (line range, nameToText (getActual fn), Just (nameToText (getActual input)), "no written type")
+  line = fmap (\rg -> rg.start.line)
+  siteName = \case
+    ExportInput n -> Just (nameToText (getActual n))
+    ExportResult -> Nothing
+
+-- | The messages of every error (not warning) the type check gives a snippet.
+-- A refused @\@export@ is not one of them: the file still type-checks.
 errorMessages :: Text -> Either [Text] [Text]
 errorMessages source =
   case checkWithImports emptyVFS source of
@@ -51,16 +53,18 @@ errorMessages source =
       , severity e == SError
       ]
 
--- | A snippet gives exactly one error, and its message holds both lines
--- (the checker adds a line naming the definition around them).
-expectOneError :: Text -> Text -> Text -> Expectation
-expectOneError source firstLine secondLine =
-  case errorMessages source of
-    Left errs -> expectationFailure $ "Fatal: " ++ show errs
-    Right [msg] -> do
-      msg `shouldSatisfy` Text.isInfixOf firstLine
-      msg `shouldSatisfy` Text.isInfixOf secondLine
-    Right msgs -> expectationFailure $ "Expected one error, got " ++ show msgs
+-- | The shape of each exported input of a snippet (or 'Left' on fatal failure).
+inputShapes :: Text -> Either [Text] [(Text, Either Unsendable JsonShape)]
+inputShapes source =
+  case checkWithImports emptyVFS source of
+    Left errs -> Left errs
+    Right r ->
+      let env = shapeEnvFromDeclares (moduleDeclares r.tcdModule) r.tcdEntityInfo
+      in Right
+        [ (p.paramName, maybe (Left (UUnknownType "no type")) (jsonShape env) p.paramType)
+        | ef <- getExportedFunctions r.tcdModule
+        , p <- ef.exportParams
+        ]
 
 -- | Run typecheck on a source snippet and return the exported function
 -- names (or 'Left' on fatal failure).
@@ -122,19 +126,25 @@ spec = do
             ]
       exportedNames src `shouldBe` Right []
 
-  describe "validateExportInputs" $ do
-    it "rejects @export with a function-typed GIVEN parameter" $ do
+  describe "checkExports" $ do
+    let types =
+          [ "DECLARE Party IS ONE OF alice, bob"
+          , "DECLARE Act IS ONE OF ping, pong"
+          , ""
+          ]
+        noTypeError src = errorMessages src `shouldBe` Right []
+
+    it "refuses a function-typed GIVEN, at the @export" $ do
       let src = Text.unlines
             [ "@export Apply the predicate"
             , "GIVEN `p` IS A FUNCTION FROM BOOLEAN TO BOOLEAN"
             , "GIVETH A BOOLEAN"
             , "DECIDE `fn_given_test` IF `p` OF TRUE"
             ]
-      case exportFnErrors src of
-        Left errs -> fail $ "Fatal: " ++ show errs
-        Right fns -> length fns `shouldBe` 1
+      problems src `shouldBe` Right [(Just 1, "fn_given_test", Just "p", "a function")]
+      noTypeError src
 
-    it "rejects @export that references a function-typed ASSUME" $ do
+    it "refuses an ASSUME of function type that the body reads" $ do
       let src = Text.unlines
             [ "ASSUME `pred` IS A FUNCTION FROM BOOLEAN TO BOOLEAN"
             , ""
@@ -142,11 +152,10 @@ spec = do
             , "GIVETH A BOOLEAN"
             , "DECIDE `fn_assume_test` IF `pred` OF TRUE"
             ]
-      case exportFnErrors src of
-        Left errs -> fail $ "Fatal: " ++ show errs
-        Right fns -> length fns `shouldBe` 1
+      problems src `shouldBe` Right [(Just 3, "fn_assume_test", Just "pred", "a function")]
+      noTypeError src
 
-    it "accepts @export with only value-typed inputs" $ do
+    it "accepts value-typed inputs" $ do
       let src = Text.unlines
             [ "ASSUME `age` IS A NUMBER"
             , ""
@@ -154,11 +163,9 @@ spec = do
             , "GIVETH A BOOLEAN"
             , "DECIDE `adult` IF `age` >= 18"
             ]
-      case exportFnErrors src of
-        Left errs -> fail $ "Fatal: " ++ show errs
-        Right fns -> fns `shouldBe` []
+      problems src `shouldBe` Right []
 
-    it "ignores function-typed ASSUMEs that aren't referenced by any export" $ do
+    it "ignores a function-typed ASSUME that no export reads" $ do
       let src = Text.unlines
             [ "ASSUME `unused_fn` IS A FUNCTION FROM BOOLEAN TO BOOLEAN"
             , "ASSUME `age` IS A NUMBER"
@@ -167,21 +174,17 @@ spec = do
             , "GIVETH A BOOLEAN"
             , "DECIDE `check_age` IF `age` >= 18"
             ]
-      case exportFnErrors src of
-        Left errs -> fail $ "Fatal: " ++ show errs
-        Right fns -> fns `shouldBe` []
+      problems src `shouldBe` Right []
 
-    it "ignores function-typed GIVENs on non-@export DECIDEs" $ do
+    it "ignores function-typed GIVENs on a rule that is not @export" $ do
       let src = Text.unlines
             [ "GIVEN `p` IS A FUNCTION FROM BOOLEAN TO BOOLEAN"
             , "GIVETH A BOOLEAN"
             , "DECIDE `internal_helper` IF `p` OF TRUE"
             ]
-      case exportFnErrors src of
-        Left errs -> fail $ "Fatal: " ++ show errs
-        Right fns -> fns `shouldBe` []
+      problems src `shouldBe` Right []
 
-    it "rejects MAYBE-wrapped function-typed GIVEN" $ do
+    it "refuses a function inside MAYBE OF" $ do
       let src = Text.unlines
             [ "IMPORT prelude"
             , ""
@@ -190,11 +193,9 @@ spec = do
             , "GIVETH A BOOLEAN"
             , "DECIDE `fn_maybe_test` IF TRUE"
             ]
-      case exportFnErrors src of
-        Left errs -> fail $ "Fatal: " ++ show errs
-        Right fns -> length fns `shouldBe` 1
+      problems src `shouldBe` Right [(Just 3, "fn_maybe_test", Just "cb", "a function")]
 
-    it "rejects function-typed input via type synonym" $ do
+    it "refuses a function named through a type synonym" $ do
       let src = Text.unlines
             [ "DECLARE `Pred` IS A FUNCTION FROM BOOLEAN TO BOOLEAN"
             , ""
@@ -203,150 +204,229 @@ spec = do
             , "GIVETH A BOOLEAN"
             , "DECIDE `fn_syn_test` IF `p` OF TRUE"
             ]
-      case exportFnErrors src of
-        Left errs -> fail $ "Fatal: " ++ show errs
-        Right fns -> length fns `shouldBe` 1
+      problems src `shouldBe` Right [(Just 3, "fn_syn_test", Just "p", "a function")]
 
-  -- An EVENT cannot be supplied by a request and would be published as a bare
-  -- object, so @export refuses it: as an input (a GIVEN, or an ASSUME the body
-  -- reads), as the result, or inside LIST OF / MAYBE OF / a type synonym.
-  describe "an EVENT in an @export" $ do
-    let types =
-          [ "DECLARE Party IS ONE OF alice, bob"
-          , "DECLARE Act IS ONE OF ping, pong"
-          , ""
+    describe "EVENT" $ do
+      it "refuses an EVENT input, at the @export" $ do
+        let src = Text.unlines $ types ++
+              [ "@export Who acted"
+              , "GIVEN e IS AN EVENT Party Act"
+              , "GIVETH A Party"
+              , "`who acted` MEANS"
+              , "  CONSIDER e"
+              , "  WHEN EVENT p a n THEN p"
+              ]
+        problems src `shouldBe` Right [(Just 4, "who acted", Just "e", "an EVENT")]
+        noTypeError src
+
+      it "refuses an EVENT result that is written" $ do
+        let src = Text.unlines $ types ++
+              [ "@export Make an event"
+              , "GIVEN p IS A Party"
+              , "GIVETH AN EVENT Party Act"
+              , "`make event` MEANS EVENT p ping 0"
+              ]
+        problems src `shouldBe` Right [(Just 4, "make event", Nothing, "an EVENT")]
+        noTypeError src
+
+      it "refuses an EVENT result that is inferred" $ do
+        let src = Text.unlines $ types ++
+              [ "@export Make an event"
+              , "GIVEN p IS A Party"
+              , "`make event` MEANS EVENT p ping 0"
+              ]
+        problems src `shouldBe` Right [(Just 4, "make event", Nothing, "an EVENT")]
+
+      it "refuses an EVENT in a LIST OF, a MAYBE OF, or behind a synonym, or an ASSUME that the body reads" $ do
+        let listed = Text.unlines $ types ++
+              [ "@export How many"
+              , "GIVEN es IS A LIST OF EVENT Party Act"
+              , "GIVETH A NUMBER"
+              , "`how many` MEANS 0"
+              ]
+            maybed = Text.unlines $ types ++
+              [ "IMPORT prelude"
+              , ""
+              , "@export Maybe time"
+              , "GIVEN m IS A MAYBE OF EVENT Party Act"
+              , "GIVETH A NUMBER"
+              , "`maybe time` MEANS 0"
+              ]
+            synonym = Text.unlines $ types ++
+              [ "DECLARE Occurrence IS AN EVENT Party Act"
+              , ""
+              , "@export Who acted"
+              , "GIVEN e IS AN Occurrence"
+              , "GIVETH A NUMBER"
+              , "`who acted` MEANS 0"
+              ]
+            assumed = Text.unlines $ types ++
+              [ "ASSUME e IS AN EVENT Party Act"
+              , ""
+              , "@export Who acted"
+              , "GIVETH A Party"
+              , "`who acted` MEANS"
+              , "  CONSIDER e"
+              , "  WHEN EVENT p a n THEN p"
+              ]
+        problems listed `shouldBe` Right [(Just 4, "how many", Just "es", "an EVENT")]
+        problems maybed `shouldBe` Right [(Just 6, "maybe time", Just "m", "an EVENT")]
+        problems synonym `shouldBe` Right [(Just 6, "who acted", Just "e", "an EVENT")]
+        problems assumed `shouldBe` Right [(Just 6, "who acted", Just "e", "an EVENT")]
+
+      it "accepts an EVENT that the body builds or reads but the signature does not name" $ do
+        let src = Text.unlines $ types ++
+              [ "@export Who acted first"
+              , "GIVEN p IS A Party"
+              , "GIVETH A Party"
+              , "`who acted first` MEANS"
+              , "  CONSIDER EVENT p ping 0"
+              , "  WHEN EVENT q a n THEN q"
+              ]
+        noTypeError src
+        problems src `shouldBe` Right []
+
+      it "accepts an EVENT in a definition that is not @export" $ do
+        let src = Text.unlines $ types ++
+              [ "GIVEN e IS AN EVENT Party Act"
+              , "GIVETH A Party"
+              , "`who acted` MEANS"
+              , "  CONSIDER e"
+              , "  WHEN EVENT p a n THEN p"
+              ]
+        noTypeError src
+        problems src `shouldBe` Right []
+
+      it "accepts a type of the user's own called EVENT" $ do
+        let src = Text.unlines
+              [ "DECLARE EVENT HAS who IS A STRING"
+              , ""
+              , "@export Who"
+              , "GIVEN e IS AN EVENT"
+              , "GIVETH A STRING"
+              , "speaker MEANS e's who"
+              ]
+        noTypeError src
+        problems src `shouldBe` Right []
+
+    describe "DEONTIC" $ do
+      -- Meng, 2026-10-30: contract rules are not exported for now, and the
+      -- editor still evaluates them. The refusal is meant to be revisited.
+      it "refuses a result that is a DEONTIC, and the file still type-checks" $ do
+        let src = Text.unlines $ types ++
+              [ "@export Duty"
+              , "GIVETH A DEONTIC Party Act"
+              , "`duty` MEANS PARTY alice MUST ping WITHIN 3"
+              , ""
+              , "#EVAL `duty`"
+              ]
+        problems src `shouldBe` Right [(Just 4, "duty", Nothing, "a DEONTIC, a contract rule")]
+        noTypeError src
+
+      it "refuses a DEONTIC input" $ do
+        let src = Text.unlines $ types ++
+              [ "@export Is it breached"
+              , "GIVEN d IS A DEONTIC Party Act"
+              , "GIVETH A BOOLEAN"
+              , "`is breached` MEANS TRUE"
+              ]
+        problems src `shouldBe` Right [(Just 4, "is breached", Just "d", "a DEONTIC, a contract rule")]
+
+    describe "which types have a shape" $ do
+      it "accepts a record, an enumeration, a LIST OF, a MAYBE OF and a DATE" $ do
+        let src = Text.unlines $ types ++
+              [ "DECLARE Bill HAS"
+              , "  amount IS A NUMBER"
+              , "  due IS A DATE"
+              , "  payer IS A Party"
+              , "  notes IS A LIST OF STRING"
+              , "  ref IS A MAYBE STRING"
+              , ""
+              , "@export Owed"
+              , "GIVEN b IS A Bill"
+              , "GIVETH A BOOLEAN"
+              , "owed MEANS b's amount > 0"
+              ]
+        problems src `shouldBe` Right []
+        inputShapes src `shouldBe` Right
+          [ ( "b"
+            , Right $ JRecord "Bill"
+                [ JsonField "amount" JNumber True
+                , JsonField "due" JDate True
+                , JsonField "payer" (JEnum "Party" ["alice", "bob"]) True
+                , JsonField "notes" (JArray JString) True
+                , JsonField "ref" (JOptional JString) False
+                ]
+            )
           ]
 
-    it "refuses an EVENT input, at the @export" $ do
-      let src = Text.unlines $ types ++
-            [ "@export Who acted"
-            , "GIVEN e IS AN EVENT Party Act"
-            , "GIVETH A Party"
-            , "`who acted` MEANS"
-            , "  CONSIDER e"
-            , "  WHEN EVENT p a n THEN p"
-            ]
-      exportEventErrors src `shouldBe` Right [(Just 4, "who acted", Just "e")]
-      expectOneError src
-        "`who acted` is published with @export, but its input `e` has a type that is or contains an EVENT."
-        "@export does not support an EVENT as an input yet"
+      it "accepts a record that contains itself, and stops there" $ do
+        let src = Text.unlines
+              [ "DECLARE Tree HAS"
+              , "  label IS A STRING"
+              , "  kids IS A LIST OF Tree"
+              , ""
+              , "@export Label"
+              , "GIVEN t IS A Tree"
+              , "GIVETH A STRING"
+              , "label MEANS t's label"
+              ]
+        problems src `shouldBe` Right []
+        inputShapes src `shouldBe` Right
+          [ ("t", Right (JRecord "Tree" [JsonField "label" JString True, JsonField "kids" (JArray (JRecursive "Tree")) True])) ]
 
-    it "refuses an EVENT result that is written" $ do
-      let src = Text.unlines $ types ++
-            [ "@export Make an event"
-            , "GIVEN p IS A Party"
-            , "GIVETH AN EVENT Party Act"
-            , "`make event` MEANS EVENT p ping 0"
-            ]
-      exportEventErrors src `shouldBe` Right [(Just 4, "make event", Nothing)]
-      expectOneError src
-        "`make event` is published with @export, but its result has a type that is or contains an EVENT."
-        "@export does not support an EVENT as a result yet"
+      it "refuses a record with a function among its fields, and says which" $ do
+        let src = Text.unlines
+              [ "DECLARE Rule HAS"
+              , "  name IS A STRING"
+              , "  test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+              , ""
+              , "@export Name"
+              , "GIVEN r IS A Rule"
+              , "GIVETH A STRING"
+              , "name MEANS r's name"
+              ]
+        problems src `shouldBe` Right [(Just 5, "name", Just "r", "of a record type Rule whose field test is a function")]
 
-    it "refuses an EVENT result that is inferred" $ do
-      let src = Text.unlines $ types ++
-            [ "@export Make an event"
-            , "GIVEN p IS A Party"
-            , "`make event` MEANS EVENT p ping 0"
-            ]
-      exportEventErrors src `shouldBe` Right [(Just 4, "make event", Nothing)]
-      expectOneError src
-        "`make event` is published with @export, but its result has a type that is or contains an EVENT."
-        "@export does not support an EVENT as a result yet"
+      it "accepts an enumeration whose constructors have fields, as published until now" $ do
+        let src = Text.unlines
+              [ "DECLARE Action IS ONE OF"
+              , "  delivery"
+              , "  payment HAS amount IS A NUMBER"
+              , ""
+              , "@export Is it a payment"
+              , "GIVEN a IS AN Action"
+              , "GIVETH A BOOLEAN"
+              , "`is it a payment` MEANS TRUE"
+              ]
+        problems src `shouldBe` Right []
 
-    it "refuses an EVENT that sits in a LIST OF" $ do
-      let src = Text.unlines $ types ++
-            [ "@export How many"
-            , "GIVEN es IS A LIST OF EVENT Party Act"
-            , "GIVETH A NUMBER"
-            , "`how many` MEANS 0"
-            ]
-      exportEventErrors src `shouldBe` Right [(Just 4, "how many", Just "es")]
+      it "accepts an EITHER whose two sides have shapes, as published until now" $ do
+        let src = Text.unlines
+              [ "@export Pick"
+              , "GIVEN e IS AN EITHER STRING NUMBER"
+              , "GIVETH AN EITHER STRING NUMBER"
+              , "pick MEANS e"
+              ]
+        problems src `shouldBe` Right []
 
-    it "refuses an EVENT that sits in a MAYBE OF" $ do
-      let src = Text.unlines $ types ++
-            [ "IMPORT prelude"
-            , ""
-            , "@export Maybe time"
-            , "GIVEN m IS A MAYBE OF EVENT Party Act"
-            , "GIVETH A NUMBER"
-            , "`maybe time` MEANS 0"
-            ]
-      exportEventErrors src `shouldBe` Right [(Just 6, "maybe time", Just "m")]
+      it "refuses an EITHER with a function on one side" $ do
+        let src = Text.unlines
+              [ "@export Pick"
+              , "GIVEN e IS AN EITHER STRING (FUNCTION FROM NUMBER TO NUMBER)"
+              , "GIVETH A BOOLEAN"
+              , "pick MEANS TRUE"
+              ]
+        problems src `shouldBe` Right [(Just 1, "pick", Just "e", "a function")]
 
-    it "refuses an EVENT named through a type synonym" $ do
-      let src = Text.unlines $ types ++
-            [ "DECLARE Occurrence IS AN EVENT Party Act"
-            , ""
-            , "@export Who acted"
-            , "GIVEN e IS AN Occurrence"
-            , "GIVETH A NUMBER"
-            , "`who acted` MEANS 0"
-            ]
-      exportEventErrors src `shouldBe` Right [(Just 6, "who acted", Just "e")]
-
-    it "refuses an ASSUME of an EVENT that the body reads" $ do
-      let src = Text.unlines $ types ++
-            [ "ASSUME e IS AN EVENT Party Act"
-            , ""
-            , "@export Who acted"
-            , "GIVETH A Party"
-            , "`who acted` MEANS"
-            , "  CONSIDER e"
-            , "  WHEN EVENT p a n THEN p"
-            ]
-      exportEventErrors src `shouldBe` Right [(Just 6, "who acted", Just "e")]
-
-    it "accepts an EVENT that the body builds or reads but the signature does not name" $ do
-      let src = Text.unlines $ types ++
-            [ "@export Who acted first"
-            , "GIVEN p IS A Party"
-            , "GIVETH A Party"
-            , "`who acted first` MEANS"
-            , "  CONSIDER EVENT p ping 0"
-            , "  WHEN EVENT q a n THEN q"
-            ]
-      errorMessages src `shouldBe` Right []
-      exportEventErrors src `shouldBe` Right []
-
-    -- Known limit: the fields of a record are not looked into, so a record
-    -- that holds an EVENT is published. Pinned so that a change is noticed.
-    it "does not look into the fields of a record" $ do
-      let src = Text.unlines $ types ++
-            [ "DECLARE Log HAS last IS AN EVENT Party Act"
-            , ""
-            , "@export Last time"
-            , "GIVEN l IS A Log"
-            , "GIVETH A NUMBER"
-            , "`last time` MEANS"
-            , "  CONSIDER l's last"
-            , "  WHEN EVENT p a n THEN n"
-            ]
-      errorMessages src `shouldBe` Right []
-      exportEventErrors src `shouldBe` Right []
-
-    it "accepts an EVENT in a definition that is not @export" $ do
-      let src = Text.unlines $ types ++
-            [ "GIVEN e IS AN EVENT Party Act"
-            , "GIVETH A Party"
-            , "`who acted` MEANS"
-            , "  CONSIDER e"
-            , "  WHEN EVENT p a n THEN p"
-            ]
-      errorMessages src `shouldBe` Right []
-      exportEventErrors src `shouldBe` Right []
-
-    it "accepts a type of the user's own called EVENT" $ do
-      let src = Text.unlines
-            [ "DECLARE EVENT HAS who IS A STRING"
-            , ""
-            , "@export Who"
-            , "GIVEN e IS AN EVENT"
-            , "GIVETH A STRING"
-            , "speaker MEANS e's who"
-            ]
-      errorMessages src `shouldBe` Right []
-      exportEventErrors src `shouldBe` Right []
+      it "warns about a GIVEN with no written type, and does not refuse it" $ do
+        let src = Text.unlines
+              [ "@export Is positive"
+              , "GIVEN n"
+              , "GIVETH A BOOLEAN"
+              , "`is positive` MEANS n > 0"
+              ]
+        problems src `shouldBe` Right [(Just 1, "is positive", Just "n", "no written type")]
 
   describe "exported return type display" $ do
     -- A concrete inferred return type renders normally.

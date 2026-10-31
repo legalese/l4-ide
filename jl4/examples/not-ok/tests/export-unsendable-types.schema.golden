@@ -1,0 +1,38 @@
+{
+    "$defs": {
+        "Bill": {
+            "properties": {
+                "amount": {
+                    "$ref": "#/$defs/NUMBER"
+                },
+                "payer": {
+                    "$ref": "#/$defs/Party"
+                }
+            },
+            "required": [
+                "amount",
+                "payer"
+            ],
+            "type": "object"
+        },
+        "Party": {
+            "enum": [
+                "alice",
+                "bob"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "How much is owed",
+    "properties": {
+        "b": {
+            "$ref": "#/$defs/Bill"
+        }
+    },
+    "required": [
+        "b"
+    ],
+    "title": "how much is owed",
+    "type": "object"
+}

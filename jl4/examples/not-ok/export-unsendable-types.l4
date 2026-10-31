@@ -1,0 +1,59 @@
+-- An @export whose input or result has no JSON form yet is an error at the
+-- @export, reported by the export check ("L4.Export"), not by the type check:
+-- the file still type-checks, so the #EVAL at the end still runs, and the
+-- contract rule is still evaluated in the editor.
+--
+-- The golden holds one error for each rule below that cannot be sent (an EVENT
+-- input, an EVENT result, a DEONTIC result, a function input), one warning for
+-- the GIVEN with no written type, and nothing for `how much is owed` or for
+-- `who acts first`, which builds an EVENT inside its body and does not name one.
+-- `how much is owed` comes first because it is the default export, the one the
+-- schema golden is about: a default export that is refused still gets a schema
+-- from the schema generator, which is not told about the check.
+DECLARE Party IS ONE OF alice, bob
+DECLARE Act IS ONE OF ping, pong
+
+DECLARE Bill HAS
+  amount IS A NUMBER
+  payer IS A Party
+
+@export How much is owed
+GIVEN b IS A Bill
+GIVETH A NUMBER
+`how much is owed` MEANS b's amount
+
+@export Who acted
+GIVEN e IS AN EVENT Party Act
+GIVETH A Party
+`who acted` MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN p
+
+@export Make an event
+GIVEN p IS A Party
+GIVETH AN EVENT Party Act
+`make event` MEANS EVENT p ping 0
+
+@export The duty
+GIVETH A DEONTIC Party Act
+`the duty` MEANS PARTY alice MUST ping WITHIN 3
+
+@export Apply the test
+GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN
+GIVETH A BOOLEAN
+`apply the test` MEANS test 1
+
+@export Is it positive
+GIVEN n
+GIVETH A BOOLEAN
+`is it positive` MEANS n > 0
+
+@export Who acts first
+GIVEN p IS A Party
+GIVETH A Party
+`who acts first` MEANS
+  CONSIDER EVENT p ping 0
+  WHEN EVENT q a n THEN q
+
+#EVAL `the duty`
+#EVAL `how much is owed` (Bill 5 alice)
