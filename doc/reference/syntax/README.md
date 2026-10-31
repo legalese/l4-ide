@@ -226,6 +226,19 @@ The sentence can follow the last input, as the prelude writes it for `` `is in` 
 `l4 render` reads the sentence at such a call too, inside the body of another rule: for `` `the price we charge` `` in the example it writes "the smaller of price and 100".
 A call written with `WITH` reads the same way in `l4 render` as in `l4 nlg`: the sentence, then each argument under its name, so `` `the lower of` WITH a IS price, b IS 100 `` in the body of a rule reads "the smaller of a and b where a is price and b is 100".
 
+What a call reads is the sentence of the definition it resolved to, not of any definition with the same name.
+Your own `` `is in` `` on numbers, written with no sentence, reads as an unheralded call (`` `_ is in _` with 5 and 10 ``) even when you import the prelude, whose `` `is in` `` on sets has one; and two functions with the same name, one of them imported, each keep their own sentence.
+
+Limits:
+
+- **A function you pass on, or name without calling, reads as its name.** In `filter even xs`, `even` reads `even`, not "x is even", because the sentence's slots are filled by a call's arguments and there are none.
+  A function with no inputs keeps its sentence, since it has no slots to fill.
+- **A sentence is spliced in without brackets.** When a call is an argument of another, two groupings can read as the same words.
+  With "the smaller of %a% and %b%" for `` `the lower of` `` and "%a% and %b% together" for `` `plus` ``, both ``(`the lower of` 1 `and` 5) `plus` 10`` and `` `the lower of` 1 `and` (5 `plus` 10) `` read "the smaller of 1 and 5 and 10 together", though they are different numbers.
+  This is true of a function written in prefix form as well.
+  Write a sentence whose slots are set off by words that cannot be taken for part of an argument, and read the output of a nested call before relying on it.
+- **A function with no sentence reads as its pattern** (`` `_ LESS _` with 100 and 20 ``), also in `l4 render`, which prints the call as you wrote it.
+
 `l4 nlg` writes a date given as literals as a date: `YMD 2025 7 16` and `Date 16 7 2025` both read `16 July 2025`.
 That covers only daydate's own `YMD` and `Date`, only when all three arguments are whole numbers, and only when they name a real day.
 Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.
