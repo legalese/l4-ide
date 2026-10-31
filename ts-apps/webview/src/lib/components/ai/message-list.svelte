@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte'
   import UserMessage from './message-user.svelte'
   import AssistantMessage from './message-assistant.svelte'
   import SectionSpinner from './section-spinner.svelte'
@@ -26,6 +27,7 @@
     onOpenFile,
     onOpenFileDiff,
     filesOpenable = true,
+    filesAction,
     tools = [],
     onToolSignIn,
     rollbackOfferAt,
@@ -59,6 +61,9 @@
     /** False when the conversation's files aren't on this machine
      *  (cloud sessions): file paths render as plain text. */
     filesOpenable?: boolean
+    /** Top right of a turn's "Files changed" box: a cloud session's
+     *  Clone / Sync. */
+    filesAction?: Snippet
     /** Cloud conversations: the MCP servers passed to the session, shown
      *  with the first prompt; a click on one needing a sign-in runs it. */
     tools?: CloudToolChip[]
@@ -250,6 +255,7 @@
             {onOpenFile}
             {onOpenFileDiff}
             {filesOpenable}
+            {filesAction}
           />
         </div>
       {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte'
   import StreamingMarkdown from './streaming-markdown.svelte'
   import ErrorBubble from './error-bubble.svelte'
   // import CopyButton from './copy-button.svelte'
@@ -24,6 +25,7 @@
     onOpenFile,
     onOpenFileDiff,
     filesOpenable = true,
+    filesAction,
   }: {
     content: string
     streaming: boolean
@@ -46,6 +48,8 @@
     /** False when the turn's files aren't on this machine (cloud
      *  sessions): paths render as plain text. */
     filesOpenable?: boolean
+    /** Top right of the "Files changed" box. */
+    filesAction?: Snippet
   } = $props()
 
   // Token badge — "• 1.2k in / 380 out" at the bottom of a
@@ -426,6 +430,7 @@
             <span class="review-title"
               >Files changed this turn ({fileChanges.length})</span
             >
+            {@render filesAction?.()}
           </div>
           <ul class="review-list">
             {#each fileChanges as change (change.callId)}

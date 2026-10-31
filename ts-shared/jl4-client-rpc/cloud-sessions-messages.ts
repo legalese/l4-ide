@@ -260,6 +260,14 @@ export const AiCloudDelete: RequestType<{ sessionId: string }, AiCloudResult> =
     method: 'aiCloudDelete',
   }
 
+/** Webview → extension: a new name for a cloud session. */
+export const AiCloudRename: RequestType<
+  { sessionId: string; title: string },
+  AiCloudResult
+> = {
+  method: 'aiCloudRename',
+}
+
 /** Webview → extension: the cloud part of the history. `refresh:
  *  false` answers from the cache in extension storage right away. */
 export const AiCloudSessionList: RequestType<

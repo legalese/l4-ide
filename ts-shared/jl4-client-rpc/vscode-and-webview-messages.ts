@@ -1356,12 +1356,22 @@ export const AiConversationLoad: RequestType<
   method: 'aiConversationLoad',
 }
 
-/** Rename-delete locally + on the server. */
+/** Delete locally + on the server, after asking in a VS Code dialog
+ *  (`cancelled` when the user declined). */
 export const AiConversationDelete: RequestType<
   { id: string },
-  { ok: boolean }
+  { ok: boolean; cancelled?: boolean }
 > = {
   method: 'aiConversationDelete',
+}
+
+/** Webview renames a local conversation (its title, at most 80
+ *  characters; an automatic title no longer replaces it). */
+export const AiConversationRename: RequestType<
+  { id: string; title: string },
+  { ok: boolean }
+> = {
+  method: 'aiConversationRename',
 }
 
 /** Webview asks for a fresh conversation id (drops local state; starts
