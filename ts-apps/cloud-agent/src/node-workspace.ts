@@ -116,6 +116,11 @@ export class NodeWorkspace implements Workspace {
     this.turn = turnId && TURN_ID_RE.test(turnId) ? turnId : null
   }
 
+  /** Copies of deleted files: a file there is not where it lives now. */
+  hiddenFromSearch(fsPath: string): boolean {
+    return fsPath === path.join(this.root, REPO_DELETED_DIR)
+  }
+
   /** Create `data/` and `tmp/` if they are missing (without following
    *  links), so a fresh or cleared session has both. */
   async ensureLayout(): Promise<void> {
@@ -143,7 +148,7 @@ export class NodeWorkspace implements Workspace {
     }
     this.realRelative(absolute, p)
     return {
-      relative: rel || path.basename(absolute),
+      relative: rel || '.',
       uri: uriForPath(absolute),
       fsPath: absolute,
     }
@@ -163,7 +168,11 @@ export class NodeWorkspace implements Workspace {
     this.assertInside(fsPath)
     try {
       const st = await fs.lstat(fsPath)
-      return { isDirectory: st.isDirectory(), isFile: st.isFile() }
+      return {
+        isDirectory: st.isDirectory(),
+        isFile: st.isFile(),
+        size: st.size,
+      }
     } catch (err) {
       if (isErrno(err, 'ENOENT')) return null
       throw err

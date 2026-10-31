@@ -5,16 +5,22 @@ import {
 } from './directive-snapshot.js'
 import {
   fsCopyFile,
+  fsCopyFileDetailed,
   fsCreateFile,
+  fsCreateFileDetailed,
   fsDeleteFile,
   fsEditFile,
+  fsEditFileDetailed,
   fsReadFile,
   resolveCurrentContents,
   resolveFileUri,
   type FsCopyArgs,
+  type EditSequence,
   type FsCreateArgs,
+  type FsCreateResult,
   type FsDeleteArgs,
   type FsEditArgs,
+  type FsEditResult,
   type FsReadArgs,
 } from './fs.js'
 import { l4Evaluate, type L4EvaluateArgs } from './l4-evaluate.js'
@@ -32,6 +38,8 @@ export interface DirectiveSnapshotStores {
  *  `ToolCallContext`). Absent for callers without one. */
 export interface ToolSessionContext {
   conversationId?: string
+  /** Whether a failed edit may quote the file back (see `FsToolContext`). */
+  mayQuoteFile?: boolean
 }
 
 /** Conversations whose snapshots are kept; the least recently used
@@ -91,12 +99,15 @@ export class BuiltinTools {
     return stores
   }
 
-  private withStores(
-    ctx: ToolSessionContext | undefined
-  ): { workspace: Workspace; l4: L4Language } & DirectiveSnapshotStores {
+  private withStores(ctx: ToolSessionContext | undefined): {
+    workspace: Workspace
+    l4: L4Language
+    mayQuoteFile: boolean
+  } & DirectiveSnapshotStores {
     return {
       workspace: this.workspace,
       l4: this.l4,
+      mayQuoteFile: ctx?.mayQuoteFile === true,
       ...this.storesFor(ctx?.conversationId),
     }
   }
@@ -105,12 +116,27 @@ export class BuiltinTools {
     return fsReadFile(this, args)
   }
 
-  createFile(args: FsCreateArgs): Promise<string> {
-    return fsCreateFile(this, args)
+  createFile(args: FsCreateArgs, ctx?: ToolSessionContext): Promise<string> {
+    return fsCreateFile(this.withStores(ctx), args)
+  }
+
+  createFileDetailed(
+    args: FsCreateArgs,
+    ctx?: ToolSessionContext
+  ): Promise<FsCreateResult> {
+    return fsCreateFileDetailed(this.withStores(ctx), args)
   }
 
   editFile(args: FsEditArgs, ctx?: ToolSessionContext): Promise<string> {
     return fsEditFile(this.withStores(ctx), args)
+  }
+
+  editFileDetailed(
+    args: FsEditArgs,
+    ctx?: ToolSessionContext,
+    sequence?: EditSequence
+  ): Promise<FsEditResult> {
+    return fsEditFileDetailed(this.withStores(ctx), args, sequence)
   }
 
   deleteFile(args: FsDeleteArgs): Promise<string> {
@@ -119,6 +145,13 @@ export class BuiltinTools {
 
   copyFile(args: FsCopyArgs, ctx?: ToolSessionContext): Promise<string> {
     return fsCopyFile(this.withStores(ctx), args)
+  }
+
+  copyFileDetailed(
+    args: FsCopyArgs,
+    ctx?: ToolSessionContext
+  ): Promise<FsCreateResult> {
+    return fsCopyFileDetailed(this.withStores(ctx), args)
   }
 
   evaluate(args: L4EvaluateArgs, ctx?: ToolSessionContext): Promise<string> {

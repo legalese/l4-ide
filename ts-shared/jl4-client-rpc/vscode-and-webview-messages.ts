@@ -1318,6 +1318,15 @@ export const AiChatThinkingDelta: NotificationType<{
   method: 'aiChatThinkingDelta',
 }
 
+/** Extension → webview: a new conversation's name, generated alongside
+ * its first turn. */
+export const AiChatTitle: NotificationType<{
+  conversationId: string
+  title: string
+}> = {
+  method: 'aiChatTitle',
+}
+
 /** Extension → webview: turn finished. `finishReason` matches the
  * OpenAI set: 'stop' | 'tool_calls' | 'length' | 'content_filter' | 'error'.
  */

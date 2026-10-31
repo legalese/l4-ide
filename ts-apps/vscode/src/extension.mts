@@ -64,7 +64,10 @@ import { commandRenameIdentifier } from './ai/rename-command.js'
 import { VsCodeMcpTools } from './ai/vscode-mcp.js'
 import { McpOAuthManager, type McpOAuthCallbackResult } from './ai/mcp-oauth.js'
 import { VsCodeWorkspace } from './ai/vscode-workspace.js'
-import { VsCodeL4Language } from './ai/vscode-l4-language.js'
+import {
+  VsCodeL4Language,
+  type WireDiagnostic,
+} from './ai/vscode-l4-language.js'
 import { VsCodeEditorContext } from './ai/editor-context.js'
 import { SettingsPermissionPolicy } from './ai/vscode-permissions.js'
 import { WebviewUserInteraction } from './ai/vscode-user-interaction.js'
@@ -959,6 +962,27 @@ export async function activate(context: ExtensionContext) {
   // current directive results. Forward them to the inspector webview as SyncInspectorResults.
   // This replaces the old onDidChangeDiagnostics + per-directive request approach,
   // eliminating the race condition where evaluation hadn't completed yet.
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      aiL4Language.forgetDocument(doc.uri.toString())
+    })
+  )
+  context.subscriptions.push(
+    client.onNotification(
+      'l4/fileChecked',
+      (params: {
+        uri: string
+        version: number | null
+        diagnostics: WireDiagnostic[]
+      }) => {
+        aiL4Language.recordFileChecked(
+          params.uri,
+          params.version ?? null,
+          params.diagnostics ?? []
+        )
+      }
+    )
+  )
   context.subscriptions.push(
     client.onNotification(
       'l4/directiveResultsUpdated',

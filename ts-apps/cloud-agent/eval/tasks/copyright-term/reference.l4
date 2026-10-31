@@ -1,0 +1,9 @@
+GIVEN `year of death` IS A NUMBER
+GIVETH A NUMBER
+`last protected year` `year of death` MEANS `year of death` PLUS 70
+
+GIVEN `year of death` IS A NUMBER
+      year            IS A NUMBER
+GIVETH A BOOLEAN
+`is protected in` `year of death` year MEANS
+    year AT MOST `last protected year` `year of death`

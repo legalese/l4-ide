@@ -1,6 +1,5 @@
 import { describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
-import type { ChatServiceEvent } from '../src/index.js'
 import {
   ProtocolError,
   agentKeyName,
@@ -46,6 +45,7 @@ import {
   tryParse,
   type CloudEvent,
   type SessionFile,
+  type LoggedChatEvent,
 } from '../src/protocol/index.js'
 
 const SID = '01J9Z8X7W6V5T4S3R2Q1P0N9M8'
@@ -204,7 +204,7 @@ describe('session files', () => {
 
 describe('events', () => {
   test('chat-service events map to cloud events and back', () => {
-    const chat: ChatServiceEvent[] = [
+    const chat: LoggedChatEvent[] = [
       { kind: 'started', conversationId: 'c1', turnId: 't1', model: 'm' },
       { kind: 'text-delta', conversationId: 'c1', text: 'hi' },
       {

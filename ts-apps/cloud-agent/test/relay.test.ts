@@ -706,6 +706,13 @@ describe('SessionJson and safe reads', () => {
 })
 
 describe('CloudInteraction', () => {
+  test('keeps a conversation title out of the event log', () => {
+    const sent: CloudEventPayload[] = []
+    const interaction = new CloudInteraction((p) => sent.push(p))
+    interaction.emit({ kind: 'title', conversationId: 'c', title: 'A title' })
+    assert.deepEqual(sent, [])
+  })
+
   test('caps the tool text it puts in events', () => {
     const sent: CloudEventPayload[] = []
     const interaction = new CloudInteraction((p) => sent.push(p))

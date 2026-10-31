@@ -104,8 +104,9 @@ export function categoryForTool(toolName: string): PermissionCategory | null {
 /**
  * Every category a call needs, from its arguments: a copy creates its
  * target, replaces it with `overwrite` (an edit), and deletes its
- * source with `deleteSource` (a move). Read as the tool reads them
- * (truthy), so a call can't do more than it was checked for.
+ * source with `deleteSource` (a move); a create with `content` also
+ * writes text. Read as the tool reads them (truthy), so a call can't do
+ * more than it was checked for.
  */
 export function categoriesForCall(
   toolName: string,
@@ -122,14 +123,80 @@ export function categoriesForCall(
       ...(a.deleteSource ? (['fs.delete'] as const) : []),
     ]
   }
+  // Without content, create only makes a stub and the text arrives through
+  // fs__edit_file. With it, the one call also does that edit, so it can't
+  // get past a user who set fs.edit to `ask`.
+  if (toolName === 'fs__create_file') {
+    const content = (args as { content?: unknown } | null)?.content
+    return typeof content === 'string' && content.length > 0
+      ? ['fs.create', 'fs.edit']
+      : ['fs.create']
+  }
   const category = categoryForTool(toolName)
   return category ? [category] : []
+}
+
+/** Directories whose files configure the editor, git or another agent. */
+const SENSITIVE_DIRS: ReadonlySet<string> = new Set([
+  '.git',
+  '.vscode',
+  '.claude',
+  '.cursor',
+  '.husky',
+  '.devcontainer',
+])
+
+/** Single files that do the same. */
+const SENSITIVE_FILES: ReadonlySet<string> = new Set([
+  '.devcontainer.json',
+  '.mcp.json',
+  '.envrc',
+  '.gitmodules',
+  '.gitconfig',
+])
+
+/**
+ * Whether writing to `p` could change what the editor, git or an agent
+ * does, instead of just changing the user's documents. A prompt-injected
+ * model could use such a file to lift its own limits or run code later, so
+ * hosts ask before writing one whatever the category settings say. Matched
+ * case-insensitively, because macOS and Windows file systems are.
+ */
+export function isSensitivePath(p: string): boolean {
+  const parts = p.replace(/\\/g, '/').toLowerCase().split('/').filter(Boolean)
+  const name = parts[parts.length - 1] ?? ''
+  if (SENSITIVE_FILES.has(name) || name.endsWith('.code-workspace')) return true
+  return parts.some(
+    (part, i) =>
+      SENSITIVE_DIRS.has(part) ||
+      (part === '.github' && parts[i + 1] === 'workflows')
+  )
 }
 
 const STRICTNESS: Record<PermissionValue, number> = {
   always: 0,
   ask: 1,
   never: 2,
+}
+
+/**
+ * The value that applies when settings live at several levels: the user's
+ * own value or the default, tightened by any level above it. A workspace
+ * may restrict what the agent does there, as a team might, but never relax
+ * it: a repo, or a prompt-injected model writing `.vscode/settings.json`,
+ * must not be able to switch approvals off.
+ */
+export function effectivePermission(
+  user: unknown,
+  fallback: PermissionValue,
+  ...workspaceLevels: unknown[]
+): PermissionValue {
+  let value = parsePermissionValue(user) ?? fallback
+  for (const level of workspaceLevels) {
+    const tighter = parsePermissionValue(level)
+    if (tighter && STRICTNESS[tighter] > STRICTNESS[value]) value = tighter
+  }
+  return value
 }
 
 /** The strictest permission among `categories`, with the category it

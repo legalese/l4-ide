@@ -74,6 +74,16 @@ export class SessionConversationStore implements ConversationStore {
     return { ...conv }
   }
 
+  async update(
+    id: string,
+    change: (conv: AiConversation) => void
+  ): Promise<void> {
+    if (this.conv?.id !== id) return
+    const conv = { ...this.conv, messages: [] }
+    change(conv)
+    this.remember({ ...conv, messages: [] })
+  }
+
   async setTitle(id: string, title: string): Promise<void> {
     if (this.conv?.id === id) this.conv = { ...this.conv, title }
     this.hooks.onTitle?.(id, title)

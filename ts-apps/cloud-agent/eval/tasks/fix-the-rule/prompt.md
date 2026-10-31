@@ -1,0 +1,1 @@
+`data/solution.l4` encodes 29 U.S.C. section 207(a)(1), under which overtime applies to hours "longer than forty hours" in a workweek. One of its tests fails. Find out why and fix it so the file is correct.

@@ -15,6 +15,9 @@ export interface AiProxyChatRequest {
    *  conversation's existing history. Empty `messages` is allowed
    *  in this mode. */
   continueTurn?: boolean
+  /** Text for the model about this turn, inlined into the trailing user
+   *  message on the wire and never stored in the local transcript. */
+  inlineContext?: string
   /** Client-generated turn id — registered server-side so we can
    *  reattach via `GET /v1/chat/turns/{turnId}/stream` after a
    *  disconnect and pick up missed deltas. Required for reattach
@@ -212,7 +215,8 @@ export class AiProxyClient {
     // the wire payload carries the timestamp. role:"system" wouldn't
     // work here because the proxy's extractDelta filters system
     // messages out of follow-up-turn deltas.
-    const wireMessages = withCurrentTimeOnLastUser(request.messages)
+    const { inlineContext, ...body } = request
+    const wireMessages = withContextOnLastUser(request.messages, inlineContext)
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -221,7 +225,7 @@ export class AiProxyClient {
         Accept: 'text/event-stream',
       },
       body: JSON.stringify({
-        ...request,
+        ...body,
         messages: wireMessages,
         stream: true,
       }),
@@ -440,7 +444,10 @@ export class AiProxyClient {
    * the call stateless (no conversationId) so it doesn't create junk
    * conversation files on the server.
    */
-  async summarizeTitle(firstUserMessage: string): Promise<string | null> {
+  async summarizeTitle(
+    firstUserMessage: string,
+    opts: { signal?: AbortSignal } = {}
+  ): Promise<string | null> {
     const url = `${this.getEndpoint().url}/v1/chat/completions`
     const headers = await this.getAuthHeaders(url)
     const body = {
@@ -464,6 +471,7 @@ export class AiProxyClient {
           Accept: 'text/event-stream',
         },
         body: JSON.stringify(body),
+        signal: opts.signal ?? null,
       })
       if (!res.ok || !res.body) return null
       let text = ''
@@ -647,14 +655,17 @@ function httpStatusToCode(status: number, body = ''): string {
 }
 
 /**
- * Return a NEW messages array with the {@link buildCurrentTimeBlock}
- * prepended to the trailing `role:"user"` message's content. Pure —
- * the input array and its messages aren't mutated, so the caller's
- * local-store copy stays clean of wire-only metadata. When there's no
- * user message in the body (tool-result follow-ups, `continueTurn`)
- * the original array is returned unchanged.
+ * Return a NEW messages array with the {@link buildCurrentTimeBlock} and
+ * any `inlineContext` prepended to the trailing `role:"user"` message's
+ * content. Pure — the input array and its messages aren't mutated, so the
+ * caller's local-store copy stays clean of wire-only metadata. When
+ * there's no user message in the body (tool-result follow-ups,
+ * `continueTurn`) the original array is returned unchanged.
  */
-function withCurrentTimeOnLastUser(messages: AiChatMessage[]): AiChatMessage[] {
+function withContextOnLastUser(
+  messages: AiChatMessage[],
+  inlineContext?: string
+): AiChatMessage[] {
   let lastUserIdx = -1
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i]!.role === 'user') {
@@ -663,7 +674,9 @@ function withCurrentTimeOnLastUser(messages: AiChatMessage[]): AiChatMessage[] {
     }
   }
   if (lastUserIdx < 0) return messages
-  const timeBlock = buildCurrentTimeBlock()
+  const timeBlock = inlineContext
+    ? `${buildCurrentTimeBlock()}\n\n${inlineContext}`
+    : buildCurrentTimeBlock()
   const original = messages[lastUserIdx]!
   const content = original.content
   let augmented: AiChatMessage['content']

@@ -1,0 +1,7 @@
+GIVEN hours IS A NUMBER
+      rate  IS A NUMBER
+GIVETH A NUMBER
+`weekly pay` hours rate MEANS
+    IF hours GREATER THAN 40
+    THEN (40 TIMES rate) PLUS ((hours MINUS 40) TIMES rate TIMES 1.5)
+    ELSE hours TIMES rate

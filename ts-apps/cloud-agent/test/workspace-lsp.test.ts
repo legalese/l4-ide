@@ -477,6 +477,120 @@ describe('Jl4Lsp', () => {
     return { servers, spawner, exit }
   }
 
+  describe('l4/fileChecked', () => {
+    /** A server that sends `l4/fileChecked` the way `script` says, and
+     *  publishes nothing else, like one whose diagnostics didn't change. */
+    function checkingServer(
+      script: (version: number, uri: string) => Array<number | null>
+    ): ReturnType<typeof fakeServer> {
+      const f = fakeServer()
+      const respond = (uri: string, version: number): void => {
+        for (const v of script(version, uri)) {
+          void f.server.sendNotification('l4/fileChecked', {
+            uri,
+            version: v,
+            diagnostics: [
+              {
+                range: {
+                  start: { line: 0, character: 0 },
+                  end: { line: 0, character: 1 },
+                },
+                severity: 1,
+                message: `checked ${v}`,
+                source: 'check',
+                code: 'check/type-mismatch',
+              },
+            ],
+          })
+        }
+      }
+      f.server.onNotification(
+        'textDocument/didOpen',
+        (p: { textDocument: { uri: string; version: number } }) =>
+          respond(p.textDocument.uri, p.textDocument.version)
+      )
+      f.server.onNotification(
+        'textDocument/didChange',
+        (p: { textDocument: { uri: string; version: number } }) =>
+          respond(p.textDocument.uri, p.textDocument.version)
+      )
+      return f
+    }
+
+    test('an edit that changes no diagnostics does not stall', async () => {
+      const { client, server } = checkingServer((v) => [v])
+      const uri = uriForPath(path.join(dir, 'a.l4'))
+      await writeFile(path.join(dir, 'a.l4'), 'x')
+      const lsp = await Jl4Lsp.connect(client, uriForPath(dir), silent)
+      await lsp.getCheckedDiagnostics(uri)
+      lsp.onDidWrite(uri, 'y', false)
+      const started = Date.now()
+      const result = await lsp.getCheckedDiagnostics(uri)
+      assert.ok(Date.now() - started < 1_000, 'no 20 s wait')
+      assert.equal(result.pending, false)
+      assert.equal(result.confirmed, true)
+      assert.equal(result.diagnostics[0]?.code, 'check/type-mismatch')
+      await lsp.dispose(10)
+      client.dispose()
+      server.dispose()
+    })
+
+    test('a check of an older version does not count', async () => {
+      const { client, server } = checkingServer((v) =>
+        v >= 2 ? [v - 1, v] : [v]
+      )
+      const uri = uriForPath(path.join(dir, 'a.l4'))
+      await writeFile(path.join(dir, 'a.l4'), 'x')
+      const lsp = await Jl4Lsp.connect(client, uriForPath(dir), silent)
+      await lsp.getCheckedDiagnostics(uri)
+      lsp.onDidWrite(uri, 'y', false)
+      const result = await lsp.getCheckedDiagnostics(uri)
+      assert.equal(result.diagnostics[0]?.message, 'checked 2')
+      await lsp.dispose(10)
+      client.dispose()
+      server.dispose()
+    })
+
+    test('a check that never finishes is pending, never clean', async () => {
+      const { client, server } = checkingServer((v) => (v === 1 ? [1] : []))
+      const uri = uriForPath(path.join(dir, 'a.l4'))
+      await writeFile(path.join(dir, 'a.l4'), 'x')
+      const lsp = await Jl4Lsp.connect(client, uriForPath(dir), silent)
+      await lsp.getCheckedDiagnostics(uri)
+      lsp.checkTimeoutMs = 30
+      lsp.onDidWrite(uri, 'y', false)
+      const result = await lsp.getCheckedDiagnostics(uri)
+      assert.equal(result.pending, true)
+      assert.equal(result.confirmed, undefined)
+      await lsp.dispose(10)
+      client.dispose()
+      server.dispose()
+    })
+
+    test('an older server without the signal still answers', async () => {
+      const { client, server } = checkingServer(() => [])
+      server.onNotification(
+        'textDocument/didOpen',
+        (p: { textDocument: { uri: string } }) =>
+          void server.sendNotification('textDocument/publishDiagnostics', {
+            uri: p.textDocument.uri,
+            diagnostics: [],
+          })
+      )
+      const uri = uriForPath(path.join(dir, 'a.l4'))
+      await writeFile(path.join(dir, 'a.l4'), 'x')
+      const lsp = await Jl4Lsp.connect(client, uriForPath(dir), silent)
+      lsp.checkTimeoutMs = 30
+      // Silence might only be a slow start, so the first answer can't vouch.
+      assert.equal((await lsp.getCheckedDiagnostics(uri)).pending, true)
+      const result = await lsp.getCheckedDiagnostics(uri)
+      assert.deepEqual(result, { diagnostics: [], pending: false })
+      await lsp.dispose(10)
+      client.dispose()
+      server.dispose()
+    })
+  })
+
   test('starts the server again after it dies and re-sends open documents', async () => {
     const uri = uriForPath(path.join(dir, 'a.l4'))
     const { servers, spawner, exit } = restartable()

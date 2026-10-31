@@ -1,6 +1,6 @@
 import type { L4Language, Workspace } from '../ports.js'
 import { resolveFileUri } from './fs.js'
-import { fetchL4Diagnostics } from './lsp.js'
+import { formatChecked, formatL4Diagnostics, l4FileState } from './lsp.js'
 import {
   parseLineFromDirectiveId,
   renderDirectiveResults,
@@ -73,15 +73,20 @@ export async function l4Evaluate(
   // Diagnostics gate: if the file fails to type-check, directive
   // evaluation results are either stale (from a prior good compile)
   // or empty (the LSP skipped evaluation this round) — return
-  // diagnostics so the model fixes the errors first. Match `fs.ts`'s
-  // edit-time check: gate strictly on `\d+ error[s]` in the
-  // diagnostic header. Info/hint diagnostics (jl4 emits one per
-  // directive trace) and warnings don't suppress evaluation — the
-  // model still wants the directive results in those cases.
-  const diagnostics = await fetchL4Diagnostics(ctx.l4, uri).catch(() => null)
-  if (diagnostics && /\b\d+ errors?\b/.test(diagnostics)) {
-    return diagnostics
+  // diagnostics so the model fixes the errors first. Same gate as the
+  // edit tools. Info/hint diagnostics (jl4 emits one per directive trace)
+  // and warnings don't suppress evaluation — the model still wants the
+  // directive results in those cases. A check that hasn't finished can't
+  // vouch for anything, so it's reported as such.
+  const checked = await ctx.l4.getCheckedDiagnostics(uri).catch(() => null)
+  if (checked && (checked.pending || l4FileState(checked).errors > 0)) {
+    return formatChecked(checked)
   }
+  const warnings = (checked?.diagnostics ?? []).filter(
+    (d) => d.severity === 'warning'
+  )
+  const warningBlock =
+    warnings.length > 0 ? `\n${formatL4Diagnostics(warnings)}` : ''
 
   const uriStr = uri
   const timeoutMs = Math.min(args.timeoutMs ?? 6000, 15000)
@@ -103,10 +108,7 @@ export async function l4Evaluate(
     mode,
   })
 
-  if (results.length === 0) {
-    return `${header}\n${block}\n(Add a #EVAL line referencing a function, or wait for the LSP to finish compiling.)`
-  }
-  return `${header}\n${block}`
+  return `${header}\n${block}${warningBlock}`
 }
 
 /**

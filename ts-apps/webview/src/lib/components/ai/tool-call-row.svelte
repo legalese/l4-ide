@@ -29,6 +29,8 @@
     'read_file',
     'search_identifier',
     'search_text',
+    'search_rules',
+    'get_schema',
   ])
 
   let {
@@ -89,7 +91,19 @@
     click: ClickMode
   } {
     const path = typeof a.path === 'string' ? a.path : null
-    if (name === 'fs__read_file')
+    if (name === 'fs__read_file') {
+      const keywords =
+        typeof a.search_keywords === 'string' ? a.search_keywords.trim() : ''
+      if (keywords)
+        return {
+          running: 'Searching…',
+          settled: 'Searched',
+          target:
+            path && path !== '.'
+              ? `${path} for ${keywords}`
+              : `for ${keywords}`,
+          click: 'open',
+        }
       // "Read" works as both base and past tense (read/read/read) —
       // settled label stays unchanged.
       return {
@@ -98,6 +112,7 @@
         target: path,
         click: 'open',
       }
+    }
     if (name === 'fs__create_file')
       return {
         running: 'Creating…',

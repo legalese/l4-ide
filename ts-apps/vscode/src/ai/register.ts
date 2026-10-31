@@ -19,6 +19,7 @@ import {
   AiChatStarted,
   AiChatTextDelta,
   AiChatThinkingDelta,
+  AiChatTitle,
   AiChatToolActivity,
   AiChatToolCall,
   AiChatTurnSpawn,
@@ -66,6 +67,7 @@ import {
   AiProxyError,
   MCP_L4_RULES_PREFIX,
   categoriesForCall,
+  proposedChange,
   categoryForTool,
   type AiProxyClient,
   type AppliedEditSnapshot,
@@ -236,6 +238,12 @@ export function registerAiChatHandlers(deps: {
         messenger.sendNotification(AiChatThinkingDelta, frontend, {
           conversationId: event.conversationId,
           text: event.text,
+        })
+        break
+      case 'title':
+        messenger.sendNotification(AiChatTitle, frontend, {
+          conversationId: event.conversationId,
+          title: event.title,
         })
         break
       case 'done':
@@ -510,21 +518,41 @@ export function registerAiChatHandlers(deps: {
   })
 
   // Plain open — for fs__read_file and fs__create_file. Shows the
-  // current on-disk file in the editor. For a create that hasn't
-  // landed yet the file won't exist; we silently no-op in that case.
+  // current on-disk file in the editor, or for a write that hasn't run
+  // yet, what it would write.
   messenger.onNotification(AiFileOpen, async ({ callId }) => {
     const meta = callArgs.get(callId)
     // A cloud session's paths name files in the cloud, not here (the
     // webview renders them as plain text).
     if (!meta || cloudSessionIdOf(meta.conversationId)) return
     try {
+      // Still waiting for approval: show what would be written, which
+      // may be a file that doesn't exist yet.
+      const proposed = dispatcher.snapshotFor(callId)
+        ? null
+        : proposedChange(meta.name, argsOf(meta.argsJson))
+      if (proposed) {
+        const doc = await vscode.workspace.openTextDocument({
+          content: proposed.text,
+          language: proposed.language,
+        })
+        await vscode.window.showTextDocument(doc, { preview: true })
+        return
+      }
       const uri = dispatcher.resolveFile({
         callId,
         name: meta.name,
         argsJson: meta.argsJson,
       })
       if (!uri) return
-      await vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(uri))
+      const target = vscode.Uri.parse(uri)
+      // A folder read or search has no editor to open.
+      const stat = await vscode.workspace.fs.stat(target)
+      const opens =
+        stat.type & vscode.FileType.Directory
+          ? 'revealInExplorer'
+          : 'vscode.open'
+      await vscode.commands.executeCommand(opens, target)
     } catch (err) {
       logger.warn(
         `file/open failed: ${err instanceof Error ? err.message : String(err)}`

@@ -18,6 +18,8 @@ export * from './ai-proxy-client.js'
 
 // Tools
 export * from './tool-dispatcher.js'
+export * from './edit-guard.js'
+export * from './file-checks.js'
 export * from './tool-registry.js'
 export * from './permissions.js'
 export * from './pending-interactions.js'

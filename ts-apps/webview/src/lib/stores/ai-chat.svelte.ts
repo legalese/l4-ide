@@ -61,7 +61,6 @@ import {
   type AiPermissionValue,
   ShowNotification,
 } from 'jl4-client-rpc'
-import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
 import {
   adoptTurn,
   applyCloudEvent,
@@ -622,7 +621,7 @@ export function createAiChatStore(
   }
 
   /** The current conversation's name for its header: its title, else
-   *  the history's (an automatic title reaches only the history). */
+   *  the history's. */
   function currentTitle(): string {
     const conv = getConversation()
     if (!conv) return ''
@@ -1494,6 +1493,16 @@ export function createAiChatStore(
     turn.blocks.push({ kind: 'thinking', text: params.text })
   }
 
+  /** A new conversation's generated name. A name the user gave it
+   *  meanwhile stays. */
+  function onTitle(params: { conversationId: string; title: string }): void {
+    const conv = conversations[params.conversationId]
+    if (!conv || conv.title) return
+    conv.title = params.title
+    const item = history.find((h) => h.id === params.conversationId)
+    if (item) item.title = params.title
+  }
+
   function onToolActivity(params: {
     conversationId: string
     tool: string
@@ -1605,35 +1614,26 @@ export function createAiChatStore(
       return
     }
 
-    // Dedupe policy:
+    // Status updates:
     //   - Same tool + same message as the tail → treat as a status
     //     update on the existing block (don't push a new row). This
     //     is what swallows a `running → running → done` burst that
-    //     keeps re-emitting the same status text.
+    //     keeps re-emitting the same status text. A failed block stays
+    //     failed: what follows it is a new attempt.
     //   - Same tool but a new message → the activity is reporting
     //     real progress, so push a new row even if the previous one
     //     is still "running" (it effectively terminates when the next
     //     message arrives).
     //
-    // When the user has hidden reasoning ("Show model reasoning"
-    // toggle off in chat settings), the dedupe scan walks past
-    // intervening thinking blocks. Otherwise two identical activity
-    // events sandwiching a hidden think look like duplicate rows.
-    // When reasoning is visible, we want a thinking block to act
-    // as a divider so the user can see "model thought, then status
-    // re-emitted" — so the scan only looks at the immediate tail.
-    let tailIdx = turn.blocks.length - 1
-    if (!aiPrefs.showReasoning) {
-      while (tailIdx >= 0 && turn.blocks[tailIdx]?.kind === 'thinking') {
-        tailIdx--
-      }
-    }
-    const tail = turn.blocks[tailIdx]
+    // Which rows are worth showing isn't decided here: the bubble
+    // leaves out a row that repeats the one above it (`omittedBlocks`).
+    const tail = turn.blocks[turn.blocks.length - 1]
     if (
       tail &&
       tail.kind === 'tool-activity' &&
       tail.activity.tool === params.tool &&
-      tail.activity.message === params.message
+      tail.activity.message === params.message &&
+      tail.activity.status !== 'error'
     ) {
       tail.activity.status = params.status
       return
@@ -2936,6 +2936,7 @@ export function createAiChatStore(
     onStarted,
     onTextDelta,
     onThinkingDelta,
+    onTitle,
     onDone,
     onError,
     onToolCall,
@@ -3090,6 +3091,7 @@ export type AiChatStore = {
   }) => void
   onTextDelta: (params: { conversationId: string; text: string }) => void
   onThinkingDelta: (params: { conversationId: string; text: string }) => void
+  onTitle: (params: { conversationId: string; title: string }) => void
   onDone: (params: {
     conversationId: string
     finishReason: string

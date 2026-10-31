@@ -211,7 +211,7 @@ Platform-specific extension builds (macOS ARM64, Windows x64, etc.) bundle `jl4-
 cabal install exe:jl4-lsp --overwrite-policy=always
 ```
 
-Or specify the path manually:
+Or specify the path manually in your user settings. Workspace settings are ignored here, so that opening a repository can't choose which program runs:
 
 ```json
 {

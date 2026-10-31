@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import type {
   DirectiveResultRow,
+  CheckedDiagnostics,
   L4Diagnostic,
   L4Language,
   Logger,
@@ -133,6 +134,9 @@ export class StubL4 implements L4Language {
   }
   async getDiagnostics(): Promise<L4Diagnostic[]> {
     return []
+  }
+  async getCheckedDiagnostics(): Promise<CheckedDiagnostics> {
+    return { diagnostics: [], pending: false }
   }
   getDirectiveResults(uri: string): DirectiveResultRow[] | undefined {
     return this.directives.get(uri)

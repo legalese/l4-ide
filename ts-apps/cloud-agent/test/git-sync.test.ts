@@ -12,6 +12,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import * as path from 'node:path'
+import { TURN_STATUS_HEADING } from '@repo/legalese-agent'
 import type { CloudEventPayload } from '@repo/legalese-agent/protocol'
 import {
   GitSync,
@@ -134,6 +135,21 @@ describe('GitSync', () => {
     // A second start doesn't commit again.
     await git().start(ctx)
     assert.equal(sh(repo, 'rev-list', '--count', 'HEAD'), '1')
+  })
+
+  test('records what compiled, from the turn status', async () => {
+    const g = git()
+    await g.start(ctx)
+    await write('a.l4', 'broken\n')
+    await g.afterTurn({
+      turnId: 'turn-1',
+      prompt: 'Write a rule',
+      reply: `All done!${'\n\n---\n'}${TURN_STATUS_HEADING}\n- \`a.l4\`: does not compile (2 errors)`,
+    })
+    assert.match(
+      sh(repo, 'log', '-1', '--format=%B'),
+      /L4-Status: `a\.l4`: does not compile \(2 errors\)/
+    )
   })
 
   test('commits each turn with a Turn-Id trailer and reports it', async () => {
