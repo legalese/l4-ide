@@ -6,6 +6,7 @@ import * as path from 'node:path'
 import type {
   ChatServiceEvent,
   DirectiveResultRow,
+  CheckedDiagnostics,
   L4Diagnostic,
   L4Language,
   Logger,
@@ -35,6 +36,10 @@ export class MemoryWorkspace implements Workspace {
   readonly deleted: string[] = []
   /** Set by a test that needs one file under two names. */
   sameFile?: (a: string, b: string) => Promise<boolean>
+  /** Set by a test of sensitive paths. */
+  requiresWriteApproval?: (target: ResolvedPath) => boolean
+  /** Set by a test of a workspace with several folders. */
+  searchRoots?: () => ResolvedPath[]
 
   constructor(files: Record<string, string> = {}) {
     for (const [rel, text] of Object.entries(files)) {
@@ -53,7 +58,7 @@ export class MemoryWorkspace implements Workspace {
       throw new Error(`Path is outside the workspace: ${p}`)
     }
     return {
-      relative: path.relative(ROOT, abs) || path.basename(abs),
+      relative: path.relative(ROOT, abs) || '.',
       uri: uriOf(abs),
       fsPath: abs,
     }
@@ -76,7 +81,14 @@ export class MemoryWorkspace implements Workspace {
   }
 
   async stat(fsPath: string): Promise<WorkspaceStat | null> {
-    if (this.files.has(fsPath)) return { isDirectory: false, isFile: true }
+    const file = this.files.get(fsPath)
+    if (file !== undefined) {
+      return {
+        isDirectory: false,
+        isFile: true,
+        size: Buffer.byteLength(file),
+      }
+    }
     if (this.isDir(fsPath)) return { isDirectory: true, isFile: false }
     return null
   }
@@ -146,6 +158,15 @@ export class FakeL4Language implements L4Language {
   semanticTokens: SemanticTokensSnapshot | null = null
   exported: Array<{ name: string; returnType?: string }> = []
   opened: string[] = []
+  /** Derive diagnostics from the file's text, for tests where each edit
+   *  changes them. Wins over `diagnostics`. */
+  diagnose?: (text: string, uri: string) => L4Diagnostic[]
+  /** Set by a test of errors in files other than the one edited. */
+  fileErrorCounts?: () => Map<string, number>
+  /** Files whose check never finishes. */
+  pending = new Set<string>()
+  /** Report checks as confirmed, like a server with `l4/fileChecked`. */
+  confirmed = false
 
   constructor(private readonly workspace?: MemoryWorkspace) {}
 
@@ -160,7 +181,19 @@ export class FakeL4Language implements L4Language {
   }
 
   async getDiagnostics(uri: string): Promise<L4Diagnostic[]> {
+    if (this.diagnose && this.workspace) {
+      const text = this.workspace.files.get(this.workspace.pathForUri(uri))
+      return this.diagnose(text ?? '', uri)
+    }
     return this.diagnostics.get(uri) ?? []
+  }
+
+  async getCheckedDiagnostics(uri: string): Promise<CheckedDiagnostics> {
+    return {
+      diagnostics: await this.getDiagnostics(uri),
+      pending: this.pending.has(uri),
+      ...(this.confirmed ? { confirmed: true } : {}),
+    }
   }
 
   getDirectiveResults(uri: string): DirectiveResultRow[] | undefined {

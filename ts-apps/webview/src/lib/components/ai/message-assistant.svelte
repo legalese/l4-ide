@@ -10,6 +10,7 @@
     RenderedToolCall,
   } from '$lib/stores/ai-chat.svelte'
   import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
+  import { activityRow, omittedBlocks } from 'jl4-client-rpc'
 
   import type { Messenger } from 'vscode-messenger-webview'
 
@@ -51,6 +52,8 @@
     /** Top right of the "Files changed" box. */
     filesAction?: Snippet
   } = $props()
+
+  const omitted = $derived(omittedBlocks(blocks ?? [], aiPrefs.showReasoning))
 
   // Token badge — "• 1.2k in / 380 out" at the bottom of a
   // completed assistant bubble. Only renders after the stream
@@ -322,7 +325,9 @@
   <div class="assistant-bubble" class:is-streaming={streaming}>
     {#if blocks && blocks.length > 0}
       {#each blocks as block, i (blockKey(block, i))}
-        {#if block.kind === 'text'}
+        {#if omitted.has(i)}
+          <!-- Shows nothing, or only what the row above it shows. -->
+        {:else if block.kind === 'text'}
           <StreamingMarkdown
             text={block.text}
             streaming={streaming && i === blocks.length - 1}
@@ -335,7 +340,7 @@
             onOpenDiff={onOpenFileDiff}
             {filesOpenable}
           />
-        {:else if block.kind === 'thinking' && aiPrefs.showReasoning}
+        {:else if block.kind === 'thinking'}
           <!-- Collapsed-by-default reasoning block. Chevron flips when
                toggled; expanded body renders as italic gray text with
                preserved whitespace so chain-of-thought indentation
@@ -373,15 +378,6 @@
             onOpenDiff={onOpenFileDiff}
             {filesOpenable}
           />
-        {:else if block.kind === 'tool-activity' && block.activity.tool === 'web_search'}
-          <!-- Web-search activities carry the URL citations the
-               upstream model's native search produced. We don't render
-               them inline — they're surfaced in the turn's review card
-               below ("Sources:" section). Rendering a row here would
-               also split the assistant text stream into two text
-               blocks at the moment this block was pushed, breaking
-               any markdown element whose tokens straddle the citation
-               (most visibly tables and fenced code). -->
         {:else if block.kind === 'tool-activity'}
           <!-- Plain status activity (e.g. doc search, compaction,
                deployment browsing): bold action label + monospace
@@ -399,16 +395,13 @@
                appended after it, the row falls out of `:last-child`
                and the dot freezes solid. Errored rows opt out via
                the `is-error` class. -->
-          {@const actionLabel = block.activity.label ?? 'Activity'}
-          <div
-            class="tool-call tool-activity-row"
-            class:is-error={block.activity.status === 'error'}
-          >
+          {@const row = activityRow(block.activity)}
+          <div class="tool-call tool-activity-row" class:is-error={row.failed}>
             <div class="tool-row">
               <span class="dot" aria-hidden="true"></span>
-              <span class="action">{actionLabel}</span>
-              {#if block.activity.message && block.activity.message !== actionLabel}
-                <span class="target plain">{block.activity.message}</span>
+              <span class="action">{row.label}</span>
+              {#if row.detail}
+                <span class="target plain">{row.detail}</span>
               {/if}
             </div>
           </div>

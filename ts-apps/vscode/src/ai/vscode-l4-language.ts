@@ -1,6 +1,8 @@
 import * as vscode from 'vscode'
 import {
   DirectiveResultsCache,
+  FileCheckTracker,
+  type CheckedDiagnostics,
   type DiagnosticSeverity,
   type DirectiveResultRow,
   type L4Diagnostic,
@@ -19,6 +21,19 @@ import type { VSCodeL4LanguageClient } from '../vscode-l4-language-client.js'
  *  arrive asynchronously via publishDiagnostics. */
 const DIAGNOSTIC_SETTLE_MS = 400
 
+/** Longest wait for the check of a file's latest text. After this the
+ *  result is reported as pending: never as clean. */
+const CHECK_TIMEOUT_MS = 15_000
+
+/** A diagnostic as `l4/fileChecked` carries it. */
+export interface WireDiagnostic {
+  severity?: number
+  range?: { start?: { line?: number } }
+  message: string
+  source?: string
+  code?: string | number
+}
+
 /**
  * {@link L4Language} port over VS Code's view of jl4-lsp: documents are
  * opened with `openTextDocument` (the language client sends didOpen),
@@ -32,8 +47,35 @@ const DIAGNOSTIC_SETTLE_MS = 400
  */
 export class VsCodeL4Language implements L4Language {
   private readonly directives = new DirectiveResultsCache()
+  /** What `l4/fileChecked` has said, per file path. */
+  private readonly checks = new FileCheckTracker<L4Diagnostic>()
 
   constructor(private readonly client: VSCodeL4LanguageClient) {}
+
+  /** Mirror an `l4/fileChecked` payload. */
+  recordFileChecked(
+    uri: string,
+    version: number | null,
+    diagnostics: WireDiagnostic[]
+  ): void {
+    this.checks.record(
+      vscode.Uri.parse(uri).fsPath,
+      version,
+      diagnostics.map((d) => ({
+        severity: severityFromWire(d.severity),
+        line: d.range?.start?.line ?? 0,
+        message: d.message,
+        source: d.source,
+        code: d.code === undefined ? undefined : String(d.code),
+      }))
+    )
+  }
+
+  /** A document closed: its version numbers start over if it reopens,
+   *  so what was said about it no longer applies. */
+  forgetDocument(uri: string): void {
+    this.checks.forget(vscode.Uri.parse(uri).fsPath)
+  }
 
   /** Mirror an `l4/directiveResultsUpdated` payload. */
   recordDirectiveResults(uri: string, results: DirectiveResultRow[]): void {
@@ -78,6 +120,39 @@ export class VsCodeL4Language implements L4Language {
             ? String((d.code as { value: string | number }).value)
             : String(d.code),
     }))
+  }
+
+  /**
+   * Diagnostics for the file's current text. `getDiagnostics` reads
+   * whatever VS Code holds after a fixed delay, which on a slow compile is
+   * the previous version's result: an edit could report clean when the
+   * file had errors. This waits for the check of this exact version.
+   */
+  async getCheckedDiagnostics(uri: string): Promise<CheckedDiagnostics> {
+    const target = vscode.Uri.parse(uri)
+    const doc = await vscode.workspace.openTextDocument(target)
+    const key = target.fsPath
+    const outcome = await this.checks.settle(key, doc.version, CHECK_TIMEOUT_MS)
+    if (outcome === 'unsupported') {
+      return { diagnostics: await this.getDiagnostics(uri), pending: false }
+    }
+    const done = outcome === 'checked'
+    return {
+      diagnostics: this.checks.latest(key) ?? (await this.getDiagnostics(uri)),
+      pending: !done,
+      ...(done ? { confirmed: true } : {}),
+    }
+  }
+
+  fileErrorCounts(): Map<string, number> {
+    const counts = new Map<string, number>()
+    const byPath = this.checks.errorCounts(
+      (d) => d.severity === 'error' && d.source !== 'eval'
+    )
+    for (const [fsPath, n] of byPath) {
+      counts.set(vscode.Uri.file(fsPath).toString(), n)
+    }
+    return counts
   }
 
   getDirectiveResults(uri: string): DirectiveResultRow[] | undefined {
@@ -151,5 +226,18 @@ function severityName(
       return 'hint'
     default:
       return 'info'
+  }
+}
+
+function severityFromWire(s: number | undefined): DiagnosticSeverity {
+  switch (s) {
+    case 2:
+      return 'warning'
+    case 3:
+      return 'info'
+    case 4:
+      return 'hint'
+    default:
+      return 'error'
   }
 }

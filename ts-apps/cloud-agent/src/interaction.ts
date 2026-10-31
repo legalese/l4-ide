@@ -58,6 +58,8 @@ export class CloudInteraction implements UserInteraction {
   }
 
   emit(event: ChatServiceEvent): void {
+    // A session's name goes in `session.json`, not its event log.
+    if (event.kind === 'title') return
     if (event.kind === 'tool-call') {
       this.calls.set(event.callId, {
         conversationId: event.conversationId,

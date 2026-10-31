@@ -1,5 +1,6 @@
 import { describe, test } from 'node:test'
 import * as assert from 'node:assert/strict'
+import * as path from 'node:path'
 import {
   BuiltinTools,
   ToolDispatcher,
@@ -13,6 +14,7 @@ import {
   FakeL4Language,
   MemoryWorkspace,
   RecordingInteraction,
+  ROOT,
   row,
   silentLogger,
   uriOf,
@@ -41,7 +43,7 @@ describe('fs tools over the Workspace port', () => {
     const { tools } = session({ 'b.txt': '', 'sub/c.l4': '', 'a.txt': '' })
     assert.equal(
       await tools.readFile({ path: '.' }),
-      '[ws 1-3/3]\nsub/\na.txt\nb.txt'
+      '[. 1-3/3]\nsub/\na.txt\nb.txt'
     )
   })
 
@@ -52,8 +54,142 @@ describe('fs tools over the Workspace port', () => {
     })
     assert.equal(
       await tools.readFile({ path: '.', search_keywords: 'foo' }),
-      '[ws/ keywords="foo" matches=1 files=1]\nws/x/one.l4:1: DECIDE foo'
+      '[./ keywords="foo" names=0 matches=1 files=1]\nx/one.l4:1: DECIDE foo'
     )
+  })
+
+  test('read_file finds files and folders by name', async () => {
+    const { tools } = session({
+      'law/sg-employment-pass.l4': 'nothing to see',
+      'employment/notes.txt': '',
+      'other.l4': '',
+    })
+    assert.equal(
+      await tools.readFile({ path: '.', search_keywords: 'EMPLOYMENT' }),
+      '[./ keywords="EMPLOYMENT" names=2 matches=0]\n' +
+        'employment/\nlaw/sg-employment-pass.l4'
+    )
+  })
+
+  test('a directory search puts name hits before lines', async () => {
+    const { tools } = session({ 'a.l4': 'foo', 'z/foo.l4': 'nothing' })
+    assert.equal(
+      await tools.readFile({ path: '.', search_keywords: 'foo' }),
+      '[./ keywords="foo" names=1 matches=1 files=1]\nz/foo.l4\na.l4:1: foo'
+    )
+  })
+
+  test('a long list of lines leaves name hits showing', async () => {
+    const { tools } = session({
+      'a.l4': 'foo\n'.repeat(600),
+      'z/foo.l4': '',
+    })
+    const out = await tools.readFile({ path: '.', search_keywords: 'foo' })
+    assert.match(
+      out.split('\n')[0]!,
+      /^\[\.\/ keywords="foo" names=1 matches=600 files=1, shown=\d+\/601\]$/
+    )
+    assert.equal(out.split('\n')[1], 'z/foo.l4')
+  })
+
+  test('a directory search goes by name alone for very large files', async () => {
+    const { tools } = session({
+      'a.l4': 'foo',
+      'foo-output.bin': 'foo\n'.repeat(300_000),
+    })
+    assert.equal(
+      await tools.readFile({ path: '.', search_keywords: 'foo' }),
+      '[./ keywords="foo" names=1 matches=1 files=1 over1MB=1]\n' +
+        'foo-output.bin\na.l4:1: foo'
+    )
+  })
+
+  test('one very long line does not use up a directory search', async () => {
+    const { tools } = session({
+      'a/bundle.js': `foo${'x'.repeat(10_000)}`,
+      'b/one.l4': 'foo one',
+      'b/two.l4': 'foo two',
+    })
+    const out = await tools.readFile({ path: '.', search_keywords: 'foo' })
+    assert.match(out, /^a\/bundle\.js:1: fooxxx/m)
+    assert.match(out, /^b\/one\.l4:1: foo one$/m)
+    assert.match(out, /^b\/two\.l4:1: foo two$/m)
+    assert.ok(out.length < 1000)
+  })
+
+  test('a directory search passes over build output, unless asked to look inside', async () => {
+    const { tools } = session({
+      'src/rules.l4': 'foo',
+      'dist/rules.js': 'foo',
+      'pkg/dist-newstyle/rules.hi': 'foo',
+      'pkg/.turbo/build.log': 'foo',
+    })
+    assert.equal(
+      await tools.readFile({ path: '.', search_keywords: 'foo' }),
+      '[./ keywords="foo" names=0 matches=1 files=1]\nsrc/rules.l4:1: foo'
+    )
+    assert.equal(
+      await tools.readFile({ path: 'dist', search_keywords: 'foo' }),
+      '[dist/ keywords="foo" names=0 matches=1 files=1]\ndist/rules.js:1: foo'
+    )
+    assert.match(await tools.readFile({ path: '.' }), /^dist\/$/m)
+  })
+
+  test('a search of the workspace covers every folder it has loaded', async () => {
+    const { ws, tools } = session({ 'a.l4': 'foo' })
+    const other = path.join(ROOT, '../other')
+    ws.files.set(path.join(other, 'sub/b.l4'), 'foo')
+    ws.searchRoots = () => [
+      ws.resolvePath('.'),
+      { relative: '../other', uri: uriOf(other), fsPath: other },
+    ]
+    assert.equal(
+      await tools.readFile({ path: '.', search_keywords: 'foo' }),
+      '[./ keywords="foo" names=0 matches=2 files=2]\n' +
+        'a.l4:1: foo\n../other/sub/b.l4:1: foo'
+    )
+    await assert.rejects(
+      tools.readFile({ path: 'b.l4' }),
+      /That name is at: \.\.\/other\/sub\/b\.l4/
+    )
+  })
+
+  test('a directory search says what it looked in when empty', async () => {
+    const { tools } = session({ 'a.l4': 'x' })
+    assert.equal(
+      await tools.readFile({ path: '.', search_keywords: 'nothing' }),
+      '[./ keywords="nothing" names=0 matches=0]'
+    )
+  })
+
+  test('paths from a directory search work as they stand', async () => {
+    const { tools } = session({ 'x/y/one.l4': 'DECIDE foo' })
+    for (const from of ['.', 'x']) {
+      const out = await tools.readFile({ path: from, search_keywords: 'one' })
+      const row = out.split('\n')[1]!
+      assert.equal(row, 'x/y/one.l4')
+      assert.match(await tools.readFile({ path: row }), /DECIDE foo/)
+    }
+  })
+
+  test('a missing path says where that name is now', async () => {
+    const { tools } = session({
+      'moved/here/rules.l4': '',
+      'moved/there/RULES.L4': '',
+      'other.l4': '',
+    })
+    await assert.rejects(tools.readFile({ path: 'rules.l4' }), (err: Error) => {
+      assert.equal(
+        err.message,
+        'No such file or directory: rules.l4. ' +
+          'That name is at: moved/here/rules.l4, moved/there/RULES.L4'
+      )
+      return true
+    })
+    await assert.rejects(tools.readFile({ path: 'gone.l4' }), (err: Error) => {
+      assert.equal(err.message, 'No such file or directory: gone.l4')
+      return true
+    })
   })
 
   test('read_file rejects paths outside the workspace', async () => {
@@ -103,7 +239,8 @@ describe('fs tools over the Workspace port', () => {
     const out = await tools.editFile({ path: 'a.l4', old: '1', new: '2' })
     assert.match(out, /--- L4 diagnostics: 1 issue \(1 error\) ---/)
     assert.match(out, /error 1 → boom \[jl4\]/)
-    assert.match(out, /search_l4_docs/)
+    // L4 advice belongs next to the system prompt, not in the harness.
+    assert.doesNotMatch(out, /search_l4_docs/)
   })
 
   test('delete_file reports what the workspace did', async () => {

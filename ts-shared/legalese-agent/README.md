@@ -56,6 +56,32 @@ const service = new ChatService({
 await service.start(params) // events arrive at interaction.emit
 ```
 
+## When L4 goes wrong
+
+Models rarely write good L4 first time, so the tools assume the next edit may
+be a mistake. All of this works from the language server's fields (severity,
+source, code) and knows no L4 syntax: advice about the language doesn't belong
+here.
+
+- **Checked diagnostics.** `L4Language.getCheckedDiagnostics` answers for the
+  file's current text, or reports `pending`. A pending result is never read as
+  clean.
+- **File state** (`tools/lsp.ts`). Parse failure, type errors, failed checks and
+  clean, in that order. Compare with `isWorse`, not by error count: the parser
+  stops at the first error, so a good fix can reveal more.
+- **Multi-edit.** `fs__edit_file` takes up to `MAX_EDITS_PER_FILE` changes in
+  `edits`. Each is applied and checked in turn, and the run stops at the first
+  that fails, leaves the file worse, or can't be checked. Separate calls to one
+  file in one response count as one run.
+- **`EditGuard`** (`edit-guard.ts`). Tracks a turn's files: it blocks a file
+  after `MAX_BROKEN_EDITS` broken edits with no progress, nudges once when a turn
+  would end with compile errors of its own making, and writes the status line
+  added to the reply. Failed checks only ever go in that status line: pushing a
+  model to turn them green invites it to weaken them.
+- **Permissions.** `content` on `fs__create_file` needs `fs.edit` as well as
+  `fs.create`. `Workspace.requiresWriteApproval` makes writes to configuration
+  files (`isSensitivePath`) ask, whatever the category settings say.
+
 `BuiltinTools` owns the directive snapshot stores behind `l4__evaluate` and
 `fs__edit_file`'s "what changed since I last reported" diffs, keyed by
 conversation (the dispatcher passes `ToolCallContext.conversationId`) and by

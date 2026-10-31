@@ -1,4 +1,5 @@
 import type { AiProxyTool, Logger, ToolProvider } from '@repo/legalese-agent'
+import { userMcpToolName } from '@repo/legalese-agent'
 import {
   generateSealingKeyPair,
   mcpCredentials,
@@ -81,16 +82,9 @@ interface Server {
 
 let rpcId = 1
 
-function sanitize(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]/g, '_')
-}
-
 /** `vsmcp__<server>_<tool>`, ≤ 64 characters, like the extension. */
 export function wireName(server: string, tool: string): string {
-  return `${USER_MCP_PREFIX}${sanitize(server).slice(0, 16)}_${sanitize(tool).slice(0, 40)}`.slice(
-    0,
-    64
-  )
+  return userMcpToolName(USER_MCP_PREFIX, server, tool)
 }
 
 /**

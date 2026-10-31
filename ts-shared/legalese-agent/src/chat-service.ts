@@ -6,9 +6,10 @@ import type {
 } from 'jl4-client-rpc'
 import { AiProxyError, type AiProxyClient } from './ai-proxy-client.js'
 import {
-  buildEditorContextMessage,
-  buildMentionContextMessage,
+  buildEditorContextBlock,
+  buildMentionContextBlock,
   buildMethodologyContextMessage,
+  buildRuleIndexMessage,
   buildSessionContextMessage,
   buildWorkspaceBootstrapMessage,
 } from './context-messages.js'
@@ -47,7 +48,19 @@ export interface ChatServiceOptions {
    *  locally-persisted conversations so support can correlate
    *  transcripts with a specific build. */
   extensionVersion: string
+  /** How long a generated title may take. Default {@link TITLE_TIMEOUT_MS}. */
+  titleTimeoutMs?: number
 }
+
+/** Past this a chat is named from its first message, so a stalled request
+ *  can't leave it unnamed. */
+export const TITLE_TIMEOUT_MS = 10_000
+
+/** Turns an unchanged editor context may go unsent. */
+const EDITOR_CONTEXT_RESEND_TURNS = 10
+
+/** Conversations whose last editor context is remembered. */
+const MAX_REMEMBERED_CONTEXTS = 200
 
 /**
  * Orchestrates a single user → assistant turn end-to-end. Holds one
@@ -86,7 +99,19 @@ export class ChatService {
    *  assistant→tool→user sequence. Cleared on abort and on the
    *  turn's ultimate exit from `start()`. */
   private readonly injections = new Map<string, QueuedUserMessage[]>()
+  /** The title being generated for a turn that starts a conversation,
+   *  until the conversation exists to carry it. */
+  private readonly titles = new Map<string, Promise<string | null>>()
   private readonly editor: EditorContext
+  /** The editor context last sent per conversation. It's only sent again
+   *  when it changes, so an unchanged editor costs nothing and a turn that
+   *  merely continues isn't redirected by it, and now and then anyway,
+   *  because compaction can drop the message that carried it. Bounded like
+   *  the tools' snapshot stores. */
+  private readonly lastEditorContext = new Map<
+    string,
+    { text: string; unsentTurns: number }
+  >()
 
   constructor(private readonly opts: ChatServiceOptions) {
     this.editor = opts.editor ?? NO_EDITOR_CONTEXT
@@ -127,8 +152,8 @@ export class ChatService {
   /**
    * Start a turn. Runs entirely in the background — awaiting this
    * promise waits for the whole pipeline to complete (including
-   * persistence + title generation + draining any user messages
-   * queued mid-stream via `inject()`). Callers typically
+   * persistence + draining any user messages queued mid-stream via
+   * `inject()`), though not for the title. Callers typically
    * fire-and-forget since progress flows through the event emitter.
    *
    * Sub-turn loop: a single `start()` call may produce multiple
@@ -168,6 +193,27 @@ export class ChatService {
     const abortController = new AbortController()
     this.active.set(turnId, abortController)
     this.injections.set(turnId, [])
+    // Asked alongside the turn, so the chat has its name while the
+    // answer streams.
+    //
+    // Title generation goes through the default Legalese AI proxy's
+    // stateless summize pipeline regardless of where the turn itself
+    // runs — deployment ("Use in chat") chats included. Anyone in an AI
+    // chat already has AI access (the panel is gated on it), and the
+    // deployment's own endpoint only serves its comply model, not
+    // summize, so the default proxy is the correct target here.
+    if (isNewConversation && params.text.trim()) {
+      this.titles.set(
+        turnId,
+        this.opts.proxy
+          .summarizeTitle(params.text, {
+            signal: AbortSignal.timeout(
+              this.opts.titleTimeoutMs ?? TITLE_TIMEOUT_MS
+            ),
+          })
+          .catch(() => null)
+      )
+    }
     this.opts.logger.info(
       `turn start (turnId=${turnId}, conv=${params.conversationId ?? '<new>'}, isNew=${isNewConversation}, textLen=${params.text.length})`
     )
@@ -201,11 +247,16 @@ export class ChatService {
         // user delta.
         const isNewForAssemble = isFirstSubTurn && isNewConversation
         let nextMessages: AiChatMessage[] | null
+        let inlineContext: string | undefined
+        let editorContext: string | undefined
         try {
-          nextMessages = await this.assembleMessages(
+          const assembled = await this.assembleMessages(
             activeParams,
             isNewForAssemble
           )
+          nextMessages = assembled.messages
+          inlineContext = assembled.inlineContext
+          editorContext = assembled.editorContext
         } catch (err) {
           this.opts.logger.error('chat-service: assembleMessages failed', err)
           this.emit({
@@ -271,9 +322,15 @@ export class ChatService {
           isFirstSubTurn,
           serverConversationId,
           nextMessages,
+          inlineContext,
           abortController,
           onMetadata: (md) => {
             serverConversationId = md.conversationId
+            // Only now is it known to have arrived. A failed request, or a
+            // retry with no user message to carry it, must send it again.
+            if (editorContext && !activeParams.continueTurn) {
+              this.rememberEditorContext(md.conversationId, editorContext)
+            }
           },
         })
 
@@ -326,7 +383,36 @@ export class ChatService {
     } finally {
       this.active.delete(turnId)
       this.injections.delete(turnId)
+      this.titles.delete(turnId)
+      this.opts.dispatcher.endTurn(turnId)
     }
+  }
+
+  private rememberEditorContext(conversationId: string, text: string): void {
+    this.lastEditorContext.delete(conversationId)
+    this.lastEditorContext.set(conversationId, { text, unsentTurns: 0 })
+    while (this.lastEditorContext.size > MAX_REMEMBERED_CONTEXTS) {
+      const oldest = this.lastEditorContext.keys().next().value as string
+      this.lastEditorContext.delete(oldest)
+    }
+  }
+
+  /** Append the harness-written status of this turn's files to the reply.
+   *  It's for the user, so the model never sees it as its own words. */
+  private async appendTurnStatus(
+    turnId: string,
+    conversationId: string,
+    blocks: PersistedBlock[]
+  ): Promise<string> {
+    const status = await this.opts.dispatcher
+      .takeTurnStatus(turnId)
+      .catch(() => null)
+    if (!status) return ''
+    const tail = blocks[blocks.length - 1]
+    if (tail && tail.kind === 'text') tail.text += status
+    else blocks.push({ kind: 'text', text: status })
+    this.emit({ kind: 'text-delta', conversationId, text: status })
+    return status
   }
 
   /**
@@ -350,6 +436,7 @@ export class ChatService {
     isFirstSubTurn: boolean
     serverConversationId: string | undefined
     nextMessages: AiChatMessage[]
+    inlineContext?: string
     abortController: AbortController
     onMetadata: (md: { conversationId: string; model: string }) => void
   }): Promise<{
@@ -367,6 +454,7 @@ export class ChatService {
       activeParams,
       isNewForAssemble,
       isFirstSubTurn,
+      inlineContext,
       abortController,
       onMetadata,
     } = opts
@@ -389,6 +477,7 @@ export class ChatService {
             blocks: turnBlocks,
             apiBaseUrl: activeParams.apiBaseUrl,
             deploymentId: activeParams.deploymentId,
+            ...(iteration === 0 && inlineContext ? { inlineContext } : {}),
             // `continueTurn` only applies to the FIRST iteration of
             // the FIRST sub-turn — that's the retry-from-error-
             // bubble path where the caller wants the server to run
@@ -411,11 +500,43 @@ export class ChatService {
           })
         totalAssistantText += assistantText
 
+        // A clean stop that leaves compile errors this turn introduced gets
+        // one more pass, unless the user has already said something else.
+        if (
+          finishReason === 'stop' &&
+          (this.injections.get(turnId) ?? []).length === 0
+        ) {
+          const nudge = await this.opts.dispatcher
+            .stopNudge(turnId)
+            .catch(() => null)
+          if (nudge) {
+            // Keep what the model said so far apart from what follows.
+            const gap = '\n\n'
+            totalAssistantText += gap
+            const tail = turnBlocks[turnBlocks.length - 1]
+            if (tail && tail.kind === 'text') tail.text += gap
+            this.emit({
+              kind: 'text-delta',
+              conversationId: serverConversationId ?? turnId,
+              text: gap,
+            })
+            nextMessages = [{ role: 'user', content: nudge }]
+            continue
+          }
+        }
+
         if (finishReason !== 'tool_calls') {
           // Natural terminal state: stop, length, content_filter,
           // error, aborted. Persist the assistant turn locally
           // (proxy already owns the authoritative copy server-side)
           // and emit `done` for this sub-turn.
+          if (finishReason !== 'aborted') {
+            totalAssistantText += await this.appendTurnStatus(
+              turnId,
+              serverConversationId ?? turnId,
+              turnBlocks
+            )
+          }
           if (serverConversationId) {
             await this.persistAssistantTurn(
               serverConversationId,
@@ -432,24 +553,6 @@ export class ChatService {
             finishReason,
             usage,
           })
-          if (
-            isFirstSubTurn &&
-            isNewForAssemble &&
-            serverConversationId &&
-            finishReason === 'stop'
-          ) {
-            // Title generation goes through the default Legalese AI
-            // proxy's stateless summize pipeline regardless of where
-            // the turn itself ran — deployment ("Use in chat") chats
-            // included. Anyone in an AI chat already has AI access
-            // (the panel is gated on it), and the deployment's own
-            // endpoint only serves its comply model, not summize, so
-            // the default proxy is the correct target here.
-            this.generateTitleInBackground(
-              serverConversationId,
-              activeParams.text
-            )
-          }
           // Only `stop` (clean finish) lets the pipeline drain
           // queued messages into another sub-turn. Length caps and
           // errors halt the whole pipeline so we don't burn tokens
@@ -471,6 +574,7 @@ export class ChatService {
         }
 
         // Execute each pending tool call.
+        this.opts.dispatcher.beginRound(turnId, pendingCalls)
         const toolMessages: AiChatMessage[] = []
         for (const call of pendingCalls) {
           const result = await this.opts.dispatcher.run(
@@ -625,6 +729,7 @@ export class ChatService {
      *  extractDelta + appendMessages and runs another pass against
      *  the stored history. Only meaningful on iteration 0. */
     continueTurn: boolean
+    inlineContext?: string
     /** Set on every sub-turn past the first within a single
      *  pipeline. The conversationId already exists from the first
      *  sub-turn's metadata frame, so re-emitting `started` would
@@ -652,6 +757,7 @@ export class ChatService {
       suppressStartedEmit,
       onMetadata,
       apiBaseUrl,
+      inlineContext,
     } = opts
     const deploymentMode = !!apiBaseUrl
     const pendingCalls: Array<{
@@ -689,6 +795,7 @@ export class ChatService {
         // server so no duplicate user message lands in the stored
         // transcript.
         ...(continueTurn ? { continueTurn: true } : {}),
+        ...(inlineContext ? { inlineContext } : {}),
         // Deployment-scoped passthrough: POST against
         // `{apiBaseUrl}/v1/chat/completions` (and reattach there)
         // instead of the default Legalese AI proxy.
@@ -731,6 +838,11 @@ export class ChatService {
                 `chat-service: initial user-turn save failed: ${err instanceof Error ? err.message : String(err)}`
               )
             )
+          const title = this.titles.get(opts.turnId)
+          if (title) {
+            this.titles.delete(opts.turnId)
+            void this.publishTitle(ev.conversationId, title, opts.userText)
+          }
         }
       } else if (ev.kind === 'text-delta') {
         assistantText += ev.text
@@ -903,13 +1015,21 @@ export class ChatService {
         // For infra tools (list_files / read_file / etc.) and any
         // non-`l4-rules__` call this returns null and we leave the
         // fields undefined.
-        const ruleTarget = this.opts.dispatcher.getToolTarget(ev.name)
+        const ruleTarget = this.opts.dispatcher.getToolTarget(
+          ev.name,
+          ev.argsJson
+        )
         const existingBlock = blocks.find(
           (b) => b.kind === 'tool-call' && b.callId === ev.callId
         )
         if (existingBlock && existingBlock.kind === 'tool-call') {
           if (ev.argsJson) existingBlock.argsJson = ev.argsJson
           if (ev.name) existingBlock.name = ev.name
+          // A generic rule tool only names its rule once the args arrive.
+          if (ruleTarget) {
+            existingBlock.ruleFnName = ruleTarget.fnName
+            existingBlock.deploymentId = ruleTarget.deployId
+          }
         } else {
           blocks.push({
             kind: 'tool-call',
@@ -990,8 +1110,16 @@ export class ChatService {
   private async assembleMessages(
     params: AiChatStartParams,
     isNew: boolean
-  ): Promise<AiChatMessage[]> {
+  ): Promise<{
+    messages: AiChatMessage[]
+    /** Wire-only context for this turn's user message. */
+    inlineContext?: string
+    /** The editor context this turn sends, to remember once it's sent. */
+    editorContext?: string
+  }> {
     const messages: AiChatMessage[] = []
+    const inline: string[] = []
+    let editorContext: string | undefined
 
     // Deployment ("Use in chat") mode is a plain passthrough to the
     // deployment's own model: no editor context, @-mention context,
@@ -1009,10 +1137,22 @@ export class ChatService {
       // live activeTextEditor when the webview didn't send one
       // (older builds, or "include active file" toggled on without a
       // file open at the moment of the send).
-      const editorCtx = buildEditorContextMessage(
+      const editorCtx = buildEditorContextBlock(
         this.editor.describe(params.activeFile)
       )
-      if (editorCtx) messages.push(editorCtx)
+      const known = params.conversationId
+        ? this.lastEditorContext.get(params.conversationId)
+        : undefined
+      if (
+        editorCtx &&
+        (editorCtx !== known?.text ||
+          known.unsentTurns >= EDITOR_CONTEXT_RESEND_TURNS)
+      ) {
+        inline.push(editorCtx)
+        editorContext = editorCtx
+      } else if (known) {
+        known.unsentTurns++
+      }
     }
 
     // @-mention context: the user's text already contains the literal
@@ -1023,8 +1163,8 @@ export class ChatService {
     // the user attaches an extra file via @ never see the body — the
     // model has no signal that the @-token is anything actionable.
     if (!deploymentMode) {
-      const mentionCtx = buildMentionContextMessage(params.mentions)
-      if (mentionCtx) messages.push(mentionCtx)
+      const mentionCtx = buildMentionContextBlock(params.mentions)
+      if (mentionCtx) inline.push(mentionCtx)
     }
 
     if (isNew && !deploymentMode) {
@@ -1038,6 +1178,10 @@ export class ChatService {
         this.opts.l4
       )
       if (bootstrap) messages.push(bootstrap)
+      const ruleIndex = buildRuleIndexMessage(
+        await this.opts.dispatcher.promptIndexes()
+      )
+      if (ruleIndex) messages.push(ruleIndex)
       // User's standing methodology, last so it sits closest to the
       // first user prompt it should shape. Gated on !deploymentMode
       // (this block) so attached deployments stay a plain passthrough.
@@ -1054,7 +1198,16 @@ export class ChatService {
     // against the stored history. body.messages can be empty — the
     // proxy allows it when continueTurn is set, so we don't need
     // the old "continue" system-hint workaround.
-    if (params.continueTurn) return messages
+    const done = (): {
+      messages: AiChatMessage[]
+      inlineContext?: string
+      editorContext?: string
+    } => ({
+      messages,
+      ...(inline.length > 0 ? { inlineContext: inline.join('\n\n') } : {}),
+      ...(editorContext ? { editorContext } : {}),
+    })
+    if (params.continueTurn) return done()
 
     // Multimodal user content: when the webview has staged attachments,
     // ship them as OpenAI-shaped content parts alongside the text so
@@ -1116,7 +1269,7 @@ export class ChatService {
     } else {
       messages.push({ role: 'user', content: params.text })
     }
-    return messages
+    return done()
   }
 
   private async persistAssistantTurn(
@@ -1130,16 +1283,15 @@ export class ChatService {
     const blocks = (meta as { blocks?: PersistedBlock[] } | undefined)?.blocks
     const hasBlocks = Array.isArray(blocks) && blocks.length > 0
     if (!text && !hasBlocks) return
-    const existing = await this.opts.store.load(conversationId)
-    if (!existing) return
-    existing.messages.push({
-      role: 'assistant',
-      content: text,
-      ...(meta ? { _meta: meta } : {}),
-    })
-    existing.lastActiveAt = new Date().toISOString()
     await this.opts.store
-      .save(existing)
+      .update(conversationId, (conv) => {
+        conv.messages.push({
+          role: 'assistant',
+          content: text,
+          ...(meta ? { _meta: meta } : {}),
+        })
+        conv.lastActiveAt = new Date().toISOString()
+      })
       .catch((err) =>
         this.opts.logger.warn(
           `chat-service: assistant-turn save failed: ${err instanceof Error ? err.message : String(err)}`
@@ -1147,20 +1299,24 @@ export class ChatService {
       )
   }
 
-  private generateTitleInBackground(
+  /** Name a new conversation: the generated title, or the start of its
+   *  first message without one, so it never stays unnamed. */
+  private async publishTitle(
     conversationId: string,
+    generated: Promise<string | null>,
     firstUserMessage: string
-  ): void {
-    void this.opts.proxy
-      .summarizeTitle(firstUserMessage)
-      .then(async (title) => {
-        if (!title) return
-        // Not over a title the user gave it meanwhile.
-        await this.opts.store.setTitle(conversationId, title, {
-          replacing: titleFromUserMessage(firstUserMessage),
-        })
-      })
-      .catch(() => undefined)
+  ): Promise<void> {
+    const seeded = titleFromUserMessage(firstUserMessage)
+    const title = (await generated)?.trim() || seeded
+    // Not over a title the user gave it meanwhile.
+    await this.opts.store
+      .setTitle(conversationId, title, { replacing: seeded })
+      .catch((err) =>
+        this.opts.logger.warn(
+          `chat-service: title save failed: ${err instanceof Error ? err.message : String(err)}`
+        )
+      )
+    this.emit({ kind: 'title', conversationId, title })
   }
 }
 

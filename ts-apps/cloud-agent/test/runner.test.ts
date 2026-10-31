@@ -3,7 +3,12 @@ import { execFileSync } from 'node:child_process'
 import * as assert from 'node:assert/strict'
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import * as path from 'node:path'
-import { type AuthProvider } from '@repo/legalese-agent'
+import {
+  TURN_STATUS_HEADING,
+  turnStatusLines,
+  type AuthProvider,
+  type ChatServiceEvent,
+} from '@repo/legalese-agent'
 import type { CloudEvent } from '@repo/legalese-agent/protocol'
 import { claimDevRun, initSessionFolder, sendCommand } from '../src/dev.js'
 import { Fence } from '../src/lease.js'
@@ -712,12 +717,13 @@ describe('Runner', () => {
       role: string
       content: string
     }>
-    const system = msgs
-      .filter((m) => m.role === 'system')
+    // Inline on the user message, so it reaches the model on every turn.
+    const user = msgs
+      .filter((m) => m.role === 'user')
       .map((m) => m.content)
       .join('\n')
-    assert.match(system, /<editor-context>[\s\S]*data\/a\.l4/)
-    assert.match(system, /<mention-context>[\s\S]*data\/b\.l4/)
+    assert.match(user, /<editor-context>[\s\S]*data\/a\.l4/)
+    assert.match(user, /<mention-context>[\s\S]*data\/b\.l4/)
   })
 
   test('commits each turn and rolls it back through commands (git plugin)', async () => {
@@ -912,5 +918,30 @@ describe('ReplyCollector', () => {
     assert.equal(c.final(), 'Also done.')
     c.begin()
     assert.equal(c.final(), '')
+  })
+})
+
+describe('ReplyCollector', () => {
+  const delta = (text: string): ChatServiceEvent => ({
+    kind: 'text-delta',
+    conversationId: 'c',
+    text,
+  })
+
+  test('keeps the status of a reply too long to keep whole', () => {
+    const c = new ReplyCollector()
+    c.begin()
+    c.observe(delta('x'.repeat(9_000)))
+    c.observe(delta(`\n\n---\n${TURN_STATUS_HEADING}\n- \`a.l4\`: compiles`))
+    assert.deepEqual(turnStatusLines(c.final()), ['`a.l4`: compiles'])
+  })
+
+  test('does not repeat a status that fits', () => {
+    const c = new ReplyCollector()
+    c.begin()
+    c.observe(
+      delta(`Done.\n\n---\n${TURN_STATUS_HEADING}\n- \`a.l4\`: compiles`)
+    )
+    assert.equal(c.final().split(TURN_STATUS_HEADING).length, 2)
   })
 })

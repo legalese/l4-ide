@@ -13,6 +13,7 @@
     AiChatStarted,
     AiChatTextDelta,
     AiChatThinkingDelta,
+    AiChatTitle,
     AiChatToolActivity,
     AiChatToolCall,
     AiChatTurnSpawn,
@@ -132,6 +133,7 @@
     m.onNotification(AiChatStarted, (p) => store.onStarted(p))
     m.onNotification(AiChatTextDelta, (p) => store.onTextDelta(p))
     m.onNotification(AiChatThinkingDelta, (p) => store.onThinkingDelta(p))
+    m.onNotification(AiChatTitle, (p) => store.onTitle(p))
     m.onNotification(AiChatDone, (p) => store.onDone(p))
     m.onNotification(AiChatError, (p) => store.onError(p))
     m.onNotification(AiChatToolCall, (p) => store.onToolCall(p))

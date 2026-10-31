@@ -13,10 +13,17 @@ import {
   type PermissionCategory,
   type PermissionValue,
 } from './permissions.js'
+import {
+  EditGuard,
+  NEW_FILE,
+  type FileSnapshot,
+  type KnockOnFile,
+} from './edit-guard.js'
 import { BUILTIN_TOOLS } from './tool-registry.js'
 import { metaAskUser } from './tools/ask-user.js'
-import type { BuiltinTools } from './tools/builtin-tools.js'
-import type { FsCopyArgs } from './tools/fs.js'
+import type { BuiltinTools, ToolSessionContext } from './tools/builtin-tools.js'
+import type { FsCopyArgs, FsCreateArgs, FsEditArgs } from './tools/fs.js'
+import { l4FileState } from './tools/lsp.js'
 import type { L4RefactorArgs } from './tools/refactor.js'
 
 /** Result returned to the proxy as the content of a `role:"tool"` message. */
@@ -68,6 +75,7 @@ export interface AppliedEditSnapshot {
 }
 
 export class ToolDispatcher {
+  private readonly guard = new EditGuard()
   /** Pre-edit snapshots keyed by callId, populated for fs__edit_file
    *  and fs__create_file. Lives for the extension's lifetime — small
    *  values, turnover is low. Used by the register layer to resolve
@@ -82,6 +90,11 @@ export class ToolDispatcher {
   /** Resolve a tool-call's target file to its current URI. Read /
    *  create / edit / delete take `{ path }`; copy targets `to`. */
   resolveFile(call: ToolCall): string | null {
+    // A create can land on another name than the one it asked for.
+    if (call.name === 'fs__create_file') {
+      const uri = this.edits.get(call.callId)?.uri
+      if (uri) return uri
+    }
     try {
       const p = targetPath(call.name, JSON.parse(call.argsJson || '{}'))
       if (!p) return null
@@ -96,12 +109,35 @@ export class ToolDispatcher {
    *  service render a tool row in its real initial state
    *  (pending-approval vs running). */
   permissionFor(name: string, argsJson = ''): PermissionValue | null {
-    return (
-      strictestPermission(
-        this.opts.permissions,
-        categoriesForCall(name, argsOrNull(argsJson))
-      )?.permission ?? null
-    )
+    const args = argsOrNull(argsJson)
+    const permission = strictestPermission(
+      this.opts.permissions,
+      categoriesForCall(name, args)
+    )?.permission
+    if (!permission) return null
+    return this.withWriteApproval(permission, name, args)
+  }
+
+  /** `ask` instead of `always` when the call writes a file the workspace
+   *  wants confirmed. `never` stays `never`. */
+  private withWriteApproval(
+    permission: PermissionValue,
+    name: string,
+    args: unknown
+  ): PermissionValue {
+    if (permission !== 'always') return permission
+    const workspace = this.opts.tools.workspace
+    if (!workspace.requiresWriteApproval) return permission
+    for (const p of writtenPaths(name, args)) {
+      try {
+        if (workspace.requiresWriteApproval(workspace.resolvePath(p))) {
+          return 'ask'
+        }
+      } catch {
+        // A path that doesn't resolve fails when the tool runs.
+      }
+    }
+    return permission
   }
 
   /** Category for a tool name, or null for an unknown tool. */
@@ -128,14 +164,108 @@ export class ToolDispatcher {
     return tools
   }
 
+  /** What each provider wants the model told on the first turn. */
+  async promptIndexes(): Promise<string[]> {
+    const out: string[] = []
+    for (const provider of this.providers) {
+      try {
+        const index = await provider.promptIndex?.()
+        if (index) out.push(index)
+      } catch (err) {
+        this.opts.logger.warn(
+          `chat-service: ${provider.prefix} index failed: ${err instanceof Error ? err.message : String(err)}`
+        )
+      }
+    }
+    return out
+  }
+
   /** `(deployId, fnName)` for a deployed-rule tool, for display. */
-  getToolTarget(name: string): { deployId: string; fnName: string } | null {
+  getToolTarget(
+    name: string,
+    argsJson?: string
+  ): { deployId: string; fnName: string } | null {
     for (const provider of this.providers) {
       if (!name.startsWith(provider.prefix)) continue
-      const target = provider.getToolTarget?.(name)
+      const target = provider.getToolTarget?.(name, argsJson)
       if (target) return target
     }
     return null
+  }
+
+  /** Call before running the tool calls of one model response. */
+  beginRound(turnId: string, calls: ToolCall[]): void {
+    const uris: string[] = []
+    for (const call of calls) {
+      if (call.name !== 'fs__edit_file') continue
+      const p = targetPath(call.name, argsOrNull(call.argsJson))
+      const uri = p ? this.opts.tools.resolveFileUri(p) : null
+      if (uri) uris.push(uri)
+    }
+    this.guard.beginRound(turnId, uris)
+  }
+
+  private async snapshot(uri: string): Promise<FileSnapshot | null> {
+    const { l4 } = this.opts.tools
+    try {
+      const checked = await l4.getCheckedDiagnostics(uri)
+      const rows = l4.getDirectiveResults(uri) ?? []
+      return {
+        state: l4FileState(checked),
+        checks: rows
+          .filter((r) => r.success !== null)
+          .map(({ body, success }) => ({ body, success })),
+      }
+    } catch {
+      return null
+    }
+  }
+
+  /** Where the turn's edited files stand now; `null` for one that's gone. */
+  private async currentFiles(
+    turnId: string
+  ): Promise<Map<string, FileSnapshot | null>> {
+    const { workspace } = this.opts.tools
+    const files = this.guard.trackedFiles(turnId)
+    const snapshots = await Promise.all(
+      files.map(async (f): Promise<[string, FileSnapshot | null]> => {
+        const exists = await workspace
+          .stat(workspace.pathForUri(f.uri))
+          .catch(() => null)
+        return [f.uri, exists ? await this.snapshot(f.uri) : null]
+      })
+    )
+    return new Map(snapshots)
+  }
+
+  /** A message to continue the turn with, when it would otherwise end
+   *  with compile errors of its own making. */
+  async stopNudge(turnId: string): Promise<string | null> {
+    return this.guard.stopNudge(
+      turnId,
+      await this.currentFiles(turnId),
+      this.knockOnFiles(turnId)
+    )
+  }
+
+  private knockOnFiles(turnId: string): KnockOnFile[] {
+    const { l4, workspace } = this.opts.tools
+    return this.guard.knockOnFiles(turnId, l4.fileErrorCounts?.(), (uri) =>
+      workspace.relativePath(uri)
+    )
+  }
+
+  /** Status of the files this turn edited, once. */
+  async takeTurnStatus(turnId: string): Promise<string | null> {
+    return this.guard.takeStatus(
+      turnId,
+      await this.currentFiles(turnId),
+      this.knockOnFiles(turnId)
+    )
+  }
+
+  endTurn(turnId: string): void {
+    this.guard.endTurn(turnId)
   }
 
   /** Look up the pre-edit snapshot for a tool call. Returns null if
@@ -173,10 +303,19 @@ export class ToolDispatcher {
       }
     }
     // The strictest of what the call needs (a move also deletes).
-    const { category: deciding, permission } = strictestPermission(
-      this.opts.permissions,
-      categoriesForCall(call.name, argsOrNull(call.argsJson))
-    ) ?? { category, permission: this.opts.permissions.getPermission(category) }
+    const { category: deciding, permission: categoryPermission } =
+      strictestPermission(
+        this.opts.permissions,
+        categoriesForCall(call.name, argsOrNull(call.argsJson))
+      ) ?? {
+        category,
+        permission: this.opts.permissions.getPermission(category),
+      }
+    const permission = this.withWriteApproval(
+      categoryPermission,
+      call.name,
+      argsOrNull(call.argsJson)
+    )
     this.opts.logger.info(
       `tool/dispatch ${call.name} (category=${deciding}, permission=${permission}) args=${call.argsJson}`
     )
@@ -268,16 +407,13 @@ export class ToolDispatcher {
       case 'fs__read_file':
         return tools.readFile(args as { path: string })
       case 'fs__create_file':
-        return tools.createFile(args as { path: string })
+        return this.createFile(callId, args as FsCreateArgs, ctx)
       case 'fs__edit_file':
-        return tools.editFile(
-          args as { path: string; old: string; new: string },
-          ctx
-        )
+        return this.editFile(args as FsEditArgs, ctx)
       case 'fs__delete_file':
         return tools.deleteFile(args as { path: string })
       case 'fs__copy_file':
-        return tools.copyFile(args as FsCopyArgs, ctx)
+        return this.copyFile(args as FsCopyArgs, ctx)
       case 'l4__evaluate':
         return tools.evaluate(
           args as {
@@ -303,6 +439,123 @@ export class ToolDispatcher {
         throw new Error(`No executor for tool: ${name}`)
     }
   }
+
+  private async createFile(
+    callId: string,
+    args: FsCreateArgs,
+    ctx: ToolCallContext
+  ): Promise<string> {
+    const tools = this.opts.tools
+    const blocked = (() => {
+      const uri = tools.resolveFileUri(args.path)
+      return uri ? this.guard.blocked(ctx.turnId, uri) : null
+    })()
+    if (blocked) throw new Error(blocked)
+    const result = await tools.createFileDetailed(args, this.toolContext(ctx))
+    // The snapshot was taken for the requested path. When the content went
+    // to a numbered name, the file there is unrelated to this call.
+    const snapshot = this.edits.get(callId)
+    if (snapshot && snapshot.uri !== result.uri) {
+      snapshot.uri = result.uri
+      snapshot.relativePath = result.relative
+      snapshot.before = ''
+    }
+    if (result.state) {
+      this.guard.track(ctx.turnId, result.uri, result.relative, NEW_FILE)
+      this.guard.recordState(ctx.turnId, result.uri, result.state)
+    }
+    return result.output
+  }
+
+  /** A copy can put a broken file in place of a good one, so it counts as
+   *  an edit of its target. `fs__create_file` itself suggests this route. */
+  private async copyFile(
+    args: FsCopyArgs,
+    ctx: ToolCallContext
+  ): Promise<string> {
+    const tools = this.opts.tools
+    const to = tools.workspace.resolvePath(args.to)
+    const blocked = this.guard.blocked(ctx.turnId, to.uri)
+    if (blocked) throw new Error(blocked)
+    if (
+      to.fsPath.toLowerCase().endsWith('.l4') &&
+      !this.guard.isTracked(ctx.turnId, to.uri)
+    ) {
+      this.guard.noteErrorsBefore(ctx.turnId, tools.l4.fileErrorCounts?.())
+      const exists = await tools.workspace.stat(to.fsPath)
+      const baseline = exists ? await this.snapshot(to.uri) : NEW_FILE
+      this.guard.track(
+        ctx.turnId,
+        to.uri,
+        to.relative,
+        baseline ?? { state: null, checks: [] }
+      )
+    }
+    const result = await tools.copyFileDetailed(args, this.toolContext(ctx))
+    if (result.state) {
+      this.guard.recordState(ctx.turnId, result.uri, result.state)
+    }
+    return result.output
+  }
+
+  private async editFile(
+    args: FsEditArgs,
+    ctx: ToolCallContext
+  ): Promise<string> {
+    const tools = this.opts.tools
+    const r = tools.workspace.resolvePath(args.path)
+    const blocked = this.guard.blocked(ctx.turnId, r.uri)
+    if (blocked) throw new Error(blocked)
+    const isL4 = r.fsPath.toLowerCase().endsWith('.l4')
+    if (isL4 && !this.guard.isTracked(ctx.turnId, r.uri)) {
+      this.guard.noteErrorsBefore(ctx.turnId, tools.l4.fileErrorCounts?.())
+      const baseline = await this.snapshot(r.uri)
+      this.guard.track(
+        ctx.turnId,
+        r.uri,
+        r.relative,
+        baseline ?? { state: null, checks: [] }
+      )
+    }
+    const result = await tools.editFileDetailed(
+      args,
+      this.toolContext(ctx),
+      this.guard.sequenceFor(ctx.turnId, r.uri)
+    )
+    if (result.state) {
+      this.guard.recordState(ctx.turnId, r.uri, result.state, result.applied)
+    }
+    return result.output
+  }
+
+  private toolContext(ctx: ToolCallContext): ToolSessionContext {
+    return {
+      conversationId: ctx.conversationId,
+      mayQuoteFile: this.opts.permissions.getPermission('fs.read') === 'always',
+    }
+  }
+}
+
+/** Every path a tool call writes to or removes. */
+function writtenPaths(name: string, args: unknown): string[] {
+  const a = (args ?? {}) as {
+    path?: unknown
+    to?: unknown
+    from?: unknown
+    deleteSource?: unknown
+  }
+  const paths: unknown[] = []
+  if (
+    name === 'fs__create_file' ||
+    name === 'fs__edit_file' ||
+    name === 'fs__delete_file'
+  ) {
+    paths.push(a.path)
+  } else if (name === 'fs__copy_file') {
+    paths.push(a.to)
+    if (a.deleteSource) paths.push(a.from)
+  }
+  return paths.filter((p): p is string => typeof p === 'string' && p !== '')
 }
 
 /** The file a tool call writes or names: `to` for a copy, else `path`. */

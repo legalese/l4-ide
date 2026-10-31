@@ -1,7 +1,21 @@
 import * as path from 'node:path'
-import type { L4Language, ResolvedPath, Workspace } from '../ports.js'
+import type {
+  CheckedDiagnostics,
+  L4Language,
+  ResolvedPath,
+  Workspace,
+  WorkspaceDirEntry,
+} from '../ports.js'
 import { positionAt } from '../text-positions.js'
-import { fetchL4Diagnostics } from './lsp.js'
+import {
+  describeFileState,
+  formatChecked,
+  formatL4Diagnostics,
+  isWorse,
+  l4FileState,
+  type DiagnosticsLimit,
+  type L4FileState,
+} from './lsp.js'
 import {
   renderDirectiveResults,
   type DirectiveSnapshotStore,
@@ -17,6 +31,9 @@ export interface FsToolContext {
    *  changed since the last l4__evaluate call". Per conversation: see
    *  {@link BuiltinTools}. */
   editStore: DirectiveSnapshotStore
+  /** Whether a failed edit may quote the file back. Unset means no: an
+   *  edit must not become a way around a user who restricted `fs.read`. */
+  mayQuoteFile?: boolean
 }
 
 /** How long to wait (ms) after an edit for the LSP to push fresh
@@ -40,7 +57,8 @@ export interface FsReadArgs {
    *  Default 1. Applied after `search_keywords` when both are set. */
   startLine?: number
   /** 1-based inclusive end line. Default: read to the end of the
-   *  output, capped at `startLine + 499` (500-line ceiling). */
+   *  output, capped at `startLine + 499` (500-line ceiling). Naming one
+   *  also raises the character cap, see EXPLICIT_RANGE_CHAR_LIMIT. */
   endLine?: number
   /** Optional keyword filter. One or more keywords separated by
    *  whitespace; a line is a hit if it matches ANY of them (OR).
@@ -49,10 +67,11 @@ export interface FsReadArgs {
    *  For files, matching lines are returned with 2 lines of
    *  surrounding context. For directories, the tree is walked
    *  recursively (skipping `.git`, `node_modules`, `.DS_Store`)
-   *  and file *contents* are grepped — results are emitted as
-   *  `<relative-path>:<lineno>: <text>` so the model can jump to
+   *  and both entry *names* and file *contents* are searched — name
+   *  hits come first as `<relative-path>`, then contents as
+   *  `<relative-path>:<lineno>: <text>`, so the model can jump to
    *  the file with a follow-up `fs__read_file`. Use this to find
-   *  a symbol or string anywhere under the workspace. */
+   *  a file, a symbol or a string anywhere under the workspace. */
   search_keywords?: string
 }
 
@@ -63,37 +82,59 @@ export interface FsReadArgs {
  *  to files and directories. */
 const LINE_LIMIT = 500
 const CHAR_LIMIT = 4000
+/** Cap when the model names an `endLine`. Most capped reads never go on to
+ *  the next page, so raising the default would grow those for nothing; a
+ *  model that does want the rest can ask for it in one call. */
+const EXPLICIT_RANGE_CHAR_LIMIT = 24_000
 const PATTERN_CONTEXT_LINES = 2
 
+/** Diagnostics appended to an edit stay in the conversation for every later
+ *  round, so they're capped. `l4__evaluate` still returns the full list. */
+const EDIT_DIAGNOSTICS_LIMIT: DiagnosticsLimit = {
+  maxEntries: 8,
+  maxChars: 1500,
+}
+
+function isL4Path(fsPath: string): boolean {
+  return fsPath.toLowerCase().endsWith('.l4')
+}
+
 /**
- * For `.l4` files, append the exact same diagnostics payload the
- * `l4__evaluate` tool surfaces when the file fails type-check. Runs on
- * every `fs__read_file` / `fs__create_file` / `fs__edit_file` so the
- * model doesn't need a separate round-trip to confirm the file
- * compiles. Failures are swallowed — the primary tool result is more
- * important than the diagnostic annotation.
+ * For `.l4` files, append what the language server says about the file now,
+ * so the model doesn't need a separate round-trip to confirm it compiles.
+ * Runs after every write. Failures are swallowed: the primary tool result
+ * is more important than the annotation.
+ *
+ * Errors gate everything: they come back as a capped diagnostics block,
+ * since no directive-level diff means anything until they're fixed. A clean
+ * compile gets a compact directive diff, plus any warnings. Warnings are
+ * the only signal for code that compiles but likely isn't what was meant.
  */
-async function appendL4Diagnostics(
+async function reportL4File(
   ctx: FsToolContext,
   r: ResolvedPath,
-  body: string
-): Promise<string> {
-  if (!r.fsPath.toLowerCase().endsWith('.l4')) return body
+  body: string,
+  known?: CheckedDiagnostics
+): Promise<{ text: string; state?: L4FileState }> {
+  if (!isL4Path(r.fsPath)) return { text: body }
   try {
-    const diagnostics = await fetchL4Diagnostics(ctx.l4, r.uri)
-    // Errors gate everything: the model needs to fix them before any
-    // directive-level diff is meaningful. Return the diagnostics block
-    // verbatim — same payload `l4__evaluate` surfaces in that case.
-    if (/\b\d+ errors?\b/.test(diagnostics)) {
-      return `${body}\n${diagnostics}`
+    const checked = known ?? (await ctx.l4.getCheckedDiagnostics(r.uri))
+    const state = l4FileState(checked)
+    if (checked.pending || state.errors > 0) {
+      return {
+        text: `${body}\n${formatChecked(checked, EDIT_DIAGNOSTICS_LIMIT)}`,
+        state,
+      }
     }
-    // Clean compile: emit a compact directive diff against the
-    // edit-tool's snapshot. A fully-clean call with zero changes
-    // collapses to a single header line.
-    const diffBlock = await computeEditDiff(ctx, r)
-    return `${body}\n${diffBlock}`
+    const diffBlock = await computeEditDiff(ctx, r, checked)
+    const warnings = checked.diagnostics.filter((d) => d.severity === 'warning')
+    const warningBlock =
+      warnings.length > 0
+        ? `\n${formatL4Diagnostics(warnings, EDIT_DIAGNOSTICS_LIMIT)}`
+        : ''
+    return { text: `${body}\n${diffBlock}${warningBlock}`, state }
   } catch {
-    return body
+    return { text: body }
   }
 }
 
@@ -102,19 +143,18 @@ async function appendL4Diagnostics(
  *  two tools' "what changed since I last spoke" views stay
  *  independent. Always renders in `changed` mode — the edit's purpose
  *  is "did this write move any directive values?", which the full
- *  catalog would drown. Waits briefly for the LSP to push fresh
- *  directive results post-edit; falls back to whatever's in the cache
- *  on timeout. */
+ *  catalog would drown. When the server confirmed the check, directive
+ *  results have already arrived; otherwise wait briefly for its push and
+ *  fall back to whatever's in the cache on timeout. */
 async function computeEditDiff(
   ctx: FsToolContext,
-  r: ResolvedPath
+  r: ResolvedPath,
+  checked: CheckedDiagnostics
 ): Promise<string> {
   const uriStr = r.uri
-  // After applyEdit + save the LSP recompiles and pushes a fresh
-  // result set. We always wait for the next push (even if a stale
-  // cache entry exists) so the diff reflects post-edit state. The
-  // timeout caps the worst-case tool latency.
-  await ctx.l4.awaitDirectiveResults(uriStr, DIRECTIVE_PUSH_WAIT_MS)
+  if (!checked.confirmed) {
+    await ctx.l4.awaitDirectiveResults(uriStr, DIRECTIVE_PUSH_WAIT_MS)
+  }
   const results = ctx.l4.getDirectiveResults(uriStr) ?? []
   return renderDirectiveResults({
     results,
@@ -127,6 +167,28 @@ async function computeEditDiff(
 /** Skip these at any depth to keep listings useful — they're almost
  *  always noise the model doesn't want to reason about. */
 const DIR_IGNORES = new Set(['.git', 'node_modules', '.DS_Store'])
+/** What a folder search also passes over: build output, whose names and
+ *  contents would bury the sources. A listing still shows these, and a
+ *  search that starts inside one still works. */
+const SEARCH_IGNORES = new Set([
+  '.next',
+  '.svelte-kit',
+  '.turbo',
+  '.venv',
+  '__pycache__',
+  'dist',
+  'dist-newstyle',
+])
+/** Most of a line a folder search shows. The reply is capped in total, so
+ *  one minified line would otherwise be all of it. */
+const MAX_SEARCH_LINE_CHARS = 240
+/** Beyond this a directory search goes by a file's name alone: what's
+ *  this large is build output, and reading it is nearly all of what such
+ *  a search costs. */
+const MAX_SEARCHED_FILE_SIZE = 1_000_000
+/** Entries {@link pathsNamed} looks at, and the paths it reports. */
+const NAME_WALK_LIMIT = 20_000
+const MAX_PATHS_NAMED = 5
 
 /**
  * Read a file (one source line per output line) or list a directory
@@ -141,15 +203,16 @@ const DIR_IGNORES = new Set(['.git', 'node_modules', '.DS_Store'])
  *   [<path> 1-500/2489]                                — paginated (more after line 500)
  *   [<path> keywords="..." matches=3 chunks=2/2]       — file grep
  *   [<path> keywords="..." matches=0]                  — no hits
- *   [<dir>/ keywords="..." matches=12 files=3]         — recursive dir grep
+ *   [<dir>/ keywords="..." names=1 matches=12 files=3] — recursive dir grep
+ *     (` over1MB=N` when N files were too large to search inside)
  *
  * For file grep, matching lines are prefixed `>>>` and context
  * lines `   ` so the model can distinguish hits from surroundings;
  * non-contiguous chunks are separated by `---`. For directory grep
- * the tree is walked recursively (skipping `.git`, `node_modules`,
- * `.DS_Store`) and matches are emitted as
- * `<relative-path>:<lineno>: <text>` rows — file contents, not just
- * entry names.
+ * the tree is walked recursively (skipping `DIR_IGNORES` and
+ * `SEARCH_IGNORES`): entries whose name matches are emitted as
+ * `<relative-path>` rows (`/` on the end for a folder), then lines
+ * that match as `<relative-path>:<lineno>: <text>` rows.
  */
 export async function fsReadFile(
   ctx: Pick<FsToolContext, 'workspace'>,
@@ -158,7 +221,13 @@ export async function fsReadFile(
   const r = ctx.workspace.resolvePath(args.path)
   const stat = await ctx.workspace.stat(r.fsPath)
   if (!stat) {
-    throw new Error(`No such file or directory: ${r.relative}`)
+    const elsewhere = await pathsNamed(ctx.workspace, path.basename(r.fsPath))
+    throw new Error(
+      `No such file or directory: ${r.relative}` +
+        (elsewhere.length > 0
+          ? `. That name is at: ${elsewhere.join(', ')}`
+          : '')
+    )
   }
 
   const isDir = stat.isDirectory
@@ -170,7 +239,7 @@ export async function fsReadFile(
   // subtree. Different code path because we never want to materialise
   // the entire subtree as a flat `lines[]` (would defeat the cap and
   // burn memory on a big repo) — `grepDirRecursive` walks
-  // file-by-file and stops once the cap is hit.
+  // file-by-file and keeps only what fits the cap.
   if (isDir && hasKeywords) {
     return grepDirRecursive(ctx.workspace, r, args.search_keywords!)
   }
@@ -230,16 +299,18 @@ function sliceLines(
   // Hard line cap even if the caller asks for more — prevents an
   // endLine: 99999 from smuggling the whole target back.
   const capByLines = Math.min(requestedEnd, startLine + LINE_LIMIT - 1, total)
+  const charLimit =
+    endLineRaw !== undefined ? EXPLICIT_RANGE_CHAR_LIMIT : CHAR_LIMIT
   let endLine = capByLines
   let body = lines.slice(startLine - 1, endLine).join('\n')
-  while (body.length > CHAR_LIMIT && endLine > startLine) {
+  while (body.length > charLimit && endLine > startLine) {
     endLine--
     body = lines.slice(startLine - 1, endLine).join('\n')
   }
   // Edge case: even a single line exceeds the char cap. Clip
   // mid-line; the model can retry with a narrower window if needed.
-  if (body.length > CHAR_LIMIT) {
-    body = body.slice(0, CHAR_LIMIT)
+  if (body.length > charLimit) {
+    body = body.slice(0, charLimit)
   }
   // Header is uniform: `[<path> <start>-<end>/<total>]`. The model
   // can compute the next call's `startLine` from `<end>` directly, so
@@ -402,13 +473,13 @@ function clampInt(n: number, lo: number, hi: number): number {
  *
  *   <relative-path>:<lineno>: <text>
  *
- * Skips `DIR_IGNORES` at every level and silently skips files that
- * fail to decode (binary blobs, broken symlinks). No surrounding
+ * Skips `DIR_IGNORES` and `SEARCH_IGNORES` at every level and silently
+ * skips files that fail to decode (binary blobs, broken symlinks). No surrounding
  * context — across many files the model wants `path:line` to navigate
  * to with a follow-up `fs__read_file`, not a chunk of code.
  *
  * Caps to LINE_LIMIT rows / CHAR_LIMIT chars, signalled in the header
- * as `shown=X/total`. Stops the walk early once the cap is hit.
+ * as `shown=X/total`.
  */
 async function grepDirRecursive(
   workspace: Workspace,
@@ -417,82 +488,170 @@ async function grepDirRecursive(
 ): Promise<string> {
   const matcher = buildKeywordMatcher(keywordsRaw)
 
+  const names: string[] = []
   const rows: string[] = []
   const filesWithMatches = new Set<string>()
+  let totalNames = 0
   let totalMatches = 0
+  let tooLarge = 0
   let renderedChars = 0
   let truncated = false
 
-  // DFS via an explicit stack so we can break out early once the cap
-  // is hit without unwinding a recursion. `relRoot` is the path
-  // displayed in each row — relative to the workspace, not to `r`.
-  const stack: string[] = [r.fsPath]
-  const baseRel = r.relative
-  while (stack.length > 0) {
-    const dir = stack.pop()!
-    let entries: Awaited<ReturnType<Workspace['readDirectory']>>
+  const roots = r.relative === '.' ? workspaceRoots(workspace) : [r]
+  for await (const entry of walkTree(workspace, roots)) {
+    const rel = entry.rel
+    if (matcher(entry.name)) {
+      totalNames++
+      if (names.length < LINE_LIMIT) {
+        names.push(entry.isDirectory ? `${rel}/` : rel)
+      }
+    }
+    if (!entry.isFile) continue
+    let buf: string
     try {
-      entries = await workspace.readDirectory(dir)
+      const size = (await workspace.stat(entry.full))?.size ?? 0
+      if (size > MAX_SEARCHED_FILE_SIZE) {
+        tooLarge++
+        continue
+      }
+      buf = await workspace.readFile(entry.full)
     } catch {
       continue
     }
-    entries.sort((a, b) => {
-      const rank = (e: typeof a): number => (e.isDirectory ? 0 : 1)
-      const d = rank(a) - rank(b)
-      return d !== 0 ? d : a.name.localeCompare(b.name)
-    })
-    // Push directories in reverse so the stack pops them in
-    // alphabetical order, matching the per-directory sort above.
-    const subdirs: string[] = []
-    for (const e of entries) {
-      if (DIR_IGNORES.has(e.name)) continue
-      const full = path.join(dir, e.name)
-      if (e.isDirectory) {
-        subdirs.push(full)
+    const fileLines = buf.replace(/\r\n/g, '\n').split('\n')
+    for (let i = 0; i < fileLines.length; i++) {
+      if (!matcher(fileLines[i]!)) continue
+      totalMatches++
+      filesWithMatches.add(rel)
+      if (truncated) continue
+      const line = fileLines[i]!
+      const shownLine =
+        line.length > MAX_SEARCH_LINE_CHARS
+          ? `${line.slice(0, MAX_SEARCH_LINE_CHARS)}…`
+          : line
+      const row = `${rel}:${i + 1}: ${shownLine}`
+      if (
+        rows.length + 1 > LINE_LIMIT ||
+        renderedChars + row.length + 1 > CHAR_LIMIT
+      ) {
+        truncated = true
         continue
       }
-      if (!e.isFile) continue
-      let buf: string
+      rows.push(row)
+      renderedChars += row.length + 1
+    }
+  }
+
+  // Name hits first: they're short, and likely what a search that has
+  // them was after, so they aren't pushed out by a long list of lines.
+  const shown: string[] = []
+  let shownChars = 0
+  for (const row of [...names, ...rows]) {
+    if (
+      shown.length + 1 > LINE_LIMIT ||
+      shownChars + row.length + 1 > CHAR_LIMIT
+    ) {
+      break
+    }
+    shown.push(row)
+    shownChars += row.length + 1
+  }
+
+  const total = totalNames + totalMatches
+  const header =
+    `[${r.relative}/ keywords=${JSON.stringify(keywordsRaw)} ` +
+    `names=${totalNames} matches=${totalMatches}` +
+    (totalMatches > 0 ? ` files=${filesWithMatches.size}` : '') +
+    (tooLarge > 0 ? ` over1MB=${tooLarge}` : '') +
+    (shown.length < total ? `, shown=${shown.length}/${total}]` : `]`)
+  return [header, ...shown].join('\n')
+}
+
+/** What `.` covers: every folder the workspace has loaded. */
+function workspaceRoots(workspace: Workspace): ResolvedPath[] {
+  return workspace.searchRoots?.() ?? [workspace.resolvePath('.')]
+}
+
+/**
+ * Every entry under `roots` a search looks at: a folder's entries,
+ * directories first and each kind alphabetical, then what's in its
+ * subfolders. A folder that can't be read is passed over. `rel` is relative
+ * to the workspace, not to the root walked, so it can be passed straight
+ * back to a tool.
+ */
+async function* walkTree(
+  workspace: Workspace,
+  roots: ResolvedPath[]
+): AsyncGenerator<WorkspaceDirEntry & { full: string; rel: string }> {
+  for (const root of roots) {
+    // DFS via an explicit stack, so a caller can stop part way.
+    const stack: string[] = [root.fsPath]
+    while (stack.length > 0) {
+      const dir = stack.pop()!
+      let entries: WorkspaceDirEntry[]
       try {
-        buf = await workspace.readFile(full)
+        entries = await workspace.readDirectory(dir)
       } catch {
         continue
       }
-      const fileRel = path.join(baseRel, path.relative(r.fsPath, full))
-      const fileLines = buf.replace(/\r\n/g, '\n').split('\n')
-      for (let i = 0; i < fileLines.length; i++) {
-        if (!matcher(fileLines[i]!)) continue
-        totalMatches++
-        filesWithMatches.add(fileRel)
-        if (truncated) continue
-        const row = `${fileRel}:${i + 1}: ${fileLines[i]!}`
-        if (
-          rows.length + 1 > LINE_LIMIT ||
-          renderedChars + row.length + 1 > CHAR_LIMIT
-        ) {
-          truncated = true
-          continue
-        }
-        rows.push(row)
-        renderedChars += row.length + 1
+      entries.sort((a, b) => {
+        const rank = (e: typeof a): number => (e.isDirectory ? 0 : 1)
+        const d = rank(a) - rank(b)
+        return d !== 0 ? d : a.name.localeCompare(b.name)
+      })
+      // Push directories in reverse so the stack pops them in
+      // alphabetical order, matching the per-directory sort above.
+      const subdirs: string[] = []
+      for (const e of entries) {
+        if (DIR_IGNORES.has(e.name) || SEARCH_IGNORES.has(e.name)) continue
+        const full = path.join(dir, e.name)
+        if (workspace.hiddenFromSearch?.(full)) continue
+        if (e.isDirectory) subdirs.push(full)
+        const rel = path.join(root.relative, path.relative(root.fsPath, full))
+        yield { ...e, full, rel }
       }
+      for (let i = subdirs.length - 1; i >= 0; i--) stack.push(subdirs[i]!)
     }
-    for (let i = subdirs.length - 1; i >= 0; i--) stack.push(subdirs[i]!)
   }
+}
 
-  const keywordsLabel = JSON.stringify(keywordsRaw)
-  if (totalMatches === 0) {
-    return `[${r.relative}/ keywords=${keywordsLabel} matches=0]`
+/** Where else the workspace has an entry called `name`, for the error
+ *  on a path that doesn't exist: a moved file is usually still around.
+ *  Names only, and it gives up after {@link NAME_WALK_LIMIT} entries,
+ *  so a miss stays cheap in a big repo. */
+async function pathsNamed(
+  workspace: Workspace,
+  name: string
+): Promise<string[]> {
+  const wanted = name.toLowerCase()
+  const found: string[] = []
+  let seen = 0
+  for await (const entry of walkTree(workspace, workspaceRoots(workspace))) {
+    if (++seen > NAME_WALK_LIMIT) break
+    if (entry.name.toLowerCase() !== wanted) continue
+    found.push(entry.rel)
+    if (found.length === MAX_PATHS_NAMED) break
   }
-  const header =
-    `[${r.relative}/ keywords=${keywordsLabel} matches=${totalMatches} ` +
-    `files=${filesWithMatches.size}` +
-    (truncated ? `, shown=${rows.length}/${totalMatches}]` : `]`)
-  return `${header}\n${rows.join('\n')}`
+  return found
 }
 
 export interface FsCreateArgs {
   path: string
+  /** Initial text. Without it the file gets a seed line to edit. */
+  content?: string
+}
+
+/** Highest `-N` a created file may get before create gives up. A model
+ *  stuck in a loop gets no other brake, since each copy looks like success. */
+export const MAX_NAME_SUFFIX = 20
+
+/** What a create did. `uri` and `relative` name the file that holds the
+ *  content, which isn't always the requested path. */
+export interface FsCreateResult {
+  output: string
+  relative: string
+  uri: string
+  state?: L4FileState
 }
 
 /**
@@ -536,42 +695,123 @@ export function isHtmlPath(fsPath: string): boolean {
   return ext === '.html' || ext === '.htm'
 }
 
-/**
- * Create a file seeded with FS_CREATE_FILE_SEED. The model fills it
- * via follow-up `fs__edit_file` calls — the first one replaces the
- * seed line, subsequent ones add sections incrementally. Keeps the
- * create surface narrow and avoids the "model calls create with the
- * whole file inline" pattern that wastes tokens / risks max_tokens
- * truncation mid-payload.
- */
-export async function fsCreateFile(
-  ctx: Pick<FsToolContext, 'workspace'>,
-  args: FsCreateArgs
-): Promise<string> {
-  const r = ctx.workspace.resolvePath(args.path)
-  if (await ctx.workspace.stat(r.fsPath)) {
-    throw new Error(`File already exists: ${r.relative}`)
-  }
-  // HTML files get a full (plain-white) document skeleton so a browser
-  // preview renders a real page from the start; everything else gets
-  // the one-line code seed. The workspace creates parent directories,
-  // routes the write through the editor where there is one (so the
-  // LSP sees the new file via didOpen and l4__evaluate isn't stale),
-  // and may reveal it (VS Code opens a tab, or the HTML preview).
-  const isHtml = isHtmlPath(r.fsPath)
-  const seed = isHtml ? FS_CREATE_HTML_SEED : FS_CREATE_FILE_SEED
-  await ctx.workspace.createFile(r, seed)
-  // Skip the appendL4Diagnostics tail — a freshly-created file has no
-  // real content to type-check, and the Edit tool the model uses next
-  // will run diagnostics naturally.
-  const anchor = isHtml
-    ? '\n```html\n' + FS_CREATE_HTML_SEED + '\n```'
-    : '"' + FS_CREATE_FILE_SEED.trimEnd() + '"'
-  return `Created ${r.relative} - seeded with ${anchor}`
+/** `foo.l4` as `foo-3.l4`. The counter always goes on the requested name
+ *  and never bumps a number already in it: `section-33.l4` becoming
+ *  `section-34.l4` would read as a different section. */
+function numberedPath(fsPath: string, n: number): string {
+  const ext = path.extname(fsPath)
+  const stem = path.basename(fsPath, ext)
+  return path.join(path.dirname(fsPath), `${stem}-${n}${ext}`)
 }
 
-export interface FsEditArgs {
-  path: string
+async function hasContent(
+  ctx: Pick<FsToolContext, 'workspace'>,
+  target: ResolvedPath,
+  content: string
+): Promise<boolean> {
+  try {
+    const { text } = await ctx.workspace.readDocument(target.uri)
+    return text.replace(/\r\n/g, '\n') === content.replace(/\r\n/g, '\n')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Create a file. With `content` the text lands in one call: by then it has
+ * been generated and paid for, so a name clash doesn't fail. The file goes
+ * to the first free `-N` name instead and the result says so plainly. A
+ * clash with identical text creates nothing, so a retried turn doesn't pile
+ * up copies.
+ *
+ * Without `content` the file gets FS_CREATE_FILE_SEED for the model to fill
+ * via `fs__edit_file`, and a name clash is still an error: nothing is lost,
+ * and the model probably meant to edit what's there.
+ */
+export async function fsCreateFileDetailed(
+  ctx: FsToolContext,
+  args: FsCreateArgs
+): Promise<FsCreateResult> {
+  const r = ctx.workspace.resolvePath(args.path)
+  if (args.content === undefined) {
+    if (await ctx.workspace.stat(r.fsPath)) {
+      throw new Error(`File already exists: ${r.relative}`)
+    }
+    // HTML files get a full (plain-white) document skeleton so a browser
+    // preview renders a real page from the start; everything else gets
+    // the one-line code seed. The workspace creates parent directories,
+    // routes the write through the editor where there is one (so the
+    // LSP sees the new file via didOpen and l4__evaluate isn't stale),
+    // and may reveal it (VS Code opens a tab, or the HTML preview).
+    const isHtml = isHtmlPath(r.fsPath)
+    const seed = isHtml ? FS_CREATE_HTML_SEED : FS_CREATE_FILE_SEED
+    await ctx.workspace.createFile(r, seed)
+    // Skip the diagnostics tail — a freshly-created file has no real
+    // content to type-check, and the Edit tool the model uses next will
+    // run diagnostics naturally.
+    const anchor = isHtml
+      ? '\n```html\n' + FS_CREATE_HTML_SEED + '\n```'
+      : '"' + FS_CREATE_FILE_SEED.trimEnd() + '"'
+    return {
+      output: `Created ${r.relative} - seeded with ${anchor}`,
+      relative: r.relative,
+      uri: r.uri,
+    }
+  }
+  if (typeof args.content !== 'string') {
+    throw new Error("fs__create_file: 'content' must be a string.")
+  }
+  if (args.content.includes('\u0000')) {
+    throw new Error("fs__create_file: 'content' must be text.")
+  }
+  for (let n = 0; n <= MAX_NAME_SUFFIX; n++) {
+    const target =
+      n === 0 ? r : ctx.workspace.resolvePath(numberedPath(r.fsPath, n))
+    const taken = await ctx.workspace.stat(target.fsPath)
+    if (taken) {
+      if (taken.isFile && (await hasContent(ctx, target, args.content))) {
+        return {
+          output: `No change: ${target.relative} already has this exact content.`,
+          relative: target.relative,
+          uri: target.uri,
+        }
+      }
+      continue
+    }
+    try {
+      await ctx.workspace.createFile(target, args.content)
+    } catch (err) {
+      // Lost a race for the name: try the next one.
+      if (await ctx.workspace.stat(target.fsPath)) continue
+      throw err
+    }
+    const lines = args.content.split('\n').length
+    const body =
+      n === 0
+        ? `Created ${target.relative} (${lines} lines)`
+        : `Created ${target.relative} (${lines} lines). ${r.relative} already existed and was not changed, and nothing refers to the new file yet. If this was meant to replace it, call fs__copy_file with from "${target.relative}", to "${r.relative}", overwrite and deleteSource instead of writing it again.`
+    const { text, state } = await reportL4File(ctx, target, body)
+    return {
+      output: text,
+      relative: target.relative,
+      uri: target.uri,
+      ...(state ? { state } : {}),
+    }
+  }
+  throw new Error(
+    `fs__create_file: ${r.relative} and its numbered copies up to -${MAX_NAME_SUFFIX} all exist. Delete the ones you no longer need, or pick another name.`
+  )
+}
+
+export async function fsCreateFile(
+  ctx: FsToolContext,
+  args: FsCreateArgs
+): Promise<string> {
+  return (await fsCreateFileDetailed(ctx, args)).output
+}
+
+/** One replacement in a file. */
+export interface FsEditItem {
   /** Exact text to replace. When `startLine` is omitted (or 0),
    *  must appear EXACTLY ONCE in the file. When `startLine` is set,
    *  the first occurrence strictly after that line is taken — no
@@ -588,6 +828,71 @@ export interface FsEditArgs {
   startLine?: number
 }
 
+export interface FsEditArgs extends Partial<FsEditItem> {
+  path: string
+  /** Several changes to this file, applied and checked one at a time. */
+  edits?: FsEditItem[]
+}
+
+/** Most edits to one file in one model response. Models rarely write L4
+ *  right the first time, and a mistake compounds under whatever follows. */
+export const MAX_EDITS_PER_FILE = 5
+
+/** Progress through one model response's edits to one file. */
+export interface EditSequence {
+  applied: number
+  /** State before the next edit. `null` when it couldn't be determined;
+   *  unset until the first edit reads it. */
+  state?: L4FileState | null
+  /** Why no further edit to this file may run in this response. */
+  stopped?: string
+}
+
+export interface FsEditResult {
+  output: string
+  /** How many edits landed. */
+  applied: number
+  /** The file's state after the last applied edit, when known. */
+  state?: L4FileState
+}
+
+/**
+ * Text near a failed `old`, so the model can correct it without another
+ * read. Only ever advice: it's never applied, because whitespace is
+ * meaningful in L4 and a near match can change what a rule decides.
+ */
+function describeNearestText(text: string, old: string): string | undefined {
+  const squash = (t: string): string => t.replace(/\s+/g, ' ').trim()
+  const wanted = squash(old)
+  if (!wanted) return undefined
+  const lines = text.split(/\r?\n/)
+  const span = old.trim().split(/\r?\n/).length
+  const clip = (t: string): string =>
+    t.length > 600 ? `${t.slice(0, 600)}...` : t
+  for (let i = 0; i + span <= lines.length; i++) {
+    const window = lines.slice(i, i + span).join('\n')
+    if (squash(window) === wanted) {
+      return `The text at line ${i + 1} differs only in whitespace. Copy it exactly, because whitespace can change what the code means:\n${clip(window)}`
+    }
+  }
+  const firstLine = squash(old.trim().split(/\r?\n/)[0] ?? '')
+  if (!firstLine) return undefined
+  const same = lines
+    .map((line, i) => ({ line, i }))
+    .filter(({ line }) => squash(line) === firstLine)
+    .slice(0, 3)
+  if (same.length === 0) return undefined
+  const rows = same.map(({ line, i }) => `${i + 1}: ${clip(line)}`)
+  return `The first line of 'old' appears at:\n${rows.join('\n')}`
+}
+
+interface AppliedEdit {
+  startLine: number
+  endLine: number
+  oldLines: number
+  newLines: number
+}
+
 /**
  * String-anchored find/replace. Fails loudly when `old` is missing or
  * ambiguous. Line numbers would be brittle across multi-round turns;
@@ -600,11 +905,11 @@ export interface FsEditArgs {
  * undo stack, and disk-based readers (`fs__read_file`, other
  * extensions) see the new content immediately.
  */
-export async function fsEditFile(
+async function applyOneEdit(
   ctx: FsToolContext,
-  args: FsEditArgs
-): Promise<string> {
-  const r = ctx.workspace.resolvePath(args.path)
+  r: ResolvedPath,
+  args: FsEditItem
+): Promise<AppliedEdit> {
   if (typeof args.old !== 'string') {
     throw new Error(
       "fs__edit_file: 'old' must be a non-empty string identifying the snippet to replace."
@@ -614,12 +919,11 @@ export async function fsEditFile(
   // tool_use carrying the entire file body is the classic max_tokens
   // truncation trap — Anthropic cuts the args JSON mid-string,
   // toolCalls comes back empty, the edit silently never lands. For a
-  // freshly-created file: anchor the first edit on the seed line
-  // (`FS_CREATE_FILE_SEED`); for an existing file: replace surgical
-  // sections in multiple smaller fs__edit_file calls.
+  // new file: pass `content` to fs__create_file; for an existing file:
+  // replace surgical sections in multiple smaller edits.
   if (args.old.length === 0) {
     throw new Error(
-      `fs__edit_file: 'old' must be a non-empty anchor snippet. Whole-file replacement is not supported — for a freshly-created file replace the seed line "${FS_CREATE_FILE_SEED.trimEnd()}" first, then build up content via additional fs__edit_file calls. For large rewrites, split into multiple smaller edits.`
+      `fs__edit_file: 'old' must be a non-empty anchor snippet. Whole-file replacement is not supported — for a new file, pass \`content\` to fs__create_file; for a seeded file, replace the seed line "${FS_CREATE_FILE_SEED.trimEnd()}" first. For large rewrites, split into multiple smaller edits.`
     )
   }
   // Same defensive check we use in fs__create_file: fail fast when
@@ -685,12 +989,18 @@ export async function fsEditFile(
       anchorLine * docEol.length
   }
   const searchWindow = currentText.slice(searchOffset)
+  const notFoundHint = (): string => {
+    const nearest = ctx.mayQuoteFile
+      ? describeNearestText(currentText, oldNormalized)
+      : undefined
+    return nearest ? `\n${nearest}` : ''
+  }
 
   if (anchorLine === 0) {
     const occurrences = countOccurrences(searchWindow, oldNormalized)
     if (occurrences === 0) {
       throw new Error(
-        `fs__edit_file: the 'old' snippet was not found in ${r.relative}`
+        `fs__edit_file: the 'old' snippet was not found in ${r.relative}${notFoundHint()}`
       )
     }
     if (occurrences > 1) {
@@ -704,8 +1014,8 @@ export async function fsEditFile(
   if (hit === -1) {
     throw new Error(
       anchorLine === 0
-        ? `fs__edit_file: 'old' snippet not found in ${r.relative}`
-        : `fs__edit_file: 'old' snippet not found in ${r.relative} after line ${anchorLine}`
+        ? `fs__edit_file: 'old' snippet not found in ${r.relative}${notFoundHint()}`
+        : `fs__edit_file: 'old' snippet not found in ${r.relative} after line ${anchorLine}${notFoundHint()}`
     )
   }
   const startOffset = searchOffset + hit
@@ -719,6 +1029,152 @@ export async function fsEditFile(
       `fs__edit_file: could not apply edit to ${r.relative} (file may be read-only): ${err instanceof Error ? err.message : String(err)}`
     )
   }
+  const editStartLine = positionAt(currentText, startOffset).line + 1
+  return {
+    startLine: editStartLine,
+    endLine: editStartLine + args.new.split('\n').length - 1,
+    oldLines: args.old.split('\n').length,
+    newLines: args.new.split('\n').length,
+  }
+}
+
+/** The changes a call asks for, in order. */
+function editItems(args: FsEditArgs): FsEditItem[] {
+  if (args.edits === undefined) {
+    return [
+      {
+        old: args.old as string,
+        new: args.new as string,
+        ...(args.startLine !== undefined ? { startLine: args.startLine } : {}),
+      },
+    ]
+  }
+  if (!Array.isArray(args.edits) || args.edits.length === 0) {
+    throw new Error(
+      "fs__edit_file: 'edits' must be a non-empty list of { old, new } changes."
+    )
+  }
+  return args.edits
+}
+
+async function fileState(
+  ctx: FsToolContext,
+  r: ResolvedPath
+): Promise<CheckedDiagnostics | null> {
+  try {
+    return await ctx.l4.getCheckedDiagnostics(r.uri)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Apply edits one at a time, checking the file after each, and stop at the
+ * first one that fails or leaves the file worse: anything after a mistake
+ * would land blind on a broken file. Earlier edits stay, and so does the
+ * one that stopped the run, so the diagnostics match what's on disk. An
+ * unknown result stops the run too, because continuing past it is exactly
+ * how a broken file gets built on.
+ */
+async function applySequence(
+  ctx: FsToolContext,
+  r: ResolvedPath,
+  items: FsEditItem[],
+  run: EditSequence
+): Promise<FsEditResult> {
+  if (run.stopped) {
+    throw new Error(`fs__edit_file: not applied. ${run.stopped}`)
+  }
+  const room = MAX_EDITS_PER_FILE - run.applied
+  if (room <= 0) {
+    throw new Error(
+      `fs__edit_file: not applied. A file takes at most ${MAX_EDITS_PER_FILE} edits in one response; send the rest once you've seen the result.`
+    )
+  }
+  const isL4 = isL4Path(r.fsPath)
+  if (isL4 && run.state === undefined) {
+    const before = await fileState(ctx, r)
+    run.state = before && !before.pending ? l4FileState(before) : null
+  }
+  const batch = items.slice(0, room)
+  const notes: string[] = []
+  let first: number | undefined
+  let last: number | undefined
+  let checked: CheckedDiagnostics | undefined
+  let done = 0
+  let failed = false
+  let stop: string | undefined
+  for (const [i, item] of batch.entries()) {
+    let edit: AppliedEdit
+    try {
+      edit = await applyOneEdit(ctx, r, item)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      run.stopped = `An earlier edit to ${r.relative} in this response failed. Look at the file again first.`
+      if (done === 0) throw err
+      failed = true
+      stop = message
+      notes.push(`Edit ${i + 1}: not applied. ${message}`)
+      break
+    }
+    run.applied++
+    done++
+    first = Math.min(first ?? edit.startLine, edit.startLine)
+    last = Math.max(last ?? edit.endLine, edit.endLine)
+    let note = `Edit ${i + 1}: lines ${edit.startLine}-${edit.endLine}`
+    if (isL4) {
+      const now = await fileState(ctx, r)
+      checked = now ?? undefined
+      const state = now && !now.pending ? l4FileState(now) : null
+      if (!state) {
+        stop = `the check did not finish, so the next edit would be blind`
+      } else if (run.state && isWorse(run.state, state)) {
+        stop = `the file went from "${describeFileState(run.state)}" to "${describeFileState(state)}"`
+      }
+      run.state = state
+    }
+    if (stop) {
+      note += `. Stopped here: ${stop}`
+      run.stopped = `An earlier edit to ${r.relative} in this response ${stop}. Fix that first.`
+    }
+    notes.push(note)
+    if (stop) break
+  }
+  const left = items.length - done - (failed ? 1 : 0)
+  if (left > 0) {
+    const from = items.length - left + 1
+    const which = left === 1 ? `Edit ${from}` : `Edits ${from}-${items.length}`
+    notes.push(
+      stop
+        ? `${which}: not applied. Send what's still needed once the file is fixed.`
+        : `${which}: not applied. A file takes at most ${MAX_EDITS_PER_FILE} edits in one response.`
+    )
+  }
+  const header = `[${r.relative} ${first}-${last}] (Applied ${done} of ${items.length} edits)`
+  const { text, state } = await reportL4File(
+    ctx,
+    r,
+    `${header}\n${notes.join('\n')}`,
+    checked
+  )
+  return { output: text, applied: done, ...(state ? { state } : {}) }
+}
+
+/**
+ * Apply one edit, or a run of them when `edits` is given or `sequence` ties
+ * this call to others in the same model response.
+ */
+export async function fsEditFileDetailed(
+  ctx: FsToolContext,
+  args: FsEditArgs,
+  sequence?: EditSequence
+): Promise<FsEditResult> {
+  const r = ctx.workspace.resolvePath(args.path)
+  const items = editItems(args)
+  if (items.length > 1 || sequence) {
+    return applySequence(ctx, r, items, sequence ?? { applied: 0 })
+  }
+  const edit = await applyOneEdit(ctx, r, items[0]!)
   // `[<path> <start>-<end>]` prefix carries the post-edit line range
   // so the chat row can render it as a muted "Lines 23-45" suffix
   // (matches fs__read_file's surfacing). No `/total` segment here —
@@ -726,29 +1182,54 @@ export async function fsEditFile(
   // absence tells the webview parser this is an edit-anchor range
   // (always shown) rather than a read range (suppressed when it
   // covers the whole file).
-  const editStartLine = positionAt(currentText, startOffset).line + 1
-  const editEndLine = editStartLine + args.new.split('\n').length - 1
-  return withDocsHintOnError(
-    await appendL4Diagnostics(
-      ctx,
-      r,
-      `[${r.relative} ${editStartLine}-${editEndLine}] (Edited ${args.old.split('\n').length} → ${args.new.split('\n').length} lines)`
-    )
+  const { text, state } = await reportL4File(
+    ctx,
+    r,
+    `[${r.relative} ${edit.startLine}-${edit.endLine}] (Edited ${edit.oldLines} → ${edit.newLines} lines)`
   )
+  return { output: text, applied: 1, ...(state ? { state } : {}) }
+}
+
+export async function fsEditFile(
+  ctx: FsToolContext,
+  args: FsEditArgs,
+  sequence?: EditSequence
+): Promise<string> {
+  return (await fsEditFileDetailed(ctx, args, sequence)).output
 }
 
 /**
- * Append a `search_l4_docs` hint when the diagnostics block reports at
- * least one error. Detected by the header that
- * `fetchL4Diagnostics` produces — the count summary contains
- * "N error" / "N errors" only when the error count is non-zero.
- *
- * Scoped to fs__edit_file: we only nudge the model toward
- * doc-search after a code edit landed, not on every read or create.
+ * What a write call would do, as text for a user deciding whether to allow
+ * it. Before the call runs there's no file to show, so without this an
+ * approval would be a blind yes. `null` when there's nothing to preview.
  */
-function withDocsHintOnError(text: string): string {
-  if (!/\b\d+ errors?\b/.test(text)) return text
-  return `${text}\n\nUse \`search_l4_docs\` tool to learn L4 syntax and keyword use`
+export function proposedChange(
+  name: string,
+  args: unknown
+): { text: string; language: 'plaintext' | 'diff' } | null {
+  const a = (args ?? {}) as Partial<FsCreateArgs & FsEditArgs>
+  if (name === 'fs__create_file') {
+    return typeof a.content === 'string'
+      ? { text: a.content, language: 'plaintext' }
+      : null
+  }
+  if (name !== 'fs__edit_file') return null
+  const edits = Array.isArray(a.edits)
+    ? a.edits
+    : typeof a.old === 'string' && typeof a.new === 'string'
+      ? [{ old: a.old, new: a.new }]
+      : []
+  if (edits.length === 0) return null
+  const quote = (text: unknown, mark: string): string =>
+    String(text ?? '')
+      .split('\n')
+      .map((line) => `${mark} ${line}`)
+      .join('\n')
+  const parts = edits.map(
+    (e, i) =>
+      `@@ Edit ${i + 1} of ${edits.length} @@\n${quote(e.old, '-')}\n${quote(e.new, '+')}`
+  )
+  return { text: parts.join('\n'), language: 'diff' }
 }
 
 export interface FsDeleteArgs {
@@ -789,10 +1270,10 @@ export interface FsCopyArgs {
  * any edit. The source goes through {@link Workspace.deleteFile}, which
  * keeps it recoverable.
  */
-export async function fsCopyFile(
+export async function fsCopyFileDetailed(
   ctx: FsToolContext,
   args: FsCopyArgs
-): Promise<string> {
+): Promise<FsCreateResult> {
   if (typeof args.from !== 'string' || typeof args.to !== 'string') {
     throw new Error("fs__copy_file: 'from' and 'to' are required paths.")
   }
@@ -840,7 +1321,20 @@ export async function fsCopyFile(
     const how = await ctx.workspace.deleteFile(from)
     if (how === 'trashed') body += `; ${from.relative} is in the trash`
   }
-  return appendL4Diagnostics(ctx, to, body)
+  const { text: output, state } = await reportL4File(ctx, to, body)
+  return {
+    output,
+    relative: to.relative,
+    uri: to.uri,
+    ...(state ? { state } : {}),
+  }
+}
+
+export async function fsCopyFile(
+  ctx: FsToolContext,
+  args: FsCopyArgs
+): Promise<string> {
+  return (await fsCopyFileDetailed(ctx, args)).output
 }
 
 function countOccurrences(haystack: string, needle: string): number {

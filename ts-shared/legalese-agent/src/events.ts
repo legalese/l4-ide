@@ -7,6 +7,8 @@ export type ChatServiceEvent =
   | { kind: 'started'; conversationId: string; turnId: string; model: string }
   | { kind: 'text-delta'; conversationId: string; text: string }
   | { kind: 'thinking-delta'; conversationId: string; text: string }
+  /** A new conversation's name, generated alongside its first turn. */
+  | { kind: 'title'; conversationId: string; title: string }
   | {
       kind: 'tool-activity'
       conversationId: string

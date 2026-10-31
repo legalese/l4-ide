@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import {
+  TURN_STATUS_HEADING,
   AiProxyClient,
   BuiltinTools,
   ChatService,
@@ -1012,14 +1013,19 @@ const REPLY_KEEP_CHARS = 8_000
 export class ReplyCollector {
   private current = ''
   private previous = ''
+  /** The harness's status block. Kept apart because it comes last, so a
+   *  long reply would otherwise cut it off. */
+  private status = ''
 
   begin(): void {
     this.current = ''
     this.previous = ''
+    this.status = ''
   }
 
   observe(event: ChatServiceEvent): void {
     if (event.kind === 'text-delta') {
+      if (event.text.includes(TURN_STATUS_HEADING)) this.status = event.text
       if (this.current.length < REPLY_KEEP_CHARS) {
         this.current = (this.current + event.text).slice(0, REPLY_KEEP_CHARS)
       }
@@ -1030,6 +1036,7 @@ export class ReplyCollector {
   }
 
   final(): string {
-    return (this.current.trim() || this.previous.trim()).trim()
+    const reply = (this.current.trim() || this.previous.trim()).trim()
+    return reply.includes(TURN_STATUS_HEADING) ? reply : reply + this.status
   }
 }

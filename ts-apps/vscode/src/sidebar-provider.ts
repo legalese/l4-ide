@@ -806,6 +806,32 @@ export function initializeSidebarMessenger(
       }
       const importUris = lspResponse.importedFiles ?? []
 
+      // A rule whose test fails can still be deployed, on purpose. But once
+      // deployed, tools and agents treat its answers as authoritative, so
+      // make that a decision rather than an accident.
+      const failedChecks = [params.fileUri, ...importUris]
+        .flatMap((uri) =>
+          vscode.languages.getDiagnostics(vscode.Uri.parse(uri))
+        )
+        .filter(
+          (d) =>
+            d.source === 'eval' &&
+            d.severity === vscode.DiagnosticSeverity.Error
+        ).length
+      if (failedChecks > 0) {
+        const choice = await vscode.window.showWarningMessage(
+          `${failedChecks} check${failedChecks === 1 ? '' : 's'} in this file or its imports failed. Once deployed, its answers are treated as authoritative.`,
+          { modal: true },
+          'Deploy anyway'
+        )
+        if (choice !== 'Deploy anyway') {
+          return {
+            success: false,
+            error: 'Deployment cancelled: failed checks in the file.',
+          }
+        }
+      }
+
       // Collect the main file and all its LSP-resolved imports
       const files = await collectL4Sources(
         params.fileUri,

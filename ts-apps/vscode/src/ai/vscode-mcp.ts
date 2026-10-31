@@ -4,7 +4,11 @@ import * as path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import * as vscode from 'vscode'
 import type { AiLogger } from './logger.js'
-import type { AiProxyTool, ToolProvider } from '@repo/legalese-agent'
+import {
+  userMcpToolName,
+  type AiProxyTool,
+  type ToolProvider,
+} from '@repo/legalese-agent'
 import type { McpOAuthManager } from './mcp-oauth.js'
 import type { LocalMcpServer, McpServerSource } from '../cloud/mcp-transfer.js'
 import { notificationText } from '../cloud/notification-text.js'
@@ -216,9 +220,14 @@ export class VsCodeMcpTools implements ToolProvider, McpServerSource {
   // ── Master switch ─────────────────────────────────────────────────
 
   allEnabled(): boolean {
+    // Off at any level is off: a workspace can restrict this, never relax it.
+    const info = vscode.workspace
+      .getConfiguration()
+      .inspect<boolean>(MCP_ENABLED_SETTING)
     return (
-      vscode.workspace.getConfiguration().get<boolean>(MCP_ENABLED_SETTING) !==
-      false
+      info?.globalValue !== false &&
+      info?.workspaceValue !== false &&
+      info?.workspaceFolderValue !== false
     )
   }
 
@@ -1167,7 +1176,7 @@ async function removeFromSetting(
   setting: string,
   drop: (s: string) => boolean
 ): Promise<void> {
-  const current = [...readStringSetSetting(setting)]
+  const current = [...userStringSetting(setting)]
   const next = current.filter((s) => !drop(s))
   if (next.length === current.length) return
   await vscode.workspace
@@ -1175,10 +1184,28 @@ async function removeFromSetting(
     .update(setting, next.sort(), vscode.ConfigurationTarget.Global)
 }
 
+/** A deny-list as the user set it: the part this extension can change. */
+function userStringSetting(setting: string): Set<string> {
+  const raw = vscode.workspace.getConfiguration().inspect<string[]>(setting)
+  return strings(raw?.globalValue)
+}
+
+/** A deny-list in force: every level's entries together, so a workspace
+ *  can add to it but not take anything off the user's. */
 function readStringSetSetting(setting: string): Set<string> {
-  const raw = vscode.workspace.getConfiguration().get<string[]>(setting)
+  const raw = vscode.workspace.getConfiguration().inspect<string[]>(setting)
+  return new Set([
+    ...strings(raw?.globalValue),
+    ...strings(raw?.workspaceValue),
+    ...strings(raw?.workspaceFolderValue),
+  ])
+}
+
+function strings(value: unknown): Set<string> {
   return new Set(
-    Array.isArray(raw) ? raw.filter((s) => typeof s === 'string') : []
+    Array.isArray(value)
+      ? value.filter((s): s is string => typeof s === 'string')
+      : []
   )
 }
 
@@ -1240,17 +1267,10 @@ function extractSseJson(body: string, id: number): string | null {
   return last
 }
 
-/** OpenAI function names allow `[a-zA-Z0-9_-]{1,64}`. */
-function sanitizeToolName(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]/g, '_')
-}
-
 /** Wire name for a server's tool. Uniqueness comes from the wireMap
  *  dedupe; the name only needs to be stable. */
 function directWireName(serverId: string, toolName: string): string {
-  const server = sanitizeToolName(serverId).slice(0, 16)
-  const tool = sanitizeToolName(toolName).slice(0, 40)
-  return `${VSCODE_MCP_PREFIX}${server}_${tool}`.slice(0, 64)
+  return userMcpToolName(VSCODE_MCP_PREFIX, serverId, toolName)
 }
 
 /** OpenAI function tools require `parameters.type === 'object'`; some

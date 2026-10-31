@@ -50,7 +50,11 @@ type ToPayload<E> = E extends { kind: infer K }
   : never
 
 /** A {@link ChatServiceEvent} as an event payload: `kind` → `type`. */
-export type ChatEventPayload = ToPayload<ChatServiceEvent>
+/** The chat-service events a session logs. Not `title`: a session's
+ *  name goes in `session.json`. */
+export type LoggedChatEvent = Exclude<ChatServiceEvent, { kind: 'title' }>
+
+export type ChatEventPayload = ToPayload<LoggedChatEvent>
 
 /** Longest `git-committed.summary` accepted (the harness caps commit
  *  subjects at 72 characters; this leaves room). */
@@ -274,12 +278,12 @@ export function parseCloudEvent(value: unknown): CloudEvent {
 // ── Chat events ⇄ cloud events ────────────────────────────────────────
 
 /** Turn a chat-service event into an event payload. */
-export function chatEventToPayload(event: ChatServiceEvent): ChatEventPayload {
+export function chatEventToPayload(event: LoggedChatEvent): ChatEventPayload {
   const { kind, ...rest } = event
   return { type: kind, ...rest } as ChatEventPayload
 }
 
-const CHAT_KINDS: ReadonlySet<string> = new Set<ChatServiceEvent['kind']>([
+const CHAT_KINDS: ReadonlySet<string> = new Set<LoggedChatEvent['kind']>([
   'started',
   'text-delta',
   'thinking-delta',

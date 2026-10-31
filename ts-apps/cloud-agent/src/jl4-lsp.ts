@@ -4,6 +4,8 @@ import rpc from 'vscode-jsonrpc/node.js'
 import type { MessageConnection } from 'vscode-jsonrpc'
 import {
   DirectiveResultsCache,
+  FileCheckTracker,
+  type CheckedDiagnostics,
   type DiagnosticSeverity,
   type DirectiveResultRow,
   type L4Diagnostic,
@@ -25,6 +27,9 @@ const DIAGNOSTICS_TIMEOUT_MS = 20_000
 /** After the first publish, how long to wait for follow-up publishes
  *  (jl4-lsp may publish parse and type-check results separately). */
 const DIAGNOSTICS_SETTLE_MS = 300
+/** Longest wait for the check of a file's latest text. After this the
+ *  result is reported as pending: never as clean. */
+const CHECK_TIMEOUT_MS = 15_000
 const REQUEST_TIMEOUT_MS = 60_000
 
 /** After jl4-lsp dies it's started again after these delays; once they
@@ -108,6 +113,10 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
   private process?: ChildProcess
   /** Change notifications go out in order. */
   private notifying: Promise<void> = Promise.resolve()
+  /** What `l4/fileChecked` has said. */
+  private readonly checks = new FileCheckTracker<LspDiagnostic>()
+  /** How long a check may take before its result is reported as pending. */
+  checkTimeoutMs = CHECK_TIMEOUT_MS
 
   private constructor(
     private readonly logger: Logger,
@@ -186,6 +195,7 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
     }
     this.logger.warn(msg)
     this.diagnostics.clear()
+    this.checks.clear()
     this.changedAt.clear()
     this.directives = new DirectiveResultsCache()
     // Calls waiting for diagnostics see the exit now, not at a timeout.
@@ -281,6 +291,21 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
           this.diagnosticWaiters.delete(uri)
           for (const w of waiters) w()
         }
+      }
+    )
+    c.onNotification(
+      'l4/fileChecked',
+      (params: {
+        uri: string
+        version: number | null
+        diagnostics: LspDiagnostic[]
+      }) => {
+        if (!params || typeof params.uri !== 'string') return
+        this.checks.record(
+          normalizeFileUri(params.uri),
+          params.version ?? null,
+          params.diagnostics ?? []
+        )
       }
     )
     c.onNotification(
@@ -384,13 +409,47 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
       this.assertRunning()
       throw new Error('The L4 language server restarted; try again')
     }
-    return (this.diagnostics.get(key)?.diagnostics ?? []).map((d) => ({
-      severity: severityName(d.severity),
-      line: d.range?.start?.line ?? 0,
-      message: d.message,
-      source: d.source,
-      code: d.code === undefined ? undefined : String(d.code),
-    }))
+    return (this.diagnostics.get(key)?.diagnostics ?? []).map(toL4Diagnostic)
+  }
+
+  /**
+   * Diagnostics for the file's current text. The server's `l4/fileChecked`
+   * fires for every check, including one that changed nothing, which a
+   * publishDiagnostics never does: waiting for that was a 20 s stall on
+   * any edit that left the diagnostics as they were.
+   */
+  async getCheckedDiagnostics(
+    uri: string,
+    retry = true
+  ): Promise<CheckedDiagnostics> {
+    const key = normalizeFileUri(uri)
+    await this.openDocument(key)
+    await this.notifying
+    const epoch = this.epoch
+    const version = this.open.get(key)?.version ?? 0
+    const outcome = await this.checks.settle(key, version, this.checkTimeoutMs)
+    if (outcome === 'unsupported') {
+      return { diagnostics: await this.getDiagnostics(key), pending: false }
+    }
+    if (this.exited || this.epoch !== epoch) {
+      if (retry) return this.getCheckedDiagnostics(key, false)
+      this.assertRunning()
+      throw new Error('The L4 language server restarted; try again')
+    }
+    const done = outcome === 'checked'
+    const latest =
+      this.checks.latest(key) ?? this.diagnostics.get(key)?.diagnostics ?? []
+    return {
+      diagnostics: latest.map(toL4Diagnostic),
+      pending: !done,
+      ...(done ? { confirmed: true } : {}),
+    }
+  }
+
+  fileErrorCounts(): Map<string, number> {
+    return this.checks.errorCounts(
+      (d) => d.severity === 1 && d.source !== 'eval'
+    )
   }
 
   getDirectiveResults(uri: string): DirectiveResultRow[] | undefined {
@@ -495,10 +554,11 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
   }
 
   /**
-   * jl4-lsp re-checks a document (and pushes its directive results) only
-   * when that document changes, not when a module it imports does. After
-   * an `.l4` file changes, re-send every other open document unchanged
-   * so importers are checked against the new version.
+   * After an `.l4` file changes, re-send every other open document
+   * unchanged. The server re-checks importers by itself, but under their
+   * old version, so a caller of `getCheckedDiagnostics` couldn't tell the
+   * new result from the old one. A new version makes it wait for the
+   * re-check.
    */
   private refreshImporters(changed: string): void {
     const others = [...this.open].filter(
@@ -523,6 +583,7 @@ export class Jl4Lsp implements L4Language, WorkspaceChangeListener {
     const key = normalizeFileUri(uri)
     const wasOpen = this.open.delete(key)
     this.diagnostics.delete(key)
+    this.checks.forget(key)
     if (this.exited) return
     const send = async (): Promise<void> => {
       if (wasOpen) {
@@ -697,6 +758,16 @@ function lineCount(text: string): number {
   let n = 1
   for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10) n++
   return n
+}
+
+function toL4Diagnostic(d: LspDiagnostic): L4Diagnostic {
+  return {
+    severity: severityName(d.severity),
+    line: d.range?.start?.line ?? 0,
+    message: d.message,
+    source: d.source,
+    code: d.code === undefined ? undefined : String(d.code),
+  }
 }
 
 function severityName(s: number | undefined): DiagnosticSeverity {

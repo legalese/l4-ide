@@ -6,6 +6,7 @@ import {
   isIncomingBundleName,
   type CloudCommand,
 } from '@repo/legalese-agent/protocol'
+import { turnStatusLines } from '@repo/legalese-agent'
 import { Git } from './git.js'
 import type {
   ExitReason,
@@ -227,11 +228,17 @@ export class GitSync implements RunnerPlugin {
 
   async afterTurn(turn: TurnInfo): Promise<void> {
     const promptLine = cap(firstLine(turn.prompt), PROMPT_LINE_MAX)
+    // What compiled goes in the history, so a broken file committed by the
+    // turn doesn't hide behind a summary the model wrote.
+    const body = [
+      ...(promptLine ? [`Prompt: ${promptLine}`] : []),
+      ...turnStatusLines(turn.reply).map((line) => `L4-Status: ${line}`),
+    ].join('\n')
     const committed = await this.commitChanges(
       (changes) => this.turnSubject(turn, changes),
       {
         turnId: turn.turnId,
-        ...(promptLine ? { body: `Prompt: ${promptLine}` } : {}),
+        ...(body ? { body } : {}),
       }
     )
     if (!committed) return

@@ -24,6 +24,9 @@ import type { ConversationStore, Logger } from './ports.js'
  * Deletion renames; a future cleanup job reaps tombstones.
  */
 export class FileConversationStore implements ConversationStore {
+  /** Each conversation's last write (see {@link inOrder}). */
+  private readonly writes = new Map<string, Promise<void>>()
+
   constructor(
     private readonly rootDir: string,
     private readonly logger: Logger,
@@ -113,18 +116,21 @@ export class FileConversationStore implements ConversationStore {
     if (!isSafeId(id)) return false
     const dir = this.baseDir()
     if (!dir) return false
-    const src = path.join(dir, `${id}.json`)
-    const dst = path.join(dir, `${id}.deleted-${Date.now()}.json`)
-    try {
-      await fs.rename(src, dst)
-      return true
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false
-      this.logger.warn(
-        `conv-store: delete failed for ${id}: ${err instanceof Error ? err.message : String(err)}`
-      )
-      return false
-    }
+    // In turn, or a write under way would put the file back.
+    return this.inOrder(id, async () => {
+      const src = path.join(dir, `${id}.json`)
+      const dst = path.join(dir, `${id}.deleted-${Date.now()}.json`)
+      try {
+        await fs.rename(src, dst)
+        return true
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false
+        this.logger.warn(
+          `conv-store: delete failed for ${id}: ${err instanceof Error ? err.message : String(err)}`
+        )
+        return false
+      }
+    })
   }
 
   /**
@@ -143,42 +149,71 @@ export class FileConversationStore implements ConversationStore {
     deploymentId?: string,
     apiBaseUrl?: string
   ): Promise<AiConversation> {
-    let conv = await this.load(id)
-    const now = new Date().toISOString()
-    if (!conv) {
-      conv = {
-        id,
-        orgId,
-        userId,
-        model,
-        title: titleHint.slice(0, 80),
-        createdAt: now,
-        lastActiveAt: now,
-        messages: [],
-        ...(extensionVersion ? { extensionVersion } : {}),
-        // Deployment binding is stamped once at creation and never
-        // rewritten — follow-up turns re-resolve it from here so a
-        // reload / history-reopen keeps hitting the same deployment.
-        ...(deploymentId ? { deploymentId } : {}),
-        ...(apiBaseUrl ? { apiBaseUrl } : {}),
+    return this.inOrder(id, async () => {
+      let conv = await this.load(id)
+      const now = new Date().toISOString()
+      if (!conv) {
+        conv = {
+          id,
+          orgId,
+          userId,
+          model,
+          title: titleHint.slice(0, 80),
+          createdAt: now,
+          lastActiveAt: now,
+          messages: [],
+          ...(extensionVersion ? { extensionVersion } : {}),
+          // Deployment binding is stamped once at creation and never
+          // rewritten — follow-up turns re-resolve it from here so a
+          // reload / history-reopen keeps hitting the same deployment.
+          ...(deploymentId ? { deploymentId } : {}),
+          ...(apiBaseUrl ? { apiBaseUrl } : {}),
+        }
       }
-    }
-    conv.messages.push(...messages)
-    conv.lastActiveAt = now
-    await this.save(conv)
-    return conv
+      conv.messages.push(...messages)
+      conv.lastActiveAt = now
+      await this.save(conv)
+      return conv
+    })
   }
 
-  async setTitle(
+  update(id: string, change: (conv: AiConversation) => void): Promise<void> {
+    return this.inOrder(id, async () => {
+      const conv = await this.load(id)
+      if (!conv) return
+      change(conv)
+      await this.save(conv)
+    })
+  }
+
+  setTitle(
     id: string,
     title: string,
     opts: { replacing?: string } = {}
   ): Promise<void> {
-    const conv = await this.load(id)
-    if (!conv) return
-    if (opts.replacing !== undefined && conv.title !== opts.replacing) return
-    conv.title = title
-    await this.save(conv)
+    return this.inOrder(id, async () => {
+      const conv = await this.load(id)
+      if (!conv) return
+      if (opts.replacing !== undefined && conv.title !== opts.replacing) return
+      conv.title = title
+      await this.save(conv)
+    })
+  }
+
+  /** A write reads the whole file and replaces it, so two at once would
+   *  lose one of them (a title set while a turn is being saved, say).
+   *  A conversation's writes therefore run one at a time. */
+  private inOrder<T>(id: string, write: () => Promise<T>): Promise<T> {
+    const result = (this.writes.get(id) ?? Promise.resolve()).then(write)
+    const settled = result.then(
+      () => undefined,
+      () => undefined
+    )
+    this.writes.set(id, settled)
+    void settled.then(() => {
+      if (this.writes.get(id) === settled) this.writes.delete(id)
+    })
+    return result
   }
 
   private filePath(id: string): string | undefined {

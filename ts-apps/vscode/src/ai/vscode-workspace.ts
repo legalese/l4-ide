@@ -9,6 +9,7 @@ import {
   type WorkspaceStat,
   type WorkspaceTextEdit,
 } from '@repo/legalese-agent'
+import { isWriteSensitive, leavesRoots } from './workspace-paths.js'
 
 /**
  * {@link Workspace} port over the VS Code workspace: tool paths resolve
@@ -72,12 +73,37 @@ export class VsCodeWorkspace implements Workspace {
         `Path is outside every loaded workspace folder: ${p}. fs tools only operate on files inside a loaded workspace folder — ask the user to add the target folder to the workspace first.`
       )
     }
+    // The check above only reads the path. A symlink inside the workspace
+    // can still lead out of it, so compare where it really goes.
+    const workspaceRoots = folders.map((f) => f.uri.fsPath)
+    if (leavesRoots(absolute, workspaceRoots)) {
+      throw new Error(
+        `Path leaves the workspace through a symbolic link: ${p}. fs tools only operate on files inside a loaded workspace folder.`
+      )
+    }
     return {
-      relative:
-        path.relative(preferredBase, absolute) || path.basename(absolute),
+      relative: path.relative(preferredBase, absolute) || '.',
       uri: vscode.Uri.file(absolute).toString(),
       fsPath: absolute,
     }
+  }
+
+  searchRoots(): ResolvedPath[] {
+    const roots = (vscode.workspace.workspaceFolders ?? []).map((f) =>
+      this.resolvePath(f.uri.fsPath)
+    )
+    // The folder `.` resolves to first, as a relative path would.
+    return roots.sort(
+      (a, b) => Number(b.relative === '.') - Number(a.relative === '.')
+    )
+  }
+
+  requiresWriteApproval(target: ResolvedPath): boolean {
+    const folders = vscode.workspace.workspaceFolders ?? []
+    return isWriteSensitive(
+      target.fsPath,
+      folders.map((f) => f.uri.fsPath)
+    )
   }
 
   relativePath(uri: string): string {
@@ -99,11 +125,18 @@ export class VsCodeWorkspace implements Workspace {
   async stat(fsPath: string): Promise<WorkspaceStat | null> {
     try {
       const st = await fs.stat(fsPath)
-      return { isDirectory: st.isDirectory(), isFile: st.isFile() }
+      return {
+        isDirectory: st.isDirectory(),
+        isFile: st.isFile(),
+        size: st.size,
+      }
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
-      throw err
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
     }
+    // A dangling symlink stats as missing, but the name is taken, and a
+    // write to it would land wherever it points.
+    const link = await fs.lstat(fsPath).catch(() => null)
+    return link ? { isDirectory: false, isFile: false } : null
   }
 
   async sameFile(a: string, b: string): Promise<boolean> {

@@ -67,10 +67,10 @@
         "title": "L4 Language Server",
         "properties": {
           "jl4.serverExecutablePath": {
-            "scope": "machine-overridable",
+            "scope": "machine",
             "type": "string",
             "default": "",
-            "markdownDescription": "Path to the `jl4-lsp` executable. Leave empty to use the bundled binary or find `jl4-lsp` on your PATH."
+            "markdownDescription": "Path to the `jl4-lsp` executable. Leave empty to use the bundled binary or find `jl4-lsp` on your PATH. Only user settings apply: a workspace can't choose which program runs."
           },
           "jl4.trace.server": {
             "scope": "resource",
@@ -129,6 +129,7 @@
             "description": "Show the model's reasoning (\"Thinking\" blocks) in the Legalese AI chat."
           },
           "legaleseAi.methodology": {
+            "scope": "application",
             "type": "string",
             "default": "",
             "description": "Guidance the Legalese AI follows when encoding natural language rules in L4."

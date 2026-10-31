@@ -160,6 +160,51 @@ describe('repo layout: data/ and tmp/', () => {
     await assert.rejects(stat(path.join(repo, 'tmp', 'sub')))
   })
 
+  test('a search from the root gives paths that work as they stand', async () => {
+    const tools = new BuiltinTools(ws(), new StubL4())
+    const out = await tools.readFile({ path: '.', search_keywords: 'b\\.l4' })
+    assert.equal(
+      out,
+      '[./ keywords="b\\\\.l4" names=1 matches=0]\ndata/sub/b.l4'
+    )
+    assert.match(
+      await tools.readFile({ path: out.split('\n')[1]! }),
+      /original b/
+    )
+    await assert.rejects(
+      tools.readFile({ path: 'data/b.l4' }),
+      /That name is at: data\/sub\/b\.l4/
+    )
+  })
+
+  test('a search leaves out copies of deleted files', async () => {
+    const w = ws()
+    w.setTurn('t1')
+    await w.deleteFile(w.resolvePath('data/sub/b.l4'))
+    const tools = new BuiltinTools(w, new StubL4())
+
+    assert.equal(
+      await tools.readFile({ path: '.', search_keywords: 'original' }),
+      '[./ keywords="original" names=0 matches=1 files=1]\n' +
+        'data/a.l4:1: original a'
+    )
+    await assert.rejects(tools.readFile({ path: 'data/sub/b.l4' }), (err) => {
+      assert.equal(
+        (err as Error).message,
+        'No such file or directory: data/sub/b.l4'
+      )
+      return true
+    })
+    // Still there for a search that asks for them.
+    assert.match(
+      await tools.readFile({
+        path: 'tmp/deleted',
+        search_keywords: 'original',
+      }),
+      /t-t1\/sub\/b\.l4:1: original b/
+    )
+  })
+
   test('no git for the model: .git is not readable, listable or searchable', async () => {
     await mkdir(path.join(repo, '.git', 'hooks'), { recursive: true })
     await writeFile(
