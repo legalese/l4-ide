@@ -797,7 +797,10 @@ instance Linearize (Directive Resolved) where
       [ "executing contract", lin e, "at", lin t, "with the following events:" ]
       <> map lin es
     Assert _ e -> linearize e
-    AssertRefused _ e _mmsg -> hcat [ "the following must refuse:", lin e ]
+    -- A BECAUSE is part of what is asserted: the refusal must give that reason.
+    AssertRefused _ e mmsg -> hcat $
+      [ "the following must refuse:", lin e ]
+      <> maybe [] (\ m -> [ "because", text "“" <> lin m <> text "”" ]) mmsg
 
 
 instance Linearize (NamedExpr Resolved) where
