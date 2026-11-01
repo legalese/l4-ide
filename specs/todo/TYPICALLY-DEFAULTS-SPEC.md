@@ -1,12 +1,19 @@
 # Specification: TYPICALLY Keyword for Default Values
 
-**Status:** ⚠️ BACKED OUT (December 2025)
-**Related:** `doc/default-values.md` (conceptual background), `BOOLEAN-MINIMIZATION-SPEC.md`
+**Status:** STAGE ONE BUILT (checked 2026-10-30, and again on 2026-11-01 after a rebase onto a newer main, by building this tree and running the probes in `specs/as-built/typically.md`).
+`TYPICALLY` is lexed, parsed, type-checked and printed, and its value is kept in the syntax tree and handed to tools: literal values only, an explicit type required on a rule's `GIVEN`, rejected on a type variable.
+**Nothing applies it.** The evaluator, `l4 batch` and `jl4-service` ignore a default, so an input that is left out stays missing and must be supplied.
+Everything below about evaluation (`resolveParameter`, nested defaults, "innermost wins"), partial evaluation and the `PEVAL`/`PASSERT` directives is proposed, not built.
+What is built is described in `specs/as-built/typically.md` and, for users, in `doc/reference/types/TYPICALLY.md`.
+This spec is retained because the unbuilt parts are still the design, and `specs/as-built/typically.md` cites its phases and edge cases.
+**Ruling P6 (2026-10-30, bench https://claude.ai/artifact/FbeZhcJfDvS5SHpZJ5gsMT):** accept, option A, as a re-carve, Meng's note "with the five conditions": (1) re-carve Scalpel's `64373a5f4` and fold in #609's TYPICALLY half and #539's `checkFieldDefaults`, each with its tests; (2) hand-port W1's placeholder half (`notSuppliedTerm`), removing all three `fromMaybe FALSE` sites; (3) say what it is, here and on the TYPICALLY page, and record this ruling in its owning document; (4) the fill is not folded in; (5) building starts on acceptance, and opening is Scalpel's call, behind REFUSE's re-land.
+**Related:** `BOOLEAN-MINIMIZATION-SPEC.md`
 
-> **⚠️ IMPLEMENTATION STATUS: REVERTED**
+> **HISTORY: FIRST IMPLEMENTATION BACKED OUT (December 2025)**
 >
-> An initial implementation of TYPICALLY was attempted on branch `mengwong/635` but was
+> An initial full implementation of TYPICALLY was attempted on branch `mengwong/635` but was
 > reverted due to a critical heisenbug in the type checker's name disambiguation logic.
+> The present build is a fresh one, not those commits.
 >
 > **What was implemented:**
 >
@@ -23,12 +30,6 @@
 >   added to handle PEVAL wrapper name resolution.
 > - Only actual `trace` output (with stderr I/O side effects) prevented the bug -
 >   `seq`, `force`, and `unsafePerformIO` without I/O did not work.
->
-> **Next steps for fresh implementation:**
->
-> - Start fresh from a clean codebase without the buggy TypeCheck changes
-> - Consider a simpler approach that doesn't require complex name disambiguation
-> - The specification below remains valid as a design document
 >
 > **Reverted commits:** `6fea6b8e` through `afba20a0` on branch `mengwong/635` > **Reference:** See git history for commit `53f4e718` which bundled the buggy changes
 

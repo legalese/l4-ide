@@ -1,4 +1,4 @@
--- TYPICALLY: metadata-only default values (rebuttable presumptions)
+-- TYPICALLY: usual values (rebuttable presumptions), stored and checked but not applied
 
 -- Record fields with defaults
 DECLARE Person HAS
@@ -6,6 +6,12 @@ DECLARE Person HAS
   has_capacity IS A BOOLEAN TYPICALLY TRUE
   is_under_duress IS A BOOLEAN TYPICALLY FALSE
   jurisdiction IS A STRING TYPICALLY "Singapore"
+
+-- A field whose type is an enumeration may use one of its values
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint HAS
+  colour IS A Colour TYPICALLY Red
 
 -- Assumed external values with defaults
 ASSUME `applicable law` IS A STRING TYPICALLY "Singapore"
