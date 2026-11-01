@@ -485,6 +485,11 @@ nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
 
+-- An @nlg on its own line above a rule under a section GIVEN, which has no
+-- GIVEN of its own (assumed, not ruled, 2026-11-01, porting legalese/l4-ide#802).
+nlgOwnLineSectionGivenFixture :: FilePath
+nlgOwnLineSectionGivenFixture = fixtureDir </> "nlg-own-line-section-given.l4"
+
 -- An @nlg on a MIXFIX definition, read at a call site in the same module, and
 -- across an IMPORT. The importing fixture makes the same calls, row for row,
 -- as the local one (less one row it says it leaves out), so one expected list
@@ -656,7 +661,7 @@ coreFixtures =
   , verifyUnfoldCallsFixture, verifyUnfoldNamedCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
-  , nlgHeadPlacementSource, placementReadme
+  , nlgHeadPlacementSource, placementReadme, nlgOwnLineSectionGivenFixture
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -3429,6 +3434,21 @@ spec bin = do
   -- Rows 5, 7, 8 and 12 of the fixture are the repaired ones; row 13 and the
   -- `AKA` rows are the controls, and they are the assertions that fail if the
   -- repair is widened into an unconditional promotion.
+  -- A rule under a section GIVEN has no GIVEN of its own, so an @nlg on its own
+  -- line above it is its sentence, as for any rule with no GIVEN; one indented
+  -- under the section GIVEN is the binder's. This is a port decision, assumed,
+  -- not ruled (2026-11-01, legalese/l4-ide#802 to unstable).
+  describe "an @nlg on its own line above a rule under a section GIVEN" $ do
+    it "is that rule's sentence, and one indented under the GIVEN is the binder's" $ do
+      Output code sout _ <- runL4 bin ["nlg", nlgOwnLineSectionGivenFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("the age of the applicant" `isPrefixOf`)
+      -- The rule above used to take these two, so they read as bare names.
+      out `shouldSatisfy` any ("the applicant's age again" `isPrefixOf`)
+      out `shouldSatisfy` any ("the constant seven" `isPrefixOf`)
+      out `shouldSatisfy` any ("the claimant is a minor where the claimant's age in years is 3" `isInfixOf`)
+
   describe "an @nlg on a rule head's input" $ do
     let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]
         renderOf = runL4 bin ["render", "--format", "text", nlgHeadPlacementSource]
