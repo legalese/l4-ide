@@ -117,11 +117,21 @@
     "pin on purpose: commons main had moved 84 files in the blessed directories",
     "since 6b6476d6 (child-support restructured), so catching the mirror up to",
     "main is a separate job, NOT done here. Re-point at a main SHA when that job",
-    "lands; until then delete_branch_on_merge=false keeps this SHA reachable."
+    "lands; until then delete_branch_on_merge=false keeps this SHA reachable.",
+    "",
+    "THIRD BRANCH PIN, 2026-11-02 (the #802/#803/#804 port to unstable,",
+    "explore-verify): nested arithmetic and operands that are prose are now",
+    "bracketed, which moves 39 lines in seven blessed nlg goldens (citi-rewards,",
+    "ofek-cases, ofek-placement, ofek-salary-table, ofek-worktime,",
+    "sg-child-support-cases, regcf-wizard). They were re-blessed in commons on",
+    "branch port-802-at-pin (e1b7780e1, 50d3655e6, 96b2b09a8), stacked on the",
+    "previous pin b38cd5ab, so this bump moves those lines and nothing else.",
+    "The same caveat as above applies: re-point at a main SHA when the mirror is",
+    "caught up to commons main."
   ],
   "repo": "legalese/commons",
-  "sha": "b38cd5ab364fbd045a2c3bef7047bdc9d3d408d4",
-  "ref": "fix/nlg-minus-order-at-pin",
+  "sha": "96b2b09a899b22302d4468259f8f408570dd0a2f",
+  "ref": "port-802-at-pin",
   "pinned": "2026-11-01",
   "blessed": [
     {
