@@ -59,7 +59,7 @@ import L4.Annotation (emptyAnno)
 import L4.Desugar (carameliseExpr, carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
-import L4.Nlg (Linearize, daydateLiteral, markedLinearizer, markFrame, possessiveOf, stripFrameMarks, NlgFnInfo, nlgFnInfo, substituteNlgCall, renderNlgWith, normalizeWs, oxford)
+import L4.Nlg (Linearize, daydateLiteral, markedLinearizer, markFrame, possessiveOf, stripFrameMarks, NlgFnInfo, nlgFnInfo, substituteNlgCallMarked, renderNlgWith, normalizeWs, oxford)
 import qualified L4.Nlg as Nlg
 import L4.Syntax
 import L4.Names (stripSectionBinderElaborations)
@@ -1989,9 +1989,9 @@ rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
     App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
     App ann n args
       | Just (_, inputs) <- Map.lookup (getUnique n) rd.rdHeralds, length inputs == length args ->
-          substituteNlgCall Nothing rd.rdHeralds (App ann n (map (asText (slotText rd)) args))
-      | otherwise -> substituteNlgCall Nothing rd.rdHeralds (App ann n (map (asText leafText) args))
-    e -> substituteNlgCall Nothing rd.rdHeralds e
+          substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (slotText rd)) args))
+      | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
+    e -> substituteNlgCallMarked rd.rdHeralds e
   asText f a = Inert (a ^. annoOf) (f a) InertCtxNone
   rw = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.

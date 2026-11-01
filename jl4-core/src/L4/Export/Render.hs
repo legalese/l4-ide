@@ -419,7 +419,7 @@ closeItems sep end items = zipWith close (reverse [0 .. length items - 1]) items
   close i it = case sep of
     Sentences -> finish "." it
     Joined _ | i == 0 -> finish end it
-    Joined w | i == 1, not (Text.null w) -> finish ("; " <> w) it
+    Joined w | i == 1, not (Text.null w) -> finish ("; " <> markFrame w) it
     Joined _ -> finish ";" it
 
 -- | Put the rendering's text into the document's language. See
@@ -436,7 +436,7 @@ joinSpans :: (Span -> Text) -> [Span] -> Text
 joinSpans f = List.foldl' step ""
  where
   step acc = \case
-    Glue g -> acc <> g
+    s@(Glue _) -> acc <> f s
     s | Text.null acc -> f s
       | otherwise     -> acc <> " " <> f s
 
@@ -499,7 +499,7 @@ renderText cfg doc =
     Key t       -> own t
     Condition t -> phrased t
     Modal t     -> own t
-    Glue t      -> t
+    Glue t      -> inLanguage cfg t
 
   bodyLines :: Int -> Flow -> [Text]
   bodyLines depth f = contentLines depth f.flowBody <> whereLines f.flowWhere
@@ -659,7 +659,7 @@ renderHtml cfg doc =
     Key t       -> "<span class=\"kw\">" <> esc (own t) <> "</span>"
     Condition t -> "<span class=\"cond\">" <> lk t <> "</span>"
     Modal t     -> "<strong>" <> esc (own t) <> "</strong>"
-    Glue t      -> esc t
+    Glue t      -> esc (inLanguage cfg t)
 
   contentHtml = \case
     NoBody -> ""
@@ -820,7 +820,7 @@ renderAkn cfg doc =
     Key t       -> xesc (own t)
     Condition t -> phrased t
     Modal t     -> xesc (own t)
-    Glue t      -> xesc t
+    Glue t      -> xesc (inLanguage cfg t)
 
   contentAkn = \case
     NoBody -> ""
