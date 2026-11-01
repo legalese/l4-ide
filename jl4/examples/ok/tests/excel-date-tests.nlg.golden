@@ -20,10 +20,10 @@ the 30/360 day count from `US 30/360 start` to `US 30/360 end`, European if `TRU
 the year fraction from `Basis start` to `Basis end` on Excel basis 0 (negative if reversed)
 the year fraction from `Basis start` to `Basis end` on Excel basis 1 (negative if reversed)
 the year fraction from `Basis start` to `Basis end` on Excel basis 2 (negative if reversed)
-the date 1 months after `Late Jan 24` (capped at the last day of that month)
+the date 1 month after `Late Jan 24` (capped at the last day of that month)
 the date -1 months after `Late Jan 24` (capped at the last day of that month)
 the day before the date 0 months plus one month after `Jan 2024`
-the day before the date 1 months plus one month after `Jan 2024`
+the day before the date 1 month plus one month after `Jan 2024`
 the date 10 working days after `Jan 2024` (skipping weekends)
 the date -5 working days after `Late Jan 24` (skipping weekends)
 the date 10 working days after `Jan 2024` (counting weekdays, and weekend days listed in `Holidays 24`)

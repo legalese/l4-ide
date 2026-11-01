@@ -154,7 +154,7 @@ The first renders as "The balance due equals the purchase price − the deposit 
 
 Legal writing sometimes uses letters on purpose, as in "A person (A) discriminates against another (B) if …" (Equality Act 2010, s.13). There, single letters are the right choice.
 
-When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". A role written as a name of its own is kept: ``GIVEN `the applicant` IS A Person`` reads "the applicant", not "the person". This works well when only one input has that type; two inputs of the same type would share the same phrase.
+When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". A possessive is spelled to fit the word: "the contribution facts' rate", "the witness's age". A role written as a name of its own is kept: ``GIVEN `the applicant` IS A Person`` reads "the applicant", not "the person". This works well when only one input has that type; two inputs of the same type would share the same phrase.
 
 **Name record fields readably.** A field renders as "X's field", so field names go straight into the prose. A `BOOLEAN` field states something, so it never takes a possessive. A field that starts with _is_ or _has_ follows its record ("the applicant is a citizen"), and any other reads as its own words and says which record it is about ("necessary for a contract, for the processing"). Field names go straight into the prose:
 

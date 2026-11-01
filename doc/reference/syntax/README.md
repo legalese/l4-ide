@@ -267,9 +267,11 @@ Limits:
   With "the smaller of %a% and %b%" for `` `the lower of` `` and "%a% and %b% together" for `` `plus` ``, both ``(`the lower of` 1 `and` 5) `plus` 10`` and `` `the lower of` 1 `and` (5 `plus` 10) `` read "the smaller of 1 and 5 and 10 together", though they are different numbers.
   This is true of a function written in prefix form as well.
   Write a sentence whose slots are set off by words that cannot be taken for part of an argument, and read the output of a nested call before relying on it.
+  The built-in operators are not affected: nested arithmetic is bracketed, so `10 - (5 - 2)` reads "10 minus (5 minus 2)".
 - **A function with no sentence reads as its pattern** (`` `_ LESS _` with 100 and 20 ``), also in `l4 render`, which prints the call as you wrote it.
 
 `l4 nlg` also writes a date given as literals as a date: `Date 16 7 2025` reads `16 July 2025`.
+A unit of time straight after a slot agrees with the number in it: "%n% months" reads "1 month" when the argument is 1, and "2 months" when it is 2.
 That covers only daydate's own `Date`, only when all three arguments are whole numbers, and only when they name a real day.
 Anything else stays a call, so `Date 31 2 2025`, which rolls forward to March, reads as `` `Date` with 31, 2 and 2025 `` and not as a day that is not in the text.
 A percentage reads `50%`.

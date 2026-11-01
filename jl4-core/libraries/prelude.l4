@@ -840,7 +840,7 @@ GIVEN k IS A TYPE
 @nlg a dictionary holding the entries %pairs%
 listToDict MEANS  Dictionary WITH contents IS pairs
 
-@nlg a dictionary built
+@nlg a dictionary
 fromList MEANS listToDict
 
 -- Dictionary: empty
@@ -851,7 +851,7 @@ GIVETH A Dictionary k v
 emptyDict MEANS Dictionary WITH contents IS EMPTY
 
 -- Dictionary: singleton (alias for singleToDict)
-@nlg a one-entry dictionary built
+@nlg a one-entry dictionary
 singleton MEANS singleToDict
 
 -- Dictionary: dictToList (extract contents)

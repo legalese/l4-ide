@@ -170,3 +170,47 @@ DECIDE `a real date` IS Date 29 2 2024
 GIVEN x IS A NUMBER
 GIVETH A DATE
 DECIDE `a date that rolls over` IS Date 29 2 2025
+
+-- A possessive follows the word's spelling.
+DECLARE `Contribution Facts` HAS
+  `rate` IS A NUMBER
+  `is met` IS A BOOLEAN
+
+DECLARE `Witness` HAS
+  `age` IS A NUMBER
+
+GIVEN facts IS A `Contribution Facts`
+GIVETH A NUMBER
+`the rate on the facts` facts MEANS facts's `rate` TIMES 2
+
+GIVEN w IS A `Witness`
+GIVETH A NUMBER
+`the age of the witness` w MEANS w's `age` TIMES 2
+
+-- A denial covers one operand of an OR, not all of it.
+GIVEN facts IS A `Contribution Facts`
+GIVETH A BOOLEAN
+`the facts are not met` facts MEANS facts's `is met`
+
+GIVEN facts IS A `Contribution Facts`
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denial of one operand` facts b MEANS
+  IF (NOT (`the facts are not met` facts)) OR b THEN 1 ELSE 2
+
+GIVEN facts IS A `Contribution Facts`
+GIVETH A BOOLEAN
+`I am 18 or over` facts MEANS facts's `is met`
+
+GIVEN facts IS A `Contribution Facts`
+GIVETH A BOOLEAN
+`old enough` facts MEANS `I am 18 or over` facts
+
+#EVAL 10 MINUS (5 MINUS 2)
+#EVAL (10 MINUS 5) MINUS 2
+#EVAL 4 TIMES (5 MINUS 2)
+#EVAL (4 TIMES 5) MINUS 2
+#EVAL 12 DIVIDED BY (6 MINUS 2)
+#EVAL (12 DIVIDED BY 6) MINUS 2
+#EVAL `add months` (Date 1 1 2025) 1
+#EVAL `add months` (Date 1 1 2025) 2

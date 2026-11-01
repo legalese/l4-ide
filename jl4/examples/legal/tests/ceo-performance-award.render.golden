@@ -117,46 +117,46 @@
 § 4  Market Cap Achievement Functions
 
 1. Market Cap Milestone Met if:
-    (a) Required Market Cap is at most the tesla performance metrics's Six Month Avg Market Cap; and
-    (b) Required Market Cap is at most the tesla performance metrics's Thirty Day Avg Market Cap.
+    (a) Required Market Cap is at most the tesla performance metrics' Six Month Avg Market Cap; and
+    (b) Required Market Cap is at most the tesla performance metrics' Thirty Day Avg Market Cap.
     where:
     - Required Market Cap means Required Market Cap For Tranche for tranche number.
 
 2. Market Cap Milestone Met For Change In Control if Required Market Cap is at most Change In Control Market Cap.
     where:
     - Required Market Cap means Required Market Cap For Tranche for tranche number.
-    - Change In Control Market Cap equals the tesla performance metrics's Outstanding Shares × Higher Price.
+    - Change In Control Market Cap equals the tesla performance metrics' Outstanding Shares × Higher Price.
     - Higher Price is:
-        (a) If the tesla performance metrics's Per Share Consideration is no value: the tesla performance metrics's Last Closing Price;
-        (b) Otherwise: depending on the tesla performance metrics's Per Share Consideration:
+        (a) If the tesla performance metrics' Per Share Consideration is no value: the tesla performance metrics' Last Closing Price;
+        (b) Otherwise: depending on the tesla performance metrics' Per Share Consideration:
             (i) If it is present, with the value consideration:
-                (1) If consideration is more than the tesla performance metrics's Last Closing Price: consideration;
-                (2) Otherwise: the tesla performance metrics's Last Closing Price;
-            (ii) If it is absent: the tesla performance metrics's Last Closing Price.
+                (1) If consideration is more than the tesla performance metrics' Last Closing Price: consideration;
+                (2) Otherwise: the tesla performance metrics' Last Closing Price;
+            (ii) If it is absent: the tesla performance metrics' Last Closing Price.
 
 
 § 5  Operational Milestone Functions
 
 1. Operational Milestone Met is decided as follows:
-    (a) If tranche number is 1: the tesla performance metrics's Tesla Vehicles Delivered is at least Million 20;
-    (b) Otherwise, if tranche number is 2: the tesla performance metrics's Active FSD Subscriptions is at least Million 10;
-    (c) Otherwise, if tranche number is 3: the tesla performance metrics's Bots Delivered is at least Million 1;
-    (d) Otherwise, if tranche number is 4: the tesla performance metrics's Robotaxis In Operation is at least Million 1;
+    (a) If tranche number is 1: the tesla performance metrics' Tesla Vehicles Delivered is at least Million 20;
+    (b) Otherwise, if tranche number is 2: the tesla performance metrics' Active FSD Subscriptions is at least Million 10;
+    (c) Otherwise, if tranche number is 3: the tesla performance metrics' Bots Delivered is at least Million 1;
+    (d) Otherwise, if tranche number is 4: the tesla performance metrics' Robotaxis In Operation is at least Million 1;
     (e) Otherwise: all of the following:
         (i) tranche number is at least 5;
         (ii) tranche number is at most 12; and
         (iii) EBITDA Milestone Met for tranche number and the tesla performance metrics.
 
 2. EBITDA Milestone Met is decided as follows:
-    (a) If tranche number is 5: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 50;
-    (b) Otherwise, if tranche number is 6: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 80;
-    (c) Otherwise, if tranche number is 7: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 130;
-    (d) Otherwise, if tranche number is 8: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 210;
-    (e) Otherwise, if tranche number is 9: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 300;
+    (a) If tranche number is 5: the tesla performance metrics' Current Adjusted EBITDA is at least Billion 50;
+    (b) Otherwise, if tranche number is 6: the tesla performance metrics' Current Adjusted EBITDA is at least Billion 80;
+    (c) Otherwise, if tranche number is 7: the tesla performance metrics' Current Adjusted EBITDA is at least Billion 130;
+    (d) Otherwise, if tranche number is 8: the tesla performance metrics' Current Adjusted EBITDA is at least Billion 210;
+    (e) Otherwise, if tranche number is 9: the tesla performance metrics' Current Adjusted EBITDA is at least Billion 300;
     (f) Otherwise: all of the following:
         (i) tranche number is at least 10;
         (ii) tranche number is at most 12; and
-        (iii) the tesla performance metrics's Current Adjusted EBITDA is at least Billion 400.
+        (iii) the tesla performance metrics' Current Adjusted EBITDA is at least Billion 400.
 
 
 § 6  Deemed Achievement Logic
@@ -173,9 +173,9 @@
     (c) the CEO award state's Covered Event Type is External Event Affecting Product Goals.
 
 3. All Market Cap Averages Met if:
-    (a) Required Market Cap is at least the tesla performance metrics's Thirty Day Avg Market Cap;
-    (b) Required Market Cap is at least the tesla performance metrics's Six Month Avg Market Cap; and
-    (c) Required Market Cap is at least the tesla performance metrics's One Year Avg Market Cap.
+    (a) Required Market Cap is at least the tesla performance metrics' Thirty Day Avg Market Cap;
+    (b) Required Market Cap is at least the tesla performance metrics' Six Month Avg Market Cap; and
+    (c) Required Market Cap is at least the tesla performance metrics' One Year Avg Market Cap.
     where:
     - Required Market Cap means Required Market Cap For Tranche for tranche number.
 

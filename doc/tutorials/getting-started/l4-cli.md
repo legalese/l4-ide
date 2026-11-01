@@ -201,7 +201,7 @@ Check succeeded.
 
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
 `--json` and `--fixed-now` work here too.
-`l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files. Other commands, such as `l4 render` and `l4 nlg`, don't stop on an error in an imported file.
+`l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files. `l4 render` still writes its document when an imported file has an error, and then exits with status 1. Other commands, such as `l4 nlg`, don't stop on an error in an imported file.
 Files can't import each other in a ring; [Import cycle](../../reference/errors/README.md#import-cycle) says how to fix one.
 
 ---

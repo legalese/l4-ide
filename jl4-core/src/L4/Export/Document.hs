@@ -57,7 +57,7 @@ import L4.Annotation (emptyAnno)
 import L4.Desugar (carameliseExpr, carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
-import L4.Nlg (Linearize, daydateLiteral, markedLinearizer, markFrame, stripFrameMarks, NlgFnInfo, nlgFnInfo, substituteNlgCall, renderNlgWith, normalizeWs, oxford)
+import L4.Nlg (Linearize, daydateLiteral, markedLinearizer, markFrame, possessiveOf, stripFrameMarks, NlgFnInfo, nlgFnInfo, substituteNlgCall, renderNlgWith, normalizeWs, oxford)
 import qualified L4.Nlg as Nlg
 import L4.Syntax
 import L4.TypeCheck.Types (CheckInfo (..), FunTypeSig (..), MixfixRegistry (..))
@@ -1500,7 +1500,7 @@ joinCond conj parts0
         | isCompound p -> x <> ", " <> fw conj <> " " <> y
         | otherwise    -> x <> " " <> fw conj <> " " <> y
       (_, xs) -> oxford (fw conj) xs
-  | otherwise = Text.intercalate (" " <> fw conj <> " ") (map condText parts)
+  | otherwise = Text.intercalate (" " <> fw conj <> " ") (map boundedCond parts)
  where
   parts = keepLabels parts0
   -- A statutory label belongs to what follows it, and no connective joins them.
@@ -1545,12 +1545,22 @@ groupText e = case carameliseNode e of
     | isCompound n, isOrNode n -> case map itemText (flattenOr n) of
         [a, b] -> fw "either" <> " " <> a <> " " <> fw "or" <> " " <> b
         xs     -> fw "any of:" <> " " <> orList xs
-  _ -> condText e
+  _ -> boundedCond e
 
 itemText :: Expr Resolved -> Text
 itemText e
   | isCompound e = "(" <> condText e <> ")"
-  | otherwise    = condText e
+  | otherwise    = boundedCond e
+
+-- | An operand of a connective. "it is not the case that" reaches as far as the
+-- sentence does, so in "it is not the case that a or b" a reader takes the denial
+-- to cover both. Brackets say that it covers one.
+boundedCond :: Expr Resolved -> Text
+boundedCond e
+  | "it is not the case that" `Text.isPrefixOf` stripFrameMarks t = "(" <> t <> ")"
+  | otherwise = t
+ where
+  t = condText e
 
 -- | The negation of an AND, which denies only that all of it holds.
 notAllText :: [Expr Resolved] -> Text
@@ -1745,7 +1755,7 @@ formulaText e
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)
     Inert _ t _     -> Just (4, t)   -- a substituted parameter phrase
-    Proj _ a nm     -> do (_, t) <- go a; Just (4, t <> "'s " <> resolvedText nm)
+    Proj _ a nm     -> do (_, t) <- go a; Just (4, possessiveOf t <> " " <> resolvedText nm)
     -- A non-arithmetic operand (a function call, projection chain, parameter …)
     -- becomes an inline atom rendered as prose, so a formula that mixes
     -- arithmetic with such terms still reads as "a + b × f(x)" rather than
@@ -1953,8 +1963,8 @@ endsInPreposition r = case reverse (Text.words (nameToText (getActual r))) of
 
 prepositionWords :: Set.Set Text
 prepositionWords = Set.fromList
-  ["of", "for", "to", "from", "into", "onto", "on", "in", "by", "at", "over"
-  , "under", "between", "than", "as", "after", "before", "among", "amongst"
+  ["of", "for", "to", "from", "into", "onto", "on", "in", "by", "at"
+  , "between", "than", "as", "after", "before", "among", "amongst"
   , "within", "per", "against", "upon", "about", "through", "during", "until"
   , "since", "with"]
 
