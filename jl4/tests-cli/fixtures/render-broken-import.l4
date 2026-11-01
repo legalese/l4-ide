@@ -1,0 +1,6 @@
+-- This module checks, and a module it imports does not.
+
+IMPORT `render-broken-import-lib`
+
+GIVETH A NUMBER
+`still fine` MEANS 1

@@ -17,7 +17,7 @@ the time 20 hours, 0 minutes and 0 seconds is in the evening (from 6 pm until mi
 `afternoon time` is at or after noon
 the time 2 hours after `morning time` (wrapping past midnight)
 the time 30 minutes after `morning time` (wrapping past midnight)
-the time 1 hours before `morning time` (wrapping past midnight)
+the time 1 hour before `morning time` (wrapping past midnight)
 `morning before afternoon`
 `afternoon after morning`
 the earlier of `morning time` and `afternoon time`

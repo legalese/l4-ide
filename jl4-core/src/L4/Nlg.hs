@@ -2,6 +2,7 @@ module L4.Nlg (
   simpleLinearizer,
   markedLinearizer,
   markFrame,
+  possessiveOf,
   stripFrameMarks,
   localiseMarked,
   simpleLinearizerIn,
@@ -110,9 +111,31 @@ simpleLinearizerIn mlang a = first renderLinTree (localizeIn mlang (linearize a)
 -- renderer's as far as the writer. The backtick round a name works the same way.
 markedLinearizer :: Linearize a => a -> Text
 markedLinearizer =
-    Text.replace (Text.unwords (map markFrame ["is", "equal", "to"])) (markFrame "is")
+    plainPossessives
+  . Text.replace (Text.unwords (map markFrame ["is", "equal", "to"])) (markFrame "is")
   . renderTokens markFrame
   . linearize
+
+-- | The possessive the linearizer supplies, set against what it follows and spelt
+-- to fit it. The linearizer writes it apart from the word before it, so this finds
+-- that and never an apostrophe of the author's.
+plainPossessives :: Text -> Text
+plainPossessives t = case Base.unsnoc (Text.splitOn " 's" t) of
+  Just (owners, rest) -> Text.concat (map possessiveOf owners <> [rest])
+  Nothing             -> t
+
+-- | "the applicant's", but "the facts'". Spelling, and nothing more: a word ending
+-- in one s takes the apostrophe alone, and one ending in two is a singular such as
+-- "the witness's". A trailing backtick closes a name, and comes before either.
+possessiveOf :: Text -> Text
+possessiveOf t
+  | lastWord == "it"                      = t <> "s"
+  | Text.isSuffixOf "ss" s                = t <> "'s"
+  | Text.isSuffixOf "s" s                 = t <> "'"
+  | otherwise                             = t <> "'s"
+ where
+  s = fromMaybe t (Text.stripSuffix "`" t)
+  lastWord = Text.takeWhileEnd (/= ' ') s
 
 -- | Mark words as the renderer's own. Unicode noncharacters, which are set aside
 -- for a program's internal use, so they cannot occur in an author's text.
@@ -613,39 +636,39 @@ instance Linearize (Expr Resolved) where
       [ frame "the"
       , frame "sum"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Minus _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isArithNode e1
       , frame "minus"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Times _ e1 e2 -> hcat
       [ frame "the"
       , frame "product"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     DividedBy _ e1 e2 -> hcat
       [ frame "the"
       , frame "result"
       , frame "of"
       , frame "dividing"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "by"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Modulo _ e1 e2 -> hcat
       [ frame "the"
       , frame "result"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "modulo"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Cons _ e1 e2 -> hcat
       [ lin e1
@@ -821,9 +844,10 @@ instance Linearize (Expr Resolved) where
       LifecycleDeadline -> "the deadline"
       LifecycleArming   -> "the arming"
 
--- | An operand of a connective, in brackets if it is the kind of compound that
--- flat text would regroup: @a AND (b OR c)@ reads "a and (b or c)", and not "a
--- and b or c", which states a different rule. A sentence the author wrote for the
+-- | An operand, in brackets if it is the kind of compound that flat text would
+-- regroup: @a AND (b OR c)@ reads "a and (b or c)", and not "a and b or c", which
+-- states a different rule, and @10 MINUS (5 MINUS 2)@ reads "10 minus (5 minus 2)",
+-- and not the words of @(10 MINUS 5) MINUS 2@. A sentence the author wrote for the
 -- operand carries its own meaning and is left as it is.
 groupedUnder :: (Expr Resolved -> Bool) -> Expr Resolved -> LinTree
 groupedUnder needsBrackets e
@@ -831,9 +855,12 @@ groupedUnder needsBrackets e
       text "(" <> lin e <> text ")"
   | otherwise = lin e
 
-isAndNode, isOrNode :: Expr Resolved -> Bool
+isAndNode, isOrNode, isArithNode :: Expr Resolved -> Bool
 isAndNode = \ case And{} -> True; RAnd{} -> True; _ -> False
 isOrNode  = \ case Or{} -> True; ROr{} -> True; _ -> False
+isArithNode = \ case
+  Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
+  _ -> False
 
 instance Linearize (Event Resolved) where
   linearize (MkEvent _ p a t _) = hcat
@@ -1278,9 +1305,21 @@ renderNlgWith = renderNlgWithIn Nothing
 
 renderNlgWithIn :: Maybe LangTag -> Map.Map Unique (Expr Resolved) -> Nlg -> Text
 renderNlgWithIn mlang argMap = \case
-  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (map frag frags))
+  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (agreeing frags))
   other                 -> simpleLinearizer other
  where
+  -- The parser keeps one text fragment per token, so the words after a slot are
+  -- gathered before 'singularUnit' looks at them.
+  agreeing = \case
+    r@(MkNlgRef{}) : rest
+      | frag r == "1"
+      , (words', others) <- span isWords rest ->
+          frag r : singularUnit (foldMap frag words') : agreeing others
+    f : rest -> frag f : agreeing rest
+    [] -> []
+  isWords = \case
+    MkNlgText{} -> True
+    MkNlgRef{}  -> False
   -- Escapes decode HERE, not in the lexer: the annotation token carries
   -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
   -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
@@ -1293,6 +1332,17 @@ renderNlgWithIn mlang argMap = \case
   frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
     Just a  -> fst (simpleLinearizerIn mlang a)
     Nothing -> resolvedText r
+
+-- | The words after a slot that held the number 1: a sentence written for any
+-- count says "%n% months", and "1 months" is never what its author meant. Only a
+-- unit of time directly after the slot changes.
+singularUnit :: Text -> Text
+singularUnit t = case Text.stripPrefix " " t of
+  Just rest
+    | (unit, after) <- Text.break (not . isLetter) rest
+    , unit `elem` ["years", "months", "weeks", "days", "hours", "minutes", "seconds"] ->
+        " " <> Text.dropEnd 1 unit <> after
+  _ -> t
 
 resolvedText :: Resolved -> Text
 resolvedText = nameToText . getActual

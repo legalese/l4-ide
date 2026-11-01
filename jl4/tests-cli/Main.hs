@@ -494,6 +494,11 @@ nlgOwnLineSectionGivenFixture = fixtureDir </> "nlg-own-line-section-given.l4"
 renderMeaningFixture :: FilePath
 renderMeaningFixture = fixtureDir </> "render-meaning.l4"
 
+-- A module that checks, importing one that does not.
+renderBrokenImportFixture, renderBrokenImportLib :: FilePath
+renderBrokenImportFixture = fixtureDir </> "render-broken-import.l4"
+renderBrokenImportLib     = fixtureDir </> "render-broken-import-lib.l4"
+
 -- The shape of a document, as `l4 render` lays it out.
 renderHouseStyleFixture :: FilePath
 renderHouseStyleFixture = fixtureDir </> "render-house-style.l4"
@@ -701,6 +706,7 @@ coreFixtures =
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme, nlgOwnLineSectionGivenFixture
   , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
+  , renderBrokenImportFixture, renderBrokenImportLib
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
   , renderMixfixOperandFixture
   , regulativeActionParamSource
@@ -3922,6 +3928,35 @@ spec bin = do
       rowOf "Not as a whole rule" >>= (`shouldSatisfy` ("neither a nor b." `isInfixOf`))
       rowOf "Rule with not of an and" >>= (`shouldSatisfy` ("it is not the case that both a and (b or c)." `isInfixOf`))
 
+    it "spells a possessive to fit the word, and leaves an author's alone" $ do
+      rowOf "The rate on the facts" >>= (`shouldSatisfy` ("the contribution facts' rate" `isInfixOf`))
+      rowOf "The age of the witness" >>= (`shouldSatisfy` ("the witness's age" `isInfixOf`))
+
+    it "keeps a denial to the one operand of an OR it covers" $
+      rowOf "Denial of one operand" >>= (`shouldSatisfy` ("If (it is not the case that the facts are not met for the contribution facts) or b: 1;" `isInfixOf`))
+
+    it "does not take a name ending in over for a preposition" $
+      rowOf "Old enough" >>= (`shouldSatisfy` ("I am 18 or over for the contribution facts." `isInfixOf`))
+
+    it "gives each nested calculation words of its own in l4 nlg" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderMeaningFixture]
+      code `shouldBe` ExitSuccess
+      take 6 (lines (filter (/= '\r') sout)) `shouldBe`
+        [ "10 minus (5 minus 2)"
+        , "(10 minus 5) minus 2"
+        , "the product of 4 and (5 minus 2)"
+        , "(the product of 4 and 5) minus 2"
+        , "the result of dividing 12 by (6 minus 2)"
+        , "(the result of dividing 12 by 6) minus 2"
+        ]
+
+    it "makes a unit of time agree with the number 1 in a sentence" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderMeaningFixture]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      out `shouldSatisfy` ("the date 1 month after" `isInfixOf`)
+      out `shouldSatisfy` ("the date 2 months after" `isInfixOf`)
+
     it "keeps a subtraction in the order it was written" $
       rowOf "Difference in prose" >>= (`shouldSatisfy` ("If a − b is more than 0: more;" `isInfixOf`))
 
@@ -3944,6 +3979,11 @@ spec bin = do
   -- The two surfaces read one document: `l4 render` with no flags is the Render
   -- tab's default, so an import is left out but still informs the file's own rules.
   describe "l4 render and imports" $ do
+    it "writes the document, and fails, when an imported module does not check" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderBrokenImportFixture]
+      code `shouldNotBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy` ("Still fine means 1." `isInfixOf`)
+
     let run args = do
           Output code sout _ <- runL4 bin (["render", "--format", "text"] ++ args ++ [nlgTransTop])
           code `shouldBe` ExitSuccess

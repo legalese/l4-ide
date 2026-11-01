@@ -304,6 +304,7 @@ Check succeeded.
 ```
 
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics). `--json` and `--fixed-now` work here too.
+`l4 render` still writes its document when an imported file has an error, and then exits with status 1.
 
 ---
 

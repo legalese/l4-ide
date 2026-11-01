@@ -1,13 +1,13 @@
-the date 1 months after 31 January 2023 (capped at the last day of that month) is equal to 28 February 2023
-the date 1 months after 31 January 2024 (capped at the last day of that month) is equal to 29 February 2024
-the date 1 months after 30 January 2023 (capped at the last day of that month) is equal to 28 February 2023
-the date 1 months after 31 March 2024 (capped at the last day of that month) is equal to 30 April 2024
-the date 1 months after 15 January 2024 (capped at the last day of that month) is equal to 15 February 2024
+the date 1 month after 31 January 2023 (capped at the last day of that month) is equal to 28 February 2023
+the date 1 month after 31 January 2024 (capped at the last day of that month) is equal to 29 February 2024
+the date 1 month after 30 January 2023 (capped at the last day of that month) is equal to 28 February 2023
+the date 1 month after 31 March 2024 (capped at the last day of that month) is equal to 30 April 2024
+the date 1 month after 15 January 2024 (capped at the last day of that month) is equal to 15 February 2024
 the date 0 months after 15 January 2024 (capped at the last day of that month) is equal to 15 January 2024
 the date 12 months after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2025
 the date 4 months after 31 October 2024 (capped at the last day of that month) is equal to 28 February 2025
 the date 3 months after 15 November 2024 (capped at the last day of that month) is equal to 15 February 2025
-the date 1 months after 1 December 2024 (capped at the last day of that month) is equal to 1 January 2025
+the date 1 month after 1 December 2024 (capped at the last day of that month) is equal to 1 January 2025
 the date 12 months after 31 December 2024 (capped at the last day of that month) is equal to 31 December 2025
 the date 24 months after 15 January 2024 (capped at the last day of that month) is equal to 15 January 2026
 the date 1.5 months after 15 January 2024 (capped at the last day of that month) is equal to 15 February 2024
@@ -17,11 +17,11 @@ the date 0 minus 2 months after 31 January 2024 (capped at the last day of that 
 the date 0 minus 1 months after 31 March 2025 (capped at the last day of that month) is equal to 28 February 2025
 the date 0 minus 13 months after 15 January 2024 (capped at the last day of that month) is equal to 15 December 2022
 the date 0 minus 12 months after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2023
-the date 1 years after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2025
+the date 1 year after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2025
 the date 4 years after 29 February 2024 (capped at the last day of that month) is equal to 29 February 2028
-the date 1 years after 28 February 2023 (capped at the last day of that month) is equal to 28 February 2024
-the date 1 years after 28 February 2024 (capped at the last day of that month) is equal to 28 February 2025
-the date 1 years after 31 December 2024 (capped at the last day of that month) is equal to 31 December 2025
+the date 1 year after 28 February 2023 (capped at the last day of that month) is equal to 28 February 2024
+the date 1 year after 28 February 2024 (capped at the last day of that month) is equal to 28 February 2025
+the date 1 year after 31 December 2024 (capped at the last day of that month) is equal to 31 December 2025
 the date 25 years after 1 January 2000 (capped at the last day of that month) is equal to 1 January 2025
 the date 0 years after 15 June 2024 (capped at the last day of that month) is equal to 15 June 2024
 the date 1.9 years after 15 June 2024 (capped at the last day of that month) is equal to 15 June 2025
