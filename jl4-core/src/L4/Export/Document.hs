@@ -283,10 +283,10 @@ data Reading = MkReading
     -- too ('slotText'). By name: a reference to one resolves to the checker's
     -- elaboration of it, which the document has stripped.
   , rdNested     :: !(Set.Set SrcRange)
-    -- ^ Where the expression being read has a call of two or more arguments or
-    -- a built-in operator ('nestedCalls'). The rewrite works from the leaves up, so by the time a
-    -- mixfix call fills its slots an argument that was such a call is already
-    -- text; this is how 'slotArg' still knows it was one.
+    -- ^ Where the expression being read has something that reads as more than
+    -- one thing ('isCompoundNode', 'nestedCalls'). The rewrite works from the
+    -- leaves up, so by the time a mixfix call fills its slots such an argument
+    -- may already be text; this is how 'slotArg' still knows what it was.
   }
 
 noReading :: Reading
@@ -2220,11 +2220,10 @@ patternMixfix rd n args = do
         SlotArg i  -> slotArg rd (args !! i)
   Just (Text.unwords (map tok slots))
 
--- | An argument in a slot of a mixfix pattern, bracketed when it is itself a call
--- of two or more arguments or a built-in operator. Without the brackets
+-- | An argument in a slot of a mixfix pattern, bracketed unless it reads as one
+-- thing ('isCompoundNode'). Without the brackets
 -- @(a `reduced by` b) `reduced by` c@ and @a `reduced by` (b `reduced by` c)@ read
--- as the same words, for two different numbers. A slot with one argument or a
--- name needs none, and a date written as literals is a single value.
+-- as the same words, for two different numbers.
 slotArg :: Reading -> Expr Resolved -> Text
 slotArg rd a
   | compound  = "(" <> slotText rd a <> ")"
@@ -2234,24 +2233,32 @@ slotArg rd a
     Inert{} -> maybe False (`Set.member` rd.rdNested) (rangeOf a)
     _       -> isCompoundNode a
 
--- | A call of two or more arguments, a call or a record with named arguments, or
--- a built-in operator: what reads as more than one thing beside a pattern's
--- words. A record reads "Money where amount is 100 and cur is SGD", and after it
--- in a slot "reduced by 5" would seem to be part of its last field. A date
--- written as literals and the prelude's @append@ read as a single value and a
--- list, and are not counted.
+-- | What reads as more than one thing beside a pattern's words, decided by shape
+-- alone. Only these read as one thing: a literal, a name, a field of one, a
+-- percentage of one, a date written as literals, a lifecycle noun, and a call
+-- with one argument (a known limit: @(double p) `reduced by` d@ and
+-- @double (p `reduced by` d)@ still read alike, because the call's own argument
+-- is not bracketed either, 'callPhrase'). Everything else counts: a call of two
+-- or more arguments, a record or call with named arguments ("Money where amount
+-- is 100 and cur is SGD", after which "reduced by 5" would seem part of its last
+-- field), every built-in operator, a denial ("no is false"), a choice (IF,
+-- BRANCH, CONSIDER), a list, and a list joined on (FOLLOWED BY, and the
+-- prelude's @append@, which reads the same).
 isCompoundNode :: Expr Resolved -> Bool
 isCompoundNode = \case
-  AppNamed _ _ (_ : _) _ -> True
-  App _ n args@(_ : _ : _) ->
-       isNothing (daydateLiteral n args)
-    && not (nameIs "Date" n && isJust (dateFromArgs args))
-    && isNothing (monthDateFromArgs n args)
-    && not (resolvedText n == "append" && fromPrelude n)
-  And{} -> True; Or{} -> True; Implies{} -> True; Equals{} -> True
-  Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
-  Leq{} -> True; Geq{} -> True; Lt{} -> True; Gt{} -> True
-  _ -> False
+  Lit{}       -> False
+  Inert{}     -> False   -- already text: 'slotArg' asks 'rdNested' where it came from
+  Lifecycle{} -> False
+  App _ _ []  -> False
+  App _ _ [_] -> False
+  App _ n args
+    | isJust (daydateLiteral n args)                  -> False
+    | nameIs "Date" n, isJust (dateFromArgs args)     -> False
+    | isJust (monthDateFromArgs n args)               -> False
+  AppNamed _ _ [] _ -> False
+  Proj _ a _  -> isCompoundNode a
+  Percent _ a -> isCompoundNode a
+  _           -> True
 
 -- | The source ranges of the compound nodes of an expression ('isCompoundNode').
 nestedCalls :: Expr Resolved -> Set.Set SrcRange

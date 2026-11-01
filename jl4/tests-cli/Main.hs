@@ -3584,6 +3584,31 @@ spec bin = do
       rowOf "four" `shouldSatisfy` ("Net four means (Money where amount is 100 and cur is SGD) less 5." `isSuffixOf`)
       drop 7 (rowOf "one") `shouldNotBe` drop 7 (rowOf "two")
 
+    -- A denial, a choice, a list joined on, or a joined list in a slot reads as
+    -- more than one thing too. Each pair below has two values; while those slots
+    -- took no brackets, each pair read as one sentence (the round-3 refuter's G1
+    -- and G2). A rule's reading is its whole entry, less its name.
+    it "brackets a slot that holds a denial, a choice or a list, so each pair reads apart" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderMixfixNestedFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+          entryOf name = case dropWhile (not . ((". " <> name <> " ") `isInfixOf`)) out of
+            (h : rest) -> unwords (drop 1 (dropWhile (/= lastWord name) (words h)))
+                            <> concat (takeWhile (not . null) rest)
+            []         -> ""
+          lastWord name = case reverse (words name) of { (w : _) -> w; [] -> "" }
+      forM_ [("Neg right", "Neg whole"), ("Multi left", "Multi whole"), ("If left", "If right")
+           , ("Cons left", "Cons right"), ("Join left", "Join right")] $ \ (l, r) -> do
+        entryOf l `shouldNotBe` ""
+        entryOf l `shouldNotBe` entryOf r
+      entryOf "Neg right" `shouldSatisfy` ("(b) yes as well as (no is false)." `isSuffixOf`)
+      entryOf "Neg whole" `shouldSatisfy` ("(b) yes as well as no is false." `isSuffixOf`)
+      entryOf "Multi left" `shouldSatisfy` ("(b) (it is not the case that is big for 5) as well as no." `isSuffixOf`)
+      entryOf "If left" `shouldBe` "equals 0 + (if c then base else 7) reduced by [r]."
+      entryOf "Cons left" `shouldBe` "means (1 followed by nums) then also [ys]."
+      entryOf "Cons right" `shouldBe` "means 1 followed by nums then also [ys]."
+      entryOf "Join left" `shouldBe` "means (nums followed by nums) then also [ys]."
+
     it "reads a section GIVEN's input in a slot as a blank, as a rule's own input" $ do
       Output code sout _ <- runL4 bin ["render", "--format", "text", renderSectionGivenBlanksFixture]
       code `shouldBe` ExitSuccess
