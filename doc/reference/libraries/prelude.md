@@ -116,9 +116,8 @@ With rates of 1000, income of 20000 and no dependants, the code gave 630 where t
 - "Exceeds" as a yes-or-no question ("income exceeds the threshold") is a comparison, `income GREATER THAN threshold`, not this function.
 - An input that is itself a function call needs parentheses: `` `the amount by which` income `exceeds` (FLOOR threshold) ``.
   Without them, L4 reads `FLOOR` and `threshold` as two more inputs and reports that the function "expects 2 inputs, but here it is given 4 inputs".
-- The sentence that `l4 nlg` writes for an `#EVAL` or `#ASSERT` shows a call to this function as `` `the amount by which _ exceeds _` with 840 and 160 ``.
-  The `@nlg` sentence on its definition is not spliced into a call to a mixfix function.
-  `l4 render` writes the same call as the phrase, "the amount by which income exceeds the threshold".
+- `l4 nlg` and `l4 render` both write a call to this function with the `@nlg` phrase on its definition.
+  For the first `#EVAL` in the example, `l4 nlg` writes "the amount by which 840 exceeds 160"; for `rebate`, `l4 render` writes "the amount by which income exceeds income threshold".
 - A module that imports the prelude and defines its own function with the same words gets "There are multiple definitions for the identifier", as it would for its own `max`.
 
 ## MAYBE values
