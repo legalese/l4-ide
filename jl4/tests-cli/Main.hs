@@ -4464,9 +4464,15 @@ spec bin = do
       hasRow "And beside the slot if p and (it is not the case that the Act governs for n) is disclosed implies r."
       hasRow "Last slot then and if ([p] is told it is not the case that the Act governs for n and r) is disclosed."
 
+    it "brackets a call that ends with such a condition, in such a slot" $ do
+      hasRow "Call ending in a denial in the slot if (fb for it is not the case that the Act governs for n) is disclosed."
+      hasRow "Call around a denied sentence if fb for it is not the case that the Act governs for n is disclosed."
+      hasRow "Call ending in an implies in the slot if (fb for p and (q implies r)) is disclosed."
+      hasRow "Call around an and with the sentence if fb for p and (q implies r) is disclosed."
+      hasRow "And in the last slot if ([p] is told (it is not the case that the Act governs for n) and r) is disclosed."
+
     it "leaves a slot at the end of the sentence, and a delimited denial, as they were" $ do
       hasRow "Denial in the last slot if [p] is told it is not the case that the Act governs for n."
-      hasRow "And in the last slot if [p] is told (it is not the case that the Act governs for n) and r is disclosed."
       hasRow "One word denied if p is false is disclosed."
       hasRow "Inequality in the slot if n is not 3 is disclosed."
 
