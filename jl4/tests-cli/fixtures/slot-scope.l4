@@ -101,6 +101,28 @@ GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE `and beside the slot` n p r IF (p AND (`disclosed` (NOT (`the Act governs` n)))) IMPLIES r
 
+-- A call with no sentence of its own ends with its last argument, so a call
+-- that ends with a condition has no closing word either.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `call ending in a denial in the slot` n IF `disclosed` (`fb` (NOT (`the Act governs` n)))
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `call around a denied sentence` n IF `fb` (NOT (`disclosed` (`the Act governs` n)))
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `call ending in an implies in the slot` p q r IF `disclosed` (`fb` (p AND (q IMPLIES r)))
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `call around an and with the sentence` p q r IF `fb` (p AND (`disclosed` (q IMPLIES r)))
+
 -- Controls. A denial or an AND in the last slot ends where the sentence does,
 -- and is left as it was.
 GIVEN n IS A NUMBER

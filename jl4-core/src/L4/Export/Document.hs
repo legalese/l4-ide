@@ -1883,9 +1883,9 @@ rewriteWith rd = go
  where
   -- 'transformOf', except that an arithmetic node also sees its operands as
   -- they were before they were rewritten ('groupOperands').
-  go e = rw (herald (groupOperands e (over (gplate @(Expr Resolved)) go e)))
+  go e = rw e (herald e (groupOperands e (over (gplate @(Expr Resolved)) go e)))
   inert ann t = Inert ann t InertCtxNone
-  herald = \case
+  herald orig = \case
     -- A date given as literals reads as the date, whatever its rule's sentence.
     App ann n args | Just (d, m, y) <- daydateLiteral n args -> inert ann (Text.unwords [d, m, y])
     App ann n args | nameIs "Date" n, Just t <- dateFromArgs args -> inert ann t
@@ -1895,7 +1895,8 @@ rewriteWith rd = go
     App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
     App ann n args
       | Just followed <- heraldSlots n args ->
-          substituteNlgCallMarked rd.rdHeralds (App ann n (zipWith (\f a -> asText (filler f) a) followed args))
+          substituteNlgCallMarked rd.rdHeralds
+            (App ann n (zipWith3 (\f o a -> asText (filler f o) a) followed (argsEndOpen orig args) args))
       | readsAsFunction n args -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
       | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument leafText)) args))
     e -> substituteNlgCallMarked rd.rdHeralds e
@@ -1912,11 +1913,47 @@ rewriteWith rd = go
   -- the case that X is disclosed" is also how @NOT (`disclosed` X)@ reads. Told
   -- by where the slot is in the sentence, not by what its words say; in the last
   -- slot nothing follows it.
-  filler followed a
-    | followed, slotRunsOn a t = "(" <> t <> ")"
-    | otherwise            = t
+  --
+  -- So is a call that ends with such a condition ('callEndsOpen'): with no
+  -- brackets of its own, "fb for p and (q implies r) is shown" is also how
+  -- @`fb` (p AND (`shown` (q IMPLIES r)))@ reads.
+  filler followed open a
+    | followed, slotRunsOn a t || open = "(" <> t <> ")"
+    | otherwise                         = t
    where
     t = argument (slotText rd) a
+  -- 'callEndsOpen' for each argument of a call, read from the call as it was
+  -- before its arguments were rewritten.
+  argsEndOpen orig args = case orig of
+    App _ _ oargs | length oargs == length args -> map callEndsOpen oargs
+    _ -> map (const False) args
+  -- Whether a call, printed, ends with an argument that has no closing word, so
+  -- that the call has none either and runs on into whatever follows it. A call
+  -- that reads as f(x), or as a date, closes itself; a call with a sentence ends
+  -- where the sentence does, unless its last slot holds such an argument; any
+  -- other call ends with its last argument. Read from the shape of the call and
+  -- of its sentence, not from any word.
+  callEndsOpen o = isNothing (nlgOf o) && case carameliseNode o of
+    App _ m margs@(_ : _)
+      | isJust (daydateLiteral m margs) -> False
+      | nameIs "Date" m, isJust (dateFromArgs margs) -> False
+      | isJust (monthDateFromArgs m margs) -> False
+      | [f, xs] <- margs, isJust (quantified m f xs) -> False
+      | Just (nlg, inputs) <- Map.lookup (getUnique m) rd.rdHeralds, length inputs == length margs ->
+          let bound = zip inputs margs
+              refs  = Nlg.nlgRefs nlg
+          in case [ x | (i, x) <- bound, i `notElem` refs ] of
+               []       -> or [ endsOpen x | (i, x) <- bound, not (i `Set.member` Nlg.refsFollowedByWords nlg) ]
+               leftover -> endsOpen (last leftover)
+      | readsAsFunction m margs -> False
+      | Just toks <- mixfixTokens m margs -> last toks == "_" && endsOpen (last margs)
+      | otherwise -> endsOpen (last margs)
+    _ -> False
+  -- An argument that has no closing word: a condition that 'slotRunsOn', as it
+  -- reads once rewritten, or a call that ends with one.
+  endsOpen x = callEndsOpen x || slotRunsOn x' (leafText x')
+   where
+    x' = go x
   -- For each argument of a call whose sentence fits it, whether the sentence's
   -- words come after its slot.
   heraldSlots n args = case Map.lookup (getUnique n) rd.rdHeralds of
@@ -1970,7 +2007,7 @@ rewriteWith rd = go
   isArithmetic = \case
     Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
     _ -> False
-  rw = \case
+  rw orig = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.
     Where _ e _ -> e
     LetIn _ _ e -> e
@@ -1985,7 +2022,7 @@ rewriteWith rd = go
     App ann n [x] | Just phrase <- Map.lookup (nameToText (getActual n)) builtinUnaryOf ->
       inert ann ("the " <> phrase <> " of " <> leafText x)
     -- Mixfix: interleave the arguments into the @_@ holes.
-    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd n args -> inert ann txt
+    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd (argsEndOpen orig args) n args -> inert ann txt
     -- A function whose name ends in a preposition reads "minimum of x and y",
     -- not the linearizer's "minimum of with x and y".
     App ann n args@(_ : _) | endsInPreposition n ->
@@ -2077,13 +2114,20 @@ scalarInputs (MkTypeSig _ (MkGivenSig _ names) _) = Set.fromList
   [ spaceCamel (cleanParam (resolvedText r))
   | MkOptionallyTypedName _ r mty <- names, isNothing (mty >>= userTypeName) ]
 
-interleaveMixfix :: Reading -> Resolved -> [Expr Resolved] -> Maybe Text
-interleaveMixfix rd n args =
+-- | A call whose name is a mixfix pattern with a hole for each argument: the
+-- pattern's words.
+mixfixTokens :: Resolved -> [Expr Resolved] -> Maybe [Text]
+mixfixTokens n args =
   let toks  = Text.words (nameToText (getActual n))
       holes = length (filter (== "_") toks)
-  in if holes >= 1 && holes == length args
-       then Just (Text.unwords (fill toks args))
-       else Nothing
+  in if holes >= 1 && holes == length args then Just toks else Nothing
+
+-- | The arguments in a mixfix pattern's holes. Each comes with whether it is a
+-- call that ends with a condition that has no closing word ('rewriteWith').
+interleaveMixfix :: Reading -> [Bool] -> Resolved -> [Expr Resolved] -> Maybe Text
+interleaveMixfix rd opens n args = do
+  toks <- mixfixTokens n args
+  Just (Text.unwords (fill toks (zip opens args)))
  where
   fill [] _ = []
   fill (t : ts) as
@@ -2093,9 +2137,9 @@ interleaveMixfix rd n args =
     | otherwise = t : fill ts as
   -- A hole that the pattern's own words come after, as a sentence's slot is
   -- ('slotRunsOn').
-  hole followed a
-    | followed, slotRunsOn a s = "(" <> s <> ")"
-    | otherwise            = s
+  hole followed (open, a)
+    | followed, slotRunsOn a s || open = "(" <> s <> ")"
+    | otherwise                         = s
    where
     s = slotText rd a
 
