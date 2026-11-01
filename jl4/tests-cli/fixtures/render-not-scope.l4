@@ -64,3 +64,50 @@ GIVEN n IS A NUMBER
 GIVETH A NUMBER
 `denied or among three` n b c d MEANS
   IF (NOT (`the Act governs` n)) AND (NOT (b OR c)) AND d THEN 1 ELSE 2
+
+-- An IMPLIES, or an IF, has no word that closes it, so as one operand of a
+-- group it would take in the rest: "neither p nor q implies r" also reads as
+-- (NOT (p OR q)) IMPLIES r.
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`implication in a denied or` p q r MEANS
+  IF NOT (p OR (q IMPLIES r)) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`denied or then implication` p q r MEANS
+  IF (NOT (p OR q)) IMPLIES r THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`implication first in a denied or` p q r MEANS
+  IF NOT ((q IMPLIES r) OR p) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`implication in a denied and` p q r MEANS
+  IF NOT (p AND (q IMPLIES r)) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+      s IS A BOOLEAN
+GIVETH A NUMBER
+`implication in a group` p q r s MEANS
+  IF s AND ((q IMPLIES r) OR p) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+      s IS A BOOLEAN
+GIVETH A NUMBER
+`if in a denied or` p q r s MEANS
+  IF NOT ((IF q THEN r ELSE s) OR p) THEN 1 ELSE 2
