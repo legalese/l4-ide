@@ -107,7 +107,7 @@ Validation messages (`:387-415`): `Missing required field: '<p>'`, `Field '<p>' 
   Expanding such a synonym in those two places is for unstable first; it is not done here.
 - A line of empty cells, such as `,,`, is a case with nothing given: if any input has to be given it is an `error` row, and without `--continue-on-error` the run stops there.
 - The message that refuses a record of the wrong length says what the reader would otherwise have done: "a cell missing from a short row would otherwise be read as left out (NOTHING for a `MAYBE` input, a missing field for any other), and a long row's extra cells would be dropped".
-  Unstable's message says "would otherwise take its default" instead, because unstable has `TYPICALLY` defaults and `main` has none; the wording is changed here because the unstable sentence would be false on `main`, and the rest of the message ("Line 3 has 2 cells, but the header has 3, so the row is refused") is the same.
+  Unstable's message says "would otherwise take its default" instead, because unstable has `TYPICALLY` defaults and `main` takes none (its `TYPICALLY` is stored and checked, not applied: `specs/as-built/typically.md`); the wording is changed here because the unstable sentence would be false on `main`, and the rest of the message ("Line 3 has 2 cells, but the header has 3, so the row is refused") is the same.
   Pinned in `describe "the CSV reader"`.
 - `--validate-only` judges NUMBER, BOOLEAN and STRING inputs (and a `MAYBE` of one) only.
   For any other type, such as a DATE, a list or a record, whatever is given passes: with an `@export` taking a DATE, the cases `2024-01-15` and `not a date` are both `valid`, and the second fails when run (`Could not parse date string 'not a date'`).
