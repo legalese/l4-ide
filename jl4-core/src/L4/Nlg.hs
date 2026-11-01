@@ -1387,20 +1387,26 @@ renderNlgWithIn mlang argMap = \case
   -- @%a% doubled@ filled with @5 MINUS 2@ would read "5 minus 2 doubled", as
   -- @5 MINUS `dbl` 2@ does. Decided by the filler's shape, not the sentence's
   -- words; a filler with a sentence of its own is left as it is.
-  -- So is a denial, an IMPLIES or an IF in a slot that the sentence's words come
-  -- after: "not X is disclosed" is also how @NOT (`disclosed` X)@ reads, because
-  -- "not" reaches as far as the words go. In the last slot nothing follows it.
+  -- So is a denial, an IMPLIES, an IF, an AND or an OR in a slot that the
+  -- sentence's words come after: "not X is disclosed" is also how
+  -- @NOT (`disclosed` X)@ reads, because "not" reaches as far as the words go,
+  -- and "p or (q implies r) is shown" how @p OR (`shown` (q IMPLIES r))@ does.
+  -- In the last slot nothing follows it. A call ends with its last argument,
+  -- so a call whose last argument is such a condition is bracketed too.
   frag followed (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
     Just a
       | isNothing (a ^. annoOf % annNlg), isArithNode (carameliseNode a) ->
           "(" <> fst (simpleLinearizerIn mlang a) <> ")"
-      | getUnique r `Set.member` followed
-      , isNothing (a ^. annoOf % annNlg), runsOn (carameliseNode a) ->
+      | getUnique r `Set.member` followed, endsOpen a ->
           "(" <> fst (simpleLinearizerIn mlang a) <> ")"
       | otherwise -> fst (simpleLinearizerIn mlang a)
     Nothing -> resolvedText r
-  runsOn = \ case
+  -- A call with a sentence has been spliced in by now ('Inert'), and is not
+  -- looked into.
+  endsOpen a = isNothing (a ^. annoOf % annNlg) && case carameliseNode a of
     Not{} -> True; Implies{} -> True; IfThenElse{} -> True; MultiWayIf{} -> True; Consider{} -> True
+    And{} -> True; Or{} -> True; RAnd{} -> True; ROr{} -> True
+    App _ n es@(_ : _) | isNothing (daydateLiteral n es) -> endsOpen (last es)
     _ -> False
 
 -- | The words after a slot that held the number 1: a sentence written for any

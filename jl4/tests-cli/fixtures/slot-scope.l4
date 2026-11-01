@@ -1,7 +1,8 @@
 -- A condition that fills a slot of a rule's sentence, as `l4 render` and
--- `l4 nlg` read it: a denial, an IMPLIES or an IF has no closing word, so when
--- the sentence goes on after the slot, the rest of it must not read as part of
--- the filler. A slot at the end of the sentence has nothing after it.
+-- `l4 nlg` read it: a denial, an IMPLIES, an IF, an AND or an OR has no closing
+-- word, and nor has a call that ends with one, so when the sentence goes on
+-- after the slot, the rest of it must not read as part of the filler. A slot at
+-- the end of the sentence has nothing after it.
 -- The rules are stubs; each pair below states two different conditions, and
 -- what is tested is that they are worded apart.
 
@@ -29,6 +30,10 @@ GIVETH A BOOLEAN
 GIVEN p IS A BOOLEAN
 GIVETH A BOOLEAN
 p `is published` MEANS TRUE
+
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+`fb` p MEANS p
 
 -- The denial fills the slot, and the denial is of the whole sentence: two rules.
 GIVEN n IS A NUMBER
@@ -133,3 +138,7 @@ DECIDE `inequality in the slot` n IF `disclosed` (NOT (n EQUALS 3))
 #EVAL TRUE IMPLIES (`disclosed` FALSE)
 #EVAL `disclosed` (IF TRUE THEN FALSE ELSE TRUE)
 #EVAL IF TRUE THEN FALSE ELSE (`disclosed` TRUE)
+#EVAL `disclosed` (TRUE OR FALSE)
+#EVAL TRUE OR (`disclosed` FALSE)
+#EVAL `disclosed` (`fb` (TRUE OR FALSE))
+#EVAL `fb` (TRUE OR (`disclosed` FALSE))
