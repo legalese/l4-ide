@@ -156,7 +156,7 @@ Legal writing sometimes uses letters on purpose, as in "A person (A) discriminat
 
 When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". A role written as a name of its own is kept: ``GIVEN `the applicant` IS A Person`` reads "the applicant", not "the person". This works well when only one input has that type; two inputs of the same type would share the same phrase.
 
-**Name record fields readably.** A field renders as "X's field", so field names go straight into the prose. A `BOOLEAN` field states something, so it reads as a statement: "the applicant is a citizen", "the processing is necessary for a contract". Field names go straight into the prose:
+**Name record fields readably.** A field renders as "X's field", so field names go straight into the prose. A `BOOLEAN` field states something, so it never takes a possessive. A field that starts with _is_ or _has_ follows its record ("the applicant is a citizen"), and any other reads as its own words and says which record it is about ("necessary for a contract, for the processing"). Field names go straight into the prose:
 
 ```l4
 DECLARE `Property Details`
@@ -291,6 +291,14 @@ In
 
 the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot, while `%amount%` is one.
 Where a percent sign would end up flush against a word, as in `5%levy`, wrap it in backticks (`` `5%` ``) or spell it out ("5 percent"), either of which puts it beyond doubt.
+
+**The renderer never rewrites your words.** It prints a name as you wrote it and arranges what is around it. So a negation stays outside the statement: `NOT` `` `the person is a hotel` `` reads "it is not the case that the person is a hotel". If you want a negative wording, write it as a rule with an `@nlg`, and call that rule:
+
+```l4
+GIVETH A BOOLEAN
+@nlg the person is not a hotel
+`not a hotel` MEANS NOT `the person is a hotel`
+```
 
 **It heads the rule, and the logic stays.** A rule with `@nlg` opens with its sentence, and its body follows as usual, so annotating a rule never removes a condition from the document:
 
