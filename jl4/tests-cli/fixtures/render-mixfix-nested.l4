@@ -1,0 +1,45 @@
+-- Two rules that differ only in how one mixfix call nests inside another.
+-- `l4 run` gives 85 for `net one` and 95 for `net two`. When the slots of a
+-- mixfix pattern were filled with no brackets, both rules read "price reduced
+-- by discount reduced by rebate", so two different numbers had one sentence
+-- (the round-2 refuter of the #802 port, finding F1).
+
+GIVEN amount IS A NUMBER
+      cut IS A NUMBER
+GIVETH A NUMBER
+amount `reduced by` cut MEANS amount MINUS cut
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`net one` price discount rebate MEANS (price `reduced by` discount) `reduced by` rebate
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`net two` price discount rebate MEANS price `reduced by` (discount `reduced by` rebate)
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`net three` price discount rebate MEANS (price PLUS discount) `reduced by` rebate
+
+-- A record in a slot: without brackets, "reduced by 5" reads as part of its
+-- last field.
+DECLARE Money HAS amount IS A NUMBER
+                  cur IS A STRING
+
+GIVEN m IS A Money
+      cut IS A NUMBER
+GIVETH A NUMBER
+m `less` cut MEANS m's amount MINUS cut
+
+GIVETH A NUMBER
+`net four` MEANS (Money 100 "SGD") `less` 5
+
+#EVAL `net one` 100 10 5
+#EVAL `net two` 100 10 5
+#EVAL `net three` 100 10 5

@@ -53,9 +53,10 @@ import qualified Data.Map.Strict as Map
 import Data.Ratio (denominator, numerator)
 import Data.Time (fromGregorianValid)
 import qualified Data.Set as Set
-import Optics (gplate, toListOf, (%), (^.))
+import Optics (cosmosOf, gplate, toListOf, (%), (^.))
 
-import L4.Annotation (emptyAnno)
+import L4.Annotation (emptyAnno, rangeOf)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Desugar (carameliseExpr, carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
@@ -275,10 +276,15 @@ data Reading = MkReading
   , rdBlanks     :: !(Set.Set Text)
     -- ^ How this rule's own inputs of a built-in type read, so that one in a slot
     -- of a pattern can read as a blank.
+  , rdNested     :: !(Set.Set SrcRange)
+    -- ^ Where the expression being read has a call of two or more arguments or
+    -- a built-in operator ('nestedCalls'). The rewrite works from the leaves up, so by the time a
+    -- mixfix call fills its slots an argument that was such a call is already
+    -- text; this is how 'slotArg' still knows it was one.
   }
 
 noReading :: Reading
-noReading = MkReading Map.empty Map.empty Set.empty Map.empty Set.empty
+noReading = MkReading Map.empty Map.empty Set.empty Map.empty Set.empty Set.empty
 
 extractUnits :: Module Resolved -> [Unit]
 extractUnits (MkModule _ _ section) = goSection section
@@ -317,7 +323,7 @@ allUnits headings patterns mainModule deps =
       -- Told apart from a record's constructor by what the head resolved to, not
       -- by its name: a record can be named like a rule that has a herald.
       calls = Map.keysSet info
-      reading = MkReading info (ruleResults mods) (booleanFields mods) patterns Set.empty
+      reading = MkReading info (ruleResults mods) (booleanFields mods) patterns Set.empty Set.empty
   in map (\u -> (mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u)
                   { uCalls = calls, uReading = reading })
        (extractUnits mainModule <> concatMap extractUnits deps)
@@ -1976,8 +1982,9 @@ rewriteExpr = rewriteWith noReading
 -- beforehand: spliced first, its arguments would miss every rewrite below and
 -- print raw, in the middle of an otherwise readable sentence.
 rewriteWith :: Reading -> Expr Resolved -> Expr Resolved
-rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
+rewriteWith rd0 e0 = transformOf (gplate @(Expr Resolved)) (rw . herald) e0
  where
+  rd = rd0 { rdNested = rd0.rdNested <> nestedCalls e0 }
   inert ann t = Inert ann t InertCtxNone
   herald = \case
     -- A date given as literals reads as the date, whatever its rule's sentence.
@@ -2144,7 +2151,7 @@ interleaveMixfix rd n args =
   fill [] _ = []
   fill (t : ts) as
     | t == "_" = case as of
-        (a : rest) -> slotText rd a : fill ts rest
+        (a : rest) -> slotArg rd a : fill ts rest
         []         -> t : fill ts as
     | otherwise = t : fill ts as
 
@@ -2157,8 +2164,46 @@ patternMixfix rd n args = do
   guard (used == [0 .. length args - 1])
   let tok = \ case
         SlotWord w -> w
-        SlotArg i  -> slotText rd (args !! i)
+        SlotArg i  -> slotArg rd (args !! i)
   Just (Text.unwords (map tok slots))
+
+-- | An argument in a slot of a mixfix pattern, bracketed when it is itself a call
+-- of two or more arguments or a built-in operator. Without the brackets
+-- @(a `reduced by` b) `reduced by` c@ and @a `reduced by` (b `reduced by` c)@ read
+-- as the same words, for two different numbers. A slot with one argument or a
+-- name needs none, and a date written as literals is a single value.
+slotArg :: Reading -> Expr Resolved -> Text
+slotArg rd a
+  | compound  = "(" <> slotText rd a <> ")"
+  | otherwise = slotText rd a
+ where
+  compound = case a of
+    Inert{} -> maybe False (`Set.member` rd.rdNested) (rangeOf a)
+    _       -> isCompoundNode a
+
+-- | A call of two or more arguments, a call or a record with named arguments, or
+-- a built-in operator: what reads as more than one thing beside a pattern's
+-- words. A record reads "Money where amount is 100 and cur is SGD", and after it
+-- in a slot "reduced by 5" would seem to be part of its last field. A date
+-- written as literals and the prelude's @append@ read as a single value and a
+-- list, and are not counted.
+isCompoundNode :: Expr Resolved -> Bool
+isCompoundNode = \case
+  AppNamed _ _ (_ : _) _ -> True
+  App _ n args@(_ : _ : _) ->
+       isNothing (daydateLiteral n args)
+    && not (nameIs "Date" n && isJust (dateFromArgs args))
+    && isNothing (monthDateFromArgs n args)
+    && not (resolvedText n == "append" && fromPrelude n)
+  And{} -> True; Or{} -> True; Implies{} -> True; Equals{} -> True
+  Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
+  Leq{} -> True; Geq{} -> True; Lt{} -> True; Gt{} -> True
+  _ -> False
+
+-- | The source ranges of the compound nodes of an expression ('isCompoundNode').
+nestedCalls :: Expr Resolved -> Set.Set SrcRange
+nestedCalls e = Set.fromList
+  [ r | c <- toListOf (cosmosOf (gplate @(Expr Resolved))) e, isCompoundNode c, Just r <- [rangeOf c] ]
 
 -- | An argument in a slot among an author's words: a pattern's, or a sentence's.
 -- One that is just an input of the rule reads as a blank, as it does in the

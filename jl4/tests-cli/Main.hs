@@ -529,6 +529,10 @@ sectionGivenBridgeSource = "examples/ok/section-given-bridge.l4"
 renderMixfixOperandFixture :: FilePath
 renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
 
+-- Two mixfix calls, nested on the left and on the right.
+renderMixfixNestedFixture :: FilePath
+renderMixfixNestedFixture = fixtureDir </> "render-mixfix-nested.l4"
+
 -- An obligation whose action is an input.
 regulativeActionParamSource :: FilePath
 regulativeActionParamSource = "examples/ok/regulative-action-param-reference.l4"
@@ -712,7 +716,7 @@ coreFixtures =
   , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
   , renderBrokenImportFixture, renderBrokenImportLib, renderHebrewWordsFixture
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
-  , renderMixfixOperandFixture
+  , renderMixfixOperandFixture, renderMixfixNestedFixture
   , regulativeActionParamSource
   , everyRandSource
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
@@ -3557,10 +3561,24 @@ spec bin = do
     it "puts each operand in its slot" $ do
       out <- rows
       hasRow "(a) the day x is on or before the day y;" out
-      hasRow "(b) the day x plus days 12 is on or before the day y;" out
-      hasRow "(c) the day y is on or before the day x plus days 12;" out
-      hasRow "(d) the day y plus days 1 is on or before the day x plus days 12; and" out
-      hasRow "(e) the day x plus days 2 precedes the day y." out
+      hasRow "(b) (the day x plus days 12) is on or before the day y;" out
+      hasRow "(c) the day y is on or before (the day x plus days 12);" out
+      hasRow "(d) (the day y plus days 1) is on or before (the day x plus days 12); and" out
+      hasRow "(e) (the day x plus days 2) precedes the day y." out
+
+    -- A slot holding a call of two or more arguments, or a built-in operator, is
+    -- bracketed. Without that, a left-nested and a right-nested call read the
+    -- same, for two different numbers (85 and 95).
+    it "brackets a slot that holds a call, so left and right nesting read apart" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderMixfixNestedFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+          rowOf w = headOr "" [ l | l <- out, ("Net " <> w <> " means") `isInfixOf` l ]
+      rowOf "one" `shouldSatisfy` ("Net one means ([price] reduced by [discount]) reduced by [rebate]." `isSuffixOf`)
+      rowOf "two" `shouldSatisfy` ("Net two means [price] reduced by ([discount] reduced by [rebate])." `isSuffixOf`)
+      rowOf "three" `shouldSatisfy` ("Net three means (price + discount) reduced by [rebate]." `isSuffixOf`)
+      rowOf "four" `shouldSatisfy` ("Net four means (Money where amount is 100 and cur is SGD) less 5." `isSuffixOf`)
+      drop 7 (rowOf "one") `shouldNotBe` drop 7 (rowOf "two")
 
   describe "an @nlg on a rule head's input" $ do
     let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]
