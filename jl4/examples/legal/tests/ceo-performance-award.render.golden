@@ -1,0 +1,392 @@
+2025 CEO Performance Award - Complete Implementation
+====================================================
+
+
+§ 1  Core Constants
+
+1. Grant Date means 3 September 2025.
+
+2. Performance Period Years means 10.
+
+3. Performance End Date means years after Performance Period Years and Grant Date.
+
+4. Reference Stock Price means 334.09.
+
+5. Total Award Shares means 423,743,904.
+
+6. Shares Per Tranche means 35,311,992.
+
+7. Number Of Tranches means 12.
+
+8. Third Anniversary means years after 3 and Grant Date.
+
+9. Fifth Anniversary means years after 5 and Grant Date.
+
+10. Seventh And Half Anniversary means years after 7.5 and Grant Date.
+
+11. Acquisition Threshold means Billion 20.
+
+12. EBITDA Threshold means Billion 2.
+
+
+§ 2  Type Definitions
+
+1. Tesla Performance Metrics consists of:
+    - Current Market Cap — number
+    - Six Month Avg Market Cap — number
+    - Thirty Day Avg Market Cap — number
+    - One Year Avg Market Cap — number
+    - Tesla Vehicles Delivered — number
+    - Active FSD Subscriptions — number
+    - Bots Delivered — number
+    - Robotaxis In Operation — number
+    - Current Adjusted EBITDA — number
+    - Outstanding Shares — number
+    - Last Closing Price — number
+    - Per Share Consideration — number, if any
+
+2. Service Status means one of:
+    - Chief Executive Officer
+    - Executive Officer Product Development
+    - Not In Eligible Service
+
+3. Termination Reason means one of:
+    - Without Cause
+    - For Cause
+    - Death
+    - Disability
+    - Change In Control
+    - Voluntary Resignation
+
+4. Covered Event Type means one of:
+    - External Event Affecting Product Goals
+    - Other External Event
+
+5. Vesting Category means one of:
+    - Seven And Half Year Earned Shares
+    - Ten Year Earned Shares
+
+6. Award Participant consists of:
+    - Name — text
+    - Birthdate — date
+
+7. Tranche Status consists of:
+    - Tranche Number — number
+    - Is Earned — yes or no
+    - Earn Date — date, if any
+    - Vesting Category — Vesting Category, if any
+    - Vesting Date — date, if any
+    - Is Vested — yes or no
+    - Market Cap Met — yes or no
+    - Operational Met — yes or no
+
+8. Award Action means one of:
+    - maintain eligible service status
+    - achieve market cap milestone
+    - achieve operational milestone
+    - vest earned shares
+    - forfeit unvested shares
+    - vest immediately
+    - pay offset amount
+    - hold shares for period
+
+9. CEO Award State consists of:
+    - Musk Service Status — Service Status
+    - Current Date — date
+    - Performance Metrics — Tesla Performance Metrics
+    - Earned Tranches — list of number
+    - Earned Dates — list of date
+    - CEO Succession Framework — yes or no
+    - Termination Reason — Termination Reason, if any
+    - Covered Event Occurred — yes or no
+    - Covered Event Type — Covered Event Type, if any
+    - HSR Waiting Period Expired — yes or no
+    - Shareholder Approval Received — yes or no
+
+
+§ 3  Market Cap Milestone Functions
+
+1. Required Market Cap For Tranche is:
+    (a) If tranche number is 1: Trillion 2;
+    (b) Otherwise, if tranche number is at least 2 and tranche number is at most 10: Trillion 2 + (tranche number − 1) × Billion 500;
+    (c) Otherwise, if tranche number is 11: Trillion 7.5;
+    (d) Otherwise, if tranche number is 12: Trillion 8.5;
+    (e) Otherwise: 0.
+
+
+§ 4  Market Cap Achievement Functions
+
+1. Market Cap Milestone Met if:
+    (a) Required Market Cap is at most the tesla performance metrics's Six Month Avg Market Cap; and
+    (b) Required Market Cap is at most the tesla performance metrics's Thirty Day Avg Market Cap.
+    where:
+    - Required Market Cap means Required Market Cap For Tranche for tranche number.
+
+2. Market Cap Milestone Met For Change In Control if Required Market Cap is at most Change In Control Market Cap.
+    where:
+    - Required Market Cap means Required Market Cap For Tranche for tranche number.
+    - Change In Control Market Cap equals the tesla performance metrics's Outstanding Shares × Higher Price.
+    - Higher Price is:
+        (a) If the tesla performance metrics's Per Share Consideration is no value: the tesla performance metrics's Last Closing Price;
+        (b) Otherwise: depending on the tesla performance metrics's Per Share Consideration:
+            (i) If it is present, with the value consideration:
+                (1) If consideration is more than the tesla performance metrics's Last Closing Price: consideration;
+                (2) Otherwise: the tesla performance metrics's Last Closing Price;
+            (ii) If it is absent: the tesla performance metrics's Last Closing Price.
+
+
+§ 5  Operational Milestone Functions
+
+1. Operational Milestone Met is decided as follows:
+    (a) If tranche number is 1: the tesla performance metrics's Tesla Vehicles Delivered is at least Million 20;
+    (b) Otherwise, if tranche number is 2: the tesla performance metrics's Active FSD Subscriptions is at least Million 10;
+    (c) Otherwise, if tranche number is 3: the tesla performance metrics's Bots Delivered is at least Million 1;
+    (d) Otherwise, if tranche number is 4: the tesla performance metrics's Robotaxis In Operation is at least Million 1;
+    (e) Otherwise: all of the following:
+        (i) tranche number is at least 5;
+        (ii) tranche number is at most 12; and
+        (iii) EBITDA Milestone Met for tranche number and the tesla performance metrics.
+
+2. EBITDA Milestone Met is decided as follows:
+    (a) If tranche number is 5: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 50;
+    (b) Otherwise, if tranche number is 6: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 80;
+    (c) Otherwise, if tranche number is 7: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 130;
+    (d) Otherwise, if tranche number is 8: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 210;
+    (e) Otherwise, if tranche number is 9: the tesla performance metrics's Current Adjusted EBITDA is at least Billion 300;
+    (f) Otherwise: all of the following:
+        (i) tranche number is at least 10;
+        (ii) tranche number is at most 12; and
+        (iii) the tesla performance metrics's Current Adjusted EBITDA is at least Billion 400.
+
+
+§ 6  Deemed Achievement Logic
+
+1. Deemed Achievement Applies if:
+    (a) the CEO award state's Current Date is at least Third Anniversary;
+    (b) Covered Event Occurred, for the CEO award state;
+    (c) Covered Event Affects Product Goals for tranche number and the CEO award state; and
+    (d) All Market Cap Averages Met for tranche number and the CEO award state's Performance Metrics.
+
+2. Covered Event Affects Product Goals if:
+    (a) tranche number is at least 2;
+    (b) tranche number is at most 4; and
+    (c) the CEO award state's Covered Event Type is External Event Affecting Product Goals.
+
+3. All Market Cap Averages Met if:
+    (a) Required Market Cap is at least the tesla performance metrics's Thirty Day Avg Market Cap;
+    (b) Required Market Cap is at least the tesla performance metrics's Six Month Avg Market Cap; and
+    (c) Required Market Cap is at least the tesla performance metrics's One Year Avg Market Cap.
+    where:
+    - Required Market Cap means Required Market Cap For Tranche for tranche number.
+
+
+§ 7  Earning Logic
+
+1. Tranche Can Be Earned if:
+    (a) any of the following:
+        (i) Market Cap Milestone Met for tranche number and the CEO award state's Performance Metrics; or
+        (ii) all of the following:
+            (1) Deemed Achievement Applies for tranche number and the CEO award state; and
+            (2) Market Cap Milestone Met For Change In Control for tranche number and the CEO award state's Performance Metrics;
+    (b) any of the following:
+        (i) Operational Milestone Met for tranche number and the CEO award state's Performance Metrics; or
+        (ii) Deemed Achievement Applies for tranche number and the CEO award state;
+    (c) Musk In Eligible Service for the CEO award state;
+    (d) CEO Succession Framework Required Met for tranche number and the CEO award state;
+    (e) it is not the case that Tranche Already Earned for tranche number and the CEO award state;
+    (f) it is not the case that Operational Milestone Already Used for tranche number and the CEO award state; and
+    (g) Issuance Conditions Met for the CEO award state.
+
+2. Musk In Eligible Service if:
+    (a) the CEO award state's Musk Service Status is Chief Executive Officer; or
+    (b) the CEO award state's Musk Service Status is Executive Officer Product Development.
+
+3. CEO Succession Framework Required Met if:
+    (a) it is not the case that tranche number is at least 11; or
+    (b) CEO Succession Framework, for the CEO award state.
+
+4. Tranche Already Earned if Number In List for tranche number and the CEO award state's Earned Tranches.
+
+5. Operational Milestone Already Used if:
+    (a) tranche number is at least 1;
+    (b) tranche number is at most 4; and
+    (c) Product Goal Already Used for tranche number and the CEO award state.
+
+6. Product Goal Already Used if Any Earned Tranche Uses Same Product Goal for tranche number and the CEO award state's Earned Tranches.
+
+7. Issuance Conditions Met if:
+    (a) HSR Waiting Period Expired, for the CEO award state; and
+    (b) Shareholder Approval Received, for the CEO award state.
+
+
+§ 8  Vesting Logic
+
+1. Determine Vesting Category is:
+    (a) If earn date is at most Fifth Anniversary: Seven And Half Year Earned Shares;
+    (b) Otherwise: Ten Year Earned Shares.
+
+2. Determine Vesting Date is:
+    (a) If the vesting category is Seven And Half Year Earned Shares: Seventh And Half Anniversary;
+    (b) Otherwise: Performance End Date.
+
+3. Tranche Is Vested if current date is at least vesting date.
+    where:
+    - Vesting category means Determine Vesting Category for earn date.
+    - Vesting date means Determine Vesting Date for vesting category.
+
+
+§ 9  Termination and Change in Control Logic
+
+1. Immediate Vesting Applies if the CEO award state's Termination Reason is one of Without Cause, Death, Disability, or Change In Control.
+
+2. Forfeiture Applies depends on the CEO award state's Termination Reason:
+    (a) If it is For Cause: true;
+    (b) If it is Voluntary Resignation: true;
+    (c) If it is absent: any of the following:
+        (i) it is not the case that Musk In Eligible Service for the CEO award state; or
+        (ii) the CEO award state's Current Date is more than Performance End Date;
+    (d) If it is Without Cause: false;
+    (e) If it is Death: false;
+    (f) If it is Disability: false;
+    (g) If it is Change In Control: false.
+
+
+§ 10  Offset Amount Calculations
+
+1. Offset Amount For Tranche equals Reference Stock Price × Shares Per Tranche.
+
+
+§ 11  Holding Period Requirements
+
+1. Holding Period Met if current date is at least holding period end.
+    where:
+    - Holding period end means years after 5 and earn date.
+
+
+§ 12  Regulative Deontics
+
+1. Elon Musk is an Award Participant with:
+    - Name — Elon Reeve Musk
+    - Birthdate — 28 June 1971
+
+2. Eligible Service Requirement is:
+    (a) If Forfeiture Applies for the CEO award state: Elon Musk must forfeit unvested shares (Forfeiture Reason of the CEO award state);
+    (b) Otherwise, if Immediate Vesting Applies for the CEO award state: Elon Musk may vest immediately (Immediate Vesting Reason for the CEO award state);
+    (c) Otherwise: Elon Musk must maintain eligible service status (Service Status) within the day numbered Performance End Date − the CEO award state's Current Date:
+        (i) Provided that any of the following:
+            (1) Service Status is Chief Executive Officer; or
+            (2) Service Status is Executive Officer Product Development.
+        (ii) Failing that, Elon Musk must forfeit unvested shares (Cessation of Eligible Service).
+
+3. Milestone Achievement Requirement is:
+    (a) If Tranche Can Be Earned for tranche and the CEO award state: Elon Musk may achieve market cap milestone (tranche no and mkt cap) within the day numbered Performance End Date − the CEO award state's Current Date:
+        (i) Provided that all of the following:
+            (1) mkt cap is more than Required Market Cap For Tranche for tranche no; and
+            (2) any of the following:
+                (A) Market Cap Milestone Met for tranche no and the CEO award state's Performance Metrics; or
+                (B) Market Cap Milestone Met For Change In Control for tranche no and the CEO award state's Performance Metrics.
+        (ii) Whether or not that is done, Elon Musk may achieve operational milestone (tranche n and Milestone Type) within the day numbered Performance End Date − the CEO award state's Current Date:
+            (1) Provided that any of the following:
+                (A) Operational Milestone Met for tranche n and the CEO award state's Performance Metrics; or
+                (B) Deemed Achievement Applies for tranche n and the CEO award state.
+    (b) Otherwise: FULFILLED.
+
+4. Vesting Requirement is:
+    (a) If Tranche Is Earned for tranche and the CEO award state and the CEO award state's Current Date is at least vesting date: Elon Musk must vest earned shares (tranche no and date) within 1:
+        (i) Provided that all of the following:
+            (1) tranche no is tranche; and
+            (2) date is at least vesting date.
+        (ii) Once that is done, Elon Musk must pay offset amount (Offset Amount For Tranche for tranche) within 30. Once that is done, Elon Musk must hold shares for period (5) within the day numbered holding period end − the CEO award state's Current Date.
+    (b) Otherwise: FULFILLED.
+    where:
+    - Earn date means Get Earn Date For Tranche for tranche and the CEO award state.
+    - Vesting category means Determine Vesting Category for earn date.
+    - Vesting date means Determine Vesting Date for vesting category.
+
+
+§ 13  Date Tracking Functions
+
+1. Tranche Is Earned if Number In List for tranche and the CEO award state's Earned Tranches.
+
+2. Get Earn Date For Tranche means Get Date At Index for Get Index Of Tranche for tranche, the CEO award state's Earned Tranches, and 0 and the CEO award state's Earned Dates.
+
+3. Get Index Of Tranche depends on tranche list:
+    (a) If tranche list is empty: 0;
+    (b) If tranche list starts with head, followed by tail:
+        (i) If tranche is head: index;
+        (ii) Otherwise: Get Index Of Tranche for tranche, tail, and index + 1.
+
+4. Get Date At Index depends on date list:
+    (a) If date list is empty: Grant Date;
+    (b) If date list starts with head, followed by tail:
+        (i) If index is 0: head;
+        (ii) Otherwise: Get Date At Index for index − 1 and tail.
+
+
+§ 14  Helper Functions
+
+1. Million equals a × 1,000,000.
+
+2. Billion equals Million a × 1000.
+
+3. Trillion equals Billion a × 1000.
+
+4. Years after means the date new day/new month/new year.
+    where:
+    - New year equals the year of d + FLOOR with n.
+    - Fractional days equals the number of days in new year × (n − FLOOR with n).
+    - New day equals the day of d + FLOOR with fractional days.
+    - New month means the month of d.
+
+5. Number In List depends on list:
+    (a) If list is empty: false;
+    (b) If list starts with head, followed by tail: any of the following:
+        (i) item is head; or
+        (ii) Number In List for item and tail.
+
+6. Any Earned Tranche Uses Same Product Goal depends on earned tranches:
+    (a) If earned tranches is empty: false;
+    (b) If earned tranches starts with head, followed by tail: any of the following:
+        (i) Product Goals Are Same for tranche number and head; or
+        (ii) Any Earned Tranche Uses Same Product Goal for tranche number and tail.
+
+7. Product Goals Are Same if:
+    (a) tranche1 is at least 1;
+    (b) tranche1 is at most 4;
+    (c) tranche2 is at least 1;
+    (d) tranche2 is at most 4; and
+    (e) tranche1 is tranche2.
+
+8. Forfeiture Reason depends on the CEO award state's Termination Reason:
+    (a) If it is For Cause: Termination For Cause;
+    (b) If it is Voluntary Resignation: Voluntary Resignation;
+    (c) If it is absent:
+        (i) If it is not the case that Musk In Eligible Service for the CEO award state: Cessation of Eligible Service;
+        (ii) Otherwise: Performance Period Expired;
+    (d) If it is Without Cause: Should Not Forfeit;
+    (e) If it is Death: Should Not Forfeit;
+    (f) If it is Disability: Should Not Forfeit;
+    (g) If it is Change In Control: Should Not Forfeit.
+
+9. Immediate Vesting Reason depends on the CEO award state's Termination Reason:
+    | the CEO award state's Termination Reason | Result                      |
+    |------------------------------------------|-----------------------------|
+    | Without Cause                            | Termination Without Cause   |
+    | Death                                    | Death                       |
+    | Disability                               | Disability                  |
+    | Change In Control                        | Change In Control           |
+    | For Cause                                | Should Not Vest Immediately |
+    | Voluntary Resignation                    | Should Not Vest Immediately |
+    | absent                                   | Should Not Vest Immediately |
+
+
+Coverage
+left out: Example Metrics High Performance
+left out: Example Metrics Medium Performance
+left out: Example Metrics Low Performance
+left out: Example Award State Active
+left out: Example Award State Terminated
+left out: Example Award State Change In Control
+left out: Example Award State Medium Performance
+left out: Example Award State Low Performance
+left out: Example Award State With Earned Tranche

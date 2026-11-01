@@ -39,7 +39,7 @@ import L4.Lexer (LangTag (..))
 import L4.Syntax (defaultModuleLang)
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser as Parser
-import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
+import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText, sourceLinksFrom)
 
 import L4.Cli.Common
 
@@ -194,6 +194,7 @@ renderCmd opts = do
                    { numberSections = opts.renderNumberSections
                    , numberClauses  = opts.renderNumberClauses
                    , toc            = opts.renderToc
+                   , sourceLinks    = maybe mempty (sourceLinksFrom . fst) mToks
                    , docLang        = docLanguage
                    }
           -- Choose the language BEFORE building the document, not inside it.

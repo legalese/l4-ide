@@ -1,0 +1,159 @@
+British Citizen Act
+===================
+
+
+§ 1  Assumptions
+
+The following are taken as given:
+
+1. Person.
+
+2. Mother of.
+
+3. Father of.
+
+4. Is born in the United Kingdom after commencement.
+
+5. Is born in a qualifying territory after the appointed day.
+
+6. Is settled in the United Kingdom.
+
+7. Is settled in the qualifying territory in which the person is born.
+
+
+§ 2  Improved Readability Version
+
+Definitions:
+
+1. Place consists of:
+    - English name — text
+
+2. Date consists of:
+    - year — number
+    - month — number
+    - day — number
+
+3. Maybe means one of Nothing or Just.
+
+4. Natural Person consists of:
+    - mama — Maybe of Person
+    - papa — Maybe of Person
+    - birthPlace — Maybe of Place
+    - birthDate — Maybe of Date
+
+Provisions:
+
+1. Is BOT if:
+    (a) the place's English name is Anguilla;
+    (b) the place's English name is Bermuda;
+    (c) the place's English name is British Antarctic Territory;
+    (d) the place's English name is British Indian Ocean Territory;
+    (e) the place's English name is Cayman Islands;
+    (f) the place's English name is Falkland Islands;
+    (g) the place's English name is Gibraltar;
+    (h) the place's English name is Hong Kong;
+    (i) the place's English name is Montserrat;
+    (j) the place's English name is Pitcairn, Henderson, Ducie and Oeno Islands;
+    (k) the place's English name is St Helena, Ascension and Tristan da Cunha;
+    (l) the place's English name is Sovereign Base Areas of Akrotiri and Dhekelia;
+    (m) the place's English name is South Georgia and the South Sandwich Islands;
+    (n) the place's English name is Turks and Caicos Islands; or
+    (o) the place's English name is Virgin Islands.
+
+2. Commencement is a Date with:
+    - year — 1983
+    - month — 1
+    - day — 1
+
+3. Appointed day is a Date with:
+    - year — 2002
+    - month — 2
+    - day — 21
+
+4. Qualifying territory if:
+    (a) is BOT for the place; and
+    (b) the place's English name is not Sovereign Base Areas of Akrotiri and Dhekelia.
+
+5. After if (year with the date c − 1900) × 365 + month with the date c × 30 + day with the date c is less than (the date d's year − 1900) × 365 + the date d's month × 30 + the date d's day.
+
+6. Is born in UK if UK is English name with the natural person's birth place's val.
+
+7. Is born in US if US is English name with p's birth place's val.
+
+8. After commencement means after p's birth date's val and commencement.
+
+9. After appointed day means after p's birth date's val and appointed day.
+
+10. Plus equals a + b.
+
+
+§ 3  Expanded version
+
+1. Is a British citizen if anything if:
+    (a) any of the following:
+        (i) is born in the United Kingdom after commencement with the person; or
+        (ii) is born in a qualifying territory after the appointed day with the person; and
+    (b) any of the following:
+        (i) is a British citizen if anything for father of the person and a;
+        (ii) is a British citizen if anything for mother of the person and a;
+        (iii) is settled in the United Kingdom with father of the person;
+        (iv) is settled in the United Kingdom with mother of the person;
+        (v) is settled in the qualifying territory in which the person is born with father of the person; or
+        (vi) is settled in the qualifying territory in which the person is born with mother of the person.
+
+
+§ 4  Version using a local auxiliary declaration
+
+1. Is a British citizen (local) if:
+    (a) any of the following:
+        (i) is born in the United Kingdom after commencement with the person; or
+        (ii) is born in a qualifying territory after the appointed day with the person; and
+    (b) any of the following:
+        (i) father or mother with is settled in the United Kingdom; or
+        (ii) father or mother with is settled in the qualifying territory in which the person is born.
+    where:
+    - Father or mother if:
+        (a) property with father of the person; or
+        (b) property with mother of the person.
+
+
+§ 5  Version using a global auxiliary declaration
+
+1. For father or mother of if:
+    (a) property with father of person; or
+    (b) property with mother of person.
+
+2. Is a British citizen (variant) if:
+    (a) any of the following:
+        (i) is born in the United Kingdom after commencement with the person; or
+        (ii) is born in a qualifying territory after the appointed day with the person; and
+    (b) any of the following:
+        (i) for father or mother of the person and is a British citizen (variant);
+        (ii) for father or mother of the person and is settled in the United Kingdom; or
+        (iii) for father or mother of the person and is settled in the qualifying territory in which the person is born.
+
+
+§ 6  Schedule 1: British Overseas Territories
+
+1. British Overseas Territories means the following list of Place:
+    | English name                                      |
+    |---------------------------------------------------|
+    | Anguilla                                          |
+    | Bermuda                                           |
+    | British Antarctic Territory                       |
+    | British Indian Ocean Territory                    |
+    | Cayman Islands                                    |
+    | Falkland Islands                                  |
+    | Gibraltar                                         |
+    | Hong Kong                                         |
+    | Montserrat                                        |
+    | Pitcairn, Henderson, Ducie and Oeno Islands       |
+    | St Helena, Ascension and Tristan da Cunha         |
+    | South Georgia and the South Sandwich Islands      |
+    | The Sovereign Base Areas of Akrotiri and Dhekelia |
+    | Turks and Caicos Islands                          |
+    | Virgin Islands                                    |
+
+
+Coverage
+left out: akdh

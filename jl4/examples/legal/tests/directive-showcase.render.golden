@@ -1,0 +1,45 @@
+Directive Showcase
+==================
+
+
+§ 1  Types
+
+1. Person consists of:
+    - name — text
+    - age — number
+
+2. Color means one of Red, Green, or Blue.
+
+3. Data Point consists of:
+    - label — text
+    - value — number
+
+4. Timeline Event consists of:
+    - year — text
+    - event — text
+
+
+§ 2  Functions
+
+1. Is adult if the person's age is at least 18.
+
+2. Age category of is:
+    | Condition                                     | Result |
+    |-----------------------------------------------|--------|
+    | the person's age is at least 65               | Senior |
+    | otherwise, if the person's age is at least 18 | Adult  |
+    | otherwise                                     | Minor  |
+
+
+Coverage
+left out: alice
+left out: bob
+left out: q1 revenue
+left out: q2 revenue
+left out: q3 revenue
+left out: q4 revenue
+left out: event 1
+left out: event 2
+left out: event 3
+left out: event 4
+left out: event 5

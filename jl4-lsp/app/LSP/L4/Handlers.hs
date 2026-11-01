@@ -726,6 +726,7 @@ handlers evalConfig recorder =
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
                              , ExportRender.toc = reqParams.toc
+                             , ExportRender.sourceLinks = maybe mempty (ExportRender.sourceLinksFrom . fst) mToks
                              , ExportRender.docLang =
                                  Maybe.fromMaybe defaultModuleLang
                                    (declaredModuleLang . fst =<< mToks) }
