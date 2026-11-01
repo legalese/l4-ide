@@ -96,8 +96,8 @@ GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
 DECIDE `and beside the slot` n p r IF (p AND (`disclosed` (NOT (`the Act governs` n)))) IMPLIES r
 
--- Controls. A denial in the last slot ends where the sentence does. Bracketed
--- there, it would read like the AND in a slot below, which is not bracketed.
+-- Controls. A denial or an AND in the last slot ends where the sentence does,
+-- and is left as it was.
 GIVEN n IS A NUMBER
       p IS A BOOLEAN
 GIVETH A BOOLEAN
