@@ -533,6 +533,10 @@ renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
 renderMixfixNestedFixture :: FilePath
 renderMixfixNestedFixture = fixtureDir </> "render-mixfix-nested.l4"
 
+-- A section GIVEN's input in a slot of a pattern and of a sentence.
+renderSectionGivenBlanksFixture :: FilePath
+renderSectionGivenBlanksFixture = fixtureDir </> "render-section-given-blanks.l4"
+
 -- An obligation whose action is an input.
 regulativeActionParamSource :: FilePath
 regulativeActionParamSource = "examples/ok/regulative-action-param-reference.l4"
@@ -716,7 +720,7 @@ coreFixtures =
   , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
   , renderBrokenImportFixture, renderBrokenImportLib, renderHebrewWordsFixture
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
-  , renderMixfixOperandFixture, renderMixfixNestedFixture
+  , renderMixfixOperandFixture, renderMixfixNestedFixture, renderSectionGivenBlanksFixture
   , regulativeActionParamSource
   , everyRandSource
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
@@ -3579,6 +3583,13 @@ spec bin = do
       rowOf "three" `shouldSatisfy` ("Net three means (price + discount) reduced by [rebate]." `isSuffixOf`)
       rowOf "four" `shouldSatisfy` ("Net four means (Money where amount is 100 and cur is SGD) less 5." `isSuffixOf`)
       drop 7 (rowOf "one") `shouldNotBe` drop 7 (rowOf "two")
+
+    it "reads a section GIVEN's input in a slot as a blank, as a rule's own input" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderSectionGivenBlanksFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("Net income means [income] reduced by 10." `isSuffixOf`)
+      out `shouldSatisfy` any ("Check if [income] is above the age." `isSuffixOf`)
 
   describe "an @nlg on a rule head's input" $ do
     let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]

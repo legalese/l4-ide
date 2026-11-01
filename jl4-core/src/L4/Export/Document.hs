@@ -276,6 +276,12 @@ data Reading = MkReading
   , rdBlanks     :: !(Set.Set Text)
     -- ^ How this rule's own inputs of a built-in type read, so that one in a slot
     -- of a pattern can read as a blank.
+  , rdSectionBlanks :: !(Set.Set Text)
+    -- ^ The names of the inputs, of a built-in type, of the section GIVENs a rule
+    -- sits under: its own section's and every enclosing one's ('extractUnits').
+    -- The rule reads them as inputs of its own, so in a slot they read as blanks
+    -- too ('slotText'). By name: a reference to one resolves to the checker's
+    -- elaboration of it, which the document has stripped.
   , rdNested     :: !(Set.Set SrcRange)
     -- ^ Where the expression being read has a call of two or more arguments or
     -- a built-in operator ('nestedCalls'). The rewrite works from the leaves up, so by the time a
@@ -284,22 +290,25 @@ data Reading = MkReading
   }
 
 noReading :: Reading
-noReading = MkReading Map.empty Map.empty Set.empty Map.empty Set.empty Set.empty
+noReading = MkReading Map.empty Map.empty Set.empty Map.empty Set.empty Set.empty Set.empty
 
 extractUnits :: Module Resolved -> [Unit]
-extractUnits (MkModule _ _ section) = goSection section
+extractUnits (MkModule _ _ section) = goSection Set.empty section
  where
-  goSection (MkSection _ _ _ _ decls) = concatMap goDecl decls
-  goDecl :: TopDecl Resolved -> [Unit]
-  goDecl = \case
-    Decide ann d  -> [mkUnit ann RuleUnit (decideApp d) (UDecide d)]
-    Declare ann d -> [mkUnit ann TypeUnit (declareApp d) (UDeclare d)]
-    Assume ann a  -> [mkUnit ann AssumptionUnit (assumeApp a) (UAssume a)]
-    Section _ s -> goSection s
+  -- The scope carries the section GIVEN inputs a declaration can read: its own
+  -- section's and every enclosing one's.
+  goSection scope (MkSection _ _ _ mgiven decls) =
+    concatMap (goDecl (scope <> givenScalarNames mgiven)) decls
+  goDecl :: Set.Set Text -> TopDecl Resolved -> [Unit]
+  goDecl scope = \case
+    Decide ann d  -> [mkUnit scope ann RuleUnit (decideApp d) (UDecide d)]
+    Declare ann d -> [mkUnit scope ann TypeUnit (declareApp d) (UDeclare d)]
+    Assume ann a  -> [mkUnit scope ann AssumptionUnit (assumeApp a) (UAssume a)]
+    Section _ s -> goSection scope s
     Directive{} -> []
     Import{}    -> []
     Timezone{}  -> []
-  mkUnit ann kind appHead decl =
+  mkUnit scope ann kind appHead decl =
     MkUnit
       { uPrimary = getUnique appHead
       , uModule  = (getUnique appHead).moduleUri
@@ -310,7 +319,7 @@ extractUnits (MkModule _ _ section) = goSection section
       , uDecl    = decl
       , uTopAnno = ann
       , uCalls   = Set.empty
-      , uReading = noReading
+      , uReading = noReading { rdSectionBlanks = scope }
       }
 
 -- | All renderable units across the open module and its dependencies, with
@@ -323,9 +332,10 @@ allUnits headings patterns mainModule deps =
       -- Told apart from a record's constructor by what the head resolved to, not
       -- by its name: a record can be named like a rule that has a herald.
       calls = Map.keysSet info
-      reading = MkReading info (ruleResults mods) (booleanFields mods) patterns Set.empty Set.empty
+      reading = MkReading info (ruleResults mods) (booleanFields mods) patterns
+                  Set.empty Set.empty Set.empty
   in map (\u -> (mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u)
-                  { uCalls = calls, uReading = reading })
+                  { uCalls = calls, uReading = reading { rdSectionBlanks = u.uReading.rdSectionBlanks } })
        (extractUnits mainModule <> concatMap extractUnits deps)
 
 -- | Every rule and whether it gives a BOOLEAN, keyed by the definition a call
@@ -883,6 +893,13 @@ inputDependentDefs inputs us = go inputs
     let dep' = Set.unions (dep : [ u.uDefs | u <- us, not (Set.disjoint u.uRefs dep) ])
     in if Set.size dep' == Set.size dep then dep else go dep'
 
+-- | The names of a section GIVEN's inputs that have a built-in type.
+givenScalarNames :: Maybe (GivenSig Resolved) -> Set.Set Text
+givenScalarNames = \case
+  Nothing -> Set.empty
+  Just (MkGivenSig _ names) -> Set.fromList
+    [ resolvedText r | MkOptionallyTypedName _ r mty _ <- names, isNothing (mty >>= userTypeName) ]
+
 -- | The inputs of a document: every ASSUME, including those the checker makes
 -- of a section GIVEN, which is why this reads the modules before
 -- 'stripSectionBinderElaborations', and every name of a section GIVEN.
@@ -1195,7 +1212,7 @@ substParams pm
   action = \case
     MkAction a m (PatExpr pa (App ann n [])) prov
       | Just phrase <- Map.lookup (getUnique n) pm ->
-          MkAction a m (PatExpr pa (Inert ann ("perform " <> phrase) InertCtxNone)) prov
+          MkAction a m (PatExpr pa (Inert ann (fw "perform" <> " " <> phrase) InertCtxNone)) prov
     act -> act
 
 -- | The name of a user-defined (non-builtin) nullary type constructor.
@@ -1387,7 +1404,7 @@ toClause e0 = case carameliseNode e0 of
   -- landlord must deliver has within 20".
   -- A run of such steps is one list.
   Record _ mParty cell val isOfficial (Just k) ->
-    CAll ( CLeaf (inlineProse cell <> " is recorded as " <> inlineProse val <> ledgerOf mParty isOfficial)
+    CAll ( CLeaf (inlineProse cell <> " " <> fw "is recorded as" <> " " <> inlineProse val <> ledgerOf mParty isOfficial)
          : case (carameliseNode k, toClause k) of
              (Record _ _ _ _ _ (Just _), CAll rest) -> rest
              (_, next)                             -> [next] )
@@ -1811,13 +1828,13 @@ subjectProse :: Subject Resolved -> Text
 subjectProse = \case
   Party _ party -> inlineProse party
   Every _ mCast v mRoll mFilter ->
-    "every "
+    fw "every" <> " "
       <> maybe "" (\c -> nameToText (getActual c) <> " ") mCast
       <> nameToText (getActual v)
-      <> maybe "" (\r -> " in " <> inlineProse r) mRoll
+      <> maybe "" (\r -> " " <> fw "in" <> " " <> inlineProse r) mRoll
       <> maybe "" (\f -> case f of
-                     Who _ e   -> " who " <> inlineProse e
-                     Whose _ e -> " whose " <> inlineProse e) mFilter
+                     Who _ e   -> " " <> fw "who" <> " " <> inlineProse e
+                     Whose _ e -> " " <> fw "whose" <> " " <> inlineProse e) mFilter
 
 modalWord :: DeonticModal -> Text
 modalWord = \case
@@ -2043,28 +2060,28 @@ rewriteWith rd0 e0 = transformOf (gplate @(Expr Resolved)) (rw . herald) e0
     -- One with a HENCE is a step of a contract, and is left for 'toClause',
     -- which every HENCE and LEST reaches, to lay out with what follows it.
     Record ann mParty cell val isOfficial Nothing ->
-      inert ann (leafText val <> ", recorded as " <> leafText cell <> ledgerOf mParty isOfficial)
+      inert ann (leafText val <> ", " <> fw "recorded as" <> " " <> leafText cell <> ledgerOf mParty isOfficial)
     -- A ledger read is the value recorded there: the last one, which may be
     -- absent, or all of them.
     ReadCell ann mParty isOfficial mode cell -> inert ann $ case mode of
-      RecallLast -> "the value last recorded as " <> leafText cell <> ledgerOf mParty isOfficial <> ", if any"
-      RecallAll  -> "every value recorded as " <> leafText cell <> ledgerOf mParty isOfficial <> ", oldest first"
+      RecallLast -> fw "the value last recorded as" <> " " <> leafText cell <> ledgerOf mParty isOfficial <> ", " <> fw "if any"
+      RecallAll  -> fw "every value recorded as" <> " " <> leafText cell <> ledgerOf mParty isOfficial <> ", " <> fw "oldest first"
     -- A lifecycle noun as a value, in the words a deadline's anchor uses
     -- ('deonticClause', @anchorProse@).
     Lifecycle ann p -> inert ann $ case p of
-      LifecycleJoin     -> "the join"
-      LifecycleDeadline -> "the deadline"
-      LifecycleArming   -> "the arming"
+      LifecycleJoin     -> fw "the join"
+      LifecycleDeadline -> fw "the deadline"
+      LifecycleArming   -> fw "the arming"
     -- A refusal is not a value, and says so in the author's words.
-    Refuse ann msg -> inert ann ("the model refuses to answer: " <> leafText msg)
+    Refuse ann msg -> inert ann (fw "the model refuses to answer:" <> " " <> leafText msg)
     e -> e
 
 -- | Whose ledger a write or a read is on, after the cell's name: nothing for the
 -- acting party's own.
 ledgerOf :: Maybe (Expr Resolved) -> Bool -> Text
 ledgerOf mParty isOfficial
-  | isOfficial       = " in the official record"
-  | Just q <- mParty = " in " <> leafText q <> "'s record"
+  | isOfficial       = " " <> fw "in the official record"
+  | Just q <- mParty = " " <> fw "in" <> " " <> possessiveOf (leafText q) <> " " <> fw "record"
   | otherwise        = ""
 
 mathUnaryFns :: Map.Map Text Text
@@ -2212,6 +2229,12 @@ nestedCalls e = Set.fromList
 slotText :: Reading -> Expr Resolved -> Text
 slotText rd a = case a of
   Inert _ t _ | t `Set.member` rd.rdBlanks -> "[" <> t <> "]"
+  App _ n [] | resolvedText n `Set.member` rd.rdSectionBlanks, not (Map.member (getUnique n) rd.rdRules) ->
+    "[" <> spaceCamel (cleanParam (resolvedText n)) <> "]"
+  -- The same input, made text by the rewrite below the slot: its name as the
+  -- linearizer quotes it.
+  Inert _ t _ | Just nm <- Text.stripPrefix "`" t >>= Text.stripSuffix "`", nm `Set.member` rd.rdSectionBlanks ->
+    "[" <> spaceCamel (cleanParam nm) <> "]"
   _ -> leafText a
 
 nameIs :: Text -> Resolved -> Bool
