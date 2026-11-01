@@ -114,7 +114,9 @@ The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](
 - **A function passed on, or named without being called,** reads as its name. In `filter even xs`, `even` reads `even`.
 - **A sentence is spliced in without brackets,** so nested calls can read alike. Set slots off with words that cannot be part of an argument, and read the output of nested calls. Built-in arithmetic is bracketed: "10 minus (5 minus 2)".
 - **A function with no sentence** reads as its pattern: `` `_ LESS _` with 100 and 20 ``.
-- **In `l4 render`, a mixfix call's slots are bracketed** when one holds another call, a record or an operator, so ``(a `reduced by` b) `reduced by` c`` and ``a `reduced by` (b `reduced by` c)`` read apart. A mixfix call inside built-in arithmetic is not bracketed: ``price PLUS (discount `reduced by` rebate)`` reads "price + discount reduced by rebate".
+- **In `l4 render`, a mixfix call's slot is bracketed** unless it holds a literal, a name, a field of one, a date written as numbers, or a call with one argument. So ``(a `reduced by` b) `reduced by` c`` and ``a `reduced by` (b `reduced by` c)`` read apart, and so do a `NOT`, an `IF`, a list or a `FOLLOWED BY` in a slot: ``yes `as well as` (NOT no)`` reads "yes as well as (no is false)".
+- **A call with one argument is not bracketed, in a slot or around its own argument,** so ``(double p) `reduced by` d`` and ``double (p `reduced by` d)`` read "double of p reduced by [d]" and "double of [p] reduced by [d]": with `p` an input they differ only in a blank, and with a constant in its place they read the same. Give one of them a name of its own.
+- **A mixfix call inside built-in arithmetic is not bracketed:** ``price PLUS (discount `reduced by` rebate)`` reads "price + [discount] reduced by [rebate]".
 
 ## Several languages
 
