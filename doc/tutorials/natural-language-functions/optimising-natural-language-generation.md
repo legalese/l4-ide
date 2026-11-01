@@ -627,7 +627,7 @@ GIVETH A NUMBER
 pmt p r n MEANS p TIMES r DIVIDED BY (1 MINUS EXPONENT (1 PLUS r) (0 MINUS n))
 ```
 
-This renders as "Pmt equals p × r ÷ (1 − EXPONENT with 1 + r and 0 − n)."
+This renders as "Pmt equals p × r ÷ (1 − (EXPONENT with (1 + r) and (0 − n)))."
 
 After, with descriptive names and one `@nlg`:
 
