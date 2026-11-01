@@ -1992,9 +1992,9 @@ formulaText e
   go expr = case carameliseNode expr of
     Plus _ a b      -> bin 1 " + " a b
     Minus _ a b     -> binRight 1 " − " a b
-    Times _ a b     -> bin 2 " × " a b
-    DividedBy _ a b -> binRight 2 " ÷ " a b
-    Modulo _ a b    -> binRight 2 " mod " a b
+    Times _ a b     -> multiplicative False 2 " × " False a b
+    DividedBy _ a b -> multiplicative False 2 " ÷ " True a b
+    Modulo _ a b    -> multiplicative True 2 " mod " True a b
     Lit _ (NumericLit _ r) -> Just (4, numText r)
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)
@@ -2019,6 +2019,24 @@ formulaText e
     (pb, tb) <- go b
     Just (p, wrap p pa ta <> op <> wrap (p + 1) pb tb)
   wrap parentP childP t = if childP < parentP then "(" <> t <> ")" else t
+  -- mod shares a level with × and ÷ but does not reassociate with either:
+  -- a × (b mod c), (a × b) mod c and (a mod b) × c are three formulas, and flat
+  -- "a × b mod c" can be read as more than one of them. So a mod that is an
+  -- operand of × or ÷, and a × or ÷ that is an operand of mod, is bracketed on
+  -- either side. Decided by the operators alone.
+  multiplicative isMod p op strictRight a b = do
+    (pa, ta) <- go a
+    (pb, tb) <- go b
+    let side x px tx q
+          | mixesMod x = "(" <> tx <> ")"
+          | otherwise  = wrap q px tx
+    Just (p, side a pa ta p <> op <> side b pb tb (if strictRight then p + 1 else p))
+   where
+    mixesMod x = case carameliseNode x of
+      Modulo{}    -> not isMod
+      Times{}     -> isMod
+      DividedBy{} -> isMod
+      _           -> False
 
 numText :: Rational -> Text
 numText r = fromMaybe (prettyRatio r) (groupedInt r)
