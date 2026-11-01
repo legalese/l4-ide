@@ -17,6 +17,12 @@ declare global {
   }
 }
 
+/** Where the widget goes, and who to tell when it needs a click. */
+export interface TurnstileHost {
+  element: HTMLElement
+  onInteractionChange: (needed: boolean) => void
+}
+
 let scriptPromise: Promise<TurnstileApi> | undefined
 
 function loadScript(): Promise<TurnstileApi> {
@@ -46,11 +52,14 @@ const TOKEN_MAX_AGE_MS = 240_000
 let warmToken: { promise: Promise<string>; requestedAt: number } | undefined
 
 /** Starts fetching the token the next share will use. */
-export function warmUpTurnstileToken(siteKey: string): void {
+export function warmUpTurnstileToken(
+  siteKey: string,
+  host: TurnstileHost
+): void {
   if (warmToken && Date.now() - warmToken.requestedAt < TOKEN_MAX_AGE_MS) {
     return
   }
-  const promise = fetchToken(siteKey)
+  const promise = fetchToken(siteKey, host)
   promise.catch(() => {
     if (warmToken?.promise === promise) warmToken = undefined
   })
@@ -58,7 +67,10 @@ export function warmUpTurnstileToken(siteKey: string): void {
 }
 
 /** A single-use token for one share: the warmed-up one if still fresh. */
-export async function getTurnstileToken(siteKey: string): Promise<string> {
+export async function getTurnstileToken(
+  siteKey: string,
+  host: TurnstileHost
+): Promise<string> {
   const warm = warmToken
   warmToken = undefined
   if (warm && Date.now() - warm.requestedAt < TOKEN_MAX_AGE_MS) {
@@ -68,19 +80,17 @@ export async function getTurnstileToken(siteKey: string): Promise<string> {
       // Fetch a fresh one below
     }
   }
-  return fetchToken(siteKey)
+  return fetchToken(siteKey, host)
 }
 
-/**
- * The widget stays invisible unless Cloudflare wants an interaction, in which
- * case it shows bottom-right.
- */
-async function fetchToken(siteKey: string): Promise<string> {
+/** The widget stays invisible unless Cloudflare wants an interaction. */
+async function fetchToken(
+  siteKey: string,
+  host: TurnstileHost
+): Promise<string> {
   const turnstile = await loadScript()
   const container = document.createElement('div')
-  container.style.cssText =
-    'position: fixed; right: 1rem; bottom: 1rem; z-index: 10000;'
-  document.body.appendChild(container)
+  host.element.appendChild(container)
 
   let widgetId: string | undefined
   try {
@@ -89,13 +99,20 @@ async function fetchToken(siteKey: string): Promise<string> {
         sitekey: siteKey,
         action: 'share',
         appearance: 'interaction-only',
+        // The normal widget is 300px wide, too much for the narrowest phones
+        size: window.matchMedia('(max-width: 359px)').matches
+          ? 'compact'
+          : 'normal',
         callback: (token: string) => resolve(token),
         'error-callback': () => reject(new Error('Turnstile check failed')),
         'timeout-callback': () =>
           reject(new Error('Turnstile check timed out')),
+        'before-interactive-callback': () => host.onInteractionChange(true),
+        'after-interactive-callback': () => host.onInteractionChange(false),
       })
     })
   } finally {
+    host.onInteractionChange(false)
     if (widgetId !== undefined) turnstile.remove(widgetId)
     container.remove()
   }
