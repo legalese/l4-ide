@@ -1269,10 +1269,42 @@ substituteNlgCallsIn mlang info = go
     (Modulo _ a b,    Modulo ann a' b')    -> Modulo ann (operand a a') (operand b b')
     (App _ _ [a, b],  App ann n [a', b'])
       | isArithNode (carameliseNode new), not (heralded new) -> App ann n [operand a a', operand b b']
+    -- A slot that the sentence goes on after, filled by an argument with no
+    -- closing word ('endsOpen'), is bracketed. Told by the argument as it was
+    -- written, because a call with a sentence of its own is 'Inert' text once
+    -- spliced, and the slot at the end of that sentence may hold a condition:
+    -- "it is shown that p or (q and r) is shown" is also how
+    -- @`tail` (p OR (`shown` (q AND r)))@ reads.
+    (App _ _ oargs, App ann n args)
+      | Just (nlg, params) <- Map.lookup (getUnique n) info
+      , length params == length args, length oargs == length args
+      , isNothing (daydateLiteral n args) ->
+          let followed = refsFollowedByWords nlg
+          in App ann n
+               [ if p `Set.member` followed && endsOpen o then closed a else a
+               | (p, o, a) <- zip3 params oargs args ]
     _ -> new
   operand o o' = case o' of
     Inert ann t ctx | heralded o -> Inert ann ("(" <> t <> ")") ctx
     _                            -> o'
+  closed a = Inert (a ^. annoOf) ("(" <> fst (simpleLinearizerIn mlang a) <> ")") InertCtxNone
+  -- Whether an argument, as written, ends with no closing word: a condition of
+  -- these shapes, a call with no sentence whose last argument is one, or a call
+  -- with a sentence whose slot at the end holds one (or, if the sentence leaves
+  -- arguments out, whose last such argument does, since "with …" follows it).
+  -- Read from the shape of the call and of its sentence, not from any word.
+  endsOpen a = isNothing (a ^. annoOf % annNlg) && case carameliseNode a of
+    Not{} -> True; Implies{} -> True; IfThenElse{} -> True; MultiWayIf{} -> True; Consider{} -> True
+    And{} -> True; Or{} -> True; RAnd{} -> True; ROr{} -> True
+    App _ m es@(_ : _)
+      | isJust (daydateLiteral m es) -> False
+      | Just (nlg, params) <- Map.lookup (getUnique m) info, length params == length es ->
+          let bound = zip params es
+          in case [ x | (p, x) <- bound, p `notElem` nlgRefs nlg ] of
+               []       -> or [ endsOpen x | (p, x) <- bound, not (p `Set.member` refsFollowedByWords nlg) ]
+               leftover -> endsOpen (last leftover)
+      | otherwise -> endsOpen (last es)
+    _ -> False
   -- A rule with no inputs has a phrase, not a sentence with slots, and is left.
   heralded = \ case
     App _ n args@(_ : _)
