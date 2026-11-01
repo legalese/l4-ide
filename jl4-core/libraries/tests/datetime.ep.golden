@@ -13,6 +13,7 @@ IMPORT daydate
 GIVEN date IS A DATE
       t    IS A TIME
 GIVETH A DATETIME
+@nlg %t% on %date% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ date t TIMEZONE
 
@@ -21,6 +22,7 @@ GIVEN date IS A DATE
       t    IS A TIME
       tz   IS A STRING
 GIVETH A DATETIME
+@nlg %t% on %date% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ date t tz
 
@@ -30,6 +32,7 @@ GIVEN date IS A DATE
       m    IS A NUMBER
       s    IS A NUMBER
 GIVETH A DATETIME
+@nlg %h% hours, %m% minutes and %s% seconds on %date% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ date (TIME_FROM_HMS h m s) TIMEZONE
 
@@ -40,12 +43,14 @@ GIVEN date IS A DATE
       s    IS A NUMBER
       tz   IS A STRING
 GIVETH A DATETIME
+@nlg %h% hours, %m% minutes and %s% seconds on %date% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ date (TIME_FROM_HMS h m s) tz
 
 -- Datetime date  -> midnight in document TIMEZONE
 GIVEN date IS A DATE
 GIVETH A DATETIME
+@nlg midnight at the start of %date% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ date (TIME_FROM_HMS 0 0 0) TIMEZONE
 
@@ -53,12 +58,14 @@ GIVETH A DATETIME
 GIVEN date IS A DATE
       tz   IS A STRING
 GIVETH A DATETIME
+@nlg midnight at the start of %date% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ date (TIME_FROM_HMS 0 0 0) tz
 
 -- Datetime dt  -> identity (1 DATETIME -> DATETIME)
 GIVEN dt IS A DATETIME
 GIVETH A DATETIME
+@nlg %dt%
 `Datetime` MEANS dt
 
 -- Datetime d m y h mn s  -> day, month, year, hour, min, sec, document TIMEZONE
@@ -69,6 +76,7 @@ GIVEN d  IS A NUMBER
       mn IS A NUMBER
       s  IS A NUMBER
 GIVETH A DATETIME
+@nlg %h% hours, %mn% minutes and %s% seconds on %d%/%mo%/%y% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d mo y) (TIME_FROM_HMS h mn s) TIMEZONE
 
@@ -81,6 +89,7 @@ GIVEN d  IS A NUMBER
       s  IS A NUMBER
       tz IS A STRING
 GIVETH A DATETIME
+@nlg %h% hours, %mn% minutes and %s% seconds on %d%/%mo%/%y% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d mo y) (TIME_FROM_HMS h mn s) tz
 
@@ -91,6 +100,7 @@ GIVEN d  IS A NUMBER
       h  IS A NUMBER
       mn IS A NUMBER
 GIVETH A DATETIME
+@nlg %h% hours and %mn% minutes on %d%/%mo%/%y% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d mo y) (TIME_FROM_HMS h mn 0) TIMEZONE
 
@@ -102,6 +112,7 @@ GIVEN d  IS A NUMBER
       mn IS A NUMBER
       tz IS A STRING
 GIVETH A DATETIME
+@nlg %h% hours and %mn% minutes on %d%/%mo%/%y% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d mo y) (TIME_FROM_HMS h mn 0) tz
 
@@ -111,6 +122,7 @@ GIVEN d IS A NUMBER
       y IS A NUMBER
       h IS A NUMBER
 GIVETH A DATETIME
+@nlg %h% hours on %d%/%m%/%y% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d m y) (TIME_FROM_HMS h 0 0) TIMEZONE
 
@@ -121,6 +133,7 @@ GIVEN d  IS A NUMBER
       h  IS A NUMBER
       tz IS A STRING
 GIVETH A DATETIME
+@nlg %h% hours on %d%/%m%/%y% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d m y) (TIME_FROM_HMS h 0 0) tz
 
@@ -129,6 +142,7 @@ GIVEN d IS A NUMBER
       m IS A NUMBER
       y IS A NUMBER
 GIVETH A DATETIME
+@nlg midnight at the start of %d%/%m%/%y% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d m y) (TIME_FROM_HMS 0 0 0) TIMEZONE
 
@@ -138,6 +152,7 @@ GIVEN d  IS A NUMBER
       y  IS A NUMBER
       tz IS A STRING
 GIVETH A DATETIME
+@nlg midnight at the start of %d%/%m%/%y% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY d m y) (TIME_FROM_HMS 0 0 0) tz
 
@@ -145,6 +160,7 @@ GIVETH A DATETIME
 GIVEN m IS A NUMBER
       y IS A NUMBER
 GIVETH A DATETIME
+@nlg midnight at the start of month %m% of %y% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY 1 m y) (TIME_FROM_HMS 0 0 0) TIMEZONE
 
@@ -153,12 +169,14 @@ GIVEN m  IS A NUMBER
       y  IS A NUMBER
       tz IS A STRING
 GIVETH A DATETIME
+@nlg midnight at the start of month %m% of %y% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY 1 m y) (TIME_FROM_HMS 0 0 0) tz
 
 -- Datetime y  -> year, January 1st, midnight, document TIMEZONE
 GIVEN y IS A NUMBER
 GIVETH A DATETIME
+@nlg midnight at the start of %y% in the document's time zone
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY 1 1 y) (TIME_FROM_HMS 0 0 0) TIMEZONE
 
@@ -166,12 +184,14 @@ GIVETH A DATETIME
 GIVEN y  IS A NUMBER
       tz IS A STRING
 GIVETH A DATETIME
+@nlg midnight at the start of %y% in %tz%
 `Datetime` MEANS
     DATETIME_FROM_DTZ (DATE_FROM_DMY 1 1 y) (TIME_FROM_HMS 0 0 0) tz
 
 -- Datetime str  -> parse ISO-8601 string (e.g. "2024-06-15T10:30:00Z"), document TIMEZONE
 GIVEN str IS A STRING
 GIVETH A MAYBE DATETIME
+@nlg the moment stated in %str%, expressed in the document's time zone, if it can be read
 `Datetime` MEANS
     TODATETIME str
 
@@ -179,6 +199,7 @@ GIVETH A MAYBE DATETIME
 GIVEN str IS A STRING
       tz  IS A STRING
 GIVETH A MAYBE DATETIME
+@nlg the moment in %tz% with the same clock reading as %str% in the document's time zone, if it can be read
 `Datetime` MEANS
     CONSIDER TODATETIME str
     WHEN JUST dt THEN JUST (DATETIME_FROM_DTZ (DATETIME_DATE dt) (DATETIME_TIME dt) tz)
@@ -189,38 +210,47 @@ GIVETH A MAYBE DATETIME
 
 GIVEN dt IS A DATETIME
 GIVETH A DATE
+@nlg the date of %dt% in its own time zone
 `Date of` dt MEANS DATETIME_DATE dt
 
 GIVEN dt IS A DATETIME
 GIVETH A TIME
+@nlg the time of %dt% in its own time zone
 `Time of` dt MEANS DATETIME_TIME dt
 
 GIVEN dt IS A DATETIME
 GIVETH A STRING
+@nlg the IANA time zone name of %dt%
 `Timezone of` dt MEANS DATETIME_TZ dt
 
 GIVEN dt IS A DATETIME
 GIVETH A NUMBER
+@nlg the hour of %dt% on the 24-hour clock in its own time zone
 `the hour of` dt MEANS TIME_HOUR (DATETIME_TIME dt)
 
 GIVEN dt IS A DATETIME
 GIVETH A NUMBER
+@nlg the minute of %dt% in its own time zone
 `the minute of` dt MEANS TIME_MINUTE (DATETIME_TIME dt)
 
 GIVEN dt IS A DATETIME
 GIVETH A NUMBER
+@nlg the second of %dt% in its own time zone
 `the second of` dt MEANS TIME_SECOND (DATETIME_TIME dt)
 
 GIVEN dt IS A DATETIME
 GIVETH A NUMBER
+@nlg the day of the month of %dt% in its own time zone
 `the day of` dt MEANS DATE_DAY (DATETIME_DATE dt)
 
 GIVEN dt IS A DATETIME
 GIVETH A NUMBER
+@nlg the month number of %dt% in its own time zone
 `the month of` dt MEANS DATE_MONTH (DATETIME_DATE dt)
 
 GIVEN dt IS A DATETIME
 GIVETH A NUMBER
+@nlg the year of %dt% in its own time zone
 `the year of` dt MEANS DATE_YEAR (DATETIME_DATE dt)
 
 
@@ -229,6 +259,7 @@ GIVETH A NUMBER
 -- Serial is the UTC datestamp (number of days since L4 epoch)
 GIVEN dt IS A DATETIME
 GIVETH A NUMBER
+@nlg the UTC day number of %dt% (with the time as a fraction of a day)
 dt `Datetime to serial` MEANS DATETIME_SERIAL dt
 
 
@@ -236,22 +267,27 @@ dt `Datetime to serial` MEANS DATETIME_SERIAL dt
 
 GIVEN dt IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %dt% is before noon in its own time zone
 dt `is before noon` MEANS TIME_HOUR (DATETIME_TIME dt) LESS THAN 12
 
 GIVEN dt IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %dt% is at or after noon in its own time zone
 dt `is after noon` MEANS TIME_HOUR (DATETIME_TIME dt) AT LEAST 12
 
 GIVEN dt IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %dt% is in the morning (before noon) in its own time zone
 dt `is morning` MEANS TIME_HOUR (DATETIME_TIME dt) LESS THAN 12
 
 GIVEN dt IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %dt% is in the afternoon (from noon until 6 pm) in its own time zone
 dt `is afternoon` MEANS TIME_HOUR (DATETIME_TIME dt) AT LEAST 12 AND TIME_HOUR (DATETIME_TIME dt) LESS THAN 18
 
 GIVEN dt IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %dt% is in the evening (from 6 pm until midnight) in its own time zone
 dt `is evening` MEANS TIME_HOUR (DATETIME_TIME dt) AT LEAST 18
 
 
@@ -259,17 +295,20 @@ dt `is evening` MEANS TIME_HOUR (DATETIME_TIME dt) AT LEAST 18
 
 GIVEN dt IS A DATETIME
 GIVETH A DATETIME
+@nlg midnight at the start of the date of %dt% in its own time zone
 `at midnight` dt MEANS
     Datetime (DATETIME_DATE dt) (TIME_FROM_HMS 0 0 0) (DATETIME_TZ dt)
 
 GIVEN dt IS A DATETIME
 GIVETH A DATETIME
+@nlg noon on the date of %dt% in its own time zone
 `at noon` dt MEANS
     Datetime (DATETIME_DATE dt) (TIME_FROM_HMS 12 0 0) (DATETIME_TZ dt)
 
 GIVEN dt IS A DATETIME
       t  IS A TIME
 GIVETH A DATETIME
+@nlg %t% on the date of %dt% in its own time zone
 dt `at` t MEANS
     Datetime (DATETIME_DATE dt) t (DATETIME_TZ dt)
 
@@ -279,12 +318,14 @@ dt `at` t MEANS
 GIVEN dt1 IS A DATETIME
       dt2 IS A DATETIME
 GIVETH A DATETIME
+@nlg the earlier of %dt1% and %dt2%
 `the earlier of` dt1 dt2 MEANS
     IF DATETIME_SERIAL dt1 AT MOST DATETIME_SERIAL dt2 THEN dt1 ELSE dt2
 
 GIVEN dt1 IS A DATETIME
       dt2 IS A DATETIME
 GIVETH A DATETIME
+@nlg the later of %dt1% and %dt2%
 `the later of` dt1 dt2 MEANS
     IF DATETIME_SERIAL dt1 AT LEAST DATETIME_SERIAL dt2 THEN dt1 ELSE dt2
 
@@ -294,33 +335,39 @@ GIVETH A DATETIME
 GIVEN a IS A DATETIME
       b IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %a% is at or after %b%
 `__GEQ__` MEANS
     DATETIME_SERIAL a AT LEAST DATETIME_SERIAL b
 
 GIVEN a IS A DATETIME
       b IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %a% is at or before %b%
 `__LEQ__` MEANS
     DATETIME_SERIAL a AT MOST DATETIME_SERIAL b
 
 GIVEN a IS A DATETIME
       b IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %a% is after %b%
 `__GT__` MEANS
     DATETIME_SERIAL a GREATER THAN DATETIME_SERIAL b
 
 GIVEN a IS A DATETIME
       b IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %a% is before %b%
 `__LT__` MEANS
     DATETIME_SERIAL a LESS THAN DATETIME_SERIAL b
 
 GIVEN a IS A DATETIME
       b IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %a% is before %b%
 a `is before` b MEANS a LESS THAN b
 
 GIVEN a IS A DATETIME
       b IS A DATETIME
 GIVETH A BOOLEAN
+@nlg %a% is after %b%
 a `is after` b MEANS a GREATER THAN b

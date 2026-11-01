@@ -198,6 +198,7 @@ test-suite jl4-core-test
     PrintRoundtripSpec
     RefAnnotationSpec
     NlgPercentSpec
+    LibraryNlgSpec
     NlgRenderSpec
     DirectiveAmbiguitySpec
     NlgMultiplicitySpec
