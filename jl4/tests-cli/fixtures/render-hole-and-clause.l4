@@ -1,0 +1,95 @@
+-- Where legalese/l4-ide#804's slot and operand brackets meet what unstable has
+-- and main does not. The l4-cli-test block "l4 render and nlg where #804 meets
+-- unstable" reads each row.
+--
+-- 1. A mixfix call's hole. The port brackets every hole that does not read as
+--    one thing, first, middle or last (5e2b00e4e); #804 brackets a call that
+--    ends with a condition. In a hole the two are one rule, so `one` and `two`
+--    read apart, and a mixfix call that is an operand of arithmetic is
+--    bracketed as a whole (`sum then reduced`).
+-- 2. unstable's ledger write, ledger read and refusal end in a clause of their
+--    own ("100, recorded as balance"), so they take #804's brackets as an
+--    operand of arithmetic and in a slot that the sentence goes on after. Each
+--    pair below records or returns a different value and read alike before.
+
+IMPORT prelude
+
+GIVEN p IS A BOOLEAN
+DECIDE `fb` p IF p
+
+GIVEN x IS A BOOLEAN
+@nlg %x% is shown
+DECIDE `shown` x IF x
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+DECIDE a `beats` b IF a AND NOT b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+a `reduced by` b MEANS a MINUS b
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg %x% doubled
+`dbl` x MEANS 2 * x
+
+GIVEN x IS A NUMBER
+GIVETH A BOOLEAN
+@nlg %x% is due
+`due` x MEANS x > 0
+
+-- 1. Holes.
+
+GIVEN x IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+DECIDE `one` x q r IF `shown` ((x `beats` (`fb` q)) AND r)
+
+GIVEN x IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+DECIDE `two` x q r IF `shown` (x `beats` (`fb` (q AND r)))
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`sum then reduced` price discount rebate MEANS price PLUS (discount `reduced by` rebate)
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`reduced then sum` price discount rebate MEANS (price PLUS discount) `reduced by` rebate
+
+-- 2. Clauses.
+
+GIVETH A NUMBER
+`record then minus` MEANS (RECORD `balance` IS 100) MINUS 3
+
+GIVETH A NUMBER
+`record of a minus` MEANS RECORD `balance` IS (100 MINUS 3)
+
+GIVETH A NUMBER
+`refuse then minus` MEANS (REFUSE "not yet") MINUS 3
+
+GIVETH A NUMBER
+`record doubled` MEANS `dbl` (RECORD `balance` IS 100)
+
+GIVETH A NUMBER
+`record of a double` MEANS RECORD `balance` IS (`dbl` 100)
+
+GIVETH A NUMBER
+`refuse doubled` MEANS `dbl` (REFUSE "not yet")
+
+GIVETH A BOOLEAN
+`every recall due` MEANS `due` (sum (RECALL ALL `balance`))
+
+#EVAL (RECORD `balance` IS 100) MINUS 3
+#EVAL RECORD `balance` IS (100 MINUS 3)
+#EVAL `dbl` (RECORD `balance` IS 100)
+#EVAL RECORD `balance` IS (`dbl` 100)
+#EVAL (REFUSE "not yet") MINUS 3
+#EVAL `dbl` (REFUSE "not yet")

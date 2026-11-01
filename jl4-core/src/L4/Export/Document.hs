@@ -1771,10 +1771,24 @@ runsOn e t = "it is not the case that" `Text.isPrefixOf` stripFrameMarks t || de
     IfThenElse{} -> True
     MultiWayIf{} -> True
     Consider{}   -> True
-    _            -> False
+    n            -> endsInClause n
+
+-- | unstable's ledger and refusal constructs, which 'rewriteWith' says in words
+-- that end in a clause: "100, recorded as balance", "the value last recorded as
+-- balance, if any", "every value recorded as balance, oldest first", "the model
+-- refuses to answer: not yet". No word closes them, so what follows reads as
+-- part of the clause. Told by the node, not by its words. 'rewriteWith' makes
+-- each one 'Inert' text, so a caller that sees the rewritten node asks this of
+-- the node as written.
+endsInClause :: Expr Resolved -> Bool
+endsInClause = \case
+  Record{}   -> True
+  ReadCell{} -> True
+  Refuse{}   -> True
+  _          -> False
 
 -- | Whether a condition, printed as @t@, would take in the words of a sentence
--- that go on after the slot it fills ('rewriteWith', 'interleaveMixfix'). What
+-- that go on after the slot it fills ('rewriteWith', 'slotArg'). What
 -- 'runsOn' says, and an AND or an OR as well: "p or q is shown" is also how
 -- @p OR (`shown` q)@ reads. Beside a connective an AND or an OR is set off in
 -- words ('joinCond'); in a slot nothing sets it off. Told by the condition's
@@ -2158,7 +2172,7 @@ rewriteWith rd0 e0 = go e0
   -- 'callEndsOpen' for each argument of a call, read from the call as it was
   -- before its arguments were rewritten.
   argsEndOpen orig args = case orig of
-    App _ _ oargs | length oargs == length args -> map callEndsOpen oargs
+    App _ _ oargs | length oargs == length args -> map (\o -> callEndsOpen o || endsInClause (carameliseNode o)) oargs
     _ -> map (const False) args
   -- Whether a call, printed, ends with an argument that has no closing word, so
   -- that the call has none either and runs on into whatever follows it. A call
@@ -2187,7 +2201,7 @@ rewriteWith rd0 e0 = go e0
     _ -> False
   -- An argument that has no closing word: a condition that 'slotRunsOn', as it
   -- reads once rewritten, or a call that ends with one.
-  endsOpen x = callEndsOpen x || slotRunsOn x' (leafText x')
+  endsOpen x = callEndsOpen x || endsInClause (carameliseNode x) || slotRunsOn x' (leafText x')
    where
     x' = go x
   -- For each argument of a call whose sentence fits it, whether the sentence's
@@ -2239,7 +2253,7 @@ rewriteWith rd0 e0 = go e0
     IfThenElse{} -> True
     MultiWayIf{} -> True
     Consider{}   -> True
-    _            -> False
+    n            -> endsInClause n
   isArithmetic = \case
     Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
     _ -> False

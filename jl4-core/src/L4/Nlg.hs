@@ -875,7 +875,10 @@ leftOperand :: Expr Resolved -> LinTree
 leftOperand = groupedUnder (\ n -> isArithNode n || opensAtEnd n)
 
 -- | An expression whose phrase has no closing word: a call with arguments (not
--- a date written as literals, which reads as the date), an IF, a CONSIDER.
+-- a date written as literals, which reads as the date), an IF, a CONSIDER, and
+-- two of unstable's constructs, a ledger write ("record balance is 100", which
+-- ends with its value) and a refusal ("the model refuses to answer: …", which
+-- ends with the author's message).
 opensAtEnd :: Expr Resolved -> Bool
 opensAtEnd = \ case
   App _ n es@(_ : _) -> isNothing (daydateLiteral n es)
@@ -883,7 +886,17 @@ opensAtEnd = \ case
   IfThenElse{} -> True
   MultiWayIf{} -> True
   Consider{}   -> True
-  _ -> False
+  e            -> endsInClause e
+
+-- | unstable's ledger write and refusal: "record balance is 100" ends with its
+-- value, and "the model refuses to answer: not yet" with the author's message,
+-- so what follows either reads as part of it. Told by the node, not its words.
+-- A ledger read ("recall balance") ends with the cell's name, and is closed.
+endsInClause :: Expr Resolved -> Bool
+endsInClause = \ case
+  Record{} -> True
+  Refuse{} -> True
+  _        -> False
 
 -- | An argument of a call. An infix "minus" in the last argument runs on as if
 -- it applied to the call, so @`f2` 2 (5 MINUS 3)@ reads "`f2` with 2 and (5
@@ -1296,6 +1309,7 @@ substituteNlgCallsIn mlang info = go
   endsOpen a = isNothing (a ^. annoOf % annNlg) && case carameliseNode a of
     Not{} -> True; Implies{} -> True; IfThenElse{} -> True; MultiWayIf{} -> True; Consider{} -> True
     And{} -> True; Or{} -> True; RAnd{} -> True; ROr{} -> True
+    n | endsInClause n -> True
     App _ m es@(_ : _)
       | isJust (daydateLiteral m es) -> False
       | Just (nlg, params) <- Map.lookup (getUnique m) info, length params == length es ->
@@ -1473,6 +1487,7 @@ renderNlgWithIn mlang argMap = \case
   endsOpen a = isNothing (a ^. annoOf % annNlg) && case carameliseNode a of
     Not{} -> True; Implies{} -> True; IfThenElse{} -> True; MultiWayIf{} -> True; Consider{} -> True
     And{} -> True; Or{} -> True; RAnd{} -> True; ROr{} -> True
+    n | endsInClause n -> True
     App _ n es@(_ : _) | isNothing (daydateLiteral n es) -> endsOpen (last es)
     _ -> False
 

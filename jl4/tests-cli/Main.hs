@@ -590,6 +590,11 @@ slotScope = fixtureDir </> "slot-scope.l4"
 slotScopeSentence :: FilePath
 slotScopeSentence = fixtureDir </> "slot-scope-sentence.l4"
 
+-- Where #804's slot and operand brackets meet the port's mixfix holes and
+-- unstable's ledger and refusal constructs.
+renderHoleAndClause :: FilePath
+renderHoleAndClause = fixtureDir </> "render-hole-and-clause.l4"
+
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
@@ -754,6 +759,7 @@ coreFixtures =
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
   , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
   , nlgLibraryWording, libraryAliasTwoTypes
+  , slotScope, slotScopeSentence, renderHoleAndClause
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -3632,7 +3638,9 @@ spec bin = do
       entryOf "Neg right" `shouldSatisfy` ("(b) yes as well as (no is false)." `isSuffixOf`)
       entryOf "Neg whole" `shouldSatisfy` ("(b) yes as well as no is false." `isSuffixOf`)
       entryOf "Multi left" `shouldSatisfy` ("(b) (it is not the case that is big for 5) as well as no." `isSuffixOf`)
-      entryOf "If left" `shouldBe` "equals 0 + (if c then base else 7) reduced by [r]."
+      -- A mixfix call that is an operand of arithmetic is bracketed as a whole
+      -- too (legalese/l4-ide#804's operand rule), around the slot's own brackets.
+      entryOf "If left" `shouldBe` "equals 0 + ((if c then base else 7) reduced by [r])."
       entryOf "Cons left" `shouldBe` "means (1 followed by nums) then also [ys]."
       entryOf "Cons right" `shouldBe` "means 1 followed by nums then also [ys]."
       entryOf "Join left" `shouldBe` "means (nums followed by nums) then also [ys]."
@@ -4567,6 +4575,48 @@ spec bin = do
     it "lets a module use singleton and fromList at two types" $ do
       Output code _ _ <- runL4 bin ["check", libraryAliasTwoTypes]
       code `shouldBe` ExitSuccess
+
+  -- legalese/l4-ide#804 brackets a call that ends with a condition, in a slot
+  -- the sentence goes on after, and an operand that is prose. On unstable a
+  -- mixfix hole already brackets whatever does not read as one thing, in any
+  -- hole; the open call joins that rule. unstable's ledger write, ledger read and
+  -- refusal end in a clause of their own, so they take both brackets. Each pair
+  -- below records or returns different values, and read alike before.
+  describe "l4 render and nlg where #804 meets unstable" $ do
+    let renderRows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderHoleAndClause]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = renderRows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a call that ends with a condition in a mixfix hole, so the pair reads apart" $ do
+      hasRow "One means ([x] beats fb of q and r) is shown."
+      hasRow "Two means [x] beats (fb of q and r) is shown."
+
+    it "brackets a mixfix call that is an operand of arithmetic" $ do
+      hasRow "Sum then reduced equals price + ([discount] reduced by [rebate])."
+      hasRow "Reduced then sum means (price + discount) reduced by [rebate]."
+
+    it "brackets a ledger write, a ledger read and a refusal that would run on" $ do
+      hasRow "Record then minus equals (100, recorded as balance) − 3."
+      hasRow "Record of a minus means 100 − 3, recorded as balance."
+      hasRow "Refuse then minus equals (the model refuses to answer: not yet) − 3."
+      hasRow "Record doubled means (100, recorded as balance) doubled."
+      hasRow "Record of a double means 100 doubled, recorded as balance."
+      hasRow "Refuse doubled means (the model refuses to answer: not yet) doubled."
+      hasRow "Every recall due if (the sum of every value recorded as balance, oldest first) is due."
+
+    it "brackets a ledger write and a refusal in l4 nlg the same way" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderHoleAndClause]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(record balance is 100) minus 3"
+        , "record balance is 100 minus 3"
+        , "(record balance is 100) doubled"
+        , "record balance is 100 doubled"
+        , "(the model refuses to answer: not yet) minus 3"
+        , "(the model refuses to answer: not yet) doubled"
+        ]
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
