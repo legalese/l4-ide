@@ -1052,8 +1052,9 @@ decideRendering calls tysig body
   -- on its head), not as "is a the gap with" and a list of fields. Told apart by
   -- what the head resolved to, not by its name or a herald on it: a record can be
   -- named like a rule that has a herald, and can carry a herald of its own, and
-  -- its literal is still a record. A call to a rule WITHOUT a herald still reads
-  -- as a construction.
+  -- its literal is still a record. A call to a rule WITHOUT a herald is not one
+  -- either: a head the checker did not resolve to a data constructor is a call
+  -- ('isRuleCall'), and reads "F means g where foo is foo".
   | Just (ctor, fields) <- bodyAsRecordLiteral body
   , not (isRuleCall calls body) =
       ("is " <> withArticle (spaceCamel ctor) <> " with", CFields (map fieldPair fields))
