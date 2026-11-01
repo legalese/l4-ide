@@ -26,6 +26,7 @@ module L4.Nlg (
   nlgFnInfo,
   substituteNlgCalls,
   substituteNlgCall,
+  substituteNlgCallMarked,
   nlgRefs,
   daydateLiteral,
   substituteNlgCallsIn,
@@ -1195,7 +1196,16 @@ substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) (substit
 -- expression. @l4 render@ walks the tree itself, because it phrases a call's
 -- arguments for a reader before they are spliced in.
 substituteNlgCall :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
-substituteNlgCall mlang info = \case
+substituteNlgCall mlang =
+  splicingCall mlang (\w -> fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang))
+
+-- | 'substituteNlgCall' for @l4 render@, whose own words stay marked until a
+-- writer puts them into the document's language.
+substituteNlgCallMarked :: NlgFnInfo -> Expr Resolved -> Expr Resolved
+substituteNlgCallMarked = splicingCall Nothing markFrame
+
+splicingCall :: Maybe LangTag -> (Text -> Text) -> NlgFnInfo -> Expr Resolved -> Expr Resolved
+splicingCall mlang word info = \case
   App ann n args
     | Just (nlg, params) <- Map.lookup (getUnique n) info
     , length params == length args
@@ -1244,7 +1254,6 @@ substituteNlgCall mlang info = \case
     | Just (_, _ : _) <- Map.lookup (getUnique sel) info -> Proj ann e (plainName sel)
   e -> e
  where
-  word w = fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang)
   -- A maqaf-final rendering is written against the next word.
   prefix w | Text.takeEnd 1 w == Text.singleton maqaf = w
            | otherwise                                = w <> " "

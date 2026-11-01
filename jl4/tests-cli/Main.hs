@@ -392,6 +392,10 @@ nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
 renderMeaningFixture :: FilePath
 renderMeaningFixture = fixtureDir </> "render-meaning.l4"
 
+-- Rules whose rendering needs the renderer's own connecting words.
+renderHebrewWordsFixture :: FilePath
+renderHebrewWordsFixture = fixtureDir </> "render-hebrew-words.l4"
+
 -- A module that checks, importing one that does not.
 renderBrokenImportFixture, renderBrokenImportLib :: FilePath
 renderBrokenImportFixture = fixtureDir </> "render-broken-import.l4"
@@ -696,7 +700,7 @@ main = do
        , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
        , nlgHeadPlacementSource
        , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture
-       , renderBrokenImportFixture, renderBrokenImportLib
+       , renderBrokenImportFixture, renderBrokenImportLib, renderHebrewWordsFixture
        , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -2370,6 +2374,22 @@ spec bin = do
       forM_ ["text", "html", "akn", "json"] $ \format -> do
         out <- render format
         filter (`elem` ['\xFDD0', '\xFDD1']) out `shouldBe` ""
+
+    it "puts its own connecting words into the document's language, in every format" $
+      forM_ ["text", "html", "akn"] $ \format -> do
+        Output code sout _ <- runL4 bin ["render", "--format", format, "--lang", "he", renderHebrewWordsFixture]
+        code `shouldBe` ExitSuccess
+        let out = filter (/= '\r') sout
+        out `shouldSatisfy` ("; \1488\1493" `isInfixOf`)         -- "; or"
+        out `shouldSatisfy` ("\1506\1501 5" `isInfixOf`)         -- "with 5"
+        out `shouldNotSatisfy` ("; or" `isInfixOf`)
+        filter (`elem` ['\xFDD0', '\xFDD1']) out `shouldBe` ""
+
+    it "keeps those words in English without --lang" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderHebrewWordsFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("; or" `isInfixOf`)
+      sout `shouldSatisfy` ("the threshold is passed with 5" `isInfixOf`)
 
     it "keeps a provision's own labels and lead-in, and generates no letters for them" $ do
       out <- render "text"
