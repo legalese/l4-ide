@@ -1,0 +1,66 @@
+-- A NOT beside AND or OR, as `l4 render` reads it: the denial must not reach
+-- past the operand it applies to.
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`the Act governs` n MEANS n > 5
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied call or` n b MEANS
+  IF (NOT (`the Act governs` n)) OR b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied or` n b MEANS
+  IF NOT ((`the Act governs` n) OR b) THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied call and` n b MEANS
+  IF (NOT (`the Act governs` n)) AND b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A NUMBER
+`denied both or` n b c MEANS
+  IF (NOT ((`the Act governs` n) AND c)) OR b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied call in a group` n a b MEANS
+  IF a AND ((NOT (`the Act governs` n)) OR b) THEN 1 ELSE 2
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied variable or` a b MEANS
+  IF (NOT a) OR b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A NUMBER
+`denied or and` n b c MEANS
+  IF (NOT ((`the Act governs` n) OR b)) AND c THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied one of or` n b MEANS
+  IF (NOT (n EQUALS 1 OR n EQUALS 2)) OR b THEN 1 ELSE 2
+
+-- Three operands, as in Delaware s 165 (commons dg3-subscriptions.l4:211).
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+      d IS A BOOLEAN
+GIVETH A NUMBER
+`denied or among three` n b c d MEANS
+  IF (NOT (`the Act governs` n)) AND (NOT (b OR c)) AND d THEN 1 ELSE 2
