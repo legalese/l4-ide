@@ -154,6 +154,7 @@ renderCmd opts = do
                   { dropUnused = not opts.renderIncludeUnused
                   , moduleDispositions = hiddenImports showImport rawDeps
                   , mixfixHeadings = mixfixHeadingsFromRegistry tc.mixfixRegistry
+                  , mixfixPatterns = mixfixPatternsFromRegistry tc.mixfixRegistry
                   }
           showImport name =
                opts.renderIncludeUnused

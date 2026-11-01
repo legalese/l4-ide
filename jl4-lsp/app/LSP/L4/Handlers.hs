@@ -719,6 +719,8 @@ handlers evalConfig recorder =
                       , ExportDoc.moduleDispositions = hidden
                       , ExportDoc.mixfixHeadings =
                           ExportDoc.mixfixHeadingsFromRegistry tcResult.mixfixRegistry
+                      , ExportDoc.mixfixPatterns =
+                          ExportDoc.mixfixPatternsFromRegistry tcResult.mixfixRegistry
                       }
                     rcfg = ExportRender.MkRenderConfig
                              { ExportRender.numberSections = reqParams.numberSections

@@ -512,6 +512,10 @@ renderSectionGivenEvalFixture = fixtureDir </> "render-section-given-eval.l4"
 sectionGivenBridgeSource :: FilePath
 sectionGivenBridgeSource = "examples/ok/section-given-bridge.l4"
 
+-- A mixfix call whose first operand is itself a call.
+renderMixfixOperandFixture :: FilePath
+renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
+
 -- An @nlg on a MIXFIX definition, read at a call site in the same module, and
 -- across an IMPORT. The importing fixture makes the same calls, row for row,
 -- as the local one (less one row it says it leaves out), so one expected list
@@ -686,6 +690,7 @@ coreFixtures =
   , nlgHeadPlacementSource, placementReadme, nlgOwnLineSectionGivenFixture
   , renderMeaningFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
+  , renderMixfixOperandFixture
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -3514,6 +3519,24 @@ spec bin = do
       out `shouldSatisfy` any ("Twice " `isInfixOf`)
       out `shouldNotSatisfy` any ("doubled fee" `isInfixOf`)
       out `shouldNotSatisfy` any ("test age" `isInfixOf`)
+
+  -- The operands of a mixfix call go in its pattern's slots, whatever the
+  -- operands are. A call whose first operand was itself a call used to reach
+  -- the renderer as a plain function, and lost its subject.
+  describe "l4 render of a mixfix call whose operand is a call" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderMixfixOperandFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = (`shouldSatisfy` any (r `isSuffixOf`))
+
+    it "puts each operand in its slot" $ do
+      out <- rows
+      hasRow "(a) the day x is on or before the day y;" out
+      hasRow "(b) the day x plus days 12 is on or before the day y;" out
+      hasRow "(c) the day y is on or before the day x plus days 12;" out
+      hasRow "(d) the day y plus days 1 is on or before the day x plus days 12; and" out
+      hasRow "(e) the day x plus days 2 precedes the day y." out
 
   describe "an @nlg on a rule head's input" $ do
     let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]

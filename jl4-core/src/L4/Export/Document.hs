@@ -32,6 +32,8 @@ module L4.Export.Document
   , defaultExportConfig
   , hiddenImports
   , mixfixHeadingsFromRegistry
+  , mixfixPatternsFromRegistry
+  , MixfixSlot (..)
     -- * Names
   , spaceCamel
     -- * Entry points
@@ -87,8 +89,17 @@ data ExportConfig = MkExportConfig
     -- function's 'Unique'. Name resolution discards the mixfix pattern, so
     -- these are derived from the typechecker's 'MixfixRegistry' (via
     -- 'mixfixHeadingsFromRegistry') and threaded in by the caller.
+  , mixfixPatterns     :: !(Map.Map Unique [MixfixSlot])
+    -- ^ The pattern of every mixfix function, keyed by the function's
+    -- 'Unique', so a call is laid out as its definition declares it whatever
+    -- name the call reached the renderer under ('mixfixPatternsFromRegistry').
   }
   deriving stock (Show, Generic)
+
+-- | One token of a mixfix pattern: a keyword, or the argument in that position
+-- of the call.
+data MixfixSlot = SlotWord !Text | SlotArg !Int
+  deriving stock (Show, Eq, Generic)
 
 defaultExportConfig :: ExportConfig
 defaultExportConfig = MkExportConfig
@@ -96,6 +107,7 @@ defaultExportConfig = MkExportConfig
   , moduleDispositions = Map.empty
   , unitDispositions   = Map.empty
   , mixfixHeadings     = Map.empty
+  , mixfixPatterns     = Map.empty
   }
 
 -- | Hide every imported module but those a caller asks to show, by file name
@@ -244,6 +256,8 @@ data Reading = MkReading
   { rdHeralds    :: !NlgFnInfo
   , rdRules      :: !(Map.Map Unique RuleShape)
   , rdBoolFields :: !(Set.Set Unique)
+  , rdMixfix     :: !(Map.Map Unique [MixfixSlot])
+    -- ^ The pattern of every mixfix function ('mixfixPatterns').
   , rdSubjects   :: !(Set.Set Text)
     -- ^ How the enclosing rule's subjects read: an input of a user type that is
     -- the only one of its type. Passing one on says nothing a reader needs, and
@@ -257,7 +271,7 @@ data RuleShape = MkRuleShape
   }
 
 noReading :: Reading
-noReading = MkReading Map.empty Map.empty Set.empty Set.empty
+noReading = MkReading Map.empty Map.empty Set.empty Map.empty Set.empty
 
 extractUnits :: Module Resolved -> [Unit]
 extractUnits (MkModule _ _ section) = goSection section
@@ -288,15 +302,15 @@ extractUnits (MkModule _ _ section) = goSection section
 
 -- | All renderable units across the open module and its dependencies, with
 -- mixfix headings fixed up and @\@nlg@ calls expanded.
-allUnits :: Map.Map Unique Text -> Module Resolved -> [Module Resolved] -> [Unit]
-allUnits headings mainModule deps =
+allUnits :: Map.Map Unique Text -> Map.Map Unique [MixfixSlot] -> Module Resolved -> [Module Resolved] -> [Unit]
+allUnits headings patterns mainModule deps =
   let mods  = mainModule : deps
       info  = nlgFnInfo mods
       ctors = recordCtorFields mods
       -- Told apart from a record's constructor by what the head resolved to, not
       -- by its name: a record can be named like a rule that has a herald.
       calls = Map.keysSet info
-      reading = MkReading info (ruleShapes mods) (booleanFields mods) Set.empty
+      reading = MkReading info (ruleShapes mods) (booleanFields mods) patterns Set.empty
   in map (\u -> (mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u)
                   { uCalls = calls, uReading = reading })
        (extractUnits mainModule <> concatMap extractUnits deps)
@@ -390,6 +404,29 @@ mixfixHeadingsFromRegistry reg = Map.fromList
   | fts <- concat (Map.elems reg.byCanonicalName)
   , Just info <- [fts.mixfixInfo]
   , let heading = mixfixHeadingText fts.rtysig info
+  , nm <- fts.name.names
+  ]
+
+-- | The pattern of every mixfix function in a typechecked 'MixfixRegistry',
+-- keyed by the function's 'Unique', each parameter given as its position among
+-- the definition's arguments, which is the position of the call's argument.
+--
+-- A call does not always reach the renderer under its pattern's name: one
+-- whose first operand is itself a call, @(x `plus days` 12) `is on or before`
+-- y@, arrives under the bare keyword, and was read as an ordinary function
+-- that had lost its subject ("is on or before the day x plus days 12 and the
+-- day y"). Keyed by what the call resolved to, the pattern is found either way.
+mixfixPatternsFromRegistry :: MixfixRegistry -> Map.Map Unique [MixfixSlot]
+mixfixPatternsFromRegistry reg = Map.fromList
+  [ (getUnique nm, slots)
+  | fts <- concat (Map.elems reg.byCanonicalName)
+  , Just info <- [fts.mixfixInfo]
+  , let MkAppForm _ _ args _ = fts.rappForm
+        position p = List.elemIndex p [ rawName (getActual a) | a <- args ]
+        slot = \ case
+          MixfixKeyword kw -> Just (SlotWord (rawNameToText kw))
+          MixfixParam p    -> SlotArg <$> position p
+  , Just slots <- [traverse slot info.pattern]
   , nm <- fts.name.names
   ]
 
@@ -523,7 +560,7 @@ buildDocument cfg mainModule0 deps0 =
   deps       = map stripSectionBinderElaborations deps0
   (title, bodySection) = documentTitleAndBody mainModule
   mainUri = moduleUri' mainModule
-  units   = allUnits cfg.mixfixHeadings mainModule deps
+  units   = allUnits cfg.mixfixHeadings cfg.mixfixPatterns mainModule deps
   graph   = buildGraph mainUri units
   reach   = reachableUnits graph
   ranks   = rankByBlockId graph
@@ -1807,6 +1844,7 @@ rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
       inert ann ("the " <> phrase <> " of " <> leafText x)
     -- Mixfix: interleave the arguments into the @_@ holes.
     App ann n args@(_ : _) | Just txt <- interleaveMixfix n args -> inert ann txt
+    App ann n args@(_ : _) | Just txt <- patternMixfix rd n args -> inert ann txt
     -- A function whose name ends in a preposition reads "minimum of x and y",
     -- not the linearizer's "minimum of with x and y".
     App ann n args@(_ : _) | endsInPreposition n ->
@@ -1997,6 +2035,18 @@ interleaveMixfix n args =
         []         -> t : fill ts as
     | otherwise = t : fill ts as
 
+-- | A mixfix call laid out by its definition's pattern ('mixfixPatterns'),
+-- when every slot has its argument and every argument a slot.
+patternMixfix :: Reading -> Resolved -> [Expr Resolved] -> Maybe Text
+patternMixfix rd n args = do
+  slots <- Map.lookup (getUnique n) rd.rdMixfix
+  let used = List.sort [ i | SlotArg i <- slots ]
+  guard (used == [0 .. length args - 1])
+  let tok = \ case
+        SlotWord w -> w
+        SlotArg i  -> leafText (args !! i)
+  Just (Text.unwords (map tok slots))
+
 nameIs :: Text -> Resolved -> Bool
 nameIs t r = nameToText (getActual r) == t
 
@@ -2082,7 +2132,7 @@ buildPlan cfg mainModule0 deps0 =
   mainModule = stripSectionBinderElaborations mainModule0
   deps       = map stripSectionBinderElaborations deps0
   mainUri = moduleUri' mainModule
-  units   = allUnits cfg.mixfixHeadings mainModule deps
+  units   = allUnits cfg.mixfixHeadings cfg.mixfixPatterns mainModule deps
   graph   = buildGraph mainUri units
   reach   = reachableUnits graph
   indexed = Map.toList graph.ugUnits
