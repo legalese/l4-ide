@@ -595,6 +595,9 @@ slotScopeSentence = fixtureDir </> "slot-scope-sentence.l4"
 renderHoleAndClause :: FilePath
 renderHoleAndClause = fixtureDir </> "render-hole-and-clause.l4"
 
+renderLedgerWriteOperand :: FilePath
+renderLedgerWriteOperand = fixtureDir </> "render-ledger-write-operand.l4"
+
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
@@ -759,7 +762,7 @@ coreFixtures =
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
   , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
   , nlgLibraryWording, libraryAliasTwoTypes
-  , slotScope, slotScopeSentence, renderHoleAndClause
+  , slotScope, slotScopeSentence, renderHoleAndClause, renderLedgerWriteOperand
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -4626,6 +4629,52 @@ spec bin = do
         , "(the model refuses to answer: not yet) minus 3"
         , "(the model refuses to answer: not yet) doubled"
         ]
+
+  -- A ledger write reads "V, recorded as C": its value comes first, and no word
+  -- of its own opens it, so ", recorded as C" can attach to the words before the
+  -- value. So it is bracketed wherever it is part of something larger: a call's
+  -- argument, a sentence's slot in any position, a comparison, an operand of OR,
+  -- a branch, a list's element. Each pair records a different value; before,
+  -- both rules of each pair read the same.
+  describe "l4 render brackets a ledger write given to something larger" $ do
+    let renderRows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderLedgerWriteOperand]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = renderRows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a write given to a call with no sentence, in any argument" $ do
+      hasRow "Call of a record means plain1 of (100, recorded as balance)."
+      hasRow "Record of a call means plain1 of 100, recorded as balance."
+      hasRow "Second argument record means plain2 for 100 and (3, recorded as balance)."
+      hasRow "Record of two arguments means plain2 for 100 and 3, recorded as balance."
+      hasRow "First argument record means plain2 for (100, recorded as balance) and 3."
+      hasRow "Preposition of a record means minimum of 3 and (100, recorded as balance)."
+      hasRow "Record of a preposition means minimum of 3 and 100, recorded as balance."
+      hasRow "Condition of a record means fb for (p, recorded as flag)."
+      hasRow "Record of a condition means fb for p, recorded as flag."
+
+    it "brackets a write in a sentence's slot that nothing follows" $ do
+      hasRow "Sentence of a record means pay (100, recorded as balance)."
+      hasRow "Record of a sentence means pay 100, recorded as balance."
+      hasRow "Bare of a record means (100, recorded as balance)."
+      hasRow "Record of a bare means 100, recorded as balance."
+
+    it "brackets a write that is compared" $ do
+      hasRow "Compare to a record if p is (true, recorded as flag)."
+      hasRow "Record of a comparison means p is true, recorded as flag."
+
+    it "brackets a write anywhere else inside something larger" $ do
+      hasRow "Or of a record means (p or (q, recorded as flag)) is shown."
+      hasRow "Record of an or means (p or q, recorded as flag) is shown."
+      hasRow "Branch of a record means total of list of if c then 1 else (3, recorded as balance)."
+      hasRow "Record of a branch means total of list of (if c then 1 else 3, recorded as balance)."
+      hasRow "Element of a record means total of list of 1 and (2, recorded as balance)."
+      hasRow "Record of a list means total of list of 1 and 2, recorded as balance."
+
+    it "leaves a write on its own as it was, and keeps the brackets on a list's item" $ do
+      hasRow "A write alone means 100, recorded as balance."
+      hasRow "    (b) (true, recorded as flag)."
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

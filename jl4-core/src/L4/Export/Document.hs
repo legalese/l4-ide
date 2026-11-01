@@ -2125,8 +2125,17 @@ rewriteExpr = rewriteWith noReading
 -- beforehand: spliced first, its arguments would miss every rewrite below and
 -- print raw, in the middle of an otherwise readable sentence.
 rewriteWith :: Reading -> Expr Resolved -> Expr Resolved
-rewriteWith rd0 e0 = go e0
+rewriteWith rd0 e0 = alone (go e0)
  where
+  -- A ledger write that is the whole of what is read needs no brackets: nothing
+  -- comes before it ('rw'). Below a WHERE or a LET it is still the whole.
+  alone r = case (written e0, r) of
+    (Record _ _ _ _ _ Nothing, Inert ann t ctx) -> Inert ann (unbracketed t) ctx
+    _ -> r
+  written = \case
+    Where _ b _ -> written b
+    LetIn _ _ b -> written b
+    x           -> x
   rd = rd0 { rdNested = rd0.rdNested <> nestedCalls e0 }
   -- 'transformOf', except that an arithmetic node also sees its operands as
   -- they were before they were rewritten ('groupOperands').
@@ -2243,9 +2252,10 @@ rewriteWith rd0 e0 = go e0
     (DividedBy _ a b, DividedBy ann a' b') -> DividedBy ann (operand a a') (operand b b')
     (Modulo _ a b,    Modulo ann a' b')    -> Modulo ann (operand a a') (operand b b')
     _ -> new
+  -- 'bracketed', not a bare pair: a ledger write arrives bracketed already.
   operand o o'
     | opensAtEnd (carameliseNode o) =
-        Inert (o' ^. annoOf) ("(" <> normalizeWs (simpleLinearizer o') <> ")") InertCtxNone
+        Inert (o' ^. annoOf) (bracketed (normalizeWs (simpleLinearizer o'))) InertCtxNone
     | otherwise = o'
   opensAtEnd = \case
     App _ n args@(_ : _) ->
@@ -2302,8 +2312,18 @@ rewriteWith rd0 e0 = go e0
     -- A ledger write (STATE-AS-LEDGER) is the value it records, and says where.
     -- One with a HENCE is a step of a contract, and is left for 'toClause',
     -- which every HENCE and LEST reaches, to lay out with what follows it.
+    --
+    -- Its value comes first and no word of its own opens it, so ", recorded as
+    -- balance" can also attach to whatever comes before the value: "plain1 of
+    -- 100, recorded as balance" is how both @`plain1` (RECORD `balance` IS 100)@
+    -- and @RECORD `balance` IS (`plain1` 100)@ would read. So a write is
+    -- bracketed here, wherever it is part of something larger: a call's
+    -- argument, a sentence's slot, a mixfix hole, an operand, a branch, a list's
+    -- element. A write that is the whole of what is read is not ('alone'). Told
+    -- by the node, not by its words; a read and a refusal open with words of
+    -- their own and are left.
     Record ann mParty cell val isOfficial Nothing ->
-      inert ann (leafText val <> ", " <> fw "recorded as" <> " " <> leafText cell <> ledgerOf mParty isOfficial)
+      inert ann (bracketed (leafText val <> ", " <> fw "recorded as" <> " " <> leafText cell <> ledgerOf mParty isOfficial))
     -- A ledger read is the value recorded there: the last one, which may be
     -- absent, or all of them.
     ReadCell ann mParty isOfficial mode cell -> inert ann $ case mode of
