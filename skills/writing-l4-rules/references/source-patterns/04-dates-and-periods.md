@@ -98,13 +98,13 @@ ontology actually puts in evidence, and consult it in the rule it saves.
 @ref Probate and Administration Act 1934 s 18(5)
 GIVEN d IS A `Deceased person`
 GIVETH A BOOLEAN
-`s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` d MEANS
+`s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` MEANS
         "Nothing in this section shall affect any law by which special provision is made regarding the estates of persons of a particular religion or race."
     AND d's `a Muslim`
 
 GIVEN d IS A `Deceased person`
 GIVETH A BOOLEAN
-`s 18 governs the distribution of the estate of` d MEANS
+`s 18 governs the distribution of the estate of` MEANS
     NOT `s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` d
 ```
 
@@ -268,7 +268,7 @@ DECLARE `Hearing notice` HAS
 @ref 6 NYCRR 617.9(a)(4)
 GIVEN notice IS A `Hearing notice`
 GIVETH A BOOLEAN
-`the hearing is scheduled in the permitted window` notice MEANS
+`the hearing is scheduled in the permitted window` MEANS
         notice's `Scheduled date` AT LEAST notice's `Publish date` PLUS 14
     AND notice's `Scheduled date` AT MOST  notice's `Publish date` PLUS 60
 ```
@@ -433,7 +433,7 @@ DECLARE PersonProfile HAS
 @ref British Nationality Act 1981 s 1(1)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-`section 1(1) is satisfied for` person MEANS
+`section 1(1) is satisfied for` MEANS
         person's `born in the United Kingdom`
     AND person's `date of birth` AT LEAST `commencement`
     AND person's `father or mother a British citizen at the time of the birth`
@@ -452,7 +452,7 @@ present-tense source:
 ```l4
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-`the parent was a citizen at the birth (wrong)` person MEANS
+`the parent was a citizen at the birth (wrong)` MEANS
         person's `father or mother a British citizen`
     AND person's `date of birth` AT MOST TODAY
 ```
@@ -482,7 +482,7 @@ corpus reads that off a built-in rather than off a parameter:
 ```text
 GIVEN amendment IS A DATE
 GIVETH A BOOLEAN
-`the rules in force include` amendment MEANS
+`the rules in force include` MEANS
     `RULES EFFECTIVE DATE` AT LEAST amendment
 ```
 
@@ -514,7 +514,7 @@ GIVETH A NUMBER
 
 GIVEN value IS A NUMBER
 GIVETH A NUMBER
-`the tax payable on` value MEANS value TIMES `the rate of tax`
+`the tax payable on` MEANS value TIMES `the rate of tax`
 
 #ASSERT `EVAL UNDER RULES EFFECTIVE AT` (YMD 2023 6 1) (`the tax payable on` 1000) EQUALS 70
 #ASSERT `EVAL UNDER RULES EFFECTIVE AT` (YMD 2024 7 1) (`the tax payable on` 1000) EQUALS 90
@@ -535,7 +535,7 @@ GIVETH A NUMBER
 
 GIVEN value IS A NUMBER
 GIVETH A NUMBER
-`the tax payable on (wrong)` value MEANS value TIMES `the rate of tax (wrong)`
+`the tax payable on (wrong)` MEANS value TIMES `the rate of tax (wrong)`
 
 #EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2023 6 1) (`the tax payable on (wrong)` 1000)
 ```
@@ -584,7 +584,7 @@ citation on each arm and the pre-commencement case last.
 @ref 17 CFR 227.100(a)(2)(i)-(ii) — "greater of" since 2021-03-15; "lesser of" before
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
-`the applicable measure of annual income or net worth` investor MEANS
+`the applicable measure of annual income or net worth` MEANS
     BRANCH IF `the rules in force include` `the 2021 amendments` THEN max (investor's `annual income`) (investor's `net worth`)
            IF `the rules in force include` `Reg CF commenced`    THEN min (investor's `annual income`) (investor's `net worth`)
            OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
@@ -616,7 +616,7 @@ GIVETH A NUMBER
 
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
-`the applicable measure (wrong)` investor MEANS
+`the applicable measure (wrong)` MEANS
     max (investor's `annual income`) (investor's `net worth`)
 
 #EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2018 1 1) (`the applicable measure (wrong)` `the investor`)
@@ -684,7 +684,7 @@ the next month:
 ```l4
 GIVEN d IS A DATE
 GIVETH A DATE
-`the first anniversary of (wrong)` d MEANS
+`the first anniversary of (wrong)` MEANS
     Date (DATE_DAY d) (DATE_MONTH d) (DATE_YEAR d PLUS 1)
 
 #EVAL `the first anniversary of (wrong)` (YMD 2024 2 29)
@@ -752,7 +752,7 @@ yourself. There is no holiday calendar in the library, and no import will produc
 
 GIVEN d IS A DATE
 GIVETH A BOOLEAN
-`is a business day` d MEANS
+`is a business day` MEANS
         `is weekday` d
     AND NOT (elem d `the public holidays for 2026`)
 
@@ -797,7 +797,7 @@ nobody can file:
 ```l4
 GIVEN d IS A DATE
 GIVETH A DATE
-`the day three business days after (wrong)` d MEANS Date (Day d PLUS 3)
+`the day three business days after (wrong)` MEANS Date (Day d PLUS 3)
 
 #EVAL `the day three business days after (wrong)` (YMD 2026 12 24)
 ```

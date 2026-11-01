@@ -2,4 +2,4 @@ DECLARE Applicant HAS name IS A STRING
 
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-`is known` a MEANS TRUE
+`is known` MEANS TRUE
