@@ -3,10 +3,13 @@
 -- unstable" reads each row.
 --
 -- 1. A mixfix call's hole. The port brackets every hole that does not read as
---    one thing, first, middle or last (5e2b00e4e); #804 brackets a call that
---    ends with a condition. In a hole the two are one rule, so `one` and `two`
---    read apart, and a mixfix call that is an operand of arithmetic is
---    bracketed as a whole (`sum then reduced`).
+--    one thing, first, middle or last (5e2b00e4e). A mixfix call that ends with
+--    a hole ends as the argument there does (#804's callEndsOpen), so in a
+--    sentence's slot that the sentence goes on after it is bracketed whole
+--    (`beats then shown` against `shown in a hole`). A call with one argument
+--    reads as one thing in a hole, even one that ends with a condition, so
+--    `one` and `two` still read alike (a stated limit). A mixfix call that is an
+--    operand of arithmetic is bracketed as a whole (`sum then reduced`).
 -- 2. unstable's ledger write, ledger read and refusal end in a clause of their
 --    own ("100, recorded as balance"), so they take #804's brackets as an
 --    operand of arithmetic and in a slot that the sentence goes on after. Each
@@ -51,6 +54,16 @@ GIVEN x IS A BOOLEAN
       q IS A BOOLEAN
       r IS A BOOLEAN
 DECIDE `two` x q r IF `shown` (x `beats` (`fb` (q AND r)))
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+DECIDE `beats then shown` p q r IF `shown` (p `beats` (q AND r))
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+DECIDE `shown in a hole` p q r IF p `beats` (`shown` (q AND r))
 
 GIVEN price IS A NUMBER
       discount IS A NUMBER

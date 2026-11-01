@@ -2130,7 +2130,7 @@ rewriteWith rd0 e0 = go e0
   rd = rd0 { rdNested = rd0.rdNested <> nestedCalls e0 }
   -- 'transformOf', except that an arithmetic node also sees its operands as
   -- they were before they were rewritten ('groupOperands').
-  go e = rw e (herald e (groupOperands e (over (gplate @(Expr Resolved)) go e)))
+  go e = rw (herald e (groupOperands e (over (gplate @(Expr Resolved)) go e)))
   inert ann t = Inert ann t InertCtxNone
   herald orig = \case
     -- A date given as literals reads as the date, whatever its rule's sentence.
@@ -2193,10 +2193,14 @@ rewriteWith rd0 e0 = go e0
                []       -> or [ endsOpen x | (i, x) <- bound, not (i `Set.member` Nlg.refsFollowedByWords nlg) ]
                leftover -> endsOpen (last leftover)
       | readsAsFunction m margs -> False
-      -- A mixfix call brackets every hole that would run on ('slotArg'), so it
-      -- ends where its words do.
-      | isJust (mixfixTokens m margs) -> False
-      | isJust (patternSlots rd m margs) -> False
+      -- A mixfix call ends as its pattern does: with a word, or with the
+      -- argument in its last hole. 'slotArg' brackets that argument when it is
+      -- compound, but "[p] beats (q and r) is shown" still reads as if "is
+      -- shown" were said of "q and r", so the call is bracketed whole.
+      | Just toks <- mixfixTokens m margs -> last toks == "_" && endsOpen (last margs)
+      | Just slots <- patternSlots rd m margs -> case last slots of
+          SlotArg i -> endsOpen (margs !! i)
+          SlotWord _ -> False
       | otherwise -> endsOpen (last margs)
     _ -> False
   -- An argument that has no closing word: a condition that 'slotRunsOn', as it
@@ -2257,7 +2261,7 @@ rewriteWith rd0 e0 = go e0
   isArithmetic = \case
     Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
     _ -> False
-  rw orig = \case
+  rw = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.
     Where _ e _ -> e
     LetIn _ _ e -> e
@@ -2272,8 +2276,8 @@ rewriteWith rd0 e0 = go e0
     App ann n [x] | Just phrase <- Map.lookup (nameToText (getActual n)) builtinUnaryOf ->
       inert ann ("the " <> phrase <> " of " <> leafText x)
     -- Mixfix: interleave the arguments into the @_@ holes.
-    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd (argsEndOpen orig args) n args -> inert ann txt
-    App ann n args@(_ : _) | Just txt <- patternMixfix rd (argsEndOpen orig args) n args -> inert ann txt
+    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd n args -> inert ann txt
+    App ann n args@(_ : _) | Just txt <- patternMixfix rd n args -> inert ann txt
     -- A function whose name ends in a preposition reads "minimum of x and y",
     -- not the linearizer's "minimum of with x and y".
     App ann n args@(_ : _) | endsInPreposition n ->
@@ -2405,30 +2409,27 @@ mixfixTokens n args =
       holes = length (filter (== "_") toks)
   in if holes >= 1 && holes == length args then Just toks else Nothing
 
--- | The arguments in a mixfix pattern's holes. Each comes with whether it is a
--- call that ends with a condition that has no closing word ('rewriteWith'),
--- which 'slotArg' brackets in any hole.
-interleaveMixfix :: Reading -> [Bool] -> Resolved -> [Expr Resolved] -> Maybe Text
-interleaveMixfix rd opens n args = do
+-- | The arguments in a mixfix pattern's holes ('slotArg').
+interleaveMixfix :: Reading -> Resolved -> [Expr Resolved] -> Maybe Text
+interleaveMixfix rd n args = do
   toks <- mixfixTokens n args
-  Just (Text.unwords (fill toks (zip opens args)))
+  Just (Text.unwords (fill toks args))
  where
   fill [] _ = []
   fill (t : ts) as
     | t == "_" = case as of
-        ((open, a) : rest) -> slotArg rd open a : fill ts rest
-        []                 -> t : fill ts as
+        (a : rest) -> slotArg rd a : fill ts rest
+        []         -> t : fill ts as
     | otherwise = t : fill ts as
 
 -- | A mixfix call laid out by its definition's pattern ('mixfixPatterns'),
--- when every slot has its argument and every argument a slot. Each argument
--- comes with whether it is a call that ends with a condition ('slotArg').
-patternMixfix :: Reading -> [Bool] -> Resolved -> [Expr Resolved] -> Maybe Text
-patternMixfix rd opens n args = do
+-- when every slot has its argument and every argument a slot ('slotArg').
+patternMixfix :: Reading -> Resolved -> [Expr Resolved] -> Maybe Text
+patternMixfix rd n args = do
   slots <- patternSlots rd n args
   let tok = \ case
         SlotWord w -> w
-        SlotArg i  -> slotArg rd (opens !! i) (args !! i)
+        SlotArg i  -> slotArg rd (args !! i)
   Just (Text.unwords (map tok slots))
 
 -- | The pattern a call is laid out by ('patternMixfix'), if it has one that
@@ -2443,17 +2444,20 @@ patternSlots rd n args = do
 -- | An argument in a hole of a mixfix pattern, in any hole, first, middle or
 -- last, bracketed unless it reads as one thing ('isCompoundNode'). Without the
 -- brackets @(a `reduced by` b) `reduced by` c@ and @a `reduced by` (b `reduced
--- by` c)@ read as the same words, for two different numbers. A call that reads
--- as one thing but ends with a condition that has no closing word (@open@,
--- 'rewriteWith''s @callEndsOpen@: @`fb` (q AND r)@, "fb for q and r") is
--- bracketed too, and so is a condition that 'slotRunsOn'. This is the one rule
--- for a hole; a sentence's slot has its own ('rewriteWith''s @filler@), because
--- a sentence's last slot has no words of the sentence after it. A mixfix call
--- laid out this way therefore never ends open itself.
-slotArg :: Reading -> Bool -> Expr Resolved -> Text
-slotArg rd open a
-  | compound || open || slotRunsOn a t = bracketed t
-  | otherwise                          = t
+-- by` c)@ read as the same words, for two different numbers. A call with one
+-- argument reads as one thing even when that argument is a condition with no
+-- closing word: bracketing it as well made more pairs read alike than it set
+-- apart (measured on the two-slot corpus, rf6/gs: the inner run-on at the end
+-- of a sentence, "it is shown that p and q and r", is the same for
+-- @`tail` (p AND (q AND r))@ and @(`tail` (p AND q)) AND r@, and the second is
+-- bracketed already). This is the one rule for a hole; a sentence's slot has
+-- its own ('rewriteWith''s @filler@). A mixfix call whose pattern ends with a
+-- hole ends as the argument there does ('rewriteWith''s @callEndsOpen@), so
+-- in a sentence's slot that the sentence goes on after it is bracketed whole.
+slotArg :: Reading -> Expr Resolved -> Text
+slotArg rd a
+  | compound || slotRunsOn a t = bracketed t
+  | otherwise                  = t
  where
   t = slotText rd a
   compound = case a of

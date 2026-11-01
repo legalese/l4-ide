@@ -4579,9 +4579,9 @@ spec bin = do
   -- legalese/l4-ide#804 brackets a call that ends with a condition, in a slot
   -- the sentence goes on after, and an operand that is prose. On unstable a
   -- mixfix hole already brackets whatever does not read as one thing, in any
-  -- hole; the open call joins that rule. unstable's ledger write, ledger read and
-  -- refusal end in a clause of their own, so they take both brackets. Each pair
-  -- below records or returns different values, and read alike before.
+  -- hole. unstable's ledger write, ledger read and refusal end in a clause of
+  -- their own, so they take both brackets. Each pair below records or returns
+  -- different values.
   describe "l4 render and nlg where #804 meets unstable" $ do
     let renderRows = do
           Output code sout _ <- runL4 bin ["render", "--format", "text", renderHoleAndClause]
@@ -4589,9 +4589,18 @@ spec bin = do
           pure (map (filter (/= '\r')) (lines sout))
         hasRow r = renderRows >>= (`shouldSatisfy` any (r `isInfixOf`))
 
-    it "brackets a call that ends with a condition in a mixfix hole, so the pair reads apart" $ do
+    -- #804's slot brackets made "[p] beats (q and r) is shown" the reading of
+    -- both rules below, until a mixfix call that ends with a hole was taken to
+    -- end as the argument there does.
+    it "brackets a mixfix call whose last hole would run on, in a slot the sentence goes on after" $ do
+      hasRow "Beats then shown means ([p] beats (q and r)) is shown."
+      hasRow "Shown in a hole means [p] beats (q and r) is shown."
+
+    -- A stated limit (nlg.md): a call with one argument reads as one thing in a
+    -- hole, so these two still read alike.
+    it "leaves a call with one argument in a hole as it was" $ do
       hasRow "One means ([x] beats fb of q and r) is shown."
-      hasRow "Two means [x] beats (fb of q and r) is shown."
+      hasRow "Two means ([x] beats fb of q and r) is shown."
 
     it "brackets a mixfix call that is an operand of arithmetic" $ do
       hasRow "Sum then reduced equals price + ([discount] reduced by [rebate])."
