@@ -1,0 +1,7 @@
+-- The bottom of a three-module chain (nlg-trans-top.l4 imports nlg-trans-mid.l4,
+-- which imports this). A prefix function whose herald follows its last input.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the gap` a b @nlg the gap between %a% and %b%
+  MEANS a MINUS b

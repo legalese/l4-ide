@@ -1,0 +1,7 @@
+-- The top of the chain. `mid rule` is shown under "Imported definitions", and
+-- must read there as it does when nlg-trans-mid.l4 is rendered on its own.
+IMPORT `nlg-trans-mid`
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`top rule` n MEANS `mid rule` n

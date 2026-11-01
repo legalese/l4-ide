@@ -24,7 +24,7 @@ reach.
 @ref British Nationality Act 1981 s 1(2)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-DECIDE `deemed by subsection (2) to satisfy subsection (1)` person IF
+DECIDE `deemed by subsection (2) to satisfy subsection (1)` IF
         person's `found abandoned in the United Kingdom after commencement`
     AND NOT person's `the contrary shown, rebutting the subsection (2) presumption`
     AND "(a) to have been born in the United Kingdom after commencement ...; and"
@@ -33,7 +33,7 @@ DECIDE `deemed by subsection (2) to satisfy subsection (1)` person IF
 @ref British Nationality Act 1981 s 1(1), (2)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-DECIDE `a British citizen under section 1(1)` person IF
+DECIDE `a British citizen under section 1(1)` IF
         person's `born in the United Kingdom after commencement to a settled parent`
     OR  `deemed by subsection (2) to satisfy subsection (1)` person
 ```
@@ -74,7 +74,7 @@ parentage is not on file — so the rule must run off the second.
 --  subsection (1) ..."
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-DECIDE `deemed by subsection (2) to satisfy subsection (1)` person IF
+DECIDE `deemed by subsection (2) to satisfy subsection (1)` IF
         person's `found abandoned as a new-born infant in the United Kingdom`
     AND person's `date found abandoned` AT LEAST `commencement`
     AND NOT person's `the contrary shown, rebutting the subsection (2) presumption`
@@ -118,7 +118,7 @@ DECLARE Notice HAS
 
 GIVEN n IS A Notice
 GIVETH A DATE
-`the day of receipt of` n MEANS
+`the day of receipt of` MEANS
     fromMaybe (n's `the day of posting` PLUS `the presumed number of days after posting`)
               (n's `the day of actual receipt, if shown`)
 ```
@@ -167,7 +167,7 @@ DECLARE Agreement HAS
 
 GIVEN a IS AN Agreement
 GIVETH A NUMBER
-`the rate of interest on a late payment under` a MEANS
+`the rate of interest on a late payment under` MEANS
     fromMaybe `the statutory rate in the absence of agreement`
               (a's `the rate the parties agreed, per annum`)
 ```
@@ -277,7 +277,7 @@ the paragraph permits:
 ```l4
 GIVEN a IS A `portal activity`
 GIVETH A BOOLEAN
-`the portal has violated the prohibitions` a MEANS
+`the portal has violated the prohibitions` MEANS
     NOT a's `meets the conditions specified in paragraph (b)`
 ```
 
@@ -316,7 +316,7 @@ GIVETH A BOOLEAN
 -- "15. No will or codicil ... shall be revoked otherwise than -- ..."
 GIVEN w IS A Will
 GIVETH A BOOLEAN
-`the will has been revoked` w MEANS
+`the will has been revoked` MEANS
         w's `revoked by a later will, writing or destruction`
     OR  `revocation by presumption of an intention on the ground of an alteration in circumstances`
 ```
