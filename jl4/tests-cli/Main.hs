@@ -450,6 +450,10 @@ renderNotScope = fixtureDir </> "render-not-scope.l4"
 slotScope :: FilePath
 slotScope = fixtureDir </> "slot-scope.l4"
 
+-- A slot that another slot comes after, and a sentence that fills a slot.
+slotScopeSentence :: FilePath
+slotScopeSentence = fixtureDir </> "slot-scope-sentence.l4"
+
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
@@ -727,7 +731,7 @@ main = do
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
        , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
-       , slotScope, nlgLibraryWording, libraryAliasTwoTypes
+       , slotScope, slotScopeSentence, nlgLibraryWording, libraryAliasTwoTypes
        , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
@@ -2707,6 +2711,44 @@ spec bin = do
         , "`TRUE` or `FALSE` is disclosed"
         , "(`fb` with `TRUE` or `FALSE`) is disclosed"
         , "`fb` with `TRUE` or `FALSE` is disclosed"
+        ]
+
+  -- A slot is the end of the sentence only when nothing of the sentence comes
+  -- after it, words or another slot. And a call with a sentence of its own has
+  -- no closing word when the slot at the end of its sentence holds a condition
+  -- that has none, so in such a slot it is bracketed as a whole.
+  describe "l4 render and a slot that another slot comes after" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", slotScopeSentence]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denial in a slot that a slot, or punctuation and a slot, comes after" $ do
+      hasRow "Juxt inside if (it is not the case that the Act governs for n) [q]."
+      hasRow "Juxt outside if it is not the case that the Act governs for n [q]."
+      hasRow "Comma inside if (it is not the case that the Act governs for n), [q]."
+      hasRow "Comma outside if it is not the case that the Act governs for n, [q]."
+      hasRow "Paren inside if (it is not the case that the Act governs for n) ([q])."
+      hasRow "Paren outside if it is not the case that the Act governs for n ([q])."
+
+    it "leaves a denial in the last slot as it was" $
+      hasRow "Juxt last if [q] it is not the case that the Act governs for n."
+
+  describe "l4 nlg and a sentence in a slot" $
+    it "brackets a sentence whose last slot holds a condition, and a condition in a slot another slot comes after" $ do
+      Output code sout _ <- runL4 bin ["nlg", slotScopeSentence]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(it is shown that `TRUE` or (`FALSE` and `TRUE`)) is shown"
+        , "it is shown that `TRUE` or (`FALSE` and `TRUE`) is shown"
+        , "(`TRUE` is told not (`FALSE` and `TRUE`)) is shown"
+        , "`TRUE` is told not (`FALSE` and `TRUE`) is shown"
+        , "`TRUE` not `FALSE`"
+        , "(not `FALSE`) `TRUE`"
+        , "not `FALSE` `TRUE`"
+        , "(not `FALSE`), `TRUE`"
+        , "not `FALSE`, `TRUE`"
         ]
 
   describe "library sentences at a call" $ do
