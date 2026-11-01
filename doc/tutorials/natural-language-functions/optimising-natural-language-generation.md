@@ -307,6 +307,8 @@ GIVETH A BOOLEAN
 `not a hotel` MEANS NOT `the person is a hotel`
 ```
 
+**An input in a sentence reads as a blank.** Beside your words, an input's name would read as more of them: "when assessed on assessed on". So where a mixfix heading or an `@nlg` sentence names an input of a built-in type, it reads in square brackets: "when assessed on [assessed on]". An input of one of your own types reads as the rule's body calls it: "the application kind". A rule whose name ends in a preposition takes its inputs the same way: "The rate for [n] means…". To avoid the brackets' repetition, name the input as a noun, such as `` `the assessment date` ``.
+
 **It heads the rule, and the logic stays.** A rule with `@nlg` opens with its sentence, and its body follows as usual, so annotating a rule never removes a condition from the document:
 
 ```l4

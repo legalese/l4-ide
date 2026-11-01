@@ -23,7 +23,7 @@ Directive Showcase
 
 1. Is adult if the person's age is at least 18.
 
-2. Age category of is:
+2. Age category of the person is:
     | Condition                                     | Result |
     |-----------------------------------------------|--------|
     | the person's age is at least 65               | Senior |

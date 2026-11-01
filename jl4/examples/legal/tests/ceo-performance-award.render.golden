@@ -239,7 +239,7 @@
 
 1. Immediate Vesting Applies if the CEO award state's Termination Reason is one of Without Cause, Death, Disability, or Change In Control.
 
-2. Forfeiture Applies depends on the CEO award state's Termination Reason:
+2. Forfeiture Applies, depending on the CEO award state's Termination Reason:
     (a) If it is For Cause: true;
     (b) If it is Voluntary Resignation: true;
     (c) If it is absent: any of the following:
@@ -331,20 +331,20 @@
 
 3. Trillion equals Billion a × 1000.
 
-4. Years after means the date new day/new month/new year.
+4. Years after [n] and [d] means the date new day/new month/new year.
     where:
     - New year equals the year of d + FLOOR with n.
     - Fractional days equals the number of days in new year × (n − FLOOR with n).
     - New day equals the day of d + FLOOR with fractional days.
     - New month means the month of d.
 
-5. Number In List depends on list:
+5. Number In List, depending on list:
     (a) If list is empty: false;
     (b) If list starts with head, followed by tail: any of the following:
         (i) item is head; or
         (ii) Number In List for item and tail.
 
-6. Any Earned Tranche Uses Same Product Goal depends on earned tranches:
+6. Any Earned Tranche Uses Same Product Goal, depending on earned tranches:
     (a) If earned tranches is empty: false;
     (b) If earned tranches starts with head, followed by tail: any of the following:
         (i) Product Goals Are Same for tranche number and head; or
