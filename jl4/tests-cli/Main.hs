@@ -578,6 +578,10 @@ nlgArithOperands, renderArithOperands :: FilePath
 nlgArithOperands    = fixtureDir </> "nlg-arith-operands.l4"
 renderArithOperands = fixtureDir </> "render-arith-operands.l4"
 
+-- A NOT beside AND or OR, in each shape that denies with more than one word.
+renderNotScope :: FilePath
+renderNotScope = fixtureDir </> "render-not-scope.l4"
+
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
 nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
@@ -735,7 +739,7 @@ coreFixtures =
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
-  , nlgArithGrouping, nlgArithOperands, renderArithOperands
+  , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -4367,6 +4371,34 @@ spec bin = do
       hasRow "Mod of a quotient equals a mod (b ÷ c)."
       hasRow "Quotient then mod equals (a ÷ b) mod c."
       hasRow "Divided by a mod equals a ÷ (b mod c)."
+
+  -- A denial in more than one word, next to AND or OR, is bracketed, so that it
+  -- cannot be read as denying what follows it as well.
+  describe "l4 render and the scope of a NOT" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderNotScope]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denied call beside OR or AND" $ do
+      hasRow "(a) If (it is not the case that the Act governs for n) or b: 1;"
+      hasRow "(a) If (it is not the case that the Act governs for n) and b: 1;"
+
+    it "brackets a denied AND beside OR" $
+      hasRow "(a) If (it is not the case that both the Act governs for n and c) or b: 1;"
+
+    it "brackets a denied call inside a group" $
+      hasRow "(a) If a and either (it is not the case that the Act governs for n) or b: 1;"
+
+    it "brackets a denied OR beside AND or OR" $ do
+      hasRow "(a) If (neither the Act governs for n nor b) and c: 1;"
+      hasRow "(a) If (n is not one of 1 or 2) or b: 1;"
+      hasRow "(a) If (it is not the case that the Act governs for n) and (neither b nor c) and d: 1;"
+
+    it "leaves a denial that is already delimited as it was" $ do
+      hasRow "(a) If neither the Act governs for n nor b: 1;"
+      hasRow "(a) If a is false or b: 1;"
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

@@ -1739,12 +1739,21 @@ itemText e
 -- | An operand of a connective. "it is not the case that" reaches as far as the
 -- sentence does, so in "it is not the case that a or b" a reader takes the denial
 -- to cover both. Brackets say that it covers one.
+--
+-- A denied OR is open in the same way, though it does not start with those
+-- words: "neither a nor b and c" reads as denying @b AND c@, and "n is not one of
+-- 1 or 2 or b" as @b@ being one of the values, because only the start of each is
+-- marked. It is told by its shape, a NOT over an OR, and not by its words.
 boundedCond :: Expr Resolved -> Text
 boundedCond e
   | "it is not the case that" `Text.isPrefixOf` stripFrameMarks t = "(" <> t <> ")"
+  | deniedOr = "(" <> t <> ")"
   | otherwise = t
  where
   t = condText e
+  deniedOr = isNothing (nlgOf e) && case carameliseNode e of
+    Not _ inner -> isOrNode (carameliseNode inner)
+    _           -> False
 
 -- | The negation of an AND, which denies only that all of it holds.
 notAllText :: [Expr Resolved] -> Text
