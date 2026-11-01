@@ -78,6 +78,7 @@ Take care with `%word%`: if `word` names an input, L4 fills it in and nothing wa
 - **An `ASSUME`d function has no named inputs,** so it has no slots, and a call reads as its name and arguments. Use a `BOOLEAN` field or a rule instead.
 - **A function passed on, or named without being called,** reads as its name. In `filter even xs`, `even` reads `even`.
 - **A sentence inside another call is spliced in without brackets,** so nested calls can read alike: with `@nlg %a% doubled` on `dbl`, `` `f2` 2 (`dbl` 3) `` and `` `dbl` (`f2` 2 3) `` both read "`f2` with 2 and 3 doubled". Set slots off with words that cannot be part of an argument, and read the output of nested calls. Arithmetic is bracketed, and so is anything beside it that does not say where it ends: "10 minus (5 minus 2)", "(5 doubled) minus 2", "twice (5 minus 2)", "(f2 for 2 and x) − 3".
+- **A condition or an IF that fills a slot is not bracketed either,** so the rest of the sentence can read as part of it: with `@nlg %p% is shown` on `shown`, `` `shown` (TRUE OR FALSE) AND FALSE `` reads "`TRUE` or `FALSE` is shown and `FALSE`", and with `dbl` as above, `` `dbl` (IF FALSE THEN 1 ELSE 10 MINUS 3) `` reads "if `FALSE` then 1 else 10 minus 3 doubled". `l4 render` does the same with a condition given to a call: ``NOT (p OR (`fb` (q AND r)))`` reads "neither p nor fb for q and r". Give the condition a rule of its own, with a sentence, and call that.
 - **A function with no sentence** reads as its pattern: `` `_ LESS _` with 100 and 20 ``.
 
 ## Several languages
