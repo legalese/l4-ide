@@ -4410,6 +4410,14 @@ spec bin = do
       hasRow "(a) If (n is not one of 1 or 2) or b: 1;"
       hasRow "(a) If (it is not the case that the Act governs for n) and (neither b nor c) and d: 1;"
 
+    it "brackets an IMPLIES or an IF inside a group" $ do
+      hasRow "(a) If neither p nor (q implies r): 1;"
+      hasRow "(a) If neither (q implies r) nor p: 1;"
+      hasRow "(a) If it is not the case that both p and (q implies r): 1;"
+      hasRow "(a) If s and either (q implies r) or p: 1;"
+      hasRow "(a) If neither (if q then r else s) nor p: 1;"
+      hasRow "(a) If not (p or q) implies r: 1;"
+
     it "leaves a denial that is already delimited as it was" $ do
       hasRow "(a) If neither the Act governs for n nor b: 1;"
       hasRow "(a) If a is false or b: 1;"

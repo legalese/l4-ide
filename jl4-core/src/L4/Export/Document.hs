@@ -1744,16 +1744,27 @@ itemText e
 -- words: "neither a nor b and c" reads as denying @b AND c@, and "n is not one of
 -- 1 or 2 or b" as @b@ being one of the values, because only the start of each is
 -- marked. It is told by its shape, a NOT over an OR, and not by its words.
+--
+-- So is an IMPLIES, an IF or a CONSIDER, which no word closes: "neither p nor q
+-- implies r" also reads as @(NOT (p OR q)) IMPLIES r@, and "neither if q then r
+-- else s nor p" puts the "nor" in the ELSE.
 boundedCond :: Expr Resolved -> Text
 boundedCond e
   | "it is not the case that" `Text.isPrefixOf` stripFrameMarks t = "(" <> t <> ")"
   | deniedOr = "(" <> t <> ")"
+  | unclosed = "(" <> t <> ")"
   | otherwise = t
  where
   t = condText e
   deniedOr = isNothing (nlgOf e) && case carameliseNode e of
     Not _ inner -> isOrNode (carameliseNode inner)
     _           -> False
+  unclosed = isNothing (nlgOf e) && case carameliseNode e of
+    Implies{}    -> True
+    IfThenElse{} -> True
+    MultiWayIf{} -> True
+    Consider{}   -> True
+    _            -> False
 
 -- | The negation of an AND, which denies only that all of it holds.
 notAllText :: [Expr Resolved] -> Text
