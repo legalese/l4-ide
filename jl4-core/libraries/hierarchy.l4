@@ -336,7 +336,7 @@ GIVETH A LIST OF STRING
 #EVAL `render outline` `default scheme` `amended bumping`   -- "1 …", "2b …", "3 …"
 
 -- restart-at: the counter resumes from 7.
-@nlg the example outline of recitals renumbered from 7
+@nlg the example outline of recitals 1, 2, 7 and 8
 `renumbered` MEANS
   item "Recitals"
     (item "Recital one")

@@ -3,7 +3,7 @@ the number of levels in the example outline of a Tenant's covenants
 the numbered lines of the example outline of a Tenant's covenants under the numbering of paragraphs inside a clause (a, i, A)
 the numbered lines of the example outline with an entry 2b outside the count under the usual numbering of legal paragraphs (1, A, i, a)
 the numbered lines of the example outline with an entry 2b in place of the next number under the usual numbering of legal paragraphs (1, A, i, a)
-the numbered lines of the example outline of recitals renumbered from 7 under the usual numbering of legal paragraphs (1, A, i, a)
+the numbered lines of the example outline of recitals 1, 2, 7 and 8 under the usual numbering of legal paragraphs (1, A, i, a)
 the numbered lines of the example outline of six defined terms under the numbering of paragraphs inside a clause (a, i, A)
 the number of levels in the numbered outline entry solo is equal to 1
 the number of nodes in the example outline of a Tenant's covenants is equal to 6
@@ -17,5 +17,5 @@ the marker for position 2 in the style `Decimal` is equal to 2
 the numbered lines of the example outline of a Tenant's covenants under the numbering of paragraphs inside a clause (a, i, A) is equal to list of Tenant's covenants, a	pay the Rent when due, b	keep the interior in good repair, b.i	fair wear and tear excepted, b.ii	damage by insured risks excepted and c	not assign or sublet without the Landlord's consent
 the numbered lines of the example outline with an entry 2b outside the count under the usual numbering of legal paragraphs (1, A, i, a) is equal to list of Clauses, 1	Payment, 2b	Late payment and 2	Delivery
 the numbered lines of the example outline with an entry 2b in place of the next number under the usual numbering of legal paragraphs (1, A, i, a) is equal to list of Clauses, 1	Payment, 2b	Late payment and 3	Delivery
-the numbered lines of the example outline of recitals renumbered from 7 under the usual numbering of legal paragraphs (1, A, i, a) is equal to list of Recitals, 1	Recital one, 2	Recital two, 7	Recital seven and 8	Recital eight
+the numbered lines of the example outline of recitals 1, 2, 7 and 8 under the usual numbering of legal paragraphs (1, A, i, a) is equal to list of Recitals, 1	Recital one, 2	Recital two, 7	Recital seven and 8	Recital eight
 the numbered lines of the example outline of six defined terms under the numbering of paragraphs inside a clause (a, i, A) is equal to list of Definitions, a	Affiliate, b	Business Day, c	Confidential Information, d	Effective Date, e	Intellectual Property and f	Territory

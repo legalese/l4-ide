@@ -772,7 +772,7 @@ nub list @nlg %list% with duplicate items removed
 GIVEN
   a IS A TYPE
 GIVETH AN a
-@nlg a refusal, because this rule has not been written yet
+@nlg a refusal (this rule has not been written yet)
 TBD MEANS REFUSE "TBD: this rule has not been written yet"
 
 §§ `Comparison Operators`
