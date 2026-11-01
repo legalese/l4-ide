@@ -12,8 +12,6 @@ pkgs.mkShell {
     pkgs.pkg-config
     pkgs.nodejs
     pkgs.typescript
-    pkgs.nixos-anywhere
-    pkgs.sqlite
     pkgs.nodePackages.prettier
     pkgs.graphviz
     pkgs.xdot

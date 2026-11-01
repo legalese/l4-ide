@@ -22,7 +22,6 @@
       "edit",
       "bash",
       "ssh",
-      "nixos-rebuild",
       "bash:execute",
       "mcp_context7_get-library-doc"
     ]
