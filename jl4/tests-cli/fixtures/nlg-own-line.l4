@@ -36,3 +36,14 @@ GIVETH A NUMBER
 
 GIVETH A NUMBER
 `uses them` MEANS `slotted rule` 3 "the tenant" PLUS `third constant` PLUS `declared constant`
+
+-- A @ref above a rule or below its signature cites the rule, and prints with it.
+@ref Grants Act 2024, s 4(1)
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+`cited above` age MEANS age >= 18
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+@ref Grants Act 2024, s 5
+`cited below the signature` age MEANS age >= 65

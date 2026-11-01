@@ -221,6 +221,9 @@ data Unit = MkUnit
   , uDefs    :: !(Set.Set Unique)
   , uRefs    :: !(Set.Set Unique)
   , uDecl    :: !UnitDecl
+  , uTopAnno :: !Anno
+    -- ^ The declaration's outer annotation: a @\@ref@ written above a rule lands
+    -- here, the first node it reaches, and not on the rule.
   , uCalls   :: !(Set.Set Unique)
     -- ^ The head of every rule that has a herald: a named-argument call to one of
     -- these is a call, not a record construction ('decideRendering'). Empty until
@@ -257,14 +260,14 @@ extractUnits (MkModule _ _ section) = goSection section
   goSection (MkSection _ _ _ decls) = concatMap goDecl decls
   goDecl :: TopDecl Resolved -> [Unit]
   goDecl = \case
-    Decide _ d  -> [mkUnit RuleUnit (decideApp d) (UDecide d)]
-    Declare _ d -> [mkUnit TypeUnit (declareApp d) (UDeclare d)]
-    Assume _ a  -> [mkUnit AssumptionUnit (assumeApp a) (UAssume a)]
+    Decide ann d  -> [mkUnit ann RuleUnit (decideApp d) (UDecide d)]
+    Declare ann d -> [mkUnit ann TypeUnit (declareApp d) (UDeclare d)]
+    Assume ann a  -> [mkUnit ann AssumptionUnit (assumeApp a) (UAssume a)]
     Section _ s -> goSection s
     Directive{} -> []
     Import{}    -> []
     Timezone{}  -> []
-  mkUnit kind appHead decl =
+  mkUnit ann kind appHead decl =
     MkUnit
       { uPrimary = getUnique appHead
       , uModule  = (getUnique appHead).moduleUri
@@ -273,6 +276,7 @@ extractUnits (MkModule _ _ section) = goSection section
       , uDefs    = definedIn decl
       , uRefs    = referencedIn decl
       , uDecl    = decl
+      , uTopAnno = ann
       , uCalls   = Set.empty
       , uReading = noReading
       }
@@ -787,14 +791,17 @@ unitSentence u = case u.uDecl of
 readsAsItsSentence :: Bool -> Unit -> Bool
 readsAsItsSentence imported u = imported || Set.member u.uPrimary u.uRefs
 
--- | The rule's citations, as its @\@ref@ annotations give them.
+-- | The rule's citations, wherever its @\@ref@ annotations landed: above the rule
+-- on the declaration, or below the signature on the head. A @\@ref@ on an input
+-- or a field cites that input or field, and is not the rule's.
 unitSources :: Unit -> [Text]
-unitSources u = case u.uDecl of
-  UDecide d  -> sourcesOf (d ^. annoOf % annRefs)
-  UDeclare d -> sourcesOf (d ^. annoOf % annRefs)
-  UAssume a  -> sourcesOf (a ^. annoOf % annRefs)
+unitSources u = map refCitation (u.uTopAnno ^. annRefs <> own)
  where
-  sourcesOf refs = [ t | MkRef _ t <- refs ]
+  own = case u.uDecl of
+    UDecide d@(MkDecide _ _ af _)  -> (d ^. annoOf % annRefs) <> headRefs af
+    UDeclare d@(MkDeclare _ _ af _) -> (d ^. annoOf % annRefs) <> headRefs af
+    UAssume a@(MkAssume _ _ af _)  -> (a ^. annoOf % annRefs) <> headRefs af
+  headRefs af@(MkAppForm _ n _ _) = (af ^. annoOf % annRefs) <> (getActual n ^. annoOf % annRefs)
 
 unitRendering :: Bool -> Unit -> (Text, Clause)
 unitRendering imported u = case u.uDecl of

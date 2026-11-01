@@ -2325,6 +2325,11 @@ spec bin = do
       out `shouldSatisfy` any ("The third constant means the second constant." `isInfixOf`)
       out `shouldSatisfy` any ("The declared constant means 4." `isInfixOf`)
 
+    it "prints a rule's @ref with the rule, written above it or below its signature" $ do
+      out <- rows
+      out `shouldSatisfy` any ("Source: Grants Act 2024, s 4(1)" `isInfixOf`)
+      out `shouldSatisfy` any ("Source: Grants Act 2024, s 5" `isInfixOf`)
+
     it "fills a slot with the input it names, not a rule or a field of that name" $ do
       out <- rows
       out `shouldSatisfy` any ("the day 3 for the tenant" `isInfixOf`)
