@@ -460,7 +460,13 @@ signatureBeforeKeyword ann =
   keywords = [ r.start | AnnoCsn (Just r) _ <- drop 1 ann.payload ]
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
-  addNlg a = extendNlgA a $ case a of
+  -- A directive, like a rule's body, stops short of an annotation written
+  -- below it at its own column: its last name has no node after it to bound
+  -- its region either, so an @\@nlg@ on its own line above the next rule
+  -- landed on the directive's expression (porting legalese/l4-ide#802, where
+  -- main bounds bodies and type declarations the same way; the libraries'
+  -- worked examples put an #EVAL before a rule).
+  addNlg a = extendNlgA a $ hoistNlgA (leavingTheNextRuleItsNlg a a) $ case a of
     LazyEval ann e -> do
       e' <- addNlg e
       pure $ LazyEval ann e'
