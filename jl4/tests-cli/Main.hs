@@ -446,6 +446,11 @@ renderArithOperands = fixtureDir </> "render-arith-operands.l4"
 renderNotScope :: FilePath
 renderNotScope = fixtureDir </> "render-not-scope.l4"
 
+-- Library sentences at a call site, and library aliases used at two types.
+nlgLibraryWording, libraryAliasTwoTypes :: FilePath
+nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
+libraryAliasTwoTypes = fixtureDir </> "library-alias-two-types.l4"
+
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
 nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
@@ -718,6 +723,7 @@ main = do
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
        , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
+       , nlgLibraryWording, libraryAliasTwoTypes
        , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
@@ -2612,6 +2618,36 @@ spec bin = do
     it "leaves a denial that is already delimited as it was" $ do
       hasRow "(a) If neither the Act governs for n nor b: 1;"
       hasRow "(a) If a is false or b: 1;"
+
+  describe "library sentences at a call" $ do
+    let nlgRows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgLibraryWording]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads a count of one without a plural" $
+      nlgRows >>= (`shouldBe`
+        [ "the date 1 month after 31 January 2025 (capped at the last day of that month)"
+        , "the date 1 year after 29 February 2024 (capped at the last day of that month)"
+        , "a one-entry dictionary mapping 1 to a"
+        , "the date 1 day after 31 January 2025"
+        , "the date 1 day before 31 January 2025"
+        , "the date 1 day after 31 January 2025"
+        , "the date 1 month after 31 January 2025 (capped at the last day of that month)"
+        , "the day before the date 1 month plus one month after 31 January 2025"
+        , "the date 1 day after 31 January 2025"
+        ])
+
+    it "reads a dictionary alias by its sentence in l4 render too" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgLibraryWording]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      out `shouldSatisfy` ("One entry means a one-entry dictionary mapping 1 to a." `isInfixOf`)
+      out `shouldSatisfy` ("From pairs means a dictionary holding the entries list of PAIR where fst is 1 and snd is a." `isInfixOf`)
+
+    it "lets a module use singleton and fromList at two types" $ do
+      Output code _ _ <- runL4 bin ["check", libraryAliasTwoTypes]
+      code `shouldBe` ExitSuccess
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do
