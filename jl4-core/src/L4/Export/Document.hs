@@ -30,7 +30,10 @@ module L4.Export.Document
   , ExportConfig (..)
   , Disposition (..)
   , defaultExportConfig
+  , hiddenImports
   , mixfixHeadingsFromRegistry
+    -- * Names
+  , spaceCamel
     -- * Entry points
   , buildDocument
   , buildPlan
@@ -46,14 +49,15 @@ import qualified Data.List as List
 import Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as Map
 import Data.Ratio (denominator, numerator)
+import Data.Time (fromGregorianValid)
 import qualified Data.Set as Set
 import Optics (gplate, toListOf, (%), (^.))
 
 import L4.Annotation (emptyAnno)
-import L4.Desugar (carameliseNode)
+import L4.Desugar (carameliseExpr, carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
-import L4.Nlg (simpleLinearizer, NlgFnInfo, nlgFnInfo, substituteNlgCalls, renderNlgWith, normalizeWs, oxford)
+import L4.Nlg (daydateLiteral, simpleLinearizer, NlgFnInfo, nlgFnInfo, substituteNlgCall, renderNlgWith, normalizeWs, oxford)
 import qualified L4.Nlg as Nlg
 import L4.Syntax
 import L4.TypeCheck.Types (CheckInfo (..), FunTypeSig (..), MixfixRegistry (..))
@@ -63,7 +67,14 @@ import L4.Utils.Ratio (prettyRatio)
 -- Configuration
 -- ----------------------------------------------------------------------------
 
-data Disposition = Inline | Reference | Exclude
+-- | What the document does with a unit from an imported module.
+--
+-- 'Hidden' is the one to reach for when a reader unticks an import. The module
+-- stays in the dependency list, so a rule that calls it still reads its @\@nlg@
+-- sentences and its records still have their fields; only its own text is left
+-- out. Taking the module out of the list instead changes how the document's own
+-- rules read.
+data Disposition = Inline | Reference | Exclude | Hidden
   deriving stock (Eq, Show, Generic)
 
 data ExportConfig = MkExportConfig
@@ -85,6 +96,12 @@ defaultExportConfig = MkExportConfig
   , unitDispositions   = Map.empty
   , mixfixHeadings     = Map.empty
   }
+
+-- | Hide every imported module but those a caller asks to show, by file name
+-- without its extension. A document's own rules read the same either way.
+hiddenImports :: (Text -> Bool) -> [Module Resolved] -> Map.Map NormalizedUri Disposition
+hiddenImports shown deps = Map.fromList
+  [ (uri, Hidden) | MkModule _ uri _ <- deps, not (shown (moduleLabel uri)) ]
 
 -- ----------------------------------------------------------------------------
 -- Public IR
@@ -108,7 +125,7 @@ data Clause
   | CCases Text [(Text, Clause)]               -- ^ consider <subject>: when <pattern> -> …
   | CDeontic Text Text Text                    -- ^ party, modal, action
              (Maybe Text)                      -- ^ deadline
-             (Maybe Text)                      -- ^ provided-that
+             (Maybe Clause)                    -- ^ provided-that
              (Maybe Clause)                    -- ^ hence (on compliance)
              (Maybe Clause)                    -- ^ lest (on breach)
   | CChain Text [Text]                         -- ^ a long arithmetic chain
@@ -127,10 +144,14 @@ data Block = MkBlock
   { blockId           :: !Text
   , blockKind         :: !UnitKind
   , blockHeading      :: !Text
+  , blockSentence     :: !(Maybe Text)
+    -- ^ The rule's @\@nlg@ sentence, read in place of the heading. The heading
+    -- stays the rule's name, which is what a reference to it links by.
   , blockConnector    :: !Text        -- ^ "means", "holds if", "provides that", "equals"
   , blockBody         :: !Clause
   , blockRenderedAs   :: !RenderedAs
   , blockCitation     :: !(Maybe Text)
+  , blockSources      :: ![Text]      -- ^ the rule's @\@ref@ citations
   , blockSourceModule :: !Text
   , blockImported     :: !Bool
   }
@@ -200,7 +221,38 @@ data Unit = MkUnit
   , uDefs    :: !(Set.Set Unique)
   , uRefs    :: !(Set.Set Unique)
   , uDecl    :: !UnitDecl
+  , uTopAnno :: !Anno
+    -- ^ The declaration's outer annotation: a @\@ref@ written above a rule lands
+    -- here, the first node it reaches, and not on the rule.
+  , uCalls   :: !(Set.Set Unique)
+    -- ^ The head of every rule that has a herald: a named-argument call to one of
+    -- these is a call, not a record construction ('decideRendering'). Empty until
+    -- 'allUnits' fills it.
+  , uReading :: !Reading
+    -- ^ What phrasing this unit's body needs to know of the rest of the document.
+    -- Empty until 'allUnits' fills it.
   }
+
+-- | What a rule's body is read against: the other rules and records of the
+-- document, and the inputs of the rule itself.
+data Reading = MkReading
+  { rdHeralds    :: !NlgFnInfo
+  , rdRules      :: !(Map.Map Unique RuleShape)
+  , rdBoolFields :: !(Set.Set Unique)
+  , rdSubjects   :: !(Set.Set Text)
+    -- ^ How the enclosing rule's subjects read: an input of a user type that is
+    -- the only one of its type. Passing one on says nothing a reader needs, and
+    -- no other input could be confused with it.
+  }
+
+-- | What a call needs to know of the rule it calls.
+data RuleShape = MkRuleShape
+  { rsBoolean :: !Bool
+  , rsInputs  :: ![Text]
+  }
+
+noReading :: Reading
+noReading = MkReading Map.empty Map.empty Set.empty Set.empty
 
 extractUnits :: Module Resolved -> [Unit]
 extractUnits (MkModule _ _ section) = goSection section
@@ -208,14 +260,14 @@ extractUnits (MkModule _ _ section) = goSection section
   goSection (MkSection _ _ _ decls) = concatMap goDecl decls
   goDecl :: TopDecl Resolved -> [Unit]
   goDecl = \case
-    Decide _ d  -> [mkUnit RuleUnit (decideApp d) (UDecide d)]
-    Declare _ d -> [mkUnit TypeUnit (declareApp d) (UDeclare d)]
-    Assume _ a  -> [mkUnit AssumptionUnit (assumeApp a) (UAssume a)]
+    Decide ann d  -> [mkUnit ann RuleUnit (decideApp d) (UDecide d)]
+    Declare ann d -> [mkUnit ann TypeUnit (declareApp d) (UDeclare d)]
+    Assume ann a  -> [mkUnit ann AssumptionUnit (assumeApp a) (UAssume a)]
     Section _ s -> goSection s
     Directive{} -> []
     Import{}    -> []
     Timezone{}  -> []
-  mkUnit kind appHead decl =
+  mkUnit ann kind appHead decl =
     MkUnit
       { uPrimary = getUnique appHead
       , uModule  = (getUnique appHead).moduleUri
@@ -224,6 +276,9 @@ extractUnits (MkModule _ _ section) = goSection section
       , uDefs    = definedIn decl
       , uRefs    = referencedIn decl
       , uDecl    = decl
+      , uTopAnno = ann
+      , uCalls   = Set.empty
+      , uReading = noReading
       }
 
 -- | All renderable units across the open module and its dependencies, with
@@ -233,8 +288,32 @@ allUnits headings mainModule deps =
   let mods  = mainModule : deps
       info  = nlgFnInfo mods
       ctors = recordCtorFields mods
-  in map (substNlgInUnit info . mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings)
+      -- Told apart from a record's constructor by what the head resolved to, not
+      -- by its name: a record can be named like a rule that has a herald.
+      calls = Map.keysSet info
+      reading = MkReading info (ruleShapes mods) (booleanFields mods) Set.empty
+  in map (\u -> (mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u)
+                  { uCalls = calls, uReading = reading })
        (extractUnits mainModule <> concatMap extractUnits deps)
+
+-- | Every rule's shape, keyed by the definition a call resolves to.
+ruleShapes :: [Module Resolved] -> Map.Map Unique RuleShape
+ruleShapes mods = Map.fromList
+  [ (getUnique n, MkRuleShape (returnsBoolean tysig) [ resolvedText a | a <- args ])
+  | m <- mods
+  , Decide _ (MkDecide _ tysig (MkAppForm _ n args _) _) <- topDeclsRec m
+  ]
+
+-- | The record fields of type BOOLEAN. Such a field states something about its
+-- record, so a possessive is always the wrong way to read it.
+booleanFields :: [Module Resolved] -> Set.Set Unique
+booleanFields mods = Set.fromList
+  [ getUnique n
+  | m <- mods
+  , Declare _ (MkDeclare _ _ _ (RecordDecl _ _ fields)) <- topDeclsRec m
+  , MkTypedName _ n ty _ <- fields
+  , typeNameText ty == "BOOLEAN"
+  ]
 
 -- | Apply a transform to a unit's DECIDE body (a no-op for other units).
 mapUnitBody :: (Expr Resolved -> Expr Resolved) -> Unit -> Unit
@@ -242,15 +321,18 @@ mapUnitBody f u = case u.uDecl of
   UDecide (MkDecide a t af body) -> u { uDecl = UDecide (MkDecide a t af (f body)) }
   _ -> u
 
--- | The field-name references of each record, keyed by record name, so a
--- positional construction (@Bullet "A" "B"@) can be matched up with its fields.
--- Keyed by name, not 'Unique': a record's constructor occurrence and its
--- declaring type name do not share a 'Unique'.
-recordCtorFields :: [Module Resolved] -> Map.Map Text [Resolved]
+-- | The field-name references of each record, keyed by the 'Unique' of its
+-- constructor, so a positional construction (@Bullet "A" "B"@) can be matched up
+-- with its fields.
+-- Keyed by the constructor and not by a name: a function can be named like a
+-- record (the prelude's @range@ beside a record @range@), and a call to it is not
+-- a construction. The constructor is not the declaring type name, which has a
+-- 'Unique' of its own; the type checker records it in the 'RecordDecl'.
+recordCtorFields :: [Module Resolved] -> Map.Map Unique [Resolved]
 recordCtorFields mods = Map.fromList
-  [ (resolvedText ctorName, [ n | MkTypedName _ n _ _ <- fields ])
+  [ (getUnique con, [ n | MkTypedName _ n _ _ <- fields ])
   | m <- mods
-  , Declare _ (MkDeclare _ _ (MkAppForm _ ctorName _ _) (RecordDecl _ _ fields)) <- topDeclsRec m
+  , Declare _ (MkDeclare _ _ _ (RecordDecl _ (Just con) fields)) <- topDeclsRec m
   ]
 
 -- | All top-level declarations of a module, descending through @SECTION@s.
@@ -263,12 +345,12 @@ topDeclsRec (MkModule _ _ sec) = go sec
 -- | Rewrite a positional record construction (@App ctor [a, b]@) into the named
 -- form (@AppNamed ctor [field IS a, …]@), so the table and record renderers —
 -- which key off field names — recognise it the same as a @WITH@ literal.
-normalizePositionalRecords :: Map.Map Text [Resolved] -> Expr Resolved -> Expr Resolved
+normalizePositionalRecords :: Map.Map Unique [Resolved] -> Expr Resolved -> Expr Resolved
 normalizePositionalRecords ctorFields
   | Map.null ctorFields = id
   | otherwise = transformOf (gplate @(Expr Resolved)) $ \case
       App ann ctor args
-        | Just fnames <- Map.lookup (resolvedText ctor) ctorFields
+        | Just fnames <- Map.lookup (getUnique ctor) ctorFields
         , length fnames == length args ->
             AppNamed ann ctor [ MkNamedExpr ann f a | (f, a) <- zip fnames args ] Nothing
       e -> e
@@ -282,12 +364,6 @@ normalizePositionalRecords ctorFields
 -- available here, hence the 'Nothing'.
 decideNlg :: Decide Resolved -> Maybe Nlg
 decideNlg = Nlg.decideNlg Nothing
-
-substNlgInUnit :: NlgFnInfo -> Unit -> Unit
-substNlgInUnit info u = case u.uDecl of
-  UDecide (MkDecide a t af body) ->
-    u { uDecl = UDecide (MkDecide a t af (substituteNlgCalls info body)) }
-  _ -> u
 
 -- | Replace a mixfix function's heading with its precomputed prose form
 -- (e.g. "a Person buyer may trade with a Person seller"). The map is keyed by
@@ -332,7 +408,7 @@ paramTypeMap (MkTypeSig _ (MkGivenSig _ names) _) =
 -- Falls back to the bare parameter name when no type is available.
 paramPhrase :: Text -> Maybe (Type' Resolved) -> Text
 paramPhrase pname mty = case mty >>= typeDisplay of
-  Just ty -> article ty <> " " <> ty <> " " <> cleanParam pname
+  Just ty -> withArticle ty <> " " <> cleanParam pname
   Nothing -> cleanParam pname
  where
   typeDisplay ty = case userTypeName ty of
@@ -340,9 +416,12 @@ paramPhrase pname mty = case mty >>= typeDisplay of
     Nothing -> case ty of
       TyApp _ n _ -> Just (nameToText (getActual n))   -- builtin, e.g. NUMBER
       _           -> Nothing
-  article ty = case Text.uncons ty of
-    Just (c, _) | toLower c `elem` ['a', 'e', 'i', 'o', 'u'] -> "an"
-    _                                                        -> "a"
+
+-- | "a Person", "an Award Participant".
+withArticle :: Text -> Text
+withArticle t = case Text.uncons t of
+  Just (c, _) | toLower c `elem` ['a', 'e', 'i', 'o', 'u'] -> "an " <> t
+  _                                                        -> "a " <> t
 
 decideApp :: Decide Resolved -> Resolved
 decideApp (MkDecide _ _ (MkAppForm _ n _ _) _) = n
@@ -477,6 +556,7 @@ buildDocument cfg mainModule deps =
           Exclude
             | Set.member i required -> Just (referenceBlock True u)
             | otherwise             -> Nothing
+          Hidden -> Nothing
 
   blockByUnique :: Map.Map Unique Block
   blockByUnique = Map.fromList [ (u.uPrimary, b) | (i, u) <- indexed, Just b <- [renderUnit i u] ]
@@ -519,9 +599,16 @@ toDocSection rankOf bmap (MkSection _ mName _ decls) =
   MkDocSection
     { sectionNumber  = ""
     , sectionHeading = fmap resolvedText mName
-    , sectionGroups  = groupByKind rankOf (orderedBlocks bmap decls)
+    , sectionGroups  = unlabelledIfAlone (groupByKind rankOf (orderedBlocks bmap decls))
     , sectionSubs    = [ toDocSection rankOf bmap s | Section _ s <- decls ]
     }
+
+-- | A section's heading already frames its only group; a label would only repeat
+-- it, as "Definitions:" under a heading with nothing but definitions.
+unlabelledIfAlone :: [DocGroup] -> [DocGroup]
+unlabelledIfAlone = \case
+  [g] -> [g { groupLabel = Nothing }]
+  gs  -> gs
 
 -- | Turn the open document's body into top-level sections. Its directly-held
 -- definitions / assumptions / rules each become a headed section (so they
@@ -651,15 +738,17 @@ isComputedSelector u = case u.uDecl of
 
 inlineBlock :: Bool -> Unit -> Block
 inlineBlock imported u =
-  let (connector, body) = unitRendering u
+  let (connector, body) = unitRendering imported u
   in MkBlock
     { blockId           = uniqueId u.uPrimary
     , blockKind         = u.uKind
     , blockHeading      = u.uHeading
+    , blockSentence     = if imported then Nothing else unitSentence u
     , blockConnector    = connector
     , blockBody         = body
     , blockRenderedAs   = RenderedInline
     , blockCitation     = Nothing
+    , blockSources      = unitSources u
     , blockSourceModule = uriText u.uModule
     , blockImported     = imported
     }
@@ -670,22 +759,54 @@ referenceBlock isForced u =
     { blockId           = uniqueId u.uPrimary
     , blockKind         = u.uKind
     , blockHeading      = u.uHeading
+    , blockSentence     = Nothing
     , blockConnector    = ""
     , blockBody         = CLeaf ""
     , blockRenderedAs   = RenderedReference isForced
     , blockCitation     = Just ("as defined in " <> moduleLabel u.uModule)
+    , blockSources      = []
     , blockSourceModule = uriText u.uModule
     , blockImported     = True
     }
 
-unitRendering :: Unit -> (Text, Clause)
-unitRendering u = case u.uDecl of
+-- | The sentence a rule reads as, with its own inputs in the slots.
+--
+-- An @\@nlg@ on a rule adds to the rule: it says what the rule is about, and the
+-- body still says how. So "the applicant qualifies for the grant" heads the
+-- conditions. Only a rule whose body says nothing to the document's reader is
+-- read as the sentence alone ('readsAsItsSentence').
+unitSentence :: Unit -> Maybe Text
+unitSentence u = case u.uDecl of
+  UDecide d@(MkDecide _ tysig _ _)
+    | not (readsAsItsSentence False u), Just nlg <- decideNlg d ->
+        Just (renderNlgWith (Map.map inputPhrase (paramSubst tysig)) nlg)
+  _ -> Nothing
+ where
+  inputPhrase t = Inert emptyAnno t InertCtxNone
+
+-- | A rule whose body would not help a reader, so that its sentence stands in for
+-- it: one imported from a library, and one defined by recursion, whose @CONSIDER@
+-- is how a list is walked, not what the rule means. @filter@ reads "the items of
+-- list for which f holds".
+readsAsItsSentence :: Bool -> Unit -> Bool
+readsAsItsSentence imported u = imported || Set.member u.uPrimary u.uRefs
+
+-- | The rule's citations, wherever its @\@ref@ annotations landed: above the rule
+-- on the declaration, or below the signature on the head. A @\@ref@ on an input
+-- or a field cites that input or field, and is not the rule's.
+unitSources :: Unit -> [Text]
+unitSources u = map refCitation (u.uTopAnno ^. annRefs <> own)
+ where
+  own = case u.uDecl of
+    UDecide d@(MkDecide _ _ af _)  -> (d ^. annoOf % annRefs) <> headRefs af
+    UDeclare d@(MkDeclare _ _ af _) -> (d ^. annoOf % annRefs) <> headRefs af
+    UAssume a@(MkAssume _ _ af _)  -> (a ^. annoOf % annRefs) <> headRefs af
+  headRefs af@(MkAppForm _ n _ _) = (af ^. annoOf % annRefs) <> (getActual n ^. annoOf % annRefs)
+
+unitRendering :: Bool -> Unit -> (Text, Clause)
+unitRendering imported u = case u.uDecl of
   UDecide d@(MkDecide _ tysig _ body)
-    -- A function with an @\@nlg@ annotation renders AS its authored description
-    -- (with parameter names filling the @%slots%@) rather than its
-    -- implementation — so e.g. @filter@ reads "the items of list for which f
-    -- holds", not its recursive @CONSIDER@ body.
-    | Just nlg <- decideNlg d ->
+    | Just nlg <- decideNlg d, readsAsItsSentence imported u ->
         ( if returnsBoolean tysig then "holds if" else "means"
         , CLeaf (renderNlgWith Map.empty nlg) )
     -- Otherwise rewrite the body up front (mixfix/maths/dates/numbers/params ->
@@ -695,38 +816,53 @@ unitRendering u = case u.uDecl of
     -- render as an attached "where:" block.
     | otherwise ->
         let subst              = paramSubst tysig
-            (inner, locals)    = peelWhere (clauseLayout body)
-            (conn, mainClause) = decideRendering tysig (rewriteExpr (substParams subst inner))
-        in case mapMaybe (localDefClause subst) locals of
+            reading            = u.uReading { rdSubjects = ruleSubjects subst tysig }
+            -- Normalised first: until then an AND can sit inside a call's
+            -- argument, and phrasing that argument would swallow the condition.
+            (inner, locals)    = peelWhere (distributeCalls (carameliseExpr (clauseLayout body)))
+            read'              = collapseTruth . rewriteWith reading . substParams subst
+            (conn, mainClause) = decideRendering u.uCalls tysig (read' inner)
+        in case mapMaybe (localDefClause reading u.uCalls subst) locals of
              []   -> (conn, mainClause)
              defs -> (conn, CWhere mainClause defs)
   UAssume _ -> ("is assumed to be given", CLeaf "")
   UDeclare (MkDeclare _ _ _ tyDecl) ->
     case tyDecl of
-      RecordDecl _ _ (_ : _) -> ("means a record with", declareClause tyDecl)
+      RecordDecl _ _ (_ : _) -> ("consists of", declareClause tyDecl)
       EnumDecl _ cons
         | longEnum cons -> ("means one of", CFields [ (conName c, "") | c <- cons ])
       _                      -> ("means", declareClause tyDecl)
  where
-  conName (MkConDecl _ n _) = resolvedText n
+  conName (MkConDecl _ n _) = spaceCamel (resolvedText n)
   -- Bullet a long enum, or one whose cases are long phrases, rather than
   -- running them all into one "one of …" sentence.
   longEnum cons =
     length cons > 5 || any (\c -> Text.length (conName c) > 24) cons
 
-decideRendering :: TypeSig Resolved -> Expr Resolved -> (Text, Clause)
-decideRendering tysig body
+decideRendering :: Set.Set Unique -> TypeSig Resolved -> Expr Resolved -> (Text, Clause)
+decideRendering calls tysig body
   | Just t <- nlgOf body =
       (connectorFor tysig body, CLeaf t)   -- an authored @nlg sentence wins
   | Regulative _ deon <- body =
       ("provides that", deonticClause deon)
   | Just (cols, rows) <- bodyAsTable body =
-      ( maybe "means" ("means the following list of " <>) (listElemTypeName body)
+      ( maybe "means" (("means the following list of " <>) . spaceCamel) (listElemTypeName body)
       , tableClause cols rows )
   | Just items <- bodyAsValueList body =
       ("means", CChain "a list of the following" items)
-  | Just (ctor, fields) <- bodyAsRecordLiteral body =
-      ("is a " <> ctor <> " with", CFields (map fieldPair fields))
+  | Just c <- listChainClause body =
+      ("means", c)
+  -- A named-argument call to a rule that has a herald has the shape of a record
+  -- construction and is not one: it reads as the herald with its arguments in a
+  -- @where@ clause, as @l4 nlg@ prints it ('substituteNlgCalls' has put the herald
+  -- on its head), not as "is a the gap with" and a list of fields. Told apart by
+  -- what the head resolved to, not by its name or a herald on it: a record can be
+  -- named like a rule that has a herald, and can carry a herald of its own, and
+  -- its literal is still a record. A call to a rule WITHOUT a herald still reads
+  -- as a construction.
+  | Just (ctor, fields) <- bodyAsRecordLiteral body
+  , not (isRuleCall calls body) =
+      ("is " <> withArticle (spaceCamel ctor) <> " with", CFields (map fieldPair fields))
   | Just c <- arithChainClause body =
       ("equals", c)
   | Just f <- formulaText body =
@@ -808,18 +944,22 @@ peelWhere = \case
 -- | Render one local @WHERE@/@LET@ binding as a (heading, connector, body)
 -- triple. The enclosing rule's GIVEN parameters are in scope inside the binding,
 -- so its parameter substitution is threaded in alongside the binding's own.
-localDefClause :: Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
-localDefClause outerSubst = \case
+localDefClause :: Reading -> Set.Set Unique -> Map.Map Unique Text -> LocalDecl Resolved -> Maybe (Text, Text, Clause)
+localDefClause reading calls outerSubst = \case
   LocalDecide _ d@(MkDecide _ ltysig _ lbody) ->
     let subst          = Map.union (paramSubst ltysig) outerSubst
-        (conn, clause) = decideRendering ltysig (rewriteExpr (substParams subst lbody))
+        (conn, clause) = decideRendering calls ltysig
+                           (collapseTruth (rewriteWith reading (substParams subst (distributeCalls (carameliseExpr lbody)))))
     in Just (resolvedText (decideApp d), conn, clause)
   LocalAssume{} -> Nothing
 
--- | Map each GIVEN parameter to a readable noun phrase: a record/enum-typed
--- parameter becomes "the <type>" (so the bound name @p@ reads as "the
--- payment"); a scalar parameter keeps its own name with underscores spaced.
--- Two parameters of the same type are disambiguated by their name.
+-- | Map each GIVEN parameter to a readable noun phrase. A short or generic name
+-- of a record or enum takes its type's name, so @p@ reads "the payment" and
+-- @scenario@ of a @Sell Scenario@ reads "the sell scenario". A name that says
+-- more than the type does is the drafter's word for a role and is kept:
+-- @`the applicant`@ of a @Person@ stays "the applicant". A scalar parameter
+-- keeps its own name, spaced. Two parameters that would read alike are told
+-- apart by their names.
 paramSubst :: TypeSig Resolved -> Map.Map Unique Text
 paramSubst (MkTypeSig _ (MkGivenSig _ names) _) =
   let params = [ (getUnique r, nameToText (getActual r), mty >>= userTypeName)
@@ -827,11 +967,32 @@ paramSubst (MkTypeSig _ (MkGivenSig _ names) _) =
       dupTypes = Map.fromListWith (+) [ (tn, 1 :: Int) | (_, _, Just tn) <- params ]
       phraseOf pname = \case
         Just tn
+          | not (namedByType pname tn) -> rolePhrase pname
           | Map.findWithDefault 0 tn dupTypes > 1 -> "the " <> noun tn <> " " <> cleanParam pname
           | otherwise                             -> "the " <> noun tn
-        Nothing -> cleanParam pname
-      noun = Text.toLower . spaceCamel
+        Nothing -> spaceCamel (cleanParam pname)
+      -- Too short to mean anything, or just a word of the type's own name, when
+      -- that name is short enough to say each time.
+      namedByType pname tn =
+        let typeWords = Text.words (Text.toLower (spaceCamel tn))
+        in Text.length pname <= 2
+             || (length typeWords <= 4 && all (`elem` typeWords) (Text.words (Text.toLower pname)))
+      rolePhrase pname
+        | Just rest <- Text.stripPrefix "The " pname = "the " <> rest
+        | any (`Text.isPrefixOf` pname) ["the ", "a ", "an ", "this ", "that "] = pname
+        | otherwise = "the " <> spaceCamel (cleanParam pname)
+      noun = Text.unwords . map lowerOrdinary . Text.words . spaceCamel
+      lowerOrdinary w = case Text.unpack w of
+        (c : d : _) | isUpper c, isUpper d -> w
+        _                                  -> Text.toLower w
   in Map.fromList [ (u, phraseOf pname mtn) | (u, pname, mtn) <- params ]
+
+-- | The phrases of a rule's inputs that are the only one of their type.
+ruleSubjects :: Map.Map Unique Text -> TypeSig Resolved -> Set.Set Text
+ruleSubjects subst (MkTypeSig _ (MkGivenSig _ names) _) =
+  let typed = [ (tn, getUnique r) | MkOptionallyTypedName _ r mty <- names, Just tn <- [mty >>= userTypeName] ]
+      counts = Map.fromListWith (+) [ (tn, 1 :: Int) | (tn, _) <- typed ]
+  in Set.fromList [ p | (tn, u) <- typed, Map.lookup tn counts == Just 1, Just p <- [Map.lookup u subst] ]
 
 substParams :: Map.Map Unique Text -> Expr Resolved -> Expr Resolved
 substParams pm
@@ -855,20 +1016,43 @@ builtinTypeNames =
 cleanParam :: Text -> Text
 cleanParam = Text.map (\c -> if c == '_' then ' ' else c)
 
--- | Insert a space at lower->upper boundaries so @LoanState@ becomes
--- @Loan State@ and @ProductionOrder@ becomes @Production Order@.
+-- | Space a run-together name for a reader: @LoanState@ reads @Loan State@,
+-- @EPApplication@ reads @EP Application@, and @dateOfBirth@, which starts in
+-- lower case, reads @date of birth@. A name that is already spaced, or all in
+-- capitals, is left as it is.
 spaceCamel :: Text -> Text
-spaceCamel = Text.pack . go . Text.unpack
+spaceCamel t
+  | Text.any (== ' ') t = t
+  | otherwise           =
+      let spaced = Text.words (Text.pack (go (Text.unpack t)))
+      in Text.unwords $ case Text.uncons t of
+           Just (c, _) | isLower c -> map lowerWord spaced
+           _                       -> spaced
  where
   go (a : b : rest) | isLower a, isUpper b = a : ' ' : go (b : rest)
+  go (a : b : c : rest) | isUpper a, isUpper b, isLower c = a : ' ' : go (b : c : rest)
   go (a : rest)     = a : go rest
   go []             = []
+  -- An acronym inside the name keeps its capitals.
+  lowerWord w = case Text.unpack w of
+    (c : d : _) | isUpper c, isUpper d -> w
+    _                                  -> Text.toLower w
 
 connectorFor :: TypeSig Resolved -> Expr Resolved -> Text
 connectorFor tysig body
   | returnsBoolean tysig = "holds if"
   | otherwise = case carameliseNode body of
       Consider{} -> "is determined by"
+      And{}      -> "holds if"
+      Or{}       -> "holds if"
+      Not{}      -> "holds if"
+      Equals{}   -> "holds if"
+      Geq{}      -> "holds if"
+      Leq{}      -> "holds if"
+      Gt{}       -> "holds if"
+      Lt{}       -> "holds if"
+      RAnd{}     -> "provides that"
+      ROr{}      -> "provides that"
       _          -> "means"
 
 returnsBoolean :: TypeSig Resolved -> Bool
@@ -880,6 +1064,12 @@ typeNameText :: Type' Resolved -> Text
 typeNameText = \case
   TyApp _ n _ -> nameToText (getActual n)
   _           -> ""
+
+-- | Is this a named-argument call to one of these rules?
+isRuleCall :: Set.Set Unique -> Expr Resolved -> Bool
+isRuleCall calls = \case
+  AppNamed _ n _ _ -> getUnique n `Set.member` calls
+  _                -> False
 
 bodyAsRecordLiteral :: Expr Resolved -> Maybe (Text, [NamedExpr Resolved])
 bodyAsRecordLiteral = \case
@@ -946,7 +1136,7 @@ declareClause = \case
   recordField (MkTypedName _ n ty Nothing)     = (resolvedText n, typeText ty)
   recordField (MkTypedName _ n ty (Just expr)) =
     (resolvedText n, typeText ty <> ", computed as " <> leafText expr)
-  conName (MkConDecl _ n _) = resolvedText n
+  conName (MkConDecl _ n _) = spaceCamel (resolvedText n)
 
 -- ----------------------------------------------------------------------------
 -- Expression -> Clause tree
@@ -963,13 +1153,11 @@ toClause e0 = case carameliseNode e0 of
   Regulative _ deon  -> deonticClause deon
   And{}              -> CAll (map toClause (flattenAnd e0))
   Or{}               -> CAny (map toClause (flattenOr e0))
-  -- A function applied to a single control-flow argument distributes over that
-  -- argument's branches: "the day before (CONSIDER … THEN x …)" lays out as a
-  -- case tree whose leaves are "the day before x" — a readable outline rather
-  -- than one run-on line that inlines the whole nested CONSIDER.
-  App ann n [arg]
-    | isControlFlowExpr (carameliseNode arg) ->
-        toClause (distributeIntoBranches (\leaf -> App ann n [leaf]) arg)
+  Concat _ es        -> CLeaf (textParts es)
+  Cons{}
+    | Just c <- listChainClause e0 -> c
+  RAnd{}             -> CAll (map toClause (flattenAnd e0))
+  ROr{}              -> CAny (map toClause (flattenOr e0))
   e | Just c <- arithChainClause e -> c
     | Just f <- formulaText e       -> CLeaf (normalizeWs f)
     | otherwise                     -> CLeaf (condText e)
@@ -980,6 +1168,93 @@ toClause e0 = case carameliseNode e0 of
       CIf (acc <> [ (condText gc, toClause gf) | MkGuardedExpr _ gc gf <- gs ]) (Just (toClause o))
     _                     -> CIf acc (Just (toClause f))
   branchPair (MkBranch _ lhs body) = (branchLhsText lhs, toClause body)
+
+-- | A function applied to a single control-flow argument distributes over that
+-- argument's branches: "the day before (CONSIDER … THEN x …)" lays out as a case
+-- tree whose leaves are "the day before x", a readable outline rather than one
+-- run-on line that inlines the whole nested CONSIDER. Done before the calls are
+-- phrased, so that each leaf is phrased as a call of its own.
+distributeCalls :: Expr Resolved -> Expr Resolved
+distributeCalls = transformOf (gplate @(Expr Resolved)) $ \e -> case e of
+  App ann n [arg]
+    | isControlFlowExpr (carameliseNode arg) ->
+        distributeIntoBranches (\leaf -> App ann n [leaf]) arg
+  _ -> e
+
+-- | Say a rule that only produces truth values as the condition it states.
+-- @IF c THEN TRUE ELSE x@ is @c OR x@, and a CONSIDER whose every result is TRUE
+-- or FALSE names the cases that are true. This is logic, not style: each rewrite
+-- is an identity, and it is what lets such a rule read as a list of conditions.
+collapseTruth :: Expr Resolved -> Expr Resolved
+collapseTruth = transformOf (gplate @(Expr Resolved)) $ \e -> case carameliseNode e of
+  IfThenElse ann c t f -> case (truthOf t, truthOf f) of
+    (Just True,  Just False) -> c
+    (Just False, Just True)  -> Not ann c
+    (Just True,  _)          -> Or ann c f
+    (Just False, _)          -> And ann (Not ann c) f
+    (_,          Just False) -> And ann c t
+    (_,          Just True)  -> Or ann (Not ann c) t
+    _                        -> e
+  Consider ann s brs | Just t <- considerAsTest s brs -> Inert ann t InertCtxNone
+  _ -> e
+
+truthOf :: Expr Resolved -> Maybe Bool
+truthOf e = case carameliseNode e of
+  App _ n [] | nameIs "TRUE" n  -> Just True
+             | nameIs "FALSE" n -> Just False
+  Var _ n    | nameIs "TRUE" n  -> Just True
+             | nameIs "FALSE" n -> Just False
+  _ -> Nothing
+
+-- | A CONSIDER that only answers yes or no, on patterns that name a value, as a
+-- test of its subject. With an OTHERWISE that says yes, the test is on the cases
+-- that say no.
+considerAsTest :: Expr Resolved -> [Branch Resolved] -> Maybe Text
+considerAsTest s brs = do
+  cases <- traverse caseOf brs
+  let named b = [ p | (Just p, r) <- cases, r == b ]
+      fallback = listToMaybe [ r | (Nothing, r) <- cases ]
+      subject = inlineProse s
+  case (named True, named False, fallback) of
+    (_, _, Just True)    -> test subject False (named False)
+    ([], _, _)           -> Nothing
+    (yes, _, _)          -> test subject True yes
+ where
+  caseOf (MkBranch _ lhs body) = do
+    r <- truthOf body
+    case lhs of
+      Otherwise _  -> Just (Nothing, r)
+      When _ pat   -> (\p -> (Just p, r)) <$> valueName pat
+  valueName = \case
+    PatApp _ con [] | nameIs "NOTHING" con -> Just "absent"
+                    | otherwise            -> Just (spaceCamel (resolvedText con))
+    PatApp _ con [p] | nameIs "JUST" con   -> valueName p
+    PatLit _ l                                   -> Just (patternText (PatLit emptyAnno l))
+    _                                            -> Nothing
+  test _ _ [] = Nothing
+  test subj True [v]  = Just (subj <> " is " <> v)
+  test subj False [v] = Just (subj <> " is not " <> v)
+  test subj True vs   = Just (subj <> " is one of " <> oxford "or" vs)
+  test subj False vs  = Just (subj <> " is not one of " <> oxford "or" vs)
+
+-- | The parts of a text built by joining, as the text they make: the words of a
+-- literal, with each part that is worked out named where it falls.
+textParts :: [Expr Resolved] -> Text
+textParts = Text.unwords . map leafText
+
+-- | A list written out item by item, as a list a reader can go down. Its last
+-- item is left out when it is just the empty list that ends it.
+listChainClause :: Expr Resolved -> Maybe Clause
+listChainClause e
+  | length items >= 3 = Just (CChain "a list of the following" (map leafText items))
+  | otherwise         = Nothing
+ where
+  items = spine e
+  spine x = case carameliseNode x of
+    Cons _ a b -> a : spine b
+    App _ n [] | nameIs "EMPTY" n -> []
+    Var _ n    | nameIs "EMPTY" n -> []
+    y -> [y]
 
 -- | Whether an expression is a branching construct (so it should lay out as a
 -- structured clause rather than inline prose).
@@ -1007,8 +1282,25 @@ distributeIntoBranches wrap e = case carameliseNode e of
 
 branchLhsText :: BranchLhs Resolved -> Text
 branchLhsText = \case
-  When _ pat  -> patternText pat
+  When _ pat  -> patternPredicate pat
   Otherwise _ -> "otherwise"
+
+-- | What a pattern says about the value it is matched against, as a predicate
+-- on that value, so that a case can name its subject: "the unit type is Studio",
+-- "the guarantor is absent", "the instalments start with first, followed by
+-- rest". 'patternText' is the same pattern as a noun.
+patternPredicate :: Pattern Resolved -> Text
+patternPredicate = \case
+  PatApp _ con []
+    | nameIs "NOTHING" con -> "is absent"
+    | nameIs "EMPTY" con   -> "is empty"
+  PatApp _ con [p]
+    | nameIs "JUST" con -> case p of
+        PatVar _ v -> "is present, with the value " <> resolvedText v
+        _          -> patternPredicate p
+  PatVar _ v -> "is any value, called " <> resolvedText v
+  PatCons _ a b -> "starts with " <> patternText a <> ", followed by " <> patternText b
+  pat -> "is " <> patternText pat
 
 flattenAnd :: Expr Resolved -> [Expr Resolved]
 flattenAnd e = case carameliseNode e of
@@ -1032,32 +1324,117 @@ condText e = case carameliseNode e of
   Equals _ a b         -> side a <> " is " <> side b
   Not _ inner          -> case carameliseNode inner of
     Equals _ a b -> side a <> " is not " <> side b
-    App _ _ []   -> side inner <> " is false"   -- a boolean variable
-    Proj{}       -> side inner <> " is false"   -- a boolean field access
-    _            -> "it is not the case that " <> condText inner
+    n | isAndNode n -> notAllText (flattenAnd n)
+      | isOrNode n  -> case oneOfParts n of
+          Just (lhs, rhs) -> lhs <> " is not one of " <> oxford "or" rhs
+          Nothing         -> noneOfText (flattenOr n)
+    _            -> negated (condText inner)
   Geq _ a b            -> side a <> " is at least " <> side b
   Leq _ a b            -> side a <> " is at most " <> side b
   Gt _ a b             -> side a <> " is more than " <> side b
   Lt _ a b             -> side a <> " is less than " <> side b
   orChain@Or{}         -> case oneOfText orChain of
                             Just t  -> t
-                            Nothing -> joinCond " or " (flattenOr orChain)
-  ROr _ _ _            -> joinCond " or " (flattenOr e)
-  And{}                -> joinCond " and " (flattenAnd e)
-  RAnd _ _ _           -> joinCond " and " (flattenAnd e)
+                            Nothing -> joinCond "or" (flattenOr orChain)
+  ROr _ _ _            -> joinCond "or" (flattenOr e)
+  And{}                -> joinCond "and" (flattenAnd e)
+  RAnd _ _ _           -> joinCond "and" (flattenAnd e)
   e'                   -> inlineProse e'
  where
   side = inlineProse
-  joinCond sep parts = Text.intercalate sep (map condText parts)
+
+-- | Join the operands of one connective.
+--
+-- An operand that is a compound of the OTHER connective has to say where it
+-- starts and ends: @a AND (b OR c)@ printed flat is "a and b or c", which reads
+-- as @(a AND b) OR c@ and states a different rule. So it reads "a and either b
+-- or c", and @(a OR b) AND c@ reads "either a or b, and c". Two operands of
+-- which the first is grouped take a comma, because nothing else marks where the
+-- group ends; three or more are a comma list.
+joinCond :: Text -> [Expr Resolved] -> Text
+joinCond conj parts
+  | any isCompound parts = case (parts, map groupText parts) of
+      (p : _, [x, y])
+        | isCompound p -> x <> ", " <> conj <> " " <> y
+        | otherwise    -> x <> " " <> conj <> " " <> y
+      (_, xs) -> oxford conj xs
+  | otherwise = Text.intercalate (" " <> conj <> " ") (map condText parts)
+
+-- | A statement, denied in the way a drafter would. A clause with exactly one
+-- verb that can take the negation takes it there; a single name is false; and
+-- anything else keeps the long form, because the scope of a "not" placed inside
+-- it would be a guess. "Must" is left out on purpose: "must not" is a prohibition
+-- and not the denial of an obligation.
+negated :: Text -> Text
+negated t
+  | Text.isInfixOf " not " padded = long
+  | any (`Text.isInfixOf` padded) [" and ", " or ", " if "] = long
+  | otherwise = case [ pair | pair@(v, _) <- negations, Text.isInfixOf v padded ] of
+      [(v, n)] | Text.count v padded == 1 -> Text.strip (Text.replace v n padded)
+      _ | length (Text.words t) == 1 -> t <> " is false"
+        | otherwise                  -> long
+ where
+  padded = " " <> t <> " "
+  long = "it is not the case that " <> t
+  negations =
+    [ (" is ", " is not "), (" are ", " are not "), (" was ", " was not ")
+    , (" were ", " were not "), (" has ", " does not have "), (" have ", " do not have ")
+    , (" may ", " may not "), (" can ", " cannot "), (" will ", " will not ")
+    , (" does ", " does not "), (" do ", " do not ") ]
+
+-- | A compound of AND or OR, unless it collapses to a single "is one of".
+isCompound :: Expr Resolved -> Bool
+isCompound e = case carameliseNode e of
+  n | isAndNode n -> True
+    | isOrNode n  -> isNothing (oneOfText n)
+  _ -> False
+
+isAndNode, isOrNode :: Expr Resolved -> Bool
+isAndNode = \case And{} -> True; RAnd{} -> True; _ -> False
+isOrNode  = \case Or{} -> True; ROr{} -> True; _ -> False
+
+-- | An operand, delimited in words if it is a compound. Inside a group a further
+-- compound is put in brackets, the only marking that stays clear at any depth.
+groupText :: Expr Resolved -> Text
+groupText e = case carameliseNode e of
+  n | isCompound n, isAndNode n -> case map itemText (flattenAnd n) of
+        [a, b] -> "both " <> a <> " and " <> b
+        xs     -> "all of " <> oxford "and" xs
+    | isCompound n, isOrNode n -> case map itemText (flattenOr n) of
+        [a, b] -> "either " <> a <> " or " <> b
+        xs     -> "any of " <> oxford "or" xs
+  _ -> condText e
+
+itemText :: Expr Resolved -> Text
+itemText e
+  | isCompound e = "(" <> condText e <> ")"
+  | otherwise    = condText e
+
+-- | The negation of an AND, which denies only that all of it holds.
+notAllText :: [Expr Resolved] -> Text
+notAllText parts = case map itemText parts of
+  [a, b] -> "not both " <> a <> " and " <> b
+  xs     -> "not all of " <> oxford "and" xs
+
+-- | The negation of an OR, which denies each of its operands.
+noneOfText :: [Expr Resolved] -> Text
+noneOfText parts = case map itemText parts of
+  [a, b] -> "neither " <> a <> " nor " <> b
+  xs     -> "none of " <> oxford "or" xs
 
 -- | Detect @x = A OR x = B OR …@ (same left side) and collapse to a membership.
 oneOfText :: Expr Resolved -> Maybe Text
 oneOfText e = do
+  (lhs, rhs) <- oneOfParts e
+  Just (lhs <> " is one of " <> oxford "or" rhs)
+
+-- | The shared left side of an OR of equalities, and the values it is compared to.
+oneOfParts :: Expr Resolved -> Maybe (Text, [Text])
+oneOfParts e = do
   pairs <- orEquals e
   case pairs of
     ((lhs0, r0) : rest)
-      | all ((== lhs0) . fst) rest ->
-          Just (lhs0 <> " is one of " <> oxford "or" (r0 : map snd rest))
+      | not (null rest), all ((== lhs0) . fst) rest -> Just (lhs0, r0 : map snd rest)
     _ -> Nothing
  where
   orEquals x = case carameliseNode x of
@@ -1070,9 +1447,9 @@ oneOfText e = do
 -- nullary constructors.
 patternText :: Pattern Resolved -> Text
 patternText = \case
-  PatApp _ con []  -> resolvedText con
+  PatApp _ con []  -> spaceCamel (resolvedText con)
   PatApp _ con [p] | nameToText (getActual con) == "JUST" -> patternText p
-  PatApp _ con ps  -> resolvedText con <> " (" <> oxford "and" (map patternText ps) <> ")"
+  PatApp _ con ps  -> spaceCamel (resolvedText con) <> " (" <> oxford "and" (map patternText ps) <> ")"
   PatVar _ v       -> resolvedText v
   PatLit _ l       -> litText l
   PatCons _ a b    -> patternText a <> " followed by " <> patternText b
@@ -1092,20 +1469,24 @@ deonticClause (MkDeonton _ party (MkAction _ modal actPat mprov) mdue mhence mle
     (modalWord modal)
     (patternText actPat)
     (dueText mdue)
-    (fmap inlineProse mprov)
+    (fmap toClause mprov)
     (mhence >>= henceClause)
     (fmap consequence mlest)
  where
-  dueText (Just d) | not (isZeroLit d) = Just (inlineProse d)
-  dueText _ = Nothing
+  -- A deadline of zero leaves no time to act, which is not the same thing as no
+  -- deadline at all: a rule with no WITHIN waits for ever.
+  dueText (Just d)
+    | isZeroLit d = Just "immediately"
+    | otherwise   = Just ("within " <> inlineProse d)
+  dueText Nothing = Nothing
   henceClause h
     | isFulfilled h = Nothing
     | otherwise     = Just (consequence h)
-  -- A BREACH branch already says "breach"; render only the (quoted) reason
-  -- rather than the redundant "breach by <party>".
+  -- Who is in breach is part of the rule, so a BREACH BY says so. Without a BY
+  -- the rule does not name anyone, and neither does this.
   consequence e = case e of
-    Breach _ _ mReason ->
-      CLeaf ("the obligation is breached"
+    Breach _ mParty mReason ->
+      CLeaf (maybe "the obligation is breached" (\p -> inlineProse p <> " is in breach") mParty
                <> maybe "" (\r -> " because “" <> inlineProse r <> "”") mReason)
     _ -> toClause e
 
@@ -1129,9 +1510,14 @@ isFulfilled = \case
 -- | A non-structured leaf value: a formula if it is pure arithmetic, otherwise
 -- prose.
 leafText :: Expr Resolved -> Text
-leafText e = case formulaText (rewriteExpr e) of
-  Just f  -> normalizeWs f
-  Nothing -> inlineProse e
+leafText e
+  | isLogic (carameliseNode e) = condText e
+  | otherwise                  = inlineProse e
+ where
+  isLogic = \case
+    And{} -> True; Or{} -> True; Not{} -> True
+    Equals{} -> True; Geq{} -> True; Leq{} -> True; Gt{} -> True; Lt{} -> True
+    _ -> False
 
 -- | A top-level arithmetic chain (a sum/product/… whose operator repeats) with
 -- this many operands or more renders as a bulleted list rather than one long
@@ -1209,10 +1595,10 @@ formulaText e
   go :: Expr Resolved -> Maybe (Int, Text)
   go expr = case carameliseNode expr of
     Plus _ a b      -> bin 1 " + " a b
-    Minus _ a b     -> bin 1 " − " a b
+    Minus _ a b     -> binRight 1 " − " a b
     Times _ a b     -> bin 2 " × " a b
-    DividedBy _ a b -> bin 2 " ÷ " a b
-    Modulo _ a b    -> bin 2 " mod " a b
+    DividedBy _ a b -> binRight 2 " ÷ " a b
+    Modulo _ a b    -> binRight 2 " mod " a b
     Lit _ (NumericLit _ r) -> Just (4, numText r)
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)
@@ -1227,6 +1613,12 @@ formulaText e
     (pa, ta) <- go a
     (pb, tb) <- go b
     Just (p, wrap p pa ta <> op <> wrap p pb tb)
+  -- The right operand of a subtraction or a division keeps its brackets at equal
+  -- precedence too: a − (b − c) is not a − b − c, and a ÷ (b × c) is not a ÷ b × c.
+  binRight p op a b = do
+    (pa, ta) <- go a
+    (pb, tb) <- go b
+    Just (p, wrap p pa ta <> op <> wrap (p + 1) pb tb)
   wrap parentP childP t = if childP < parentP then "(" <> t <> ")" else t
 
 numText :: Rational -> Text
@@ -1239,7 +1631,9 @@ numText r = fromMaybe (prettyRatio r) (groupedInt r)
 inlineProse :: Expr Resolved -> Text
 inlineProse e = case nlgOf e of
   Just t  -> t
-  Nothing -> normalizeWs (simpleLinearizer (rewriteExpr e))
+  Nothing ->
+    let rewritten = rewriteExpr e
+    in normalizeWs (fromMaybe (simpleLinearizer rewritten) (formulaText rewritten))
 
 -- | An authored @\@nlg@ sentence on an expression, if present, takes precedence
 -- over the structural rendering.
@@ -1250,33 +1644,56 @@ nlgOf e = (normalizeWs . simpleLinearizer) <$> (e ^. annoOf % annNlg)
 -- a chain) so an inner transform's 'Inert' result is in place before an outer
 -- transform linearizes it.
 rewriteExpr :: Expr Resolved -> Expr Resolved
-rewriteExpr = transformOf (gplate @(Expr Resolved)) rw
+rewriteExpr = rewriteWith noReading
+
+-- | 'rewriteExpr' with what the document knows. Bottom-up, so a call's arguments
+-- are already phrased when the call is, and a herald is spliced here and not
+-- beforehand: spliced first, its arguments would miss every rewrite below and
+-- print raw, in the middle of an otherwise readable sentence.
+rewriteWith :: Reading -> Expr Resolved -> Expr Resolved
+rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
  where
   inert ann t = Inert ann t InertCtxNone
+  herald = \case
+    -- A date given as literals reads as the date, whatever its rule's sentence.
+    App ann n args | Just (d, m, y) <- daydateLiteral n args -> inert ann (Text.unwords [d, m, y])
+    App ann n args | nameIs "Date" n, Just t <- dateFromArgs args -> inert ann t
+    App ann n args | Just t <- monthDateFromArgs n args -> inert ann t
+    App ann n [f, xs] | Just t <- quantified n f xs -> inert ann t
+    -- Joined lists read as one list, so a long chain of them can be laid out.
+    App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
+    App ann n args -> substituteNlgCall Nothing rd.rdHeralds (App ann n (map phrased args))
+    e -> substituteNlgCall Nothing rd.rdHeralds e
+  phrased a = Inert (a ^. annoOf) (leafText a) InertCtxNone
   rw = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.
     Where _ e _ -> e
     LetIn _ _ e -> e
     -- The implicit computed-field self.
     App ann n [] | nameIs "_self" n -> inert ann "it"
-    -- A date constructor.
-    App ann n args | nameIs "Date" n, Just t <- dateFromArgs args -> inert ann t
+    Concat ann es -> inert ann (textParts es)
     -- Unary maths read as f(x), not "f with x".
     App ann n [x] | Just fn <- Map.lookup (nameToText (getActual n)) mathUnaryFns ->
-      inert ann (fn <> "(" <> simpleLinearizer x <> ")")
+      inert ann (fn <> "(" <> leafText x <> ")")
     -- Unary date/time component primitives read as "the year of x", not
     -- "DATE_YEAR with x". These appear in library bodies (and inlined calls).
     App ann n [x] | Just phrase <- Map.lookup (nameToText (getActual n)) builtinUnaryOf ->
-      inert ann ("the " <> phrase <> " of " <> simpleLinearizer x)
+      inert ann ("the " <> phrase <> " of " <> leafText x)
     -- Mixfix: interleave the arguments into the @_@ holes.
     App ann n args@(_ : _) | Just txt <- interleaveMixfix n args -> inert ann txt
     -- A function whose name ends in a preposition reads "minimum of x and y",
     -- not the linearizer's "minimum of with x and y".
     App ann n args@(_ : _) | endsInPreposition n ->
-      inert ann (resolvedText n <> " " <> oxford "and" (map simpleLinearizer args))
+      inert ann (resolvedText n <> " " <> oxford "and" (map leafText args))
+    -- A call to a rule reads by what the rule returns.
+    App ann n args@(_ : _) | Just shape <- Map.lookup (getUnique n) rd.rdRules ->
+      inert ann (callPhrase rd n shape args)
     -- A boolean field access drops the possessive: "the car has four wheels".
     Proj ann a n | predicateField n ->
-      inert ann (simpleLinearizer a <> " " <> resolvedText n)
+      inert ann (leafText a <> " " <> resolvedText n)
+    Proj ann a n | Just t <- booleanFieldPhrase rd a n -> inert ann t
+    -- A present value reads as the value.
+    App _ n [x] | nameIs "JUST" n -> x
     -- Comma-group large integers.
     Lit ann (NumericLit _ r) | Just t <- groupedInt r -> inert ann t
     e -> e
@@ -1296,6 +1713,117 @@ builtinUnaryOf = Map.fromList
   , ("DATETIME_SERIAL", "serial number"), ("TIME_SERIAL", "serial number")
   , ("DATE_SERIAL", "serial number") ]
 
+-- | A list operation over a one-input function, said with the function's input
+-- as the thing being talked about. "at least one item d of the family is such
+-- that d is living" says what a herald with a slot for the function cannot,
+-- because that slot would have to hold the condition and name its subject.
+quantified :: Resolved -> Expr Resolved -> Expr Resolved -> Maybe Text
+quantified n f xs = case carameliseNode f of
+  Lam _ (MkGivenSig _ [MkOptionallyTypedName _ v _]) body
+    | Just frame <- Map.lookup (resolvedText n) frames, fromPrelude n ->
+        Just (frame (resolvedText v) (leafText xs) (leafText body))
+  _ -> Nothing
+ where
+  frames = Map.fromList
+    [ ("any",    \v l b -> "at least one item " <> v <> " of " <> l <> " is such that " <> b)
+    , ("all",    \v l b -> "every item " <> v <> " of " <> l <> " is such that " <> b)
+    , ("filter", \v l b -> "the items " <> v <> " of " <> l <> " such that " <> b)
+    , ("map",    \v l b -> b <> ", for each item " <> v <> " of " <> l)
+    , ("fmap",   \v l b -> b <> ", for each item " <> v <> " of " <> l)
+    ]
+
+-- | Is this name defined in the prelude, and not just named like something there?
+fromPrelude :: Resolved -> Bool
+fromPrelude r = "prelude.l4" `Text.isSuffixOf` uriText (getUnique r).moduleUri
+
+-- | A call to a rule with no sentence of its own, read from what is known of it.
+--
+-- Each input is placed by what the sentence needs, in this order, so that an
+-- argument can never end up saying something about the wrong party:
+--
+-- * A predicate with a leading verb takes its first argument as its subject,
+--   even one the enclosing rule is about, because the sentence needs one.
+--
+-- * An input the rule's name mentions takes the argument in its place, so
+--   @`the person left living descendants`@ on @d@ reads "d left living
+--   descendants", and @`is a descendant of the ancestor`@ on @d@ and @p@ reads
+--   "d is a descendant of p".
+--
+-- * An input that is just one of the enclosing rule's subjects is dropped. The
+--   rule is already about it, and no other input could be mistaken for it.
+--
+-- * Anything left follows the name.
+callPhrase :: Reading -> Resolved -> RuleShape -> [Expr Resolved] -> Text
+callPhrase rd n shape args = case (leadVerb, inputs) of
+  (True, (_, s) : more) -> leafText s <> " " <> placed more
+  _                     -> placed inputs
+ where
+  name   = resolvedText n
+  inputs = zip (shape.rsInputs <> repeat "") args
+  placed ps =
+    let (mentioned, others) = List.partition (mentions . fst) ps
+        term = case mentioned of
+          [] -> "`" <> name <> "`"
+          _  -> List.foldl' fill name [ (p, leafText a) | (p, a) <- mentioned ]
+    in trailing term [ leafText a | (_, a) <- others, not (isSubject a) ]
+  mentions p = Text.length p > 1 && Text.isInfixOf (" " <> p <> " ") (" " <> name <> " ")
+  -- An article on the input's name goes with it: the argument brings its own.
+  fill t (p, a) =
+    let padded = " " <> t <> " "
+        withArticle' = " the " <> p <> " "
+        slot = if withArticle' `Text.isInfixOf` padded then withArticle' else " " <> p <> " "
+    in Text.strip (Text.replace slot (" " <> a <> " ") padded)
+  leadVerb = shape.rsBoolean && case Text.words name of
+    w : _ -> Text.toLower w `Set.member` predicateLeaders
+    []    -> False
+  isSubject = \case
+    Inert _ t _ -> t `Set.member` rd.rdSubjects
+    _           -> False
+  trailing term = \case
+    [] -> term
+    xs | endsInPreposition n -> term <> " " <> oxford "and" xs
+       | shape.rsBoolean     -> term <> " for " <> oxford "and" xs
+    [x] | [_] <- Text.words name, isCapitalised name -> term <> " " <> x
+        | length (Text.words name) <= 2              -> term <> " of " <> x
+    xs | [_] <- Text.words name, isCapitalised name -> term <> " with " <> oxford "and" xs
+       | otherwise                                  -> term <> " for " <> oxford "and" xs
+  isCapitalised t = maybe False (isUpper . fst) (Text.uncons t)
+
+-- | A BOOLEAN field that does not start with a verb. An adjective takes "is": "the
+-- processing is necessary for …". Anything else states something of its own, so
+-- it stands alone when the record is the rule's subject, and says which record it
+-- is about when it might be another.
+booleanFieldPhrase :: Reading -> Expr Resolved -> Resolved -> Maybe Text
+booleanFieldPhrase rd a n
+  | not (getUnique n `Set.member` rd.rdBoolFields) = Nothing
+  | hasHerald, isSubject = Just field
+  | hasHerald            = Just (field <> ", for " <> subject)
+  | adjectival           = Just (subject <> " is " <> field)
+  | verbLed              = Just (subject <> " " <> field)
+  | isSubject            = Just field
+  | otherwise            = Just (field <> ", for " <> subject)
+ where
+  subject = leafText a
+  field = simpleLinearizer n
+  hasHerald = isJust (getActual n ^. annoOf % annNlg) || isJust (getOriginal n ^. annoOf % annNlg)
+  adjectival = case Text.words (resolvedText n) of
+    w : _ -> Text.toLower w `Set.member` adjectiveLeaders
+    []    -> False
+  -- "resides in Singapore": a verb in the third person, which needs its subject.
+  verbLed = case Text.words (resolvedText n) of
+    w : _ : _ -> Text.isSuffixOf "s" w && not (Text.isSuffixOf "ss" w)
+    _         -> False
+  isSubject = case a of
+    Inert _ t _ -> t `Set.member` rd.rdSubjects
+    _           -> False
+
+adjectiveLeaders :: Set.Set Text
+adjectiveLeaders = Set.fromList
+  [ "necessary", "required", "eligible", "entitled", "subject", "liable", "bound"
+  , "carried", "made", "signed", "filed", "approved", "registered", "exempt", "valid"
+  , "void", "deemed", "resident", "married", "living", "deceased", "active", "pending"
+  , "responsible", "able", "unable", "permitted", "prohibited", "payable", "due" ]
+
 interleaveMixfix :: Resolved -> [Expr Resolved] -> Maybe Text
 interleaveMixfix n args =
   let toks  = Text.words (nameToText (getActual n))
@@ -1307,7 +1835,7 @@ interleaveMixfix n args =
   fill [] _ = []
   fill (t : ts) as
     | t == "_" = case as of
-        (a : rest) -> simpleLinearizer a : fill ts rest
+        (a : rest) -> leafText a : fill ts rest
         []         -> t : fill ts as
     | otherwise = t : fill ts as
 
@@ -1324,7 +1852,9 @@ endsInPreposition r = case reverse (Text.words (nameToText (getActual r))) of
 prepositionWords :: Set.Set Text
 prepositionWords = Set.fromList
   ["of", "for", "to", "from", "into", "onto", "on", "in", "by", "at", "over"
-  , "under", "between", "than", "as"]
+  , "under", "between", "than", "as", "after", "before", "among", "amongst"
+  , "within", "per", "against", "upon", "about", "through", "during", "until"
+  , "since", "with"]
 
 -- | A field name that reads as a predicate, so its projection drops the
 -- possessive: "the car has four wheels" rather than "the car's has four wheels".
@@ -1338,9 +1868,19 @@ predicateLeaders = Set.fromList
   ["is", "are", "was", "were", "has", "have", "had", "may", "must", "shall"
   , "can", "could", "should", "will", "does", "did", "do"]
 
+-- | daydate's month helpers, @January 1 1972@, given as literals.
+monthDateFromArgs :: Resolved -> [Expr Resolved] -> Maybe Text
+monthDateFromArgs n [d, y] = do
+  m <- List.lookup (resolvedText n) (zip (map monthName [1 .. 12]) [1 ..] <> zip (map (Text.take 3 . monthName) [1 .. 12]) [1 ..])
+  dateFromArgs [d, Lit emptyAnno (NumericLit emptyAnno (fromInteger m)), y]
+monthDateFromArgs _ _ = Nothing
+
 dateFromArgs :: [Expr Resolved] -> Maybe Text
 dateFromArgs [d, m, y]
-  | Just di <- intLit d, Just mi <- intLit m, Just yi <- intLit y, mi >= 1, mi <= 12 =
+  -- Only a day that exists. @Date@ rolls an out-of-range day forward, so printing
+  -- 29 February 2025 for what is 1 March would state a date the rule does not.
+  | Just di <- intLit d, Just mi <- intLit m, Just yi <- intLit y
+  , isJust (fromGregorianValid yi (fromInteger mi) (fromInteger di)) =
       Just (showInt di <> " " <> monthName mi <> " " <> showInt yi)
 dateFromArgs _ = Nothing
 
@@ -1512,13 +2052,23 @@ uniqueId mu =
 
 typeText :: Type' Resolved -> Text
 typeText = \case
-  TyApp _ n args ->
-    let base = resolvedText n
-    in if null args then base else base <> " of " <> Text.intercalate ", " (map typeText args)
+  TyApp _ n args -> case (resolvedText n, args) of
+    ("MAYBE", [t]) -> typeText t <> ", if any"
+    ("LIST", [t])  -> "list of " <> typeText t
+    (name, [])     -> Map.findWithDefault (spaceCamel name) name builtinTypeGloss
+    (name, _)      -> spaceCamel name <> " of " <> Text.intercalate ", " (map typeText args)
   Fun{}         -> "a function"
   Forall _ _ ty -> typeText ty
   Type{}        -> "a type"
   InfVar{}      -> "an inferred type"
+
+-- | The built-in types, as a reader of a contract would name them.
+builtinTypeGloss :: Map.Map Text Text
+builtinTypeGloss = Map.fromList
+  [ ("NUMBER", "number"), ("INTEGER", "whole number"), ("STRING", "text")
+  , ("BOOLEAN", "yes or no"), ("DATE", "date"), ("TIME", "time")
+  , ("DATETIME", "date and time"), ("MONEY", "amount of money")
+  , ("PERCENT", "percentage") ]
 
 -- ----------------------------------------------------------------------------
 -- JSON
@@ -1535,6 +2085,7 @@ instance Aeson.ToJSON Disposition where
     Inline    -> Aeson.String "inline"
     Reference -> Aeson.String "reference"
     Exclude   -> Aeson.String "exclude"
+    Hidden    -> Aeson.String "hidden"
 
 instance Aeson.ToJSON RenderedAs where
   toJSON RenderedInline = Aeson.object ["kind" .= ("inline" :: Text)]
@@ -1571,10 +2122,12 @@ instance Aeson.ToJSON Block where
     [ "id"           .= b.blockId
     , "kind"         .= b.blockKind
     , "heading"      .= b.blockHeading
+    , "sentence"     .= b.blockSentence
     , "connector"    .= b.blockConnector
     , "body"         .= b.blockBody
     , "renderedAs"   .= b.blockRenderedAs
     , "citation"     .= b.blockCitation
+    , "sources"      .= b.blockSources
     , "sourceModule" .= b.blockSourceModule
     , "imported"     .= b.blockImported
     ]

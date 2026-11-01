@@ -307,7 +307,12 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Section n) where
   addNlg a = extendNlgA a $ case a of
     MkSection ann lbl maka topDecls -> do
-      lbl' <- traverse addNlg lbl
+      -- An annotation on its own line describes what follows, so with a
+      -- declaration below it, the line under a heading is that declaration's.
+      -- A section with nothing in it has only its heading to describe.
+      lbl' <- case (topDecls, lbl) of
+        (_ : _, Just l) -> Just <$> confineToEndOfLine l (addNlg l)
+        _               -> traverse addNlg lbl
       maka' <- traverse addNlg maka
       topDecls' <- traverse addNlg topDecls
       pure (MkSection ann lbl' maka' topDecls')
@@ -340,7 +345,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Declare n) where
     MkDeclare ann tySig appFormAka tyDecl -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
-      tyDecl' <- addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl
+      tyDecl' <- hoistNlgA (leavingTheNextRuleItsNlg a tyDecl)
+        (addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl)
       pure $ MkDeclare ann tySig' appFormAka' tyDecl'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
@@ -361,9 +367,32 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
       -- clause below (a pattern, say) can take the one written above it.
       (expr', ann') <- hoistNlgA (\ m -> do
         ann'' <- claimLaterClauseNlgs ann
-        e <- m
+        e <- leavingTheNextRuleItsNlg a expr m
         pure (e, ann'')) (addNlg expr)
       pure $ MkDecide ann' tySig' appFormAka' expr'
+
+-- | Keep a rule's body from taking what is written below it at the rule's own
+-- column. The last name in a body has no node after it to bound its region, so
+-- it reached as far as the next rule's head, and an @\@nlg@ on its own line above
+-- that head, the placement the reference recommends, landed on a name in the rule
+-- before it. That rule then read the sentence and the next rule had none.
+--
+-- An annotation indented under the body is still the body's.
+leavingTheNextRuleItsNlg :: (HasSrcRange rule, HasSrcRange body) => rule -> body -> NlgM a -> NlgM a
+leavingTheNextRuleItsNlg rule body m =
+  case (fromSrcRange <$> rangeOf rule, fromSrcRange <$> rangeOf body) of
+    (Just ruleSpan, Just bodySpan) -> do
+      pending <- use #nlgs
+      let nextRules =
+            [ w.range.start
+            | w <- pending
+            , w.range.start.line > bodySpan.end.line
+            , w.range.start.column <= ruleSpan.start.column
+            ]
+      case nextRules of
+        [] -> m
+        _  -> inLocRange (locRangeTo (Just (minimum nextRules))) m
+    _ -> m
 
 -- | A rule's head, visited as any 'AppForm' is, keeping track of whose
 -- sentence a wording on an input is.

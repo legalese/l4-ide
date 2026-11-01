@@ -3,11 +3,14 @@ IMPORT daydate
 
 §§ `Runtime Bridges`
 
+@nlg the day number of today's date in the document's time zone
 `Today serial` MEANS DATE_SERIAL TODAY
+@nlg the present UTC day number (with the time as a fraction of a day)
 `Now serial` MEANS DATETIME_SERIAL NOW
 
 GIVEN text IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the day number of the date in %text%
 `DateValue serial` text MEANS
     CONSIDER DATEVALUE text
     WHEN LEFT err THEN LEFT err
@@ -15,6 +18,7 @@ GIVETH AN EITHER STRING NUMBER
 
 GIVEN text IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the fraction of a day elapsed at the time in %text%
 `TimeValue fraction` text MEANS TIMEVALUE text
 
 § `Excel Date Compatibility Library`
@@ -26,12 +30,18 @@ GIVETH AN EITHER STRING NUMBER
 
 §§ `Serial Epochs`
 
+@nlg the epoch of the Excel 1900 date system, 31 December 1899
 `Excel 1900 epoch`        MEANS Date OF 31, 12, 1899
+@nlg 1 March 1900, the first date after Excel's non-existent 29 February 1900
 `Excel 1900 bug threshold` MEANS Date OF 1, 3, 1900
+@nlg the Excel serial number of the non-existent 29 February 1900
 `Excel 1900 bug serial`    MEANS 60
+@nlg the epoch of the Excel 1904 date system, 1 January 1904
 `Excel 1904 epoch`        MEANS Date OF 1, 1, 1904
 
+@nlg the day number of the epoch of the Excel 1900 date system
 `Excel 1900 epoch days`   MEANS Day `Excel 1900 epoch`
+@nlg the day number of the epoch of the Excel 1904 date system
 `Excel 1904 epoch days`   MEANS Day `Excel 1904 epoch`
 
 
@@ -55,6 +65,7 @@ year date @nlg the year of %date%
 
 GIVEN date IS A DATE
 GIVETH A NUMBER
+@nlg the Excel 1900 serial number of %date%
 excelSerial1900 date MEANS
     baseSerial PLUS leapOffset
     WHERE
@@ -63,11 +74,13 @@ excelSerial1900 date MEANS
 
 GIVEN date IS A DATE
 GIVETH A NUMBER
+@nlg the Excel 1904 serial number of %date%
 excelSerial1904 date MEANS
     Day date MINUS `Excel 1904 epoch days`
 
 GIVEN serial IS A NUMBER
 GIVETH AN EITHER STRING DATE
+@nlg the date with Excel 1900 serial number %serial%
 dateFromExcelSerial serial MEANS
     CONSIDER ensureWhole "Excel serial" serial
     WHEN LEFT err THEN LEFT err
@@ -83,6 +96,7 @@ dateFromExcelSerial serial MEANS
 
 GIVEN serial IS A NUMBER
 GIVETH AN EITHER STRING DATE
+@nlg the date with Excel 1904 serial number %serial%
 dateFromExcelSerial1904 serial MEANS
     CONSIDER ensureWhole "Excel serial" serial
     WHEN LEFT err THEN LEFT err
@@ -93,10 +107,12 @@ dateFromExcelSerial1904 serial MEANS
 §§ `Current Clock Helpers`
 
 GIVETH A DATE
+@nlg today's date in the document's time zone
 excelToday MEANS
     TODAY
 
 GIVETH A NUMBER
+@nlg the present UTC date and time as an Excel 1900 serial number
 excelNow MEANS
     serialDate PLUS timeFraction
     WHERE
@@ -107,6 +123,7 @@ excelNow MEANS
 
 GIVEN text IS A STRING
 GIVETH AN EITHER STRING DATE
+@nlg the date in %text%
 ExcelDateValue text MEANS
     CONSIDER `DateValue serial` text
     WHEN LEFT err THEN LEFT err
@@ -114,6 +131,7 @@ ExcelDateValue text MEANS
 
 GIVEN text IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the fraction of a day elapsed at the time in %text%
 ExcelTimeValue text MEANS
     `TimeValue fraction` text
 
@@ -129,6 +147,7 @@ ExcelDays endDate startDate @nlg the number of days from %startDate% to %endDate
 GIVEN endSerial   IS A NUMBER
       startSerial IS A NUMBER
 GIVETH A NUMBER
+@nlg the number of days from serial number %startSerial% to serial number %endSerial%
 ExcelDays endSerial startSerial MEANS
     endSerial MINUS startSerial
 
@@ -136,6 +155,7 @@ GIVEN startDate IS A DATE
       endDate   IS A DATE
       unit      IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the Excel DATEDIF interval from %startDate% to %endDate% in unit %unit%
 DATEDIF startDate endDate unit MEANS
     IF Day endDate LESS THAN Day startDate
     THEN LEFT "DATEDIF requires start_date AT MOST end_date."
@@ -215,6 +235,7 @@ GIVEN startSerial IS A NUMBER
       endSerial   IS A NUMBER
       unit        IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the Excel DATEDIF interval from 1900 serial number %startSerial% to 1900 serial number %endSerial% in unit %unit%
 DATEDIF startSerial endSerial unit MEANS
     CONSIDER dateFromExcelSerial startSerial
     WHEN LEFT err THEN LEFT err
@@ -227,6 +248,7 @@ GIVEN startDate IS A DATE
       endSerial IS A NUMBER
       unit      IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the Excel DATEDIF interval from %startDate% to 1900 serial number %endSerial% in unit %unit%
 DATEDIF startDate endSerial unit MEANS
     CONSIDER dateFromExcelSerial endSerial
     WHEN LEFT err THEN LEFT err
@@ -236,6 +258,7 @@ GIVEN startSerial IS A NUMBER
       endDate   IS A DATE
       unit      IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the Excel DATEDIF interval from 1900 serial number %startSerial% to %endDate% in unit %unit%
 DATEDIF startSerial endDate unit MEANS
     CONSIDER dateFromExcelSerial startSerial
     WHEN LEFT err THEN LEFT err
@@ -248,6 +271,7 @@ DATEDIF startSerial endDate unit MEANS
 GIVEN startDate IS A DATE
       endDate   IS A DATE
 GIVETH AN EITHER STRING NUMBER
+@nlg the US 30/360 day count from %startDate% to %endDate%
 ExcelDays360 startDate endDate MEANS
     ExcelDays360 startDate endDate FALSE
 
@@ -255,6 +279,7 @@ GIVEN startDate IS A DATE
       endDate   IS A DATE
       european  IS A BOOLEAN
 GIVETH AN EITHER STRING NUMBER
+@nlg the 30/360 day count from %startDate% to %endDate%, European if %european% holds, otherwise US
 ExcelDays360 startDate endDate european MEANS
     RIGHT numerator
     WHERE
@@ -295,6 +320,7 @@ ExcelDays360 startDate endDate european MEANS
 GIVEN startDate IS A DATE
       endDate   IS A DATE
 GIVETH AN EITHER STRING NUMBER
+@nlg the year fraction from %startDate% to %endDate% on the US 30/360 basis (negative if reversed)
 ExcelYearFrac startDate endDate MEANS
     ExcelYearFrac startDate endDate 0
 
@@ -302,6 +328,7 @@ GIVEN startDate IS A DATE
       endDate   IS A DATE
       basis     IS A NUMBER
 GIVETH AN EITHER STRING NUMBER
+@nlg the year fraction from %startDate% to %endDate% on Excel basis %basis% (negative if reversed)
 ExcelYearFrac startDate endDate basis MEANS
     IF basis LESS THAN 0 OR basis GREATER THAN 4
     THEN LEFT "YEARFRAC basis must be between 0 and 4."
@@ -357,6 +384,7 @@ ExcelYearFrac startDate endDate basis MEANS
 GIVEN startDate IS A DATE
       months    IS A NUMBER
 GIVETH AN EITHER STRING DATE
+@nlg the date %months% months after %startDate% (capped at the last day of that month)
 ExcelEDate startDate months MEANS
     CONSIDER ensureWhole "EDATE months" months
     WHEN LEFT err THEN LEFT err
@@ -377,6 +405,7 @@ ExcelEDate startDate months MEANS
 GIVEN startDate IS A DATE
       months    IS A NUMBER
 GIVETH AN EITHER STRING DATE
+@nlg the day before the date %months% months plus one month after %startDate%
 ExcelEOMonth startDate months MEANS
     CONSIDER ExcelEDate startDate (months PLUS 1)
     WHEN LEFT err THEN LEFT err
@@ -389,6 +418,7 @@ ExcelEOMonth startDate months MEANS
 GIVEN startDate IS A DATE
       days      IS A NUMBER
 GIVETH AN EITHER STRING DATE
+@nlg the date %days% working days after %startDate% (skipping weekends)
 ExcelWorkday startDate days MEANS
     ExcelWorkday startDate days EMPTY
 
@@ -396,6 +426,7 @@ GIVEN startDate IS A DATE
       days      IS A NUMBER
       holidays  IS A LIST OF DATE
 GIVETH AN EITHER STRING DATE
+@nlg the date %days% working days after %startDate% (counting weekdays, and weekend days listed in %holidays%)
 ExcelWorkday startDate days holidays MEANS
     CONSIDER ensureWhole "WORKDAY days" days
     WHEN LEFT err THEN LEFT err
@@ -420,6 +451,7 @@ ExcelWorkday startDate days holidays MEANS
 GIVEN startDate IS A DATE
       endDate   IS A DATE
 GIVETH AN EITHER STRING NUMBER
+@nlg the number of working days from %startDate% to %endDate% inclusive (skipping weekends, and negative if reversed)
 ExcelNetworkDays startDate endDate MEANS
     ExcelNetworkDays startDate endDate EMPTY
 
@@ -427,6 +459,7 @@ GIVEN startDate IS A DATE
       endDate   IS A DATE
       holidays  IS A LIST OF DATE
 GIVETH AN EITHER STRING NUMBER
+@nlg the number of weekdays, and weekend days listed in %holidays%, from %startDate% to %endDate% inclusive (negative if reversed)
 ExcelNetworkDays startDate endDate holidays MEANS
     RIGHT (directionSign TIMES countBusiness minDate maxDate)
     WHERE
@@ -452,6 +485,7 @@ ExcelNetworkDays startDate endDate holidays MEANS
 GIVEN label IS A STRING
       value IS A NUMBER
 GIVETH AN EITHER STRING NUMBER
+@nlg %value% if it is a whole number, otherwise an error naming %label%
 ensureWhole label value MEANS
     IF value EQUALS FLOOR value
     THEN RIGHT value
@@ -459,6 +493,7 @@ ensureWhole label value MEANS
 
 GIVEN value IS A NUMBER
 GIVETH A NUMBER
+@nlg the absolute value of %value%
 absoluteValue value MEANS
     IF value LESS THAN 0
     THEN 0 MINUS value
@@ -467,6 +502,7 @@ absoluteValue value MEANS
 GIVEN day IS A NUMBER
       days IS A LIST OF NUMBER
 GIVETH A BOOLEAN
+@nlg %day% is one of %days%
 containsDay day days MEANS
     CONSIDER days
     WHEN EMPTY THEN FALSE
@@ -477,5 +513,6 @@ containsDay day days MEANS
 
 GIVEN date IS A DATE
 GIVETH A NUMBER
+@nlg the day of the year of %date% (1 January being day 1)
 dayOfYear date MEANS
     Day date MINUS Day (Year date) PLUS 1

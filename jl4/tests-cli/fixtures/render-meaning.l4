@@ -1,0 +1,172 @@
+IMPORT daydate
+
+-- What `l4 render` must never change: which operands a rule groups, the order of
+-- a subtraction, the words a drafter chose for a party, and whether a deadline
+-- exists. One rule per case; the CLI test reads each by name.
+
+§ `Meaning`
+
+DECLARE Person HAS
+  `age`       IS A NUMBER
+  `is a citizen` IS A BOOLEAN
+  `has a licence` IS A BOOLEAN
+  `resides in Singapore` IS A BOOLEAN
+  `the spouse is a citizen` IS A BOOLEAN
+
+DECLARE Status IS ONE OF Active, Dormant, Closed
+
+GIVEN a IS A NUMBER, b IS A NUMBER, c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `right nested minus` IS a MINUS (b MINUS c)
+
+GIVEN a IS A NUMBER, b IS A NUMBER, c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `right nested division` IS a DIVIDED BY (b TIMES c)
+
+GIVEN a IS A NUMBER, b IS A NUMBER, c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `right nested divide by quotient` IS a DIVIDED BY (b DIVIDED BY c)
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE `and of or in a condition` IS
+  IF a AND (b OR c) THEN 1 ELSE 2
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE `or of and in a condition` IS
+  IF (a OR b) AND c THEN 1 ELSE 2
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE `not of and in a condition` IS
+  IF NOT (a AND b) THEN 1 ELSE 2
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `and of or in a list` IF
+      a
+  AND (b OR c)
+
+GIVEN `the applicant` IS A Person
+GIVETH A BOOLEAN
+DECIDE `the applicant is eligible` IF
+      `the applicant`'s `is a citizen`
+  AND `the applicant`'s `age` >= 21
+
+GIVEN `the buyer` IS A Person, `the amount` IS A NUMBER
+GIVETH A NUMBER
+DECIDE `discount` IS
+  IF `the buyer`'s `age` >= 65 THEN `the amount` TIMES 0.1 ELSE 0
+
+GIVEN `the applicant` IS A Person
+GIVETH A BOOLEAN
+DECIDE `the applicant resides here` IF `the applicant`'s `resides in Singapore`
+
+GIVEN `the applicant` IS A Person
+GIVETH A BOOLEAN
+DECIDE `the spouse qualifies` IF `the applicant`'s `the spouse is a citizen`
+
+GIVEN `the applicant` IS A Person
+GIVETH A BOOLEAN
+DECIDE `boolean rule with an IF` IF
+  IF `the applicant`'s `is a citizen` THEN TRUE ELSE `the applicant`'s `has a licence`
+
+GIVEN s IS A Status
+GIVETH A BOOLEAN
+DECIDE `boolean rule with a CONSIDER` IF
+  CONSIDER s
+    WHEN Active THEN TRUE
+    OTHERWISE FALSE
+
+GIVEN s IS A Status
+GIVETH A NUMBER
+DECIDE `consider rule` IS
+  CONSIDER s
+    WHEN Active THEN 1
+    WHEN Dormant THEN 2
+    OTHERWISE 3
+
+GIVEN x IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE `consider a maybe` IS
+  CONSIDER x
+    WHEN NOTHING THEN 0
+    WHEN JUST n THEN n PLUS 1
+
+GIVEN x IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE `consider a list` IS
+  CONSIDER x
+    WHEN EMPTY THEN 0
+    WHEN h FOLLOWED BY t THEN h
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `not as a whole rule` IF NOT (a OR b)
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `rule with not of an and with a nested or` IF
+  NOT (a AND (b OR c))
+
+GIVEN a IS A NUMBER, b IS A NUMBER
+GIVETH A STRING
+DECIDE `difference in prose` IS
+  IF (a MINUS b) > 0 THEN "more" ELSE "less"
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE `where nested` IS
+  IF a THEN x ELSE y
+  WHERE
+    x MEANS IF b THEN 1 ELSE 2
+    y MEANS 3
+DECLARE Party IS ONE OF `the Tenant`, `the Landlord`
+DECLARE Action IS ONE OF `pay the rent`, `repair the roof`, `give notice`
+
+GIVETH A DEONTIC Party Action
+DECIDE `at once` IS
+  PARTY `the Tenant`
+  MUST `pay the rent`
+  WITHIN 0
+  HENCE FULFILLED
+  LEST BREACH BY `the Tenant` BECAUSE "the rent was not paid"
+
+GIVETH A DEONTIC Party Action
+DECIDE `no deadline at all` IS
+  PARTY `the Tenant`
+  MUST `pay the rent`
+  HENCE FULFILLED
+  LEST BREACH BY `the Tenant`
+
+GIVETH A DEONTIC Party Action
+DECIDE `with a deadline and a chain` IS
+  PARTY `the Tenant`
+  MUST `give notice`
+  WITHIN 14
+  HENCE
+    PARTY `the Landlord`
+    MUST `repair the roof`
+    WITHIN 30
+    HENCE FULFILLED
+    LEST BREACH BY `the Landlord` BECAUSE "the roof was not repaired"
+  LEST BREACH BY `the Tenant`
+
+GIVETH A DEONTIC Party Action
+DECIDE `either obligation` IS
+      `no deadline at all`
+  ROR `at once`
+
+GIVETH A DEONTIC Party Action
+DECIDE `both obligations` IS
+       `no deadline at all`
+  RAND `at once`
+
+GIVEN x IS A NUMBER
+GIVETH A DATE
+DECIDE `a real date` IS Date 29 2 2024
+
+GIVEN x IS A NUMBER
+GIVETH A DATE
+DECIDE `a date that rolls over` IS Date 29 2 2025
