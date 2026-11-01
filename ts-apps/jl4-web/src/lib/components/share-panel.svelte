@@ -127,7 +127,7 @@
   .share-panel {
     visibility: hidden;
     position: fixed;
-    top: 44px;
+    top: 46px;
     right: 1em;
     z-index: 400;
     box-sizing: border-box;
