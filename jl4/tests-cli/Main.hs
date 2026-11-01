@@ -520,6 +520,10 @@ renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
 regulativeActionParamSource :: FilePath
 regulativeActionParamSource = "examples/ok/regulative-action-param-reference.l4"
 
+-- An EVERY under RAND and ROR.
+everyRandSource :: FilePath
+everyRandSource = "examples/ok/every/rand.l4"
+
 -- An @nlg on a MIXFIX definition, read at a call site in the same module, and
 -- across an IMPORT. The importing fixture makes the same calls, row for row,
 -- as the local one (less one row it says it leaves out), so one expected list
@@ -696,6 +700,7 @@ coreFixtures =
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
   , renderMixfixOperandFixture
   , regulativeActionParamSource
+  , everyRandSource
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -4011,6 +4016,26 @@ spec bin = do
       let out = map (filter (/= '\r')) (lines sout)
       out `shouldSatisfy` any ("the party must perform the action within 30." `isInfixOf`)
       out `shouldNotSatisfy` any ("must the action" `isInfixOf`)
+
+  -- An EVERY that is an operand of RAND or ROR is laid out like any other
+  -- operand: a lettered list, "; and" before the last entry of a RAND and
+  -- "; or" before the last entry of a ROR. doc/reference/regulative/EVERY.md
+  -- states it, and states that the join line is not rendered.
+  describe "l4 render of an EVERY under RAND and ROR" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", everyRandSource]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "lists the operands, joined by and, or by or" $ do
+      out <- rows
+      out `shouldSatisfy` any ("(a) every Tenant t must Sign (t) within 14. Failing that, the obligation is breached; and" `isSuffixOf`)
+      out `shouldSatisfy` any ("(a) every Tenant t must Sign (t) within 14; or" `isSuffixOf`)
+      out `shouldSatisfy` any ("(b) every Tenant t who t is Tenant with Alice must Sign (t) within 7." `isSuffixOf`)
+
+    it "echoes no keyword of the join line" $ do
+      out <- rows
+      out `shouldNotSatisfy` any (\l -> any (`isInfixOf` l) ["once all", "ONCE", "hence", "FULFILLED", "lest"])
 
   describe "an @nlg on its own line above a rule" $ do
     let rows = do
