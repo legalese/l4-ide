@@ -81,6 +81,13 @@ How an L4 file is written, on one page:
 - **Directives:** [`#EVAL`, `#CHECK`, `#ASSERT`, `#TRACE`](syntax/README.md#directives)
 - **Legal phrasing:** [genitive 's](syntax/README.md#genitive), [OF](syntax/README.md#of), [ditto ^](syntax/README.md#ditto), [AND and OR over several lines](syntax/README.md#asyndetic-and-and-or)
 
+### [Query planning](query-planning/README.md)
+
+Turning a Boolean decision into an interactive question-and-answer session:
+
+- **[Query Planner](query-planning/README.md):** determinability, question ordering, and the proposal to order questions by information gain with usual values as odds
+- **[Binary Decision Diagrams (ROBDD)](query-planning/robdd.md):** the canonical Boolean-function substrate the planner is built on
+
 ## Library
 
 ### [Built-in functions](builtins/README.md)

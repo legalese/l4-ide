@@ -120,3 +120,4 @@ If the rule reads it, the evaluation stops with a message such as "I needed to k
 - [ASSUME](ASSUME.md): declaring assumed values
 - [DECLARE](DECLARE.md): declaring record types
 - [GIVEN](../functions/GIVEN.md): function inputs
+- [Query Planning](../query-planning/README.md): the planner that decides which question to ask next, and the proposal to read usual values as odds

@@ -37,6 +37,8 @@
   - [EVENT](regulative/EVENT.md)
 - [Syntax and directives](syntax/README.md)
   - [@nlg](syntax/nlg.md)
+- [Query planning](query-planning/README.md)
+  - [Binary Decision Diagrams (ROBDD)](query-planning/robdd.md)
 
 ## Library
 
