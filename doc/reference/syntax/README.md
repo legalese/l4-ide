@@ -59,7 +59,7 @@ ASSUME `the applicant's age` IS A NUMBER
 
 ### @nlg
 
-`@nlg` gives the natural-language wording of a definition, with `%name%` slots for its inputs. Write it at the end of the definition's line. `l4 render` and the editor use it when they put the rule into words.
+`@nlg` gives the natural-language wording of a definition, with `%name%` slots for its inputs. Write it on its own line above the definition, or at the end of the definition's line. `l4 render` and the editor use it when they put the rule into words: the sentence heads the rule, its body follows, and every call to the rule reads as the sentence.
 
 ```l4
 GIVEN x IS A NUMBER, y IS A NUMBER

@@ -272,22 +272,24 @@ Late Fee Policy
 ===============
 
 
-Definitions
+§ 1  Definitions
 
-• Invoice means a record with:
-    - amount — NUMBER
-    - days overdue — NUMBER
+1. Invoice consists of:
+    - amount — number
+    - days overdue — number
 
 
-Provisions
+§ 2  Provisions
 
-• Late fee means:
-    - if the invoice's days overdue is at most 0: 0
-    - otherwise, if the invoice's days overdue is at most 30: the invoice's amount × 0.02
-    - otherwise: the invoice's amount × 0.05
+1. Late fee is:
+    (a) If the invoice's days overdue is at most 0: 0;
+    (b) Otherwise, if the invoice's days overdue is at most 30: the invoice's amount × 0.02;
+    (c) Otherwise: the invoice's amount × 0.05.
 ```
 
-Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
+Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--no-number-sections`, `--no-number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
+
+With no flags, `l4 render` writes the same document as the VS Code Render tab: sections and clauses numbered, and the file's own rules only. Imported modules still decide how those rules read. `--include-imports` adds the imported rules the document uses, `--include-import NAME` adds those of one module, and `--include-unused` adds everything.
 
 ### `l4 nlg` — the directives, as sentences
 
