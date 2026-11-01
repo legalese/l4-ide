@@ -1,4 +1,4 @@
-`EVAL AS OF SYSTEM TIME` with 1 January 2020 and `serial snapshot 1` minus `serial snapshot 1`
+(`EVAL AS OF SYSTEM TIME` with 1 January 2020 and `serial snapshot 1`) minus `serial snapshot 1`
 `serial snapshot 2` minus `EVAL AS OF SYSTEM TIME` with 1 January 2020 and `serial snapshot 2`
-`EVAL AS OF SYSTEM TIME` with 1 January 2020 and `serial snapshot 3` minus `EVAL AS OF SYSTEM TIME` with 1 January 2010 and `serial snapshot 3`
-`EVAL AS OF SYSTEM TIME` with 1 January 2020 and `serial snapshot 4` minus `serial snapshot 4`
+`EVAL AS OF SYSTEM TIME` with 1 January 2020 and (`serial snapshot 3` minus `EVAL AS OF SYSTEM TIME` with 1 January 2010 and `serial snapshot 3`)
+`EVAL AS OF SYSTEM TIME` with 1 January 2020 and (`serial snapshot 4` minus `serial snapshot 4`)
