@@ -77,7 +77,7 @@ Take care with `%word%`: if `word` names an input, L4 fills it in and nothing wa
 
 - **An `ASSUME`d function has no named inputs,** so it has no slots, and a call reads as its name and arguments. Use a `BOOLEAN` field or a rule instead.
 - **A function passed on, or named without being called,** reads as its name. In `filter even xs`, `even` reads `even`.
-- **A sentence is spliced in without brackets,** so nested calls can read alike. Set slots off with words that cannot be part of an argument, and read the output of nested calls. Built-in arithmetic is bracketed: "10 minus (5 minus 2)".
+- **A sentence inside another call is spliced in without brackets,** so nested calls can read alike: with `@nlg %a% doubled` on `dbl`, `` `f2` 2 (`dbl` 3) `` and `` `dbl` (`f2` 2 3) `` both read "`f2` with 2 and 3 doubled". Set slots off with words that cannot be part of an argument, and read the output of nested calls. Arithmetic is bracketed, and so is anything beside it that does not say where it ends: "10 minus (5 minus 2)", "(5 doubled) minus 2", "twice (5 minus 2)", "(f2 for 2 and x) − 3".
 - **A function with no sentence** reads as its pattern: `` `_ LESS _` with 100 and 20 ``.
 
 ## Several languages
