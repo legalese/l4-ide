@@ -1835,6 +1835,8 @@ patternText :: Pattern Resolved -> Text
 patternText = \case
   PatApp _ con []  -> spaceCamel (resolvedText con)
   PatApp _ con [p] | nameToText (getActual con) == "JUST" -> patternText p
+  -- One argument's own brackets say nothing more inside these ('bracketed').
+  PatApp _ con [p] -> spaceCamel (resolvedText con) <> " (" <> unbracketed (patternText p) <> ")"
   PatApp _ con ps  -> spaceCamel (resolvedText con) <> " (" <> oxford "and" (map patternText ps) <> ")"
   PatVar _ v       -> resolvedText v
   PatLit _ l       -> litText l
@@ -2280,7 +2282,7 @@ rewriteWith rd0 e0 = alone (go e0)
     Concat ann es -> inert ann (textParts es)
     -- Unary maths read as f(x), not "f with x".
     App ann n [x] | Just fn <- Map.lookup (nameToText (getActual n)) mathUnaryFns ->
-      inert ann (fn <> "(" <> leafText x <> ")")
+      inert ann (fn <> "(" <> unbracketed (leafText x) <> ")")
     -- Unary date/time component primitives read as "the year of x", not
     -- "DATE_YEAR with x". These appear in library bodies (and inlined calls).
     App ann n [x] | Just phrase <- Map.lookup (nameToText (getActual n)) builtinUnaryOf ->

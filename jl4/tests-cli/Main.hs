@@ -4676,6 +4676,11 @@ spec bin = do
       hasRow "A write alone means 100, recorded as balance."
       hasRow "    (b) (true, recorded as flag)."
 
+    it "gives a write one pair of brackets inside a wrapper that brackets its argument" $ do
+      hasRow "Abs of a record means abs(4, recorded as balance)."
+      hasRow "must Pay (3, recorded as balance) within 14."
+      renderRows >>= (`shouldSatisfy` all (not . ("((" `isInfixOf`)))
+
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
   -- checker whose green runs mean nothing either.

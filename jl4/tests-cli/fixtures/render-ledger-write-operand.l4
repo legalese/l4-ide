@@ -108,3 +108,21 @@ GIVETH A NUMBER
 `a write alone` MEANS RECORD `balance` IS 100
 GIVEN p IS A BOOLEAN
 DECIDE `an item of a list` p IF p AND (RECORD `flag` IS TRUE)
+
+-- A wrapper that brackets its argument itself, a maths function's f(x) and a
+-- deontic action's argument, gives a write one pair of brackets, not two.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+abs x MEANS IF x < 0 THEN 0 - x ELSE x
+
+GIVETH A NUMBER
+`abs of a record` MEANS abs (RECORD `balance` IS 4)
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Pay HAS amt IS A NUMBER
+
+GIVETH A DEONTIC Actor Action
+`pay a record` MEANS PARTY Landlord OF "x" MUST Pay (RECORD `balance` IS 3) WITHIN 14
