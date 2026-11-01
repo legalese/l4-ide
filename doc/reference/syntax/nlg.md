@@ -128,8 +128,12 @@ The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](
 - **A call with one argument is not bracketed in a hole, even one that ends with a condition, and it does not bracket its own argument,** so ``(double p) `reduced by` d`` and ``double (p `reduced by` d)`` read "double of p reduced by [d]" and "double of [p] reduced by [d]": with `p` an input they differ only in a blank, and with a constant in its place they read the same. With `fb` a rule with no sentence, `` `shown` (x `beats` (`fb` (q AND r))) `` and `` `shown` ((x `beats` (`fb` q)) AND r) `` both render "([x] beats fb for q and r) is shown". Give one of them a name of its own.
 - **A ledger write, a ledger read and a refusal end in a clause of their own,** so `l4 render` brackets each in a slot the sentence goes on after, as it does a condition, and a write or a refusal beside arithmetic as well.
   With `dbl` as above, ``(RECORD `balance` IS 100) MINUS 3`` renders "(100, recorded as balance) − 3", `` `dbl` (REFUSE "not yet") `` renders "(the model refuses to answer: not yet) doubled", and with `@nlg %m% is kept` on `kept`, `` `kept` (RECALL `balance`) `` renders "(the value last recorded as balance, if any) is kept".
+  A write in `l4 render` also starts with its value, with no word of its own before it, so it is bracketed wherever it is part of something larger: given to a call, in any slot or hole, compared, beside `AND` or `OR`, in a branch of an `IF` or in a list.
+  With `@nlg pay %x%` on `pay`, `` `pay` (RECORD `balance` IS 100) `` renders "pay (100, recorded as balance)", and ``RECORD `balance` IS (`pay` 100)`` renders "pay 100, recorded as balance".
+  A write that is the whole of a rule's body is not bracketed, but one laid out as an item of a list, or as a branch of an `IF`, keeps its brackets: "(b) (true, recorded as flag)."
   `l4 nlg` brackets a write and a refusal the same way: "(record balance is 100) minus 3".
   There a ledger read, "recall balance", ends with the cell's name, and is not bracketed.
+  And there a write that is an operand of `OR` or `AND` is not bracketed, as an `IF` is not: ``(RECORD `flag` IS FALSE) OR TRUE`` and ``RECORD `flag` IS (FALSE OR TRUE)`` both read "record flag is `FALSE` or `TRUE`".
 
 ## Several languages
 
