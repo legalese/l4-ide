@@ -47,7 +47,11 @@ Promissory Note
     - Currency — Principal Amount's Currency
     - Value — Monthly Installment Amount's Value × Monthly Installments
 
-4. Payment Obligations is:
+4. Total Interest Amount is a Money with:
+    - Currency — Principal Amount's Currency
+    - Value — Total Repayment Amount's Value − Principal Amount's Value
+
+5. Payment Obligations is:
     (a) If the Outstanding Payment Amount's Value is more than 0: The Borrower must pay monthly installment to (The Lender and Amount Transferred) within Next Payment Due Date, provided that is money at least equal within error for Amount Transferred and Next Payment Due's Amount:
         (i) Once that is done, Payment Obligations of Money where Currency is Monthly Installment Amount's Currency and Value is the Outstanding Payment Amount's Value minus Amount Transferred's Value.
         (ii) Failing that, The Borrower must pay monthly installment to (The Lender and Amount Transferred) within Default After Days Beyond Commencement, provided that is money at least equal within error for Amount Transferred and Next Payment Due Amount With Penalty. Failing that, The Borrower must pay monthly installment to (The Lender and Amount Transferred), provided that is money at least equal within error for Amount Transferred and All Outstanding Debts.
@@ -160,4 +164,3 @@ The following are taken as given:
 
 
 Coverage
-left out: Total Interest Amount
