@@ -2645,6 +2645,44 @@ spec bin = do
       hasRow "(a) If neither the Act governs for n nor b: 1;"
       hasRow "(a) If a is false or b: 1;"
 
+  -- A denial, an IMPLIES or an IF that fills a slot is bracketed when the
+  -- sentence goes on after the slot, so that the rest of the sentence cannot
+  -- read as part of it. A slot at the end of the sentence is left as it was.
+  describe "l4 render and a condition in a sentence's slot" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", slotScope]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denial in a slot the sentence goes on after" $ do
+      hasRow "Denial in the slot if (it is not the case that the Act governs for n) is disclosed."
+      hasRow "Denial of the sentence if it is not the case that the Act governs for n is disclosed."
+      hasRow "Denial in the first slot if (it is not the case that the Act governs for n) is told [p]."
+      hasRow "Denial of the two-slot sentence if it is not the case that the Act governs for n is told [p]."
+      hasRow "Denial in the middle slot if [p] outweighs (it is not the case that the Act governs for n) in law."
+
+    it "brackets a denial in a pattern's hole the pattern goes on after" $ do
+      hasRow "Denial in the hole if (it is not the case that the Act governs for n) is published."
+      hasRow "Denial of the pattern if it is not the case that the Act governs for n is published."
+
+    it "brackets a denied OR or an IMPLIES in such a slot" $ do
+      hasRow "Denied or in the slot if (neither the Act governs for n nor q) is disclosed."
+      hasRow "Denied or around the sentence if neither the Act governs for n nor [q] is disclosed."
+      hasRow "Implies in the slot if (the Act governs for n implies q) is disclosed."
+      hasRow "Implies around the sentence if the Act governs for n implies [q] is disclosed."
+
+    it "brackets an AND in such a slot, so that it is not read as the sentence beside an AND" $ do
+      hasRow "And in the slot if (p and (it is not the case that the Act governs for n)) is disclosed implies r."
+      hasRow "And beside the slot if p and (it is not the case that the Act governs for n) is disclosed implies r."
+      hasRow "Last slot then and if ([p] is told it is not the case that the Act governs for n and r) is disclosed."
+
+    it "leaves a slot at the end of the sentence, and a delimited denial, as they were" $ do
+      hasRow "Denial in the last slot if [p] is told it is not the case that the Act governs for n."
+      hasRow "And in the last slot if [p] is told (it is not the case that the Act governs for n) and r is disclosed."
+      hasRow "One word denied if p is false is disclosed."
+      hasRow "Inequality in the slot if n is not 3 is disclosed."
+
   describe "l4 nlg and a condition in a sentence's slot" $
     it "brackets a denial, an IMPLIES or an IF in a slot the sentence goes on after" $ do
       Output code sout _ <- runL4 bin ["nlg", slotScope]
