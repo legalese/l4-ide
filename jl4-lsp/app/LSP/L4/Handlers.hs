@@ -1011,6 +1011,7 @@ handlers evalConfig recorder =
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
                              , ExportRender.toc = reqParams.toc
+                             , ExportRender.sourceLinks = maybe mempty (ExportRender.sourceLinksFrom . fst) mToks
                              , ExportRender.docLang = docLang }
                     -- The same preparation as `l4 render`: a herald written after a
                     -- rule's last input is moved onto the rule, then the language

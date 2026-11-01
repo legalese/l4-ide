@@ -1,0 +1,19 @@
+-- The renderer's own words, in a document in another language.
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`large or not` MEANS `is large` amount OR NOT `is large` amount
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+@nlg:en the threshold is passed
+@nlg:he הסף נחצה
+`passed` MEANS n > 1
+
+`uses it` MEANS `passed` 5

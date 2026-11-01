@@ -39,7 +39,7 @@ import L4.Lexer (LangTag (..))
 import L4.Syntax (defaultModuleLang)
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser as Parser
-import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
+import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText, sourceLinksFrom)
 
 import L4.Cli.Common
 
@@ -136,7 +136,7 @@ renderCmd opts = do
   -- token stream (see 'Parser.declaredModuleLang') rather than anything the
   -- resolved AST keeps. 'Rules.GetLexTokens' is what the parse rule itself
   -- consumed, so this re-reads nothing.
-  (errs, (mTc, mToks)) <- runOneshot evalConfig opts.renderFile \nfp -> do
+  (errs, diags, (mTc, mToks)) <- runOneshotWithDiagnostics evalConfig opts.renderFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     (,) <$> Shake.use Rules.SuccessfulTypeCheck uri
@@ -175,6 +175,7 @@ renderCmd opts = do
                    { numberSections = opts.renderNumberSections
                    , numberClauses  = opts.renderNumberClauses
                    , toc            = opts.renderToc
+                   , sourceLinks    = maybe mempty (sourceLinksFrom . fst) mToks
                    , docLang        = docLanguage
                    }
           -- Choose the language BEFORE building the document, not inside it.
@@ -212,7 +213,10 @@ renderCmd opts = do
         FmtText -> emitText opts (renderText rcfg doc)
         FmtHtml -> emitText opts (renderHtml rcfg doc)
         FmtAkn  -> emitText opts (renderAkn rcfg doc)
-      exitSuccess
+      -- The document is written either way, because it can still be read. But a
+      -- module this one imports may be broken while this one checks, and the
+      -- exit code says so, as it does for 'l4 check'.
+      if hasBlockingError diags then exitFailure else exitSuccess
 
 -- | Does this format put the document's language in its output?
 --

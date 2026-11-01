@@ -7,6 +7,7 @@
 module L4.Export.Render
   ( RenderConfig (..)
   , defaultRenderConfig
+  , sourceLinksFrom
   , isRtlLang
   , rtlLangTags
   , rtlScripts
@@ -26,8 +27,10 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import L4.Citations (normalizeRef, withRefMap)
 import L4.Export.Document
-import L4.Lexer (LangTag (..))
+import L4.Lexer (LangTag (..), PosToken)
+import L4.Nlg (localiseMarked, markFrame, stripFrameMarks)
 import L4.Syntax (defaultModuleLang)
 
 -- | Rendering knobs. Section headings and top-level clauses are numbered by
@@ -37,6 +40,8 @@ data RenderConfig = MkRenderConfig
   { numberSections :: !Bool
   , numberClauses  :: !Bool
   , toc            :: !Bool   -- ^ prepend a linked table of contents (HTML)
+  , sourceLinks    :: !(Map.Map Text Text)
+    -- ^ The file's @\@ref-map@ table: a normalised citation to its web address.
   , docLang        :: !LangTag
     -- ^ The language this document is being rendered in. The caller decides it;
     -- 'L4.Cli.Render' uses @--lang@ if given (and if the module renders
@@ -56,8 +61,13 @@ defaultRenderConfig =
     { numberSections = True
     , numberClauses = True
     , toc = False
+    , sourceLinks = Map.empty
     , docLang = defaultModuleLang
     }
+
+-- | The web address of each citation a file's @\@ref-map@ lines name.
+sourceLinksFrom :: [PosToken] -> Map.Map Text Text
+sourceLinksFrom = Map.fromList . concatMap (toList . withRefMap)
 
 -- | The language subtags whose default script runs right to left.
 --
@@ -189,6 +199,9 @@ data Flow = MkFlow
   { flowLead  :: ![Span]
   , flowBody  :: !Body
   , flowWhere :: ![(Text, Flow)]
+  , flowLabel :: !(Maybe Text)
+    -- ^ The label a provision gives this entry, printed in place of a generated
+    -- letter.
   }
 
 data Body
@@ -203,7 +216,10 @@ data Sep
   | Sentences     -- ^ each entry is a sentence of its own
 
 said :: [Span] -> Flow
-said spans = MkFlow spans NoBody []
+said spans = MkFlow spans NoBody [] Nothing
+
+opened :: [Span] -> Body -> Flow
+opened spans body = MkFlow spans body [] Nothing
 
 prefixed :: [Span] -> Flow -> Flow
 prefixed spans f = f { flowLead = spans <> f.flowLead }
@@ -211,59 +227,118 @@ prefixed spans f = f { flowLead = spans <> f.flowLead }
 -- | The flow of one block: its heading is printed by the writer, and this is
 -- everything after it.
 blockFlow :: Block -> Flow
-blockFlow b = finish "." (ruleFlow (isJust b.blockSentence || readsAsClause b.blockHeading) b.blockConnector b.blockBody)
+blockFlow b = case (b.blockConnector, b.blockBody) of
+  ("", CLeaf "") -> said [Glue "."]
+  (conn, body)   -> finish "." (ruleFlow conn body)
 
 -- | What a block is called: its sentence, or else its name. Either way it opens
 -- the block, so it takes a capital.
-blockTitle :: Block -> Text
-blockTitle b = capitalize (maybe (displayName b.blockHeading) displayVars b.blockSentence)
+blockTitle :: RenderConfig -> Block -> Text
+blockTitle cfg b = capitalize (maybe (displayName b.blockHeading) (displayVars . inLanguage cfg) b.blockSentence)
+
+-- | The space between a block's title and what follows it.
+titleGap :: Flow -> Text
+titleGap f = case f.flowLead of
+  Glue _ : _ -> ""
+  _          -> " "
 
 -- | A rule's body, opened by the connector. The connector is chosen by
 -- "L4.Export.Document" from the rule's type and the shape of its body, and the
 -- frame is fitted to what follows, so that a rule never reads "holds if as
 -- follows" or "is determined by, depending on".
-ruleFlow :: Bool -> Text -> Clause -> Flow
-ruleFlow titledAsClause conn clause = case clause of
-  CLeaf "" -> said [Word opening]
-  CLeaf t  -> said [Word opening, Phrase t]
-  CDeontic{} -> prefixed [Word opening] inner
-  CChain lead _ -> inner { flowLead = [Word opening, Word lead] }
+ruleFlow :: Text -> Clause -> Flow
+ruleFlow conn clause = case clause of
+  CLeaf "" -> said [Word conn]
+  CLeaf t  -> said [Word conn, Phrase t]
+  CDeontic{} -> prefixed [Word conn] inner
+  CChain lead _ -> inner { flowLead = [Word conn, Word lead] }
+  CIf chain (Just els)
+    | Just rows <- ladderRows chain els ->
+        opened [Word ifFrame] (Grid ["Condition", "Result"] rows)
   CIf{} -> inner { flowLead = [Word ifFrame] }
-  CCases s _ -> inner { flowLead = [Word casesFrame, Phrase s] }
-  CWhere body defs -> (ruleFlow titledAsClause conn body) { flowWhere = map whereDef defs }
-  _ -> inner { flowLead = [Word opening] }
+  CCases s brs
+    | Just rows <- caseRows brs ->
+        opened (casesLead s) (Grid [s, "Result"] rows)
+  CCases s _ -> inner { flowLead = casesLead s }
+  CLed lead _ -> inner { flowLead = [Word conn, Phrase lead] }
+  -- The provision's own words lead its list, and say what the frame would have.
+  CLeadIn{} -> inner
+  CWhere body defs -> (ruleFlow conn body) { flowWhere = map whereDef defs }
+  _ -> inner { flowLead = [Word conn] }
  where
   inner = clauseFlow clause
-  -- A rule named as a clause reads straight on: "the public task basis applies
-  -- if". A rule named as a noun needs the verb: "eligibility holds if".
-  clausal = conn == "holds if" && titledAsClause
-  opening = if clausal then "if" else conn
   ifFrame
-    | conn == "holds if" = if clausal then "as follows" else "holds as follows"
-    | conn == "means"    = "is"
-    | otherwise          = conn
-  casesFrame
-    | conn == "holds if" = if clausal then "depending on" else "holds depending on"
-    | otherwise          = "depends on"
+    | conn == "if"    = "is decided as follows"
+    | conn == "means" = "is"
+    | otherwise       = conn
+  -- A rule that gives a BOOLEAN is named as a statement, which nothing can follow
+  -- with a verb.
+  casesLead s
+    | conn == "if" = [Glue ",", Word "depending on", Phrase s]
+    | otherwise    = [Word "depends on", Phrase s]
+
+-- | A decision table, when every branch of a rule ends in a short result. A table
+-- is a layout and nothing else, so it reads exactly as the branches do, in their
+-- order: a ladder is decided from the top, so each row after the first keeps its
+-- "otherwise".
+ladderRows :: [(Text, Clause)] -> Clause -> Maybe [[Flow]]
+ladderRows chain els = do
+  guard (length chain >= 2)
+  results <- traverse (shortResult . snd) chain
+  other   <- shortResult els
+  let conditions = zipWith condition [0 :: Int ..] (map fst chain)
+      condition i c = if i == 0 then c else markFrame "otherwise, if" <> " " <> c
+  pure (zipWith decisionRow (conditions <> [markFrame "otherwise"]) (results <> [other]))
+
+-- | The same for cases that name a value of their subject.
+caseRows :: [(Text, Clause)] -> Maybe [[Flow]]
+caseRows brs = do
+  guard (length brs >= 3)
+  traverse caseRow brs
+ where
+  caseRow (pat, cl) = do
+    result <- shortResult cl
+    value  <- caseValue pat
+    guard (not (Text.any (== ',') value))
+    pure (decisionRow value result)
+
+-- | What a case's pattern names: the predicate without its "is". A predicate that
+-- is all the rendering's own words stays that way.
+caseValue :: Text -> Maybe Text
+caseValue pat
+  | pat == "otherwise"     = Just (markFrame pat)
+  | pat == stripFrameMarks pat = Text.stripPrefix "is " pat
+  | otherwise              = markFrame <$> Text.stripPrefix "is " (stripFrameMarks pat)
+
+decisionRow :: Text -> Text -> [Flow]
+decisionRow c r = [said [Phrase c], said [Phrase r]]
+
+shortResult :: Clause -> Maybe Text
+shortResult = \case
+  CLeaf t | Text.length (stripBackticks t) <= 40 -> Just t
+  _ -> Nothing
 
 whereDef :: (Text, Text, Clause) -> (Text, Flow)
-whereDef (h, c, cl) = (h, finish "." (ruleFlow (readsAsClause h) c cl))
+whereDef (h, c, cl) = (h, finish "." (ruleFlow c cl))
 
 -- | A clause inside a rule, where no connector leads into it.
 clauseFlow :: Clause -> Flow
 clauseFlow = \case
   CLeaf t    -> said [Phrase t]
-  CFields fs -> MkFlow [] (Fields fs) []
-  CAll cs    -> MkFlow [Word "all of the following"] (Items (Joined "and") (map clauseFlow cs)) []
-  CAny cs    -> MkFlow [Word "any of the following"] (Items (Joined "or") (map clauseFlow cs)) []
-  CIf chain els -> MkFlow []
-    (Items (Joined "") (zipWith branch [0 ..] chain <> maybe [] (pure . otherwiseFlow) els)) []
-  CCases s brs -> MkFlow [Word "depending on", Phrase s] (Items (Joined "") (map (caseFlow s) brs)) []
+  CFields fs -> opened [] (Fields fs)
+  CAll cs    -> opened [Word "all of the following"] (Items (Joined "and") (map clauseFlow cs))
+  CAny cs    -> opened [Word "any of the following"] (Items (Joined "or") (map clauseFlow cs))
+  CIf chain els -> opened []
+    (Items (Joined "") (zipWith branch [0 ..] chain <> maybe [] (pure . otherwiseFlow) els))
+  CCases s brs -> opened [Word "depending on", Phrase s] (Items (Joined "") (map (caseFlow s) brs))
   CChain lead items ->
-    MkFlow [Word lead] (Items (Joined (chainWord lead)) (map (said . pure . Phrase) items)) []
+    opened [Word lead] (Items (Joined (chainWord lead)) (map (said . pure . Phrase) items))
   CDeontic p m a due prov h l -> deonticFlow p m a due prov h l
-  CTable cols rows -> MkFlow [] (Grid cols (map (map clauseFlow) rows)) []
+  CTable cols rows -> opened [] (Grid cols (map (map clauseFlow) rows))
   CWhere inner defs -> (clauseFlow inner) { flowWhere = map whereDef defs }
+  CLed lead inner -> (clauseFlow inner) { flowLead = [Phrase lead] }
+  CLeadIn lead inner -> (clauseFlow inner) { flowLead = [Phrase lead] }
+  CLabel label inner -> (clauseFlow inner) { flowLabel = Just label }
  where
   branch :: Int -> (Text, Clause) -> Flow
   branch i (cond, then_) =
@@ -271,10 +346,11 @@ clauseFlow = \case
   otherwiseFlow = prefixed [Key "Otherwise", Glue ":"] . clauseFlow
   caseFlow s (pat, cl)
     | pat == "otherwise" = otherwiseFlow cl
-    | otherwise = prefixed [Key "If", Condition (subject s <> " " <> pat), Glue ":"] (clauseFlow cl)
+    | otherwise = prefixed [Key "If", Condition (subject s <> " " <> predicate pat), Glue ":"] (clauseFlow cl)
   -- Each case names what it tests, unless that is too long to repeat on every
   -- line; the lead-in has named it, and "it" then reads clearly.
-  subject s = if Text.length (stripBackticks s) <= 36 then s else "it"
+  subject s = if Text.length (stripBackticks s) <= 36 then s else markFrame "it"
+  predicate pat = maybe pat ((markFrame "is" <> " ") <>) (Text.stripPrefix "is " pat)
   chainWord lead
     | any (`Text.isPrefixOf` lead) ["the sum", "the product", "a list"] = "and"
     | otherwise = ""
@@ -287,7 +363,7 @@ deonticFlow party modal act due prov hence lest =
     [] | null longProviso -> said base
     [(lab, c)] | isSentence (clauseFlow c), null longProviso ->
       said (base <> [Glue ".", Word lab] <> (clauseFlow c).flowLead)
-    conseq -> MkFlow base (Items Sentences (longProviso <> [ prefixed [Word lab] (clauseFlow c) | (lab, c) <- conseq ])) []
+    conseq -> opened base (Items Sentences (longProviso <> [ prefixed [Word lab] (clauseFlow c) | (lab, c) <- conseq ]))
  where
   base = [Phrase party, Modal modal, Phrase act]
            <> maybe [] (pure . Phrase) due
@@ -343,29 +419,26 @@ closeItems sep end items = zipWith close (reverse [0 .. length items - 1]) items
   close i it = case sep of
     Sentences -> finish "." it
     Joined _ | i == 0 -> finish end it
-    Joined w | i == 1, not (Text.null w) -> finish ("; " <> w) it
+    Joined w | i == 1, not (Text.null w) -> finish ("; " <> markFrame w) it
     Joined _ -> finish ";" it
+
+-- | Put the rendering's text into the document's language. See
+-- 'L4.Nlg.markedLinearizer'.
+inLanguage :: RenderConfig -> Text -> Text
+inLanguage cfg = localiseMarked (Just cfg.docLang)
+
+-- | Words of the rendering's own, in the document's language.
+ownWords :: RenderConfig -> Text -> Text
+ownWords cfg = inLanguage cfg . markFrame
 
 -- | Lay out spans as text, each through a writer's own function.
 joinSpans :: (Span -> Text) -> [Span] -> Text
 joinSpans f = List.foldl' step ""
  where
   step acc = \case
-    Glue g -> acc <> g
+    s@(Glue _) -> acc <> f s
     s | Text.null acc -> f s
       | otherwise     -> acc <> " " <> f s
-
--- | Does this heading read as a clause, so that "if" can follow it directly?
-readsAsClause :: Text -> Bool
-readsAsClause h = any (`Set.member` clauseVerbs) (Text.words (Text.toLower (displayName h)))
-
-clauseVerbs :: Set.Set Text
-clauseVerbs = Set.fromList
-  [ "is", "are", "was", "were", "has", "have", "had", "may", "must", "shall", "can"
-  , "will", "does", "applies", "apply", "holds", "exists", "exist", "meets", "qualifies"
-  , "qualify", "counts", "covers", "falls", "owes", "satisfies", "satisfy", "contains"
-  , "requires", "require", "resides", "reside", "owns", "pays", "receives", "provides"
-  , "permits", "allows", "includes", "exceeds" ]
 
 -- ----------------------------------------------------------------------------
 -- Plain-text rendering
@@ -389,16 +462,17 @@ renderText cfg doc =
   sectionHeadingText depth sec =
     case sectionLabel cfg.numberSections depth sec of
       Nothing -> []
-      Just h  -> ["", h, ""]
+      Just h  -> ["", inLanguage cfg h, ""]
 
   groupText g =
-    maybe [] (\l -> [l <> ":", ""]) g.groupLabel
+    maybe [] (\l -> [own l <> ":", ""]) g.groupLabel
+      <> maybe [] (\l -> [own l, ""]) g.groupLead
       <> concat (zipWith blockText [1 ..] g.groupBlocks)
 
   blockText n b =
     let num = Text.pack (show (n :: Int))
         marker = if cfg.numberClauses then num <> ". " else "• "
-        title = blockTitle b
+        title = blockTitle cfg b
     in case b.blockRenderedAs of
       RenderedReference forced ->
         [ marker <> title
@@ -408,21 +482,24 @@ renderText cfg doc =
         ]
       RenderedInline ->
         let f = blockFlow b
-        in (marker <> title <> " " <> leadText f)
+        in (marker <> title <> titleGap f <> leadText f)
              : map ("    " <>) (bodyLines 0 f <> sourceLines b)
              <> [""]
 
-  sourceLines b = [ "Source: " <> s | s <- b.blockSources ]
+  own = ownWords cfg
+  phrased = displayVars . inLanguage cfg
+
+  sourceLines b = [ own "Source" <> ": " <> s | s <- b.blockSources ]
 
   leadText f = joinSpans spanText f.flowLead
 
   spanText = \case
-    Word t      -> t
-    Phrase t    -> displayVars t
-    Key t       -> t
-    Condition t -> displayVars t
-    Modal t     -> t
-    Glue t      -> t
+    Word t      -> own t
+    Phrase t    -> phrased t
+    Key t       -> own t
+    Condition t -> phrased t
+    Modal t     -> own t
+    Glue t      -> inLanguage cfg t
 
   bodyLines :: Int -> Flow -> [Text]
   bodyLines depth f = contentLines depth f.flowBody <> whereLines f.flowWhere
@@ -434,13 +511,13 @@ renderText cfg doc =
     Grid cols rows -> tableLines cols rows
 
   itemLines depth i f =
-    let mark = listMarker depth i <> " "
+    let mark = fromMaybe (listMarker depth i) f.flowLabel <> " "
     in case leadText f of
          ""   -> mark : map ("    " <>) (bodyLines (depth + 1) f)
          lead -> (mark <> lead) : map ("    " <>) (bodyLines (depth + 1) f)
 
   whereLines [] = []
-  whereLines defs = "where:" : concatMap whereLine defs
+  whereLines defs = (own "where" <> ":") : concatMap whereLine defs
 
   whereLine (h, f) =
     ("- " <> capitalize (displayName h) <> " " <> leadText f)
@@ -451,13 +528,15 @@ renderText cfg doc =
     let cellText c = Text.unwords (Text.words (Text.intercalate " " (leadText (finish "" c) : bodyLines 0 (finish "" c))))
         textRows = [ map cellText row | row <- rows ]
         widths = [ maximum (Text.length h : [ Text.length (r !! i) | r <- textRows, i < length r ])
-                 | (i, h) <- zip [0 ..] cols ]
+                 | (i, h) <- zip [0 ..] (map headingOf cols) ]
         pad w t = t <> Text.replicate (w - Text.length t) " "
         renderRow cells = "| " <> Text.intercalate " | " (zipWith pad widths cells) <> " |"
         sep = "|" <> Text.intercalate "|" (map (\w -> Text.replicate (w + 2) "-") widths) <> "|"
-    in renderRow cols : sep : map renderRow textRows
+    in renderRow (map headingOf cols) : sep : map renderRow textRows
 
-  fieldLine (k, v) = "- " <> displayVars k <> (if Text.null v then "" else " — " <> displayVars v)
+  headingOf = columnName cfg
+
+  fieldLine (k, v) = "- " <> phrased k <> (if Text.null v then "" else " — " <> phrased v)
 
 -- | The marker of a list entry at a depth, matching the HTML rendering's counters.
 listMarker :: Int -> Int -> Text
@@ -530,10 +609,11 @@ renderHtml cfg doc =
       Just h  ->
         let tag = "h" <> Text.pack (show (min 4 (depth + 1)))
         in "<" <> tag <> " id=\"" <> sectionAnchor sec <> "\" class=\"section\">"
-             <> esc h <> "</" <> tag <> ">\n"
+             <> esc (inLanguage cfg h) <> "</" <> tag <> ">\n"
 
   groupHtml g =
-    maybe "" (\l -> "<p class=\"group-label\">" <> esc l <> "</p>\n") g.groupLabel
+    maybe "" (\l -> "<p class=\"group-label\">" <> esc (own l) <> "</p>\n") g.groupLabel
+      <> maybe "" (\l -> "<p class=\"group-lead\">" <> esc (own l) <> "</p>\n") g.groupLead
       <> "<ol class=\"clauses\">\n"
       <> Text.concat (map blockHtml g.groupBlocks)
       <> "</ol>\n"
@@ -547,8 +627,8 @@ renderHtml cfg doc =
     in case b.blockRenderedAs of
       RenderedInline ->
         "<li class=\"clause " <> kindClass <> "\"" <> anchor <> ">"
-          <> termHtml b <> " " <> flowHtml (blockFlow b)
-          <> Text.concat [ "<div class=\"source\">" <> esc s <> "</div>" | s <- b.blockSources ]
+          <> termHtml b <> titleGap (blockFlow b) <> flowHtml (blockFlow b)
+          <> Text.concat (map sourceHtml b.blockSources)
           <> "</li>\n"
       RenderedReference forced ->
         "<li class=\"clause reference " <> kindClass <> "\"" <> anchor <> ">"
@@ -558,33 +638,45 @@ renderHtml cfg doc =
           <> "</li>\n"
 
   termHtml b =
-    let inner = esc (blockTitle b)
+    let inner = esc (blockTitle cfg b)
         quoted = if b.blockKind == TypeUnit then "“" <> inner <> "”" else inner
     in "<span class=\"term\">" <> quoted <> "</span>"
+
+  -- A citation links only to a web address, whatever a @ref-map says.
+  sourceHtml s = case Map.lookup (normalizeRef s) cfg.sourceLinks of
+    Just url | any (`Text.isPrefixOf` url) ["https://", "http://"] ->
+      "<div class=\"source\"><a href=\"" <> esc url <> "\">" <> esc s <> "</a></div>"
+    _ -> "<div class=\"source\">" <> esc s <> "</div>"
 
   flowHtml f =
     joinSpans spanHtml f.flowLead <> contentHtml f.flowBody <> whereHtml f.flowWhere
 
+  own = ownWords cfg
+
   spanHtml = \case
-    Word t      -> esc t
+    Word t      -> esc (own t)
     Phrase t    -> "<span class=\"prose\">" <> lk t <> "</span>"
-    Key t       -> "<span class=\"kw\">" <> esc t <> "</span>"
+    Key t       -> "<span class=\"kw\">" <> esc (own t) <> "</span>"
     Condition t -> "<span class=\"cond\">" <> lk t <> "</span>"
-    Modal t     -> "<strong>" <> esc t <> "</strong>"
-    Glue t      -> esc t
+    Modal t     -> "<strong>" <> esc (own t) <> "</strong>"
+    Glue t      -> esc (inLanguage cfg t)
 
   contentHtml = \case
     NoBody -> ""
     Items _ items ->
       "\n<ol class=\"tree\">\n"
-        <> Text.concat (map (\f -> "<li>" <> flowHtml f <> "</li>\n") items)
+        <> Text.concat (map itemHtml items)
         <> "</ol>\n"
     Fields fs -> fieldsHtml fs
     Grid cols rows -> tableHtml cols rows
 
+  itemHtml f = case f.flowLabel of
+    Just label -> "<li class=\"labelled\"><span class=\"label\">" <> esc label <> "</span>" <> flowHtml f <> "</li>\n"
+    Nothing    -> "<li>" <> flowHtml f <> "</li>\n"
+
   whereHtml [] = ""
   whereHtml defs =
-    " <span class=\"where-label\">where:</span>"
+    " <span class=\"where-label\">" <> esc (own "where") <> ":</span>"
       <> "\n<ol class=\"where-defs\">\n"
       <> Text.concat (map whereDefLi defs)
       <> "</ol>"
@@ -595,7 +687,7 @@ renderHtml cfg doc =
 
   tableHtml cols rows =
     "<table class=\"l4-table\">\n<thead><tr>"
-      <> Text.concat (map (\c -> "<th>" <> esc (displayName c) <> "</th>") cols)
+      <> Text.concat (map (\c -> "<th>" <> esc (columnName cfg c) <> "</th>") cols)
       <> "</tr></thead>\n<tbody>\n"
       <> Text.concat (map rowHtml rows)
       <> "</tbody></table>\n"
@@ -618,7 +710,7 @@ renderHtml cfg doc =
     fieldRow (k, v) =
       "<tr><td class=\"field\">" <> lk k <> "</td><td><span class=\"prose\">" <> lk v <> "</span></td></tr>\n"
 
-  lk = proseHtml linkMap
+  lk = proseHtml linkMap . inLanguage cfg
 
 -- ----------------------------------------------------------------------------
 -- Akoma Ntoso (AKN/XML) rendering
@@ -694,24 +786,28 @@ renderAkn cfg doc =
     | otherwise =
         "<section eId=\"sec_" <> idSafe sec.sectionNumber <> "\">"
           <> (if Text.null sec.sectionNumber then "" else "<num>" <> xesc sec.sectionNumber <> "</num>")
-          <> maybe "" (\h -> "<heading>" <> xesc h <> "</heading>") sec.sectionHeading
+          <> maybe "" (\h -> "<heading>" <> xesc (inLanguage cfg h) <> "</heading>") sec.sectionHeading
           <> Text.concat (map groupAkn sec.sectionGroups)
           <> Text.concat (map sectionAkn sec.sectionSubs)
           <> "</section>\n"
 
   groupAkn g =
-    maybe "" (\l -> "<hcontainer name=\"crossHeading\"><heading>" <> xesc l <> "</heading></hcontainer>") g.groupLabel
+    maybe "" (\l -> "<hcontainer name=\"crossHeading\"><heading>" <> xesc (own l) <> "</heading></hcontainer>") g.groupLabel
+      <> maybe "" (\l -> "<hcontainer name=\"lead\"><content><p>" <> xesc (own l) <> "</p></content></hcontainer>") g.groupLead
       <> Text.concat (map blockAkn g.groupBlocks)
 
   blockAkn b =
     "<paragraph eId=\"para_" <> anchorOf b <> "\">"
-      <> "<heading>" <> xesc (blockTitle b) <> "</heading>"
+      <> "<heading>" <> xesc (blockTitle cfg b) <> "</heading>"
       <> "<content>" <> bodyAkn b <> "</content>"
       <> "</paragraph>\n"
 
+  own = ownWords cfg
+  phrased = xt . inLanguage cfg
+
   bodyAkn b = case b.blockRenderedAs of
     RenderedReference _ -> p (xesc (fromMaybe "referenced" b.blockCitation))
-    RenderedInline -> flowAkn (blockFlow b) <> Text.concat [ p ("Source: " <> xesc s) | s <- b.blockSources ]
+    RenderedInline -> flowAkn (blockFlow b) <> Text.concat [ p (xesc (own "Source") <> ": " <> xesc s) | s <- b.blockSources ]
 
   flowAkn f =
     (if null f.flowLead then "" else p (joinSpans spanAkn f.flowLead))
@@ -719,27 +815,29 @@ renderAkn cfg doc =
       <> whereAkn f.flowWhere
 
   spanAkn = \case
-    Word t      -> xesc t
-    Phrase t    -> xt t
-    Key t       -> xesc t
-    Condition t -> xt t
-    Modal t     -> xesc t
-    Glue t      -> xesc t
+    Word t      -> xesc (own t)
+    Phrase t    -> phrased t
+    Key t       -> xesc (own t)
+    Condition t -> phrased t
+    Modal t     -> xesc (own t)
+    Glue t      -> xesc (inLanguage cfg t)
 
   contentAkn = \case
     NoBody -> ""
-    Items _ items -> blockList (map (item . flowAkn) items)
-    Fields fs -> blockList [ item (p (xt k <> if Text.null v then "" else " — " <> xt v)) | (k, v) <- fs ]
+    Items _ items -> blockList (map itemAkn items)
+    Fields fs -> blockList [ item (p (phrased k <> if Text.null v then "" else " — " <> phrased v)) | (k, v) <- fs ]
     Grid cols rows -> tableAkn cols rows
 
+  itemAkn f = item (maybe "" (\label -> "<num>" <> xesc label <> "</num>") f.flowLabel <> flowAkn f)
+
   whereAkn [] = ""
-  whereAkn defs = p "where:" <> blockList (map whereItem defs)
+  whereAkn defs = p (xesc (own "where") <> ":") <> blockList (map whereItem defs)
    where
     whereItem (h, f) = item (p (xt (capitalize (displayName h))) <> flowAkn f)
 
   tableAkn cols rows =
     "<table>"
-      <> "<tr>" <> Text.concat (map (\c -> "<th>" <> p (xesc (displayName c)) <> "</th>") cols) <> "</tr>"
+      <> "<tr>" <> Text.concat (map (\c -> "<th>" <> p (xesc (columnName cfg c)) <> "</th>") cols) <> "</tr>"
       <> Text.concat
            (map (\row -> "<tr>" <> Text.concat (map (\c -> "<td>" <> flowAkn (finish "" c) <> "</td>") row) <> "</tr>") rows)
       <> "</table>"
@@ -782,6 +880,13 @@ displayName = \case
   "EMPTY"   -> "an empty list"
   n | "_" `elem` Text.words n -> n
     | otherwise -> spaceCamel (Text.map (\c -> if c == '_' then ' ' else c) n)
+
+-- | A table's column heading: a field's name, or the subject of a decision.
+columnName :: RenderConfig -> Text -> Text
+columnName cfg c
+  | c `elem` ["Condition", "Result"] = ownWords cfg c
+  | Text.any (== '`') c              = displayVars (inLanguage cfg c)
+  | otherwise                        = displayName (stripFrameMarks c)
 
 -- | Every backticked name in a text, as a reader sees it, without the backticks.
 displayVars :: Text -> Text
@@ -843,7 +948,7 @@ collectLinks doc = Map.fromList (concatMap sec doc.docSections)
 
 blockTip :: Block -> Text
 blockTip b =
-  Text.strip (Text.take 200 (displayVars (b.blockConnector <> " " <> clauseSummary b.blockBody)))
+  Text.strip (Text.take 200 (stripFrameMarks (displayVars (b.blockConnector <> " " <> clauseSummary b.blockBody))))
 
 -- | A one-line gist of a clause for tooltips.
 clauseSummary :: Clause -> Text
@@ -858,12 +963,15 @@ clauseSummary = \case
   CDeontic p m a _ _ _ _ -> p <> " " <> m <> " " <> a
   CTable cols _  -> "a table of " <> Text.intercalate ", " cols
   CWhere body _  -> clauseSummary body
+  CLed lead _    -> lead
+  CLeadIn lead _ -> lead
+  CLabel _ body  -> clauseSummary body
 
 -- | A stable anchor for a section heading (from its number, else its heading).
 sectionAnchor :: DocSection -> Text
 sectionAnchor sec =
   "sec_" <> if Text.null sec.sectionNumber
-              then idSafe (fromMaybe "" sec.sectionHeading)
+              then idSafe (stripFrameMarks (fromMaybe "" sec.sectionHeading))
               else idSafe sec.sectionNumber
 
 -- | A linked, nested table of contents from the section hierarchy.
@@ -883,7 +991,7 @@ tocHtml cfg secs =
     in case sectionLabel cfg.numberSections depth s of
       Nothing -> subs   -- the unnumbered document-body root: splice children up
       Just h  ->
-        "<li><a href=\"#" <> sectionAnchor s <> "\">" <> esc h <> "</a>" <> subs <> "</li>"
+        "<li><a href=\"#" <> sectionAnchor s <> "\">" <> esc (inLanguage cfg h) <> "</a>" <> subs <> "</li>"
 
 esc :: Text -> Text
 esc =
@@ -922,6 +1030,9 @@ css = Text.intercalate "\n"
   , "  li.reference { color:var(--muted); }"
   , "  .citation { font-style:italic; }"
   , "  .source { font-size:.85em; font-style:italic; color:var(--muted); margin-top:.15rem; }"
+  , "  .group-lead { margin:.6rem 0 .5rem; }"
+  , "  ol.tree > li.labelled::before { content:none; }"
+  , "  ol.tree > li.labelled > .label { position:absolute; inset-inline-start:0; top:0; color:var(--muted); }"
   , "  .forced { font-size:.85em; color:#8a2b2b; font-style:normal; }"
   -- Table of contents.
   , "  nav.toc { margin:0 0 2rem; padding:1rem 1.25rem; background:#fafafa;"

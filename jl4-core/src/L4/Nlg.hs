@@ -1,5 +1,10 @@
 module L4.Nlg (
   simpleLinearizer,
+  markedLinearizer,
+  markFrame,
+  possessiveOf,
+  stripFrameMarks,
+  localiseMarked,
   simpleLinearizerIn,
   linearizeDirectives,
   linearizeDirectivesIn,
@@ -21,6 +26,7 @@ module L4.Nlg (
   nlgFnInfo,
   substituteNlgCalls,
   substituteNlgCall,
+  substituteNlgCallMarked,
   nlgRefs,
   daydateLiteral,
   substituteNlgCallsIn,
@@ -101,8 +107,77 @@ simpleLinearizer = renderLinTree . linearize
 simpleLinearizerIn :: Linearize a => Maybe LangTag -> a -> (Text, Set.Set Text)
 simpleLinearizerIn mlang a = first renderLinTree (localizeIn mlang (linearize a))
 
+-- | 'simpleLinearizer' with its frame words marked, for text that is kept and put
+-- into a language later. @l4 render@ builds its sentences before a writer sees
+-- them, so it cannot translate them as 'simpleLinearizerIn' does while
+-- linearizing; the marks carry the distinction between the author's words and the
+-- renderer's as far as the writer. The backtick round a name works the same way.
+markedLinearizer :: Linearize a => a -> Text
+markedLinearizer =
+    plainPossessives
+  . Text.replace (Text.unwords (map markFrame ["is", "equal", "to"])) (markFrame "is")
+  . renderTokens markFrame
+  . linearize
+
+-- | The possessive the linearizer supplies, set against what it follows and spelt
+-- to fit it. The linearizer writes it apart from the word before it, so this finds
+-- that and never an apostrophe of the author's.
+plainPossessives :: Text -> Text
+plainPossessives t = case Base.unsnoc (Text.splitOn " 's" t) of
+  Just (owners, rest) -> Text.concat (map possessiveOf owners <> [rest])
+  Nothing             -> t
+
+-- | "the applicant's", but "the facts'". Spelling, and nothing more: a word ending
+-- in one s takes the apostrophe alone, and one ending in two is a singular such as
+-- "the witness's". A trailing backtick closes a name, and comes before either.
+possessiveOf :: Text -> Text
+possessiveOf t
+  | lastWord == "it"                      = t <> "s"
+  | Text.isSuffixOf "ss" s                = t <> "'s"
+  | Text.isSuffixOf "s" s                 = t <> "'"
+  | otherwise                             = t <> "'s"
+ where
+  s = fromMaybe t (Text.stripSuffix "`" t)
+  lastWord = Text.takeWhileEnd (/= ' ') s
+
+-- | Mark words as the renderer's own. Unicode noncharacters, which are set aside
+-- for a program's internal use, so they cannot occur in an author's text.
+markFrame :: Text -> Text
+markFrame t = Text.singleton frameOpen <> t <> Text.singleton frameClose
+
+frameOpen, frameClose :: Char
+frameOpen  = '\xFDD0'
+frameClose = '\xFDD1'
+
+stripFrameMarks :: Text -> Text
+stripFrameMarks = Text.filter (\c -> c /= frameOpen && c /= frameClose)
+
+-- | Put marked text into a language, through the same phrasebook lookup as
+-- 'simpleLinearizerIn', so a phrase reads the same in @l4 nlg@ and in @l4 render@.
+-- A language with no phrasebook keeps the English, unmarked. A phrasebook is keyed
+-- in lower case, and a capital at the start of a frame word means nothing to it.
+localiseMarked :: Maybe LangTag -> Text -> Text
+localiseMarked mlang t = case phrasebookFor =<< mlang of
+  Nothing -> stripFrameMarks t
+  Just pb -> renderLinTree (fst (localize pb (markedTree t)))
+
+-- | Marked text as tokens: what is marked becomes frame words, one a word, as
+-- 'hcat' lays them out, so that a phrase can match across them.
+markedTree :: Text -> LinTree
+markedTree t0 = case Text.break (== frameOpen) t0 of
+  (plain0, rest)
+    | Just after' <- Text.stripPrefix " " plain0 -> text " " <> markedTree (after' <> rest)
+    | Text.null rest -> text plain0
+    | otherwise ->
+        let (marked, after) = Text.break (== frameClose) (Text.drop 1 rest)
+            framed = mconcat (intersperse (text " ") (map (frame . Text.toLower) (Text.words marked)))
+        in text plain0 <> framed <> markedTree (Text.drop 1 after)
+
 renderLinTree :: LinTree -> Text
-renderLinTree tree =
+renderLinTree = renderTokens id
+
+renderTokens :: (Text -> Text) -> LinTree -> Text
+renderTokens onFrame tree =
   let
     sp :: Text
     sp = " "
@@ -114,7 +189,7 @@ renderLinTree tree =
       LinUser -> t.payload
       LinVar -> "`" <> t.payload <> "`"
       LinText -> t.payload
-      LinFrame -> t.payload
+      LinFrame -> onFrame t.payload
   in
     case tree.tokens of
       [] -> ""
@@ -598,39 +673,39 @@ instance Linearize (Expr Resolved) where
       [ frame "the"
       , frame "sum"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Minus _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isArithNode e1
       , frame "minus"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Times _ e1 e2 -> hcat
       [ frame "the"
       , frame "product"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     DividedBy _ e1 e2 -> hcat
       [ frame "the"
       , frame "result"
       , frame "of"
       , frame "dividing"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "by"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Modulo _ e1 e2 -> hcat
       [ frame "the"
       , frame "result"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "modulo"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Cons _ e1 e2 -> hcat
       [ lin e1
@@ -754,9 +829,10 @@ instance Linearize (Expr Resolved) where
       <> maybe [] (\r -> [ frame "because", lin r ]) mReason
     Inert _ txt _ctx -> text txt
 
--- | An operand of a connective, in brackets if it is the kind of compound that
--- flat text would regroup: @a AND (b OR c)@ reads "a and (b or c)", and not "a
--- and b or c", which states a different rule. A sentence the author wrote for the
+-- | An operand, in brackets if it is the kind of compound that flat text would
+-- regroup: @a AND (b OR c)@ reads "a and (b or c)", and not "a and b or c", which
+-- states a different rule, and @10 MINUS (5 MINUS 2)@ reads "10 minus (5 minus 2)",
+-- and not the words of @(10 MINUS 5) MINUS 2@. A sentence the author wrote for the
 -- operand carries its own meaning and is left as it is.
 groupedUnder :: (Expr Resolved -> Bool) -> Expr Resolved -> LinTree
 groupedUnder needsBrackets e
@@ -764,9 +840,12 @@ groupedUnder needsBrackets e
       text "(" <> lin e <> text ")"
   | otherwise = lin e
 
-isAndNode, isOrNode :: Expr Resolved -> Bool
+isAndNode, isOrNode, isArithNode :: Expr Resolved -> Bool
 isAndNode = \ case And{} -> True; RAnd{} -> True; _ -> False
 isOrNode  = \ case Or{} -> True; ROr{} -> True; _ -> False
+isArithNode = \ case
+  Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
+  _ -> False
 
 instance Linearize (Event Resolved) where
   linearize (MkEvent _ p a t _) = hcat
@@ -1117,7 +1196,16 @@ substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) (substit
 -- expression. @l4 render@ walks the tree itself, because it phrases a call's
 -- arguments for a reader before they are spliced in.
 substituteNlgCall :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
-substituteNlgCall mlang info = \case
+substituteNlgCall mlang =
+  splicingCall mlang (\w -> fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang))
+
+-- | 'substituteNlgCall' for @l4 render@, whose own words stay marked until a
+-- writer puts them into the document's language.
+substituteNlgCallMarked :: NlgFnInfo -> Expr Resolved -> Expr Resolved
+substituteNlgCallMarked = splicingCall Nothing markFrame
+
+splicingCall :: Maybe LangTag -> (Text -> Text) -> NlgFnInfo -> Expr Resolved -> Expr Resolved
+splicingCall mlang word info = \case
   App ann n args
     | Just (nlg, params) <- Map.lookup (getUnique n) info
     , length params == length args
@@ -1166,7 +1254,6 @@ substituteNlgCall mlang info = \case
     | Just (_, _ : _) <- Map.lookup (getUnique sel) info -> Proj ann e (plainName sel)
   e -> e
  where
-  word w = fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang)
   -- A maqaf-final rendering is written against the next word.
   prefix w | Text.takeEnd 1 w == Text.singleton maqaf = w
            | otherwise                                = w <> " "
@@ -1196,9 +1283,21 @@ renderNlgWith = renderNlgWithIn Nothing
 
 renderNlgWithIn :: Maybe LangTag -> Map.Map Unique (Expr Resolved) -> Nlg -> Text
 renderNlgWithIn mlang argMap = \case
-  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (map frag frags))
+  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (agreeing frags))
   other                 -> simpleLinearizer other
  where
+  -- The parser keeps one text fragment per token, so the words after a slot are
+  -- gathered before 'singularUnit' looks at them.
+  agreeing = \case
+    r@(MkNlgRef{}) : rest
+      | frag r == "1"
+      , (words', others) <- span isWords rest ->
+          frag r : singularUnit (foldMap frag words') : agreeing others
+    f : rest -> frag f : agreeing rest
+    [] -> []
+  isWords = \case
+    MkNlgText{} -> True
+    MkNlgRef{}  -> False
   -- Escapes decode HERE, not in the lexer: the annotation token carries
   -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
   -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
@@ -1211,6 +1310,17 @@ renderNlgWithIn mlang argMap = \case
   frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
     Just a  -> fst (simpleLinearizerIn mlang a)
     Nothing -> resolvedText r
+
+-- | The words after a slot that held the number 1: a sentence written for any
+-- count says "%n% months", and "1 months" is never what its author meant. Only a
+-- unit of time directly after the slot changes.
+singularUnit :: Text -> Text
+singularUnit t = case Text.stripPrefix " " t of
+  Just rest
+    | (unit, after) <- Text.break (not . isLetter) rest
+    , unit `elem` ["years", "months", "weeks", "days", "hours", "minutes", "seconds"] ->
+        " " <> Text.dropEnd 1 unit <> after
+  _ -> t
 
 resolvedText :: Resolved -> Text
 resolvedText = nameToText . getActual
