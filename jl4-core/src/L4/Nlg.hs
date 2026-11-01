@@ -521,9 +521,9 @@ instance Linearize (Expr Resolved) where
       [ frame "the"
       , frame "difference"
       , frame "between"
-      , lin e2
-      , frame "and"
       , lin e1
+      , frame "and"
+      , lin e2
       ]
     Times _ e1 e2 -> hcat
       [ frame "the"

@@ -105,12 +105,24 @@
     "",
     "Canon's sg-csp.l4:79 still USES ASSUME; the diagnostic is telling its author",
     "to move to a section-level GIVEN. Re-blessing makes the golden truthful.",
-    "Migrating the encoding is a canon-side improvement and is not done."
+    "Migrating the encoding is a canon-side improvement and is not done.",
+    "",
+    "SECOND BRANCH PIN, 2026-11-01 (MOONWALK + TIMECAPSULE, explore-verify):",
+    "`a MINUS b` now reads \"the difference between a and b\" (it read b first),",
+    "which moves four lines in two blessed nlg goldens: sg/child-support",
+    "sg-child-support-cases.nlg.golden:27-28 and il/ofek-hadash-2008",
+    "ofek-cases.nlg.golden:17,25. They were re-blessed in commons on branch",
+    "fix/nlg-minus-order-at-pin, whose parent is the previous pin 6b6476d6, so",
+    "this bump moves exactly those four lines and nothing else. It is a BRANCH",
+    "pin on purpose: commons main had moved 84 files in the blessed directories",
+    "since 6b6476d6 (child-support restructured), so catching the mirror up to",
+    "main is a separate job, NOT done here. Re-point at a main SHA when that job",
+    "lands; until then delete_branch_on_merge=false keeps this SHA reachable."
   ],
   "repo": "legalese/commons",
-  "sha": "6b6476d6d94aeaaeb6fdcbf498c89316ee95b570",
-  "ref": "main",
-  "pinned": "2026-09-26",
+  "sha": "b38cd5ab364fbd045a2c3bef7047bdc9d3d408d4",
+  "ref": "fix/nlg-minus-order-at-pin",
+  "pinned": "2026-11-01",
   "blessed": [
     {
       "from": "subjects/sg/child-support/encodings/legalese",

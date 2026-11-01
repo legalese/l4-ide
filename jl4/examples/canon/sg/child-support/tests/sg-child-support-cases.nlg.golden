@@ -24,8 +24,8 @@
 `the change to the cash line for` with `Chloe` is equal to -1000
 `the change to the cash line for` with `Aisha` is equal to -1000
 `the change to the cash line for` with `Devi` is equal to 0
-the difference between `settled gift for` with `Devi` and `settled gift for` with `Chloe` is equal to 10000
-the difference between `lifetime Gift-line cash for` with `Devi` and `lifetime Gift-line cash for` with `Chloe` is equal to 2000
+the difference between `settled gift for` with `Chloe` and `settled gift for` with `Devi` is equal to 10000
+the difference between `lifetime Gift-line cash for` with `Chloe` and `lifetime Gift-line cash for` with `Devi` is equal to 2000
 `settled support change for` with `Bala` is greater than 0
 `settled support change for` with `Aisha` is greater than 0
 `co-matching cap under the outgoing scheme for` with `Aisha` is equal to 4000
