@@ -569,6 +569,14 @@ nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
 nlgBareReference :: FilePath
 nlgBareReference = fixtureDir </> "nlg-bare-reference.l4"
 
+-- Nested arithmetic, each #EVAL commented with its value.
+nlgArithGrouping :: FilePath
+nlgArithGrouping = fixtureDir </> "nlg-arith-grouping.l4"
+
+-- Arithmetic whose operand is a call, a rule's sentence or an IF.
+nlgArithOperands :: FilePath
+nlgArithOperands = fixtureDir </> "nlg-arith-operands.l4"
+
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
 nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
@@ -726,6 +734,7 @@ coreFixtures =
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
+  , nlgArithGrouping, nlgArithOperands
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -4260,6 +4269,70 @@ spec bin = do
         , "Own biggest means the items of [xs] combined from the right with max, starting from 0."
         , "Own mapper means fmap."
         ]
+
+  -- An operand of an arithmetic phrase says where it starts and ends, or two
+  -- calculations with different answers read alike.
+  describe "l4 nlg and nested arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgArithGrouping]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads each grouping as it is written" $
+      rows >>= (`shouldBe`
+        [ "10 minus (5 minus 2)"
+        , "(10 minus 5) minus 2"
+        , "the product of 4 and (5 minus 2)"
+        , "(the product of 4 and 5) minus 2"
+        , "the sum of 4 and (5 minus 2)"
+        , "(the sum of 4 and 5) minus 2"
+        , "10 minus (the sum of 5 and 2)"
+        , "the sum of (10 minus 5) and 2"
+        , "the result of dividing 12 by (6 minus 2)"
+        , "(the result of dividing 12 by 6) minus 2"
+        , "the product of (the sum of 4 and 5) and 2"
+        , "the sum of 4 and (the product of 5 and 2)"
+        , "(the result of 12 modulo 5) minus 1"
+        , "the result of 12 modulo (5 minus 1)"
+        , "the result of (10 minus 4) modulo 3"
+        , "10 minus (the result of 4 modulo 3)"
+        , "10 minus 4 is greater than 5"
+        ])
+
+    it "gives no two groupings the same words" $ do
+      out <- rows
+      length (nub out) `shouldBe` length out
+
+  -- A call's arguments, an IF's ELSE and a rule's own sentence do not say where
+  -- they end, so "minus" after one would read as part of it.
+  describe "l4 nlg and operands that are not arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgArithOperands]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads each grouping as it is written" $
+      rows >>= (`shouldBe`
+        [ "(`f2` with 2 and 5) minus 3"
+        , "`f2` with 2 and (5 minus 3)"
+        , "(5 doubled) minus 2"
+        , "(5 minus 2) doubled"
+        , "5 minus (2 doubled)"
+        , "(twice 5) minus 2"
+        , "twice (5 minus 2)"
+        , "(if `TRUE` then 1 else 10) minus 3"
+        , "if `TRUE` then 1 else 10 minus 3"
+        , "(the sum of 5 and 2) doubled"
+        , "the sum of 5 and (2 doubled)"
+        , "the sum of (`f2` with 2 and 5) and 3"
+        , "`f2` with 2 and the sum of 5 and 3"
+        , "2 less (3 minus 5)"
+        , "(2 less 3) minus 5"
+        ])
+
+    it "gives no two groupings the same words" $ do
+      out <- rows
+      length (nub out) `shouldBe` length out
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
