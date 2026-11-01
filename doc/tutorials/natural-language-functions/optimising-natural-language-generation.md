@@ -156,9 +156,9 @@ The first renders as "The balance due equals the purchase price − the deposit 
 
 Legal writing sometimes uses letters on purpose, as in "A person (A) discriminates against another (B) if …" (Equality Act 2010, s.13). There, single letters are the right choice.
 
-When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". This works well when only one input has that type; two inputs of the same type would share the same phrase.
+When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". A role written as a name of its own is kept: ``GIVEN `the applicant` IS A Person`` reads "the applicant", not "the person". This works well when only one input has that type; two inputs of the same type would share the same phrase.
 
-**Name record fields readably.** A field renders as "X's field", so field names go straight into the prose:
+**Name record fields readably.** A field renders as "X's field", so field names go straight into the prose. A `BOOLEAN` field states something, so it reads as a statement: "the applicant is a citizen", "the processing is necessary for a contract". Field names go straight into the prose:
 
 ```l4
 DECLARE `Property Details`
@@ -196,7 +196,7 @@ GIVETH A NUMBER
 `the deadline` MEANS `the later of` `start date` `end date`
 ```
 
-The call renders as "the later of start date and end date". The same function named `` `maximum` `` renders as "maximum with start date and end date".
+The call renders as "the later of start date and end date". The same function named `` `maximum` `` renders as "maximum for start date and end date".
 
 **Let control flow stay structured.** `CONSIDER`, `IF`/`THEN`/`ELSE` and `AND`/`OR` render as indented outlines, not run-on sentences, so keep the operative logic where the renderer can see it:
 
@@ -215,10 +215,9 @@ GIVETH A STRING
 renders as
 
 ```
-• The reminder is determined by:
-    depending on the claim's status:
-    - if it is Paid: none
-    - if it is Overdue: send a reminder
+1. The reminder depends on the claim's status:
+    (a) If the claim's status is Paid: none;
+    (b) If the claim's status is Overdue: send a reminder.
 ```
 
 **Keep arithmetic as arithmetic.** Numeric expressions render as formulas, with `+ − × ÷` and parentheses, not as "the sum of the product of …":
@@ -254,7 +253,7 @@ DECIDE `the applicant` `is of working age` IF
     `the applicant`'s `age` AT LEAST 18
 ```
 
-With **Number sections** turned on in the Render tab (or `--number-sections` on the command line), the headings are numbered: `§ 2  Eligibility`, then `2.1  Age requirements`. A file with no section markers is still grouped into automatic **Definitions** and **Provisions** sections, but your own markers let you name and order the parts the way a reader of the contract or statute expects.
+Headings are numbered by default, in the Render tab and on the command line (turn it off with `--no-number-sections`): `§ 2  Eligibility`, then `2.1  Age requirements`. A file with no section markers is still grouped into automatic **Definitions** and **Provisions** sections, but your own markers let you name and order the parts the way a reader of the contract or statute expects.
 
 ---
 
@@ -279,9 +278,14 @@ GIVETH A NUMBER
 Each slot is filled with the input's name in the definition itself, and with the actual argument at each call:
 
 ```
-• Bigger means whichever is larger of x and y.
-• The deadline means whichever is larger of start date and end date.
+1. Whichever is larger of x and y is:
+    (a) If x is at least y: x;
+    (b) Otherwise: y.
+…
+4. The deadline means whichever is larger of start date and end date.
 ```
+
+The sentence heads the definition and its body follows; a call reads as the sentence alone.
 
 A slot is **tight**: `%amount%`, with no spaces inside the delimiters. That is
 what keeps a written-out percentage from being mistaken for one. In
@@ -295,12 +299,31 @@ and so is not a slot; `%amount%` still is one. Where a percent sign would end up
 flush against a word — `5%levy` — wrap it in backticks (`` `5%` ``) or spell it
 out ("5 percent"), either of which puts it beyond doubt.
 
-**It replaces the body.** A function with `@nlg` renders as its sentence, not as its implementation. That is what makes recursive library functions readable; the prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so a call reads as a sentence instead of exposing the recursion.
+**It heads the rule, and the logic stays.** A rule with `@nlg` opens with its sentence, and its body follows as usual, so annotating a rule never removes a condition from the document:
+
+```l4
+GIVEN `the applicant` IS AN Applicant
+GIVETH A BOOLEAN
+@nlg %`the applicant`% qualifies for the grant
+DECIDE `qualifies` IF
+      `the applicant`'s `is a citizen`
+  AND `the applicant`'s `age` >= 21
+```
+
+renders as
+
+```text
+The applicant qualifies for the grant if:
+    (a) the applicant is a citizen; and
+    (b) the applicant's age is at least 21.
+```
+
+The sentence stands in for the body only where the body would not help a reader: in a rule that calls itself, and in a rule from an imported module. The prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so it reads as that sentence and does not expose the recursion. Every rule in the standard libraries has a sentence, so a call to one reads as prose.
 
 | Situation                                            | Why `@nlg` helps                                   |
 | ---------------------------------------------------- | -------------------------------------------------- |
-| Recursive or higher-order helpers                    | Describes the result, hides the implementation     |
-| A formula better said in words                       | "the pro-rated premium" instead of the arithmetic  |
+| Recursive or higher-order helpers                    | Describes the result, hides the recursion          |
+| A rule called from other rules                       | Every call reads as the sentence                   |
 | Terms of art                                         | Matches the exact statutory or contractual wording |
 | A name that cannot be both valid code and good prose | Separates the two                                  |
 
@@ -591,7 +614,7 @@ GIVETH A NUMBER
 pmt p r n MEANS p TIMES r DIVIDED BY (1 MINUS EXPONENT (1 PLUS r) (0 MINUS n))
 ```
 
-This renders as "Pmt equals p × r ÷ (1 − EXPONENT with the sum of 1 and r and the difference between 0 and n)."
+This renders as "Pmt equals p × r ÷ (1 − EXPONENT with 1 + r and 0 − n)."
 
 After, with descriptive names and one `@nlg`:
 

@@ -123,7 +123,7 @@ Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the reque
 
 ### @nlg
 
-`@nlg` gives the natural-language wording of a definition, with `%name%` slots for its inputs. Write it at the end of the definition's line, or on a line of its own above it ([Where to put it](#where-to-put-it)). `l4 render` and the editor use it when they put the rule into words.
+`@nlg` gives the natural-language wording of a definition, with `%name%` slots for its inputs. Write it at the end of the definition's line, or on a line of its own above it ([Where to put it](#where-to-put-it)). `l4 render` and the editor use it when they put the rule into words: the sentence heads the rule, its body follows, and every call to the rule reads as the sentence.
 
 ```l4
 GIVEN x IS A NUMBER, y IS A NUMBER
