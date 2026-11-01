@@ -68,6 +68,7 @@ import qualified L4.EvaluateLazy as EL
 import qualified L4.Export as Export
 import qualified L4.Export.Document as ExportDoc
 import qualified L4.Export.Render as ExportRender
+import qualified L4.Nlg as Nlg
 import qualified L4.FunctionSchema as FSchema
 
 data ReactorMessage
@@ -727,7 +728,10 @@ handlers evalConfig recorder =
                              , ExportRender.docLang =
                                  Maybe.fromMaybe defaultModuleLang
                                    (declaredModuleLang . fst =<< mToks) }
-                    doc = ExportDoc.buildDocument ecfg tcResult.module' deps
+                    -- The same preparation as `l4 render`: a herald written after a
+                    -- rule's last input is moved onto the rule.
+                    (docModule, docDeps) = Nlg.prepareModules Nothing tcResult.module' deps
+                    doc = ExportDoc.buildDocument ecfg docModule docDeps
                     content = case reqParams.format of
                       "text" -> ExportRender.renderText rcfg doc
                       "akn"  -> ExportRender.renderAkn rcfg doc
@@ -758,7 +762,8 @@ handlers evalConfig recorder =
                 , _xdata = Nothing }
               Just tcResult -> do
                 let deps = drop 1 (flattenExportModules tcResult)
-                    plan = ExportDoc.buildPlan ExportDoc.defaultExportConfig tcResult.module' deps
+                    (planModule, planDeps) = Nlg.prepareModules Nothing tcResult.module' deps
+                    plan = ExportDoc.buildPlan ExportDoc.defaultExportConfig planModule planDeps
                 pure $ Right $ Aeson.toJSON plan
     ]
 
