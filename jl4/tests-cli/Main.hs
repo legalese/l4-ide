@@ -438,8 +438,9 @@ nlgArithGrouping :: FilePath
 nlgArithGrouping = fixtureDir </> "nlg-arith-grouping.l4"
 
 -- Arithmetic whose operand is a call, a rule's sentence or an IF.
-nlgArithOperands :: FilePath
-nlgArithOperands = fixtureDir </> "nlg-arith-operands.l4"
+nlgArithOperands, renderArithOperands :: FilePath
+nlgArithOperands    = fixtureDir </> "nlg-arith-operands.l4"
+renderArithOperands = fixtureDir </> "render-arith-operands.l4"
 
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
@@ -712,7 +713,7 @@ main = do
        , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
-       , nlgArithGrouping, nlgArithOperands
+       , nlgArithGrouping, nlgArithOperands, renderArithOperands
        , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
@@ -2131,9 +2132,9 @@ spec bin = do
           , "Render greater means the greater of [n] and 100."
           , "Render nested means the smaller of the smaller of [n] and 100 and 200."
           , "Render of [n] means the smaller of [n] and 100."
-          , "Render exceeds with [n] equals the amount by which a exceeds b where a is n and b is 100 + 1."
-          , "Render gap with [n] equals the gap between a and b where a is n and b is 100 + 1."
-          , "Render lower with [n] equals the smaller of a and b where a is n and b is 100 + 1."
+          , "Render exceeds with [n] equals (the amount by which a exceeds b where a is n and b is 100) + 1."
+          , "Render gap with [n] equals (the gap between a and b where a is n and b is 100) + 1."
+          , "Render lower with [n] equals (the smaller of a and b where a is n and b is 100) + 1."
           , "Render half selector means the span's size's half."
           , "Render third selector means the span's size's third."
           , "Render exceeds direct means the amount by which a exceeds b where a is n and b is 100."
@@ -2167,7 +2168,7 @@ spec bin = do
           pure [ dropWhile (not . Char.isAlpha) l
                | l <- map (filter (/= '\r')) (lines sout)
                , "Mid rule " `isInfixOf` l ]
-        expected = ["Mid rule equals the gap between a and b where a is n and b is 100 + 1."]
+        expected = ["Mid rule equals (the gap between a and b where a is n and b is 100) + 1."]
 
     it "reads the same when the middle module is the one rendered" $ do
       rows <- midRows nlgTransMid
@@ -2546,6 +2547,29 @@ spec bin = do
     it "gives no two groupings the same words" $ do
       out <- rows
       length (nub out) `shouldBe` length out
+
+  describe "l4 render and operands that are not arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderArithOperands]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a call, a sentence or an IF beside an operator" $ do
+      hasRow "Call then minus equals (f2 for 2 and x) − 3."
+      hasRow "Sentence then minus equals (twice [x]) − 3."
+      hasRow "If then minus equals (if c then 1 else 10) − x."
+      hasRow "Year then minus equals (the year of d) − 1."
+      hasRow "Call then minus then call equals a − (f2 for b and c) − d."
+
+    it "brackets arithmetic given to a call or a sentence" $ do
+      hasRow "Minus in a call means f2 for 2 and (x − 3)."
+      hasRow "Minus in a sentence means twice (x − 3)."
+      hasRow "Months less one means the date (n − 1) months after [d]"
+      hasRow "Minus of a call of minus equals a − (f2 for b and (c − d))."
+
+    it "leaves arithmetic inside arithmetic as the formula has it" $
+      hasRow "Times of minus equals 4 × (x − 2)."
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do

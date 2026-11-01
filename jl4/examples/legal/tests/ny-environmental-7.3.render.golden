@@ -127,7 +127,7 @@ Provisions:
     (a) If Tentative or recommended decision will contain a final EIS for the decision: Never;
     (b) Otherwise: depending on Cause for extension:
         (i) If Cause for extension is absent: the day number of Closing date;
-        (ii) If Cause for extension is present, with the value cause: the day number of Closing date + 45 + Days of extension.
+        (ii) If Cause for extension is present, with the value cause: the day number of (Closing date + 45 + Days of extension).
     where:
     - Closing date equals the decision's Proceeding Record's Closing date + 45.
 
@@ -152,7 +152,7 @@ Provisions:
     (a) If Good cause to delay: FULFILLED;
     (b) Otherwise: depending on the action's EIS's Final filing date:
         (i) If the action's EIS's Final filing date is absent: FULFILLED;
-        (ii) If the action's EIS's Final filing date is present, with the value date: Commission must Render decision on whether or not to approve action (the action) within the day number of date + 30.
+        (ii) If the action's EIS's Final filing date is present, with the value date: Commission must Render decision on whether or not to approve action (the action) within (the day number of date) + 30.
 
 2. Never means -1.
 

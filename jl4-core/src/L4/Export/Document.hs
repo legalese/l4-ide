@@ -1697,11 +1697,26 @@ arithChainClause e = case carameliseNode e of
         let uniform = all ((== firstOp) . fst) terms
             lead    = if uniform then uniformLead else "the following"
             line i (op, t)
-              | i == (0 :: Int) || uniform = leafText t
-              | otherwise                  = word op <> " " <> leafText t
+              | i == (0 :: Int) || uniform = term t
+              | otherwise                  = word op <> " " <> term t
         in Just (CChain lead (zipWith line [0 ..] terms))
+  -- A line holds one operand, and says where it ends, so the brackets an operand
+  -- is given inside a formula ('rewriteWith') are not needed on it.
+  term = unbracketed . leafText
   addWord o = if o == "-" then "minus" else "plus"
   mulWord o = if o == "÷" then "divided by" else "times"
+
+-- | Text without the brackets round the whole of it, if it has them.
+unbracketed :: Text -> Text
+unbracketed t = case Text.uncons t of
+  Just ('(', rest)
+    | Just (inner, ')') <- Text.unsnoc rest, balanced (0 :: Int) (Text.unpack inner) -> inner
+  _ -> t
+ where
+  balanced d []         = d == 0
+  balanced d ('(' : cs) = balanced (d + 1) cs
+  balanced d (')' : cs) = d > 0 && balanced (d - 1) cs
+  balanced d (_ : cs)   = balanced d cs
 
 -- | Walk the left spine of an operator chain into @(operator, operand)@ pairs,
 -- leftmost first (its operator is the chain's identity, "+" or "×"). Right
@@ -1803,8 +1818,11 @@ rewriteExpr = rewriteWith noReading
 -- beforehand: spliced first, its arguments would miss every rewrite below and
 -- print raw, in the middle of an otherwise readable sentence.
 rewriteWith :: Reading -> Expr Resolved -> Expr Resolved
-rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
+rewriteWith rd = go
  where
+  -- 'transformOf', except that an arithmetic node also sees its operands as
+  -- they were before they were rewritten ('groupOperands').
+  go e = rw (herald (groupOperands e (over (gplate @(Expr Resolved)) go e)))
   inert ann t = Inert ann t InertCtxNone
   herald = \case
     -- A date given as literals reads as the date, whatever its rule's sentence.
@@ -1816,10 +1834,52 @@ rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
     App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
     App ann n args
       | Just (_, inputs) <- Map.lookup (getUnique n) rd.rdHeralds, length inputs == length args ->
-          substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (slotText rd)) args))
-      | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
+          substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument (slotText rd))) args))
+      | ownBrackets n -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
+      | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument leafText)) args))
     e -> substituteNlgCallMarked rd.rdHeralds e
   asText f a = Inert (a ^. annoOf) (f a) InertCtxNone
+  -- An arithmetic argument is bracketed: printed as a formula it has no end, and
+  -- "f2 for 2 and x − 3" also reads as @`f2` 2 x MINUS 3@. So does a sentence's
+  -- slot: "twice (x − 3)". A maths function brackets its argument itself
+  -- ("sqrt(x)"), and a present value reads as the value.
+  argument f a
+    | isArithmetic (carameliseNode a), isNothing (nlgOf a) = "(" <> f a <> ")"
+    | otherwise = f a
+  ownBrackets n = Map.member (nameToText (getActual n)) mathUnaryFns || nameIs "JUST" n
+  -- An operand that is a call, a rule's sentence or an IF is printed as prose,
+  -- and prose has no end: "f2 for 2 and x − 3" is also how @`f2` 2 (x MINUS 3)@
+  -- would read, and "if c then 1 else 10 − x" how the IF with a subtraction in
+  -- its ELSE would. So such an operand of an arithmetic operator is bracketed.
+  -- It is told by the shape it had before it was rewritten, since rewritten it is
+  -- 'Inert' text like any other leaf; a date written as literals, or a maths
+  -- function, says where it ends and is not bracketed. No word of a name or a
+  -- sentence is read.
+  groupOperands orig new = case (carameliseNode orig, new) of
+    (Plus _ a b,      Plus ann a' b')      -> Plus ann (operand a a') (operand b b')
+    (Minus _ a b,     Minus ann a' b')     -> Minus ann (operand a a') (operand b b')
+    (Times _ a b,     Times ann a' b')     -> Times ann (operand a a') (operand b b')
+    (DividedBy _ a b, DividedBy ann a' b') -> DividedBy ann (operand a a') (operand b b')
+    (Modulo _ a b,    Modulo ann a' b')    -> Modulo ann (operand a a') (operand b b')
+    _ -> new
+  operand o o'
+    | opensAtEnd (carameliseNode o) =
+        Inert (o' ^. annoOf) ("(" <> normalizeWs (simpleLinearizer o') <> ")") InertCtxNone
+    | otherwise = o'
+  opensAtEnd = \case
+    App _ n args@(_ : _) ->
+      isNothing (daydateLiteral n args)
+        && not (nameIs "Date" n && isJust (dateFromArgs args))
+        && isNothing (monthDateFromArgs n args)
+        && not (ownBrackets n)
+    AppNamed{}   -> True
+    IfThenElse{} -> True
+    MultiWayIf{} -> True
+    Consider{}   -> True
+    _            -> False
+  isArithmetic = \case
+    Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
+    _ -> False
   rw = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.
     Where _ e _ -> e
