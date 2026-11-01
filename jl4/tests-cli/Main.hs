@@ -171,14 +171,26 @@ runL4In mCwd mEnv bin args = do
   hClose hin
   hSetBinaryMode hout True
   hSetBinaryMode herr True
-  soutBytes <- BS.hGetContents hout
-  serrBytes <- BS.hGetContents herr
+  (soutBytes, serrBytes) <- readOutputs hout herr
   code <- waitForProcess ph
   pure Output
     { outExit   = code
     , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
+
+-- | Read a child's stdout and stderr to their ends at the same time. Reading
+-- them one after the other deadlocks as soon as the child fills the pipe that
+-- isn't being read: it waits for room there, and we wait for it to close the
+-- other one. How much a pipe holds differs by platform, so that can pass
+-- everywhere but Windows.
+readOutputs :: Handle -> Handle -> IO (BS.ByteString, BS.ByteString)
+readOutputs hout herr = do
+  errVar <- newEmptyMVar
+  _ <- forkIO (BS.hGetContents herr >>= putMVar errVar)
+  outBytes <- BS.hGetContents hout
+  errBytes <- takeMVar errVar
+  pure (outBytes, errBytes)
 
 -- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
 -- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports
@@ -778,6 +790,64 @@ spec bin = do
   -- command line, and the verdict looked only at the named file's typecheck. A
   -- self-import is the exception: there the error lands on the entry file, so
   -- it already failed, which makes it the positive control for the rest.
+  describe "a file on a ring of imports is refused, not run with the import left out" $ do
+    let rule imports = unlines $
+          map ("IMPORT " <>) imports <>
+          [ ""
+          , "@export Doubles a number"
+          , "GIVEN x IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE doubled x IS x TIMES 2"
+          ]
+        withProject act = withSystemTempDirectory "l4-import-ring" \dir -> do
+          writeFile (dir </> "left.l4") (rule ["right"])
+          writeFile (dir </> "right.l4") "IMPORT left\n\nDECIDE `the rate` IS 2\n"
+          writeFile (dir </> "solo.l4") (rule ["solo"])
+          writeFile (dir </> "plain.l4") (rule [])
+          writeFile (dir </> "inputs.json") "[{\"x\": 1}]"
+          act dir
+        schemaGenerator =
+          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+
+    it "the same rule with no ring goes through both, which is what the rest refuses" $
+      withProject \dir -> do
+        Output batchCode _ _ <- runL4 bin ["batch", dir </> "plain.l4", "--inputs", dir </> "inputs.json"]
+        batchCode `shouldBe` ExitSuccess
+        schema <- schemaGenerator
+        Output schemaCode _ _ <- runL4 schema [dir </> "plain.l4"]
+        schemaCode `shouldBe` ExitSuccess
+
+    forM_ [("a ring of imports", "left.l4"), ("a self-import", "solo.l4")] \(what, file) -> do
+      it ("l4 batch refuses " <> what) $
+        withProject \dir -> do
+          Output code sout _ <- runL4 bin ["batch", dir </> file, "--inputs", dir </> "inputs.json"]
+          code `shouldBe` ExitFailure 1
+          sout `shouldSatisfy` ("type checking failed" `isInfixOf`)
+
+      it ("jl4-schema refuses " <> what) $
+        withProject \dir -> do
+          schema <- schemaGenerator
+          Output code _ serr <- runL4 schema [dir </> file]
+          code `shouldBe` ExitFailure 1
+          serr `shouldSatisfy` ("Failed to parse or typecheck" `isInfixOf`)
+
+    -- More on stderr than any platform's pipe holds, and nothing on stdout. A
+    -- Windows pipe holds about 4 KB, so the ring above stopped the release build
+    -- there and passed everywhere else; this one would stop it everywhere.
+    it "jl4-schema refuses a ring too long for its log to fit in a pipe" $
+      withSystemTempDirectory "l4-long-ring" \dir -> do
+        let links = 100 :: Int
+            link i = "link" <> show (i `mod` links)
+        forM_ [1 .. links] \i ->
+          writeFile (dir </> link i <> ".l4") ("IMPORT " <> link (i + 1) <> "\n\nDECIDE `the rate` IS 2\n")
+        schema <- schemaGenerator
+        finished <- timeout 60000000 (runL4 schema [dir </> link 1 <> ".l4"])
+        case finished of
+          Nothing -> expectationFailure "jl4-schema did not finish within a minute"
+          Just (Output code _ serr) -> do
+            code `shouldBe` ExitFailure 1
+            length serr `shouldSatisfy` (> 65536)
+
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
       it ("fails " <> cmd <> " on a 3-module import ring") $
@@ -1676,8 +1746,7 @@ spec bin = do
           hClose hin
           hSetBinaryMode hout True
           hSetBinaryMode herr True
-          soutBytes <- BS.hGetContents hout
-          _ <- BS.hGetContents herr
+          (soutBytes, _) <- readOutputs hout herr
           _ <- waitForProcess ph
           -- the banner, then one reply after each prompt, then the last prompt's goodbye
           let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))

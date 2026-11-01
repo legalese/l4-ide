@@ -6,7 +6,7 @@ File: mixfix-wrong-keyword.l4
   Range: 12:22-12:55
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/mixfix-mismatch
   Message:
     Expected keyword `mythen` but found `myelse`
     In expression involving: myif
@@ -17,7 +17,7 @@ File: mixfix-wrong-keyword.l4
   Range: 12:22-12:55
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 
@@ -31,7 +31,7 @@ File: mixfix-wrong-keyword.l4
   Range: 12:34-12:42
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -46,7 +46,7 @@ File: mixfix-wrong-keyword.l4
   Range: 12:45-12:53
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 

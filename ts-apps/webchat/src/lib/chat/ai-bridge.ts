@@ -15,9 +15,8 @@
 // transcript — including reconstructed L4 rule cards — is fetched on demand via
 // `GET {apiBaseUrl}/v1/conversations/{id}` when a conversation is reopened.
 //
-// Only the deployment path is implemented — server-side tools (the `comply`
-// pipeline) run in the proxy, so there is no client tool dispatch, MCP, editor
-// context, mentions, or permissions here.
+// Only the deployment path is implemented — tools run on the server, so there is
+// no client tool dispatch, MCP, editor context, mentions, or permissions here.
 
 import {
   // inbound (host → webview) — we emit these into the store's handlers
@@ -79,7 +78,7 @@ export interface BridgeConfig {
   /** Deployment API root for this org — `{API_BASE}/{orgSlug}`. The
    *  per-function schema endpoint (`/deployments/{id}/functions/{fn}`,
    *  used for L4-syntax rendering of rule tool-calls) lives here, NOT
-   *  on the ai-proxy `apiBaseUrl`. */
+   *  on the AI service `apiBaseUrl`. */
   serviceBaseUrl: string
   deploymentId: string
   orgSlug: string
@@ -113,8 +112,8 @@ function buildCurrentTimeBlock(): string {
 }
 
 /** Prepend the current-time block to the last user message. Inlined as a text
- *  part (not a `role:"system"` message) because the proxy's `extractDelta`
- *  filters system messages out of follow-up-turn deltas, which would drop the
+ *  part (not a `role:"system"` message) because a system message only
+ *  reaches the model on the first turn, which would drop the
  *  timestamp. Pure: returns a new array, leaving the locally-stored copy clean
  *  of this wire-only metadata. Mirrors the extension's `withCurrentTimeOnLastUser`. */
 function withCurrentTimeOnLastUser(messages: AiChatMessage[]): AiChatMessage[] {
@@ -342,11 +341,8 @@ export class AiBridge {
     }
   }
 
-  /** "Delete" a conversation: a SOFT delete server-side and a hard drop
-   *  of the local index row. The server's DELETE endpoint only renames
-   *  the transcript file (`…json` → `…deleted-<ts>.json`,
-   *  ConversationStore.softDeleteByRename) — nothing is unlinked, so the
-   *  history stays recoverable. The server copy is the source of truth,
+  /** "Delete" a conversation: a delete on the server and a hard drop
+   *  of the local index row. The server copy is the source of truth,
    *  so we always attempt the remote call; a network failure still
    *  clears the local index so the sidebar reflects the user's intent. */
   private async deleteConversation(id: string): Promise<void> {
@@ -406,7 +402,7 @@ export class AiBridge {
       work = (async () => {
         try {
           // The consolidated api.legalese.cloud/{slug} host uses a
-          // path-slug scheme (jl4-auth-proxy parseApiHostPath): the
+          // path-slug scheme: the
           // canonical jl4-service path /deployments/{id}/functions/{fn}
           // is exposed here as /{id}/fn/{fn} (no `/deployments` prefix,
           // `functions` shortened to `fn`). serviceBaseUrl already
@@ -476,7 +472,7 @@ export class AiBridge {
   //
   // The extension host records natively for its webview; here the page
   // itself can open the microphone. Same contract either way: Start,
-  // then Stop returns the transcript from the proxy's speech-to-text
+  // then Stop returns the transcript from the AI service's speech-to-text
   // endpoint (`legalese-listen-4`), metered against this deployment.
 
   private async startDictation(): Promise<{ error?: string }> {
@@ -535,7 +531,7 @@ export class AiBridge {
       : (loadIndexEntry(convId)?.title ?? '')
 
     // Outgoing messages. The server owns history: with a conversationId it
-    // resumes its own copy and `extractDelta` keeps only the trailing user
+    // resumes its own copy and keeps only the trailing user
     // turn, so we send just the new message (or nothing on continueTurn).
     const outgoing: AiChatMessage[] = p.continueTurn
       ? []
@@ -746,9 +742,8 @@ export class AiBridge {
 
   /** Stateless 4-6 word title from the first user message via the summize
    *  model. Mirrors the extension's `summarizeTitle`. Posts to the NON-scoped
-   *  proxy (`AI_API_URL`, no org/deployment path): scoped deployment routes
-   *  force the comply model and 400 on any other, so summize only resolves on
-   *  the default endpoint. Returns null on any failure (caller keeps the
+   *  AI service (`AI_API_URL`, no org/deployment path): scoped deployment routes
+   *  don't serve it, so it only resolves on the default endpoint. Returns null on any failure (caller keeps the
    *  fallback title). */
   private async summarizeTitle(
     firstUserMessage: string
@@ -836,7 +831,7 @@ const TRANSCRIPTION_FAILED = 'Couldn’t transcribe that.'
 function dictationErrorMessage(err: unknown): string {
   if (err instanceof DictationError) return err.message
   // fetch rejects with a TypeError only when no response came back.
-  if (err instanceof TypeError) return 'Couldn’t reach the AI proxy.'
+  if (err instanceof TypeError) return 'Couldn’t reach the AI service.'
   return TRANSCRIPTION_FAILED
 }
 

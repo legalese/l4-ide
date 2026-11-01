@@ -7,7 +7,7 @@ L4 is a programming language for law. You write contracts, legislation and regul
 ## Get L4
 
 - **[VS Code extension](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode)**: the editor, the `l4` command, Legalese AI and deployment in one install.
-- **[Web editor](https://jl4.legalese.com)**: try L4 in the browser, nothing to install.
+- **[Web editor](https://play.legalese.com)**: try L4 in the browser, nothing to install.
 
 ## Where to start
 

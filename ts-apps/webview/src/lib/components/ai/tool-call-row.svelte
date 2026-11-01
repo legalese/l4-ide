@@ -29,6 +29,8 @@
     'read_file',
     'search_identifier',
     'search_text',
+    'search_rules',
+    'get_schema',
   ])
 
   let {
@@ -36,6 +38,7 @@
     messenger,
     onOpenFile,
     onOpenDiff,
+    filesOpenable = true,
   }: {
     call: RenderedToolCall
     /** Webview→extension messenger; used to fetch render metadata
@@ -49,6 +52,9 @@
     /** Applied-diff open: shows the before/after of a completed edit
      *  in the diff editor with red/green change markers. */
     onOpenDiff: (callId: string) => void
+    /** False when the call's paths aren't on this machine (cloud
+     *  sessions): the target renders as plain text. */
+    filesOpenable?: boolean
   } = $props()
 
   // Best-effort arg parse; keep going even if the JSON is malformed
@@ -70,7 +76,10 @@
    *     to done / error ("Edit"). Pairs with the chevron that opens
    *     the result / diff.
    */
-  const view = $derived.by(() => viewFor(call.name, args))
+  const view = $derived.by(() => {
+    const v = viewFor(call.name, args)
+    return filesOpenable ? v : { ...v, click: null }
+  })
 
   function viewFor(
     name: string,
@@ -82,7 +91,19 @@
     click: ClickMode
   } {
     const path = typeof a.path === 'string' ? a.path : null
-    if (name === 'fs__read_file')
+    if (name === 'fs__read_file') {
+      const keywords =
+        typeof a.search_keywords === 'string' ? a.search_keywords.trim() : ''
+      if (keywords)
+        return {
+          running: 'Searching…',
+          settled: 'Searched',
+          target:
+            path && path !== '.'
+              ? `${path} for ${keywords}`
+              : `for ${keywords}`,
+          click: 'open',
+        }
       // "Read" works as both base and past tense (read/read/read) —
       // settled label stays unchanged.
       return {
@@ -91,6 +112,7 @@
         target: path,
         click: 'open',
       }
+    }
     if (name === 'fs__create_file')
       return {
         running: 'Creating…',
@@ -107,6 +129,17 @@
         // just open the file so the user can see the context.
         click: call.status === 'done' ? 'diff' : 'open',
       }
+    if (name === 'fs__copy_file') {
+      const from = typeof a.from === 'string' ? a.from : null
+      const to = typeof a.to === 'string' ? a.to : null
+      const move = a.deleteSource === true
+      return {
+        running: move ? 'Moving…' : 'Copying…',
+        settled: move ? 'Moved' : 'Copied',
+        target: from && to ? `${from} → ${to}` : to,
+        click: to ? 'open' : null,
+      }
+    }
     if (name === 'fs__delete_file')
       return {
         running: 'Deleting…',
@@ -295,7 +328,7 @@
       // once the call settles (the MCP tool list may not have been
       // populated yet when the first row mounted on a streaming turn).
     } catch {
-      // Network / proxy hiccup — retry on the next effect tick.
+      // Network hiccup — retry on the next effect tick.
     } finally {
       renderMetaInFlight = false
     }
@@ -448,7 +481,7 @@
   // rows in message-assistant.svelte) — no chevron, not expandable,
   // dot pulsating. The instant the call resolves to `done` or
   // `error`, the row swaps to the standard chevron card so the user
-  // can expand the diff or the error message. The proxy now streams
+  // can expand the diff or the error message. The AI service now streams
   // partial tool-call frames as soon as the model commits to a tool
   // name (toolCallStreaming) so the pulsating dot appears
   // immediately — even before the args JSON has finished streaming.

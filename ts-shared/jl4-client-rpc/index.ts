@@ -6,6 +6,7 @@ export * from './language-client.js'
 
 /* Message types for communication between VSCode extension and webview */
 export * from './vscode-and-webview-messages.js'
+export * from './cloud-sessions-messages.js'
 
 // Ladder Backend API
 export * from './ladder-api.js'
@@ -16,3 +17,6 @@ export * from './utils.js'
 // JSON → L4 source rendering (drives chat tool-call cards: renders rule
 // arguments / return values as L4 syntax using `x-l4-type` annotations)
 export * from './render-l4-value.js'
+
+// What the chat shows for an assistant message's blocks
+export * from './assistant-blocks.js'

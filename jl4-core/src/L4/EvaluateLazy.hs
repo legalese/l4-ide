@@ -12,6 +12,8 @@ module L4.EvaluateLazy
 , execEvalModuleWithJSON
 , execEvalExprInContextOfModule
 , prettyEvalException
+, evalDirectiveCode
+, evalExceptionCode
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
 , prettyAssertionOutcome
@@ -183,6 +185,18 @@ data EvalDirectiveValue =
   | Reduction (Either EvalException NF)
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The stable diagnostic code of a directive's outcome. See
+-- 'L4.TypeCheck.Types.checkErrorCode' for what a code promises. A directive
+-- that raised has the code of what it raised, an @#ASSERT@ included: that is
+-- neither a pass nor a failed verdict.
+evalDirectiveCode :: EvalDirectiveValue -> Text
+evalDirectiveCode = \ case
+  Assertion (Right True)  -> "eval/assertion-passed"
+  Assertion (Right False) -> "eval/assertion-failed"
+  Assertion (Left exc)    -> evalExceptionCode exc
+  Reduction (Right _)     -> "eval/result"
+  Reduction (Left exc)    -> evalExceptionCode exc
 
 prettyEvalDirectiveValue :: EvalDirectiveValue -> Text
 prettyEvalDirectiveValue (Assertion a)          = prettyAssertionOutcome a

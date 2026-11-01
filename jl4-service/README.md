@@ -426,13 +426,13 @@ The script registers tools based on the `data-tools` attribute. By default (`aut
 
 #### Visibility Headers
 
-The proxy injects these headers to control what jl4-service includes in responses. All default to `true` when absent (local dev, direct access).
+A reverse proxy can set these headers to control what jl4-service includes in responses. All default to `true` when absent (local dev, direct access).
 
-| Header                | Controls                                                               | Proxy permission |
-| --------------------- | ---------------------------------------------------------------------- | ---------------- |
-| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP | `l4:rules`       |
-| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP        | `l4:read`        |
-| `X-Include-Evaluate`  | Evaluation/batch/query-plan paths in OpenAPI, evaluation tools in MCP  | `l4:evaluate`    |
+| Header                | Controls                                                               | Permission    |
+| --------------------- | ---------------------------------------------------------------------- | ------------- |
+| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP | `l4:rules`    |
+| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP        | `l4:read`     |
+| `X-Include-Evaluate`  | Evaluation/batch/query-plan paths in OpenAPI, evaluation tools in MCP  | `l4:evaluate` |
 
 > **Note:** The legacy path `/webmcp.js` is redirected to `/.webmcp/embed.js` with a 301. Update existing embeds when convenient.
 

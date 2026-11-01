@@ -1,6 +1,6 @@
 /**
  * Host side of chat dictation: records the microphone and hands back a
- * WAV clip for the ai-proxy's speech-to-text endpoint.
+ * WAV clip for the AI service's speech-to-text endpoint.
  *
  * A VSCode webview can't open the microphone (its iframe isn't granted
  * the permission), so recording happens here in the extension host
@@ -22,8 +22,7 @@ import {
   type DictationWorkerMessage,
 } from './dictation-protocol.js'
 
-/** Longest clip the input lets run. Matches the ai-proxy's default
- *  `listen.maxSeconds`; the proxy enforces its own copy server-side. */
+/** Longest clip the input lets run. The AI service enforces its own limit. */
 export const DICTATION_MAX_SECONDS = 120
 
 // Shorter than this and it was a stray click, not speech.

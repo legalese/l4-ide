@@ -22,7 +22,7 @@ import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (lspDefaultPolicy)
 import qualified LSP.Core.Shake as Shake
 import LSP.Core.Types.Diagnostics (FileDiagnostic (..))
-import LSP.L4.BlockingErrors (ImportCycle (..), blockingErrorsIn, importClosure, importCycles)
+import LSP.L4.BlockingErrors (blockingErrorsIn, importClosure)
 import LSP.L4.Oneshot (oneshotL4ActionAndDiagnostics)
 import LSP.L4.Rules (EvaluateLazy (..), TypeCheckResult (..), pattern TypeCheck)
 
@@ -32,7 +32,6 @@ data Outcome = Outcome
   { rootTypechecks :: Bool
   , closure :: [NormalizedUri]
   , blocking :: [FileDiagnostic]
-  , cycles :: [ImportCycle]
   , mainImportErrors :: [(Int, Text)]
   -- ^ The errors on @main@'s own IMPORT lines (0-based line, message)
   }
@@ -48,19 +47,17 @@ checkProject name files = do
   forM_ files \(stem, src) -> T.writeFile (dir </> stem <> ".l4") src
   let entry = dir </> "main.l4"
   evalConfig <- resolveEvalConfig Nothing (lspDefaultPolicy defaultGraphVizOptions)
-  (_, diags, (mTc, uris, cs)) <- oneshotL4ActionAndDiagnostics evalConfig entry \nfp -> do
+  (_, diags, (mTc, uris)) <- oneshotL4ActionAndDiagnostics evalConfig entry \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     mTc <- Shake.use TypeCheck uri
     _ <- Shake.use EvaluateLazy uri
     uris <- importClosure uri
-    cs <- importCycles uri
-    pure (mTc, uris, cs)
+    pure (mTc, uris)
   pure Outcome
     { rootTypechecks = maybe False (.success) mTc
     , closure = uris
     , blocking = blockingErrorsIn uris diags
-    , cycles = cs
     , mainImportErrors =
         [ (fromIntegral d._range._start._line, d._message)
         | fd <- diags
@@ -136,9 +133,11 @@ spec = describe "LSP.L4.BlockingErrors" do
     o.rootTypechecks `shouldBe` True
     Set.fromList o.closure `shouldSatisfy` ((== 3) . Set.size)
     o.blocking `shouldSatisfy` (not . null)
-    [dua, dub] <- traverse (uriOf "cycle") ["dua", "dub"]
-    map (\c -> (c.importer, c.line, c.cycle)) o.cycles
-      `shouldBe` [(dub, Just 1, [dua, dub, dua])]
+    -- Named in words, on the IMPORT of each file the check reached: this one,
+    -- and the file of the ring that it imports.
+    [dua, main] <- traverse (uriOf "cycle") ["dua", "main"]
+    Set.fromList (map (.fdFilePath) o.blocking) `shouldBe` Set.fromList [dua, main]
+    o.blocking `shouldSatisfy` all (T.isInfixOf "ring of imports" . (._message) . (.fdLspDiagnostic))
 
   it "finds no cycle in a diamond of imports" do
     o <- checkProject "diamond"
@@ -148,7 +147,6 @@ spec = describe "LSP.L4.BlockingErrors" do
       , ("base", "b MEANS 1\n")
       ]
     o.blocking `shouldSatisfy` null
-    map (.cycle) o.cycles `shouldBe` []
 
   it "lets a warning in an import through" do
     o <- checkProject "warning"

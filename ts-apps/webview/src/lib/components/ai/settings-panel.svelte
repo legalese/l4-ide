@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type {
-    AiMcpCandidateInfo,
     AiMcpServerInfo,
     AiPermissionCategory,
     AiPermissionValue,
@@ -22,175 +21,93 @@
   let values = $state<Values | null>(null)
 
   // ── MCP servers ───────────────────────────────────────────────────
-  let mcpServers = $state<AiMcpServerInfo[] | null>(null)
-  /** VS Code-registered servers offered for import. */
-  let mcpCandidates = $state<AiMcpCandidateInfo[]>([])
-  /** Candidate currently being imported (its toggle shows on). */
-  let importingId = $state<string | null>(null)
-  /** Master switch mirrored from `legaleseAi.mcp.enabled`. */
-  let mcpAllEnabled = $state(true)
+  // The state comes from the extension (`store.mcp`, pushed on every
+  // change). Only states show here: why something failed is a VS Code
+  // notification.
+  const mcp = $derived(store.mcp)
   let showAddForm = $state(false)
   let addName = $state('')
   let addTransport = $state<'http' | 'sse' | 'stdio'>('http')
   let addUrl = $state('')
   let addCommand = $state('')
   let addBearerToken = $state('')
-  let addError = $state<string | null>(null)
   let addBusy = $state(false)
-  /** Set when the submitted name collides with an existing server —
-   *  the primary button becomes "Replace server" and the resubmit
-   *  carries overwrite: true. Cleared when the name changes. */
-  let addOverwritePending = $state(false)
   /** Server ids whose tool list is expanded. */
   let expandedIds = $state<Record<string, boolean>>({})
   /** Server id whose three-dot menu is open, if any. */
   let menuOpenId = $state<string | null>(null)
-  let menuError = $state<string | null>(null)
 
-  async function refreshMcpServers(): Promise<void> {
-    const res = await store.getMcpServers()
-    mcpServers = res.servers
-    mcpCandidates = res.candidates
-    mcpAllEnabled = res.allEnabled
-  }
+  /** Add is enabled once the form holds a name and a URL or command. */
+  const addValid = $derived(
+    addName.trim() !== '' &&
+      (addTransport === 'stdio'
+        ? addCommand.trim() !== ''
+        : /^https?:\/\/\S+$/.test(addUrl.trim()))
+  )
 
-  /** Toggle-on of a VS Code-registered row: copy its config into our
-   *  list (the row becomes a full server row with menu and tools). May
-   *  take a while when the server needs an OAuth browser sign-in. */
-  async function importCandidate(candidate: AiMcpCandidateInfo): Promise<void> {
-    if (importingId) return
-    importingId = candidate.id
-    menuError = null
-    try {
-      const res = await store.importMcpServer(candidate.id)
-      if (!res.ok) menuError = res.error ?? 'Could not import the server.'
-    } finally {
-      importingId = null
-      await refreshMcpServers()
-    }
-  }
-
-  function toggleMcpAll(): void {
-    const next = !mcpAllEnabled
-    mcpAllEnabled = next
-    store.setMcpAllEnabled(next)
-    // Re-enabling reconnects the enabled servers on the extension
-    // side; poll once for the connection outcomes.
-    setTimeout(() => void refreshMcpServers(), 1500)
-  }
-
-  function toggleMcpServer(server: AiMcpServerInfo): void {
-    const next = !server.enabled
-    store.setMcpServerEnabled(server.id, next)
-    // Optimistic update — enabling kicks off a connection on the
-    // extension side, so reflect "connecting" right away and poll once
-    // shortly after for the real outcome.
-    if (mcpServers) {
-      mcpServers = mcpServers.map((s) =>
-        s.id === server.id
-          ? { ...s, enabled: next, status: next ? 'connecting' : 'stopped' }
-          : s
-      )
-    }
-    setTimeout(() => void refreshMcpServers(), 1500)
-  }
-
-  async function runServerAction(
-    id: string,
-    action: 'start' | 'stop' | 'refresh' | 'remove'
-  ): Promise<void> {
+  function runServerAction(id: string, action: 'connect' | 'remove'): void {
     menuOpenId = null
-    menuError = null
-    if (action === 'start' || action === 'refresh') {
-      // The request resolves only once the connection attempt settled
-      // (including a possible OAuth browser round-trip); show the
-      // intermediate state meanwhile.
-      if (mcpServers) {
-        mcpServers = mcpServers.map((s) =>
-          s.id === id ? { ...s, status: 'connecting' } : s
-        )
-      }
-    }
-    const res = await store.mcpServerAction(id, action)
-    if (!res.ok) menuError = res.error ?? `Could not ${action} the server.`
-    await refreshMcpServers()
-  }
-
-  function toggleMcpTool(
-    server: AiMcpServerInfo,
-    tool: { name: string; enabled: boolean }
-  ): void {
-    const next = !tool.enabled
-    store.setMcpToolEnabled(server.id, tool.name, next)
-    if (mcpServers) {
-      mcpServers = mcpServers.map((s) =>
-        s.id === server.id
-          ? {
-              ...s,
-              tools: s.tools.map((t) =>
-                t.name === tool.name ? { ...t, enabled: next } : t
-              ),
-            }
-          : s
-      )
-    }
+    void store.mcpServerAction(id, action)
   }
 
   async function submitAddServer(): Promise<void> {
-    if (addBusy) return
-    addError = null
+    if (addBusy || !addValid) return
     addBusy = true
     try {
-      const res = await store.addMcpServer({
-        name: addName,
+      const added = await store.addMcpServer({
+        name: addName.trim(),
         transport: addTransport,
         ...(addTransport === 'stdio'
           ? { command: addCommand }
           : {
-              url: addUrl,
+              url: addUrl.trim(),
               ...(addBearerToken.trim()
                 ? { bearerToken: addBearerToken.trim() }
                 : {}),
             }),
-        ...(addOverwritePending ? { overwrite: true } : {}),
       })
-      if (!res.ok) {
-        if (res.exists) {
-          addOverwritePending = true
-          addError = `${res.error ?? 'A server with this name already exists.'} Click "Replace server" to override it.`
-        } else {
-          addError = res.error ?? 'Could not add the server.'
-        }
-        return
-      }
+      if (!added) return
       addName = ''
       addUrl = ''
       addCommand = ''
       addBearerToken = ''
-      addOverwritePending = false
       showAddForm = false
-      await refreshMcpServers()
     } finally {
       addBusy = false
     }
   }
 
-  /** Badge text summarizing the extension's own connection state. */
-  function serverStatus(server: AiMcpServerInfo): string {
+  /** A server's badge: its state, or the thing to click when it needs
+   *  something (amber Sign in, like the cloud session chips). None for a
+   *  server that is off. */
+  function badge(
+    server: AiMcpServerInfo
+  ): { text: string; click?: 'sign-in' | 'retry'; title?: string } | null {
+    if (!server.enabled) return null
     switch (server.status) {
       case 'connected':
-        return server.tools.length === 1
-          ? '1 tool'
-          : `${server.tools.length} tools`
+        return {
+          text:
+            server.tools.length === 1
+              ? '1 tool'
+              : `${server.tools.length} tools`,
+        }
       case 'connecting':
-        return 'connecting…'
-      case 'error':
-        return 'connection failed'
+        return { text: 'connecting…' }
       case 'unauthorized':
-        return 'sign-in required'
-      case 'stopped':
+        return {
+          text: 'Sign in',
+          click: 'sign-in',
+          title: `Sign in to ${server.name} in your browser`,
+        }
+      case 'error':
+        return {
+          text: "couldn't connect",
+          click: 'retry',
+          title: 'Try again',
+        }
       default:
-        return server.enabled ? 'not connected' : 'off'
+        return { text: 'connect', click: 'retry', title: 'Connect now' }
     }
   }
 
@@ -242,7 +159,7 @@
   ]
 
   onMount(async () => {
-    void refreshMcpServers()
+    void store.refreshMcpServers()
     values = await store.getPermissions()
   })
 
@@ -320,27 +237,28 @@
           Extend the abilities of Legalese AI with MCP tools from 3rd parties to
           allow it to discover context or control applications.
         </div>
-        {#if mcpServers}
+        {#if mcp}
           <div class="perm-grid">
-            {#if mcpServers.length > 1}
+            {#if !mcp.allEnabled}
+              <!-- legaleseAi.mcp.enabled is off: the way back on. -->
               <div class="mcp-row mcp-master-row">
                 <div class="perm-name mcp-grow">
-                  <div>All MCP servers &amp; tools</div>
+                  <div>MCP servers are off for Legalese AI</div>
                 </div>
                 <button
                   class="toggle"
-                  class:on={mcpAllEnabled}
                   role="switch"
-                  aria-checked={mcpAllEnabled}
+                  aria-checked="false"
                   aria-label="Use MCP servers"
-                  onclick={toggleMcpAll}
+                  onclick={() => store.setMcpAllEnabled(true)}
                 >
                   <span class="knob"></span>
                 </button>
               </div>
             {/if}
-            {#each mcpServers as server (server.id)}
-              <div class="mcp-row-wrap" class:all-off={!mcpAllEnabled}>
+            {#each mcp.servers as server (server.id)}
+              {@const b = badge(server)}
+              <div class="mcp-row-wrap" class:all-off={!mcp.allEnabled}>
                 <div class="mcp-row">
                   <button
                     class="mcp-expander"
@@ -354,17 +272,22 @@
                   <div class="perm-name mcp-grow">
                     <div class="mcp-name-line">
                       <span>{server.name}</span>
-                      <span class="mcp-badge">{serverStatus(server)}</span>
-                    </div>
-                    <div class="perm-hint">
-                      {#if server.status === 'error' && server.error}
-                        {server.error}
-                      {:else if server.detail}
-                        {server.detail}
-                      {:else}
-                        Registered in VS Code
+                      {#if b?.click}
+                        <button
+                          class="mcp-badge clickable"
+                          class:sign-in={b.click === 'sign-in'}
+                          title={b.title}
+                          disabled={!mcp.allEnabled}
+                          onclick={() => runServerAction(server.id, 'connect')}
+                          >{b.text}</button
+                        >
+                      {:else if b}
+                        <span class="mcp-badge">{b.text}</span>
                       {/if}
                     </div>
+                    {#if server.detail}
+                      <div class="perm-hint">{server.detail}</div>
+                    {/if}
                   </div>
                   <div class="mcp-menu-anchor">
                     <button
@@ -380,39 +303,21 @@
                     </button>
                     {#if menuOpenId === server.id}
                       <div class="mcp-menu" role="menu">
-                        {#if server.status === 'connected'}
+                        {#if server.enabled}
                           <button
                             role="menuitem"
                             onclick={() =>
-                              void runServerAction(server.id, 'refresh')}
+                              runServerAction(server.id, 'connect')}
                           >
-                            Refresh tools
-                          </button>
-                          <button
-                            role="menuitem"
-                            onclick={() =>
-                              void runServerAction(server.id, 'stop')}
-                          >
-                            Stop
-                          </button>
-                        {:else}
-                          <button
-                            role="menuitem"
-                            onclick={() =>
-                              void runServerAction(server.id, 'start')}
-                          >
-                            {server.status === 'unauthorized'
-                              ? 'Sign in & start'
-                              : 'Start'}
+                            Reconnect
                           </button>
                         {/if}
                         <button
                           role="menuitem"
                           class="danger"
-                          onclick={() =>
-                            void runServerAction(server.id, 'remove')}
+                          onclick={() => runServerAction(server.id, 'remove')}
                         >
-                          Remove
+                          Remove…
                         </button>
                       </div>
                     {/if}
@@ -423,7 +328,8 @@
                     role="switch"
                     aria-checked={server.enabled}
                     aria-label={`Use ${server.name} tools`}
-                    onclick={() => toggleMcpServer(server)}
+                    onclick={() =>
+                      store.setMcpServerEnabled(server.id, !server.enabled)}
                   >
                     <span class="knob"></span>
                   </button>
@@ -439,7 +345,12 @@
                           role="switch"
                           aria-checked={tool.enabled}
                           aria-label={`Use ${tool.name}`}
-                          onclick={() => toggleMcpTool(server, tool)}
+                          onclick={() =>
+                            store.setMcpToolEnabled(
+                              server.id,
+                              tool.name,
+                              !tool.enabled
+                            )}
                         >
                           <span class="knob"></span>
                         </button>
@@ -454,52 +365,10 @@
                 {/if}
               </div>
             {/each}
-            <!-- Servers registered in VS Code that aren't ours yet:
-                 shown inline below our own, toggled off. Toggling one
-                 on copies its config into our list (mcp.json is never
-                 modified) and the row above takes over. -->
-            {#each mcpCandidates as candidate (candidate.id)}
-              <div class="mcp-row-wrap" class:all-off={!mcpAllEnabled}>
-                <div class="mcp-row">
-                  <span class="mcp-expander ghost" aria-hidden="true"
-                    >&#9002;</span
-                  >
-                  <div class="perm-name mcp-grow">
-                    <div class="mcp-name-line">
-                      <span>{candidate.name}</span>
-                      <span class="mcp-badge">
-                        {importingId === candidate.id
-                          ? 'connecting…'
-                          : 'VS Code'}
-                      </span>
-                    </div>
-                    {#if candidate.detail}
-                      <div class="perm-hint">{candidate.detail}</div>
-                    {/if}
-                  </div>
-                  <button
-                    class="toggle"
-                    class:on={importingId === candidate.id}
-                    role="switch"
-                    aria-checked={importingId === candidate.id}
-                    aria-label={`Use ${candidate.name} in Legalese AI`}
-                    disabled={importingId !== null}
-                    onclick={() => void importCandidate(candidate)}
-                  >
-                    <span class="knob"></span>
-                  </button>
-                </div>
-              </div>
-            {/each}
-            {#if mcpServers.length === 0 && mcpCandidates.length === 0}
-              <div class="section-help">
-                No MCP servers yet — add one below.
-              </div>
+            {#if mcp.servers.length === 0}
+              <div class="section-help">No MCP servers yet.</div>
             {/if}
           </div>
-          {#if menuError}
-            <div class="mcp-error">{menuError}</div>
-          {/if}
           {#if showAddForm}
             <div class="mcp-add-form">
               <input
@@ -507,12 +376,6 @@
                 type="text"
                 placeholder="Name (e.g. github)"
                 bind:value={addName}
-                oninput={() => {
-                  // A different name is a fresh add — drop the pending
-                  // replace confirmation so it can't silently override
-                  // some other existing server.
-                  addOverwritePending = false
-                }}
               />
               <select class="perm-select" bind:value={addTransport}>
                 <option value="http">HTTP</option>
@@ -541,46 +404,33 @@
                   bind:value={addBearerToken}
                 />
               {/if}
-              {#if addError}
-                <div class="mcp-error">{addError}</div>
-              {/if}
               <div class="mcp-form-actions">
                 <button
                   class="mcp-btn primary"
-                  disabled={addBusy}
+                  disabled={addBusy || !addValid}
                   onclick={() => void submitAddServer()}
                 >
-                  {addBusy
-                    ? 'Adding…'
-                    : addOverwritePending
-                      ? 'Replace server'
-                      : 'Add server'}
+                  {addBusy ? 'Adding…' : 'Add server'}
                 </button>
-                <button
-                  class="mcp-btn"
-                  onclick={() => {
-                    showAddForm = false
-                    addError = null
-                    addOverwritePending = false
-                  }}
-                >
+                <button class="mcp-btn" onclick={() => (showAddForm = false)}>
                   Cancel
                 </button>
               </div>
             </div>
           {:else}
             <div class="mcp-actions-row">
-              <button
-                class="mcp-btn"
-                onclick={() => {
-                  showAddForm = true
-                }}
-              >
+              <button class="mcp-btn" onclick={() => (showAddForm = true)}>
                 + Add MCP server
               </button>
-              <button class="mcp-btn" onclick={() => void refreshMcpServers()}>
-                Refresh
-              </button>
+              {#if mcp.candidates.length > 0}
+                <button
+                  class="mcp-btn"
+                  title="Servers in VS Code's mcp.json; Legalese AI keeps its own copy"
+                  onclick={() => void store.importMcpServers()}
+                >
+                  Import {mcp.candidates.length} from VS Code…
+                </button>
+              {/if}
             </div>
           {/if}
         {:else}
@@ -811,6 +661,25 @@
     font-size: 10px;
     color: var(--vscode-descriptionForeground);
   }
+  /* A badge to click: Sign in (amber, like the cloud session chips),
+     or try again. */
+  .mcp-badge.clickable {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .mcp-badge.clickable:hover:not(:disabled) {
+    text-decoration: underline;
+    color: var(--vscode-foreground);
+  }
+  .mcp-badge.sign-in {
+    color: var(--vscode-editorWarning-foreground, #cca700);
+  }
+  .mcp-badge.sign-in:hover:not(:disabled) {
+    color: var(--vscode-editorWarning-foreground, #cca700);
+  }
   .mcp-add-form {
     display: flex;
     flex-direction: column;
@@ -865,18 +734,12 @@
     gap: 6px;
     margin: 2px 8px 0;
   }
-  /* Candidate rows (VS Code-registered, not imported yet) have no
-     expander — a hidden copy of the glyph keeps names aligned with the
-     rows above. */
-  .mcp-expander.ghost {
-    visibility: hidden;
-  }
   .mcp-row-wrap {
     display: flex;
     flex-direction: column;
   }
   /* Master switch off: the server rows read as removed from the AI —
-     dimmed and inert; only the master toggle stays interactive. */
+     dimmed and inert; only the switch back on stays interactive. */
   .mcp-row-wrap.all-off {
     opacity: 0.45;
     pointer-events: none;
@@ -987,11 +850,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .mcp-error {
-    font-size: 11px;
-    color: var(--vscode-errorForeground, #f14c4c);
-    line-height: 1.4;
   }
   .toggle {
     flex-shrink: 0;

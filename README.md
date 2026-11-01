@@ -27,7 +27,7 @@ This repository contains the L4 compiler, IDE tooling (VS Code extension, LSP, R
 ## Getting Started
 
 - **Install the VS Code extension:** [L4 Rules-as-code on the Marketplace](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode)
-- **Try the web editor:** <https://jl4.legalese.com/>
+- **Try the web editor:** <https://play.legalese.com/>
 - **Learn L4:** [Foundation Course](https://legalese.com/l4/courses/foundation) — no prior programming experience required
 - **Deploy your L4 projects to Legalese Cloud:** [Deploy your rules](https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment) — publish rules as APIs that apps and AI agents can call
 - **Full documentation:** [legalese.com/l4](https://legalese.com/l4)

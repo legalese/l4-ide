@@ -4,7 +4,7 @@ File: parse-error3.l4
   Range: 5:1-5:1
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-ASSUME
   Message:
       |
     5 | ASSUME one IS A NUMBER
@@ -17,7 +17,7 @@ File: parse-error3.l4
   Range: 7:1-7:1
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-end-of-input
   Message:
       |
     7 | 

@@ -6,7 +6,7 @@ File: computed-fields-self-cycle.l4
   Range: 3:9-3:12
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/cyclic-computed-fields
   Message:
     Circular dependency detected between computed fields:
 
@@ -21,7 +21,7 @@ File: computed-fields-self-cycle.l4
   Range: 6:15-6:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of '+' is expected to be of type
 
