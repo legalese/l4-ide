@@ -582,7 +582,7 @@ renderArithOperands = fixtureDir </> "render-arith-operands.l4"
 renderNotScope :: FilePath
 renderNotScope = fixtureDir </> "render-not-scope.l4"
 
--- A denial, an IMPLIES or an IF that fills a slot of a rule's sentence.
+-- A condition that fills a slot of a rule's sentence.
 slotScope :: FilePath
 slotScope = fixtureDir </> "slot-scope.l4"
 
@@ -4471,7 +4471,7 @@ spec bin = do
       hasRow "Inequality in the slot if n is not 3 is disclosed."
 
   describe "l4 nlg and a condition in a sentence's slot" $
-    it "brackets a denial, an IMPLIES or an IF in a slot the sentence goes on after" $ do
+    it "brackets a denial, an IMPLIES, an IF, an OR, or a call ending in one, in a slot the sentence goes on after" $ do
       Output code sout _ <- runL4 bin ["nlg", slotScope]
       code `shouldBe` ExitSuccess
       map (filter (/= '\r')) (lines sout) `shouldBe`
@@ -4484,6 +4484,10 @@ spec bin = do
         , "`TRUE` implies `FALSE` is disclosed"
         , "(if `TRUE` then `FALSE` else `TRUE`) is disclosed"
         , "if `TRUE` then `FALSE` else `TRUE` is disclosed"
+        , "(`TRUE` or `FALSE`) is disclosed"
+        , "`TRUE` or `FALSE` is disclosed"
+        , "(`fb` with `TRUE` or `FALSE`) is disclosed"
+        , "`fb` with `TRUE` or `FALSE` is disclosed"
         ]
 
   describe "library sentences at a call" $ do
