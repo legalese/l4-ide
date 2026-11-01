@@ -1748,14 +1748,21 @@ itemText e
 -- So is an IMPLIES, an IF or a CONSIDER, which no word closes: "neither p nor q
 -- implies r" also reads as @(NOT (p OR q)) IMPLIES r@, and "neither if q then r
 -- else s nor p" puts the "nor" in the ELSE.
+--
+-- The same holds where such a condition fills a slot that a sentence's words
+-- come after ('slotRunsOn').
 boundedCond :: Expr Resolved -> Text
 boundedCond e
-  | "it is not the case that" `Text.isPrefixOf` stripFrameMarks t = "(" <> t <> ")"
-  | deniedOr = "(" <> t <> ")"
-  | unclosed = "(" <> t <> ")"
-  | otherwise = t
+  | runsOn e t = "(" <> t <> ")"
+  | otherwise  = t
  where
   t = condText e
+
+-- | Whether a condition, printed as @t@, has no word to close it: what
+-- 'boundedCond' brackets.
+runsOn :: Expr Resolved -> Text -> Bool
+runsOn e t = "it is not the case that" `Text.isPrefixOf` stripFrameMarks t || deniedOr || unclosed
+ where
   deniedOr = isNothing (nlgOf e) && case carameliseNode e of
     Not _ inner -> isOrNode (carameliseNode inner)
     _           -> False
@@ -1765,6 +1772,15 @@ boundedCond e
     MultiWayIf{} -> True
     Consider{}   -> True
     _            -> False
+
+-- | Whether a condition, printed as @t@, would take in the words of a sentence
+-- that go on after the slot it fills ('rewriteWith', 'interleaveMixfix'). What
+-- 'runsOn' says, and an AND or an OR as well: "p or q is shown" is also how
+-- @p OR (`shown` q)@ reads. Beside a connective an AND or an OR is set off in
+-- words ('joinCond'); in a slot nothing sets it off. Told by the condition's
+-- shape, and by where the slot is, not by what any word says.
+slotRunsOn :: Expr Resolved -> Text -> Bool
+slotRunsOn e t = runsOn e t || (isNothing (nlgOf e) && isCompound e)
 
 -- | The negation of an AND, which denies only that all of it holds.
 notAllText :: [Expr Resolved] -> Text
@@ -2111,8 +2127,8 @@ rewriteWith rd0 e0 = go e0
     -- Joined lists read as one list, so a long chain of them can be laid out.
     App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
     App ann n args
-      | heraldFits n args ->
-          substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument (slotText rd))) args))
+      | Just followed <- heraldSlots n args ->
+          substituteNlgCallMarked rd.rdHeralds (App ann n (zipWith (\f a -> asText (filler f) a) followed args))
       | readsAsFunction n args -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
       | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument leafText)) args))
     e -> substituteNlgCallMarked rd.rdHeralds e
@@ -2124,6 +2140,23 @@ rewriteWith rd0 e0 = go e0
   argument f a
     | isArithmetic (carameliseNode a), isNothing (nlgOf a) = "(" <> f a <> ")"
     | otherwise = f a
+  -- A sentence's slot. A condition with no closing word, in a slot the
+  -- sentence's own words come after, is bracketed ('slotRunsOn'): "it is not
+  -- the case that X is disclosed" is also how @NOT (`disclosed` X)@ reads. Told
+  -- by where the slot is in the sentence, not by what its words say; in the last
+  -- slot nothing follows it.
+  filler followed a
+    | followed, slotRunsOn a t = "(" <> t <> ")"
+    | otherwise            = t
+   where
+    t = argument (slotText rd) a
+  -- For each argument of a call whose sentence fits it, whether the sentence's
+  -- words come after its slot.
+  heraldSlots n args = case Map.lookup (getUnique n) rd.rdHeralds of
+    Just (nlg, inputs)
+      | length inputs == length args ->
+          Just (map (`Set.member` Nlg.refsFollowedByWords nlg) inputs)
+    _ -> Nothing
   -- A call that the f(x) clause in 'rw' prints, with its argument in brackets
   -- already: exactly one argument, a name in 'mathUnaryFns', and no sentence that
   -- the clause above would splice in first. The same conditions as that clause,
