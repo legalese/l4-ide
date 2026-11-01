@@ -2581,6 +2581,14 @@ spec bin = do
     it "leaves arithmetic inside arithmetic as the formula has it" $
       hasRow "Times of minus equals 4 × (x − 2)."
 
+    it "brackets a call named like a maths function unless it reads as f(x)" $ do
+      hasRow "Round then minus equals (round for a and b) − c."
+      hasRow "Minus in a round means round for a and (b − c)."
+      hasRow "Floor then minus equals (the floor of [x]) − 3."
+      hasRow "Minus in a floor means the floor of (x − 3)."
+      hasRow "Exp then minus equals (e raised to the power of [x]) − 3."
+      hasRow "Minus in exp means e raised to the power of (x − 3)."
+
     it "brackets a mod beside a × or a ÷, which do not reassociate with it" $ do
       hasRow "Times of mod equals a × (b mod c)."
       hasRow "Mod of times equals (a × b) mod c."

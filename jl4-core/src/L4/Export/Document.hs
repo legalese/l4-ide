@@ -1860,9 +1860,9 @@ rewriteWith rd = go
     -- Joined lists read as one list, so a long chain of them can be laid out.
     App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
     App ann n args
-      | Just (_, inputs) <- Map.lookup (getUnique n) rd.rdHeralds, length inputs == length args ->
+      | heraldFits n args ->
           substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument (slotText rd))) args))
-      | ownBrackets n -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
+      | readsAsFunction n args -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
       | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument leafText)) args))
     e -> substituteNlgCallMarked rd.rdHeralds e
   asText f a = Inert (a ^. annoOf) (f a) InertCtxNone
@@ -1873,7 +1873,19 @@ rewriteWith rd = go
   argument f a
     | isArithmetic (carameliseNode a), isNothing (nlgOf a) = "(" <> f a <> ")"
     | otherwise = f a
-  ownBrackets n = Map.member (nameToText (getActual n)) mathUnaryFns || nameIs "JUST" n
+  -- A call that the f(x) clause in 'rw' prints, with its argument in brackets
+  -- already: exactly one argument, a name in 'mathUnaryFns', and no sentence that
+  -- the clause above would splice in first. The same conditions as that clause,
+  -- so a rule that only shares the name ("round" with two inputs, or a "floor"
+  -- or the library's "exp" with a sentence) is bracketed like any other call.
+  -- JUST is a constructor, and reads as its value.
+  readsAsFunction n args
+    | nameIs "JUST" n = True
+    | [_] <- args     = Map.member (nameToText (getActual n)) mathUnaryFns && not (heraldFits n args)
+    | otherwise       = False
+  heraldFits n args = case Map.lookup (getUnique n) rd.rdHeralds of
+    Just (_, inputs) -> length inputs == length args
+    Nothing          -> False
   -- An operand that is a call, a rule's sentence or an IF is printed as prose,
   -- and prose has no end: "f2 for 2 and x − 3" is also how @`f2` 2 (x MINUS 3)@
   -- would read, and "if c then 1 else 10 − x" how the IF with a subtraction in
@@ -1898,7 +1910,7 @@ rewriteWith rd = go
       isNothing (daydateLiteral n args)
         && not (nameIs "Date" n && isJust (dateFromArgs args))
         && isNothing (monthDateFromArgs n args)
-        && not (ownBrackets n)
+        && not (readsAsFunction n args)
     AppNamed{}   -> True
     IfThenElse{} -> True
     MultiWayIf{} -> True
