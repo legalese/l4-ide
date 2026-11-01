@@ -2,6 +2,7 @@
 -- reads them: a call, a rule's own sentence, an IF, a library date phrase.
 -- Each pair has different values, and must read differently.
 IMPORT daydate
+IMPORT math
 
 GIVEN a IS A NUMBER
       b IS A NUMBER
@@ -112,3 +113,44 @@ GIVEN a IS A NUMBER
       c IS A NUMBER
 GIVETH A NUMBER
 `divided by a mod` a b c MEANS a DIVIDED BY (b MODULO c)
+
+-- A call reads as f(x), which says where it ends, only when it has one input
+-- and no sentence of its own. A rule that happens to share a name with a maths
+-- function is bracketed like any other call: the name decides nothing.
+GIVEN x IS A NUMBER
+      places IS A NUMBER
+GIVETH A NUMBER
+`round` x places MEANS x TIMES places
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg the floor of %x%
+`floor` x MEANS x TIMES 2
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`round then minus` a b c MEANS `round` a b MINUS c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`minus in a round` a b c MEANS `round` a (b MINUS c)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`floor then minus` x MEANS `floor` x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in a floor` x MEANS `floor` (x MINUS 3)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`exp then minus` x MEANS exp x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in exp` x MEANS exp (x MINUS 3)
