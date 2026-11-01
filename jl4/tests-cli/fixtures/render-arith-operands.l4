@@ -61,3 +61,54 @@ GIVEN a IS A NUMBER
       d IS A NUMBER
 GIVETH A NUMBER
 `minus of a call of minus` a b c d MEANS a MINUS `f2` b (c MINUS d)
+
+-- MODULO does not reassociate with TIMES or DIVIDED BY, so each pair below has
+-- two values: 6 and 2, then 8 and 2, at 2, 7, 4; 2 and 0 at 12, 8, 2; 2 and 6
+-- at 12, 2, 4.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`times of mod` a b c MEANS a TIMES (b MODULO c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of times` a b c MEANS (a TIMES b) MODULO c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod then times` a b c MEANS (a MODULO b) TIMES c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of a product` a b c MEANS a MODULO (b TIMES c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod then divided` a b c MEANS (a MODULO b) DIVIDED BY c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of a quotient` a b c MEANS a MODULO (b DIVIDED BY c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`quotient then mod` a b c MEANS (a DIVIDED BY b) MODULO c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`divided by a mod` a b c MEANS a DIVIDED BY (b MODULO c)

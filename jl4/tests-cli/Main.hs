@@ -2571,6 +2571,16 @@ spec bin = do
     it "leaves arithmetic inside arithmetic as the formula has it" $
       hasRow "Times of minus equals 4 × (x − 2)."
 
+    it "brackets a mod beside a × or a ÷, which do not reassociate with it" $ do
+      hasRow "Times of mod equals a × (b mod c)."
+      hasRow "Mod of times equals (a × b) mod c."
+      hasRow "Mod then times equals (a mod b) × c."
+      hasRow "Mod of a product equals a mod (b × c)."
+      hasRow "Mod then divided equals (a mod b) ÷ c."
+      hasRow "Mod of a quotient equals a mod (b ÷ c)."
+      hasRow "Quotient then mod equals (a ÷ b) mod c."
+      hasRow "Divided by a mod equals a ÷ (b mod c)."
+
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
