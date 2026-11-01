@@ -955,6 +955,8 @@ css = Text.intercalate "\n"
   -- Data fields and enum options: a reference table, not a lettered clause.
   , "  table.l4-dict { border-collapse:collapse; margin:.3rem 0 .5rem; margin-inline-start:1.6rem; }"
   , "  table.l4-dict td { padding:.1rem 0; padding-inline-end:1.1rem; vertical-align:top; }"
+  , "  table.l4-dict td.field { font-weight:400; }"
+  , "  table.l4-dict td:last-child { min-width:5.5rem; color:var(--muted); }"
   , "  ul.options { margin:.3rem 0 .5rem; margin-inline-start:1.6rem; padding-inline-start:1rem; }"
   , "  ul.options > li { margin:.1rem 0; }"
   -- Local WHERE / LET definitions attached to a rule.
