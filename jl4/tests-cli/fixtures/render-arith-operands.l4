@@ -154,3 +154,29 @@ GIVETH A NUMBER
 GIVEN x IS A NUMBER
 GIVETH A NUMBER
 `minus in exp` x MEANS exp (x MINUS 3)
+
+-- A mod beside + or −: tighter by the formula's rules, but a word, so a reader
+-- can take "a − b mod c" to be (a − b) mod c.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`plus of mod` a b c MEANS a PLUS (b MODULO c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`minus of mod` a b c MEANS a MINUS (b MODULO c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod then minus` a b c MEANS (a MODULO b) MINUS c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of a difference` a b c MEANS (a MINUS b) MODULO c

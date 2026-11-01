@@ -4386,6 +4386,12 @@ spec bin = do
       hasRow "Quotient then mod equals (a ÷ b) mod c."
       hasRow "Divided by a mod equals a ÷ (b mod c)."
 
+    it "brackets a mod beside a + or a −, where the word could reach further" $ do
+      hasRow "Plus of mod equals a + (b mod c)."
+      hasRow "Minus of mod equals a − (b mod c)."
+      hasRow "Mod then minus equals (a mod b) − c."
+      hasRow "Mod of a difference equals (a − b) mod c."
+
   -- A denial in more than one word, next to AND or OR, is bracketed, so that it
   -- cannot be read as denying what follows it as well.
   describe "l4 render and the scope of a NOT" $ do

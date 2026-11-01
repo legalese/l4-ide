@@ -2031,13 +2031,20 @@ formulaText e
   bin p op a b = do
     (pa, ta) <- go a
     (pb, tb) <- go b
-    Just (p, wrap p pa ta <> op <> wrap p pb tb)
+    Just (p, besideSum a (wrap p pa ta) <> op <> besideSum b (wrap p pb tb))
   -- The right operand of a subtraction or a division keeps its brackets at equal
   -- precedence too: a − (b − c) is not a − b − c, and a ÷ (b × c) is not a ÷ b × c.
   binRight p op a b = do
     (pa, ta) <- go a
     (pb, tb) <- go b
-    Just (p, wrap p pa ta <> op <> wrap (p + 1) pb tb)
+    Just (p, besideSum a (wrap p pa ta) <> op <> besideSum b (wrap (p + 1) pb tb))
+  -- 'bin' and 'binRight' print only + and −. A mod binds tighter than either, so
+  -- "a − b mod c" is a − (b mod c) by the formula's own rules; but "mod" is a word,
+  -- and a reader can take it to cover "a − b". So a mod beside + or − is
+  -- bracketed. Decided by the operator alone.
+  besideSum x t = case carameliseNode x of
+    Modulo{} -> "(" <> t <> ")"
+    _        -> t
   wrap parentP childP t = if childP < parentP then "(" <> t <> ")" else t
   -- mod shares a level with × and ÷ but does not reassociate with either:
   -- a × (b mod c), (a × b) mod c and (a mod b) × c are three formulas, and flat
