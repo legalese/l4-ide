@@ -212,11 +212,10 @@ GIVETH A STRING
 
 renders as
 
-```
-• The reminder is determined by:
-    depending on the claim's status:
-    - if it is Paid: none
-    - if it is Overdue: send a reminder
+```text
+1. The reminder depends on the claim's status:
+    (a) If the claim's status is Paid: none;
+    (b) If the claim's status is Overdue: send a reminder.
 ```
 
 **Keep arithmetic as arithmetic.** Numeric expressions render as formulas, with `+ − × ÷` and parentheses, not as "the sum of the product of …":
@@ -258,90 +257,40 @@ Headings are numbered by default, in the Render tab and on the command line (tur
 
 ## `@nlg` annotations
 
-When names and shape are not enough (a recursive helper, a term of art, a formula you would rather state in words), add an `@nlg` annotation. It is the natural-language form of the definition and replaces the generated sentence.
-
-Write `@nlg` at the end of the definition's line, after the name and inputs, with the body on the next line. Inside the sentence, `%name%` is a slot for an input; an input whose name has spaces keeps its backticks: ``%`the principal`%``.
+When names and shape are not enough, write the sentence yourself. Put `@nlg` on its own line above the rule, with a `%name%` slot for each input:
 
 ```l4
 GIVEN x IS A NUMBER
       y IS A NUMBER
 GIVETH A NUMBER
-`bigger` x y @nlg whichever is larger of %x% and %y%
-  MEANS IF x >= y THEN x ELSE y
+@nlg whichever is larger of %x% and %y%
+`bigger` x y MEANS IF x >= y THEN x ELSE y
 
 `start date` MEANS 3
 `end date`   MEANS 7
 `the deadline` MEANS `bigger` `start date` `end date`
 ```
 
-Each slot is filled with the input's name in the definition itself, and with the actual argument at each call:
-
-```
-• Bigger means whichever is larger of x and y.
-• The deadline means whichever is larger of start date and end date.
-```
-
-A slot is **tight**: `%amount%`, with no spaces inside the delimiters.
-That is what keeps a written-out percentage from being mistaken for one.
-In
-
-```l4
-@nlg a 5% levy on %amount%
-```
-
-the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot, while `%amount%` is one.
-Where a percent sign would end up flush against a word, as in `5%levy`, wrap it in backticks (`` `5%` ``) or spell it out ("5 percent"), either of which puts it beyond doubt.
-
-**The renderer never rewrites your words.** It prints a name as you wrote it and arranges what is around it. So a negation stays outside the statement: `NOT` `` `the person is a hotel` `` reads "it is not the case that the person is a hotel". If you want a negative wording, write it as a rule with an `@nlg`, and call that rule:
-
-```l4
-GIVETH A BOOLEAN
-@nlg the person is not a hotel
-`not a hotel` MEANS NOT `the person is a hotel`
-```
-
-**An input in a sentence reads as a blank.** Beside your words, an input's name would read as more of them: "when assessed on assessed on". So where a mixfix heading or an `@nlg` sentence names an input of a built-in type, it reads in square brackets: "when assessed on [assessed on]". An input of one of your own types reads as the rule's body calls it: "the application kind". A rule whose name ends in a preposition takes its inputs the same way: "The rate for [n] means…". To avoid the brackets' repetition, name the input as a noun, such as `` `the assessment date` ``.
-
-**It heads the rule, and the logic stays.** A rule with `@nlg` opens with its sentence, and its body follows as usual, so annotating a rule never removes a condition from the document:
-
-```l4
-GIVEN `the applicant` IS AN Applicant
-GIVETH A BOOLEAN
-@nlg %`the applicant`% qualifies for the grant
-DECIDE `qualifies` IF
-      `the applicant`'s `is a citizen`
-  AND `the applicant`'s `age` >= 21
-```
-
-renders as
+The sentence heads the rule, its logic follows, and every call reads as the sentence:
 
 ```text
-The applicant qualifies for the grant if:
-    (a) the applicant is a citizen; and
-    (b) the applicant's age is at least 21.
+1. Whichever is larger of [x] and [y] is:
+    (a) If x is at least y: x;
+    (b) Otherwise: y.
+
+4. The deadline means whichever is larger of start date and end date.
 ```
 
-The sentence stands in for the body only where the body would not help a reader: in a rule that calls itself, and in a rule from an imported module. The prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so it reads as that sentence and does not expose the recursion. Every rule in the standard libraries has a sentence, so a call to one reads as prose.
+Use it for recursive helpers, for rules called from other rules, and for terms of art. Every rule in the standard libraries has a sentence.
 
-| Situation                                            | Why `@nlg` helps                                   |
-| ---------------------------------------------------- | -------------------------------------------------- |
-| Recursive or higher-order helpers                    | Describes the result, hides the recursion          |
-| A rule called from other rules                       | Every call reads as the sentence                   |
-| Terms of art                                         | Matches the exact statutory or contractual wording |
-| A name that cannot be both valid code and good prose | Separates the two                                  |
-
-Tips:
-
-- Use only the function's own inputs as slots, and write the sentence so that it reads well with each slot as a noun phrase.
-- Try names and shape first. An `@nlg` sentence can drift away from the logic it describes, so use it where it pays off.
-- One sentence per definition. For branching prose, let `CONSIDER` or `IF` render as an outline instead.
+- **Fix wording that reads badly:** [Fix wording with @nlg](fix-wording-with-nlg.md)
+- **All the rules:** [@nlg](../../reference/syntax/nlg.md)
 
 ---
 
 ## One encoding, several languages
 
-An `@nlg` sentence is in whatever language you wrote it in.
-To keep the same rule readable in two languages, give it one sentence per language and tag each with its language:
+Give a rule one sentence per language, and ask for the one you want:
 
 ```l4
 GIVEN amount IS A NUMBER
@@ -351,22 +300,11 @@ DECIDE `is large` @nlg:en the amount %amount% is large
   IF amount GREATER THAN 100
 ```
 
-Nothing about the rule is duplicated, only its wording.
-Ask for the language you want:
-
 ```bash
 l4 render --lang he --format html contract.l4 > contract.he.html
-l4 nlg --lang he contract.l4
 ```
 
-A rule with no sentence in that language keeps its default one, so a half-translated file produces a whole document.
-When a whole module is in one language, say it once with `@lang he` on a line of its own instead of tagging every sentence; the tag then means "every untagged `@nlg` in this module is Hebrew".
-
-What this does not do is translate.
-L4 prints the words you wrote.
-The little words it adds itself, such as "is equal to" or "with", stay English unless L4 has a phrase table for the language.
-Hebrew is the one language with a table, and it is small, so have a Hebrew speaker read its output before you rely on it.
-[The syntax reference](../../reference/syntax/README.md#labelling-the-language-nlghe) has the details and the limits.
+L4 does not translate: it prints the words you wrote. See [Several languages](../../reference/syntax/nlg.md#several-languages).
 
 ---
 
