@@ -503,6 +503,15 @@ nlgOwnLineFixture = fixtureDir </> "nlg-own-line.l4"
 renderUnstableConstructsFixture :: FilePath
 renderUnstableConstructsFixture = fixtureDir </> "render-unstable-constructs.l4"
 
+-- A rule with no GIVEN of its own whose body calls another rule, under a
+-- section GIVEN and named by an #EVAL: a provision, not test data.
+renderSectionGivenEvalFixture :: FilePath
+renderSectionGivenEvalFixture = fixtureDir </> "render-section-given-eval.l4"
+
+-- A rule that reaches a rule under another section GIVEN by a named call.
+sectionGivenBridgeSource :: FilePath
+sectionGivenBridgeSource = "examples/ok/section-given-bridge.l4"
+
 -- An @nlg on a MIXFIX definition, read at a call site in the same module, and
 -- across an IMPORT. The importing fixture makes the same calls, row for row,
 -- as the local one (less one row it says it leaves out), so one expected list
@@ -676,6 +685,7 @@ coreFixtures =
   , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
   , nlgHeadPlacementSource, placementReadme, nlgOwnLineSectionGivenFixture
   , renderMeaningFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
+  , renderSectionGivenEvalFixture, sectionGivenBridgeSource
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -3462,6 +3472,48 @@ spec bin = do
       out `shouldSatisfy` any ("the applicant's age again" `isPrefixOf`)
       out `shouldSatisfy` any ("the constant seven" `isPrefixOf`)
       out `shouldSatisfy` any ("the claimant is a minor where the claimant's age in years is 3" `isInfixOf`)
+
+    -- `l4 render` used to leave `age again` out: a rule with no GIVEN of its
+    -- own whose body is a call counted as test data once an #EVAL named it.
+    -- `seven` is a bare literal that only an #EVAL names, which is test data on
+    -- main and unstable alike, and stays out even with an @nlg (assumed, not
+    -- ruled, 2026-11-01).
+    it "renders every rule under the section GIVEN, with its sentence" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgOwnLineSectionGivenFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("The age of the applicant means" `isInfixOf`)
+      out `shouldSatisfy` any ("The applicant's age again means the age of the applicant." `isInfixOf`)
+      out `shouldSatisfy` any ("The claimant is a minor if" `isInfixOf`)
+      out `shouldNotSatisfy` any ("seven" `isInfixOf`)
+
+  describe "l4 render of a rule that a directive names" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderSectionGivenEvalFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "keeps a rule under a section GIVEN whose body calls another rule" $ do
+      out <- rows
+      out `shouldSatisfy` any ("The person is an adult if age is at least 18." `isInfixOf`)
+      out `shouldSatisfy` any ("The person may vote" `isInfixOf`)
+      out `shouldSatisfy` any ("May stand" `isInfixOf`)
+
+    -- Such a rule is often a named-argument call to a rule under another
+    -- section GIVEN. With no herald on that rule it used to read as a record
+    -- construction ("F is a g with: foo — foo").
+    it "reads a named-argument call to a rule as a call, not a record" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", sectionGivenBridgeSource]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("1. F means g where foo is foo." `isSuffixOf`)
+      out `shouldNotSatisfy` any ("is a g with" `isInfixOf`)
+
+    it "still leaves out a constant that only a directive names" $ do
+      out <- rows
+      out `shouldSatisfy` any ("Twice " `isInfixOf`)
+      out `shouldNotSatisfy` any ("doubled fee" `isInfixOf`)
+      out `shouldNotSatisfy` any ("test age" `isInfixOf`)
 
   describe "an @nlg on a rule head's input" $ do
     let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]

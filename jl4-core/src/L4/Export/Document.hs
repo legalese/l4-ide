@@ -544,13 +544,17 @@ buildDocument cfg mainModule0 deps0 =
   -- definition they actually use. A value object that falls outside this
   -- closure is referenced only by directives (and other such objects).
   operativeClosure = closure graph.ugEdges
-    (Set.fromList [ i | (i, u) <- indexed, not (isInstanceValueUnit u) ])
+    (Set.fromList [ i | (i, u) <- indexed, not (isValueUnit u) ])
+
+  -- A unit that reads an input is a provision, whatever its shape.
+  inputDependent = inputDependentDefs (inputUniques (mainModule0 : deps0)) (map snd indexed)
+  isValueUnit u = isInstanceValueUnit u && not (Set.member u.uPrimary inputDependent)
 
   isFixture i u =
        cfg.dropUnused && isMain i
     && not (Set.disjoint u.uDefs dirRefs)
     && not (Set.member i operativeClosure)
-    && isInstanceValueUnit u
+    && isValueUnit u
     && not (isExportUnit u)
 
   renderUnit i u
@@ -718,6 +722,8 @@ directiveRefsOf (MkModule _ _ section) = goSection section
 -- literal — as opposed to an operative rule (which has parameters or a body
 -- with control flow / logic). Such units are the only ones eligible to be
 -- dropped as directive-only fixtures.
+--
+-- The shape alone does not make a value constant: see 'inputDependentDefs'.
 isInstanceValueUnit :: Unit -> Bool
 isInstanceValueUnit u = case u.uDecl of
   UDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ params) _) _ body)
@@ -728,6 +734,38 @@ isInstanceValueUnit u = case u.uDecl of
         Lit{}      -> True   -- a bare numeric / string literal
         _          -> False
   _ -> False
+
+-- | Everything defined by a unit whose value depends on an input of the
+-- document ('inputUniques'): a unit that names an input, or names something
+-- defined by such a unit, at any distance.
+--
+-- __Such a unit is never test data, whatever its shape.__ A parameterless rule
+-- whose body is a call, @`may vote` MEANS `is adult`@, has the shape of a
+-- constant ('isInstanceValueUnit'), and until 2026-11-01 left the document,
+-- with no message, as soon as a directive named it. Its value is worked out
+-- from the inputs, so it is a provision. A rule under a section GIVEN has no
+-- GIVEN of its own once the elaborations are stripped, and reads the section's
+-- inputs, so every such rule that called another was exposed
+-- (@jl4/tests-cli/fixtures/render-section-given-eval.l4@). A call whose
+-- arguments are all constants, @Date 15 5 2025@ or @`twice` 21@, depends on no
+-- input and is still data.
+inputDependentDefs :: Set.Set Unique -> [Unit] -> Set.Set Unique
+inputDependentDefs inputs us = go inputs
+ where
+  go dep =
+    let dep' = Set.unions (dep : [ u.uDefs | u <- us, not (Set.disjoint u.uRefs dep) ])
+    in if Set.size dep' == Set.size dep then dep else go dep'
+
+-- | The inputs of a document: every ASSUME, including those the checker makes
+-- of a section GIVEN, which is why this reads the modules before
+-- 'stripSectionBinderElaborations', and every name of a section GIVEN.
+inputUniques :: [Module Resolved] -> Set.Set Unique
+inputUniques mods = Set.fromList $
+     [ getUnique (assumeApp a) | m <- mods, Assume _ a <- topDeclsRec m ]
+  <> [ getUnique r
+     | m@(MkModule _ _ root) <- mods
+     , MkSection _ _ _ (Just (MkGivenSig _ names)) _ <- root : [ s | Section _ s <- topDeclsRec m ]
+     , MkOptionallyTypedName _ r _ _ <- names ]
 
 isExportUnit :: Unit -> Bool
 isExportUnit u = case u.uDecl of
@@ -1079,11 +1117,26 @@ typeNameText = \case
   TyApp _ n _ -> nameToText (getActual n)
   _           -> ""
 
--- | Is this a named-argument call to one of these rules?
+-- | Is this a named-argument call to one of these rules, or to any rule that is
+-- not a record's constructor?
+--
+-- The second half is from 2026-11-01. A named-argument call to a rule with no
+-- herald read as a record construction, "F is a g with: foo — foo" for
+-- @f MEANS g WITH foo IS foo@, which says that F is a record and not that it
+-- is G worked out with FOO set. Such calls are the usual way to reach a rule
+-- under a section GIVEN, and one named by a directive used to be dropped as
+-- test data ('inputDependentDefs'), which hid how they read.
 isRuleCall :: Set.Set Unique -> Expr Resolved -> Bool
 isRuleCall calls = \case
-  AppNamed _ n _ _ -> getUnique n `Set.member` calls
+  AppNamed _ n _ _ -> getUnique n `Set.member` calls || not (isConstructorName n)
   _                -> False
+
+-- | Did the checker resolve this name to a data constructor?
+isConstructorName :: Resolved -> Bool
+isConstructorName r = case getActual r of
+  MkName nameAnn _ -> case nameAnn ^. annInfo of
+    Just (TypeInfo _ (Just Constructor)) -> True
+    _                                    -> False
 
 bodyAsRecordLiteral :: Expr Resolved -> Maybe (Text, [NamedExpr Resolved])
 bodyAsRecordLiteral = \case
