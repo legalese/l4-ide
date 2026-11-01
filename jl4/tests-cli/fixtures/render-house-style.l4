@@ -1,0 +1,66 @@
+-- What `l4 render` does with the shape of a document: the words of a provision
+-- kept among its conditions, negative wording an author chose, decision tables,
+-- the interpretation section, schedules and citations.
+
+IMPORT prelude
+
+@ref-map Grants Act 2024, s 4(1) https://example.com/Acts/Grants#S4
+
+§ `House style`
+
+ASSUME `the person is a hotel` IS A BOOLEAN
+ASSUME `the person is licensed` IS A BOOLEAN
+
+DECLARE Transfer HAS
+  `to the issuer of the securities` IS A BOOLEAN
+  `to an accredited investor` IS A BOOLEAN
+
+DECLARE Status IS ONE OF Active, Dormant, Closed
+
+GIVEN transfer IS A Transfer
+GIVETH A BOOLEAN
+`transfer falls within an exception` transfer MEANS
+        "unless such securities are transferred:"
+    ..  "(1)" ... transfer's `to the issuer of the securities`
+    OR  "(2)" ... transfer's `to an accredited investor`
+
+-- With no wording of its own, a negation stays outside the statement.
+GIVETH A BOOLEAN
+`plain negation` MEANS NOT `the person is a hotel`
+
+-- An author who wants a negative wording writes it.
+GIVETH A BOOLEAN
+@nlg the person is not a hotel
+`not a hotel` MEANS NOT `the person is a hotel`
+
+GIVETH A BOOLEAN
+`may hold a licence` MEANS `not a hotel` AND `the person is licensed`
+
+GIVEN status IS A Status
+GIVETH A NUMBER
+`the fee by status` MEANS
+  CONSIDER status
+    WHEN Active THEN 10
+    WHEN Dormant THEN 20
+    OTHERWISE 30
+
+GIVEN age IS A NUMBER
+GIVETH A STRING
+`the age band` MEANS
+  IF age AT LEAST 65
+    THEN "senior"
+    ELSE IF age AT LEAST 18
+      THEN "adult"
+      ELSE "minor"
+
+GIVETH A LIST OF NUMBER
+`the rate table` MEANS LIST 1, 2, 3, 4, 5
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the rate for` n MEANS at `the rate table` n
+
+@ref Grants Act 2024, s 4(1)
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+`is eligible` age MEANS age AT LEAST 18

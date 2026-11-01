@@ -1,5 +1,9 @@
 module L4.Nlg (
   simpleLinearizer,
+  markedLinearizer,
+  markFrame,
+  stripFrameMarks,
+  localiseMarked,
   simpleLinearizerIn,
   linearizeDirectives,
   linearizeDirectivesIn,
@@ -101,8 +105,55 @@ simpleLinearizer = renderLinTree . linearize
 simpleLinearizerIn :: Linearize a => Maybe LangTag -> a -> (Text, Set.Set Text)
 simpleLinearizerIn mlang a = first renderLinTree (localizeIn mlang (linearize a))
 
+-- | 'simpleLinearizer' with its frame words marked, for text that is kept and put
+-- into a language later. @l4 render@ builds its sentences before a writer sees
+-- them, so it cannot translate them as 'simpleLinearizerIn' does while
+-- linearizing; the marks carry the distinction between the author's words and the
+-- renderer's as far as the writer. The backtick round a name works the same way.
+markedLinearizer :: Linearize a => a -> Text
+markedLinearizer =
+    Text.replace (Text.unwords (map markFrame ["is", "equal", "to"])) (markFrame "is")
+  . renderTokens markFrame
+  . linearize
+
+-- | Mark words as the renderer's own. Unicode noncharacters, which are set aside
+-- for a program's internal use, so they cannot occur in an author's text.
+markFrame :: Text -> Text
+markFrame t = Text.singleton frameOpen <> t <> Text.singleton frameClose
+
+frameOpen, frameClose :: Char
+frameOpen  = '\xFDD0'
+frameClose = '\xFDD1'
+
+stripFrameMarks :: Text -> Text
+stripFrameMarks = Text.filter (\c -> c /= frameOpen && c /= frameClose)
+
+-- | Put marked text into a language, through the same phrasebook lookup as
+-- 'simpleLinearizerIn', so a phrase reads the same in @l4 nlg@ and in @l4 render@.
+-- A language with no phrasebook keeps the English, unmarked. A phrasebook is keyed
+-- in lower case, and a capital at the start of a frame word means nothing to it.
+localiseMarked :: Maybe LangTag -> Text -> Text
+localiseMarked mlang t = case phrasebookFor =<< mlang of
+  Nothing -> stripFrameMarks t
+  Just pb -> renderLinTree (fst (localize pb (markedTree t)))
+
+-- | Marked text as tokens: what is marked becomes frame words, one a word, as
+-- 'hcat' lays them out, so that a phrase can match across them.
+markedTree :: Text -> LinTree
+markedTree t0 = case Text.break (== frameOpen) t0 of
+  (plain0, rest)
+    | Just after' <- Text.stripPrefix " " plain0 -> text " " <> markedTree (after' <> rest)
+    | Text.null rest -> text plain0
+    | otherwise ->
+        let (marked, after) = Text.break (== frameClose) (Text.drop 1 rest)
+            framed = mconcat (intersperse (text " ") (map (frame . Text.toLower) (Text.words marked)))
+        in text plain0 <> framed <> markedTree (Text.drop 1 after)
+
 renderLinTree :: LinTree -> Text
-renderLinTree tree =
+renderLinTree = renderTokens id
+
+renderTokens :: (Text -> Text) -> LinTree -> Text
+renderTokens onFrame tree =
   let
     sp :: Text
     sp = " "
@@ -114,7 +165,7 @@ renderLinTree tree =
       LinUser -> t.payload
       LinVar -> "`" <> t.payload <> "`"
       LinText -> t.payload
-      LinFrame -> t.payload
+      LinFrame -> onFrame t.payload
   in
     case tree.tokens of
       [] -> ""

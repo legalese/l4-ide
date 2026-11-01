@@ -1,0 +1,42 @@
+Library cards
+=============
+
+
+§ 1  Interpretation
+
+In this document, unless the context otherwise requires:
+
+1. Residence means one of in the city or outside the city.
+
+2. Card means one of adult card, junior card, or no card.
+
+3. Applicant consists of:
+    - name — text
+    - age — number
+    - residence — Residence
+    - has a guardian's consent — yes or no
+    - number of overdue books — number
+
+
+§ 2  Provisions
+
+1. An Applicant applicant has overdue books if the applicant's number of overdue books is more than 0.
+
+2. An Applicant applicant may get a library card if:
+    (a) the applicant's residence is in the city;
+    (b) any of the following:
+        (i) the applicant's age is at least 16; or
+        (ii) the applicant has a guardian's consent; and
+    (c) it is not the case that the applicant has overdue books.
+
+3. The card for is:
+    | Condition                                                    | Result      |
+    |--------------------------------------------------------------|-------------|
+    | it is not the case that the applicant may get a library card | no card     |
+    | otherwise, if the applicant's age is at least 16             | adult card  |
+    | otherwise                                                    | junior card |
+
+
+Coverage
+left out: Ada
+left out: Ben

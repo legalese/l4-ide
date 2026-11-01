@@ -392,6 +392,10 @@ nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
 renderMeaningFixture :: FilePath
 renderMeaningFixture = fixtureDir </> "render-meaning.l4"
 
+-- The shape of a document, as `l4 render` lays it out.
+renderHouseStyleFixture :: FilePath
+renderHouseStyleFixture = fixtureDir </> "render-house-style.l4"
+
 -- An @nlg on its own line above a rule that has no GIVEN.
 nlgOwnLineFixture :: FilePath
 nlgOwnLineFixture = fixtureDir </> "nlg-own-line.l4"
@@ -686,7 +690,7 @@ main = do
        , syntaxImportEntry, lexImportEntry, missingImportEntry
        , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
        , nlgHeadPlacementSource
-       , renderMeaningFixture, nlgOwnLineFixture
+       , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture
        , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -1033,7 +1037,7 @@ spec bin = do
       code `shouldBe` ExitSuccess
       -- Windows ends lines with a carriage return, as in the l4 format test.
       let sout = filter (/= '\r') sout0
-      sout `shouldSatisfy` ("(b) If the colour is Green: 2;\n    (c) Otherwise: 3." `isInfixOf`)
+      sout `shouldSatisfy` ("| Green      | 2      |\n    | otherwise  | 3      |" `isInfixOf`)
       sout `shouldSatisfy` ("depends on input 1:" `isInfixOf`)
       sout `shouldSatisfy` ("(b) Otherwise: the result of clause 2." `isInfixOf`)
       sout `shouldSatisfy` ("The result of clause 2 depends on input 1:" `isInfixOf`)
@@ -2014,8 +2018,8 @@ spec bin = do
       nlgOut `shouldSatisfy` endsLine "`row fourteen` with 200"
       nlgOut `shouldSatisfy` ("`row fourteen` where the sum of money is 200" `isInfixOf`)
       nlgOut `shouldNotSatisfy` ("the sum of money with 200" `isInfixOf`)
-      renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
-      renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` (" if the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row fourteen if amount is more than 100" `isInfixOf`)
 
     it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15, 16)" $ do
       Output _ nlgOut _ <- nlgOf
@@ -2026,8 +2030,8 @@ spec bin = do
       nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
       nlgOut `shouldSatisfy` (joinLines ["`row sixteen` with 200", "`row sixteen` where the sum of money is 200"] `isInfixOf`)
       -- Render describes each rule by its own body.
-      renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
-      renOut `shouldSatisfy` ("Row sixteen holds if amount is more than 100" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row fifteen if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen if amount is more than 100" `isInfixOf`)
       renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
 
     it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
@@ -2185,7 +2189,7 @@ spec bin = do
       rows <- renderedRows nlgOwnerMain ["Own net price", "Own working age", "Own total"]
       rows `shouldBe`
         [ "Own net price means price LESS 20."
-        , "Own working age holds if age is in 65."
+        , "Own working age if age is in 65."
         , "Own total means sum of total."
         ]
 
@@ -2270,9 +2274,9 @@ spec bin = do
     it "says where a group of the other connective starts and ends" $ do
       rowOf "And of or in a condition" >>= (`shouldSatisfy` ("If a and either b or c: 1;" `isInfixOf`))
       rowOf "Or of and in a condition" >>= (`shouldSatisfy` ("If either a or b, and c: 1;" `isInfixOf`))
-      rowOf "Not of and in a condition" >>= (`shouldSatisfy` ("If not both a and b: 1;" `isInfixOf`))
+      rowOf "Not of and in a condition" >>= (`shouldSatisfy` ("If it is not the case that both a and b: 1;" `isInfixOf`))
       rowOf "Not as a whole rule" >>= (`shouldSatisfy` ("neither a nor b." `isInfixOf`))
-      rowOf "Rule with not of an and" >>= (`shouldSatisfy` ("not both a and (b or c)." `isInfixOf`))
+      rowOf "Rule with not of an and" >>= (`shouldSatisfy` ("it is not the case that both a and (b or c)." `isInfixOf`))
 
     it "keeps a subtraction in the order it was written" $
       rowOf "Difference in prose" >>= (`shouldSatisfy` ("If a − b is more than 0: more;" `isInfixOf`))
@@ -2311,6 +2315,47 @@ spec bin = do
     it "numbers sections and clauses unless told not to" $ do
       run [] >>= (`shouldSatisfy` ("1. " `isInfixOf`))
       run ["--no-number-clauses"] >>= (`shouldNotSatisfy` ("1. " `isInfixOf`))
+
+  -- What the renderer does with the shape of a document, none of which reads an
+  -- author's words: a name or a sentence is printed as it stands.
+  describe "l4 render house style" $ do
+    let render format = do
+          Output code sout _ <- runL4 bin ["render", "--format", format, renderHouseStyleFixture]
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout)
+
+    it "keeps a provision's own labels and lead-in, and generates no letters for them" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("if unless such securities are transferred:\n    (1) to the issuer of the securities, for the transfer; or\n    (2) to an accredited investor, for the transfer." `isInfixOf`)
+
+    it "keeps a negation outside the statement it denies" $
+      render "text" >>= (`shouldSatisfy` ("Plain negation if it is not the case that the person is a hotel." `isInfixOf`))
+
+    it "reads a negative wording an author wrote as an @nlg" $
+      render "text" >>= (`shouldSatisfy` ("(a) the person is not a hotel; and\n    (b) the person is licensed." `isInfixOf`))
+
+    it "lays out cases and ladders with short results as decision tables, in order" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("The fee by status depends on the status:\n    | the status | Result |" `isInfixOf`)
+      out `shouldSatisfy` ("| otherwise, if age is at least 18 | adult  |" `isInfixOf`)
+
+    it "opens with an interpretation section" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("§ 1  Interpretation\n\nIn this document, unless the context otherwise requires:" `isInfixOf`)
+      out `shouldSatisfy` ("The following are taken as given:\n\n1. The person is a hotel." `isInfixOf`)
+
+    it "moves long constant data to a Schedule, and says so where it is used" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("item number n of the rate table (Schedule 1)." `isInfixOf`)
+      out `shouldSatisfy` ("§ 3  Schedule 1: The rate table" `isInfixOf`)
+
+    it "links a citation its file maps to a web address, keeping the address's case" $
+      render "html" >>= (`shouldSatisfy` ("<a href=\"https://example.com/Acts/Grants#S4\">Grants Act 2024, s 4(1)</a>" `isInfixOf`))
+
+    it "puts the rendering's own words into the document's language" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldNotSatisfy` (" if amount" `isInfixOf`)
 
   describe "an @nlg on its own line above a rule" $ do
     let rows = do
