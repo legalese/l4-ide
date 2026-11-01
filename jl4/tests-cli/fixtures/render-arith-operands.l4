@@ -1,0 +1,63 @@
+-- Operands of arithmetic that are not themselves arithmetic, as `l4 render`
+-- reads them: a call, a rule's own sentence, an IF, a library date phrase.
+-- Each pair has different values, and must read differently.
+IMPORT daydate
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`f2` a b MEANS a TIMES b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+@nlg twice %a%
+`twice` a MEANS a TIMES 2
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`call then minus` x MEANS `f2` 2 x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in a call` x MEANS `f2` 2 (x MINUS 3)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`sentence then minus` x MEANS `twice` x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in a sentence` x MEANS `twice` (x MINUS 3)
+
+GIVEN c IS A BOOLEAN
+      x IS A NUMBER
+GIVETH A NUMBER
+`if then minus` c x MEANS (IF c THEN 1 ELSE 10) MINUS x
+
+GIVEN d IS A DATE
+GIVETH A NUMBER
+`year then minus` d MEANS (DATE_YEAR d) MINUS 1
+
+GIVEN d IS A DATE
+      n IS A NUMBER
+GIVETH A DATE
+`months less one` d n MEANS `add months` d (n MINUS 1)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`times of minus` x MEANS 4 TIMES (x MINUS 2)
+
+-- Pairs whose texts must differ, each needing more than precedence to read.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+      d IS A NUMBER
+GIVETH A NUMBER
+`call then minus then call` a b c d MEANS a MINUS `f2` b c MINUS d
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+      d IS A NUMBER
+GIVETH A NUMBER
+`minus of a call of minus` a b c d MEANS a MINUS `f2` b (c MINUS d)

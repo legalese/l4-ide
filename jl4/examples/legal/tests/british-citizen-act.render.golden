@@ -78,7 +78,7 @@ Provisions:
     (a) is BOT for the place; and
     (b) the place's English name is not Sovereign Base Areas of Akrotiri and Dhekelia.
 
-5. After the date d and the date c if (year with the date c − 1900) × 365 + month with the date c × 30 + day with the date c is less than (the date d's year − 1900) × 365 + the date d's month × 30 + the date d's day.
+5. After the date d and the date c if ((year with the date c) − 1900) × 365 + (month with the date c) × 30 + (day with the date c) is less than (the date d's year − 1900) × 365 + the date d's month × 30 + the date d's day.
 
 6. Is born in UK if UK is English name with the natural person's birth place's val.
 

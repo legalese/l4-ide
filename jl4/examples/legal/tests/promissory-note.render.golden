@@ -41,7 +41,7 @@ Promissory Note
     - Currency — Principal Amount's Currency
     - Value — Principal Amount's Value × Monthly Interest Rate × Compound Factor ÷ (Compound Factor − 1)
     where:
-    - Compound Factor means Base to the power of 1 + Monthly Interest Rate and Monthly Installments.
+    - Compound Factor means Base to the power of (1 + Monthly Interest Rate) and Monthly Installments.
 
 3. Total Repayment Amount is a Money with:
     - Currency — Principal Amount's Currency
@@ -61,11 +61,11 @@ Promissory Note
     - Next Payment Due is a Payment with:
         - Amount — Money where Currency is Monthly Installment Amount's Currency and Value is The lesser of Monthly Installment Amount's Value and the Outstanding Payment Amount's Value
         - Days Beyond Commencement — (Installments Covered Since Commencement + 1) × the average number of days in a Gregorian month
-    - Next Payment Due Date equals CEILING with Next Payment Due's Days Beyond Commencement + Late Payment Penalty's Grace Period Days.
+    - Next Payment Due Date equals (CEILING with Next Payment Due's Days Beyond Commencement) + Late Payment Penalty's Grace Period Days.
     - Next Payment Due Amount With Penalty is a Money with:
         - Currency — Next Payment Due's Amount's Currency
         - Value — Next Payment Due's Amount's Value + Next Payment Due's Amount's Value × Late Payment Penalty's Interest Rate
-    - Default After Days Beyond Commencement equals CEILING with Next Payment Due's Days Beyond Commencement + Default After Days Not Paid Beyond Due.
+    - Default After Days Beyond Commencement equals (CEILING with Next Payment Due's Days Beyond Commencement) + Default After Days Not Paid Beyond Due.
     - All Outstanding Debts is a Money with:
         - Currency — Next Payment Due's Amount's Currency
         - Value — the Outstanding Payment Amount's Value + Next Payment Due Amount With Penalty's Value − Next Payment Due's Amount's Value
@@ -143,8 +143,8 @@ The following are taken as given:
         (i) If exp is less than 0: Na N;
         (ii) Otherwise: 0;
     (c) Otherwise, if exp is 1: base;
-    (d) Otherwise, if exp is more than 0: base × Base to the power of base and exp − 1;
-    (e) Otherwise: 1 ÷ Base to the power of base and 0 − exp.
+    (d) Otherwise, if exp is more than 0: base × (Base to the power of base and (exp − 1));
+    (e) Otherwise: 1 ÷ (Base to the power of base and (0 − exp)).
 
 4. Is money at least equal within error if:
     (a) the money a's Currency is the money b's Currency; and
