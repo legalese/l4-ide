@@ -582,6 +582,10 @@ renderArithOperands = fixtureDir </> "render-arith-operands.l4"
 renderNotScope :: FilePath
 renderNotScope = fixtureDir </> "render-not-scope.l4"
 
+-- A denial, an IMPLIES or an IF that fills a slot of a rule's sentence.
+slotScope :: FilePath
+slotScope = fixtureDir </> "slot-scope.l4"
+
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
@@ -4427,6 +4431,22 @@ spec bin = do
     it "leaves a denial that is already delimited as it was" $ do
       hasRow "(a) If neither the Act governs for n nor b: 1;"
       hasRow "(a) If a is false or b: 1;"
+
+  describe "l4 nlg and a condition in a sentence's slot" $
+    it "brackets a denial, an IMPLIES or an IF in a slot the sentence goes on after" $ do
+      Output code sout _ <- runL4 bin ["nlg", slotScope]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(not `the Act governs` with 3) is disclosed"
+        , "not `the Act governs` with 3 is disclosed"
+        , "(not `the Act governs` with 3) is told `TRUE`"
+        , "not `the Act governs` with 3 is told `TRUE`"
+        , "`TRUE` is told not `the Act governs` with 3"
+        , "(`TRUE` implies `FALSE`) is disclosed"
+        , "`TRUE` implies `FALSE` is disclosed"
+        , "(if `TRUE` then `FALSE` else `TRUE`) is disclosed"
+        , "if `TRUE` then `FALSE` else `TRUE` is disclosed"
+        ]
 
   describe "library sentences at a call" $ do
     let nlgRows = do

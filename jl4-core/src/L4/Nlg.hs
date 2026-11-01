@@ -26,6 +26,7 @@ module L4.Nlg (
   substituteNlgCall,
   substituteNlgCallMarked,
   nlgRefs,
+  refsFollowedByWords,
   daydateLiteral,
   substituteNlgCallsIn,
   substituteNlgDirective,
@@ -51,7 +52,7 @@ import Optics
 import Data.Ratio (denominator, numerator)
 import Data.Time (fromGregorianValid)
 import qualified Data.Time.Format as TimeFormat
-import Data.Char (isLetter)
+import Data.Char (isAlphaNum, isLetter)
 
 -- | Convert a deontic modal to its text representation for NLG
 deonticModalText :: DeonticModal -> Text
@@ -1364,6 +1365,24 @@ nlgRefs = \case
   MkResolvedNlg _ _ frags -> [ getUnique r | MkNlgRef _ r <- frags ]
   _                       -> []
 
+-- | The parameters with a slot that the sentence's own words come after: in
+-- "%a% is told %b%", @a@ and not @b@. What fills such a slot is followed by
+-- the author's words, so a filler with no closing word of its own would take
+-- them in. Read from where the slot is, not from what the words say.
+refsFollowedByWords :: Nlg -> Set.Set Unique
+refsFollowedByWords = \case
+  MkResolvedNlg _ _ frags -> go frags
+  _                       -> Set.empty
+ where
+  go = \case
+    MkNlgRef _ r : rest
+      | any wordy rest -> Set.insert (getUnique r) (go rest)
+    _ : rest -> go rest
+    [] -> Set.empty
+  wordy = \case
+    MkNlgText _ t -> Text.any isAlphaNum t
+    MkNlgRef{}    -> False
+
 -- | Render an @\@nlg@ annotation, substituting each parameter reference with the
 -- corresponding call argument.
 renderNlgWith :: Map.Map Unique (Expr Resolved) -> Nlg -> Text
@@ -1371,17 +1390,17 @@ renderNlgWith = renderNlgWithIn Nothing
 
 renderNlgWithIn :: Maybe LangTag -> Map.Map Unique (Expr Resolved) -> Nlg -> Text
 renderNlgWithIn mlang argMap = \case
-  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (agreeing frags))
+  nlg@(MkResolvedNlg _ _ frags) -> normalizeWs (Text.concat (agreeing (refsFollowedByWords nlg) frags))
   other                 -> simpleLinearizer other
  where
   -- The parser keeps one text fragment per token, so the words after a slot are
   -- gathered before 'singularUnit' looks at them.
-  agreeing = \case
+  agreeing followed = \case
     r@(MkNlgRef{}) : rest
-      | frag r == "1"
+      | frag followed r == "1"
       , (words', others) <- span isWords rest ->
-          frag r : singularUnit (foldMap frag words') : agreeing others
-    f : rest -> frag f : agreeing rest
+          frag followed r : singularUnit (foldMap (frag followed) words') : agreeing followed others
+    f : rest -> frag followed f : agreeing followed rest
     [] -> []
   isWords = \case
     MkNlgText{} -> True
@@ -1390,7 +1409,7 @@ renderNlgWithIn mlang argMap = \case
   -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
   -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
   -- backslash still in it.
-  frag (MkNlgText _ t) = unescapeNlgText t
+  frag _ (MkNlgText _ t) = unescapeNlgText t
   -- An unsubstituted reference (definition view, or a name with no matching
   -- argument) renders as the bare parameter name — NOT via 'simpleLinearizer',
   -- which would re-expand that parameter's own @\@nlg@ and recurse when the
@@ -1399,12 +1418,21 @@ renderNlgWithIn mlang argMap = \case
   -- @%a% doubled@ filled with @5 MINUS 2@ would read "5 minus 2 doubled", as
   -- @5 MINUS `dbl` 2@ does. Decided by the filler's shape, not the sentence's
   -- words; a filler with a sentence of its own is left as it is.
-  frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
+  -- So is a denial, an IMPLIES or an IF in a slot that the sentence's words come
+  -- after: "not X is disclosed" is also how @NOT (`disclosed` X)@ reads, because
+  -- "not" reaches as far as the words go. In the last slot nothing follows it.
+  frag followed (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
     Just a
       | isNothing (a ^. annoOf % annNlg), isArithNode (carameliseNode a) ->
           "(" <> fst (simpleLinearizerIn mlang a) <> ")"
+      | getUnique r `Set.member` followed
+      , isNothing (a ^. annoOf % annNlg), runsOn (carameliseNode a) ->
+          "(" <> fst (simpleLinearizerIn mlang a) <> ")"
       | otherwise -> fst (simpleLinearizerIn mlang a)
     Nothing -> resolvedText r
+  runsOn = \ case
+    Not{} -> True; Implies{} -> True; IfThenElse{} -> True; MultiWayIf{} -> True; Consider{} -> True
+    _ -> False
 
 -- | The words after a slot that held the number 1: a sentence written for any
 -- count says "%n% months", and "1 months" is never what its author meant. Only a
