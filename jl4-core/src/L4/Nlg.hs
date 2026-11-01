@@ -20,6 +20,9 @@ module L4.Nlg (
   NlgFnInfo,
   nlgFnInfo,
   substituteNlgCalls,
+  substituteNlgCall,
+  nlgRefs,
+  daydateLiteral,
   substituteNlgCallsIn,
   substituteNlgDirective,
   substituteNlgDirectiveIn,
@@ -556,24 +559,24 @@ class Linearize a where
 instance Linearize (Expr Resolved) where
   linearize expr = case carameliseNode expr of
     And _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isOrNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isOrNode e2
       ]
     Or _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isAndNode e1
       , frame "or"
-      , lin e2
+      , groupedUnder isAndNode e2
       ]
     RAnd _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isOrNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isOrNode e2
       ]
     ROr _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isAndNode e1
       , frame "or"
-      , lin e2
+      , groupedUnder isAndNode e2
       ]
     Implies _ e1 e2 -> hcat
       [ lin e1
@@ -589,7 +592,7 @@ instance Linearize (Expr Resolved) where
       ]
     Not _ e -> hcat
       [ frame "not"
-      , lin e
+      , groupedUnder (\n -> isAndNode n || isOrNode n) e
       ]
     Plus _ e1 e2 -> hcat
       [ frame "the"
@@ -600,12 +603,9 @@ instance Linearize (Expr Resolved) where
       , lin e2
       ]
     Minus _ e1 e2 -> hcat
-      [ frame "the"
-      , frame "difference"
-      , frame "between"
+      [ lin e1
+      , frame "minus"
       , lin e2
-      , frame "and"
-      , lin e1
       ]
     Times _ e1 e2 -> hcat
       [ frame "the"
@@ -754,6 +754,20 @@ instance Linearize (Expr Resolved) where
       <> maybe [] (\r -> [ frame "because", lin r ]) mReason
     Inert _ txt _ctx -> text txt
 
+-- | An operand of a connective, in brackets if it is the kind of compound that
+-- flat text would regroup: @a AND (b OR c)@ reads "a and (b or c)", and not "a
+-- and b or c", which states a different rule. A sentence the author wrote for the
+-- operand carries its own meaning and is left as it is.
+groupedUnder :: (Expr Resolved -> Bool) -> Expr Resolved -> LinTree
+groupedUnder needsBrackets e
+  | isNothing (e ^. annoOf % annNlg), needsBrackets (carameliseNode e) =
+      text "(" <> lin e <> text ")"
+  | otherwise = lin e
+
+isAndNode, isOrNode :: Expr Resolved -> Bool
+isAndNode = \ case And{} -> True; RAnd{} -> True; _ -> False
+isOrNode  = \ case Or{} -> True; ROr{} -> True; _ -> False
+
 instance Linearize (Event Resolved) where
   linearize (MkEvent _ p a t _) = hcat
     [ "party", lin p, "did", lin a, "at", lin t]
@@ -796,7 +810,7 @@ instance Linearize (NamedExpr Resolved) where
 -- The month name is a frame word ('LinFrame'), so a phrasebook translates it.
 daydateLiteral :: Resolved -> [Expr Resolved] -> Maybe (Text, Text, Text)
 daydateLiteral r args@[_, _, _] = do
-  guard (fromDaydate r)
+  guard (fromDaydate r || builtinDate r)
   order <- lookup (unqualifiedRawNameToText (rawName (getActual r))) orders
   [a, b, c] <- traverse wholeLit args
   let (y, m, d) = order (a, b, c)
@@ -810,12 +824,13 @@ daydateLiteral r args@[_, _, _] = do
   dmy (d, m, y) = (y, m, d)
   orders =
     [ ("YMD", ymd), ("Year month day", ymd)
-    , ("Date", dmy), ("Days to date", dmy) ]
+    , ("Date", dmy), ("Days to date", dmy), ("DATE_FROM_DMY", dmy) ]
   wholeLit = \ case
     Lit _ (NumericLit _ q) | denominator q == 1 -> Just (numerator q)
     _ -> Nothing
   fromDaydate x =
     "daydate.l4" `Text.isSuffixOf` (fromNormalizedUri (getUnique x).moduleUri).getUri
+  builtinDate x = unqualifiedRawNameToText (rawName (getActual x)) == "DATE_FROM_DMY"
 daydateLiteral _ _ = Nothing
 
 instance Linearize (LocalDecl Resolved) where
@@ -1096,10 +1111,18 @@ substituteNlgCalls = substituteNlgCallsIn Nothing
 -- appended ones, rendered with a language's frame words. The herald's own
 -- text is the author's and is never touched.
 substituteNlgCallsIn :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
-substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
+substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) (substituteNlgCall mlang info)
+
+-- | One step of 'substituteNlgCallsIn', for the one call at the top of an
+-- expression. @l4 render@ walks the tree itself, because it phrases a call's
+-- arguments for a reader before they are spliced in.
+substituteNlgCall :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
+substituteNlgCall mlang info = \case
   App ann n args
     | Just (nlg, params) <- Map.lookup (getUnique n) info
-    , length params == length args ->
+    , length params == length args
+      -- A date given as literals reads as the date, whatever its rule's sentence.
+    , isNothing (daydateLiteral n args) ->
         let bound    = zip params args
             leftover = [ a | (p, a) <- bound, p `notElem` nlgRefs nlg ]
             sentence = renderNlgWithIn mlang (Map.fromList bound) nlg

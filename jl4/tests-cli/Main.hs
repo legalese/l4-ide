@@ -388,6 +388,14 @@ fixtureDir = "tests-cli/fixtures"
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
 
+-- Rules whose meaning a flat rendering would change, one per case.
+renderMeaningFixture :: FilePath
+renderMeaningFixture = fixtureDir </> "render-meaning.l4"
+
+-- An @nlg on its own line above a rule that has no GIVEN.
+nlgOwnLineFixture :: FilePath
+nlgOwnLineFixture = fixtureDir </> "nlg-own-line.l4"
+
 -- An @nlg on a MIXFIX definition, read at a call site in the same module, and
 -- across an IMPORT. The importing fixture makes the same calls, row for row,
 -- as the local one (less one row it says it leaves out), so one expected list
@@ -678,6 +686,7 @@ main = do
        , syntaxImportEntry, lexImportEntry, missingImportEntry
        , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
        , nlgHeadPlacementSource
+       , renderMeaningFixture, nlgOwnLineFixture
        , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -1024,10 +1033,10 @@ spec bin = do
       code `shouldBe` ExitSuccess
       -- Windows ends lines with a carriage return, as in the l4 format test.
       let sout = filter (/= '\r') sout0
-      sout `shouldSatisfy` ("- if it is Green: 2\n    - otherwise: 3" `isInfixOf`)
-      sout `shouldSatisfy` ("depending on input 1:" `isInfixOf`)
-      sout `shouldSatisfy` ("- otherwise: the result of clause 2" `isInfixOf`)
-      sout `shouldSatisfy` ("The result of clause 2 is determined by:" `isInfixOf`)
+      sout `shouldSatisfy` ("(b) If the colour is Green: 2;\n    (c) Otherwise: 3." `isInfixOf`)
+      sout `shouldSatisfy` ("depends on input 1:" `isInfixOf`)
+      sout `shouldSatisfy` ("(b) Otherwise: the result of clause 2." `isInfixOf`)
+      sout `shouldSatisfy` ("The result of clause 2 depends on input 1:" `isInfixOf`)
       sout `shouldNotSatisfy` mentionsOldName
 
     it "names no generated input in the HTML rendering either" $ do
@@ -1953,10 +1962,10 @@ spec bin = do
     it "renders the same sentences through l4 render, which is the point" $ do
       Output code sout _ <- renderOf
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("row five saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row seven saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row eight saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row twelve saw amount over floor" `isInfixOf`)
+      sout `shouldSatisfy` ("Row five saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("Row seven saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("Row eight saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("Row twelve saw amount over floor" `isInfixOf`)
 
     it "reads the placements that already worked the same way, argument in the slot" $ do
       Output _ sout _ <- nlgOf
@@ -1983,13 +1992,13 @@ spec bin = do
       -- A call through the alias reads the same.
       nlgOut `shouldNotSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
       nlgOut `shouldSatisfy` (unlines ["row ten saw 200", "row ten saw `amount` where `amount` is 200", "row ten saw 200"] `isInfixOf`)
-      renOut `shouldSatisfy` ("row ten saw amount" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row ten saw amount if amount is more than 100." `isInfixOf`)
       -- Row 11: the herald above the head lands on the declaration. A `WITH`
       -- call used to print the bare name, "`row eleven` where ...".
       nlgOut `shouldSatisfy` endsLine "row eleven saw 200"
       nlgOut `shouldSatisfy` ("row eleven saw `amount` where `amount` is 200" `isInfixOf`)
       nlgOut `shouldNotSatisfy` ("`row eleven` where" `isInfixOf`)
-      renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row eleven saw amount if amount is more than 100." `isInfixOf`)
 
     it "heads a WITH call with the herald without re-expanding an input's gloss (row 13)" $ do
       Output _ nlgOut _ <- nlgOf
@@ -2018,14 +2027,14 @@ spec bin = do
       nlgOut `shouldSatisfy` (joinLines ["`row sixteen` with 200", "`row sixteen` where the sum of money is 200"] `isInfixOf`)
       -- Render describes each rule by its own body.
       renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
-      renOut `shouldSatisfy` ("Row sixteen means amount is more than 100" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen holds if amount is more than 100" `isInfixOf`)
       renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
 
     it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
       Output _ nlgOut _ <- nlgOf
       Output _ renOut _ <- renderOf
       nlgOut `shouldSatisfy` endsLine "row seventeen saw 200"
-      renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row seventeen saw amount if amount is more than 100." `isInfixOf`)
 
   -- An @nlg on a MIXFIX definition, read at its call sites. A mixfix call
   -- resolves to the operator's canonical name (`the lower of _ and _`), while the
@@ -2130,7 +2139,7 @@ spec bin = do
   -- rendered had its heralds moved onto their rules.
   describe "l4 render of a rule imported through two modules" $ do
     let midRows fixture = do
-          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          Output code sout _ <- runL4 bin ["render", "--format", "text", "--include-imports", fixture]
           code `shouldBe` ExitSuccess
           pure [ dropWhile (not . Char.isAlpha) l
                | l <- map (filter (/= '\r')) (lines sout)
@@ -2177,7 +2186,7 @@ spec bin = do
       rows `shouldBe`
         [ "Own net price means price LESS 20."
         , "Own working age holds if age is in 65."
-        , "Own total means sum with total."
+        , "Own total means sum of total."
         ]
 
     it "gives a #EVAL of a definition with no herald no sentence from a prelude definition of the same name" $ do
@@ -2243,6 +2252,83 @@ spec bin = do
   -- `foldr` or given a second name, has no arguments to bind them, and used to
   -- read as its sentence with the slot names of its definition in it
   -- ("for which x is even holds"), which says something the author did not write.
+  -- What a rendering must never change. A reader of the document has nothing but
+  -- these words, so each row is a rule whose meaning a flat rendering would change
+  -- or lose, read as a whole line: an infix test would not see a wrong line beside
+  -- a right one.
+  describe "l4 render keeps a rule's meaning" $ do
+    let rowOf heading = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderMeaningFixture]
+          code `shouldBe` ExitSuccess
+          pure (unlines (takeWhile (not . null) (dropWhile (not . (heading `isInfixOf`)) (map (filter (/= '\r')) (lines sout)))))
+
+    it "keeps the right operand of a subtraction or a division in brackets" $ do
+      rowOf "Right nested minus" >>= (`shouldSatisfy` ("equals a − (b − c)." `isInfixOf`))
+      rowOf "Right nested division" >>= (`shouldSatisfy` ("equals a ÷ (b × c)." `isInfixOf`))
+      rowOf "Right nested divide by quotient" >>= (`shouldSatisfy` ("equals a ÷ (b ÷ c)." `isInfixOf`))
+
+    it "says where a group of the other connective starts and ends" $ do
+      rowOf "And of or in a condition" >>= (`shouldSatisfy` ("If a and either b or c: 1;" `isInfixOf`))
+      rowOf "Or of and in a condition" >>= (`shouldSatisfy` ("If either a or b, and c: 1;" `isInfixOf`))
+      rowOf "Not of and in a condition" >>= (`shouldSatisfy` ("If not both a and b: 1;" `isInfixOf`))
+      rowOf "Not as a whole rule" >>= (`shouldSatisfy` ("neither a nor b." `isInfixOf`))
+      rowOf "Rule with not of an and" >>= (`shouldSatisfy` ("not both a and (b or c)." `isInfixOf`))
+
+    it "keeps a subtraction in the order it was written" $
+      rowOf "Difference in prose" >>= (`shouldSatisfy` ("If a − b is more than 0: more;" `isInfixOf`))
+
+    it "keeps the drafter's name for a role" $ do
+      rowOf "The applicant is eligible" >>= (`shouldSatisfy` ("(a) the applicant is a citizen; and" `isInfixOf`))
+      rowOf "Discount" >>= (`shouldSatisfy` ("If the buyer's age is at least 65: the amount × 0.1;" `isInfixOf`))
+
+    it "tells a deadline of zero from no deadline at all" $ do
+      rowOf "At once" >>= (`shouldSatisfy` ("the Tenant must pay the rent immediately." `isInfixOf`))
+      rowOf "No deadline at all" >>= (`shouldSatisfy` ("the Tenant must pay the rent. Failing" `isInfixOf`))
+
+    it "says who is in breach, and what follows an obligation" $ do
+      rowOf "With a deadline and a chain" >>= (`shouldSatisfy` ("(a) Once that is done, the Landlord must repair the roof within 30." `isInfixOf`))
+      rowOf "With a deadline and a chain" >>= (`shouldSatisfy` ("(b) Failing that, the Tenant is in breach." `isInfixOf`))
+
+    it "reads a day that exists as that day, and no other as a day" $ do
+      rowOf "A real date" >>= (`shouldSatisfy` ("29 February 2024" `isInfixOf`))
+      rowOf "A date that rolls over" >>= (`shouldNotSatisfy` ("29 February 2025" `isInfixOf`))
+
+  -- The two surfaces read one document: `l4 render` with no flags is the Render
+  -- tab's default, so an import is left out but still informs the file's own rules.
+  describe "l4 render and imports" $ do
+    let run args = do
+          Output code sout _ <- runL4 bin (["render", "--format", "text"] ++ args ++ [nlgTransTop])
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout)
+
+    it "leaves imported rules out by default" $
+      run [] >>= (`shouldNotSatisfy` ("Mid rule" `isInfixOf`))
+
+    it "shows them when asked" $ do
+      run ["--include-imports"] >>= (`shouldSatisfy` ("Mid rule" `isInfixOf`))
+      run ["--include-import", "nlg-trans-mid"] >>= (`shouldSatisfy` ("Mid rule" `isInfixOf`))
+
+    it "numbers sections and clauses unless told not to" $ do
+      run [] >>= (`shouldSatisfy` ("1. " `isInfixOf`))
+      run ["--no-number-clauses"] >>= (`shouldNotSatisfy` ("1. " `isInfixOf`))
+
+  describe "an @nlg on its own line above a rule" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", nlgOwnLineFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "belongs to that rule after a section heading, a name or a DECLARE" $ do
+      out <- rows
+      out `shouldSatisfy` any ("The first constant means 1." `isInfixOf`)
+      out `shouldSatisfy` any ("The second constant means the first constant." `isInfixOf`)
+      out `shouldSatisfy` any ("The third constant means the second constant." `isInfixOf`)
+      out `shouldSatisfy` any ("The declared constant means 4." `isInfixOf`)
+
+    it "fills a slot with the input it names, not a rule or a field of that name" $ do
+      out <- rows
+      out `shouldSatisfy` any ("the day 3 for the tenant" `isInfixOf`)
+
   describe "a rule named but not called" $ do
     it "reads as its name in l4 nlg" $ do
       Output code sout _ <- runL4 bin ["nlg", nlgBareReference]
