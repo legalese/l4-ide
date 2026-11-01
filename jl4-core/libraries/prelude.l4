@@ -850,8 +850,11 @@ GIVEN k IS A TYPE
 @nlg a dictionary holding the entries %pairs%
 listToDict MEANS  Dictionary WITH contents IS pairs
 
-@nlg a dictionary
-fromList MEANS listToDict
+GIVEN k IS A TYPE
+      v IS A TYPE
+      pairs IS A LIST OF PAIR OF k, v
+@nlg a dictionary holding the entries %pairs%
+fromList MEANS listToDict pairs
 
 -- Dictionary: empty
 GIVEN k IS A TYPE
@@ -861,8 +864,12 @@ GIVETH A Dictionary k v
 emptyDict MEANS Dictionary WITH contents IS EMPTY
 
 -- Dictionary: singleton (alias for singleToDict)
-@nlg a one-entry dictionary
-singleton MEANS singleToDict
+GIVEN k IS A TYPE
+      v IS A TYPE
+      key IS A k
+      value IS A v
+@nlg a one-entry dictionary mapping %key% to %value%
+singleton MEANS singleToDict key value
 
 -- Dictionary: dictToList (extract contents)
 GIVEN k IS A TYPE
