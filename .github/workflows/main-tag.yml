@@ -999,8 +999,9 @@ jobs:
   # ============================================
   # Deploy the web editor (play.legalese.com)
   # ============================================
-  # Runs once the release exists, with that release's WASM. Until its target
-  # is set as repository variables, the job is skipped.
+  # Runs once the release exists, with that release's WASM. Its target comes
+  # from the web-editor environment's variables, which steps can read but a
+  # job-level `if:` can't.
 
   deploy-web-editor:
     name: Deploy Web Editor
@@ -1008,7 +1009,6 @@ jobs:
     needs:
       - build-wasm
       - create-tag
-    if: ${{ vars.WEB_EDITOR_BUCKET != '' && vars.WEB_EDITOR_DISTRIBUTION_ID != '' }}
     environment:
       name: web-editor
       url: https://play.legalese.com
