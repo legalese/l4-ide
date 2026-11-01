@@ -8,7 +8,7 @@ not `x`
 `x` implies `TRUE` and `y` implies `TRUE`
 `x` and `y`
 `x` and `y`
-not `x` and `y`
+not (`x` and `y`)
 `x` is equal to `x`
 the sum of `n` and 1 is equal to the sum of `n` and 1
 `d` 's `age` is equal to `d` 's `age`

@@ -1,7 +1,7 @@
 `rate is high` and `TRUE`
 `TRUE` and `rate is high`
-not `rate is low` or `FALSE`
-not `FALSE` or `rate is low`
+not (`rate is low` or `FALSE`)
+not (`FALSE` or `rate is low`)
 `rate is low` implies `FALSE`
 `TRUE` implies `rate is high`
 not `rate is low`

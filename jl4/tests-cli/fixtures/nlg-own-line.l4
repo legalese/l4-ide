@@ -1,0 +1,38 @@
+-- An @nlg on its own line above a rule belongs to that rule, whatever comes
+-- before it. Each of these rules has no GIVEN, so the annotation sits outside the
+-- rule's own span, and used to be taken by the name before it: a section heading,
+-- a name at the end of the rule above, or the type of a DECLARE.
+
+§ `Own line`
+
+§§ `First section`
+
+@nlg the first constant
+`first constant` MEANS 1
+
+@nlg the second constant
+`second constant` MEANS `first constant`
+
+@nlg the third constant
+`third constant` MEANS `second constant`
+
+DECLARE `declared constant` IS A NUMBER
+@nlg the declared constant
+`declared constant` MEANS 4
+
+-- A slot means the rule's input, not a rule or a record field of the same name.
+DECLARE Message HAS
+  role IS A STRING
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+day x MEANS x
+
+GIVEN day  IS A NUMBER
+      role IS A STRING
+GIVETH A NUMBER
+@nlg the day %day% for %role%
+`slotted rule` day role MEANS day
+
+GIVETH A NUMBER
+`uses them` MEANS `slotted rule` 3 "the tenant" PLUS `third constant` PLUS `declared constant`
