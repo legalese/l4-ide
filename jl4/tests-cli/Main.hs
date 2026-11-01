@@ -516,6 +516,10 @@ sectionGivenBridgeSource = "examples/ok/section-given-bridge.l4"
 renderMixfixOperandFixture :: FilePath
 renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
 
+-- An obligation whose action is an input.
+regulativeActionParamSource :: FilePath
+regulativeActionParamSource = "examples/ok/regulative-action-param-reference.l4"
+
 -- An @nlg on a MIXFIX definition, read at a call site in the same module, and
 -- across an IMPORT. The importing fixture makes the same calls, row for row,
 -- as the local one (less one row it says it leaves out), so one expected list
@@ -691,6 +695,7 @@ coreFixtures =
   , renderMeaningFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
   , renderMixfixOperandFixture
+  , regulativeActionParamSource
   , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
   , nlgTransTop, nlgTransMid, nlgTransDeep
   , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
@@ -3995,6 +4000,17 @@ spec bin = do
       Output code sout _ <- runL4 bin ["nlg", renderUnstableConstructsFixture]
       code `shouldBe` ExitSuccess
       lines (filter (/= '\r') sout) `shouldSatisfy` (("the following must refuse: `the fee in year` with 1999" `elem`))
+
+  -- An action that is an input of the rule is whatever action is passed in.
+  -- Read as a noun after "must" it is not a sentence ("the party must the
+  -- action"), so it takes a verb (assumed, not ruled, 2026-11-01).
+  describe "l4 render of an obligation whose action is an input" $
+    it "says the party must perform that action" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", regulativeActionParamSource]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("the party must perform the action within 30." `isInfixOf`)
+      out `shouldNotSatisfy` any ("must the action" `isInfixOf`)
 
   describe "an @nlg on its own line above a rule" $ do
     let rows = do

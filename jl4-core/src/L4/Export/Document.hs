@@ -1086,9 +1086,19 @@ ruleSubjects subst (MkTypeSig _ (MkGivenSig _ names) _) =
 substParams :: Map.Map Unique Text -> Expr Resolved -> Expr Resolved
 substParams pm
   | Map.null pm = id
-  | otherwise = transformOf (gplate @(Expr Resolved)) $ \case
-      App ann n [] | Just phrase <- Map.lookup (getUnique n) pm -> Inert ann phrase InertCtxNone
-      e -> e
+  | otherwise = transformOf (gplate @(Expr Resolved)) param . over (gplate @(RAction Resolved)) action
+ where
+  param = \case
+    App ann n [] | Just phrase <- Map.lookup (getUnique n) pm -> Inert ann phrase InertCtxNone
+    e -> e
+  -- An action that is an input is whatever action the caller passes in. It is
+  -- not a verb, and read as its noun phrase "the party must the action" is not
+  -- a sentence, so it takes one (assumed, not ruled, 2026-11-01).
+  action = \case
+    MkAction a m (PatExpr pa (App ann n [])) prov
+      | Just phrase <- Map.lookup (getUnique n) pm ->
+          MkAction a m (PatExpr pa (Inert ann ("perform " <> phrase) InertCtxNone)) prov
+    act -> act
 
 -- | The name of a user-defined (non-builtin) nullary type constructor.
 userTypeName :: Type' Resolved -> Maybe Text
