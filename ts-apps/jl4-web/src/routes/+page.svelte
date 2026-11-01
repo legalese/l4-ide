@@ -24,7 +24,7 @@
 
   // Kept with the test corpus, so CI keeps it compiling
   import starterProgram from '../../../../jl4/examples/legal/library-card.l4?raw'
-  import { getTurnstileToken } from '$lib/turnstile'
+  import { getTurnstileToken, warmUpTurnstileToken } from '$lib/turnstile'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import {
     EvalDirectiveResultRequestType,
@@ -69,13 +69,47 @@
   // Set from URL search params as early as possible to avoid flicker
   const ownUrl = new URL(window.location.href)
 
+  // Fetched while the editor loads, so the editor opens with the shared
+  // program instead of showing the starter program first
+  const sharedProgramId = ownUrl.searchParams.get('id')
+  const sharedProgram =
+    sharedProgramId && sessionUrl
+      ? loadSharedProgram(sessionUrl, sharedProgramId)
+      : undefined
+
+  type SharedProgram =
+    | { status: 'found'; program: string }
+    | { status: 'missing' }
+    | { status: 'failed'; reason: string }
+
+  async function loadSharedProgram(
+    url: string,
+    id: string
+  ): Promise<SharedProgram> {
+    try {
+      const response = await fetch(`${url}?id=${encodeURIComponent(id)}`)
+      if (response.ok) {
+        return { status: 'found', program: await response.json() }
+      }
+      if (response.status === 404 || response.status === 400) {
+        return { status: 'missing' }
+      }
+      // Throttled or a server error: keep the id so a reload can retry
+      return { status: 'failed', reason: `status ${response.status}` }
+    } catch (e) {
+      return { status: 'failed', reason: `${e}` }
+    }
+  }
+
   let showFrame = $state(!ownUrl.searchParams.has('standalone'))
   // `no-examples` predates the docs sidebar; existing embeds use it to hide the sidebar
   const showDocsToggle = !ownUrl.searchParams.has('no-examples')
   const docsUrl = 'https://legalese.com/l4'
+  const docsOrigin = new URL(docsUrl).origin
   let showSidebar = $state(false)
   // The docs iframe stays mounted once opened, so reopening keeps the reader's place
   let docsOpened = $state(false)
+  let docsFrame: HTMLIFrameElement | undefined = $state(undefined)
   let showVisualizer = $state(false)
   let rightPaneView: 'ladder' | 'inspector' = $state('ladder')
   let inspectorPanel: InspectorPanel | undefined = $state(undefined)
@@ -355,8 +389,28 @@
         },
       })
 
+      // The program to open with: a #program= fragment, else ?program=, else
+      // the shared ?id=, else the starter program
+      const shared = await sharedProgram
+      let queryProgram: string | undefined
+      const programParam = ownUrl.searchParams.get('program')
+      if (programParam) {
+        try {
+          queryProgram = decodeURIComponent(programParam)
+        } catch (e) {
+          logger.error(`could not decode program from url param, error: ${e}`)
+        }
+      }
+      const fragmentProgram = programFromFragment(ownUrl)
+      const initialProgram =
+        fragmentProgram ??
+        queryProgram ??
+        (shared?.status === 'found' && shared.program
+          ? shared.program
+          : starterProgram)
+
       editor = monaco.editor.create(editorElement, {
-        value: starterProgram,
+        value: initialProgram,
         language: 'jl4',
         automaticLayout: true,
         wordBasedSuggestions: 'currentDocument',
@@ -466,48 +520,24 @@
         }
       )
 
-      const sessionid: string | null = ownUrl.searchParams.get('id')
-      if (sessionid && sessionUrl) {
-        // A failed load must not keep the LSP below from starting
-        try {
-          const response = await fetch(
-            `${sessionUrl}?id=${encodeURIComponent(sessionid)}`
-          )
-          logger.debug('sent GET for session')
-          if (response.ok) {
-            const prog = await response.json()
-            if (prog) {
-              editor.setValue(prog)
-            }
-          } else if (response.status === 404 || response.status === 400) {
-            logger.debug('no such session - deleting search param')
-            ownUrl.searchParams.delete('id')
-            history.pushState(null, '', ownUrl)
-          } else {
-            // Throttled or a server error: keep the id so a reload can retry
-            logger.error(
-              `could not load session ${sessionid}, status ${response.status}`
-            )
-            toast.push(
-              'Could not load the shared program. Reload to try again.'
-            )
-          }
-        } catch (e) {
-          logger.error(`could not load session ${sessionid}, error: ${e}`)
-          toast.push('Could not load the shared program. Reload to try again.')
-        }
+      if (shared?.status === 'missing') {
+        logger.debug('no such session - deleting search param')
+        ownUrl.searchParams.delete('id')
+        history.pushState(null, '', ownUrl)
+      } else if (shared?.status === 'failed') {
+        logger.error(
+          `could not load session ${sharedProgramId}, ${shared.reason}`
+        )
+        toast.push('Could not load the shared program. Reload to try again.')
       }
 
-      const programParam: string | null = ownUrl.searchParams.get('program')
       if (programParam) {
-        try {
-          const decoded = decodeURIComponent(programParam)
-          editor.setValue(decoded)
-        } catch (e) {
-          logger.error(`could not decode program from url param, error: ${e}`)
-        }
         ownUrl.searchParams.delete('program')
         history.replaceState(null, '', ownUrl)
+      }
+
+      if (fragmentProgram !== undefined) {
+        clearProgramFragment()
       }
 
       persistSession = async () => {
@@ -907,6 +937,12 @@
     }, 0)
   }
 
+  // Most of a share's wait is the Turnstile check, so it starts when the
+  // pointer reaches Share (or Share gets focus) rather than on the click
+  function warmUpShare() {
+    if (turnstileSiteKey) warmUpTurnstileToken(turnstileSiteKey)
+  }
+
   async function handleShare() {
     const sessionId = await handlePersist()
     if (sessionId) {
@@ -940,6 +976,76 @@
   function toggleSidebar() {
     showSidebar = !showSidebar
     docsOpened ||= showSidebar
+  }
+
+  // The docs in the sidebar ask whether they're in the editor (l4-docs-hello).
+  // Once told, their "Run code" buttons send the example here
+  // (l4-open-program) instead of opening a new tab.
+  function handleDocsMessage(event: MessageEvent) {
+    if (event.origin !== docsOrigin) return
+    if (!docsFrame || event.source !== docsFrame.contentWindow) return
+    if (event.data?.type === 'l4-docs-hello') {
+      docsFrame.contentWindow?.postMessage(
+        { type: 'l4-editor-host' },
+        docsOrigin
+      )
+    } else if (
+      event.data?.type === 'l4-open-program' &&
+      typeof event.data.program === 'string'
+    ) {
+      openDocsExample(event.data.program)
+    }
+  }
+
+  function openDocsExample(program: string) {
+    const model = editor?.getModel()
+    if (!editor || !model) return
+    // An edit rather than setValue, so undo brings back the previous program
+    editor.pushUndoStop()
+    editor.executeEdits('docs-example', [
+      { range: model.getFullModelRange(), text: program },
+    ])
+    editor.pushUndoStop()
+    editor.setPosition({ lineNumber: 1, column: 1 })
+    editor.revealLine(1)
+    inspectorPanel?.clear()
+    // Below 1024px the sidebar covers the editor
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      showSidebar = false
+    }
+    toast.push('Opened the example. Undo brings back your program.', {
+      duration: 6000,
+    })
+  }
+
+  // A program too long for an 8 KB URL limit comes in the fragment,
+  // which never leaves the browser: #program=<encodeURIComponent(program)>
+  function programFromFragment(url: URL): string | undefined {
+    const encoded = url.hash.match(/^#program=(.*)$/)?.[1]
+    if (encoded === undefined) return undefined
+    try {
+      return decodeURIComponent(encoded)
+    } catch (e) {
+      console.error(`could not decode program from url fragment, error: ${e}`)
+      return undefined
+    }
+  }
+
+  function clearProgramFragment() {
+    const url = new URL(window.location.href)
+    url.hash = ''
+    history.replaceState(null, '', url)
+  }
+
+  // The docs open examples in a tab named l4-code. When that tab already
+  // shows the editor, a new #program= changes only the fragment, so the page
+  // doesn't load again.
+  function handleHashChange() {
+    if (!editor) return
+    const program = programFromFragment(new URL(window.location.href))
+    if (program === undefined) return
+    clearProgramFragment()
+    openDocsExample(program)
   }
 
   function handleLoadFile() {
@@ -1059,6 +1165,8 @@
     URL.revokeObjectURL(url)
   }
 </script>
+
+<svelte:window onmessage={handleDocsMessage} onhashchange={handleHashChange} />
 
 {#if showFrame}
   <div class="top-bar">
@@ -1189,26 +1297,35 @@
       <button
         class="fab fab-share"
         onclick={handleShare}
+        onpointerenter={warmUpShare}
+        onfocus={warmUpShare}
         aria-label="Share the current file"
-        title="Share the current file"
+        aria-busy={persistButtonBlocked}
+        title={persistButtonBlocked
+          ? 'Creating the share link…'
+          : 'Share the current file'}
         disabled={persistButtonBlocked}
       >
-        <svg
-          width="20"
-          height="20"
-          style="font-size: 24px; vertical-align: middle; margin-right: 0.2em;"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          stroke-width="1.3"
-          ><path
-            d="M6.99609 9L11.9961 4L16.9961 9M6.99609 9M12 16V4"
-            stroke="currentColor"
-          ></path><path
-            d="M4 15V16C4 18.2091 5.79086 20 8 20H16C18.2091 20 20 18.2091 20 16V15"
-            stroke="currentColor"
-          ></path></svg
-        >
+        {#if persistButtonBlocked}
+          <span class="share-spinner" aria-hidden="true"></span>
+        {:else}
+          <svg
+            width="20"
+            height="20"
+            style="font-size: 24px; vertical-align: middle; margin-right: 0.2em;"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            stroke-width="1.3"
+            ><path
+              d="M6.99609 9L11.9961 4L16.9961 9M6.99609 9M12 16V4"
+              stroke="currentColor"
+            ></path><path
+              d="M4 15V16C4 18.2091 5.79086 20 8 20H16C18.2091 20 20 18.2091 20 16V15"
+              stroke="currentColor"
+            ></path></svg
+          >
+        {/if}
         Share
       </button>
     {/if}
@@ -1217,6 +1334,7 @@
     <div class="sidebar" class:hidden-pane={!showSidebar}>
       <!-- No allow-top-navigation: the docs can't navigate the editor away -->
       <iframe
+        bind:this={docsFrame}
         class="docs-frame"
         src={docsUrl}
         title="L4 documentation"
@@ -1403,6 +1521,27 @@
   }
   .slightly-shorter-than-full-viewport-height {
     height: 100%;
+  }
+  /* Takes the share icon's 20px while a share is in progress */
+  .share-spinner {
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    margin: 0 calc(0.2em + 3px) 0 3px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: share-spin 0.8s linear infinite;
+  }
+  @keyframes share-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .share-spinner {
+      animation-duration: 2.4s;
+    }
   }
   .hidden-pane {
     display: none;

@@ -244,10 +244,8 @@ jobs:
         run: ./doc/test-docs.sh
 
       # The linux-x64 jl4-service this PR's checks built and tested, under the
-      # name a release publishes it by. Nothing is triggered by it. The binary
-      # verifier in legalese/jl4-auth-proxy fetches it, and only once every
-      # check on the commit has passed, to compile every stored production
-      # deployment with it (scripts/verify-binary.sh --pr <number>).
+      # name a release publishes it by, kept as an artifact so that exact binary
+      # can be tried out. Nothing is triggered by it.
       - name: Package jl4-service
         if: needs.changes.outputs.haskell == 'true'
         run: |

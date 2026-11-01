@@ -11,6 +11,7 @@ import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Base.Text as Text
 
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Monoid (Alt (..))
 import qualified Data.Scientific as Sci
 import Data.Char hiding (Space)
@@ -868,7 +869,9 @@ execLexer :: NormalizedUri -> Text -> Either (NonEmpty PError) [PosToken]
 execLexer uri input =
   case parse (rawTokens <* eof) (showNormalizedUri uri) input of
     Right rtoks -> Right (mkPosTokens Nothing uri input rtoks)
-    Left errs   -> Left (fmap (mkPError "lexer") $ errorBundleToErrorMessages errs)
+    -- A lexer error is about a raw character, which is user text: it has no
+    -- token kind to name.
+    Left errs   -> Left (bundleToPErrors "lexer" (const Nothing) errs)
 
 execNlgLexer :: SourcePos -> NormalizedUri -> Text -> Either (ParseErrorBundle Text Void) [PosToken]
 execNlgLexer offset uri input = do
@@ -1098,11 +1101,13 @@ data PError
     { message :: Text
     , range :: SrcSpan
     , origin :: Text
+    , code :: Text
+      -- ^ The stable diagnostic code ('parseErrorCode').
     }
   deriving (Show, Eq, Ord)
 
-mkPError :: Text -> (Text, SourcePos, SourcePos) -> PError
-mkPError orig (m, s, e) =
+mkPError :: Text -> Text -> (Text, SourcePos, SourcePos) -> PError
+mkPError orig errCode (m, s, e) =
   PError
     { message = m
     , range = MkSrcSpan
@@ -1118,7 +1123,109 @@ mkPError orig (m, s, e) =
             }
       }
     , origin = orig
+    , code = errCode
     }
+
+-- | The errors of a bundle, in order, each with its code. The first argument
+-- says where they came from; the second names the kind of a token of the
+-- stream, or 'Nothing' if a token of this stream has no kind that is safe to
+-- put in a code.
+bundleToPErrors ::
+  ( VisualStream s
+  , TraversableStream s
+  , ShowErrorComponent e
+  ) =>
+  Text -> (Token s -> Maybe Text) -> ParseErrorBundle s e -> NonEmpty PError
+bundleToPErrors orig tokenKind bundle =
+  NonEmpty.zipWith
+    (mkPError orig . parseErrorCode tokenKind)
+    (bundleErrors bundle)
+    (errorBundleToErrorMessages bundle)
+
+-- | The stable diagnostic code of a parse error, read from the error itself and
+-- never from its rendered text. See 'L4.TypeCheck.Types.checkErrorCode' for
+-- what a code promises.
+--
+-- A code must not contain anything the user wrote, so that tools can group by
+-- it. An unexpected token contributes its KIND ('tokenKindSlug'). A 'Label' is
+-- free text from a parser, which may quote the source, so it is not used.
+-- Anything else, such as the messages of 'fail', is @parse/syntax-error@.
+parseErrorCode :: (Token s -> Maybe Text) -> ParseError s e -> Text
+parseErrorCode tokenKind = \ case
+  TrivialError _ (Just (Tokens (t :| _))) _ -> maybe syntaxError unexpectedCode (tokenKind t)
+  TrivialError _ (Just EndOfInput) _        -> unexpectedCode endOfInputSlug
+  TrivialError _ (Just (Label _)) _         -> syntaxError
+  TrivialError _ Nothing _                  -> syntaxError
+  FancyError _ fancy
+    | any isIndentationError fancy -> "parse/indentation"
+    | otherwise                    -> syntaxError
+ where
+  syntaxError = "parse/syntax-error"
+  unexpectedCode kind = "parse/unexpected-" <> kind
+  isIndentationError = \ case
+    ErrorIndentation {} -> True
+    _                   -> False
+
+endOfInputSlug :: Text
+endOfInputSlug = "end-of-input"
+
+-- | The kind of a token, for a code such as @parse/unexpected-WITH@. A keyword
+-- is its own kind, spelled as the language spells it. Every other token is
+-- named by a fixed word: an identifier or a literal must never appear as what
+-- the user wrote. Exhaustive on purpose, so that a new token has to be named.
+tokenKindSlug :: TokenType -> Text
+tokenKindSlug tt = case tt of
+  TKeywords _   -> displayTokenType tt
+  TDirectives _ -> "directive"
+  TAnnotations _ -> "annotation"
+  TLiterals lit -> case lit of
+    TIntLit {}      -> "number"
+    TRationalLit {} -> "number"
+    TStringLit {}   -> "string"
+  TSpaces spaces -> case spaces of
+    TSpace {}        -> "whitespace"
+    TLineComment {}  -> "comment"
+    TBlockComment {} -> "comment"
+    EOF              -> endOfInputSlug
+  TIdentifiers ident -> case ident of
+    TIdentifier {} -> "identifier"
+    TQuoted {}     -> "identifier"
+    TGenitive      -> "genitive"
+  TSymbols sym -> case sym of
+    TRefOpen         -> "ref-open"
+    TRefClose        -> "ref-close"
+    TNlgOpen         -> "open-bracket"
+    TNlgClose        -> "close-bracket"
+    TParagraph       -> "section-sign"
+    TPOpen           -> "open-paren"
+    TPClose          -> "close-paren"
+    TCOpen           -> "open-brace"
+    TCClose          -> "close-brace"
+    TComma           -> "comma"
+    TSemicolon       -> "semicolon"
+    TDot             -> "dot"
+    TEllipsis        -> "ellipsis"
+    TEllipsisOr      -> "ellipsis-or"
+    TColon           -> "colon"
+    TPercent         -> "percent"
+    TCopy (Just tt') -> tokenKindSlug tt'
+    TCopy Nothing    -> "caret"
+    TOtherSymbolic _ -> "symbol"
+  TOperators op -> case op of
+    TTimes         -> "times"
+    TPlus          -> "plus"
+    TMinus         -> "minus"
+    TGreaterEquals -> "greater-equals"
+    TLessEquals    -> "less-equals"
+    TGreaterThan   -> "greater-than"
+    TLessThan      -> "less-than"
+    TEquals        -> "equals"
+    TEqualsEquals  -> "double-equals"
+    TNotEquals     -> "not-equals"
+    TAnd           -> "and"
+    TOr            -> "or"
+    TImplies       -> "implies"
+    TDividedBy     -> "divided-by"
 
 errorBundleToErrorMessages ::
   forall s e.

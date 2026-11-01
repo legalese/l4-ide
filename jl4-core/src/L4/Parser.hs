@@ -3098,7 +3098,7 @@ execParserForTokens = execParserForTokensWithHints mempty
 execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWithHints hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
-    Left err -> Left (fmap (mkPError "parser") $ errorBundleToErrorMessages err)
+    Left err -> Left (bundleToPErrors "parser" (Just . tokenKindSlug . computedPayload) err)
     Right (a, pstate)  ->
       let
         -- The module's declared language, or `en`. Taken as the LAST

@@ -59,12 +59,15 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
 - [An @export with an input or result that cannot be sent yet](#an-export-with-an-input-or-result-that-cannot-be-sent-yet)
 - [An @export that reaches an ASSUME it cannot be given](#an-export-that-reaches-an-assume-it-cannot-be-given)
+- [An @export with an input that has no written type](#an-export-with-an-input-that-has-no-written-type)
 
 ---
 
 ## Layout and syntax
 
 L4 is layout-sensitive, like Python: indentation decides what belongs to what. Use spaces, not tabs, and indent a continuation line further than the line it continues.
+
+<a id="parse-indentation"></a>
 
 ### Incorrect indentation
 
@@ -215,6 +218,8 @@ GIVETH A BOOLEAN
 
 ---
 
+<a id="parse-unexpected-double-equals"></a>
+
 ### Double equals sign
 
 **Error:** `unexpected ==`
@@ -314,6 +319,8 @@ result x MEANS
 
 ---
 
+<a id="check-wrong-argument-count"></a>
+
 ### Wrong number of arguments
 
 **Error:** `The function add (defined at ...) expects 2 arguments, but you are applying it to 3 arguments here.`
@@ -332,6 +339,8 @@ add a b MEANS a + b
 ```
 
 ---
+
+<a id="check-type-mismatch"></a>
 
 ### Argument of the wrong type
 
@@ -381,6 +390,10 @@ Rename one of the two types, or delete the `DECLARE` that repeats the other.
 
 ---
 
+<a id="check-ambiguous-identifier"></a>
+
+<a id="check-ambiguous-type"></a>
+
 ### Several definitions with the same name
 
 **Error:** `There are multiple definitions for the identifier Date and I do not have sufficient information to make a choice between them.`, followed by the candidates and their types
@@ -404,6 +417,8 @@ A type called `EVENT` with no parameters is not affected, because the built-in `
 ---
 
 ## Names and imports
+
+<a id="check-unknown-identifier"></a>
 
 ### I could not find a definition for the identifier
 
@@ -429,6 +444,8 @@ DECIDE `is ready` IS TRUE
 
 ---
 
+<a id="import-module-not-found"></a>
+
 ### Module not found
 
 **Error:** `I could not find a module with this name: helpers`, then `I have tried the following locations:` and the places that were tried. The list ends with the standard library built into `l4`, for example `the stdlib embedded in this binary (20 modules, not among them)`, or `the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)` when that variable is set. On the command line, `l4` also prints `Warning | [Import Resolution] Module not found: helpers`.
@@ -445,6 +462,10 @@ This stops `l4 check`, `l4 run` and deploying, even if nothing from the module i
 [IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
 
 ---
+
+<a id="import-cycle"></a>
+
+<a id="import-self-import"></a>
 
 ### Import cycle
 
@@ -556,6 +577,8 @@ Give that input another name, and the body means what it says.
 
 ---
 
+<a id="check-clause-pattern-count"></a>
+
 ### Clauses with more or fewer patterns than the GIVEN names
 
 **Error:**
@@ -604,6 +627,8 @@ L4 then works out the type of each input from the patterns and the clause bodies
 Such clauses cannot be published with `@export`, even a single one; see [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given).
 
 ---
+
+<a id="lint-non-exhaustive-clauses"></a>
 
 ### Multi-clause DECIDE does not cover all cases
 
@@ -657,6 +682,8 @@ See [Several clauses](../functions/DECIDE.md#several-clauses).
 
 ---
 
+<a id="lint-unreachable-clause"></a>
+
 ### Clause that is never used
 
 **Warning:**
@@ -702,6 +729,8 @@ There is no warning for a clause that repeats one above it.
 
 ---
 
+<a id="lint-misplaced-clause-annotation"></a>
+
 ### Annotation above a later clause
 
 **Warning:**
@@ -735,6 +764,8 @@ An `@desc` or `@export` goes above the rule's `GIVEN`, or above its first clause
 An `@nlg` goes on the line above the first clause.
 
 ---
+
+<a id="lint-clause-arity-changed"></a>
 
 ### A definition after clauses that is not another clause
 
@@ -778,6 +809,8 @@ f c d MEANS 3
 
 ---
 
+<a id="eval-infinite-loop"></a>
+
 ### Infinite loop detected
 
 **Error:** `Infinite loop detected while trying to evaluate: x PLUS 1`
@@ -808,6 +841,8 @@ If you did not, you probably meant another name on the right-hand side.
 ---
 
 ## Pattern matching
+
+<a id="lint-non-exhaustive-match"></a>
 
 ### Non-exhaustive pattern match
 
@@ -857,6 +892,8 @@ What the check covers:
 
 ---
 
+<a id="lint-redundant-branch"></a>
+
 ### Redundant pattern match branch
 
 **Warning:** `The following CONSIDER branch is redundant:`, followed by the branch
@@ -878,6 +915,8 @@ A branch can never be reached, because the branches above it, here the OTHERWISE
 **How to fix it:** Delete the branch, or move it above the more general one.
 
 ---
+
+<a id="eval-non-exhaustive-patterns"></a>
 
 ### Non-exhaustive patterns at runtime
 
@@ -938,6 +977,8 @@ This gives `FULFILLED`. See [Regulative rules](../regulative/README.md) and [EVE
 
 ## Export
 
+<a id="check-export-clauses-without-given"></a>
+
 ### An @export of clauses with no GIVEN
 
 **Error:**
@@ -983,6 +1024,16 @@ The rule is then published with the inputs `c` and `n`.
 Or remove the `@export`, if the rule is not meant to be published.
 
 ---
+
+<a id="check-export-event-type"></a>
+
+<a id="check-export-function-input"></a>
+
+<a id="check-export-function-result"></a>
+
+<a id="check-export-deontic-type"></a>
+
+<a id="check-export-unsupported-type"></a>
 
 ### An @export with an input or result that cannot be sent yet
 
@@ -1059,6 +1110,8 @@ For a contract rule, remove the `@export`.
 
 ---
 
+<a id="check-export-assume-reached"></a>
+
 ### An @export that reaches an ASSUME it cannot be given
 
 **Error:**
@@ -1112,3 +1165,38 @@ GIVETH A NUMBER
 ```
 
 Or remove the `@export`, if the rule is not meant to be published.
+
+---
+
+<a id="lint-export-untyped-given"></a>
+
+### An @export with an input that has no written type
+
+**Warning:**
+
+```
+`is it positive` is published with @export, but its input `n` has no written type.
+Write one in the GIVEN, so that the schema says what to send.
+```
+
+**What you wrote:**
+
+```l4
+@export Is it positive
+GIVEN n
+GIVETH A BOOLEAN
+`is it positive` MEANS n > 0
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and the schema of that endpoint tells a caller what to send for each input.
+A `GIVEN` with no `IS A` has no written type, so the schema is not told what to send for it.
+This is a warning, not an error: the rule is still published, and the file still checks.
+
+**How to fix it:** Write the type in the `GIVEN`:
+
+```l4
+@export Is it positive
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`is it positive` MEANS n > 0
+```

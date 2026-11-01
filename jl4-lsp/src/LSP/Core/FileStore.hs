@@ -127,9 +127,10 @@ getModificationTimeImpl missingFileDiags uri = do
               Just file -> do
                   liftIO $ fmap wrap (getModTime file)
                       `catch` \(e :: IOException) -> do
-                          let err | isDoesNotExistError e = "File does not exist: " ++ file
-                                  | otherwise = "IO error while reading " ++ file ++ ", " ++ displayException e
-                              diag = ideErrorText uri (T.pack err)
+                          let (code, err)
+                                | isDoesNotExistError e = ("file/not-found", "File does not exist: " ++ file)
+                                | otherwise = ("file/io-error", "IO error while reading " ++ file ++ ", " ++ displayException e)
+                              diag = ideErrorText code uri (T.pack err)
                           if isDoesNotExistError e && not missingFileDiags
                               then return (Nothing, ([], Nothing))
                               else return (Nothing, ([diag], Nothing))

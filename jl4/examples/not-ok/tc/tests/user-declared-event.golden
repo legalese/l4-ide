@@ -6,7 +6,7 @@ File: user-declared-event.l4
   Range: 18:12-18:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-type
   Message:
     There are multiple definitions for the identifier
 

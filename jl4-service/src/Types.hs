@@ -155,8 +155,7 @@ data FunctionSummary = FunctionSummary
   , fsReturnSchema :: !(Maybe Parameter)
   -- ^ Structured JSON Schema of the return type, with x-l4-type annotations
   -- on each record/enum node. Computed at compile time and persisted in the
-  -- metadata cache so read endpoints (incl. the per-function schema and
-  -- proxy-side EFS rendering) can be served without recompiling. 'Nothing'
+  -- metadata cache so read endpoints (incl. the per-function schema) can be served without recompiling. 'Nothing'
   -- only when the return type has no structured schema.
   , fsSection     :: !(Maybe Text)
   -- ^ L4 section header (§§) this function belongs to.
@@ -223,7 +222,7 @@ instance FromJSON FileEntry where
       <*> o .:? "exports" .!= []
 
 -- | Visibility flags controlling what information to include in responses.
--- Driven by proxy headers X-Include-Functions / X-Include-Files.
+-- Driven by request headers X-Include-Functions / X-Include-Files.
 -- Both default to True when headers are absent (backward compat, local dev).
 data Visibility = Visibility
   { showFunctions :: !Bool
@@ -627,10 +626,7 @@ data AppEnv = MkAppEnv
   , options            :: Options.Options
   , mcpTasks           :: TVar (Map TaskId TaskState)
   -- ^ MCP @tools/call@ tasks (2026-07-28 Tasks extension). Keyed by an
-  -- opaque task id. Lifetime is per-process; tasks tied to a deployment
-  -- naturally pin to whichever instance has that deployment loaded
-  -- because the auth proxy already routes deployment-scoped MCP traffic
-  -- with affinity.
+  -- opaque task id. Lifetime is per-process.
   }
 
 -- | The handler monad for all Servant routes.
@@ -645,10 +641,10 @@ data HealthResponse = HealthResponse
   { hrStatus        :: !Text
   , hrDeployments   :: !HealthDeploymentCounts
   , hrInstanceToken :: !(Maybe Text)
-  -- ^ Opaque token for process identity verification by the auth proxy.
+  -- ^ Opaque token for process identity verification by the caller.
   , hrVersion       :: !Text
   -- ^ The jl4-service build version (e.g. "1.5.79"), baked in at compile time.
-  -- Lets the auth proxy report the running service version directly rather
+  -- Lets a caller report the running service version directly rather
   -- than inferring it from the configured binary release URL.
   }
   deriving stock (Show, Generic)

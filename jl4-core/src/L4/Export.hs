@@ -21,6 +21,7 @@ module L4.Export (
   exportErrorRange,
   exportErrorFunction,
   exportErrorSeverity,
+  exportErrorCode,
   withoutRefused,
   prettyExportError,
   isExportedDecide,
@@ -41,7 +42,7 @@ import L4.Annotation (getAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 import L4.TypeCheck.Environment (maybeUnique)
-import L4.Export.Shape (ShapeEnv (..), Unsendable, jsonShape, unsendableHint, unsendableWhat)
+import L4.Export.Shape (ShapeEnv (..), Unsendable (..), jsonShape, unsendableHint, unsendableWhat)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), EntityInfo, Severity (..))
 import Optics
 
@@ -468,6 +469,25 @@ exportErrorSeverity = \case
   ExportUnsendable{} -> SError
   ExportUntypedGiven{} -> SWarn
   ExportAssumeReached{} -> SError
+
+-- | The stable code of the diagnostic (see @jl4-lsp/DIAGNOSTIC-CODES.md@). A
+-- type that has an EVENT or a function inside a record has the code of the
+-- EVENT or the function.
+exportErrorCode :: ExportError -> Text
+exportErrorCode = \case
+  ExportUnsendable _ _ site why -> unsendableCode site why
+  ExportUntypedGiven{} -> "lint/export-untyped-given"
+  ExportAssumeReached{} -> "check/export-assume-reached"
+ where
+  unsendableCode site = \case
+    UInField _ _ why -> unsendableCode site why
+    UEvent -> "check/export-event-type"
+    UFunction -> case site of
+      ExportInput _ -> "check/export-function-input"
+      ExportResult -> "check/export-function-result"
+    UDeontic -> "check/export-deontic-type"
+    UPolymorphic _ -> "check/export-unsupported-type"
+    UUnknownType _ -> "check/export-unsupported-type"
 
 prettyExportError :: ExportError -> [Text]
 prettyExportError = \case

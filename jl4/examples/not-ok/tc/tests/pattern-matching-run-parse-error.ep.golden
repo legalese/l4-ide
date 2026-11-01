@@ -4,5 +4,5 @@ File: pattern-matching-run-parse-error.l4
   Range: 10:1-10:1
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message: | 10 | g y MEANS 5 | ^ expecting % or space token

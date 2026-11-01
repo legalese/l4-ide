@@ -167,16 +167,21 @@ test-suite jl4-lsp-test
     CheckSource
     ClauseGeneratedNamesSpec
     ClauseGroupLadderSpec
+    DiagnosticCodesSpec
     EmbeddedLibrarySpec
+    FileCheckedSpec
     HoverDisplaySpec
     ImportClosureSpec
     ImportOnceSpec
     ImportSharedSpec
     LibraryResolutionSpec
+  -- FileCheckedSpec talks to the server.
   build-tool-depends:
-    hspec-discover:hspec-discover
+    hspec-discover:hspec-discover,
+    jl4-lsp:jl4-lsp
   build-depends:
     aeson,
+    bytestring,
     containers,
     deepseq,
     directory,
@@ -185,5 +190,6 @@ test-suite jl4-lsp-test
     jl4-core,
     jl4-lsp,
     lsp-types,
+    process,
     text,
     text-rope

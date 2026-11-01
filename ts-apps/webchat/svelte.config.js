@@ -22,7 +22,7 @@ const config = {
     //   - self                → chat.legalese.cloud (shell, JS, CSS)
     //   - legalese.cloud + *. → auth (apex /auth/session), api. (deployment
     //                           metadata + function schemas), ai. (chat SSE)
-    //   - workoscdn / google  → WorkOS/Google account profile pictures
+    //   - account avatars     → profile pictures from sign-in providers
     //
     // `mode: 'hash'` makes SvelteKit hash its inline hydration-bootstrap script
     // and append that hash to script-src, so scripts get a strict policy with

@@ -1,7 +1,7 @@
 /**
  * Events: what a cloud session's harness appends to
  * `state/events/<n>.jsonl`, one JSON object per line, and what
- * `GET /events` returns (spec §8).
+ * `GET /events` returns.
  *
  * Every event is `{ seq, ts, type, … }`. The `type`s are the
  * {@link ChatServiceEvent} kinds (payload = the chat event minus `kind`)
@@ -50,7 +50,15 @@ type ToPayload<E> = E extends { kind: infer K }
   : never
 
 /** A {@link ChatServiceEvent} as an event payload: `kind` → `type`. */
-export type ChatEventPayload = ToPayload<ChatServiceEvent>
+/** The chat-service events a session logs. Not `title`: a session's
+ *  name goes in `session.json`. */
+export type LoggedChatEvent = Exclude<ChatServiceEvent, { kind: 'title' }>
+
+export type ChatEventPayload = ToPayload<LoggedChatEvent>
+
+/** Longest `git-committed.summary` accepted (the harness caps commit
+ *  subjects at 72 characters; this leaves room). */
+export const GIT_SUMMARY_MAX = 200
 
 /** Git commit ids (SHA-1 or SHA-256). */
 export const GIT_SHA_RE = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
@@ -75,18 +83,28 @@ export type CloudOnlyEventPayload =
       choices?: string[]
     }
   /** Lifecycle. While `running`, carries the sealing public key for
-   *  `mcp-credentials` (§6.4). */
+   *  `mcp-credentials`. */
   | {
       type: 'session-state'
       state: SessionState
       /** Raw X25519 public key, base64url (see `sealed.ts`). */
       publicKey?: string
     }
-  | { type: 'git-committed'; turnId: string; sha: string; parent: string }
+  /** The turn's changes were committed. `summary` is the commit's
+   *  subject line (a one-line summary of the turn, or the prompt's first
+   *  line when no summary could be generated), for labelling the commit
+   *  and the rollback confirmation. */
+  | {
+      type: 'git-committed'
+      turnId: string
+      sha: string
+      parent: string
+      summary?: string
+    }
   | { type: 'rolled-back'; turnId: string; sha: string }
   | { type: 'local-merged'; sha: string }
   | { type: 'local-merge-conflict'; files: string[] }
-  /** An `add-files` batch landed in `repo/` (§10). `sha` is the file's
+  /** An `add-files` batch landed in `repo/`. `sha` is the file's
    *  git blob id, when known. */
   | {
       type: 'files-added'
@@ -204,6 +222,7 @@ const payloads: { [T in CloudEventType]: Check<Payload<T>> } = {
     turnId: opaqueId,
     sha,
     parent: sha,
+    summary: optional(str({ min: 1, max: GIT_SUMMARY_MAX })),
   }),
   'rolled-back': obj({ type: literal('rolled-back'), turnId: opaqueId, sha }),
   'local-merged': obj({ type: literal('local-merged'), sha }),
@@ -229,13 +248,7 @@ const payloads: { [T in CloudEventType]: Check<Payload<T>> } = {
   }),
   'auth-required': obj({
     type: literal('auth-required'),
-    reason: literal(
-      'invalid_key',
-      'chain_expired',
-      'inactive',
-      'chain_forked',
-      'mcp'
-    ),
+    reason: literal('invalid_key', 'chain_expired', 'chain_forked', 'mcp'),
     server: optional(str({ max: 64 })),
   }),
 }
@@ -265,12 +278,12 @@ export function parseCloudEvent(value: unknown): CloudEvent {
 // ── Chat events ⇄ cloud events ────────────────────────────────────────
 
 /** Turn a chat-service event into an event payload. */
-export function chatEventToPayload(event: ChatServiceEvent): ChatEventPayload {
+export function chatEventToPayload(event: LoggedChatEvent): ChatEventPayload {
   const { kind, ...rest } = event
   return { type: kind, ...rest } as ChatEventPayload
 }
 
-const CHAT_KINDS: ReadonlySet<string> = new Set<ChatServiceEvent['kind']>([
+const CHAT_KINDS: ReadonlySet<string> = new Set<LoggedChatEvent['kind']>([
   'started',
   'text-delta',
   'thinking-delta',

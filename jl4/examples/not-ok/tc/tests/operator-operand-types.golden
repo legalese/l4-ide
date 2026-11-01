@@ -6,7 +6,7 @@ File: operator-operand-types.l4
   Range: 7:10-7:12
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The second argument of UNLESS is expected to be of type
 
@@ -21,7 +21,7 @@ File: operator-operand-types.l4
   Range: 10:36-10:45
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of UNLESS is expected to be of type
 
@@ -36,7 +36,7 @@ File: operator-operand-types.l4
   Range: 13:61-13:66
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The argument of NOT is expected to be of type
 
@@ -51,7 +51,7 @@ File: operator-operand-types.l4
   Range: 16:32-16:37
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The argument of NOT is expected to be of type
 
@@ -66,7 +66,7 @@ File: operator-operand-types.l4
   Range: 19:52-19:54
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The second argument of AND is expected to be of type
 
@@ -81,7 +81,7 @@ File: operator-operand-types.l4
   Range: 22:55-22:56
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The second argument of '&&' is expected to be of type
 
@@ -96,7 +96,7 @@ File: operator-operand-types.l4
   Range: 25:43-25:47
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The second argument of '+' is expected to be of type
 
@@ -111,7 +111,7 @@ File: operator-operand-types.l4
   Range: 28:37-28:46
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The first argument of PLUS is expected to be of type
 
@@ -126,7 +126,7 @@ File: operator-operand-types.l4
   Range: 31:61-31:62
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The second argument of FOLLOWED BY is expected to be of type
 
