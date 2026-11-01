@@ -87,7 +87,7 @@ GIVETH A NUMBER
 ### Words for an input
 
 An input can carry an `@nlg` annotation: the words that `l4 nlg` uses for it in place of its name.
-The document renderer, `l4 render`, does not use an input's annotation, except for an input declared in a section's `GIVEN`; the [placement table](../syntax/README.md#where-to-put-it) has the facts per projection.
+The document renderer, `l4 render`, does not use an input's annotation, except for an input declared in a section's `GIVEN`; the [placement table](../syntax/nlg.md#the-placement-measured) has the facts per projection.
 Write it at the end of the input's line, or on a line of its own under the input:
 
 ```l4
@@ -100,7 +100,7 @@ DECIDE `is large` IF amount GREATER THAN floor
 
 `l4 nlg` then writes ``#EVAL `is large` WITH floor IS 100, amount IS 200`` as `` `is large` where the floor is 100 and the sum of money is 200 ``.
 Under the LAST input, indent the annotation further than `GIVEN`: written at `GIVEN`'s column, it describes what follows instead, which is the rule when no `GIVETH` comes between.
-The full placement rules are in [Where to put it](../syntax/README.md#where-to-put-it).
+The full placement rules are in [Where to put it](../syntax/nlg.md#where-to-put-it).
 
 ### Anonymous functions
 

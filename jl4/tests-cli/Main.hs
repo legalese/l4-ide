@@ -582,7 +582,7 @@ nlgMixfixDocExample = "../doc/reference/syntax/nlg-mixfix-example.l4"
 -- The reference page whose placement table describes that fixture row by row.
 -- The test that reads it pins the page, not just the output.
 placementReadme :: FilePath
-placementReadme = "../doc/reference/syntax/README.md"
+placementReadme = "../doc/reference/syntax/nlg.md"
 
 shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
 shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
@@ -3663,7 +3663,7 @@ spec bin = do
       renOut `shouldSatisfy` ("Row eighteen if amount is more than floor" `isInfixOf`)
       renOut `shouldSatisfy` ("Row nineteen if amount is more than the section's floor" `isInfixOf`)
 
-    -- doc/reference/syntax/README.md says of its placement table that "a
+    -- doc/reference/syntax/nlg.md says of its placement table that "a
     -- change to any cell is a test failure". So the cells are read from the
     -- page: each row's `l4 render` cell, and both `l4 nlg` cells of rows 2 and
     -- 3, name what the output must show. Editing a cell turns this red, and so
@@ -4638,7 +4638,7 @@ findingsByDecision env =
   , Just (String nm) <- [objField d "name"]
   ]
 
--- | The placement table of doc/reference/syntax/README.md: each row's number
+-- | The placement table of doc/reference/syntax/nlg.md: each row's number
 -- and the cells after it, trimmed.
 placementTable :: String -> [(Int, [String])]
 placementTable page =

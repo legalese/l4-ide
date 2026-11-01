@@ -214,7 +214,7 @@ GIVETH A STRING
 
 renders as
 
-```
+```text
 1. The reminder depends on the claim's status:
     (a) If the claim's status is Paid: none;
     (b) If the claim's status is Overdue: send a reminder.
@@ -275,10 +275,10 @@ GIVETH A NUMBER
 `the deadline` MEANS `bigger` `start date` `end date`
 ```
 
-Each slot is filled with the input's name in the definition itself, and with the actual argument at each call:
+Each slot reads as a blank in the definition itself, and as the actual argument at each call:
 
-```
-1. Whichever is larger of x and y is:
+```text
+1. Whichever is larger of [x] and [y] is:
     (a) If x is at least y: x;
     (b) Otherwise: y.
 …
@@ -342,6 +342,9 @@ Tips:
 - Use only the function's own inputs as slots, and write the sentence so that it reads well with each slot as a noun phrase.
 - Try names and shape first. An `@nlg` sentence can drift away from the logic it describes, so use it where it pays off.
 - One sentence per definition. For branching prose, let `CONSIDER` or `IF` render as an outline instead.
+
+- **Fix wording that reads badly:** [Fix wording with @nlg](fix-wording-with-nlg.md)
+- **All the rules:** [@nlg](../../reference/syntax/nlg.md)
 
 ---
 
@@ -453,7 +456,7 @@ base rtl: . ⟨Hebrew clause, laid out right to left⟩    <- at the left-hand e
 (The Hebrew is stood in for here because `fribidi` prints _visual_ order, and a visual-order line pasted into a page is re-ordered again by the browser rendering it.)
 
 The corollary is that a line which _begins_ in the other direction is laid out as a line of the base direction containing a foreign run.
-An L4 clause heading is the rule's own name, which is usually an English identifier, so in a Hebrew document `Is large holds if amount עולה על הסף.` is a right-to-left line whose Latin run and full stop sit on the left.
+An L4 clause heading is the rule's own name, which is usually an English identifier, so in a Hebrew document `Is large if amount עולה על הסף.` is a right-to-left line whose Latin run and full stop sit on the left.
 That is correct for a Hebrew document and looks wrong if you read the line as an English sentence; judging each element on its own characters is what `dir="auto"` is for, and L4 does not emit it on individual clauses today.
 
 The stylesheet mirrors along with `dir`: clause numbers, indents and table alignment move to the other side, because every rule that has a side is written in terms of the start and end of a line rather than of left and right.
@@ -503,7 +506,7 @@ is written in English, so its default renderings are English sentences, and the
 output looks like a language setting nobody configured. It is not one. A corpus
 whose annotations are written in Hebrew has always produced Hebrew documents,
 with no tags and no flag, and did so before tags existed at all — see
-[Multilingual L4](../../reference/syntax/README.md#labelling-the-language-nlghe).
+[Several languages](../../reference/syntax/nlg.md#several-languages).
 
 The practical consequence: **you never have to start tagging.** Tags earn their
 keep at the moment a second language appears, and not before. An encoding with

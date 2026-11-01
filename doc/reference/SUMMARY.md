@@ -41,6 +41,7 @@
   - [What is owed now: `l4 lts`](regulative/lts-list.md)
   - [The state graph](regulative/STATE-GRAPH.md)
 - [Syntax and directives](syntax/README.md)
+  - [@nlg](syntax/nlg.md)
   - [Sections](syntax/sections.md)
   - [The section GIVEN](syntax/section-given.md)
   - [Field opening](syntax/field-opening.md)
