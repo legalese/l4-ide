@@ -1334,10 +1334,11 @@ nlgRefs = \case
   MkResolvedNlg _ _ frags -> [ getUnique r | MkNlgRef _ r <- frags ]
   _                       -> []
 
--- | The parameters with a slot that the sentence's own words come after: in
--- "%a% is told %b%", @a@ and not @b@. What fills such a slot is followed by
--- the author's words, so a filler with no closing word of its own would take
--- them in. Read from where the slot is, not from what the words say.
+-- | The parameters with a slot that the sentence goes on after, with its own
+-- words or another slot: in "%a% is told %b%", @a@ and not @b@. What fills such
+-- a slot is followed by more of the sentence, so a filler with no closing word
+-- of its own would take it in. Read from where the slot is, not from what the
+-- words say.
 refsFollowedByWords :: Nlg -> Set.Set Unique
 refsFollowedByWords = \case
   MkResolvedNlg _ _ frags -> go frags
@@ -1345,12 +1346,15 @@ refsFollowedByWords = \case
  where
   go = \case
     MkNlgRef _ r : rest
-      | any wordy rest -> Set.insert (getUnique r) (go rest)
+      | any following rest -> Set.insert (getUnique r) (go rest)
     _ : rest -> go rest
     [] -> Set.empty
-  wordy = \case
+  -- A word, or another slot: in "%a% %b%", "%a%, %b%" and "%a% (%b%)" the
+  -- sentence goes on after @a@. Punctuation alone, such as a closing full stop,
+  -- does not.
+  following = \case
     MkNlgText _ t -> Text.any isAlphaNum t
-    MkNlgRef{}    -> False
+    MkNlgRef{}    -> True
 
 -- | Render an @\@nlg@ annotation, substituting each parameter reference with the
 -- corresponding call argument.
