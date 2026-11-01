@@ -125,15 +125,15 @@ The following are taken as given:
 
 2.2  Useful Functions
 
-1. The lesser of is:
+1. The lesser of [a] and [b] is:
     (a) If a is more than b: b;
     (b) Otherwise: a.
 
-2. The greater of is:
+2. The greater of [a] and [b] is:
     (a) If a is more than b: a;
     (b) Otherwise: b.
 
-3. Base to the power of is:
+3. Base to the power of [base] and [exp] is:
     (a) If exp is 0: 1;
     (b) Otherwise, if base is 0:
         (i) If exp is less than 0: Na N;

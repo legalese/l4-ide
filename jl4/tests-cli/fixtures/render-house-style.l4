@@ -20,7 +20,7 @@ DECLARE Status IS ONE OF Active, Dormant, Closed
 GIVEN transfer IS A Transfer
 GIVETH A BOOLEAN
 `transfer falls within an exception` transfer MEANS
-        "unless such securities are transferred:"
+        "where such securities are transferred:"
     ..  "(1)" ... transfer's `to the issuer of the securities`
     OR  "(2)" ... transfer's `to an accredited investor`
 
@@ -64,3 +64,26 @@ GIVETH A NUMBER
 GIVEN age IS A NUMBER
 GIVETH A BOOLEAN
 `is eligible` age MEANS age AT LEAST 18
+
+-- Beside a pattern's words, an input's name would read as more of them. One of a
+-- built-in type is a blank to fill, and one of a user's type reads as the body
+-- calls it. So does an input passed on to a sentence or a pattern.
+GIVEN status IS A Status
+      `assessed on` IS A NUMBER
+      `expiring on` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `the later schedule applies to` status `when assessed on` `assessed on` `and the pass expires on` `expiring on` IF
+  CONSIDER status
+    WHEN Active THEN `assessed on` AT LEAST 2027
+    OTHERWISE `expiring on` AT LEAST 2028
+
+GIVEN `on date` IS A NUMBER
+GIVETH A BOOLEAN
+`the later schedule applies to an active case` `on date` MEANS
+  `the later schedule applies to` Active `when assessed on` `on date` `and the pass expires on` 0
+
+DECLARE `C1 Sector` IS ONE OF Finance, Other
+
+GIVEN sector IS A `C1 Sector`
+GIVETH A NUMBER
+`the band for` sector MEANS 1

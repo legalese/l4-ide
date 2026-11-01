@@ -233,8 +233,8 @@ blockFlow b = case (b.blockConnector, b.blockBody) of
 
 -- | What a block is called: its sentence, or else its name. Either way it opens
 -- the block, so it takes a capital.
-blockTitle :: Block -> Text
-blockTitle b = capitalize (maybe (displayName b.blockHeading) displayVars b.blockSentence)
+blockTitle :: RenderConfig -> Block -> Text
+blockTitle cfg b = capitalize (maybe (displayName b.blockHeading) (displayVars . inLanguage cfg) b.blockSentence)
 
 -- | The space between a block's title and what follows it.
 titleGap :: Flow -> Text
@@ -258,9 +258,11 @@ ruleFlow conn clause = case clause of
   CIf{} -> inner { flowLead = [Word ifFrame] }
   CCases s brs
     | Just rows <- caseRows brs ->
-        opened [Word casesFrame, Phrase s] (Grid [s, "Result"] rows)
-  CCases s _ -> inner { flowLead = [Word casesFrame, Phrase s] }
+        opened (casesLead s) (Grid [s, "Result"] rows)
+  CCases s _ -> inner { flowLead = casesLead s }
   CLed lead _ -> inner { flowLead = [Word conn, Phrase lead] }
+  -- The provision's own words lead its list, and say what the frame would have.
+  CLeadIn{} -> inner
   CWhere body defs -> (ruleFlow conn body) { flowWhere = map whereDef defs }
   _ -> inner { flowLead = [Word conn] }
  where
@@ -269,7 +271,11 @@ ruleFlow conn clause = case clause of
     | conn == "if"    = "is decided as follows"
     | conn == "means" = "is"
     | otherwise       = conn
-  casesFrame = "depends on"
+  -- A rule that gives a BOOLEAN is named as a statement, which nothing can follow
+  -- with a verb.
+  casesLead s
+    | conn == "if" = [Glue ",", Word "depending on", Phrase s]
+    | otherwise    = [Word "depends on", Phrase s]
 
 -- | A decision table, when every branch of a rule ends in a short result. A table
 -- is a layout and nothing else, so it reads exactly as the branches do, in their
@@ -331,6 +337,7 @@ clauseFlow = \case
   CTable cols rows -> opened [] (Grid cols (map (map clauseFlow) rows))
   CWhere inner defs -> (clauseFlow inner) { flowWhere = map whereDef defs }
   CLed lead inner -> (clauseFlow inner) { flowLead = [Phrase lead] }
+  CLeadIn lead inner -> (clauseFlow inner) { flowLead = [Phrase lead] }
   CLabel label inner -> (clauseFlow inner) { flowLabel = Just label }
  where
   branch :: Int -> (Text, Clause) -> Flow
@@ -465,7 +472,7 @@ renderText cfg doc =
   blockText n b =
     let num = Text.pack (show (n :: Int))
         marker = if cfg.numberClauses then num <> ". " else "• "
-        title = blockTitle b
+        title = blockTitle cfg b
     in case b.blockRenderedAs of
       RenderedReference forced ->
         [ marker <> title
@@ -631,7 +638,7 @@ renderHtml cfg doc =
           <> "</li>\n"
 
   termHtml b =
-    let inner = esc (blockTitle b)
+    let inner = esc (blockTitle cfg b)
         quoted = if b.blockKind == TypeUnit then "“" <> inner <> "”" else inner
     in "<span class=\"term\">" <> quoted <> "</span>"
 
@@ -791,7 +798,7 @@ renderAkn cfg doc =
 
   blockAkn b =
     "<paragraph eId=\"para_" <> anchorOf b <> "\">"
-      <> "<heading>" <> xesc (blockTitle b) <> "</heading>"
+      <> "<heading>" <> xesc (blockTitle cfg b) <> "</heading>"
       <> "<content>" <> bodyAkn b <> "</content>"
       <> "</paragraph>\n"
 
@@ -957,6 +964,7 @@ clauseSummary = \case
   CTable cols _  -> "a table of " <> Text.intercalate ", " cols
   CWhere body _  -> clauseSummary body
   CLed lead _    -> lead
+  CLeadIn lead _ -> lead
   CLabel _ body  -> clauseSummary body
 
 -- | A stable anchor for a section heading (from its number, else its heading).

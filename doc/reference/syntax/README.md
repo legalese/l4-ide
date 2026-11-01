@@ -253,7 +253,7 @@ In [nlg-mixfix-example.l4](nlg-mixfix-example.l4), `` `the lower of` a `and` b `
 It does so whether the function is defined in the same file or in a module that file imports.
 The sentence can follow the last input, as the prelude writes it for `` `is in` ``, or sit on a line of its own above the head.
 
-`l4 render` reads the sentence at such a call too, inside the body of another rule: for `` `the price we charge` `` in the example it writes "the smaller of price and 100".
+`l4 render` reads the sentence at such a call too, inside the body of another rule: for `` `the price we charge` `` in the example it writes "the smaller of [price] and 100". The brackets mark an input of the rule, so that its name cannot read as more of your sentence.
 A call written with `WITH` reads the same way in `l4 render` as in `l4 nlg`: the sentence, then each argument under its name, so `` `the lower of` WITH a IS price, b IS 100 `` in the body of a rule reads "the smaller of a and b where a is price and b is 100".
 
 What a call reads is the sentence of the definition it resolved to, not of any definition with the same name.

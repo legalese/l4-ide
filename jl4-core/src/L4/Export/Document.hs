@@ -44,7 +44,7 @@ import Base
 import qualified Base.Text as Text
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import Data.Char (isAlphaNum, isLower, isUpper, toLower, toUpper)
+import Data.Char (isAlphaNum, isDigit, isLower, isUpper, toLower, toUpper)
 import qualified Data.List as List
 import Data.List.Split (chunksOf)
 import qualified Data.Map.Strict as Map
@@ -139,6 +139,9 @@ data Clause
                                                --   WHERE / LET definitions, each a
                                                --   (heading, connector, body) triple
   | CLed Text Clause                           -- ^ a list, led by these words
+  | CLeadIn Text Clause                        -- ^ a list, led by the provision's
+                                               --   own words, which replace the
+                                               --   rule's connector
   | CLabel Text Clause                         -- ^ a list entry with the label the
                                                --   provision gives it
   deriving stock (Show, Generic)
@@ -250,10 +253,13 @@ data Reading = MkReading
   , rdRules      :: !(Map.Map Unique Bool)
     -- ^ Every rule, and whether it gives a BOOLEAN.
   , rdBoolFields :: !(Set.Set Unique)
+  , rdBlanks     :: !(Set.Set Text)
+    -- ^ How this rule's own inputs of a built-in type read, so that one in a slot
+    -- of a pattern can read as a blank.
   }
 
 noReading :: Reading
-noReading = MkReading Map.empty Map.empty Set.empty
+noReading = MkReading Map.empty Map.empty Set.empty Set.empty
 
 extractUnits :: Module Resolved -> [Unit]
 extractUnits (MkModule _ _ section) = goSection section
@@ -292,7 +298,7 @@ allUnits headings mainModule deps =
       -- Told apart from a record's constructor by what the head resolved to, not
       -- by its name: a record can be named like a rule that has a herald.
       calls = Map.keysSet info
-      reading = MkReading info (ruleResults mods) (booleanFields mods)
+      reading = MkReading info (ruleResults mods) (booleanFields mods) Set.empty
   in map (\u -> (mapUnitBody (normalizePositionalRecords ctors) . fixMixfixHeading headings $ u)
                   { uCalls = calls, uReading = reading })
        (extractUnits mainModule <> concatMap extractUnits deps)
@@ -394,27 +400,35 @@ mixfixHeadingsFromRegistry reg = Map.fromList
 -- each slot rendered as "a \<Type\> \<name\>" using the GIVEN type.
 mixfixHeadingText :: TypeSig Resolved -> MixfixInfo -> Text
 mixfixHeadingText tysig info =
-  let types = paramTypeMap tysig
+  let slots = slotPhrases tysig
       tok (MixfixKeyword kw) = rawNameToText kw
       tok (MixfixParam p)    =
         let pn = rawNameToText p
-        in paramPhrase pn (Map.findWithDefault Nothing pn types)
+        in Map.findWithDefault (blank pn) pn slots
   in normalizeWs (Text.unwords (map tok info.pattern))
 
--- | Each GIVEN parameter's name to its (optional) declared type.
-paramTypeMap :: TypeSig Resolved -> Map.Map Text (Maybe (Type' Resolved))
-paramTypeMap (MkTypeSig _ (MkGivenSig _ names) _) =
-  Map.fromList [ (resolvedText r, mty) | MkOptionallyTypedName _ r mty <- names ]
+-- | An input in a slot of a pattern, by what it is. One of a user's types reads as
+-- the rule's body calls it. Any other is a blank to fill, in brackets, because
+-- beside the words of the pattern its name reads as more of those words.
+slotPhrases :: TypeSig Resolved -> Map.Map Text Text
+slotPhrases sig = Map.fromList [ (resolvedText r, p) | (r, p) <- inputSlots sig ]
 
--- | "a Person buyer" / "an Order item" — article + type + parameter name.
--- Falls back to the bare parameter name when the type is built in or not known.
-paramPhrase :: Text -> Maybe (Type' Resolved) -> Text
-paramPhrase pname mty = case mty >>= typeDisplay of
-  Just ty -> withArticle ty <> " " <> cleanParam pname
-  Nothing -> cleanParam pname
- where
-  -- A built-in type says nothing a reader needs in a heading.
-  typeDisplay ty = spaceCamel <$> userTypeName ty
+-- | The same, for the slots of a rule's own sentence, which go by the input.
+sentenceSlots :: TypeSig Resolved -> Map.Map Unique (Expr Resolved)
+sentenceSlots sig = Map.fromList
+  [ (getUnique r, Inert emptyAnno p InertCtxNone) | (r, p) <- inputSlots sig ]
+
+inputSlots :: TypeSig Resolved -> [(Resolved, Text)]
+inputSlots sig@(MkTypeSig _ (MkGivenSig _ names) _) =
+  [ (r, phrase)
+  | MkOptionallyTypedName _ r mty <- names
+  , let phrase = case (mty >>= userTypeName, Map.lookup (getUnique r) (paramSubst sig)) of
+          (Just _, Just p) -> p
+          _                -> blank (resolvedText r)
+  ]
+
+blank :: Text -> Text
+blank t = "[" <> spaceCamel (cleanParam t) <> "]"
 
 -- | "a Person", "an Award Participant".
 withArticle :: Text -> Text
@@ -754,6 +768,7 @@ overClauseText f = go
     CTable cols rows -> CTable cols (map (map go) rows)
     CWhere body defs -> CWhere (go body) [ (h, c, go cl) | (h, c, cl) <- defs ]
     CLed lead body -> CLed (f lead) (go body)
+    CLeadIn lead body -> CLeadIn lead (go body)
     CLabel label body -> CLabel label (go body)
 
 pruneSection :: DocSection -> Maybe DocSection
@@ -857,12 +872,16 @@ fw = markFrame
 -- read as the sentence alone ('readsAsItsSentence').
 unitSentence :: Unit -> Maybe Text
 unitSentence u = case u.uDecl of
-  UDecide d@(MkDecide _ tysig _ _)
+  UDecide d@(MkDecide _ tysig (MkAppForm _ n args _) _)
     | not (readsAsItsSentence False u), Just nlg <- decideNlg d ->
-        Just (renderNlgWith (Map.map inputPhrase (paramSubst tysig)) nlg)
+        Just (renderNlgWith (sentenceSlots tysig) nlg)
+    -- A name that ends in a preposition is waiting for its inputs: "the rate for"
+    -- says nothing until it has one. A mixfix heading already has them.
+    | not (null args), endsInPreposition n, u.uHeading == resolvedText n ->
+        Just (u.uHeading <> " " <> oxford (fw "and") (map (inputSlot tysig) args))
   _ -> Nothing
  where
-  inputPhrase t = Inert emptyAnno t InertCtxNone
+  inputSlot sig a = Map.findWithDefault (blank (resolvedText a)) (resolvedText a) (slotPhrases sig)
 
 -- | A rule whose body would not help a reader, so that its sentence stands in for
 -- it: one imported from a library, and one defined by recursion, whose @CONSIDER@
@@ -888,7 +907,7 @@ unitRendering imported u = case u.uDecl of
   UDecide d@(MkDecide _ tysig _ body)
     | Just nlg <- decideNlg d, readsAsItsSentence imported u ->
         ( if returnsBoolean tysig then "if" else "means"
-        , CLeaf (renderNlgWith Map.empty nlg) )
+        , CLeaf (renderNlgWith (sentenceSlots tysig) nlg) )
     -- Otherwise rewrite the body up front (mixfix/maths/dates/numbers/params ->
     -- Inert leaves) so formula mode survives arithmetic that contains a mixfix
     -- call or a function like @exp@/@ln@. A top-level @WHERE@/@LET@ is peeled off
@@ -896,7 +915,7 @@ unitRendering imported u = case u.uDecl of
     -- render as an attached "where:" block.
     | otherwise ->
         let subst              = paramSubst tysig
-            reading            = u.uReading
+            reading            = u.uReading { rdBlanks = scalarInputs tysig }
             -- Normalised first: until then an AND can sit inside a call's
             -- argument, and phrasing that argument would swallow the condition.
             (inner, locals)    = peelWhere (distributeCalls (carameliseExpr (clauseLayout body)))
@@ -1028,8 +1047,9 @@ localDefClause :: Reading -> Set.Set Unique -> Map.Map Unique Text -> LocalDecl 
 localDefClause reading calls outerSubst = \case
   LocalDecide _ d@(MkDecide _ ltysig _ lbody) ->
     let subst          = Map.union (paramSubst ltysig) outerSubst
+        localReading   = reading { rdBlanks = reading.rdBlanks <> scalarInputs ltysig }
         (conn, clause) = decideRendering calls ltysig
-                           (collapseTruth (rewriteWith reading (substParams subst (distributeCalls (carameliseExpr lbody)))))
+                           (collapseTruth (rewriteWith localReading (substParams subst (distributeCalls (carameliseExpr lbody)))))
     in Just (resolvedText (decideApp d), conn, clause)
   LocalAssume{} -> Nothing
 
@@ -1062,9 +1082,7 @@ paramSubst (MkTypeSig _ (MkGivenSig _ names) _) =
         | any (`Text.isPrefixOf` pname) ["the ", "a ", "an ", "this ", "that "] = pname
         | otherwise = "the " <> spaceCamel (cleanParam pname)
       noun = Text.unwords . map lowerOrdinary . Text.words . spaceCamel
-      lowerOrdinary w = case Text.unpack w of
-        (c : d : _) | isUpper c, isUpper d -> w
-        _                                  -> Text.toLower w
+      lowerOrdinary w = if keepsCapitals w then w else Text.toLower w
   in Map.fromList [ (u, phraseOf pname mtn) | (u, pname, mtn) <- params ]
 
 substParams :: Map.Map Unique Text -> Expr Resolved -> Expr Resolved
@@ -1107,9 +1125,13 @@ spaceCamel t
   go (a : rest)     = a : go rest
   go []             = []
   -- An acronym inside the name keeps its capitals.
-  lowerWord w = case Text.unpack w of
-    (c : d : _) | isUpper c, isUpper d -> w
-    _                                  -> Text.toLower w
+  lowerWord w = if keepsCapitals w then w else Text.toLower w
+
+-- | An acronym or a code: EP, C1.
+keepsCapitals :: Text -> Bool
+keepsCapitals w = case Text.unpack w of
+  c : d : _ -> isUpper c && (isUpper d || isDigit d)
+  _         -> False
 
 connectorFor :: TypeSig Resolved -> Expr Resolved -> Text
 connectorFor tysig body
@@ -1325,7 +1347,7 @@ statuteList :: ([Clause] -> Clause) -> [Expr Resolved] -> Clause
 statuteList mk parts = case parts of
   p : rest@(_ : _)
     | Just leadIn <- inertText p, isNothing (statutoryLabel p) ->
-        CLed (fromMaybe leadIn (Text.stripSuffix ":" (Text.strip leadIn))) (mk (entries rest))
+        CLeadIn (fromMaybe leadIn (Text.stripSuffix ":" (Text.strip leadIn))) (mk (entries rest))
   _ -> mk (entries parts)
  where
   entries = \case
@@ -1782,9 +1804,12 @@ rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
     App ann n [f, xs] | Just t <- quantified n f xs -> inert ann t
     -- Joined lists read as one list, so a long chain of them can be laid out.
     App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
-    App ann n args -> substituteNlgCall Nothing rd.rdHeralds (App ann n (map phrased args))
+    App ann n args
+      | Just (_, inputs) <- Map.lookup (getUnique n) rd.rdHeralds, length inputs == length args ->
+          substituteNlgCall Nothing rd.rdHeralds (App ann n (map (asText (slotText rd)) args))
+      | otherwise -> substituteNlgCall Nothing rd.rdHeralds (App ann n (map (asText leafText) args))
     e -> substituteNlgCall Nothing rd.rdHeralds e
-  phrased a = Inert (a ^. annoOf) (leafText a) InertCtxNone
+  asText f a = Inert (a ^. annoOf) (f a) InertCtxNone
   rw = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.
     Where _ e _ -> e
@@ -1800,7 +1825,7 @@ rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
     App ann n [x] | Just phrase <- Map.lookup (nameToText (getActual n)) builtinUnaryOf ->
       inert ann ("the " <> phrase <> " of " <> leafText x)
     -- Mixfix: interleave the arguments into the @_@ holes.
-    App ann n args@(_ : _) | Just txt <- interleaveMixfix n args -> inert ann txt
+    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd n args -> inert ann txt
     -- A function whose name ends in a preposition reads "minimum of x and y",
     -- not the linearizer's "minimum of with x and y".
     App ann n args@(_ : _) | endsInPreposition n ->
@@ -1886,8 +1911,14 @@ booleanFieldPhrase rd a n
   field = simpleLinearizer n
   hasHerald = isJust (getActual n ^. annoOf % annNlg) || isJust (getOriginal n ^. annoOf % annNlg)
 
-interleaveMixfix :: Resolved -> [Expr Resolved] -> Maybe Text
-interleaveMixfix n args =
+-- | The phrases of a rule's inputs of a built-in type.
+scalarInputs :: TypeSig Resolved -> Set.Set Text
+scalarInputs (MkTypeSig _ (MkGivenSig _ names) _) = Set.fromList
+  [ spaceCamel (cleanParam (resolvedText r))
+  | MkOptionallyTypedName _ r mty <- names, isNothing (mty >>= userTypeName) ]
+
+interleaveMixfix :: Reading -> Resolved -> [Expr Resolved] -> Maybe Text
+interleaveMixfix rd n args =
   let toks  = Text.words (nameToText (getActual n))
       holes = length (filter (== "_") toks)
   in if holes >= 1 && holes == length args
@@ -1897,9 +1928,18 @@ interleaveMixfix n args =
   fill [] _ = []
   fill (t : ts) as
     | t == "_" = case as of
-        (a : rest) -> leafText a : fill ts rest
+        (a : rest) -> slotText rd a : fill ts rest
         []         -> t : fill ts as
     | otherwise = t : fill ts as
+
+
+-- | An argument in a slot among an author's words: a pattern's, or a sentence's.
+-- One that is just an input of the rule reads as a blank, as it does in the
+-- rule's heading ('slotPhrases'). Any other reads as what it is.
+slotText :: Reading -> Expr Resolved -> Text
+slotText rd a = case a of
+  Inert _ t _ | t `Set.member` rd.rdBlanks -> "[" <> t <> "]"
+  _ -> leafText a
 
 nameIs :: Text -> Resolved -> Bool
 nameIs t r = nameToText (getActual r) == t
@@ -2176,6 +2216,8 @@ instance Aeson.ToJSON Clause where
       [ "$type" .= ("where" :: Text), "body" .= body, "definitions" .= map whereDef defs ]
     CLed lead body -> Aeson.object
       [ "$type" .= ("led" :: Text), "lead" .= lead, "body" .= body ]
+    CLeadIn lead body -> Aeson.object
+      [ "$type" .= ("leadIn" :: Text), "lead" .= lead, "body" .= body ]
     CLabel label body -> Aeson.object
       [ "$type" .= ("labelled" :: Text), "label" .= label, "body" .= body ]
    where
