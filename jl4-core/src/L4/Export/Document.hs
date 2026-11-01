@@ -675,14 +675,49 @@ buildDocument cfg mainModule0 deps0 =
 
 -- | Build one section subtree, leaving 'sectionNumber' blank — numbering is a
 -- separate post-pass ('renumberSections') run after empty sections are pruned.
-toDocSection :: (Block -> Int) -> Map.Map Unique Block -> Section Resolved -> DocSection
-toDocSection rankOf bmap (MkSection _ mName _ _ decls) =
-  MkDocSection
+toDocSection :: Bool -> (Block -> Int) -> Map.Map Unique Block -> Section Resolved -> DocSection
+toDocSection imported rankOf bmap (MkSection _ mName _ mgiven decls) =
+  let own  = orderedBlocks bmap decls
+      subs = [ toDocSection imported rankOf bmap s | Section _ s <- decls ]
+      -- A section whose rules are all left out is left out, GIVEN and all.
+      givens
+        | null own && all (isNothing . pruneSection) subs = []
+        | otherwise                                      = givenBlocks imported mgiven
+  in MkDocSection
     { sectionNumber  = ""
     , sectionHeading = fmap resolvedText mName
-    , sectionGroups  = unlabelledIfAlone (groupByKind rankOf (orderedBlocks bmap decls))
-    , sectionSubs    = [ toDocSection rankOf bmap s | Section _ s <- decls ]
+    , sectionGroups  = unlabelledIfAlone (groupByKind rankOf (givens <> own))
+    , sectionSubs    = subs
     }
+
+-- | A section GIVEN's inputs, as the document states what it takes as given.
+--
+-- unstable writes an input that the rules under a heading share as a section
+-- GIVEN, where main writes an ASSUME, and legalese/l4-ide#803 opens a document
+-- with what it takes as given ("The following are taken as given:"). The checker
+-- elaborates each input into an ASSUME, which the document strips
+-- ('stripSectionBinderElaborations'), so without this the inputs were stated
+-- nowhere. Each reads as an ASSUME does: its name, or its @\@nlg@ wording.
+-- Assumed, not ruled (2026-11-01): a TYPICALLY default is not stated.
+givenBlocks :: Bool -> Maybe (GivenSig Resolved) -> [Block]
+givenBlocks imported = \case
+  Nothing -> []
+  Just (MkGivenSig _ names) ->
+    [ MkBlock
+        { blockId           = uniqueId (getUnique r)
+        , blockKind         = AssumptionUnit
+        , blockHeading      = resolvedText r
+        , blockSentence     = renderNlgWith Map.empty <$> (getActual r ^. annoOf % annNlg)
+        , blockConnector    = ""
+        , blockBody         = CLeaf ""
+        , blockRenderedAs   = RenderedInline
+        , blockCitation     = Nothing
+        , blockSources      = []
+        , blockIsData       = False
+        , blockSourceModule = uriText (getUnique r).moduleUri
+        , blockImported     = imported
+        }
+    | MkOptionallyTypedName _ r _ _ <- names ]
 
 -- | A section's heading already frames its only group; a label would only repeat
 -- it, as "Definitions:" under a heading with nothing but definitions.
@@ -696,8 +731,8 @@ unlabelledIfAlone = \case
 -- carry a § number and a TOC entry); any explicit @SECTION@ markers follow as
 -- further top-level sections.
 bodyToSections :: (Block -> Int) -> Map.Map Unique Block -> Section Resolved -> [DocSection]
-bodyToSections rankOf bmap (MkSection _ _ _ _ decls) =
-  let groups = groupByKind rankOf (orderedBlocks bmap decls)
+bodyToSections rankOf bmap (MkSection _ _ _ mgiven decls) =
+  let groups = groupByKind rankOf (givenBlocks False mgiven <> orderedBlocks bmap decls)
       (front, rules) = List.partition (\g -> g.groupLabel /= Just "Provisions" && isJust g.groupLabel) groups
       interpretation =
         [ MkDocSection
@@ -715,7 +750,7 @@ bodyToSections rankOf bmap (MkSection _ _ _ _ decls) =
             , sectionSubs    = []
             }
         | g <- rules ]
-      subSecs = [ toDocSection rankOf bmap s | Section _ s <- decls ]
+      subSecs = [ toDocSection False rankOf bmap s | Section _ s <- decls ]
   in interpretation <> groupSecs <> subSecs
  where
   interpretationGroup g = g
@@ -2413,12 +2448,12 @@ leadingSection (MkSection _ _ _ _ decls) =
 buildImportSection
   :: (Block -> Int) -> Map.Map Unique Block -> NormalizedUri -> Module Resolved -> DocSection
 buildImportSection rankOf bmap uri m =
-  let (heading, MkSection _ _ _ _ decls) = importHeadingAndBody uri m
+  let (heading, MkSection _ _ _ mgiven decls) = importHeadingAndBody uri m
   in MkDocSection
     { sectionNumber  = ""
     , sectionHeading = Just heading
-    , sectionGroups  = groupByKind rankOf (orderedBlocks bmap decls)
-    , sectionSubs    = [ toDocSection rankOf bmap s | Section _ s <- decls ]
+    , sectionGroups  = groupByKind rankOf (givenBlocks True mgiven <> orderedBlocks bmap decls)
+    , sectionSubs    = [ toDocSection True rankOf bmap s | Section _ s <- decls ]
     }
 
 titleCase :: Text -> Text

@@ -3591,6 +3591,15 @@ spec bin = do
       out `shouldSatisfy` any ("Net income means [income] reduced by 10." `isSuffixOf`)
       out `shouldSatisfy` any ("Check if [income] is above the age." `isSuffixOf`)
 
+    -- A section GIVEN is unstable's way to write what main writes as an ASSUME,
+    -- and #803 opens a document with what it takes as given. The checker's
+    -- ASSUMEs for the section are stripped, so the section states its inputs.
+    it "states a section GIVEN's inputs as taken as given" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderSectionGivenBlanksFixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy`
+        ("The following are taken as given:\n\n1. Age.\n\n2. Income." `isInfixOf`)
+
   describe "an @nlg on a rule head's input" $ do
     let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]
         renderOf = runL4 bin ["render", "--format", "text", nlgHeadPlacementSource]
