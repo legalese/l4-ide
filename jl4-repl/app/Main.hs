@@ -16,6 +16,8 @@ import Data.Time.Format (defaultTimeLocale, formatTime)
 import Options.Applicative
 import System.Console.Haskeline
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory, makeAbsolute)
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
+import System.IO (hSetEncoding, stdin, stdout, stderr)
 import System.FilePath (takeDirectory, takeBaseName)
 import Text.Printf (printf)
 
@@ -86,6 +88,15 @@ data TraceSink = TraceSink
 
 main :: IO ()
 main = do
+  -- UTF-8 everywhere, as `l4` does (jl4/app/Main.hs): on Windows the
+  -- locale encoding is the user's code page, so a `↯` in a reply came out
+  -- as U+FFFD and a trace saved with :tracefile lost its header. New
+  -- handles take the locale encoding; the standard handles were opened
+  -- before `main` and need setting one by one.
+  setLocaleEncoding utf8
+  hSetEncoding stdin  utf8
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
   opts <- execParser optionsInfo
   curDir <- getCurrentDirectory
   -- REPL default: enable traces for exploration (TRACE-GRAPHVIZ-ARCHITECTURE.md)
