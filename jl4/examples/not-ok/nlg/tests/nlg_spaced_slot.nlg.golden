@@ -5,7 +5,7 @@ File: nlg_spaced_slot.l4
   Range: 6:21-6:67
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/spaced-nlg-slot
   Message:
     This wording has `% amount %`, with spaces inside the percent signs, so it prints as plain text.
     A slot is written `%amount%`, with no spaces. For a percent sign meant literally, write `\%`.

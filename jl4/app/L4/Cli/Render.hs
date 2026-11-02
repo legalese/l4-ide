@@ -12,8 +12,10 @@
 -- and the @jl4-lsp@ server share one implementation; this module only handles
 -- the CLI surface (option parsing, loading the file, writing output).
 --
--- "Don't render unused definitions and rules" is on by default; pass
--- @--include-unused@ to render unreachable imported material too.
+-- By default the document is the file's own rules, numbered, as in the Render
+-- tab: imported modules still inform how those rules read, but their own text is
+-- left out. @--include-imports@ or @--include-import NAME@ shows it, and
+-- @--include-unused@ also shows what nothing in the document reaches.
 module L4.Cli.Render
   ( RenderOptions(..)
   , RenderFormat(..)
@@ -37,7 +39,7 @@ import L4.Lexer (LangTag (..))
 import L4.Syntax (defaultModuleLang)
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser as Parser
-import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
+import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText, sourceLinksFrom)
 
 import L4.Cli.Common
 
@@ -53,6 +55,8 @@ data RenderOptions = RenderOptions
   , renderFormat         :: RenderFormat
   , renderOutput         :: Maybe FilePath
   , renderIncludeUnused  :: Bool
+  , renderIncludeImports :: Bool
+  , renderIncludeImport  :: [Text]
   , renderNumberSections :: Bool
   , renderNumberClauses  :: Bool
   , renderToc            :: Bool
@@ -91,22 +95,34 @@ renderOptionsParser = RenderOptions
         )
   <*> switch
         ( long "include-unused"
-       <> help "Also render imported definitions/rules not referenced by this document"
+       <> help "Also render imported definitions/rules not referenced by this document (implies --include-imports)"
         )
   <*> switch
-        ( long "number-sections"
-       <> help "Number section headings (§ 1, 1.1, …); off by default"
+        ( long "include-imports"
+       <> help "Render the imported rules this document uses, after its own"
         )
-  <*> switch
-        ( long "number-clauses"
-       <> help "Number clauses (1.); off by default"
-        )
+  <*> many (strOption
+        ( long "include-import"
+       <> metavar "NAME"
+       <> help "Render the rules this document uses from one imported module, named without .l4 (repeatable)"
+        ))
+  <*> (not <$> switch
+        ( long "no-number-sections"
+       <> help "Do not number section headings (§ 1, 1.1, …)"
+        ))
+  <*> (not <$> switch
+        ( long "no-number-clauses"
+       <> help "Do not number clauses (1.)"
+        ))
   <*> switch
         ( long "toc"
        <> help "Prepend a linked table of contents (HTML only)"
         )
   <*> langOption "rule"
   <*> fixedNowParser
+  -- Numbering is now the default; these stay accepted for existing scripts.
+  <* switch (long "number-sections" <> internal)
+  <* switch (long "number-clauses" <> internal)
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -120,7 +136,7 @@ renderCmd opts = do
   -- token stream (see 'Parser.declaredModuleLang') rather than anything the
   -- resolved AST keeps. 'Rules.GetLexTokens' is what the parse rule itself
   -- consumed, so this re-reads nothing.
-  (errs, (mTc, mToks)) <- runOneshot evalConfig opts.renderFile \nfp -> do
+  (errs, diags, (mTc, mToks)) <- runOneshotWithDiagnostics evalConfig opts.renderFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     (,) <$> Shake.use Rules.SuccessfulTypeCheck uri
@@ -136,11 +152,16 @@ renderCmd opts = do
       putDiagnostics errs
       let cfg = defaultExportConfig
                   { dropUnused = not opts.renderIncludeUnused
+                  , moduleDispositions = hiddenImports showImport rawDeps
                   , mixfixHeadings = mixfixHeadingsFromRegistry tc.mixfixRegistry
                   }
+          showImport name =
+               opts.renderIncludeUnused
+            || opts.renderIncludeImports
+            || name `elem` opts.renderIncludeImport
           -- The language the document SAYS it is in, in one place: the one
           -- asked for, else the one the module declares, else @en@. The
-          -- same order 'localise' below effectively applies to the renderings
+          -- same order 'Nlg.prepareModules' below effectively applies to the renderings
           -- themselves — @--lang@ promotes a tagged herald, and with no flag the
           -- default herald is the one @\@lang@ stamped.
           declaredLanguage = fromMaybe defaultModuleLang
@@ -154,6 +175,7 @@ renderCmd opts = do
                    { numberSections = opts.renderNumberSections
                    , numberClauses  = opts.renderNumberClauses
                    , toc            = opts.renderToc
+                   , sourceLinks    = maybe mempty (sourceLinksFrom . fst) mToks
                    , docLang        = docLanguage
                    }
           -- Choose the language BEFORE building the document, not inside it.
@@ -169,10 +191,12 @@ renderCmd opts = do
           --
           -- 'selectLanguage' 'Nothing' is the identity, so with no --lang the
           -- output is byte-for-byte what it was.
-          localise = Nlg.selectLanguage opts.renderLang
+          --
+          -- A herald written after a rule's last input is moved onto the rule
+          -- first, as 'l4 nlg' does ('Nlg.prepareModules'): left where it is it
+          -- also labels that input, and a call written with WITH printed it twice.
           rawDeps = dedupModules (transitiveDeps tc)
-          mainModule = localise tc.module'
-          depModules = map localise rawDeps
+          (mainModule, depModules) = Nlg.prepareModules opts.renderLang tc.module' rawDeps
           doc = buildDocument cfg mainModule depModules
       -- Said only for the formats that carry a document language, so that
       -- `--format text --lang zz` stays byte-identical on BOTH streams.
@@ -189,7 +213,10 @@ renderCmd opts = do
         FmtText -> emitText opts (renderText rcfg doc)
         FmtHtml -> emitText opts (renderHtml rcfg doc)
         FmtAkn  -> emitText opts (renderAkn rcfg doc)
-      exitSuccess
+      -- The document is written either way, because it can still be read. But a
+      -- module this one imports may be broken while this one checks, and the
+      -- exit code says so, as it does for 'l4 check'.
+      if hasBlockingError diags then exitFailure else exitSuccess
 
 -- | Does this format put the document's language in its output?
 --

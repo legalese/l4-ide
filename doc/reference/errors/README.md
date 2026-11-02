@@ -25,6 +25,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Branch type mismatch](#branch-type-mismatch)
 - [Wrong number of arguments](#wrong-number-of-arguments)
 - [Argument of the wrong type](#argument-of-the-wrong-type)
+- [Two types with the same name](#two-types-with-the-same-name)
 - [Several definitions with the same name](#several-definitions-with-the-same-name)
 
 **Names and imports**
@@ -56,12 +57,15 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Export**
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
+- [An @export that takes or returns an EVENT](#an-export-that-takes-or-returns-an-event)
 
 ---
 
 ## Layout and syntax
 
 L4 is layout-sensitive, like Python: indentation decides what belongs to what. Use spaces, not tabs, and indent a continuation line further than the line it continues.
+
+<a id="parse-indentation"></a>
 
 ### Incorrect indentation
 
@@ -212,6 +216,8 @@ GIVETH A BOOLEAN
 
 ---
 
+<a id="parse-unexpected-double-equals"></a>
+
 ### Double equals sign
 
 **Error:** `unexpected ==`
@@ -311,6 +317,8 @@ result x MEANS
 
 ---
 
+<a id="check-wrong-argument-count"></a>
+
 ### Wrong number of arguments
 
 **Error:** `The function add (defined at ...) expects 2 arguments, but you are applying it to 3 arguments here.`
@@ -329,6 +337,8 @@ add a b MEANS a + b
 ```
 
 ---
+
+<a id="check-type-mismatch"></a>
 
 ### Argument of the wrong type
 
@@ -353,6 +363,35 @@ DECIDE `the same greeting` IS CONCAT "hello", " world"
 
 ---
 
+### Two types with the same name
+
+**Error:** a type mismatch whose two types are spelled the same, each followed by where it was declared, such as `Verdict (Verdict defined at verdicts.l4:1:9-16)` against `Verdict (Verdict defined at verdicts.l4:3:9-16)`
+
+```l4
+DECLARE Verdict IS ONE OF yes, no
+
+DECLARE Verdict IS ONE OF maybe, perhaps
+
+GIVEN x IS A BOOLEAN
+`pick` MEANS IF x THEN yes ELSE maybe
+```
+
+The file declares two different types called `Verdict`, and `yes` belongs to the first and `maybe` to the second.
+So the two branches of the `IF` have different types, though both are called `Verdict`.
+When the two types of a mismatch are spelled the same, L4 adds where each was declared, so that you can tell them apart.
+The numbers after the file name are the line, then the columns.
+
+Writing the name of such a type, in a `GIVETH` for example, gives a different message: [several definitions with the same name](#several-definitions-with-the-same-name), because L4 cannot tell which of the two you mean.
+
+**How to fix it:** Declare each name once.
+Rename one of the two types, or delete the `DECLARE` that repeats the other.
+
+---
+
+<a id="check-ambiguous-identifier"></a>
+
+<a id="check-ambiguous-type"></a>
+
 ### Several definitions with the same name
 
 **Error:** `There are multiple definitions for the identifier Date and I do not have sufficient information to make a choice between them.`, followed by the candidates and their types
@@ -367,9 +406,17 @@ IMPORT daydate
 #EVAL (Date 10 1 2024) `is before` (Date 11 1 2024)
 ```
 
+A type you declare yourself is ambiguous in the same way when it has the same name and the same number of parameters as a built-in type.
+`DECLARE EVENT party action HAS ...` clashes with the built-in `EVENT`, and `DECLARE MAYBE a HAS ...` with the built-in `MAYBE`.
+L4 then reports this error at each place that names the type, with your type and the built-in one as the two options, and nothing else about the use.
+Give your type another name.
+A type called `EVENT` with no parameters is not affected, because the built-in `EVENT` takes two.
+
 ---
 
 ## Names and imports
+
+<a id="check-unknown-identifier"></a>
 
 ### I could not find a definition for the identifier
 
@@ -382,6 +429,7 @@ L4 met a name that nothing in scope defines. The usual causes:
 - **The wrong case.** Keywords and built-in values are upper case: `TRUE` and `FALSE`, not `True` or `true`; `NOTHING`, `JUST`, `LEFT`, `RIGHT`.
 - **An `IMPORT` below a section heading.** `IMPORT` lines count only before the first `§`; one placed after it is ignored, so the names it should bring in are not defined. Move it to the top of the file.
 - **A name defined somewhere it cannot be seen.** A name defined in the `WHERE` or `LET` of one definition exists only inside that definition.
+- **A type that was never declared**, such as `Money` in `GIVEN amount IS A Money`. L4 reports the type at every place it is written, each at its own position, and nothing else about it: a `Money` in two `GIVEN`s and a `GIVETH` is three errors, and the rule that uses a `Money` is not also reported as having the wrong type.
 
 **How to fix it:** Correct the spelling, or add the `IMPORT`:
 
@@ -393,6 +441,8 @@ DECIDE `is ready` IS TRUE
 ```
 
 ---
+
+<a id="import-module-not-found"></a>
 
 ### Module not found
 
@@ -410,6 +460,10 @@ This stops `l4 check`, `l4 run` and deploying, even if nothing from the module i
 [IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
 
 ---
+
+<a id="import-cycle"></a>
+
+<a id="import-self-import"></a>
 
 ### Import cycle
 
@@ -521,6 +575,8 @@ Give that input another name, and the body means what it says.
 
 ---
 
+<a id="check-clause-pattern-count"></a>
+
 ### Clauses with more or fewer patterns than the GIVEN names
 
 **Error:**
@@ -569,6 +625,8 @@ L4 then works out the type of each input from the patterns and the clause bodies
 Such clauses cannot be published with `@export`, even a single one; see [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given).
 
 ---
+
+<a id="lint-non-exhaustive-clauses"></a>
 
 ### Multi-clause DECIDE does not cover all cases
 
@@ -622,6 +680,8 @@ See [Several clauses](../functions/DECIDE.md#several-clauses).
 
 ---
 
+<a id="lint-unreachable-clause"></a>
+
 ### Clause that is never used
 
 **Warning:**
@@ -667,6 +727,8 @@ There is no warning for a clause that repeats one above it.
 
 ---
 
+<a id="lint-misplaced-clause-annotation"></a>
+
 ### Annotation above a later clause
 
 **Warning:**
@@ -700,6 +762,8 @@ An `@desc` or `@export` goes above the rule's `GIVEN`, or above its first clause
 An `@nlg` goes on the line above the first clause.
 
 ---
+
+<a id="lint-clause-arity-changed"></a>
 
 ### A definition after clauses that is not another clause
 
@@ -743,6 +807,8 @@ f c d MEANS 3
 
 ---
 
+<a id="eval-infinite-loop"></a>
+
 ### Infinite loop detected
 
 **Error:** `Infinite loop detected while trying to evaluate: x PLUS 1`
@@ -773,6 +839,8 @@ If you did not, you probably meant another name on the right-hand side.
 ---
 
 ## Pattern matching
+
+<a id="lint-non-exhaustive-match"></a>
 
 ### Non-exhaustive pattern match
 
@@ -822,6 +890,8 @@ What the check covers:
 
 ---
 
+<a id="lint-redundant-branch"></a>
+
 ### Redundant pattern match branch
 
 **Warning:** `The following CONSIDER branch is redundant:`, followed by the branch
@@ -843,6 +913,8 @@ A branch can never be reached, because the branches above it, here the OTHERWISE
 **How to fix it:** Delete the branch, or move it above the more general one.
 
 ---
+
+<a id="eval-non-exhaustive-patterns"></a>
 
 ### Non-exhaustive patterns at runtime
 
@@ -903,6 +975,8 @@ This gives `FULFILLED`. See [Regulative rules](../regulative/README.md) and [EVE
 
 ## Export
 
+<a id="check-export-clauses-without-given"></a>
+
 ### An @export of clauses with no GIVEN
 
 **Error:**
@@ -945,4 +1019,64 @@ DECIDE size Blue  n IS 0
 ```
 
 The rule is then published with the inputs `c` and `n`.
+Or remove the `@export`, if the rule is not meant to be published.
+
+---
+
+<a id="check-export-event-type"></a>
+
+### An @export that takes or returns an EVENT
+
+**Error:**
+
+```
+`who acted` is published with @export, but its input `e` has a type that is or contains an EVENT.
+@export does not support an EVENT as an input yet.
+```
+
+For a result, the second line reads `@export does not support an EVENT as a result yet.`
+
+**What you wrote:**
+
+```l4
+DECLARE Party IS ONE OF alice, bob
+DECLARE Act IS ONE OF ping, pong
+
+@export Who acted
+GIVEN e IS AN EVENT Party Act
+GIVETH A Party
+`who acted` MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN p
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input as a value written in JSON.
+L4 has no JSON form for an [EVENT](../regulative/EVENT.md), so the input would be published as a bare `object`, and no request could give the rule an event.
+The same goes for a result, and for an `EVENT` inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
+So an `@export` of such a rule is an error, reported at the `@export` line.
+The error stops the whole file from checking: `l4 run` and `l4 batch` refuse the file, the `#EVAL`s of its other rules included, and jl4-service will not deploy it, until you remove the `@export` or the `EVENT`.
+A rule that builds or reads an `EVENT` inside its body, and does not name one in its inputs or its result, is published as usual.
+A record that you declare with an `EVENT` among its fields is not looked into, so a rule that takes such a record is not refused.
+
+**How to fix it:** Take the parts of the event as separate inputs, and build the event inside the rule if it needs one.
+A helper that is not published can still take an `EVENT`:
+
+```l4
+DECLARE Party IS ONE OF alice, bob
+DECLARE Act IS ONE OF ping, pong
+
+GIVEN e IS AN EVENT Party Act
+GIVETH A NUMBER
+`event time` MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN n
+
+@export When it happened
+GIVEN who IS A Party
+      what IS AN Act
+      time IS A NUMBER
+GIVETH A NUMBER
+`when it happened` MEANS `event time` (EVENT who what time)
+```
+
 Or remove the `@export`, if the rule is not meant to be published.

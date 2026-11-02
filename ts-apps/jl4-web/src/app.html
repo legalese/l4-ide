@@ -2,13 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%sveltekit.assets%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>L4 Editor</title>
+    <meta
+      name="description"
+      content="Write and run L4, a programming language for law, in your browser. Rules are checked as you type and can be seen as decision diagrams. Nothing to install."
+    />
+    <link rel="canonical" href="https://play.legalese.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Legalese" />
+    <meta property="og:title" content="L4 Editor" />
+    <meta
+      property="og:description"
+      content="Write and run L4, a programming language for law, in your browser. Rules are checked as you type and can be seen as decision diagrams. Nothing to install."
+    />
+    <meta property="og:url" content="https://play.legalese.com/" />
+    <meta
+      property="og:image"
+      content="https://legalese.com/opengraph/ai-is-eating-law-v2.jpg"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="L4 Editor" />
+    <meta
+      name="twitter:description"
+      content="Write and run L4, a programming language for law, in your browser. Rules are checked as you type and can be seen as decision diagrams. Nothing to install."
+    />
+    <meta
+      name="twitter:image"
+      content="https://legalese.com/opengraph/ai-is-eating-law-v2.jpg"
+    />
+    <link rel="icon" href="%sveltekit.assets%/favicon.ico" />
+    <!-- Starts the language server (WASM) download with the page, behind the editor's own code; hooks.server.ts fills in the URL -->
+    <link
+      rel="preload"
+      href="%l4.wasmUrl%"
+      as="fetch"
+      type="application/wasm"
+      crossorigin="anonymous"
+      fetchpriority="low"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- media="print" until loaded, so the font doesn't hold up the first paint -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Poppins:wght@100;300;400;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
     %sveltekit.head%
   </head>

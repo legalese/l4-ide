@@ -13,10 +13,16 @@ const config = {
       // these options are set automatically — see below
       pages: 'build',
       assets: 'build',
-      fallback: 'index.html',
+      // No SPA fallback: the one page is prerendered to index.html (see
+      // src/routes/+layout.ts), and a fallback would overwrite it.
       precompress: true,
       strict: true,
     }),
+    // The one page is the only entry; following its links would request the
+    // preloaded WASM, which isn't there in builds that skip it.
+    prerender: {
+      crawl: false,
+    },
     serviceWorker: {
       register: false,
     },

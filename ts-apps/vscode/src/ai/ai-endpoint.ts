@@ -17,14 +17,14 @@ export function isLocalMode(): boolean {
 }
 
 /**
- * Resolve the active ai-proxy base URL. Re-evaluated per call so the
+ * Resolve the active AI base URL. Re-evaluated per call so the
  * setting toggle applies immediately to subsequent requests.
  */
 export function getAiEndpoint(): string {
   return isLocalMode() ? LOCAL_AI_ENDPOINT : PROD_AI_ENDPOINT
 }
 
-/** The endpoint resolver handed to the core's `AiProxyClient`. */
+/** The endpoint resolver handed to the core's `AiClient`. */
 export function vscodeAiEndpoint(): AiEndpoint {
   const local = isLocalMode()
   return { url: local ? LOCAL_AI_ENDPOINT : PROD_AI_ENDPOINT, local }

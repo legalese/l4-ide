@@ -218,7 +218,7 @@ concurrencyLimiter maxConcurrent = do
 
 -- | Middleware that ensures every response has a Content-Length header.
 -- Servant's JSON encoding uses responseBuilder (chunked transfer encoding)
--- which omits Content-Length. CloudFront requires Content-Length to perform
+-- which omits Content-Length. A CDN needs Content-Length to perform
 -- on-the-fly gzip/brotli compression. This middleware buffers the streaming
 -- body into a lazy ByteString and re-emits it via responseLBS, which Warp
 -- automatically sends with Content-Length.
@@ -239,7 +239,7 @@ contentLengthMiddleware baseApp req sendResp =
 app :: AppEnv -> Application
 app env req sendResp = do
   let vis = extractVisibility req
-      -- Override serverName with X-L4-Origin header if present (set by auth proxy).
+      -- Override serverName with X-L4-Origin header if present (set by a reverse proxy).
       -- This allows the OpenAPI spec to reflect the org's external URL.
       reqEnv = case lookup "X-L4-Origin" (requestHeaders req) of
         Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks

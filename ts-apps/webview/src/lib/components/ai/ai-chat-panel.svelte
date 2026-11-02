@@ -13,15 +13,26 @@
     AiChatStarted,
     AiChatTextDelta,
     AiChatThinkingDelta,
+    AiChatTitle,
     AiChatToolActivity,
     AiChatToolCall,
     AiChatTurnSpawn,
     AiUsageUpdate,
+    AiCloudConfig,
+    AiCloudEvent,
+    AiCloudMcpSignInNeeded,
+    AiMcpServersChanged,
+    AiCloudProgress,
+    AiCloudReveal,
+    AiCloudState,
+    AiCloudViewing,
     RequestOpenUrl,
     RequestSidebarLogin,
+    cloudSessionIdOf,
     type AiChatAttachment,
   } from 'jl4-client-rpc'
   import { createAiChatStore } from '$lib/stores/ai-chat.svelte'
+  import { cloudToolChips } from '$lib/stores/cloud-chat'
   import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
   import MessageList from './message-list.svelte'
   import ChatInput from './chat-input.svelte'
@@ -29,6 +40,8 @@
   import ConversationHistory from './conversation-history.svelte'
   import SettingsPanel from './settings-panel.svelte'
   import DeploymentBanner from './deployment-banner.svelte'
+  import CloudGitButton from './cloud-git-button.svelte'
+  import ConversationHeader from './conversation-header.svelte'
   import CloudUpsell from '../cloud-upsell.svelte'
 
   let {
@@ -120,6 +133,7 @@
     m.onNotification(AiChatStarted, (p) => store.onStarted(p))
     m.onNotification(AiChatTextDelta, (p) => store.onTextDelta(p))
     m.onNotification(AiChatThinkingDelta, (p) => store.onThinkingDelta(p))
+    m.onNotification(AiChatTitle, (p) => store.onTitle(p))
     m.onNotification(AiChatDone, (p) => store.onDone(p))
     m.onNotification(AiChatError, (p) => store.onError(p))
     m.onNotification(AiChatToolCall, (p) => store.onToolCall(p))
@@ -131,6 +145,18 @@
     m.onNotification(AiActiveFile, (p) => store.onActiveFile(p))
     m.onNotification(AiChatAskUser, (p) => store.onAskUser(p))
     m.onNotification(AiChatSeedDraft, (p) => store.seedDraft(p.text))
+    // Cloud sessions: config flag, cloud-only events, state,
+    // "Run in cloud" progress, and "Open" from a notification.
+    m.onNotification(AiCloudConfig, (p) => store.onCloudConfig(p))
+    m.onNotification(AiCloudEvent, (p) => store.onCloudEvent(p))
+    m.onNotification(AiCloudState, (p) => store.onCloudState(p))
+    m.onNotification(AiCloudProgress, (p) => store.onCloudProgress(p))
+    m.onNotification(AiCloudMcpSignInNeeded, (p) => store.onCloudMcpSignIn(p))
+    m.onNotification(AiMcpServersChanged, (p) => store.onMcpServersChanged(p))
+    m.onNotification(AiCloudReveal, (p) => {
+      historyOpen = false
+      store.onCloudReveal(p)
+    })
   }
 
   // Attach handlers as soon as the messenger prop is non-null. An
@@ -145,6 +171,13 @@
     subscribed = true
     void store.refreshHistory()
     void store.refreshDictationStatus()
+  })
+
+  // Which cloud session is on screen: only that one starts again by
+  // itself when its credentials end mid-turn.
+  $effect(() => {
+    const sessionId = cloudSessionIdOf(store.currentId)
+    messenger?.sendNotification(AiCloudViewing, HOST_EXTENSION, { sessionId })
   })
 
   onDestroy(() => {
@@ -169,8 +202,20 @@
 
   function openHistory(): void {
     void store.refreshHistory()
+    void store.refreshCloudHistory(true)
     historyOpen = true
   }
+
+  // The cloud part of the history is refetched every 30 s while the
+  // history is open.
+  $effect(() => {
+    if (!historyOpen || !visible || !store.cloudEnabled) return
+    const timer = setInterval(
+      () => void store.refreshCloudHistory(true),
+      30_000
+    )
+    return () => clearInterval(timer)
+  })
 
   async function onSeedSelect(seed: { prompt: string }): Promise<void> {
     // Every seed is document-driven: pre-fill the prompt, then
@@ -193,7 +238,11 @@
   }
 
   async function onLoadConversation(id: string): Promise<void> {
-    await store.loadConversation(id)
+    const loading = store.loadConversation(id)
+    // A cloud session shows at once (its banner animates while the log
+    // is replayed); a local one is read first.
+    if (cloudSessionIdOf(id)) historyOpen = false
+    await loading
     historyOpen = false
   }
 
@@ -216,10 +265,10 @@
   // Retry asks the server to run another turn against the existing
   // conversation state — no duplicated user message. The user's
   // original prompt is already persisted on disk from the aborted
-  // attempt (ai-proxy saves the conversation on create, before the
+  // attempt (the AI service saves the conversation on create, before the
   // stream starts), so the model has everything it needs to produce
   // a fresh response. The store's continueTurn() handles both the
-  // happy path (server-assigned conversationId exists → ask the proxy
+  // happy path (server-assigned conversationId exists → ask the AI service
   // to run another pass against stored history) and the
   // first-turn-error fallback (no id yet → re-send the last user
   // message as a fresh request). It also drops the trailing errored
@@ -233,12 +282,43 @@
   const showChat = $derived(store.signedIn && store.current !== null)
 </script>
 
+<!-- Clone / Sync: in a cloud session's header and on its Files changed
+     boxes. -->
+{#snippet cloudGitButton()}
+  {#if store.current?.cloud}
+    <CloudGitButton
+      state={store.current.cloud.state}
+      git={store.cloudGitStatus}
+      ready={store.cloudGitReady}
+      busy={store.cloudGitBusy}
+      onClick={() => void store.cloudGitAction()}
+    />
+  {/if}
+{/snippet}
+
 <div class="ai-panel">
   {#if showUnauth}
     <!-- Mirrors the Deployments tab signed-out state — both render the
          shared Legalese Cloud promo so the two tabs read the same. -->
     <CloudUpsell context="ai" onSignIn={signIn} />
   {:else}
+    {#if showChat && store.current}
+      {@const conv = store.current}
+      {@const id = conv.id}
+      <ConversationHeader
+        cloud={conv.cloud ?? null}
+        title={store.currentTitle}
+        running={conv.streaming}
+        waiting={!!(store.pendingApproval || store.pendingQuestion)}
+        action={conv.cloud ? cloudGitButton : undefined}
+        onStop={() => void store.stopCloud()}
+        onDelete={() =>
+          id ? void store.deleteConversation(id) : store.newConversation()}
+        onRename={id
+          ? (title) => void store.renameConversation(id, title)
+          : undefined}
+      />
+    {/if}
     {#if showEmptyState}
       <EmptyState
         onSeed={onSeedSelect}
@@ -251,7 +331,7 @@
       />
     {:else if showChat && store.current}
       <MessageList
-        turns={store.current.turns}
+        turns={store.current.cloud?.loading ? [] : store.current.turns}
         streaming={store.current.streaming}
         pipelineActive={store.pipelineActive}
         pendingApproval={store.pendingApproval}
@@ -263,14 +343,23 @@
         onAnswerQuestion={(answer) => store.answerQuestion(answer)}
         onOpenFile={(callId) => store.openFile(callId)}
         onOpenFileDiff={(callId) => store.openFileDiff(callId)}
+        filesOpenable={!store.current.cloud}
+        filesAction={store.current.cloud ? cloudGitButton : undefined}
+        tools={cloudToolChips(store.current.cloud)}
+        onToolSignIn={(server) => void store.signInCloudMcp(server)}
+        rollbackOfferAt={store.current.cloud
+          ? (i) => store.rollbackOfferAt(i)
+          : undefined}
+        onRollback={(offer) => void store.rollbackCloudTurn(offer)}
       />
     {/if}
 
     {#if historyOpen}
       <ConversationHistory
-        items={store.history}
+        items={store.historyEntries}
         currentId={store.currentId}
         streamingIds={store.streamingConversationIds}
+        waitingIds={store.waitingConversationIds}
         onLoad={onLoadConversation}
         onDelete={onDeleteConversation}
         onClose={() => (historyOpen = false)}

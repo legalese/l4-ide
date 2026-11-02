@@ -12,20 +12,13 @@ module LSP.L4.BlockingErrors
   ( isBlockingDiagnostic
   , hasBlockingError
   , importClosure
-  , ImportCycle (..)
-  , importCycles
   , blockingErrorsIn
   ) where
 
-import Control.Monad (foldM)
-import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
-import Development.IDE.Graph (Action)
-import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import Language.LSP.Protocol.Types (Diagnostic (..), DiagnosticSeverity (..), NormalizedUri)
-import LSP.Core.Shake (use)
-import LSP.Core.Types.Diagnostics (FileDiagnostic (..))
-import LSP.L4.Rules (GetImportEdges (..))
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..), diagnosticCode)
+import LSP.L4.Rules (importClosure)
 
 -- | An Error-severity diagnostic from any source /except/ @\"eval\"@: parse
 -- errors, type errors, an @IMPORT@ that resolves to nothing, and an import
@@ -35,63 +28,18 @@ import LSP.L4.Rules (GetImportEdges (..))
 -- @\"eval\"@, a failed assertion at Error severity. Those are left out: a rule
 -- whose test verdict is FALSE is still a rule that can be deployed.
 --
--- The error on an @IMPORT@ of a module with errors (source @\"import\"@) is
--- left out too: it points at an error in that module, which is counted there.
+-- The error on an @IMPORT@ of a module with errors is left out too: it points
+-- at an error in that module, which is counted there. That goes by its code,
+-- because an @IMPORT@ that closes a ring of imports has the same source and
+-- nothing else reports the ring.
 isBlockingDiagnostic :: FileDiagnostic -> Bool
 isBlockingDiagnostic fd =
   fd.fdLspDiagnostic._severity == Just DiagnosticSeverity_Error
-    && fd.fdLspDiagnostic._source `notElem` [Just "eval", Just "import"]
+    && fd.fdLspDiagnostic._source /= Just "eval"
+    && fd.fdLspDiagnostic._code /= diagnosticCode "import/module-has-errors"
 
 hasBlockingError :: [FileDiagnostic] -> Bool
 hasBlockingError = any isBlockingDiagnostic
-
--- | The file and every module it imports, transitively, root first. Each module
--- appears once. The walk follows 'GetImportEdges', which needs only a first
--- parse of each module, so it reaches modules whose typecheck failed or that sit
--- in a cycle. A module that does not parse is included but not walked further.
-importClosure :: NormalizedUri -> Action [NormalizedUri]
-importClosure root = reverse . snd <$> go (Set.empty, []) root
-  where
-    go acc@(seen, out) uri
-      | uri `Set.member` seen = pure acc
-      | otherwise = do
-          edges <- fromMaybe [] <$> use GetImportEdges uri
-          foldM go (Set.insert uri seen, uri : out) (map snd edges)
-
--- | An @IMPORT@ that closes a cycle: the file it is in, its line (1-based, when
--- known), and the cycle from the imported module back to it, e.g.
--- @[dua, dub, dua]@.
-data ImportCycle = ImportCycle
-  { importer :: NormalizedUri
-  , line :: Maybe Int
-  , cycle :: [NormalizedUri]
-  }
-
--- | The import cycles reachable from the file, each reported once, at the
--- @IMPORT@ that closes it.
---
--- The engine reports a cycle as a raw exception on one of the modules in it,
--- which names rules and not files; this names the files. A module that imports
--- itself is left out: the engine reports that one in words.
-importCycles :: NormalizedUri -> Action [ImportCycle]
-importCycles root = reverse . snd <$> go [] (Set.empty, []) root
-  where
-    go path (done, out) uri
-      | uri `Set.member` done = pure (done, out)
-      | otherwise = do
-          edges <- fromMaybe [] <$> use GetImportEdges uri
-          let path' = uri : path
-              step acc@(done', out') (range, target)
-                | target == uri = pure acc
-                | target `elem` path' =
-                    pure (done', ImportCycle
-                      { importer = uri
-                      , line = (.start.line) <$> range
-                      , cycle = dropWhile (/= target) (reverse path') <> [target]
-                      } : out')
-                | otherwise = go path' acc target
-          (done', out') <- foldM step (done, out) edges
-          pure (Set.insert uri done', out')
 
 -- | The blocking diagnostics among the given ones that belong to a file in the
 -- closure.

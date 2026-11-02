@@ -14,6 +14,8 @@ import L4.TracePolicy (lspDefaultPolicy)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Export (ExportedFunction (..))
 import qualified L4.Export as Export
+import qualified L4.Export.Document as Doc
+import qualified L4.Export.Render as Render
 import L4.JsonSchema (SchemaContext (..))
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
@@ -91,6 +93,12 @@ main = do
       corpusNonEmpty "hover"           hoverFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
+    -- The legal examples are what a reader of a rendered document sees. A change
+    -- to the wording shows here as a diff, line by line, across all of them.
+    describe "rendered documents" $
+      forM_ legalFiles $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4RenderGolden evalConfig (takeDirectory inputFile </> "tests") inputFile
     -- Invariant: exactprint is the identity on the source for every parseable
     -- corpus file. This is the single guard against the whole class of
     -- format-mangling bugs (mixfix/event reordering, dropped TIMEZONE/DECIDE
@@ -229,6 +237,49 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
       , actualFile = Just (dir </> takeFileName inputFile -<.> "nlg.actual")
       , failFirstTime = True
       }
+
+-- | What @l4 render --format text@ prints for a file, then what it left out: every
+-- definition appears exactly once, or is named here.
+jl4RenderGolden :: JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden Text)
+jl4RenderGolden evalConfig dir inputFile = do
+  (_, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.SuccessfulTypeCheck uri
+  let output = normalizeWhitespace $ case moutput of
+        Nothing -> "Cannot render a module that doesn't typecheck\n"
+        Just checkResult ->
+          let rawDeps = map (.module') (Rules.transitiveDependencies checkResult)
+              cfg = Doc.defaultExportConfig
+                { Doc.moduleDispositions = Doc.hiddenImports (const False) rawDeps
+                , Doc.mixfixHeadings = Doc.mixfixHeadingsFromRegistry checkResult.mixfixRegistry
+                }
+              (mainModule, deps) = Nlg.prepareModules Nothing checkResult.module' rawDeps
+              doc = Doc.buildDocument cfg mainModule deps
+          in Render.renderText Render.defaultRenderConfig doc
+               <> coverageNote (Doc.buildPlan cfg mainModule deps) doc
+  pure
+    Golden
+      { output
+      , encodePretty = Text.unpack
+      , writeToFile = Text.writeFile
+      , readFromFile = fmap normalizeWhitespace . Text.readFile
+      , goldenFile = dir </> takeFileName inputFile -<.> "render.golden"
+      , actualFile = Just (dir </> takeFileName inputFile -<.> "render.actual")
+      , failFirstTime = True
+      }
+
+-- | Which of a module's definitions a document does not show once.
+coverageNote :: Doc.ExportPlan -> Doc.Document -> Text
+coverageNote plan doc =
+  "\n\nCoverage\n" <> Text.unlines
+    ( [ "left out: " <> u.planHeading | u <- units, u.planId `notElem` shown ]
+   <> [ "shown twice: " <> u.planHeading | u <- units, length (filter (== u.planId) shown) > 1 ]
+    )
+ where
+  units = [ u | m <- plan.planModules, m.planModuleIsMain, u <- m.planUnits ]
+  shown = concatMap sectionIds doc.docSections
+  sectionIds s = [ b.blockId | g <- s.sectionGroups, b <- g.groupBlocks ] <> concatMap sectionIds s.sectionSubs
 
 jl4JsonSchemaGolden :: JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden String)
 jl4JsonSchemaGolden evalConfig dir inputFile = do

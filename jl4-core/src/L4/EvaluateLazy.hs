@@ -18,6 +18,8 @@ module L4.EvaluateLazy
 , refusalMarker
 , parseRefusalMarker
 , Refusal(..)
+, evalDirectiveCode
+, evalExceptionCode
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
 , prettyAssertionOutcome
@@ -268,6 +270,21 @@ data ReductionOutcome
   | ReducedErrored !EvalException
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The stable diagnostic code of a directive's outcome. See
+-- 'L4.TypeCheck.Types.checkErrorCode' for what a code promises. A directive
+-- that raised has the code of what it raised, an @#ASSERT@ included: that is
+-- neither a pass nor a failed verdict.
+evalDirectiveCode :: EvalDirectiveValue -> Text
+evalDirectiveCode = \ case
+  Assertion Holds              -> "eval/assertion-passed"
+  Assertion Fails              -> "eval/assertion-failed"
+  Assertion (FailsBecause _)   -> "eval/assertion-failed"
+  Assertion (Refused _)        -> "eval/refused"
+  Assertion (Errored exc)      -> evalExceptionCode exc
+  Reduction (Reduced _)        -> "eval/result"
+  Reduction (ReducedRefused _) -> "eval/refused"
+  Reduction (ReducedErrored exc) -> evalExceptionCode exc
 
 prettyEvalDirectiveValue :: EvalDirectiveValue -> Text
 prettyEvalDirectiveValue (Assertion a) = prettyAssertionOutcome a

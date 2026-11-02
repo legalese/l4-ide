@@ -27,7 +27,7 @@ This repository contains the L4 compiler, IDE tooling (VS Code extension, LSP, R
 ## Getting Started
 
 - **Install the VS Code extension:** [L4 Rules-as-code on the Marketplace](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode)
-- **Try the web editor:** <https://jl4.legalese.com/>
+- **Try the web editor:** <https://play.legalese.com/>
 - **Learn L4:** [Foundation Course](https://legalese.com/l4/courses/foundation) — no prior programming experience required
 - **Deploy your L4 projects to Legalese Cloud:** [Deploy your rules](https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment) — publish rules as APIs that apps and AI agents can call
 - **Full documentation:** [legalese.com/l4](https://legalese.com/l4)
@@ -43,7 +43,6 @@ This repository contains the L4 compiler, IDE tooling (VS Code extension, LSP, R
 | [jl4-lsp](jl4-lsp/)                       | Language Server Protocol for IDE support                 |
 | [jl4-repl](jl4-repl/)                     | Interactive REPL                                         |
 | [jl4-service](jl4-service/)               | REST API for decision evaluation                         |
-| [jl4-websessions](jl4-websessions/)       | Session persistence service                              |
 | [jl4-query-plan](jl4-query-plan/)         | Query planning utilities                                 |
 | [jl4-actus-analyzer](jl4-actus-analyzer/) | Static analyzer classifying L4 contracts by ACTUS / FIBO |
 | [jl4-wasm](jl4-wasm/)                     | WebAssembly build of L4 for browser/Node.js              |

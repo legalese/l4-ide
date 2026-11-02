@@ -9,24 +9,29 @@ IMPORT prelude
 §§ `Constants`
 
 DECLARE EULER IS A NUMBER
+@nlg Euler's number
 EULER MEANS 2.718281828459045
 
 DECLARE TAN_EPSILON IS A NUMBER
+@nlg the tolerance below which a cosine counts as zero
 TAN_EPSILON MEANS 0.000000001
 
 §§ `Exponential & Logarithmic`
 
 GIVEN x IS A NUMBER
 GIVETH A NUMBER
+@nlg e raised to the power of %x%
 exp x MEANS EXPONENT EULER x
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the natural logarithm of %x%
 ln x MEANS
   IF x AT MOST 0 THEN NOTHING ELSE JUST (LN x)
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the base-10 logarithm of %x%
 log10 x MEANS
   IF x AT MOST 0 THEN NOTHING ELSE JUST (LOG10 x)
 
@@ -46,14 +51,17 @@ absNumber value @nlg the absolute value of %value%
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the sine of %x%
 sin x MEANS JUST (SIN x)
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the cosine of %x%
 cos x MEANS JUST (COS x)
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the tangent of %x%
 tan x MEANS
   IF absNumber (COS x) LESS THAN TAN_EPSILON
     THEN NOTHING
@@ -61,6 +69,7 @@ tan x MEANS
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the arcsine of %x%
 asin x MEANS
   IF x LESS THAN 0 MINUS 1
     THEN NOTHING
@@ -68,6 +77,7 @@ asin x MEANS
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the arccosine of %x%
 acos x MEANS
   IF x LESS THAN 0 MINUS 1
     THEN NOTHING
@@ -75,4 +85,5 @@ acos x MEANS
 
 GIVEN x IS A NUMBER
 GIVETH A MAYBE NUMBER
+@nlg the arctangent of %x%
 atan x MEANS JUST (ATAN x)

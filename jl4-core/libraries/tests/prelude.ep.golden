@@ -6,6 +6,7 @@ GIVEN
   a IS A TYPE
   x IS AN a
 GIVETH AN a
+@nlg %x%
 id x MEANS x
 
 GIVEN
@@ -14,6 +15,7 @@ GIVEN
   x IS AN a
   y IS A b
 GIVETH AN a
+@nlg %x%, whatever %y% is
 const x y MEANS x
 
 §§ `Lists — Queries & Folds`
@@ -73,6 +75,7 @@ append list1 list2 @nlg %list1% followed by %list2%
 GIVEN x IS A STRING
       y IS A STRING
 GIVETH A STRING
+@nlg %x% followed by %y%
 x APPEND y MEANS CONCAT x, y
 
 GIVEN
@@ -484,6 +487,7 @@ GIVEN
   nothing IS A b
   x       IS A MAYBE a
 GIVETH A b
+@nlg %just% applied to %x% if it is present, otherwise %nothing%
 maybe just nothing x MEANS
   CONSIDER x
   WHEN NOTHING THEN nothing
@@ -524,6 +528,7 @@ GIVEN
   a       IS A TYPE
   x       IS A MAYBE a
 GIVETH A LIST OF a
+@nlg a list holding %x% if it is present, otherwise an empty list
 maybeToList x MEANS
   CONSIDER x
   WHEN NOTHING THEN EMPTY
@@ -533,6 +538,7 @@ GIVEN
   a       IS A TYPE
   list    IS A LIST OF a
 GIVETH A MAYBE OF a
+@nlg the first item of %list%, if there is one
 listToMaybe list MEANS
   CONSIDER list
   WHEN EMPTY            THEN NOTHING
@@ -605,6 +611,7 @@ GIVEN
   f    IS A FUNCTION FROM b TO c
   p    IS A PAIR OF a, b
 GIVETH PAIR OF a, c
+@nlg %p% with %f% applied to its second part
 pmap f p MEANS
   CONSIDER p
     WHEN PAIR OF k,   v
@@ -683,6 +690,7 @@ GIVEN
   right IS A FUNCTION FROM b TO c
   x IS AN EITHER a b
 GIVETH A c
+@nlg %left% or %right% applied to %x%, according to which side it holds
 either left right x MEANS
   CONSIDER x
   WHEN LEFT  a THEN left  a
@@ -763,6 +771,7 @@ ASSUME TBD
 GIVEN a IS A MAYBE NUMBER
       b IS A MAYBE NUMBER
 GIVETH A BOOLEAN
+@nlg %a% is at least %b%
 `__GEQ__` MEANS
         CONSIDER a
         WHEN NOTHING THEN FALSE
@@ -773,6 +782,7 @@ GIVETH A BOOLEAN
 GIVEN a IS A MAYBE NUMBER
       b IS A MAYBE NUMBER
 GIVETH A BOOLEAN
+@nlg %a% is at most %b%
 `__LEQ__` MEANS
         CONSIDER a
         WHEN NOTHING THEN FALSE
@@ -783,6 +793,7 @@ GIVETH A BOOLEAN
 GIVEN a IS A MAYBE NUMBER
       b IS A MAYBE NUMBER
 GIVETH A BOOLEAN
+@nlg %a% is less than %b%
 `__LT__` MEANS
         CONSIDER a
         WHEN NOTHING THEN FALSE
@@ -793,6 +804,7 @@ GIVETH A BOOLEAN
 GIVEN a IS A MAYBE NUMBER
       b IS A MAYBE NUMBER
 GIVETH A BOOLEAN
+@nlg %a% is more than %b%
 `__GT__` MEANS
         CONSIDER a
         WHEN NOTHING THEN FALSE
@@ -813,27 +825,33 @@ GIVEN  a IS A TYPE
        b IS A TYPE
        k IS AN a
        v IS A  b 
+@nlg a dictionary mapping %k% to %v%
 singleToDict MEANS  Dictionary WITH contents IS LIST (PAIR OF k, v)
 
 GIVEN k IS A TYPE
       v IS A TYPE
       pair IS A PAIR OF k, v
+@nlg a dictionary holding the entry %pair%
 pairToDict MEANS  Dictionary WITH contents IS LIST pair
 
 GIVEN k IS A TYPE
       v IS A TYPE
       pairs IS A LIST OF PAIR OF k, v
+@nlg a dictionary holding the entries %pairs%
 listToDict MEANS  Dictionary WITH contents IS pairs
 
+@nlg a dictionary
 fromList MEANS listToDict
 
 -- Dictionary: empty
 GIVEN k IS A TYPE
       v IS A TYPE
 GIVETH A Dictionary k v
+@nlg an empty dictionary
 emptyDict MEANS Dictionary WITH contents IS EMPTY
 
 -- Dictionary: singleton (alias for singleToDict)
+@nlg a one-entry dictionary
 singleton MEANS singleToDict
 
 -- Dictionary: dictToList (extract contents)
@@ -841,6 +859,7 @@ GIVEN k IS A TYPE
       v IS A TYPE
       dict IS A Dictionary k v
 GIVETH A LIST OF PAIR OF k, v
+@nlg the entries of %dict%
 dictToList dict MEANS dict's contents
 
 -- Dictionary: dictKeys (extract all keys)
@@ -848,6 +867,7 @@ GIVEN k IS A TYPE
       v IS A TYPE
       dict IS A Dictionary k v
 GIVETH A LIST OF k
+@nlg the keys of %dict%
 dictKeys dict MEANS map fst (dict's contents)
 
 -- Dictionary: dictElems (extract all values)
@@ -855,6 +875,7 @@ GIVEN k IS A TYPE
       v IS A TYPE
       dict IS A Dictionary k v
 GIVETH A LIST OF v
+@nlg the values of %dict%
 dictElems dict MEANS map snd (dict's contents)
 
 -- Dictionary: dictSize (count entries)
@@ -862,6 +883,7 @@ GIVEN k IS A TYPE
       v IS A TYPE
       dict IS A Dictionary k v
 GIVETH A NUMBER
+@nlg the number of entries in %dict%
 dictSize dict MEANS go 0 (dict's contents)
   WHERE
     go acc list MEANS
@@ -874,6 +896,7 @@ GIVEN k IS A TYPE
       v IS A TYPE
       dict IS A Dictionary k v
 GIVETH A BOOLEAN
+@nlg %dict% is empty
 dictIsEmpty dict MEANS null (dict's contents)
 
 -- Dictionary: lookup (query by key, returns MAYBE)
@@ -882,6 +905,7 @@ GIVEN k IS A TYPE
       key IS A k
       dict IS A Dictionary k v
 GIVETH A MAYBE v
+@nlg the value of %key% in %dict%, if it has one
 dictLookup key dict MEANS lookup key (dict's contents)
 
 -- Dictionary: dictMember (test if key exists)
@@ -890,6 +914,7 @@ GIVEN k IS A TYPE
       key IS A k
       dict IS A Dictionary k v
 GIVETH A BOOLEAN
+@nlg %key% is a key of %dict%
 dictMember key dict MEANS isJust (dictLookup key dict)
 
 -- Dictionary: dictNotMember (test if key does not exist)
@@ -898,6 +923,7 @@ GIVEN k IS A TYPE
       key IS A k
       dict IS A Dictionary k v
 GIVETH A BOOLEAN
+@nlg %key% is not a key of %dict%
 dictNotMember key dict MEANS NOT dictMember key dict
 
 -- Dictionary: dictFindWithDefault (lookup with default)
@@ -907,6 +933,7 @@ GIVEN k IS A TYPE
       key IS A k
       dict IS A Dictionary k v
 GIVETH A v
+@nlg the value of %key% in %dict%, or %default% if it has none
 dictFindWithDefault default key dict MEANS fromMaybe default (dictLookup key dict)
 
 -- Dictionary: dictInsert (add or replace entry)
@@ -916,6 +943,7 @@ GIVEN k IS A TYPE
       value IS A v
       dict IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg %dict% with %key% set to %value%
 dictInsert key value dict MEANS Dictionary WITH contents IS go (dict's contents)
   WHERE
     go list MEANS
@@ -934,6 +962,7 @@ GIVEN k IS A TYPE
       value IS A v
       dict IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg %dict% with %key% set to %value%, combined by %combiner% with any value already there
 dictInsertWith combiner key value dict MEANS Dictionary WITH contents IS go (dict's contents)
   WHERE
     go list MEANS
@@ -950,6 +979,7 @@ GIVEN k IS A TYPE
       key IS A k
       dict IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg %dict% without %key%
 dictDelete key dict MEANS Dictionary WITH contents IS go (dict's contents)
   WHERE
     go list MEANS
@@ -967,6 +997,7 @@ GIVEN k IS A TYPE
       key IS A k
       dict IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg %dict% with %f% applied to the value of %key%
 dictAdjust f key dict MEANS Dictionary WITH contents IS go (dict's contents)
   WHERE
     go list MEANS
@@ -984,6 +1015,7 @@ GIVEN k IS A TYPE
       key IS A k
       dict IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg %dict% with the value of %key% updated by %f%
 dictUpdate f key dict MEANS Dictionary WITH contents IS go (dict's contents)
   WHERE
     go list MEANS
@@ -1002,6 +1034,7 @@ GIVEN k IS A TYPE
       dict1 IS A Dictionary k v
       dict2 IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg %dict1% together with %dict2%, keeping the value in %dict1% where both have a key
 dictUnion dict1 dict2 MEANS
   foldl (GIVEN acc, pair YIELD CONSIDER pair WHEN PAIR OF key, val THEN dictInsert key val acc)
         dict2
@@ -1014,6 +1047,7 @@ GIVEN k IS A TYPE
       dict1 IS A Dictionary k v
       dict2 IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg %dict1% together with %dict2%, combining the values of shared keys with %combiner%
 dictUnionWith combiner dict1 dict2 MEANS
   foldl (GIVEN acc, pair YIELD
            CONSIDER pair
@@ -1028,6 +1062,7 @@ GIVEN k IS A TYPE
       f IS A FUNCTION FROM v TO w
       dict IS A Dictionary k v
 GIVETH A Dictionary k w
+@nlg %dict% with %f% applied to each value
 mapDict f dict MEANS Dictionary WITH contents IS map (GIVEN p YIELD CONSIDER p WHEN PAIR OF key, val THEN PAIR OF key, f val) (dict's contents)
 
 -- Dictionary: dictMapWithKey (map over values with access to key)
@@ -1037,6 +1072,7 @@ GIVEN k IS A TYPE
       f IS A FUNCTION FROM k AND v TO w
       dict IS A Dictionary k v
 GIVETH A Dictionary k w
+@nlg %dict% with %f% applied to each key and value
 dictMapWithKey f dict MEANS Dictionary WITH contents IS map (GIVEN p YIELD CONSIDER p WHEN PAIR OF key, val THEN PAIR OF key, f key val) (dict's contents)
 
 -- Dictionary: filterDict (filter entries by value predicate)
@@ -1045,6 +1081,7 @@ GIVEN k IS A TYPE
       pred IS A FUNCTION FROM v TO BOOLEAN
       dict IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg the entries of %dict% whose value satisfies %pred%
 filterDict pred dict MEANS Dictionary WITH contents IS filter (GIVEN p YIELD CONSIDER p WHEN PAIR OF key, val THEN pred val) (dict's contents)
 
 -- Dictionary: dictFilterWithKey (filter entries by key-value predicate)
@@ -1053,6 +1090,7 @@ GIVEN k IS A TYPE
       pred IS A FUNCTION FROM k AND v TO BOOLEAN
       dict IS A Dictionary k v
 GIVETH A Dictionary k v
+@nlg the entries of %dict% whose key and value satisfy %pred%
 dictFilterWithKey pred dict MEANS Dictionary WITH contents IS filter (GIVEN p YIELD CONSIDER p WHEN PAIR OF key, val THEN pred key val) (dict's contents)
 
 -- Dictionary: foldrDict (right fold over values)
@@ -1063,6 +1101,7 @@ GIVEN k IS A TYPE
       z IS AN r
       dict IS A Dictionary k v
 GIVETH AN r
+@nlg the values of %dict% combined from the right with %f%, starting from %z%
 foldrDict f z dict MEANS foldr (GIVEN p, acc YIELD CONSIDER p WHEN PAIR OF key, val THEN f val acc) z (dict's contents)
 
 -- Dictionary: foldlDict (left fold over values)
@@ -1073,6 +1112,7 @@ GIVEN k IS A TYPE
       z IS AN r
       dict IS A Dictionary k v
 GIVETH AN r
+@nlg the values of %dict% combined from the left with %f%, starting from %z%
 foldlDict f z dict MEANS foldl (GIVEN acc, p YIELD CONSIDER p WHEN PAIR OF key, val THEN f acc val) z (dict's contents)
 
 -- Dictionary: dictFoldrWithKey (right fold with keys)
@@ -1083,6 +1123,7 @@ GIVEN k IS A TYPE
       z IS AN r
       dict IS A Dictionary k v
 GIVETH AN r
+@nlg the entries of %dict% combined from the right with %f%, starting from %z%
 dictFoldrWithKey f z dict MEANS foldr (GIVEN p, acc YIELD CONSIDER p WHEN PAIR OF key, val THEN f key val acc) z (dict's contents)
 
 -- Dictionary: dictFoldlWithKey (left fold with keys)
@@ -1093,6 +1134,7 @@ GIVEN k IS A TYPE
       z IS AN r
       dict IS A Dictionary k v
 GIVETH AN r
+@nlg the entries of %dict% combined from the left with %f%, starting from %z%
 dictFoldlWithKey f z dict MEANS foldl (GIVEN acc, p YIELD CONSIDER p WHEN PAIR OF key, val THEN f acc key val) z (dict's contents)
 
 -- Grouping: insertValue (insert into grouped association list)
@@ -1103,6 +1145,7 @@ GIVEN k IS A TYPE
       value IS A v
       dictPairs IS A LIST OF PAIR OF k, LIST OF v
 GIVETH A LIST OF PAIR OF k, LIST OF v
+@nlg %dictPairs% with %value% added under %key%
 insertValue key value dictPairs MEANS
   CONSIDER dictPairs
     WHEN EMPTY
@@ -1118,6 +1161,7 @@ GIVEN k IS A TYPE
       v IS A TYPE
       pairs IS A LIST OF PAIR OF k, v
 GIVETH A LIST OF PAIR OF k, LIST OF v
+@nlg the values of %pairs% grouped by key
 groupPairs pairs MEANS go EMPTY pairs
   WHERE
     go acc list MEANS
@@ -1131,12 +1175,15 @@ GIVEN k IS A TYPE
       v IS A TYPE
       pairs IS A LIST OF PAIR OF k, v
 GIVETH A Dictionary k (LIST OF v)
+@nlg a dictionary of the values of %pairs% grouped by key
 fromListGrouped pairs MEANS Dictionary WITH contents IS groupPairs pairs
 
 -- Pair: mapSnd (map over second element - alias for pmap)
+@nlg a pair transformed in its second part
 mapSnd MEANS pmap
 
 -- Pair: mapPairs (map over second element of each pair - alias for fmap on pairs)
 -- Note: This is fmap specialized to List of Pairs
+@nlg pairs transformed in their second parts
 mapPairs MEANS fmap
 

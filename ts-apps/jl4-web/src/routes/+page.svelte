@@ -22,8 +22,16 @@
   import { LadderApiForMonaco } from '$lib/ladder-api-for-monaco'
   import { MonacoErrorLens } from '@ym-han/monaco-error-lens'
 
-  import { defaultExample, type LegalExample } from '$lib/legal-examples'
-  import ExampleSelector from '$lib/components/example-selector.svelte'
+  // Kept with the test corpus, so CI keeps it compiling
+  import starterProgram from '../../../../jl4/examples/legal/library-card.l4?raw'
+  import {
+    getTurnstileToken,
+    warmUpTurnstileToken,
+    type TurnstileHost,
+  } from '$lib/turnstile'
+  import SharePanel, {
+    type ShareStatus,
+  } from '$lib/components/share-panel.svelte'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import {
     EvalDirectiveResultRequestType,
@@ -53,7 +61,8 @@
   // `persistSession` does not need to be reactive
   let persistSession: undefined | (() => Promise<string | undefined>) =
     undefined
-  const sessionUrl = import.meta.env.VITE_SESSION_URL || 'http://localhost:5008'
+  const sessionUrl = import.meta.env.VITE_SESSION_URL
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
 
   let currentFunctionName: string | null = $state(null)
   let currentVerDocId: { uri: string; version: number } | null = null
@@ -63,15 +72,63 @@
   let queryPlanNeedsRerun = false
 
   let persistButtonBlocked = $state(false)
+  let shareStatus: ShareStatus = $state('closed')
+  let shareLink = $state('')
+  let turnstileNeedsClick = $state(false)
+  let shareButton: HTMLButtonElement | undefined = $state(undefined)
+  /* Always there alongside the Share button, like editorElement below */
+  let turnstileElement: HTMLDivElement = $state(
+    undefined as unknown as HTMLDivElement
+  )
+  let canUndo = $state(false)
+  let canRedo = $state(false)
+  let firstVersionId = 0
+  let lastVersionId = 0
 
   // Set from URL search params as early as possible to avoid flicker
   const ownUrl = new URL(window.location.href)
 
+  // Fetched while the editor loads, so the editor opens with the shared
+  // program instead of showing the starter program first
+  const sharedProgramId = ownUrl.searchParams.get('id')
+  const sharedProgram =
+    sharedProgramId && sessionUrl
+      ? loadSharedProgram(sessionUrl, sharedProgramId)
+      : undefined
+
+  type SharedProgram =
+    | { status: 'found'; program: string }
+    | { status: 'missing' }
+    | { status: 'failed'; reason: string }
+
+  async function loadSharedProgram(
+    url: string,
+    id: string
+  ): Promise<SharedProgram> {
+    try {
+      const response = await fetch(`${url}?id=${encodeURIComponent(id)}`)
+      if (response.ok) {
+        return { status: 'found', program: await response.json() }
+      }
+      if (response.status === 404 || response.status === 400) {
+        return { status: 'missing' }
+      }
+      // Throttled or a server error: keep the id so a reload can retry
+      return { status: 'failed', reason: `status ${response.status}` }
+    } catch (e) {
+      return { status: 'failed', reason: `${e}` }
+    }
+  }
+
   let showFrame = $state(!ownUrl.searchParams.has('standalone'))
-  let showExamples = $state(!ownUrl.searchParams.has('no-examples'))
-  let showSidebar = $state(
-    window.innerWidth < 1024 ? false : !ownUrl.searchParams.has('no-examples')
-  )
+  // `no-examples` predates the docs sidebar; existing embeds use it to hide the sidebar
+  const showDocsToggle = !ownUrl.searchParams.has('no-examples')
+  const docsUrl = 'https://legalese.com/l4'
+  const docsOrigin = new URL(docsUrl).origin
+  let showSidebar = $state(false)
+  // The docs iframe stays mounted once opened, so reopening keeps the reader's place
+  let docsOpened = $state(false)
+  let docsFrame: HTMLIFrameElement | undefined = $state(undefined)
   let showVisualizer = $state(false)
   let rightPaneView: 'ladder' | 'inspector' = $state('ladder')
   let inspectorPanel: InspectorPanel | undefined = $state(undefined)
@@ -173,7 +230,7 @@
   let monacoL4LangClient: MonacoL4LanguageClient | undefined
   let monacoErrorLens: MonacoErrorLens | undefined
   let lspConnection: LspConnectionResult | undefined
-  let renderResultCommandDisposable: vscode.Disposable | undefined
+  let lirSubscription: ReturnType<LirRegistry['subscribe']> | undefined
 
   function bindingsKey(bindings: Record<string, boolean>) {
     const entries = Object.entries(bindings).sort(([a], [b]) =>
@@ -284,7 +341,7 @@
     )
     const { ConsoleLogger } = await import('monaco-languageclient/tools')
 
-    // Get LSP connection configuration (supports WebSocket or WASM)
+    // Get the LSP connection configuration
     const lspConfig = getDefaultConfig()
 
     const runClient = async () => {
@@ -350,8 +407,28 @@
         },
       })
 
+      // The program to open with: a #program= fragment, else ?program=, else
+      // the shared ?id=, else the starter program
+      const shared = await sharedProgram
+      let queryProgram: string | undefined
+      const programParam = ownUrl.searchParams.get('program')
+      if (programParam) {
+        try {
+          queryProgram = decodeURIComponent(programParam)
+        } catch (e) {
+          logger.error(`could not decode program from url param, error: ${e}`)
+        }
+      }
+      const fragmentProgram = programFromFragment(ownUrl)
+      const initialProgram =
+        fragmentProgram ??
+        queryProgram ??
+        (shared?.status === 'found' && shared.program
+          ? shared.program
+          : starterProgram)
+
       editor = monaco.editor.create(editorElement, {
-        value: defaultExample.content,
+        value: initialProgram,
         language: 'jl4',
         automaticLayout: true,
         wordBasedSuggestions: 'currentDocument',
@@ -360,6 +437,11 @@
         glyphMargin: true, // Required for gutter icons
         codeLens: true, // Enable code lenses for visualization actions
       })
+
+      refreshHistoryButtons(true)
+      editor.onDidChangeModelContent((event) =>
+        refreshHistoryButtons(event.isFlush)
+      )
 
       // Prevent the suggestion widget from auto-popping after Enter (new line).
       // When the widget IS visible, this command doesn't fire so Enter still accepts suggestions.
@@ -461,130 +543,86 @@
         }
       )
 
-      const sessionid: string | null = ownUrl.searchParams.get('id')
-      if (sessionid) {
-        const response = await fetch(`${sessionUrl}?id=${sessionid}`)
-        logger.debug('sent GET for session')
-        if (response.ok) {
-          const prog = await response.json()
-          if (prog) {
-            editor.setValue(prog)
-          }
-        } else {
-          logger.debug('response was not okay - deleting search param')
-          ownUrl.searchParams.delete('id')
-          history.pushState(null, '', ownUrl)
-        }
+      if (shared?.status === 'missing') {
+        logger.debug('no such session - deleting search param')
+        ownUrl.searchParams.delete('id')
+        history.pushState(null, '', ownUrl)
+      } else if (shared?.status === 'failed') {
+        logger.error(
+          `could not load session ${sharedProgramId}, ${shared.reason}`
+        )
+        toast.push('Could not load the shared program. Reload to try again.')
       }
 
-      const programParam: string | null = ownUrl.searchParams.get('program')
       if (programParam) {
-        try {
-          const decoded = decodeURIComponent(programParam)
-          editor.setValue(decoded)
-        } catch (e) {
-          logger.error(`could not decode program from url param, error: ${e}`)
-        }
         ownUrl.searchParams.delete('program')
         history.replaceState(null, '', ownUrl)
       }
 
+      if (fragmentProgram !== undefined) {
+        clearProgramFragment()
+      }
+
       persistSession = async () => {
-        if (!editor) return undefined
+        if (!editor || !sessionUrl) return undefined
         const bufferContent: string = editor.getValue()
-        const response = await fetch(sessionUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bufferContent),
-        })
-        logger.debug('sent POST for session')
-        const newSessionId: string = await response.json()
-        if (newSessionId) {
-          logger.debug(`new session id: ${newSessionId}`)
-          return newSessionId
-        } else {
-          logger.error(`response was not present`)
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          }
+          if (turnstileSiteKey) {
+            headers['X-Turnstile-Token'] = await getTurnstileToken(
+              turnstileSiteKey,
+              turnstileHost()
+            )
+          }
+          const response = await fetch(sessionUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(bufferContent),
+          })
+          logger.debug('sent POST for session')
+          if (!response.ok) {
+            logger.error(`session POST failed with status ${response.status}`)
+            return undefined
+          }
+          const newSessionId: string = await response.json()
+          if (newSessionId) {
+            logger.debug(`new session id: ${newSessionId}`)
+            return newSessionId
+          } else {
+            logger.error(`response was not present`)
+            return undefined
+          }
+        } catch (e) {
+          logger.error(`could not persist session, error: ${e}`)
           return undefined
         }
       }
 
-      // Initialize LSP connection using the factory
-      // This abstracts over WebSocket vs WASM connection types
+      // Start the language server (WASM, in the browser)
       await initLspConnection(logger, lspConfig)
     }
 
     /**
-     * Initialize LSP connection using the connection factory.
-     * Supports both WebSocket (current) and WASM (future) connection types.
+     * Initialize the LSP connection using the connection factory.
      */
     const initLspConnection = async (
       logger: ConsoleLogger,
       config: ReturnType<typeof getDefaultConfig>
     ): Promise<void> => {
       try {
-        logger.info(
-          `[L4 LSP] Connecting with preferred type: ${config.preferredType}`
-        )
+        logger.info(`[L4 LSP] Connecting to WASM ${config.wasmVersion}`)
 
         lspConnection = await createLspConnection(config)
 
-        logger.info(`[L4 LSP] Connected via ${lspConnection.type}`)
+        logger.info('[L4 LSP] Connected via wasm')
 
         const languageClient = createLanguageClient(
           logger,
           lspConnection.transports
         )
         await languageClient.start()
-
-        // For websocket LSP: Haskell server doesn't declare executeCommandProvider,
-        // so l4.renderResult is never registered by the language client.
-        // Register it manually so codelens clicks work.
-        if (lspConnection.type === 'websocket') {
-          renderResultCommandDisposable = vscode.commands.registerCommand(
-            'l4.renderResult',
-            async (...args: unknown[]) => {
-              if (!monacoL4LangClient) return
-              const [verDocId, srcPos, directiveType] = args as [
-                { uri: string; version: number },
-                SrcPos,
-                string,
-              ]
-              try {
-                const result = await monacoL4LangClient.sendRequest(
-                  EvalDirectiveResultRequestType,
-                  { verDocId, srcPos, directiveType }
-                )
-                if (result) {
-                  rightPaneView = 'inspector'
-                  showVisualizer = true
-                  await tick()
-                  const directiveId = `${srcPos.line}:${srcPos.column}`
-                  // `body` is the directive's full source span — the
-                  // inclusive [range.start.line .. range.end.line]
-                  // slice joined by '\n', read from the live editor
-                  // model. Multi-line directives stay distinct from
-                  // visually identical leading lines.
-                  const directiveResult = result as DirectiveResult
-                  const body = sliceBodyFromModel(
-                    editor?.getModel() ?? null,
-                    directiveResult.range
-                  )
-                  const fileUri =
-                    editor?.getModel()?.uri.toString() ?? verDocId.uri
-                  inspectorPanel?.addOrScrollToResult(
-                    directiveId,
-                    srcPos,
-                    directiveResult,
-                    body,
-                    fileUri
-                  )
-                }
-              } catch (e) {
-                logger.error(`l4.renderResult failed: ${e}`)
-              }
-            }
-          )
-        }
 
         // Handle connection close
         lspConnection.transports.reader.onClose(() => {
@@ -809,18 +847,17 @@
     await runClient()
     console.log('✅ runClient() completed')
 
-    const sub = lirRegistry.subscribe((_ctx, id) => {
+    // Unsubscribed in onDestroy below: lifecycle functions can't be called after an await
+    lirSubscription = lirRegistry.subscribe((_ctx, id) => {
       if (!currentLadderGraphId) return
       if (!id.isEqualTo(currentLadderGraphId)) return
       scheduleQueryPlanRefresh()
     })
-
-    onDestroy(() => sub.unsubscribe())
   })
 
   onDestroy(() => {
-    renderResultCommandDisposable?.dispose()
-    renderResultCommandDisposable = undefined
+    lirSubscription?.unsubscribe()
+    lirSubscription = undefined
 
     if (monacoErrorLens) {
       monacoErrorLens.dispose()
@@ -868,35 +905,135 @@
     }, 0)
   }
 
-  async function handleShare() {
-    const sessionId = await handlePersist()
-    if (sessionId) {
-      const shareUrl = `${window.location.origin}${window.location.pathname}?id=${sessionId}`
-      window.history.pushState(null, '', shareUrl)
-
-      if (navigator.share) {
-        navigator.share({
-          url: shareUrl,
-          text: 'L4 document',
-        })
-      }
-
-      await navigator.clipboard.writeText(shareUrl)
-      toast.push('Link copied to clipboard.', { duration: 4000 })
-    } else {
-      toast.push('Could not persist the file to generate a share link.')
+  // Most of a share's wait is the Turnstile check, so it starts when the
+  // pointer reaches Share (or Share gets focus) rather than on the click
+  function warmUpShare() {
+    if (turnstileSiteKey) {
+      warmUpTurnstileToken(turnstileSiteKey, turnstileHost())
     }
   }
 
-  function handleExampleSelect(example: LegalExample) {
-    if (showExamples && editor) {
-      editor.setValue(example.content)
-      inspectorPanel?.clear()
-
-      if (window.innerWidth <= 1023) {
-        showSidebar = false
-      }
+  function turnstileHost(): TurnstileHost {
+    return {
+      element: turnstileElement,
+      onInteractionChange: (needed) => {
+        turnstileNeedsClick = needed
+      },
     }
+  }
+
+  async function handleShare() {
+    shareStatus = 'working'
+    const sessionId = await handlePersist()
+    if (!sessionId) {
+      shareStatus = 'failed'
+      return
+    }
+    shareLink = `${window.location.origin}${window.location.pathname}?id=${sessionId}`
+    window.history.pushState(null, '', shareLink)
+    shareStatus = 'ready'
+
+    // The panel covers desktops; phones have a share sheet worth opening
+    if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+      navigator
+        .share({
+          url: shareLink,
+          text: 'L4 document',
+        })
+        .catch(() => {})
+    }
+  }
+
+  function triggerHistory(action: 'undo' | 'redo') {
+    if (!editor) return
+    editor.focus()
+    editor.trigger('toolbar', action, null)
+  }
+
+  // Undo and redo move the model's alternative version id back and forth, and
+  // a new edit gives it a new highest value. Replacing the whole program
+  // (setValue) clears the undo stack, so the buttons start over.
+  function refreshHistoryButtons(startOver: boolean) {
+    const versionId = editor?.getModel()?.getAlternativeVersionId() ?? 0
+    if (startOver) firstVersionId = lastVersionId = versionId
+    lastVersionId = Math.max(lastVersionId, versionId)
+    canUndo = versionId > firstVersionId
+    canRedo = versionId < lastVersionId
+  }
+
+  function toggleSidebar() {
+    showSidebar = !showSidebar
+    docsOpened ||= showSidebar
+  }
+
+  // The docs in the sidebar ask whether they're in the editor (l4-docs-hello).
+  // Once told, their "Run code" buttons send the example here
+  // (l4-open-program) instead of opening a new tab.
+  function handleDocsMessage(event: MessageEvent) {
+    if (event.origin !== docsOrigin) return
+    if (!docsFrame || event.source !== docsFrame.contentWindow) return
+    if (event.data?.type === 'l4-docs-hello') {
+      docsFrame.contentWindow?.postMessage(
+        { type: 'l4-editor-host' },
+        docsOrigin
+      )
+    } else if (
+      event.data?.type === 'l4-open-program' &&
+      typeof event.data.program === 'string'
+    ) {
+      openDocsExample(event.data.program)
+    }
+  }
+
+  function openDocsExample(program: string) {
+    const model = editor?.getModel()
+    if (!editor || !model) return
+    // An edit rather than setValue, so undo brings back the previous program
+    editor.pushUndoStop()
+    editor.executeEdits('docs-example', [
+      { range: model.getFullModelRange(), text: program },
+    ])
+    editor.pushUndoStop()
+    editor.setPosition({ lineNumber: 1, column: 1 })
+    editor.revealLine(1)
+    inspectorPanel?.clear()
+    // Below 1024px the sidebar covers the editor
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      showSidebar = false
+    }
+    toast.push('Opened the example. Undo brings back your program.', {
+      duration: 6000,
+    })
+  }
+
+  // A program too long for an 8 KB URL limit comes in the fragment,
+  // which never leaves the browser: #program=<encodeURIComponent(program)>
+  function programFromFragment(url: URL): string | undefined {
+    const encoded = url.hash.match(/^#program=(.*)$/)?.[1]
+    if (encoded === undefined) return undefined
+    try {
+      return decodeURIComponent(encoded)
+    } catch (e) {
+      console.error(`could not decode program from url fragment, error: ${e}`)
+      return undefined
+    }
+  }
+
+  function clearProgramFragment() {
+    const url = new URL(window.location.href)
+    url.hash = ''
+    history.replaceState(null, '', url)
+  }
+
+  // The docs open examples in a tab named l4-code. When that tab already
+  // shows the editor, a new #program= changes only the fragment, so the page
+  // doesn't load again.
+  function handleHashChange() {
+    if (!editor) return
+    const program = programFromFragment(new URL(window.location.href))
+    if (program === undefined) return
+    clearProgramFragment()
+    openDocsExample(program)
   }
 
   function handleLoadFile() {
@@ -1017,16 +1154,19 @@
   }
 </script>
 
+<svelte:window onmessage={handleDocsMessage} onhashchange={handleHashChange} />
+
 {#if showFrame}
   <div class="top-bar">
     <div>
       <h3>L4 Editor</h3>
     </div>
-    {#if showExamples}
+    {#if showDocsToggle}
       <button
         class="fab fab-sidebar {showSidebar ? 'open' : ''}"
-        onclick={() => (showSidebar = !showSidebar)}
-        aria-label="Toggle sidebar"
+        onclick={toggleSidebar}
+        aria-label="Toggle the L4 documentation"
+        title="L4 documentation"
       >
         <svg
           width="22"
@@ -1049,6 +1189,49 @@
       </button>
     {/if}
     <div class="spacer"></div>
+    <button
+      class="fab fab-history"
+      onclick={() => triggerHistory('undo')}
+      aria-label="Undo"
+      title="Undo"
+      disabled={!canUndo}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="8,5 3,10 8,15" />
+        <path d="M3 10H15A5.5 5.5 0 0 1 15 21H9" />
+      </svg>
+    </button>
+    <button
+      class="fab fab-history"
+      onclick={() => triggerHistory('redo')}
+      aria-label="Redo"
+      title="Redo"
+      disabled={!canRedo}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="16,5 21,10 16,15" />
+        <path d="M21 10H9A5.5 5.5 0 0 0 9 21H15" />
+      </svg>
+    </button>
+    <div class="top-bar-separator"></div>
     <button
       class="fab fab-load-file"
       onclick={handleLoadFile}
@@ -1141,38 +1324,58 @@
         Inspector
       </button>
     {/if}
-    <button
-      class="fab fab-share"
-      onclick={handleShare}
-      aria-label="Share the current file"
-      title="Share the current file"
-      disabled={persistButtonBlocked}
-    >
-      <svg
-        width="20"
-        height="20"
-        style="font-size: 24px; vertical-align: middle; margin-right: 0.2em;"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        stroke-width="1.3"
-        ><path
-          d="M6.99609 9L11.9961 4L16.9961 9M6.99609 9M12 16V4"
-          stroke="currentColor"
-        ></path><path
-          d="M4 15V16C4 18.2091 5.79086 20 8 20H16C18.2091 20 20 18.2091 20 16V15"
-          stroke="currentColor"
-        ></path></svg
+    {#if sessionUrl}
+      <button
+        bind:this={shareButton}
+        class="fab fab-share"
+        onclick={handleShare}
+        onpointerenter={warmUpShare}
+        onfocus={warmUpShare}
+        aria-label="Share the current file"
+        aria-busy={persistButtonBlocked}
+        title={persistButtonBlocked
+          ? 'Creating the share link…'
+          : 'Share the current file'}
+        disabled={persistButtonBlocked}
       >
-      Share
-    </button>
+        {#if persistButtonBlocked}
+          <span class="share-spinner" aria-hidden="true"></span>
+        {:else}
+          <svg
+            width="20"
+            height="20"
+            style="font-size: 24px; vertical-align: middle; margin-right: 0.2em;"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            stroke-width="1.3"
+            ><path
+              d="M6.99609 9L11.9961 4L16.9961 9M6.99609 9M12 16V4"
+              stroke="currentColor"
+            ></path><path
+              d="M4 15V16C4 18.2091 5.79086 20 8 20H16C18.2091 20 20 18.2091 20 16V15"
+              stroke="currentColor"
+            ></path></svg
+          >
+        {/if}
+        Share
+      </button>
+    {/if}
   </div>
-  {#if showExamples && showSidebar}
-    <div class="sidebar">
-      <ExampleSelector onExampleSelect={handleExampleSelect} />
+  {#if showDocsToggle && docsOpened}
+    <div class="sidebar" class:hidden-pane={!showSidebar}>
+      <!-- No allow-top-navigation: the docs can't navigate the editor away -->
+      <iframe
+        bind:this={docsFrame}
+        class="docs-frame"
+        src={docsUrl}
+        title="L4 documentation"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        referrerpolicy="strict-origin-when-cross-origin"
+      ></iframe>
     </div>
   {/if}
-  <div class="panes">
+  <div class="panes" class:with-sidebar={showSidebar}>
     <Resizable.PaneGroup direction="horizontal" bind:this={paneGroup}>
       <Resizable.Pane defaultSize={showVisualizer ? 50 : 100}>
         <div id="jl4-editor" class="h-full" bind:this={editorElement}></div>
@@ -1237,6 +1440,18 @@
   </div>
 {/if}
 
+{#if showFrame && sessionUrl}
+  <SharePanel
+    status={shareStatus}
+    link={shareLink}
+    needsClick={turnstileNeedsClick}
+    onClose={() => (shareStatus = 'closed')}
+    onRetry={handleShare}
+    anchor={shareButton}
+    bind:turnstileElement
+  />
+{/if}
+
 <SvelteToast />
 
 <style>
@@ -1274,12 +1489,23 @@
   .spacer {
     flex: 1;
   }
+  :root {
+    --sidebar-width: max(30%, 380px);
+  }
   .sidebar {
-    width: max(20%, 250px);
+    width: var(--sidebar-width);
     position: absolute;
     top: 42px;
     height: calc(100dvh - 42px);
     left: 0;
+    background: white;
+    /* Continues the editor's top border (style.css) under the header */
+    border-top: 1px solid grey;
+  }
+  .docs-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
   }
   .panes {
     position: absolute;
@@ -1289,8 +1515,8 @@
     right: 0;
     height: calc(100dvh - 42px);
   }
-  .sidebar + .panes {
-    left: max(20%, 250px);
+  .panes.with-sidebar {
+    left: var(--sidebar-width);
   }
   h3 {
     font-size: 1.4rem;
@@ -1320,13 +1546,25 @@
   .fab:hover {
     color: rgba(30, 29, 28, 1);
   }
+  .fab:disabled {
+    cursor: default;
+    color: rgba(30, 29, 28, 0.3);
+  }
+  .fab-history svg {
+    transform: translateY(-1px);
+  }
+  .top-bar-separator {
+    width: 1px;
+    height: 16px;
+    background: rgba(30, 29, 28, 0.15);
+  }
   .fab.selected {
     background: #f3f2f1;
     outline: 3px solid #f3f2f1;
   }
   .fab-sidebar.open {
     position: absolute;
-    left: calc(max(20%, 250px) + 0.5rem);
+    left: calc(var(--sidebar-width) + 0.5rem);
   }
   .fab-sidebar.open .arrow-right,
   .fab-sidebar:not(.open) .arrow-left {
@@ -1340,19 +1578,39 @@
   .slightly-shorter-than-full-viewport-height {
     height: 100%;
   }
+  /* Takes the share icon's 20px while a share is in progress */
+  .share-spinner {
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    margin: 0 calc(0.2em + 3px) 0 3px;
+    border: 1px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: share-spin 0.8s linear infinite;
+  }
+  @keyframes share-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .share-spinner {
+      animation-duration: 2.4s;
+    }
+  }
   .hidden-pane {
     display: none;
   }
 
   @media (max-width: 1023px) {
-    .sidebar + .panes {
+    .panes.with-sidebar {
       left: 0;
     }
     .sidebar {
       position: fixed;
       z-index: 10;
       width: 100vw;
-      backdrop-filter: blur(4px);
     }
     .fab-sidebar {
       position: relative !important;
@@ -1360,7 +1618,8 @@
     }
     .fab-load-file,
     .fab-save-file,
-    .fab-logic {
+    .fab-logic,
+    .top-bar-separator {
       display: none;
     }
   }

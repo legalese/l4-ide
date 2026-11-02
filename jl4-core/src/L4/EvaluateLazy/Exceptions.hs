@@ -6,6 +6,7 @@ module L4.EvaluateLazy.Exceptions
 , InternalEvalException (..)
 , UserEvalException (..)
 , Refusal (..)
+, evalExceptionCode
 , prettyEvalException
 , prettyRefusal
 , refusalMarker
@@ -109,6 +110,29 @@ data UserEvalException =
     -- known, so the assertion is undecided.
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The stable diagnostic code of an exception that stopped a directive. See
+-- 'L4.TypeCheck.Types.checkErrorCode' for what a code promises. No wildcard, so
+-- that a new exception has to be given a code.
+evalExceptionCode :: EvalException -> Text
+evalExceptionCode = \ case
+  InternalEvalException internal -> case internal of
+    RuntimeScopeError {}  -> "eval/internal-error"
+    RuntimeTypeError {}   -> "eval/internal-error"
+    PrematureGC           -> "eval/internal-error"
+    DanglingPointer       -> "eval/internal-error"
+    UnhandledPatternMatch -> "eval/internal-error"
+  UserEvalException user -> case user of
+    BlackholeForced {}           -> "eval/infinite-loop"
+    EqualityOnUnsupportedType {} -> "eval/unsupported-equality"
+    NonExhaustivePatterns {}     -> "eval/non-exhaustive-patterns"
+    StackOverflow                -> "eval/stack-overflow"
+    DivisionByZero {}            -> "eval/division-by-zero"
+    NotAnInteger {}              -> "eval/not-an-integer"
+    Stuck {}                     -> "eval/stuck"
+    UserError {}                 -> "eval/user-error"
+    ValueTooDeep                 -> "eval/value-too-deep"
+  RefusalException {} -> "eval/refused"
 
 prettyEvalException :: EvalException -> [Text]
 prettyEvalException (InternalEvalException exc) = wrapInternal (prettyInternalEvalException exc)

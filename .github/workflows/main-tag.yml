@@ -90,6 +90,7 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
+        timeout-minutes: 20
         run: |
           test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
           cabal test l4-cli-test --test-show-details=streaming
@@ -173,6 +174,7 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
+        timeout-minutes: 20
         shell: bash
         run: |
           test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
@@ -231,13 +233,16 @@ jobs:
           tail -n 4 "$GITHUB_ENV"
 
       - name: Install system dependencies
+        timeout-minutes: 5
+        env:
+          APT_OPTIONS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30
         run: |
           for i in 1 2 3; do
-            sudo apt-get update && break
+            sudo apt-get $APT_OPTIONS update && break
             echo "Retry $i: apt-get update failed, waiting 10s..."
             sleep 10
           done
-          sudo apt-get install -y pkg-config liblzma-dev libgmp-dev
+          sudo apt-get $APT_OPTIONS install -y pkg-config liblzma-dev libgmp-dev
 
       - name: Set up GHC
         uses: haskell-actions/setup@v2
@@ -278,6 +283,7 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4 exe:jl4-service
 
       - name: Run l4 CLI test suite
+        timeout-minutes: 20
         run: |
           test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
           cabal test l4-cli-test --test-show-details=streaming
@@ -356,13 +362,16 @@ jobs:
           submodules: true
 
       - name: Install system dependencies
+        timeout-minutes: 5
+        env:
+          APT_OPTIONS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30
         run: |
           for i in 1 2 3; do
-            sudo apt-get update && break
+            sudo apt-get $APT_OPTIONS update && break
             echo "Retry $i: apt-get update failed, waiting 10s..."
             sleep 10
           done
-          sudo apt-get install -y pkg-config liblzma-dev libgmp-dev
+          sudo apt-get $APT_OPTIONS install -y pkg-config liblzma-dev libgmp-dev
 
       - name: Set up GHC
         uses: haskell-actions/setup@v2
@@ -412,6 +421,7 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
+        timeout-minutes: 20
         run: |
           test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
           cabal test l4-cli-test --test-show-details=streaming
@@ -431,6 +441,49 @@ jobs:
         with:
           name: jl4-lsp-linux-arm64
           path: bin/linux-arm64/
+          retention-days: 90
+
+  # ============================================
+  # Build the cloud agent bundle
+  # ============================================
+
+  # The headless Legalese AI harness for cloud sessions. This repository only
+  # publishes it (with jl4-lsp-linux-arm64) as release assets.
+  build-cloud-agent:
+    name: Build cloud agent bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and test the harness
+        run: |
+          npx turbo build --filter=cloud-agent
+          npm test --workspace=cloud-agent
+
+      - name: Hash the bundle
+        working-directory: ts-apps/cloud-agent/dist
+        run: |
+          sha256sum cloud-agent.cjs | awk '{print $1}' > cloud-agent.cjs.sha256
+          echo "cloud-agent.cjs SHA256: $(cat cloud-agent.cjs.sha256)"
+          ls -lh
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: cloud-agent
+          path: |
+            ts-apps/cloud-agent/dist/cloud-agent.cjs
+            ts-apps/cloud-agent/dist/cloud-agent.cjs.sha256
           retention-days: 90
 
   # ============================================
@@ -784,6 +837,9 @@ jobs:
       - package-vscode-universal
       - build-wasm
       - package-plugin
+      - build-cloud-agent
+    outputs:
+      tag: ${{ steps.tag-name.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -820,6 +876,15 @@ jobs:
             echo "jl4-service SHA256: $(cat release-artifacts/jl4-service-linux-x64.sha256)"
           fi
 
+          # Collect the cloud agent bundle and its language server (linux-arm64),
+          # each with a SHA256.
+          cp artifacts/cloud-agent/cloud-agent.cjs release-artifacts/cloud-agent.cjs
+          cp artifacts/cloud-agent/cloud-agent.cjs.sha256 release-artifacts/cloud-agent.cjs.sha256
+          cp artifacts/jl4-lsp-linux-arm64/jl4-lsp release-artifacts/jl4-lsp-linux-arm64
+          sha256sum release-artifacts/jl4-lsp-linux-arm64 | awk '{print $1}' > release-artifacts/jl4-lsp-linux-arm64.sha256
+          echo "cloud-agent.cjs SHA256: $(cat release-artifacts/cloud-agent.cjs.sha256)"
+          echo "jl4-lsp-linux-arm64 SHA256: $(cat release-artifacts/jl4-lsp-linux-arm64.sha256)"
+
           echo "Release artifacts:"
           ls -la release-artifacts/
 
@@ -854,7 +919,8 @@ jobs:
           - VSCode extensions (platform-specific, cross-platform, universal)
           - WASM binaries (jl4-core.wasm, jl4-core.mjs)
           - jl4-service binary (linux-x64) with SHA256
-          - Claude Code plugin (l4-plugin.zip) and skill (writing-l4-rules.skill)"
+          - Claude Code plugin (l4-plugin.zip) and skill (writing-l4-rules.skill)
+          - Cloud agent bundle and jl4-lsp (linux-arm64) with SHA256"
           git push origin "${{ steps.tag-name.outputs.tag }}"
 
       - name: Upload artifacts to tag
@@ -885,6 +951,15 @@ jobs:
             |------|-------------|
             | `jl4-service-linux-x64` | Decision service binary for Linux x86_64 |
             | `jl4-service-linux-x64.sha256` | SHA256 hash for binary verification |
+
+            ### Cloud agent (Legalese AI cloud sessions)
+
+            | File | Description |
+            |------|-------------|
+            | `cloud-agent.cjs` | Headless Legalese AI harness bundle (Node.js 24) |
+            | `cloud-agent.cjs.sha256` | SHA256 hash for bundle verification |
+            | `jl4-lsp-linux-arm64` | Language server for Linux ARM64, used by the harness image |
+            | `jl4-lsp-linux-arm64.sha256` | SHA256 hash for binary verification |
 
             ### WASM Binaries
 
@@ -922,6 +997,84 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================
+  # Deploy the web editor (play.legalese.com)
+  # ============================================
+  # Runs once the release exists, with that release's WASM. Its target comes
+  # from the web-editor environment's variables, which steps can read but a
+  # job-level `if:` can't.
+
+  deploy-web-editor:
+    name: Deploy Web Editor
+    runs-on: ubuntu-latest
+    needs:
+      - build-wasm
+      - create-tag
+    environment:
+      name: web-editor
+      url: https://play.legalese.com
+    permissions:
+      contents: read
+      id-token: write # OIDC
+    env:
+      RELEASE_TAG: ${{ needs.create-tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: jl4-wasm-${{ needs.build-wasm.outputs.version }}
+          path: ${{ runner.temp }}/wasm
+
+      # The WASM lives under its release tag, so each release has new URLs and
+      # browsers never mix a cached module with a newer page.
+      - name: Configure the build for this release
+        env:
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+        run: |
+          # The session Lambda rejects shares without a Turnstile token, so a
+          # build without the key would ship a Share button that always fails.
+          if [ -z "$TURNSTILE_SITE_KEY" ]; then
+            echo "::error::Repository variable TURNSTILE_SITE_KEY is not set"
+            exit 1
+          fi
+          WASM_DIR="ts-apps/jl4-web/static/wasm/$RELEASE_TAG"
+          mkdir -p "$WASM_DIR"
+          cp "$RUNNER_TEMP/wasm/jl4-core.wasm" "$RUNNER_TEMP/wasm/jl4-core.mjs" "$WASM_DIR/"
+          cat > ts-apps/jl4-web/.env.production.local <<EOF
+          VITE_WASM_VERSION=$RELEASE_TAG
+          VITE_WASM_URL=/wasm/$RELEASE_TAG/jl4-core.wasm
+          VITE_WASM_JS_URL=/wasm/$RELEASE_TAG/jl4-core.mjs
+          VITE_SESSION_URL=/session
+          VITE_TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY
+          EOF
+          cat ts-apps/jl4-web/.env.production.local
+
+      - name: Build web editor
+        run: npx turbo build --filter=jl4-web
+
+      - name: Configure credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Publish the web editor
+        run: >-
+          ts-apps/jl4-web/scripts/deploy-static.sh ts-apps/jl4-web/build
+          "${{ vars.WEB_EDITOR_BUCKET }}" "${{ vars.WEB_EDITOR_DISTRIBUTION_ID }}"
+
+  # ============================================
   # Build summary
   # ============================================
 
@@ -934,7 +1087,9 @@ jobs:
       - package-vscode-universal
       - build-wasm
       - package-plugin
+      - build-cloud-agent
       - create-tag
+      - deploy-web-editor
     if: always()
     steps:
       - name: Summary
@@ -953,4 +1108,6 @@ jobs:
           echo "| Universal | ${{ needs.package-vscode-universal.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.build-wasm.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Claude Code Plugin | ${{ needs.package-plugin.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Agent Bundle | ${{ needs.build-cloud-agent.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Git Tag | ${{ needs.create-tag.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web Editor | ${{ needs.deploy-web-editor.result == 'success' && '✅' || needs.deploy-web-editor.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY

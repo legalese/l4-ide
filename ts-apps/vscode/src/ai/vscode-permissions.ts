@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import {
   DEFAULT_PERMISSIONS,
-  parsePermissionValue,
+  effectivePermission,
   type PermissionCategory,
   type PermissionPolicy,
   type PermissionValue,
@@ -27,13 +27,20 @@ const CATEGORY_SETTING: Record<PermissionCategory, string> = {
 
 /** {@link PermissionPolicy} backed by the user's VS Code settings, with
  *  the core's defaults when a setting is unset or invalid. Read fresh
- *  on every call so a settings change applies to the next tool call. */
+ *  on every call so a settings change applies to the next tool call.
+ *  A workspace's settings can only tighten these: see
+ *  {@link effectivePermission}. */
 export class SettingsPermissionPolicy implements PermissionPolicy {
   getPermission(category: PermissionCategory): PermissionValue {
-    const raw = vscode.workspace
+    const info = vscode.workspace
       .getConfiguration()
-      .get<string>(CATEGORY_SETTING[category])
-    return parsePermissionValue(raw) ?? DEFAULT_PERMISSIONS[category]
+      .inspect<string>(CATEGORY_SETTING[category])
+    return effectivePermission(
+      info?.globalValue,
+      DEFAULT_PERMISSIONS[category],
+      info?.workspaceValue,
+      info?.workspaceFolderValue
+    )
   }
 
   async setPermission(

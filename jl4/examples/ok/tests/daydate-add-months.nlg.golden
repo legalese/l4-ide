@@ -1,29 +1,29 @@
-`add months` with `DATE_FROM_DMY` with 31, 1 and 2023 and 1 is equal to `DATE_FROM_DMY` with 28, 2 and 2023
-`add months` with `DATE_FROM_DMY` with 31, 1 and 2024 and 1 is equal to `DATE_FROM_DMY` with 29, 2 and 2024
-`add months` with `DATE_FROM_DMY` with 30, 1 and 2023 and 1 is equal to `DATE_FROM_DMY` with 28, 2 and 2023
-`add months` with `DATE_FROM_DMY` with 31, 3 and 2024 and 1 is equal to `DATE_FROM_DMY` with 30, 4 and 2024
-`add months` with `DATE_FROM_DMY` with 15, 1 and 2024 and 1 is equal to `DATE_FROM_DMY` with 15, 2 and 2024
-`add months` with `DATE_FROM_DMY` with 15, 1 and 2024 and 0 is equal to `DATE_FROM_DMY` with 15, 1 and 2024
-`add months` with `DATE_FROM_DMY` with 29, 2 and 2024 and 12 is equal to `DATE_FROM_DMY` with 28, 2 and 2025
-`add months` with `DATE_FROM_DMY` with 31, 10 and 2024 and 4 is equal to `DATE_FROM_DMY` with 28, 2 and 2025
-`add months` with `DATE_FROM_DMY` with 15, 11 and 2024 and 3 is equal to `DATE_FROM_DMY` with 15, 2 and 2025
-`add months` with `DATE_FROM_DMY` with 1, 12 and 2024 and 1 is equal to `DATE_FROM_DMY` with 1, 1 and 2025
-`add months` with `DATE_FROM_DMY` with 31, 12 and 2024 and 12 is equal to `DATE_FROM_DMY` with 31, 12 and 2025
-`add months` with `DATE_FROM_DMY` with 15, 1 and 2024 and 24 is equal to `DATE_FROM_DMY` with 15, 1 and 2026
-`add months` with `DATE_FROM_DMY` with 15, 1 and 2024 and 1.5 is equal to `DATE_FROM_DMY` with 15, 2 and 2024
-`add months` with `DATE_FROM_DMY` with 31, 3 and 2024 and the difference between 1 and 0 is equal to `DATE_FROM_DMY` with 29, 2 and 2024
-`add months` with `DATE_FROM_DMY` with 15, 1 and 2024 and the difference between 1 and 0 is equal to `DATE_FROM_DMY` with 15, 12 and 2023
-`add months` with `DATE_FROM_DMY` with 31, 1 and 2024 and the difference between 2 and 0 is equal to `DATE_FROM_DMY` with 30, 11 and 2023
-`add months` with `DATE_FROM_DMY` with 31, 3 and 2025 and the difference between 1 and 0 is equal to `DATE_FROM_DMY` with 28, 2 and 2025
-`add months` with `DATE_FROM_DMY` with 15, 1 and 2024 and the difference between 13 and 0 is equal to `DATE_FROM_DMY` with 15, 12 and 2022
-`add months` with `DATE_FROM_DMY` with 29, 2 and 2024 and the difference between 12 and 0 is equal to `DATE_FROM_DMY` with 28, 2 and 2023
-`add years` with `DATE_FROM_DMY` with 29, 2 and 2024 and 1 is equal to `DATE_FROM_DMY` with 28, 2 and 2025
-`add years` with `DATE_FROM_DMY` with 29, 2 and 2024 and 4 is equal to `DATE_FROM_DMY` with 29, 2 and 2028
-`add years` with `DATE_FROM_DMY` with 28, 2 and 2023 and 1 is equal to `DATE_FROM_DMY` with 28, 2 and 2024
-`add years` with `DATE_FROM_DMY` with 28, 2 and 2024 and 1 is equal to `DATE_FROM_DMY` with 28, 2 and 2025
-`add years` with `DATE_FROM_DMY` with 31, 12 and 2024 and 1 is equal to `DATE_FROM_DMY` with 31, 12 and 2025
-`add years` with `DATE_FROM_DMY` with 1, 1 and 2000 and 25 is equal to `DATE_FROM_DMY` with 1, 1 and 2025
-`add years` with `DATE_FROM_DMY` with 15, 6 and 2024 and 0 is equal to `DATE_FROM_DMY` with 15, 6 and 2024
-`add years` with `DATE_FROM_DMY` with 15, 6 and 2024 and 1.9 is equal to `DATE_FROM_DMY` with 15, 6 and 2025
-`add years` with `DATE_FROM_DMY` with 29, 2 and 2024 and the difference between 1 and 0 is equal to `DATE_FROM_DMY` with 28, 2 and 2023
-`add years` with `DATE_FROM_DMY` with 29, 2 and 2024 and the difference between 4 and 0 is equal to `DATE_FROM_DMY` with 29, 2 and 2020
+the date 1 month after 31 January 2023 (capped at the last day of that month) is equal to 28 February 2023
+the date 1 month after 31 January 2024 (capped at the last day of that month) is equal to 29 February 2024
+the date 1 month after 30 January 2023 (capped at the last day of that month) is equal to 28 February 2023
+the date 1 month after 31 March 2024 (capped at the last day of that month) is equal to 30 April 2024
+the date 1 month after 15 January 2024 (capped at the last day of that month) is equal to 15 February 2024
+the date 0 months after 15 January 2024 (capped at the last day of that month) is equal to 15 January 2024
+the date 12 months after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2025
+the date 4 months after 31 October 2024 (capped at the last day of that month) is equal to 28 February 2025
+the date 3 months after 15 November 2024 (capped at the last day of that month) is equal to 15 February 2025
+the date 1 month after 1 December 2024 (capped at the last day of that month) is equal to 1 January 2025
+the date 12 months after 31 December 2024 (capped at the last day of that month) is equal to 31 December 2025
+the date 24 months after 15 January 2024 (capped at the last day of that month) is equal to 15 January 2026
+the date 1.5 months after 15 January 2024 (capped at the last day of that month) is equal to 15 February 2024
+the date 0 minus 1 months after 31 March 2024 (capped at the last day of that month) is equal to 29 February 2024
+the date 0 minus 1 months after 15 January 2024 (capped at the last day of that month) is equal to 15 December 2023
+the date 0 minus 2 months after 31 January 2024 (capped at the last day of that month) is equal to 30 November 2023
+the date 0 minus 1 months after 31 March 2025 (capped at the last day of that month) is equal to 28 February 2025
+the date 0 minus 13 months after 15 January 2024 (capped at the last day of that month) is equal to 15 December 2022
+the date 0 minus 12 months after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2023
+the date 1 year after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2025
+the date 4 years after 29 February 2024 (capped at the last day of that month) is equal to 29 February 2028
+the date 1 year after 28 February 2023 (capped at the last day of that month) is equal to 28 February 2024
+the date 1 year after 28 February 2024 (capped at the last day of that month) is equal to 28 February 2025
+the date 1 year after 31 December 2024 (capped at the last day of that month) is equal to 31 December 2025
+the date 25 years after 1 January 2000 (capped at the last day of that month) is equal to 1 January 2025
+the date 0 years after 15 June 2024 (capped at the last day of that month) is equal to 15 June 2024
+the date 1.9 years after 15 June 2024 (capped at the last day of that month) is equal to 15 June 2025
+the date 0 minus 1 years after 29 February 2024 (capped at the last day of that month) is equal to 28 February 2023
+the date 0 minus 4 years after 29 February 2024 (capped at the last day of that month) is equal to 29 February 2020

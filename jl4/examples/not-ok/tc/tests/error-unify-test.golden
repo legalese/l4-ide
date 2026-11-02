@@ -6,7 +6,7 @@ File: error-unify-test.l4
   Range: 5:23-5:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     All elements in a LIST literal must have the same type.
     From looking at the context, I have inferred that this type must be
