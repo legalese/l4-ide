@@ -17,7 +17,8 @@ import Options.Applicative
 import System.Console.Haskeline
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory, makeAbsolute)
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
-import System.IO (hSetEncoding, stdin, stdout, stderr)
+import System.IO (hFlush, hIsTerminalDevice, hSetEncoding, stdin, stdout, stderr)
+import System.Info (os)
 import System.FilePath (takeDirectory, takeBaseName)
 import Text.Printf (printf)
 
@@ -89,10 +90,10 @@ data TraceSink = TraceSink
 main :: IO ()
 main = do
   -- UTF-8 everywhere, as `l4` does (jl4/app/Main.hs): on Windows the
-  -- locale encoding is the user's code page, so a `↯` in a reply came out
-  -- as U+FFFD and a trace saved with :tracefile lost its header. New
-  -- handles take the locale encoding; the standard handles were opened
-  -- before `main` and need setting one by one.
+  -- locale encoding is the user's code page, so a trace saved with
+  -- :tracefile lost its header. New handles take the locale encoding; the
+  -- standard handles were opened before `main` and need setting one by one.
+  -- haskeline writes a reply in an encoding of its own: see `runRepl`.
   setLocaleEncoding utf8
   hSetEncoding stdin  utf8
   hSetEncoding stdout utf8
@@ -186,19 +187,28 @@ runRepl replState = do
         { historyFile = Just ".jl4_history"
         , complete = completeFunc replState
         }
-  runInputT settings (loop replState)
+  toConsole <- hIsTerminalDevice stdout
+  runInputT settings (loop (reply toConsole) replState)
   where
-    loop :: ReplState -> InputT IO ()
-    loop st = do
+    -- On Windows haskeline writes to the console in Unicode, but to a pipe
+    -- or a file in the console's code page, whatever the encoding of
+    -- stdout, so a `↯` came out as `?`. There a reply that is not for the
+    -- console goes to stdout, which is UTF-8.
+    reply :: Bool -> String -> InputT IO ()
+    reply toConsole
+      | os == "mingw32", not toConsole = \s -> liftIO (putStrLn s >> hFlush stdout)
+      | otherwise = outputStrLn
+    loop :: (String -> InputT IO ()) -> ReplState -> InputT IO ()
+    loop say st = do
       minput <- getInputLine "jl4> "
       case minput of
-        Nothing -> outputStrLn "Goodbye!"
+        Nothing -> say "Goodbye!"
         Just input -> do
           (output, newState, shouldQuit) <- liftIO $ processInput st (Text.pack input)
-          unless (Text.null output) $ outputStrLn (Text.unpack output)
+          unless (Text.null output) $ say (Text.unpack output)
           if shouldQuit
-            then outputStrLn "Goodbye!"
-            else loop newState
+            then say "Goodbye!"
+            else loop say newState
 
 -- | Load a file and trigger type checking
 loadFile :: ReplState -> FilePath -> IO (Either Text ())

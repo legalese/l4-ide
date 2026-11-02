@@ -1692,8 +1692,9 @@ spec bin = do
           , ":trace #ASSERT REFUSED 1"
           ]
         length replies `shouldBe` 4
+        -- the trace is saved with the platform's line endings, as `l4 trace` saves one
         headers <- forM ["trace-01.dot", "trace-02.dot", "trace-03.dot"] \name -> do
-          saved <- TE.decodeUtf8Lenient <$> BS.readFile (work </> name)
+          saved <- T.filter (/= '\r') . TE.decodeUtf8Lenient <$> BS.readFile (work </> name)
           pure [ l | l <- T.lines saved, "// Result: " `T.isPrefixOf` l ]
         case headers of
           [[expr], [asserted], [failed]] -> do
