@@ -10,9 +10,9 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Exception (IOException, finally, throwIO, try)
+import Control.Exception (IOException, finally, onException, throwIO, try)
 import Control.Monad (forM_, unless, void, when)
 import qualified Data.Char as Char
 import Data.Foldable (toList)
@@ -195,9 +195,13 @@ runL4In mCwd mEnv bin args = do
 readOutputs :: Handle -> Handle -> IO (BS.ByteString, BS.ByteString)
 readOutputs hout herr = do
   errVar <- newEmptyMVar
-  _ <- forkIO (BS.hGetContents herr >>= putMVar errVar)
-  outBytes <- BS.hGetContents hout
-  errBytes <- takeMVar errVar
+  reader <- forkIO (BS.hGetContents herr >>= putMVar errVar)
+  -- If this thread is interrupted, stop the reader too: it holds stderr's lock,
+  -- so closing stderr afterwards ('withCreateProcess') would otherwise wait for
+  -- an end that never comes when a child ignores SIGTERM or a grandchild holds
+  -- the pipe open.
+  outBytes <- BS.hGetContents hout `onException` killThread reader
+  errBytes <- takeMVar errVar `onException` killThread reader
   pure (outBytes, errBytes)
 
 -- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
@@ -890,10 +894,13 @@ spec bin = do
           fromCabal <- case fromEnv of
             Just p -> pure (Just p)
             Nothing -> do
-              (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-schema"]) ""
-              let path = T.unpack (T.strip (T.pack out))
-              ok <- if code == ExitSuccess then doesFileExist path else pure False
-              pure (if ok then Just path else Nothing)
+              listed <- try (readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-schema"]) "")
+              case listed :: Either IOException (ExitCode, String, String) of
+                Right (ExitSuccess, out, _) -> do
+                  let path = T.unpack (T.strip (T.pack out))
+                  ok <- doesFileExist path
+                  pure (if ok then Just path else Nothing)
+                _ -> pure Nothing
           found <- maybe (findExecutable "jl4-schema") (pure . Just) fromCabal
           maybe (fail "jl4-schema not found: set JL4_SCHEMA_BIN or run this with cabal test") pure found
 
