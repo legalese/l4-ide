@@ -72,6 +72,7 @@ data PlanDecline = MkPlanDecline
   , reasons :: ![Text]
   }
   deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
 
 -- | The decline for the definition, if it may refuse to answer
 -- ('refusalReasons'); 'Nothing' if it cannot.

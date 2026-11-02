@@ -23,7 +23,6 @@ import Base
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import L4.FunctionSchema (Parameter (..), Parameters (..), parametersFromDecideWithErrors)
 import Backend.Jl4 (CompiledModule (..))
-import L4.Refusal (planDecline)
 import Data.Aeson (FromJSON, ToJSON, (.=), object)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as BS
@@ -182,8 +181,9 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
   -- A rule that may refuse to answer gets no plan: a plan would say which
   -- inputs settle an answer the rule may not give. The decline is read from
   -- what the rule and the definitions it calls are written to do, through
-  -- every module it imports, before any ladder is drawn.
-  forM_ (planDecline (resolvedModule : compiled.compiledDependencies) decide) \declined ->
+  -- every module it imports, once, when the function is compiled
+  -- ('compiledDecline'), before any ladder is drawn.
+  forM_ compiled.compiledDecline \declined ->
     throwError err400 {errBody = Aeson.encode declined}
 
   (ladderInfo, vizState) <- case LadderViz.doVisualize decide vizCfg of
