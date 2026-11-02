@@ -31,6 +31,7 @@ import L4.Lint.AndOrDepth (checkAndOrDepth)
 import L4.Parser (execProgramParser)
 import L4.Print (prettyLayout)
 import qualified L4.StateGraph as SG
+import L4.Syntax (Module, Resolved)
 import L4.TracePolicy (TraceDestination (..), TraceFormat (..), TracePolicy, apiDefaultPolicy, traceAll)
 import qualified L4.TypeCheck as TC
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), Severity (..))
@@ -69,6 +70,15 @@ evalAllConfigured policy adjust src = case frontEnd src of
 -- when it has one.
 rootOf :: Text -> Text
 rootOf out = Text.strip (last ("" : Text.lines (Text.strip out)))
+
+-- | The exported document of a module, 'show'n, without the marks around the
+-- renderer's own words ('L4.Nlg.markFrame', U+FDD0 and U+FDD1), which every
+-- writer strips. 'show' writes them as code points, and a code point before a
+-- digit is followed by @\\&@.
+documentText :: Module Resolved -> Text
+documentText m =
+  foldr (\mark -> Text.replace mark "") (Text.pack (show (buildDocument defaultExportConfig m [])))
+    ["\\64976\\&", "\\64977\\&", "\\64976", "\\64977"]
 
 -- | Two rules that answer a list of n numbers and then refuse: with the
 -- refusal as one more element, and as the rest of the list.
@@ -850,7 +860,7 @@ spec = describe "REFUSE" $ do
       case frontEnd (ruleOfType "A NUMBER" "REFUSE \"not encoded\"") of
         Left msg -> expectationFailure ("the module did not check:\n" <> Text.unpack msg)
         Right r -> do
-          let doc = Text.pack (show (buildDocument defaultExportConfig r.tcdModule []))
+          let doc = documentText r.tcdModule
           doc `shouldSatisfy` Text.isInfixOf "the model refuses to answer"
           doc `shouldSatisfy` Text.isInfixOf "not encoded"
 
@@ -868,7 +878,7 @@ spec = describe "REFUSE" $ do
              ]) of
         Left msg -> expectationFailure ("the module did not check:\n" <> Text.unpack msg)
         Right r -> do
-          let doc = Text.pack (show (buildDocument defaultExportConfig r.tcdModule []))
+          let doc = documentText r.tcdModule
           -- 'show' writes the curly quotes as their code points.
           doc `shouldSatisfy` Text.isInfixOf "the model refuses to answer: \\8220after payment\\8221"
 
@@ -887,7 +897,7 @@ spec = describe "REFUSE" $ do
              ]) of
         Left msg -> expectationFailure ("the module did not check:\n" <> Text.unpack msg)
         Right r -> do
-          let doc = Text.pack (show (buildDocument defaultExportConfig r.tcdModule []))
+          let doc = documentText r.tcdModule
           -- Unquoted, the "%" and the "'s amount" around a refusal read as
           -- part of its reason. 'show' writes the curly quotes as code points.
           for_ ["rates are not encoded", "no record", "not modelled"] $ \reason ->
@@ -901,7 +911,7 @@ spec = describe "REFUSE" $ do
              ]) of
         Left msg -> expectationFailure ("the module did not check:\n" <> Text.unpack msg)
         Right r -> do
-          let doc = Text.pack (show (buildDocument defaultExportConfig r.tcdModule []))
+          let doc = documentText r.tcdModule
           -- Formula mode would write "n + …", reading the refusal as a quantity.
           doc `shouldSatisfy` Text.isInfixOf "the sum of n and the model refuses to answer"
           doc `shouldSatisfy` Text.isInfixOf "not encoded"

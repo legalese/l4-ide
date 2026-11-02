@@ -198,7 +198,8 @@ lspCustomTable =
   , ("l4/queryPlan", Door [Plan LspPlan])
   , ("l4.visualize", Door [Plan LspPlan])
   , ("l4/evalApp", NotRunHere "the ladder's evaluation of a call, which a client asks with a checked module, its environment and a drawn ladder; no test drives it")
-  , ("l4/directiveResultsNotif", NotResult "the name of the action that gathers l4/directiveResultsUpdated")
+  , ("l4/fileChecked", NotRunHere "sent after each check of a file, with the file's diagnostics as textDocument/publishDiagnostics gives them, so a refusal reads there as it does in a publish; no test here drives it")
+  , ("l4/fileChecked.importers", NotResult "the name of the action that finds the open documents importing a file, for l4/fileChecked")
   , ("l4/evalDirectiveResult/#CHECK", NotResult "the name of the action that checks a #CHECK for l4/evalDirectiveResult")
   , ("l4.renderResult", NotResult "the client command a directive's lens names")
   , ("l4.resetvisualization", NotResult "clears the drawn decision graph")
@@ -244,7 +245,6 @@ executableTable =
   , ("jl4-wasm", Listed "the functions the browser's WASM module exports")
   , ("jl4-mlir", NotRunHere "compiles a module to WASM and runs it; `jl4-mlir run` declines a function that may refuse, which jl4-mlir-test's \"jl4-mlir run declines an unsupported export\" pins")
   , ("jl4-schema", NotResult "writes the JSON schema of a module's exports")
-  , ("jl4-websessions", NotResult "stores the browser editor's sessions")
   ]
 
 -- The doors there are -------------------------------------------------------

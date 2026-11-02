@@ -5,7 +5,7 @@ File: assert-refused-computed-because.l4
   Range: 18:32-18:32
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-identifier
   Message:
        |
     18 | #ASSERT REFUSED `nope` BECAUSE `wrong reason`
