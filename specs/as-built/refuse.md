@@ -49,8 +49,8 @@ Code is cited by module and function, not by line.
   `doc/check-l4-run-output.sh` fails on a `Result:` followed by a line that holds only `assertion refused:`, so `doc/test-docs.sh` fails on a documentation example with such an `#ASSERT`.
 - An `#ASSERT REFUSED` reports `assertion satisfied`; `assertion failed: expected a refusal, but the expression produced a value`; `assertion failed: expected the refusal "…", got "…"`; or `assertion could not be evaluated:` and the cause, an evaluation error or the depth sentence.
 - `l4 batch` reports a refusing row and goes on to the next.
-- jl4-service answers a refusal at `/evaluation` with `422` and `{"contents": {"kind": "refused", "reason": …}, "tag": "Error"}`; an MCP tool call with `isError: true` and that body as its text; `/evaluation/batch` with `@refused` for the case, counted in `casesProcessed`.
-  An error's `contents` carries a `tag` of its own, and an MCP error's text is the message, so `kind` tells the two apart.
+- jl4-service answers a refusal at `/evaluation` with `200` and `{"contents": {"kind": "refused", "reason": …}, "tag": "Refused"}`; an MCP tool call without `isError`, with that body as its text; `/evaluation/batch` with `@refused` for the case, counted in `casesProcessed`.
+  A `422` and `isError: true` are only an evaluation that stops with an error. Until 2026-11-02 a refusal was a `422` tagged `Error` with `isError: true`; Meng ruled that day, on the second review of #762, that a refusal is an answer at every door, so that an org-wide MCP and a request log do not count it as a failed call.
 - A query planner declines a rule whose `refusalReasons` is not empty, whatever inputs it is given.
   The service answers `400` with `"kind": "declined"`, the `rule`, its `reasons` and `declineMessage`'s sentence, `No query plan for <rule>: it may refuse to answer, with the reason "…".`
 

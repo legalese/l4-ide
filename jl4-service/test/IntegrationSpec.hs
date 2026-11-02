@@ -793,15 +793,15 @@ spec = describe "integration" do
         mcp <- httpLbs mcpReq mgr
         let toolResult = fmap (fmap (Aeson.decodeStrict . Text.Encoding.encodeUtf8)) (mcpToolText (responseBody mcp))
         (statusCode' mcp, toolResult) `shouldBe`
-          (200, Just (True, Just (Aeson.object ["tag" Aeson..= ("Error" :: Text), "contents" Aeson..= refusalOf reason])))
-        -- the 422's body, as the MCP tool result carries it
+          (200, Just (False, Just (Aeson.object ["tag" Aeson..= ("Refused" :: Text), "contents" Aeson..= refusalOf reason])))
+        -- the evaluation's body, as the MCP tool result carries it, with no isError
         Aeson.decode (responseBody single) `shouldBe` (snd =<< toolResult :: Maybe Aeson.Value)
 
     -- A tool call that arrives while its deployment is still compiling, from a
     -- client that asked for tasks, is answered with a task, which evaluates the
     -- call once the deployment is compiled. The task's result is the text the
-    -- call answers: for a refusal, the 422's body, its reason as the rule gives
-    -- it, and for an answer, the 200's.
+    -- call answers: for a refusal, the evaluation's body, tagged Refused, its
+    -- reason as the rule gives it, and for an answer, the answer's.
     it "answers an MCP tool called as a task, while its deployment compiles, as a call is answered, a refusal among them" do
       let src = Text.unlines
             [ "@export Whether a person qualifies"
@@ -825,7 +825,7 @@ spec = describe "integration" do
         answered `shouldCarry` Answers (Aeson.Bool True)
         refusedTask <- asTask 10
         answeredTask <- asTask 20
-        asJson refusedTask `shouldBe` Just (True, Aeson.decode (responseBody refused))
+        asJson refusedTask `shouldBe` Just (False, Aeson.decode (responseBody refused))
         asJson answeredTask `shouldBe` Just (False, Aeson.decode (responseBody answered))
 
   -- The wrapper path evaluates a module with its directives taken out line by
@@ -3474,10 +3474,11 @@ data WireOutcome
   | Refuses Text
     -- ^ 422, with an error message that contains this text
   | RefusedWith Text
-    -- ^ 422, with the refusal of this reason in place of an error
+    -- ^ 200, tagged Refused, with the refusal of this reason in place of an answer
 
--- | How the service writes a refusal wherever it answers one: in a 422's
--- @contents@, in a batch case's @\@refused@, and in an MCP tool result.
+-- | How the service writes a refusal wherever it answers one: in the
+-- @contents@ of an evaluation tagged Refused, in a batch case's @\@refused@,
+-- and in an MCP tool result.
 refusalOf :: Text -> Aeson.Value
 refusalOf reason = Aeson.object ["kind" Aeson..= ("refused" :: Text), "reason" Aeson..= reason]
 
@@ -3486,7 +3487,7 @@ shouldCarry resp = \case
   Answers v -> (statusCode' resp, wireAt resp ["contents", "result", "value"]) `shouldBe` (200, Right v)
   RefusedWith reason ->
     (statusCode' resp, wireAt resp ["tag"], wireAt resp ["contents"])
-      `shouldBe` (422, Right (Aeson.String "Error"), Right (refusalOf reason))
+      `shouldBe` (200, Right (Aeson.String "Refused"), Right (refusalOf reason))
   Refuses t -> do
     statusCode' resp `shouldBe` 422
     wireAt resp ["contents", "contents"] `shouldSatisfy` \case

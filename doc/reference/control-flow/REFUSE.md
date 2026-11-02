@@ -146,12 +146,13 @@ Each of these reports a refusal as a refusal, with the reason as the rule wrote 
 | The REPL, and its `:traceascii`     | `Refused:` and the reason                                                                                                                                              |
 | The editor                          | a warning at the directive: `The model refuses to answer:` and the reason                                                                                              |
 | The editor's Inspector              | `The model refuses to answer:` and the reason, shown neither as a success nor as a failure                                                                             |
-| The service's `/evaluation`         | a body whose `contents` is `{"kind": "refused", "reason": …}`                                                                                                          |
+| The service's `/evaluation`         | status `200`, a body tagged `Refused` whose `contents` is `{"kind": "refused", "reason": …}`                                                                           |
 | The service's `/evaluation/batch`   | for that case, `"@refused": {"kind": "refused", "reason": …}` in place of a `value`; the case is counted in `casesProcessed`                                           |
-| The service's MCP tools             | a result whose text is the body `/evaluation` gives, with `"kind": "refused"` and the reason                                                                           |
+| The service's MCP tools             | a successful tool result whose text is the body `/evaluation` gives, with `"kind": "refused"` and the reason                                                           |
 | A query plan                        | no plan for a rule that may refuse, and the sentence `No query plan for covered: it may refuse to answer, with the reason "the insurance of a minor is not modelled".` |
 
-The service marks a refusal by `"kind": "refused"`, and answers it with `422`, the HTTP status of an evaluation that stops with an error:
+The service answers a refusal with `200`, as it answers an answer, because declining is how the rules answer that case; a `422` is only an evaluation that stops with an error.
+The body is tagged `Refused`, and its `contents` is the refusal, marked by `"kind": "refused"`:
 
 ```json
 {
@@ -159,12 +160,12 @@ The service marks a refusal by `"kind": "refused"`, and answers it with `422`, t
     "kind": "refused",
     "reason": "this schedule is not encoded for years before 2000"
   },
-  "tag": "Error"
+  "tag": "Refused"
 }
 ```
 
-An MCP tool call answers a refusal with `isError: true`, and that body as its text.
-So tell a refusal by its `kind`: the `contents` of an error has a `tag` of its own, and an MCP error's text is the error's message.
+An MCP tool call answers a refusal without `isError`, as it answers an answer, with that body as its text, so an agent relays the refusal instead of treating the tool as broken.
+Tell a refusal by its `tag` or its `kind`: an answer's `contents` has a `result`.
 
 ## The query plan
 

@@ -35,7 +35,7 @@ module Types (
   AppM,
 ) where
 
-import Backend.Api (EvalBackend, FnLiteral, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
+import Backend.Api (EvalBackend, FnLiteral, RunFunction, EvaluatorError (EvaluatorRefused), ResponseWithReason, GraphVizResponse, responseTag)
 import Backend.DecisionQueryPlan (CachedDecisionQuery)
 import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
@@ -343,6 +343,9 @@ instance FromJSON Function where
 -- | Evaluation response: either a result with reasoning, or an error.
 -- Tags reflect content: SimpleResponse (result only), TraceResponse
 -- (result + reasoning), GraphVizResponse (result + reasoning + graphviz).
+-- A refusal is tagged Refused, not Error: the rules declined to answer, which
+-- is how they answer that case, so it is not an error of the call.
+-- 'SimpleError' still holds it, as 'EvaluatorRefused'.
 data SimpleResponse
   = SimpleResponse !ResponseWithReason
   | SimpleError !EvaluatorError
@@ -350,7 +353,7 @@ data SimpleResponse
 
 instance ToJSON SimpleResponse where
   toJSON (SimpleError err) = Aeson.object
-    [ "tag" .= ("Error" :: Text)
+    [ "tag" .= (case err of EvaluatorRefused _ -> "Refused"; _ -> "Error" :: Text)
     , "contents" .= err
     ]
   toJSON (SimpleResponse rwr) = Aeson.object
@@ -366,6 +369,7 @@ instance FromJSON SimpleResponse where
     tag <- o .:? "tag" :: Parser (Maybe Text)
     case tag of
       Just "Error" -> SimpleError <$> o .: "contents"
+      Just "Refused" -> SimpleError <$> o .: "contents"
       _ -> SimpleResponse <$> o .: "contents"
 
 -- ----------------------------------------------------------------------------

@@ -212,8 +212,10 @@ field k = \case
   Aeson.Object o -> KeyMap.lookup (Key.fromText k) o
   _ -> Nothing
 
--- | The evaluation endpoint's answer: a SimpleResponse, or an Error that is
--- a refusal or an error of the evaluator; with its HTTP status.
+-- | The evaluation endpoint's answer: a SimpleResponse, a Refused, or an
+-- Error of the evaluator; with its HTTP status. A refusal tagged Error (the
+-- shape before refusals were answered with 200) is still read as a refusal,
+-- so that its 422 is what disagrees.
 seenOfResponse :: Int -> LBS.ByteString -> Seen
 seenOfResponse st body = case Aeson.decode body >>= seenOfSimple of
   Just seen -> SeenFlagged (HttpStatus st) seen
@@ -222,6 +224,8 @@ seenOfResponse st body = case Aeson.decode body >>= seenOfSimple of
 seenOfSimple :: Aeson.Value -> Maybe Seen
 seenOfSimple v = case (field "tag" v, field "contents" v) of
   (Just "SimpleResponse", Just c) -> SeenJson <$> (field "result" c >>= field "value")
+  (Just "Refused", Just c)
+    | Just "refused" <- field "kind" c, Just (Aeson.String r) <- field "reason" c -> Just (SeenRefused r)
   (Just "Error", Just c)
     | Just "refused" <- field "kind" c, Just (Aeson.String r) <- field "reason" c -> Just (SeenRefused r)
     | Just (Aeson.String m) <- field "contents" c -> Just (SeenRaised m)

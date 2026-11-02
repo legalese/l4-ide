@@ -112,16 +112,16 @@ agrees core seen = case (core, seen) of
 -- | Whether a surface's flag gives core's verdict. An answer and a holding
 -- assertion succeed, an evaluation that raises does not, and a refusal does
 -- neither: its success is null and its severity a warning's. An MCP tool's
--- result is an error, and the evaluation endpoint answers 422, for every
--- result that is not an answer, a refusal among them. An assertion that
+-- result is an error, and the evaluation endpoint answers 422, only for an
+-- evaluation that raises; a refusal, like an answer, is no error and a 200. An assertion that
 -- does not hold agrees with no surface ('agrees'), so its flag decides
 -- nothing.
 flagAgrees :: CoreVerdict -> Flag -> Bool
 flagAgrees core = \case
   Success v -> v == maybe Aeson.Null Aeson.Bool outcome
   Severity v -> v == Aeson.Number (case outcome of Just True -> 3; Just False -> 1; Nothing -> 2)
-  IsError b -> b == (outcome /= Just True)
-  HttpStatus n -> n == (if outcome == Just True then 200 else 422)
+  IsError b -> b == (outcome == Just False)
+  HttpStatus n -> n == (if outcome == Just False then 422 else 200)
  where
   outcome = case core of
     CoreAnswers {} -> Just True

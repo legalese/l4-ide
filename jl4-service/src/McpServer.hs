@@ -529,13 +529,15 @@ evalResultToToolResponse reqId reverseMap = jsonRpcResult reqId . evalResultToTo
 -- | Like 'evalResultToToolResponse' but produces ONLY the result body
 -- (omitting JSON-RPC envelope). Used to store completed-task payloads.
 --
--- A refusal is a result with @isError@, as an error is, and its text is the
--- refusal as the service writes it everywhere, with the reason as its author
--- wrote it. An error's message has the request's field names put back.
+-- A refusal is a result without @isError@, as an answer is: the rules
+-- declined to answer, which is not a failure of the tool, so a client relays
+-- it rather than retrying. Its text is the refusal as the service writes it
+-- everywhere (tagged Refused), with the reason as its author wrote it. An
+-- error's message has the request's field names put back.
 evalResultToToolPayload :: Map Text Text -> ToolOutcome -> Aeson.Value
 evalResultToToolPayload reverseMap = \case
   ToolFailed errMsg -> toolBody (sanitizeFieldNamesInText reverseMap errMsg) True
-  ToolRefused refusal -> toolBody refusal True
+  ToolRefused refusal -> toolBody refusal False
   ToolAnswered resultVal -> toolBody resultVal False
  where
   toolBody content flagged = Aeson.object $

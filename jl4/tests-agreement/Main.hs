@@ -248,8 +248,8 @@ spec bins root helpers headerErrors preps = do
             <> [Severity (Aeson.Number n) | n <- [1, 2, 3]]
             <> [IsError True, IsError False, HttpStatus 200, HttpStatus 422, HttpStatus 500]
         agreeing core seen = [f | f <- flags, agrees core (SeenFlagged f seen)]
-    it "agrees with a refusal only as a null success, a warning, an MCP error, or a 422" do
-      agreeing (CoreRefuses "r") (SeenRefused "r") `shouldBe` [Success Aeson.Null, Severity (Aeson.Number 2), IsError True, HttpStatus 422]
+    it "agrees with a refusal only as a null success, a warning, an MCP result that is no error, or a 200" do
+      agreeing (CoreRefuses "r") (SeenRefused "r") `shouldBe` [Success Aeson.Null, Severity (Aeson.Number 2), IsError False, HttpStatus 200]
     it "agrees with an answer only as a success, information, an MCP result that is no error, or a 200" do
       agreeing (CoreAnswers "TRUE" (Aeson.Bool True) False) (SeenText "TRUE") `shouldBe` [Success (Aeson.Bool True), Severity (Aeson.Number 3), IsError False, HttpStatus 200]
     it "agrees with an evaluation that raises only as a failure, an error, an MCP error, or a 422" do

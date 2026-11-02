@@ -107,17 +107,22 @@ spec = do
           Aeson.Success c -> expectationFailure ("read a case: " <> show c)
           Aeson.Error _ -> pure ()
 
-    -- A refusal is answered in the slot of an error, and written as the
-    -- refusal and its reason: in a 422's contents, as here, in a batch case's
-    -- @refused, and in an MCP tool result.
+    -- A refusal is held in the slot of an error, and written as the refusal
+    -- and its reason: in the contents of a response tagged Refused, as here,
+    -- in a batch case's @refused, and in an MCP tool result.
     describe "a refusal in the place of an error" do
       it "reads a refusal as an EvaluatorError and writes it back as it was" do
         fmap Aeson.toJSON (Aeson.fromJSON refusal :: Aeson.Result EvaluatorError)
           `shouldBe` Aeson.Success refusal
       it "reads a response that refused and writes it back as it was" do
-        let body = Aeson.object ["tag" Aeson..= ("Error" :: Text.Text), "contents" Aeson..= refusal]
+        let body = Aeson.object ["tag" Aeson..= ("Refused" :: Text.Text), "contents" Aeson..= refusal]
         fmap Aeson.toJSON (Aeson.fromJSON body :: Aeson.Result SimpleResponse)
           `shouldBe` Aeson.Success body
+      it "reads a refusal tagged Error, as one was written before, and writes it tagged Refused" do
+        let old = Aeson.object ["tag" Aeson..= ("Error" :: Text.Text), "contents" Aeson..= refusal]
+            new = Aeson.object ["tag" Aeson..= ("Refused" :: Text.Text), "contents" Aeson..= refusal]
+        fmap Aeson.toJSON (Aeson.fromJSON old :: Aeson.Result SimpleResponse)
+          `shouldBe` Aeson.Success new
  where
   refusal = Aeson.object
     [ "kind" Aeson..= ("refused" :: Text.Text)

@@ -261,7 +261,10 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
       runDeonticEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs st evts
         vf.fnImpl.deonticPartyType vf.fnImpl.deonticActionType
         mTraceHeader mTraceParam mGraphViz
+  -- A refusal is answered with 200, as an answer is: the rules declined to
+  -- answer, which is not an error of the call (tagged Refused, 'SimpleResponse').
   case result of
+    SimpleError (EvaluatorRefused _) -> pure $ addHeader allocBytes result
     SimpleError _ -> throwEvalError allocBytes result
     _ -> pure $ addHeader allocBytes result
 
