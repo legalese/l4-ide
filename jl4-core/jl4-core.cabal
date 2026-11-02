@@ -182,6 +182,7 @@ test-suite jl4-core-test
     MixfixRegistryMergeSpec
     PatternMatchParserSpec
     PatternClausesMissingSpec
+    NestedParenParserSpec
     EventExactPrintSpec
     FormatFidelitySpec
     UUID5Spec
