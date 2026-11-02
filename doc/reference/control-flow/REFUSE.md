@@ -185,24 +185,23 @@ DECIDE `may travel` IF
     adult AND REFUSE "travel is not modelled"
 ```
 
-is rendered as
+is rendered by `l4 render --format text` as
 
 ```text
-• May travel holds if:
-    all of the following are true:
-    - adult
-    - the model refuses to answer: “travel is not modelled”
+1. May travel if:
+    (a) adult; and
+    (b) the model refuses to answer: “travel is not modelled”.
 ```
 
 Read such a line as the point at which the rule stops without an answer: the rule reaches it only when what comes before it has not settled the answer, here for an adult.
-A refusal with a name of its own is written by its name, as `covered` reads "otherwise: the insurance of a minor is not modelled".
+A refusal with a name of its own is written by its name, as `covered` reads "Otherwise: the insurance of a minor is not modelled".
 
 ## Limits
 
 - The reason is the string literal beside `REFUSE`: `REFUSE 42` is a type error, and `REFUSE ("a" APPEND "b")` is a parse error.
   In `REFUSE "a" APPEND "b"`, `REFUSE` takes `"a"` alone, so the rule refuses with the reason "a".
 - A directive prints the reason exactly as written, spaces included, and `REFUSE ""` refuses with an empty reason.
-- `REFUSE` is a keyword, so a definition named `REFUSE` is written in backticks, `` `REFUSE` ``.
+- `REFUSE` and `REFUSED` are keywords everywhere, though `REFUSED` is used only in `#ASSERT REFUSED`, so a name spelled either way is written in backticks: `DECLARE Status IS ONE OF Approved, REFUSED` is a parse error ("unexpected REFUSED"), and `` DECLARE Status IS ONE OF Approved, `REFUSED` `` checks.
 - An operator with more than one meaning must be able to tell the type of a refusal it is given.
   Under `IMPORT daydate`, `PLUS` adds numbers and dates, so L4 must be able to tell whether a refusal added to a number stands for a number or for a date.
   A `GIVETH A NUMBER` on a rule whose answer is the sum, or on the named refusal, tells it, so `` `the deposit` `` above checks under `IMPORT daydate`.

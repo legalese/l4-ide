@@ -76,6 +76,7 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 | **OTHERWISE**                    | The branch for every remaining case, in CONSIDER and BRANCH                          | [CONSIDER](control-flow/CONSIDER.md) |
 | **EXACTLY**                      | In a pattern, matches a given value; in a regulative rule, matches an action exactly | [CONSIDER](control-flow/CONSIDER.md) |
 | **REFUSE**                       | Declines to answer, and gives the author's reason: `REFUSE "reason"`                 | [REFUSE](control-flow/REFUSE.md)     |
+| **REFUSED**                      | Reserved for `#ASSERT REFUSED`; a name spelled `REFUSED` is written in backticks     | [REFUSE](control-flow/REFUSE.md)     |
 
 ## Operators
 
