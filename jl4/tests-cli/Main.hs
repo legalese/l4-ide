@@ -1597,7 +1597,7 @@ spec bin = do
           absFile <- makeAbsolute refuseFile
           (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
             { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
-          hPutStr hin (unlines (queries <> [":quit"]))
+          BS.hPut hin (TE.encodeUtf8 (T.pack (unlines (queries <> [":quit"]))))
           hClose hin
           hSetBinaryMode hout True
           hSetBinaryMode herr True
@@ -1639,6 +1639,12 @@ spec bin = do
       -- the first two lines of each reply; :traceascii adds the trace below them
       map (take 2 . T.lines) replies `shouldBe`
         replicate 4 ["Refused: line one", "         line two"]
+
+    -- A reason outside ASCII comes back as it went in, through a pipe each
+    -- way: UTF-8, which on Windows is not the console's code page.
+    it "reads a query and writes its reply in UTF-8" $ withRepl \repl -> do
+      replies <- replReplies repl ["REFUSE \"§ 12 is not modelled\""]
+      replies `shouldBe` ["Refused: § 12 is not modelled"]
 
     it "lists #ASSERT REFUSED in its :help" $ withRepl \repl -> do
       replies <- replReplies repl [":help"]
