@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | The parser once took time exponential in how deeply parentheses nest:
--- @#EVAL ((1 PLUS 1) PLUS 1)@ nested 16 levels took 15 s, nested 18 took more
--- than a minute, and every further level doubled it.
+-- @l4 check@ on @#EVAL ((1 PLUS 1) PLUS 1)@ took 0.8 s nested 12 levels and
+-- 12 s nested 16 (@main@ at 2ae7c9b1d, 2026-11-02), and every further level
+-- doubled it.
 --
--- Three shapes did it, and each parsed the same bracketed group more than once:
+-- Two shapes did it, and both parsed the same bracketed group more than once:
 --
 --   * __a @try@ whose branch parses the whole group and then fails.__
 --     'L4.Parser.baseExpr'' tried a genitive projection (@(e)'s field@) first;
@@ -16,22 +17,23 @@
 --     ahead to see whether an expression followed it, by parsing that
 --     expression, which the infix reading then parsed again.
 --
---   * __a bracket in pattern position, read as a pattern first.__
---     'L4.Parser.parenPatternOrExpr' tried @(…)@ as a pattern and, when it was
---     not one, read it again as an expression. When the bracket holds a
---     @CONSIDER@ (or a @MUST@) whose own pattern slot holds the next bracket,
---     the failed pattern attempt had already parsed that inner @CONSIDER@,
---     and the expression reading parsed it again: twice per level.
+-- (On @unstable@ a third shape did it too: a bracket in pattern position
+-- read first as a pattern and then as an expression, 'parenPatternOrExpr'.
+-- That reading is not on @main@, where an expression in pattern position is
+-- spelled with @EXACTLY@, so the pattern-position cases here use that
+-- spelling.)
 --
 -- Each case in 'depthSpec' nests one construct 40 levels deep. Once parsing
 -- is polynomial in depth, that takes milliseconds. The exponential parser
--- (21467cd84 on @unstable@) cannot finish thirteen of its fifteen cases in a
--- lifetime. The other two, a genitive projection on a bracketed head and
--- brackets that are patterns, did not double per level there and pass on it
--- too; they guard against a change that would make them double. The time
--- budget is therefore deliberately generous: a slow CI machine cannot make a
--- correct parser fail it, and no machine can make the exponential parser
--- pass the other thirteen.
+-- (@main@ at 2ae7c9b1d; @l4 check@, single runs, 2026-11-02) doubled per
+-- level on fourteen of its fifteen cases: at depth 16 each took 6.5 s or
+-- more, and eight did not finish within 30 s; four of the @EXACTLY@ nests
+-- holding a @CONSIDER@ took 25 s or more already at depth 8. The other
+-- one, a genitive projection on a bracketed head, did not double per level
+-- there and passes on it too; it guards against a change that would make it
+-- double. The time budget is therefore deliberately generous: a slow CI
+-- machine cannot make a correct parser fail it, and no machine can make the
+-- exponential parser pass the other fourteen.
 --
 -- Each 'depthSpec' case also exact-prints the parsed module back to its
 -- source, which fails if the deep parse dropped or reordered a token.
@@ -107,49 +109,25 @@ depthSpec =
             ]
         )
 
-    it "a bracketed expression in pattern position: WHEN ((1 PLUS 1) PLUS 1) THEN" $
+    it "an expression in pattern position: WHEN EXACTLY ((1 PLUS 1) PLUS 1) THEN" $
       parsesWithin
         ( T.unlines
             [ "GIVETH A BOOLEAN"
             , "probe MEANS"
             , "  CONSIDER 3"
-            , "  WHEN " <> leftNested "PLUS" <> " THEN TRUE"
+            , "  WHEN EXACTLY " <> leftNested "PLUS" <> " THEN TRUE"
             , "  OTHERWISE FALSE"
             ]
         )
 
-    it "a bracketed expression as a deontic action's argument: MUST pay ((1 PLUS 1) PLUS 1)" $
-      parsesWithin
-        ( T.unlines
-            [ "DECLARE Person IS ONE OF alice, bob"
-            , "DECLARE Act IS ONE OF"
-            , "  pay HAS amount IS A NUMBER"
-            , ""
-            , "GIVETH A DEONTIC Person Act"
-            , "probe MEANS"
-            , "  PARTY alice"
-            , "  MUST pay " <> leftNested "PLUS"
-            , "  WITHIN 3"
-            ]
-        )
+    it "an expression as a deontic action's argument: MUST pay (EXACTLY ((1 PLUS 1) PLUS 1))" $
+      parsesWithin (inMust ("(EXACTLY " <> leftNested "PLUS" <> ")"))
 
-    it "a bracket in pattern position holding a CONSIDER whose WHEN holds the next bracket" $
-      parsesWithin (inWhen (nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"))
+    it "an expression in pattern position holding a CONSIDER whose WHEN holds the next one" $
+      parsesWithin (inWhen (nestedIn exactlyConsiderOpen exactlyConsiderClose "1"))
 
-    it "the same nest as a deontic action's argument: MUST pay ((CONSIDER 1 WHEN … ) PLUS 1)" $
-      parsesWithin
-        ( T.unlines
-            [ "DECLARE Person IS ONE OF alice, bob"
-            , "DECLARE Act IS ONE OF"
-            , "  pay HAS amount IS A NUMBER"
-            , ""
-            , "GIVETH A DEONTIC Person Act"
-            , "probe MEANS"
-            , "  PARTY alice"
-            , "  MUST pay " <> nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"
-            , "  WITHIN 3"
-            ]
-        )
+    it "the same nest as a deontic action's argument: MUST pay (EXACTLY ((CONSIDER 1 WHEN … ) PLUS 1))" $
+      parsesWithin (inMust ("(" <> nestedIn exactlyConsiderOpen exactlyConsiderClose "1" <> ")"))
 
     it "the same nest as a DECIDE clause's argument" $
       parsesWithin
@@ -157,33 +135,31 @@ depthSpec =
             [ "GIVEN n IS A NUMBER"
             , "GIVETH A NUMBER"
             , "DECIDE probe n IS 0"
-            , "DECIDE probe " <> nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1" <> " IS 1"
+            , "DECIDE probe (" <> nestedIn exactlyConsiderOpen exactlyConsiderClose "1" <> ") IS 1"
             ]
         )
 
-    it "a pattern-shaped head, then the bracket, then an operator: (f (CONSIDER … ) PLUS 1)" $
-      parsesWithin (inWhen (nestedIn "(f (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"))
+    it "a name head, then the bracket, then an operator: EXACTLY (f (CONSIDER … ) PLUS 1)" $
+      parsesWithin (inWhen (nestedIn "EXACTLY (f (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"))
 
-    it "a pattern operator before the bracket, then an operator: (x FOLLOWED BY (CONSIDER … ) PLUS 1)" $
-      parsesWithin (inWhen (nestedIn "(x FOLLOWED BY (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "x"))
+    it "a pattern operator before the expression: (x FOLLOWED BY EXACTLY ((CONSIDER … ) PLUS 1))" $
+      parsesWithin (inWhen (nestedIn "(x FOLLOWED BY EXACTLY ((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1))" "x"))
 
-    it "brackets that ARE patterns, each holding a CONSIDER: ((CONSIDER … ) FOLLOWED BY x)" $
-      parsesWithin (inWhen (nestedIn "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) FOLLOWED BY x)" "x"))
+    it "brackets that ARE patterns, each holding a CONSIDER: ((EXACTLY (CONSIDER … )) FOLLOWED BY x)" $
+      parsesWithin (inWhen (nestedIn "((EXACTLY (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2)) FOLLOWED BY x)" "x"))
 
--- | Speeding the parser up must not move its errors. A bracket in pattern
--- position that is neither a pattern nor an expression fails both readings,
--- and megaparsec reports whichever got further; when such brackets nest, the
--- error depends on both readings of every level. An earlier version of the
--- fix (badea173a) got all six cases below wrong. In five it reported an
--- outer bracket or keyword instead, in the last of them in place of the
--- indentation diagnostic. In the third it reported the same token, but left
--- @EXACTLY@ out of what it expected.
+-- | Speeding the parser up must not move its errors. On @unstable@, where a
+-- bracket in pattern position is read as a pattern and then as an
+-- expression, an earlier version of the fix moved the errors of these six
+-- broken nests. On @main@ such a bracket is read only as a pattern, and the
+-- six are kept as broken nests whose errors must not move either.
 --
 -- Each expected position and message is copied from what the parser reported
--- before MATRYOSHKA was fixed: @l4 ast@ at 21467cd84 on @unstable@.
+-- before MATRYOSHKA was fixed: @l4 check@ at 2ae7c9b1d on @main@, the base of
+-- the port of legalese/l4-ide#582.
 errorSpec :: Spec
 errorSpec =
-  describe "a nest of brackets in pattern position that fail both readings reports the error the parser always reported" $
+  describe "a broken nest of brackets in pattern position reports the error the parser always reported" $
     for_ brokenNests \ (name, src, at, expected) ->
       it name $ failsWith src at expected
 
@@ -207,19 +183,17 @@ brokenNests =
         , "GIVETH A NUMBER"
         , "other MEANS 1"
         ]
-    , (9, 44)
-    , "unexpected 's\n"
-        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+    , (9, 35)
+    , "unexpected PLUS\n" <> patternArgumentExpected
     )
   , ("WHEN (((EXACTLY 1 PLUS) z PLUS) w PLUS)", inWhen "(((EXACTLY 1 PLUS) z PLUS) w PLUS)", (3, 32), closeBracketExpected)
   , ( "WHEN (((x ,) z PLUS) w PLUS)"
     , inWhen "(((x ,) z PLUS) w PLUS)"
     , (3, 24)
-    , "unexpected ,\n"
-        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, EXACTLY, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+    , "unexpected ,\n" <> patternArgumentExpected
     )
-  , ("WHEN (f ((g (1 PLUS) y PLUS)) x PLUS)", inWhen "(f ((g (1 PLUS) y PLUS)) x PLUS)", (3, 29), closeBracketExpected)
-  , ("WHEN (f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", inWhen "(f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", (3, 31), closeBracketExpected)
+  , ("WHEN (f ((g (1 PLUS) y PLUS)) x PLUS)", inWhen "(f ((g (1 PLUS) y PLUS)) x PLUS)", (3, 29), patternCloseExpected)
+  , ("WHEN (f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", inWhen "(f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", (3, 31), patternCloseExpected)
   , ( "a DECIDE argument whose IF ... ELSE runs onto a line indented too little"
     , T.unlines
         [ "GIVEN n IS A NUMBER"
@@ -236,6 +210,11 @@ brokenNests =
     closeBracketExpected =
       "unexpected PLUS\n"
         <> "expecting %, ), FOLLOWED, WHERE, infix identifier, mixfix keyword, or space token\n"
+    patternCloseExpected =
+      "unexpected PLUS\n"
+        <> "expecting ), FOLLOWED, or space token\n"
+    patternArgumentExpected =
+      "expecting (, ), EXACTLY, FOLLOWED, Float Literal, Numeric Literal, OF, String Literal, identifier, or space token\n"
 
 -- | The parser's memo ('L4.Parser.memoGroup') replays a bracketed group's
 -- first parse wherever the group is reached again. That is exact only while
@@ -247,49 +226,36 @@ brokenNests =
 --
 -- jl4-test does the same on its whole corpus ("parser memo changes
 -- nothing"). The corpus has few nests and fewer broken ones, so the cases
--- here are nests in pattern position, where a failed pattern reading leaves
--- inner groups for the expression reading to replay: 'errorSpec''s six, and
--- the nests of PATTERN-REFERENCE-RULE-SPEC A.7 three or four levels deep,
--- broken and whole, with mixfix keywords and inline annotations inside the
--- groups replayed, and with an error already pending when they are parsed.
--- Without the memo the parser is exponential in depth, which is why these
--- stay shallow.
+-- here are 'errorSpec''s six, and nests three or four levels deep of
+-- expressions in pattern position holding a @CONSIDER@ (the nests of
+-- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md A.7 on @unstable@, spelled with
+-- @EXACTLY@ as @main@ spells them), broken and whole, with mixfix keywords
+-- and inline annotations inside the groups, and with an error already
+-- pending when they are parsed. Without the memo the parser is exponential
+-- in depth, which is why these stay shallow.
 memoSpec :: Spec
 memoSpec =
   describe "the parser's memo changes nothing: memo on and off agree" $ do
     for_ brokenNests \ (name, src, _, _) ->
       it name $ memoChangesNothing src
-    it "a CONSIDER in pattern position whose WHEN holds the next bracket, four deep" $
-      memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"))
+    it "a CONSIDER in pattern position whose WHEN holds the next one, four deep" $
+      memoChangesNothing (inWhen (nestedTo 4 exactlyConsiderOpen exactlyConsiderClose "1"))
     it "the same nest as a deontic action's argument, four deep" $
-      memoChangesNothing
-        ( T.unlines
-            [ "DECLARE Person IS ONE OF alice, bob"
-            , "DECLARE Act IS ONE OF"
-            , "  pay HAS amount IS A NUMBER"
-            , ""
-            , "GIVETH A DEONTIC Person Act"
-            , "probe MEANS"
-            , "  PARTY alice"
-            , "  MUST pay " <> nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1"
-            , "  WITHIN 3"
-            ]
-        )
-    it "a broken chain, four deep: (f (CONSIDER 1 WHEN … THEN 1, OTHERWISE 2) x PLUS) around (1 PLUS)" $
-      memoChangesNothing (inWhen (nestedTo 4 "(f (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) x PLUS)" "(1 PLUS)"))
-    it "a broken, alternating nest, three deep: (f (g (CONSIDER … ) b PLUS) a PLUS)" $
-      memoChangesNothing (inWhen (nestedTo 3 "(f (g (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) b PLUS) a PLUS)" "(1 PLUS)"))
-    it "an unclosed nest, four deep: ((CONSIDER 1 WHEN ((CONSIDER 1 WHEN …" $
-      memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " "" "1"))
+      memoChangesNothing (inMust ("(" <> nestedTo 4 exactlyConsiderOpen exactlyConsiderClose "1" <> ")"))
+    it "a broken chain, four deep: EXACTLY (f (CONSIDER 1 WHEN … THEN 1, OTHERWISE 2) x PLUS) around (1 PLUS)" $
+      memoChangesNothing (inWhen (nestedTo 4 "EXACTLY (f (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) x PLUS)" "EXACTLY (1 PLUS)"))
+    it "a broken, alternating nest, three deep: EXACTLY (f (g (CONSIDER … ) b PLUS) a PLUS)" $
+      memoChangesNothing (inWhen (nestedTo 3 "EXACTLY (f (g (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) b PLUS) a PLUS)" "EXACTLY (1 PLUS)"))
+    it "an unclosed nest, four deep: EXACTLY ((CONSIDER 1 WHEN EXACTLY ((CONSIDER 1 WHEN …" $
+      memoChangesNothing (inWhen (nestedTo 4 "EXACTLY ((CONSIDER 1 WHEN " "" "1"))
     it "brackets that ARE patterns, each holding a CONSIDER, four deep" $
-      memoChangesNothing (inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) FOLLOWED BY x)" "x"))
+      memoChangesNothing (inWhen (nestedTo 4 "((EXACTLY (CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2)) FOLLOWED BY x)" "x"))
     -- @f plus 1@ is @f@ of two arguments in the first pass, which has no
-    -- mixfix hints, and @plus@ of @f@ and @1@ in the second. @PLUS@ makes
-    -- each level's pattern reading fail, so its expression reading replays.
+    -- mixfix hints, and @plus@ of @f@ and @1@ in the second.
     it "user-defined mixfix keywords, bare and backticked, in a nest in pattern position" $
       memoChangesNothing
         ( plusPrologue
-            <> inWhen (nestedTo 4 "((CONSIDER 1 WHEN " " THEN f plus 1, OTHERWISE 2) PLUS 1 `plus` 1)" "(1 `plus` 1)")
+            <> inWhen (nestedTo 4 "EXACTLY ((CONSIDER 1 WHEN " " THEN f plus 1, OTHERWISE 2) PLUS 1 `plus` 1)" "EXACTLY (1 `plus` 1)")
         )
     it "inline annotations inside a nest in pattern position" $
       memoChangesNothing
@@ -298,7 +264,7 @@ memoSpec =
             , "GIVETH A NUMBER"
             , "probe walks eats MEANS"
             , "  CONSIDER TRUE WHEN "
-                <> nestedTo 3 "((CONSIDER walks [it walks] WHEN " " THEN eats [it eats], OTHERWISE FALSE) AND eats [it eats])" "(walks [it walks])"
+                <> nestedTo 3 "EXACTLY ((CONSIDER walks [it walks] WHEN " " THEN eats [it eats], OTHERWISE FALSE) AND eats [it eats])" "EXACTLY (walks [it walks])"
                 <> " THEN 1, OTHERWISE 2"
             ]
         )
@@ -313,7 +279,7 @@ memoSpec =
             , ""
             , "GIVETH A NUMBER"
             , "probe MEANS"
-            , "  CONSIDER 3 WHEN " <> nestedTo 4 "((CONSIDER 1 WHEN " " THEN 1, OTHERWISE 2) PLUS 1)" "1" <> " THEN 1, OTHERWISE 2"
+            , "  CONSIDER 3 WHEN " <> nestedTo 4 exactlyConsiderOpen exactlyConsiderClose "1" <> " THEN 1, OTHERWISE 2"
             ]
         )
 
@@ -387,6 +353,28 @@ nestedIn = nestedTo depth
 -- | Wrap @core@ in @n@ copies of @open@ … @close@.
 nestedTo :: Int -> Text -> Text -> Text -> Text
 nestedTo n open close core = iterate (\ e -> open <> e <> close) core !! n
+
+-- | One level of the nest of @CONSIDER@s in pattern position, as @main@
+-- spells it: @EXACTLY ((CONSIDER 1 WHEN g THEN 1, OTHERWISE 2) PLUS 1)@,
+-- with the next level as @g@.
+exactlyConsiderOpen, exactlyConsiderClose :: Text
+exactlyConsiderOpen = "EXACTLY ((CONSIDER 1 WHEN "
+exactlyConsiderClose = " THEN 1, OTHERWISE 2) PLUS 1)"
+
+-- | @inMust a@ is a rule whose obligation is @MUST pay a@.
+inMust :: Text -> Text
+inMust a =
+  T.unlines
+    [ "DECLARE Person IS ONE OF alice, bob"
+    , "DECLARE Act IS ONE OF"
+    , "  pay HAS amount IS A NUMBER"
+    , ""
+    , "GIVETH A DEONTIC Person Act"
+    , "probe MEANS"
+    , "  PARTY alice"
+    , "  MUST pay " <> a
+    , "  WITHIN 3"
+    ]
 
 -- | @inWhen g@ is a rule that puts @g@ in the pattern slot of a @WHEN@.
 inWhen :: Text -> Text
