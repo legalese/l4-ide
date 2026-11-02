@@ -25,12 +25,11 @@
 --
 -- Each case in 'depthSpec' nests one construct 40 levels deep. Once parsing
 -- is polynomial in depth, that takes milliseconds. The exponential parser
--- (@main@ at 2ae7c9b1d; @l4 check@, single runs, 2026-11-02) doubled per
--- level on fourteen of its fifteen cases: at depth 16 each took 6.5 s or
--- more, and eight did not finish within 30 s; four of the @EXACTLY@ nests
--- holding a @CONSIDER@ took 25 s or more already at depth 8. The other
--- one, a genitive projection on a bracketed head, did not double per level
--- there and passes on it too; it guards against a change that would make it
+-- (@main@ at 2ae7c9b1d; @l4 check@, 2026-11-02) doubled per level on
+-- fourteen of its fifteen cases: at depth 16 each took 5.8 s or more (median
+-- of three runs), and eight did not finish within 30 s. The other one, a
+-- genitive projection on a bracketed head, did not double per level there
+-- and passes on it too; it guards against a change that would make it
 -- double. The time budget is therefore deliberately generous: a slow CI
 -- machine cannot make a correct parser fail it, and no machine can make the
 -- exponential parser pass the other fourteen.
@@ -233,6 +232,11 @@ brokenNests =
 -- and inline annotations inside the groups, and with an error already
 -- pending when they are parsed. Without the memo the parser is exponential
 -- in depth, which is why these stay shallow.
+--
+-- On @main@ the clause-body memo replays in every case here that defines a
+-- rule, but a bracketed group is reached twice only in the @DECIDE@
+-- argument whose @IF … ELSE@ runs onto the next line (checked on 2026-11-02
+-- with a build that fails on any replay of a group).
 memoSpec :: Spec
 memoSpec =
   describe "the parser's memo changes nothing: memo on and off agree" $ do

@@ -1274,7 +1274,9 @@ parenExpr = memoGroup #exprGroups (paren expr)
 -- __Why.__ A bracketed group can be parsed more than once at the same
 -- position, by two alternatives that both start with it, and when the group
 -- holds the next group, that doubles with every level of nesting. Here the
--- second parse of a group at a position replays the first.
+-- second parse of a group at a position replays the first. Since
+-- 'parenExprOrProjection' and 'postfixOrInfix' read a group once, few groups
+-- are reached twice; the memo bounds whatever alternatives still do.
 --
 -- __Why replaying is exact.__ The first parse runs @p@ to completion with
 -- 'Megaparsec.runParsecT', which records everything megaparsec would have
@@ -2349,7 +2351,8 @@ baseExprStep = baseExpr' >>= postfixOrInfix
 -- needs @b@. This used to be decided by parsing @b@ inside a 'notFollowedBy'
 -- and then, when that succeeded, parsing @b@ again as the chain's operand.
 -- Nested, that doubles per level: @1 `plus` (1 `plus` (1 `plus` 1))@ nested
--- ten deep took more than a minute. 'infixAhead' parses @b@ once and keeps it.
+-- twelve deep did not finish in 30 s. 'infixAhead' parses @b@ once and keeps
+-- it.
 --
 -- When 'infixAhead' fails, the operand look-ahead of the postfix reading is
 -- certain to fail too, so the postfix reading skips it. Both start with
@@ -3044,7 +3047,7 @@ patApp = do
 -- when it was tried over a parenthesised group with no @'s@ after it, the
 -- group was parsed here, thrown away, and parsed again by the plain
 -- parenthesis alternative -- twice per level of nesting, so
--- @((1 PLUS 1) PLUS 1)@ nested 16 deep took 15 s.
+-- @((1 PLUS 1) PLUS 1)@ nested 16 deep took 12 s.
 projection :: Parser (Expr Name)
 projection =
       -- TODO: should 'TGenitive' be part of 'Name' or 'Proj'?
