@@ -57,6 +57,7 @@ import System.Process
   , readCreateProcessWithExitCode
   , terminateProcess
   , waitForProcess
+  , withCreateProcess
   )
 import System.Timeout (timeout)
 import Test.Hspec
@@ -167,17 +168,24 @@ runL4In mCwd mEnv bin args = do
         , env     = mEnv
         , cwd     = mCwd
         }
-  (Just hin, Just hout, Just herr, ph) <- createProcess cp
-  hClose hin
-  hSetBinaryMode hout True
-  hSetBinaryMode herr True
-  (soutBytes, serrBytes) <- readOutputs hout herr
-  code <- waitForProcess ph
-  pure Output
-    { outExit   = code
-    , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
-    , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
-    }
+  -- 'withCreateProcess' terminates the child if this thread is interrupted, by a
+  -- 'timeout' round the call or anything else. Without it a child that never
+  -- finishes outlives the suite: an old jl4-schema on a long import ring did,
+  -- seven times over, with launchd as its parent.
+  withCreateProcess cp \mhin mhout mherr ph -> do
+    (hin, hout, herr) <- case (mhin, mhout, mherr) of
+      (Just i, Just o, Just e) -> pure (i, o, e)
+      _ -> fail ("runL4In: no pipes to " <> bin)
+    hClose hin
+    hSetBinaryMode hout True
+    hSetBinaryMode herr True
+    (soutBytes, serrBytes) <- readOutputs hout herr
+    code <- waitForProcess ph
+    pure Output
+      { outExit   = code
+      , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
+      , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
+      }
 
 -- | Read a child's stdout and stderr to their ends at the same time. Reading
 -- them one after the other deadlocks as soon as the child fills the pipe that
@@ -875,8 +883,19 @@ spec bin = do
           writeFile (dir </> "plain.l4") (rule [])
           writeFile (dir </> "inputs.json") "[{\"x\": 1}]"
           act dir
-        schemaGenerator =
-          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+        -- Found as 'locateL4Binary' finds l4, so the jl4-schema tested is the one
+        -- built here: PATH can put an older install first, and one did.
+        schemaGenerator = do
+          fromEnv <- lookupEnv "JL4_SCHEMA_BIN"
+          fromCabal <- case fromEnv of
+            Just p -> pure (Just p)
+            Nothing -> do
+              (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-schema"]) ""
+              let path = T.unpack (T.strip (T.pack out))
+              ok <- if code == ExitSuccess then doesFileExist path else pure False
+              pure (if ok then Just path else Nothing)
+          found <- maybe (findExecutable "jl4-schema") (pure . Just) fromCabal
+          maybe (fail "jl4-schema not found: set JL4_SCHEMA_BIN or run this with cabal test") pure found
 
     it "the same rule with no ring goes through both, which is what the rest refuses" $
       withProject \dir -> do
