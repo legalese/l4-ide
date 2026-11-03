@@ -35,6 +35,7 @@
   - [DEONTIC](regulative/DEONTIC.md)
   - [EVENT](regulative/EVENT.md)
 - [Syntax and directives](syntax/README.md)
+  - [@nlg](syntax/nlg.md)
 
 ## Library
 

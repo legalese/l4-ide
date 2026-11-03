@@ -49,7 +49,7 @@ import {
 import { AuthManager } from './auth.js'
 import { ServiceClient } from './service-client.js'
 import {
-  AiProxyClient,
+  AiClient,
   BuiltinTools,
   ChatService,
   FileConversationStore,
@@ -62,12 +62,17 @@ import { registerChatParticipant } from './chat-participant.js'
 import { registerAiChatHandlers } from './ai/register.js'
 import { commandRenameIdentifier } from './ai/rename-command.js'
 import { VsCodeMcpTools } from './ai/vscode-mcp.js'
-import { McpOAuthManager } from './ai/mcp-oauth.js'
+import { McpOAuthManager, type McpOAuthCallbackResult } from './ai/mcp-oauth.js'
 import { VsCodeWorkspace } from './ai/vscode-workspace.js'
-import { VsCodeL4Language } from './ai/vscode-l4-language.js'
+import {
+  VsCodeL4Language,
+  type WireDiagnostic,
+} from './ai/vscode-l4-language.js'
 import { VsCodeEditorContext } from './ai/editor-context.js'
 import { SettingsPermissionPolicy } from './ai/vscode-permissions.js'
 import { WebviewUserInteraction } from './ai/vscode-user-interaction.js'
+import { createCloudSessions } from './cloud/vscode-cloud.js'
+import { registerCloudHandlers } from './cloud/register-cloud.js'
 
 /***********************************************
      decode for RenderAsLadderInfo
@@ -539,16 +544,24 @@ export async function activate(context: ExtensionContext) {
     )
   )
 
-  // Register the extension's single URI handler. `/mcp-oauth` routes
-  // to the MCP OAuth client (created further down — late-bound ref);
-  // everything else is the legalese.cloud login callback.
-  const mcpOAuthRef: { handleCallback: (uri: vscode.Uri) => boolean } = {
-    handleCallback: () => false,
-  }
+  // Register the extension's single URI handler. `/mcp-oauth` goes to
+  // the MCP OAuth client (created further down — late-bound ref), and
+  // only there: it carries a `code` the legalese.cloud login would take
+  // for its own. Everything else is the legalese.cloud login callback.
+  const mcpOAuthRef: {
+    handleCallback: (uri: vscode.Uri) => Promise<McpOAuthCallbackResult>
+  } = { handleCallback: async () => 'unknown' }
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri: (uri: vscode.Uri) => {
-        if (uri.path === '/mcp-oauth' && mcpOAuthRef.handleCallback(uri)) {
+        if (uri.path === '/mcp-oauth') {
+          void mcpOAuthRef.handleCallback(uri).then((result) => {
+            if (result === 'unknown') {
+              void vscode.window.showWarningMessage(
+                'This MCP sign-in link has expired or was used already. Sign in again from the Legalese AI settings.'
+              )
+            }
+          })
           return
         }
         void auth.handleAuthCallback(uri)
@@ -599,11 +612,11 @@ export async function activate(context: ExtensionContext) {
   )
 
   // Legalese AI services — independent from the jl4 service URL flow.
-  // The proxy endpoint is hardcoded (see ai-proxy-client.ts) and only
+  // The endpoint is hardcoded (see ai-client.ts) and only
   // overridable via the LEGALESE_AI_ENDPOINT env var for local dev.
   const aiLogger = new AiLogger()
   context.subscriptions.push(aiLogger)
-  const aiProxy = new AiProxyClient({
+  const aiClient = new AiClient({
     auth,
     logger: aiLogger,
     endpoint: vscodeAiEndpoint,
@@ -672,7 +685,7 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(
     registerChatParticipant({
       auth,
-      proxy: aiProxy,
+      aiClient,
       logger: aiLogger,
       tools: new BuiltinTools(aiWorkspace, aiL4Language),
       permissions: aiPermissions,
@@ -697,7 +710,7 @@ export async function activate(context: ExtensionContext) {
   const chatService = new ChatService({
     auth,
     store: aiStore,
-    proxy: aiProxy,
+    aiClient,
     logger: aiLogger,
     dispatcher,
     interaction: aiInteraction,
@@ -707,6 +720,21 @@ export async function activate(context: ExtensionContext) {
       vscode.workspace.getConfiguration().get<string>('legaleseAi.methodology'),
     extensionVersion,
   })
+
+  // Cloud sessions: inert until
+  // `legaleseAi.cloudSessions.enabled` is on —
+  // nothing polls or calls out before a session is started or opened.
+  // Their chat events take the same path as the local chat service's.
+  const cloudSessions = createCloudSessions({
+    auth,
+    client,
+    mcp: vsMcpTools,
+    emitChat: (event) => aiInteraction.emit(event),
+    logger: aiLogger,
+    storage: context.globalState,
+    summarizeTitle: (text) => aiClient.summarizeTitle(text),
+  })
+  context.subscriptions.push(cloudSessions)
 
   // Instantiate the sidebar provider BEFORE wiring AI chat handlers
   // so the handlers can subscribe to its visibility event and buffer
@@ -728,7 +756,7 @@ export async function activate(context: ExtensionContext) {
       auth,
       service: chatService,
       store: aiStore,
-      proxy: aiProxy,
+      aiClient,
       logger: aiLogger,
       interaction: aiInteraction,
       permissions: aiPermissions,
@@ -738,6 +766,27 @@ export async function activate(context: ExtensionContext) {
       vsMcp: vsMcpTools,
       serviceClient,
       extensionPath: context.extensionPath,
+    })
+  )
+
+  context.subscriptions.push(
+    registerCloudHandlers({
+      messenger: sidebarMessenger,
+      frontend: sidebarWebviewFrontend,
+      cloud: cloudSessions,
+      logger: aiLogger,
+      storage: context.globalState,
+      account: () => {
+        const user = auth.getUserId()
+        const org = auth.getCloudOrgSlug()
+        return user && org ? `${user}:${org}` : undefined
+      },
+      visibility: sidebarProvider,
+      reveal: async () => {
+        await sidebarProvider.revealSidebar()
+        await sidebarProvider.waitUntilReady()
+        sidebarProvider.switchToTab('ai-chat')
+      },
     })
   )
 
@@ -913,6 +962,27 @@ export async function activate(context: ExtensionContext) {
   // current directive results. Forward them to the inspector webview as SyncInspectorResults.
   // This replaces the old onDidChangeDiagnostics + per-directive request approach,
   // eliminating the race condition where evaluation hadn't completed yet.
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      aiL4Language.forgetDocument(doc.uri.toString())
+    })
+  )
+  context.subscriptions.push(
+    client.onNotification(
+      'l4/fileChecked',
+      (params: {
+        uri: string
+        version: number | null
+        diagnostics: WireDiagnostic[]
+      }) => {
+        aiL4Language.recordFileChecked(
+          params.uri,
+          params.version ?? null,
+          params.diagnostics ?? []
+        )
+      }
+    )
+  )
   context.subscriptions.push(
     client.onNotification(
       'l4/directiveResultsUpdated',

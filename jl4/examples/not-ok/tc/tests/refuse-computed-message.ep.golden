@@ -4,7 +4,7 @@ File: refuse-computed-message.l4
   Range: 11:28-11:28
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-open-paren
   Message:
        |
     11 | `bad refusal` MEANS REFUSE (1 PLUS 1)

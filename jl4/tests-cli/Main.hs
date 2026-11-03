@@ -175,14 +175,26 @@ runL4In mCwd mEnv bin args = do
   hClose hin
   hSetBinaryMode hout True
   hSetBinaryMode herr True
-  soutBytes <- BS.hGetContents hout
-  serrBytes <- BS.hGetContents herr
+  (soutBytes, serrBytes) <- readOutputs hout herr
   code <- waitForProcess ph
   pure Output
     { outExit   = code
     , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
+
+-- | Read a child's stdout and stderr to their ends at the same time. Reading
+-- them one after the other deadlocks as soon as the child fills the pipe that
+-- isn't being read: it waits for room there, and we wait for it to close the
+-- other one. How much a pipe holds differs by platform, so that can pass
+-- everywhere but Windows.
+readOutputs :: Handle -> Handle -> IO (BS.ByteString, BS.ByteString)
+readOutputs hout herr = do
+  errVar <- newEmptyMVar
+  _ <- forkIO (BS.hGetContents herr >>= putMVar errVar)
+  outBytes <- BS.hGetContents hout
+  errBytes <- takeMVar errVar
+  pure (outBytes, errBytes)
 
 -- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
 -- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports
@@ -383,6 +395,69 @@ queryPlanDeclineDir = fixtureDir </> "refuse-queryplan"
 -- projections agree (smucclaw/l4-ide#972).
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
+
+-- Rules whose meaning a flat rendering would change, one per case.
+renderMeaningFixture :: FilePath
+renderMeaningFixture = fixtureDir </> "render-meaning.l4"
+
+-- Rules whose rendering needs the renderer's own connecting words.
+renderHebrewWordsFixture :: FilePath
+renderHebrewWordsFixture = fixtureDir </> "render-hebrew-words.l4"
+
+-- A module that checks, importing one that does not.
+renderBrokenImportFixture, renderBrokenImportLib :: FilePath
+renderBrokenImportFixture = fixtureDir </> "render-broken-import.l4"
+renderBrokenImportLib     = fixtureDir </> "render-broken-import-lib.l4"
+
+-- The shape of a document, as `l4 render` lays it out.
+renderHouseStyleFixture :: FilePath
+renderHouseStyleFixture = fixtureDir </> "render-house-style.l4"
+
+-- An @nlg on its own line above a rule that has no GIVEN.
+nlgOwnLineFixture :: FilePath
+nlgOwnLineFixture = fixtureDir </> "nlg-own-line.l4"
+
+-- An @nlg on a MIXFIX definition, read at a call site in the same module, and
+-- across an IMPORT. The importing fixture makes the same calls, row for row,
+-- as the local one (less one row it says it leaves out), so one expected list
+-- serves both.
+nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib :: FilePath
+nlgMixfixLocalFixture  = fixtureDir </> "nlg-mixfix-local.l4"
+nlgMixfixImportFixture = fixtureDir </> "nlg-mixfix-import.l4"
+nlgMixfixImportLib     = fixtureDir </> "nlg-mixfix-import-lib.l4"
+
+-- A rule imported through two levels: top imports mid, which imports deep.
+-- `mid rule` makes a WITH call to a function in deep and is shown in top's
+-- document under "Imported definitions".
+nlgTransTop, nlgTransMid, nlgTransDeep :: FilePath
+nlgTransTop  = fixtureDir </> "nlg-trans-top.l4"
+nlgTransMid  = fixtureDir </> "nlg-trans-mid.l4"
+nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
+
+-- A herald belongs to the definition a call resolved to. The main module reuses
+-- the names of definitions that carry heralds, in the library next to it and in
+-- the prelude, for definitions of its own.
+-- A rule named but not called: passed on as a value, or named with no inputs.
+nlgBareReference :: FilePath
+nlgBareReference = fixtureDir </> "nlg-bare-reference.l4"
+
+nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
+nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
+nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
+nlgOwnerOverload = fixtureDir </> "nlg-owner-overload.l4"
+
+-- A positional call is a record construction only if its head is the record's
+-- constructor. The main module has records named like a function in the library
+-- (no herald) and like a function in the prelude (with one).
+nlgPositionalMain, nlgPositionalLib :: FilePath
+nlgPositionalMain = fixtureDir </> "nlg-positional-main.l4"
+nlgPositionalLib  = fixtureDir </> "nlg-positional-lib.l4"
+
+-- The example the syntax reference links for this: one mixfix function with a
+-- herald, and a rule that calls it. The test that reads it pins the page's
+-- claim, not just the output.
+nlgMixfixDocExample :: FilePath
+nlgMixfixDocExample = "../doc/reference/syntax/nlg-mixfix-example.l4"
 
 -- The `l4 nlg` differential pairs: a corpus module and the golden jl4-test
 -- wrote for it.
@@ -632,6 +707,12 @@ main = do
        , syntaxImportEntry, lexImportEntry, missingImportEntry
        , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
        , nlgHeadPlacementSource
+       , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture
+       , renderBrokenImportFixture, renderBrokenImportLib, renderHebrewWordsFixture
+       , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
+       , nlgTransTop, nlgTransMid, nlgTransDeep
+       , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
+       , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
@@ -786,6 +867,64 @@ spec bin = do
   -- command line, and the verdict looked only at the named file's typecheck. A
   -- self-import is the exception: there the error lands on the entry file, so
   -- it already failed, which makes it the positive control for the rest.
+  describe "a file on a ring of imports is refused, not run with the import left out" $ do
+    let rule imports = unlines $
+          map ("IMPORT " <>) imports <>
+          [ ""
+          , "@export Doubles a number"
+          , "GIVEN x IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE doubled x IS x TIMES 2"
+          ]
+        withProject act = withSystemTempDirectory "l4-import-ring" \dir -> do
+          writeFile (dir </> "left.l4") (rule ["right"])
+          writeFile (dir </> "right.l4") "IMPORT left\n\nDECIDE `the rate` IS 2\n"
+          writeFile (dir </> "solo.l4") (rule ["solo"])
+          writeFile (dir </> "plain.l4") (rule [])
+          writeFile (dir </> "inputs.json") "[{\"x\": 1}]"
+          act dir
+        schemaGenerator =
+          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+
+    it "the same rule with no ring goes through both, which is what the rest refuses" $
+      withProject \dir -> do
+        Output batchCode _ _ <- runL4 bin ["batch", dir </> "plain.l4", "--inputs", dir </> "inputs.json"]
+        batchCode `shouldBe` ExitSuccess
+        schema <- schemaGenerator
+        Output schemaCode _ _ <- runL4 schema [dir </> "plain.l4"]
+        schemaCode `shouldBe` ExitSuccess
+
+    forM_ [("a ring of imports", "left.l4"), ("a self-import", "solo.l4")] \(what, file) -> do
+      it ("l4 batch refuses " <> what) $
+        withProject \dir -> do
+          Output code sout _ <- runL4 bin ["batch", dir </> file, "--inputs", dir </> "inputs.json"]
+          code `shouldBe` ExitFailure 1
+          sout `shouldSatisfy` ("type checking failed" `isInfixOf`)
+
+      it ("jl4-schema refuses " <> what) $
+        withProject \dir -> do
+          schema <- schemaGenerator
+          Output code _ serr <- runL4 schema [dir </> file]
+          code `shouldBe` ExitFailure 1
+          serr `shouldSatisfy` ("Failed to parse or typecheck" `isInfixOf`)
+
+    -- More on stderr than any platform's pipe holds, and nothing on stdout. A
+    -- Windows pipe holds about 4 KB, so the ring above stopped the release build
+    -- there and passed everywhere else; this one would stop it everywhere.
+    it "jl4-schema refuses a ring too long for its log to fit in a pipe" $
+      withSystemTempDirectory "l4-long-ring" \dir -> do
+        let links = 100 :: Int
+            link i = "link" <> show (i `mod` links)
+        forM_ [1 .. links] \i ->
+          writeFile (dir </> link i <> ".l4") ("IMPORT " <> link (i + 1) <> "\n\nDECIDE `the rate` IS 2\n")
+        schema <- schemaGenerator
+        finished <- timeout 60000000 (runL4 schema [dir </> link 1 <> ".l4"])
+        case finished of
+          Nothing -> expectationFailure "jl4-schema did not finish within a minute"
+          Just (Output code _ serr) -> do
+            code `shouldBe` ExitFailure 1
+            length serr `shouldSatisfy` (> 65536)
+
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
       it ("fails " <> cmd <> " on a 3-module import ring") $
@@ -916,10 +1055,10 @@ spec bin = do
       code `shouldBe` ExitSuccess
       -- Windows ends lines with a carriage return, as in the l4 format test.
       let sout = filter (/= '\r') sout0
-      sout `shouldSatisfy` ("- if it is Green: 2\n    - otherwise: 3" `isInfixOf`)
-      sout `shouldSatisfy` ("depending on input 1:" `isInfixOf`)
-      sout `shouldSatisfy` ("- otherwise: the result of clause 2" `isInfixOf`)
-      sout `shouldSatisfy` ("The result of clause 2 is determined by:" `isInfixOf`)
+      sout `shouldSatisfy` ("| Green      | 2      |\n    | otherwise  | 3      |" `isInfixOf`)
+      sout `shouldSatisfy` ("depends on input 1:" `isInfixOf`)
+      sout `shouldSatisfy` ("(b) Otherwise: the result of clause 2." `isInfixOf`)
+      sout `shouldSatisfy` ("The result of clause 2 depends on input 1:" `isInfixOf`)
       sout `shouldNotSatisfy` mentionsOldName
 
     it "names no generated input in the HTML rendering either" $ do
@@ -1458,7 +1597,7 @@ spec bin = do
           absFile <- makeAbsolute refuseFile
           (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
             { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
-          hPutStr hin (unlines (queries <> [":quit"]))
+          BS.hPut hin (TE.encodeUtf8 (T.pack (unlines (queries <> [":quit"]))))
           hClose hin
           hSetBinaryMode hout True
           hSetBinaryMode herr True
@@ -1500,6 +1639,12 @@ spec bin = do
       -- the first two lines of each reply; :traceascii adds the trace below them
       map (take 2 . T.lines) replies `shouldBe`
         replicate 4 ["Refused: line one", "         line two"]
+
+    -- A reason outside ASCII comes back as it went in, through a pipe each
+    -- way: UTF-8, which on Windows is not the console's code page.
+    it "reads a query and writes its reply in UTF-8" $ withRepl \repl -> do
+      replies <- replReplies repl ["REFUSE \"§ 12 is not modelled\""]
+      replies `shouldBe` ["Refused: § 12 is not modelled"]
 
     it "lists #ASSERT REFUSED in its :help" $ withRepl \repl -> do
       replies <- replReplies repl [":help"]
@@ -1553,8 +1698,9 @@ spec bin = do
           , ":trace #ASSERT REFUSED 1"
           ]
         length replies `shouldBe` 4
+        -- the trace is saved with the platform's line endings, as `l4 trace` saves one
         headers <- forM ["trace-01.dot", "trace-02.dot", "trace-03.dot"] \name -> do
-          saved <- TE.decodeUtf8Lenient <$> BS.readFile (work </> name)
+          saved <- T.filter (/= '\r') . TE.decodeUtf8Lenient <$> BS.readFile (work </> name)
           pure [ l | l <- T.lines saved, "// Result: " `T.isPrefixOf` l ]
         case headers of
           [[expr], [asserted], [failed]] -> do
@@ -2454,8 +2600,7 @@ spec bin = do
           hClose hin
           hSetBinaryMode hout True
           hSetBinaryMode herr True
-          soutBytes <- BS.hGetContents hout
-          _ <- BS.hGetContents herr
+          (soutBytes, _) <- readOutputs hout herr
           _ <- waitForProcess ph
           -- the banner, then one reply after each prompt, then the last prompt's goodbye
           let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
@@ -2646,10 +2791,10 @@ spec bin = do
     it "renders the same sentences through l4 render, which is the point" $ do
       Output code sout _ <- renderOf
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("row five saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row seven saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row eight saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row twelve saw amount over floor" `isInfixOf`)
+      sout `shouldSatisfy` ("Row five saw [amount]" `isInfixOf`)
+      sout `shouldSatisfy` ("Row seven saw [amount]" `isInfixOf`)
+      sout `shouldSatisfy` ("Row eight saw [amount]" `isInfixOf`)
+      sout `shouldSatisfy` ("Row twelve saw [amount] over [floor]" `isInfixOf`)
 
     it "reads the placements that already worked the same way, argument in the slot" $ do
       Output _ sout _ <- nlgOf
@@ -2676,13 +2821,13 @@ spec bin = do
       -- A call through the alias reads the same.
       nlgOut `shouldNotSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
       nlgOut `shouldSatisfy` (unlines ["row ten saw 200", "row ten saw `amount` where `amount` is 200", "row ten saw 200"] `isInfixOf`)
-      renOut `shouldSatisfy` ("row ten saw amount" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row ten saw [amount] if amount is more than 100." `isInfixOf`)
       -- Row 11: the herald above the head lands on the declaration. A `WITH`
       -- call used to print the bare name, "`row eleven` where ...".
       nlgOut `shouldSatisfy` endsLine "row eleven saw 200"
       nlgOut `shouldSatisfy` ("row eleven saw `amount` where `amount` is 200" `isInfixOf`)
       nlgOut `shouldNotSatisfy` ("`row eleven` where" `isInfixOf`)
-      renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row eleven saw [amount] if amount is more than 100." `isInfixOf`)
 
     it "heads a WITH call with the herald without re-expanding an input's gloss (row 13)" $ do
       Output _ nlgOut _ <- nlgOf
@@ -2698,8 +2843,8 @@ spec bin = do
       nlgOut `shouldSatisfy` endsLine "`row fourteen` with 200"
       nlgOut `shouldSatisfy` ("`row fourteen` where the sum of money is 200" `isInfixOf`)
       nlgOut `shouldNotSatisfy` ("the sum of money with 200" `isInfixOf`)
-      renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
-      renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` (" if the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row fourteen if amount is more than 100" `isInfixOf`)
 
     it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15, 16)" $ do
       Output _ nlgOut _ <- nlgOf
@@ -2710,15 +2855,439 @@ spec bin = do
       nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
       nlgOut `shouldSatisfy` (joinLines ["`row sixteen` with 200", "`row sixteen` where the sum of money is 200"] `isInfixOf`)
       -- Render describes each rule by its own body.
-      renOut `shouldSatisfy` ("Row fifteen holds if amount is more than floor" `isInfixOf`)
-      renOut `shouldSatisfy` ("Row sixteen means amount is more than 100" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row fifteen if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen if amount is more than 100" `isInfixOf`)
       renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
 
     it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
       Output _ nlgOut _ <- nlgOf
       Output _ renOut _ <- renderOf
       nlgOut `shouldSatisfy` endsLine "row seventeen saw 200"
-      renOut `shouldSatisfy` ("Row seventeen means row seventeen saw amount" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row seventeen saw [amount] if amount is more than 100." `isInfixOf`)
+
+  -- An @nlg on a MIXFIX definition, read at its call sites. A mixfix call
+  -- resolves to the operator's canonical name (`the lower of _ and _`), while the
+  -- herald table was keyed on the definition's head keyword alone (`the lower
+  -- of`), so an interleaved call never found its herald and printed the pattern
+  -- with the arguments after it, or, where the herald sat on the head, with its
+  -- slots unfilled. The `OF` spelling and a `WITH` call resolve to the head
+  -- keyword and always worked; they are rows here so a repair that keys on the
+  -- canonical name ONLY would fail them.
+  --
+  -- Whole-output equality, not `isInfixOf`: the failure being guarded is a line
+  -- that reads plausibly and is wrong, and an infix test would not see a wrong
+  -- line sitting beside a right one.
+  describe "an @nlg on a mixfix definition" $ do
+    let -- Lines of `l4 nlg`'s output with any carriage return dropped, as the house idiom does.
+        nlgLines fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        -- One line per #EVAL in the fixtures, in order. The first seven are the
+        -- interleaved calls, then the nested one, then the OF and WITH calls.
+        interleaved =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          , "840 less 160"
+          , "840 and 160 together"
+          , "the first of 840 with 160"
+          , "`the bare _ and _` with 840 and 160"
+          , "the greater of 3 and 4"
+          , "the smaller of the smaller of 5 and 6 and 7"
+          ]
+        ofCalls =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          ]
+        lowerWith = "the smaller of `a` and `b` where `a` is 840 and `b` is 160"
+        exceedsWith = "the amount by which `a` exceeds `b` where `a` is 840 and `b` is 160"
+        -- The prefix control with its herald after the last input: positional,
+        -- then WITH. Across an IMPORT the WITH call used to print the herald a
+        -- second time, as the label of `b`.
+        gapRows =
+          [ "the gap between 840 and 160"
+          , "the gap between `a` and `b` where `a` is 840 and `b` is 160"
+          ]
+
+    it "fills the herald's slots at a call in the same module" $ do
+      rows <- nlgLines nlgMixfixLocalFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
+
+    it "fills the herald's slots at a call across an IMPORT" $ do
+      rows <- nlgLines nlgMixfixImportFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
+
+    -- The other reader of a herald at a call site: `l4 render`, for a call in the
+    -- body of another rule. The fixtures end in one rule per call shape, named
+    -- "render ...". A rule's bullet is "• Render lower means ..."; the bullet is
+    -- not what is being tested, so the row is the text after it.
+    let renderRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ drop 1 (dropWhile (/= ' ') l)
+               | l <- map (filter (/= '\r')) (lines sout)
+               , " Render " `isInfixOf` l ]
+        expectedRenderRows =
+          [ "Render lower means the smaller of [n] and 100."
+          , "Render exceeds means the amount by which [n] exceeds 100."
+          , "Render shortfall means 100 less [n]."
+          , "Render plus means [n] and 100 together."
+          , "Render first means the first of [n] with 100."
+          , "Render bare means the bare [n] and 100."
+          , "Render greater means the greater of [n] and 100."
+          , "Render nested means the smaller of the smaller of [n] and 100 and 200."
+          , "Render of [n] means the smaller of [n] and 100."
+          , "Render exceeds with [n] equals the amount by which a exceeds b where a is n and b is 100 + 1."
+          , "Render gap with [n] equals the gap between a and b where a is n and b is 100 + 1."
+          , "Render lower with [n] equals the smaller of a and b where a is n and b is 100 + 1."
+          , "Render half selector means the span's size's half."
+          , "Render third selector means the span's size's third."
+          , "Render exceeds direct means the amount by which a exceeds b where a is n and b is 100."
+          , "Render gap direct means the gap between a and b where a is n and b is 100."
+          , "Render lower direct means the smaller of a and b where a is n and b is 100."
+          , "Render point is a Pt with:"
+          ]
+
+    it "is read by l4 render at a call in the body of another rule" $ do
+      rows <- renderRows nlgMixfixLocalFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render at such a call across an IMPORT" $ do
+      rows <- renderRows nlgMixfixImportFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render in the example the syntax reference links" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgMixfixDocExample]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy` ("The price we charge means the smaller of [price] and 100." `isInfixOf`)
+
+  -- A rule shown under "Imported definitions" is rendered from its own module's
+  -- copy of the tree, so it must read as it does when that module is rendered on
+  -- its own. A WITH call made in the middle of a chain used to print the herald
+  -- of a function two modules down a second time, because only the module being
+  -- rendered had its heralds moved onto their rules.
+  describe "l4 render of a rule imported through two modules" $ do
+    let midRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", "--include-imports", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ dropWhile (not . Char.isAlpha) l
+               | l <- map (filter (/= '\r')) (lines sout)
+               , "Mid rule " `isInfixOf` l ]
+        expected = ["Mid rule equals the gap between a and b where a is n and b is 100 + 1."]
+
+    it "reads the same when the middle module is the one rendered" $ do
+      rows <- midRows nlgTransMid
+      rows `shouldBe` expected
+
+    it "reads the same when the top module is the one rendered" $ do
+      rows <- midRows nlgTransTop
+      rows `shouldBe` expected
+
+  -- A herald is found by the definition a call resolved to. It used to be found
+  -- by the call's name and its number of arguments, so any definition with the
+  -- same name read the herald of another one: a record, a rule of the drafter's
+  -- own beside an imported one, a library function reused for something else.
+  describe "a herald belongs to the definition the call resolved to" $ do
+    let -- The rows of `l4 render` whose heading starts with one of these words.
+        renderedRows fixture needles = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ row
+               | l <- map (filter (/= '\r')) (lines sout)
+               , let row = dropWhile (not . Char.isAlpha) l
+               , any (`isPrefixOf` row) needles ]
+        nlgRows fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads a WITH body that builds a record as a record, not as a call to a rule named like it" $ do
+      rows <- renderedRows nlgOwnerMain ["Own origin shift", "Own band around"]
+      rows `shouldBe`
+        [ "Own origin shift is a Pt with:"
+        , "Own band around is a range with:"
+        ]
+
+    -- The drafter's own `LESS`, `is in` and `sum` have no herald. The prelude's
+    -- do, on sets and lists; a call to the drafter's reads as an unheralded call.
+    it "gives a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- renderedRows nlgOwnerMain ["Own net price", "Own working age", "Own total"]
+      rows `shouldBe`
+        [ "Own net price means [price] LESS 20."
+        , "Own working age if [age] is in 65."
+        , "Own total means sum of total."
+        ]
+
+    it "gives a #EVAL of a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- nlgRows nlgOwnerMain
+      take 3 rows `shouldBe`
+        [ "`_ LESS _` with 100 and 20"
+        , "`_ is in _` with 5 and 10"
+        , "`sum` with 5"
+        ]
+
+    -- Same pattern, same name, different types, each with a herald: the call
+    -- reads the one it resolved to, from this module or from the library.
+    it "reads the herald of the overload a call resolved to, one in this module and one imported" $ do
+      rows <- renderedRows nlgOwnerMain ["Own first name", "Own cap", "Own first word", "Own floor"]
+      rows `shouldBe`
+        [ "Own first name means whichever of [s] and m comes first in the alphabet."
+        , "Own cap means the smaller of [n] and 100."
+        , "Own first word means whichever of [s] and m comes first in the alphabet, written plainly."
+        , "Own floor means the smaller number of [n] and 100."
+        ]
+
+    it "reads the herald of the overload a #EVAL resolved to, one in this module and one imported" $ do
+      rows <- nlgRows nlgOwnerMain
+      drop 3 rows `shouldBe`
+        [ "whichever of x and y comes first in the alphabet"
+        , "the smaller of 3 and 4"
+        , "whichever of x and y comes first in the alphabet, written plainly"
+        , "the smaller number of 3 and 4"
+        ]
+
+    -- The same, for two overloads of one mixfix pattern in a single module.
+    it "reads the herald of the overload a call resolved to, both written in one module" $ do
+      nlg <- nlgRows nlgOwnerOverload
+      nlg `shouldBe`
+        [ "the smaller number of 3 and 4"
+        , "whichever of x and y comes first in the alphabet"
+        ]
+      ren <- renderedRows nlgOwnerOverload ["Own cap", "Own first name"]
+      ren `shouldBe`
+        [ "Own cap means the smaller number of [n] and 100."
+        , "Own first name means whichever of [s] and m comes first in the alphabet."
+        ]
+
+    -- A positional call builds a record only if its head is the record's
+    -- constructor. These records share a name with a function that is not one:
+    -- the library's `Pt` and the prelude's `range`.
+    it "reads a positional call to a function named like a record as a call, not as building the record" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos shift", "Pos numbers"]
+      rows `shouldBe`
+        [ "Pos shift means Pt with n and 100."
+        , "Pos numbers means the whole numbers from 1 to [n]."
+        ]
+
+    it "still reads a positional call to the record's own constructor as building it" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos point", "Pos band"]
+      rows `shouldBe`
+        [ "Pos point is a Pt with:"
+        , "Pos band is a range with:"
+        ]
+
+  -- A herald is the sentence for a CALL: its slots are bound by the call's
+  -- arguments. A rule that is named but not called, passed to `filter` or
+  -- `foldr` or given a second name, has no arguments to bind them, and used to
+  -- read as its sentence with the slot names of its definition in it
+  -- ("for which x is even holds"), which says something the author did not write.
+  -- What a rendering must never change. A reader of the document has nothing but
+  -- these words, so each row is a rule whose meaning a flat rendering would change
+  -- or lose, read as a whole line: an infix test would not see a wrong line beside
+  -- a right one.
+  describe "l4 render keeps a rule's meaning" $ do
+    let rowOf heading = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderMeaningFixture]
+          code `shouldBe` ExitSuccess
+          pure (unlines (takeWhile (not . null) (dropWhile (not . (heading `isInfixOf`)) (map (filter (/= '\r')) (lines sout)))))
+
+    it "keeps the right operand of a subtraction or a division in brackets" $ do
+      rowOf "Right nested minus" >>= (`shouldSatisfy` ("equals a − (b − c)." `isInfixOf`))
+      rowOf "Right nested division" >>= (`shouldSatisfy` ("equals a ÷ (b × c)." `isInfixOf`))
+      rowOf "Right nested divide by quotient" >>= (`shouldSatisfy` ("equals a ÷ (b ÷ c)." `isInfixOf`))
+
+    it "says where a group of the other connective starts and ends" $ do
+      rowOf "And of or in a condition" >>= (`shouldSatisfy` ("If a and either b or c: 1;" `isInfixOf`))
+      rowOf "Or of and in a condition" >>= (`shouldSatisfy` ("If either a or b, and c: 1;" `isInfixOf`))
+      rowOf "Not of and in a condition" >>= (`shouldSatisfy` ("If it is not the case that both a and b: 1;" `isInfixOf`))
+      rowOf "Not as a whole rule" >>= (`shouldSatisfy` ("neither a nor b." `isInfixOf`))
+      rowOf "Rule with not of an and" >>= (`shouldSatisfy` ("it is not the case that both a and (b or c)." `isInfixOf`))
+
+    it "spells a possessive to fit the word, and leaves an author's alone" $ do
+      rowOf "The rate on the facts" >>= (`shouldSatisfy` ("the contribution facts' rate" `isInfixOf`))
+      rowOf "The age of the witness" >>= (`shouldSatisfy` ("the witness's age" `isInfixOf`))
+
+    it "keeps a denial to the one operand of an OR it covers" $
+      rowOf "Denial of one operand" >>= (`shouldSatisfy` ("If (it is not the case that the facts are not met for the contribution facts) or b: 1;" `isInfixOf`))
+
+    it "does not take a name ending in over for a preposition" $
+      rowOf "Old enough" >>= (`shouldSatisfy` ("I am 18 or over for the contribution facts." `isInfixOf`))
+
+    it "gives each nested calculation words of its own in l4 nlg" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderMeaningFixture]
+      code `shouldBe` ExitSuccess
+      take 6 (lines (filter (/= '\r') sout)) `shouldBe`
+        [ "10 minus (5 minus 2)"
+        , "(10 minus 5) minus 2"
+        , "the product of 4 and (5 minus 2)"
+        , "(the product of 4 and 5) minus 2"
+        , "the result of dividing 12 by (6 minus 2)"
+        , "(the result of dividing 12 by 6) minus 2"
+        ]
+
+    it "makes a unit of time agree with the number 1 in a sentence" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderMeaningFixture]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      out `shouldSatisfy` ("the date 1 month after" `isInfixOf`)
+      out `shouldSatisfy` ("the date 2 months after" `isInfixOf`)
+
+    it "keeps a subtraction in the order it was written" $
+      rowOf "Difference in prose" >>= (`shouldSatisfy` ("If a − b is more than 0: more;" `isInfixOf`))
+
+    it "keeps the drafter's name for a role" $ do
+      rowOf "The applicant is eligible" >>= (`shouldSatisfy` ("(a) the applicant is a citizen; and" `isInfixOf`))
+      rowOf "Discount" >>= (`shouldSatisfy` ("If the buyer's age is at least 65: the amount × 0.1;" `isInfixOf`))
+
+    it "tells a deadline of zero from no deadline at all" $ do
+      rowOf "At once" >>= (`shouldSatisfy` ("the Tenant must pay the rent immediately." `isInfixOf`))
+      rowOf "No deadline at all" >>= (`shouldSatisfy` ("the Tenant must pay the rent. Failing" `isInfixOf`))
+
+    it "says who is in breach, and what follows an obligation" $ do
+      rowOf "With a deadline and a chain" >>= (`shouldSatisfy` ("(a) Once that is done, the Landlord must repair the roof within 30." `isInfixOf`))
+      rowOf "With a deadline and a chain" >>= (`shouldSatisfy` ("(b) Failing that, the Tenant is in breach." `isInfixOf`))
+
+    it "reads a day that exists as that day, and no other as a day" $ do
+      rowOf "A real date" >>= (`shouldSatisfy` ("29 February 2024" `isInfixOf`))
+      rowOf "A date that rolls over" >>= (`shouldNotSatisfy` ("29 February 2025" `isInfixOf`))
+
+  -- The two surfaces read one document: `l4 render` with no flags is the Render
+  -- tab's default, so an import is left out but still informs the file's own rules.
+  describe "l4 render and imports" $ do
+    it "writes the document, and fails, when an imported module does not check" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderBrokenImportFixture]
+      code `shouldNotBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy` ("Still fine means 1." `isInfixOf`)
+
+    let run args = do
+          Output code sout _ <- runL4 bin (["render", "--format", "text"] ++ args ++ [nlgTransTop])
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout)
+
+    it "leaves imported rules out by default" $
+      run [] >>= (`shouldNotSatisfy` ("Mid rule" `isInfixOf`))
+
+    it "shows them when asked" $ do
+      run ["--include-imports"] >>= (`shouldSatisfy` ("Mid rule" `isInfixOf`))
+      run ["--include-import", "nlg-trans-mid"] >>= (`shouldSatisfy` ("Mid rule" `isInfixOf`))
+
+    it "numbers sections and clauses unless told not to" $ do
+      run [] >>= (`shouldSatisfy` ("1. " `isInfixOf`))
+      run ["--no-number-clauses"] >>= (`shouldNotSatisfy` ("1. " `isInfixOf`))
+
+  -- What the renderer does with the shape of a document, none of which reads an
+  -- author's words: a name or a sentence is printed as it stands.
+  describe "l4 render house style" $ do
+    let render format = do
+          Output code sout _ <- runL4 bin ["render", "--format", format, renderHouseStyleFixture]
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout)
+
+    -- The marks that tell the renderer's words from an author's are internal, and
+    -- a noncharacter in a document prints as a box.
+    it "leaves none of its internal marks in any format" $
+      forM_ ["text", "html", "akn", "json"] $ \format -> do
+        out <- render format
+        filter (`elem` ['\xFDD0', '\xFDD1']) out `shouldBe` ""
+
+    it "puts its own connecting words into the document's language, in every format" $
+      forM_ ["text", "html", "akn"] $ \format -> do
+        Output code sout _ <- runL4 bin ["render", "--format", format, "--lang", "he", renderHebrewWordsFixture]
+        code `shouldBe` ExitSuccess
+        let out = filter (/= '\r') sout
+        out `shouldSatisfy` ("; \1488\1493" `isInfixOf`)         -- "; or"
+        out `shouldSatisfy` ("\1506\1501 5" `isInfixOf`)         -- "with 5"
+        out `shouldNotSatisfy` ("; or" `isInfixOf`)
+        filter (`elem` ['\xFDD0', '\xFDD1']) out `shouldBe` ""
+
+    it "keeps those words in English without --lang" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderHebrewWordsFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("; or" `isInfixOf`)
+      sout `shouldSatisfy` ("the threshold is passed with 5" `isInfixOf`)
+
+    it "keeps a provision's own labels and lead-in, and generates no letters for them" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("Transfer falls within an exception where such securities are transferred:\n    (1) to the issuer of the securities, for the transfer; or\n    (2) to an accredited investor, for the transfer." `isInfixOf`)
+
+    it "keeps a negation outside the statement it denies" $
+      render "text" >>= (`shouldSatisfy` ("Plain negation if it is not the case that the person is a hotel." `isInfixOf`))
+
+    it "reads a negative wording an author wrote as an @nlg" $
+      render "text" >>= (`shouldSatisfy` ("(a) the person is not a hotel; and\n    (b) the person is licensed." `isInfixOf`))
+
+    it "lays out cases and ladders with short results as decision tables, in order" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("The fee by status depends on the status:\n    | the status | Result |" `isInfixOf`)
+      out `shouldSatisfy` ("| otherwise, if age is at least 18 | adult  |" `isInfixOf`)
+
+    it "opens with an interpretation section" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("§ 1  Interpretation\n\nIn this document, unless the context otherwise requires:" `isInfixOf`)
+      out `shouldSatisfy` ("The following are taken as given:\n\n1. The person is a hotel." `isInfixOf`)
+
+    it "moves long constant data to a Schedule, and says so where it is used" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("The rate for [n] means item number [n] of the rate table (Schedule 1)." `isInfixOf`)
+      out `shouldSatisfy` ("§ 3  Schedule 1: The rate table" `isInfixOf`)
+
+    it "fills a pattern's slots so that an input's name cannot read as more of its words" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("The later schedule applies to the status when assessed on [assessed on] and the pass expires on [expiring on], depending on the status:" `isInfixOf`)
+      out `shouldSatisfy` ("the later schedule applies to Active when assessed on [on date] and the pass expires on 0." `isInfixOf`)
+
+    it "gives a name that ends in a preposition its inputs, and keeps a code's capitals" $
+      render "text" >>= (`shouldSatisfy` ("The band for the C1 sector means 1." `isInfixOf`))
+
+    it "links a citation its file maps to a web address, keeping the address's case" $
+      render "html" >>= (`shouldSatisfy` ("<a href=\"https://example.com/Acts/Grants#S4\">Grants Act 2024, s 4(1)</a>" `isInfixOf`))
+
+    it "puts the rendering's own words into the document's language" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldNotSatisfy` (" if amount" `isInfixOf`)
+
+  describe "an @nlg on its own line above a rule" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", nlgOwnLineFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "belongs to that rule after a section heading, a name or a DECLARE" $ do
+      out <- rows
+      out `shouldSatisfy` any ("The first constant means 1." `isInfixOf`)
+      out `shouldSatisfy` any ("The second constant means the first constant." `isInfixOf`)
+      out `shouldSatisfy` any ("The third constant means the second constant." `isInfixOf`)
+      out `shouldSatisfy` any ("The declared constant means 4." `isInfixOf`)
+
+    it "prints a rule's @ref with the rule, written above it or below its signature" $ do
+      out <- rows
+      out `shouldSatisfy` any ("Source: Grants Act 2024, s 4(1)" `isInfixOf`)
+      out `shouldSatisfy` any ("Source: Grants Act 2024, s 5" `isInfixOf`)
+
+    it "fills a slot with the input it names, not a rule or a field of that name" $ do
+      out <- rows
+      out `shouldSatisfy` any ("the day 3 for the tenant" `isInfixOf`)
+
+  describe "a rule named but not called" $ do
+    it "reads as its name in l4 nlg" $ do
+      Output code sout _ <- runL4 bin ["nlg", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "the items of list of 1, 2 and 4 for which `even` holds"
+        , "the items of list of 1, 5 and 3 combined from the right with `max`, starting from 0"
+        , "`the span` 's `size` 's `half`"
+        ]
+
+    it "reads as its name in l4 render" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      [ dropWhile (not . Char.isAlpha) l
+        | l <- map (filter (/= '\r')) (lines sout), "Own " `isInfixOf` l ] `shouldBe`
+        [ "Own evens means the items of [xs] for which even holds."
+        , "Own biggest means the items of [xs] combined from the right with max, starting from 0."
+        , "Own mapper means fmap."
+        ]
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do

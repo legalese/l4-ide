@@ -11,7 +11,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Configuration from environment or defaults
-WEBSESSIONS_PORT="${JL4_WEBSESSIONS_PORT:-8002}"
 LSP_PORT="${JL4_LSP_PORT:-8000}"
 SERVICE_PORT="${JL4_SERVICE_PORT:-8080}"
 WEB_IDE_PORT="${JL4_WEB_IDE_PORT:-5173}"
@@ -37,22 +36,6 @@ print_result() {
     else
         echo -e "${RED}✗${NC} ${BOLD}${service}${NC} - ${details}"
         ALL_HEALTHY=false
-    fi
-}
-
-check_websessions() {
-    local url="http://localhost:${WEBSESSIONS_PORT}/session"
-
-    # Try to GET the session list endpoint
-    if response=$(curl -s --max-time "$TIMEOUT" "$url" 2>&1); then
-        # Websessions should return JSON array
-        if echo "$response" | jq -e 'type == "array"' >/dev/null 2>&1; then
-            print_result "Websessions" "OK" "port $WEBSESSIONS_PORT (CRUD API responding)"
-        else
-            print_result "Websessions" "FAIL" "port $WEBSESSIONS_PORT (unexpected response format)"
-        fi
-    else
-        print_result "Websessions" "FAIL" "port $WEBSESSIONS_PORT (not responding)"
     fi
 }
 
@@ -104,7 +87,6 @@ print_footer() {
         echo "Services accessible at:"
         echo "  LSP:         ws://localhost:${LSP_PORT}"
         echo "  jl4-service: http://localhost:${SERVICE_PORT}"
-        echo "  Websessions: http://localhost:${WEBSESSIONS_PORT}"
         echo "  Web IDE:     http://localhost:${WEB_IDE_PORT}"
         return 0
     else
@@ -113,7 +95,7 @@ print_footer() {
         echo "Troubleshooting:"
         echo "  1. Start services: ./dev-start.sh full --run"
         echo "  2. Check logs in /tmp/jl4-*.log"
-        echo "  3. Verify ports not in use: lsof -i :${WEBSESSIONS_PORT},${LSP_PORT},${SERVICE_PORT},${WEB_IDE_PORT}"
+        echo "  3. Verify ports not in use: lsof -i :${LSP_PORT},${SERVICE_PORT},${WEB_IDE_PORT}"
         return 1
     fi
 }
@@ -125,7 +107,6 @@ main() {
     # Run checks in order
     check_lsp_server
     check_jl4_service
-    check_websessions
     check_web_ide
 
     # Print summary

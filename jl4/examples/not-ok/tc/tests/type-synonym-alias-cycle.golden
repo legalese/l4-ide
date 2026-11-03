@@ -6,7 +6,7 @@ File: type-synonym-alias-cycle.l4
   Range: 11:9-11:11
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/cyclic-type-synonyms
   Message:
     Circular dependency detected between type synonyms:
 
@@ -20,7 +20,7 @@ File: type-synonym-alias-cycle.l4
   Range: 14:9-14:11
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/cyclic-type-synonyms
   Message:
     Circular dependency detected between type synonyms:
 
@@ -34,7 +34,7 @@ File: type-synonym-alias-cycle.l4
   Range: 18:9-18:11
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/cyclic-type-synonyms
   Message:
     Circular dependency detected between type synonyms:
 
@@ -48,7 +48,7 @@ File: type-synonym-alias-cycle.l4
   Range: 23:14-23:15
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The type of this definition must match its type signature at type-synonym-alias-cycle.l4:22:8-12, namely
 

@@ -11,30 +11,53 @@ IMPORT `date-compat`
 §§ `Constants`
 
 
+@nlg the number of months in a year
 `Months in a year`      MEANS 12
+@nlg the average number of days in a Gregorian year
 `Days in a year`        MEANS 365.2425   -- Considering 4 year leap-cycle with 100 and 400 year exceptions
+@nlg the average number of days in a Gregorian month
 `Days in a month`       MEANS 30.436875  -- Average month
+@nlg the number of days in a week
 `Days in a week`        MEANS 7
 
+@nlg the day-of-week number for Monday
 `Monday`     AKA `Mon`  MEANS 1
+@nlg the day-of-week number for Tuesday
 `Tuesday`    AKA `Tue`  MEANS 2
+@nlg the day-of-week number for Wednesday
 `Wednesday`  AKA `Wed`  MEANS 3
+@nlg the day-of-week number for Thursday
 `Thursday`   AKA `Thu`  MEANS 4
+@nlg the day-of-week number for Friday
 `Friday`     AKA `Fri`  MEANS 5
+@nlg the day-of-week number for Saturday
 `Saturday`   AKA `Sat`  MEANS 6
+@nlg the day-of-week number for Sunday
 `Sunday`     AKA `Sun`  MEANS 0
 
+@nlg the month number for January
 `January`    AKA `Jan`  MEANS 1
+@nlg the month number for February
 `February`   AKA `Feb`  MEANS 2
+@nlg the month number for March
 `March`      AKA `Mar`  MEANS 3
+@nlg the month number for April
 `April`      AKA `Apr`  MEANS 4
+@nlg the month number for May
 `May`                   MEANS 5
+@nlg the month number for June
 `June`       AKA `Jun`  MEANS 6
+@nlg the month number for July
 `July`       AKA `Jul`  MEANS 7
+@nlg the month number for August
 `August`     AKA `Aug`  MEANS 8
+@nlg the month number for September
 `September`  AKA `Sep`  MEANS 9
+@nlg the month number for October
 `October`    AKA `Oct`  MEANS 10
+@nlg the month number for November
 `November`   AKA `Nov`  MEANS 11
+@nlg the month number for December
 `December`   AKA `Dec`  MEANS 12
 
 
@@ -49,6 +72,7 @@ GIVEN day   IS A NUMBER
       month IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg the date %day%/%month%/%year%
 `Date` AKA `Days to date` MEANS
     DATE_FROM_SERIAL (jan1serial PLUS monthDays PLUS day MINUS 1)
     WHERE
@@ -57,16 +81,19 @@ GIVETH A DATE
 
 GIVEN days  IS A NUMBER
 GIVETH A DATE
+@nlg the date numbered %days%
 `Date` AKA `Days to date` MEANS
     DATE_FROM_SERIAL days
 
 GIVEN date  IS A DATE
 GIVETH A DATE
+@nlg %date%
 `Date` AKA `Days to date` MEANS date
 
 -- Date str  -> parse date string (YYYY-MM-DD, etc.), ignores time/timezone if present
 GIVEN str IS A STRING
 GIVETH A MAYBE DATE
+@nlg the date in %str%, if it can be read
 `Date` AKA `Days to date` MEANS
     CONSIDER DATEVALUE str
     WHEN RIGHT d THEN JUST d
@@ -78,6 +105,7 @@ GIVETH A MAYBE DATE
 -- Date dt  -> extract date from DATETIME (ignores time and timezone)
 GIVEN dt IS A DATETIME
 GIVETH A DATE
+@nlg the date of %dt% in its own time zone
 `Date` AKA `Days to date` MEANS DATETIME_DATE dt
 
 -- YMD year month day  -> the date, with its parts in ISO 8601 order.
@@ -109,6 +137,7 @@ GIVETH A DATE
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the day number of %date%
 `Day` AKA `Date to days` MEANS
     DATE_SERIAL date
 
@@ -116,43 +145,51 @@ GIVEN day   IS A NUMBER
       month IS A NUMBER
       year  IS A NUMBER
 GIVETH A NUMBER
+@nlg the day %day%/%month%/%year%
 `Day` AKA `Date to days` MEANS
     DATE_SERIAL (Date day month year)
 
 GIVEN days  IS A NUMBER
 GIVETH A NUMBER
+@nlg the day numbered %days%
 `Day` AKA `Date to days` MEANS
     days
 
 GIVEN year  IS A NUMBER
 GIVETH A DATE
+@nlg the first day of %year%
 `Year` MEANS
     Month 1 year
 
 GIVEN date  IS A DATE
 GIVETH A DATE
+@nlg the first day of the year containing %date%
 `Year` MEANS
     Year (DATE_YEAR date)
 
 GIVEN month IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg the first day of month %month% of %year%
 `Month` MEANS
     Date (Day 1 month year)
             
 GIVEN days  IS A NUMBER
 GIVETH A DATE
+@nlg the first day of the month containing the day numbered %days%
 `Month` MEANS
     Month (Date days)
 
 GIVEN date  IS A DATE
 GIVETH A DATE
+@nlg the first day of the month containing %date%
 `Month` MEANS
     Month (DATE_MONTH date) (DATE_YEAR date)
 
 GIVEN week  IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg the Monday of ISO week %week% of %year%
 `Week` MEANS
     Year year
         PLUS (3 MINUS `Days in a week`) MINUS o
@@ -165,6 +202,7 @@ GIVETH A DATE
 
 GIVEN days  IS A NUMBER
 GIVETH A DATE
+@nlg the Monday of the ISO week containing the day numbered %days%
 `Week` MEANS
     IF   w EQUALS 0
     THEN Date (days MINUS (`Days in a week` MINUS 1))
@@ -174,6 +212,7 @@ GIVETH A DATE
 
 GIVEN date  IS A DATE
 GIVETH A DATE
+@nlg the Monday of the ISO week containing %date%
 `Week` MEANS
     Week (Day date)
 
@@ -185,83 +224,97 @@ GIVETH A DATE
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% January %year%
 `January` AKA `Jan` MEANS
     Date day 1 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% February %year%
 `February` AKA `Feb` MEANS
     Date day 2 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% March %year%
 `March` AKA `Mar` MEANS
     Date day 3 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% April %year%
 `April` AKA `Apr` MEANS
     Date day 4 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% May %year%
 `May` MEANS
     Date day 5 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% June %year%
 `June` AKA `Jun` MEANS
     Date day 6 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% July %year%
 `July` AKA `Jul` MEANS
     Date day 7 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% August %year%
 `August` AKA `Aug` MEANS
     Date day 8 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% September %year%
 `September` AKA `Sep` MEANS
     Date day 9 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% October %year%
 `October` AKA `Oct` MEANS
     Date day 10 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% November %year%
 `November` AKA `Nov` MEANS
     Date day 11 year
 
 GIVEN day   IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg %day% December %year%
 `December` AKA `Dec` MEANS
     Date day 12 year
 
 
 GIVEN days  IS A NUMBER
 GIVETH A NUMBER
+@nlg the month number of the day numbered %days%
 `Month of the year` MEANS 
     `Month of the year` (Date days)
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the month number of %date%
 `Month of the year` MEANS                     -- Returns the number of the week of this date
     `Month of days` 1 (`Months since year start to days` (DATE_MONTH date PLUS 1) (DATE_YEAR date))
     WHERE
@@ -283,6 +336,7 @@ GIVETH A NUMBER
 GIVEN month IS A NUMBER
       year  IS A NUMBER
 GIVETH A NUMBER
+@nlg the number of days in %year% before month %month%
 `Months since year start to days` MEANS
     IF    m LESS THAN 1
     THEN  0
@@ -293,17 +347,20 @@ GIVETH A NUMBER
 
 GIVEN days  IS A NUMBER
 GIVETH A NUMBER
+@nlg the number of days of the year before the month containing the day numbered %days%
 `Months since year start to days` MEANS
     `Months since year start to days` (Date days)
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the number of days of the year before the month containing %date%
 `Months since year start to days` MEANS
     `Months since year start to days` (DATE_MONTH date) (DATE_YEAR date)
 
 GIVEN month IS A NUMBER
       year  IS A NUMBER
 GIVETH A NUMBER
+@nlg the number of days in month %month% of %year%
 `Days in month` MEANS
     IF       m EQUALS 4   -- April
           OR m EQUALS 6   -- June
@@ -325,16 +382,19 @@ GIVETH A NUMBER
 
 GIVEN days  IS A NUMBER
 GIVETH A NUMBER
+@nlg the number of days in the month containing the day numbered %days%
 `Days in month` MEANS
     `Days in month` (Date days)
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the number of days in the month containing %date%
 `Days in month` MEANS
     `Days in month` (DATE_MONTH date) (DATE_YEAR date)
 
 GIVEN year  IS A NUMBER
 GIVETH A NUMBER
+@nlg the number of days in %year%
 `Days in year` MEANS
     IF   `is leap year` year
     THEN 366
@@ -342,11 +402,13 @@ GIVETH A NUMBER
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the number of days in the year containing %date%
 `Days in year` MEANS
     `Days in year` (DATE_YEAR date)
 
 GIVEN year  IS A NUMBER
 GIVETH A NUMBER
+@nlg the day number of 1 January of %year%
 `Years to days` MEANS
     (year TIMES 365)
         PLUS  FLOOR (y DIVIDED BY 4)   -- consider leap years
@@ -357,6 +419,7 @@ GIVETH A NUMBER
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the day number of 1 January of the year containing %date%
 `Years to days` MEANS
     `Years to days` (DATE_YEAR date)
 
@@ -381,6 +444,7 @@ GIVETH A NUMBER
 GIVEN date   IS A DATE
       months IS A NUMBER
 GIVETH A DATE
+@nlg the date %months% months after %date% (capped at the last day of that month)
 `add months` MEANS
     DATE_FROM_DMY clampedDay newMonth newYear
     WHERE
@@ -396,6 +460,7 @@ GIVETH A DATE
 GIVEN date  IS A DATE
       years IS A NUMBER
 GIVETH A DATE
+@nlg the date %years% years after %date% (capped at the last day of that month)
 `add years` MEANS
     `add months` date (FLOOR years TIMES `Months in a year`)
 
@@ -406,38 +471,45 @@ GIVETH A DATE
 
 GIVEN days  IS A NUMBER
 GIVETH A NUMBER
+@nlg the day-of-week number (Sunday being 0) of the day numbered %days%
 `Weekday of` MEANS
     days MODULO `Days in a week`
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the day-of-week number (Sunday being 0) of %date%
 `Weekday of` MEANS
     `Weekday of` (Day date)
 
 GIVEN month  IS A NUMBER
       year   IS A NUMBER
 GIVETH A NUMBER
+@nlg the day-of-week number of the first day of month %month% of %year%
 `Weekday of 1st day of month` MEANS
     `Weekday of`
         (Day 1 month year)
 
 GIVEN days   IS A NUMBER
 GIVETH A NUMBER
+@nlg the day-of-week number of the first day of the month containing the day numbered %days%
 `Weekday of 1st day of month` MEANS
     `Weekday of 1st day of month` (Date days)
 
 GIVEN date   IS A DATE
 GIVETH A NUMBER
+@nlg the day-of-week number of the first day of the month containing %date%
 `Weekday of 1st day of month` MEANS
     `Weekday of 1st day of month` (DATE_MONTH date) (DATE_YEAR date)
 
 GIVEN year  IS A NUMBER
 GIVETH A NUMBER
+@nlg the day-of-week number of the first day of %year%
 `Weekday of 1st day of year` MEANS
     `Weekday of` (Year year)
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the day-of-week number of the first day of the year containing %date%
 `Weekday of 1st day of year` MEANS
     `Weekday of 1st day of year` (DATE_YEAR date)
 
@@ -448,11 +520,13 @@ GIVETH A NUMBER
 
 GIVEN days  IS A NUMBER
 GIVETH A NUMBER
+@nlg the ISO week number of the day numbered %days%
 `Week of the year` MEANS 
     `Week of the year` (Date days)
 
 GIVEN date  IS A DATE
 GIVETH A NUMBER
+@nlg the ISO week number of %date%
 `Week of the year` MEANS                     -- Returns the number of the week of this date
     IF    n EQUALS 53 AND `Weeks in year` (DATE_YEAR date) EQUALS 52
     THEN  1
@@ -468,6 +542,7 @@ GIVETH A NUMBER
 
 GIVEN year  IS A NUMBER
 GIVETH A NUMBER
+@nlg the number of ISO weeks in %year%
 `Weeks in year` MEANS             -- Calculating the weeks in a given year using Zeller's Congruence
     IF        h EQUALS 5
           OR (h EQUALS 4 AND `is leap year` year)
@@ -485,6 +560,7 @@ GIVETH A NUMBER
 
 GIVEN date   IS A DATE
 GIVETH A NUMBER
+@nlg the number of ISO weeks in the year containing %date%
 `Weeks in year` MEANS
     `Weeks in year` (DATE_YEAR date)   
 
@@ -496,6 +572,7 @@ GIVETH A NUMBER
 
 GIVEN days  IS A NUMBER
 GIVETH A BOOLEAN
+@nlg the day numbered %days% falls on a weekend
 `is weekend` MEANS
         w EQUALS Saturday
     OR  w EQUALS Sunday
@@ -505,22 +582,26 @@ GIVETH A BOOLEAN
 
 GIVEN date  IS A DATE
 GIVETH A BOOLEAN
+@nlg %date% falls on a weekend
 `is weekend` MEANS
     `is weekend` (Day date)
 
 
 GIVEN days  IS A NUMBER
 GIVETH A BOOLEAN
+@nlg the day numbered %days% falls on a weekday
 `is weekday` MEANS
     NOT `is weekend` days
 
 GIVEN date  IS A DATE
 GIVETH A BOOLEAN
+@nlg %date% falls on a weekday
 `is weekday` MEANS
     `is weekday` (Day date)
 
 GIVEN year  IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %year% is a leap year
 `is leap year` MEANS
             y MODULO 4   EQUALS 0
     AND NOT y MODULO 100 EQUALS 0
@@ -530,6 +611,7 @@ GIVETH A BOOLEAN
 
 GIVEN date   IS A DATE
 GIVETH A BOOLEAN
+@nlg %date% falls in a leap year
 `is leap year` MEANS
     `is leap year` (DATE_YEAR date)
 
@@ -542,21 +624,25 @@ GIVETH A BOOLEAN
 GIVEN day   IS A NUMBER
       date  IS A DATE
 GIVETH A DATE
+@nlg day %day% of the period beginning on %date%
 `on day` MEANS
     date PLUS day MINUS 1
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the day after %date%
 `the day after` MEANS
     date PLUS 1
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the day before %date%
 `the day before` MEANS
     date MINUS 1
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the Monday of the ISO week after the one containing %date%
 `the week after` MEANS
     IF    d GREATER THAN `Days in a week`
     THEN  Date (days PLUS d MINUS `Days in a week`)
@@ -567,16 +653,19 @@ GIVETH A DATE
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the Monday of the ISO week before the one containing %date%
 `the week before` MEANS
     `the week after` date MINUS (`Days in a week` TIMES 2)
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the first day of the month after the one containing %date%
 `the month after` MEANS
     Date 1 (DATE_MONTH date PLUS 1) (DATE_YEAR date)
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the first day of the month before the one containing %date%
 `the month before` MEANS
     IF    DATE_MONTH date EQUALS 1
     THEN  Date 1 12 (DATE_YEAR date MINUS 1)
@@ -584,11 +673,13 @@ GIVETH A DATE
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the first day of the year after the one containing %date%
 `the year after` MEANS
     Date 1 1 (DATE_YEAR date PLUS 1)
 
 GIVEN date   IS A DATE
 GIVETH A DATE
+@nlg the first day of the year before the one containing %date%
 `the year before` MEANS
     Date 1 1 (DATE_YEAR date MINUS 1)
 
@@ -598,6 +689,7 @@ GIVETH A DATE
 GIVEN date1  IS A DATE
       date2  IS A DATE
 GIVETH A DATE
+@nlg the earlier of %date1% and %date2%
 `the earlier of` MEANS
     IF   date1 AT MOST date2
     THEN date1
@@ -606,6 +698,7 @@ GIVETH A DATE
 GIVEN date1  IS A DATE
       date2  IS A DATE
 GIVETH A DATE
+@nlg the later of %date1% and %date2%
 `the later of` MEANS
     IF   date1 GREATER THAN date2
     THEN date1
@@ -617,11 +710,13 @@ GIVETH A DATE
 
 GIVEN date  IS A DATE 
 GIVETH A STRING
+@nlg the name of the month containing %date%
 `Name of month` MEANS
     `Name of month` (Day date)
 
 GIVEN days  IS A NUMBER
 GIVETH A STRING
+@nlg the name of month %days%, or of the month containing that day number if not 1 to 12
 `Name of month` MEANS
     IF m EQUALS 0 THEN "January" ELSE
         IF m EQUALS 1 THEN "February" ELSE
@@ -643,6 +738,7 @@ GIVETH A STRING
 
 GIVEN days   IS A NUMBER
 GIVETH A STRING
+@nlg the day-of-week name of the day numbered %days%
 `Name of weekday` MEANS
     IF w EQUALS Monday THEN "Monday" ELSE
         IF w EQUALS Tuesday THEN "Tuesday" ELSE
@@ -656,6 +752,7 @@ GIVETH A STRING
 
 GIVEN date   IS A DATE
 GIVETH A STRING
+@nlg the day-of-week name of %date%
 `Name of weekday` MEANS
     `Name of weekday` (Day date)
 
@@ -666,69 +763,81 @@ GIVETH A STRING
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A BOOLEAN
+@nlg %a% is on or after %b%
 `__GEQ__` MEANS
     Day a AT LEAST Day b
 
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A BOOLEAN
+@nlg %a% is on or before %b%
 `__LEQ__` MEANS
     Day a AT MOST Day b
 
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A BOOLEAN
+@nlg %a% is after %b%
 `__GT__` MEANS
     Day a GREATER THAN Day b
 
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A BOOLEAN
+@nlg %a% is before %b%
 `__LT__` MEANS
     Day a LESS THAN Day b
 
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A BOOLEAN
+@nlg %a% is before %b%
 a `is before` b MEANS a LESS THAN b
 
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A BOOLEAN
+@nlg %a% is after %b%
 a `is after` b MEANS a GREATER THAN b
 
 GIVEN a IS A DATE
       b IS A NUMBER
 GIVETH A DATE
+@nlg the date %b% days after %a%
 `__PLUS__` MEANS
     Date (Day a PLUS b)
 
 GIVEN a IS A DATE
       b IS A NUMBER
 GIVETH A DATE
+@nlg the date %b% days before %a%
 `__MINUS__` MEANS
     Date (Day a MINUS b)
 
 GIVEN a IS A NUMBER
       b IS A DATE
 GIVETH A DATE
+@nlg the date %a% days after %b%
 `__PLUS__` MEANS
     Date (a PLUS Day b)
 
 GIVEN a IS A NUMBER
       b IS A DATE
 GIVETH A DATE
+@nlg the date numbered %a% less the day number of %b%
 `__MINUS__` MEANS
     Date (a MINUS Day b)
 
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A NUMBER
+@nlg the sum of the day numbers of %a% and %b%
 `__PLUS__` MEANS
     Day a PLUS Day b
 
 GIVEN a IS A DATE
       b IS A DATE
 GIVETH A NUMBER
+@nlg the number of days from %b% to %a%
 `__MINUS__` MEANS
     Day a MINUS Day b

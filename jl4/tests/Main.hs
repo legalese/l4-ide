@@ -14,9 +14,12 @@ import L4.TracePolicy (lspDefaultPolicy)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Export (ExportedFunction (..))
 import qualified L4.Export as Export
+import qualified L4.Export.Document as Doc
+import qualified L4.Export.Render as Render
 import L4.JsonSchema (SchemaContext (..))
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
+import L4.Parser (PError (..), execProgramParserWithHintPass, execProgramParserWithHintPassUnmemoised)
 import qualified L4.Parser.SrcSpan as JL4
 import L4.Syntax
 import qualified L4.TypeCheck as JL4
@@ -91,6 +94,12 @@ main = do
       corpusNonEmpty "hover"           hoverFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
+    -- The legal examples are what a reader of a rendered document sees. A change
+    -- to the wording shows here as a diff, line by line, across all of them.
+    describe "rendered documents" $
+      forM_ legalFiles $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4RenderGolden evalConfig (takeDirectory inputFile </> "tests") inputFile
     -- Invariant: exactprint is the identity on the source for every parseable
     -- corpus file. This is the single guard against the whole class of
     -- format-mangling bugs (mixfix/event reordering, dropped TIMEZONE/DECIDE
@@ -102,6 +111,20 @@ main = do
       forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ExactPrintIdentity evalConfig inputFile
+    -- Invariant: the parser's memo of bracketed groups changes nothing
+    -- (MATRYOSHKA, smucclaw/l4-ide#1017). 'L4.Parser.memoGroup' replays a
+    -- group's first parse wherever the group is reached again, which is exact
+    -- only while the invariants documented there hold. If one breaks, the memo
+    -- replays a wrong syntax tree or a wrong error SILENTLY: the file still
+    -- parses, or still fails, and nothing else need move. So every file the
+    -- blocks in this suite read, those that fail to parse included, is parsed
+    -- with the memo on and off, and the two answers must be equal to the
+    -- token. jl4-core-test's NestedParenParserSpec does the same on deeper
+    -- and broken nests, which the corpus has few of.
+    describe "parser memo changes nothing (memo on = memo off; #1017)" $
+      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles <> exportPlacementFiles) $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4ParserMemoChangesNothing inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
@@ -198,6 +221,34 @@ jl4ExactPrintIdentity evalConfig inputFile = do
             <> "\n  source:    " <> show s
             <> "\n  exactprint:" <> show o
 
+-- | Assert that the parser answers the same on a file with its memo of
+-- bracketed groups on ('execProgramParserWithHintPass', what the tools run)
+-- and off: the same syntax tree, hints and warnings when the file parses, and
+-- the same errors, message and position, when it does not.
+jl4ParserMemoChangesNothing :: FilePath -> IO ()
+jl4ParserMemoChangesNothing inputFile = do
+  src <- Text.readFile inputFile
+  let uri = toNormalizedUri (filePathToUri inputFile)
+      memoOn = execProgramParserWithHintPass uri src
+      memoOff = execProgramParserWithHintPassUnmemoised uri src
+  when (memoOn /= memoOff) $
+    expectationFailure $
+      "the parser's memo changed its answer on " <> inputFile <> case (memoOn, memoOff) of
+        (Left on, Left off) ->
+          "\n  memo on:\n" <> errors on <> "\n  memo off:\n" <> errors off
+        _ ->
+          -- A syntax tree is too big to print whole; show where the two
+          -- first differ.
+          let shownOn = show memoOn
+              shownOff = show memoOff
+              differAt = length (takeWhile id (List.zipWith (==) shownOn shownOff))
+              excerpt shown = take 400 (drop (max 0 (differAt - 200)) shown)
+          in  "\n  first difference at character " <> show differAt <> " of the shown answers"
+                <> "\n  memo on:  " <> excerpt shownOn
+                <> "\n  memo off: " <> excerpt shownOff
+  where
+    errors errs = unlines [show e.range <> "\n" <> Text.unpack e.message | e <- toList errs]
+
 jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
   (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
@@ -229,6 +280,49 @@ jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
       , actualFile = Just (dir </> takeFileName inputFile -<.> "nlg.actual")
       , failFirstTime = True
       }
+
+-- | What @l4 render --format text@ prints for a file, then what it left out: every
+-- definition appears exactly once, or is named here.
+jl4RenderGolden :: JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden Text)
+jl4RenderGolden evalConfig dir inputFile = do
+  (_, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.SuccessfulTypeCheck uri
+  let output = normalizeWhitespace $ case moutput of
+        Nothing -> "Cannot render a module that doesn't typecheck\n"
+        Just checkResult ->
+          let rawDeps = map (.module') (Rules.transitiveDependencies checkResult)
+              cfg = Doc.defaultExportConfig
+                { Doc.moduleDispositions = Doc.hiddenImports (const False) rawDeps
+                , Doc.mixfixHeadings = Doc.mixfixHeadingsFromRegistry checkResult.mixfixRegistry
+                }
+              (mainModule, deps) = Nlg.prepareModules Nothing checkResult.module' rawDeps
+              doc = Doc.buildDocument cfg mainModule deps
+          in Render.renderText Render.defaultRenderConfig doc
+               <> coverageNote (Doc.buildPlan cfg mainModule deps) doc
+  pure
+    Golden
+      { output
+      , encodePretty = Text.unpack
+      , writeToFile = Text.writeFile
+      , readFromFile = fmap normalizeWhitespace . Text.readFile
+      , goldenFile = dir </> takeFileName inputFile -<.> "render.golden"
+      , actualFile = Just (dir </> takeFileName inputFile -<.> "render.actual")
+      , failFirstTime = True
+      }
+
+-- | Which of a module's definitions a document does not show once.
+coverageNote :: Doc.ExportPlan -> Doc.Document -> Text
+coverageNote plan doc =
+  "\n\nCoverage\n" <> Text.unlines
+    ( [ "left out: " <> u.planHeading | u <- units, u.planId `notElem` shown ]
+   <> [ "shown twice: " <> u.planHeading | u <- units, length (filter (== u.planId) shown) > 1 ]
+    )
+ where
+  units = [ u | m <- plan.planModules, m.planModuleIsMain, u <- m.planUnits ]
+  shown = concatMap sectionIds doc.docSections
+  sectionIds s = [ b.blockId | g <- s.sectionGroups, b <- g.groupBlocks ] <> concatMap sectionIds s.sectionSubs
 
 jl4JsonSchemaGolden :: JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden String)
 jl4JsonSchemaGolden evalConfig dir inputFile = do

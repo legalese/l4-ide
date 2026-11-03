@@ -76,7 +76,7 @@ How an L4 file is written, on one page:
 
 - **Text and layout:** [layout](syntax/README.md#layout), [comments](syntax/README.md#comments), [identifiers](syntax/README.md#identifiers), [literals](syntax/README.md#literals)
 - **Files:** [IMPORT](syntax/README.md#import), [§ sections](syntax/README.md#sections)
-- **Annotations:** [`@desc`, `@nlg`, `@ref`, `@export`](syntax/README.md#annotations)
+- **Annotations:** [`@desc`, `@ref`, `@export`](syntax/README.md#annotations), [`@nlg`](syntax/nlg.md)
 - **Directives:** [`#EVAL`, `#CHECK`, `#ASSERT`, `#TRACE`](syntax/README.md#directives)
 - **Legal phrasing:** [genitive 's](syntax/README.md#genitive), [OF](syntax/README.md#of), [ditto ^](syntax/README.md#ditto), [AND and OR over several lines](syntax/README.md#asyndetic-and-and-or)
 

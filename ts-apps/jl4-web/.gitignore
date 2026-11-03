@@ -1,3 +1,4 @@
-# WASM build artifacts - built on demand when VITE_PREFER_WASM=true
+# WASM build artifacts - built on demand by scripts/maybe-build-wasm.sh, or put
+# in static/wasm/<release>/ by release builds
 static/wasm/*
 !static/wasm/.gitkeep

@@ -40,8 +40,8 @@ import qualified Data.Maybe as Maybe
 import Data.Time (UTCTime, getCurrentTime, diffUTCTime)
 import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
-import Control.Exception (SomeException, catch)
+import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit, disableAllocationLimit)
+import Control.Exception (SomeException, catch, finally)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import System.Timeout (timeout)
 
@@ -514,8 +514,8 @@ buildArgPairs reverseMap isDeontic arguments = case arguments of
   _ -> []
 
 -- | How an MCP evaluation came out: the encoded answer; the encoded
--- refusal, the same JSON an evaluation request's 422 carries; or the message
--- of an error.
+-- refusal, the same JSON an evaluation request's 200 carries for it; or the
+-- message of an error.
 data ToolOutcome
   = ToolAnswered Text
   | ToolRefused Text
@@ -529,13 +529,15 @@ evalResultToToolResponse reqId reverseMap = jsonRpcResult reqId . evalResultToTo
 -- | Like 'evalResultToToolResponse' but produces ONLY the result body
 -- (omitting JSON-RPC envelope). Used to store completed-task payloads.
 --
--- A refusal is a result with @isError@, as an error is, and its text is the
--- refusal as the service writes it everywhere, with the reason as its author
--- wrote it. An error's message has the request's field names put back.
+-- A refusal is a result without @isError@, as an answer is: the rules
+-- declined to answer, which is not a failure of the tool, so a client relays
+-- it rather than retrying. Its text is the refusal as the service writes it
+-- everywhere (tagged Refused), with the reason as its author wrote it. An
+-- error's message has the request's field names put back.
 evalResultToToolPayload :: Map Text Text -> ToolOutcome -> Aeson.Value
 evalResultToToolPayload reverseMap = \case
   ToolFailed errMsg -> toolBody (sanitizeFieldNamesInText reverseMap errMsg) True
-  ToolRefused refusal -> toolBody refusal True
+  ToolRefused refusal -> toolBody refusal False
   ToolAnswered resultVal -> toolBody resultVal False
  where
   toolBody content flagged = Aeson.object $
@@ -560,15 +562,18 @@ runMcpEvaluationIO cfg vf args = do
   case Map.lookup JL4 vf.fnEvaluator of
     Nothing -> pure $ ToolFailed "No evaluator available"
     Just runFn -> do
-      mResult <- (timeout timeoutMicros $ do
-          setAllocationCounter memLimitBytes
-          enableAllocationLimit
-          r <- runExceptT (runFn.runFunction args Nothing TraceNone False)
-          remaining <- getAllocationCounter
-          let _ = memLimitBytes - remaining
-          pure r
-        ) `catch` \AllocationLimitExceeded ->
-          pure Nothing
+      -- The limit is lifted when the evaluation ends, as 'timeoutAction'
+      -- lifts it: a call answered at once runs on the thread that serves the
+      -- connection's next request.
+      let limited = do
+            setAllocationCounter memLimitBytes
+            enableAllocationLimit
+            r <- runExceptT (runFn.runFunction args Nothing TraceNone False)
+            remaining <- getAllocationCounter
+            let _ = memLimitBytes - remaining
+            pure r
+      mResult <- timeout timeoutMicros (limited `finally` disableAllocationLimit)
+        `catch` \AllocationLimitExceeded -> pure Nothing
       case mResult of
         Nothing -> pure $ ToolFailed "Evaluation resource limit exceeded"
         Just (Left err@(EvaluatorRefused _)) ->
@@ -793,8 +798,8 @@ handleTasksCancel reqId params = case parseTaskId params of
 -- every deployment; on a scoped one (@/{id}/.mcp@) only the scope itself.
 --
 -- The file tools name their deployment in an argument, not in the route, so
--- they check it here: the auth proxy admits a caller with a grant for one
--- deployment to that deployment's route only, and an argument naming another
+-- they check it here: a caller with a grant for one deployment reaches that
+-- deployment's route only, and an argument naming another
 -- deployment must not reach past it. A deployment outside the scope is treated
 -- as one that does not exist.
 inScope :: Maybe Text -> Text -> Bool

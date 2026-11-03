@@ -183,6 +183,7 @@ test-suite jl4-core-test
     MixfixRegistryMergeSpec
     PatternMatchParserSpec
     PatternClausesMissingSpec
+    NestedParenParserSpec
     EventExactPrintSpec
     FormatFidelitySpec
     UUID5Spec
@@ -202,12 +203,14 @@ test-suite jl4-core-test
     RefusalReportSpec
     RefuseSpec
     NlgPercentSpec
+    LibraryNlgSpec
     NlgRenderSpec
     DirectiveAmbiguitySpec
     NlgMultiplicitySpec
     NlgAttachmentSpec
     NlgSilentReadingSpec
     ImportErrorRangeSpec
+    ResolutionCascadeSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

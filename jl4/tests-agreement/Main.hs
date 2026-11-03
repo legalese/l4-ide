@@ -248,8 +248,8 @@ spec bins root helpers headerErrors preps = do
             <> [Severity (Aeson.Number n) | n <- [1, 2, 3]]
             <> [IsError True, IsError False, HttpStatus 200, HttpStatus 422, HttpStatus 500]
         agreeing core seen = [f | f <- flags, agrees core (SeenFlagged f seen)]
-    it "agrees with a refusal only as a null success, a warning, an MCP error, or a 422" do
-      agreeing (CoreRefuses "r") (SeenRefused "r") `shouldBe` [Success Aeson.Null, Severity (Aeson.Number 2), IsError True, HttpStatus 422]
+    it "agrees with a refusal only as a null success, a warning, an MCP result that is no error, or a 200" do
+      agreeing (CoreRefuses "r") (SeenRefused "r") `shouldBe` [Success Aeson.Null, Severity (Aeson.Number 2), IsError False, HttpStatus 200]
     it "agrees with an answer only as a success, information, an MCP result that is no error, or a 200" do
       agreeing (CoreAnswers "TRUE" (Aeson.Bool True) False) (SeenText "TRUE") `shouldBe` [Success (Aeson.Bool True), Severity (Aeson.Number 3), IsError False, HttpStatus 200]
     it "agrees with an evaluation that raises only as a failure, an error, an MCP error, or a 422" do
@@ -284,6 +284,10 @@ spec bins root helpers headerErrors preps = do
     it "lists, in each row that sends to another list, a list that the registry has" do
       let titles = map (.title) fams
       [t | fam <- fams, (_, Listed t) <- fam.table, t `notElem` titles] `shouldBe` []
+
+    it "reads the verbs of l4 --help whose lines end in CRLF, as on Windows" do
+      helpVerbs "Usage: l4 COMMAND\r\n\r\nAvailable commands:\r\n  run   Run a file\r\n  check   Check a file\r\n"
+        `shouldBe` ["run", "check"]
 
   -- The reference page for REFUSE says, in one table, what each surface
   -- shows for a refusal. Each surface's row is named in Agreement.Page.

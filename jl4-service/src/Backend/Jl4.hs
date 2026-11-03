@@ -5,6 +5,7 @@ import Base hiding (trace)
 import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Text as Text
+import Control.Exception (evaluate)
 
 import L4.Annotation
 -- import qualified L4.Evaluate.Value as Eval
@@ -13,6 +14,7 @@ import qualified L4.EvaluateLazy as Eval
 import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment, parseDateText, parseTimeText, parseDatetimeText)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import L4.EvaluateLazy.Trace
+import L4.Refusal (PlanDecline, planDecline)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.TracePolicy (apiDefaultPolicy, TracePolicy(..))
 import qualified L4.TracePolicy as TracePolicy
@@ -62,9 +64,10 @@ data CompiledModule = CompiledModule
                                                      -- Consulted by 'buildModuleInfo' so a record parameter
                                                      -- whose type is defined in an IMPORT'd file resolves —
                                                      -- the entry module's own 'flattenDeclares' wouldn't see it.
-  , compiledDependencies :: ![Module Resolved]       -- ^ Every module the entry file imports, directly or not.
-                                                     -- Read with 'compiledModule' to decide whether a rule may
-                                                     -- refuse ('L4.Refusal'), which follows the names it calls.
+  , compiledDecline :: !(Maybe PlanDecline)          -- ^ Why the function's rule may refuse ('L4.Refusal.planDecline'),
+                                                     -- worked out once, when it is compiled, from the entry module and
+                                                     -- every module it imports. Only this result is kept: keeping the
+                                                     -- modules would keep every import's check result alive.
   }
   deriving (Generic)
 
@@ -87,8 +90,9 @@ data SharedModuleContext = SharedModuleContext
     --   file. Carried through into 'CompiledModule.compiledAllDeclares'
     --   so direct-AST evaluation can resolve cross-file record types.
   , sharedDependencies :: ![Module Resolved]
-    -- ^ Every module the entry file imports, directly or not. Carried
-    --   through into 'CompiledModule.compiledDependencies'.
+    -- ^ Every module the entry file imports, directly or not. Read only
+    --   while each function is compiled, for 'CompiledModule.compiledDecline';
+    --   the shared context is not kept after compilation.
   }
 
 -- | Build shared context from an already-typechecked module.
@@ -125,6 +129,7 @@ buildSharedContext filepath source moduleContext resolvedModule dependencies env
 buildCompiledFromShared :: SharedModuleContext -> RawName -> IO (Either Text CompiledModule)
 buildCompiledFromShared shared funName = runExceptT $ do
   decide <- withExceptT evalErrorToText $ getFunctionDefinition funName shared.sharedModule
+  decline <- liftIO $ evaluate $ force $ planDecline (shared.sharedModule : shared.sharedDependencies) decide
   pure CompiledModule
     { compiledModule = shared.sharedModule
     , compiledEnvironment = shared.sharedEnvironment
@@ -132,7 +137,7 @@ buildCompiledFromShared shared funName = runExceptT $ do
     , compiledDecide = decide
     , compiledImportEnv = shared.sharedImportEnv
     , compiledAllDeclares = shared.sharedAllDeclares
-    , compiledDependencies = shared.sharedDependencies
+    , compiledDecline = decline
     }
  where
   evalErrorToText :: EvaluatorError -> Text
@@ -321,6 +326,10 @@ precompileModule filepath source moduleContext funName = runExceptT $ do
   -- environment to be pre-computed (it only evaluates the current module fresh)
   importEnv <- liftIO $ buildImportEnvironment filepath source moduleContext tcRes.entityInfo
 
+  -- Whether the rule may refuse, worked out now so the imports are not kept.
+  decline <- liftIO $ evaluate $ force $
+    planDecline (tcRes.module' : map (.module') (Rules.transitiveDependencies tcRes)) decide
+
   -- Build the compiled module. precompileModule is the single-file
   -- fallback — bundle compilation populates `compiledAllDeclares` from
   -- the full import graph in Compiler.hs. Here we only have the entry
@@ -333,7 +342,7 @@ precompileModule filepath source moduleContext funName = runExceptT $ do
     , compiledDecide = decide
     , compiledImportEnv = importEnv
     , compiledAllDeclares = moduleDeclaresOnly tcRes.module'
-    , compiledDependencies = map (.module') (Rules.transitiveDependencies tcRes)
+    , compiledDecline = decline
     }
  where
   evalErrorToText :: EvaluatorError -> Text

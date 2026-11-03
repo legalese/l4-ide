@@ -208,7 +208,7 @@ resolveImports lookupModule inProgress resolved (modName : rest)
           -- Parse the module
           case execProgramParserWithHintPass uri source of
             Left parseErrors ->
-              pure $ Left $ ParseError modName $ map (\(PError msg _ _) -> msg) (toList parseErrors)
+              pure $ Left $ ParseError modName $ map (.message) (toList parseErrors)
             
             Right (parsed, _hints, _warnings) -> do
               -- Extract and resolve transitive imports first
@@ -310,7 +310,7 @@ typecheckWithDependenciesLocated lookupModule uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
-      pure $ Left (Nothing, map (\(PError msg _ _) -> msg) (toList parseErrors))
+      pure $ Left (Nothing, map (.message) (toList parseErrors))
     
     Right (parsed, _hints, annotationWarnings) -> do
       -- Extract and resolve imports

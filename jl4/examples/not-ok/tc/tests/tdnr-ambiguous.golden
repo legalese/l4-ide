@@ -6,7 +6,7 @@ File: tdnr-ambiguous.l4
   Range: 7:6-7:9
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -23,7 +23,7 @@ File: tdnr-ambiguous.l4
   Range: 14:18-14:21
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -40,7 +40,7 @@ File: tdnr-ambiguous.l4
   Range: 14:27-14:30
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

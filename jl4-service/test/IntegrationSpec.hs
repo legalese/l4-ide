@@ -45,7 +45,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import qualified Data.Text.Encoding as Text.Encoding
-import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
+import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getTemporaryDirectory, removeDirectoryRecursive, removePathForcibly, withCurrentDirectory)
@@ -793,15 +793,15 @@ spec = describe "integration" do
         mcp <- httpLbs mcpReq mgr
         let toolResult = fmap (fmap (Aeson.decodeStrict . Text.Encoding.encodeUtf8)) (mcpToolText (responseBody mcp))
         (statusCode' mcp, toolResult) `shouldBe`
-          (200, Just (True, Just (Aeson.object ["tag" Aeson..= ("Error" :: Text), "contents" Aeson..= refusalOf reason])))
-        -- the 422's body, as the MCP tool result carries it
+          (200, Just (False, Just (Aeson.object ["tag" Aeson..= ("Refused" :: Text), "contents" Aeson..= refusalOf reason])))
+        -- the evaluation's body, as the MCP tool result carries it, with no isError
         Aeson.decode (responseBody single) `shouldBe` (snd =<< toolResult :: Maybe Aeson.Value)
 
     -- A tool call that arrives while its deployment is still compiling, from a
     -- client that asked for tasks, is answered with a task, which evaluates the
     -- call once the deployment is compiled. The task's result is the text the
-    -- call answers: for a refusal, the 422's body, its reason as the rule gives
-    -- it, and for an answer, the 200's.
+    -- call answers: for a refusal, the evaluation's body, tagged Refused, its
+    -- reason as the rule gives it, and for an answer, the answer's.
     it "answers an MCP tool called as a task, while its deployment compiles, as a call is answered, a refusal among them" do
       let src = Text.unlines
             [ "@export Whether a person qualifies"
@@ -825,7 +825,7 @@ spec = describe "integration" do
         answered `shouldCarry` Answers (Aeson.Bool True)
         refusedTask <- asTask 10
         answeredTask <- asTask 20
-        asJson refusedTask `shouldBe` Just (True, Aeson.decode (responseBody refused))
+        asJson refusedTask `shouldBe` Just (False, Aeson.decode (responseBody refused))
         asJson answeredTask `shouldBe` Just (False, Aeson.decode (responseBody answered))
 
   -- The wrapper path evaluates a module with its directives taken out line by
@@ -1324,6 +1324,30 @@ spec = describe "integration" do
           statusCode' resp `shouldBe` 500
           lookupKey "error" (decodeObject (responseBody resp))
             `shouldBe` Just (Aeson.String "Query plan timed out")
+
+    it "is not held to the memory limit of an evaluation or a tool call before it on the same connection" do
+      -- The limit is the thread's, and Warp serves a kept-alive connection's
+      -- requests on one thread. Left on after an evaluation or an MCP tool
+      -- call that answered, what was left of it ran down over the requests
+      -- that followed, and the one that used it up lost its connection with
+      -- no answer. The client here does not retry such a request on a new
+      -- connection, as the default manager does, which hid it.
+      withServicesRestartedOpts testOptions {maxEvalMemoryMb = 1}
+        [("qp-after-limit", [("qualifies.l4", qualifiesJL4)])] (const (pure ())) \_ baseUrl _ -> do
+          mgr <- newManager defaultManagerSettings {managerRetryableException = const False}
+          let inputs = Aeson.object [ "walks" Aeson..= True, "eats" Aeson..= True, "drinks" Aeson..= True ]
+              allTrue = Aeson.object [ "arguments" Aeson..= inputs ]
+              plans = forM [1 .. 100 :: Int] \_ ->
+                statusCode' <$> queryPlan' baseUrl mgr "qp-after-limit" "compute_qualifies" allTrue
+          evaluated <- evalFunction baseUrl mgr "qp-after-limit" "compute_qualifies" allTrue
+          statusCode' evaluated `shouldBe` 200
+          afterEvaluation <- plans
+          afterEvaluation `shouldBe` replicate 100 200
+          called <- mcpRpc baseUrl mgr "qp-after-limit" "tools/call" $ Aeson.object
+            [ "name" Aeson..= ("compute_qualifies" :: Text), "arguments" Aeson..= inputs ]
+          fmap fst (mcpPayloadText =<< called) `shouldBe` Just False
+          afterToolCall <- plans
+          afterToolCall `shouldBe` replicate 100 200
 
     it "returns 404 for unknown function" do
       withServiceFromSources "qp-404" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -2192,6 +2216,31 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp)
         lookupKey "openapi" body `shouldBe` Just (Aeson.String "3.0.0")
         lookupKey "paths" body `shouldSatisfy` Maybe.isJust
+
+    it "says that an evaluation's 200 may be a refusal, with a reason and no result" do
+      withServiceFromSources "openapi-refused" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        resp <- httpGet mgr (baseUrl <> "/deployments/openapi-refused/openapi.json")
+        statusCode' resp `shouldBe` 200
+        let schemas = case lookupKey "components" (decodeObject (responseBody resp)) of
+              Just (Aeson.Object c) | Just (Aeson.Object ss) <- Aeson.KeyMap.lookup "schemas" c -> Just ss
+              _ -> Nothing
+            schema n = lookupKey n schemas
+            tagMapping = do
+              Aeson.Object r <- schema "EvaluationResponse"
+              Aeson.Object d <- Aeson.KeyMap.lookup "discriminator" r
+              Aeson.KeyMap.lookup "mapping" d
+        tagMapping `shouldBe` Just (Aeson.object
+          [ "SimpleResponse" Aeson..= ("#/components/schemas/EvaluationAnswer" :: Text)
+          , "TraceResponse" Aeson..= ("#/components/schemas/EvaluationAnswer" :: Text)
+          , "GraphVizResponse" Aeson..= ("#/components/schemas/EvaluationAnswer" :: Text)
+          , "Refused" Aeson..= ("#/components/schemas/EvaluationRefusal" :: Text)
+          ])
+        let refusalContents = do
+              Aeson.Object r <- schema "EvaluationRefusal"
+              Aeson.Object ps <- Aeson.KeyMap.lookup "properties" r
+              Aeson.Object c <- Aeson.KeyMap.lookup "contents" ps
+              Aeson.KeyMap.lookup "required" c
+        refusalContents `shouldBe` Just (Aeson.toJSON (["kind", "reason"] :: [Text]))
 
     it "returns OpenAPI 3.0 spec via org-wide /openapi.json" do
       withServiceFromSources "org-openapi" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -3230,6 +3279,102 @@ spec = describe "integration" do
           expectationFailure $
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
+    -- A type name nothing declares is reported as an out-of-scope error whose
+    -- type is TYPE, and the deploy must refuse it with that error. The deploy
+    -- tolerates out-of-scope errors for names that an @export reads without
+    -- declaring them (they become implicit inputs), and that tolerance must
+    -- not reach a type name: an undeclared result type was once refused only
+    -- because the checker went on to report a second, internal error about it.
+    it "rejects an @export whose result type was never declared" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badreturn.l4" $ Text.unlines
+        [ "@export Double a number"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Numbr"
+        , "`double it` MEANS n * 2"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input type was never declared, even if the body never uses it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badinput.l4" $ Text.unlines
+        [ "@export Add one"
+        , "GIVEN n IS A Numbr"
+        , "GIVETH A NUMBER"
+        , "`add one` MEANS 1"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "still publishes an input the module never declared as a name, not as a type" do
+      -- The same out-of-scope error, raised for a name an expression reads:
+      -- the deploy turns it into an input (here `flag`), as it always did.
+      logger <- newLogger False
+      result <- compileBundle logger "test" (Map.singleton "flag.l4" implicitFlagJL4)
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+            `shouldBe` [["flag", "threshold"]]
+    -- An EVENT cannot be supplied by a request, and was published as an input
+    -- typed "object" (`typeToParameter` has no declaration for it). Since
+    -- the EVENT type resolves, nothing else stops it, so the deploy refuses it,
+    -- as an input and as a result.
+    it "rejects an @export that takes an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventin.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , ""
+        , "@export Who acted"
+        , "GIVEN e IS AN EVENT Party Act"
+        , "GIVETH A Party"
+        , "`who acted` MEANS"
+        , "  CONSIDER e"
+        , "  WHEN EVENT p a n THEN p"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as an input yet"
+          err `shouldSatisfy` Text.isInfixOf "who acted"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export that returns an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventout.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , ""
+        , "@export Make an event"
+        , "GIVEN p IS A Party"
+        , "GIVETH AN EVENT Party Act"
+        , "`make event` MEANS EVENT p ping 0"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as a result yet"
+          err `shouldSatisfy` Text.isInfixOf "make event"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published "
+              <> show [fs.fsName | fs <- meta.metaFunctions]
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed
@@ -3378,10 +3523,11 @@ data WireOutcome
   | Refuses Text
     -- ^ 422, with an error message that contains this text
   | RefusedWith Text
-    -- ^ 422, with the refusal of this reason in place of an error
+    -- ^ 200, tagged Refused, with the refusal of this reason in place of an answer
 
--- | How the service writes a refusal wherever it answers one: in a 422's
--- @contents@, in a batch case's @\@refused@, and in an MCP tool result.
+-- | How the service writes a refusal wherever it answers one: in the
+-- @contents@ of an evaluation tagged Refused, in a batch case's @\@refused@,
+-- and in an MCP tool result.
 refusalOf :: Text -> Aeson.Value
 refusalOf reason = Aeson.object ["kind" Aeson..= ("refused" :: Text), "reason" Aeson..= reason]
 
@@ -3390,7 +3536,7 @@ shouldCarry resp = \case
   Answers v -> (statusCode' resp, wireAt resp ["contents", "result", "value"]) `shouldBe` (200, Right v)
   RefusedWith reason ->
     (statusCode' resp, wireAt resp ["tag"], wireAt resp ["contents"])
-      `shouldBe` (422, Right (Aeson.String "Error"), Right (refusalOf reason))
+      `shouldBe` (200, Right (Aeson.String "Refused"), Right (refusalOf reason))
   Refuses t -> do
     statusCode' resp `shouldBe` 422
     wireAt resp ["contents", "contents"] `shouldSatisfy` \case

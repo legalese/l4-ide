@@ -4,7 +4,7 @@ File: assert-refused-because-column.l4
   Range: 14:1-14:1
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
        |
     14 | BECAUSE "the real reason"

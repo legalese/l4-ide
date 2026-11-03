@@ -205,11 +205,33 @@ export const Evaluator: LadderEvaluator = {
             .map(toVEBoolValue)
             .filter((a) => a !== 'UnknownV')
 
-          const lspResponse = await l4connection.evalApp(
-            expr.id,
-            argsForApp,
-            verDocId
-          )
+          let lspResponse
+          try {
+            lspResponse = await l4connection.evalApp(
+              expr.id,
+              argsForApp,
+              verDocId
+            )
+          } catch (err) {
+            // A call that refuses has no TRUE or FALSE to give. The rule that
+            // makes it may refuse too, so the planner has declined it, and the
+            // ladder shows that sentence and gives no answer; the call is
+            // unknown, not a problem in evaluating it. Any other error stays one.
+            if (!isRefusal(err)) throw err
+            const res = new UnknownVal()
+            return {
+              result: res,
+              intermediate: combineIntermediates(
+                argResults.map((r) => r.intermediate)
+              ).set(expr.id, res),
+              consultedUniques: unionSets(
+                argResults.map((r) => r.consultedUniques)
+              ),
+              shortCircuitedRoots: unionSets(
+                argResults.map((r) => r.shortCircuitedRoots)
+              ),
+            }
+          }
           console.log('eval.ts: eval app lspResponse', lspResponse)
           if (!lspResponse) {
             throw new Error(`Problem evaluating App ${expr}`)
@@ -253,6 +275,26 @@ export const Evaluator: LadderEvaluator = {
 /***************************
       AndChain, OrChain
 ****************************/
+
+/** Whether l4/evalApp answered with a refusal: the language server marks one
+ * with `{"kind": "refused"}` in the error's data, and writes it as
+ * "The model refuses to answer:" in the message, which is all that reaches a
+ * host that relays the error without its data. */
+export function isRefusal(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false
+  const data = (err as { data?: unknown }).data
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as { kind?: unknown }).kind === 'refused'
+  )
+    return true
+  const message = (err as { message?: unknown }).message
+  return (
+    typeof message === 'string' &&
+    message.includes('The model refuses to answer')
+  )
+}
 
 function evalAndChain(bools: UBoolVal[], ids: IRId[]) {
   const firstFalse = bools.findIndex(isFalseVal)

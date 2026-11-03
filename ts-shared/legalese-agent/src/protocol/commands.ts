@@ -1,7 +1,7 @@
 /**
  * Commands: what clients send with `POST /sessions/:sid/commands` and
  * the Sessions API stores as `state/commands/<n>.json` for the harness
- * to pick up (spec §8).
+ * to pick up.
  */
 import {
   FILE_NAME_RE,
@@ -76,17 +76,17 @@ export type CommandPayload =
   | { type: 'abort'; turnId: string }
   /** Answer to an `ask-user` event (`''` = skipped). */
   | { type: 'answer'; callId: string; answer: string }
-  /** Restore the files to before turn `turnId` (§9.4). */
+  /** Restore the files to before turn `turnId`. */
   | { type: 'rollback'; turnId: string }
-  /** MCP credentials sealed to the running harness's key (§6.4), as
+  /** MCP credentials sealed to the running harness's key, as
    *  `encodeSealed(seal(publicKey, JSON.stringify(creds),
    *  mcpCredentialsContext(sid)))`; the plaintext is {@link McpCredentials}. */
   | { type: 'mcp-credentials'; sealed: string }
   | { type: 'stop' }
-  /** Merge `state/git/incoming/<file>` (§9.1). Issued by the Sessions
+  /** Merge `state/git/incoming/<file>`. Issued by the Sessions
    *  API after an accepted push, never by clients. */
   | { type: 'apply-bundle'; file: string }
-  /** Copy `incoming/files/<batchId>/<path>` into `repo/<path>` (§10).
+  /** Copy `incoming/files/<batchId>/<path>` into `repo/<path>`.
    *  Issued by the Sessions API on `POST /sessions/:sid/files/:batchId/
    *  commit`, never by clients. */
   | { type: 'add-files'; batchId: string; files: Array<{ path: string }> }

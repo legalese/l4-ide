@@ -189,7 +189,7 @@ A field's name is spelled as declared, spaces included, and not hyphenated as a 
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 
 A function that reaches a `REFUSE` gives no answer: it declines to, with its author's reason.
-The response is a `422`, as for an evaluation that stops with an error, with the body `{"tag": "Error", "contents": {"kind": "refused", "reason": "not modelled"}}`: its `contents` is the refusal, where an error's `contents` has a `tag` of its own.
+The response is a `200`, as for an answer, with the body `{"tag": "Refused", "contents": {"kind": "refused", "reason": "not modelled"}}`: its `contents` is the refusal, where an answer's `contents` has a `result`. A refusal is how the rules answer that case, so it is not an error: a `422` is only an evaluation that stops with one.
 The reason is as the rule wrote it.
 
 The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
@@ -307,7 +307,7 @@ The response has one entry per case, in the order the cases were sent, each unde
 ```
 
 An answered case carries the function's result under `value`.
-A case that refused carries `@refused`, the refusal as a single request's `422` carries it, `{"kind": "refused", "reason": "…"}`, has no `value`, and is counted in `casesProcessed`: a refusal is how the rules answer that case.
+A case that refused carries `@refused`, the refusal as a single request's `200` carries it, `{"kind": "refused", "reason": "…"}`, has no `value`, and is counted in `casesProcessed`: a refusal is how the rules answer that case.
 A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
 That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is rejected in a batch and answered as text in a single request.
 A case that runs past `--eval-timeout` or `--max-eval-memory-mb` is not returned this way: it fails the whole batch with `500`, and no case comes back.
@@ -411,7 +411,7 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-A tool call whose function refuses answers with `isError: true`, as an error does, and its text is the refusal, the body a `422` of the evaluation endpoint carries: `{"tag":"Error","contents":{"kind":"refused","reason":"not modelled"}}`.
+A tool call whose function refuses answers without `isError`, as an answer does, and its text is the refusal, the body the evaluation endpoint answers it with: `{"tag":"Refused","contents":{"kind":"refused","reason":"not modelled"}}`. A client tells it from an answer by that `tag` or by the `kind`, and relays it rather than treating the tool as broken.
 The reason is as the rule wrote it, with no input name rewritten.
 A client that asks for a task while the deployment is still compiling gets that text as the task's result.
 
@@ -451,13 +451,13 @@ The script registers tools based on the `data-tools` attribute. By default (`aut
 
 #### Visibility Headers
 
-The proxy injects these headers to control what jl4-service includes in responses. All default to `true` when absent (local dev, direct access).
+A reverse proxy can set these headers to control what jl4-service includes in responses. All default to `true` when absent (local dev, direct access).
 
-| Header                | Controls                                                               | Proxy permission |
-| --------------------- | ---------------------------------------------------------------------- | ---------------- |
-| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP | `l4:rules`       |
-| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP        | `l4:read`        |
-| `X-Include-Evaluate`  | Evaluation/batch/query-plan paths in OpenAPI, evaluation tools in MCP  | `l4:evaluate`    |
+| Header                | Controls                                                               | Permission    |
+| --------------------- | ---------------------------------------------------------------------- | ------------- |
+| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP | `l4:rules`    |
+| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP        | `l4:read`     |
+| `X-Include-Evaluate`  | Evaluation/batch/query-plan paths in OpenAPI, evaluation tools in MCP  | `l4:evaluate` |
 
 > **Note:** The legacy path `/webmcp.js` is redirected to `/.webmcp/embed.js` with a 301. Update existing embeds when convenient.
 

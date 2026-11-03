@@ -6,7 +6,7 @@ File: mixfix-call-type-errors.l4
   Range: 8:15-8:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 
@@ -20,7 +20,7 @@ File: mixfix-call-type-errors.l4
   Range: 11:24-11:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The condition in IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs is expected to be of type
 
@@ -35,7 +35,7 @@ File: mixfix-call-type-errors.l4
   Range: 14:17-14:38
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 

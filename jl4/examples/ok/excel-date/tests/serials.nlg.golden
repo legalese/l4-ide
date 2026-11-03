@@ -1,11 +1,11 @@
-`excelToday`
-`excelNow`
-`ExcelDateValue` with `Sample iso`
-`ExcelDateValue` with `Sample slash`
-`ExcelDateValue` with `Bad date text`
-`ExcelTimeValue` with 2:30 PM
-`ExcelTimeValue` with 23:59:59
-`ExcelTimeValue` with `Bad time text`
-`excelSerial1900` with 1 March 1900
-`dateFromExcelSerial` with 61
-`dateFromExcelSerial` with 60
+today's date in the document's time zone
+the present UTC date and time as an Excel 1900 serial number
+the date in `Sample iso`
+the date in `Sample slash`
+the date in `Bad date text`
+the fraction of a day elapsed at the time in 2:30 PM
+the fraction of a day elapsed at the time in 23:59:59
+the fraction of a day elapsed at the time in `Bad time text`
+the Excel 1900 serial number of 1 March 1900
+the date with Excel 1900 serial number 61
+the date with Excel 1900 serial number 60

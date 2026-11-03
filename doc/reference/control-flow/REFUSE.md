@@ -146,12 +146,13 @@ Each of these reports a refusal as a refusal, with the reason as the rule wrote 
 | The REPL, and its `:traceascii`     | `Refused:` and the reason                                                                                                                                              |
 | The editor                          | a warning at the directive: `The model refuses to answer:` and the reason                                                                                              |
 | The editor's Inspector              | `The model refuses to answer:` and the reason, shown neither as a success nor as a failure                                                                             |
-| The service's `/evaluation`         | a body whose `contents` is `{"kind": "refused", "reason": …}`                                                                                                          |
+| The service's `/evaluation`         | status `200`, a body tagged `Refused` whose `contents` is `{"kind": "refused", "reason": …}`                                                                           |
 | The service's `/evaluation/batch`   | for that case, `"@refused": {"kind": "refused", "reason": …}` in place of a `value`; the case is counted in `casesProcessed`                                           |
-| The service's MCP tools             | a result whose text is the body `/evaluation` gives, with `"kind": "refused"` and the reason                                                                           |
+| The service's MCP tools             | a successful tool result whose text is the body `/evaluation` gives, with `"kind": "refused"` and the reason                                                           |
 | A query plan                        | no plan for a rule that may refuse, and the sentence `No query plan for covered: it may refuse to answer, with the reason "the insurance of a minor is not modelled".` |
 
-The service marks a refusal by `"kind": "refused"`, and answers it with `422`, the HTTP status of an evaluation that stops with an error:
+The service answers a refusal with `200`, as it answers an answer, because declining is how the rules answer that case; a `422` is only an evaluation that stops with an error.
+The body is tagged `Refused`, and its `contents` is the refusal, marked by `"kind": "refused"`:
 
 ```json
 {
@@ -159,12 +160,12 @@ The service marks a refusal by `"kind": "refused"`, and answers it with `422`, t
     "kind": "refused",
     "reason": "this schedule is not encoded for years before 2000"
   },
-  "tag": "Error"
+  "tag": "Refused"
 }
 ```
 
-An MCP tool call answers a refusal with `isError: true`, and that body as its text.
-So tell a refusal by its `kind`: the `contents` of an error has a `tag` of its own, and an MCP error's text is the error's message.
+An MCP tool call answers a refusal without `isError`, as it answers an answer, with that body as its text, so an agent relays the refusal instead of treating the tool as broken.
+Tell a refusal by its `tag` or its `kind`: an answer's `contents` has a `result`.
 
 ## The query plan
 
@@ -185,24 +186,23 @@ DECIDE `may travel` IF
     adult AND REFUSE "travel is not modelled"
 ```
 
-is rendered as
+is rendered by `l4 render --format text` as
 
 ```text
-• May travel holds if:
-    all of the following are true:
-    - adult
-    - the model refuses to answer: “travel is not modelled”
+1. May travel if:
+    (a) adult; and
+    (b) the model refuses to answer: “travel is not modelled”.
 ```
 
 Read such a line as the point at which the rule stops without an answer: the rule reaches it only when what comes before it has not settled the answer, here for an adult.
-A refusal with a name of its own is written by its name, as `covered` reads "otherwise: the insurance of a minor is not modelled".
+A refusal with a name of its own is written by its name, as `covered` reads "Otherwise: the insurance of a minor is not modelled".
 
 ## Limits
 
 - The reason is the string literal beside `REFUSE`: `REFUSE 42` is a type error, and `REFUSE ("a" APPEND "b")` is a parse error.
   In `REFUSE "a" APPEND "b"`, `REFUSE` takes `"a"` alone, so the rule refuses with the reason "a".
 - A directive prints the reason exactly as written, spaces included, and `REFUSE ""` refuses with an empty reason.
-- `REFUSE` is a keyword, so a definition named `REFUSE` is written in backticks, `` `REFUSE` ``.
+- `REFUSE` and `REFUSED` are keywords everywhere, though `REFUSED` is used only in `#ASSERT REFUSED`, so a name spelled either way is written in backticks: `DECLARE Status IS ONE OF Approved, REFUSED` is a parse error ("unexpected REFUSED"), and `` DECLARE Status IS ONE OF Approved, `REFUSED` `` checks.
 - An operator with more than one meaning must be able to tell the type of a refusal it is given.
   Under `IMPORT daydate`, `PLUS` adds numbers and dates, so L4 must be able to tell whether a refusal added to a number stands for a number or for a date.
   A `GIVETH A NUMBER` on a rule whose answer is the sum, or on the named refusal, tells it, so `` `the deposit` `` above checks under `IMPORT daydate`.

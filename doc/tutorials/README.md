@@ -13,6 +13,7 @@ Step-by-step guides for getting a task done with L4: from installing it and writ
 - [Fix errors](getting-started/debugging-type-errors.md): read a diagnostic, and fix the errors that come up most.
 - [Encode legislation](getting-started/encoding-legislation.md): turn a statutory provision into a tested rule, alone or with an AI assistant.
 - [Make rules read like law](natural-language-functions/optimising-natural-language-generation.md): infix and mixfix names, and rules that render as readable documents.
+- [Fix wording with @nlg](natural-language-functions/fix-wording-with-nlg.md): the fix for each kind of bad wording in a rendered document
 - [Common patterns](getting-started/common-patterns.md): recipes for records, decisions, calculations, lists, dates and obligations.
 
 ## Publish rules

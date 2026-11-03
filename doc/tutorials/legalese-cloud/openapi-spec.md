@@ -66,7 +66,7 @@ Five things to know:
 - A rule that gives back a `MAYBE` of a `MAYBE` answers `null` both for `NOTHING` and for `JUST NOTHING`, so the two cannot be told apart.
 - Each rule's description includes a `returnSchema` for its answer. It does not show the record's name around a record's fields, or that a `MAYBE` answer can be `null`; go by the table above for those two.
 - A long list can come back cut short. A list answer of around 200 items or more may end with two `null`s in place of the rest, still with status 200, so two `null`s at the end of a long list mean it was cut, not that items were empty.
-- A rule can decline to answer, with a reason its author wrote ([REFUSE](../../reference/control-flow/REFUSE.md)). The call then has no `value`: it answers with status 422 and `{"contents": {"kind": "refused", "reason": "…"}, "tag": "Error"}`. Tell it from an error by `"kind": "refused"`.
+- A rule can decline to answer, with a reason its author wrote ([REFUSE](../../reference/control-flow/REFUSE.md)). The call then has no `value`: it answers with status 200 and `{"contents": {"kind": "refused", "reason": "…"}, "tag": "Refused"}`. Tell it from an answer by its `"tag": "Refused"`; a 422 is only an evaluation that stops with an error.
 
 ## Ask only the questions that matter
 

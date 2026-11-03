@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte'
   import StreamingMarkdown from './streaming-markdown.svelte'
   import ErrorBubble from './error-bubble.svelte'
   // import CopyButton from './copy-button.svelte'
@@ -9,6 +10,7 @@
     RenderedToolCall,
   } from '$lib/stores/ai-chat.svelte'
   import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
+  import { activityRow, omittedBlocks } from 'jl4-client-rpc'
 
   import type { Messenger } from 'vscode-messenger-webview'
 
@@ -23,6 +25,8 @@
     onRetry,
     onOpenFile,
     onOpenFileDiff,
+    filesOpenable = true,
+    filesAction,
   }: {
     content: string
     streaming: boolean
@@ -42,7 +46,14 @@
     onRetry?: () => void
     onOpenFile: (callId: string) => void
     onOpenFileDiff: (callId: string) => void
+    /** False when the turn's files aren't on this machine (cloud
+     *  sessions): paths render as plain text. */
+    filesOpenable?: boolean
+    /** Top right of the "Files changed" box. */
+    filesAction?: Snippet
   } = $props()
+
+  const omitted = $derived(omittedBlocks(blocks ?? [], aiPrefs.showReasoning))
 
   // Token badge — "• 1.2k in / 380 out" at the bottom of a
   // completed assistant bubble. Only renders after the stream
@@ -66,7 +77,7 @@
     return `tx:${i}`
   }
 
-  // Project an L4-rule tool-activity (the proxy ran a deployed rule
+  // Project an L4-rule tool-activity (the AI service ran a deployed rule
   // server-side) onto the SAME shape a client-side rule tool-call
   // uses, so it flows through the exact same <ToolCallRow> render
   // path — one source of truth for the INPUT/OUTPUT card, the L4
@@ -81,7 +92,7 @@
   // shows just the rule's inputs, identical to a direct rule call.
   // The server-side rule activity carries the *raw MCP CallToolResult*
   // as `output` (`{ content: [{ type: 'text', text: '<json>' }] }`),
-  // because the ai-proxy forwards the JSON-RPC `result` verbatim. A
+  // because the AI service forwards the JSON-RPC `result` verbatim. A
   // client-side rule tool-call, by contrast, has already been flattened
   // to just the joined text by the IDE's mcp-client. ToolCallRow's
   // INPUT/OUTPUT extraction (`extractRuleResultValue` / `returnL4`)
@@ -183,45 +194,63 @@
        *  ordering the user saw the tool rows in. */
       order: number
     }
+    type Touch = { path: string; kind: 'created' | 'edited' | 'deleted' }
+    /** The files a finished call changed: one `path` for create / edit
+     *  / delete; a copy's `to`, and for a move also its `from`. */
+    function touches(name: string, argsJson: string): Touch[] {
+      let a: {
+        path?: string
+        from?: string
+        to?: string
+        overwrite?: boolean
+        deleteSource?: boolean
+      }
+      try {
+        a = JSON.parse(argsJson)
+      } catch {
+        return []
+      }
+      const one = (kind: Touch['kind']): Touch[] =>
+        a.path ? [{ path: a.path, kind }] : []
+      if (name === 'fs__edit_file') return one('edited')
+      if (name === 'fs__create_file') return one('created')
+      if (name === 'fs__delete_file') return one('deleted')
+      if (name !== 'fs__copy_file' || !a.to) return []
+      const out: Touch[] = [
+        { path: a.to, kind: a.overwrite ? 'edited' : 'created' },
+      ]
+      if (a.deleteSource && a.from) out.push({ path: a.from, kind: 'deleted' })
+      return out
+    }
     const byPath = new Map<string, PathState>()
     let nextOrder = 0
     for (const b of blocks) {
       if (b.kind !== 'tool-call' || b.call.status !== 'done') continue
       const call = b.call
-      let kind: 'created' | 'edited' | 'deleted' | null = null
-      if (call.name === 'fs__edit_file') kind = 'edited'
-      else if (call.name === 'fs__create_file') kind = 'created'
-      else if (call.name === 'fs__delete_file') kind = 'deleted'
-      if (!kind) continue
-      let path: string | undefined
-      try {
-        path = (JSON.parse(call.argsJson) as { path?: string }).path
-      } catch {
-        continue
-      }
-      if (!path) continue
-      let state = byPath.get(path)
-      if (!state) {
-        state = {
-          created: false,
-          edited: false,
-          deleted: false,
-          firstCreateId: null,
-          firstEditId: null,
-          firstDeleteId: null,
-          order: nextOrder++,
+      for (const { path, kind } of touches(call.name, call.argsJson)) {
+        let state = byPath.get(path)
+        if (!state) {
+          state = {
+            created: false,
+            edited: false,
+            deleted: false,
+            firstCreateId: null,
+            firstEditId: null,
+            firstDeleteId: null,
+            order: nextOrder++,
+          }
+          byPath.set(path, state)
         }
-        byPath.set(path, state)
-      }
-      if (kind === 'created') {
-        state.created = true
-        if (!state.firstCreateId) state.firstCreateId = call.callId
-      } else if (kind === 'edited') {
-        state.edited = true
-        if (!state.firstEditId) state.firstEditId = call.callId
-      } else {
-        state.deleted = true
-        if (!state.firstDeleteId) state.firstDeleteId = call.callId
+        if (kind === 'created') {
+          state.created = true
+          if (!state.firstCreateId) state.firstCreateId = call.callId
+        } else if (kind === 'edited') {
+          state.edited = true
+          if (!state.firstEditId) state.firstEditId = call.callId
+        } else {
+          state.deleted = true
+          if (!state.firstDeleteId) state.firstDeleteId = call.callId
+        }
       }
     }
     const rows: Array<FileChange & { order: number }> = []
@@ -256,11 +285,9 @@
     return rows.map(({ path, action, callId }) => ({ path, action, callId }))
   })
 
-  // Turn-end review card: web-search citations the upstream provider
-  // attached to this turn (via Anthropic's native `web_search` tool,
-  // surfaced as `source` parts by the AI SDK and aggregated by the
-  // proxy into the `sources` field of a synthetic `web_search`
-  // activity). Deduped by URL across all activity blocks in case a
+  // Turn-end review card: web-search citations the model provider
+  // attached to this turn (aggregated by the AI service into the
+  // `sources` field of a synthetic `web_search` activity). Deduped by URL across all activity blocks in case a
   // single turn fired the search more than once.
   type Source = { url: string; title?: string }
   const sources = $derived.by<Source[]>(() => {
@@ -296,7 +323,9 @@
   <div class="assistant-bubble" class:is-streaming={streaming}>
     {#if blocks && blocks.length > 0}
       {#each blocks as block, i (blockKey(block, i))}
-        {#if block.kind === 'text'}
+        {#if omitted.has(i)}
+          <!-- Shows nothing, or only what the row above it shows. -->
+        {:else if block.kind === 'text'}
           <StreamingMarkdown
             text={block.text}
             streaming={streaming && i === blocks.length - 1}
@@ -307,8 +336,9 @@
             {messenger}
             {onOpenFile}
             onOpenDiff={onOpenFileDiff}
+            {filesOpenable}
           />
-        {:else if block.kind === 'thinking' && aiPrefs.showReasoning}
+        {:else if block.kind === 'thinking'}
           <!-- Collapsed-by-default reasoning block. Chevron flips when
                toggled; expanded body renders as italic gray text with
                preserved whitespace so chain-of-thought indentation
@@ -333,7 +363,7 @@
             {/if}
           </div>
         {:else if block.kind === 'tool-activity' && block.activity.ruleKey}
-          <!-- L4-rule activity: the proxy evaluated a deployed rule
+          <!-- L4-rule activity: the AI service evaluated a deployed rule
                server-side. Render it through the SAME ToolCallRow as
                a client-side rule call so the pulsating row, the
                auto-expanding INPUT/OUTPUT card and the L4 colorize
@@ -344,25 +374,17 @@
             {messenger}
             {onOpenFile}
             onOpenDiff={onOpenFileDiff}
+            {filesOpenable}
           />
-        {:else if block.kind === 'tool-activity' && block.activity.tool === 'web_search'}
-          <!-- Web-search activities carry the URL citations the
-               upstream model's native search produced. We don't render
-               them inline — they're surfaced in the turn's review card
-               below ("Sources:" section). Rendering a row here would
-               also split the assistant text stream into two text
-               blocks at the moment this block was pushed, breaking
-               any markdown element whose tokens straddle the citation
-               (most visibly tables and fenced code). -->
         {:else if block.kind === 'tool-activity'}
           <!-- Plain status activity (e.g. doc search, compaction,
                deployment browsing): bold action label + monospace
                message + pulsating-then-frozen dot. The label is
-               stamped on the event by the proxy ("L4 Deployments",
+               stamped on the event by the AI service ("L4 Deployments",
                "Compacting...", "Legalesing...") — no per-tool name
                mapping lives here, so adding a new server-emitted
                activity type doesn't require a webview change. Older
-               proxy builds may omit it; fall back to "Activity" so
+               older servers may omit it; fall back to "Activity" so
                the row still renders.
 
                The dot pulses iff this row is the trailing element
@@ -371,16 +393,13 @@
                appended after it, the row falls out of `:last-child`
                and the dot freezes solid. Errored rows opt out via
                the `is-error` class. -->
-          {@const actionLabel = block.activity.label ?? 'Activity'}
-          <div
-            class="tool-call tool-activity-row"
-            class:is-error={block.activity.status === 'error'}
-          >
+          {@const row = activityRow(block.activity)}
+          <div class="tool-call tool-activity-row" class:is-error={row.failed}>
             <div class="tool-row">
               <span class="dot" aria-hidden="true"></span>
-              <span class="action">{actionLabel}</span>
-              {#if block.activity.message && block.activity.message !== actionLabel}
-                <span class="target plain">{block.activity.message}</span>
+              <span class="action">{row.label}</span>
+              {#if row.detail}
+                <span class="target plain">{row.detail}</span>
               {/if}
             </div>
           </div>
@@ -402,6 +421,7 @@
             <span class="review-title"
               >Files changed this turn ({fileChanges.length})</span
             >
+            {@render filesAction?.()}
           </div>
           <ul class="review-list">
             {#each fileChanges as change (change.callId)}
@@ -409,23 +429,27 @@
                 <span class="review-action review-action-{change.action}"
                   >{change.action}</span
                 >
-                <button
-                  type="button"
-                  class="review-path"
-                  onclick={() =>
-                    change.action === 'edited'
-                      ? onOpenFileDiff(change.callId)
-                      : onOpenFile(change.callId)}
-                  title={change.action === 'edited'
-                    ? 'Open applied diff'
-                    : 'Open file'}>{change.path}</button
-                >
+                {#if filesOpenable}
+                  <button
+                    type="button"
+                    class="review-path"
+                    onclick={() =>
+                      change.action === 'edited'
+                        ? onOpenFileDiff(change.callId)
+                        : onOpenFile(change.callId)}
+                    title={change.action === 'edited'
+                      ? 'Open applied diff'
+                      : 'Open file'}>{change.path}</button
+                  >
+                {:else}
+                  <span class="review-path plain">{change.path}</span>
+                {/if}
               </li>
             {/each}
           </ul>
         {/if}
         {#if sources.length > 0}
-          <!-- Sources sub-section. Cites the URLs the upstream provider
+          <!-- Sources sub-section. Cites the URLs the model provider
                actually consulted via its native web_search tool — the
                evidence chain for whatever the assistant just wrote.
                Spacing above mirrors the gap between the file-changes
@@ -703,6 +727,12 @@
   }
   .review-path:hover {
     text-decoration: underline;
+  }
+  .review-path.plain {
+    cursor: default;
+  }
+  .review-path.plain:hover {
+    text-decoration: none;
   }
   /* Sources sub-header — when stacked under the files list, give it
      a little breathing room so the two sections read as separate

@@ -4,7 +4,7 @@ File: assert-refused-breach-because.l4
   Range: 9:57-9:57
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
       |
     9 | #ASSERT REFUSED IF TRUE THEN REFUSE "wrong" ELSE BREACH BECAUSE "right"

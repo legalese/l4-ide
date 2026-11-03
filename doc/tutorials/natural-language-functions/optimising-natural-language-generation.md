@@ -154,9 +154,9 @@ The first renders as "The balance due equals the purchase price − the deposit 
 
 Legal writing sometimes uses letters on purpose, as in "A person (A) discriminates against another (B) if …" (Equality Act 2010, s.13). There, single letters are the right choice.
 
-When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". This works well when only one input has that type; two inputs of the same type would share the same phrase.
+When an input has a record type, the renderer refers to it by the type's name: with `` GIVEN claim IS A `Payment Claim` ``, `` claim's `amount` `` renders as "the payment claim's amount". A possessive is spelled to fit the word: "the contribution facts' rate", "the witness's age". A role written as a name of its own is kept: ``GIVEN `the applicant` IS A Person`` reads "the applicant", not "the person". This works well when only one input has that type; two inputs of the same type would share the same phrase.
 
-**Name record fields readably.** A field renders as "X's field", so field names go straight into the prose:
+**Name record fields readably.** A field renders as "X's field", so field names go straight into the prose. A `BOOLEAN` field states something, so it never takes a possessive. A field that starts with _is_ or _has_ follows its record ("the applicant is a citizen"), and any other reads as its own words and says which record it is about ("necessary for a contract, for the processing"). Field names go straight into the prose:
 
 ```l4
 DECLARE `Property Details`
@@ -194,7 +194,7 @@ GIVETH A NUMBER
 `the deadline` MEANS `the later of` `start date` `end date`
 ```
 
-The call renders as "the later of start date and end date". The same function named `` `maximum` `` renders as "maximum with start date and end date".
+The call renders as "the later of start date and end date". The same function named `` `maximum` `` renders as "maximum for start date and end date".
 
 **Let control flow stay structured.** `CONSIDER`, `IF`/`THEN`/`ELSE` and `AND`/`OR` render as indented outlines, not run-on sentences, so keep the operative logic where the renderer can see it:
 
@@ -212,11 +212,10 @@ GIVETH A STRING
 
 renders as
 
-```
-• The reminder is determined by:
-    depending on the claim's status:
-    - if it is Paid: none
-    - if it is Overdue: send a reminder
+```text
+1. The reminder depends on the claim's status:
+    (a) If the claim's status is Paid: none;
+    (b) If the claim's status is Overdue: send a reminder.
 ```
 
 **Keep arithmetic as arithmetic.** Numeric expressions render as formulas, with `+ − × ÷` and parentheses, not as "the sum of the product of …":
@@ -252,67 +251,46 @@ DECIDE `the applicant` `is of working age` IF
     `the applicant`'s `age` AT LEAST 18
 ```
 
-With **Number sections** turned on in the Render tab (or `--number-sections` on the command line), the headings are numbered: `§ 2  Eligibility`, then `2.1  Age requirements`. A file with no section markers is still grouped into automatic **Definitions** and **Provisions** sections, but your own markers let you name and order the parts the way a reader of the contract or statute expects.
+Headings are numbered by default, in the Render tab and on the command line (turn it off with `--no-number-sections`): `§ 2  Eligibility`, then `2.1  Age requirements`. A file with no section markers is still grouped into automatic **Definitions** and **Provisions** sections, but your own markers let you name and order the parts the way a reader of the contract or statute expects.
 
 ---
 
 ## `@nlg` annotations
 
-When names and shape are not enough (a recursive helper, a term of art, a formula you would rather state in words), add an `@nlg` annotation. It is the natural-language form of the definition and replaces the generated sentence.
-
-Write `@nlg` at the end of the definition's line, after the name and inputs, with the body on the next line. Inside the sentence, `%name%` is a slot for an input; an input whose name has spaces keeps its backticks: ``%`the principal`%``.
+When names and shape are not enough, write the sentence yourself. Put `@nlg` on its own line above the rule, with a `%name%` slot for each input:
 
 ```l4
 GIVEN x IS A NUMBER
       y IS A NUMBER
 GIVETH A NUMBER
-`bigger` x y @nlg whichever is larger of %x% and %y%
-  MEANS IF x >= y THEN x ELSE y
+@nlg whichever is larger of %x% and %y%
+`bigger` x y MEANS IF x >= y THEN x ELSE y
 
 `start date` MEANS 3
 `end date`   MEANS 7
 `the deadline` MEANS `bigger` `start date` `end date`
 ```
 
-Each slot is filled with the input's name in the definition itself, and with the actual argument at each call:
+The sentence heads the rule, its logic follows, and every call reads as the sentence:
 
-```
-• Bigger means whichever is larger of x and y.
-• The deadline means whichever is larger of start date and end date.
-```
+```text
+1. Whichever is larger of [x] and [y] is:
+    (a) If x is at least y: x;
+    (b) Otherwise: y.
 
-A slot is **tight**: `%amount%`, with no spaces inside the delimiters.
-That is what keeps a written-out percentage from being mistaken for one.
-In
-
-```l4
-@nlg a 5% levy on %amount%
+4. The deadline means whichever is larger of start date and end date.
 ```
 
-the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it and so is not a slot, while `%amount%` is one.
-Where a percent sign would end up flush against a word, as in `5%levy`, wrap it in backticks (`` `5%` ``) or spell it out ("5 percent"), either of which puts it beyond doubt.
+Use it for recursive helpers, for rules called from other rules, and for terms of art. Every rule in the standard libraries has a sentence.
 
-**It replaces the body.** A function with `@nlg` renders as its sentence, not as its implementation. That is what makes recursive library functions readable; the prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so a call reads as a sentence instead of exposing the recursion.
-
-| Situation                                            | Why `@nlg` helps                                   |
-| ---------------------------------------------------- | -------------------------------------------------- |
-| Recursive or higher-order helpers                    | Describes the result, hides the implementation     |
-| A formula better said in words                       | "the pro-rated premium" instead of the arithmetic  |
-| Terms of art                                         | Matches the exact statutory or contractual wording |
-| A name that cannot be both valid code and good prose | Separates the two                                  |
-
-Tips:
-
-- Use only the function's own inputs as slots, and write the sentence so that it reads well with each slot as a noun phrase.
-- Try names and shape first. An `@nlg` sentence can drift away from the logic it describes, so use it where it pays off.
-- One sentence per definition. For branching prose, let `CONSIDER` or `IF` render as an outline instead.
+- **Fix wording that reads badly:** [Fix wording with @nlg](fix-wording-with-nlg.md)
+- **All the rules:** [@nlg](../../reference/syntax/nlg.md)
 
 ---
 
 ## One encoding, several languages
 
-An `@nlg` sentence is in whatever language you wrote it in.
-To keep the same rule readable in two languages, give it one sentence per language and tag each with its language:
+Give a rule one sentence per language, and ask for the one you want:
 
 ```l4
 GIVEN amount IS A NUMBER
@@ -322,22 +300,11 @@ DECIDE `is large` @nlg:en the amount %amount% is large
   IF amount GREATER THAN 100
 ```
 
-Nothing about the rule is duplicated, only its wording.
-Ask for the language you want:
-
 ```bash
 l4 render --lang he --format html contract.l4 > contract.he.html
-l4 nlg --lang he contract.l4
 ```
 
-A rule with no sentence in that language keeps its default one, so a half-translated file produces a whole document.
-When a whole module is in one language, say it once with `@lang he` on a line of its own instead of tagging every sentence; the tag then means "every untagged `@nlg` in this module is Hebrew".
-
-What this does not do is translate.
-L4 prints the words you wrote.
-The little words it adds itself, such as "is equal to" or "with", stay English unless L4 has a phrase table for the language.
-Hebrew is the one language with a table, and it is small, so have a Hebrew speaker read its output before you rely on it.
-[The syntax reference](../../reference/syntax/README.md#labelling-the-language-nlghe) has the details and the limits.
+L4 does not translate: it prints the words you wrote. See [Several languages](../../reference/syntax/nlg.md#several-languages).
 
 ---
 
@@ -353,7 +320,7 @@ GIVETH A NUMBER
 pmt p r n MEANS p TIMES r DIVIDED BY (1 MINUS EXPONENT (1 PLUS r) (0 MINUS n))
 ```
 
-This renders as "Pmt equals p × r ÷ (1 − EXPONENT with the sum of 1 and r and the difference between n and 0)."
+This renders as "Pmt equals p × r ÷ (1 − EXPONENT with 1 + r and 0 − n)."
 
 After, with descriptive names and one `@nlg`:
 

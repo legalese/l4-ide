@@ -25,6 +25,7 @@ module Agreement.Registry
   , serviceRouteTable
   , doorsOf
   , allSurfaces
+  , helpVerbs
   ) where
 
 import Control.Exception (IOException, try)
@@ -198,7 +199,8 @@ lspCustomTable =
   , ("l4/queryPlan", Door [Plan LspPlan])
   , ("l4.visualize", Door [Plan LspPlan])
   , ("l4/evalApp", NotRunHere "the ladder's evaluation of a call, which a client asks with a checked module, its environment and a drawn ladder; no test drives it")
-  , ("l4/directiveResultsNotif", NotResult "the name of the action that gathers l4/directiveResultsUpdated")
+  , ("l4/fileChecked", NotRunHere "sent after each check of a file, with the file's diagnostics as textDocument/publishDiagnostics gives them, so a refusal reads there as it does in a publish; no test here drives it")
+  , ("l4/fileChecked.importers", NotResult "the name of the action that finds the open documents importing a file, for l4/fileChecked")
   , ("l4/evalDirectiveResult/#CHECK", NotResult "the name of the action that checks a #CHECK for l4/evalDirectiveResult")
   , ("l4.renderResult", NotResult "the client command a directive's lens names")
   , ("l4.resetvisualization", NotResult "clears the drawn decision graph")
@@ -244,7 +246,6 @@ executableTable =
   , ("jl4-wasm", Listed "the functions the browser's WASM module exports")
   , ("jl4-mlir", NotRunHere "compiles a module to WASM and runs it; `jl4-mlir run` declines a function that may refuse, which jl4-mlir-test's \"jl4-mlir run declines an unsupported export\" pins")
   , ("jl4-schema", NotResult "writes the JSON schema of a module's exports")
-  , ("jl4-websessions", NotResult "stores the browser editor's sessions")
   ]
 
 -- The doors there are -------------------------------------------------------
@@ -252,9 +253,15 @@ executableTable =
 l4Verbs :: FilePath -> IO (Either T.Text [T.Text])
 l4Verbs l4 = do
   (_, out, err) <- runIn "." l4 ["--help"] ""
-  let after = drop 1 (dropWhile (/= "Available commands:") (T.lines (out <> err)))
-      verbs = [v | l <- after, Just rest <- [T.stripPrefix "  " l], let v = T.takeWhile (not . Char.isSpace) rest, not (T.null v)]
-  pure (if null verbs then Left ("no commands in l4 --help: " <> out <> err) else Right (nub verbs))
+  let verbs = helpVerbs (out <> err)
+  pure (if null verbs then Left ("no commands in l4 --help: " <> out <> err) else Right verbs)
+
+-- | The commands that l4 --help lists under "Available commands:". On
+-- Windows its lines end in CRLF, so the carriage returns are dropped first.
+helpVerbs :: T.Text -> [T.Text]
+helpVerbs help =
+  let after = drop 1 (dropWhile (/= "Available commands:") (T.lines (T.filter (/= '\r') help)))
+   in nub [v | l <- after, Just rest <- [T.stripPrefix "  " l], let v = T.takeWhile (not . Char.isSpace) rest, not (T.null v)]
 
 -- | The string literals of the guards of processInput (the lines that start
 -- with "|" at the indentation of its first guard), each guard the part of

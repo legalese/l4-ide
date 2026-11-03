@@ -57,8 +57,8 @@ checkCmd opts = do
       -- Exit code depends on the Shake rule and the structured diagnostics,
       -- not the log stream: see the same comment in L4.Cli.Run for why.
       -- The entry file's own typecheck can look successful when a module it
-      -- imports is broken (an import cycle's error attaches to an imported
-      -- file), so also require that no blocking Error diagnostic was published
+      -- imports is broken (a module on a ring of imports has no typecheck, so
+      -- its importer is checked without it), so also require that no blocking Error diagnostic was published
       -- anywhere in the import closure.
       overallOk = typecheckOk && not (hasBlockingError diags)
 

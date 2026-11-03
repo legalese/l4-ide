@@ -1,61 +1,61 @@
-`United States alpha-2`
-`United Kingdom alpha-2`
-`Canada alpha-2`
-`Japan alpha-2`
-`Singapore alpha-2`
-`United States alpha-3`
-`Germany alpha-3`
-`Australia alpha-3`
-`United States numeric`
-`United Kingdom numeric`
-`Japan numeric`
-`European Union code`
-`ASEAN code`
-`California code`
-`New York code`
-`Delaware code`
-`Texas code`
-`Ontario code`
-`Quebec code`
-`British Columbia code`
-`England code`
-`Scotland code`
-`Wales code`
-`is valid ISO 3166-1 alpha-2` with US
-`is valid ISO 3166-1 alpha-2` with USA
-`is valid ISO 3166-1 alpha-2` with us
-`is valid ISO 3166-1 alpha-3` with USA
-`is valid ISO 3166-1 alpha-3` with US
-`is valid ISO 3166-1 alpha-3` with usa
-`is valid ISO 3166-2` with US-CA
-`is valid ISO 3166-2` with CA-ON
-`is valid ISO 3166-2` with GB-ENG
-`is valid ISO 3166-2` with INVALID
-`country name from alpha-2` with US
-`country name from alpha-2` with GB
-`country name from alpha-2` with CA
-`country name from alpha-2` with JP
-`country name from alpha-2` with SG
-`country name from alpha-2` with DE
-`country name from alpha-2` with ZZ
-`country name from alpha-3` with USA
-`country name from alpha-3` with GBR
-`country name from alpha-3` with CAN
-`country name from alpha-3` with JPN
-`country name from alpha-3` with ZZZ
-`alpha-2 to alpha-3` with US
-`alpha-2 to alpha-3` with GB
-`alpha-2 to alpha-3` with CA
-`alpha-2 to alpha-3` with JP
-`alpha-2 to alpha-3` with SG
-`alpha-2 to alpha-3` with DE
-`alpha-2 to alpha-3` with FR
-`alpha-2 to alpha-3` with ZZ
-`alpha-3 to alpha-2` with USA
-`alpha-3 to alpha-2` with GBR
-`alpha-3 to alpha-2` with CAN
-`alpha-3 to alpha-2` with JPN
-`alpha-3 to alpha-2` with SGP
-`alpha-3 to alpha-2` with DEU
-`alpha-3 to alpha-2` with FRA
-`alpha-3 to alpha-2` with ZZZ
+the ISO 3166 alpha-2 code for the United States
+the ISO 3166 alpha-2 code for the United Kingdom
+the ISO 3166 alpha-2 code for Canada
+the ISO 3166 alpha-2 code for Japan
+the ISO 3166 alpha-2 code for Singapore
+the ISO 3166 alpha-3 code for the United States
+the ISO 3166 alpha-3 code for Germany
+the ISO 3166 alpha-3 code for Australia
+the ISO 3166 numeric code for the United States
+the ISO 3166 numeric code for the United Kingdom
+the ISO 3166 numeric code for Japan
+the code for the European Union
+the code for the Association of Southeast Asian Nations
+the ISO 3166-2 code for the US state of California
+the ISO 3166-2 code for the US state of New York
+the ISO 3166-2 code for the US state of Delaware
+the ISO 3166-2 code for the US state of Texas
+the ISO 3166-2 code for the Canadian province of Ontario
+the ISO 3166-2 code for the Canadian province of Quebec
+the ISO 3166-2 code for the Canadian province of British Columbia
+the ISO 3166-2 code for England
+the ISO 3166-2 code for Scotland
+the ISO 3166-2 code for Wales
+US has two characters and no lower-case letters, like an ISO 3166-1 alpha-2 code
+USA has two characters and no lower-case letters, like an ISO 3166-1 alpha-2 code
+us has two characters and no lower-case letters, like an ISO 3166-1 alpha-2 code
+USA has three characters and no lower-case letters, like an ISO 3166-1 alpha-3 code
+US has three characters and no lower-case letters, like an ISO 3166-1 alpha-3 code
+usa has three characters and no lower-case letters, like an ISO 3166-1 alpha-3 code
+US-CA has two non-lower-case characters, a hyphen and at least one more character, like an ISO 3166-2 code
+CA-ON has two non-lower-case characters, a hyphen and at least one more character, like an ISO 3166-2 code
+GB-ENG has two non-lower-case characters, a hyphen and at least one more character, like an ISO 3166-2 code
+INVALID has two non-lower-case characters, a hyphen and at least one more character, like an ISO 3166-2 code
+the country name for alpha-2 code US
+the country name for alpha-2 code GB
+the country name for alpha-2 code CA
+the country name for alpha-2 code JP
+the country name for alpha-2 code SG
+the country name for alpha-2 code DE
+the country name for alpha-2 code ZZ
+the country name for alpha-3 code USA
+the country name for alpha-3 code GBR
+the country name for alpha-3 code CAN
+the country name for alpha-3 code JPN
+the country name for alpha-3 code ZZZ
+the alpha-3 code matching alpha-2 code US
+the alpha-3 code matching alpha-2 code GB
+the alpha-3 code matching alpha-2 code CA
+the alpha-3 code matching alpha-2 code JP
+the alpha-3 code matching alpha-2 code SG
+the alpha-3 code matching alpha-2 code DE
+the alpha-3 code matching alpha-2 code FR
+the alpha-3 code matching alpha-2 code ZZ
+the alpha-2 code matching alpha-3 code USA
+the alpha-2 code matching alpha-3 code GBR
+the alpha-2 code matching alpha-3 code CAN
+the alpha-2 code matching alpha-3 code JPN
+the alpha-2 code matching alpha-3 code SGP
+the alpha-2 code matching alpha-3 code DEU
+the alpha-2 code matching alpha-3 code FRA
+the alpha-2 code matching alpha-3 code ZZZ

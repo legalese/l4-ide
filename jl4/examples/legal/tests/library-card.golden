@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+library-card.l4:80:1-37:
+  TRUE
+library-card.l4:81:1-27:
+  `junior card`
+library-card.l4:82:1-27:
+  `no card`
+library-card.l4:85:1-43:
+  assertion satisfied

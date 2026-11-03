@@ -44,6 +44,26 @@ a warning naming all of them (symlinks dereferenced) and the one chosen. See
 `doc/reference/libraries/resolution.md` for the full dev-vs-prod guide, and
 `specs/as-built/import-resolution.md` for an as-built description of the code.
 
+## Every rule has a sentence
+
+Each rule in these files carries an `@nlg` sentence, so that a call to it reads as prose in `l4 render`, `l4 nlg` and the editor. `LibraryNlgSpec` in `jl4-core/test` fails if a rule has none, if an input has no slot, or if a sentence landed on the wrong name.
+
+When you add a rule, write its sentence on its own line directly above the head:
+
+```l4
+GIVEN date IS A DATE
+GIVETH A BOOLEAN
+@nlg %date% falls on a weekend
+`is weekend` date MEANS ...
+```
+
+- A rule that gives `BOOLEAN` reads as a clause with a subject: `%list% is empty`.
+- Any other rule reads as a noun phrase, usually starting "the": `the last day of the month containing %date%`.
+- A rule with no inputs reads as a noun phrase with no slots: `the ISO alpha-2 code for Canada`.
+- Give every input a slot, once. Write ``%`the amount`%`` for an input whose name has spaces.
+- Say what the rule means, and read the body first: the sentence has to be true of it. Leave out programmer detail such as what happens on bad input, since it would print at every call.
+- Keep words between slots, because a sentence is spliced into others without brackets.
+
 ## Editing these files? Read this first (the staleness gotcha)
 
 The embedded copy is captured at **build** time, when GHC compiles
