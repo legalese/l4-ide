@@ -22,6 +22,7 @@
   - [IF](control-flow/IF.md)
   - [BRANCH](control-flow/BRANCH.md)
   - [CONSIDER](control-flow/CONSIDER.md)
+  - [REFUSE](control-flow/REFUSE.md)
 - [Operators](operators/README.md)
   - [AND, OR, NOT, IMPLIES](operators/logical.md)
   - [UNLESS](operators/UNLESS.md)
@@ -34,6 +35,7 @@
   - [DEONTIC](regulative/DEONTIC.md)
   - [EVENT](regulative/EVENT.md)
 - [Syntax and directives](syntax/README.md)
+  - [@nlg](syntax/nlg.md)
 
 ## Library
 

@@ -201,7 +201,7 @@ Check succeeded.
 
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
 `--json` and `--fixed-now` work here too.
-`l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files. Other commands, such as `l4 render` and `l4 nlg`, don't stop on an error in an imported file.
+`l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files. `l4 render` still writes its document when an imported file has an error, and then exits with status 1. Other commands, such as `l4 nlg`, don't stop on an error in an imported file.
 Files can't import each other in a ring; [Import cycle](../../reference/errors/README.md#import-cycle) says how to fix one.
 
 ---
@@ -272,22 +272,28 @@ Late Fee Policy
 ===============
 
 
-Definitions
+§ 1  Interpretation
 
-• Invoice means a record with:
-    - amount — NUMBER
-    - days overdue — NUMBER
+In this document, unless the context otherwise requires:
+
+1. Invoice consists of:
+    - amount — number
+    - days overdue — number
 
 
-Provisions
+§ 2  Provisions
 
-• Late fee means:
-    - if the invoice's days overdue is at most 0: 0
-    - otherwise, if the invoice's days overdue is at most 30: the invoice's amount × 0.02
-    - otherwise: the invoice's amount × 0.05
+1. Late fee is:
+    | Condition                                              | Result                      |
+    |--------------------------------------------------------|-----------------------------|
+    | the invoice's days overdue is at most 0                | 0                           |
+    | otherwise, if the invoice's days overdue is at most 30 | the invoice's amount × 0.02 |
+    | otherwise                                              | the invoice's amount × 0.05 |
 ```
 
-Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
+Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--no-number-sections`, `--no-number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
+
+With no flags, `l4 render` writes the same document as the VS Code Render tab: sections and clauses numbered, and the file's own rules only. Imported modules still decide how those rules read. Definitions and assumptions open the document as an interpretation section, branches with short results become decision tables, long constant lists move to numbered Schedules at the end, and a citation with a `@ref-map` entry is a link in `html`. `--include-imports` adds the imported rules the document uses, `--include-import NAME` adds those of one module, and `--include-unused` adds everything.
 
 ### `l4 nlg` — the directives, as sentences
 
@@ -385,12 +391,13 @@ Every case that is run produces one line, or one item with `--format json` or `y
 - `status` says how the case went, as below.
 - `diagnostics` is the list of messages for a case that did not succeed, and `[]` for one that did.
 
-`status` is one of two words:
+`status` is one of three words:
 
 - `success`: the rules gave an answer.
 - `error`: the rules could not be run on the case, or raised an error. A fact is missing, a value cannot be read as the type the fact declares, a CSV line has a different number of cells from the header, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+- `refused`: the rules declined to answer the case with a [`REFUSE`](../../reference/control-flow/REFUSE.md), which is not an error. The `result` is then an object holding the reason, `{"refused": {"reason": …}}`, and `diagnostics` gives the reason too. The batch goes on to the next case.
 
-The command exits with status 0 when every case was `success`, and 1 when any case was `error`, once every case that was going to run has run.
+The command exits with status 1 when any case was `error`, and 0 when none was, once every case that was going to run has run.
 
 #### Checking cases without running them
 

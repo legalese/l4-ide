@@ -74,8 +74,8 @@ import qualified L4.Export as Export
 import qualified L4.Export.Shape as Shape
 import qualified L4.Export.Document as ExportDoc
 import qualified L4.Export.Render as ExportRender
-import qualified L4.FunctionSchema as FSchema
 import qualified L4.Nlg as Nlg
+import qualified L4.FunctionSchema as FSchema
 
 data ReactorMessage
   = ReactorNotification (IO ())
@@ -451,14 +451,6 @@ handlers evalConfig recorder =
           -- adds codelenses to visualize DECIDE or MEANS clauses
           visualizeDecides :: [CodeLens] = decisionGraphCodeLenses verTextDocId typeCheck
 
-          directiveLabel :: Directive Resolved -> Text
-          directiveLabel = \case
-            LazyEval{}      -> "#EVAL"
-            LazyEvalTrace{} -> "#EVALTRACE"
-            Check{}         -> "#CHECK"
-            Contract{}      -> "#CHECK"
-            Assert{}        -> "#ASSERT"
-
           mkRenderResultCodeLens srcPos label = CodeLens
             { _command = Just Command
               { _title = "Track result"
@@ -594,14 +586,15 @@ handlers evalConfig recorder =
                 case rangeOfNode d of
                   Just rng ->
                     let lspRange = srcRangeToLspRange (Just rng)
-                        (label, dExpr) = case d of
-                          LazyEval _ e      -> ("#EVAL", e)
-                          LazyEvalTrace _ e -> ("#EVALTRACE", e)
-                          Check _ e         -> ("#CHECK", e)
-                          Contract _ e _ _  -> ("#CHECK", e)
-                          Assert _ e        -> ("#ASSERT", e)
+                        dExpr = case d of
+                          LazyEval _ e        -> e
+                          LazyEvalTrace _ e   -> e
+                          Check _ e           -> e
+                          Contract _ e _ _    -> e
+                          Assert _ e          -> e
+                          AssertRefused _ e _ -> e
                         detail = prettyLayout dExpr
-                    in [ mkSymbol label (Just detail) SymbolKind_Operator lspRange lspRange ]
+                    in [ mkSymbol (directiveLabel d) (Just detail) SymbolKind_Operator lspRange lspRange ]
                   Nothing -> []
 
               Import _ imp@(MkImport _ n _) ->
@@ -762,8 +755,12 @@ handlers evalConfig recorder =
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.QueryPlanMethodName) params ide $
           \(qpParams :: Ladder.QueryPlanRequestParams) _tcRes recentViz -> do
             let vizConfig = Ladder.getVizConfig recentViz.vizState
+            -- A rule that may refuse to answer gets no plan: the answer is the
+            -- decline decided when its decision graph was drawn.
             MkVizHandler $
-              case Ladder.doVisualize recentViz.decide vizConfig of
+              case recentViz.decline of
+               Just declined -> pure (Aeson.toJSON declined)
+               Nothing -> case Ladder.doVisualize recentViz.decide vizConfig of
                 Right (vizProgramInfo, vizState) ->
                   let paramsByUnique =
                         VizQueryPlan.buildParamsByUnique vizProgramInfo
@@ -999,28 +996,22 @@ handlers evalConfig recorder =
                 , _message = "No type check result available"
                 , _xdata = Nothing }
               Just tcResult -> do
-                let -- Excluded imports are removed from the dependency list
-                    -- outright (not merely set to the 'Exclude' disposition,
-                    -- which only collapses a still-referenced module to
-                    -- "as defined in …" stubs). Dropping the module means its
-                    -- units are never extracted, so the main document's
-                    -- references to them render as plain prose names.
-                    excludedUris = Set.fromList
-                      [ toNormalizedUri (Uri u) | u <- reqParams.excludeModules ]
-                    keepModule (MkModule _ u _) = not (u `Set.member` excludedUris)
-                    rawDeps = filter keepModule (drop 1 (flattenExportModules tcResult))
+                let -- An unticked import is hidden, not dropped: it stays in the
+                    -- dependency list, so the main document's rules keep reading
+                    -- its @nlg sentences and its records, as they do in `l4 render`.
+                    -- Only its own text is left out, and references to it read as
+                    -- plain prose names.
+                    hidden = Map.fromList
+                      [ (toNormalizedUri (Uri u), ExportDoc.Hidden) | u <- reqParams.excludeModules ]
+                    rawDeps = drop 1 (flattenExportModules tcResult)
                     declaredLang =
                       Maybe.fromMaybe defaultModuleLang (declaredModuleLang . fst =<< mToks)
                     requestedLang = MkLangTag <$> reqParams.lang
-                    -- Chosen before the document is built, and in the imports
-                    -- too, as `l4 render --lang` does ('Nlg.selectLanguage').
-                    -- With no @lang@ it is the identity.
-                    localise = Nlg.selectLanguage requestedLang
                     (docLang, _unsupported) =
                       Nlg.documentLanguage declaredLang requestedLang (tcResult.module' : rawDeps)
-                    deps = map localise rawDeps
                     ecfg = ExportDoc.defaultExportConfig
                       { ExportDoc.dropUnused = not reqParams.includeUnused
+                      , ExportDoc.moduleDispositions = hidden
                       , ExportDoc.mixfixHeadings =
                           ExportDoc.mixfixHeadingsFromRegistry tcResult.mixfixRegistry
                       }
@@ -1028,8 +1019,13 @@ handlers evalConfig recorder =
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
                              , ExportRender.toc = reqParams.toc
+                             , ExportRender.sourceLinks = maybe mempty (ExportRender.sourceLinksFrom . fst) mToks
                              , ExportRender.docLang = docLang }
-                    doc = ExportDoc.buildDocument ecfg (localise tcResult.module') deps
+                    -- The same preparation as `l4 render`: a herald written after a
+                    -- rule's last input is moved onto the rule, then the language
+                    -- is chosen, in the imports too.
+                    (docModule, docDeps) = Nlg.prepareModules requestedLang tcResult.module' rawDeps
+                    doc = ExportDoc.buildDocument ecfg docModule docDeps
                     -- What the Render tab offers to switch to: the languages
                     -- of the file's own wordings, not of its imports, whose
                     -- English would otherwise be offered for every file.
@@ -1067,7 +1063,8 @@ handlers evalConfig recorder =
                 , _xdata = Nothing }
               Just tcResult -> do
                 let deps = drop 1 (flattenExportModules tcResult)
-                    plan = ExportDoc.buildPlan ExportDoc.defaultExportConfig tcResult.module' deps
+                    (planModule, planDeps) = Nlg.prepareModules Nothing tcResult.module' deps
+                    plan = ExportDoc.buildPlan ExportDoc.defaultExportConfig planModule planDeps
                 pure $ Right $ Aeson.toJSON plan
     ]
 

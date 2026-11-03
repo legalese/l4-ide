@@ -1,0 +1,13 @@
+-- An `@nlg` sentence on a mixfix function, and what reads it.
+-- See the `@nlg` section of the syntax reference.
+
+GIVEN a IS A NUMBER, b IS A NUMBER
+GIVETH A NUMBER
+`the lower of` a `and` b @nlg the smaller of %a% and %b%
+  MEANS IF a AT MOST b THEN a ELSE b
+
+GIVEN price IS A NUMBER
+GIVETH A NUMBER
+`the price we charge` price MEANS `the lower of` price `and` 100
+
+#EVAL `the lower of` 840 `and` 160

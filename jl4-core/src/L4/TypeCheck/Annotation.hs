@@ -36,8 +36,17 @@ resolveNlgAnnotation a = do
 resolveNlgFragment :: NlgFragment Name -> Check (NlgFragment Resolved)
 resolveNlgFragment = \ case
   MkNlgText ann t -> pure $ MkNlgText ann t
-  MkNlgRef ann n ->
-    MkNlgRef ann . fst <$> resolveTerm n
+  -- A slot names an input of the rule, and a record's field or a top-level rule
+  -- of the same name is not what it means. An expression tells such names apart
+  -- by type; a slot has none, so the nearest binding wins.
+  MkNlgRef ann n -> do
+    options <- lookupRawNameInEnvironment (rawName n)
+    let kinds = [ kind | (_, _, KnownTerm _ kind) <- options ]
+        wanted
+          | Local `elem` kinds         = (== Local)
+          | any (/= Selector) kinds    = (/= Selector)
+          | otherwise                  = const True
+    MkNlgRef ann . fst <$> resolveTerm' wanted n
 
 resolveNlgAnnotationInResolved :: Resolved -> Check Resolved
 resolveNlgAnnotationInResolved = traverseResolved resolveNlgAnnotation
@@ -204,6 +213,7 @@ nlgExpr = \ case
       mParty' <- traverse nlgExpr mParty
       mReason' <- traverse nlgExpr mReason
       pure $ Breach ann mParty' mReason'
+    Refuse ann msg -> Refuse ann <$> nlgExpr msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 nlgPattern :: Pattern Resolved -> Check (Pattern Resolved)

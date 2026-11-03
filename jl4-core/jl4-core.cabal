@@ -145,6 +145,7 @@ library
     L4.Parser.SrcSpan
     L4.ParserCombinators
     L4.Print
+    L4.Refusal
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
@@ -183,6 +184,7 @@ test-suite jl4-core-test
     MixfixRegistryMergeSpec
     PatternMatchParserSpec
     PatternClausesMissingSpec
+    NestedParenParserSpec
     EventExactPrintSpec
     FormatFidelitySpec
     UUID5Spec
@@ -198,7 +200,11 @@ test-suite jl4-core-test
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     RefAnnotationSpec
+    MayRefuseSpec
+    RefusalReportSpec
+    RefuseSpec
     NlgPercentSpec
+    LibraryNlgSpec
     NlgRenderSpec
     DirectiveAmbiguitySpec
     NlgMultiplicitySpec
@@ -209,6 +215,7 @@ test-suite jl4-core-test
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
     base,
     bytestring,
     containers,

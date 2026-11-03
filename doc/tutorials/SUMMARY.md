@@ -13,6 +13,7 @@
 - [Fix errors](getting-started/debugging-type-errors.md)
 - [Encode legislation](getting-started/encoding-legislation.md)
 - [Make rules read like law](natural-language-functions/optimising-natural-language-generation.md)
+  - [Fix wording with @nlg](natural-language-functions/fix-wording-with-nlg.md)
 - [Common patterns](getting-started/common-patterns.md)
 
 ## Publish rules

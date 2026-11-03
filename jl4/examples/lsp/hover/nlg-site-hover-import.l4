@@ -1,0 +1,8 @@
+-- Hover at a WITH call to a rule in ANOTHER module whose herald follows its last
+-- input (`absNumber value @nlg ...` in math.l4). Hover reads the herald from the
+-- module's own map, stamped at the definitions (nlg-site-hover.l4, test 3), so a
+-- call site shows none, here or across an IMPORT; and the label of the input must
+-- not show the rule's sentence as the input's gloss.
+IMPORT math
+
+DECIDE `size of loss` IS absNumber WITH value IS 5

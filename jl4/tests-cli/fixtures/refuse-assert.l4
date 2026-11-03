@@ -1,0 +1,7 @@
+-- Typechecks cleanly. `not modelled` refuses, so neither it nor its negation
+-- is decided.
+GIVETH A BOOLEAN
+`not modelled` MEANS REFUSE "not modelled"
+
+#ASSERT `not modelled`
+#ASSERT NOT `not modelled`

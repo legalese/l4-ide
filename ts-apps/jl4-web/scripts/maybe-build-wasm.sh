@@ -1,8 +1,6 @@
 #!/bin/bash
-# Conditionally build WASM if VITE_PREFER_WASM is enabled
-#
-# This script checks if WASM mode is enabled (via .env.local or environment)
-# and builds the WASM module if needed.
+# Build the WASM language server if static/wasm/ doesn't have it yet.
+# The editor always runs the LSP in the browser from these files.
 #
 # Usage: ./scripts/maybe-build-wasm.sh
 
@@ -19,32 +17,6 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Check if WASM mode is enabled
-check_wasm_enabled() {
-    # Check environment variable first
-    if [ "$VITE_PREFER_WASM" = "true" ]; then
-        return 0
-    fi
-    
-    # Check .env.local file
-    local ENV_LOCAL="$WEB_APP_DIR/.env.local"
-    if [ -f "$ENV_LOCAL" ]; then
-        if grep -q "^VITE_PREFER_WASM=true" "$ENV_LOCAL" 2>/dev/null; then
-            return 0
-        fi
-    fi
-    
-    # Check .env.wasm file (alternative config)
-    local ENV_WASM="$WEB_APP_DIR/.env.wasm"
-    if [ -f "$ENV_WASM" ]; then
-        if grep -q "^VITE_PREFER_WASM=true" "$ENV_WASM" 2>/dev/null; then
-            return 0
-        fi
-    fi
-    
-    return 1
-}
-
 # Check if WASM files exist (release builds put them in static/wasm/<release>/)
 wasm_files_exist() {
     local WASM_DIR="$WEB_APP_DIR/static/wasm"
@@ -57,13 +29,6 @@ wasm_files_exist() {
 
 # Main
 main() {
-    if ! check_wasm_enabled; then
-        echo -e "${BLUE}[WASM] Skipping - VITE_PREFER_WASM is not enabled${NC}"
-        exit 0
-    fi
-    
-    echo -e "${BLUE}[WASM] WASM mode enabled${NC}"
-    
     # Check if WASM files already exist
     if wasm_files_exist; then
         echo -e "${GREEN}[WASM] WASM files already exist, skipping build${NC}"

@@ -7,10 +7,12 @@ module QueryPlanSpec (spec) where
 
 import Test.Hspec
 
+import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import Control.Monad.Trans.Except (runExceptT)
+import Servant.Server (ServerError (..))
 
 import Backend.Jl4 (CompiledModule (..), precompileModule)
 import qualified Backend.DecisionQueryPlan as Service
@@ -72,9 +74,78 @@ DECIDE compute_qualifies IF walks AND eats AND drinks
 |]
 
 
+-- | A helper that refuses for a person who is not insured.
+insuredHelperL4 :: Text
+insuredHelperL4 = [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance is not modelled"
+|]
+
+-- | The same helper, with an answer for every person.
+insuredHelperAnswersL4 :: Text
+insuredHelperAnswersL4 = [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS person
+|]
+
+-- | A rule that reads the helper in a file it imports.
+coveredL4 :: Text
+coveredL4 = [i|
+IMPORT helper
+
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE covered IF adult AND `the person is insured` applicant
+|]
+
+-- | The helper and a rule that reads it, in one file.
+coveredHereL4 :: Text
+coveredHereL4 = [i|
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is insured` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "insurance is not modelled"
+
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE covered IF adult AND `the person is insured` applicant
+|]
+
+-- | A rule over a number that refuses below zero.
+feeL4 :: Text
+feeL4 = [i|
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+fee n MEANS IF n < 0 THEN REFUSE "a negative fee is not modelled" ELSE n
+|]
+
+
 -- ----------------------------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------------------------
+
+-- | What the service's plan builder answers for the rule of that name, in
+-- @main.l4@ checked beside the given files.
+serviceAnswer :: [(FilePath, Text)] -> Text -> Text -> IO (Either ServerError Service.CachedDecisionQuery)
+serviceAnswer neighbours fnName source = do
+  result <- precompileModule "main.l4" source (Map.fromList neighbours) (NormalName fnName)
+  cm <- either (fail . ("Compilation failed: " <>) . show) pure result
+  runExceptT $ Service.buildDecisionQueryCacheFromCompiled fnName cm source
+
+-- | The answer is the 400 that declines a rule, with this body.
+declinedWith :: Either ServerError a -> Aeson.Value -> Expectation
+declinedWith answer body = case answer of
+  Left err -> do
+    errHTTPCode err `shouldBe` 400
+    Aeson.decode (errBody err) `shouldBe` Just body
+  Right _ -> expectationFailure "a plan was built for a rule that may refuse"
 
 -- | Compile L4 source and return the CompiledModule.
 compile :: Text -> Text -> IO CompiledModule
@@ -207,6 +278,40 @@ serviceTests = do
       c <- serviceCache "with not" notL4
       let r = svcQP c [("a", False), ("b", True)]
       r.determined `shouldBe` Just True
+
+  -- A rule that may refuse to answer gets no plan: the builder declines it
+  -- before it draws a ladder, from what the rule and the definitions it calls
+  -- are written to do, in a file it imports or in its own.
+  describe "a rule that may refuse" do
+    it "is declined with a 400 that names the rule and the reason of a definition it imports" do
+      answer <- serviceAnswer [("helper.l4", insuredHelperL4)] "covered" coveredL4
+      answer `declinedWith` Aeson.object
+        [ "error" Aeson..= ("No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\"." :: Text)
+        , "kind" Aeson..= ("declined" :: Text)
+        , "rule" Aeson..= ("covered" :: Text)
+        , "reasons" Aeson..= (["insurance is not modelled"] :: [Text])
+        ]
+    it "is declined with the reason of a definition in its own file" do
+      answer <- serviceAnswer [] "covered" coveredHereL4
+      answer `declinedWith` Aeson.object
+        [ "error" Aeson..= ("No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\"." :: Text)
+        , "kind" Aeson..= ("declined" :: Text)
+        , "rule" Aeson..= ("covered" :: Text)
+        , "reasons" Aeson..= (["insurance is not modelled"] :: [Text])
+        ]
+    it "is declined whatever it answers with, a number here" do
+      answer <- serviceAnswer [] "fee" feeL4
+      answer `declinedWith` Aeson.object
+        [ "error" Aeson..= ("No query plan for fee: it may refuse to answer, with the reason \"a negative fee is not modelled\"." :: Text)
+        , "kind" Aeson..= ("declined" :: Text)
+        , "rule" Aeson..= ("fee" :: Text)
+        , "reasons" Aeson..= (["a negative fee is not modelled"] :: [Text])
+        ]
+    it "is planned when the definition it imports has an answer for every input" do
+      answer <- serviceAnswer [("helper.l4", insuredHelperAnswersL4)] "covered" coveredL4
+      case answer of
+        Left err -> expectationFailure ("no plan: " <> show err)
+        Right c -> (svcQP c [("adult", False)]).determined `shouldBe` Just False
 
   describe "elicitation" do
     it "returns asks when no bindings" do

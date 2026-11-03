@@ -1,0 +1,8 @@
+-- The BECAUSE payload of `#ASSERT REFUSED` must be a STRING literal. A numeric
+-- literal parses (so the grammar stays simple) and is rejected here, by the
+-- type checker -- mirroring `refuse-nonliteral.l4` for REFUSE's own message.
+
+GIVETH A NUMBER
+`nope` MEANS REFUSE "the real reason"
+
+#ASSERT REFUSED `nope` BECAUSE 42

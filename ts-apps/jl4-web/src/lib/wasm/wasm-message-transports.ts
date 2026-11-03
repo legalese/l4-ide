@@ -564,7 +564,10 @@ export class WasmLspHandler {
         uri,
         p.fnName,
         bindingsJson
-      )) as { error?: string } | null
+      )) as { error?: string; kind?: string } | null
+      // A rule that may refuse to answer is declined; the decline carries the
+      // sentence that says why, under `error`, and is the answer.
+      if (result?.kind === 'declined') return result
       if (!result || result.error) return null
       return result
     } catch {
@@ -799,20 +802,16 @@ export class WasmLspHandler {
   }
 
   /**
-   * Convert an evaluation result to an LSP diagnostic.
-   * Matches the behavior of evalLazyResultToDiagnostic in jl4-lsp.
+   * Convert an evaluation result to an LSP diagnostic, with the severity the
+   * evaluator gives it: the one the language server gives it too.
    */
   private evalResultToDiagnostic(evalResult: EvalDirectiveResult): Diagnostic {
-    // Severity: Error (1) for failed assertions, Information (3) otherwise
-    // This matches the real LSP server behavior in Rules.hs
-    const severity = evalResult.success === false ? 1 : 3
-
     return {
       range: evalResult.range ?? {
         start: { line: 0, character: 0 },
         end: { line: 0, character: 0 },
       },
-      severity,
+      severity: evalResult.severity,
       message: evalResult.result,
       source: 'eval',
     }

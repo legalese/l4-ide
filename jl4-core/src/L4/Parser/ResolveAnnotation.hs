@@ -307,7 +307,12 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Section n) where
   addNlg a = extendNlgA a $ case a of
     MkSection ann lbl maka topDecls -> do
-      lbl' <- traverse addNlg lbl
+      -- An annotation on its own line describes what follows, so with a
+      -- declaration below it, the line under a heading is that declaration's.
+      -- A section with nothing in it has only its heading to describe.
+      lbl' <- case (topDecls, lbl) of
+        (_ : _, Just l) -> Just <$> confineToEndOfLine l (addNlg l)
+        _               -> traverse addNlg lbl
       maka' <- traverse addNlg maka
       topDecls' <- traverse addNlg topDecls
       pure (MkSection ann lbl' maka' topDecls')
@@ -340,7 +345,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Declare n) where
     MkDeclare ann tySig appFormAka tyDecl -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
-      tyDecl' <- addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl
+      tyDecl' <- hoistNlgA (leavingTheNextRuleItsNlg a tyDecl)
+        (addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl)
       pure $ MkDeclare ann tySig' appFormAka' tyDecl'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
@@ -361,9 +367,32 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
       -- clause below (a pattern, say) can take the one written above it.
       (expr', ann') <- hoistNlgA (\ m -> do
         ann'' <- claimLaterClauseNlgs ann
-        e <- m
+        e <- leavingTheNextRuleItsNlg a expr m
         pure (e, ann'')) (addNlg expr)
       pure $ MkDecide ann' tySig' appFormAka' expr'
+
+-- | Keep a rule's body from taking what is written below it at the rule's own
+-- column. The last name in a body has no node after it to bound its region, so
+-- it reached as far as the next rule's head, and an @\@nlg@ on its own line above
+-- that head, the placement the reference recommends, landed on a name in the rule
+-- before it. That rule then read the sentence and the next rule had none.
+--
+-- An annotation indented under the body is still the body's.
+leavingTheNextRuleItsNlg :: (HasSrcRange rule, HasSrcRange body) => rule -> body -> NlgM a -> NlgM a
+leavingTheNextRuleItsNlg rule body m =
+  case (fromSrcRange <$> rangeOf rule, fromSrcRange <$> rangeOf body) of
+    (Just ruleSpan, Just bodySpan) -> do
+      pending <- use #nlgs
+      let nextRules =
+            [ w.range.start
+            | w <- pending
+            , w.range.start.line > bodySpan.end.line
+            , w.range.start.column <= ruleSpan.start.column
+            ]
+      case nextRules of
+        [] -> m
+        _  -> inLocRange (locRangeTo (Just (minimum nextRules))) m
+    _ -> m
 
 -- | A rule's head, visited as any 'AppForm' is, keeping track of whose
 -- sentence a wording on an input is.
@@ -515,6 +544,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
     Assert ann e -> do
       e' <- addNlg e
       pure $ Assert ann e'
+    AssertRefused ann e mmsg -> do
+      e' <- addNlg e
+      mmsg' <- traverse addNlg mmsg
+      pure $ AssertRefused ann e' mmsg'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Event n) where
   addNlg a@(MkEvent ann party act timestamp atFirst) = extendNlgA a do
@@ -1114,6 +1147,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       mParty' <- traverse addNlg mParty
       mReason' <- traverse addNlg mReason
       pure $ Breach ann mParty' mReason'
+    Refuse ann msg -> Refuse ann <$> addNlg msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
@@ -1271,6 +1305,7 @@ instance HasDesc (Directive n) where
     Check ann e -> Check ann <$> addDesc e
     Contract ann e t evs -> Contract ann <$> addDesc e <*> addDesc t <*> traverse addDesc evs
     Assert ann e -> Assert ann <$> addDesc e
+    AssertRefused ann e mmsg -> AssertRefused ann <$> addDesc e <*> traverse addDesc mmsg
 
 instance HasDesc (Import n) where
   addDesc a = pure a
@@ -1735,6 +1770,8 @@ instance (HasSrcRange n, HasRef n) => HasRef (Directive n) where
     Contract ann e t evs -> attachRef a ann >>= \ann' ->
       Contract ann' <$> addRef e <*> addRef t <*> traverse addRef evs
     Assert ann e -> attachRef a ann >>= \ann' -> Assert ann' <$> addRef e
+    AssertRefused ann e mmsg -> attachRef a ann >>= \ann' ->
+      AssertRefused ann' <$> addRef e <*> traverse addRef mmsg
 
 instance (HasSrcRange n, HasRef n) => HasRef (Event n) where
   addRef a@(MkEvent ann party act timestamp atFirst) = do
@@ -1947,6 +1984,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       mParty' <- traverse addRef mParty
       mReason' <- traverse addRef mReason
       pure $ Breach ann' mParty' mReason'
+    Refuse ann msg -> attachRef expr ann >>= \ann' -> Refuse ann' <$> addRef msg
     Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
    where
     bin f ann e1 e2 = do

@@ -1,5 +1,10 @@
 module L4.Nlg (
   simpleLinearizer,
+  markedLinearizer,
+  markFrame,
+  possessiveOf,
+  stripFrameMarks,
+  localiseMarked,
   simpleLinearizerIn,
   linearizeDirectives,
   linearizeDirectivesIn,
@@ -8,6 +13,8 @@ module L4.Nlg (
   decideNlg,
   decideNlgSite,
   promoteHeadInputNlg,
+  promoteHeadInputNlgWith,
+  prepareModules,
   carriesLanguage,
   moduleLanguages,
   documentLanguage,
@@ -18,6 +25,10 @@ module L4.Nlg (
   NlgFnInfo,
   nlgFnInfo,
   substituteNlgCalls,
+  substituteNlgCall,
+  substituteNlgCallMarked,
+  nlgRefs,
+  daydateLiteral,
   substituteNlgCallsIn,
   substituteNlgDirective,
   substituteNlgDirectiveIn,
@@ -96,8 +107,77 @@ simpleLinearizer = renderLinTree . linearize
 simpleLinearizerIn :: Linearize a => Maybe LangTag -> a -> (Text, Set.Set Text)
 simpleLinearizerIn mlang a = first renderLinTree (localizeIn mlang (linearize a))
 
+-- | 'simpleLinearizer' with its frame words marked, for text that is kept and put
+-- into a language later. @l4 render@ builds its sentences before a writer sees
+-- them, so it cannot translate them as 'simpleLinearizerIn' does while
+-- linearizing; the marks carry the distinction between the author's words and the
+-- renderer's as far as the writer. The backtick round a name works the same way.
+markedLinearizer :: Linearize a => a -> Text
+markedLinearizer =
+    plainPossessives
+  . Text.replace (Text.unwords (map markFrame ["is", "equal", "to"])) (markFrame "is")
+  . renderTokens markFrame
+  . linearize
+
+-- | The possessive the linearizer supplies, set against what it follows and spelt
+-- to fit it. The linearizer writes it apart from the word before it, so this finds
+-- that and never an apostrophe of the author's.
+plainPossessives :: Text -> Text
+plainPossessives t = case Base.unsnoc (Text.splitOn " 's" t) of
+  Just (owners, rest) -> Text.concat (map possessiveOf owners <> [rest])
+  Nothing             -> t
+
+-- | "the applicant's", but "the facts'". Spelling, and nothing more: a word ending
+-- in one s takes the apostrophe alone, and one ending in two is a singular such as
+-- "the witness's". A trailing backtick closes a name, and comes before either.
+possessiveOf :: Text -> Text
+possessiveOf t
+  | lastWord == "it"                      = t <> "s"
+  | Text.isSuffixOf "ss" s                = t <> "'s"
+  | Text.isSuffixOf "s" s                 = t <> "'"
+  | otherwise                             = t <> "'s"
+ where
+  s = fromMaybe t (Text.stripSuffix "`" t)
+  lastWord = Text.takeWhileEnd (/= ' ') s
+
+-- | Mark words as the renderer's own. Unicode noncharacters, which are set aside
+-- for a program's internal use, so they cannot occur in an author's text.
+markFrame :: Text -> Text
+markFrame t = Text.singleton frameOpen <> t <> Text.singleton frameClose
+
+frameOpen, frameClose :: Char
+frameOpen  = '\xFDD0'
+frameClose = '\xFDD1'
+
+stripFrameMarks :: Text -> Text
+stripFrameMarks = Text.filter (\c -> c /= frameOpen && c /= frameClose)
+
+-- | Put marked text into a language, through the same phrasebook lookup as
+-- 'simpleLinearizerIn', so a phrase reads the same in @l4 nlg@ and in @l4 render@.
+-- A language with no phrasebook keeps the English, unmarked. A phrasebook is keyed
+-- in lower case, and a capital at the start of a frame word means nothing to it.
+localiseMarked :: Maybe LangTag -> Text -> Text
+localiseMarked mlang t = case phrasebookFor =<< mlang of
+  Nothing -> stripFrameMarks t
+  Just pb -> renderLinTree (fst (localize pb (markedTree t)))
+
+-- | Marked text as tokens: what is marked becomes frame words, one a word, as
+-- 'hcat' lays them out, so that a phrase can match across them.
+markedTree :: Text -> LinTree
+markedTree t0 = case Text.break (== frameOpen) t0 of
+  (plain0, rest)
+    | Just after' <- Text.stripPrefix " " plain0 -> text " " <> markedTree (after' <> rest)
+    | Text.null rest -> text plain0
+    | otherwise ->
+        let (marked, after) = Text.break (== frameClose) (Text.drop 1 rest)
+            framed = mconcat (intersperse (text " ") (map (frame . Text.toLower) (Text.words marked)))
+        in text plain0 <> framed <> markedTree (Text.drop 1 after)
+
 renderLinTree :: LinTree -> Text
-renderLinTree tree =
+renderLinTree = renderTokens id
+
+renderTokens :: (Text -> Text) -> LinTree -> Text
+renderTokens onFrame tree =
   let
     sp :: Text
     sp = " "
@@ -109,7 +189,7 @@ renderLinTree tree =
       LinUser -> t.payload
       LinVar -> "`" <> t.payload <> "`"
       LinText -> t.payload
-      LinFrame -> t.payload
+      LinFrame -> onFrame t.payload
   in
     case tree.tokens of
       [] -> ""
@@ -352,11 +432,30 @@ decideNlg mouter d = case decideNlgSite mouter d of
 --   * A collision — two heralds in one language on one input — attaches neither,
 --     so there is nothing to find and nothing to move.
 promoteHeadInputNlg :: Module Resolved -> Module Resolved
-promoteHeadInputNlg m
+promoteHeadInputNlg = promoteHeadInputNlgWith []
+
+-- | 'promoteHeadInputNlg' for a module that imports others: the promotion is
+-- decided by the rules of the given dependencies as well as by the module's own,
+-- and applied to this module's tree only.
+--
+-- __Why a module needs its dependencies' rules.__ A call to an imported rule
+-- carries a copy of the imported name, and of each of its inputs (a @WITH@
+-- call's labels are the inputs), taken when the reference was resolved —
+-- before any promotion. 'promoteHeadInputNlg' on the importing module sees
+-- none of the imported rules, so it left the herald on the copy of the input
+-- the author had written it after. A @WITH@ call then printed that sentence a
+-- second time as the label of the input (@the gap between `a` and `b` where `a`
+-- is 840 and the gap between `a` and `b` is 160@), which the same rule called
+-- from its own module does not.
+--
+-- The dependencies themselves are not rewritten here: 'nlgFnInfo' reads each
+-- one through its own 'promoteHeadInputNlg'.
+promoteHeadInputNlgWith :: [Module Resolved] -> Module Resolved -> Module Resolved
+promoteHeadInputNlgWith deps m
   | Map.null promote = m
   | otherwise        = over (gplate @Resolved) fixup m
  where
-  (promote, suppress) = foldTopLevelDecides collect m
+  (promote, suppress) = foldMap (foldTopLevelDecides collect) (m : deps)
 
   collect :: Decide Resolved -> (Map Unique (Nlg, [Nlg]), Set Unique)
   collect d@(MkDecide _ _ (MkAppForm _ headName _ _) _) =
@@ -388,6 +487,11 @@ overBothNames f = \ case
   Def u n        -> Def u (f n)
   Ref r u o      -> Ref (f r) u (f o)
   OutOfScope u n -> OutOfScope u (f n)
+
+-- | A name with no herald and none of its other-language renderings, so it
+-- linearizes as its own words.
+plainName :: Resolved -> Resolved
+plainName = overBothNames (annoOf %~ (annNlg .~ Nothing) . (annNlgAlts .~ []))
 
 -- | Clear the annotations on a sentence's own @%slot%@ references.
 --
@@ -433,10 +537,30 @@ linearizeDirectivesIn mlang mod'' deps'' =
   , foldMap (snd . simpleLinearizerIn mlang) directives
   )
  where
-  prepare    = selectLanguage mlang . promoteHeadInputNlg
-  mod'       = prepare mod''
-  heralds    = nlgFnInfo (mod' : map prepare deps'')
-  directives = toListOf (gplate @(Directive Resolved)) mod'
+  (mod', deps') = prepareModules mlang mod'' deps''
+  heralds       = nlgFnInfo (mod' : deps')
+  directives    = toListOf (gplate @(Directive Resolved)) mod'
+
+-- | A module and its dependencies, ready to have their heralds read: a herald
+-- written after a rule's last input moved onto the rule ('promoteHeadInputNlg'),
+-- then a language chosen ('selectLanguage'), in that order (see
+-- 'linearizeDirectives').
+--
+-- Each module also learns which of the others' inputs were carrying a herald, so
+-- a call to one of those rules is labelled as a call to a rule of its own would
+-- be ('promoteHeadInputNlgWith'). That holds for a dependency's own calls too: a
+-- rule in the middle of a chain of imports is shown, in the document of the
+-- module at the top, with the calls it makes to the module below it.
+--
+-- Shared by @l4 nlg@ and @l4 render@, which read a call's herald alike. A reader
+-- that skips it still finds the rule's herald, because 'nlgFnInfo' looks
+-- wherever it landed, but it also prints the herald a second time as the label
+-- of the last input at a @WITH@ call.
+prepareModules :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> (Module Resolved, [Module Resolved])
+prepareModules mlang m deps =
+  ( selectLanguage mlang (promoteHeadInputNlgWith deps m)
+  , map (selectLanguage mlang . promoteHeadInputNlgWith deps) deps
+  )
 
 -- | Does any rendering in this module name this language?
 --
@@ -510,24 +634,24 @@ class Linearize a where
 instance Linearize (Expr Resolved) where
   linearize expr = case carameliseNode expr of
     And _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isOrNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isOrNode e2
       ]
     Or _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isAndNode e1
       , frame "or"
-      , lin e2
+      , groupedUnder isAndNode e2
       ]
     RAnd _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isOrNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isOrNode e2
       ]
     ROr _ e1 e2 -> hcat
-      [ lin e1
+      [ groupedUnder isAndNode e1
       , frame "or"
-      , lin e2
+      , groupedUnder isAndNode e2
       ]
     Implies _ e1 e2 -> hcat
       [ lin e1
@@ -543,48 +667,45 @@ instance Linearize (Expr Resolved) where
       ]
     Not _ e -> hcat
       [ frame "not"
-      , lin e
+      , groupedUnder (\n -> isAndNode n || isOrNode n) e
       ]
     Plus _ e1 e2 -> hcat
       [ frame "the"
       , frame "sum"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Minus _ e1 e2 -> hcat
-      [ frame "the"
-      , frame "difference"
-      , frame "between"
-      , lin e2
-      , frame "and"
-      , lin e1
+      [ groupedUnder isArithNode e1
+      , frame "minus"
+      , groupedUnder isArithNode e2
       ]
     Times _ e1 e2 -> hcat
       [ frame "the"
       , frame "product"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "and"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     DividedBy _ e1 e2 -> hcat
       [ frame "the"
       , frame "result"
       , frame "of"
       , frame "dividing"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "by"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Modulo _ e1 e2 -> hcat
       [ frame "the"
       , frame "result"
       , frame "of"
-      , lin e1
+      , groupedUnder isArithNode e1
       , frame "modulo"
-      , lin e2
+      , groupedUnder isArithNode e2
       ]
     Cons _ e1 e2 -> hcat
       [ lin e1
@@ -706,7 +827,30 @@ instance Linearize (Expr Resolved) where
       [ frame "breach" ]
       <> maybe [] (\p -> [ frame "by", lin p ]) mParty
       <> maybe [] (\r -> [ frame "because", lin r ]) mReason
+    -- A refusal reads as what it is: the model declining to answer, with the
+    -- author's reason in quotes, as the document quotes it after HENCE and
+    -- LEST. Unquoted, the text around a refusal (a "%", a "'s amount")
+    -- reads as part of the reason.
+    Refuse _ msg -> hcat [ "the model refuses to answer:", text "“" <> lin msg <> text "”" ]
     Inert _ txt _ctx -> text txt
+
+-- | An operand, in brackets if it is the kind of compound that flat text would
+-- regroup: @a AND (b OR c)@ reads "a and (b or c)", and not "a and b or c", which
+-- states a different rule, and @10 MINUS (5 MINUS 2)@ reads "10 minus (5 minus 2)",
+-- and not the words of @(10 MINUS 5) MINUS 2@. A sentence the author wrote for the
+-- operand carries its own meaning and is left as it is.
+groupedUnder :: (Expr Resolved -> Bool) -> Expr Resolved -> LinTree
+groupedUnder needsBrackets e
+  | isNothing (e ^. annoOf % annNlg), needsBrackets (carameliseNode e) =
+      text "(" <> lin e <> text ")"
+  | otherwise = lin e
+
+isAndNode, isOrNode, isArithNode :: Expr Resolved -> Bool
+isAndNode = \ case And{} -> True; RAnd{} -> True; _ -> False
+isOrNode  = \ case Or{} -> True; ROr{} -> True; _ -> False
+isArithNode = \ case
+  Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
+  _ -> False
 
 instance Linearize (Event Resolved) where
   linearize (MkEvent _ p a t _) = hcat
@@ -721,6 +865,7 @@ instance Linearize (Directive Resolved) where
       [ "executing contract", lin e, "at", lin t, "with the following events:" ]
       <> map lin es
     Assert _ e -> linearize e
+    AssertRefused _ e _mmsg -> hcat [ "the following must refuse:", lin e ]
 
 
 instance Linearize (NamedExpr Resolved) where
@@ -750,7 +895,7 @@ instance Linearize (NamedExpr Resolved) where
 -- The month name is a frame word ('LinFrame'), so a phrasebook translates it.
 daydateLiteral :: Resolved -> [Expr Resolved] -> Maybe (Text, Text, Text)
 daydateLiteral r args@[_, _, _] = do
-  guard (fromDaydate r)
+  guard (fromDaydate r || builtinDate r)
   order <- lookup (unqualifiedRawNameToText (rawName (getActual r))) orders
   [a, b, c] <- traverse wholeLit args
   let (y, m, d) = order (a, b, c)
@@ -764,12 +909,13 @@ daydateLiteral r args@[_, _, _] = do
   dmy (d, m, y) = (y, m, d)
   orders =
     [ ("YMD", ymd), ("Year month day", ymd)
-    , ("Date", dmy), ("Days to date", dmy) ]
+    , ("Date", dmy), ("Days to date", dmy), ("DATE_FROM_DMY", dmy) ]
   wholeLit = \ case
     Lit _ (NumericLit _ q) | denominator q == 1 -> Just (numerator q)
     _ -> Nothing
   fromDaydate x =
     "daydate.l4" `Text.isSuffixOf` (fromNormalizedUri (getUnique x).moduleUri).getUri
+  builtinDate x = unqualifiedRawNameToText (rawName (getActual x)) == "DATE_FROM_DMY"
 daydateLiteral _ _ = Nothing
 
 instance Linearize (LocalDecl Resolved) where
@@ -997,19 +1143,33 @@ spaced p = text " " <> p <> text " "
 -- sentence and its GIVEN parameter uniques (in order), so a call's positional
 -- arguments can be matched to the sentence's @%parameter%@ slots.
 --
--- Keyed by @(function name, arity)@ rather than 'Unique': a call site in the
--- importing module and the definition in a dependency module do not share
--- 'Unique's (each module is resolved independently), so a unique-based key
--- would never match across an @IMPORT@. The inner @%param%@ substitution stays
--- 'Unique'-based — those refs are self-consistent within the defining module.
-type NlgFnInfo = Map.Map (Text, Int) (Nlg, [Unique])
+-- __Keyed by the 'Unique' of the definition's head__, which is what a call
+-- resolved to, and not by the head's text. A name is not a definition: a
+-- record can be named like a rule, a drafter's rule can be named like an
+-- imported one, and two overloads of one pattern share a name, so a text key
+-- gave a call the sentence of whichever definition with that name was entered
+-- last, or was in a library. A call's head carries the 'Unique' of the
+-- definition it resolved to, also across an @IMPORT@ (the import fixtures of
+-- the CLI tests fail if it does not).
+--
+-- A mixfix call resolves to its pattern's canonical name (@the lower of _ and
+-- _@), which the type checker registers as an alias of the definition with the
+-- head's 'Unique' (@defAka@), so the interleaved, @OF@ and @WITH@ spellings find
+-- the same entry. So does a call through an @AKA@ name: every spelling of the
+-- head is entered, under the one 'Unique'.
+--
+-- A definition inside another one (@WHERE@, @LET@) is not entered: only
+-- top-level rules are, as before. The inner @%param%@ substitution is
+-- 'Unique'-based as well: those refs are self-consistent within the defining
+-- module.
+type NlgFnInfo = Map.Map Unique (Nlg, [Unique])
 
 nlgFnInfo :: [Module Resolved] -> NlgFnInfo
 nlgFnInfo mods = Map.fromList
-  [ ((resolvedText name, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
+  [ (getUnique name, (nlg, [ getUnique a | a <- appArgs ]))
     -- Value parameters are the appform arguments, not the GIVEN names: a
     -- polymorphic function (@GIVEN a IS A TYPE@) lists its type parameter in
-    -- GIVEN but never in the appform, so keying arity off GIVEN would not match
+    -- GIVEN but never in the appform, so counting GIVEN names would not match
     -- the call's positional argument count.
   | m <- mods
   , d@(MkDecide _ _ appForm@(MkAppForm _ _ appArgs _) _) <- foldTopLevelDecides (: []) m
@@ -1036,10 +1196,27 @@ substituteNlgCalls = substituteNlgCallsIn Nothing
 -- appended ones, rendered with a language's frame words. The herald's own
 -- text is the author's and is never touched.
 substituteNlgCallsIn :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
-substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
+substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) (substituteNlgCall mlang info)
+
+-- | One step of 'substituteNlgCallsIn', for the one call at the top of an
+-- expression. @l4 render@ walks the tree itself, because it phrases a call's
+-- arguments for a reader before they are spliced in.
+substituteNlgCall :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
+substituteNlgCall mlang =
+  splicingCall mlang (\w -> fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang))
+
+-- | 'substituteNlgCall' for @l4 render@, whose own words stay marked until a
+-- writer puts them into the document's language.
+substituteNlgCallMarked :: NlgFnInfo -> Expr Resolved -> Expr Resolved
+substituteNlgCallMarked = splicingCall Nothing markFrame
+
+splicingCall :: Maybe LangTag -> (Text -> Text) -> NlgFnInfo -> Expr Resolved -> Expr Resolved
+splicingCall mlang word info = \case
   App ann n args
-    | Just (nlg, params) <- Map.lookup (resolvedText n, length args) info
-    , length params == length args ->
+    | Just (nlg, params) <- Map.lookup (getUnique n) info
+    , length params == length args
+      -- A date given as literals reads as the date, whatever its rule's sentence.
+    , isNothing (daydateLiteral n args) ->
         let bound    = zip params args
             leftover = [ a | (p, a) <- bound, p `notElem` nlgRefs nlg ]
             sentence = renderNlgWithIn mlang (Map.fromList bound) nlg
@@ -1062,12 +1239,27 @@ substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) $ \case
   -- expanded in the heading too it printed twice (row 13 of
   -- @jl4\/examples\/ok\/nlg-head-placement.l4@).
   AppNamed ann n es order
-    | Just (nlg, _) <- Map.lookup (resolvedText n, length es) info
+    | Just (nlg, params) <- Map.lookup (getUnique n) info
+    , length params == length es
     , not (carriesNlg (getActual n) || carriesNlg (getOriginal n)) ->
         AppNamed ann (overBothNames (annoOf % annNlg .~ Just (unslot nlg)) n) es order
+  -- A rule with inputs that is named but not called reads as its name. A herald
+  -- is the sentence for a call, and its slots are bound by the call's arguments:
+  -- passed to @filter@ or @foldr@, or given a second name, the rule has none, and
+  -- its name would read as the sentence with the slot names of its definition in
+  -- it ("for which x is even holds"). The herald is on the name because a herald
+  -- written after the last input is moved onto the rule ('promoteHeadInputNlg'),
+  -- and one written above the head always was. A rule with NO inputs has no slots
+  -- and keeps its herald: it is a phrase, not a sentence for a call.
+  Var ann n
+    | Just (_, _ : _) <- Map.lookup (getUnique n) info -> Var ann (plainName n)
+  -- A projection's selector is such a reference too: @startDate's day@ is a
+  -- call of @day@ on @startDate@, written the other way round, and reads as
+  -- written, not as "startDate's the day of date".
+  Proj ann e sel
+    | Just (_, _ : _) <- Map.lookup (getUnique sel) info -> Proj ann e (plainName sel)
   e -> e
  where
-  word w = fromMaybe w (Map.lookup [w] =<< phrasebookFor =<< mlang)
   -- A maqaf-final rendering is written against the next word.
   prefix w | Text.takeEnd 1 w == Text.singleton maqaf = w
            | otherwise                                = w <> " "
@@ -1097,9 +1289,21 @@ renderNlgWith = renderNlgWithIn Nothing
 
 renderNlgWithIn :: Maybe LangTag -> Map.Map Unique (Expr Resolved) -> Nlg -> Text
 renderNlgWithIn mlang argMap = \case
-  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (map frag frags))
+  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (agreeing frags))
   other                 -> simpleLinearizer other
  where
+  -- The parser keeps one text fragment per token, so the words after a slot are
+  -- gathered before 'singularUnit' looks at them.
+  agreeing = \case
+    r@(MkNlgRef{}) : rest
+      | frag r == "1"
+      , (words', others) <- span isWords rest ->
+          frag r : singularUnit (foldMap frag words') : agreeing others
+    f : rest -> frag f : agreeing rest
+    [] -> []
+  isWords = \case
+    MkNlgText{} -> True
+    MkNlgRef{}  -> False
   -- Escapes decode HERE, not in the lexer: the annotation token carries
   -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
   -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
@@ -1112,6 +1316,17 @@ renderNlgWithIn mlang argMap = \case
   frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
     Just a  -> fst (simpleLinearizerIn mlang a)
     Nothing -> resolvedText r
+
+-- | The words after a slot that held the number 1: a sentence written for any
+-- count says "%n% months", and "1 months" is never what its author meant. Only a
+-- unit of time directly after the slot changes.
+singularUnit :: Text -> Text
+singularUnit t = case Text.stripPrefix " " t of
+  Just rest
+    | (unit, after) <- Text.break (not . isLetter) rest
+    , unit `elem` ["years", "months", "weeks", "days", "hours", "minutes", "seconds"] ->
+        " " <> Text.dropEnd 1 unit <> after
+  _ -> t
 
 resolvedText :: Resolved -> Text
 resolvedText = nameToText . getActual

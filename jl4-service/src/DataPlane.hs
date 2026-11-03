@@ -33,7 +33,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch, evaluate)
+import Control.Exception (catch, evaluate, finally)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
@@ -45,7 +45,7 @@ import Data.Scientific (Scientific)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
+import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit, disableAllocationLimit)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Servant
 import System.FilePath ((<.>))
@@ -261,7 +261,10 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
       runDeonticEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs st evts
         vf.fnImpl.deonticPartyType vf.fnImpl.deonticActionType
         mTraceHeader mTraceParam mGraphViz
+  -- A refusal is answered with 200, as an answer is: the rules declined to
+  -- answer, which is not an error of the call (tagged Refused, 'SimpleResponse').
   case result of
+    SimpleError (EvaluatorRefused _) -> pure $ addHeader allocBytes result
     SimpleError _ -> throwEvalError allocBytes result
     _ -> pure $ addHeader allocBytes result
 
@@ -307,9 +310,10 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    -- Every case that finishes comes back. An answer carries its result; an
-    -- error carries its message, so that no case vanishes into the count
-    -- without a reason. Only answers count as processed. A case that reaches
+    -- Every case that finishes comes back. An answer carries its result, a
+    -- refusal its reason, and an error its message, so that no case vanishes
+    -- into the count without a reason. A refusal is how the rules answer a
+    -- case, so answers and refusals count as processed. A case that reaches
     -- --eval-timeout or --max-eval-memory-mb does not finish: 'timeoutAction'
     -- throws, and the check above fails the whole batch with it. Unstable
     -- returns such a case with @error and @limit, from 0765fef5d and
@@ -319,12 +323,19 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
       SimpleResponse r -> OutputCase
         { id = rid, attributes = r.fnResult, graphviz = r.graphviz
         , outcome = CaseAnswered }
+      SimpleError (EvaluatorRefused reason) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , outcome = CaseRefused reason }
       SimpleError err -> OutputCase
         { id = rid, attributes = Map.empty, graphviz = Nothing
         , outcome = CaseErrored (prettyEvaluatorError err) }
     outputCases = map outputCase responses
 
-    nSuccessful = length [ () | c <- outputCases, c.outcome == CaseAnswered ]
+    processed = \case
+      CaseAnswered  -> True
+      CaseRefused _ -> True
+      CaseErrored _ -> False
+    nSuccessful = length [ () | c <- outputCases, processed c.outcome ]
     nIgnored = nCases - nSuccessful
 
   pure $ addHeader totalAllocBytes $ BatchResponse
@@ -572,20 +583,26 @@ runAppM env action = runHandler $ runReaderT action env
 -- | Timeout and memory-limited evaluation action.
 -- Uses configurable eval timeout and per-evaluation allocation limits.
 -- Returns the result and the number of GHC allocation bytes consumed.
+--
+-- The allocation limit is the thread's, and Warp serves every request of a
+-- kept-alive connection on one thread, so it is lifted when the evaluation
+-- ends, however it ends. Otherwise a request that follows on the connection,
+-- such as a query plan, runs under what is left of it, and loses its
+-- connection with no answer when that runs out.
 timeoutAction :: IO b -> AppM (b, Int64)
 timeoutAction act = do
   cfg <- asks (.options)
   let timeoutMicros = cfg.evalTimeout * 1_000_000
       memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
+      limited = do
+        setAllocationCounter memLimitBytes
+        enableAllocationLimit
+        r <- act
+        remaining <- getAllocationCounter
+        pure (r, memLimitBytes - remaining)
   result <- liftIO $
-    (timeout timeoutMicros $ do
-      setAllocationCounter memLimitBytes
-      enableAllocationLimit
-      r <- act
-      remaining <- getAllocationCounter
-      pure (r, memLimitBytes - remaining)
-    ) `catch` \AllocationLimitExceeded ->
-      pure Nothing
+    timeout timeoutMicros (limited `finally` disableAllocationLimit)
+      `catch` \AllocationLimitExceeded -> pure Nothing
   case result of
     Nothing -> throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
     Just x -> pure x

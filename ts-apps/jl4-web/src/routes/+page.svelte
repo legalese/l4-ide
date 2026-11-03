@@ -24,7 +24,14 @@
 
   // Kept with the test corpus, so CI keeps it compiling
   import starterProgram from '../../../../jl4/examples/legal/library-card.l4?raw'
-  import { getTurnstileToken, warmUpTurnstileToken } from '$lib/turnstile'
+  import {
+    getTurnstileToken,
+    warmUpTurnstileToken,
+    type TurnstileHost,
+  } from '$lib/turnstile'
+  import SharePanel, {
+    type ShareStatus,
+  } from '$lib/components/share-panel.svelte'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import {
     EvalDirectiveResultRequestType,
@@ -65,6 +72,18 @@
   let queryPlanNeedsRerun = false
 
   let persistButtonBlocked = $state(false)
+  let shareStatus: ShareStatus = $state('closed')
+  let shareLink = $state('')
+  let turnstileNeedsClick = $state(false)
+  let shareButton: HTMLButtonElement | undefined = $state(undefined)
+  /* Always there alongside the Share button, like editorElement below */
+  let turnstileElement: HTMLDivElement = $state(
+    undefined as unknown as HTMLDivElement
+  )
+  let canUndo = $state(false)
+  let canRedo = $state(false)
+  let firstVersionId = 0
+  let lastVersionId = 0
 
   // Set from URL search params as early as possible to avoid flicker
   const ownUrl = new URL(window.location.href)
@@ -211,7 +230,6 @@
   let monacoL4LangClient: MonacoL4LanguageClient | undefined
   let monacoErrorLens: MonacoErrorLens | undefined
   let lspConnection: LspConnectionResult | undefined
-  let renderResultCommandDisposable: vscode.Disposable | undefined
   let lirSubscription: ReturnType<LirRegistry['subscribe']> | undefined
 
   function bindingsKey(bindings: Record<string, boolean>) {
@@ -323,7 +341,7 @@
     )
     const { ConsoleLogger } = await import('monaco-languageclient/tools')
 
-    // Get LSP connection configuration (supports WebSocket or WASM)
+    // Get the LSP connection configuration
     const lspConfig = getDefaultConfig()
 
     const runClient = async () => {
@@ -419,6 +437,11 @@
         glyphMargin: true, // Required for gutter icons
         codeLens: true, // Enable code lenses for visualization actions
       })
+
+      refreshHistoryButtons(true)
+      editor.onDidChangeModelContent((event) =>
+        refreshHistoryButtons(event.isFlush)
+      )
 
       // Prevent the suggestion widget from auto-popping after Enter (new line).
       // When the widget IS visible, this command doesn't fire so Enter still accepts suggestions.
@@ -548,8 +571,10 @@
             'Content-Type': 'application/json',
           }
           if (turnstileSiteKey) {
-            headers['X-Turnstile-Token'] =
-              await getTurnstileToken(turnstileSiteKey)
+            headers['X-Turnstile-Token'] = await getTurnstileToken(
+              turnstileSiteKey,
+              turnstileHost()
+            )
           }
           const response = await fetch(sessionUrl, {
             method: 'POST',
@@ -575,83 +600,29 @@
         }
       }
 
-      // Initialize LSP connection using the factory
-      // This abstracts over WebSocket vs WASM connection types
+      // Start the language server (WASM, in the browser)
       await initLspConnection(logger, lspConfig)
     }
 
     /**
-     * Initialize LSP connection using the connection factory.
-     * Supports both WebSocket (current) and WASM (future) connection types.
+     * Initialize the LSP connection using the connection factory.
      */
     const initLspConnection = async (
       logger: ConsoleLogger,
       config: ReturnType<typeof getDefaultConfig>
     ): Promise<void> => {
       try {
-        logger.info(
-          `[L4 LSP] Connecting with preferred type: ${config.preferredType}`
-        )
+        logger.info(`[L4 LSP] Connecting to WASM ${config.wasmVersion}`)
 
         lspConnection = await createLspConnection(config)
 
-        logger.info(`[L4 LSP] Connected via ${lspConnection.type}`)
+        logger.info('[L4 LSP] Connected via wasm')
 
         const languageClient = createLanguageClient(
           logger,
           lspConnection.transports
         )
         await languageClient.start()
-
-        // For websocket LSP: Haskell server doesn't declare executeCommandProvider,
-        // so l4.renderResult is never registered by the language client.
-        // Register it manually so codelens clicks work.
-        if (lspConnection.type === 'websocket') {
-          renderResultCommandDisposable = vscode.commands.registerCommand(
-            'l4.renderResult',
-            async (...args: unknown[]) => {
-              if (!monacoL4LangClient) return
-              const [verDocId, srcPos, directiveType] = args as [
-                { uri: string; version: number },
-                SrcPos,
-                string,
-              ]
-              try {
-                const result = await monacoL4LangClient.sendRequest(
-                  EvalDirectiveResultRequestType,
-                  { verDocId, srcPos, directiveType }
-                )
-                if (result) {
-                  rightPaneView = 'inspector'
-                  showVisualizer = true
-                  await tick()
-                  const directiveId = `${srcPos.line}:${srcPos.column}`
-                  // `body` is the directive's full source span — the
-                  // inclusive [range.start.line .. range.end.line]
-                  // slice joined by '\n', read from the live editor
-                  // model. Multi-line directives stay distinct from
-                  // visually identical leading lines.
-                  const directiveResult = result as DirectiveResult
-                  const body = sliceBodyFromModel(
-                    editor?.getModel() ?? null,
-                    directiveResult.range
-                  )
-                  const fileUri =
-                    editor?.getModel()?.uri.toString() ?? verDocId.uri
-                  inspectorPanel?.addOrScrollToResult(
-                    directiveId,
-                    srcPos,
-                    directiveResult,
-                    body,
-                    fileUri
-                  )
-                }
-              } catch (e) {
-                logger.error(`l4.renderResult failed: ${e}`)
-              }
-            }
-          )
-        }
 
         // Handle connection close
         lspConnection.transports.reader.onClose(() => {
@@ -888,9 +859,6 @@
     lirSubscription?.unsubscribe()
     lirSubscription = undefined
 
-    renderResultCommandDisposable?.dispose()
-    renderResultCommandDisposable = undefined
-
     if (monacoErrorLens) {
       monacoErrorLens.dispose()
       monacoErrorLens = undefined
@@ -940,37 +908,57 @@
   // Most of a share's wait is the Turnstile check, so it starts when the
   // pointer reaches Share (or Share gets focus) rather than on the click
   function warmUpShare() {
-    if (turnstileSiteKey) warmUpTurnstileToken(turnstileSiteKey)
+    if (turnstileSiteKey) {
+      warmUpTurnstileToken(turnstileSiteKey, turnstileHost())
+    }
+  }
+
+  function turnstileHost(): TurnstileHost {
+    return {
+      element: turnstileElement,
+      onInteractionChange: (needed) => {
+        turnstileNeedsClick = needed
+      },
+    }
   }
 
   async function handleShare() {
+    shareStatus = 'working'
     const sessionId = await handlePersist()
-    if (sessionId) {
-      const shareUrl = `${window.location.origin}${window.location.pathname}?id=${sessionId}`
-      window.history.pushState(null, '', shareUrl)
-
-      if (navigator.share) {
-        navigator
-          .share({
-            url: shareUrl,
-            text: 'L4 document',
-          })
-          .catch(() => {})
-      }
-
-      // The Turnstile check and the POST can outlast the click's user
-      // activation, and then the browser refuses the clipboard write
-      try {
-        await navigator.clipboard.writeText(shareUrl)
-        toast.push('Link copied to clipboard.', { duration: 4000 })
-      } catch {
-        toast.push(`Share link (also in the address bar): ${shareUrl}`, {
-          duration: 15000,
-        })
-      }
-    } else {
-      toast.push('Could not persist the file to generate a share link.')
+    if (!sessionId) {
+      shareStatus = 'failed'
+      return
     }
+    shareLink = `${window.location.origin}${window.location.pathname}?id=${sessionId}`
+    window.history.pushState(null, '', shareLink)
+    shareStatus = 'ready'
+
+    // The panel covers desktops; phones have a share sheet worth opening
+    if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+      navigator
+        .share({
+          url: shareLink,
+          text: 'L4 document',
+        })
+        .catch(() => {})
+    }
+  }
+
+  function triggerHistory(action: 'undo' | 'redo') {
+    if (!editor) return
+    editor.focus()
+    editor.trigger('toolbar', action, null)
+  }
+
+  // Undo and redo move the model's alternative version id back and forth, and
+  // a new edit gives it a new highest value. Replacing the whole program
+  // (setValue) clears the undo stack, so the buttons start over.
+  function refreshHistoryButtons(startOver: boolean) {
+    const versionId = editor?.getModel()?.getAlternativeVersionId() ?? 0
+    if (startOver) firstVersionId = lastVersionId = versionId
+    lastVersionId = Math.max(lastVersionId, versionId)
+    canUndo = versionId > firstVersionId
+    canRedo = versionId < lastVersionId
   }
 
   function toggleSidebar() {
@@ -1202,6 +1190,49 @@
     {/if}
     <div class="spacer"></div>
     <button
+      class="fab fab-history"
+      onclick={() => triggerHistory('undo')}
+      aria-label="Undo"
+      title="Undo"
+      disabled={!canUndo}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="8,5 3,10 8,15" />
+        <path d="M3 10H15A5.5 5.5 0 0 1 15 21H9" />
+      </svg>
+    </button>
+    <button
+      class="fab fab-history"
+      onclick={() => triggerHistory('redo')}
+      aria-label="Redo"
+      title="Redo"
+      disabled={!canRedo}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="16,5 21,10 16,15" />
+        <path d="M21 10H9A5.5 5.5 0 0 0 9 21H15" />
+      </svg>
+    </button>
+    <div class="top-bar-separator"></div>
+    <button
       class="fab fab-load-file"
       onclick={handleLoadFile}
       aria-label="Load .l4 file"
@@ -1295,6 +1326,7 @@
     {/if}
     {#if sessionUrl}
       <button
+        bind:this={shareButton}
         class="fab fab-share"
         onclick={handleShare}
         onpointerenter={warmUpShare}
@@ -1408,6 +1440,18 @@
   </div>
 {/if}
 
+{#if showFrame && sessionUrl}
+  <SharePanel
+    status={shareStatus}
+    link={shareLink}
+    needsClick={turnstileNeedsClick}
+    onClose={() => (shareStatus = 'closed')}
+    onRetry={handleShare}
+    anchor={shareButton}
+    bind:turnstileElement
+  />
+{/if}
+
 <SvelteToast />
 
 <style>
@@ -1502,6 +1546,18 @@
   .fab:hover {
     color: rgba(30, 29, 28, 1);
   }
+  .fab:disabled {
+    cursor: default;
+    color: rgba(30, 29, 28, 0.3);
+  }
+  .fab-history svg {
+    transform: translateY(-1px);
+  }
+  .top-bar-separator {
+    width: 1px;
+    height: 16px;
+    background: rgba(30, 29, 28, 0.15);
+  }
   .fab.selected {
     background: #f3f2f1;
     outline: 3px solid #f3f2f1;
@@ -1528,7 +1584,7 @@
     width: 14px;
     height: 14px;
     margin: 0 calc(0.2em + 3px) 0 3px;
-    border: 2px solid currentColor;
+    border: 1px solid currentColor;
     border-right-color: transparent;
     border-radius: 50%;
     animation: share-spin 0.8s linear infinite;
@@ -1562,7 +1618,8 @@
     }
     .fab-load-file,
     .fab-save-file,
-    .fab-logic {
+    .fab-logic,
+    .top-bar-separator {
       display: none;
     }
   }

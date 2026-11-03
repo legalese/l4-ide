@@ -48,9 +48,9 @@ in the browser via WebAssembly, without requiring a server connection.
 ```
 
 The key insight is that `WasmMessageReader` and `WasmMessageWriter` implement the
-standard `vscode-languageclient` `MessageTransports` interface. This means the
-WASM mode works identically to WebSocket mode from Monaco's perspective - no
-special handling needed in the application code.
+standard `vscode-languageclient` `MessageTransports` interface, so Monaco talks
+to the in-browser server like any other language server - no special handling
+needed in the application code.
 
 ## Files
 
@@ -73,16 +73,14 @@ import { createLspConnection, getDefaultConfig } from './lsp-connection-factory'
 // Get config from environment variables
 const config = getDefaultConfig()
 
-// Create connection (works for both WebSocket and WASM)
+// Load and start the WASM language server
 const connection = await createLspConnection(config)
 
-console.log(`Connected via ${connection.type}`) // 'websocket' or 'wasm'
-
-// Use transports with MonacoLanguageClient - same API for both modes!
+// Use transports with MonacoLanguageClient
 const client = new MonacoLanguageClient({
   name: 'JL4 Language Client',
   clientOptions: { documentSelector: ['jl4'] },
-  messageTransports: connection.transports, // Works for both WebSocket and WASM
+  messageTransports: connection.transports,
 })
 
 await client.start()
@@ -91,25 +89,16 @@ await client.start()
 await connection.dispose()
 ```
 
-To enable WASM mode, set `VITE_PREFER_WASM=true` in your environment.
-
 ## Building the WASM Module
 
 The WASM module is built from `jl4-wasm` using GHC's WASM backend with JS FFI.
 
 ### Automatic Build
 
-When `VITE_PREFER_WASM=true` is set in your environment, the WASM module is
-automatically built when you run `npm run dev` or `npm run build`. The build
-script checks if the WASM files exist and only rebuilds if necessary.
-
-```bash
-# Enable WASM mode in .env.local
-echo "VITE_PREFER_WASM=true" >> .env.local
-
-# Run dev server - WASM will be built automatically if needed
-npm run dev
-```
+The WASM module is built automatically when you run `npm run dev` or
+`npm run build` and `static/wasm/` doesn't have it yet (release builds put a
+prebuilt one under `static/wasm/<release>/` first). Delete `static/wasm/` to
+force a rebuild.
 
 To force a rebuild, delete the `static/wasm/` directory and run again.
 
@@ -246,8 +235,6 @@ IMPORT helper      -- Would look in VFS
 - `VITE_WASM_VERSION` - The release the WASM came from, shown in load errors (default: `dev`)
 
 Release builds (`main-tag.yml`) serve both files from `/wasm/<release>/`, cached as immutable, so the browser's HTTP cache keeps the WASM between visits and each release gets new URLs.
-
-- `VITE_PREFER_WASM` - Set to "true" to prefer WASM over WebSocket
 
 ## File Sizes
 

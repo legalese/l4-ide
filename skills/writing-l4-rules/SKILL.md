@@ -115,6 +115,14 @@ GIVEN n IS A NUMBER
 - Field access uses the genitive `'s`: `person's age`, `application's employee's nationality`. Note that function arguments bind stronger than genitive. `f r's foo` parses as `(f r)'s foo`, not `f (r's foo)`.
 - Multiple parameters go on one `GIVEN` separated by commas (or wrapped with matching indentation), not successive `GIVEN` lines: `GIVEN a IS A T, b IS A U`.
 
+**Where the encoding stops.**
+A case the encoding leaves out is not `FALSE`, not zero and not a default: write `REFUSE "reason"`, which declines to answer and gives the reason, and stands wherever a value of any type can.
+The reason is a string literal, written as a reader should see it; give it a definition of its own, named for what is not encoded, and use that name where the rule needs it.
+A refusal cannot be caught: whatever needs its value refuses with the same reason, `NOT`, `IF` and `CONSIDER` on it included, while `AND` and `OR` stay lazy and left to right, so `FALSE AND` a refusal is `FALSE`.
+`l4 run` exits 0 on an `#ASSERT` that refuses and prints `assertion refused:`, so a check that looks for `assertion failed` looks for `assertion refused` too.
+Every query planner declines a rule that may reach a `REFUSE`, through any rule it uses, in its own file or an imported one, whether or not the inputs reach it: such a rule gets no questionnaire.
+The reference is `doc/reference/control-flow/REFUSE.md`.
+
 ### 4. Structure like the source
 
 **Isomorphic encoding** — match the logical shape of the source text. If legislation has sections numbered 1.1 / 1.2 / 1.3 with three clauses joined by AND, your L4 should have three conjuncts in the same order. This keeps the rule auditable against the statute.
@@ -244,7 +252,7 @@ iterate until the check passes.
 #ASSERT `assess risk` `Alice` EQUALS LowRisk
 ```
 
-Available directives: `#EVAL`, `#EVALTRACE`, `#TRACE`, `#CHECK`, `#ASSERT`.
+Available directives: `#EVAL`, `#EVALTRACE`, `#TRACE`, `#CHECK`, `#ASSERT`, `#ASSERT REFUSED`.
 
 ### 8. Deploy
 
@@ -463,6 +471,7 @@ application's employee's nationality   -- chaining
 - `#EVALTRACE expr` — evaluate with execution trace
 - `#CHECK expr` — type-check without evaluating
 - `#ASSERT bool_expr` — assert must be TRUE
+- `#ASSERT REFUSED expr [BECAUSE "reason"]` — assert that the expression refuses, with exactly that reason when `BECAUSE` is given (a string literal, on the `#ASSERT`'s line or indented on the next)
 - `#TRACE contract AT time WITH ...` — simulate a regulative rule; see [references/regulative.md](references/regulative.md)
 
 ### Annotations

@@ -1,0 +1,4 @@
+-- A module that does not check, for a rule that imports it.
+
+GIVETH A NUMBER
+`broken` MEANS "not a number"

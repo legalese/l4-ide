@@ -1,0 +1,23 @@
+-- Rules that answer a number: one that may refuse, and one that cannot but
+-- raises an error for one input. See boolean-rules.l4 for what an
+-- "agreement:" line says, and for `pad`.
+--
+-- agreement: fee may refuse with ["a negative fee is not modelled"]
+-- agreement: fee {"n": 4} => answers 2
+-- agreement: fee {"n": -1} => refuses "a negative fee is not modelled"
+--
+-- agreement: ratio may refuse with []
+-- agreement: ratio {"n": 4} => answers 0.25
+-- agreement: ratio {"n": 0} => raises
+
+@export the fee
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+fee n pad MEANS IF n < 0 THEN REFUSE "a negative fee is not modelled" ELSE n DIVIDED BY 2
+
+@export a ratio
+GIVEN n IS A NUMBER
+      pad IS A MAYBE NUMBER
+GIVETH A NUMBER
+ratio n pad MEANS 1 DIVIDED BY n

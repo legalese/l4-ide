@@ -1,4 +1,4 @@
-`ExcelEDate` with `Late Jan 24` and 1
-`ExcelEDate` with `Late Jan 24` and -1
-`ExcelEOMonth` with `Jan 2024` and 0
-`ExcelEOMonth` with `Jan 2024` and 1
+the date 1 month after `Late Jan 24` (capped at the last day of that month)
+the date -1 months after `Late Jan 24` (capped at the last day of that month)
+the day before the date 0 months plus one month after `Jan 2024`
+the day before the date 1 month plus one month after `Jan 2024`

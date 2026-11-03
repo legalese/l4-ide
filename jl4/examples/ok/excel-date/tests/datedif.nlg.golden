@@ -1,6 +1,6 @@
-`DATEDIF` with `Start 2012`, `Mid 2012` and Y
-`DATEDIF` with `Start 2012`, `Mid 2012` and M
-`DATEDIF` with `Start 2012`, `Mid 2012` and D
-`DATEDIF` with `Start 2012`, `Mid 2012` and YM
-`DATEDIF` with `Start 2012`, `Mid 2012` and YD
-`DATEDIF` with 1 January 2012, 15 July 2012 and MD
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit Y
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit M
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit D
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit YM
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit YD
+the Excel DATEDIF interval from 1 January 2012 to 15 July 2012 in unit MD
