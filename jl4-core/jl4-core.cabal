@@ -196,6 +196,7 @@ test-suite jl4-core-test
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec
+    OverloadScaleSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     RefAnnotationSpec
