@@ -45,7 +45,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import qualified Data.Text.Encoding as Text.Encoding
-import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
+import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getTemporaryDirectory, removeDirectoryRecursive, removePathForcibly, withCurrentDirectory)
@@ -1324,6 +1324,30 @@ spec = describe "integration" do
           statusCode' resp `shouldBe` 500
           lookupKey "error" (decodeObject (responseBody resp))
             `shouldBe` Just (Aeson.String "Query plan timed out")
+
+    it "is not held to the memory limit of an evaluation or a tool call before it on the same connection" do
+      -- The limit is the thread's, and Warp serves a kept-alive connection's
+      -- requests on one thread. Left on after an evaluation or an MCP tool
+      -- call that answered, what was left of it ran down over the requests
+      -- that followed, and the one that used it up lost its connection with
+      -- no answer. The client here does not retry such a request on a new
+      -- connection, as the default manager does, which hid it.
+      withServicesRestartedOpts testOptions {maxEvalMemoryMb = 1}
+        [("qp-after-limit", [("qualifies.l4", qualifiesJL4)])] (const (pure ())) \_ baseUrl _ -> do
+          mgr <- newManager defaultManagerSettings {managerRetryableException = const False}
+          let inputs = Aeson.object [ "walks" Aeson..= True, "eats" Aeson..= True, "drinks" Aeson..= True ]
+              allTrue = Aeson.object [ "arguments" Aeson..= inputs ]
+              plans = forM [1 .. 100 :: Int] \_ ->
+                statusCode' <$> queryPlan' baseUrl mgr "qp-after-limit" "compute_qualifies" allTrue
+          evaluated <- evalFunction baseUrl mgr "qp-after-limit" "compute_qualifies" allTrue
+          statusCode' evaluated `shouldBe` 200
+          afterEvaluation <- plans
+          afterEvaluation `shouldBe` replicate 100 200
+          called <- mcpRpc baseUrl mgr "qp-after-limit" "tools/call" $ Aeson.object
+            [ "name" Aeson..= ("compute_qualifies" :: Text), "arguments" Aeson..= inputs ]
+          fmap fst (mcpPayloadText =<< called) `shouldBe` Just False
+          afterToolCall <- plans
+          afterToolCall `shouldBe` replicate 100 200
 
     it "returns 404 for unknown function" do
       withServiceFromSources "qp-404" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do

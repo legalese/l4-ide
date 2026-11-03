@@ -40,8 +40,8 @@ import qualified Data.Maybe as Maybe
 import Data.Time (UTCTime, getCurrentTime, diffUTCTime)
 import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
-import Control.Exception (SomeException, catch)
+import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit, disableAllocationLimit)
+import Control.Exception (SomeException, catch, finally)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import System.Timeout (timeout)
 
@@ -562,15 +562,18 @@ runMcpEvaluationIO cfg vf args = do
   case Map.lookup JL4 vf.fnEvaluator of
     Nothing -> pure $ ToolFailed "No evaluator available"
     Just runFn -> do
-      mResult <- (timeout timeoutMicros $ do
-          setAllocationCounter memLimitBytes
-          enableAllocationLimit
-          r <- runExceptT (runFn.runFunction args Nothing TraceNone False)
-          remaining <- getAllocationCounter
-          let _ = memLimitBytes - remaining
-          pure r
-        ) `catch` \AllocationLimitExceeded ->
-          pure Nothing
+      -- The limit is lifted when the evaluation ends, as 'timeoutAction'
+      -- lifts it: a call answered at once runs on the thread that serves the
+      -- connection's next request.
+      let limited = do
+            setAllocationCounter memLimitBytes
+            enableAllocationLimit
+            r <- runExceptT (runFn.runFunction args Nothing TraceNone False)
+            remaining <- getAllocationCounter
+            let _ = memLimitBytes - remaining
+            pure r
+      mResult <- timeout timeoutMicros (limited `finally` disableAllocationLimit)
+        `catch` \AllocationLimitExceeded -> pure Nothing
       case mResult of
         Nothing -> pure $ ToolFailed "Evaluation resource limit exceeded"
         Just (Left err@(EvaluatorRefused _)) ->
