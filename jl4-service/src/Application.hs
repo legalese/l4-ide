@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 
-module Application (defaultMain, app) where
+module Application (defaultMain, app, ServiceApi) where
 
 import qualified BundleStore
 import ControlPlane (ControlPlaneApi, controlPlaneHandler)

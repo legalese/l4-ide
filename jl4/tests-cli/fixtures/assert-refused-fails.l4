@@ -1,0 +1,9 @@
+-- Typechecks cleanly. Each #ASSERT REFUSED here fails, and none raises: a
+-- failed assertion is a verdict, so `l4 run` on this file exits 0, and each
+-- failure says why.
+
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "this case is not modelled"
+
+#ASSERT REFUSED 1
+#ASSERT REFUSED `not modelled` BECAUSE "some other reason"

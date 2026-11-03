@@ -9,6 +9,7 @@ import L4.Annotation
 import L4.Citations
 import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
+import qualified L4.Diagnostic as Diagnostic
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
@@ -1400,12 +1401,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace) = do
       Diagnostic
         { _range = srcRangeToLspRange range
-        , _severity =
-            case res of
-              EvaluateLazy.Assertion (Right False) -> Just LSP.DiagnosticSeverity_Error
-              EvaluateLazy.Assertion (Left _)      -> Just LSP.DiagnosticSeverity_Error
-              EvaluateLazy.Reduction (Left _)      -> Just LSP.DiagnosticSeverity_Error
-              _                                    -> Just LSP.DiagnosticSeverity_Information
+        , _severity = Just (diagnosticSeverityToLsp (Diagnostic.evalResultSeverity res))
         , _code = diagnosticCode code
         , _codeDescription = diagnosticCodeDescription code
         , _source = Just "eval"
@@ -1432,6 +1428,14 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         }
       where
         code = TypeCheck.checkErrorCode checkError.kind
+
+-- | The language server's severity for one of L4's own.
+diagnosticSeverityToLsp :: Diagnostic.DiagnosticSeverity -> DiagnosticSeverity
+diagnosticSeverityToLsp = \case
+  Diagnostic.DSError       -> LSP.DiagnosticSeverity_Error
+  Diagnostic.DSWarning     -> LSP.DiagnosticSeverity_Warning
+  Diagnostic.DSInformation -> LSP.DiagnosticSeverity_Information
+  Diagnostic.DSHint        -> LSP.DiagnosticSeverity_Hint
 
 translateSeverity :: TypeCheck.Severity -> DiagnosticSeverity
 translateSeverity TypeCheck.SInfo  = LSP.DiagnosticSeverity_Information

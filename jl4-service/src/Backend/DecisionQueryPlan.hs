@@ -178,6 +178,14 @@ buildDecisionQueryCacheFromCompiled funName compiled sourceText = do
       -- The module is already fully resolved; an empty substitution is sufficient.
       vizCfg = LadderViz.mkVizConfig verDocId resolvedModule Map.empty True
 
+  -- A rule that may refuse to answer gets no plan: a plan would say which
+  -- inputs settle an answer the rule may not give. The decline is read from
+  -- what the rule and the definitions it calls are written to do, through
+  -- every module it imports, once, when the function is compiled
+  -- ('compiledDecline'), before any ladder is drawn.
+  forM_ compiled.compiledDecline \declined ->
+    throwError err400 {errBody = Aeson.encode declined}
+
   (ladderInfo, vizState) <- case LadderViz.doVisualize decide vizCfg of
     Left e -> throwError err400 {errBody = Aeson.encode $ object ["error" .= LadderViz.prettyPrintVizError e]}
     Right x -> pure x

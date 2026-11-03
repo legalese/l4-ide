@@ -57,7 +57,8 @@ echo '{"arguments":{"years of service":5,"performance rating":4}}' \
 # {"tag":"SimpleResponse","contents":{"result":{"value":true}}}
 ```
 
-The input and output wire format is byte-identical to [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint, so the same client code works against either backend.
+The request body is the one [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint takes, and an answer comes back in the same envelope as the service's.
+The two backends do not answer every request alike: a function marked `"supported": false` is not run, and an evaluation that stops with an error is answered in another shape; see [Scope & limitations](#scope--limitations).
 
 ## Architecture
 
@@ -96,6 +97,9 @@ This is a working compiler, not a finished one. Out of 431 `.l4` files in this r
 
 Known gaps:
 
+- A function from which evaluation may reach a `REFUSE`, directly or through a definition it calls in its own module or an imported one, is marked `"supported": false` in the `.schema.json`, with the reason in `unsupportedReason`; so is a function whose own body holds a construct the backend cannot compile, such as a lambda (`GIVEN x YIELD ...`). Such a function is not run: `jl4-mlir run` prints the reason on stderr and exits 1, and the WASM server answers `501` with the reason in `error`. Evaluate such a function with jl4-service instead.
+- A lambda in a definition that a function calls, and a named function passed to a higher-order helper such as `map`, do not mark the function unsupported. It is marked `"supported": true`, and the WASM server answers it `500` with `unresolved runtime symbol` in `error`, where jl4-service answers it.
+- An evaluation that stops with an error, such as a division by zero, is answered `500` with the message in `error`, as `{"error": "Division by zero in the operation:\nDIVIDED_BY"}`. jl4-service answers it `422` with the message in a tagged body, as `{"tag": "Error", "contents": {"tag": "InterpreterError", "contents": "Division by zero in the operation:\nDIVIDED BY\n"}}`.
 - String operations (`__l4_str_concat`, `__l4_str_len`, `__l4_to_string`) are stubbed at runtime — good for passing strings through, not for heavy string work.
 - A function that returns `DEONTIC` is not compiled to wasm. Its wasm body is a placeholder that returns `0.0` ([Lower.hs](src/L4/MLIR/Lower.hs)); the JS runtime evaluates the function instead, walking the contract stored in the `.schema.json` against the request's `events`.
 - No GraphViz rendering of a trace. jl4-service answers an evaluation with `?trace=full&graphviz=true` with one, tagged `GraphVizResponse`; the WASM server ignores `graphviz`. A request with `?trace=full` gets the trace itself, tagged `TraceResponse`, with `result` and `reasoning`.

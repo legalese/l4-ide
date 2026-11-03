@@ -1,0 +1,19 @@
+-- A rule that may refuse through a definition three imports away, which
+-- the file it imports calls directly: ballot.l4 calls one that
+-- residency.l4 defines, and reaches it only through franchise.l4. See
+-- boolean-rules.l4 for what an "agreement:" line says, and for `pad`.
+--
+-- agreement: casts may refuse with ["non-residents are not modelled"]
+-- agreement: casts {"adult": true, "resident": true} => answers true
+-- agreement: casts {"adult": true, "resident": false} => refuses "non-residents are not modelled"
+-- agreement: casts {"adult": false, "resident": true} => answers false
+-- agreement: casts {"adult": false, "resident": false} => answers false
+
+IMPORT ballot
+
+@export whether the person casts a ballot
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE casts IF adult AND `the person may cast a ballot` resident

@@ -1,0 +1,16 @@
+-- Typechecks cleanly. The export answers, inside its own JUST, a list of n
+-- numbers with a REFUSE as one more element. The rule's JUST takes a level of
+-- the depth a directive reads, so the refusal is reached one element sooner
+-- than in a bare list. `l4 run` and `l4 batch` must reach it for the same n.
+@export the numbers in a MAYBE, then a refusal as one more element
+GIVEN n IS A NUMBER
+GIVETH A MAYBE (LIST OF NUMBER)
+`refusal in a MAYBE list` n MEANS JUST (`the numbers, then a refusal` n)
+
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`the numbers, then a refusal` n MEANS
+  IF n EQUALS 0 THEN LIST (REFUSE "deep") ELSE n FOLLOWED BY `the numbers, then a refusal` (n MINUS 1)
+
+#EVAL `refusal in a MAYBE list` 199
+#EVAL `refusal in a MAYBE list` 200

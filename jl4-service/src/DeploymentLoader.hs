@@ -20,7 +20,7 @@ import Types
 import Control.Concurrent (getNumCapabilities, newQSem, signalQSem, waitQSem)
 import Control.Concurrent.Async (async, mapConcurrently_)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, retry)
-import Control.Exception (ErrorCall (..), SomeAsyncException, SomeException, bracket_, catch, displayException, fromException, throwIO, try)
+import Control.Exception (ErrorCall (..), SomeAsyncException, SomeException, bracket_, catch, displayException, finally, fromException, throwIO, try)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks, ask)
 import Data.Aeson (toJSON)
@@ -31,7 +31,7 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Version
-import GHC.Conc (setAllocationCounter, enableAllocationLimit)
+import GHC.Conc (setAllocationCounter, enableAllocationLimit, disableAllocationLimit)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import System.Timeout (timeout)
 
@@ -270,7 +270,10 @@ compileFromSource logger timeoutMicros memLimitMb deployId sources = do
         setAllocationCounter memLimitBytes
         enableAllocationLimit
         compileBundle logger deployId sources
-  mResult <- (timeout timeoutMicros compileLimited)
+  -- The limit is lifted when the compile ends, as 'DataPlane.timeoutAction'
+  -- lifts an evaluation's: a lazy load compiles on the thread that serves the
+  -- connection's next request.
+  mResult <- timeout timeoutMicros (compileLimited `finally` disableAllocationLimit)
     `catch` \AllocationLimitExceeded -> do
       logError logger "Compilation exceeded memory limit"
         [ ("deploymentId", toJSON deployId)

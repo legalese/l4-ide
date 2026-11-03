@@ -30,6 +30,7 @@ import GHC.Generics (Generic)
 import Optics.Cons
 import Servant.API
 import Data.OpenApi (ToSchema)
+import L4.EvaluateLazy.Exceptions (Refusal (..), parseRefusalMarker, prettyRefusal, refusalMarker)
 
 type FunctionName = Text
 
@@ -244,22 +245,39 @@ isEmptyReasoning r =
 emptyTree :: Reasoning
 emptyTree = emptyReasoning
 
--- | An 'EvaluatorError' is some form of panic thrown by an evaluator.
--- The execution of a function had to be interrupted for /some/ reason.
--- Such an exception is unrecoverable.
--- The error message may contain hints of what might have gone wrong.
+-- | Why an evaluation came back with no answer. Most constructors are some
+-- form of panic: the execution of a function had to be interrupted for
+-- /some/ reason, and the message may hint at what went wrong.
+-- 'EvaluatorRefused' is not a panic: the model declined to answer, with the
+-- reason its author wrote.
 data EvaluatorError
   = InterpreterError !Text
   | RequiredParameterMissing !ParameterMismatch
   | UnknownArguments ![Text]
   | CannotHandleParameterType !FnLiteral
   | CannotHandleUnknownVars
+  | EvaluatorRefused !Text
+    -- ^ the function refused, with this reason
   deriving stock (Show, Read, Ord, Eq, Generic)
-  deriving anyclass (FromJSON, ToJSON)
+
+-- | A refusal is written as core writes one, @{"kind": "refused", "reason": ...}@
+-- ('refusalMarker'), so every door of the service carries the same value for
+-- it. Every other constructor is written in the generic tagged form.
+instance ToJSON EvaluatorError where
+  toJSON = \case
+    EvaluatorRefused reason -> refusalMarker (MkRefusal reason)
+    other -> genericToJSON defaultOptions other
+
+instance FromJSON EvaluatorError where
+  parseJSON v = case v of
+    Object o | Just (String "refused") <- Aeson.lookup "kind" o ->
+      (\r -> EvaluatorRefused r.message) <$> parseRefusalMarker v
+    _ -> genericParseJSON defaultOptions v
 
 prettyEvaluatorError :: EvaluatorError -> Text
 prettyEvaluatorError = \case
   InterpreterError msg -> msg
+  EvaluatorRefused reason -> Text.unlines (prettyRefusal (MkRefusal reason))
   RequiredParameterMissing pm ->
     "Required parameter missing: expected " <> Text.pack (show pm.expected)
     <> " parameter(s), but got " <> Text.pack (show pm.actual)

@@ -1,0 +1,86 @@
+-- REFUSE examples
+
+-- One definition for each reason a rule declines to answer,
+-- named for what is not encoded.
+
+GIVETH A NUMBER
+`fees before 2000 are not encoded` MEANS
+    REFUSE "this schedule is not encoded for years before 2000"
+
+GIVEN year IS A NUMBER
+GIVETH A NUMBER
+`the fee in` year MEANS
+    IF year >= 2000
+    THEN 100
+    ELSE `fees before 2000 are not encoded`
+
+#EVAL `the fee in` 2024
+#EVAL `the fee in` 1999
+
+-- A rule that answers yes or no refuses the same way.
+-- It has no query plan, because it may refuse.
+
+GIVETH A BOOLEAN
+`the insurance of a minor is not modelled` MEANS
+    REFUSE "the insurance of a minor is not modelled"
+
+GIVEN adult   IS A BOOLEAN
+      insured IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE covered IS
+    IF adult
+    THEN insured
+    ELSE `the insurance of a minor is not modelled`
+
+#EVAL covered TRUE TRUE
+#EVAL covered FALSE TRUE
+
+-- A REFUSE written inside a condition. `l4 render` lists it among the
+-- conditions that must all be true.
+
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `may travel` IF
+    adult AND REFUSE "travel is not modelled"
+
+#EVAL `may travel` FALSE
+#EVAL `may travel` TRUE
+
+-- One refusal, for rules of any type.
+
+GIVEN a IS A TYPE
+GIVETH AN a
+`not written yet` MEANS
+    REFUSE "this rule has not been written yet"
+
+GIVETH A NUMBER
+`the deposit` MEANS 1 PLUS `not written yet`
+
+GIVETH A BOOLEAN
+`the deposit is refundable` MEANS `not written yet`
+
+#EVAL `the deposit`
+#EVAL `the deposit is refundable`
+
+-- AND, OR and IF read from left to right, and stop as soon as the
+-- answer is known.
+
+#EVAL FALSE AND `the insurance of a minor is not modelled`
+#EVAL `the insurance of a minor is not modelled` AND FALSE
+#EVAL TRUE OR `the insurance of a minor is not modelled`
+
+-- A refusal cannot be caught.
+
+#EVAL NOT `the insurance of a minor is not modelled`
+#EVAL CONSIDER covered FALSE TRUE
+        WHEN TRUE  THEN "covered"
+        WHEN FALSE THEN "not covered"
+
+-- Testing a refusal.
+
+#ASSERT REFUSED `the fee in` 1999
+#ASSERT REFUSED `the fee in` 1999 BECAUSE "this schedule is not encoded for years before 2000"
+#ASSERT REFUSED covered FALSE TRUE
+    BECAUSE "the insurance of a minor is not modelled"
+#ASSERT `the fee in` 2024 EQUALS 100
+#ASSERT NOT (FALSE AND `the insurance of a minor is not modelled`)

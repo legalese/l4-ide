@@ -290,14 +290,56 @@ standardResponses = Aeson.object
   ]
 
 -- | Shared component schemas.
+--
+-- An evaluation's 200 is an answer or a refusal, told apart by its @tag@, so
+-- that a client generated from the document knows a 200 may have no result.
 buildComponents :: Aeson.Value
 buildComponents = Aeson.object
   [ "schemas" .= Aeson.object
       [ "EvaluationResponse" .= Aeson.object
+          [ "description" .= ("An answer, tagged SimpleResponse, TraceResponse or GraphVizResponse, whose contents has the result; or a refusal, tagged Refused, whose contents is the reason the rule declines to answer, with no result." :: Text)
+          , "oneOf" .= [schemaRef "EvaluationAnswer", schemaRef "EvaluationRefusal"]
+          , "discriminator" .= Aeson.object
+              [ "propertyName" .= ("tag" :: Text)
+              , "mapping" .= Aeson.object
+                  [ "SimpleResponse" .= componentPath "EvaluationAnswer"
+                  , "TraceResponse" .= componentPath "EvaluationAnswer"
+                  , "GraphVizResponse" .= componentPath "EvaluationAnswer"
+                  , "Refused" .= componentPath "EvaluationRefusal"
+                  ]
+              ]
+          ]
+      , "EvaluationAnswer" .= Aeson.object
           [ "type" .= ("object" :: Text)
+          , "required" .= (["tag", "contents"] :: [Text])
           , "properties" .= Aeson.object
-              [ "tag" .= Aeson.object ["type" .= ("string" :: Text)]
-              , "contents" .= Aeson.object ["type" .= ("object" :: Text)]
+              [ "tag" .= stringEnum ["SimpleResponse", "TraceResponse", "GraphVizResponse"]
+              , "contents" .= Aeson.object
+                  [ "type" .= ("object" :: Text)
+                  , "required" .= (["result"] :: [Text])
+                  , "properties" .= Aeson.object
+                      [ "result" .= Aeson.object
+                          [ "description" .= ("The answer, in the function's return type" :: Text) ]
+                      ]
+                  ]
+              ]
+          ]
+      , "EvaluationRefusal" .= Aeson.object
+          [ "type" .= ("object" :: Text)
+          , "required" .= (["tag", "contents"] :: [Text])
+          , "properties" .= Aeson.object
+              [ "tag" .= stringEnum ["Refused"]
+              , "contents" .= Aeson.object
+                  [ "type" .= ("object" :: Text)
+                  , "required" .= (["kind", "reason"] :: [Text])
+                  , "properties" .= Aeson.object
+                      [ "kind" .= stringEnum ["refused"]
+                      , "reason" .= Aeson.object
+                          [ "type" .= ("string" :: Text)
+                          , "description" .= ("Why the rule declines to answer, as its author wrote it" :: Text)
+                          ]
+                      ]
+                  ]
               ]
           ]
       , "BatchRequest" .= Aeson.object
@@ -310,6 +352,17 @@ buildComponents = Aeson.object
           ]
       ]
   ]
+
+-- | A reference to one of 'buildComponents'' schemas.
+schemaRef :: Text -> Aeson.Value
+schemaRef name = Aeson.object ["$ref" .= componentPath name]
+
+componentPath :: Text -> Text
+componentPath name = "#/components/schemas/" <> name
+
+-- | A string that is one of these.
+stringEnum :: [Text] -> Aeson.Value
+stringEnum values = Aeson.object ["type" .= ("string" :: Text), "enum" .= values]
 
 -- | Build the request body schema for evaluation endpoints.
 -- Always wraps function parameters in an "arguments" key.
