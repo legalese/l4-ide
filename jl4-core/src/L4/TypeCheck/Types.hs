@@ -100,8 +100,11 @@ data CheckState =
     -- nothing after it can tell apart ('mergeAlike'), kept as one so that the
     -- rest of the check runs once instead of once per outcome. Everything
     -- that counts viable outcomes counts it as two ('outcomeWeight'): 'prune',
-    -- 'softprune' and 'forkWithLazyFallback'. It is never cleared, so an
-    -- outcome derived from a plural one is plural too.
+    -- 'softprune' and 'forkWithLazyFallback'. An outcome derived from a
+    -- plural one is plural too: each of those three runs its own search
+    -- without the flag it was entered with ('fromEntry'), so that it counts
+    -- only the merges of that search, and puts the flag back on what it
+    -- returns ('backToEntry').
     , bindLog :: ![Int]
     -- ^ The inference variables bound so far, latest first ('bindInfVar'), and
     -- how many ('bindLogLen'). The bindings an outcome made since an earlier
@@ -867,6 +870,27 @@ outcomeWeight (w, st)
 -- read as, to code that was written for such a list.
 expandPlural :: [(With CheckErrorWithContext a, CheckState)] -> [(With CheckErrorWithContext a, CheckState)]
 expandPlural = concatMap (\ o -> if outcomeWeight o >= 2 then [o, o] else [o])
+
+-- | The state a counting combinator ('prune', 'softprune',
+-- 'forkWithLazyFallback') runs its computation from: the state it was
+-- entered with, without 'CheckState.plural'. A combinator counts the viable
+-- outcomes OF ITS OWN SEARCH. A flag it was entered with says that the path
+-- around it stands for two, which the consumer that made the merge counts;
+-- read here, it counted that path again, once per combinator on the way,
+-- and a search with one viable outcome inside a plural path (a @WHERE@
+-- constant's own 'prune', in an operand after a merged one) was read as an
+-- ambiguity, which killed the path, and the module took the meaning that was
+-- left.
+fromEntry :: CheckState -> CheckState
+fromEntry s = s { plural = False }
+
+-- | Put back on every outcome of a counting combinator the flag it was
+-- entered with ('fromEntry'), neither doubled nor cleared: an outcome of a
+-- path that stands for two still stands for two.
+backToEntry :: CheckState -> [(With CheckErrorWithContext a, CheckState)] -> [(With CheckErrorWithContext a, CheckState)]
+backToEntry s0
+  | s0.plural = map (\ (w, st) -> (w, st { plural = True }))
+  | otherwise = id
 
 -- | Bind an unbound inference variable, and record that it was bound
 -- ('CheckState.bindLog'). The only way to bind one.
@@ -2144,11 +2168,12 @@ forkWithLazyFallback :: forall a r. Bool -> [Check a] -> Check a -> (a -> Check 
 forkWithLazyFallback preambleErr cands fallback kont =
   MkCheck $ \ e s ->
     let
-      ks = runCheck (choose cands >>= kont) e s
+      -- Counted relative to the state at the fork ('fromEntry').
+      ks = runCheck (choose cands >>= kont) e (fromEntry s)
     in
-      case sum (map outcomeWeight ks) of
+      backToEntry s $ case sum (map outcomeWeight ks) of
         1 | not preambleErr -> ks
-        _                   -> ks ++ runCheck (fallback >>= kont) e s
+        _                   -> ks ++ runCheck (fallback >>= kont) e (fromEntry s)
 
 -- | Whether a 'TermKind' names a value in the ordinary term namespace (as
 -- opposed to a record selector or data constructor, which are reached through
@@ -2453,11 +2478,13 @@ orElseKeepAll m1 m2 = do
 prune :: forall a. Check a -> Check a
 prune m = do
   ctx <- asks (.errorContext)
-  MkCheck $ \ s env ->
+  MkCheck $ \ env s0 ->
     let
-      -- A plural outcome ('mergeAlike') is read as the two it stands for.
+      -- A plural outcome ('mergeAlike') is read as the two it stands for,
+      -- counted relative to the state the prune was entered with
+      -- ('fromEntry').
       candidates :: [(With CheckErrorWithContext a, CheckState)]
-      candidates = expandPlural (runCheck m s env)
+      candidates = expandPlural (runCheck m env (fromEntry s0))
 
       -- Lexical scoping across a forward reference (spec §12, FIX D). A
       -- branch that resolved a name to a not-yet-inferred binding OFF its
@@ -2502,13 +2529,17 @@ prune m = do
         | otherwise               = procFailed c cs
 
     in
-      -- What comes out of a prune is one outcome, and it is never plural: a
-      -- plural viable outcome is read as the two it stands for, so it is never
-      -- the single viable answer. It can still be the outcome that carries the
-      -- ambiguity (when every outcome after the second is viable), and that
-      -- state goes on to the next declaration, where the flag would make every
-      -- viable outcome count as two.
-      map (\ (w, st) -> (w, st { plural = False })) $
+      -- What comes out of a prune is one outcome, and it carries the flag it
+      -- was entered with and no other. The outcomes merged INSIDE the prune
+      -- have been counted here: a plural viable outcome is read as the two it
+      -- stands for, so it is never the single viable answer, and the one
+      -- outcome that would otherwise leave with such a flag is the ambiguity
+      -- of an all-viable list, a failure. The flag it was entered with belongs to
+      -- the path around the prune (a merge further out, still to be counted
+      -- by the consumer that made it), and goes back as it came. A top-level
+      -- declaration is entered with no flag, so its state goes on to the next
+      -- declaration with none.
+      map (\ (w, st) -> (w, st { plural = s0.plural })) $
         case leastDeferred of
           Just c  -> [c]
           Nothing -> proc candidates
@@ -2543,13 +2574,15 @@ softpruneWith
 softpruneWith merge m =
   MkCheck $ \ env st ->
     let
+      -- Counted relative to the state the softprune was entered with
+      -- ('fromEntry').
       candidates :: [(With CheckErrorWithContext a, CheckState)]
-      candidates = runCheck m env st
+      candidates = runCheck m env (fromEntry st)
     in
       -- The failures before the first viable outcome are dropped, as is every
       -- failure when exactly one viable outcome (counting a plural one as
       -- two) follows; with none, the last failure is kept.
-      case dropWhile ((== 0) . outcomeWeight) candidates of
+      backToEntry st $ case dropWhile ((== 0) . outcomeWeight) candidates of
         [] -> case candidates of
                 [] -> []
                 _  -> [last candidates]

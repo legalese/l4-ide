@@ -1,0 +1,31 @@
+-- A name with two meanings in one operand, and a WHERE constant in the next.
+-- `size thing` has three readings that check (size at Colour with thing at
+-- Colour; the polymorphic size with either thing), so it is ambiguous, and
+-- both names are reported. The check of the expression runs the readings
+-- that nothing after them can tell apart as one (legalese/l4-ide#683), and
+-- the WHERE constant's own declaration is checked under a prune of its own.
+-- That prune must count only its own outcomes: counting the merged outcome
+-- of the operand before it as two again made the constant ambiguous on that
+-- path, killed it, and left one reading, which the module then accepted.
+DECLARE Colour IS ONE OF Red, Green, Blue
+DECLARE Light IS ONE OF Red, Green
+
+GIVETH A Colour
+DECIDE thing IS Blue
+
+GIVETH A Light
+DECIDE thing IS Green
+
+GIVEN x IS A Colour
+GIVETH A NUMBER
+DECIDE size x IS 2
+
+GIVEN a IS A TYPE
+      x IS AN a
+GIVETH A NUMBER
+DECIDE size x IS 1
+
+GIVETH A NUMBER
+DECIDE score IS (size thing) PLUS (z WHERE z MEANS 5)
+
+#EVAL score
