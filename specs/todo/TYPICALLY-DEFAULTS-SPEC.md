@@ -1,6 +1,6 @@
 # Specification: TYPICALLY Keyword for Default Values
 
-**Status:** STAGE ONE BUILT (checked 2026-10-30, and again on 2026-11-01 after a rebase onto a newer main, by building this tree and running the probes in `specs/as-built/typically.md`).
+**Status:** STAGE ONE BUILT (checked 2026-10-30, and again on 2026-11-01 after a rebase onto a newer main, by building this tree and running the probes in `specs/as-built/typically.md`; on 2026-11-03, after a rebase onto `main` at `6842ca90c` with REFUSE, by the full test gate only, the probes not run again).
 `TYPICALLY` is lexed, parsed, type-checked and printed, and its value is kept in the syntax tree and handed to tools: literal values only, an explicit type required on a rule's `GIVEN`, rejected on a type variable.
 **Nothing applies it.** The evaluator, `l4 batch` and `jl4-service` ignore a default, so an input that is left out stays missing and must be supplied.
 Everything below about evaluation (`resolveParameter`, nested defaults, "innermost wins"), partial evaluation and the `PEVAL`/`PASSERT` directives is proposed, not built.
