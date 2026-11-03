@@ -250,5 +250,5 @@ wanting a savings provision to reach past a `REFUSE`, the `REFUSE` was wrong.**
 **Numbering.** These entries were one flat run of 25 until 2026-09-04, when they became eleven
 areas. Every cross-reference inside the phrasebook, in `SKILL.md` and in `regulative.md` now names
 the new _area_._entry_ number; the old-to-new table that stood here has been removed because nothing
-uses it any more. If you meet an "entry 17" anywhere, it predates the split and the mapping is in
-`scratchpad/docs/cookbook-map.md`.
+uses it any more. If you meet an "entry 17" anywhere, it predates the split; the flat run of 25,
+with each entry's heading, is this file as legalese/l4-ide commit `88bdbf1dd` added it.
