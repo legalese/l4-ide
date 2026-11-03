@@ -899,7 +899,7 @@ unitSources u = map refCitation (u.uTopAnno ^. annRefs <> own)
   own = case u.uDecl of
     UDecide d@(MkDecide _ _ af _)  -> (d ^. annoOf % annRefs) <> headRefs af
     UDeclare d@(MkDeclare _ _ af _) -> (d ^. annoOf % annRefs) <> headRefs af
-    UAssume a@(MkAssume _ _ af _)  -> (a ^. annoOf % annRefs) <> headRefs af
+    UAssume a@(MkAssume _ _ af _ _)  -> (a ^. annoOf % annRefs) <> headRefs af
   headRefs af@(MkAppForm _ n _ _) = (af ^. annoOf % annRefs) <> (getActual n ^. annoOf % annRefs)
 
 unitRendering :: Bool -> Unit -> (Text, Clause)
@@ -1877,7 +1877,7 @@ builtinUnaryOf = Map.fromList
 -- because that slot would have to hold the condition and name its subject.
 quantified :: Resolved -> Expr Resolved -> Expr Resolved -> Maybe Text
 quantified n f xs = case carameliseNode f of
-  Lam _ (MkGivenSig _ [MkOptionallyTypedName _ v _]) body
+  Lam _ (MkGivenSig _ [MkOptionallyTypedName _ v _ _]) body
     | Just frame <- Map.lookup (resolvedText n) frames, fromPrelude n ->
         Just (frame (resolvedText v) (leafText xs) (leafText body))
   _ -> Nothing
