@@ -7,6 +7,9 @@
 //   ⇢ { type: "eval", id, fnName, args, traceMode, startTime?, events? }
 //   ⇡ { type: "result", id, status, body, peakHeap, maxHeap, backend }
 //
+// A function the schema marks "supported": false is not run: the
+// result is a 501 whose body's 'error' names the schema's reason.
+//
 // 'startTime' and 'events' are only sent for deontic invocations
 // (M6); the worker merges them into 'args' for the JS interpreter.
 //
@@ -30,6 +33,7 @@ import {
   wrapEvaluationEnvelope,
   MemoryLimitError,
   DeonticInputError,
+  UnsupportedFunctionError,
 } from "../runtime/jl4-runtime.mjs";
 import { createBackend } from "../runtime/wasm-backend.mjs";
 
@@ -109,13 +113,21 @@ parentPort.on("message", (msg) => {
     body = aesonStringify(wrapEvaluationEnvelope(payload));
   } catch (err) {
     // Map known errors to HTTP statuses; everything else is 500.
-    // 'DeonticInputError' is a client-side input bug — the worker's
-    // wasm state is untouched, so don't trigger a respawn.
+    // 'DeonticInputError' is a client-side input bug, and
+    // 'UnsupportedFunctionError' is thrown before anything runs, for a
+    // function the schema marks "supported": false — the worker's wasm
+    // state is untouched by either, so don't trigger a respawn.
     // 'MemoryLimitError' / wasm traps leave the bump-pointer or the
     // instance in inconsistent state and ARE fatal.
-    const isFatal = !(err instanceof DeonticInputError);
+    const isFatal = !(
+      err instanceof DeonticInputError ||
+      err instanceof UnsupportedFunctionError
+    );
     if (err instanceof DeonticInputError) {
       status = 400;
+    } else if (err instanceof UnsupportedFunctionError) {
+      // This backend does not evaluate the function; jl4-service does.
+      status = 501;
     } else if (err instanceof MemoryLimitError) {
       status = 413;
     } else {

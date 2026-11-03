@@ -1,6 +1,8 @@
 // End-to-end test for the M7 hardening in 'wasm-server.mjs':
 //   - happy path returns 200 + peak-heap header
 //   - memory cap returns 413 and re-instantiates so the next request works
+//   - a function the schema marks "supported": false is not run: 501,
+//     and the worker that declined it answers the next request
 //
 // Compiles a tiny L4 fixture, spawns the server, hits its HTTP API.
 // Requires the LLVM/MLIR toolchain on PATH; otherwise the script
@@ -12,6 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
@@ -54,6 +57,13 @@ fs.writeFileSync(
     "@export default Cube of a number",
     "GIVEN n IS A NUMBER",
     "cubed n MEANS n * n * n",
+    "",
+    // The schema marks this one "supported": false, because it may REFUSE.
+    "@export Eligibility by age",
+    "GIVEN age IS A NUMBER",
+    "GIVETH A BOOLEAN",
+    "eligible age MEANS",
+    '  IF age < 0 THEN REFUSE "age cannot be negative" ELSE age >= 18',
     "",
   ].join("\n"),
 );
@@ -135,9 +145,90 @@ try {
     JSON.parse(ok3.body).contents.result.value,
     27,
   );
+
+  // A function marked "supported": false is not run, traced or not: the
+  // answer is a 501 naming the schema's reason, never a value.
+  const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+  const meta = schema.functions["eligible"];
+  eq("unsupported: the schema marks it", meta && meta.supported, false);
+  for (const trace of [undefined, "full"]) {
+    const label = trace ? "unsupported, traced" : "unsupported";
+    const r = await postEval("eligible", { age: -1 }, trace);
+    const body = JSON.parse(r.body);
+    eq(`${label}: status`, r.status, 501);
+    eq(`${label}: no answer`, "contents" in body, false);
+    eq(
+      `${label}: the error names the schema's reason`,
+      String(body.error).includes(meta.unsupportedReason),
+      true,
+    );
+    eq(
+      `${label}: the message`,
+      body.error,
+      "eligible is not evaluated by the WASM backend: " +
+        meta.unsupportedReason +
+        ". Evaluate it with jl4-service.",
+    );
+  }
+  // The server answers the next request; that the worker which declined is
+  // the one that answers is pinned below, on one worker.
+  const ok4 = await postEval("cubed", { n: 2 });
+  eq("post-501: cubed 2 === 8", JSON.parse(ok4.body).contents.result.value, 8);
 } finally {
   server.kill("SIGTERM");
   await new Promise((r) => server.on("exit", r));
+}
+
+// ---- A decline does not cost the worker its instance ------------------
+// The server terminates a worker whose result is marked fatal. A decline is
+// thrown before anything runs, so its result is not fatal, and the same
+// worker answers the next request.
+{
+  const worker = new Worker(path.join(__dirname, "wasm-worker.mjs"), {
+    workerData: {
+      schemaPath: path.resolve(schemaPath),
+      wasmPath: path.resolve(wasmPath),
+      maxHeapBytes: 64 * 1024 * 1024,
+      backend: "v8",
+    },
+  });
+  let exited = false;
+  worker.once("exit", () => {
+    exited = true;
+  });
+  const nextMessage = () =>
+    new Promise((resolve, reject) => {
+      worker.once("message", resolve);
+      worker.once("error", reject);
+    });
+  try {
+    const ready = await nextMessage();
+    eq("worker: ready", ready.type, "ready");
+    worker.postMessage({
+      type: "eval",
+      id: 1,
+      fnName: "eligible",
+      args: { age: -1 },
+    });
+    const declined = await nextMessage();
+    eq("worker: a decline is a 501", declined.status, 501);
+    eq("worker: a decline is not fatal", declined.fatal, false);
+    worker.postMessage({
+      type: "eval",
+      id: 2,
+      fnName: "cubed",
+      args: { n: 2 },
+    });
+    const answered = await nextMessage();
+    eq(
+      "worker: the worker that declined answers cubed 2 === 8",
+      JSON.parse(answered.body).contents.result.value,
+      8,
+    );
+    eq("worker: still running", exited, false);
+  } finally {
+    await worker.terminate();
+  }
 }
 
 // ---- M7 slice 2: timeout + worker_threads, header surface ----------

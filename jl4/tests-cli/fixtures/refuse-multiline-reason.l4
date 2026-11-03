@@ -1,0 +1,8 @@
+-- Typechecks cleanly. The #EVAL refuses, with a reason that runs over two
+-- lines, the second of which starts as `l4 run` reports a refused #ASSERT.
+-- The file holds no #ASSERT.
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "this case is not modelled:
+assertion refused: is how a refused #ASSERT is reported"
+
+#EVAL `not modelled`

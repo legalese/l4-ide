@@ -13,6 +13,7 @@ import L4.Syntax
 --   - LazyEvalTrace (#EVALTRACE)
 --   - Check (#CHECK)
 --   - Assert (#ASSERT)
+--   - AssertRefused (#ASSERT REFUSED)
 --
 -- Keeps:
 --   - Contract (#CONTRACT) - may have semantic meaning
@@ -37,4 +38,5 @@ isIdeDirective = \case
   LazyEvalTrace{} -> True   -- #EVALTRACE
   Check{}         -> True   -- #CHECK
   Assert{}        -> True   -- #ASSERT
+  AssertRefused{} -> True   -- #ASSERT REFUSED
   Contract{}      -> False  -- Keep #CONTRACT

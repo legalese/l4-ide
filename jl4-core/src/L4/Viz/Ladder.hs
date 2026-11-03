@@ -11,6 +11,7 @@ module L4.Viz.Ladder
     visualize
   , visualizeByName
   , visualizeByNameWithState
+  , findDecideByName
   , findAllVisualizableDecides
   , VisualizableDecide(..)
   , VizError(..)

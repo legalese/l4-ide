@@ -1,6 +1,13 @@
-// HTTP wrapper around a jl4-mlir-compiled .wasm bundle. Routes and
-// response envelope mirror jl4-service's /deployments/<id>/functions/
-// <fn>/evaluation endpoint so the two backends are drop-in swappable.
+// HTTP wrapper around a jl4-mlir-compiled .wasm bundle. Its route and
+// request body are those of jl4-service's /deployments/<id>/functions/
+// <fn>/evaluation endpoint, and an answer comes back in the service's
+// envelope. A function marked "supported": false (one from which
+// evaluation may reach a REFUSE, or one whose body holds a construct the
+// backend cannot compile) is not run: it gets a 501 whose 'error' names
+// the reason, and is evaluated by jl4-service instead. An evaluation
+// that stops with an error gets a 500 with the message in 'error', where
+// jl4-service answers a 422; jl4-mlir/README.md lists where the two
+// backends differ.
 //
 // Usage: node wasm-server.mjs <schema.json> <wasm> [port]
 //

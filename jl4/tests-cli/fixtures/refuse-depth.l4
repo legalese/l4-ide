@@ -1,0 +1,41 @@
+-- Typechecks cleanly. Each rule answers a list of n numbers whose end raises:
+-- a REFUSE or a division by zero, either as one more element or as the rest
+-- of the list. A directive reads a list answer only so deep, so it reaches
+-- that end for the smaller n below and not for the larger. `l4 run` and
+-- `l4 batch` must reach it for the same n.
+@export the numbers, then a refusal as one more element
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`refusal in the list` n MEANS
+  IF n EQUALS 0 THEN LIST (REFUSE "deep") ELSE n FOLLOWED BY `refusal in the list` (n MINUS 1)
+
+@export the numbers, then a refusal as the rest of the list
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`refusal as the rest` n MEANS
+  IF n EQUALS 0 THEN REFUSE "deep" ELSE n FOLLOWED BY `refusal as the rest` (n MINUS 1)
+
+@export the numbers, then a division by zero as one more element
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`division in the list` n MEANS
+  IF n EQUALS 0 THEN LIST (1 DIVIDED BY 0) ELSE n FOLLOWED BY `division in the list` (n MINUS 1)
+
+@export the numbers, then a division by zero as the rest of the list
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`division as the rest` n MEANS
+  IF n EQUALS 0 THEN (IF 1 DIVIDED BY 0 EQUALS 0 THEN EMPTY ELSE EMPTY) ELSE n FOLLOWED BY `division as the rest` (n MINUS 1)
+
+#EVAL `refusal in the list` 200
+#EVAL `refusal in the list` 201
+#EVAL `refusal in the list` 202
+#EVAL `refusal as the rest` 200
+#EVAL `refusal as the rest` 201
+#EVAL `refusal as the rest` 202
+#EVAL `division in the list` 200
+#EVAL `division in the list` 201
+#EVAL `division in the list` 202
+#EVAL `division as the rest` 200
+#EVAL `division as the rest` 201
+#EVAL `division as the rest` 202

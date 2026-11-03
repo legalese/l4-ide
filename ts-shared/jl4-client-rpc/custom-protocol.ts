@@ -121,12 +121,26 @@ export type QueryPlanResponse = {
 }
 
 /**
+ * The answer for a rule that may refuse to answer: no plan, because a plan
+ * would say which inputs settle an answer the rule may not give. `error` is
+ * the sentence that says why, naming the rule and every reason; `rule` is the
+ * rule as L4 writes it, and `reasons` are the reasons it may refuse with.
+ */
+export type QueryPlanDecline = {
+  kind: 'declined'
+  error: string
+  rule: string
+  reasons: string[]
+}
+
+/**
  * Request type for computing the query plan (elicitation ordering)
  * for a visualized DECIDE function, given current boolean bindings.
+ * A rule that may refuse to answer is declined.
  */
 export const QueryPlanRequestType = makeL4RpcRequestType<
   QueryPlanRequestParams,
-  QueryPlanResponse
+  QueryPlanResponse | QueryPlanDecline
 >('l4/queryPlan')
 
 /****************************************

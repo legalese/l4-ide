@@ -1,0 +1,50 @@
+-- Rules that answer TRUE or FALSE with no IMPORT: one that may refuse
+-- through a definition in this file, one whose REFUSE is an operand of OR,
+-- and one that cannot refuse. Every assignment of a rule's inputs is a case.
+-- See boolean-rules.l4 for what an "agreement:" line says, and for `pad`.
+--
+-- agreement: settled may refuse with ["residence is not modelled"]
+-- agreement: settled {"adult": true, "applicant": true} => answers true
+-- agreement: settled {"adult": true, "applicant": false} => refuses "residence is not modelled"
+-- agreement: settled {"adult": false, "applicant": true} => answers false
+-- agreement: settled {"adult": false, "applicant": false} => answers false
+--
+-- agreement: eligible may refuse with ["residence abroad is not modelled"]
+-- agreement: eligible {"adult": true, "resident": true} => answers true
+-- agreement: eligible {"adult": true, "resident": false} => refuses "residence abroad is not modelled"
+-- agreement: eligible {"adult": false, "resident": true} => answers false
+-- agreement: eligible {"adult": false, "resident": false} => answers false
+--
+-- agreement: planned may refuse with []
+-- agreement: planned is planned from its inputs
+-- agreement: planned {"adult": true, "resident": true} => answers true
+-- agreement: planned {"adult": true, "resident": false} => answers false
+-- agreement: planned {"adult": false, "resident": true} => answers false
+-- agreement: planned {"adult": false, "resident": false} => answers false
+
+GIVEN person IS A BOOLEAN
+GIVETH A BOOLEAN
+`the person is resident` person MEANS
+    IF person THEN TRUE
+    ELSE REFUSE "residence is not modelled"
+
+@export whether the applicant is settled
+GIVEN adult IS A BOOLEAN
+      applicant IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE settled IF adult AND `the person is resident` applicant
+
+@export whether the applicant is eligible
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE eligible IF adult AND (resident OR REFUSE "residence abroad is not modelled")
+
+@export whether the applicant is planned
+GIVEN adult IS A BOOLEAN
+      resident IS A BOOLEAN
+      pad IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE planned IF adult AND resident
