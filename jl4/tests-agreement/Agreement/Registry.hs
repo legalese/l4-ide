@@ -25,6 +25,7 @@ module Agreement.Registry
   , serviceRouteTable
   , doorsOf
   , allSurfaces
+  , helpVerbs
   ) where
 
 import Control.Exception (IOException, try)
@@ -252,9 +253,15 @@ executableTable =
 l4Verbs :: FilePath -> IO (Either T.Text [T.Text])
 l4Verbs l4 = do
   (_, out, err) <- runIn "." l4 ["--help"] ""
-  let after = drop 1 (dropWhile (/= "Available commands:") (T.lines (out <> err)))
-      verbs = [v | l <- after, Just rest <- [T.stripPrefix "  " l], let v = T.takeWhile (not . Char.isSpace) rest, not (T.null v)]
-  pure (if null verbs then Left ("no commands in l4 --help: " <> out <> err) else Right (nub verbs))
+  let verbs = helpVerbs (out <> err)
+  pure (if null verbs then Left ("no commands in l4 --help: " <> out <> err) else Right verbs)
+
+-- | The commands that l4 --help lists under "Available commands:". On
+-- Windows its lines end in CRLF, so the carriage returns are dropped first.
+helpVerbs :: T.Text -> [T.Text]
+helpVerbs help =
+  let after = drop 1 (dropWhile (/= "Available commands:") (T.lines (T.filter (/= '\r') help)))
+   in nub [v | l <- after, Just rest <- [T.stripPrefix "  " l], let v = T.takeWhile (not . Char.isSpace) rest, not (T.null v)]
 
 -- | The string literals of the guards of processInput (the lines that start
 -- with "|" at the indentation of its first guard), each guard the part of

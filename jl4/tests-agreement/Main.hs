@@ -285,6 +285,10 @@ spec bins root helpers headerErrors preps = do
       let titles = map (.title) fams
       [t | fam <- fams, (_, Listed t) <- fam.table, t `notElem` titles] `shouldBe` []
 
+    it "reads the verbs of l4 --help whose lines end in CRLF, as on Windows" do
+      helpVerbs "Usage: l4 COMMAND\r\n\r\nAvailable commands:\r\n  run   Run a file\r\n  check   Check a file\r\n"
+        `shouldBe` ["run", "check"]
+
   -- The reference page for REFUSE says, in one table, what each surface
   -- shows for a refusal. Each surface's row is named in Agreement.Page.
   describe "the reference page for REFUSE" do
