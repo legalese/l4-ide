@@ -61,9 +61,9 @@ data CheckState =
     -- ^ This outcome stands for TWO OR MORE viable outcomes of the search that
     -- nothing after it can tell apart ('mergeAlike'), kept as one so that the
     -- rest of the check runs once instead of once per outcome. Everything
-    -- that counts viable outcomes counts it as two ('outcomeWeight'): 'prune'
-    -- and 'softprune'. It is never cleared, so an outcome derived from a
-    -- plural one is plural too.
+    -- that counts viable outcomes counts it as two ('outcomeWeight'): 'prune',
+    -- 'softprune' and 'forkWithLazyFallback'. It is never cleared, so an
+    -- outcome derived from a plural one is plural too.
     , bindLog :: ![Int]
     -- ^ The inference variables bound so far, latest first ('bindInfVar'), and
     -- how many ('bindLogLen'). The bindings an outcome made since an earlier
@@ -1023,6 +1023,16 @@ resolveTermFiltered preambleErr p viab n kont = do
 -- two, skip the fallback, and turn its 'AmbiguousTermError' into an
 -- 'InternalAmbiguityError'.
 --
+-- And the count is of the viable outcomes each one STANDS FOR
+-- ('outcomeWeight'): a plural outcome ('CheckState.plural', 'mergeAlike') is
+-- two viable outcomes run as one, and counts as two, as 'prune' and
+-- 'softprune' count it. Counting it as one makes the same mistake: one
+-- success where 'prune' sees two, and the fallback skipped. A function with
+-- two meanings called on a CONSIDER over a name with two meanings then lost
+-- the report that names the function ("multiple definitions for the
+-- identifier f"; @WarningViableForkSpec@). legalese/l4-ide#683 on unstable
+-- counts the same way.
+--
 -- CAVEAT (the @preambleErr@ flag): the skip is byte-invisible ONLY when no
 -- Error-severity diagnostic was emitted for this node before the fork. This
 -- function counts on its LOCAL outcomes — @runCheck@ from the state at the
@@ -1049,9 +1059,9 @@ forkWithLazyFallback preambleErr cands fallback kont =
     let
       ks = runCheck (choose cands >>= kont) e s
     in
-      case filter (viableCandidate . fst) ks of
-        [_] | not preambleErr -> ks
-        _                     -> ks ++ runCheck (fallback >>= kont) e s
+      case sum (map outcomeWeight ks) of
+        1 | not preambleErr -> ks
+        _                   -> ks ++ runCheck (fallback >>= kont) e s
 
 resolveTerm :: Name -> Check (Resolved, Type' Resolved)
 resolveTerm = resolveTerm' (const True)

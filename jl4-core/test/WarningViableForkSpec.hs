@@ -36,7 +36,7 @@ import L4.TypeCheck.With (With)
 import L4.TypeCheck.Types
   ( Check, CheckError (..), CheckState (plural), CheckErrorWithContext (..)
   , CheckWarning (..)
-  , addError, addWarning, bindInfVar, choose, fresh, orElse, outcomeWeight, prune
+  , addError, addWarning, bindInfVar, choose, forkWithLazyFallback, fresh, orElse, outcomeWeight, prune
   , runCheck, softprune, softpruneAlike, viableCandidate
   )
 
@@ -135,6 +135,13 @@ spec = describe "A name with two meanings" $ do
           viableCandidate w `shouldBe` False
           show (fst (runWith w)) `shouldContain` "InternalAmbiguityError"
         other -> expectationFailure ("expected one outcome, got " <> show (length other))
+
+    it "counts as two for the fork, which then keeps its fallback" $ do
+      -- One success keeps no fallback; a plural one is two
+      -- ('forkWithLazyFallback', which main has from the port of #169).
+      let fallback = addError InternalAmbiguityError >> pure (0 :: Int)
+      length (outcomesOf (forkWithLazyFallback False [pure (1 :: Int)] fallback pure)) `shouldBe` 1
+      length (outcomesOf (forkWithLazyFallback False [softpruneAlike valueKey (choose [pure 1, warned >> pure 1, failed])] fallback pure)) `shouldBe` 3
 
     it "is made of outcomes that bound the same variable the same way" $ do
       let bound a b = do
@@ -277,6 +284,17 @@ spec = describe "A name with two meanings" $ do
           surfaced m = map errorsOf (outcomesOf (prune m))
       surfaced (softpruneAlike valueKey withFailure) `shouldBe` surfaced withFailure
 
+  describe "a name with two meanings in the argument of a name with two meanings" $ do
+    -- The CONSIDER over @thing@ is merged into one plural outcome, and it is
+    -- the only viable outcome of the call of @f@ ('forkWithLazyFallback').
+    -- Read as one success, the fork drops its fallback, and with it the
+    -- report that names @f@; read as the two it stands for, the report is
+    -- what it was before the merge.
+    forM_ meanings \ (label, m) -> describe label do
+      it "is reported as it was, with the fallback of the call kept" $ do
+        (kinds, _) <- checkedWithin 1 (forkArgSource m)
+        sort kinds `shouldBe` sort (forkArgKinds m)
+
   describe "a name with two meanings in a group of clauses" $ do
     -- The CONSIDER a clause group compiles to is checked under 'quietly',
     -- 'speculatively' and 'settleOneClause'; an ambiguous name in a clause
@@ -373,6 +391,30 @@ expectedKinds :: Meanings -> Int -> [Text]
 expectedKinds m k = concat (replicate k (warning <> ["ambiguous thing"]))
   where
     warning = if m == BothClean then [] else ["missing warning"]
+
+-- | @thing@ as in 'forkSource', and @f@ defined at NUMBER and at STRING,
+-- called on one CONSIDER over @thing@.
+forkArgSource :: Meanings -> Text
+forkArgSource m =
+  Text.unlines $
+    forkHeader m
+      <> [ "GIVEN n IS A NUMBER"
+         , "GIVETH A NUMBER"
+         , "DECIDE f n IS n"
+         , ""
+         , "GIVEN s IS A STRING"
+         , "GIVETH A NUMBER"
+         , "DECIDE f s IS 0"
+         , ""
+         , "GIVETH A NUMBER"
+         , "DECIDE score IS f " <> arm m 1
+         ]
+
+-- | What 'forkArgSource' is reported with, as main reports it without the
+-- merge (the port of #169 alone, d4102165d).
+forkArgKinds :: Meanings -> [Text]
+forkArgKinds m =
+  ["ambiguous f"] <> (if m == BothClean then [] else ["missing warning"]) <> ["ambiguous thing"]
 
 -- | @thing@ as in 'forkSource', and a group of clauses whose second clause is
 -- never used, with the CONSIDER over @thing@ in its body.
