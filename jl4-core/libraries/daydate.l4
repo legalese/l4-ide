@@ -117,6 +117,7 @@ GIVEN year  IS A NUMBER
       month IS A NUMBER
       day   IS A NUMBER
 GIVETH A DATE
+@nlg the date %year%-%month%-%day%, if there is one
 `YMD` AKA `Year month day` MEANS
     IF      month AT LEAST 1
         AND month AT MOST 12
