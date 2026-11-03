@@ -197,6 +197,8 @@ A first clause that gives an input a new name is read through, and both limits a
 A `CONSIDER` you write yourself is drawn as you wrote it.
 A rule that answers something other than yes or no, such as a number, is not drawn at all, however it is written, and L4 says that first.
 
+A rule that may refuse to answer has no query plan, whatever it answers: asked for the plan of such a rule, a number included, the planner declines it with the reasons the rule may refuse with, rather than say the rule is not drawn ([REFUSE: the query plan](../control-flow/REFUSE.md#the-query-plan)).
+
 ## Related pages
 
 - [GIVEN and GIVETH](GIVEN.md): inputs and result type

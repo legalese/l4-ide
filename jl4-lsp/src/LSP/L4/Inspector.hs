@@ -28,6 +28,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import qualified L4.EvaluateLazy as EL
+import L4.Diagnostic (evalResultSuccess)
 import qualified L4.Evaluate.ValueLazy as Val
 
 ------------------------------------------------------
@@ -142,16 +143,16 @@ evalDirectiveToResult fields dirType rng (EL.MkEvalDirectiveResult _range res mt
   DirectiveResult
     { directiveType = dirType
     , prettyText = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult _range res mtrace)
-    , success = case res of
-        EL.Assertion (Right b) -> Just b
-        EL.Assertion (Left _)  -> Just False
-        EL.Reduction (Right _) -> Just True
-        EL.Reduction (Left _)  -> Just False
+    , success = evalResultSuccess res
     , structuredValue = case res of
-        EL.Assertion (Right b) -> Just (Aeson.toJSON b)
-        EL.Assertion (Left _)  -> Nothing
-        EL.Reduction (Left _) -> Nothing
-        EL.Reduction (Right nf) -> Just (nfToJson nf)
+        EL.Assertion EL.Holds              -> Just (Aeson.toJSON True)
+        EL.Assertion EL.Fails              -> Just (Aeson.toJSON False)
+        EL.Assertion (EL.FailsBecause _)   -> Just (Aeson.toJSON False)
+        EL.Assertion (EL.Refused _)        -> Nothing
+        EL.Assertion (EL.Errored _)        -> Nothing
+        EL.Reduction (EL.ReducedErrored _) -> Nothing
+        EL.Reduction (EL.ReducedRefused _) -> Nothing
+        EL.Reduction (EL.Reduced nf)       -> Just (nfToJson nf)
     , range = rng
     }
 
@@ -276,11 +277,7 @@ evalDirectiveToUpdateItem fields getLines (EL.MkEvalDirectiveResult (Just rng@(M
   Just DirectiveUpdateItem
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
     , prettyText  = EL.prettyEvalDirectiveResultWithFields fields (EL.MkEvalDirectiveResult (Just rng) res mtrace)
-    , success     = case res of
-        EL.Assertion (Right b) -> Just b
-        EL.Assertion (Left _)  -> Just False
-        EL.Reduction (Right _) -> Just True
-        EL.Reduction (Left _)  -> Just False
+    , success     = evalResultSuccess res
     , body        = getLines startLine endLine
     }
 evalDirectiveToUpdateItem _ _ _ = Nothing

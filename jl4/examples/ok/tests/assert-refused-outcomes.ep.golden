@@ -1,0 +1,50 @@
+-- #ASSERT REFUSED holds only when the expression REFUSES, and, when a BECAUSE
+-- clause is given, only when the reason is the one it names. Each other way it
+-- can come out is reported distinctly:
+--
+--   an answer where a refusal was expected      -> assertion failed
+--   a refusal for a different reason            -> assertion failed
+--   an expression that raises an error          -> assertion could not be evaluated
+--
+-- An error is not a refusal: treating the two alike would destroy exactly the
+-- distinction the directive exists to test.
+
+IMPORT prelude
+
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "this case is not modelled"
+
+GIVETH A NUMBER
+`modelled` MEANS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`unmodelled when negative` n MEANS
+    IF n AT LEAST 0
+    THEN n
+    ELSE REFUSE "negative amounts are not modelled"
+
+-- Held: a refusal, with and without the reason pinned.
+#ASSERT REFUSED `not modelled`
+#ASSERT REFUSED `not modelled` BECAUSE "this case is not modelled"
+#ASSERT REFUSED `unmodelled when negative` (0 MINUS 1) BECAUSE "negative amounts are not modelled"
+
+-- Failed: the expression answers.
+#ASSERT REFUSED `modelled`
+#ASSERT REFUSED `unmodelled when negative` 3
+
+-- Failed: a refusal, but for another reason.
+#ASSERT REFUSED `not modelled` BECAUSE "some other reason"
+
+-- Not decided: the expression raises an error, with and without a BECAUSE.
+#ASSERT REFUSED (1 DIVIDED BY 0)
+#ASSERT REFUSED (1 DIVIDED BY 0) BECAUSE "this case is not modelled"
+
+-- The asserted expression may have any type, because a refusal is at any type.
+#ASSERT REFUSED (`not modelled` EQUALS 1)
+#ASSERT REFUSED (LIST `not modelled`, 2)
+
+-- Failed: a BECAUSE on a line of its own, indented further than the #ASSERT,
+-- is the directive's reason, and it is not the refusal's.
+#ASSERT REFUSED `not modelled`
+  BECAUSE "some other reason"

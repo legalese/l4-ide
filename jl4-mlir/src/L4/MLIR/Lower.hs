@@ -1838,6 +1838,14 @@ lowerExprCases expr expectedTy = case expr of
   -- state without re-instantiating wasm.)
   Regulative{} -> emitVal $ \vid -> arithConstantFloat vid 0.0
   Breach{}     -> emitVal $ \vid -> arithConstantFloat vid 0.0
+  -- REFUSE has no WASM image: the compiled module has no way to stop with a
+  -- reason. This emits a placeholder (0.0) that keeps the IR well-formed and
+  -- records nothing. 'L4.MLIR.Schema.buildExport' marks @supported:false@
+  -- every export from which evaluation may reach a REFUSE, through any
+  -- function it calls, so a request to such an export goes to the fallback
+  -- evaluator, which raises the refusal, and a supported export never reaches
+  -- this placeholder.
+  Refuse{}     -> emitVal $ \vid -> arithConstantFloat vid 0.0
   -- Event / IO constructs still aren't supported — they don't have a
   -- runtime interpretation in the schema yet.
   Event{}      -> markUnsupported "EVENT construct not supported by the WASM backend"
@@ -2529,6 +2537,8 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
         in Set.unions (self : map (go bound) args)
       AppNamed _ _ named _ ->
         Set.unions [go bound e | MkNamedExpr _ _ e <- named]
+      -- The REFUSE message is a literal; it binds and mentions nothing.
+      Refuse{} -> Set.empty
       And _ a b        -> Set.union (go bound a) (go bound b)
       Or _ a b         -> Set.union (go bound a) (go bound b)
       RAnd _ a b       -> Set.union (go bound a) (go bound b)

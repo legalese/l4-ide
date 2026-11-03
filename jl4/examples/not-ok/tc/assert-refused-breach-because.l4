@@ -1,0 +1,9 @@
+-- A BREACH takes a BECAUSE of its own, so in an `#ASSERT REFUSED` it can take
+-- the BECAUSE written for the directive, which would then name no reason and
+-- hold for a refusal with any reason: here the refusal is "wrong", and "right"
+-- goes to the BREACH. So a BECAUSE in the expression and outside parentheses
+-- is a parse error, at that BECAUSE. Parentheses say which is meant:
+-- `(... BREACH BECAUSE "right")` gives the reason to the BREACH, and
+-- `(... BREACH) BECAUSE "right"` gives it to the directive.
+
+#ASSERT REFUSED IF TRUE THEN REFUSE "wrong" ELSE BREACH BECAUSE "right"
