@@ -514,8 +514,8 @@ buildArgPairs reverseMap isDeontic arguments = case arguments of
   _ -> []
 
 -- | How an MCP evaluation came out: the encoded answer; the encoded
--- refusal, the same JSON an evaluation request's 422 carries; or the message
--- of an error.
+-- refusal, the same JSON an evaluation request's 200 carries for it; or the
+-- message of an error.
 data ToolOutcome
   = ToolAnswered Text
   | ToolRefused Text

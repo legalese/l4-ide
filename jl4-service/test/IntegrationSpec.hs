@@ -2193,6 +2193,31 @@ spec = describe "integration" do
         lookupKey "openapi" body `shouldBe` Just (Aeson.String "3.0.0")
         lookupKey "paths" body `shouldSatisfy` Maybe.isJust
 
+    it "says that an evaluation's 200 may be a refusal, with a reason and no result" do
+      withServiceFromSources "openapi-refused" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        resp <- httpGet mgr (baseUrl <> "/deployments/openapi-refused/openapi.json")
+        statusCode' resp `shouldBe` 200
+        let schemas = case lookupKey "components" (decodeObject (responseBody resp)) of
+              Just (Aeson.Object c) | Just (Aeson.Object ss) <- Aeson.KeyMap.lookup "schemas" c -> Just ss
+              _ -> Nothing
+            schema n = lookupKey n schemas
+            tagMapping = do
+              Aeson.Object r <- schema "EvaluationResponse"
+              Aeson.Object d <- Aeson.KeyMap.lookup "discriminator" r
+              Aeson.KeyMap.lookup "mapping" d
+        tagMapping `shouldBe` Just (Aeson.object
+          [ "SimpleResponse" Aeson..= ("#/components/schemas/EvaluationAnswer" :: Text)
+          , "TraceResponse" Aeson..= ("#/components/schemas/EvaluationAnswer" :: Text)
+          , "GraphVizResponse" Aeson..= ("#/components/schemas/EvaluationAnswer" :: Text)
+          , "Refused" Aeson..= ("#/components/schemas/EvaluationRefusal" :: Text)
+          ])
+        let refusalContents = do
+              Aeson.Object r <- schema "EvaluationRefusal"
+              Aeson.Object ps <- Aeson.KeyMap.lookup "properties" r
+              Aeson.Object c <- Aeson.KeyMap.lookup "contents" ps
+              Aeson.KeyMap.lookup "required" c
+        refusalContents `shouldBe` Just (Aeson.toJSON (["kind", "reason"] :: [Text]))
+
     it "returns OpenAPI 3.0 spec via org-wide /openapi.json" do
       withServiceFromSources "org-openapi" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         req <- parseRequest (baseUrl <> "/openapi.json")
