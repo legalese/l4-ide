@@ -23,6 +23,7 @@ module L4.Export (
   exportErrorSeverity,
   exportErrorCode,
   withoutRefused,
+  refusalsOf,
   prettyExportError,
   isExportedDecide,
 ) where
@@ -528,6 +529,17 @@ withoutRefused errs = filter \ef ->
   in getUnique name `Set.notMember` refused
  where
   refused = Set.fromList [getUnique (exportErrorFunction e) | e <- errs, exportErrorSeverity e == SError]
+
+-- | Why 'checkExports' refuses this exported rule, if it does.
+refusalsOf :: [ExportError] -> ExportedFunction -> [ExportError]
+refusalsOf errs ef =
+  [ e
+  | e <- errs
+  , exportErrorSeverity e == SError
+  , getUnique (exportErrorFunction e) == getUnique name
+  ]
+ where
+  MkDecide _ _ (MkAppForm _ name _ _) _ = ef.exportDecide
 
 -- | Collect every DECIDE whose description carries the @export flag.
 collectExportedDecides :: Module Resolved -> [Decide Resolved]

@@ -980,6 +980,45 @@ spec bin = do
             code `shouldBe` ExitFailure 1
             length serr `shouldSatisfy` (> 65536)
 
+  describe "jl4-schema and what the export check refuses" $ do
+    let withExports act = withSystemTempDirectory "l4-schema-refused" \dir -> do
+          writeFile (dir </> "exports.l4") $ unlines
+            [ "@export default A rule that cannot be published"
+            , "GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "`apply the test` MEANS test 1"
+            , ""
+            , "@export A rule that can"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`same number` MEANS n"
+            ]
+          act (dir </> "exports.l4")
+        schemaGenerator =
+          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+
+    it "writes no schema for an export the check refuses, and says why" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code sout serr <- runL4 schema [file]
+        code `shouldBe` ExitFailure 1
+        sout `shouldBe` ""
+        serr `shouldSatisfy` ("its input `test` is a function" `isInfixOf`)
+
+    it "refuses it by name too" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code _ serr <- runL4 schema [file, "--function", "apply the test"]
+        code `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` ("its input `test` is a function" `isInfixOf`)
+
+    it "writes the schema of another export of that file" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code sout _ <- runL4 schema [file, "--function", "same number"]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"n\"" `isInfixOf`)
+
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
       it ("fails " <> cmd <> " on a 3-module import ring") $

@@ -7,9 +7,9 @@
 -- input, an EVENT result, a DEONTIC result, a function input), one warning for
 -- the GIVEN with no written type, and nothing for `how much is owed` or for
 -- `who acts first`, which builds an EVENT inside its body and does not name one.
--- `how much is owed` comes first because it is the default export, the one the
--- schema golden is about: a default export that is refused still gets a schema
--- from the schema generator, which is not told about the check.
+-- `how much is owed` comes first because it is the export the schema golden is
+-- about: the rule that can be published. jl4-schema refuses to write a schema for
+-- the others, which l4-cli-test pins.
 DECLARE Party IS ONE OF alice, bob
 DECLARE Act IS ONE OF ping, pong
 

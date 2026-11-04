@@ -89,7 +89,8 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 ## Limits
 
 - The schema is still produced by `typeToParameter` (`jl4-core/src/L4/FunctionSchema.hs`), which falls back to `object` for a type it has no declaration for; it does not render a `JsonShape`.
-  So `jsonShape` and the schema can disagree for a type that `typeToParameter` handles differently, and `jl4-schema` still writes a schema for a default export that the check refuses.
+  So `jsonShape` and the schema can disagree for a type that `typeToParameter` handles differently.
+  `jl4-schema` does refuse an export that the check refuses (`refusalsOf`, `jl4/app/Schema.hs`): it prints the reason on stderr, writes no schema and exits 1.
   Making the schema render the shape, and the service's decoder follow it, is not done.
 - A constructor that carries fields has the shape of an enumeration of the constructors' names, which is what the schema publishes today, and is not refused.
   The review asked for it to be decided: a tagged shape or a refusal.
