@@ -292,6 +292,10 @@ main = do
     , test "an imported definition with no REFUSE stays supported" $
         testExportMark Nothing [("fees", T.unlines oldFeeIsFifty)]
           ("IMPORT fees" : "" : feeInYear [] "`the old fee`")
+    , test "an export that calls YMD from the daydate library is unsupported" $
+        testExportMark refuseMark [] (dateExport "YMD year month day")
+    , test "the same export with its date built by Date stays supported" $
+        testExportMark Nothing [] (dateExport "Date day month year")
     , test "REFUSE two imports away, through a module imported twice, is unsupported" $
         testExportMark refuseMark importDiamond
           ("IMPORT older" : "IMPORT newer" : "" : feeInYear [] "`the old fee in year` y")
@@ -699,6 +703,22 @@ feeInYear defs before2000 =
   , "    IF y >= 2000"
   , "    THEN 100"
   , "    ELSE " <> before2000
+  ]
+
+-- | A module that imports @daydate@, from the embedded libraries, and exports
+-- a rule that gives the date built as given from its three inputs. @YMD@
+-- refuses a date that does not exist, and the export reaches that refusal
+-- through the import; @Date@ rolls the date forward and cannot refuse.
+dateExport :: T.Text -> [T.Text]
+dateExport built =
+  [ "IMPORT daydate"
+  , ""
+  , "@export The date a payment is due"
+  , "GIVEN year IS A NUMBER"
+  , "      month IS A NUMBER"
+  , "      day IS A NUMBER"
+  , "GIVETH A DATE"
+  , "`due` year month day MEANS " <> built
   ]
 
 -- | A named refusal, one definition per reason.
