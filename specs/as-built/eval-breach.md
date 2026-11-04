@@ -102,15 +102,15 @@ Of the 11 that do not, 3 are in this repository: `legal/promissory-note.l4` and 
 - A both-breached `ROR` names only one party until #411 reaches `main`. `qda-cases-buyer.l4` [81], `BREACH BY the transferee ... OR BREACH BY another party to the transaction`, now says only `another party to the transaction`.
 - A branching rule can cost far more, here and on `unstable` alike, because a late event now walks every layer it is past. These are the rule's own branches, at events 10 apart, with `WITHIN 100` both are as fast as `main`:
 
-  | Rule                                                        | `main` | this PR         | `unstable`      |
-  | ----------------------------------------------------------- | ------ | --------------- | --------------- |
-  | `WITHIN 1 HENCE (x RAND x) LEST x`, 14 events               | 0.02 s | 1.3 s           | 18 s            |
-  | the same, 18 events                                         | 0.04 s | 21 s, 18 MB     | past 60 s       |
-  | `WITHIN 7 HENCE (x RAND x) LEST x`, 14 events               | 0.03 s | 1.3 s           | 18 s            |
-  | the same, 18 events                                         | 0.05 s | 20 s, 18 MB     | past 60 s       |
-  | `WITHIN 1 HENCE (x RAND x) LEST (x RAND x)`, 2 events       | 0.02 s | past 60 s       | past 60 s       |
-  | `MAY ... WITHIN 1 HENCE (x ROR x) LEST (x ROR x)`, 4 events | 0.02 s | past 60 s       | past 60 s       |
-  | `WITHIN 0 - 1 LEST (x RAND x)`, 9 events                    | 0.07 s | refused at once | refused at once |
+  | Rule                                                        | `main` | this PR         | `unstable`                                            |
+  | ----------------------------------------------------------- | ------ | --------------- | ----------------------------------------------------- |
+  | `WITHIN 1 HENCE (x RAND x) LEST x`, 14 events               | 0.02 s | 1.3 s           | 18 s                                                  |
+  | the same, 18 events                                         | 0.04 s | 21 s, 18 MB     | past 60 s at 16 events (an earlier round); 18 not run |
+  | `WITHIN 7 HENCE (x RAND x) LEST x`, 14 events               | 0.03 s | 1.3 s           | 18 s                                                  |
+  | the same, 18 events                                         | 0.05 s | 20 s, 18 MB     | not run at 18                                         |
+  | `WITHIN 1 HENCE (x RAND x) LEST (x RAND x)`, 2 events       | 0.02 s | past 60 s       | past 60 s                                             |
+  | `MAY ... WITHIN 1 HENCE (x ROR x) LEST (x ROR x)`, 4 events | 0.02 s | past 60 s       | past 60 s                                             |
+  | `WITHIN 0 - 1 LEST (x RAND x)`, 9 events                    | 0.07 s | refused at once | refused at once                                       |
 
   A `LEST (x RAND x)` doubles at each layer the event walks, so its cost grows with how many windows fit between two events, not only with how many events there are.
 
