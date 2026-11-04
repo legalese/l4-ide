@@ -3597,6 +3597,13 @@ spec bin = do
       Output code _ _ <- runL4 bin ["check", libraryAliasTwoTypes]
       code `shouldBe` ExitSuccess
 
+    it "looks up what singleton and fromList build" $ do
+      Output code sout _ <- runL4 bin ["run", libraryAliasTwoTypes]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("JUST OF \"a\"" `isInfixOf`)
+      sout `shouldSatisfy` ("JUST OF 2" `isInfixOf`)
+      length (filter ("JUST OF 250" `isInfixOf`) (lines sout)) `shouldSatisfy` (>= 2)
+
     it "renders a deeply nested call without its time doubling at each level" $ do
       finished <- timeout 60000000 (runL4 bin ["render", "--format", "text", renderDeepNesting])
       case finished of

@@ -825,6 +825,7 @@ GIVEN  a IS A TYPE
        b IS A TYPE
        k IS AN a
        v IS A  b 
+GIVETH A Dictionary a b
 @nlg a dictionary mapping %k% to %v%
 singleToDict MEANS  Dictionary WITH contents IS LIST (PAIR OF k, v)
 
@@ -837,12 +838,14 @@ pairToDict MEANS  Dictionary WITH contents IS LIST pair
 GIVEN k IS A TYPE
       v IS A TYPE
       pairs IS A LIST OF PAIR OF k, v
+GIVETH A Dictionary k v
 @nlg a dictionary holding the entries %pairs%
 listToDict MEANS  Dictionary WITH contents IS pairs
 
 GIVEN k IS A TYPE
       v IS A TYPE
       pairs IS A LIST OF PAIR OF k, v
+GIVETH A Dictionary k v
 @nlg a dictionary holding the entries %pairs%
 fromList MEANS listToDict pairs
 
@@ -858,6 +861,7 @@ GIVEN k IS A TYPE
       v IS A TYPE
       key IS A k
       value IS A v
+GIVETH A Dictionary k v
 @nlg a one-entry dictionary mapping %key% to %value%
 singleton MEANS singleToDict key value
 
