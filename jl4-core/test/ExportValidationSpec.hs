@@ -15,7 +15,7 @@ import System.Timeout (timeout)
 import L4.API (l4Check)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
-import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, getExportedFunctions, enrichReturnTypes)
+import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, getExportedFunctions, enrichReturnTypes, prettyExportError)
 import L4.Export.Shape (JsonField (..), JsonShape (..), Unsendable (..), jsonShape, moduleDeclares, shapeEnvFromDeclares, unsendableWhat)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
@@ -619,6 +619,87 @@ spec = do
             ]
       r <- problemsWithin 30 src
       r `shouldBe` Right []
+
+  describe "a generic rule" $ do
+    it "says of its input that is a type, and of what uses it, that the rule is generic" $ do
+      let src = Text.unlines
+            [ "@export Pick"
+            , "GIVEN a IS A TYPE"
+            , "      `the default` IS AN a"
+            , "GIVETH AN a"
+            , "`pick the default` MEANS `the default`"
+            ]
+      problems src `shouldBe` Right
+        [ (Just 1, "pick the default", Just "a", "a type, so the rule is generic")
+        , (Just 1, "pick the default", Just "the default", "of the type variable `a`, so the rule is generic")
+        , (Just 1, "pick the default", Nothing, "of the type variable `a`, so the rule is generic")
+        ]
+
+    it "says so of a result it inferred, which is not a function" $ do
+      let src = Text.unlines
+            [ "@export Same"
+            , "GIVEN a IS A TYPE"
+            , "      x IS AN a"
+            , "`same back` MEANS x"
+            ]
+      problems src `shouldBe` Right
+        [ (Just 1, "same back", Just "a", "a type, so the rule is generic")
+        , (Just 1, "same back", Just "x", "of the type variable `a`, so the rule is generic")
+        , (Just 1, "same back", Nothing, "of the type variable `a`, so the rule is generic")
+        ]
+
+    it "says so through a LIST OF and a record" $ do
+      let src = Text.unlines
+            [ "DECLARE Box b HAS v IS A b"
+            , ""
+            , "@export Count"
+            , "GIVEN a IS A TYPE"
+            , "      xs IS A LIST OF a"
+            , "      y IS A Box OF a"
+            , "GIVETH A NUMBER"
+            , "`count` MEANS 0"
+            ]
+      problems src `shouldBe` Right
+        [ (Just 3, "count", Just "a", "a type, so the rule is generic")
+        , (Just 3, "count", Just "xs", "of the type variable `a`, so the rule is generic")
+        , (Just 3, "count", Just "y", "of a record type Box whose field v is of the type variable `a`, so the rule is generic")
+        ]
+
+    it "says so of an ASSUME that holds for all types" $ do
+      let src = Text.unlines
+            [ "ASSUME anything IS FOR ALL a AN a"
+            , ""
+            , "@export Read"
+            , "GIVETH A NUMBER"
+            , "`read it` MEANS 1 + anything"
+            ]
+      problems src `shouldBe` Right
+        [(Just 3, "read it", Just "anything", "of the type variable `a`, so the rule is generic")]
+
+    it "says so of an input with no written type that the result comes from" $ do
+      let src = Text.unlines
+            [ "@export Same"
+            , "GIVEN y"
+            , "`same again` MEANS y"
+            ]
+      problems src `shouldBe` Right
+        [ (Just 1, "same again", Just "y", "no written type")
+        , (Just 1, "same again", Nothing, "of the type variable `y`, so the rule is generic")
+        ]
+
+    it "gives each of these messages one line on what to do, and does not list the types to use" $ do
+      let src = Text.unlines
+            [ "@export Pick"
+            , "GIVEN a IS A TYPE"
+            , "      `the default` IS AN a"
+            , "GIVETH AN a"
+            , "`pick the default` MEANS `the default`"
+            ]
+      case exportProblems src of
+        Right errs -> do
+          length errs `shouldBe` 3
+          map (drop 1 . prettyExportError) errs `shouldSatisfy` all (== ["Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."])
+        Left e -> expectationFailure (show e)
 
   describe "l4_check, which the web editor reads" $ do
     let refused what result = Text.unlines $

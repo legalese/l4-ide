@@ -167,10 +167,15 @@ inferredReturnType :: EntityInfo -> Resolved -> Maybe (Type' Resolved)
 inferredReturnType entInfo name =
   case Map.lookup (getUnique name) entInfo of
     Just (_, KnownTerm ty _) ->
-      Just $ case ty of
-        Fun _ _ ret -> ret
-        other       -> other
+      Just (resultOf ty)
     _ -> Nothing
+ where
+  -- A generic definition's type is quantified over its type variables, and they
+  -- stay in scope for its result.
+  resultOf = \case
+    Forall ann vars inner -> Forall ann vars (resultOf inner)
+    Fun _ _ ret -> ret
+    other -> other
 
 buildExportedFunction
   :: TypeDescMap
@@ -478,6 +483,7 @@ exportErrorCode = \case
       ExportResult -> "check/export-function-result"
     UDeontic -> "check/export-deontic-type"
     UPolymorphic _ -> "check/export-unsupported-type"
+    UTypeAsInput -> "check/export-unsupported-type"
     UUnknownType _ -> "check/export-unsupported-type"
 
 prettyExportError :: ExportError -> [Text]
@@ -578,4 +584,5 @@ checkOneExport env assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ n
     ]
  where
   exportAt = getAnno decide ^. annDesc >>= rangeOf
-  unsendable site ty = either (\why -> [ExportUnsendable exportAt fnName site why]) (const []) (jsonShape env ty)
+  unsendable site ty = either (\why -> [ExportUnsendable exportAt fnName site why]) (const []) (jsonShape envOfRule ty)
+  envOfRule = env{typeVariables = Set.fromList [getUnique n | MkOptionallyTypedName _ n (Just Type{}) <- names]}

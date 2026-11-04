@@ -28,6 +28,7 @@
 -- > EVENT party action             no shape yet: UEvent
 -- > FUNCTION FROM a TO b           no shape yet: UFunction
 -- > a type variable                no shape: UPolymorphic
+-- > TYPE, in GIVEN a IS A TYPE      no shape: UTypeAsInput
 -- > EITHER a b                     JEither (shape a) (shape b) (the service writes it as it does today; the
 -- >                                                          form is open)
 -- > any built-in type not listed above, or a type not found
@@ -65,7 +66,7 @@ import L4.TypeCheck.Environment (
   stringUnique,
   timeUnique,
  )
-import L4.TypeCheck.Types (CheckEntity (..), EntityInfo)
+import L4.TypeCheck.Types (EntityInfo)
 
 -- | The form a value of a type has in JSON.
 data JsonShape
@@ -99,8 +100,10 @@ data Unsendable
   = UFunction
   | UDeontic
   | UEvent
-  | -- | A type variable, by name.
+  | -- | A type variable, by name: the rule is generic.
     UPolymorphic Text
+  | -- | An input that is itself a type (@GIVEN a IS A TYPE@): the rule is generic.
+    UTypeAsInput
   | -- | A type that is not known, or a built-in type that has no shape yet, by name.
     UUnknownType Text
   | -- | The record, the field, and why the field's type has no shape.
@@ -109,11 +112,16 @@ data Unsendable
   deriving anyclass (NFData)
 
 -- | What 'jsonShape' looks types up in: the declarations of the module and of
--- everything it imports, by the unique of the type they declare, and the type
--- checker's own information, which says what a name that is not declared is.
+-- everything it imports, by the unique of the type they declare. The type
+-- checker's own information goes with them, for the result of a definition with
+-- no GIVETH.
 data ShapeEnv = MkShapeEnv
   { declared :: !(Map.Map Unique (Declare Resolved))
   , entities :: !EntityInfo
+  , typeVariables :: !(Set.Set Unique)
+  -- ^ The type variables in scope: the inputs of a generic rule that are types
+  -- (@GIVEN a IS A TYPE@). The type checker keeps these in its local scope and
+  -- not in 'entities'.
   }
 
 -- | Every DECLARE of a module, in sections too. Not the ones it imports.
@@ -131,6 +139,7 @@ shapeEnvFromDeclares decls ei =
   MkShapeEnv
     { declared = Map.fromList [(getUnique name, d) | d@(MkDeclare _ _ (MkAppForm _ name _ _) _) <- decls]
     , entities = ei
+    , typeVariables = Set.empty
     }
 
 -- | The shape of a type, or why it has none.
@@ -175,7 +184,7 @@ typeHead env name args
       if length params == length args
         then Declared (nameText declared) (zip (map getUnique params) args) body
         else HasNoShape (UUnknownType (nameText declared))
-  | Just (_, KnownTypeVariable) <- Map.lookup u env.entities = HasNoShape (UPolymorphic text)
+  | u `Set.member` env.typeVariables = HasNoShape (UPolymorphic text)
   | otherwise = HasNoShape (UUnknownType text)
  where
   u = getUnique name
@@ -216,9 +225,11 @@ firstUnsendable env ty =
   intern :: Map.Map Unique TypeNode -> Type' Resolved -> ExceptT Unsendable (State Walk) TypeNode
   intern vars = \case
     Fun{} -> noShape UFunction
-    Type{} -> noShape (UUnknownType "TYPE")
-    InfVar _ n _ -> noShape (UUnknownType (rawNameToText n))
-    Forall _ _ inner -> intern vars inner
+    Type{} -> noShape UTypeAsInput
+    InfVar _ n _ -> noShape (UPolymorphic (rawNameToText n))
+    Forall _ bound inner -> do
+      boundNodes <- traverse (noShape . UPolymorphic . nameText) bound
+      intern (Map.union (Map.fromList (zip (map getUnique bound) boundNodes)) vars) inner
     TyApp _ name args
       | [] <- args, Just bound <- Map.lookup (getUnique name) vars -> pure bound
       | otherwise -> do
@@ -344,7 +355,8 @@ unsendableWhat = \case
   UFunction -> "a function"
   UDeontic -> "a DEONTIC, a contract rule"
   UEvent -> "an EVENT"
-  UPolymorphic v -> "of the type variable " <> v
+  UPolymorphic v -> "of the type variable `" <> v <> "`, so the rule is generic"
+  UTypeAsInput -> "a type, so the rule is generic"
   UUnknownType t -> "of the type " <> t
   UInField r f why -> "of a record type " <> r <> " whose field " <> f <> " is " <> unsendableWhat why
 
@@ -354,6 +366,9 @@ unsendableHint = \case
   UFunction -> "Pass the values the function would work on, and apply the function inside the rule."
   UDeontic -> "A contract can't be an @export input or result yet. Remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE."
   UEvent -> "Take the party, the action and the time as separate inputs, and build the event inside the rule."
-  UPolymorphic _ -> "Write the type the rule is used at in its GIVEN or GIVETH."
+  UPolymorphic _ -> genericHint
+  UTypeAsInput -> genericHint
   UUnknownType _ -> "Use a NUMBER, BOOLEAN, STRING, DATE, TIME, DATETIME, a LIST or MAYBE of those, or a record or enumeration of them."
   UInField _ _ why -> unsendableHint why
+ where
+  genericHint = "Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."
