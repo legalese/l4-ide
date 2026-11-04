@@ -7,31 +7,51 @@ The work came from `unstable`; this page describes only what `main` has.
 
 Source: PR #53 (`ed09c65ea`, landed on `unstable` through batch #77).
 The labels T7 and T8 in #53's comments and fixture name targets of a review log that is not on `main`, and are left out here.
+This PR goes beyond #53 in three places, each assumed, not ruled, and not on `unstable`: both schema generators decide from the resolved type, the trace split handles a force that raises before it pushes, and a trace that cannot be built says so.
 
 ## What it does
 
-- `SQRT` of a negative number, and an `EXPONENT` whose result is not a finite number, stop with an error instead of returning an enormous meaningless number.
-- A crash in trace post-processing degrades only the trace. The stack-overflow case that caused it no longer happens.
+- `SQRT` of a negative number, and an `EXPONENT` that overflows, has 0 to a negative power, or has a negative base with a fractional power, stop with an error that names which, instead of returning an enormous meaningless number.
+- `l4 trace` on an `#EVALTRACE` that overflows the stack, or on a definition that needs itself, gives a graph rooted at the call, instead of failing with `splitEvalTraceActions: internal error`.
+- If a trace still cannot be built, its result is a node saying `trace unavailable`, and `l4 trace` prints an error and exits 1.
 - A negative date serial with a fraction gives the right day.
-- `jl4-schema` writes builtin types as JSON types, instead of a `$ref` to a definition that does not exist, and no longer lists a `MAYBE` record field as required.
+- `jl4-schema` writes builtin types as JSON types, instead of a `$ref` to a definition that does not exist, and no longer lists a `MAYBE` record field as required. This holds for builtins only: see Limits.
+- A type named like a builtin, such as a record `Text` or an enum `Time`, is that type in both schema generators, declared here or imported.
 
-Measured with `main`'s `l4` and this PR's:
+Measured with `main`'s binaries and this PR's:
 
-| Input                                                  | `main`                                                                          | this PR                                         |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `#EVAL SQRT (-1)`                                      | a number more than a hundred digits long                                        | `SQRT expects input greater than or equal to 0` |
-| `#EVAL EXPONENT 0 (-1)`                                | a number more than a hundred digits long                                        | `EXPONENT produced a non-finite result (...)`   |
-| `#EVAL DATE_FROM_SERIAL (-0.5)`                        | `DATE OF 2, 1, 0`, the day of serial `0.5`                                      | `DATE OF 1, 1, 0`, the day of serial `-1`       |
-| `l4 trace` on an `#EVALTRACE` that overflows the stack | prints `splitEvalTraceActions: internal error`; killed at 180 s, still printing | exit 0 in 46 s, a graph whose root is `<error>` |
+| Input                                                 | `main`                                     | this PR                                                  |
+| ----------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------- |
+| `#EVAL SQRT (-1)`                                     | a number more than a hundred digits long   | `SQRT expects input greater than or equal to 0`          |
+| `#EVAL EXPONENT 0 (-1)`                               | a number more than a hundred digits long   | `EXPONENT of 0 to a negative power has no result`        |
+| `#EVAL EXPONENT (-1) 0.5`                             | a number more than a hundred digits long   | `EXPONENT of a negative number ... has no real result`   |
+| `#EVAL EXPONENT 10 309`, and `exp 710` from `math`    | a 309-digit number                         | `EXPONENT overflowed: the result is too large (...)`     |
+| `#EVAL DATE_FROM_SERIAL (-0.5)`                       | `DATE OF 2, 1, 0`, the day of serial `0.5` | `DATE OF 1, 1, 0`, the day of serial `-1`                |
+| service schema of `DECLARE Text HAS body IS A NUMBER` | `{"type":"string"}`                        | an object with `body`, which is what the service accepts |
+| service schema of an imported record `Date`           | `{"type":"string","format":"date"}`        | an object with its fields                                |
+| `jl4-schema` of an imported record `Text`             | a `$ref` to a definition not in the file   | the same `$ref`; see Limits                              |
+
+`l4 trace`, one `#EVALTRACE` per file, 180 s limit on `main` and 590 s here, on a machine running other builds:
+
+| Recursion                                 | `main`                                              | this PR                                                  |
+| ----------------------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
+| `IF n EQUALS 0 THEN 0 ELSE 1 + f (n + 1)` | prints the internal error; killed at 180 s, 10.1 GB | exit 0 in 17 s, 5.5 GB, 4,619 nodes, root `viaIf OF 1`   |
+| `CONSIDER n` with the same recursion      | prints the internal error; killed at 180 s, 11.0 GB | exit 0 in 22 s, 4.9 GB, 5,006 nodes, root `viaCase OF 1` |
+| `1 + loop (n + 1)`                        | prints the internal error; killed at 180 s, 7.8 GB  | exit 0 in 60 s, 3.2 GB, 10,001 nodes, root `loop OF 0`   |
+| `x MEANS x + 1`                           | prints the internal error; exit 1 at once           | exit 0 at once, one node, root `x`, `<error>`            |
+| `1 + rest WHERE rest MEANS f (n + 1)`     | prints the internal error; killed at 180 s, 8.9 GB  | not finished at 590 s; see Limits                        |
 
 ## Where it lives
 
 - `SQRT`: `jl4-core/src/L4/EvaluateLazy/Machine.hs:1962`. `EXPONENT`: `Machine.hs:2036`.
-- `pushFrame` records the trace `Push` only after the stack-depth check, so a `StackOverflow` leaves no dangling `Push` (`Machine.hs:286`).
-- `safePostprocessTrace` catches `ErrorCall` only, so asynchronous exceptions still propagate, and substitutes `tracePostprocessFailed` (`jl4-core/src/L4/EvaluateLazy.hs:222`, used at `:151`). Its root is then overwritten by `rootCarriesOutcome` when the directive raised, so the fallback's text shows only for a directive that answered.
-- `serialToUTCTime` splits with `floor` (`Machine.hs:2849`). `floor` and `truncate` agree on a non-negative serial, so no such input changes.
-- `typeToJsonSchema` matches the lower-cased builtin name, plus the spellings `int`, `float`, `double`, `text`, `bool`, `time`, `listof` and `optional`, unless the module itself declares a type with that name (`jl4-core/src/L4/JsonSchema.hs:193`).
-  Without the exception, #53's list made `DECLARE Text HAS ...` a JSON string; `DECLARE Date HAS ...` was already a date on `main`, and is now the record it declares. `isMaybeOrOptionalType` lower-cases too (`JsonSchema.hs:332`).
+- `serialToUTCTime` splits with `floor` (`Machine.hs:2854`). `floor` and `truncate` agree on a non-negative serial, so no such input changes.
+- `pushFrame` records the trace `Push` only after the stack-depth check, so an overflow leaves no dangling `Push` (`Machine.hs:286`).
+- That left a second cause, measured by printing the error `safePostprocessTrace` caught on `IF` recursion. `splitEvalTraceActions` opens an address frame at each `SetRef` and closes it when the depth falls back past that frame, which assumes a `Push` follows. A force that raises first (an overflow at the update frame, or a blackhole) never pushes, so the depth never reaches the frame and the split ends in `error`, at depth -1 with the frame still open. The split now opens no frame for a `SetRef` followed directly by an exception (`jl4-core/src/L4/EvaluateLazy/Trace.hs:167`).
+- `safePostprocessTrace` catches `ErrorCall` only, so asynchronous exceptions still propagate, and substitutes `tracePostprocessFailed` (`jl4-core/src/L4/EvaluateLazy.hs:227`).
+- `rootCarriesOutcome` leaves that fallback alone (`EvaluateLazy.hs:165`). It used to overwrite its text with the directive's exception, which gave one node with an empty label and exit 0.
+- `l4 trace` exits 1 on the fallback (`jl4/app/L4/Cli/Trace.hs:153`), assumed, not ruled. No known input reaches it now: over the 6 files with `#EVALTRACE` in the differential's corpus, none does.
+- `typeToJsonSchema` matches builtin uniques (`jl4-core/src/L4/JsonSchema.hs:190`), and so does `primitiveJsonType` (`jl4-core/src/L4/FunctionSchema.hs:182`). Each previously matched a lower-cased name; no builtin is called `Int`, `Float`, `Text` or the like, so the only types those spellings matched were declared or imported ones. The service, the language server and MLIR all use `FunctionSchema`; only `jl4-schema` and `jl4-test` use `JsonSchema`.
+- `isMaybeOrOptionalType` lower-cases the name, so builtin `MAYBE` fields leave `required` (`JsonSchema.hs:317`).
 
 ## Measured against `main`
 
@@ -41,14 +61,34 @@ The instrument can see a change: the same comparison found 16 changed files for 
 
 ## Tests that pin it
 
-- `jl4/examples/ok/numeric-domain-errors.l4` and its four goldens.
-- `jl4-core/test/TracePostprocessSpec.hs`. Its first example is its own red: the raw `postprocessTrace` still crashes on a malformed action list.
-- `jl4/examples/ok/export-declared-builtin-name.l4` pins a declared type named like a builtin.
+- `jl4/examples/ok/numeric-domain-errors.l4` and its goldens: the three `EXPONENT` errors, `SQRT` of a negative, `EXPONENT 2 1023` as the largest power of 2 that fits, and a negative `DATE_FROM_SERIAL`.
+- `jl4/examples/ok/numeric-exp-overflow.l4`: `exp` from `math` either side of the limit.
+- `jl4/tests-cli/Main.hs` under "l4 trace", with `fixtures/trace-overflow.l4` and `fixtures/trace-loop.l4`: a real overflow and a real blackhole. The overflow takes about 20 s and 5.5 GB.
+- `jl4-core/test/TracePostprocessSpec.hs`: the raw `postprocessTrace` still crashes on a malformed action list, and `traceUnavailable` tells the fallback from a trace.
+- `jl4-core/test/SchemaBuiltinNameSpec.hs`: both generators, for a declared record, a declared enum, an imported record, an imported enum, and each builtin including `TIME` and `DATETIME`.
+- `jl4/examples/ok/export-schema-shapes.l4`: every builtin, a record with a `MAYBE` field, an enum and a `oneOf`.
+- `jl4/examples/ok/export-declared-builtin-name.l4`.
 - Eight `.schema.golden` files move from `$ref` to JSON types: `legal/ceo-performance-award`, and `ok/assume-as-given`, `export-explicit-default`, `export-no-explicit-default`, `export-non-ascii`, `mixfix-garden-path`, `pattern-matching-export-given` and `pattern-matching-first-clause-annotations`.
-- Nothing pins `serialToUTCTime` or the `pushFrame` order; each was measured by hand as above, because the overflow takes more than a minute.
+- Nothing pins the `l4 trace` exit 1 on the fallback, because no known input reaches it.
 
 ## Limits
 
-- `jl4-mlir/runtime/jl4-runtime.mjs` does not follow this PR: by reading, not run, `__l4_sqrt` and `__l4_pow` (`:2864`, `:2706`) go through `Math.sqrt` and `Math.pow` and raise nothing.
-- `isMaybeOrOptionalType` does not look at what the module declares, so a record field typed with a type the module itself calls `Maybe` or `Optional` is not required.
+Added by this PR:
+
+- `jl4-schema` still writes a `$ref` to a definition that does not exist for an imported type, for prelude `PAIR` (`#/$defs/PAIR`), and for the field of a parameterised type such as `DECLARE Box a` used as `Box OF NUMBER` (`#/$defs/a`). Its context holds only the module's own declarations. `main` does the same for all three.
+- A declared `Optional` or `Maybe` of one argument, which on `main` `jl4-schema` read by its name, is now a `$ref` with that dangling `a`.
+- `exp` from `math` now stops with an error above about 709.78, where it used to return a 309-digit number. It is a plain `NUMBER`, not a `MAYBE`.
+- A trace of `1 + rest WHERE rest MEANS f (n + 1)` overflowing the stack did not finish in 590 s. It was not stuck in post-processing, which no longer fails: `l4 trace` was still writing the trace's text into a diagnostic on stderr, 414 MB by then at about 0.7 MB/s.
+- The overflow traces above cost several GB, measured in the table.
+
+The same on `main`, measured on both binaries:
+
+- `FunctionSchema` still reads a one-argument type by its name: an own `List OF NUMBER` is published as an array, and an own `Optional OF NUMBER` as a number. `jl4-schema` writes the first as a `$ref`, so the two disagree there.
+- `isMaybeOrOptionalType` looks only at the name, so a record field typed with a type the module itself calls `Maybe` or `Optional` is not required.
+- `SQRT` and `EXPONENT` go through a 64-bit double and lose exactness above about 15 digits: `EXPONENT 10 25` gives `10000000000000000905969664`, and `SQRT` of 10^48 gives `999999999999999983222784`.
+- A result too small for a double is `0` with no error: `EXPONENT 10 (-400)`, `EXPONENT 0.5 1075`, and `SQRT` of 1/10^400.
+- `LN`, `LOG10`, `SIN`, `COS`, `TAN` and `SQRT` of a number past the range of a double (10^400) return a 309-digit value with no error.
+- `format: date-time` over-promises against the service: it refuses the RFC 3339 input `2025-01-31T10:30:00+00:00` with `Unknown timezone: '+00:00'`, accepts `2025-01-31T10:30:00Z`, and answers `"2025-01-31 10:30:00 UTC"`, which is not RFC 3339.
+- The service refuses the `{"tag": ...}` shape that `oneOf` describes for a `ONE OF` with fields (`FnObject but expected type is not a known record`), and refuses `[["a", null]]` for a `LIST OF (LIST OF (MAYBE STRING))`.
+- `jl4-mlir/runtime/jl4-runtime.mjs` raises for these inputs with its own message: by reading, and by the refuter feeding it `Math.sqrt(-1)`, `Math.pow(0, -1)`, `Math.pow(-1, 0.5)` and `Math.pow(10, 309)`, `ratFromNumber` (`:167`) throws `rational: non-finite ...`. The compiled backend was not run.
 - The printer still spells `BinOpExponent` as `TO THE POWER OF`; see [exponent-removal.md](exponent-removal.md).
