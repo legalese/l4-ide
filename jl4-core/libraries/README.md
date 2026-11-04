@@ -105,8 +105,7 @@ The current naming conflates type constructors and value constructors, which is 
 **Current (confusing):**
 
 - `DATE` - the type (builtin)
-- `Date` - value constructor, day month year (in daydate.l4)
-- `YMD` - value constructor, year month day (in daydate.l4)
+- `Date` - value constructor (recommended, in daydate.l4)
 - `DATE` - value constructor (legacy compat, in date-compat.l4)
 
 **Proposed (clearer):**
@@ -171,7 +170,7 @@ L4 distinguishes between **type constructors** and **value constructors** (data 
 
 **For Migration:**
 
-- Old syntax `DATE OF d, m, y` → New syntax `Date d m y`, or `YMD y m d`
+- Old syntax `DATE OF d, m, y` → New syntax `Date d m y`
 - Old field access `someDate's day` → New syntax `DATE_DAY someDate`
 - Import `date-compat` library for gradual migration
 
@@ -194,8 +193,7 @@ The naming is potentially confusing because:
 
 3. **Post-migration L4**: We have:
    - `DATE` - the type (builtin, uppercase)
-   - `Date` - value constructor, day month year (function, titlecase)
-   - `YMD` - value constructor, year month day (function, uppercase)
+   - `Date` - recommended value constructor (function, titlecase)
    - `DATE` - legacy value constructor (function in date-compat.l4, uppercase)
 
 ### Recommendations
@@ -221,9 +219,8 @@ IMPORT date-compat  -- Provides backwards-compatible DATE constructor
 -- Old style still works:
 DECIDE legacyDate IS DATE 28 6 1971
 
--- New style preferred, with either constructor:
+-- New style preferred:
 DECIDE modernDate IS Date 28 6 1971
-DECIDE modernDateYmd IS YMD 1971 6 28
 ```
 
 ## Documentation
