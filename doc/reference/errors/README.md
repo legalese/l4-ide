@@ -1064,15 +1064,16 @@ GIVETH A Party
 That works for a `NUMBER`, a `BOOLEAN`, a `STRING`, a `DATE`, a `TIME`, a `DATETIME`, a `LIST OF` or a `MAYBE` of those, and a type that you declare as a record or as an enumeration of those.
 It does not work yet for these, so an `@export` of a rule that takes or returns one is an error, reported at the `@export` line:
 
-| the input or result is...                             | the error says                                         |
-| ----------------------------------------------------- | ------------------------------------------------------ |
-| an [EVENT](../regulative/EVENT.md)                    | `an EVENT`                                             |
-| a `DEONTIC`, which is what a contract rule gives back | `a DEONTIC, a contract rule`                           |
-| a `FUNCTION FROM ... TO ...`                          | `a function`                                           |
-| a type variable, in a rule that works for any type    | ``of the type variable `...`, so the rule is generic`` |
-| a type itself, as in `GIVEN a IS A TYPE`              | `a type, so the rule is generic`                       |
-| any other built-in type that has no JSON form yet     | ``of the type `...` ``                                 |
-| a record with a field of one of those types           | ``of a record type `...` whose field `...` is ...``    |
+| the input or result is...                                | the error says                                         |
+| -------------------------------------------------------- | ------------------------------------------------------ |
+| an [EVENT](../regulative/EVENT.md)                       | `an EVENT`                                             |
+| a `DEONTIC`, which is what a contract rule gives back    | `a DEONTIC, a contract rule`                           |
+| a `FUNCTION FROM ... TO ...`                             | `a function`                                           |
+| a type variable, in a rule that works for any type       | ``of the type variable `...`, so the rule is generic`` |
+| a type itself, as in `GIVEN a IS A TYPE`                 | `a type, so the rule is generic`                       |
+| a result with no `GIVETH`, whose type L4 cannot work out | `of a type that L4 could not work out from the rule`   |
+| any other built-in type that has no JSON form yet        | ``of the type `...` ``                                 |
+| a record with a field of one of those types              | ``of a record type `...` whose field `...` is ...``    |
 
 The same goes for an `EVENT` or a function inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
 A type that you declare to take a type (`DECLARE Box a HAS ...`) has no JSON form when what it is given has none, whether or not it uses it: `Box OF (FUNCTION FROM NUMBER TO NUMBER)` is refused, and the error says ``of the type `Box`, given a function``.

@@ -1019,6 +1019,23 @@ spec bin = do
         code `shouldBe` ExitSuccess
         sout `shouldSatisfy` ("\"n\"" `isInfixOf`)
 
+  describe "an export whose type comes through a broken import" $
+    it "is told about the import, and not that the type cannot be sent" $
+      withSystemTempDirectory "l4-export-broken-import" \dir -> do
+        writeFile (dir </> "a.l4") $ unlines
+          [ "IMPORT b"
+          , "@export r"
+          , "GIVEN x IS A Mid"
+          , "GIVETH A BOOLEAN"
+          , "`r` MEANS TRUE"
+          ]
+        writeFile (dir </> "b.l4") "IMPORT c\nDECLARE Mid HAS\n  d IS A Deep\n"
+        writeFile (dir </> "c.l4") "DECLARE Deep HAS\n  n IS A NUMBER\nthis does not parse (\n"
+        Output code sout serr <- runL4 bin ["check", dir </> "a.l4"]
+        code `shouldBe` ExitFailure 1
+        (sout <> serr) `shouldSatisfy` ("has errors" `isInfixOf`)
+        (sout <> serr) `shouldSatisfy` (not . ("is published with @export" `isInfixOf`))
+
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
       it ("fails " <> cmd <> " on a 3-module import ring") $

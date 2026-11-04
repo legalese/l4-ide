@@ -43,7 +43,7 @@ import L4.Annotation (getAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 import L4.TypeCheck.Environment (maybeUnique)
-import L4.Export.Shape (ShapeEnv (..), Unsendable (..), jsonShape, unsendableHint, unsendableWhat)
+import L4.Export.Shape (ShapeEnv (..), Unsendable (..), isUnresolved, jsonShape, unsendableHint, unsendableWhat)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), EntityInfo, Severity (..))
 import Optics
 
@@ -479,6 +479,8 @@ exportErrorCode = \case
   unsendableCode site = \case
     UInField _ _ why -> unsendableCode site why
     UInArgument _ why -> unsendableCode site why
+    UNotWorkedOut -> "check/export-unsupported-type"
+    UUnresolved _ -> "check/export-unsupported-type"
     UEvent -> "check/export-event-type"
     UFunction -> case site of
       ExportInput _ -> "check/export-function-input"
@@ -597,5 +599,7 @@ checkOneExport env assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ n
     ]
  where
   exportAt = getAnno decide ^. annDesc >>= rangeOf
-  unsendable site ty = either (\why -> [ExportUnsendable exportAt fnName site why]) (const []) (jsonShape envOfRule ty)
+  unsendable site ty = case jsonShape envOfRule ty of
+    Left why | not (isUnresolved why) -> [ExportUnsendable exportAt fnName site why]
+    _ -> []
   envOfRule = env{typeVariables = Set.fromList [getUnique n | MkOptionallyTypedName _ n (Just Type{}) <- names]}

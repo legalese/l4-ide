@@ -41,6 +41,7 @@ module L4.Export.Shape (
   JsonShape (..),
   JsonField (..),
   Unsendable (..),
+  isUnresolved,
   ShapeEnv (..),
   moduleDeclares,
   shapeEnvFromDeclares,
@@ -112,6 +113,11 @@ data Unsendable
     UInField Text Text Unsendable
   | -- | The type that takes a type, and why what it was given has no shape.
     UInArgument Text Unsendable
+  | -- | A result L4 could not work out a type for, from a rule with no GIVETH.
+    UNotWorkedOut
+  | -- | A type whose name did not resolve, by name. The cause has its own error
+    -- (a missing or broken import), so this one is not reported: see 'isUnresolved'.
+    UUnresolved Text
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -189,6 +195,7 @@ typeHead env name args
       if length params == length args
         then Declared (nameText declared) (zip (map getUnique params) args) body
         else HasNoShape (UUnknownType (nameText declared))
+  | OutOfScope{} <- name = HasNoShape (UUnresolved text)
   | u `Set.member` env.typeVariables = HasNoShape (UPolymorphic text)
   | otherwise = HasNoShape (UUnknownType text)
  where
@@ -200,6 +207,9 @@ typeHead env name args
 data Reading = MkReading
   { parameters :: !(Set.Set Unique)
   , quantified :: !(Set.Set Unique)
+  , typeItself :: !Unsendable
+  -- ^ What to say of @TYPE@ here: of an input it means the rule is generic, and of
+  -- a field it does not.
   }
 
 -- | The first thing in a type that has no shape, or 'Nothing'.
@@ -217,13 +227,13 @@ data Reading = MkReading
 firstUnsendable :: ShapeEnv -> Type' Resolved -> Maybe Unsendable
 firstUnsendable env ty =
   either Just (const Nothing) $
-    evalState (runExceptT (walk (MkReading Set.empty Set.empty) ty)) Set.empty
+    evalState (runExceptT (walk (MkReading Set.empty Set.empty UTypeAsInput) ty)) Set.empty
  where
   walk :: Reading -> Type' Resolved -> ExceptT Unsendable (State (Set.Set Unique)) ()
   walk reading = \case
     Fun{} -> throwError UFunction
-    Type{} -> throwError UTypeAsInput
-    InfVar _ n _ -> throwError (UPolymorphic (rawNameToText n))
+    Type{} -> throwError reading.typeItself
+    InfVar{} -> throwError UNotWorkedOut
     Forall _ bound inner ->
       walk reading{quantified = Set.union reading.quantified (Set.fromList (map getUnique bound))} inner
     TyApp _ name args
@@ -245,7 +255,7 @@ firstUnsendable env ty =
     seen <- gets (Set.member u)
     unless seen do
       modify' (Set.insert u)
-      let reading = MkReading (Set.fromList params) Set.empty
+      let reading = MkReading (Set.fromList params) Set.empty (UUnknownType "TYPE")
       case body of
         SynonymDecl _ inner -> walk reading inner
         -- A constructor that carries fields is shaped by its name alone: see
@@ -316,6 +326,15 @@ substitute sub
 nameText :: Resolved -> Text
 nameText = rawNameToText . rawName . getActual
 
+-- | Is this only that a type did not resolve? Then the error about that says what
+-- is wrong, and saying the type cannot be sent would only mislead.
+isUnresolved :: Unsendable -> Bool
+isUnresolved = \case
+  UUnresolved _ -> True
+  UInField _ _ why -> isUnresolved why
+  UInArgument _ why -> isUnresolved why
+  _ -> False
+
 -- | What is not supported, in a few words, for the error to say "its input
 -- `e` is <what>".
 unsendableWhat :: Unsendable -> Text
@@ -328,6 +347,8 @@ unsendableWhat = \case
   UUnknownType t -> "of the type `" <> t <> "`"
   UInField r f why -> "of a record type `" <> r <> "` whose field `" <> f <> "` is " <> unsendableWhat why
   UInArgument t why -> "of the type `" <> t <> "`, given " <> dropOf (unsendableWhat why)
+  UNotWorkedOut -> "of a type that L4 could not work out from the rule"
+  UUnresolved t -> "of the type `" <> t <> "`, which was not found"
  where
   dropOf what = fromMaybe what (Text.stripPrefix "of " what)
 
@@ -342,5 +363,7 @@ unsendableHint = \case
   UUnknownType _ -> "Use a NUMBER, BOOLEAN, STRING, DATE, TIME, DATETIME, a LIST or MAYBE of those, or a record or enumeration of them."
   UInField _ _ why -> unsendableHint why
   UInArgument _ why -> unsendableHint why
+  UNotWorkedOut -> "Write its type in the GIVEN and GIVETH."
+  UUnresolved _ -> "Fix what stops the type from being found."
  where
   genericHint = "Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."

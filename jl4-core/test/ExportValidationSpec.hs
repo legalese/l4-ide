@@ -758,7 +758,7 @@ spec = do
       problems src `shouldBe` Right
         [(Just 3, "read it", Just "anything", "of the type variable `a`, so the rule is generic")]
 
-    it "says so of an input with no written type that the result comes from" $ do
+    it "does not call a value input a type variable, when the result comes from it" $ do
       let src = Text.unlines
             [ "@export Same"
             , "GIVEN y"
@@ -766,7 +766,7 @@ spec = do
             ]
       problems src `shouldBe` Right
         [ (Just 1, "same again", Just "y", "no written type")
-        , (Just 1, "same again", Nothing, "of the type variable `y`, so the rule is generic")
+        , (Just 1, "same again", Nothing, "of a type that L4 could not work out from the rule")
         ]
 
     it "gives each of these messages one line on what to do, and does not list the types to use" $ do
@@ -782,6 +782,52 @@ spec = do
           length errs `shouldBe` 3
           map (drop 1 . prettyExportError) errs `shouldSatisfy` all (== ["Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."])
         Left e -> expectationFailure (show e)
+
+    it "names no type that nobody wrote, for a result with none to name" $ do
+      let src = Text.unlines
+            [ "@export Empty"
+            , "`empty` MEANS EMPTY"
+            ]
+      problems src `shouldBe` Right
+        [(Just 1, "empty", Nothing, "of a type that L4 could not work out from the rule")]
+
+    it "does not call a rule generic for a record field that is a type" $ do
+      let src = Text.unlines
+            [ "DECLARE R HAS t IS A TYPE"
+            , ""
+            , "@export Holds"
+            , "GIVEN x IS A R"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right
+        [(Just 3, "holds", Just "x", "of a record type `R` whose field `t` is of the type `TYPE`")]
+
+  describe "a type that did not resolve" $ do
+    -- The error about the name is the one that says what is wrong; "of the type
+    -- `Deep`", with a hint to use a NUMBER, would only mislead.
+    it "is not called something an @export cannot send, in a record's field" $ do
+      let src = Text.unlines
+            [ "DECLARE Mid HAS d IS A Deep"
+            , ""
+            , "@export Holds"
+            , "GIVEN x IS A Mid"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right []
+
+    it "is not called so, given to a type or written directly" $ do
+      let src = Text.unlines
+            [ "DECLARE Box a HAS v IS AN a"
+            , ""
+            , "@export Holds"
+            , "GIVEN x IS A Box OF Deep"
+            , "      y IS A Deep"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right []
 
   describe "l4_check, which the web editor reads" $ do
     let refused what result = Text.unlines $
