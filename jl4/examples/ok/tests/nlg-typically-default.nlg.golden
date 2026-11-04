@@ -1,0 +1,6 @@
+`fields with defaults` with `With defaults` where the flag is `TRUE`, the colour is `Red`, the bonus is 5 and the label is x
+`fields without defaults` with `Without defaults` where the flag is `TRUE`, the colour is `Red`, the bonus is 5 and the label is x
+`trailing glosses, with defaults` where the flag is `TRUE`, the colour is `Red` and the bonus is 5
+`trailing glosses, without defaults` where the flag is `TRUE`, the colour is `Red` and the bonus is 5
+`own-line glosses, with defaults` where the flag is `TRUE` and the colour is `Red`
+`own-line glosses, without defaults` where the flag is `TRUE` and the colour is `Red`

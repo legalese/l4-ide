@@ -1,0 +1,25 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Decide whether a person can vote",
+    "properties": {
+        "age": {
+            "$ref": "#/$defs/NUMBER",
+            "default": 18
+        },
+        "bonus": {
+            "$ref": "#/$defs/NUMBER",
+            "default": 5
+        },
+        "married": {
+            "$ref": "#/$defs/BOOLEAN",
+            "default": false
+        }
+    },
+    "required": [
+        "married",
+        "age",
+        "bonus"
+    ],
+    "title": "can vote",
+    "type": "object"
+}

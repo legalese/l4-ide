@@ -1,0 +1,8 @@
+-- A TYPICALLY default on a binder with no explicit type cannot be
+-- type-checked (the binder's real type is only fixed later by inference),
+-- so it is rejected: TYPICALLY requires an explicit type annotation.
+
+-- ERROR: untyped GIVEN parameter carrying a TYPICALLY default
+GIVEN x TYPICALLY 5
+GIVETH A BOOLEAN
+DECIDE `needs a type` IF x

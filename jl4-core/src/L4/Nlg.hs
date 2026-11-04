@@ -345,7 +345,7 @@ decideNlgSite mouter (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkA
     -- @l4 nlg@ could not fill its slots (smucclaw\/l4-ide#978).
     <> [ (NlgOnHeadName,)    <$> getOriginal a ^. annoOf % annNlg | MkAka _ as <- toList maka, a <- as ]
     <> [ (siteOfAppArg a,)   <$> getOriginal a ^. annoOf % annNlg | a <- appArgs ]
-    <> [ (NlgOnGivenName r,) <$> getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ <- names ]
+    <> [ (NlgOnGivenName r,) <$> getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ _ <- names ]
  where
   siteOfAppArg a
     | isJust (rangeOf (getOriginal a)) = NlgOnHeadInput a
@@ -974,7 +974,7 @@ instance Linearize (GivenSig Resolved) where
 
 instance Linearize (OptionallyTypedName Resolved) where
   linearize = \ case
-    MkOptionallyTypedName _ name _mty -> hcat
+    MkOptionallyTypedName _ name _mty _mTypically -> hcat
       [ linearize name
       ]
 

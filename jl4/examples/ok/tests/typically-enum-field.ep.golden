@@ -1,0 +1,24 @@
+-- A TYPICALLY default on a DECLARE field may name an enum constructor.
+--
+-- The default is checked after every constructor is in scope.
+-- Checked any earlier, `Red` would not resolve, and the default would be
+-- refused with "could not find a definition", and then with "must be a literal".
+-- The same default on a GIVEN input always checked.
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint HAS
+    colour IS A Colour TYPICALLY Red
+    coats  IS A NUMBER TYPICALLY 2
+
+DECLARE Shape IS ONE OF
+    Dot
+    Disc HAS
+        tint   IS A Colour TYPICALLY Green
+        radius IS A NUMBER TYPICALLY 1
+
+GIVEN colour IS A Colour TYPICALLY Red
+GIVETH A BOOLEAN
+DECIDE `is red` IF colour EQUALS Red
+
+#EVAL `is red` Green

@@ -57,7 +57,7 @@ import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, missingBooleanJL4, assumeBooleanJL4, deonticBooleanJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -639,6 +639,71 @@ spec = describe "integration" do
               , "events" Aeson..= ([] :: [Aeson.Value])
               ])
           resp `shouldCarry` Refuses "Parameter 'driver': missing required parameter"
+
+  describe "a missing BOOLEAN on the wrapper path (smucclaw/l4-ide#992)" do
+    -- A {} anywhere in a request sends it through the generated wrapper,
+    -- which read every missing BOOLEAN as FALSE.
+    let uncertain = Aeson.object []
+
+    it "stops and names a missing BOOLEAN that the rule reads" do
+      withServiceFromSources "w1-read" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-read" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertStopsOn resp "has criminal record (not supplied)"
+
+    it "short-circuits past a missing BOOLEAN that the rule does not read" do
+      withServiceFromSources "w1-skip" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-skip" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    it "uses a BOOLEAN that is supplied" do
+      withServiceFromSources "w1-given" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-given" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "has criminal record" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "stops and names a missing BOOLEAN that is an ASSUME" do
+      withServiceFromSources "w1-assume" [("eligible.l4", assumeBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-assume" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "has criminal record" Aeson..= uncertain
+                ]
+            ])
+        -- The wrapper binds an ASSUME with a LET, so the message names the
+        -- assumed input itself and not the placeholder behind it.
+        assertStopsOn resp "has criminal record"
+
+    it "stops a deontic rule instead of taking its ELSE branch" do
+      withServiceFromSources "w1-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertStopsOn resp "is motorway (not supplied)"
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
@@ -4099,6 +4164,15 @@ assertSuccess resp check = do
     Nothing -> expectationFailure ("Failed to decode eval response: " <> show (responseBody resp))
     Just (SimpleResponse r) -> check r
     Just (SimpleError e) -> expectationFailure ("Evaluation error: " <> show e)
+
+-- | Assert an evaluation stopped, with a message that names the given term.
+assertStopsOn :: Response LBS.ByteString -> Text -> IO ()
+assertStopsOn resp term =
+  case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+    Just (SimpleError (InterpreterError msg)) ->
+      msg `shouldSatisfy` Text.isInfixOf ("`" <> term <> "`")
+    other ->
+      expectationFailure ("Expected evaluation to stop on " <> show term <> ", got: " <> show other)
 
 -- | Poll a deployment until its status is "ready", with a timeout in seconds.
 pollUntilReady :: String -> Manager -> String -> Int -> IO ()
