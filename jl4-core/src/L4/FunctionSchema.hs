@@ -20,7 +20,10 @@ import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
 import L4.Syntax
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeCheck.Environment
+  ( booleanUnique, dateUnique, datetimeUnique, maybeUnique
+  , numberUnique, stringUnique, timeUnique
+  )
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -170,23 +173,21 @@ typeToParameter declares visited ty =
           Nothing -> emptyParam "object"
           Just decl -> declareToParameter (resolvedNameText name) decl
 
-  -- | Map L4 primitive type names to JSON Schema type and optional format.
+  -- | Map L4's builtin types to JSON Schema type and optional format. This goes
+  -- by the resolved type, not its name: a `DECLARE Text HAS ...` or an imported
+  -- enum `Time` is that record or enum, and reading its name would publish a
+  -- schema for a JSON string that the service then refuses.
   primitiveJsonType :: Resolved -> Maybe (Text, Maybe Text)
-  primitiveJsonType name =
-    case Text.toLower (resolvedNameText name) of
-      "number" -> Just ("number", Nothing)
-      "int" -> Just ("number", Nothing)
-      "integer" -> Just ("number", Nothing)
-      "float" -> Just ("number", Nothing)
-      "double" -> Just ("number", Nothing)
-      "boolean" -> Just ("boolean", Nothing)
-      "bool" -> Just ("boolean", Nothing)
-      "string" -> Just ("string", Nothing)
-      "text" -> Just ("string", Nothing)
-      "date" -> Just ("string", Just "date")
-      "time" -> Just ("string", Just "time")
-      "datetime" -> Just ("string", Just "date-time")
-      _ -> Nothing
+  primitiveJsonType name
+    | unique == numberUnique = Just ("number", Nothing)
+    | unique == booleanUnique = Just ("boolean", Nothing)
+    | unique == stringUnique = Just ("string", Nothing)
+    | unique == dateUnique = Just ("string", Just "date")
+    | unique == timeUnique = Just ("string", Just "time")
+    | unique == datetimeUnique = Just ("string", Just "date-time")
+    | otherwise = Nothing
+   where
+    unique = getUnique name
 
   declareToParameter :: Text -> Declare Resolved -> Parameter
   declareToParameter typeName (MkDeclare declAnn _ _ typeDecl)

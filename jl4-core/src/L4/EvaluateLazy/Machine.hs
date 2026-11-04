@@ -274,12 +274,17 @@ refuseWith = raiseException . RefusalException
 
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
-  traceEval Push
   stackRef <- asks (.stack)
   s <- liftIO (readIORef stackRef)
   if s.size >= maximumFrameDepth
     then userException StackOverflow
-    else liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
+    else do
+      -- Emit the trace `Push` only once the frame is actually pushed. If we
+      -- recorded it before the overflow check, a StackOverflow would leave a
+      -- dangling Push (M Pushes / M+1 Pops) that later unbalances trace
+      -- post-processing and crashes it.
+      traceEval Push
+      liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
 
 -- | Pops a stack frame (if any are left) and calls the continuation on it.
 withPoppedFrame :: (Maybe Frame -> Eval a) -> Eval a
@@ -1952,7 +1957,10 @@ runBuiltin es op mTy = do
         UnaryCeiling -> continueBackward $ valInt $ ceiling val
         UnaryFloor -> continueBackward $ valInt $ floor val
         UnaryPercent -> continueBackward $ ValNumber (val / 100)
-        UnarySqrt -> continueBackward $ ValNumber (toRational (sqrt valDouble))
+        UnarySqrt ->
+          if val < 0
+            then userException $ UserError "SQRT expects input greater than or equal to 0"
+            else continueBackward $ ValNumber (toRational (sqrt valDouble))
   where
     valInt :: Integer -> WHNF
     valInt = ValNumber . toRational
@@ -2022,7 +2030,18 @@ runBinOp BinOpModulo    (ValNumber num1) (ValNumber num2)      = do
   if n2 /= 0
     then continueBackward $ ValNumber (toRational $ n1 `mod` n2)
     else userException (DivisionByZero BinOpModulo)
-runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)   = continueBackward $ ValNumber (toRational ((fromRational base :: Double) ** (fromRational exp_ :: Double)))
+runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)
+  -- Checked on the exact values: as doubles, a huge negative base is -Infinity,
+  -- and a power that is nearly whole rounds to whole, and then no NaN says so.
+  | base == 0 && exp_ < 0 =
+      userException $ UserError "EXPONENT of 0 to a negative power has no result"
+  | base < 0 && denominator exp_ /= 1 =
+      userException $ UserError "EXPONENT does not compute a negative number to a fractional power"
+  | otherwise =
+      let result = (fromRational base :: Double) ** (fromRational exp_ :: Double)
+      in if isNaN result || isInfinite result
+           then userException $ UserError "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
+           else continueBackward $ ValNumber (toRational result)
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
   let digitsInt = round digits :: Integer
       scale k = (10 :: Rational) ^^ k
@@ -2836,7 +2855,13 @@ secondsPerDay = 86400
 
 serialToUTCTime :: Rational -> Time.UTCTime
 serialToUTCTime serial =
-  let (wholeDays, fraction) = properFraction serial :: (Integer, Rational)
+  -- `floor` (not `properFraction`/`truncate`) so the fractional part is always
+  -- in [0,1): `properFraction` truncates toward zero, which for a negative
+  -- serial yields a negative `fraction`, hence a negative DiffTime and an
+  -- invalid UTCTime. `floor` == `truncate` for all non-negative serials, so
+  -- this is behaviour-preserving on every real (all non-negative) input.
+  let wholeDays = floor serial :: Integer
+      fraction  = serial - fromInteger wholeDays
       day = Time.addDays (wholeDays + 1) l4EpochDay
       seconds :: Pico
       seconds = realToFrac (fraction * secondsPerDay)

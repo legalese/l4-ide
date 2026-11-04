@@ -213,6 +213,8 @@ test-suite jl4-core-test
     NlgSilentReadingSpec
     ImportErrorRangeSpec
     ResolutionCascadeSpec
+    TracePostprocessSpec
+    SchemaBuiltinNameSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

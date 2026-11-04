@@ -17,6 +17,10 @@ import qualified Data.Map.Strict as Map
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
 import L4.Syntax
+import L4.TypeCheck.Environment
+  ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
+  , numberUnique, stringUnique, timeUnique
+  )
 import Optics
 
 data JsonSchema = JsonSchema
@@ -176,23 +180,26 @@ typeToJsonSchema :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text Sch
 typeToJsonSchema ctx = \case
   Type _ -> (SString Nothing, ctx.ctxCollectedDefs)
   TyApp _ name args ->
+    -- Decide from the resolved type, not from its name. A name says nothing: a
+    -- module may declare, or import, its own `Text`, `Date` or `Time`, and each
+    -- of those is that record or enum, not a JSON string. The builtins have
+    -- uniques of their own, so only they reach these arms.
     let typeName = resolvedToText name
-     in case (typeName, args) of
-          ("Number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("String", []) -> (SString Nothing, ctx.ctxCollectedDefs)
-          ("Boolean", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-          ("Integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
-          ("Date", []) -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
-          ("DateTime", []) -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
-          ("List", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SArray innerSchema Nothing, defs)
-          ("Optional", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SAnyOf [innerSchema, SNull] Nothing, defs)
-          ("Maybe", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SAnyOf [innerSchema, SNull] Nothing, defs)
+        unique = getUnique name
+     in case args of
+          [] | unique == numberUnique -> (SNumber Nothing, ctx.ctxCollectedDefs)
+             | unique == stringUnique -> (SString Nothing, ctx.ctxCollectedDefs)
+             | unique == booleanUnique -> (SBoolean Nothing, ctx.ctxCollectedDefs)
+             | unique == dateUnique -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
+             | unique == datetimeUnique -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
+             | unique == timeUnique -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
+          [inner]
+            | unique == listUnique ->
+                let (innerSchema, defs) = typeToJsonSchema ctx inner
+                 in (SArray innerSchema Nothing, defs)
+            | unique == maybeUnique ->
+                let (innerSchema, defs) = typeToJsonSchema ctx inner
+                 in (SAnyOf [innerSchema, SNull] Nothing, defs)
           _ ->
             case Map.lookup typeName ctx.ctxDeclares of
               Just decl ->
@@ -303,9 +310,12 @@ enumWithPayloads ctx' desc constructors =
             SNull -> SNull
      in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy)) : acc, newDefs)
 
--- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema
+-- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema.
+-- Lower-cased for the same reason: the resolved builtin name is ALL-CAPS "MAYBE",
+-- so the old case-sensitive match never fired and MAYBE-typed record fields were
+-- wrongly emitted as required.
 isMaybeOrOptionalType :: Type' Resolved -> Bool
-isMaybeOrOptionalType (TyApp _ name [_]) = resolvedToText name `elem` ["Maybe", "Optional"]
+isMaybeOrOptionalType (TyApp _ name [_]) = Text.toLower (resolvedToText name) `elem` ["maybe", "optional"]
 isMaybeOrOptionalType _ = False
 
 resolvedToText :: Resolved -> Text

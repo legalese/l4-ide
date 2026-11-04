@@ -3,6 +3,7 @@
 Exponentials, logarithms, square roots and trigonometry. Import it with `IMPORT math`.
 
 The functions are lowercase wrappers around the [built-in](../builtins/README.md#numbers) `LN`, `SQRT`, `ASIN` and so on. Where the built-in stops with an error on bad input, the wrapper gives `NOTHING`, so the result is a `MAYBE NUMBER`.
+`exp` is the exception: it gives a plain `NUMBER`, and stops with the built-in's error when the result is too large.
 
 **Example:** [math-example.l4](math-example.l4)
 
@@ -17,7 +18,7 @@ The functions are lowercase wrappers around the [built-in](../builtins/README.md
 
 | Function    | Input       | Gives        | What it does                                       |
 | ----------- | ----------- | ------------ | -------------------------------------------------- |
-| `exp`       | `x`: NUMBER | NUMBER       | e to the power `x`                                 |
+| `exp`       | `x`: NUMBER | NUMBER       | e to the power `x`; an error above about 709.78    |
 | `ln`        | `x`: NUMBER | MAYBE NUMBER | Natural logarithm; `NOTHING` if `x` is 0 or less   |
 | `log10`     | `x`: NUMBER | MAYBE NUMBER | Base-10 logarithm; `NOTHING` if `x` is 0 or less   |
 | `sqrt`      | `x`: NUMBER | MAYBE NUMBER | Square root; `NOTHING` if `x` is negative          |

@@ -532,6 +532,10 @@ langEnThenHeFixture = fixtureDir </> "lang-en-then-he.l4"
 langTagCaseFixture :: FilePath
 langTagCaseFixture = fixtureDir </> "lang-tag-case.l4"
 
+traceOverflowFixture, traceLoopFixture :: FilePath
+traceOverflowFixture = fixtureDir </> "trace-overflow.l4"
+traceLoopFixture     = fixtureDir </> "trace-loop.l4"
+
 evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
@@ -734,7 +738,7 @@ main = do
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
-       , evalTraceFixture, refTrailingFixture
+       , evalTraceFixture, traceOverflowFixture, traceLoopFixture, refTrailingFixture
        , langEnHintFixture, langEnThenHeFixture, langTagCaseFixture
        , bilingualFixture, bilingualFramesFixture
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
@@ -2734,6 +2738,22 @@ spec bin = do
         inRepl (whereFile n) whereQueries whereWant
 
   describe "l4 trace" $ do
+    -- Both of these raise while forcing an address, before a frame for it is
+    -- pushed. Post-processing used to fail on that, and the fallback gave a graph
+    -- of one empty node with exit 0.
+    it "traces a real stack overflow at an update frame, naming the call" $ do
+      Output code sout _ <- runL4 bin ["trace", traceOverflowFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("count up` OF 1" `isInfixOf`)
+      sout `shouldSatisfy` ("<error>" `isInfixOf`)
+      sout `shouldNotSatisfy` ("trace unavailable" `isInfixOf`)
+
+    it "traces a definition that needs itself, naming it" $ do
+      Output code sout _ <- runL4 bin ["trace", traceLoopFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("label=\"x\\n" `isInfixOf`)
+      sout `shouldSatisfy` ("<error>" `isInfixOf`)
+
     it "refuses --format png without --output-dir" $ do
       Output code _ serr <- runL4 bin ["trace", cleanFixture, "--format", "png"]
       code `shouldSatisfy` (/= ExitSuccess)
