@@ -30,7 +30,8 @@ Measured with `main`'s `l4` and this PR's:
 - `pushFrame` records the trace `Push` only after the stack-depth check, so a `StackOverflow` leaves no dangling `Push` (`Machine.hs:286`).
 - `safePostprocessTrace` catches `ErrorCall` only, so asynchronous exceptions still propagate, and substitutes `tracePostprocessFailed` (`jl4-core/src/L4/EvaluateLazy.hs:222`, used at `:151`). Its root is then overwritten by `rootCarriesOutcome` when the directive raised, so the fallback's text shows only for a directive that answered.
 - `serialToUTCTime` splits with `floor` (`Machine.hs:2849`). `floor` and `truncate` agree on a non-negative serial, so no such input changes.
-- `typeToJsonSchema` matches the lower-cased builtin name, plus the spellings `int`, `float`, `double`, `text`, `bool`, `time`, `listof` and `optional` (`jl4-core/src/L4/JsonSchema.hs:186`). `isMaybeOrOptionalType` does the same (`JsonSchema.hs:325`).
+- `typeToJsonSchema` matches the lower-cased builtin name, plus the spellings `int`, `float`, `double`, `text`, `bool`, `time`, `listof` and `optional`, unless the module itself declares a type with that name (`jl4-core/src/L4/JsonSchema.hs:193`).
+  Without the exception, #53's list made `DECLARE Text HAS ...` a JSON string; `DECLARE Date HAS ...` was already a date on `main`, and is now the record it declares. `isMaybeOrOptionalType` lower-cases too (`JsonSchema.hs:332`).
 
 ## Measured against `main`
 
@@ -42,6 +43,7 @@ The instrument can see a change: the same comparison found 16 changed files for 
 
 - `jl4/examples/ok/numeric-domain-errors.l4` and its four goldens.
 - `jl4-core/test/TracePostprocessSpec.hs`. Its first example is its own red: the raw `postprocessTrace` still crashes on a malformed action list.
+- `jl4/examples/ok/export-declared-builtin-name.l4` pins a declared type named like a builtin.
 - Eight `.schema.golden` files move from `$ref` to JSON types: `legal/ceo-performance-award`, and `ok/assume-as-given`, `export-explicit-default`, `export-no-explicit-default`, `export-non-ascii`, `mixfix-garden-path`, `pattern-matching-export-given` and `pattern-matching-first-clause-annotations`.
 - Nothing pins `serialToUTCTime` or the `pushFrame` order; each was measured by hand as above, because the overflow takes more than a minute.
 

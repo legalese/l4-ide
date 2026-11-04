@@ -182,8 +182,15 @@ typeToJsonSchema ctx = \case
     -- fell through to a dangling `$ref: "#/$defs/NUMBER"`. Mirror the naming
     -- convention used by L4.FunctionSchema.primitiveJsonType. The declares
     -- lookup below deliberately keeps the ORIGINAL-case `typeName` as its key.
+    --
+    -- A type the module itself declares is that type, whatever it is called:
+    -- `DECLARE Text HAS body IS A NUMBER` is a record, not a JSON string. The
+    -- empty name matches no builtin arm, so it reaches the declares lookup.
     let typeName = resolvedToText name
-     in case (Text.toLower typeName, args) of
+        builtinName
+          | Map.member typeName ctx.ctxDeclares = ""
+          | otherwise = Text.toLower typeName
+     in case (builtinName, args) of
           ("number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
           ("int", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
           ("integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
