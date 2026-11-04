@@ -1,0 +1,36 @@
+-- Rules that render badly. fix-wording-after.l4 is the same file with the fixes.
+
+IMPORT daydate
+
+DECLARE Employee
+    HAS `the start date`               IS A NUMBER
+        `I am or have been married`    IS A BOOLEAN
+        `a member of a pension scheme` IS A BOOLEAN
+        `the section engaged`          IS A NUMBER
+        `is on leave`                  IS A BOOLEAN
+
+ASSUME `is aged 16 or over` IS A FUNCTION FROM Employee TO BOOLEAN
+
+GIVEN `the employee` IS AN Employee
+GIVETH A BOOLEAN
+`is authorised` MEANS `the employee`'s `the start date` AT LEAST 1
+
+GIVEN `the section` IS A NUMBER
+GIVETH A BOOLEAN
+`is one of sections 9 to 14` MEANS
+    `the section` AT LEAST 9 AND `the section` AT MOST 14
+
+GIVEN `the employee` IS AN Employee
+GIVETH A BOOLEAN
+`may opt out` MEANS
+      `is authorised` `the employee`
+  AND `is aged 16 or over` `the employee`
+  AND NOT `the employee`'s `I am or have been married`
+  AND NOT `the employee`'s `a member of a pension scheme`
+  AND NOT `the employee`'s `is on leave`
+  AND NOT (`is one of sections 9 to 14` (`the employee`'s `the section engaged`) AND `is authorised` `the employee`)
+
+GIVEN last IS A DATE, next IS A DATE, agrees IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the change is at least 92 days after the last, last` last `, next` next `, employer agrees:` agrees IF
+    agrees OR Day next MINUS Day last AT LEAST 92

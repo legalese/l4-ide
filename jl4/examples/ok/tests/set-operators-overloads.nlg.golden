@@ -1,11 +1,11 @@
 the number of distinct elements of `eligible`
 carol is one of `eligible`
 `violates 8th amendment`
-the number of distinct elements of the sum of `a1` and `b1`
-the number of distinct elements of the difference between `a1` and `b1`
-the number of distinct elements of the difference between the sum of `a1` and `b1` and `b1`
-the distinct elements of the difference between the sum of `a1` and `b1` and `b1`
-the difference between 5 and 2
+the number of distinct elements of the union of `a1` and `b1`
+the number of distinct elements of the elements of `a1` not in `b1`
+the number of distinct elements of the elements of the union of `a1` and `b1` not in `b1`
+the distinct elements of the elements of the union of `a1` and `b1` not in `b1`
+5 minus 2
 the sum of 5 and 2
 the set of the items of list of 2, 1 and 1 and the set of the items of list of 1 and 2 have the same elements
 the set of the items of list of 1 and the set of the items of list of 1 and 2 have the same elements

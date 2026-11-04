@@ -4,8 +4,8 @@
 `the Bonus Points on whole dollars of` with `TRUNC` with 800.99 and 0 is equal to 7200
 `the Base Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 550
 `the Bonus Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 4950
-the sum of `the Base Points on whole dollars of` with `TRUNC` with 800.99 and 0 and `the Base Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 1350
-the sum of `the Bonus Points on whole dollars of` with `TRUNC` with 800.99 and 0 and `the Bonus Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 12150
+the sum of (`the Base Points on whole dollars of` with `TRUNC` with 800.99 and 0) and `the Base Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 1350
+the sum of (`the Bonus Points on whole dollars of` with `TRUNC` with 800.99 and 0) and `the Bonus Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 12150
 `the Bonus Points awarded on` with 12150 is equal to 9000
 the sum of 1350 and `the Bonus Points awarded on` with 12150 is equal to 10350
 `the dollars of 10X spend the bonus cap admits` is equal to 1000

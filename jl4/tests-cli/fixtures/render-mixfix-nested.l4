@@ -1,0 +1,134 @@
+-- Two rules that differ only in how one mixfix call nests inside another.
+-- `l4 run` gives 85 for `net one` and 95 for `net two`. When the slots of a
+-- mixfix pattern were filled with no brackets, both rules read "price reduced
+-- by discount reduced by rebate", so two different numbers had one sentence
+-- (the round-2 refuter of the #802 port, finding F1).
+
+IMPORT prelude
+
+GIVEN amount IS A NUMBER
+      cut IS A NUMBER
+GIVETH A NUMBER
+amount `reduced by` cut MEANS amount MINUS cut
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`net one` price discount rebate MEANS (price `reduced by` discount) `reduced by` rebate
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`net two` price discount rebate MEANS price `reduced by` (discount `reduced by` rebate)
+
+GIVEN price IS A NUMBER
+      discount IS A NUMBER
+      rebate IS A NUMBER
+GIVETH A NUMBER
+`net three` price discount rebate MEANS (price PLUS discount) `reduced by` rebate
+
+-- A record in a slot: without brackets, "reduced by 5" reads as part of its
+-- last field.
+DECLARE Money HAS amount IS A NUMBER
+                  cur IS A STRING
+
+GIVEN m IS A Money
+      cut IS A NUMBER
+GIVETH A NUMBER
+m `less` cut MEANS m's amount MINUS cut
+
+GIVETH A NUMBER
+`net four` MEANS (Money 100 "SGD") `less` 5
+
+#EVAL `net one` 100 10 5
+#EVAL `net two` 100 10 5
+#EVAL `net three` 100 10 5
+
+-- A denial, a choice and a list in a slot (the round-3 refuter of the #802
+-- port, findings G1 and G2). Each pair has two values, and while those slots
+-- took no brackets each pair read as one sentence. With b TRUE, `neg right` is
+-- FALSE and `neg whole` TRUE, and `multi left` FALSE and `multi whole` TRUE.
+-- `if left` gives 95 and `if right` 100 (c TRUE, r 5). With ys = LIST 9,
+-- `cons left` gives LIST 9 and `cons right` LIST 1, 9; `join left` gives LIST 9
+-- and `join right` LIST 2, 3, 9.
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+a `as well as` b MEANS a AND b
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`is big` n MEANS n GREATER THAN 10
+
+GIVETH A BOOLEAN
+yes MEANS FALSE
+
+GIVETH A BOOLEAN
+no MEANS FALSE
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+`neg right` b MEANS b AND (yes `as well as` (NOT no))
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+`neg whole` b MEANS b AND ((yes `as well as` no) EQUALS FALSE)
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+`multi left` b MEANS b AND ((NOT (`is big` 5)) `as well as` no)
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+`multi whole` b MEANS b AND (NOT ((`is big` 5) `as well as` no))
+
+GIVETH A NUMBER
+base MEANS 100
+
+GIVEN c IS A BOOLEAN
+      r IS A NUMBER
+GIVETH A NUMBER
+`if left` c r MEANS 0 PLUS ((IF c THEN base ELSE 7) `reduced by` r)
+
+GIVEN c IS A BOOLEAN
+      r IS A NUMBER
+GIVETH A NUMBER
+`if right` c r MEANS 0 PLUS (IF c THEN base ELSE (7 `reduced by` r))
+
+GIVEN xs IS A LIST OF NUMBER
+      ys IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+xs `then also` ys MEANS ys
+
+GIVETH A LIST OF NUMBER
+nums MEANS LIST 2, 3
+
+GIVEN ys IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`cons left` ys MEANS (1 FOLLOWED BY nums) `then also` ys
+
+GIVEN ys IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`cons right` ys MEANS 1 FOLLOWED BY (nums `then also` ys)
+
+GIVEN ys IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`join left` ys MEANS (append nums nums) `then also` ys
+
+GIVEN ys IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`join right` ys MEANS append nums (nums `then also` ys)
+
+#EVAL `neg right` TRUE
+#EVAL `neg whole` TRUE
+#EVAL `multi left` TRUE
+#EVAL `multi whole` TRUE
+#EVAL `if left` TRUE 5
+#EVAL `if right` TRUE 5
+#EVAL `cons left` (LIST 9)
+#EVAL `cons right` (LIST 9)
+#EVAL `join left` (LIST 9)
+#EVAL `join right` (LIST 9)

@@ -706,25 +706,27 @@ handlers evalConfig recorder =
                 , _message = "No type check result available"
                 , _xdata = Nothing }
               Just tcResult -> do
-                let -- Excluded imports are removed from the dependency list
-                    -- outright (not merely set to the 'Exclude' disposition,
-                    -- which only collapses a still-referenced module to
-                    -- "as defined in …" stubs). Dropping the module means its
-                    -- units are never extracted, so the main document's
-                    -- references to them render as plain prose names.
-                    excludedUris = Set.fromList
-                      [ toNormalizedUri (Uri u) | u <- reqParams.excludeModules ]
-                    keepModule (MkModule _ u _) = not (u `Set.member` excludedUris)
-                    deps = filter keepModule (drop 1 (flattenExportModules tcResult))
+                let -- An unticked import is hidden, not dropped: it stays in the
+                    -- dependency list, so the main document's rules keep reading
+                    -- its @nlg sentences and its records, as they do in `l4 render`.
+                    -- Only its own text is left out, and references to it read as
+                    -- plain prose names.
+                    hidden = Map.fromList
+                      [ (toNormalizedUri (Uri u), ExportDoc.Hidden) | u <- reqParams.excludeModules ]
+                    deps = drop 1 (flattenExportModules tcResult)
                     ecfg = ExportDoc.defaultExportConfig
                       { ExportDoc.dropUnused = not reqParams.includeUnused
+                      , ExportDoc.moduleDispositions = hidden
                       , ExportDoc.mixfixHeadings =
                           ExportDoc.mixfixHeadingsFromRegistry tcResult.mixfixRegistry
+                      , ExportDoc.mixfixPatterns =
+                          ExportDoc.mixfixPatternsFromRegistry tcResult.mixfixRegistry
                       }
                     rcfg = ExportRender.MkRenderConfig
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
                              , ExportRender.toc = reqParams.toc
+                             , ExportRender.sourceLinks = maybe mempty (ExportRender.sourceLinksFrom . fst) mToks
                              , ExportRender.docLang =
                                  Maybe.fromMaybe defaultModuleLang
                                    (declaredModuleLang . fst =<< mToks) }

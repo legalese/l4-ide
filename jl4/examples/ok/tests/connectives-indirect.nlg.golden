@@ -15,4 +15,4 @@
 `combine` with `__AND__`, `TRUE` and `FALSE`
 `combine` with `__OR__`, `TRUE` and `has a positive reciprocal` with 0
 `apply` with `__NOT__` and `TRUE`
-`TRUE` and `FALSE` or `has a positive reciprocal` with 2
+`TRUE` and (`FALSE` or `has a positive reciprocal` with 2)

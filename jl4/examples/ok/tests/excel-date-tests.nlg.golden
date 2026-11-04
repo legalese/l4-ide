@@ -1,32 +1,32 @@
-`excelToday`
-`ExcelDateValue` with 2024-02-29
-`ExcelDateValue` with 31/12/2023
-`ExcelDateValue` with not-a-date
-`ExcelTimeValue` with 2:30 PM
-`ExcelTimeValue` with 23:59:59
-`ExcelTimeValue` with 24:00
-`excelSerial1900` with 1 March 1900
-`dateFromExcelSerial` with 61
-`dateFromExcelSerial` with 60
-`DATEDIF` with `Start 2012`, `Mid 2012` and Y
-`DATEDIF` with `Start 2012`, `Mid 2012` and M
-`DATEDIF` with `Start 2012`, `Mid 2012` and D
-`DATEDIF` with `Start 2012`, `Mid 2012` and YM
-`DATEDIF` with `Start 2012`, `Mid 2012` and YD
-`DATEDIF` with 1 January 2012, 15 July 2012 and MD
+today's date in the document's time zone
+the date in 2024-02-29
+the date in 31/12/2023
+the date in not-a-date
+the fraction of a day elapsed at the time in 2:30 PM
+the fraction of a day elapsed at the time in 23:59:59
+the fraction of a day elapsed at the time in 24:00
+the Excel 1900 serial number of 1 March 1900
+the date with Excel 1900 serial number 61
+the date with Excel 1900 serial number 60
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit Y
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit M
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit D
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit YM
+the Excel DATEDIF interval from `Start 2012` to `Mid 2012` in unit YD
+the Excel DATEDIF interval from 1 January 2012 to 15 July 2012 in unit MD
 the number of days from `US 30/360 start` to `US 30/360 end`
-`ExcelDays360` with `US 30/360 start` and `US 30/360 end`
-`ExcelDays360` with `US 30/360 start`, `US 30/360 end` and `TRUE`
-`ExcelYearFrac` with `Basis start`, `Basis end` and 0
-`ExcelYearFrac` with `Basis start`, `Basis end` and 1
-`ExcelYearFrac` with `Basis start`, `Basis end` and 2
-`ExcelEDate` with `Late Jan 24` and 1
-`ExcelEDate` with `Late Jan 24` and -1
-`ExcelEOMonth` with `Jan 2024` and 0
-`ExcelEOMonth` with `Jan 2024` and 1
-`ExcelWorkday` with `Jan 2024` and 10
-`ExcelWorkday` with `Late Jan 24` and -5
-`ExcelWorkday` with `Jan 2024`, 10 and `Holidays 24`
-`ExcelNetworkDays` with `Jan 2024` and `Late Jan 24`
-`ExcelNetworkDays` with `Late Jan 24` and `Jan 2024`
-`ExcelNetworkDays` with `Jan 2024`, `Late Jan 24` and `Holidays 24`
+the US 30/360 day count from `US 30/360 start` to `US 30/360 end`
+the 30/360 day count from `US 30/360 start` to `US 30/360 end`, European if `TRUE` holds, otherwise US
+the year fraction from `Basis start` to `Basis end` on Excel basis 0 (negative if reversed)
+the year fraction from `Basis start` to `Basis end` on Excel basis 1 (negative if reversed)
+the year fraction from `Basis start` to `Basis end` on Excel basis 2 (negative if reversed)
+the date 1 month after `Late Jan 24` (capped at the last day of that month)
+the date -1 months after `Late Jan 24` (capped at the last day of that month)
+the day before the date 0 months plus one month after `Jan 2024`
+the day before the date 1 month plus one month after `Jan 2024`
+the date 10 working days after `Jan 2024` (skipping weekends)
+the date -5 working days after `Late Jan 24` (skipping weekends)
+the date 10 working days after `Jan 2024` (counting weekdays, and weekend days listed in `Holidays 24`)
+the number of working days from `Jan 2024` to `Late Jan 24` inclusive (skipping weekends, and negative if reversed)
+the number of working days from `Late Jan 24` to `Jan 2024` inclusive (skipping weekends, and negative if reversed)
+the number of weekdays, and weekend days listed in `Holidays 24`, from `Jan 2024` to `Late Jan 24` inclusive (negative if reversed)

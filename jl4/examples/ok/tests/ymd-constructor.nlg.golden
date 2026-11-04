@@ -2,20 +2,20 @@
 28 July 2026 is equal to 28 July 2026
 28 July 2026 is equal to 28 July 2026
 `DATE_SERIAL` with 28 July 2026
-`Date` with `DATE_SERIAL` with 28 July 2026
-`Date` with `DATE_SERIAL` with 28 July 2026 is equal to 28 July 2026
+the date numbered `DATE_SERIAL` with 28 July 2026
+the date numbered `DATE_SERIAL` with 28 July 2026 is equal to 28 July 2026
 28 July 2026
-`Date` with 7, 28 and 2026
-`Date` with 7, 28 and 2026 is equal to 28 July 2026
-`DATE_SERIAL` with `Date` with 7, 28 and 2026
-`YMD` with 2026, 28 and 7
+the date 7/28/2026
+the date 7/28/2026 is equal to 28 July 2026
+`DATE_SERIAL` with the date 7/28/2026
+the date 2026-28-7
 31 December 2026
 29 February 2024
-`YMD` with 2023, 2 and 29
-`Date` with 29, 2 and 2023
-`YMD` with 2026, 0 and 15
-`YMD` with 2026, 1 and 32
-`DATE_SERIAL` with `YMD` with 2023, 2 and 29
+the date 2023-2-29
+the date 29/2/2023
+the date 2026-0-15
+the date 2026-1-32
+`DATE_SERIAL` with the date 2023-2-29
 `EVAL UNDER RULES EFFECTIVE AT` with 1 June 2023 and `GST rate`
 `EVAL UNDER RULES EFFECTIVE AT` with 1 July 2024 and `GST rate`
 `GST rate`

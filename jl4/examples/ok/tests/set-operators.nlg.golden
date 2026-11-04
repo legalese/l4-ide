@@ -9,6 +9,6 @@ the number of distinct elements of the elements of `all employees` not in `on pr
 `NY` is one of `eligible states`
 `CT` is one of `eligible states`
 the distinct elements of the elements of `the tri-state universe` not in `eligible states`
-the number of distinct elements of the elements common to `new yorkers` and `emptySet`
+the number of distinct elements of the elements common to `new yorkers` and the empty set
 the number of distinct elements of the set of the items of list of 1, 1, 2, 3, 3 and 3
 the distinct elements of `SET` with list of 5, 5 and 6

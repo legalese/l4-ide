@@ -7,36 +7,60 @@
 
 §§ `Americas`
 
+@nlg the IANA time zone for New York (US Eastern time)
 EST  MEANS "America/New_York"
+@nlg the IANA time zone for New York (US Eastern time)
 EDT  MEANS "America/New_York"
+@nlg the IANA time zone for Chicago (US Central time)
 CST  MEANS "America/Chicago"
+@nlg the IANA time zone for Chicago (US Central time)
 CDT  MEANS "America/Chicago"
+@nlg the IANA time zone for Denver (US Mountain time)
 MST  MEANS "America/Denver"
+@nlg the IANA time zone for Denver (US Mountain time)
 MDT  MEANS "America/Denver"
+@nlg the IANA time zone for Los Angeles (US Pacific time)
 PST  MEANS "America/Los_Angeles"
+@nlg the IANA time zone for Los Angeles (US Pacific time)
 PDT  MEANS "America/Los_Angeles"
 
 §§ `Europe`
 
+@nlg the IANA time zone for London (UK time)
 GMT  MEANS "Europe/London"
+@nlg the IANA time zone for London (UK time)
 BST  MEANS "Europe/London"
+@nlg the IANA time zone for Berlin (Central European time)
 CET  MEANS "Europe/Berlin"
+@nlg the IANA time zone for Berlin (Central European time)
 CEST MEANS "Europe/Berlin"
+@nlg the IANA time zone for Helsinki (Eastern European time)
 EET  MEANS "Europe/Helsinki"
+@nlg the IANA time zone for Helsinki (Eastern European time)
 EEST MEANS "Europe/Helsinki"
 
 §§ `Asia-Pacific`
 
+@nlg the IANA time zone for Kolkata (India time)
 IST  MEANS "Asia/Kolkata"
+@nlg the IANA time zone for Singapore
 SGT  MEANS "Asia/Singapore"
+@nlg the IANA time zone for Hong Kong
 HKT  MEANS "Asia/Hong_Kong"
+@nlg the IANA time zone for Tokyo (Japan time)
 JST  MEANS "Asia/Tokyo"
+@nlg the IANA time zone for Seoul (South Korea time)
 KST  MEANS "Asia/Seoul"
+@nlg the IANA time zone for Sydney (Australian Eastern time)
 AEST MEANS "Australia/Sydney"
+@nlg the IANA time zone for Sydney (Australian Eastern time)
 AEDT MEANS "Australia/Sydney"
+@nlg the IANA time zone for Auckland (New Zealand time)
 NZST MEANS "Pacific/Auckland"
+@nlg the IANA time zone for Auckland (New Zealand time)
 NZDT MEANS "Pacific/Auckland"
 
 §§ `Universal`
 
+@nlg the IANA time zone for Coordinated Universal Time
 UTC  MEANS "Etc/UTC"
