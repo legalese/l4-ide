@@ -3,8 +3,11 @@
 module ExportValidationSpec (spec) where
 
 import Test.Hspec
+import Control.Exception (evaluate)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import System.Timeout (timeout)
+
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
 import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, getExportedFunctions, enrichReturnTypes)
@@ -52,6 +55,31 @@ errorMessages source =
       | e <- r.tcdErrors
       , severity e == SError
       ]
+
+-- | The problems of a snippet, which have this long to be worked out in full. A
+-- check that walks every path through nested types does not finish at all at
+-- these sizes, so a failure here is a timeout and not a slow suite.
+problemsWithin :: Int -> Text -> IO (Either [Text] [Problem])
+problemsWithin seconds source = do
+  let found = problems source
+  timeout (seconds * 1000000) (evaluate (length (show found))) >>= \case
+    Just _ -> pure found
+    Nothing -> fail ("did not finish within " <> show seconds <> " seconds")
+
+-- | Records nested to a depth, each with two fields of the record below it, so
+-- that there are 2^depth paths to the bottom and depth+1 types. The fields are
+-- given after those two.
+diamond :: Int -> [Text] -> [Text]
+diamond depth extraFields =
+  "DECLARE L0 HAS v IS A NUMBER"
+    : concat
+        [ ["DECLARE " <> level i <> " HAS", "  a IS A " <> level (i - 1), "  b IS A " <> level (i - 1)]
+        | i <- [1 .. depth]
+        ]
+    <> extraFields
+ where
+  level :: Int -> Text
+  level i = "L" <> Text.pack (show i)
 
 -- | The shape of each exported input of a snippet (or 'Left' on fatal failure).
 inputShapes :: Text -> Either [Text] [(Text, Either Unsendable JsonShape)]
@@ -427,6 +455,158 @@ spec = do
               , "`is positive` MEANS n > 0"
               ]
         problems src `shouldBe` Right [(Just 1, "is positive", Just "n", "no written type")]
+
+  describe "a type reached by many paths" $ do
+    let exported ty =
+          [ ""
+          , "@export Deep"
+          , "GIVEN x IS A " <> ty
+          , "GIVETH A NUMBER"
+          , "`deep rule` MEANS 1"
+          ]
+
+    it "checks records whose two fields share a record type, nested 64 levels" $ do
+      let src = Text.unlines (diamond 64 (exported "L64"))
+      r <- problemsWithin 30 src
+      r `shouldBe` Right []
+      case inputShapes src of
+        Right [("x", Right (JRecord "L64" (JsonField "a" (JRecord "L63" _) True : _)))] -> pure ()
+        other -> expectationFailure (show (fmap (map fst) other))
+
+    it "finds a function in the field after the shared types, 64 levels down" $ do
+      let src = Text.unlines $ diamond 64
+            [ "DECLARE Top HAS"
+            , "  below IS A L64"
+            , "  test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+            , ""
+            , "@export Deep"
+            , "GIVEN x IS A Top"
+            , "GIVETH A NUMBER"
+            , "`deep rule` MEANS 1"
+            ]
+      r <- problemsWithin 30 src
+      r `shouldBe` Right [(Just 198, "deep rule", Just "x", "of a record type Top whose field test is a function")]
+
+    it "checks 14 records that each have a field of every one of them" $ do
+      let names = [Text.pack ("T" <> show i) | i <- [1 .. 14 :: Int]]
+          declare n = ("DECLARE " <> n <> " HAS") : ["  f" <> m <> " IS A MAYBE " <> m | m <- names]
+          src = Text.unlines (concatMap declare names <> exported "T1")
+      r <- problemsWithin 30 src
+      r `shouldBe` Right []
+
+    it "says the same of 14 such records with a function in the last, by the path it first meets it" $ do
+      let names = [Text.pack ("T" <> show i) | i <- [1 .. 14 :: Int]]
+          declare n =
+            ("DECLARE " <> n <> " HAS")
+              : ["  f" <> m <> " IS A " <> m | m <- names]
+              <> ["  test IS A FUNCTION FROM NUMBER TO BOOLEAN" | n == "T14"]
+          expected = foldr
+            (\(n, m) why -> "of a record type " <> n <> " whose field f" <> m <> " is " <> why)
+            "of a record type T14 whose field test is a function"
+            (zip names (drop 1 names))
+          src = Text.unlines (concatMap declare names <> exported "T1")
+      r <- problemsWithin 30 src
+      r `shouldBe` Right [(Just (length (concatMap declare names) + 2), "deep rule", Just "x", expected)]
+
+    it "checks a type that takes a type and passes on twice what it was given, 40 levels" $ do
+      let level :: Int -> Text
+          level i = "P" <> Text.pack (show i)
+          src = Text.unlines $
+            "DECLARE P0 a HAS v IS AN a"
+              : [ "DECLARE " <> level i <> " a HAS f IS A " <> level (i - 1) <> " OF (EITHER OF a, a)" | i <- [1 .. 40] ]
+              <> exported "P40 OF NUMBER"
+      r <- problemsWithin 30 src
+      r `shouldBe` Right []
+
+    -- The shape of a type in a cycle depends on where it is reached from: what
+    -- is cut is what is being expanded on the way to it. A type must not keep
+    -- the shape it had on the first path.
+    it "gives a record in a cycle the shape it has from where it is reached" $ do
+      let src = Text.unlines
+            [ "DECLARE Top HAS"
+            , "  q IS A Q"
+            , "  r IS A R"
+            , "DECLARE Q HAS r IS A R"
+            , "DECLARE R HAS q IS A Q"
+            , ""
+            , "@export From the top"
+            , "GIVEN x IS A Top"
+            , "      y IS A Q"
+            , "      z IS A R"
+            , "GIVETH A NUMBER"
+            , "`from the top` MEANS 1"
+            ]
+          field n s = JsonField n s True
+      problems src `shouldBe` Right []
+      inputShapes src `shouldBe` Right
+        [ ( "x"
+          , Right $ JRecord "Top"
+              [ field "q" (JRecord "Q" [field "r" (JRecord "R" [field "q" (JRecursive "Q")])])
+              , field "r" (JRecord "R" [field "q" (JRecord "Q" [field "r" (JRecursive "R")])])
+              ]
+          )
+        , ("y", Right $ JRecord "Q" [field "r" (JRecord "R" [field "q" (JRecursive "Q")])])
+        , ("z", Right $ JRecord "R" [field "q" (JRecord "Q" [field "r" (JRecursive "R")])])
+        ]
+
+    it "looks at a function in a record of a cycle, wherever the cycle is entered" $ do
+      let src = Text.unlines
+            [ "DECLARE P HAS q IS A Q"
+            , "DECLARE Q HAS"
+            , "  p IS A P"
+            , "  test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+            , ""
+            , "@export From P"
+            , "GIVEN x IS A P"
+            , "      y IS A Q"
+            , "GIVETH A NUMBER"
+            , "`from p` MEANS 1"
+            ]
+      problems src `shouldBe` Right
+        [ (Just 6, "from p", Just "x", "of a record type P whose field q is of a record type Q whose field test is a function")
+        , (Just 6, "from p", Just "y", "of a record type Q whose field test is a function")
+        ]
+
+    it "tells apart two uses of a type that takes a type" $ do
+      let src = Text.unlines
+            [ "DECLARE Box a HAS v IS AN a"
+            , "DECLARE Holder HAS"
+            , "  fine IS A Box OF NUMBER"
+            , "  bad IS A Box OF (FUNCTION FROM NUMBER TO BOOLEAN)"
+            , ""
+            , "@export Holds"
+            , "GIVEN h IS A Holder"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right
+        [(Just 6, "holds", Just "h", "of a record type Holder whose field bad is of a record type Box whose field v is a function")]
+
+    it "looks inside a type given to itself" $ do
+      let src = Text.unlines
+            [ "DECLARE Box a HAS v IS AN a"
+            , ""
+            , "@export Holds"
+            , "GIVEN h IS A Box OF (Box OF (FUNCTION FROM NUMBER TO BOOLEAN))"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right
+        [(Just 3, "holds", Just "h", "of a record type Box whose field v is a function")]
+
+    it "stops at a type that gives itself a larger type" $ do
+      let src = Text.unlines
+            [ "DECLARE Grows a HAS"
+            , "  v IS AN a"
+            , "  next IS A MAYBE (Grows OF (LIST OF a))"
+            , ""
+            , "@export Grows"
+            , "GIVEN g IS A Grows OF NUMBER"
+            , "GIVETH A NUMBER"
+            , "`grows` MEANS 1"
+            ]
+      r <- problemsWithin 30 src
+      r `shouldBe` Right []
 
   describe "exported return type display" $ do
     -- A concrete inferred return type renders normally.

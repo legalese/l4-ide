@@ -37,6 +37,8 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 - `jl4-core/src/L4/Export/Shape.hs`: `JsonShape`, `Unsendable`, `ShapeEnv`, `jsonShape`, and the two functions that word a reason, `unsendableWhat` and `unsendableHint`.
   Types are looked up in the declarations of the module and of everything it imports (`moduleDeclares`), and a record that contains itself stops at `JRecursive`.
+  Whether a type has a shape is worked out once for each type reached, however many paths lead to it (`firstUnsendable`); the type's arguments count, so `Box OF NUMBER` and `Box OF STRING` are looked at apart, and a type given to itself (`Box OF (Box OF a)`) has its arguments looked at.
+  The shape itself (`expand`) is a tree that writes a declared type out on every path to it, so it is built only as far as something looks at it; nothing in this change looks at it, except a test.
 - `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:427`, `:436`), `checkExports`, `checkOneExport` (`:539`), `withoutRefused` (`:500`), `prettyExportError` (`:464`); `inferredReturnType` (`:165`) gives the result of a definition without a `GIVETH`.
 - `jl4-service/src/Compiler.hs`, `jl4-lsp/src/LSP/L4/Rules.hs` (the key `ExportCheck`, `:187`) and the two commands use it; none of them has a check of its own.
 
