@@ -249,6 +249,22 @@ main = do
         testExportRefused
           ["GIVEN a IS A TYPE", "      x IS AN a", "GIVETH AN a", "`refused` MEANS x"]
           "its input `a`"
+    , test "a MAYBE of a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH A MAYBE (DEONTIC Party Act)", "`refused` MEANS NOTHING"]
+          "its result is a DEONTIC"
+    , test "a LIST of a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH A LIST OF (DEONTIC Party Act)", "`refused` MEANS LIST (PARTY alice MUST ping WITHIN 3)"]
+          "its result is a DEONTIC"
+    , test "an EITHER with a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH AN EITHER NUMBER (DEONTIC Party Act)", "`refused` MEANS LEFT 1"]
+          "its result is a DEONTIC"
+    , test "a synonym for a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH A `Duty`", "`refused` MEANS PARTY alice MUST ping WITHIN 3"]
+          "its result is a DEONTIC"
     , test "a DEONTIC result is compiled, which the service refuses" testDeonticResultCompiled
     , test "a rule the check has nothing to say about is compiled" testPlainExportCompiled
     , test "deontic REFUSE after HENCE is unsupported" $
@@ -368,6 +384,7 @@ exportFixture rule =
     [ "DECLARE Party IS ONE OF alice, bob"
     , "DECLARE Act IS ONE OF ping, pong"
     , "DECLARE Rule HAS test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+    , "DECLARE `Duty` IS A DEONTIC Party Act"
     , ""
     , "@export The rule"
     ]

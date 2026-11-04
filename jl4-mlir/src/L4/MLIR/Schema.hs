@@ -18,6 +18,7 @@
 module L4.MLIR.Schema
   ( -- * Schema bundle
     WasmBundle (..)
+  , isDeonticType
   , FunctionExport (..)
   , StateGraphExport (..)
   , TraceMeta (..)

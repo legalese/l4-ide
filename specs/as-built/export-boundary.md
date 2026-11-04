@@ -30,7 +30,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   - the Deploy button refuses on them, because `isBlockingDiagnostic` (`jl4-lsp/src/LSP/L4/BlockingErrors.hs:35`) blocks on every error except those with the source `eval` or `import`, and `l4/getExportedFunctions` runs the check itself before it reads the diagnostics (`jl4-lsp/app/LSP/L4/Handlers.hs`);
   - the sidebar's list of exports leaves a refused rule out (`Export.withoutRefused`), so a contract rule is no longer listed with `isDeontic` set; the text test for "DEONTIC" in the printed return type (`Inspector.hs`) is gone;
   - `l4 check` and `l4 deploy` run the rule (`jl4/app/L4/Cli/Check.hs:55`, `jl4/app/L4/Cli/Deploy.hs:286`) and exit 1 on an error; `l4 run` and `l4 batch` do not run it, so they still run the file;
-  - `jl4-mlir wasm` refuses on them with the same words (`typecheckL4File`, `jl4-mlir/src/L4/MLIR/Pipeline.hs`), except a `DEONTIC` result: its JS runtime evaluates a contract from the schema, which `jl4-mlir/README.md` documents, so it is kept while the service's refusal is provisional (assumed, not ruled);
+  - `jl4-mlir wasm` refuses on them with the same words (`typecheckL4File`, `jl4-mlir/src/L4/MLIR/Pipeline.hs`), except a result that is itself a `DEONTIC` (`isDeonticType`; a `MAYBE`, `LIST`, `EITHER` or synonym of one is refused, having no contract path): its JS runtime evaluates a contract from the schema, which `jl4-mlir/README.md` documents, so it is kept while the service's refusal is provisional (assumed, not ruled);
   - the web editor's WebAssembly build gets them from `l4_check` (`L4.API.l4Check`, `exportErrorsOf`), with the source `export`, and only for a file that type-checks, as in the language server;
   - `jl4-service` builds the same errors in its deploy gate (`jl4-service/src/Compiler.hs:194`) and refuses the bundle, with the same words, once the module has no type errors: as in the editor, a module that does not type-check is not asked what its exports take and give back.
 - The two checks of the previous change, the function-typed input and the `EVENT`, are gone from the type check (`ExportFunctionTypeInput`, `ExportEventType`) and are cases of the one check.
@@ -108,7 +108,7 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
   A bundle of that kind is refused by the service from 18 levels with "compilation timed out or exceeded the memory limit", in under a second, on `main` and on this branch alike (at 12 and 16 levels it deploys, on both).
   That is consistent with the size of the schema measured here, and it was not confirmed.
   The wire form of the schema is what would have to change, and that is not done here.
-- `jl4-mlir` accepts a rule that returns a `DEONTIC` and the service refuses it (assumed, not ruled), so a `.schema.json` can list a function that the service does not.
+- `jl4-mlir` accepts a rule whose result is itself a `DEONTIC` and the service refuses it (assumed, not ruled), so a `.schema.json` can list a function that the service does not.
   `jl4-mlir/scripts/parity-harness.mjs`, which is run by hand, deploys `deontic-sale.l4`, `deontic-seatbelt.l4` and `deontic-breach.l4` to the service by default, so its comparison of contract rules no longer has a service side (read from the harness, not run).
 - `EITHER` has the shapes of its two sides and is not refused.
   The service writes an `EITHER` answer today, and the schema calls it an `object`; how it should be written is the wire-form bench's card J3, open.
