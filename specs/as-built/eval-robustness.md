@@ -12,7 +12,7 @@ This PR goes beyond #53 in three places, each assumed, not ruled, and not on `un
 ## What it does
 
 - `SQRT` of a negative number, and an `EXPONENT` that overflows, has 0 to a negative power, or has a negative base with a fractional power, stop with an error that names which, instead of returning an enormous meaningless number.
-- `l4 trace` on an `#EVALTRACE` that overflows the stack, or on a definition that needs itself, gives a graph rooted at the call, instead of failing with `splitEvalTraceActions: internal error`.
+- `l4 trace` on an `#EVALTRACE` that overflows the stack through `IF`, `CONSIDER`, a plain recursive call, mutual recursion or a record chain, or on a definition that needs itself, gives a graph rooted at the call, instead of failing with `splitEvalTraceActions: internal error`. Those are the shapes measured below; a `WHERE` recursion and a recursion through a list did not finish, and see Limits.
 - If a trace still cannot be built, its result is a node saying `trace unavailable`, and `l4 trace` prints an error and exits 1.
 - A negative date serial with a fraction gives the right day.
 - `jl4-schema` writes builtin types as JSON types, instead of a `$ref` to a definition that does not exist, and no longer lists a `MAYBE` record field as required. This holds for builtins only: see Limits.
@@ -20,31 +20,37 @@ This PR goes beyond #53 in three places, each assumed, not ruled, and not on `un
 
 Measured with `main`'s binaries and this PR's:
 
-| Input                                                 | `main`                                     | this PR                                                  |
-| ----------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------- |
-| `#EVAL SQRT (-1)`                                     | a number more than a hundred digits long   | `SQRT expects input greater than or equal to 0`          |
-| `#EVAL EXPONENT 0 (-1)`                               | a number more than a hundred digits long   | `EXPONENT of 0 to a negative power has no result`        |
-| `#EVAL EXPONENT (-1) 0.5`                             | a number more than a hundred digits long   | `EXPONENT of a negative number ... has no real result`   |
-| `#EVAL EXPONENT 10 309`, and `exp 710` from `math`    | a 309-digit number                         | `EXPONENT overflowed: the result is too large (...)`     |
-| `#EVAL DATE_FROM_SERIAL (-0.5)`                       | `DATE OF 2, 1, 0`, the day of serial `0.5` | `DATE OF 1, 1, 0`, the day of serial `-1`                |
-| service schema of `DECLARE Text HAS body IS A NUMBER` | `{"type":"string"}`                        | an object with `body`, which is what the service accepts |
-| service schema of an imported record `Date`           | `{"type":"string","format":"date"}`        | an object with its fields                                |
-| `jl4-schema` of an imported record `Text`             | a `$ref` to a definition not in the file   | the same `$ref`; see Limits                              |
+| Input                                                 | `main`                                     | this PR                                                             |
+| ----------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------- |
+| `#EVAL SQRT (-1)`                                     | a number more than a hundred digits long   | `SQRT expects input greater than or equal to 0`                     |
+| `#EVAL EXPONENT 0 (-1)`                               | a number more than a hundred digits long   | `EXPONENT of 0 to a negative power has no result`                   |
+| `#EVAL EXPONENT (-1) 0.5`, `EXPONENT (-8) (1/3)`      | a number more than a hundred digits long   | `EXPONENT does not compute a negative number to a fractional power` |
+| `EXPONENT` of about -10^400 to the power 0.5          | a 309-digit number                         | the same error                                                      |
+| `EXPONENT` of about -10^400 to the power -0.5         | `0`                                        | the same error                                                      |
+| `EXPONENT (-2) (3 + 1/10^49)`                         | `-8`                                       | the same error                                                      |
+| `#EVAL EXPONENT 10 309`, and `exp 710` from `math`    | a 309-digit number                         | `EXPONENT overflowed: the result is too large (...)`                |
+| `#EVAL DATE_FROM_SERIAL (-0.5)`                       | `DATE OF 2, 1, 0`, the day of serial `0.5` | `DATE OF 1, 1, 0`, the day of serial `-1`                           |
+| service schema of `DECLARE Text HAS body IS A NUMBER` | `{"type":"string"}`                        | an object with `body`, which is what the service accepts            |
+| service schema of an imported record `Date`           | `{"type":"string","format":"date"}`        | an object with its fields                                           |
+| `jl4-schema` of an imported record `Text`             | a `$ref` to a definition not in the file   | the same `$ref`; see Limits                                         |
 
-`l4 trace`, one `#EVALTRACE` per file, 180 s limit on `main` and 590 s here, on a machine running other builds:
+`l4 trace`, one `#EVALTRACE` per file, 180 s limit on `main` and 590 s here, on a machine running other builds: A node is a definition line in the DOT output: an earlier revision of this page said 4,619 for `IF`, which also counted 770 edge labels. Five runs of `IF` gave identical output, so the count does not vary.
 
-| Recursion                                 | `main`                                              | this PR                                                  |
-| ----------------------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
-| `IF n EQUALS 0 THEN 0 ELSE 1 + f (n + 1)` | prints the internal error; killed at 180 s, 10.1 GB | exit 0 in 17 s, 5.5 GB, 4,619 nodes, root `viaIf OF 1`   |
-| `CONSIDER n` with the same recursion      | prints the internal error; killed at 180 s, 11.0 GB | exit 0 in 22 s, 4.9 GB, 5,006 nodes, root `viaCase OF 1` |
-| `1 + loop (n + 1)`                        | prints the internal error; killed at 180 s, 7.8 GB  | exit 0 in 60 s, 3.2 GB, 10,001 nodes, root `loop OF 0`   |
-| `x MEANS x + 1`                           | prints the internal error; exit 1 at once           | exit 0 at once, one node, root `x`, `<error>`            |
-| `1 + rest WHERE rest MEANS f (n + 1)`     | prints the internal error; killed at 180 s, 8.9 GB  | not finished at 590 s; see Limits                        |
+| Recursion                                     | `main`                                               | this PR                                                         |
+| --------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------- |
+| `IF n EQUALS 0 THEN 0 ELSE 1 + f (n + 1)`     | prints the internal error; killed at 180 s, 10.1 GB  | exit 0 in 12 s, 5.5 GB, 3,849 nodes, root `viaIf OF 1`          |
+| `CONSIDER n` with the same recursion          | prints the internal error; killed at 180 s, 11.0 GB  | exit 0 in 18 s, 4.9 GB, 5,006 nodes, root `viaCase OF 1`        |
+| `1 + loop (n + 1)`                            | prints the internal error; killed at 180 s, 7.8 GB   | exit 0 in 60 s, 3.2 GB, 10,001 nodes, root `loop OF 0`          |
+| `ping n` and `pong n`, each `1 +` the other   | not measured                                         | exit 0 in 48 s, 2.8 GB, 10,001 nodes, root `ping OF 1`          |
+| `1 + depth (c's next)` down a record chain    | not measured                                         | exit 0 in 43 s, 2.5 GB, 10,001 nodes, root `depth OF (mk OF 0)` |
+| `x MEANS x + 1`                               | prints the internal error; exit 1 at once            | exit 0 at once, one node, root `x`, `<error>`                   |
+| `1 + rest WHERE rest MEANS f (n + 1)`         | prints the internal error; killed at 180 s, 8.9 GB   | not finished at 590 s; see Limits                               |
+| `y + total ys`, `CONSIDER`ing an endless list | not finished at 150 s, 13.9 GB, by the second review | not finished at 240 s, 9.2 GB, nothing on stdout; see Limits    |
 
 ## Where it lives
 
-- `SQRT`: `jl4-core/src/L4/EvaluateLazy/Machine.hs:1962`. `EXPONENT`: `Machine.hs:2036`.
-- `serialToUTCTime` splits with `floor` (`Machine.hs:2854`). `floor` and `truncate` agree on a non-negative serial, so no such input changes.
+- `SQRT`: `jl4-core/src/L4/EvaluateLazy/Machine.hs:1962`. `EXPONENT`: `Machine.hs:2037`, checking the exact base and power before any conversion to a double.
+- `serialToUTCTime` splits with `floor` (`Machine.hs:2856`). `floor` and `truncate` agree on a non-negative serial, so no such input changes.
 - `pushFrame` records the trace `Push` only after the stack-depth check, so an overflow leaves no dangling `Push` (`Machine.hs:286`).
 - That left a second cause, measured by printing the error `safePostprocessTrace` caught on `IF` recursion. `splitEvalTraceActions` opens an address frame at each `SetRef` and closes it when the depth falls back past that frame, which assumes a `Push` follows. A force that raises first (an overflow at the update frame, or a blackhole) never pushes, so the depth never reaches the frame and the split ends in `error`, at depth -1 with the frame still open. The split now opens no frame for a `SetRef` followed directly by an exception (`jl4-core/src/L4/EvaluateLazy/Trace.hs:167`).
 - `safePostprocessTrace` catches `ErrorCall` only, so asynchronous exceptions still propagate, and substitutes `tracePostprocessFailed` (`jl4-core/src/L4/EvaluateLazy.hs:227`).
@@ -79,6 +85,7 @@ Added by this PR:
 - A declared `Optional` or `Maybe` of one argument, which on `main` `jl4-schema` read by its name, is now a `$ref` with that dangling `a`.
 - `exp` from `math` now stops with an error above about 709.78, where it used to return a 309-digit number. It is a plain `NUMBER`, not a `MAYBE`.
 - A trace of `1 + rest WHERE rest MEANS f (n + 1)` overflowing the stack did not finish in 590 s. It was not stuck in post-processing, which no longer fails: `l4 trace` was still writing the trace's text into a diagnostic on stderr, 414 MB by then at about 0.7 MB/s.
+- A trace of `total (nats 0)`, a recursion through an endless list, overflowing the stack did not finish in 240 s, with nothing on stdout and 777 bytes on stderr, so it was not writing a diagnostic; it is unfinished on `main` too. `l4 run` reports the same overflow in about 3 s.
 - The overflow traces above cost several GB, measured in the table.
 
 The same on `main`, measured on both binaries:
@@ -91,4 +98,5 @@ The same on `main`, measured on both binaries:
 - `format: date-time` over-promises against the service: it refuses the RFC 3339 input `2025-01-31T10:30:00+00:00` with `Unknown timezone: '+00:00'`, accepts `2025-01-31T10:30:00Z`, and answers `"2025-01-31 10:30:00 UTC"`, which is not RFC 3339.
 - The service refuses the `{"tag": ...}` shape that `oneOf` describes for a `ONE OF` with fields (`FnObject but expected type is not a known record`), and refuses `[["a", null]]` for a `LIST OF (LIST OF (MAYBE STRING))`.
 - `jl4-mlir/runtime/jl4-runtime.mjs` raises for these inputs with its own message: by reading, and by the refuter feeding it `Math.sqrt(-1)`, `Math.pow(0, -1)`, `Math.pow(-1, 0.5)` and `Math.pow(10, 309)`, `ratFromNumber` (`:167`) throws `rational: non-finite ...`. The compiled backend was not run.
+- `EXPONENT` of a negative base to a whole power goes through a double too: -1 to the power 10^400 + 1 gives `1`, not -1.
 - The printer still spells `BinOpExponent` as `TO THE POWER OF`; see [exponent-removal.md](exponent-removal.md).
