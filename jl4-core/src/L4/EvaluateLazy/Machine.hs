@@ -160,13 +160,15 @@ data EvalState =
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
     , answerInJust :: !Bool        -- see 'L4.EvaluateLazy.EvalConfig'
-    , reofferedEvents :: !(IORef (Set Address))
-      -- ^ addresses of EVENT values that an expiring obligation has re-offered
-      -- to its HENCE/LEST continuation (see the Contract5 expiry NOTE in
-      -- 'backwardContractFrame'). Membership enforces the at-most-once
-      -- re-offer rule: a marked event that reveals a second expiry is
-      -- consumed rather than re-offered again, which bounds evaluation for
-      -- recursive continuations with non-positive deadlines.
+    , reofferedEvents :: !(IORef (Map Address Reoffered))
+      -- ^ the EVENT copies an expiring obligation has re-offered to its
+      -- HENCE/LEST continuation, each keyed by its store address and
+      -- carrying its 'Reoffered' mark: the latest deadline it has revealed
+      -- the expiry of, and how many hand-offs in a row failed to pass it
+      -- (see the Contract5 expiry NOTE in 'backwardContractFrame'). The
+      -- mark never withholds an event from a layer; it only lets the
+      -- machine refuse a chain whose deadlines have stopped advancing,
+      -- loudly, instead of walking it forever.
     }
 
 data Stack =
@@ -330,18 +332,44 @@ putTemporalContext ctx = do
   liftIO (writeIORef r ctx)
 
 -- | Record that an EVENT value (identified by its store address) has been
--- re-offered to a HENCE/LEST continuation after revealing a deadline expiry.
--- See the Contract5 expiry NOTE in 'backwardContractFrame'.
-markReoffered :: Reference -> Eval ()
-markReoffered rf = do
+-- re-offered to a HENCE/LEST continuation, with its 'Reoffered' mark. See
+-- the Contract5 expiry NOTE in 'backwardContractFrame'.
+markReoffered :: Reference -> Reoffered -> Eval ()
+markReoffered rf mark = do
   r <- asks (.reofferedEvents)
-  liftIO (modifyIORef' r (Set.insert rf.address))
+  liftIO (modifyIORef' r (Map.insert rf.address mark))
 
--- | Has this EVENT value already been re-offered once? (see 'markReoffered')
-isReoffered :: Reference -> Eval Bool
+-- | Is this EVENT value a re-offered copy, and if so what is its mark?
+-- (see 'markReoffered')
+isReoffered :: Reference -> Eval (Maybe Reoffered)
 isReoffered rf = do
   r <- asks (.reofferedEvents)
-  liftIO (Set.member rf.address <$> readIORef r)
+  liftIO (Map.lookup rf.address <$> readIORef r)
+
+-- | How many hand-offs in a row a re-offered event may make to a
+-- continuation whose deadline is no later than one it has already revealed
+-- the expiry of, before the machine refuses the chain as one that cannot
+-- end ('stalledChainRefusal'). Deliberately generous: the number decides only
+-- how soon an ill-founded chain is reported, not whether, and a chain of
+-- DISTINCT layers is finite by its syntax and never comes near it.
+maximumStalledReoffers :: Int
+maximumStalledReoffers = 1_000
+
+-- | What the machine says when a re-offered event has walked
+-- 'maximumStalledReoffers' continuations in a row without the deadline
+-- advancing: a continuation that names itself and is already past its deadline
+-- when it is entered.
+stalledChainRefusal :: Rational -> Rational -> Text
+stalledChainRefusal highWater stamp = Text.unwords
+  [ "A chain of HENCE or LEST continuations has stalled: the event at " <> prettyRatio stamp
+  , "has been handed on " <> Text.textShow maximumStalledReoffers <> " times in a row to"
+  , "continuations whose deadlines never advanced past " <> prettyRatio highWater <> ","
+  , "a deadline it had already revealed the expiry of, so no continuation this"
+  , "chain reaches can ever be open to it. A continuation that names itself and"
+  , "is already past its deadline when it is entered - a negative WITHIN, or a"
+  , "LEST's WITHIN 0 - is such a chain. Give it a positive WITHIN, or end the"
+  , "chain with BREACH."
+  ]
 
 -- | Atomically inspect-and-update a thunk. The update function additionally
 -- receives the current thread id (for blackhole bookkeeping).
@@ -936,31 +964,41 @@ backwardContractFrame val = \ case
       -- discharged at the end of its window. Counting from the event would let
       -- a payment thousands of days late discharge a 14-day grace period.
       --
-      -- Termination: an event is re-offered AT MOST ONCE. Peeling one
-      -- syntactic HENCE/LEST layer per re-offer is NOT enough on its own,
-      -- because a continuation may recursively reference the enclosing
-      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@): with a
-      -- non-positive computed WITHIN its deadline never moves past the very
-      -- same event, and unconditional re-offering would loop forever. Hence
-      -- each re-offered event is marked (by store address, 'markReoffered');
-      -- when a marked event reveals yet another expiry, the continuation
-      -- starts without it instead of it being re-offered again
-      -- ('ev'reoffered', computed at Contract1). Each real event thus funds
-      -- at most one extra scrutiny, and the event list strictly shrinks on
-      -- every other step, so evaluation terminates.
+      -- The clock is floored at the obligation's arming: one that was already
+      -- past its deadline when it was entered (a computed negative WITHIN) fails
+      -- when it is entered, not before it existed. 'time'' is the arming here,
+      -- because such an obligation expires at its first event; for any other,
+      -- 'time'' is an event no later than the deadline, and the floor is idle.
+      --
+      -- Termination. Because a continuation counts from the missed deadline,
+      -- its own deadline can lie BEFORE the re-offered event's stamp, so the
+      -- very same event reveals a second expiry, a third, and so on down a
+      -- chain of layers. Every one of them is a real obligation whose window
+      -- the event is past, and the event must reach the first layer whose
+      -- window it is NOT past: that is the layer it can perform, or fail. So a
+      -- re-offered copy is ALWAYS handed on to the next layer. A chain of
+      -- DISTINCT layers is finite by its syntax. The only chain that does not
+      -- end is one that reaches ITSELF without the deadline advancing, a
+      -- self-naming rule with a non-positive WITHIN. That is an ill-founded
+      -- contract, and the machine refuses it by name: the copy carries a
+      -- 'Reoffered' mark with the latest deadline it has revealed the expiry
+      -- of and the number of hand-offs in a row that failed to pass that mark,
+      -- and past 'maximumStalledReoffers' of those the walk stops with
+      -- 'stalledChainRefusal'.
       then do
         let reoffer followup' = do
-              clock <- allocateValue (ValNumber deadline)
-              if ev'reoffered
-                -- this event was already re-offered once and has now
-                -- revealed a second expiry: drop it (see NOTE above)
-                then continueWithFollowup env followup' events clock
-                else do
-                  ev'timeR <- allocateValue ev'time
-                  evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
-                  markReoffered evR
-                  eventsR <- allocateValue (ValCons evR events)
-                  continueWithFollowup env followup' eventsR clock
+              mark <- case ev'reoffered of
+                Nothing -> pure MkReoffered {highWater = deadline, stalled = 0}
+                Just m
+                  | deadline > m.highWater -> pure MkReoffered {highWater = deadline, stalled = 0}
+                  | m.stalled >= maximumStalledReoffers -> userException (UserError (stalledChainRefusal m.highWater stamp))
+                  | otherwise -> pure m {stalled = m.stalled + 1}
+              clock <- allocateValue (ValNumber (max deadline time'))
+              ev'timeR <- allocateValue ev'time
+              evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+              markReoffered evR mark
+              eventsR <- allocateValue (ValCons evR events)
+              continueWithFollowup env followup' eventsR clock
         case act.modal of
           DMustNot ->
             -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline

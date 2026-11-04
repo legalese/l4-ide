@@ -13,8 +13,9 @@
 --       timely; a violated prohibition reuses the event stamp as its
 --       "deadline" sentinel.
 --   (e) EXACTLY in per-argument position.
---   (f) recursive LEST with a non-positive computed WITHIN terminates:
---       the deadline-revealing event is re-offered AT MOST ONCE.
+--   (f) a revealing event is handed on, layer by layer, to the first layer
+--       whose window it is not past. A rule that names itself with a window
+--       never open is refused: ok/deontic-stalled-chain.l4.
 --   MAY expiry routes to LEST (default FULFILLED) per the table in
 --   doc/reference/regulative/consequences.md; HENCE fires only on exercise. The HENCE
 --   and LEST continuations here differ in party AND action so the golden
@@ -202,9 +203,9 @@ GIVETH A DEONTIC Person Action
   WITHIN 2
   LEST (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Bob MUST deliver WITHIN 10))
 
--- The layers are due at 2, 5 and 15. WAITUNTIL 20 expires layer 1, and is
--- re-offered to layer 2, which it also shows expired, so layer 3 starts at 5
--- without it. WAITUNTIL 30 expires layer 3: Bob's delivery at 35 is not reached.
+-- The layers are due at 2, 5 and 15. WAITUNTIL 20 is past all three, so it is
+-- handed on down the chain and reveals the breach of layer 3: dated at 20, with
+-- its deadline at 15. Bob's delivery at 35 is not reached.
 #TRACE `nested peel` AT 0 WITH
   WAITUNTIL 20
   WAITUNTIL 30
@@ -356,30 +357,8 @@ GIVETH A DEONTIC Person Action
   PARTY Alice DOES exercise AT 3
 
 -- ---------------------------------------------------------------------------
--- (f) recursive LEST with a non-positive WITHIN terminates
+-- (f) an event is handed on to the first layer whose window it is not past
 -- ---------------------------------------------------------------------------
-
-`recursive lest` MEANS
-  PARTY Alice
-  MUST pay 1
-  WITHIN 0 - 1
-  LEST `recursive lest`
-
--- The LEST recursively re-invokes the same obligation, whose computed WITHIN
--- is negative, so each incarnation's deadline is already past at its own
--- anchor. The revealing event (Bob's delivery — wrong party, wrong action)
--- is re-offered ONCE to the first LEST incarnation; when it reveals a second
--- expiry there, it is consumed instead of being re-offered again, so
--- evaluation terminates with the recursive obligation as the residual
--- (before the at-most-once rule this trace looped forever).
-#TRACE `recursive lest` AT 0 WITH
-  PARTY Bob DOES deliver AT 7
-
--- More than one event: each is re-offered at most once, and the run ends.
-#TRACE `recursive lest` AT 0 WITH
-  PARTY Bob DOES deliver AT 7
-  PARTY Bob DOES deliver AT 8
-  PARTY Alice DOES pay 1 AT 9
 
 `three layers` MEANS
   PARTY Alice
@@ -387,15 +366,63 @@ GIVETH A DEONTIC Person Action
   WITHIN 2
   LEST (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Alice MUST deliver WITHIN 100))
 
--- The delivery at 7 shows layers 1 and 2 expired, so it has used its one
--- re-offer before reaching layer 3, which is due at 105: layer 3 stays open.
--- A second delivery reaches it.
+-- The delivery at 7 is past layers 1 and 2, due at 2 and 5, and inside layer 3,
+-- due at 105, so it performs layer 3. A later event changes nothing.
 #TRACE `three layers` AT 0 WITH
   PARTY Alice DOES deliver AT 7
 
 #TRACE `three layers` AT 0 WITH
   PARTY Alice DOES deliver AT 7
-  PARTY Alice DOES deliver AT 8
+  WAITUNTIL 200
+
+-- Past layer 3 too: a breach at 106 of the deadline at 105.
+#TRACE `three layers` AT 0 WITH
+  PARTY Alice DOES deliver AT 106
+
+-- A middle layer with no window of its own is passed through like any other.
+`zero in the middle` MEANS
+  PARTY Alice
+  MUST pay 1
+  WITHIN 5
+  LEST (PARTY Alice MUST pay 2 WITHIN 0 LEST (PARTY Alice MUST deliver WITHIN 10))
+
+#TRACE `zero in the middle` AT 0 WITH
+  PARTY Alice DOES deliver AT 12
+
+-- Three no-smoking windows, 0-5, 5-10 and 10-15. Smoking at 12 is inside the
+-- third, whatever was recorded first: the act is not lost on the way to it.
+`three prohibitions` MEANS
+  PARTY Alice
+  SHANT smoke
+  WITHIN 5
+  HENCE (PARTY Alice SHANT smoke WITHIN 5 HENCE (PARTY Alice SHANT smoke WITHIN 5))
+
+#TRACE `three prohibitions` AT 0 WITH
+  PARTY Alice DOES smoke AT 12
+  WAITUNTIL 20
+
+#TRACE `three prohibitions` AT 0 WITH
+  WAITUNTIL 11
+  PARTY Alice DOES smoke AT 12
+  WAITUNTIL 20
+
+-- A WITHIN that computes below zero: the rule was past its deadline when it was
+-- entered, so it fails then, at 0, and not before it existed. The cure counts
+-- from 0 and is due at 3, so a delivery at 1 performs it, and it is not a breach
+-- of a cure that closed at -7.
+GIVEN `days` IS A NUMBER
+GIVETH A DEONTIC Person Action
+`cure after a negative window` `days` MEANS
+  PARTY Alice
+  MUST pay 1
+  WITHIN `days` - 30
+  LEST (PARTY Bob MUST deliver WITHIN 3)
+
+#TRACE `cure after a negative window` 20 AT 0 WITH
+  PARTY Bob DOES deliver AT 1
+
+#TRACE `cure after a negative window` 20 AT 0 WITH
+  PARTY Bob DOES deliver AT 4
 
 -- ---------------------------------------------------------------------------
 -- `l4 batch` prints this whole file and parses it again for each line of input,

@@ -38,7 +38,11 @@ executing contract `may with lest` at 0 with the following events: party `Alice`
 executing contract `may bare` at 0 with the following events: `WAITUNTIL` with 9
 executing contract `may or else breach` at 0 with the following events: `WAITUNTIL` with 9
 executing contract `may or else breach` at 0 with the following events: party `Alice` did `exercise` at 3
-executing contract `recursive lest` at 0 with the following events: party `Bob` did `deliver` at 7
-executing contract `recursive lest` at 0 with the following events: party `Bob` did `deliver` at 7 party `Bob` did `deliver` at 8 party `Alice` did `pay` with 1 at 9
 executing contract `three layers` at 0 with the following events: party `Alice` did `deliver` at 7
-executing contract `three layers` at 0 with the following events: party `Alice` did `deliver` at 7 party `Alice` did `deliver` at 8
+executing contract `three layers` at 0 with the following events: party `Alice` did `deliver` at 7 `WAITUNTIL` with 200
+executing contract `three layers` at 0 with the following events: party `Alice` did `deliver` at 106
+executing contract `zero in the middle` at 0 with the following events: party `Alice` did `deliver` at 12
+executing contract `three prohibitions` at 0 with the following events: party `Alice` did `smoke` at 12 `WAITUNTIL` with 20
+executing contract `three prohibitions` at 0 with the following events: `WAITUNTIL` with 11 party `Alice` did `smoke` at 12 `WAITUNTIL` with 20
+executing contract `cure after a negative window` with 20 at 0 with the following events: party `Bob` did `deliver` at 1
+executing contract `cure after a negative window` with 20 at 0 with the following events: party `Bob` did `deliver` at 4

@@ -46,7 +46,9 @@ GIVETH A DEONTIC Party Action
 - L4 finds that a deadline has passed when it reads an event, or a `WAITUNTIL` (see [EVENT](EVENT.md)), with a later time.
   An event exactly at the deadline is in time.
 - The event that shows a deadline has passed is not used up by the rule that missed it. It is offered to the rule that follows, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for, if it falls inside that reparation's own window.
-- An event is offered this way once. If it also shows that the next rule's deadline has passed, the rule after that starts without seeing it, which is what stops a rule whose `LEST` names itself from running forever. So one event reaches at most two rules: to perform a third rule in a chain, it takes another event.
+- When one event is past several windows in a chain, a first chance, a second, a third, it is offered to each in turn until it reaches the first whose window is still open, and that is the rule it performs or fails.
+- A rule that names itself under `LEST` with a window that is never open, `WITHIN 0` or a negative `WITHIN`, cannot end this way: L4 stops with an error naming the chain after 1,000 hand-offs in a row.
+- A rule whose `WITHIN` computes below zero was past its deadline when it became active. It fails at that moment, not before it existed, and the rule that follows counts from there.
 
 ## HENCE and LEST
 

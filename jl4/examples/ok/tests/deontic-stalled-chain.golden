@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+deontic-stalled-chain.l4:17:1-18:30:
+  A chain of HENCE or LEST continuations has stalled: the event at 7 has been handed on 1000 times in a row to continuations whose deadlines never advanced past -1, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, or a LEST's WITHIN 0 - is such a chain. Give it a positive WITHIN, or end the chain with BREACH.
+deontic-stalled-chain.l4:26:1-27:30:
+  A chain of HENCE or LEST continuations has stalled: the event at 7 has been handed on 1000 times in a row to continuations whose deadlines never advanced past 0, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, or a LEST's WITHIN 0 - is such a chain. Give it a positive WITHIN, or end the chain with BREACH.
+deontic-stalled-chain.l4:37:1-38:32:
+  FULFILLED
