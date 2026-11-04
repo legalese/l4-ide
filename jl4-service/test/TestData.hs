@@ -15,11 +15,6 @@ module TestData (
   synonymWrapperJL4,
   inputThenInputJL4,
   saleContractJL4,
-  deonticExportJL4,
-  deonticDeadlineJL4,
-  deonticShapesJL4,
-  deonticValueActionJL4,
-  deonticRecordPartyJL4,
   spacedFieldsJL4,
   assumeParamJL4,
   importedRecordDeclJL4,
@@ -458,19 +453,15 @@ GIVETH A NUMBER
 
 -- | A MAYBE input followed by another input, on the wrapper path: a synonym for a
 -- MAYBE and a MAYBE NUMBER written out, each first, with a NUMBER after it, and
--- the synonym last as the control; and three DEONTIC functions of the same
--- shapes. The generated wrapper once wrote the input record with a leading comma
--- on every field after the first, which does not parse after a field whose type
--- is an application (@MAYBE OF NUMBER@), so each of these failed with a parser
--- error. Every function takes @y@ and @z@, so one request fits them all.
+-- the synonym last as the control. The generated wrapper once wrote the input
+-- record with a leading comma on every field after the first, which does not
+-- parse after a field whose type is an application (@MAYBE OF NUMBER@), so each
+-- of these failed with a parser error. Every function takes @y@ and @z@, so one
+-- request fits them all.
 inputThenInputJL4 :: Text
 inputThenInputJL4 =
   [i|
 DECLARE MaybeYear IS A MAYBE NUMBER
-
-DECLARE Party IS ONE OF `the seller`, `the buyer`
-
-DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
 
 @export a synonym for a MAYBE, then a NUMBER
 GIVEN y IS A MaybeYear
@@ -510,39 +501,6 @@ GIVETH A NUMBER
   z PLUS (CONSIDER y
             WHEN JUST n THEN n
             WHEN NOTHING THEN 0)
-
-@export a contract with a synonym for a MAYBE first
-GIVEN y IS A MaybeYear
-      z IS A NUMBER
-GIVETH A DEONTIC Party `Contract Action`
-`syn contract` MEANS
-    PARTY `the seller`
-    MUST `deliver the goods`
-    WITHIN 14
-    HENCE FULFILLED
-    LEST BREACH
-
-@export a contract with a MAYBE NUMBER written out first
-GIVEN y IS A MAYBE NUMBER
-      z IS A NUMBER
-GIVETH A DEONTIC Party `Contract Action`
-`plain contract` MEANS
-    PARTY `the seller`
-    MUST `deliver the goods`
-    WITHIN 14
-    HENCE FULFILLED
-    LEST BREACH
-
-@export a contract with the synonym last: the control
-GIVEN z IS A NUMBER
-      y IS A MaybeYear
-GIVETH A DEONTIC Party `Contract Action`
-`control contract` MEANS
-    PARTY `the seller`
-    MUST `deliver the goods`
-    WITHIN 14
-    HENCE FULFILLED
-    LEST BREACH
 |]
 
 -- | L4 source with an exported boolean function and a regulative (sale contract) rule.
@@ -572,110 +530,6 @@ GIVETH A DEONTIC Party `Contract Action`
     LEST BREACH
 |]
 
--- | L4 source with an exported deontic function for testing contract simulation.
--- The sale contract has no GIVEN parameters — it's a standalone deontic rule.
-deonticExportJL4 :: Text
-deonticExportJL4 =
-  [i|
-DECLARE Party IS ONE OF `the seller`, `the buyer`
-DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
-
-@export default sale contract
-GIVETH A DEONTIC Party `Contract Action`
-`the sale contract` MEANS
-    PARTY `the seller`
-    MUST `deliver the goods`
-    WITHIN 14
-    HENCE
-        PARTY `the buyer`
-        MUST `pay the invoice`
-        WITHIN 30
-        HENCE FULFILLED
-        LEST BREACH
-    LEST BREACH
-|]
-
--- | As 'deonticExportJL4', but the seller's obligation has no @LEST@: missing
--- its deadline is a breach the evaluator reports as @deadline_missed@, naming
--- the event that revealed it and the obligation that was missed.
-deonticDeadlineJL4 :: Text
-deonticDeadlineJL4 =
-  [i|
-DECLARE Party IS ONE OF `the seller`, `the buyer`
-DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`
-
-@export default sale contract
-GIVETH A DEONTIC Party `Contract Action`
-`the sale contract` MEANS
-    PARTY `the seller`
-    MUST `deliver the goods`
-    WITHIN 14
-|]
-
--- | Shapes of party and action, each with a space in a name: the operands of a
--- @ROR@ and of a @RAND@, an action the rule does not declare (a binder), and a
--- party that is a @GIVEN@ input.
-deonticShapesJL4 :: Text
-deonticShapesJL4 =
-  [i|
-DECLARE Party IS ONE OF `the seller`, `the buyer`
-DECLARE `Contract Action` IS ONE OF `deliver the goods`, `pay the invoice`, `inspect the goods`
-
-@export default alternative
-GIVETH A DEONTIC Party `Contract Action`
-`the alternative` MEANS
-    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
-    ROR
-    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
-
-@export default conjunction
-GIVETH A DEONTIC Party `Contract Action`
-`the conjunction` MEANS
-    (PARTY `the seller` MUST `deliver the goods` WITHIN 14)
-    RAND
-    (PARTY `the buyer` MUST `pay the invoice` WITHIN 30)
-
-@export default binder
-GIVETH A DEONTIC Party `Contract Action`
-`the binder` MEANS
-    PARTY `the seller`
-    MUST `some act`
-    WITHIN 10
-
-@export default given party
-GIVEN `the payer` IS A Party
-GIVETH A DEONTIC Party `Contract Action`
-`the given party` MEANS
-    PARTY `the payer`
-    MUST `deliver the goods`
-    WITHIN 10
-    HENCE FULFILLED
-    LEST BREACH
-|]
-
--- | A contract whose one action carries a value: it is not a name, so the
--- answer prints it as the rule source it is.
-deonticValueActionJL4 :: Text
-deonticValueActionJL4 =
-  [i|
-DECLARE Party IS ONE OF Alice
-DECLARE Act IS ONE OF
-  say HAS text IS A STRING
-
-@export default the contract
-GIVETH A DEONTIC Party Act
-`the contract` MEANS
-  PARTY Alice
-  MUST say "pay now"
-  WITHIN 10
-  HENCE FULFILLED
-  LEST BREACH
-|]
-
--- | L4 source with a deontic function that uses record-typed parties.
--- Tests that events with JSON object parties (e.g. {"name": "Alice"})
--- are correctly formatted as L4 record construction (Driver WITH name IS "Alice")
--- rather than backtick-quoted identifiers.
 -- | L4 source with spaced field names, for testing hyphenated key remapping.
 -- Parameters use backtick identifiers with spaces that get sanitized to hyphens
 -- in the API/MCP schema.
@@ -711,35 +565,6 @@ IMPORT imported_record_decl.l4
 GIVEN applicant IS A Applicant
 GIVETH A BOOLEAN
 DECIDE `applicant is an adult` IS applicant's age >= 18
-|]
-
-deonticRecordPartyJL4 :: Text
-deonticRecordPartyJL4 =
-  [i|
-DECLARE Car HAS
-    `number of wheels` IS A NUMBER
-
-DECLARE Driver HAS
-    name IS A STRING
-
-DECLARE `Driver Action` IS ONE OF
-    `wear seatbelt`
-    `drive`
-
-@export default seatbelt requirement
-GIVEN car    IS A Car
-      driver IS A Driver
-GIVETH A PROVISION OF Driver, `Driver Action`
-`Seatbelt Requirement` MEANS
-    IF      car's `number of wheels` EQUALS 4
-    THEN    PARTY driver
-            MUST `wear seatbelt`
-            WITHIN 1
-            HENCE
-                PARTY driver
-                MAY `drive`
-    ELSE    PARTY driver
-            MAY `drive`
 |]
 
 -- | A rule written as clauses, with no clause for Blue. The error for Blue is

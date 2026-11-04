@@ -126,6 +126,7 @@ library
     L4.Export
     L4.Export.Document
     L4.Export.Render
+    L4.Export.Shape
     L4.FunctionSchema
     L4.FindDefinition
     L4.FindReferences

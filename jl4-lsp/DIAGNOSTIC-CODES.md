@@ -63,8 +63,11 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/cyclic-type-synonyms`         | Type synonyms refer to each other in a ring.                       |
 | `check/duplicate-name`               | A name occurs twice where names must be distinct.                  |
 | `check/export-clauses-without-given` | An `@export` of clauses with no GIVEN.                             |
+| `check/export-deontic-type`          | An `@export` takes or returns a DEONTIC, a contract rule.          |
 | `check/export-event-type`            | An `@export` takes or returns an EVENT.                            |
 | `check/export-function-input`        | An `@export` has an input of a function type.                      |
+| `check/export-function-result`       | An `@export` returns a function.                                   |
+| `check/export-unsupported-type`      | An `@export` takes or returns a type with no JSON form yet.        |
 | `check/internal-error`               | A bug in the checker.                                              |
 | `check/invalid-type-parameter`       | A parameter of a type declaration is not of type TYPE.             |
 | `check/missing-named-arguments`      | A call with named arguments leaves some out.                       |
@@ -92,6 +95,7 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/annotation-without-location` | `parser` | An annotation with no source location: a bug.               |
 | `lint/clause-arity-changed`        | `check`  | A definition after clauses that is not another clause.      |
 | `lint/empty-nlg`                   | `parser` | An `@nlg` with no text.                                     |
+| `lint/export-untyped-given`        | `export` | An `@export` with a GIVEN that has no written type.         |
 | `lint/lang-overridden`             | `parser` | A `@lang` line that a later one overrides.                  |
 | `lint/lone-lang-tag`               | `parser` | An `@nlg` tag that nothing else in the module backs.        |
 | `lint/misplaced-clause-annotation` | `check`  | An annotation above a later clause.                         |

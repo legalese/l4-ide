@@ -6,6 +6,7 @@ import qualified Data.Aeson.Encode.Pretty as AesonPretty
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
 import Options.Applicative
 import System.Directory (getCurrentDirectory)
@@ -19,7 +20,7 @@ import LSP.Logger
 
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.TracePolicy (apiDefaultPolicy)
-import L4.Export (ExportedFunction (..), getExportedFunctions)
+import L4.Export (ExportedFunction (..), getExportedFunctions, prettyExportError, refusalsOf)
 import L4.JsonSchema (SchemaContext (..), emptyContext, generateJsonSchema)
 import L4.Syntax (TopDecl (..), Declare (..), Module (..), Resolved, Section (..), AppForm (..), rawNameToText, rawName, getActual)
 
@@ -61,13 +62,15 @@ main = do
       Nothing -> pure Nothing
       Just tcRes
         | not tcRes.success -> pure Nothing
-        | otherwise -> pure $ Just tcRes.module'
+        | otherwise -> do
+            exportErrs <- Shake.use Rules.ExportCheck uri
+            pure $ Just (tcRes.module', fromMaybe [] exportErrs)
 
   case result of
     Nothing -> do
       hPutStrLn stderr "Error: Failed to parse or typecheck L4 file"
       exitWith (ExitFailure 1)
-    Just resolvedModule -> do
+    Just (resolvedModule, exportErrs) -> do
       let exports = getExportedFunctions resolvedModule
       if null exports
         then do
@@ -80,6 +83,10 @@ main = do
               hPutStrLn stderr $ "Error: Export not found: " <> maybe "(default)" Text.unpack options.functionName
               hPutStrLn stderr $ "Available exports: " <> List.intercalate ", " (map (Text.unpack . (.exportName)) exports)
               exitWith (ExitFailure 2)
+            -- What the check refuses is not published, so it has no schema.
+            Just export | refused@(_ : _) <- refusalsOf exportErrs export -> do
+              mapM_ (hPutStrLn stderr . Text.unpack) (concatMap prettyExportError refused)
+              exitWith (ExitFailure 1)
             Just export -> do
               let ctx = buildContext resolvedModule
                   schema = generateJsonSchema ctx export

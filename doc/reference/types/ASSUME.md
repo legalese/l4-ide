@@ -45,9 +45,9 @@ DECIDE `the applicant is an adult` IF `the applicant's age` >= 18
 
 Here `` `the applicant's age` `` is an input of `` `the applicant is an adult` ``; `` `an unused fact` `` is not.
 
-### Function-typed inputs are not supported for `@export`
+### Function-typed inputs are not supported yet for `@export`
 
-An exported function cannot take an input of function type, whether it is a `GIVEN` input or an `ASSUME` it uses:
+An exported function cannot take an input of function type yet, whether it is a `GIVEN` input or an `ASSUME` it uses:
 
 ```text
 ASSUME `the test` IS A FUNCTION FROM NUMBER TO BOOLEAN
@@ -55,8 +55,10 @@ ASSUME `the test` IS A FUNCTION FROM NUMBER TO BOOLEAN
 DECIDE `passes` IF `the test` 42
 ```
 
-`l4 check` reports "Function type inputs are not supported for @export", and the service refuses to deploy such a file.
+`l4 check` reports that the input `the test` is a function and that @export does not support that yet, and the service refuses to deploy such a file.
 A function cannot be sent as JSON over REST or MCP, and an assumed function has no definition to run.
+The file still checks, so the rule is still evaluated where you write it.
+See [An @export with an input or result that cannot be sent yet](../errors/README.md#an-export-with-an-input-or-result-that-cannot-be-sent-yet).
 
 ## Related pages
 
