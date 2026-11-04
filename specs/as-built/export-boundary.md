@@ -1,6 +1,6 @@
 # The export boundary: which types an `@export` may take and give back (as built)
 
-Status: built on the branch `carve/export-boundary`, the draft pull request legalese/l4-ide#779 against `main`; it follows legalese/l4-ide#769, which merged into `main` on 2026-10-30; not on `main` or `unstable` yet.
+Status: built on the branch `carve/export-boundary`, the pull request legalese/l4-ide#779 against `main`; it follows legalese/l4-ide#769, which merged into `main` on 2026-10-30; not on `main` or `unstable` yet.
 Source spec: none.
 The shape of the change is the second part of the review of legalese/l4-ide#738 (serrynaimo, 2026-10-29, sections 3 and 4), which Meng ruled to build as specified on 2026-10-30.
 This page describes what the branch has.
@@ -10,11 +10,11 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 ## What it does
 
-- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:131`), decides whether a type has a form in JSON, and says why when it has none.
+- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:153`), decides whether a type has a form in JSON, and says why when it has none.
   The table is the header comment of that module.
   `NUMBER`, `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, `LIST OF`, `MAYBE`, `EITHER` of two types that have shapes, a record, an enumeration, a synonym and a type with parameters have a shape.
   A function, an `EVENT`, a `DEONTIC`, a type variable and any other built-in type that nobody gave a row have none.
-- `checkExports` (`jl4-core/src/L4/Export.hs:492`) asks it about every input and the result of every `@export`.
+- `checkExports` (`jl4-core/src/L4/Export.hs:518`) asks it about every input and the result of every `@export`.
   An input is a `GIVEN`, or an `ASSUME` of the module that the body of the rule reads itself.
   The result is the written `GIVETH`, or the inferred type when there is none.
 - A type with no shape is the error `ExportUnsendable`, ranged at the `@export`, saying which input or the result, what it is, and one line on what to do.
@@ -25,13 +25,13 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   An error of the type check stops the file from evaluating anything (`success` in `Rules.hs`, read by `SuccessfulTypeCheck`), so a refused `@export` that was a type error would blank the `#EVAL` and `#EVALTRACE` of every rule in the file, the contract rules that the author tests there included.
   Here the file still checks and its rules still evaluate.
 - Where the errors show:
-  - the editor publishes them as diagnostics with the source `export` (`exportErrorToDiagnostic`, `jl4-lsp/src/LSP/L4/Rules.hs:1387`), kicked with the type check (`jl4-lsp/app/LSP/L4/LanguageServer.hs:349`);
-  - the Deploy button refuses on them, because `isBlockingDiagnostic` (`jl4-lsp/src/LSP/L4/BlockingErrors.hs:40`) blocks on every error except those with the source `eval` or `import`, and `l4/getExportedFunctions` runs the check itself before it reads the diagnostics (`jl4-lsp/app/LSP/L4/Handlers.hs`);
+  - the editor publishes them as diagnostics with the source `export` (`exportErrorToDiagnostic`, `jl4-lsp/src/LSP/L4/Rules.hs:1438`), kicked with the type check (`jl4-lsp/app/LSP/L4/LanguageServer.hs:349`);
+  - the Deploy button refuses on them, because `isBlockingDiagnostic` (`jl4-lsp/src/LSP/L4/BlockingErrors.hs:35`) blocks on every error except those with the source `eval` or `import`, and `l4/getExportedFunctions` runs the check itself before it reads the diagnostics (`jl4-lsp/app/LSP/L4/Handlers.hs`);
   - the sidebar's list of exports leaves a refused rule out (`Export.withoutRefused`), so a contract rule is no longer listed with `isDeontic` set; the text test for "DEONTIC" in the printed return type (`Inspector.hs`) is gone;
   - `l4 check` and `l4 deploy` run the rule (`jl4/app/L4/Cli/Check.hs:55`, `jl4/app/L4/Cli/Deploy.hs:286`) and exit 1 on an error; `l4 run` and `l4 batch` do not run it, so they still run the file;
   - `jl4-mlir wasm` refuses on them with the same words (`typecheckL4File`, `jl4-mlir/src/L4/MLIR/Pipeline.hs`), except a `DEONTIC` result: its JS runtime evaluates a contract from the schema, which `jl4-mlir/README.md` documents, so it is kept while the service's refusal is provisional (assumed, not ruled);
   - the web editor's WebAssembly build gets them from `l4_check` (`L4.API.l4Check`, `exportErrorsOf`), with the source `export`, and only for a file that type-checks, as in the language server;
-  - `jl4-service` builds the same errors in its deploy gate (`jl4-service/src/Compiler.hs:192`) and refuses the bundle, with the same words, once the module has no type errors: as in the editor, a module that does not type-check is not asked what its exports take and give back.
+  - `jl4-service` builds the same errors in its deploy gate (`jl4-service/src/Compiler.hs:194`) and refuses the bundle, with the same words, once the module has no type errors: as in the editor, a module that does not type-check is not asked what its exports take and give back.
 - The two checks of the previous change, the function-typed input and the `EVENT`, are gone from the type check (`ExportFunctionTypeInput`, `ExportEventType`) and are cases of the one check.
   So a function-typed input no longer stops the file from checking either.
 
@@ -41,8 +41,8 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   Types are looked up in the declarations of the module and of everything it imports (`moduleDeclares`), and a record that contains itself stops at `JRecursive`.
   Whether a type has a shape is worked out once for each type reached, however many paths lead to it (`firstUnsendable`); the type's arguments count, so `Box OF NUMBER` and `Box OF STRING` are looked at apart, and a type given to itself (`Box OF (Box OF a)`) has its arguments looked at.
   The shape itself (`expand`) is a tree that writes a declared type out on every path to it, so it is built only as far as something looks at it; nothing in this change looks at it, except a test.
-- `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:427`, `:436`), `checkExports`, `checkOneExport` (`:539`), `withoutRefused` (`:500`), `prettyExportError` (`:464`); `inferredReturnType` (`:165`) gives the result of a definition without a `GIVETH`.
-- `jl4-service/src/Compiler.hs`, `jl4-lsp/src/LSP/L4/Rules.hs` (the key `ExportCheck`, `:187`) and the two commands use it; none of them has a check of its own.
+- `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:443`, `:434`), `checkExports`, `checkOneExport` (`:576`), `withoutRefused` (`:526`), `refusalsOf`, `prettyExportError` (`:490`); `inferredReturnType` (`:167`) gives the result of a definition without a `GIVETH`.
+- `jl4-service/src/Compiler.hs`, `jl4-lsp/src/LSP/L4/Rules.hs` (the key `ExportCheck`, `:192`) and the two commands use it; none of them has a check of its own.
 
 ## How it is pinned
 
@@ -54,6 +54,11 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   The golden harness (`jl4/tests/Main.hs`) prints the export errors after the type-check errors, with the prefix `[export error]` or `[export warning]`, and the `#EVAL` at the end of the file still has its result there.
 - `jl4/examples/ok/tests/desc.golden` and `pattern-matching-overloads-own-annotations.golden` gained the warning for a `GIVEN` with no written type.
 - `jl4/examples/legal/ceo-performance-award.l4`: its `@export` on a rule that returns a `DEONTIC` became a comment, so that the file is not refused; see the revisit note below.
+- `jl4-core/test/ExportValidationSpec.hs` also pins, under a timeout: records whose two fields share a record type at 64 levels, 14 records that each have a field of every one of them, and a type that passes what it was given on twice at 40 levels.
+  It pins the shape of a record in a cycle from each place it is reached, and `Box OF (Box OF ...)`.
+  It pins the words for a generic rule, a generic `ASSUME` and a result with no `GIVETH`, and what `l4_check` reports (`L4.API.l4Check`).
+- `jl4-mlir/test/Main.hs` compiles files through `compileToMLIR`: an `EVENT`, function or `DEONTIC` input, a record with a function field and a generic rule are refused, and a `DEONTIC` result is compiled.
+- `jl4/tests-cli/Main.hs` pins that `jl4-schema` refuses an export the check refuses, by default and by name, and writes the schema of another export of that file.
 - `jl4-service/test/IntegrationSpec.hs`: a bundle with an `@export` that takes an `EVENT`, returns an `EVENT` or returns a `DEONTIC` is refused, with the new words.
   The tests that deployed a contract rule are removed with the path they exercised: "deontic evaluation", "deontic answers spell a party and an action one way", "deontic evaluation with record-typed parties", the contract cases of the MAYBE-input bundle, and the missing-input case of a deontic rule.
   The path's code is still there.
@@ -97,6 +102,13 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
   It is not refused because `jl4-service-test` deploys a function whose result is such a type (smucclaw/l4-ide#1003, `wireProbeJL4`), and the wire-form bench (`l4-wire-form-1015`, card J1, open) counts 8 to 11 of 3,006 exports that take one.
   A tagged shape is that bench's to rule, not this change's.
 - A built-in type nobody gave a row to is refused, as the review asked.
+- The schema that the service publishes and the editor's sidebar lists (`typeToParameter`) writes a record out in full on every path to it, so it doubles at each level of the nesting that `jsonShape` no longer doubles on, as it does on `main`.
+  Measured on 2026-11-04 through `jl4-core-test`, encoding one input's parameter: 14 MB in 0.5 s at 16 levels, 226 MB in 9.3 s at 20, 906 MB in 37 s at 22.
+  A bundle of that kind is refused by the service from 18 levels with "compilation timed out or exceeded the memory limit", in under a second, on `main` and on this branch alike (at 12 and 16 levels it deploys, on both).
+  The cause of that refusal was not traced.
+  The wire form of the schema is what would have to change, and that is not done here.
+- `jl4-mlir` accepts a rule that returns a `DEONTIC` and the service refuses it (assumed, not ruled), so a `.schema.json` can list a function that the service does not.
+  `jl4-mlir/scripts/parity-harness.mjs`, which is run by hand, deploys `deontic-sale.l4`, `deontic-seatbelt.l4` and `deontic-breach.l4` to the service by default, so its comparison of contract rules no longer has a service side (read from the harness, not run).
 - `EITHER` has the shapes of its two sides and is not refused.
   The service writes an `EITHER` answer today, and the schema calls it an `object`; how it should be written is the wire-form bench's card J3, open.
   Refusing it was measured to break two files that check today: `subjects/il/hvac-work-licensing-2025/encodings/legalese-full-sonnet-5.5/g1-register.l4` in `legalese/commons` and `jl4/experiments/thailand-cosmetics/orchestrator.l4` in this repository.
