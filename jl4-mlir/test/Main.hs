@@ -13,6 +13,7 @@ import System.IO.Temp (withSystemTempDirectory)
 import System.Process (proc, readCreateProcessWithExitCode)
 
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import L4.MLIR.IR
 import L4.MLIR.Emit (renderMLIR)
@@ -21,6 +22,7 @@ import L4.MLIR.Dialect.Arith
 import L4.MLIR.Dialect.SCF
 import L4.MLIR.Runtime.Builtins (builtinDeclarations)
 import L4.MLIR.Lower (lowerProgramWithInfo, lowerProgramWithDiagnostics)
+import L4.MLIR.Pipeline (compileToMLIR)
 import L4.MLIR.Schema (bundleExports, applyDiagnostics, encodeBundle, FunctionExport)
 
 import qualified Data.Aeson as Aeson
@@ -227,6 +229,28 @@ main = do
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "REFUSE marks the export unsupported" testRefuseUnsupported
     , test "jl4-mlir run declines an unsupported export" testRunDeclinesUnsupported
+    , test "an EVENT input is refused, as the service refuses it" $
+        testExportRefused
+          ["GIVEN e IS AN EVENT Party Act", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "its input `e` is an EVENT"
+    , test "a function-typed input is refused, as the service refuses it" $
+        testExportRefused
+          ["GIVEN f IS A FUNCTION FROM NUMBER TO BOOLEAN", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "its input `f` is a function"
+    , test "a DEONTIC input is refused, as the service refuses it" $
+        testExportRefused
+          ["GIVEN d IS A DEONTIC Party Act", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "its input `d` is a DEONTIC"
+    , test "an export of a record with a function field is refused" $
+        testExportRefused
+          ["GIVEN r IS A Rule", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "whose field"
+    , test "a generic export is refused" $
+        testExportRefused
+          ["GIVEN a IS A TYPE", "      x IS AN a", "GIVETH AN a", "`refused` MEANS x"]
+          "its input `a`"
+    , test "a DEONTIC result is compiled, which the service refuses" testDeonticResultCompiled
+    , test "a rule the check has nothing to say about is compiled" testPlainExportCompiled
     , test "deontic REFUSE after HENCE is unsupported" $
         testDeonticRefuse False ["MUST `pay`", "WITHIN 10", "HENCE REFUSE \"after payment\""]
     , test "deontic REFUSE after LEST is unsupported" $
@@ -335,6 +359,58 @@ test name action = do
   result <- action
   putStrLn $ if result then "ok" else "FAIL"
   pure result
+
+-- | A file that declares what the tests of 'L4.MLIR.Pipeline' refuse, and one
+-- @\@export@ with these lines.
+exportFixture :: [T.Text] -> T.Text
+exportFixture rule =
+  T.unlines $
+    [ "DECLARE Party IS ONE OF alice, bob"
+    , "DECLARE Act IS ONE OF ping, pong"
+    , "DECLARE Rule HAS test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+    , ""
+    , "@export The rule"
+    ]
+      <> rule
+
+-- | 'compileToMLIR' on a file holding this source: 'Nothing' when it compiles,
+-- or what it was refused with.
+compileFixture :: T.Text -> IO (Maybe [T.Text])
+compileFixture src =
+  withSystemTempDirectory "jl4-mlir-export" \dir -> do
+    let file = dir </> "fixture.l4"
+    TIO.writeFile file src
+    either Just (const Nothing) <$> compileToMLIR file
+
+testExportRefused :: [T.Text] -> T.Text -> IO Bool
+testExportRefused rule want =
+  compileFixture (exportFixture rule) >>= \case
+    Nothing -> do
+      putStrLn "\n    it compiled"
+      pure False
+    Just errs
+      | any (T.isInfixOf want) errs -> pure True
+      | otherwise -> do
+          putStrLn $ "\n    expected " <> T.unpack want <> ", got " <> show errs
+          pure False
+
+-- | The JS runtime evaluates a contract from the schema (README, known gaps),
+-- which is why this path does not refuse what the service refuses here.
+testDeonticResultCompiled :: IO Bool
+testDeonticResultCompiled =
+  compileFixture (exportFixture ["GIVETH A DEONTIC Party Act", "`the duty` MEANS PARTY alice MUST ping WITHIN 3"]) >>= \case
+    Nothing -> pure True
+    Just errs -> do
+      putStrLn $ "\n    refused: " <> show errs
+      pure False
+
+testPlainExportCompiled :: IO Bool
+testPlainExportCompiled =
+  compileFixture (exportFixture ["GIVEN p IS A Party", "GIVETH A Party", "`same` MEANS p"]) >>= \case
+    Nothing -> pure True
+    Just errs -> do
+      putStrLn $ "\n    refused: " <> show errs
+      pure False
 
 -- | Test that MLIR types render correctly.
 testTypeEmission :: IO Bool

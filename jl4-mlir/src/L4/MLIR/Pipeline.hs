@@ -34,7 +34,9 @@ import L4.MLIR.Runtime.Builtins (builtinDeclarations)
 import L4.MLIR.Schema (WasmBundle, bundleExports, applyDiagnostics, writeBundleFile)
 
 import L4.Syntax (Module, Resolved)
-import L4.TypeCheck.Types (InfoMap)
+import L4.TypeCheck.Types (InfoMap, Severity (..))
+import qualified L4.Export as Export
+import qualified L4.Export.Shape as Shape
 
 import Data.Map.Strict (Map)
 
@@ -47,6 +49,7 @@ import L4.EvaluateLazy (readFixedNowEnv, resolveEvalConfig)
 import L4.TracePolicy (cliDefaultPolicy)
 
 import Control.Monad (unless, when)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
@@ -95,15 +98,28 @@ typecheckL4File filepath = do
   fixedNow <- readFixedNowEnv
   evalConfig <- resolveEvalConfig fixedNow cliDefaultPolicy
 
-  (errs, mTc) <- oneshotL4ActionAndErrors evalConfig filepath $ \nfp -> do
+  (errs, checked) <- oneshotL4ActionAndErrors evalConfig filepath $ \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.TypeCheck uri
+    mTc <- Shake.use Rules.TypeCheck uri
+    exportErrs <- Shake.use Rules.ExportCheck uri
+    pure (mTc, fromMaybe [] exportErrs)
 
-  case mTc of
-    Just tc | tc.success -> pure $ Right (tc, tc.dependencies)
-    Just _tc -> pure $ Left (errs ++ ["Typecheck completed with errors"])
-    Nothing -> pure $ Left (if null errs then ["Typecheck failed"] else errs)
+  case checked of
+    (Just tc, exportErrs)
+      | tc.success -> case filter refusedHere exportErrs of
+          [] -> pure $ Right (tc, tc.dependencies)
+          refused -> pure $ Left (map (Text.unwords . Export.prettyExportError) refused)
+      | otherwise -> pure $ Left (errs ++ ["Typecheck completed with errors"])
+    (Nothing, _) -> pure $ Left (if null errs then ["Typecheck failed"] else errs)
+ where
+  -- The schema this writes is meant to be read as jl4-service's is, so what the
+  -- service refuses is refused here, in its words, with one exception: a DEONTIC
+  -- result, which the service refuses to deploy and the JS runtime evaluates,
+  -- from the contract in the schema.
+  refusedHere = \case
+    Export.ExportUnsendable _ _ Export.ExportResult Shape.UDeontic -> False
+    e -> Export.exportErrorSeverity e == SError
 
 -- ---------------------------------------------------------------------------
 -- Step 2-3: Lower to MLIR and emit
