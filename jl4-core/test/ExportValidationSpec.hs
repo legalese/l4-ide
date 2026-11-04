@@ -426,7 +426,7 @@ spec = do
               , "GIVETH A STRING"
               , "name MEANS r's name"
               ]
-        problems src `shouldBe` Right [(Just 5, "name", Just "r", "of a record type Rule whose field test is a function")]
+        problems src `shouldBe` Right [(Just 5, "name", Just "r", "of a record type `Rule` whose field `test` is a function")]
 
       it "accepts an enumeration whose constructors have fields, as published until now" $ do
         let src = Text.unlines
@@ -468,6 +468,11 @@ spec = do
               ]
         problems src `shouldBe` Right [(Just 1, "is positive", Just "n", "no written type")]
 
+  describe "the words for a type with no shape" $ do
+    it "quotes the names in them" $ do
+      unsendableWhat (UUnknownType "Some Type") `shouldBe` "of the type `Some Type`"
+      unsendableWhat (UInField "Tax Rule" "rate for" UFunction) `shouldBe` "of a record type `Tax Rule` whose field `rate for` is a function"
+
   describe "a type reached by many paths" $ do
     let exported ty =
           [ ""
@@ -497,7 +502,7 @@ spec = do
             , "`deep rule` MEANS 1"
             ]
       r <- problemsWithin 30 src
-      r `shouldBe` Right [(Just 198, "deep rule", Just "x", "of a record type Top whose field test is a function")]
+      r `shouldBe` Right [(Just 198, "deep rule", Just "x", "of a record type `Top` whose field `test` is a function")]
 
     it "checks 14 records that each have a field of every one of them" $ do
       let names = [Text.pack ("T" <> show i) | i <- [1 .. 14 :: Int]]
@@ -513,8 +518,8 @@ spec = do
               : ["  f" <> m <> " IS A " <> m | m <- names]
               <> ["  test IS A FUNCTION FROM NUMBER TO BOOLEAN" | n == "T14"]
           expected = foldr
-            (\(n, m) why -> "of a record type " <> n <> " whose field f" <> m <> " is " <> why)
-            "of a record type T14 whose field test is a function"
+            (\(n, m) why -> "of a record type `" <> n <> "` whose field `f" <> m <> "` is " <> why)
+            "of a record type `T14` whose field `test` is a function"
             (zip names (drop 1 names))
           src = Text.unlines (concatMap declare names <> exported "T1")
       r <- problemsWithin 30 src
@@ -575,8 +580,8 @@ spec = do
             , "`from p` MEANS 1"
             ]
       problems src `shouldBe` Right
-        [ (Just 6, "from p", Just "x", "of a record type P whose field q is of a record type Q whose field test is a function")
-        , (Just 6, "from p", Just "y", "of a record type Q whose field test is a function")
+        [ (Just 6, "from p", Just "x", "of a record type `P` whose field `q` is of a record type `Q` whose field `test` is a function")
+        , (Just 6, "from p", Just "y", "of a record type `Q` whose field `test` is a function")
         ]
 
     it "tells apart two uses of a type that takes a type" $ do
@@ -592,7 +597,7 @@ spec = do
             , "`holds` MEANS 1"
             ]
       problems src `shouldBe` Right
-        [(Just 6, "holds", Just "h", "of a record type Holder whose field bad is of a record type Box whose field v is a function")]
+        [(Just 6, "holds", Just "h", "of a record type `Holder` whose field `bad` is of a record type `Box` whose field `v` is a function")]
 
     it "looks inside a type given to itself" $ do
       let src = Text.unlines
@@ -604,7 +609,7 @@ spec = do
             , "`holds` MEANS 1"
             ]
       problems src `shouldBe` Right
-        [(Just 3, "holds", Just "h", "of a record type Box whose field v is a function")]
+        [(Just 3, "holds", Just "h", "of a record type `Box` whose field `v` is a function")]
 
     it "stops at a type that gives itself a larger type" $ do
       let src = Text.unlines
@@ -662,7 +667,7 @@ spec = do
       problems src `shouldBe` Right
         [ (Just 3, "count", Just "a", "a type, so the rule is generic")
         , (Just 3, "count", Just "xs", "of the type variable `a`, so the rule is generic")
-        , (Just 3, "count", Just "y", "of a record type Box whose field v is of the type variable `a`, so the rule is generic")
+        , (Just 3, "count", Just "y", "of a record type `Box` whose field `v` is of the type variable `a`, so the rule is generic")
         ]
 
     it "says so of an ASSUME that holds for all types" $ do

@@ -357,8 +357,8 @@ unsendableWhat = \case
   UEvent -> "an EVENT"
   UPolymorphic v -> "of the type variable `" <> v <> "`, so the rule is generic"
   UTypeAsInput -> "a type, so the rule is generic"
-  UUnknownType t -> "of the type " <> t
-  UInField r f why -> "of a record type " <> r <> " whose field " <> f <> " is " <> unsendableWhat why
+  UUnknownType t -> "of the type `" <> t <> "`"
+  UInField r f why -> "of a record type `" <> r <> "` whose field `" <> f <> "` is " <> unsendableWhat why
 
 -- | One line on what to do about it.
 unsendableHint :: Unsendable -> Text
