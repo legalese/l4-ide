@@ -137,7 +137,7 @@ L4 distinguishes between **type constructors** and **value constructors** (data 
 
 - **`YMD` function** (in `daydate.l4`, also named `Year month day`) - constructs a DATE from year, month, day
 
-  - `YMD 1990 3 15` - the same date as `Date 15 3 1990`; the year must be a whole number, and a month or a day that does not exist refuses, with a reason that says which part is wrong
+  - `YMD 1990 3 15` - the same date as `Date 15 3 1990`; a year that is not a whole number, or a month or a day that does not exist, refuses, with a reason that says which part is wrong
   - a rule that calls `YMD` has no query plan, even when the date exists; the same rule written with `Date` has one
 
 - **`DATE` function** (in `date-compat.l4`) - Legacy compatibility constructor

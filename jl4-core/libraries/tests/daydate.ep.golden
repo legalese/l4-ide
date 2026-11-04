@@ -111,7 +111,12 @@ GIVETH A DATE
 -- YMD year month day  -> the date, with its parts in ISO 8601 order.
 -- Where `Date` rolls a month or a day that does not exist forward, YMD
 -- refuses, and its reason says whether the month or the day is wrong.
--- The year must be a whole number and is not otherwise checked.
+-- Where `Date` stops with an internal error on a year that is not a whole
+-- number, YMD refuses, and its reason names the year. The year is not
+-- otherwise checked.
+-- The parts are checked in this order: the month, the year, the day. The
+-- reason names the first that is wrong, and `candidate` is not used before
+-- the month and the year are known to be whole numbers.
 -- `Year month day` is another name for YMD.
 GIVEN year  IS A NUMBER
       month IS A NUMBER
@@ -122,11 +127,13 @@ GIVETH A DATE
     IF      month AT LEAST 1
         AND month AT MOST 12
         AND FLOOR month EQUALS month
-    THEN IF      DATE_YEAR  candidate EQUALS year
-             AND DATE_MONTH candidate EQUALS month
-             AND DATE_DAY   candidate EQUALS day
-         THEN candidate
-         ELSE REFUSE "YMD: that month has no such day in that year"
+    THEN IF FLOOR year EQUALS year
+         THEN IF      DATE_YEAR  candidate EQUALS year
+                  AND DATE_MONTH candidate EQUALS month
+                  AND DATE_DAY   candidate EQUALS day
+              THEN candidate
+              ELSE REFUSE "YMD: that month has no such day in that year"
+         ELSE REFUSE "YMD: the year is not a whole number"
     ELSE REFUSE "YMD: the month is not a whole number from 1 to 12"
     WHERE
         candidate MEANS Date day month year

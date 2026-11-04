@@ -423,7 +423,7 @@ Just enough to write most rules without a round-trip. Anything not here, check <
 
 Construct literals (after `IMPORT daydate`) with `Date day month year` — e.g. `Date 15 1 2025`, **not** `DATE 2025 1 15` — or with `YMD year month day` — e.g. `YMD 2025 1 15`. Also: `Time hour minute second`, `DateTime date time`.
 `Date` rolls a day past the end of the month, or a month past 12, forward: `Date 29 2 2025` is 1 March 2025, and a year-first `Date 2025 1 15` is 17 July of the year 20.
-With a whole-number year, `YMD` refuses a month or a day that does not exist instead, with a reason that says which part is wrong.
+Where `Date` rolls forward, or stops with an error on a year that is not a whole number, `YMD` refuses, with a reason that says which part is wrong: the year, the month or the day.
 A rule that calls `YMD` has no query plan, even when the date exists; the same rule written with `Date` has one.
 Both are described at <https://legalese.com/l4/reference/libraries/daydate.md>.
 

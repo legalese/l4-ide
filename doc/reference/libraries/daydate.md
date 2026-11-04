@@ -39,9 +39,9 @@ When the day is past the end of the month, or the month is past 12, `Date day mo
 `Days to date` is another name for `Date`.
 
 `YMD year month day` takes the year first, the month second and the day third, as ISO 8601 writes a date.
-The year must be a whole number, as for `Date`, and is not otherwise checked: `YMD 0 1 1` is 1 January of year 0.
 `YMD` gives the date when that day exists in that month and year: `YMD 2024 2 29` is 29 February 2024, the same date as `Date 29 2 2024`.
-When the month or the day does not exist, it refuses to answer, with a reason that says which part is wrong ([REFUSE](../control-flow/REFUSE.md)).
+A year that is a whole number is not otherwise checked: `YMD 0 1 1` is 1 January of year 0.
+When the month or the day does not exist, or the year is not a whole number, it refuses to answer, with a reason that says which part is wrong ([REFUSE](../control-flow/REFUSE.md)).
 `#EVAL YMD 2026 28 7`, where the day and the month have changed places, prints:
 
 ```text
@@ -56,7 +56,16 @@ The model refuses to answer:
   YMD: that month has no such day in that year
 ```
 
-A wrong month gives the month's reason, even when the day is wrong too.
+and `#EVAL YMD 2026.5 7 1`, a year that is not a whole number, prints:
+
+```text
+The model refuses to answer:
+  YMD: the year is not a whole number
+```
+
+(`Date 1 7 2026.5` stops with an internal error, "DATE_FROM_DMY expects integer year", where `YMD` refuses.)
+`YMD` checks the month first, then the year, then the day, and gives the reason of the first that is wrong.
+A wrong month gives the month's reason, even when the year or the day is wrong too, and a wrong year gives the year's reason, even when the day is wrong too.
 `Year month day` is another name for `YMD`.
 
 What to know before using `YMD`:

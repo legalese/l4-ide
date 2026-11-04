@@ -21,11 +21,12 @@ DECIDE `Christmas 2024, year first` IS YMD 2024 12 25
 #ASSERT Date 7 28 2026 EQUALS Date 7 4 2028
 #ASSERT Date 2025 1 15 EQUALS Date 17 7 20  -- Date takes the day first
 
--- YMD refuses a month or a day that does not exist, and says which part is wrong
+-- YMD refuses a year that is not a whole number, and a month or a day that does not exist, and says which part is wrong
 #EVAL YMD 2023 2 29
 #ASSERT REFUSED YMD 2023 2 29 BECAUSE "YMD: that month has no such day in that year"
 #ASSERT REFUSED YMD 2026 28 7 BECAUSE "YMD: the month is not a whole number from 1 to 12"
 #ASSERT REFUSED YMD 2026 13 32 BECAUSE "YMD: the month is not a whole number from 1 to 12"
+#ASSERT REFUSED YMD 2026.5 7 1 BECAUSE "YMD: the year is not a whole number"
 
 -- Date from ISO string (returns MAYBE DATE, ignores time/timezone if present)
 DECIDE `from iso date` IS Date "2025-06-15"
