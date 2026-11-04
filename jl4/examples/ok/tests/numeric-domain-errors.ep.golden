@@ -8,3 +8,7 @@
 #EVAL EXPONENT (-1) 0.5  -- caught: non-finite (negative base, fractional exp)
 #EVAL SQRT 4             -- 2
 #EVAL EXPONENT 2 10      -- 1024
+#EVAL EXPONENT 10 309    -- caught: overflow
+#EVAL EXPONENT 2 1023    -- the largest power of 2 that fits
+#EVAL DATE_FROM_SERIAL (-0.5)  -- the day of serial -1, not of serial 0
+#EVAL DATE_FROM_SERIAL (-1)

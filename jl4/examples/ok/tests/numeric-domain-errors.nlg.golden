@@ -3,3 +3,7 @@
 `EXPONENT` with -1 and 0.5
 `SQRT` with 4
 `EXPONENT` with 2 and 10
+`EXPONENT` with 10 and 309
+`EXPONENT` with 2 and 1023
+`DATE_FROM_SERIAL` with -0.5
+`DATE_FROM_SERIAL` with -1

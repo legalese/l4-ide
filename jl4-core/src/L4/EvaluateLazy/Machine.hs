@@ -2032,9 +2032,14 @@ runBinOp BinOpModulo    (ValNumber num1) (ValNumber num2)      = do
     else userException (DivisionByZero BinOpModulo)
 runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)   =
   let result = (fromRational base :: Double) ** (fromRational exp_ :: Double)
-  in if isNaN result || isInfinite result
-       then userException $ UserError "EXPONENT produced a non-finite result (overflow, 0 to a negative power, or a negative base raised to a fractional power)"
-       else continueBackward $ ValNumber (toRational result)
+  in if isNaN result
+       then userException $ UserError "EXPONENT of a negative number to a fractional power has no real result"
+       else if isInfinite result
+         then userException $ UserError $
+           if base == 0
+             then "EXPONENT of 0 to a negative power has no result"
+             else "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
+         else continueBackward $ ValNumber (toRational result)
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
   let digitsInt = round digits :: Integer
       scale k = (10 :: Rational) ^^ k

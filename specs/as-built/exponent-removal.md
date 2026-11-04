@@ -42,4 +42,4 @@ Two user-visible strings still use the old spelling `TO THE POWER OF`, which doe
 - the domain-error message reads "TO THE POWER OF produced a non-finite result (overflow, 0 to a negative power, or a negative base raised to a fractional power)" (`Machine.hs:4953`), pinned by `jl4/examples/ok/tests/numeric-domain-errors.golden:7, 9`.
 
 Neither string is #83's code: #83 deliberately kept `BinOpExponent`, and both strings predate it.
-On main, #53's carve spells the domain-error message `EXPONENT produced a non-finite result ...`, so only the printer's string keeps the old spelling there.
+On main, #53's carve has three domain-error messages that each name `EXPONENT` and what happened, so only the printer's string keeps the old spelling there.
