@@ -1877,6 +1877,15 @@ nlgOf e = (normalizeWs . simpleLinearizer) <$> (e ^. annoOf % annNlg)
 rewriteExpr :: Expr Resolved -> Expr Resolved
 rewriteExpr = rewriteWith noReading
 
+-- | One expression as 'rewriteWith' leaves it, with what a call around it needs
+-- to know: 'callOpen', that it is a call ending in a condition with no closing
+-- word, and 'open', that it has no closing word at all.
+data Phrased = Phrased
+  { phrased  :: Expr Resolved
+  , callOpen :: Bool
+  , open     :: Bool
+  }
+
 -- | 'rewriteExpr' with what the document knows. Bottom-up, so a call's arguments
 -- are already phrased when the call is, and a herald is spliced here and not
 -- beforehand: spliced first, its arguments would miss every rewrite below and
@@ -1886,9 +1895,23 @@ rewriteWith rd = go
  where
   -- 'transformOf', except that an arithmetic node also sees its operands as
   -- they were before they were rewritten ('groupOperands').
-  go e = rw e (herald e (groupOperands e (over (gplate @(Expr Resolved)) go e)))
+  go = (.phrased) . step
+  -- One node, rewritten once. A call's arguments keep what its brackets ask of
+  -- them, so asking rewrites nothing again: a call that rewrote an argument to
+  -- ask about it took twice as long with each level of nesting.
+  step e = Phrased{phrased, callOpen, open = callOpen || slotRunsOn phrased (leafText phrased)}
+   where
+    args = case e of
+      App _ _ as -> map step as
+      _          -> []
+    opens = map (.callOpen) args
+    kids = case e of
+      App ann n _ -> App ann n (map (.phrased) args)
+      _           -> over (gplate @(Expr Resolved)) go e
+    phrased = rw opens (herald opens (groupOperands e kids))
+    callOpen = callEndsOpen e args
   inert ann t = Inert ann t InertCtxNone
-  herald orig = \case
+  herald opens = \case
     -- A date given as literals reads as the date, whatever its rule's sentence.
     App ann n args | Just (d, m, y) <- daydateLiteral n args -> inert ann (Text.unwords [d, m, y])
     App ann n args | nameIs "Date" n, Just t <- dateFromArgs args -> inert ann t
@@ -1899,7 +1922,7 @@ rewriteWith rd = go
     App ann n args
       | Just followed <- heraldSlots n args ->
           substituteNlgCallMarked rd.rdHeralds
-            (App ann n (zipWith3 (\f o a -> asText (filler f o) a) followed (argsEndOpen orig args) args))
+            (App ann n (zipWith3 (\f o a -> asText (filler f o) a) followed (argsEndOpen opens args) args))
       | readsAsFunction n args -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
       | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument leafText)) args))
     e -> substituteNlgCallMarked rd.rdHeralds e
@@ -1927,36 +1950,33 @@ rewriteWith rd = go
     t = argument (slotText rd) a
   -- 'callEndsOpen' for each argument of a call, read from the call as it was
   -- before its arguments were rewritten.
-  argsEndOpen orig args = case orig of
-    App _ _ oargs | length oargs == length args -> map callEndsOpen oargs
-    _ -> map (const False) args
+  argsEndOpen opens args
+    | length opens == length args = opens
+    | otherwise                   = map (const False) args
   -- Whether a call, printed, ends with an argument that has no closing word, so
   -- that the call has none either and runs on into whatever follows it. A call
   -- that reads as f(x), or as a date, closes itself; a call with a sentence ends
   -- where the sentence does, unless its last slot holds such an argument; any
   -- other call ends with its last argument. Read from the shape of the call and
-  -- of its sentence, not from any word.
-  callEndsOpen o = isNothing (nlgOf o) && case carameliseNode o of
+  -- of its sentence, not from any word. An argument has no closing word when it
+  -- is such a call, or a condition that 'slotRunsOn' as it reads once rewritten
+  -- ('step').
+  callEndsOpen o args = isNothing (nlgOf o) && case carameliseNode o of
     App _ m margs@(_ : _)
       | isJust (daydateLiteral m margs) -> False
       | nameIs "Date" m, isJust (dateFromArgs margs) -> False
       | isJust (monthDateFromArgs m margs) -> False
       | [f, xs] <- margs, isJust (quantified m f xs) -> False
       | Just (nlg, inputs) <- Map.lookup (getUnique m) rd.rdHeralds, length inputs == length margs ->
-          let bound = zip inputs margs
+          let bound = zip inputs args
               refs  = Nlg.nlgRefs nlg
-          in case [ x | (i, x) <- bound, i `notElem` refs ] of
-               []       -> or [ endsOpen x | (i, x) <- bound, not (i `Set.member` Nlg.refsFollowedByWords nlg) ]
-               leftover -> endsOpen (last leftover)
+          in case [ a | (i, a) <- bound, i `notElem` refs ] of
+               []       -> or [ a.open | (i, a) <- bound, not (i `Set.member` Nlg.refsFollowedByWords nlg) ]
+               leftover -> (last leftover).open
       | readsAsFunction m margs -> False
-      | Just toks <- mixfixTokens m margs -> last toks == "_" && endsOpen (last margs)
-      | otherwise -> endsOpen (last margs)
+      | Just toks <- mixfixTokens m margs -> last toks == "_" && (last args).open
+      | otherwise -> (last args).open
     _ -> False
-  -- An argument that has no closing word: a condition that 'slotRunsOn', as it
-  -- reads once rewritten, or a call that ends with one.
-  endsOpen x = callEndsOpen x || slotRunsOn x' (leafText x')
-   where
-    x' = go x
   -- For each argument of a call whose sentence fits it, whether the sentence's
   -- words come after its slot.
   heraldSlots n args = case Map.lookup (getUnique n) rd.rdHeralds of
@@ -2010,7 +2030,7 @@ rewriteWith rd = go
   isArithmetic = \case
     Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
     _ -> False
-  rw orig = \case
+  rw opens = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.
     Where _ e _ -> e
     LetIn _ _ e -> e
@@ -2025,7 +2045,7 @@ rewriteWith rd = go
     App ann n [x] | Just phrase <- Map.lookup (nameToText (getActual n)) builtinUnaryOf ->
       inert ann ("the " <> phrase <> " of " <> leafText x)
     -- Mixfix: interleave the arguments into the @_@ holes.
-    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd (argsEndOpen orig args) n args -> inert ann txt
+    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd (argsEndOpen opens args) n args -> inert ann txt
     -- A function whose name ends in a preposition reads "minimum of x and y",
     -- not the linearizer's "minimum of with x and y".
     App ann n args@(_ : _) | endsInPreposition n ->

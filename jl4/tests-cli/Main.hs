@@ -463,9 +463,10 @@ slotScopeSentence :: FilePath
 slotScopeSentence = fixtureDir </> "slot-scope-sentence.l4"
 
 -- Library sentences at a call site, and library aliases used at two types.
-nlgLibraryWording, libraryAliasTwoTypes :: FilePath
+nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
 libraryAliasTwoTypes = fixtureDir </> "library-alias-two-types.l4"
+renderDeepNesting = fixtureDir </> "render-deep-nesting.l4"
 
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
@@ -739,7 +740,7 @@ main = do
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
        , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
-       , slotScope, slotScopeSentence, nlgLibraryWording, libraryAliasTwoTypes
+       , slotScope, slotScopeSentence, nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
        , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
@@ -3595,6 +3596,14 @@ spec bin = do
     it "lets a module use singleton and fromList at two types" $ do
       Output code _ _ <- runL4 bin ["check", libraryAliasTwoTypes]
       code `shouldBe` ExitSuccess
+
+    it "renders a deeply nested call without its time doubling at each level" $ do
+      finished <- timeout 60000000 (runL4 bin ["render", "--format", "text", renderDeepNesting])
+      case finished of
+        Nothing -> expectationFailure "l4 render did not finish in 60 s"
+        Just (Output code sout _) -> do
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("[p] is shown" `isInfixOf`)
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do
