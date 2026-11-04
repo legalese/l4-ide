@@ -24,6 +24,9 @@ module L4.EvaluateLazy
 , prettyEvalDirectiveResultWithFields
 , prettyAssertionOutcome
 , prettyReductionOutcome
+, postprocessTrace
+, safePostprocessTrace
+, tracePostprocessFailed
 )
 where
 
@@ -42,7 +45,7 @@ import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (initialTemporalContext)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Exception (try)
+import Control.Exception (try, evaluate, ErrorCall)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
@@ -145,13 +148,16 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nfAnswer whnf
+  postprocessed <- case mt of
+    Nothing      -> pure Nothing
+    Just actions -> Just <$> liftIO (safePostprocessTrace actions)
   let
     -- The root of the trace carries the outcome of the directive's expression.
     -- The trace records the reduction to weak head normal form, so an
     -- exception met only while the answer is read to normal form (a refusal
     -- inside a JUST, or at the end of a list) is not in it, and its root would
     -- show the answer's head as though it were the answer.
-    finalTrace = rootCarriesOutcome v . postprocessTrace <$> mt
+    finalTrace = rootCarriesOutcome v <$> postprocessed
     rootCarriesOutcome (Left exc) (Trace l steps (Right _)) = Trace l steps (Left exc)
     rootCarriesOutcome _ t = t
     v' = case assertKind of
@@ -206,6 +212,26 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
   pure (MkEvalDirectiveResult r v' finalTrace)
+
+-- | 'postprocessTrace', guarded so it can never escape an exception: if trace
+-- post-processing throws (e.g. a malformed action sequence produced by an
+-- unbalanced push/pop), degrade to a one-node fallback trace instead of letting
+-- an ErrorCall abort the surrounding evaluation and discard the already-computed
+-- #EVAL result. Catches 'ErrorCall' specifically — not 'SomeException'
+-- — so asynchronous exceptions (request cancellation, timeouts) still propagate.
+safePostprocessTrace :: [EvalTraceAction] -> IO EvalTrace
+safePostprocessTrace actions = do
+  r <- try (evaluate (force (postprocessTrace actions)))
+  pure $ case r of
+    Right t               -> t
+    Left (_ :: ErrorCall) -> tracePostprocessFailed
+
+-- | Fallback substituted for a trace when post-processing it fails. Keeps the
+-- directive's result intact and degrades only the trace to a single marker
+-- node, instead of letting the failure abort the surrounding evaluation.
+tracePostprocessFailed :: EvalTrace
+tracePostprocessFailed =
+  Trace Nothing [] (Right (MkNF (ValString "trace unavailable (internal error during trace post-processing)")))
 
 postprocessTrace :: [EvalTraceAction] -> EvalTrace
 postprocessTrace actions =

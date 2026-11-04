@@ -15,7 +15,7 @@
             "$ref": "#/$defs/Colour"
         },
         "n": {
-            "$ref": "#/$defs/NUMBER"
+            "type": "number"
         }
     },
     "required": [
