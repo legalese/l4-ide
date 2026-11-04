@@ -1,17 +1,17 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-deontic-breach-semantics.l4:39:1-40:17:
+deontic-breach-semantics.l4:42:1-43:17:
   DEONTIC BREACHED:
     BREACH
     BY Bob
     BECAUSE "missed second"
-deontic-breach-semantics.l4:49:1-50:17:
+deontic-breach-semantics.l4:52:1-53:17:
   DEONTIC BREACHED:
     BREACH
     BY Alice
     BECAUSE "missed first"
-deontic-breach-semantics.l4:65:1-66:17:
+deontic-breach-semantics.l4:68:1-69:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -25,12 +25,143 @@ deontic-breach-semantics.l4:65:1-66:17:
       MUST deliver
     before their deadline, which was at
       10
-deontic-breach-semantics.l4:68:1-69:17:
+deontic-breach-semantics.l4:71:1-72:17:
   DEONTIC BREACHED:
     BREACH
     BY Alice
     BECAUSE "missed payment"
-deontic-breach-semantics.l4:79:1-80:16:
+deontic-breach-semantics.l4:96:1-98:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      7
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      5
+deontic-breach-semantics.l4:100:1-102:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      7
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      5
+deontic-breach-semantics.l4:105:1-107:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+deontic-breach-semantics.l4:109:1-111:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+deontic-breach-semantics.l4:114:1-115:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      5
+deontic-breach-semantics.l4:117:1-118:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+deontic-breach-semantics.l4:121:1-122:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+deontic-breach-semantics.l4:124:1-125:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      5
+deontic-breach-semantics.l4:140:1-141:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "missed payment"
+deontic-breach-semantics.l4:143:1-144:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+deontic-breach-semantics.l4:148:1-149:16:
   DEONTIC BREACHED:
     BREACH
     BY Alice
@@ -38,27 +169,82 @@ deontic-breach-semantics.l4:79:1-80:16:
   MUST deliver
   WITHIN 3
   HENCE FULFILLED
-deontic-breach-semantics.l4:94:1-95:30:
+deontic-breach-semantics.l4:163:1-164:30:
   FULFILLED
-deontic-breach-semantics.l4:105:1-106:30:
+deontic-breach-semantics.l4:174:1-175:30:
   FULFILLED
-deontic-breach-semantics.l4:117:1-118:30:
+deontic-breach-semantics.l4:179:1-180:31:
+  FULFILLED
+deontic-breach-semantics.l4:182:1-183:31:
+  DEONTIC BREACHED:
+    party
+      Bob
+    who did action
+      deliver
+    at
+      16
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      15
+deontic-breach-semantics.l4:193:1-194:30:
   PARTY Alice
   MUST pay 2
-  WITHIN 3
+  WITHIN 1
   HENCE FULFILLED
-deontic-breach-semantics.l4:130:1-133:31:
+deontic-breach-semantics.l4:196:1-197:30:
+  DEONTIC BREACHED:
+    party
+      Bob
+    who did action
+      deliver
+    at
+      7
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST pay 2
+    before their deadline, which was at
+      5
+deontic-breach-semantics.l4:208:1-211:31:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      15
+deontic-breach-semantics.l4:228:1-229:34:
   FULFILLED
-deontic-breach-semantics.l4:143:1-144:30:
+deontic-breach-semantics.l4:231:1-232:36:
+  DEONTIC BREACHED:
+    BREACH
+deontic-breach-semantics.l4:234:1-236:36:
+  DEONTIC BREACHED:
+    BREACH
+deontic-breach-semantics.l4:238:1-240:36:
+  DEONTIC BREACHED:
+    BREACH
+deontic-breach-semantics.l4:243:1-245:34:
   FULFILLED
-deontic-breach-semantics.l4:156:1-157:32:
+deontic-breach-semantics.l4:255:1-256:30:
   FULFILLED
-deontic-breach-semantics.l4:160:1-161:14:
+deontic-breach-semantics.l4:268:1-269:32:
+  FULFILLED
+deontic-breach-semantics.l4:272:1-273:14:
   PARTY Alice
   MUST pay 100
   WITHIN 0
   HENCE FULFILLED
-deontic-breach-semantics.l4:164:1-165:14:
+deontic-breach-semantics.l4:276:1-277:14:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -72,7 +258,7 @@ deontic-breach-semantics.l4:164:1-165:14:
       MUST pay 100
     before their deadline, which was at
       5
-deontic-breach-semantics.l4:174:1-175:31:
+deontic-breach-semantics.l4:286:1-287:31:
   DEONTIC BREACHED:
     party
       Alice
@@ -86,22 +272,56 @@ deontic-breach-semantics.l4:174:1-175:31:
       MUST NOT smoke
     before their deadline, which was at
       30
-deontic-breach-semantics.l4:178:1-179:15:
+deontic-breach-semantics.l4:290:1-291:15:
   FULFILLED
-deontic-breach-semantics.l4:190:1-191:33:
+deontic-breach-semantics.l4:302:1-303:33:
   FULFILLED
-deontic-breach-semantics.l4:211:1-212:31:
+deontic-breach-semantics.l4:323:1-324:31:
   FULFILLED
-deontic-breach-semantics.l4:216:1-217:33:
+deontic-breach-semantics.l4:327:1-328:32:
+  DEONTIC BREACHED:
+    party
+      Alice
+    who did action
+      pay OF 50
+    at
+      26
+    surpassed the deadline of party
+      Alice
+    who had to do obligatory action
+      MUST pay 50
+    before their deadline, which was at
+      25
+deontic-breach-semantics.l4:332:1-333:33:
   PARTY Bob
   MUST deliver
   WITHIN 10
   HENCE FULFILLED
-deontic-breach-semantics.l4:225:1-226:14:
+deontic-breach-semantics.l4:341:1-342:14:
   FULFILLED
-deontic-breach-semantics.l4:245:1-246:30:
+deontic-breach-semantics.l4:352:1-353:14:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "permission not used"
+deontic-breach-semantics.l4:355:1-356:33:
+  FULFILLED
+deontic-breach-semantics.l4:375:1-376:30:
   PARTY Alice
   MUST pay 1
   WITHIN 0 MINUS 1
   HENCE FULFILLED
   LEST `recursive lest`
+deontic-breach-semantics.l4:379:1-382:30:
+  PARTY Alice
+  MUST pay 1
+  WITHIN 0 MINUS 1
+  HENCE FULFILLED
+  LEST `recursive lest`
+deontic-breach-semantics.l4:393:1-394:32:
+  PARTY Alice
+  MUST deliver
+  WITHIN 100
+  HENCE FULFILLED
+deontic-breach-semantics.l4:396:1-398:32:
+  FULFILLED

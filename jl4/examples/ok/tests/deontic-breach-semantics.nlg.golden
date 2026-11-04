@@ -2,11 +2,29 @@ executing contract `ror both explicit` at 0 with the following events: `WAITUNTI
 executing contract `rand both explicit` at 0 with the following events: `WAITUNTIL` with 20
 executing contract `explicit or deadline` at 0 with the following events: `WAITUNTIL` with 20
 executing contract `deadline or explicit` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `short then long and` at 0 with the following events: `WAITUNTIL` with 7 `WAITUNTIL` with 20
+executing contract `long then short and` at 0 with the following events: `WAITUNTIL` with 7 `WAITUNTIL` with 20
+executing contract `short then long or` at 0 with the following events: `WAITUNTIL` with 7 `WAITUNTIL` with 20
+executing contract `long then short or` at 0 with the following events: `WAITUNTIL` with 7 `WAITUNTIL` with 20
+executing contract `short then long and` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `long then short and` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `short then long or` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `long then short or` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `explicit and deadline` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `deadline and explicit` at 0 with the following events: `WAITUNTIL` with 20
 executing contract `one breached one pending` at 0 with the following events: `WAITUNTIL` with 7
 executing contract `late delivery discharges the reparation` at 0 with the following events: party `Bob` did `deliver` at 7
 executing contract `prohibition hence sees the revealer` at 0 with the following events: party `Bob` did `deliver` at 7
-executing contract `anchor at reveal` at 0 with the following events: party `Bob` did `deliver` at 7
+executing contract `prohibition hence sees the revealer` at 0 with the following events: party `Bob` did `deliver` at 15
+executing contract `prohibition hence sees the revealer` at 0 with the following events: party `Bob` did `deliver` at 16
+executing contract `anchor at the deadline` at 0 with the following events: party `Bob` did `deliver` at 4
+executing contract `anchor at the deadline` at 0 with the following events: party `Bob` did `deliver` at 7
 executing contract `nested peel` at 0 with the following events: `WAITUNTIL` with 20 `WAITUNTIL` with 30 party `Bob` did `deliver` at 35
+executing contract `payment with late fee` at 0 with the following events: party `Alice` did `pay` with 1100 at 40
+executing contract `payment with late fee` at 0 with the following events: party `Alice` did `pay` with 1100 at 5000
+executing contract `payment with late fee` at 0 with the following events: party `Bob` did `deliver` at 31 party `Alice` did `pay` with 1100 at 5000
+executing contract `payment with late fee` at 0 with the following events: party `Bob` did `deliver` at 4999 party `Alice` did `pay` with 1100 at 5000
+executing contract `payment with late fee` at 0 with the following events: party `Bob` did `deliver` at 31 party `Alice` did `pay` with 1100 at 44
 executing contract `one event repairs both alternatives` at 0 with the following events: party `Bob` did `deliver` at 5
 executing contract `pay due` at 0 with the following events: party `Alice` did `pay` with 100 at 5
 executing contract `pay due` at 0 with the following events: `WAITUNTIL` with 5
@@ -15,6 +33,12 @@ executing contract `no smoking` at 0 with the following events: party `Alice` di
 executing contract `no smoking` at 0 with the following events: `WAITUNTIL` with 31
 executing contract `pay exactly 100` at 0 with the following events: party `Alice` did `pay` with 100 at 10
 executing contract `may with lest` at 0 with the following events: party `Alice` did `pay` with 50 at 7
+executing contract `may with lest` at 0 with the following events: party `Alice` did `pay` with 50 at 26
 executing contract `may with lest` at 0 with the following events: party `Alice` did `exercise` at 3
 executing contract `may bare` at 0 with the following events: `WAITUNTIL` with 9
+executing contract `may or else breach` at 0 with the following events: `WAITUNTIL` with 9
+executing contract `may or else breach` at 0 with the following events: party `Alice` did `exercise` at 3
 executing contract `recursive lest` at 0 with the following events: party `Bob` did `deliver` at 7
+executing contract `recursive lest` at 0 with the following events: party `Bob` did `deliver` at 7 party `Bob` did `deliver` at 8 party `Alice` did `pay` with 1 at 9
+executing contract `three layers` at 0 with the following events: party `Alice` did `deliver` at 7
+executing contract `three layers` at 0 with the following events: party `Alice` did `deliver` at 7 party `Alice` did `deliver` at 8

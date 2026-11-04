@@ -81,7 +81,6 @@ GIVETH A DEONTIC Party Action
 
 A `MAY` is often the step after an obligation, under its `HENCE`, or leads to an obligation of another party under its own `HENCE`.
 If not using the permission should have a consequence, give the `MAY` a `LEST`, or write the rule with `MUST` instead.
-If not using the permission should have a consequence, write the rule with `MUST` or `DO` and a `LEST` instead.
 
 ## SHANT and MUST NOT
 

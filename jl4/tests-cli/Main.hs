@@ -3676,6 +3676,34 @@ spec bin = do
             "Expected batch stdout NOT to contain " ++ show frag
             ++ "\n--- stdout ---\n" ++ sout
 
+    -- Batch prints a module and parses it again per row, so this is a round trip
+    -- of every #TRACE in that file: rules under HENCE and LEST, in brackets, and
+    -- several events. It must give the verdicts `l4 run` gives.
+    it "agrees with l4 run on every #TRACE of the deontic breach fixture" $ do
+      let fixture = "examples/ok/deontic-breach-semantics.l4"
+      Output code sout serr <- runL4 bin ["batch", fixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      row <- case eitherDecode (BSL8.pack (concat (take 1 (reverse (lines sout))))) of
+        Right v -> pure v
+        Left e -> fail ("batch row is not JSON: " ++ e ++ "\n" ++ sout ++ "\n" ++ serr)
+      objField row "status" `shouldBe` Just (String "success")
+      runEnv <- jsonEnvelope bin ["run", fixture, "--json"]
+      let verdict = \ case
+            String "FULFILLED" -> "fulfilled" :: String
+            -- `A OR B` with one side breached is still open
+            String t | "DEONTIC BREACHED" `T.isPrefixOf` t, not (" OR " `T.isInfixOf` t) -> "breached"
+            Object o | KeyMap.member "breached" o -> "breached"
+            _ -> "open"
+          batchVerdicts = case objField row "output" of
+            Just (Array v) -> [ verdict r | item <- toList v, Just r <- [objField item "result"] ]
+            _ -> []
+          runVerdicts = case objField runEnv "results" of
+            Just (Array v) -> [ verdict r | item <- toList v, Just r <- [objField item "value"] ]
+            _ -> []
+      length runVerdicts `shouldSatisfy` (> 30)
+      -- the last batch row is the exported function's answer
+      take (length runVerdicts) batchVerdicts `shouldBe` runVerdicts
+
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
       code `shouldBe` ExitSuccess

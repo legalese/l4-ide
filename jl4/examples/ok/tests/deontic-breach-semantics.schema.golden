@@ -1,1 +1,7 @@
-No @export annotations found in file
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "a trivial entrypoint, so that batch has a function to call",
+    "properties": {},
+    "title": "always true",
+    "type": "object"
+}

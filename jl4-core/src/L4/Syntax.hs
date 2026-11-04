@@ -357,7 +357,7 @@ data Deonton n
 -- | Deontic modal operators for regulative rules
 data DeonticModal
   = DMust    -- ^ MUST: Action required (breach if not done)
-  | DMay     -- ^ MAY: Action permitted (no breach either way)
+  | DMay     -- ^ MAY: Action permitted (no breach unless a LEST says so)
   | DMustNot -- ^ MUST NOT / SHANT: Action prohibited (breach if done)
   | DDo      -- ^ DO: Bare action (explicit HENCE/LEST required)
   deriving stock (GHC.Generic, Eq, Ord, Show)

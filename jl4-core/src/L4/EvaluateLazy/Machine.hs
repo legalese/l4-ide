@@ -927,35 +927,40 @@ backwardContractFrame val = \ case
       -- continuation, which then processes the event). So we re-offer the
       -- revealing event to the HENCE/LEST continuation — e.g. a payment
       -- arriving after the deadline must still be able to discharge the LEST
-      -- reparation it was authored for. The continuation's clock is anchored
-      -- at the revealing event's stamp, so the re-offered event decrements
-      -- the continuation's WITHIN by zero.
+      -- reparation it was authored for, if it falls inside that reparation's
+      -- own window.
+      --
+      -- The continuation's clock starts at the missed deadline, not at the
+      -- event: a party who misses a deadline and goes quiet does not push back
+      -- the start of their own cure period, and a kept prohibition was
+      -- discharged at the end of its window. Counting from the event would let
+      -- a payment thousands of days late discharge a 14-day grace period.
       --
       -- Termination: an event is re-offered AT MOST ONCE. Peeling one
       -- syntactic HENCE/LEST layer per re-offer is NOT enough on its own,
       -- because a continuation may recursively reference the enclosing
-      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@): the
-      -- continuation re-anchors at the revealing stamp, so a non-positive
-      -- computed WITHIN makes its deadline already expired for the very same
-      -- event, and unconditional re-offering would loop forever. Hence each
-      -- re-offered event is marked (by store address, 'markReoffered'); when
-      -- a marked event reveals yet another expiry, the continuation consumes
-      -- it — the pre-re-offer behavior — instead of re-offering it again
+      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@): with a
+      -- non-positive computed WITHIN its deadline never moves past the very
+      -- same event, and unconditional re-offering would loop forever. Hence
+      -- each re-offered event is marked (by store address, 'markReoffered');
+      -- when a marked event reveals yet another expiry, the continuation
+      -- starts without it instead of it being re-offered again
       -- ('ev'reoffered', computed at Contract1). Each real event thus funds
       -- at most one extra scrutiny, and the event list strictly shrinks on
       -- every other step, so evaluation terminates.
       then do
-        let reoffer followup'
-              | ev'reoffered =
-                  -- this event was already re-offered once and has now
-                  -- revealed a second expiry: consume it (see NOTE above)
-                  allocateValue ev'time >>= continueWithFollowup env followup' events
-              | otherwise = do
+        let reoffer followup' = do
+              clock <- allocateValue (ValNumber deadline)
+              if ev'reoffered
+                -- this event was already re-offered once and has now
+                -- revealed a second expiry: drop it (see NOTE above)
+                then continueWithFollowup env followup' events clock
+                else do
                   ev'timeR <- allocateValue ev'time
                   evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
                   markReoffered evR
                   eventsR <- allocateValue (ValCons evR events)
-                  continueWithFollowup env followup' eventsR ev'timeR
+                  continueWithFollowup env followup' eventsR clock
         case act.modal of
           DMustNot ->
             -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline

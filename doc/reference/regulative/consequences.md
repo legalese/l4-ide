@@ -38,14 +38,15 @@ GIVETH A DEONTIC Party Action
   PARTY Seller DOES deliver AT 14
 ```
 
-- A deadline counts from the moment its rule becomes active: from the start time for the first rule, and from the event that led to it for a rule after `HENCE` or `LEST`. Above, the buyer confirms at 10, so the seller must deliver by 15.
+- A deadline counts from the moment its rule becomes active: from the start time for the first rule, from the event that completed the rule before it for a rule after `HENCE`, and from the moment the rule before it failed for a rule after `LEST`. Above, the buyer confirms at 10, so the seller must deliver by 15.
+- A rule that failed by missing its deadline failed at that deadline, not at the later event that brought it to light. So with `MUST pay 1000 WITHIN 30 LEST (MUST pay 1100 WITHIN 14)`, the 14 days run from day 30 and close on day 44, whether the miss came to light on day 31 or day 5000. The same holds for a `MAY` whose deadline passed, and for the `HENCE` of a prohibition kept to the end of its window. A prohibition that was broken failed at the act that broke it, so its `LEST` counts from that act.
 - Deadlines are relative. There is no absolute date such as "by 1 January 2026", and no `WITHIN 5 days OF event`: to count from an event, put the rule after the `HENCE` of the rule for that event, as above.
 - As events are read, the time left shrinks: after an event at 12, what was `WITHIN 14` from 0 has 2 left.
 - A rule without `WITHIN` has no deadline. It waits for its action however long it takes, and time alone never takes it to `LEST`.
 - L4 finds that a deadline has passed when it reads an event, or a `WAITUNTIL` (see [EVENT](EVENT.md)), with a later time.
   An event exactly at the deadline is in time.
-- The event that shows a deadline has passed is not used up by the rule that missed it. The rule that follows starts at that event's time, and the event is offered to it, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for.
-- An event is offered this way once. If it also shows that the next rule's deadline has passed, the rule after that starts at the same time without seeing it, which is what stops a rule whose `LEST` names itself from running forever.
+- The event that shows a deadline has passed is not used up by the rule that missed it. It is offered to the rule that follows, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for, if it falls inside that reparation's own window.
+- An event is offered this way once. If it also shows that the next rule's deadline has passed, the rule after that starts without seeing it, which is what stops a rule whose `LEST` names itself from running forever. So one event reaches at most two rules: to perform a third rule in a chain, it takes another event.
 
 ## HENCE and LEST
 
@@ -155,8 +156,10 @@ When the action has several arguments, `EXACTLY` on one of them comes with two l
 - `A RAND B` is fulfilled when both are fulfilled, and breached as soon as either is breached.
 - `A ROR B` is fulfilled as soon as either is fulfilled, and breached only when both are breached.
 
-When both sides are breached the result is one breach: the earlier one for `RAND`, the later one for `ROR`.
-A `LEST BREACH` records no time, so a pair with one in it, like a pair at the same time, reports the left side for `RAND` and the right side for `ROR`.
+When both sides are breached the result is one breach, dated at the event that revealed it.
+If separate events revealed the two, `RAND` reports the earlier and `ROR` the later.
+If one event revealed both, which is the usual case, they tie, and `RAND` reports its left side and `ROR` its right side, whichever deadline came first.
+A `LEST BREACH` records no time, so a pair with one in it ties in the same way.
 
 ```l4
 DECLARE Party IS ONE OF Seller

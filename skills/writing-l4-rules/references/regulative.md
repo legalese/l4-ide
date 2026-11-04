@@ -187,10 +187,10 @@ Reference: <https://legalese.com/l4/reference/regulative/consequences.md>
 
 `WITHIN` takes a NUMBER: how long the party has, on the same timeline as the event times in `#TRACE`. The unit is up to you (days, hours, business days), as long as the deadlines and the event times use the same one.
 
-- A deadline counts from the moment its rule becomes active: from the start time for the first rule, and from the event that led to it for a rule under `HENCE` or `LEST`.
+- A deadline counts from the moment its rule becomes active: from the start time for the first rule, from the event that completed the rule before it for a rule under `HENCE`, and from the missed deadline for a rule under `LEST`.
 - There are no absolute deadlines and no `WITHIN 5 days OF event` (that is a parse error). To count from an event, put the rule under the `HENCE` of the rule for that event.
 - A rule without `WITHIN` waits for its action indefinitely; time alone never takes it to `LEST`.
-- L4 notices that a deadline has passed only when it reads a later event, or a `WAITUNTIL`. The rule that follows starts at that event's time, and that event is offered to it, so a late payment can discharge the `LEST` reparation it was written for. An event is offered this way once: if it also shows that the next rule's deadline has passed, the rule after that does not see it.
+- L4 notices that a deadline has passed only when it reads a later event, or a `WAITUNTIL`. The rule that follows counts from the missed deadline, not from that event, and that event is offered to it, so a late payment can discharge the `LEST` reparation it was written for if it falls inside that reparation's window. An event is offered this way once: if it also shows that the next rule's deadline has passed, the rule after that does not see it.
 
 ```l4
 DECLARE Party IS ONE OF Buyer, Seller

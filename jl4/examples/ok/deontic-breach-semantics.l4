@@ -1,11 +1,14 @@
 -- Regression pins for the deontic breach-semantics fix cluster:
 --
 --   (b) RAND/ROR over ANY both-breached pair (DeadlineMissed and/or
---       ExplicitBreach) reports a breach instead of a residual:
---       RAND reports the earliest breach, ROR the latest; untimestamped
---       ExplicitBreach pairs fall back to the tie-break (RAND left, ROR right).
+--       ExplicitBreach) reports a breach instead of a residual. A breach is
+--       dated at the event that revealed it. RAND reports the earlier and ROR
+--       the later when separate events reveal them; one event revealing both
+--       is a tie, and a tie, like any pair with an ExplicitBreach, goes to the
+--       left for RAND and the right for ROR, whichever deadline came first.
 --   (c) the event whose timestamp reveals deadline expiry is re-offered to
---       the HENCE/LEST continuation instead of being silently consumed.
+--       the HENCE/LEST continuation instead of being silently consumed, and
+--       the continuation's clock starts at the missed deadline.
 --   (d) the deadline boundary is strict: arriving exactly AT the deadline is
 --       timely; a violated prohibition reuses the event stamp as its
 --       "deadline" sentinel.
@@ -74,6 +77,72 @@ GIVETH A DEONTIC Person Action
     ROR
     (PARTY Bob MUST deliver WITHIN 10)
 
+-- Separate events: RAND reports the earlier breach and ROR the later,
+-- whichever side each is on. One event: a tie, left for RAND and right for ROR,
+-- whichever deadline came first.
+GIVETH A DEONTIC Person Action
+`short then long and` MEANS (PARTY Alice MUST deliver WITHIN 5) RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`long then short and` MEANS (PARTY Bob MUST deliver WITHIN 10) RAND (PARTY Alice MUST deliver WITHIN 5)
+
+GIVETH A DEONTIC Person Action
+`short then long or` MEANS (PARTY Alice MUST deliver WITHIN 5) ROR (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`long then short or` MEANS (PARTY Bob MUST deliver WITHIN 10) ROR (PARTY Alice MUST deliver WITHIN 5)
+
+-- RAND, separate events: Alice, at 7, from either side.
+#TRACE `short then long and` AT 0 WITH
+    WAITUNTIL 7
+    WAITUNTIL 20
+
+#TRACE `long then short and` AT 0 WITH
+    WAITUNTIL 7
+    WAITUNTIL 20
+
+-- ROR, separate events: Bob, at 20, from either side.
+#TRACE `short then long or` AT 0 WITH
+    WAITUNTIL 7
+    WAITUNTIL 20
+
+#TRACE `long then short or` AT 0 WITH
+    WAITUNTIL 7
+    WAITUNTIL 20
+
+-- RAND, one event: the left side, Alice then Bob.
+#TRACE `short then long and` AT 0 WITH
+    WAITUNTIL 20
+
+#TRACE `long then short and` AT 0 WITH
+    WAITUNTIL 20
+
+-- ROR, one event: the right side, Bob then Alice.
+#TRACE `short then long or` AT 0 WITH
+    WAITUNTIL 20
+
+#TRACE `long then short or` AT 0 WITH
+    WAITUNTIL 20
+
+GIVETH A DEONTIC Person Action
+`explicit and deadline` MEANS
+    (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
+    RAND
+    (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`deadline and explicit` MEANS
+    (PARTY Bob MUST deliver WITHIN 10)
+    RAND
+    (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
+
+-- Mixed breach kinds under RAND, both operand orders: the left operand.
+#TRACE `explicit and deadline` AT 0 WITH
+    WAITUNTIL 20
+
+#TRACE `deadline and explicit` AT 0 WITH
+    WAITUNTIL 20
+
 -- Control: only ONE alternative breached, the other still live => residual
 -- (Bob may still deliver); the compound must NOT breach yet.
 #TRACE `one breached one pending` AT 0 WITH
@@ -105,16 +174,26 @@ GIVETH A DEONTIC Person Action
 #TRACE `prohibition hence sees the revealer` AT 0 WITH
   PARTY Bob DOES deliver AT 7
 
-`anchor at reveal` MEANS
+-- A kept prohibition is discharged at the end of its window, so its HENCE counts
+-- from 5 and is due at 15: on time at 15, late at 16.
+#TRACE `prohibition hence sees the revealer` AT 0 WITH
+  PARTY Bob DOES deliver AT 15
+
+#TRACE `prohibition hence sees the revealer` AT 0 WITH
+  PARTY Bob DOES deliver AT 16
+
+`anchor at the deadline` MEANS
   PARTY Alice
   MUST pay 1
   WITHIN 2
   LEST (PARTY Alice MUST pay 2 WITHIN 3)
 
--- The continuation's clock anchors at the revealing event's stamp: the
--- re-offered event (Bob at 7, wrong party) decrements the LEST WITHIN by
--- zero, so the residual still shows WITHIN 3.
-#TRACE `anchor at reveal` AT 0 WITH
+-- The continuation's clock starts at the missed deadline, 2, so it is due at 5.
+-- Bob at 4 leaves 1 of its 3; Bob at 7 reveals that it was missed too.
+#TRACE `anchor at the deadline` AT 0 WITH
+  PARTY Bob DOES deliver AT 4
+
+#TRACE `anchor at the deadline` AT 0 WITH
   PARTY Bob DOES deliver AT 7
 
 `nested peel` MEANS
@@ -123,14 +202,47 @@ GIVETH A DEONTIC Person Action
   WITHIN 2
   LEST (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Bob MUST deliver WITHIN 10))
 
--- Each re-offer peels exactly one HENCE/LEST layer (termination), and WAIT
--- sentinels re-offered to a continuation merely advance its clock:
--- WAIT@20 expires layer 1, WAIT@30 expires layer 2 (deadline 20+3),
--- Bob's delivery at 35 discharges layer 3 (deadline 30+10) => FULFILLED.
+-- The layers are due at 2, 5 and 15. WAITUNTIL 20 expires layer 1, and is
+-- re-offered to layer 2, which it also shows expired, so layer 3 starts at 5
+-- without it. WAITUNTIL 30 expires layer 3: Bob's delivery at 35 is not reached.
 #TRACE `nested peel` AT 0 WITH
   WAITUNTIL 20
   WAITUNTIL 30
   PARTY Bob DOES deliver AT 35
+
+-- A late payment inside the grace period discharges it. A later one does not,
+-- whatever was recorded first: the 14 days run from the missed day 30, so they
+-- close at 44, and the same payment gets the same verdict on all three traces.
+`payment with late fee` MEANS
+  PARTY Alice
+  MUST pay 1000
+  WITHIN 30
+  HENCE FULFILLED
+  LEST
+    PARTY Alice
+    MUST pay 1100
+    WITHIN 14
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `payment with late fee` AT 0 WITH
+  PARTY Alice DOES pay 1100 AT 40
+
+#TRACE `payment with late fee` AT 0 WITH
+  PARTY Alice DOES pay 1100 AT 5000
+
+#TRACE `payment with late fee` AT 0 WITH
+  PARTY Bob DOES deliver AT 31
+  PARTY Alice DOES pay 1100 AT 5000
+
+#TRACE `payment with late fee` AT 0 WITH
+  PARTY Bob DOES deliver AT 4999
+  PARTY Alice DOES pay 1100 AT 5000
+
+-- Revealed late, but the reparation is still open at the reveal: on time.
+#TRACE `payment with late fee` AT 0 WITH
+  PARTY Bob DOES deliver AT 31
+  PARTY Alice DOES pay 1100 AT 44
 
 GIVETH A DEONTIC Person Action
 `one event repairs both alternatives` MEANS
@@ -211,6 +323,10 @@ GIVETH A DEONTIC Person Action
 #TRACE `may with lest` AT 0 WITH
   PARTY Alice DOES pay 50 AT 7
 
+-- The LEST counts from the missed 5, so it is due at 25.
+#TRACE `may with lest` AT 0 WITH
+  PARTY Alice DOES pay 50 AT 26
+
 -- Permission exercised: the HENCE obligation (Bob delivers) becomes the
 -- residual.
 #TRACE `may with lest` AT 0 WITH
@@ -224,6 +340,20 @@ GIVETH A DEONTIC Person Action
 -- Bare MAY expiry: LEST defaults to FULFILLED (same outcome as before).
 #TRACE `may bare` AT 0 WITH
   WAITUNTIL 9
+
+`may or else breach` MEANS
+  PARTY Alice
+  MAY exercise
+  WITHIN 5
+  LEST BREACH BY Alice BECAUSE "permission not used"
+
+-- A LEST BREACH after a MAY breaches when the permission goes unused, and only
+-- then.
+#TRACE `may or else breach` AT 0 WITH
+  WAITUNTIL 9
+
+#TRACE `may or else breach` AT 0 WITH
+  PARTY Alice DOES exercise AT 3
 
 -- ---------------------------------------------------------------------------
 -- (f) recursive LEST with a non-positive WITHIN terminates
@@ -244,3 +374,34 @@ GIVETH A DEONTIC Person Action
 -- (before the at-most-once rule this trace looped forever).
 #TRACE `recursive lest` AT 0 WITH
   PARTY Bob DOES deliver AT 7
+
+-- More than one event: each is re-offered at most once, and the run ends.
+#TRACE `recursive lest` AT 0 WITH
+  PARTY Bob DOES deliver AT 7
+  PARTY Bob DOES deliver AT 8
+  PARTY Alice DOES pay 1 AT 9
+
+`three layers` MEANS
+  PARTY Alice
+  MUST pay 1
+  WITHIN 2
+  LEST (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Alice MUST deliver WITHIN 100))
+
+-- The delivery at 7 shows layers 1 and 2 expired, so it has used its one
+-- re-offer before reaching layer 3, which is due at 105: layer 3 stays open.
+-- A second delivery reaches it.
+#TRACE `three layers` AT 0 WITH
+  PARTY Alice DOES deliver AT 7
+
+#TRACE `three layers` AT 0 WITH
+  PARTY Alice DOES deliver AT 7
+  PARTY Alice DOES deliver AT 8
+
+-- ---------------------------------------------------------------------------
+-- `l4 batch` prints this whole file and parses it again for each line of input,
+-- so this file also pins the printing of #TRACE with several events, and of a
+-- rule under a HENCE or LEST (the CLI suite runs it through batch).
+-- ---------------------------------------------------------------------------
+
+@export default a trivial entrypoint, so that batch has a function to call
+`always true` MEANS TRUE

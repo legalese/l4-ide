@@ -49,7 +49,7 @@ An event is a triple:
 
 The contract reads events in order. With each event, two things move: the contract's clock advances to the event's time, and the remaining window of the current `WITHIN` shrinks by the time that has passed. Then:
 
-- If the event comes **after the deadline**, the contract takes the branch for a missed deadline, without looking at what the event was. The event is then offered to that branch, because it may be just what the branch is waiting for: a late payment can discharge the penalty clause it fell into.
+- If the event comes **after the deadline**, the contract takes the branch for a missed deadline, without looking at what the event was. The event is then offered to that branch, because it may be just what the branch is waiting for: a late payment can discharge the penalty clause it fell into, if it is inside that clause's own window.
 - If the event is **in time and matches** the duty (right party, right action, any `PROVIDED` condition true), the contract takes the branch for the action being done.
 - If the event is **in time but does not match**, it is skipped. The next event is tried, with the clock further on.
 
@@ -57,7 +57,7 @@ For `MUST`, doing the action leads to `HENCE` and a missed deadline to `LEST`. F
 
 The timeline is just numbers. It can stand for days, hours or business days, as long as deadlines and event times use the same unit.
 
-A `WITHIN` window starts when its obligation becomes active. In a chain, the next duty's window starts at the event that fulfilled the one before: if the buyer confirms an order on day 10 and the seller then has `WITHIN 5`, the seller's deadline is day 15. There is no syntax for counting a deadline from some other named event, and none for a deadline on a fixed date; build the timing by chaining obligations with `HENCE`.
+A `WITHIN` window starts when its obligation becomes active. In a chain, the next duty's window starts at the event that fulfilled the one before: if the buyer confirms an order on day 10 and the seller then has `WITHIN 5`, the seller's deadline is day 15. After a missed deadline, the window under `LEST` starts at that deadline, not at the later event that showed it was missed: a party who misses a deadline and goes quiet does not push back the start of their own cure period. There is no syntax for counting a deadline from some other named event, and none for a deadline on a fixed date; build the timing by chaining obligations with `HENCE`.
 
 ---
 
