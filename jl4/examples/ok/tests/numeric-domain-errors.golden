@@ -6,7 +6,7 @@ numeric-domain-errors.l4:6:1-16:
 numeric-domain-errors.l4:7:1-22:
   EXPONENT of 0 to a negative power has no result
 numeric-domain-errors.l4:8:1-24:
-  EXPONENT of a negative number to a fractional power has no real result
+  EXPONENT does not compute a negative number to a fractional power
 numeric-domain-errors.l4:9:1-13:
   2
 numeric-domain-errors.l4:10:1-20:
@@ -19,3 +19,13 @@ numeric-domain-errors.l4:13:1-30:
   DATE OF 1, 1, 0
 numeric-domain-errors.l4:14:1-28:
   DATE OF 1, 1, 0
+numeric-domain-errors.l4:15:1-26:
+  EXPONENT does not compute a negative number to a fractional power
+numeric-domain-errors.l4:16:1-22:
+  -8
+numeric-domain-errors.l4:17:1-58:
+  EXPONENT does not compute a negative number to a fractional power
+numeric-domain-errors.l4:18:1-64:
+  EXPONENT does not compute a negative number to a fractional power
+numeric-domain-errors.l4:19:1-47:
+  EXPONENT does not compute a negative number to a fractional power

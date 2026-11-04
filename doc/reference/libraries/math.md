@@ -18,7 +18,7 @@ The functions are lowercase wrappers around the [built-in](../builtins/README.md
 
 | Function    | Input       | Gives        | What it does                                       |
 | ----------- | ----------- | ------------ | -------------------------------------------------- |
-| `exp`       | `x`: NUMBER | NUMBER       | e to the power `x`; an error above about 709       |
+| `exp`       | `x`: NUMBER | NUMBER       | e to the power `x`; an error above about 709.78    |
 | `ln`        | `x`: NUMBER | MAYBE NUMBER | Natural logarithm; `NOTHING` if `x` is 0 or less   |
 | `log10`     | `x`: NUMBER | MAYBE NUMBER | Base-10 logarithm; `NOTHING` if `x` is 0 or less   |
 | `sqrt`      | `x`: NUMBER | MAYBE NUMBER | Square root; `NOTHING` if `x` is negative          |

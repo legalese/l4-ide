@@ -2030,16 +2030,18 @@ runBinOp BinOpModulo    (ValNumber num1) (ValNumber num2)      = do
   if n2 /= 0
     then continueBackward $ ValNumber (toRational $ n1 `mod` n2)
     else userException (DivisionByZero BinOpModulo)
-runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)   =
-  let result = (fromRational base :: Double) ** (fromRational exp_ :: Double)
-  in if isNaN result
-       then userException $ UserError "EXPONENT of a negative number to a fractional power has no real result"
-       else if isInfinite result
-         then userException $ UserError $
-           if base == 0
-             then "EXPONENT of 0 to a negative power has no result"
-             else "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
-         else continueBackward $ ValNumber (toRational result)
+runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)
+  -- Checked on the exact values: as doubles, a huge negative base is -Infinity,
+  -- and a power that is nearly whole rounds to whole, and then no NaN says so.
+  | base == 0 && exp_ < 0 =
+      userException $ UserError "EXPONENT of 0 to a negative power has no result"
+  | base < 0 && denominator exp_ /= 1 =
+      userException $ UserError "EXPONENT does not compute a negative number to a fractional power"
+  | otherwise =
+      let result = (fromRational base :: Double) ** (fromRational exp_ :: Double)
+      in if isNaN result || isInfinite result
+           then userException $ UserError "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
+           else continueBackward $ ValNumber (toRational result)
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
   let digitsInt = round digits :: Integer
       scale k = (10 :: Rational) ^^ k

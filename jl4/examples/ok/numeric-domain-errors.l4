@@ -12,3 +12,8 @@
 #EVAL EXPONENT 2 1023    -- the largest power of 2 that fits
 #EVAL DATE_FROM_SERIAL (-0.5)  -- the day of serial -1, not of serial 0
 #EVAL DATE_FROM_SERIAL (-1)
+#EVAL EXPONENT (-8) (1/3)   -- caught: it has a real result, -2, but L4 does not compute it
+#EVAL EXPONENT (-2) 3       -- -8: a whole power of a negative base is computed
+#EVAL EXPONENT (0 - EXPONENT 10 308 * EXPONENT 10 92) 0.5        -- caught: as a double the base is -Infinity
+#EVAL EXPONENT (0 - EXPONENT 10 308 * EXPONENT 10 92) (0 - 0.5)  -- caught: as doubles this would be 0
+#EVAL EXPONENT (-2) (3 + 1 / (EXPONENT 10 49))                   -- caught: as a double the power is 3
