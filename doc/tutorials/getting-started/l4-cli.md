@@ -363,8 +363,11 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
-A `#TRACE` left in the file runs for each line too, and its result appears in `output` beside the function's.
-If it ends in a breach for a missed deadline, the result is `{"breached": {"type": "deadline_missed", ...}}`: `eventParty`, `eventAction` and `timestamp` describe the event that showed the deadline had passed, and `obligatedParty`, `obligationAction` and `deadline` describe the duty that was missed.
+A `#TRACE` left in the file usually runs for each line too, and its result appears in `output` beside the function's.
+`l4 batch` prints the file and reads it back, and that does not yet work for every file: a file it cannot read back stops with a parse or type error on every line.
+If a `#TRACE` ends in a breach for a missed deadline, the result is `{"breached": {"type": "deadline_missed", ...}}`: `eventParty`, `eventAction` and `timestamp` describe the event that showed the deadline had passed, and `obligatedParty`, `obligationAction` and `deadline` describe the duty that was missed.
+When that event is a `WAITUNTIL`, `eventParty` and `eventAction` read `NEVERMATCHESPARTY` and `NEVERMATCHESACT`, since a `WAITUNTIL` only moves the clock.
+`obligationAction` is the action as the rule writes it, so an input of the rule shows by its name: `MUST pay n`, not the amount.
 
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
