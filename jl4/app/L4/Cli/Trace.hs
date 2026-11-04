@@ -29,7 +29,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalConfig, readFixedNowEnv, resolveEvalConfig)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalConfig, readFixedNowEnv, resolveEvalConfig, traceUnavailable)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz2
 
 import L4.Cli.Common
@@ -115,7 +115,7 @@ traceCmd opts = do
             case result.trace of
               Just tr -> TIO.putStrLn (GraphViz2.traceToGraphViz gvOpts mModule tr)
               Nothing -> pure ()
-          exitSuccess
+          finish evalResults
 
         -- Auto-split into a directory for any format.
         (Just outDir, fmt) -> do
@@ -142,10 +142,18 @@ traceCmd opts = do
                       then hPutStrLn stderr ("Generated: " <> dotFile <> " and " <> svgFile)
                       else exitFailure
               Nothing -> pure ()
-          exitSuccess
+          finish evalResults
 
         -- (Nothing, PngFormat | SvgFormat) was rejected up top already.
         (Nothing, _) -> exitFailure
+  where
+    -- A trace that could not be built is a graph of one node. Exit 0 would pass
+    -- it off as the trace of something trivial.
+    finish evalResults
+      | any (maybe False traceUnavailable . (.trace)) evalResults = do
+          hPutStrLn stderr "Error: a trace could not be built (internal error during trace post-processing); its graph has one node saying so"
+          exitFailure
+      | otherwise = exitSuccess
 
 -- | Render a @.dot@ file to @outFile@ via Graphviz's @dot@, capturing its
 -- stdout into the file directly.

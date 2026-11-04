@@ -13,7 +13,7 @@ import Control.Exception (evaluate)
 import qualified Data.Text as Text
 import Test.Hspec
 
-import L4.EvaluateLazy (postprocessTrace, safePostprocessTrace)
+import L4.EvaluateLazy (postprocessTrace, safePostprocessTrace, traceUnavailable)
 import L4.EvaluateLazy.Trace (EvalTraceAction(..), EvalTrace(..))
 import L4.Evaluate.ValueLazy (NF(..), Value(..))
 
@@ -36,3 +36,8 @@ spec = describe "trace post-processing" $ do
       Trace Nothing [] (Right (MkNF (ValString msg))) ->
         msg `shouldSatisfy` ("trace unavailable" `Text.isInfixOf`)
       _ -> expectationFailure "expected the trace-post-process fallback node"
+
+  it "traceUnavailable tells the fallback from a trace" $ do
+    t <- safePostprocessTrace malformed
+    traceUnavailable t `shouldBe` True
+    traceUnavailable (Trace Nothing [] (Right (MkNF (ValString "an answer")))) `shouldBe` False

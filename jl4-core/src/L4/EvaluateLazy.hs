@@ -27,6 +27,7 @@ module L4.EvaluateLazy
 , postprocessTrace
 , safePostprocessTrace
 , tracePostprocessFailed
+, traceUnavailable
 )
 where
 
@@ -158,7 +159,11 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
     -- inside a JUST, or at the end of a list) is not in it, and its root would
     -- show the answer's head as though it were the answer.
     finalTrace = rootCarriesOutcome v <$> postprocessed
-    rootCarriesOutcome (Left exc) (Trace l steps (Right _)) = Trace l steps (Left exc)
+    -- ... except the fallback for a trace that could not be built, whose only
+    -- content is that it could not be: rewriting it leaves a node with no label
+    -- and no reason, which reads as a trace of nothing.
+    rootCarriesOutcome (Left exc) t@(Trace l steps (Right _))
+      | not (traceUnavailable t) = Trace l steps (Left exc)
     rootCarriesOutcome _ t = t
     v' = case assertKind of
       NotAnAssert -> Reduction
@@ -230,8 +235,17 @@ safePostprocessTrace actions = do
 -- directive's result intact and degrades only the trace to a single marker
 -- node, instead of letting the failure abort the surrounding evaluation.
 tracePostprocessFailed :: EvalTrace
-tracePostprocessFailed =
-  Trace Nothing [] (Right (MkNF (ValString "trace unavailable (internal error during trace post-processing)")))
+tracePostprocessFailed = Trace Nothing [] (Right (MkNF (ValString traceUnavailableMessage)))
+
+traceUnavailableMessage :: Text
+traceUnavailableMessage = "trace unavailable (internal error during trace post-processing)"
+
+-- | Is this the fallback, rather than a trace? A surface that hands the trace to
+-- a person has to say so: the fallback is a graph with one node.
+traceUnavailable :: EvalTrace -> Bool
+traceUnavailable = \ case
+  Trace Nothing [] (Right (MkNF (ValString s))) -> s == traceUnavailableMessage
+  _ -> False
 
 postprocessTrace :: [EvalTraceAction] -> EvalTrace
 postprocessTrace actions =
