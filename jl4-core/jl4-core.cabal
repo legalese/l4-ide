@@ -198,6 +198,7 @@ test-suite jl4-core-test
     MultiClausePrintSpec
     ConsiderScaleSpec
     OverloadScaleSpec
+    YmdOwnDefinitionSpec
     CheckDirectiveResultsSpec
     PrintRoundtripSpec
     RefAnnotationSpec
