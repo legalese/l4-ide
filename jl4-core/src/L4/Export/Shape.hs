@@ -115,8 +115,9 @@ data Unsendable
     UInArgument Text Unsendable
   | -- | A result L4 could not work out a type for, from a rule with no GIVETH.
     UNotWorkedOut
-  | -- | A type whose name did not resolve, by name. The cause has its own error
-    -- (a missing or broken import), so this one is not reported: see 'isUnresolved'.
+  | -- | A type whose name did not resolve, or that was given the wrong number of
+    -- arguments, by name. The cause has its own error (of the type check, here or
+    -- in an import), so this one is not reported: see 'isUnresolved'.
     UUnresolved Text
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
@@ -194,7 +195,7 @@ typeHead env name args
   | Just (MkDeclare _ _ (MkAppForm _ declared params _) body) <- Map.lookup u env.declared =
       if length params == length args
         then Declared (nameText declared) (zip (map getUnique params) args) body
-        else HasNoShape (UUnknownType (nameText declared))
+        else HasNoShape (UUnresolved (nameText declared))
   | OutOfScope{} <- name = HasNoShape (UUnresolved text)
   | u `Set.member` env.typeVariables = HasNoShape (UPolymorphic text)
   | otherwise = HasNoShape (UUnknownType text)
@@ -348,7 +349,7 @@ unsendableWhat = \case
   UInField r f why -> "of a record type `" <> r <> "` whose field `" <> f <> "` is " <> unsendableWhat why
   UInArgument t why -> "of the type `" <> t <> "`, given " <> dropOf (unsendableWhat why)
   UNotWorkedOut -> "of a type that L4 could not work out from the rule"
-  UUnresolved t -> "of the type `" <> t <> "`, which was not found"
+  UUnresolved t -> "of the type `" <> t <> "`, which has an error of its own"
  where
   dropOf what = fromMaybe what (Text.stripPrefix "of " what)
 
@@ -364,6 +365,6 @@ unsendableHint = \case
   UInField _ _ why -> unsendableHint why
   UInArgument _ why -> unsendableHint why
   UNotWorkedOut -> "Write its type in the GIVEN and GIVETH."
-  UUnresolved _ -> "Fix what stops the type from being found."
+  UUnresolved _ -> "Fix the error about that type."
  where
   genericHint = "Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."

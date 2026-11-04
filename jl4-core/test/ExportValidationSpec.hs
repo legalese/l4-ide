@@ -829,6 +829,20 @@ spec = do
             ]
       problems src `shouldBe` Right []
 
+    -- An imported module that reads a field as a type given too many arguments
+    -- has an error of its own, which the importer is told about.
+    it "is not called so, given the wrong number of arguments" $ do
+      let src = Text.unlines
+            [ "DECLARE Choice IS ONE OF yes, no"
+            , "DECLARE Mid HAS d IS A Choice OF NUMBER"
+            , ""
+            , "@export Holds"
+            , "GIVEN x IS A Mid"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right []
+
   describe "l4_check, which the web editor reads" $ do
     let refused what result = Text.unlines $
           [ "DECLARE Party IS ONE OF alice, bob"
