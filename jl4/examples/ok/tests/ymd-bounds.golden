@@ -1,0 +1,242 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+ymd-bounds.l4:13:1-20:
+  DATE OF 28, 7, 2026
+ymd-bounds.l4:15:1-44:
+  assertion satisfied
+ymd-bounds.l4:18:1-56:
+  assertion satisfied
+ymd-bounds.l4:21:1-19:
+  DATE OF 1, 1, 2026
+ymd-bounds.l4:27:1-20:
+  DATE OF 31, 1, 2023
+ymd-bounds.l4:28:1-20:
+  DATE OF 28, 2, 2023
+ymd-bounds.l4:29:1-20:
+  DATE OF 31, 3, 2023
+ymd-bounds.l4:30:1-20:
+  DATE OF 30, 4, 2023
+ymd-bounds.l4:31:1-20:
+  DATE OF 31, 5, 2023
+ymd-bounds.l4:32:1-20:
+  DATE OF 30, 6, 2023
+ymd-bounds.l4:33:1-20:
+  DATE OF 31, 7, 2023
+ymd-bounds.l4:34:1-20:
+  DATE OF 31, 8, 2023
+ymd-bounds.l4:35:1-20:
+  DATE OF 30, 9, 2023
+ymd-bounds.l4:36:1-21:
+  DATE OF 31, 10, 2023
+ymd-bounds.l4:37:1-21:
+  DATE OF 30, 11, 2023
+ymd-bounds.l4:38:1-21:
+  DATE OF 31, 12, 2023
+ymd-bounds.l4:41:1-20:
+  DATE OF 31, 1, 2024
+ymd-bounds.l4:42:1-20:
+  DATE OF 29, 2, 2024
+ymd-bounds.l4:43:1-20:
+  DATE OF 31, 3, 2024
+ymd-bounds.l4:44:1-20:
+  DATE OF 30, 4, 2024
+ymd-bounds.l4:45:1-20:
+  DATE OF 31, 5, 2024
+ymd-bounds.l4:46:1-20:
+  DATE OF 30, 6, 2024
+ymd-bounds.l4:47:1-20:
+  DATE OF 31, 7, 2024
+ymd-bounds.l4:48:1-20:
+  DATE OF 31, 8, 2024
+ymd-bounds.l4:49:1-20:
+  DATE OF 30, 9, 2024
+ymd-bounds.l4:50:1-21:
+  DATE OF 31, 10, 2024
+ymd-bounds.l4:51:1-21:
+  DATE OF 30, 11, 2024
+ymd-bounds.l4:52:1-21:
+  DATE OF 31, 12, 2024
+ymd-bounds.l4:57:1-86:
+  assertion satisfied
+ymd-bounds.l4:58:1-86:
+  assertion satisfied
+ymd-bounds.l4:59:1-86:
+  assertion satisfied
+ymd-bounds.l4:60:1-86:
+  assertion satisfied
+ymd-bounds.l4:61:1-86:
+  assertion satisfied
+ymd-bounds.l4:62:1-86:
+  assertion satisfied
+ymd-bounds.l4:63:1-86:
+  assertion satisfied
+ymd-bounds.l4:64:1-86:
+  assertion satisfied
+ymd-bounds.l4:65:1-86:
+  assertion satisfied
+ymd-bounds.l4:66:1-86:
+  assertion satisfied
+ymd-bounds.l4:67:1-86:
+  assertion satisfied
+ymd-bounds.l4:68:1-86:
+  assertion satisfied
+ymd-bounds.l4:70:1-86:
+  assertion satisfied
+ymd-bounds.l4:71:1-86:
+  assertion satisfied
+ymd-bounds.l4:72:1-86:
+  assertion satisfied
+ymd-bounds.l4:73:1-86:
+  assertion satisfied
+ymd-bounds.l4:74:1-86:
+  assertion satisfied
+ymd-bounds.l4:75:1-86:
+  assertion satisfied
+ymd-bounds.l4:76:1-86:
+  assertion satisfied
+ymd-bounds.l4:77:1-86:
+  assertion satisfied
+ymd-bounds.l4:78:1-86:
+  assertion satisfied
+ymd-bounds.l4:79:1-86:
+  assertion satisfied
+ymd-bounds.l4:80:1-86:
+  assertion satisfied
+ymd-bounds.l4:81:1-86:
+  assertion satisfied
+ymd-bounds.l4:87:1-20:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:88:1-20:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:91:1-20:
+  DATE OF 29, 2, 2000
+ymd-bounds.l4:92:1-20:
+  DATE OF 29, 2, 2400
+ymd-bounds.l4:95:1-20:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:101:1-21:
+  DATE OF 1, 3, 2023
+ymd-bounds.l4:105:1-21:
+  DATE OF 7, 4, 2028
+ymd-bounds.l4:107:1-20:
+  The model refuses to answer:
+    YMD: the month is not a whole number from 1 to 12
+ymd-bounds.l4:112:1-19:
+  The model refuses to answer:
+    YMD: the month is not a whole number from 1 to 12
+ymd-bounds.l4:113:1-20:
+  The model refuses to answer:
+    YMD: the month is not a whole number from 1 to 12
+ymd-bounds.l4:117:1-23:
+  DATE OF 28, 7, 2026
+ymd-bounds.l4:118:1-22:
+  The model refuses to answer:
+    YMD: the month is not a whole number from 1 to 12
+ymd-bounds.l4:121:1-21:
+  The model refuses to answer:
+    YMD: the month is not a whole number from 1 to 12
+ymd-bounds.l4:124:1-26:
+  The model refuses to answer:
+    YMD: the month is not a whole number from 1 to 12
+ymd-bounds.l4:126:1-96:
+  assertion satisfied
+ymd-bounds.l4:127:1-96:
+  assertion satisfied
+ymd-bounds.l4:128:1-96:
+  assertion satisfied
+ymd-bounds.l4:129:1-96:
+  assertion satisfied
+ymd-bounds.l4:130:1-96:
+  assertion satisfied
+ymd-bounds.l4:131:1-96:
+  assertion satisfied
+ymd-bounds.l4:132:1-96:
+  assertion satisfied
+ymd-bounds.l4:133:1-96:
+  assertion satisfied
+ymd-bounds.l4:137:1-96:
+  assertion satisfied
+ymd-bounds.l4:138:1-96:
+  assertion satisfied
+ymd-bounds.l4:139:1-96:
+  assertion satisfied
+ymd-bounds.l4:144:1-19:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:145:1-20:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:149:1-23:
+  DATE OF 28, 7, 2026
+ymd-bounds.l4:150:1-22:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:152:1-87:
+  assertion satisfied
+ymd-bounds.l4:153:1-87:
+  assertion satisfied
+ymd-bounds.l4:154:1-87:
+  assertion satisfied
+ymd-bounds.l4:155:1-87:
+  assertion satisfied
+ymd-bounds.l4:156:1-87:
+  assertion satisfied
+ymd-bounds.l4:163:1-21:
+  The model refuses to answer:
+    YMD: the year is not a whole number
+ymd-bounds.l4:164:1-22:
+  The model refuses to answer:
+    YMD: the year is not a whole number
+ymd-bounds.l4:165:1-18:
+  The model refuses to answer:
+    YMD: the year is not a whole number
+ymd-bounds.l4:169:1-21:
+  DATE OF 1, 7, 2026
+ymd-bounds.l4:173:1-22:
+  The model refuses to answer:
+    YMD: the year is not a whole number
+ymd-bounds.l4:174:1-22:
+  The model refuses to answer:
+    YMD: the year is not a whole number
+ymd-bounds.l4:175:1-23:
+  The model refuses to answer:
+    YMD: the year is not a whole number
+ymd-bounds.l4:177:1-80:
+  assertion satisfied
+ymd-bounds.l4:178:1-80:
+  assertion satisfied
+ymd-bounds.l4:179:1-80:
+  assertion satisfied
+ymd-bounds.l4:180:1-80:
+  assertion satisfied
+ymd-bounds.l4:181:1-80:
+  assertion satisfied
+ymd-bounds.l4:182:1-80:
+  assertion satisfied
+ymd-bounds.l4:183:1-43:
+  assertion satisfied
+ymd-bounds.l4:191:1-21:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:192:1-39:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:193:1-40:
+  The model refuses to answer:
+    YMD: that month has no such day in that year
+ymd-bounds.l4:195:1-107:
+  assertion satisfied
+ymd-bounds.l4:196:1-107:
+  assertion satisfied
+ymd-bounds.l4:197:1-107:
+  assertion satisfied
+ymd-bounds.l4:203:1-16:
+  DATE OF 1, 1, 0
+ymd-bounds.l4:206:1-17:
+  DATE OF 1, 3, -5
+ymd-bounds.l4:209:1-28:
+  DATE OF 1, 1, 1000000000000
