@@ -521,14 +521,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     AppNamed   _ n namedExpr _ ->
           printWithLayout n
       <+> "WITH"
-      <+> hang 2 (align (vcat (fmap printWithLayout namedExpr)))
+      <+> align (vcatHard (fmap printWithLayout namedExpr))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
         <+> "THEN" <+> parensIfNeeded then'
         <+> "ELSE" <+> parensIfNeeded else'
     MultiWayIf _ conds o ->
-      vcat $
+      hang 2 $ vcatHard $
         [ "BRANCH" ]
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
@@ -536,8 +536,10 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     -- clauses must be indented past PARTY, which is rarely in column 0 here
     -- (`LEST (PARTY ...`), and a #TRACE directive is line-oriented, so a contract
     -- broken across lines loses its AT and WITH. 'group' collapses the rule to
-    -- one line under the Unbounded layout; when an operand holds a hard break of
-    -- its own, flattening fails and 'hang' indents relative to PARTY.
+    -- one line under the Unbounded layout. That is safe only because every break
+    -- an operand NEEDS is a 'hardline' ('vcatHard': WITH, WHERE, BRANCH, CONSIDER),
+    -- which 'flatten' refuses, and then 'hang' indents relative to PARTY. A soft
+    -- break in an operand would collapse to nothing and jam its tokens together.
     Regulative _ (MkDeonton _ p a t f l) ->
       Prettyprinter.group $ hang 2 $ vsep $
         [ "PARTY" <+> printWithLayout p
@@ -574,20 +576,20 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     List       _ exprs ->
       "LIST" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     Where      _ e1 decls ->
-      vcat
+      align $ vcatHard
         [ indent 2 (printWithLayout e1)
         , "WHERE"
-        , indent 2 (vsep $ fmap printWithLayout decls)
+        , indent 2 (vcatHard $ fmap printWithLayout decls)
         ]
     LetIn _ decls e1 ->
-      vcat
+      align $ vcatHard
         [ "LET"
-        , indent 2 (vsep $ fmap printLetBinding decls)
+        , indent 2 (vcatHard $ fmap printLetBinding decls)
         , "IN"
         , indent 2 (printWithLayout e1)
         ]
     Event _ MkEvent {timestamp, party, action} ->
-      vcat
+      align $ vcatHard
         [ "PARTY" <+> printWithLayout party
         , "DOES" <+> printWithLayout action
         , "AT" <+> printWithLayout timestamp -- TODO: better timestamp rendering

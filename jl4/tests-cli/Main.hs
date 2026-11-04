@@ -536,6 +536,9 @@ evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
 
+batchRuleOperandsFixture :: FilePath
+batchRuleOperandsFixture = fixtureDir </> "batch-rule-operands.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -737,7 +740,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
-       , breachTraceFixture, breachInputsFixture
+       , breachTraceFixture, breachInputsFixture, batchRuleOperandsFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
        , evalTraceFixture, refTrailingFixture
        , langEnHintFixture, langEnThenHeFixture, langTagCaseFixture
@@ -3675,6 +3678,14 @@ spec bin = do
           expectationFailure $
             "Expected batch stdout NOT to contain " ++ show frag
             ++ "\n--- stdout ---\n" ++ sout
+
+    -- A rule in an expression prints on one line, so each break its operands
+    -- need has to be a hard one: a soft one collapses and jams their tokens.
+    it "reads back a rule whose clauses hold WITH, WHERE, BRANCH and LET" $ do
+      Output code sout serr <- runL4 bin ["batch", batchRuleOperandsFixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      unless ("\"status\":\"success\"" `isInfixOf` sout) $
+        expectationFailure (sout ++ "\n--- stderr ---\n" ++ serr)
 
     -- Batch prints a module and parses it again per row, so this is a round trip
     -- of every #TRACE in that file: rules under HENCE and LEST, in brackets, and
