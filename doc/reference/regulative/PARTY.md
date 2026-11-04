@@ -66,7 +66,7 @@ GIVETH A DEONTIC Party Action
 `MAY` is a permission: the party is allowed, but not required, to take the action. Typical uses are rights to terminate early, renew, prepay or convert.
 
 - Taken in time: the rule continues with `HENCE` (by default `FULFILLED`).
-- Not taken when the deadline passes: the rule also continues with `HENCE`. Not using a permission is never a breach, and a `LEST` after `MAY` is not used.
+- Not taken when the deadline passes: the rule continues with `LEST` (by default `FULFILLED`). Not using a permission is not a breach unless you make it one: a `LEST BREACH` after a `MAY` breaches when the permission goes unused.
 
 ```l4
 DECLARE Party IS ONE OF `The Borrower`
@@ -80,6 +80,7 @@ GIVETH A DEONTIC Party Action
 ```
 
 A `MAY` is often the step after an obligation, under its `HENCE`, or leads to an obligation of another party under its own `HENCE`.
+If not using the permission should have a consequence, give the `MAY` a `LEST`, or write the rule with `MUST` instead.
 If not using the permission should have a consequence, write the rule with `MUST` or `DO` and a `LEST` instead.
 
 ## SHANT and MUST NOT
@@ -116,7 +117,7 @@ GIVETH A DEONTIC Party Action
 | Modal              | Meaning     | Action taken in time      | Deadline passes without the action |
 | ------------------ | ----------- | ------------------------- | ---------------------------------- |
 | `MUST`             | obligation  | `HENCE`                   | `LEST` (default `BREACH`)          |
-| `MAY`              | permission  | `HENCE`                   | `HENCE`                            |
+| `MAY`              | permission  | `HENCE`                   | `LEST` (default `FULFILLED`)       |
 | `SHANT / MUST NOT` | prohibition | `LEST` (default `BREACH`) | `HENCE`                            |
 | `DO`               | bare action | `HENCE`                   | `LEST` (default `BREACH`)          |
 

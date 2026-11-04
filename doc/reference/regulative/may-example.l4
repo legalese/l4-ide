@@ -7,9 +7,11 @@
 -- Key Concepts:
 --   • MAY creates a permission or option to perform an action
 --   • WITHIN specifies the time period during which the option can be exercised
---   • HENCE specifies what follows, whether or not the option is exercised:
---     when the deadline passes without it, the rule also continues with HENCE
---   • Unlike MUST, not exercising a MAY option is never a breach
+--   • HENCE specifies what follows when the option is exercised in time
+--   • LEST specifies what follows when the deadline passes without it, and
+--     defaults to FULFILLED
+--   • Unlike MUST, not exercising a MAY option is not a breach unless a LEST
+--     says so
 --
 -- Common Legal Uses:
 --   • Early termination rights (lease agreements, employment contracts)
@@ -123,7 +125,7 @@ DECLARE `Contract Action` IS ONE OF
   PARTY `The Tenant`
   MAY `terminate early`
   WITHIN 180  -- Can terminate within first 6 months
-  HENCE FULFILLED  -- exercised or not, nothing further follows
+  HENCE FULFILLED  -- exercised or not (LEST defaults to FULFILLED), nothing further follows
 
 -- Chained Permissions
 

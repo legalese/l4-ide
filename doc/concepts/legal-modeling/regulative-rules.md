@@ -49,11 +49,11 @@ An event is a triple:
 
 The contract reads events in order. With each event, two things move: the contract's clock advances to the event's time, and the remaining window of the current `WITHIN` shrinks by the time that has passed. Then:
 
-- If the event comes **after the deadline**, the contract takes the branch for a missed deadline, without looking at what the event was.
+- If the event comes **after the deadline**, the contract takes the branch for a missed deadline, without looking at what the event was. The event is then offered to that branch, because it may be just what the branch is waiting for: a late payment can discharge the penalty clause it fell into.
 - If the event is **in time and matches** the duty (right party, right action, any `PROVIDED` condition true), the contract takes the branch for the action being done.
 - If the event is **in time but does not match**, it is skipped. The next event is tried, with the clock further on.
 
-For `MUST`, doing the action leads to `HENCE` and a missed deadline to `LEST`. For `MAY`, both lead to `HENCE`, because not using a permission is no breach. A prohibition, `SHANT`, turns `MUST` around: doing the forbidden act leads to `LEST`, and reaching the deadline without it leads to `HENCE`. In every case, `HENCE` names the outcome the law wants, and `LEST` the one it does not.
+For `MUST`, doing the action leads to `HENCE` and a missed deadline to `LEST`. For `MAY`, doing the action leads to `HENCE` and letting the deadline pass leads to `LEST`, which by default is `FULFILLED`, because not using a permission is no breach unless the rule makes it one. A prohibition, `SHANT`, turns `MUST` around: doing the forbidden act leads to `LEST`, and reaching the deadline without it leads to `HENCE`. In every case, `HENCE` names the outcome the law wants, and `LEST` the one it does not.
 
 The timeline is just numbers. It can stand for days, hours or business days, as long as deadlines and event times use the same unit.
 
@@ -114,8 +114,8 @@ Larger contracts are built by putting rules inside rules.
         │ arrives  │    │             │  │                │
         └────┬─────┘    └──────┬──────┘  └──────┬─────────┘
              │                 │                │
-   (MUST/MAY: HENCE)   (MUST: LEST,            │
-   (SHANT:    LEST)     SHANT/MAY: HENCE)      │
+   (MUST/MAY: HENCE)   (MUST/MAY: LEST,        │
+   (SHANT:    LEST)     SHANT:    HENCE)       │
              │                 │           (skip, try next ─┘
              ▼                 ▼            with clock advanced)
        ┌──────────┐      ┌──────────┐

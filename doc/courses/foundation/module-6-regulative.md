@@ -96,7 +96,7 @@ GIVETH A DEONTIC `Contract Party` `Sale Action`
     HENCE FULFILLED
 ```
 
-MAY doesn't need a LEST: whether the buyer inspects the goods or lets the time pass, the result is the HENCE branch, because not exercising a permission isn't a breach.
+MAY doesn't need a LEST: a permission left unused ends as FULFILLED, because not exercising a permission isn't a breach. If letting a deadline pass should have a consequence, give the MAY a WITHIN and a LEST.
 
 ---
 

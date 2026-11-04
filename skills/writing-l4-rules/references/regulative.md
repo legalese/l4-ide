@@ -59,16 +59,16 @@ PARTY Alice MUST NOT smoke WITHIN 30       -- the same prohibition
 
 `HENCE` is the consequence on success; `LEST` is the consequence on failure. **What counts as "success" depends on the modal**, and this is the single most non-obvious thing about L4 regulative rules.
 
-| Modal                | HENCE is taken when                                        | LEST is taken when                     | HENCE default | LEST default |
-| -------------------- | ---------------------------------------------------------- | -------------------------------------- | ------------- | ------------ |
-| `MUST`               | action is taken in time                                    | deadline passes without the action     | `FULFILLED`   | `BREACH`     |
-| `MAY`                | action is taken in time, **or** the deadline passes unused | never — a `LEST` after `MAY` is unused | `FULFILLED`   | not used     |
-| `SHANT` / `MUST NOT` | deadline passes (prohibition respected)                    | action is taken (prohibition violated) | `FULFILLED`   | `BREACH`     |
-| `DO`                 | action is taken in time                                    | deadline passes without the action     | `FULFILLED`   | `BREACH`     |
+| Modal                | HENCE is taken when                     | LEST is taken when                     | HENCE default | LEST default |
+| -------------------- | --------------------------------------- | -------------------------------------- | ------------- | ------------ |
+| `MUST`               | action is taken in time                 | deadline passes without the action     | `FULFILLED`   | `BREACH`     |
+| `MAY`                | action is taken in time                 | deadline passes (permission unused)    | `FULFILLED`   | `FULFILLED`  |
+| `SHANT` / `MUST NOT` | deadline passes (prohibition respected) | action is taken (prohibition violated) | `FULFILLED`   | `BREACH`     |
+| `DO`                 | action is taken in time                 | deadline passes without the action     | `FULFILLED`   | `BREACH`     |
 
 **`SHANT` flips the polarity**: for a prohibition, doing the action is the failure. This is why `SHANT … HENCE` fires when the deadline passes quietly — that is the good outcome.
 
-**Not using a permission is never a breach.** A `LEST BREACH` written after `MAY` is accepted and silently ignored. If missing the deadline should have a consequence, write the rule with `MUST` or `DO` and a `LEST`.
+**Not using a permission is not a breach unless you make it one.** A `LEST BREACH` written after `MAY` breaches when the permission goes unused; with no `LEST`, a lapsed `MAY` ends as `FULFILLED`.
 
 `LEST` can chain another obligation for a reparation clause:
 
@@ -190,7 +190,7 @@ Reference: <https://legalese.com/l4/reference/regulative/consequences.md>
 - A deadline counts from the moment its rule becomes active: from the start time for the first rule, and from the event that led to it for a rule under `HENCE` or `LEST`.
 - There are no absolute deadlines and no `WITHIN 5 days OF event` (that is a parse error). To count from an event, put the rule under the `HENCE` of the rule for that event.
 - A rule without `WITHIN` waits for its action indefinitely; time alone never takes it to `LEST`.
-- L4 notices that a deadline has passed only when it reads a later event, or a `WAITUNTIL`. The rule that follows starts at that event's time, and that event is **not** matched against it.
+- L4 notices that a deadline has passed only when it reads a later event, or a `WAITUNTIL`. The rule that follows starts at that event's time, and that event is offered to it, so a late payment can discharge the `LEST` reparation it was written for. An event is offered this way once: if it also shows that the next rule's deadline has passed, the rule after that does not see it.
 
 ```l4
 DECLARE Party IS ONE OF Buyer, Seller

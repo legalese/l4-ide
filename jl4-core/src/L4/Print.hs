@@ -403,9 +403,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       "#EVALTRACE" <+> printWithLayout e
     Check _ e ->
       "#CHECK" <+> printWithLayout e
-    Contract _ e t stmts -> hsep $
-      "#TRACE" <+> printWithLayout e <+> printWithLayout t :
-      map printWithLayout stmts
+    -- NOTE: AT and WITH are mandatory in the #TRACE grammar, and the events
+    -- are parsed with layout ('lmany'), so they must each go on their own
+    -- (indented) line for the printed directive to round-trip through the
+    -- parser (e.g. for @l4 batch@'s print-and-reparse of the module).
+    Contract _ e t stmts -> vcatHard $
+      ("#TRACE" <+> printWithLayout e <+> "AT" <+> printWithLayout t <+> "WITH") :
+      map (indent 2 . printWithLayout) stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
     -- An expression with an open tail is bracketed, so that a BECAUSE in it,

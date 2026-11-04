@@ -363,6 +363,9 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
+A `#TRACE` left in the file runs for each line too, and its result appears in `output` beside the function's.
+If it ends in a breach for a missed deadline, the result is `{"breached": {"type": "deadline_missed", ...}}`: `eventParty`, `eventAction` and `timestamp` describe the event that showed the deadline had passed, and `obligatedParty`, `obligationAction` and `deadline` describe the duty that was missed.
+
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.

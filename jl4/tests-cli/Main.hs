@@ -536,6 +536,10 @@ evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
 
+breachTraceFixture, breachInputsFixture :: FilePath
+breachTraceFixture  = fixtureDir </> "breach-trace.l4"
+breachInputsFixture = fixtureDir </> "breach-inputs.json"
+
 batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson :: FilePath
 batchEligFixture = fixtureDir </> "batch-elig.l4"
 batchDataJson    = fixtureDir </> "batch-data.json"
@@ -733,6 +737,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , breachTraceFixture, breachInputsFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
        , evalTraceFixture, refTrailingFixture
        , langEnHintFixture, langEnThenHeFixture, langTagCaseFixture
@@ -3639,6 +3644,38 @@ spec bin = do
           sout `shouldSatisfy` ("[p] is shown" `isInfixOf`)
 
   describe "l4 batch" $ do
+    it "serializes a #TRACE breach with correctly-labeled fields" $ do
+      -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch
+      -- re-prints the module and re-parses it once per input row.
+      Output code sout serr <- runL4 bin
+        ["batch", breachTraceFixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      -- DeadlineMissed labels must follow the constructor slots:
+      --   event party/action/timestamp, obligated party, obligation action,
+      --   deadline (see L4.Evaluate.ValueLazyJSON).
+      let expectedFragments =
+            [ "\"type\":\"deadline_missed\""
+            , "\"eventParty\":\"Bob\""
+            , "\"eventAction\":\"ping\""
+            , "\"timestamp\":15"
+            , "\"obligatedParty\":\"Alice\""
+            , "\"obligationAction\":\"MUST pay 100\""
+            , "\"deadline\":10"
+            ]
+      forM_ expectedFragments \frag ->
+        unless (frag `isInfixOf` sout) $
+          expectationFailure $
+            "Expected batch stdout to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+            ++ "\n--- stderr ---\n" ++ serr
+      -- The old mislabeled fields and the derived-Show AST blob must be gone.
+      let forbiddenFragments = ["\"now\":", "\"elapsed\":", "\"limit\":", "MkAction"]
+      forM_ forbiddenFragments \frag ->
+        unless (not (frag `isInfixOf` sout)) $
+          expectationFailure $
+            "Expected batch stdout NOT to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
       code `shouldBe` ExitSuccess

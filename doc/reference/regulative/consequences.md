@@ -42,7 +42,10 @@ GIVETH A DEONTIC Party Action
 - Deadlines are relative. There is no absolute date such as "by 1 January 2026", and no `WITHIN 5 days OF event`: to count from an event, put the rule after the `HENCE` of the rule for that event, as above.
 - As events are read, the time left shrinks: after an event at 12, what was `WITHIN 14` from 0 has 2 left.
 - A rule without `WITHIN` has no deadline. It waits for its action however long it takes, and time alone never takes it to `LEST`.
-- L4 finds that a deadline has passed when it reads an event, or a `WAITUNTIL` (see [EVENT](EVENT.md)), with a later time. The rule that follows starts at that event's time, and that event is not matched against it.
+- L4 finds that a deadline has passed when it reads an event, or a `WAITUNTIL` (see [EVENT](EVENT.md)), with a later time.
+  An event exactly at the deadline is in time.
+- The event that shows a deadline has passed is not used up by the rule that missed it. The rule that follows starts at that event's time, and the event is offered to it, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for.
+- An event is offered this way once. If it also shows that the next rule's deadline has passed, the rule after that starts at the same time without seeing it, which is what stops a rule whose `LEST` names itself from running forever.
 
 ## HENCE and LEST
 
@@ -69,14 +72,16 @@ GIVETH A DEONTIC Party Action
 
 Which branch is taken, and what is used when it is left out, depends on the modal:
 
-| Modal              | `HENCE` is taken when                                          | `LEST` is taken when           | `HENCE` default | `LEST` default |
-| ------------------ | -------------------------------------------------------------- | ------------------------------ | --------------- | -------------- |
-| `MUST`             | the action is taken in time                                    | the deadline passes without it | `FULFILLED`     | `BREACH`       |
-| `MAY`              | the action is taken in time, or the deadline passes without it | never                          | `FULFILLED`     | not used       |
-| `SHANT / MUST NOT` | the deadline passes without the action                         | the action is taken            | `FULFILLED`     | `BREACH`       |
-| `DO`               | the action is taken in time                                    | the deadline passes without it | `FULFILLED`     | `BREACH`       |
+| Modal              | `HENCE` is taken when                  | `LEST` is taken when           | `HENCE` default | `LEST` default |
+| ------------------ | -------------------------------------- | ------------------------------ | --------------- | -------------- |
+| `MUST`             | the action is taken in time            | the deadline passes without it | `FULFILLED`     | `BREACH`       |
+| `MAY`              | the action is taken in time            | the deadline passes without it | `FULFILLED`     | `FULFILLED`    |
+| `SHANT / MUST NOT` | the deadline passes without the action | the action is taken            | `FULFILLED`     | `BREACH`       |
+| `DO`               | the action is taken in time            | the deadline passes without it | `FULFILLED`     | `BREACH`       |
 
 For a prohibition the polarity flips: the deadline passing quietly is the good outcome. `HENCE` always names the outcome the rule wants, and `LEST` the one it does not.
+
+Not using a permission is not a breach unless you make it one: a `LEST BREACH` after a `MAY` breaches when the permission goes unused.
 
 A rule written on the same line as its `HENCE` needs parentheses when a `LEST` follows on the next line: `HENCE (PARTY Seller MUST deliver WITHIN 5)`. Without them, that `LEST` is an indentation error. A rule on lines of its own, as above, needs none.
 
@@ -138,12 +143,20 @@ GIVETH A DEONTIC Party Action
 
 `EXACTLY` can also come before the whole action: `MUST EXACTLY payment price`.
 
+When the action has several arguments, `EXACTLY` on one of them comes with two limits:
+
+- Put it in parentheses. `EXACTLY` takes everything to its right, so `MUST transfer EXACTLY 100 recipient` reads as one expression and does not type-check; write `MUST transfer (EXACTLY 100) recipient`. An action with one argument needs no parentheses: `MUST pay EXACTLY 100`.
+- Put it before any name the action binds. `MUST transfer amount (EXACTLY Bob)` stops with an internal error when the rule is evaluated, saying `Bob` is not in scope; `MUST transfer (EXACTLY 100) recipient`, which checks the amount and binds the recipient, works.
+
 ## RAND and ROR
 
 `RAND` and `ROR` combine two rules that run at the same time, on the same events.
 
 - `A RAND B` is fulfilled when both are fulfilled, and breached as soon as either is breached.
 - `A ROR B` is fulfilled as soon as either is fulfilled, and breached only when both are breached.
+
+When both sides are breached the result is one breach: the earlier one for `RAND`, the later one for `ROR`.
+A `LEST BREACH` records no time, so a pair with one in it, like a pair at the same time, reports the left side for `RAND` and the right side for `ROR`.
 
 ```l4
 DECLARE Party IS ONE OF Seller
