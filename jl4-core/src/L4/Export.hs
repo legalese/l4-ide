@@ -478,6 +478,7 @@ exportErrorCode = \case
  where
   unsendableCode site = \case
     UInField _ _ why -> unsendableCode site why
+    UInArgument _ why -> unsendableCode site why
     UEvent -> "check/export-event-type"
     UFunction -> case site of
       ExportInput _ -> "check/export-function-input"

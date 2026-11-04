@@ -86,6 +86,23 @@ diamond depth extraFields =
   level :: Int -> Text
   level i = "L" <> Text.pack (show i)
 
+-- | Types that each take a type and have two fields of the next one down, each
+-- field written as the function says. Levels below 0 are not declared.
+fanOut :: Int -> (Text -> [Text]) -> [Text]
+fanOut depth fields =
+  concat
+    [ [ "DECLARE " <> level i <> " a HAS"
+      , "  l IS A " <> l
+      , "  m IS A " <> m
+      ]
+    | i <- [0 .. depth - 1]
+    , [l, m] <- [fields (level (i + 1))]
+    ]
+    <> ["DECLARE " <> level depth <> " a HAS v IS A NUMBER"]
+ where
+  level :: Int -> Text
+  level i = "T" <> Text.pack (show i)
+
 -- | What @l4_check@ says about a snippet, as (source, severity, message).
 l4CheckDiagnostics :: Text -> [(Text, Int, Text)]
 l4CheckDiagnostics source =
@@ -597,7 +614,7 @@ spec = do
             , "`holds` MEANS 1"
             ]
       problems src `shouldBe` Right
-        [(Just 6, "holds", Just "h", "of a record type `Holder` whose field `bad` is of a record type `Box` whose field `v` is a function")]
+        [(Just 6, "holds", Just "h", "of a record type `Holder` whose field `bad` is of the type `Box`, given a function")]
 
     it "looks inside a type given to itself" $ do
       let src = Text.unlines
@@ -609,7 +626,67 @@ spec = do
             , "`holds` MEANS 1"
             ]
       problems src `shouldBe` Right
-        [(Just 3, "holds", Just "h", "of a record type `Box` whose field `v` is a function")]
+        [(Just 3, "holds", Just "h", "of the type `Box`, given the type `Box`, given a function")]
+
+    it "does not fill in a type that passes two different types on, 64 levels" $ do
+      let src = Text.unlines (fanOut 64 (\next -> [next <> " OF (LIST OF a)", next <> " OF (MAYBE a)"]) <> exported "T0 OF NUMBER")
+      r <- problemsWithin 30 src
+      r `shouldBe` Right []
+
+    it "does not fill in a type that passes a function on twice and never uses it, 64 levels" $ do
+      let fn = "(FUNCTION FROM NUMBER TO NUMBER)"
+          src = Text.unlines (fanOut 64 (\next -> [next <> " OF " <> fn, next <> " OF " <> fn]) <> exported "T0 OF NUMBER")
+      r <- problemsWithin 30 src
+      case r of
+        Right [(_, "deep rule", Just "x", what)] ->
+          what `shouldSatisfy` Text.isSuffixOf "whose field `l` is of the type `T64`, given a function"
+        other -> expectationFailure (show other)
+
+    it "refuses a parameter given what has no shape, used or not" $ do
+      let rule ty =
+            [ "DECLARE Party IS ONE OF alice, bob"
+            , "DECLARE Unused a HAS n IS A NUMBER"
+            , "DECLARE Option a IS ONE OF None, Some HAS v IS AN a"
+            , ""
+            , "@export Holds"
+            , "GIVEN x IS " <> ty
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+          said ty want = problems (Text.unlines (rule ty)) `shouldBe` Right [(Just 5, "holds", Just "x", want)]
+      said "AN Unused OF (FUNCTION FROM NUMBER TO NUMBER)" "of the type `Unused`, given a function"
+      said "AN Unused OF (EVENT Party Party)" "of the type `Unused`, given an EVENT"
+      said "AN Option OF (EVENT Party Party)" "of the type `Option`, given an EVENT"
+      said "AN Option OF (FUNCTION FROM NUMBER TO NUMBER)" "of the type `Option`, given a function"
+      problems (Text.unlines (rule "AN Unused OF NUMBER")) `shouldBe` Right []
+      problems (Text.unlines (rule "AN Option OF Party")) `shouldBe` Right []
+
+    it "names the field and the type that were given it, where the type is used in its own declaration" $ do
+      let src = Text.unlines
+            [ "DECLARE Node a HAS"
+            , "  v IS AN a"
+            , "  next IS A MAYBE (Node OF (FUNCTION FROM NUMBER TO NUMBER))"
+            , ""
+            , "@export Holds"
+            , "GIVEN x IS A Node OF NUMBER"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right
+        [(Just 5, "holds", Just "x", "of a record type `Node` whose field `next` is of the type `Node`, given a function")]
+
+    it "looks through a synonym that takes a type" $ do
+      let src = Text.unlines
+            [ "DECLARE Many a IS A LIST OF a"
+            , ""
+            , "@export Holds"
+            , "GIVEN x IS A Many OF (FUNCTION FROM NUMBER TO NUMBER)"
+            , "      y IS A Many OF NUMBER"
+            , "GIVETH A NUMBER"
+            , "`holds` MEANS 1"
+            ]
+      problems src `shouldBe` Right
+        [(Just 3, "holds", Just "x", "of the type `Many`, given a function")]
 
     it "stops at a type that gives itself a larger type" $ do
       let src = Text.unlines
@@ -667,7 +744,7 @@ spec = do
       problems src `shouldBe` Right
         [ (Just 3, "count", Just "a", "a type, so the rule is generic")
         , (Just 3, "count", Just "xs", "of the type variable `a`, so the rule is generic")
-        , (Just 3, "count", Just "y", "of a record type `Box` whose field `v` is of the type variable `a`, so the rule is generic")
+        , (Just 3, "count", Just "y", "of the type `Box`, given the type variable `a`, so the rule is generic")
         ]
 
     it "says so of an ASSUME that holds for all types" $ do

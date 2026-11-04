@@ -22,7 +22,9 @@
 -- > DECLARE T IS ONE OF a, b HAS … JEnum                     (the constructors' names; the fields are not part of
 --  >                                                          the shape: how they are written is not decided)
 -- > DECLARE T IS A type            the shape of that type
--- > a type with parameters         the shape of its body, parameters replaced
+-- > a type with parameters         the shape of its body, parameters replaced; no shape if
+-- >                                an argument has none, whether or not the parameter is used:
+-- >                                UInArgument
 -- > a record that contains itself  JRecursive               (expansion stops there)
 -- > DEONTIC party action           no shape yet: UDeontic
 -- > EVENT party action             no shape yet: UEvent
@@ -48,9 +50,9 @@ module L4.Export.Shape (
 ) where
 
 import Base
-import qualified Data.IntSet as IntSet
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 
 import L4.Syntax
 import L4.TypeCheck.Environment (
@@ -108,6 +110,8 @@ data Unsendable
     UUnknownType Text
   | -- | The record, the field, and why the field's type has no shape.
     UInField Text Text Unsendable
+  | -- | The type that takes a type, and why what it was given has no shape.
+    UInArgument Text Unsendable
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -144,12 +148,13 @@ shapeEnvFromDeclares decls ei =
 
 -- | The shape of a type, or why it has none.
 --
--- Whether it has one is worked out once for each type that is reached, however
--- many paths lead to it ('firstUnsendable'), so the answer costs what the
--- declarations cost to read. The shape itself is a tree with a declared type
--- written out on every path to it, which can be far larger than that (a record
--- whose two fields share a record type, nested, doubles at each level), so it
--- is built only as far as it is looked at. Walking all of it costs its size.
+-- Whether it has one is worked out by reading each declaration once
+-- ('firstUnsendable'), so the answer costs what the source costs to read. The
+-- shape itself is a tree with a declared type written out, with its arguments
+-- filled in, on every path to it, which can be far larger than that (a record
+-- whose two fields share a record type, nested, doubles at each level), so it is
+-- built only as far as it is looked at. Walking all of it costs its size, and
+-- only a test looks at any of it today.
 jsonShape :: ShapeEnv -> Type' Resolved -> Either Unsendable JsonShape
 jsonShape env ty = case firstUnsendable env ty of
   Just why -> Left why
@@ -190,103 +195,66 @@ typeHead env name args
   u = getUnique name
   text = nameText name
 
--- | A type in the walk of 'firstUnsendable', with its arguments filled in. Two
--- uses of a type with the same arguments are one node, so a type that takes a
--- type and passes it on in a larger one is not written out again at each level.
-data TypeNode = MkTypeNode !Int (Either Unsendable (Resolved, [TypeNode]))
-
-data Walk = MkWalk
-  { nodes :: !(Map.Map (Unique, [Int]) TypeNode)
-  , nextNode :: !Int
-  , lookedInside :: !IntSet.IntSet
-  -- ^ The nodes whose declarations have been read.
-  , lookedAtArguments :: !IntSet.IntSet
-  -- ^ The nodes met on the way through their own type, whose arguments have been
-  -- read.
+-- | Where 'firstUnsendable' is reading: the parameters of the declaration it is
+-- in, and the type variables that a FOR ALL has put in scope.
+data Reading = MkReading
+  { parameters :: !(Set.Set Unique)
+  , quantified :: !(Set.Set Unique)
   }
 
--- | The first thing in a type that has no shape, field by field, or 'Nothing'.
+-- | The first thing in a type that has no shape, or 'Nothing'.
 --
--- This goes through the types in the order the fields are written and looks at
--- each one once. It does not need to look again: what a type reaches has been
--- looked at by the time the walk has finished with the type, or is on the way to
--- it now and will be finished with next. So what it finds, and the fields it
--- names on the way to it, are what looking at every path would give.
+-- This reads declarations and does not instantiate them. Each declared type is
+-- read once, with its parameters taken as fine, in the order its fields are
+-- written. Each type argument is looked at where it is written, whether or not
+-- the parameter is used. So a type with parameters has a shape when its
+-- declaration has one and all of its arguments do, which costs what the source
+-- costs to read however many ways the types can be filled in, and on a cycle the
+-- declarations already read are all there is to say.
 --
--- A type met on the way through itself stops there, with one exception. With the
--- same arguments it has nothing new to say. With others (@Box OF (Box OF a)@, or
--- a type that gives itself a larger type, which would never end) what is new is
--- the arguments, so those are looked at.
+-- What is refused is what names something with no shape: 'UInField' says which
+-- field of which declaration, and 'UInArgument' which type was given it.
 firstUnsendable :: ShapeEnv -> Type' Resolved -> Maybe Unsendable
 firstUnsendable env ty =
   either Just (const Nothing) $
-    evalState (runExceptT (intern Map.empty ty >>= visit Set.empty)) (MkWalk Map.empty 0 IntSet.empty IntSet.empty)
+    evalState (runExceptT (walk (MkReading Set.empty Set.empty) ty)) Set.empty
  where
-  intern :: Map.Map Unique TypeNode -> Type' Resolved -> ExceptT Unsendable (State Walk) TypeNode
-  intern vars = \case
-    Fun{} -> noShape UFunction
-    Type{} -> noShape UTypeAsInput
-    InfVar _ n _ -> noShape (UPolymorphic (rawNameToText n))
-    Forall _ bound inner -> do
-      boundNodes <- traverse (noShape . UPolymorphic . nameText) bound
-      intern (Map.union (Map.fromList (zip (map getUnique bound) boundNodes)) vars) inner
+  walk :: Reading -> Type' Resolved -> ExceptT Unsendable (State (Set.Set Unique)) ()
+  walk reading = \case
+    Fun{} -> throwError UFunction
+    Type{} -> throwError UTypeAsInput
+    InfVar _ n _ -> throwError (UPolymorphic (rawNameToText n))
+    Forall _ bound inner ->
+      walk reading{quantified = Set.union reading.quantified (Set.fromList (map getUnique bound))} inner
     TyApp _ name args
-      | [] <- args, Just bound <- Map.lookup (getUnique name) vars -> pure bound
-      | otherwise -> do
-          argNodes <- traverse (intern vars) args
-          let key = (getUnique name, [i | MkTypeNode i _ <- argNodes])
-          gets (Map.lookup key . (.nodes)) >>= \case
-            Just known -> pure known
-            Nothing -> do
-              node <- newNode (Right (name, argNodes))
-              modify' \w -> w{nodes = Map.insert key node w.nodes}
-              pure node
+      | getUnique name `Set.member` reading.parameters -> traverse_ (walk reading) args
+      | getUnique name `Set.member` reading.quantified -> throwError (UPolymorphic (nameText name))
+      | otherwise -> case typeHead env name args of
+          HasShape _ -> pure ()
+          HasNoShape why -> throwError why
+          ArrayOf a -> walk reading a
+          OptionalOf a -> walk reading a
+          EitherOf a b -> walk reading a *> walk reading b
+          Declared typeName sub body -> do
+            declaration (getUnique name) typeName (map fst sub) body
+            for_ sub \(_, arg) ->
+              walk reading arg `catchError` (throwError . UInArgument typeName)
 
-  -- Not shared: nothing is ever looked up by what has no shape, and a walk that
-  -- reaches one is over.
-  noShape :: Unsendable -> ExceptT Unsendable (State Walk) TypeNode
-  noShape why = newNode (Left why)
-
-  newNode :: Either Unsendable (Resolved, [TypeNode]) -> ExceptT Unsendable (State Walk) TypeNode
-  newNode what = do
-    i <- gets (.nextNode)
-    modify' \w -> w{nextNode = i + 1}
-    pure (MkTypeNode i what)
-
-  visit :: Set.Set Unique -> TypeNode -> ExceptT Unsendable (State Walk) ()
-  visit path (MkTypeNode i what) = case what of
-    Left why -> throwError why
-    Right (name, args)
-      | getUnique name `Set.member` path -> do
-          seen <- gets (IntSet.member i . (.lookedAtArguments))
-          unless seen do
-            modify' \w -> w{lookedAtArguments = IntSet.insert i w.lookedAtArguments}
-            traverse_ (visit path) args
-      | otherwise -> do
-          seen <- gets (IntSet.member i . (.lookedInside))
-          unless seen do
-            modify' \w -> w{lookedInside = IntSet.insert i w.lookedInside}
-            inside path name args
-
-  inside :: Set.Set Unique -> Resolved -> [TypeNode] -> ExceptT Unsendable (State Walk) ()
-  inside path name args = case typeHead env name args of
-    HasShape _ -> pure ()
-    HasNoShape why -> throwError why
-    ArrayOf a -> visit path a
-    OptionalOf a -> visit path a
-    EitherOf a b -> visit path a *> visit path b
-    Declared typeName sub body ->
-      let
-        path' = Set.insert (getUnique name) path
-        vars = Map.fromList sub
-       in
-        case body of
-          SynonymDecl _ inner -> intern vars inner >>= visit path'
-          EnumDecl{} -> pure ()
-          RecordDecl _ _ fields ->
-            for_ fields \(MkTypedName _ fieldName fieldTy _) ->
-              (intern vars fieldTy >>= visit path')
-                `catchError` (throwError . UInField typeName (nameText fieldName))
+  declaration :: Unique -> Text -> [Unique] -> TypeDecl Resolved -> ExceptT Unsendable (State (Set.Set Unique)) ()
+  declaration u typeName params body = do
+    seen <- gets (Set.member u)
+    unless seen do
+      modify' (Set.insert u)
+      let reading = MkReading (Set.fromList params) Set.empty
+      case body of
+        SynonymDecl _ inner -> walk reading inner
+        -- A constructor that carries fields is shaped by its name alone: see
+        -- 'expand'.
+        EnumDecl{} -> pure ()
+        RecordDecl _ _ fields ->
+          for_ fields \(MkTypedName _ fieldName fieldTy _) ->
+            walk reading fieldTy
+              `catchError` (throwError . UInField typeName (nameText fieldName))
 
 -- | The shape of a type that 'firstUnsendable' found nothing wrong with. It stops
 -- at a declared type that is being expanded already, so what it gives for a type
@@ -359,6 +327,9 @@ unsendableWhat = \case
   UTypeAsInput -> "a type, so the rule is generic"
   UUnknownType t -> "of the type `" <> t <> "`"
   UInField r f why -> "of a record type `" <> r <> "` whose field `" <> f <> "` is " <> unsendableWhat why
+  UInArgument t why -> "of the type `" <> t <> "`, given " <> dropOf (unsendableWhat why)
+ where
+  dropOf what = fromMaybe what (Text.stripPrefix "of " what)
 
 -- | One line on what to do about it.
 unsendableHint :: Unsendable -> Text
@@ -370,5 +341,6 @@ unsendableHint = \case
   UTypeAsInput -> genericHint
   UUnknownType _ -> "Use a NUMBER, BOOLEAN, STRING, DATE, TIME, DATETIME, a LIST or MAYBE of those, or a record or enumeration of them."
   UInField _ _ why -> unsendableHint why
+  UInArgument _ why -> unsendableHint why
  where
   genericHint = "Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."

@@ -14,6 +14,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   The table is the header comment of that module.
   `NUMBER`, `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, `LIST OF`, `MAYBE`, `EITHER` of two types that have shapes, a record, an enumeration, a synonym and a type with parameters have a shape.
   A function, an `EVENT`, a `DEONTIC`, a type variable and any other built-in type that nobody gave a row have none.
+  A type that takes a type has none when what it is given has none, used or not (`Box OF (FUNCTION FROM NUMBER TO NUMBER)`; `UInArgument`), which is what `main` refuses of a function or an `EVENT` as well.
 - `checkExports` (`jl4-core/src/L4/Export.hs:518`) asks it about every input and the result of every `@export`.
   An input is a `GIVEN`, or an `ASSUME` of the module that the body of the rule reads itself.
   The result is the written `GIVETH`, or the inferred type when there is none.
@@ -39,8 +40,8 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 - `jl4-core/src/L4/Export/Shape.hs`: `JsonShape`, `Unsendable`, `ShapeEnv`, `jsonShape`, and the two functions that word a reason, `unsendableWhat` and `unsendableHint`.
   Types are looked up in the declarations of the module and of everything it imports (`moduleDeclares`), and a record that contains itself stops at `JRecursive`.
-  Whether a type has a shape is worked out once for each type reached, however many paths lead to it (`firstUnsendable`); the type's arguments count, so `Box OF NUMBER` and `Box OF STRING` are looked at apart, and a type given to itself (`Box OF (Box OF a)`) has its arguments looked at.
-  The shape itself (`expand`) is a tree that writes a declared type out on every path to it, so it is built only as far as something looks at it; nothing in this change looks at it, except a test.
+  Whether a type has a shape is worked out by reading each declaration once, with its parameters taken as fine, and each type argument where it is written, whether or not the parameter is used (`firstUnsendable`). No type is instantiated, so the cost is that of reading the source.
+  The shape itself (`expand`) is a tree that writes a declared type out, with its arguments filled in, on every path to it, so it is built only as far as something looks at it; only a test looks at it, and the check discards it.
 - `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:443`, `:434`), `checkExports`, `checkOneExport` (`:576`), `withoutRefused` (`:526`), `refusalsOf`, `prettyExportError` (`:490`); `inferredReturnType` (`:167`) gives the result of a definition without a `GIVETH`.
 - `jl4-service/src/Compiler.hs`, `jl4-lsp/src/LSP/L4/Rules.hs` (the key `ExportCheck`, `:192`) and the two commands use it; none of them has a check of its own.
 

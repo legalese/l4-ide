@@ -1075,6 +1075,7 @@ It does not work yet for these, so an `@export` of a rule that takes or returns 
 | a record with a field of one of those types           | ``of a record type `...` whose field `...` is ...``    |
 
 The same goes for an `EVENT` or a function inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
+A type that you declare to take a type (`DECLARE Box a HAS ...`) has no JSON form when what it is given has none, whether or not it uses it: `Box OF (FUNCTION FROM NUMBER TO NUMBER)` is refused, and the error says ``of the type `Box`, given a function``.
 A rule that builds or reads an `EVENT` inside its body, and does not name one in its inputs or its result, is published as usual.
 
 A rule that gives back a `DEONTIC` is a contract: it says who must do what by when.
