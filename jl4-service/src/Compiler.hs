@@ -191,7 +191,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
         -- missing type is a warning, which does not block the deploy.
         exportErrs =
           [ e
-          | e <- Export.checkExports (Shape.shapeEnvFromDeclares declaredTypes ei) resolvedModule
+          | e <- Export.checkExports (Shape.shapeEnvFromDeclares declaredTypes ei) (map (.module') (Rules.transitiveDependencies tcResult)) resolvedModule
           , Export.exportErrorSeverity e == SError
           ]
         declaredTypes = foldMap (Shape.moduleDeclares . (.module')) (tcResult : Rules.transitiveDependencies tcResult)

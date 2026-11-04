@@ -1,10 +1,10 @@
 # The export boundary: which types an `@export` may take and give back (as built)
 
-Status: built on the branch `carve/export-boundary`, the draft pull request legalese/l4-ide#779 against `main`; it follows legalese/l4-ide#769, which merged into `main` on 2026-10-30; not on `main` or `unstable` yet.
+Status: built on the branch `carve/export-boundary`, the draft pull request legalese/l4-ide#779 against `main`, and, stacked on it, the branch `carve/export-reach` (the "ASSUMEs" bullets below); #779 follows legalese/l4-ide#769, which merged into `main` on 2026-10-30; not on `main` or `unstable` yet.
 Source spec: none.
 The shape of the change is the second part of the review of legalese/l4-ide#738 (serrynaimo, 2026-10-29, sections 3 and 4), which Meng ruled to build as specified on 2026-10-30.
 This page describes what the branch has.
-Reading the inputs of an exported rule from its signature, with a record of which assumptions each definition reaches (the review's section 4), is not in this change: it is proposed, not landed, and is listed under "Not here".
+The "ASSUMEs" bullets below, which are the second half of the review's section 4, are in `carve/export-reach` only.
 
 Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the editor's rule `ExportCheck` (`jl4-lsp/src/LSP/L4/Rules.hs`), the commands `l4 check` and `l4 deploy`, the sidebar's list of exports, and the deploy gate in `jl4-service/src/Compiler.hs`.
 
@@ -21,6 +21,13 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   The wording is "is ..., and @export does not support that yet", because the infrastructure that would carry these types is not built.
 - A `GIVEN` with no written type is the warning `ExportUntypedGiven`.
   A warning does not refuse the `@export`.
+- ASSUMEs: an `ASSUME` that the exported rule reaches and cannot be given is the error `ExportAssumeReached`.
+  The rule reaches it through another rule (of its own file or of an imported one), or reads one that an imported module declares.
+  `assumeReach` (`jl4-core/src/L4/Export.hs:583`) follows the rules that the exported body calls, breadth first and once each, and keeps the shortest path to each `ASSUME` for the message.
+  The review asked for this to be recorded for each definition and exported with the module's check result, so that an importer merges it.
+  This change computes it each time the check runs, from the modules that the file imports (`checkExports` takes them), which gives the same answer without storing anything.
+- Why the service cannot take such an `ASSUME`: it binds the `ASSUME`s it publishes around the call of the exported rule (`wrapWithAssumes`, `jl4-service/src/Backend/CodeGen.hs:304`), so a helper's read of one is not bound.
+  Measured on 2026-10-30 with a temporary integration test (not kept), on a rule `helper` that reads the `ASSUME` `rate`: an exported rule that reads `rate` itself answered 200 with the value; one that only calls `helper` answered 422 "I needed to know the value of rate but it is an assumed term" on every request, `rate` supplied or not; one that reads `rate` and calls `helper` answered 422 the same way.
 - The check is its own pass and not a part of type checking.
   An error of the type check stops the file from evaluating anything (`success` in `Rules.hs`, read by `SuccessfulTypeCheck`), so a refused `@export` that was a type error would blank the `#EVAL` and `#EVALTRACE` of every rule in the file, the contract rules that the author tests there included.
   Here the file still checks and its rules still evaluate.
@@ -37,7 +44,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 - `jl4-core/src/L4/Export/Shape.hs`: `JsonShape`, `Unsendable`, `ShapeEnv`, `jsonShape`, and the two functions that word a reason, `unsendableWhat` and `unsendableHint`.
   Types are looked up in the declarations of the module and of everything it imports (`moduleDeclares`), and a record that contains itself stops at `JRecursive`.
-- `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:427`, `:436`), `checkExports`, `checkOneExport` (`:539`), `withoutRefused` (`:500`), `prettyExportError` (`:464`); `inferredReturnType` (`:165`) gives the result of a definition without a `GIVETH`.
+- `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite`, `checkExports` (`:515`), `checkOneExport` (`:612`), `assumeReach` (`:583`), `allDecidesFromModule` (`:569`), `withoutRefused`, `prettyExportError`; `inferredReturnType` gives the result of a definition without a `GIVETH`.
 - `jl4-service/src/Compiler.hs`, `jl4-lsp/src/LSP/L4/Rules.hs` (the key `ExportCheck`, `:187`) and the two commands use it; none of them has a check of its own.
 
 ## How it is pinned
@@ -46,8 +53,10 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   It refuses a function-typed `GIVEN`, an `ASSUME` of function type that the body reads, and a function inside `MAYBE OF` or behind a synonym; an `EVENT` input, a written and an inferred `EVENT` result, an `EVENT` in `LIST OF`, `MAYBE OF`, behind a synonym or in an `ASSUME` that the body reads; a `DEONTIC` result (and the file still type-checks) and a `DEONTIC` input; a record with a function among its fields (and says which); and an `EITHER` with a function on one side.
   It accepts value-typed inputs, a record, an enumeration, a `LIST OF`, a `MAYBE OF` and a `DATE`, a record that contains itself, an `EVENT` that the body builds but the signature does not name, an `EVENT` in a rule that is not `@export`, a type of the user's own called `EVENT`, an enumeration whose constructors carry fields, an `EITHER` of two types that have shapes, and a function-typed `ASSUME` that no export reads.
   It warns about a `GIVEN` with no written type, and does not refuse it.
+  Under "an ASSUME reached through another rule", seven examples: an `ASSUME` that only a helper reads, one that the body and a helper both read, a path of two helpers (named outermost first), a rule that calls itself (followed once), an `ASSUME` read directly and a helper that reads none (accepted), an `ASSUME` that an imported module declares and the body reads, and an imported helper that reads one.
 - `jl4/examples/not-ok/export-unsendable-types.l4` and its goldens: one error for each rule that cannot be sent (an `EVENT` input, an `EVENT` result, a `DEONTIC` result, a function input), one warning for the `GIVEN` with no written type, and nothing for the rule that publishes and the rule that only builds an `EVENT` in its body.
   The golden harness (`jl4/tests/Main.hs`) prints the export errors after the type-check errors, with the prefix `[export error]` or `[export warning]`, and the `#EVAL` at the end of the file still has its result there.
+- `jl4/examples/not-ok/export-assume-reach.l4` and its goldens: the error for the rule that reaches `rate` through a helper, the rule that reads it directly and gives no error, and the `#EVAL` of a rule that reads none, which still runs.
 - `jl4/examples/ok/tests/desc.golden` and `pattern-matching-overloads-own-annotations.golden` gained the warning for a `GIVEN` with no written type.
 - `jl4/examples/legal/ceo-performance-award.l4`: its `@export` on a rule that returns a `DEONTIC` became a comment, so that the file is not refused; see the revisit note below.
 - `jl4-service/test/IntegrationSpec.hs`: a bundle with an `@export` that takes an `EVENT`, returns an `EVENT` or returns a `DEONTIC` is refused, with the new words.
@@ -64,6 +73,8 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   Nothing else among the files that check changes.
 - Four Jersey charities files (`g6-art17-after-deregistration.l4`, `g6-art18-governor-duties.l4`, `g6-art20-court-orders.l4`, `g7-art24-25-powers.l4`) already fail on a build of `main` (they use `TYPICALLY`) and carry 18 more `DEONTIC` export errors between them.
 - Untyped-`GIVEN` warnings: none in `legalese/commons`, three in this repository (the two files above and the fixture).
+- The check on the `ASSUME`s that an exported rule reaches (the "ASSUMEs" bullets above) refuses none of the same 71 and 943 files: the exit code and diagnostics are those of the build without it.
+  Its own fixture is flagged by the build with it and not by the build without it, so the zero is not a build that lacks the check.
 - Refusing `EITHER` was measured first and broke one file in each of the two (the reason it is not refused, under "Limits").
 - Not measured: stored deployments, which this session cannot count.
   Meng gave the count of those that export a `DEONTIC` result as 0 on 2026-10-30.
@@ -95,12 +106,12 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 - `EITHER` has the shapes of its two sides and is not refused.
   The service writes an `EITHER` answer today, and the schema calls it an `object`; how it should be written is the wire-form bench's card J3, open.
   Refusing it was measured to break two files that check today: `subjects/il/hvac-work-licensing-2025/encodings/legalese-full-sonnet-5.5/g1-register.l4` in `legalese/commons` and `jl4/experiments/thailand-cosmetics/orchestrator.l4` in this repository.
-- An `ASSUME` is looked at only when the body of the exported rule reads it itself; an `ASSUME` that the body reaches through a helper or an import is not looked at.
-  That is the review's section 4, and it is not here.
+- Only the rules that sit at the top of a module are followed.
+  A name that the exported rule reads and nothing declares is published by the service as an input of its own (`extractImplicitAssumeParams`), and is not followed through helpers.
 
 ## Not here
 
-- The record of which assumptions each definition reaches, and the error that says "via helper reads ASSUME X through Y; pass it in as a GIVEN".
+- The record of which assumptions each definition reaches, kept with the module's check result (see above: it is computed from the imported modules each time instead).
 - A written type on every exported `GIVEN` as an error: it is a warning, until the count of stored deployments with an untyped exported `GIVEN` is taken (review, section 8).
 - The schema generator and the decoder rendering a `JsonShape`.
 - The specification of exports of contract rules on stream infrastructure (the review's section 5), which extends `specs/todo/STATEFUL-CONTRACT-DEPLOYMENT.md` and is written after this change.

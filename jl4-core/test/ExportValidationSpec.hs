@@ -6,22 +6,23 @@ import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.API.VirtualFS (VFS, checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, getExportedFunctions, enrichReturnTypes)
 import L4.Export.Shape (JsonField (..), JsonShape (..), Unsendable (..), jsonShape, moduleDeclares, shapeEnvFromDeclares, unsendableWhat)
-import L4.Import.Resolution (TypeCheckWithDepsResult(..))
+import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult(..))
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
 import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (getActual, nameToText)
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
-import L4.TypeCheck.Types (Severity(..))
+import L4.TypeCheck.Types (CheckResult (..), Severity(..))
 
--- | The problems 'checkExports' finds in a snippet (or 'Left' on fatal failure).
-exportProblems :: Text -> Either [Text] [ExportError]
-exportProblems source =
-  case checkWithImports emptyVFS source of
+-- | The problems 'checkExports' finds in a snippet, which may import modules of
+-- the VFS (or 'Left' on fatal failure).
+exportProblemsIn :: VFS -> Text -> Either [Text] [ExportError]
+exportProblemsIn vfs source =
+  case checkWithImports vfs source of
     Left errs -> Left errs
-    Right r -> Right (checkExports (shapeEnvFromDeclares (moduleDeclares r.tcdModule) r.tcdEntityInfo) r.tcdModule)
+    Right r -> Right (checkExports (shapeEnvFromDeclares (moduleDeclares r.tcdModule) r.tcdEntityInfo) [ri.riTypeChecked.program | ri <- r.tcdResolvedImports] r.tcdModule)
 
 -- | One problem as the line of the @\@export@ it is reported at, the exported
 -- rule, the input (Nothing: the result), and what is wrong. A missing type is
@@ -29,13 +30,28 @@ exportProblems source =
 type Problem = (Maybe Int, Text, Maybe Text, Text)
 
 problems :: Text -> Either [Text] [Problem]
-problems = fmap (map summarise) . exportProblems
+problems = problemsIn emptyVFS
+
+-- | As 'problems', for a snippet that imports the module @lib@.
+problemsWithLib :: Text -> Text -> Either [Text] [Problem]
+problemsWithLib lib = problemsIn (vfsFromList [("lib", lib)])
+
+problemsIn :: VFS -> Text -> Either [Text] [Problem]
+problemsIn vfs = fmap (map summarise) . exportProblemsIn vfs
  where
   summarise = \case
     ExportUnsendable range fn site why ->
       (line range, nameToText (getActual fn), siteName site, unsendableWhat why)
     ExportUntypedGiven range fn input ->
       (line range, nameToText (getActual fn), Just (nameToText (getActual input)), "no written type")
+    ExportAssumeReached range fn assume via ->
+      ( line range
+      , nameToText (getActual fn)
+      , Just (nameToText (getActual assume))
+      , case via of
+          [] -> "an import"
+          _ -> "through " <> Text.intercalate " > " [nameToText (getActual v) | v <- via]
+      )
   line = fmap (\rg -> rg.start.line)
   siteName = \case
     ExportInput n -> Just (nameToText (getActual n))
@@ -331,6 +347,114 @@ spec = do
               , "`is breached` MEANS TRUE"
               ]
         problems src `shouldBe` Right [(Just 4, "is breached", Just "d", "a DEONTIC, a contract rule")]
+
+    describe "an ASSUME reached through another rule" $ do
+      let assumeAndHelper =
+            [ "ASSUME rate IS A NUMBER"
+            , ""
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`helper` n MEANS n TIMES rate"
+            , ""
+            ]
+          viaSrc exported = Text.unlines (assumeAndHelper ++ exported)
+
+      it "refuses an ASSUME that only a helper reads, and names the helper" $ do
+        let src = viaSrc
+              [ "@export Via"
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`via` n MEANS `helper` n"
+              ]
+        problems src `shouldBe` Right [(Just 7, "via", Just "rate", "through helper")]
+
+      it "refuses an ASSUME that the body reads and a helper reads too" $ do
+        let src = viaSrc
+              [ "@export Both"
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`both` n MEANS `helper` n PLUS rate"
+              ]
+        problems src `shouldBe` Right [(Just 7, "both", Just "rate", "through helper")]
+
+      it "names the whole path, outermost first" $ do
+        let src = Text.unlines
+              [ "ASSUME rate IS A NUMBER"
+              , ""
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`inner` n MEANS n TIMES rate"
+              , ""
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`middle` n MEANS `inner` n"
+              , ""
+              , "@export Top"
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`top` n MEANS `middle` n"
+              ]
+        problems src `shouldBe` Right [(Just 11, "top", Just "rate", "through middle > inner")]
+
+      it "accepts an ASSUME that only the body reads, and a helper that reads none" $ do
+        let src = viaSrc
+              [ "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`plain` n MEANS n PLUS 1"
+              , ""
+              , "@export Direct"
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`direct` n MEANS `plain` n PLUS rate"
+              ]
+        problems src `shouldBe` Right []
+
+      it "does not follow a rule twice, or loop on a rule that calls itself" $ do
+        let src = Text.unlines
+              [ "ASSUME rate IS A NUMBER"
+              , ""
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`again` n MEANS IF n EQUALS 0 THEN rate ELSE `again` (n MINUS 1)"
+              , ""
+              , "@export Loop"
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`loop` n MEANS `again` n PLUS `again` n"
+              ]
+        problems src `shouldBe` Right [(Just 7, "loop", Just "rate", "through again")]
+
+      it "refuses an ASSUME that an imported module declares and the body reads" $ do
+        let lib = Text.unlines
+              [ "ASSUME rate IS A NUMBER"
+              ]
+            src = Text.unlines
+              [ "IMPORT lib"
+              , ""
+              , "@export Imported"
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`imported` n MEANS n PLUS rate"
+              ]
+        problemsWithLib lib src `shouldBe` Right [(Just 3, "imported", Just "rate", "an import")]
+
+      it "refuses an ASSUME that an imported helper reads" $ do
+        let lib = Text.unlines
+              [ "ASSUME rate IS A NUMBER"
+              , ""
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`scaled` n MEANS n TIMES rate"
+              ]
+            src = Text.unlines
+              [ "IMPORT lib"
+              , ""
+              , "@export Scaled again"
+              , "GIVEN n IS A NUMBER"
+              , "GIVETH A NUMBER"
+              , "`scaled again` n MEANS `scaled` n"
+              ]
+        problemsWithLib lib src `shouldBe` Right [(Just 3, "scaled again", Just "rate", "through scaled")]
 
     describe "which types have a shape" $ do
       it "accepts a record, an enumeration, a LIST OF, a MAYBE OF and a DATE" $ do

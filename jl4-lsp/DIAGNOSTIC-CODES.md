@@ -62,6 +62,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/cyclic-computed-fields`       | Computed fields depend on each other in a ring.                    |
 | `check/cyclic-type-synonyms`         | Type synonyms refer to each other in a ring.                       |
 | `check/duplicate-name`               | A name occurs twice where names must be distinct.                  |
+| `check/export-assume-reached`        | An `@export` reaches an ASSUME through another rule.               |
 | `check/export-clauses-without-given` | An `@export` of clauses with no GIVEN.                             |
 | `check/export-deontic-type`          | An `@export` takes or returns a DEONTIC, a contract rule.          |
 | `check/export-event-type`            | An `@export` takes or returns an EVENT.                            |

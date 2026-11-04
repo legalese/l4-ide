@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Read it directly",
+    "properties": {
+        "n": {
+            "$ref": "#/$defs/NUMBER"
+        },
+        "rate": {
+            "$ref": "#/$defs/NUMBER"
+        }
+    },
+    "required": [
+        "n",
+        "rate"
+    ],
+    "title": "direct",
+    "type": "object"
+}

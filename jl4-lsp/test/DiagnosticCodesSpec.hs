@@ -93,6 +93,17 @@ exportSource = T.unlines
   , "GIVEN n"
   , "GIVETH A BOOLEAN"
   , "`is it positive` MEANS n > 0"
+  , ""
+  , "ASSUME rate IS A NUMBER"
+  , ""
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "`scaled` n MEANS n TIMES rate"
+  , ""
+  , "@export Scaled again"
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "`scaled again` n MEANS `scaled` n"
   ]
 
 -- | A code that is a slug, with the link one formula gives.
@@ -249,6 +260,7 @@ spec = describe "diagnostic codes" do
         , "check/export-function-input"
         , "check/export-function-input"
         , "lint/export-untyped-given"
+        , "check/export-assume-reached"
         ]
 
   describe "every code" do
