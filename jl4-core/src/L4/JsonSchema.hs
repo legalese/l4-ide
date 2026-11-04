@@ -17,6 +17,10 @@ import qualified Data.Map.Strict as Map
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
 import L4.Syntax
+import L4.TypeCheck.Environment
+  ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
+  , numberUnique, stringUnique, timeUnique
+  )
 import Optics
 
 data JsonSchema = JsonSchema
@@ -176,45 +180,26 @@ typeToJsonSchema :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text Sch
 typeToJsonSchema ctx = \case
   Type _ -> (SString Nothing, ctx.ctxCollectedDefs)
   TyApp _ name args ->
-    -- Match on the lower-cased builtin name: L4's resolved builtin type names
-    -- are ALL-CAPS (NUMBER/STRING/BOOLEAN/DATE/DATETIME/LIST/MAYBE), so a
-    -- case-sensitive match against "Number"/… never fired and every builtin
-    -- fell through to a dangling `$ref: "#/$defs/NUMBER"`. Mirror the naming
-    -- convention used by L4.FunctionSchema.primitiveJsonType. The declares
-    -- lookup below deliberately keeps the ORIGINAL-case `typeName` as its key.
-    --
-    -- A type the module itself declares is that type, whatever it is called:
-    -- `DECLARE Text HAS body IS A NUMBER` is a record, not a JSON string. The
-    -- empty name matches no builtin arm, so it reaches the declares lookup.
+    -- Decide from the resolved type, not from its name. A name says nothing: a
+    -- module may declare, or import, its own `Text`, `Date` or `Time`, and each
+    -- of those is that record or enum, not a JSON string. The builtins have
+    -- uniques of their own, so only they reach these arms.
     let typeName = resolvedToText name
-        builtinName
-          | Map.member typeName ctx.ctxDeclares = ""
-          | otherwise = Text.toLower typeName
-     in case (builtinName, args) of
-          ("number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("int", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
-          ("integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
-          ("float", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("double", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("string", []) -> (SString Nothing, ctx.ctxCollectedDefs)
-          ("text", []) -> (SString Nothing, ctx.ctxCollectedDefs)
-          ("boolean", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-          ("bool", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-          ("date", []) -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
-          ("datetime", []) -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
-          ("time", []) -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
-          ("list", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SArray innerSchema Nothing, defs)
-          ("listof", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SArray innerSchema Nothing, defs)
-          ("optional", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SAnyOf [innerSchema, SNull] Nothing, defs)
-          ("maybe", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SAnyOf [innerSchema, SNull] Nothing, defs)
+        unique = getUnique name
+     in case args of
+          [] | unique == numberUnique -> (SNumber Nothing, ctx.ctxCollectedDefs)
+             | unique == stringUnique -> (SString Nothing, ctx.ctxCollectedDefs)
+             | unique == booleanUnique -> (SBoolean Nothing, ctx.ctxCollectedDefs)
+             | unique == dateUnique -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
+             | unique == datetimeUnique -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
+             | unique == timeUnique -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
+          [inner]
+            | unique == listUnique ->
+                let (innerSchema, defs) = typeToJsonSchema ctx inner
+                 in (SArray innerSchema Nothing, defs)
+            | unique == maybeUnique ->
+                let (innerSchema, defs) = typeToJsonSchema ctx inner
+                 in (SAnyOf [innerSchema, SNull] Nothing, defs)
           _ ->
             case Map.lookup typeName ctx.ctxDeclares of
               Just decl ->
