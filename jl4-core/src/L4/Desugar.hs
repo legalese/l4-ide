@@ -7,6 +7,7 @@ module L4.Desugar (
   --
   desugarComputedFields,
   detectComputedFieldCycles,
+  detectTypicallyOnComputedFields,
   extractComputedFieldNames,
   ) where
 
@@ -434,6 +435,30 @@ detectCFCDeclare _ = []
 exprFieldRefs :: Set RawName -> Expr Name -> Set RawName
 exprFieldRefs fieldNames expr =
   Set.fromList [rawName n | n <- toList expr, rawName n `Set.member` fieldNames]
+
+-- ----------------------------------------------------------------------------
+-- TYPICALLY on a Computed Field
+-- ----------------------------------------------------------------------------
+
+-- | Find each record field with both a TYPICALLY and a MEANS: the record's
+-- name, the field's name, and the value written after TYPICALLY.
+--
+-- Runs on the original program, because 'desugarComputedFields' removes the
+-- field from the record and 'makeComputedDecide' has no use for the value, so
+-- no later phase can see it. Only a record's fields count: a field of a ONE OF
+-- constructor keeps its value when it has a MEANS, and its TYPICALLY is checked
+-- as on any stored field.
+detectTypicallyOnComputedFields :: Module Name -> [(Name, Name, Expr Name)]
+detectTypicallyOnComputedFields (MkModule _ _ section) = detectTOCSection section
+
+detectTOCSection :: Section Name -> [(Name, Name, Expr Name)]
+detectTOCSection (MkSection _ _ _ topDecls) = concatMap detectTOCTopDecl topDecls
+
+detectTOCTopDecl :: TopDecl Name -> [(Name, Name, Expr Name)]
+detectTOCTopDecl (Declare _ (MkDeclare _ _ (MkAppForm _ recName _ _) (RecordDecl _ _ tns))) =
+  [ (recName, fn, value) | MkTypedName _ fn _ (Just value) (Just _) <- tns ]
+detectTOCTopDecl (Section _ section) = detectTOCSection section
+detectTOCTopDecl _ = []
 
 -- ----------------------------------------------------------------------------
 -- Extract Computed Field Names

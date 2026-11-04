@@ -77,6 +77,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/type-mismatch`                | A value has another type than the place it is in requires.         |
 | `check/type-synonym-chain-too-long`  | A chain of type synonyms is too long to follow.                    |
 | `check/typically-not-a-literal`      | A TYPICALLY value is not a literal.                                |
+| `check/typically-on-computed-field`  | A TYPICALLY default sits on a field computed by a MEANS.           |
 | `check/typically-on-type`            | A TYPICALLY default sits on a type, which holds no value.          |
 | `check/typically-without-type`       | A TYPICALLY default sits on a rule's input that has no type.       |
 | `check/unknown-identifier`           | Nothing in scope defines this name.                                |

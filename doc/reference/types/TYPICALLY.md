@@ -39,6 +39,9 @@ The usual value is checked when the file is checked:
 - On a rule's `GIVEN`, the input needs a type, so the value can be checked: `GIVEN x TYPICALLY 5` is an error.
   An `ASSUME` without a type, and a `GIVEN` inside a function without a name, take their type from the value instead.
 - A type variable cannot carry one: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error, because a type holds no value.
+- A field with a `MEANS` cannot carry one: `gross IS A NUMBER TYPICALLY 100 MEANS net * 1.2` is an error, whether or not the value fits the type.
+  The field's value comes from its `MEANS`, and nobody supplies it, so a usual value there would mean nothing.
+  Remove one or the other: without the `TYPICALLY` the field stays computed, and without the `MEANS` it becomes an input with a usual value.
 
 ## Examples
 
@@ -110,7 +113,6 @@ If the rule reads it, the evaluation stops with a message such as "I needed to k
 
 - **Nothing applies it.** Supply every input. Filling in a left-out input from its usual value is the design in `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`; it is proposed, not built.
 - **Literals only.** A number, a string, or a constructor that takes no arguments.
-- **A computed field is not checked.** On a field with a `MEANS` clause, the `MEANS` definition governs. A `TYPICALLY` value written beside it is kept but not checked, so `t IS A NUMBER TYPICALLY "oops" MEANS price * 2` passes the check.
 - **The error for a value that is not a literal points at the record's name,** not at the value, when the field belongs to a `DECLARE`.
 - **An `@nlg` written after a default does not attach to the default.** It describes the field or the input, as it would without the default.
 - **The query planner does not read it.** The planner that decides which question to ask next orders questions by the structure of the rule alone; using the usual values as odds is proposed, not built.

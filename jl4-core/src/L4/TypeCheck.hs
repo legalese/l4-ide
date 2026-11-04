@@ -115,7 +115,7 @@ import Optics ((%~), (^.), gplate)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
-import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, extractComputedFieldNames)
+import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, detectTypicallyOnComputedFields, extractComputedFieldNames)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -170,6 +170,10 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (CyclicComputedFields recName cycleFlds) (WhileCheckingDeclare recName None)
         | (recName, cycleFlds) <- detectComputedFieldCycles program
         ]
+      typicallyErrors =
+        [ MkCheckErrorWithContext (TypicallyOnComputedField (rangeOf value) fieldName) (WhileCheckingDeclare recName None)
+        | (recName, fieldName, value) <- detectTypicallyOnComputedFields program
+        ]
       checkEnv' = checkEnv { computedFields = extractComputedFieldNames program }
   in case runCheckUnique (checkProgram (desugarComputedFields program)) checkEnv' checkState of
     (w, s) ->
@@ -177,7 +181,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
         (errs, (rprog, topEnv, localMixfixRegistry)) = runWith w
       in
         -- might be nicer to be able to do this within the inferProgram call / at the end of it
-        case runCheckUnique (traverse applySubst (cycleErrors ++ errs)) checkEnv s of
+        case runCheckUnique (traverse applySubst (cycleErrors ++ typicallyErrors ++ errs)) checkEnv s of
           (w', s') ->
             let (moreErrs, substErrs) = runWith w'
                 env = extendEnv topEnv checkEnv
@@ -5142,6 +5146,12 @@ prettyCheckError (TypicallyRequiresType n) =
 prettyCheckError (TypicallyOnTypeVariable n) =
   [ quotedName n <> " is a type, which cannot carry a TYPICALLY default value."
   , "TYPICALLY defaults apply to term-level fields, parameters and assumptions."
+  ]
+prettyCheckError (TypicallyOnComputedField _ n) =
+  [ "The field " <> quotedName n <> " takes its value from its MEANS, so a usual value"
+  , "written with TYPICALLY means nothing there."
+  , "Remove one or the other: without the TYPICALLY the field stays computed,"
+  , "and without the MEANS it becomes an input with a usual value."
   ]
 prettyCheckError (ExportFunctionTypeInput _fnName paramName) =
   [ "Function type inputs are not supported for @export."

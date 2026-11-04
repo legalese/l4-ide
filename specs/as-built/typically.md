@@ -2,6 +2,7 @@
 
 As built in this tree, checked 2026-10-30 on a build of the branch cut from main f9cb513d6: every behaviour below marked "measured" was run on that build.
 The branch was then rebased onto a newer main, and on 2026-11-01 the `l4 check` probes, the `l4 batch` probes and the `jl4-service` probe were run again on the rebased build with the same answers, apart from the stable `Code:` line that main's diagnostics now carry.
+On 2026-11-04 the refusal of a default on a computed field and the Limits entry on `ONE OF` constructor fields were measured with `l4 check` and `l4 run` on a build of this branch merged with main db2f29e41.
 Functions are cited by name and file, not by line, because the lines move.
 Source spec: `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`.
 User page: `doc/reference/types/TYPICALLY.md`.
@@ -36,8 +37,9 @@ The JSON Schema generated for an exported function publishes it as the JSON Sche
   - `checkTypicallyOpt` raises `TypicallyRequiresType` when the input has no type, or its type is the `TYPE` kind marker;
   - `rejectTypicallyOnType` drops the value and raises `TypicallyOnTypeVariable` on a type variable;
   - `checkFieldDefaults` checks a DECLARE field's value in phase 4, once every constructor is in scope; `inferSelector` leaves it unchecked in phase 1, where an enum constructor does not resolve yet;
+  - `detectTypicallyOnComputedFields` (`jl4-core/src/L4/Desugar.hs`) finds a TYPICALLY beside a MEANS on a record field and raises `TypicallyOnComputedField`, reading the module as written, because `desugarComputedFields` removes such a field before any phase above sees it;
   - the GIVEN sites are `mkref`, `ensureNameConsistency` and `ensureTypeNameConsistency`, with `inferOptionallyTypedName` (under `inferLamGivens`) for a GIVEN inside a function without a name; `inferAssume` and `inferTyDeclAssume` are the ASSUME sites.
-- Error constructors: `TypicallyValueNotALiteral`, `TypicallyRequiresType`, `TypicallyOnTypeVariable` and the mismatch context `ExpectTypicallyValueContext` (`jl4-core/src/L4/TypeCheck/Types.hs`).
+- Error constructors: `TypicallyValueNotALiteral`, `TypicallyRequiresType`, `TypicallyOnTypeVariable`, `TypicallyOnComputedField` and the mismatch context `ExpectTypicallyValueContext` (`jl4-core/src/L4/TypeCheck/Types.hs`).
 - Printer: ` TYPICALLY <e>` after the type, and before a MEANS line (`jl4-core/src/L4/Print.hs`).
   Measured: `l4 format` keeps every default of a file that has fields, inputs and a `NOTHING` default.
 - Export and schema:
@@ -57,6 +59,8 @@ The JSON Schema generated for an exported function publishes it as the JSON Sche
 - A rule's GIVEN with no type and a default is rejected (`TypicallyRequiresType`), rather than checked against a fresh inference variable.
   Measured: an ASSUME with no type takes its type from the default (`ASSUME foo TYPICALLY "five"` makes `foo + 1` a type error), and so does a GIVEN inside a function without a name (`GIVEN y TYPICALLY 5 YIELD y + 1` applied to a string is a type error).
 - A default on a type variable (`ASSUME T IS A TYPE TYPICALLY 42`) is an error, and the value is dropped.
+- A default on a record field with a MEANS is an error at the value, whether or not the value fits the type (`check/typically-on-computed-field`, `not-ok/tc/typically-on-computed-field.l4`).
+  The refusal is an assumption of this branch, not a ruling: the alternative was to check the value's type and then ignore it.
 - A DECLARE field may default to an enum constructor (`checkFieldDefaults`); a constructor of another enum is a type mismatch (`not-ok/tc/typically-enum-field.l4`).
 - JSON form (`typicallyToJson`): a number becomes a JSON number, a string a JSON string, `TRUE`/`FALSE` a JSON Boolean.
   Anything else, including `NOTHING` and enum constructors, yields no `default` key.
@@ -87,7 +91,7 @@ Wording as it stands in `prettyCheckError` and `prettyTypeMismatch` (`jl4-core/s
 
 - `jl4/examples/ok/typically-basic.l4` and its four goldens; the `.schema.golden` pins the number and Boolean defaults and the `required` list.
 - `jl4/examples/ok/typically-enum-field.l4` and `jl4/examples/not-ok/tc/typically-enum-field.l4`, each with four goldens: an enum constructor as a field default, and a constructor of another enum.
-- `jl4/examples/not-ok/tc/typically-non-literal.l4`, `typically-on-type.l4`, `typically-requires-type.l4`, `typically-type-mismatch.l4`, each with four goldens.
+- `jl4/examples/not-ok/tc/typically-non-literal.l4`, `typically-on-computed-field.l4`, `typically-on-type.l4`, `typically-requires-type.l4`, `typically-type-mismatch.l4`, each with four goldens.
 - `jl4/examples/ok/nlg-typically-default.l4` and its four goldens, with the "a TYPICALLY default takes no annotation" block of `jl4-core/test/NlgAttachmentSpec.hs`.
 - `jl4-service/test/SchemaSpec.hs`: `parameterDefault` serialises as `"default"` only when set.
 - `jl4-service/test/IntegrationSpec.hs`, "a missing BOOLEAN on the wrapper path": the placeholder, five cases.
@@ -95,9 +99,9 @@ Wording as it stands in `prettyCheckError` and `prettyTypeMismatch` (`jl4-core/s
 
 ## Limits and known defects (verified)
 
-- **A TYPICALLY on a computed (MEANS) field is discarded unchecked.**
-  Measured: `taxed IS A NUMBER TYPICALLY "oops" MEANS price * 2` checks clean and evaluates, while the same default on a stored field is a type error.
-  Read in code: `desugarCFDeclare` removes computed fields before type checking, and `makeComputedDecide` ignores the default (`jl4-core/src/L4/Desugar.hs`).
+- **A MEANS on a field of a `ONE OF` constructor is dropped without a check, and a TYPICALLY beside it is checked as on a stored field.**
+  Measured 2026-11-04: on `Circle HAS r IS A NUMBER, d IS A NUMBER TYPICALLY 3 MEANS` an undefined name, the file checks, `Circle` still takes `d` as an argument, and `(Circle 1 5)'s d` is 5.
+  The refusal above therefore covers record fields only, because its message that the value comes from the MEANS would be false here; the dropped MEANS is a defect of its own, not addressed here.
 - The "must be a literal" error on a DECLARE field is reported at the record type's name, not at the value (`not-ok/tc/tests/typically-non-literal.golden`, range 4:9-4:14 on `Flags`).
 - `NOTHING` and enum-constructor defaults never reach a schema (measured with `jl4-schema`).
 - `jl4-service`'s deployed-function schema drops top-level GIVEN and ASSUME defaults: `paramToParameter` in `jl4-service/src/Compiler.hs` never reads `paramDefault`.

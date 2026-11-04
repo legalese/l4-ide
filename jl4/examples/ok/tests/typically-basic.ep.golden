@@ -20,11 +20,11 @@ DECLARE Config HAS
 DECLARE Contract HAS
   governing_law IS A STRING TYPICALLY "Singapore"
 
--- TYPICALLY combined with MEANS on a computed field:
--- the MEANS clause defines the field; the TYPICALLY default is inert metadata.
+-- A stored field with TYPICALLY beside a computed field: the MEANS clause
+-- defines `taxed`, so it takes no TYPICALLY (not-ok/tc/typically-on-computed-field.l4).
 DECLARE Widget HAS
   price IS A NUMBER TYPICALLY 10
-  taxed IS A NUMBER TYPICALLY 11
+  taxed IS A NUMBER
     MEANS price * 1.09
 
 -- TYPICALLY on ASSUME declarations

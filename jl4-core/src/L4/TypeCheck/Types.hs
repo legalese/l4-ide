@@ -129,6 +129,10 @@ data CheckError =
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | TypicallyOnComputedField (Maybe SrcRange) Name
+    -- ^ A TYPICALLY default was written on a record field with a MEANS, whose
+    -- value nobody supplies. Arguments: the range of the value, and the field's
+    -- name.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -332,6 +336,7 @@ checkErrorCode = \ case
   TypicallyValueNotALiteral {}   -> "check/typically-not-a-literal"
   TypicallyRequiresType {}       -> "check/typically-without-type"
   TypicallyOnTypeVariable {}     -> "check/typically-on-type"
+  TypicallyOnComputedField {}    -> "check/typically-on-computed-field"
 
 -- | The code of a checker warning. See 'checkErrorCode'.
 checkWarningCode :: CheckWarning -> Text
@@ -389,6 +394,7 @@ instance HasSrcRange CheckError where
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (ExportEventType r _ _)           = r
+  rangeOf (TypicallyOnComputedField r _)    = r
   rangeOf (CheckInfo _ mr)                  = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
