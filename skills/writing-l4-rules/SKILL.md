@@ -403,7 +403,7 @@ Other useful well-known paths on a Legalese Cloud org:
 - `/openapi.json` — org-wide OpenAPI 3.0 spec
 - `/deployments?functions=full` — cached metadata for all deployments
 
-For the full service reference (CLI flags, resource limits, deontic evaluation shapes), see the `jl4-service` README bundled with the running server.
+For the full service reference (CLI flags, resource limits), see the `jl4-service` README bundled with the running server.
 
 ---
 
