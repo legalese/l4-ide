@@ -74,8 +74,8 @@ What to know before using `YMD`:
   So a questionnaire built on the rule cannot ask for only the inputs it still needs; the same rule written with `Date` has a query plan ([REFUSE: the query plan](../control-flow/REFUSE.md#the-query-plan)).
 - The WASM backend (`jl4-mlir`) does not evaluate an `@export` that calls `YMD`, with the reason "REFUSE is not supported by the WASM backend"; evaluate it with jl4-service ([REFUSE: limits](../control-flow/REFUSE.md#limits)).
 - `YMD` and `Year month day` are names in every file that imports `daydate`, or a library that imports it, such as `datetime`.
-  A file that also defines its own `YMD` or `Year month day` of three numbers can fail to check where it uses that name, with "There are multiple definitions for the identifier".
-  A file that uses that name many times in one rule can instead take a very long time to check.
+  A file that also defines its own `YMD` or `Year month day` that takes three numbers and gives a date fails to check at each place it uses that name, with "There are multiple definitions for the identifier".
+  The more places a rule uses the name, the longer the file takes to check, and each place about triples the time: in measurements, eight uses took one to two seconds, ten took eight to twenty-three seconds, and twelve took more than a minute, where the same file with its own definition renamed checked in under a second.
   Rename its own definition.
 
 ## Reading a date
