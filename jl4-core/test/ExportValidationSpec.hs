@@ -4,10 +4,15 @@ module ExportValidationSpec (spec) where
 
 import Test.Hspec
 import Control.Exception (evaluate)
+import Data.Aeson (Value (..), decodeStrict)
+import qualified Data.Aeson.KeyMap as KeyMap
+import Data.Foldable (toList)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import System.Timeout (timeout)
 
+import L4.API (l4Check)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
 import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, getExportedFunctions, enrichReturnTypes)
@@ -80,6 +85,13 @@ diamond depth extraFields =
  where
   level :: Int -> Text
   level i = "L" <> Text.pack (show i)
+
+-- | What @l4_check@ says about a snippet, as (source, severity, message).
+l4CheckDiagnostics :: Text -> [(Text, Int, Text)]
+l4CheckDiagnostics source =
+  case decodeStrict (Text.encodeUtf8 (l4Check source)) of
+    Just (Array ds) -> [(s, truncate sev, m) | Object o <- toList ds, Just (String s) <- [KeyMap.lookup "source" o], Just (Number sev) <- [KeyMap.lookup "severity" o], Just (String m) <- [KeyMap.lookup "message" o]]
+    _ -> []
 
 -- | The shape of each exported input of a snippet (or 'Left' on fatal failure).
 inputShapes :: Text -> Either [Text] [(Text, Either Unsendable JsonShape)]
@@ -607,6 +619,41 @@ spec = do
             ]
       r <- problemsWithin 30 src
       r `shouldBe` Right []
+
+  describe "l4_check, which the web editor reads" $ do
+    let refused what result = Text.unlines $
+          [ "DECLARE Party IS ONE OF alice, bob"
+          , "DECLARE Act IS ONE OF ping, pong"
+          , ""
+          , "@export Refused"
+          ] <> what <> [result]
+    it "reports an EVENT input as l4 check does" $
+      l4CheckDiagnostics (refused ["GIVEN e IS AN EVENT Party Act", "GIVETH A NUMBER"] "`refused` MEANS 1")
+        `shouldBe` [("export", 1, "`refused` is published with @export, but its input `e` is an EVENT, and @export does not support that yet.\nTake the party, the action and the time as separate inputs, and build the event inside the rule.")]
+    it "reports a function input as l4 check does" $
+      l4CheckDiagnostics (refused ["GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN", "GIVETH A NUMBER"] "`refused` MEANS 1")
+        `shouldBe` [("export", 1, "`refused` is published with @export, but its input `test` is a function, and @export does not support that yet.\nPass the values the function would work on, and apply the function inside the rule.")]
+    it "reports a DEONTIC result as l4 check does" $
+      l4CheckDiagnostics (refused ["GIVETH A DEONTIC Party Act"] "`refused` MEANS PARTY alice MUST ping WITHIN 3")
+        `shouldBe` [("export", 1, "`refused` is published with @export, but its result is a DEONTIC, a contract rule, and @export does not support that yet.\nA contract can't be an @export input or result yet. Remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE.")]
+    it "reports a GIVEN with no written type as a warning" $
+      l4CheckDiagnostics (refused ["GIVEN n", "GIVETH A BOOLEAN"] "`refused` MEANS n > 0")
+        `shouldBe` [("export", 2, "`refused` is published with @export, but its input `n` has no written type.\nWrite one in the GIVEN, so that the schema says what to send.")]
+    it "has nothing to say of an @export that can be sent" $
+      l4CheckDiagnostics (refused ["GIVEN p IS A Party", "GIVETH A Party"] "`refused` MEANS p") `shouldBe` []
+    it "knows the types of what the file imports" $
+      l4CheckDiagnostics (Text.unlines
+        [ "IMPORT time"
+        , ""
+        , "@export Imported"
+        , "GIVEN m IS A `Meridiem Indicator`"
+        , "GIVETH A NUMBER"
+        , "`imported` MEANS 1"
+        ]) `shouldBe` []
+    it "does not ask what the exports of a file that does not type-check take" $ do
+      let ds = l4CheckDiagnostics (refused ["GIVEN e IS AN EVENT Party Act", "GIVETH A NUMBER"] "`refused` MEANS TRUE")
+      ds `shouldNotBe` []
+      [s | (s, _, _) <- ds] `shouldSatisfy` all (/= "export")
 
   describe "exported return type display" $ do
     -- A concrete inferred return type renders normally.

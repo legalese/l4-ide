@@ -60,6 +60,8 @@ import L4.FindReferences (findReferences)
 
 -- Import resolution (VFS + embedded libs)
 import L4.API.VirtualFS (checkWithImports, checkWithImportsLocated, emptyVFS, TypeCheckWithDepsResult(..), ResolvedImport(..))
+import qualified L4.Export as Export
+import qualified L4.Export.Shape as Shape
 import qualified L4.Evaluate.ValueLazy as ValLazy
 
 
@@ -99,12 +101,14 @@ l4Check source =
       -- Import/parse errors
       encodeJson $ Vector.fromList $ map (importErrorToDiagnostic mRange) errors
     Right result ->
-      -- Type check errors (if any), and the parser's annotation warnings, which
-      -- the language server reports too: without them a wording that L4 reads
-      -- differently from how it was written changes with no message here.
+      -- Type check errors (if any), the parser's annotation warnings, and the
+      -- export check, which the language server reports too: without them a
+      -- wording that L4 reads differently from how it was written changes with
+      -- no message here, and an @export that l4 check refuses looks clean.
       let diagnostics =
             map checkErrorToDiagnostic result.tcdErrors
               <> map annotationWarningToDiagnostic result.tcdAnnotationWarnings
+              <> map exportErrorToDiagnostic (exportErrorsOf result)
       in encodeJson $ Vector.fromList diagnostics
 
 -- | Get hover information at a position.
@@ -456,11 +460,13 @@ importErrorToDiagnostic mRange errMsg =
     , "message" .= errMsg
     , "source" .= ("l4" :: Text)
     ]
-  where
-    defaultRangeJson = Aeson.object
-      [ "start" .= Aeson.object ["line" .= (0 :: Int), "character" .= (0 :: Int)]
-      , "end" .= Aeson.object ["line" .= (0 :: Int), "character" .= (0 :: Int)]
-      ]
+
+-- | The start of the file, for a diagnostic with no range of its own.
+defaultRangeJson :: Aeson.Value
+defaultRangeJson = Aeson.object
+  [ "start" .= Aeson.object ["line" .= (0 :: Int), "character" .= (0 :: Int)]
+  , "end" .= Aeson.object ["line" .= (0 :: Int), "character" .= (0 :: Int)]
+  ]
 
 -- | Convert a type check error to an LSP diagnostic.
 checkErrorToDiagnostic :: CheckErrorWithContext -> Aeson.Value
@@ -470,6 +476,27 @@ checkErrorToDiagnostic err =
     , "severity" .= severityToInt (severity err)
     , "message" .= Text.intercalate "\n" (prettyCheckErrorWithContext err)
     , "source" .= ("l4" :: Text)
+    ]
+
+-- | What the export check says of a file. As in the language server's
+-- @ExportCheck@ and the service's deploy gate, a file that does not type-check
+-- is not asked what its exports take and give back.
+exportErrorsOf :: TypeCheckWithDepsResult -> [Export.ExportError]
+exportErrorsOf result
+  | result.tcdSuccess = Export.checkExports (Shape.shapeEnvFromDeclares declares result.tcdEntityInfo) result.tcdModule
+  | otherwise = []
+ where
+  declares = foldMap Shape.moduleDeclares (result.tcdModule : map (.riTypeChecked.program) result.tcdResolvedImports)
+
+-- | Convert a problem with an @\@export@ to an LSP diagnostic, with the source
+-- the language server gives it.
+exportErrorToDiagnostic :: Export.ExportError -> Aeson.Value
+exportErrorToDiagnostic err =
+  Aeson.object
+    [ "range" .= maybe defaultRangeJson rangeToJson (Export.exportErrorRange err)
+    , "severity" .= severityToInt (Export.exportErrorSeverity err)
+    , "message" .= Text.intercalate "\n" (Export.prettyExportError err)
+    , "source" .= ("export" :: Text)
     ]
 
 -- | Convert a parser annotation warning to an LSP diagnostic, in the words
