@@ -532,7 +532,22 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         [ "BRANCH" ]
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
-    Regulative _ (MkDeonton _ p a t f l) -> prettyObligation p a t f l
+    -- A rule inside an expression has to survive two parser constraints: its
+    -- clauses must be indented past PARTY, which is rarely in column 0 here
+    -- (`LEST (PARTY ...`), and a #TRACE directive is line-oriented, so a contract
+    -- broken across lines loses its AT and WITH. 'group' collapses the rule to
+    -- one line under the Unbounded layout; when an operand holds a hard break of
+    -- its own, flattening fails and 'hang' indents relative to PARTY.
+    Regulative _ (MkDeonton _ p a t f l) ->
+      Prettyprinter.group $ hang 2 $ vsep $
+        [ "PARTY" <+> printWithLayout p
+        , printWithLayout a
+        ]
+        <> mprint "WITHIN" t
+        -- Bracketed because on one line a bare rule under HENCE would take this
+        -- rule's LEST for its own, which parses, and means something else.
+        <> foldMap (\ x -> ["HENCE" <+> parensIfNeeded x]) f
+        <> foldMap (\ x -> ["LEST" <+> parensIfNeeded x]) l
     -- One branch per line, aligned, and WITHOUT the comma separator.
     -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
     -- `manyLines` over comma-separated groups: continuation lines must start at

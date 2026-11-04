@@ -17,6 +17,4 @@ promissory-note.l4:195:1-196:108:
                                      `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`
   WITHIN 61
   HENCE FULFILLED
-  LEST PARTY `The Borrower`
-  MUST `pay monthly installment to` EXACTLY `The Lender`
-                                     `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`
+  LEST PARTY `The Borrower` MUST `pay monthly installment to` EXACTLY `The Lender` `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`
