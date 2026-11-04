@@ -247,8 +247,8 @@ The same goes for any other input or result with no JSON form: an `EVENT`, a fun
 Remove the `@export` from the rule, and the rest of the bundle deploys.
 The rule still evaluates where it is written, with its `#EVAL` and `#EVALTRACE`, and [the errors reference](../doc/reference/errors/README.md) says what to do instead.
 
-No function a deployment publishes takes `startTime` or `events`, or answers with an `OBLIGATION` or a `BREACH`.
-The service's code for those is still there, and no deployed function reaches it.
+No function a deployment publishes takes `startTime` or `events`: the service's code for those is still there, and no deployed function reaches it.
+The one way a contract still shows in an answer is through a constructor that carries fields, whose fields are not looked at: a function whose result type has a constructor with a `DEONTIC` field deploys, and answers with the contract as it stands, as in `{"Duty":{"d":{"OBLIGATION":{"action":"ping","deadline":"3","modal":"MUST","party":"alice"}}}}`.
 
 ### Batch Evaluation
 

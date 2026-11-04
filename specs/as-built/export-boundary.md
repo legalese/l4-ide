@@ -102,6 +102,7 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
   The review asked for it to be decided: a tagged shape or a refusal.
   It is not refused because `jl4-service-test` deploys a function whose result is such a type (smucclaw/l4-ide#1003, `wireProbeJL4`), and the wire-form bench (`l4-wire-form-1015`, card J1, open) counts 8 to 11 of 3,006 exports that take one.
   A tagged shape is that bench's to rule, not this change's.
+  So a constructor with a field of a type that has no shape is not refused either: `DECLARE Carrier IS ONE OF Duty HAS d IS A DEONTIC Party Act` deploys, and its answer is `{"Duty":{"d":{"OBLIGATION":...}}}`.
 - A built-in type nobody gave a row to is refused, as the review asked.
 - The schema that the service publishes and the editor's sidebar lists (`typeToParameter`) writes a record out in full on every path to it, so it doubles at each level of the nesting that `jsonShape` no longer doubles on, as it does on `main`.
   Measured on 2026-11-04 through `jl4-core-test`, encoding one input's parameter: 14 MB in 0.5 s at 16 levels, 226 MB in 9.3 s at 20, 906 MB in 37 s at 22.
