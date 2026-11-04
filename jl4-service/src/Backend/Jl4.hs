@@ -1336,7 +1336,7 @@ valueToFnLiteral ei = \case
           _ -> pure $ FnLitString name
   -- JUST x is x. The Maybe wrapper is L4's, not the caller's, and wrapping it
   -- in an object would make every optional field a tagged union the client has
-  -- to unwrap.
+  -- to unwrap. This matches 'L4.Evaluate.ValueLazyJSON', which @l4 batch --json@ uses.
   Eval.ValConstructor resolved [v]
     | getUnique resolved == TypeCheck.justUnique -> nfToFnLiteral ei v
   Eval.ValConstructor resolved vals -> do

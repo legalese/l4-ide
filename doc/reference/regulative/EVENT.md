@@ -50,7 +50,7 @@ GIVETH A DEONTIC Person Action
 - Events are read in order, and each moves the clock to its time.
 - An event by the rule's party whose action matches the rule fulfils it (or, for a prohibition, breaches it).
 - An event by another party, or with another action, is skipped; only its time counts.
-- An event after a deadline shows that the deadline has passed, and the rule moves on to `LEST` (or, for `MAY` and `SHANT`, `HENCE`); see [Deadlines and consequences](consequences.md#within).
+- An event after a deadline shows that the deadline has passed, and the rule moves on to `LEST` (or, for `SHANT`, `HENCE`), which is offered that same event; see [Deadlines and consequences](consequences.md#within).
 
 ## WAITUNTIL
 

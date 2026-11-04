@@ -403,9 +403,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       "#EVALTRACE" <+> printWithLayout e
     Check _ e ->
       "#CHECK" <+> printWithLayout e
-    Contract _ e t stmts -> hsep $
-      "#TRACE" <+> printWithLayout e <+> printWithLayout t :
-      map printWithLayout stmts
+    -- NOTE: AT and WITH are mandatory in the #TRACE grammar, and the events
+    -- are parsed with layout ('lmany'), so they must each go on their own
+    -- (indented) line for the printed directive to round-trip through the
+    -- parser (e.g. for @l4 batch@'s print-and-reparse of the module).
+    Contract _ e t stmts -> vcatHard $
+      ("#TRACE" <+> printWithLayout e <+> "AT" <+> printWithLayout t <+> "WITH") :
+      map (indent 2 . printWithLayout) stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
     -- An expression with an open tail is bracketed, so that a BECAUSE in it,
@@ -517,18 +521,35 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     AppNamed   _ n namedExpr _ ->
           printWithLayout n
       <+> "WITH"
-      <+> hang 2 (align (vcat (fmap printWithLayout namedExpr)))
+      <+> align (vcatHard (fmap printWithLayout namedExpr))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
         <+> "THEN" <+> parensIfNeeded then'
         <+> "ELSE" <+> parensIfNeeded else'
     MultiWayIf _ conds o ->
-      vcat $
+      hang 2 $ vcatHard $
         [ "BRANCH" ]
         <> map (\(MkGuardedExpr _ a b) -> "IF" <+> printWithLayout a <+> "THEN" <+> printWithLayout b) conds
         <> [ "OTHERWISE" <+> printWithLayout o ]
-    Regulative _ (MkDeonton _ p a t f l) -> prettyObligation p a t f l
+    -- A rule inside an expression has to survive two parser constraints: its
+    -- clauses must be indented past PARTY, which is rarely in column 0 here
+    -- (`LEST (PARTY ...`), and a #TRACE directive is line-oriented, so a contract
+    -- broken across lines loses its AT and WITH. 'group' collapses the rule to
+    -- one line under the Unbounded layout. That is safe only because every break
+    -- an operand NEEDS is a 'hardline' ('vcatHard': WITH, WHERE, BRANCH, CONSIDER),
+    -- which 'flatten' refuses, and then 'hang' indents relative to PARTY. A soft
+    -- break in an operand would collapse to nothing and jam its tokens together.
+    Regulative _ (MkDeonton _ p a t f l) ->
+      Prettyprinter.group $ hang 2 $ vsep $
+        [ "PARTY" <+> printWithLayout p
+        , printWithLayout a
+        ]
+        <> mprint "WITHIN" t
+        -- Bracketed because on one line a bare rule under HENCE would take this
+        -- rule's LEST for its own, which parses, and means something else.
+        <> foldMap (\ x -> ["HENCE" <+> parensIfNeeded x]) f
+        <> foldMap (\ x -> ["LEST" <+> parensIfNeeded x]) l
     -- One branch per line, aligned, and WITHOUT the comma separator.
     -- 'L4.Parser.consider' reads the branch list with `lsepBy`, i.e.
     -- `manyLines` over comma-separated groups: continuation lines must start at
@@ -555,20 +576,20 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     List       _ exprs ->
       "LIST" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     Where      _ e1 decls ->
-      vcat
+      align $ vcatHard
         [ indent 2 (printWithLayout e1)
         , "WHERE"
-        , indent 2 (vsep $ fmap printWithLayout decls)
+        , indent 2 (vcatHard $ fmap printWithLayout decls)
         ]
     LetIn _ decls e1 ->
-      vcat
+      align $ vcatHard
         [ "LET"
-        , indent 2 (vsep $ fmap printLetBinding decls)
+        , indent 2 (vcatHard $ fmap printLetBinding decls)
         , "IN"
         , indent 2 (printWithLayout e1)
         ]
     Event _ MkEvent {timestamp, party, action} ->
-      vcat
+      align $ vcatHard
         [ "PARTY" <+> printWithLayout party
         , "DOES" <+> printWithLayout action
         , "AT" <+> printWithLayout timestamp -- TODO: better timestamp rendering
