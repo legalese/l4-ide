@@ -105,7 +105,7 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 - The schema that the service publishes and the editor's sidebar lists (`typeToParameter`) writes a record out in full on every path to it, so it doubles at each level of the nesting that `jsonShape` no longer doubles on, as it does on `main`.
   Measured on 2026-11-04 through `jl4-core-test`, encoding one input's parameter: 14 MB in 0.5 s at 16 levels, 226 MB in 9.3 s at 20, 906 MB in 37 s at 22.
   A bundle of that kind is refused by the service from 18 levels with "compilation timed out or exceeded the memory limit", in under a second, on `main` and on this branch alike (at 12 and 16 levels it deploys, on both).
-  The cause of that refusal was not traced.
+  That is consistent with the size of the schema measured here, and it was not confirmed.
   The wire form of the schema is what would have to change, and that is not done here.
 - `jl4-mlir` accepts a rule that returns a `DEONTIC` and the service refuses it (assumed, not ruled), so a `.schema.json` can list a function that the service does not.
   `jl4-mlir/scripts/parity-harness.mjs`, which is run by hand, deploys `deontic-sale.l4`, `deontic-seatbelt.l4` and `deontic-breach.l4` to the service by default, so its comparison of contract rules no longer has a service side (read from the harness, not run).
