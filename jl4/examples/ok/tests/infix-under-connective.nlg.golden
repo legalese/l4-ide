@@ -25,8 +25,8 @@ not `bare and` with `FALSE`, 5 and 3
 `arm plain` with `JUST` with 8 and 5 is equal to `arm parenthesised` with `JUST` with 8 and 5
 `arm plain` with `NOTHING` and 5 is equal to `arm parenthesised` with `NOTHING` and 5
 the sum of 10 and `_ SCALEDBY _` with 2 and 3
-the sum of `_ SCALEDBY _` with 2 and 3 and 10
-the sum of 10 and `_ SCALEDBY _` with 2 and 3 is equal to the sum of `_ SCALEDBY _` with 2 and 3 and 10
+the sum of (`_ SCALEDBY _` with 2 and 3) and 10
+the sum of 10 and `_ SCALEDBY _` with 2 and 3 is equal to the sum of (`_ SCALEDBY _` with 2 and 3) and 10
 `TRUE` is equal to `_ exceeds by at least _` with 5 and 3
 `FALSE` is equal to `_ exceeds by at least _` with 5 and 3
 `_ SCALEDBY _` with 2 and 3 is equal to 6 and `TRUE`
