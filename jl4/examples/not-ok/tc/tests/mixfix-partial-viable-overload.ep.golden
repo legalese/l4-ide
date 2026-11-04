@@ -1,0 +1,31 @@
+-- A partial mixfix match (keywords in the wrong order, as in
+-- mixfix-wrong-keyword.l4) on a name with two meanings, where ONE meaning
+-- remains viable for the un-restructured call: the 5-parameter `myif` takes
+-- `myif TRUE myelse 1 mythen 2` as it stands, and the 3-parameter mixfix
+-- `myif` is dropped by the overload pre-filter for its arity, so overload
+-- resolution sees exactly one locally-succeeding candidate.
+--
+-- This pins the forkWithLazyFallback seam (smucclaw/l4-ide#929): the
+-- MixfixMatchErrorCheck reported before the overload fork makes every branch
+-- a failure where inferExpr's softprune judges it, so the one-success skip of
+-- the ambiguity fallback must NOT fire. The expected output is the mixfix
+-- mismatch AND the ambiguity error, exactly as before the lazy-fallback
+-- optimisation. If the ambiguity error disappears from this golden, the
+-- preamble-diagnostic flag has come unthreaded.
+
+GIVEN cond IS A BOOLEAN, thenVal IS A NUMBER, elseVal IS A NUMBER
+GIVETH NUMBER
+`myif` cond `mythen` thenVal `myelse` elseVal MEANS
+  IF cond THEN thenVal ELSE elseVal
+
+GIVEN a IS A BOOLEAN, b IS A NUMBER, c IS A NUMBER, d IS A NUMBER, e IS A NUMBER
+GIVETH NUMBER
+myif a b c d e MEANS c
+
+GIVETH NUMBER
+myelse MEANS 0
+
+GIVETH NUMBER
+mythen MEANS 0
+
+testWrongOrder MEANS `myif` TRUE `myelse` 1 `mythen` 2
