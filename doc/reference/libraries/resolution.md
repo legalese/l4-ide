@@ -70,17 +70,28 @@ set and therefore ignored.
 
 A consequence for anyone moving a deployment onto the service: a library you
 used to supply from the host's filesystem has to be a file in the bundle, in the
-same directory as the file that imports it. A file elsewhere in the bundle is
-found only when its directory happens to be the one the service treats as the
-bundle's root, the directory of the first file in the bundle's sort order, so
-do not rely on it.
+same directory as the file that imports it, or at the top of the bundle (the
+folder that holds the bundle's folders). A bare `IMPORT` looks in those two
+places and nowhere else in the bundle: a file in any other folder is not found
+by its bare name, and which file of the bundle sorts first makes no difference.
+
+One limit of the service today.
+It does not find a file beside its importer when the first folder of the file's path in the bundle has a space, a letter outside A to Z, or one of `# ' + ( ) % , = @ & ! $ ; [ ]` in its name (a folder called `my dir`, `dossier é` or `a#b`).
+Only the first folder of the path decides: a file beside its importer in `ok/my dir` is found.
+The deployment is still reported as ready, and every call that needs the file then fails.
+A file at the top of the bundle whose own name has a space or such a letter is not found either.
+The cause is that a relative path cannot be spelled in a `file:` URI that reads back.
+This is a residual of the fix for smucclaw/l4-ide#971, which is closed, and no issue tracks it yet.
+`l4 deploy` and the extension's Deploy button refuse such a folder, and a few more names that the service finds, such as `a~b`, because they stop at any character other than letters from A to Z, digits, `.`, `-` and `_` in any folder of the path.
+`jl4-service/test/BundleRootSpec.hs` has a pending case for the day the service finds the file.
 
 A bundle that ships a file with the name of a standard library module, such as
 its own `prelude.l4`, is still honoured, as any project copy is: the importers
-that can see that file — those in the same directory — get it instead of the
-library's. The service says so, at `WARN`, each time it compiles such a bundle
-(`Bundle file stands in for a standard library module`, naming the file and the
-module), unless the file is exactly the library's own text.
+that can see that file — those in the same directory, and every importer when
+the file is at the top of the bundle — get it instead of the library's. The
+service says so, at `WARN`, each time it compiles such a bundle (`Bundle file
+stands in for a standard library module`, naming the file and the module),
+unless the file is exactly the library's own text.
 
 An `IMPORT` that finds nothing — no file in the bundle, no module in the built-in
 library — does not stop the deploy, which still reports "applied": the file
@@ -93,8 +104,9 @@ deploy time is not made; it would need a ruling of its own.
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
 (unit, table-driven), the `l4 library resolution shadow (B′)` group in
 `jl4/tests-cli/Main.hs` (black-box CLI), and, for the service's shorter ladder,
-`jl4-service/test/StdlibResolutionSpec.hs` and
-`jl4-service/test/UnresolvedImportSpec.hs`.
+`jl4-service/test/StdlibResolutionSpec.hs`,
+`jl4-service/test/UnresolvedImportSpec.hs` and, for where a bare name looks
+inside a bundle that has folders, `jl4-service/test/BundleRootSpec.hs`.
 
 ---
 
