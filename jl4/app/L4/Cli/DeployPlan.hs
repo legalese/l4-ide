@@ -5,23 +5,36 @@
 -- collected file shares, with @/@ between the parts; when they all sit in one
 -- folder that is the plain file name.
 --
--- The service looks an @IMPORT@ up in two places only: beside the importing
--- file and at the top of the zip (the folder every file shares).
+-- The service looks a bare @IMPORT@ (a name with no @/@) up in two places only:
+-- beside the importing file and at the top of the zip (the folder every file
+-- shares).
 -- @l4@ looks in more places than that (@JL4_LIBRARY_PATH@, the per-user library
 -- folder), so a library it found in some other folder of the project would be
 -- uploaded under that folder, would be found by @l4@, and would not be found by
 -- the service: the deploy says it is ready and every call fails.
--- So the plan checks, for each @IMPORT@ line, that the file it resolved to ends
--- up in one of those two places, and refuses the deploy when it does not
+-- So the plan checks, for each bare @IMPORT@ line, that the file it resolved to
+-- ends up in one of those two places, and refuses the deploy when it does not
 -- ('UnreachableImport').
--- Every line is judged, whatever it is written as: this version of @l4@ and the
--- service both read a name written with a @/@ (@IMPORT `lib\/shared`@) as the
--- bare name of its last part (@shared@), so such a line is looked up in the same
--- two places as a bare one (measured 2026-10-26: @l4 check@ answers "I could not
--- find a module with this name: helper" for @IMPORT `sub\/helper`@ with
--- @sub\/helper.l4@ in place, and the service logs "Resolving import: zdefs" for
--- @IMPORT `lib\/zdefs`@).
--- A version of l4 with path imports would need this rule revisited.
+--
+-- A path import (a backticked name with a @/@, such as @IMPORT `..\/b\/mod`@;
+-- @specs\/proposals\/RELATIVE-IMPORTS-SPEC.md@) is looked up in one place only,
+-- by @l4@ and by the service alike: the file its path names, counted from the
+-- folder of the importing file, and in the service never above the top of the
+-- zip ('classifyImport' tells the two kinds apart by the text alone).
+-- The names in the zip keep every file's place relative to every other, so the
+-- file @l4@ found for a path is, as a rule, where the path names it in the zip.
+-- The plan checks that for each path import line, and refuses the deploy when
+-- it is not so ('UnreachableImport', with 'pathNames' set).
+-- It is not so when a folder on the path is reached through a link, or is
+-- written with capitals other than the disk's on a disk that does not tell them
+-- apart: the plan names each file by its folder as the disk spells it, links
+-- followed ('L4.Cli.Deploy.canonical'), while the service looks under the name
+-- the path wrote.
+-- Assumed, not ruled: refusing those cases, rather than uploading the file under
+-- the name its path wrote, which would deploy it at the price of one file under
+-- two names when two importers reach it by different folders.
+-- A rooted path (a leading @/@) never reaches the plan: @l4@ refuses it when it
+-- checks the file.
 --
 -- The service does not find a file beside its importer when the first folder of
 -- the file's path in the zip has, in its name, a space, a letter outside A to Z,
@@ -68,9 +81,18 @@
 -- @JL4_LIBRARY_PATH@) is uploaded now as @a\/main.l4@ and @defs.l4@; such an old
 -- service deploys that as "ready", and every call answers "zmark is not in
 -- scope" (measured by a reviewer, 2026-10-26).
+-- A service built without path imports (legalese\/l4-ide#748) reads
+-- @IMPORT `..\/b\/mod`@ as the bare name @mod@ (measured 2026-10-26 for
+-- @IMPORT `lib\/zdefs`@: such a service logs "Resolving import: zdefs"), so a
+-- project with a path import into another folder deploys "ready" there and its
+-- calls fail as well.
 -- The default target of @l4 deploy@ is Legalese Cloud (@L4.Cli.Cloud@).
--- Nothing here or in @L4.Cli.Deploy@ checks the version of the service.
--- Whether the service has to be released before this tool is not decided.
+-- Nothing here or in @L4.Cli.Deploy@ checks the version of the service: a build
+-- made without @JL4_SERVICE_VERSION@ reports @0.0.0-dev@ on @\/health@, so a
+-- version number would misjudge every self-built service.
+-- Ruled 2026-11-05 (RI3; @specs\/as-built\/import-resolution.md@): the service
+-- ships first, and this tool stays a draft until Legalese Cloud runs a build
+-- that has both path imports and the bundle root at the top of the upload.
 --
 -- The /project root/ bounds the upload: a collected file outside it stops the
 -- deploy ('OutsideRoot'). Nothing is skipped, flattened or renamed to make a
@@ -108,7 +130,7 @@ import Control.Monad (guard)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Char (isAscii, isAlphaNum, toLower)
-import Data.List (find, isPrefixOf, nub, nubBy)
+import Data.List (find, intercalate, isPrefixOf, nub, nubBy)
 import System.FilePath
   ( isAbsolute
   , joinPath
@@ -118,6 +140,8 @@ import System.FilePath
   , takeExtension
   )
 import System.IO.Error (ioeGetErrorType)
+
+import L4.Import.Resolution (CollapsedPath (..), ImportForm (..), classifyImport, collapsePath, pathImportFile)
 
 -- | Why a bundle cannot be made.
 data PlanError
@@ -136,7 +160,7 @@ data PlanError
     -- ^ Two files that would both be stored under one name.
   deriving stock (Eq, Show)
 
--- | One bare @IMPORT@ that the service would not resolve.
+-- | One @IMPORT@ that the service would not resolve.
 data Unreachable = Unreachable
   { importerName :: FilePath
     -- ^ The importing file, as it is named in the zip.
@@ -146,8 +170,22 @@ data Unreachable = Unreachable
     -- ^ The file it resolved to, as it is named in the zip.
   , importedFile :: FilePath
     -- ^ The same file on this machine.
+  , pathNames :: Maybe FilePath
+    -- ^ For a path import, the name in the zip that its path names, which is
+    -- not 'importedName' (or 'Nothing' when the path climbs above the top of the
+    -- zip, which the service refuses). Absent for a bare import.
   }
   deriving stock (Eq, Show)
+
+-- | The file a path import names, as a name in the zip, from the folder of the
+-- importing file in the zip: 'Nothing' when the path climbs above the top.
+-- The same lexical walk the resolver makes ('pathImportFile', 'collapsePath').
+pathTarget :: [FilePath] -> Text -> Maybe [FilePath]
+pathTarget importerFolder w
+  | c.cpEscaped = Nothing
+  | otherwise = Just (filter (/= ".") (splitDirectories c.cpPath))
+  where
+    c = collapsePath (joinPath (importerFolder <> [pathImportFile w]))
 
 -- | An imported file that the service may not find beside its importer,
 -- because of the name of its folder.
@@ -206,20 +244,38 @@ renderPlanError hints = \case
              ]
          ]
   UnreachableImport us ->
-    Text.unlines $
-      [ case us of
-          [_] -> "The deployed service would not find a library this file imports:"
-          _ -> "The deployed service would not find libraries these files import:"
-      ]
-      <> [ "  " <> Text.pack u.importerName <> " imports " <> u.written <> ", which would be uploaded as "
-             <> Text.pack u.importedName <> " (from " <> Text.pack u.importedFile <> "), in the folder "
-             <> Text.pack (folderOf u.importedName)
-         | u <- us ]
-      <> [ "The deployed service looks an IMPORT up only beside the file that imports it and at the top of the upload (the folder that holds all the uploaded files)."
-         , "It looks nowhere else, so the deploy would say it is ready and every call would then fail."
-         , "Put each library beside the file that imports it, and deploy again."
-         ]
-      <> libraryAdvice hints
+    let byName = [ u | u <- us, isBare u.written ]
+        byPath = [ u | u <- us, not (isBare u.written) ]
+    in Text.unlines $
+      ( if null byName then [] else
+          [ case byName of
+              [_] -> "The deployed service would not find a library this file imports:"
+              _ -> "The deployed service would not find libraries these files import:"
+          ]
+          <> [ "  " <> Text.pack u.importerName <> " imports " <> u.written <> ", which would be uploaded as "
+                 <> Text.pack u.importedName <> " (from " <> Text.pack u.importedFile <> "), in the folder "
+                 <> Text.pack (folderOf u.importedName)
+             | u <- byName ]
+          <> [ "The deployed service looks an IMPORT of a bare name (one with no /) up only beside the file that imports it and at the top of the upload (the folder that holds all the uploaded files)."
+             , "It looks nowhere else, so the deploy would say it is ready and every call would then fail."
+             , "Put each library beside the file that imports it, and deploy again."
+             ]
+          <> libraryAdvice hints )
+      <> ( if null byPath then [] else
+          [ case byPath of
+              [_] -> "The deployed service would not find a file this file imports by its path:"
+              _ -> "The deployed service would not find files these files import by their paths:"
+          ]
+          <> [ "  " <> Text.pack u.importerName <> " imports `" <> u.written <> "`, which "
+                 <> maybe "climbs above the top of the upload" (\n -> "names " <> Text.pack n <> " in the upload") u.pathNames
+                 <> ", but the file l4 found for it would be uploaded as " <> Text.pack u.importedName
+                 <> " (from " <> Text.pack u.importedFile <> ")"
+             | u <- byPath ]
+          <> [ "The deployed service looks an IMPORT written as a path up only where the path names, counted from the folder of the file that imports it, and never above the top of the upload."
+             , "l4 names each uploaded file by its folder as the disk spells it, with links followed, so a folder on the path that is a link, or that is written with other capitals than the disk has, puts the file somewhere the path does not name."
+             , "The deploy would say it is ready and every call would then fail."
+             , "Write the path the way the folders are named on the disk, not through a link, and deploy again."
+             ] )
   UnsafeFolder us ->
     Text.unlines $
       [ case us of
@@ -313,10 +369,13 @@ projectRoot cwd entry
 -- those files with the file it resolved to. Result: each file's name in the zip
 -- and its path on disk.
 --
--- Every line must resolve to a file that is uploaded beside the importing file
--- or at the top of the upload, where the service looks ('UnreachableImport').
+-- Every bare line must resolve to a file that is uploaded beside the importing
+-- file or at the top of the upload, where the service looks; every path line
+-- must resolve to a file that is uploaded where its path names it
+-- ('UnreachableImport').
 -- A file that is then beside its importer in a folder whose name the service
--- may not be able to look into is refused too ('UnsafeFolder').
+-- may not be able to look into is refused too ('UnsafeFolder'); that holds for a
+-- file reached by a path as well (seen in review of legalese/l4-ide#748).
 -- A line that names a file the plan does not upload is not judged: it can only
 -- be one of the modules left out above.
 planBundle :: FilePath -> FilePath -> [(Text, Maybe FilePath)] -> [ImportEdge] -> Either PlanError [(FilePath, FilePath)]
@@ -332,12 +391,17 @@ planBundle root entry imports edges = do
       -- A file's name in the zip, and the folder part of it.
       nameIn f = joinWith "/" (drop shared f.segs)
       folderIn f = take (length f.segs - shared - 1) (drop shared f.segs)
-  case [ Unreachable { importerName = nameIn from, written = e.written, importedName = nameIn to, importedFile = render to }
+      -- Whether the service finds @to@ from @from@ by the line as written.
+      found e from to
+        | isBare e.written = null (folderIn to) || folderIn to == folderIn from
+        | otherwise = pathTarget (folderIn from) e.written == Just (drop shared to.segs)
+  case [ Unreachable
+           { importerName = nameIn from, written = e.written, importedName = nameIn to, importedFile = render to
+           , pathNames = if isBare e.written then Nothing else intercalate "/" <$> pathTarget (folderIn from) e.written }
        | e <- edges
        , Just from <- [lookupFile located (locate e.importer)]
        , Just to <- [lookupFile located (locate e.imported)]
-       , not (null (folderIn to))
-       , folderIn to /= folderIn from
+       , not (found e from to)
        ] of
     [] -> pure ()
     us -> Left (UnreachableImport (nubBy (\a b -> (a.importerName, a.written, a.importedName) == (b.importerName, b.written, b.importedName)) us))
@@ -367,6 +431,11 @@ planBundle root entry imports edges = do
     -- safe (see the header).
     unsafeSegment = not . all (\c -> isAscii c && (isAlphaNum c || c `elem` (".-_" :: String)))
 
+-- | Whether a written @IMPORT@ name is a bare name, looked up by name, and not a
+-- path.
+isBare :: Text -> Bool
+isBare w = classifyImport w == BareImport
+
 -- | Leave out of the imports each file that is exactly the standard library
 -- module of its name built into the service.
 --
@@ -375,24 +444,34 @@ planBundle root entry imports edges = do
 -- outside the project root. A file of the same name whose bytes differ is a
 -- project file like any other.
 --
--- Arguments: the built-in modules by name (as bytes), the bytes of each file
--- that could be read, and the imports as 'planBundle' takes them. Result: the
--- imports with each such file turned into a module with no file, and the names
--- of the modules left out, in order, once each.
+-- A file that any @IMPORT@ line reaches by a path (@IMPORT `lib\/prelude`@) is
+-- kept, whatever its bytes: the service resolves a path import among the
+-- uploaded files only and never from its built-in modules, so leaving the file
+-- out would deploy "ready" and fail every call that needs it.
+--
+-- Arguments: the built-in modules by name (as bytes), each @IMPORT@ line with
+-- the file it resolved to, the bytes of each file that could be read, and the
+-- imports as 'planBundle' takes them. Result: the imports with each such file
+-- turned into a module with no file, and the names of the modules left out, in
+-- order, once each.
 -- A file that could not be read is kept, and 'readBundle' says so later.
 leaveOutBuiltIn
   :: (Text -> Maybe BS.ByteString)
+  -> [ImportEdge]
   -> (FilePath -> Maybe BS.ByteString)
   -> [(Text, Maybe FilePath)]
   -> ([(Text, Maybe FilePath)], [Text])
-leaveOutBuiltIn builtIn contents imports = (map fst classified, nub [ n | (_, Just n) <- classified ])
+leaveOutBuiltIn builtIn edges contents imports = (map fst classified, nub [ n | (_, Just n) <- classified ])
   where
     classified =
       [ case mf >>= sameAsBuiltIn of
           Just n -> ((m, Nothing), Just n)
           Nothing -> ((m, mf), Nothing)
       | (m, mf) <- imports ]
+    byPath = [ locate e.imported | e <- edges, not (isBare e.written) ]
+    reachedByPath f = let l = locate f in any (\p -> p.key == l.key && p.segs == l.segs) byPath
     sameAsBuiltIn f = do
+      guard (not (reachedByPath f))
       content <- contents f
       let name = Text.pack (takeBaseName f)
       guard (takeExtension f == ".l4" && builtIn name == Just content)

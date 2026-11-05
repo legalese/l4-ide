@@ -2,9 +2,8 @@
 --
 -- Two kinds. The first calls 'planBundle' and 'readBundle' directly, with
 -- made-up paths, because most of the cases (two files of one name in different
--- folders, a file in a folder that no import of today's language leads to)
--- cannot be set up with the import forms the typechecker has today. The second
--- runs the real @l4@
+-- folders, a line that resolved somewhere its path does not name) are quicker
+-- to state as paths than to set up on a disk. The second runs the real @l4@
 -- against a service that only records what it is sent, so that the zip it
 -- reads is the one @l4 deploy@ built: a unit test of the plan cannot tell that
 -- @bundle@ forgot to use it.
@@ -38,7 +37,7 @@ import Network.Socket
   , withSocketsDo
   )
 import Network.Socket.ByteString (recv, sendAll)
-import System.Directory (canonicalizePath, createDirectory, createDirectoryIfMissing, createDirectoryLink)
+import System.Directory (canonicalizePath, createDirectory, createDirectoryIfMissing, createDirectoryLink, doesFileExist)
 import System.Environment (getEnvironment)
 import System.Exit (ExitCode(..))
 import System.FilePath (pathSeparator, takeDirectory, takeDrive, (</>))
@@ -64,6 +63,10 @@ fixtures =
   , xdgDir </> "project" </> "main.l4"
   , xdgDir </> "project" </> "data" </> "jl4" </> "libraries" </> "shared.l4"
   , xdgDir </> "outside" </> "data" </> "jl4" </> "libraries" </> "shared.l4"
+  , rowsDir </> "a" </> "main.l4"
+  , rowsDir </> "a" </> "helper.l4"
+  , rowsDir </> "b" </> "mod.l4"
+  , rowsDir </> "b" </> "neighbour.l4"
   ]
 
 flatDir, libpathDir, topDir, xdgDir :: FilePath
@@ -73,6 +76,9 @@ libpathDir = fixtureDir </> "deploy-bundle" </> "libpath"
 topDir = fixtureDir </> "deploy-bundle" </> "top"
 -- A library in the per-user library folder, inside the project and outside it.
 xdgDir = fixtureDir </> "deploy-bundle" </> "xdg"
+-- The path-import fixture of legalese/l4-ide#748, shared with its CLI tests.
+rowsDir :: FilePath
+rowsDir = fixtureDir </> "relative-import" </> "rows"
 
 spec :: FilePath -> Spec
 spec bin = do
@@ -215,7 +221,7 @@ planSpec = describe "l4 deploy: which files are uploaded, and under what name" $
       let shared = at ["p", "lib", "shared.l4"]
           r = planBundle (at ["p"]) main_ [("shared", Just shared)] [imp main_ "shared" shared]
       r `shouldBe` Left (UnreachableImport
-        [ Unreachable { importerName = "main.l4", written = "shared", importedName = "lib/shared.l4", importedFile = shared } ])
+        [ Unreachable { importerName = "main.l4", written = "shared", importedName = "lib/shared.l4", importedFile = shared, pathNames = Nothing } ])
       let said = message r
       said `shouldSatisfy` ("main.l4 imports shared" `isInfixOf`)
       said `shouldSatisfy` ("lib/shared.l4" `isInfixOf`)
@@ -281,28 +287,64 @@ planSpec = describe "l4 deploy: which files are uploaded, and under what name" $
                 [imp main_ "a" a, imp main_ "b" b, imp main_ "a" a]
       fmap (map (.importedName)) (refused r) `shouldBe` Just ["x/a.l4", "y/b.l4"]
 
-    -- This version of the language reads a name written with a slash as the
-    -- bare name of its last part (IMPORT `lib/shared` is `shared`), in l4 and in
-    -- the service alike, so such a line is as unreachable for the service as a
-    -- bare one and is judged the same way.
-    it "judges a name written with a slash as it judges a bare one" $ do
-      let shared = at ["p", "lib", "shared.l4"]
-          r = planBundle (at ["p"]) main_ [("shared", Just shared)] [imp main_ "lib/shared" shared]
-      refused r `shouldBe` Just
-        [ Unreachable { importerName = "main.l4", written = "lib/shared", importedName = "lib/shared.l4", importedFile = shared } ]
-      message r `shouldSatisfy` ("main.l4 imports lib/shared" `isInfixOf`)
+    -- A name written with a slash is a path import (legalese/l4-ide#748): the
+    -- service looks it up only where the path names, counted from the folder
+    -- of the importing file in the zip. The zip keeps every file's place
+    -- relative to every other, so a path that l4 resolved is where it names.
+    it "allows a path import whose file is uploaded where its path names it" $ do
       let entry = at ["w", "rows", "a", "main.l4"]
           modl = at ["w", "rows", "b", "mod.l4"]
-      fmap (map (.importedName)) (refused (planBundle (at ["w"]) entry [("mod", Just modl)] [imp entry "../b/mod" modl]))
-        `shouldBe` Just ["b/mod.l4"]
+          helper = at ["w", "rows", "a", "helper.l4"]
+      names (planBundle (at ["w"]) entry [("mod", Just modl), ("helper", Just helper)]
+              [imp entry "../b/mod" modl, imp entry "./helper" helper])
+        `shouldBe` Right ["a/main.l4", "b/mod.l4", "a/helper.l4"]
+      -- In a folder of its own below the importer, and with the extension written.
+      let shared = at ["p", "lib", "shared.l4"]
+      names (planBundle (at ["p"]) main_ [("shared", Just shared)] [imp main_ "lib/shared" shared])
+        `shouldBe` Right ["main.l4", "lib/shared.l4"]
+      names (planBundle (at ["p"]) main_ [("shared", Just shared)] [imp main_ "lib/shared.l4" shared])
+        `shouldBe` Right ["main.l4", "lib/shared.l4"]
 
-    it "allows a name written with a slash when its file is where the service looks" $ do
+    -- Assumed, not ruled: a path import whose file l4 found somewhere its path
+    -- does not name in the zip is refused, not renamed. That happens when a
+    -- folder on the path is a link (the plan names a file by its folder with
+    -- links followed); here the edge says what l4 would have found through one.
+    it "refuses a path import whose file would be uploaded somewhere its path does not name" $ do
       let entry = at ["p", "a", "main.l4"]
-          beside = at ["p", "a", "helper.l4"]
-          top = at ["p", "defs.l4"]
-      names (planBundle (at ["p"]) entry [("helper", Just beside), ("defs", Just top)]
-              [imp entry "sub/helper" beside, imp entry "lib/defs" top])
-        `shouldBe` Right ["a/main.l4", "a/helper.l4", "defs.l4"]
+          found = at ["p", "a", "helper.l4"]
+          r = planBundle (at ["p"]) entry [("helper", Just found), ("defs", Just (at ["p", "defs.l4"]))]
+                [imp entry "sub/helper" found]
+      refused r `shouldBe` Just
+        [ Unreachable { importerName = "a/main.l4", written = "sub/helper", importedName = "a/helper.l4"
+                      , importedFile = found, pathNames = Just "a/sub/helper.l4" } ]
+      let said = message r
+      said `shouldSatisfy` ("a/main.l4 imports `sub/helper`, which names a/sub/helper.l4 in the upload" `isInfixOf`)
+      said `shouldSatisfy` ("would be uploaded as a/helper.l4" `isInfixOf`)
+      said `shouldSatisfy` ("a folder on the path that is a link" `isInfixOf`)
+      said `shouldSatisfy` ("Write the path the way the folders are named on the disk" `isInfixOf`)
+      -- The advice for a bare name would be false of a path.
+      said `shouldNotSatisfy` ("Put each library beside the file that imports it" `isInfixOf`)
+      said `shouldNotSatisfy` ("JL4_LIBRARY_PATH" `isInfixOf`)
+
+    it "refuses a path import that climbs above the top of the upload" $ do
+      let entry = at ["p", "a", "main.l4"]
+          modl = at ["p", "b", "mod.l4"]
+          r = planBundle (at ["p"]) entry [("mod", Just modl)] [imp entry "../../p/b/mod" modl]
+      fmap (map (.pathNames)) (refused r) `shouldBe` Just [Nothing]
+      message r `shouldSatisfy` ("imports `../../p/b/mod`, which climbs above the top of the upload" `isInfixOf`)
+
+    it "judges a bare line and a path line in one plan each by its own rule, and says both" $ do
+      let entry = at ["p", "a", "main.l4"]
+          shared = at ["p", "lib", "shared.l4"]
+          other = at ["p", "lib", "other.l4"]
+          found = at ["p", "a", "helper.l4"]
+          r = planBundle (at ["p"]) entry [("shared", Just shared), ("other", Just other), ("helper", Just found)]
+                [imp entry "shared" shared, imp entry "../lib/other" other, imp entry "sub/helper" found]
+      fmap (map (\u -> (u.written, u.importedName))) (refused r)
+        `shouldBe` Just [("shared", "lib/shared.l4"), ("sub/helper", "a/helper.l4")]
+      message r `shouldSatisfy` ("a/main.l4 imports shared, which would be uploaded as lib/shared.l4" `isInfixOf`)
+      message r `shouldSatisfy` ("a/main.l4 imports `sub/helper`, which names a/sub/helper.l4" `isInfixOf`)
+      message r `shouldNotSatisfy` ("lib/other" `isInfixOf`)
 
     it "leaves a standard library alone, whether it is built in or read from a file at the top" $ do
       -- Built in: no file, so no line to judge.
@@ -341,6 +383,14 @@ planSpec = describe "l4 deploy: which files are uploaded, and under what name" $
           in planBundle (at ["p"]) entry [("helper", Just helper), ("defs", Just top)]
                [imp entry "helper" helper, imp entry "defs" top]
         unfindable r = either (\case UnsafeFolder us -> Just (map (\u -> (u.fileName, u.folderName)) us); _ -> Nothing) (const Nothing) r
+
+    -- The same limit holds for a file reached by a path (seen in the review of
+    -- legalese/l4-ide#748), so a path import into such a folder is refused too.
+    it "refuses a file reached by a path import in a folder with a space in its name" $ do
+      let entry = at ["p", "a", "main.l4"]
+          modl = at ["p", "my dir", "mod.l4"]
+      unfindable (planBundle (at ["p"]) entry [("mod", Just modl)] [imp entry "../my dir/mod" modl])
+        `shouldBe` Just [("my dir/mod.l4", "my dir")]
 
     it "refuses a library beside its importer in a folder with a space in its name" $ do
       let r = beside ["my dir"]
@@ -438,35 +488,50 @@ planSpec = describe "l4 deploy: which files are uploaded, and under what name" $
         imp from written to = ImportEdge from written to
         -- Leave out the built-in copies, then plan what is left.
         planned root files imports edges =
-          let (kept, left) = leaveOutBuiltIn builtIn (contentsOf files) imports
+          let (kept, left) = leaveOutBuiltIn builtIn edges (contentsOf files) imports
           in (planBundle root main_ kept edges, left)
 
     it "is left out, and named, whatever folder it is in" $
-      leaveOutBuiltIn builtIn (contentsOf [(libs "daydate.l4", daydate), (libs "date-compat.l4", compat)])
+      leaveOutBuiltIn builtIn [] (contentsOf [(libs "daydate.l4", daydate), (libs "date-compat.l4", compat)])
           [("daydate", Just (libs "daydate.l4")), ("date-compat", Just (libs "date-compat.l4"))]
         `shouldBe`
           ([("daydate", Nothing), ("date-compat", Nothing)], ["daydate", "date-compat"])
 
     it "is kept when its bytes differ by even one character" $
-      leaveOutBuiltIn builtIn (contentsOf [(libs "daydate.l4", daydate <> "-- local\n")])
+      leaveOutBuiltIn builtIn [] (contentsOf [(libs "daydate.l4", daydate <> "-- local\n")])
           [("daydate", Just (libs "daydate.l4"))]
         `shouldBe` ([("daydate", Just (libs "daydate.l4"))], [])
 
     it "is kept when no built-in module has its name, though its text is a built-in module's" $
-      leaveOutBuiltIn builtIn (contentsOf [(libs "mine.l4", daydate)]) [("mine", Just (libs "mine.l4"))]
+      leaveOutBuiltIn builtIn [] (contentsOf [(libs "mine.l4", daydate)]) [("mine", Just (libs "mine.l4"))]
         `shouldBe` ([("mine", Just (libs "mine.l4"))], [])
 
     it "is kept when it could not be read, so that reading the upload says so" $
-      leaveOutBuiltIn builtIn (contentsOf []) [("daydate", Just (libs "daydate.l4"))]
+      leaveOutBuiltIn builtIn [] (contentsOf []) [("daydate", Just (libs "daydate.l4"))]
         `shouldBe` ([("daydate", Just (libs "daydate.l4"))], [])
 
     it "is named once when two imports reach copies of one name" $
-      leaveOutBuiltIn builtIn (contentsOf [(libs "daydate.l4", daydate), (at ["p", "daydate.l4"], daydate)])
+      leaveOutBuiltIn builtIn [] (contentsOf [(libs "daydate.l4", daydate), (at ["p", "daydate.l4"], daydate)])
           [("daydate", Just (libs "daydate.l4")), ("daydate", Just (at ["p", "daydate.l4"]))]
         `shouldBe` ([("daydate", Nothing), ("daydate", Nothing)], ["daydate"])
 
+    -- The service resolves a path import among the uploaded files only, never
+    -- from its built-in modules, so a copy reached by a path must go up.
+    it "is kept when a line reaches it by a path, though its bytes are the built-in module's" $ do
+      let edges = [imp main_ "libs/daydate" (libs "daydate.l4")]
+      leaveOutBuiltIn builtIn edges (contentsOf [(libs "daydate.l4", daydate)]) [("daydate", Just (libs "daydate.l4"))]
+        `shouldBe` ([("daydate", Just (libs "daydate.l4"))], [])
+      -- Reached by a path from one file and by its bare name from another: kept.
+      let both = [imp main_ "libs/daydate" (libs "daydate.l4"), imp (libs "other.l4") "daydate" (libs "daydate.l4")]
+      fst (leaveOutBuiltIn builtIn both (contentsOf [(libs "daydate.l4", daydate)]) [("daydate", Just (libs "daydate.l4"))])
+        `shouldBe` [("daydate", Just (libs "daydate.l4"))]
+      -- The positive control: the same file reached by its bare name only is left out.
+      leaveOutBuiltIn builtIn [imp main_ "daydate" (libs "daydate.l4")] (contentsOf [(libs "daydate.l4", daydate)])
+          [("daydate", Just (libs "daydate.l4"))]
+        `shouldBe` ([("daydate", Nothing)], ["daydate"])
+
     it "leaves a module that has no file alone" $
-      leaveOutBuiltIn builtIn (contentsOf []) [("jl4-embedded:/prelude.l4", Nothing)]
+      leaveOutBuiltIn builtIn [] (contentsOf []) [("jl4-embedded:/prelude.l4", Nothing)]
         `shouldBe` ([("jl4-embedded:/prelude.l4", Nothing)], [])
 
     it "is not judged for where it sits: a copy in a folder of the project is not an unreachable import" $ do
@@ -681,18 +746,84 @@ serviceSpec bin = describe "l4 deploy: the zip it sends" $ do
 
   -- A name written with a slash is read as its last part (IMPORT `lib/shared` is
   -- `shared`) by l4 and by the service, so the line is judged like a bare one.
-  it "judges IMPORT `lib/shared` as it judges IMPORT shared, and sends nothing" $
+  -- Before path imports (legalese/l4-ide#748) this project was refused: l4 and
+  -- the service read `lib/shared` as the bare name `shared`, which the service
+  -- would not have found in lib/. It is a path import now, resolved against
+  -- main.l4 by l4 and by the service alike, and JL4_LIBRARY_PATH plays no part.
+  it "uploads IMPORT `lib/shared` with lib/shared.l4 in its folder, where the path names it" $
     withFakeService \url requests -> withProject
       [ ("main.l4", "IMPORT `lib/shared`\n\nGIVEN n IS A NUMBER\n`double it` MEANS n * 2\n")
       , ("lib" </> "shared.l4", "`the shared one` MEANS 1\n") ] \project -> do
         env <- withLibraryPath (project </> "lib")
         Output code _ serr <- runL4In (Just project) (Just env) bin
           ["deploy", "main.l4", "--no-wait", "--server", url]
-        code `shouldNotBe` ExitSuccess
-        serr `shouldSatisfy` ("main.l4 imports lib/shared" `isInfixOf`)
-        serr `shouldSatisfy` ("lib/shared.l4" `isInfixOf`)
-        sent <- requests
-        sent `shouldBe` []
+        expectSuccess code serr
+        posted <- uploads <$> requests
+        map (fmap (map fst)) posted `shouldBe` [Just ["main.l4", "lib/shared.l4"]]
+
+  -- The fixture of legalese/l4-ide#748: a/main.l4 imports `../b/mod` and
+  -- `./helper`, and b/mod.l4 imports `neighbour` by its bare name, beside it.
+  it "uploads a project with path imports into another folder, keeping every file where its path names it" $
+    withFakeService \url requests -> do
+      rows <- canonicalizePath rowsDir
+      Output code _ serr <- runL4EmbeddedOnlyIn (Just rows) bin
+        ["deploy", "a" </> "main.l4", "--no-wait", "--server", url]
+      expectSuccess code serr
+      posted <- uploads <$> requests
+      map (fmap (map fst)) posted `shouldBe` [Just ["a/main.l4", "b/mod.l4", "b/neighbour.l4", "a/helper.l4"]]
+
+  -- Assumed, not ruled: a folder on the path that is a link stops the deploy,
+  -- because l4 names the file by the folder the link leads to and the service
+  -- looks under the name the path wrote. This is also the control that path
+  -- import lines reach the plan at all: without them nothing would be refused.
+  it "sends nothing when a folder on an import's path is a link" $
+    withFakeService \url requests -> withProject
+      [ ("a" </> "main.l4", "IMPORT `../b/mod`\n\nGIVEN n IS A NUMBER\n`double it` MEANS n * 2\n")
+      , ("c" </> "mod.l4", "`the mod` MEANS 1\n") ] \project -> do
+        made <- try (createDirectoryLink (project </> "c") (project </> "b"))
+        case made of
+          Left e | isPermissionError e -> pendingWith ("cannot create a symbolic link here (" <> show (e :: IOException) <> ")")
+                 | otherwise -> throwIO e
+          Right () -> do
+            Output code _ serr <- runL4EmbeddedOnlyIn (Just project) bin
+              ["deploy", "a" </> "main.l4", "--no-wait", "--server", url]
+            code `shouldNotBe` ExitSuccess
+            serr `shouldSatisfy` ("a/main.l4 imports `../b/mod`, which names b/mod.l4 in the upload" `isInfixOf`)
+            serr `shouldSatisfy` ("would be uploaded as c/mod.l4" `isInfixOf`)
+            sent <- requests
+            sent `shouldBe` []
+
+  -- On a disk that does not tell capitals apart (macOS, Windows), l4 finds
+  -- b/mod.l4 for `../B/mod`; the service does tell them apart, and the plan
+  -- names the folder as the disk spells it, so the deploy stops. Elsewhere l4
+  -- does not find the file at all, which is a different refusal, so the case is
+  -- pending there.
+  it "sends nothing when an import's path spells a folder with other capitals than the disk" $
+    withFakeService \url requests -> withProject
+      [ ("a" </> "main.l4", "IMPORT `../B/mod`\n\nGIVEN n IS A NUMBER\n`double it` MEANS n * 2\n")
+      , ("b" </> "mod.l4", "`the mod` MEANS 1\n") ] \project -> do
+        foldsCase <- doesFileExist (project </> "B" </> "mod.l4")
+        if not foldsCase then pendingWith "this disk tells capitals apart" else do
+          Output code _ serr <- runL4EmbeddedOnlyIn (Just project) bin
+            ["deploy", "a" </> "main.l4", "--no-wait", "--server", url]
+          code `shouldNotBe` ExitSuccess
+          serr `shouldSatisfy` ("a/main.l4 imports `../B/mod`, which names B/mod.l4 in the upload" `isInfixOf`)
+          serr `shouldSatisfy` ("would be uploaded as b/mod.l4" `isInfixOf`)
+          sent <- requests
+          sent `shouldBe` []
+
+  -- The service never answers a path import from its built-in modules, so a
+  -- copy of one that a line reaches by a path goes up whatever its bytes.
+  it "uploads a copy of the standard library reached by a path, though its bytes are the built-in copy" $
+    withFakeService \url requests -> withProject
+      [ ("main.l4", "IMPORT `libs/daydate`\n\nGIVEN n IS A NUMBER\n`double it` MEANS n * 2\n")
+      , ("libs" </> "daydate.l4", builtInText "daydate") ] \project -> do
+        Output code _ serr <- runL4EmbeddedOnlyIn (Just project) bin
+          ["deploy", "main.l4", "--no-wait", "--server", url]
+        expectSuccess code serr
+        posted <- uploads <$> requests
+        map (fmap (map fst)) posted `shouldBe` [Just ["main.l4", "libs/daydate.l4"]]
+        serr `shouldNotSatisfy` ("Not uploaded" `isInfixOf`)
 
   -- The service does not find a file beside its importer when the folder's name
   -- has a space (a residual of the fix for smucclaw/l4-ide#971, which is closed;

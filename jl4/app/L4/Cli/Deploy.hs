@@ -314,17 +314,6 @@ bundle fp = do
   -- so the plan leaves it out and it is not uploaded.
   fromTypechecker <- sequence
     [ (moduleLabel r,) <$> traverse canonical (moduleFile r) | r <- drop 1 (flatten tc) ]
-  -- A standard library file that l4 read from disk (found through
-  -- JL4_LIBRARY_PATH, or a copy in the project) and that is exactly the copy
-  -- built into the service adds nothing to the upload, so it is left out.
-  -- A file that differs is a project file like any other.
-  readable <- fmap (Map.fromList . concat) $ sequence
-    [ either (\(_ :: IOException) -> []) (\c -> [(p, c)]) <$> try (BS.readFile p)
-    | (_, Just p) <- fromTypechecker ]
-  let (imports, builtIn) = leaveOutBuiltIn
-        (fmap TE.encodeUtf8 . EmbeddedLibraries.lookupEmbeddedLibrary)
-        (`Map.lookup` readable)
-        fromTypechecker
   -- Each IMPORT line of each collected file, with the file it resolved to:
   -- the plan checks that the service will find that file from the line.
   edges <- fmap concat $ sequence
@@ -336,6 +325,19 @@ bundle fp = do
            , Just file <- [fromNormalizedFilePath <$> uriToNormalizedFilePath uri]
            ]
     | r <- flatten tc ]
+  -- A standard library file that l4 read from disk (found through
+  -- JL4_LIBRARY_PATH, or a copy in the project) and that is exactly the copy
+  -- built into the service adds nothing to the upload, so it is left out,
+  -- unless a line reaches it by a path, which the service never answers from
+  -- its built-in copy. A file that differs is a project file like any other.
+  readable <- fmap (Map.fromList . concat) $ sequence
+    [ either (\(_ :: IOException) -> []) (\c -> [(p, c)]) <$> try (BS.readFile p)
+    | (_, Just p) <- fromTypechecker ]
+  let (imports, builtIn) = leaveOutBuiltIn
+        (fmap TE.encodeUtf8 . EmbeddedLibraries.lookupEmbeddedLibrary)
+        edges
+        (`Map.lookup` readable)
+        fromTypechecker
   entries <- case planBundle (projectRoot cwd entry) entry imports edges of
     Right es -> pure es
     Left err -> do

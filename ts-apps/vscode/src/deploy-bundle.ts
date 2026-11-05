@@ -33,6 +33,19 @@
  * language server to return the lines, which is a change to that protocol and
  * is not made.
  *
+ * A path import (a backticked name with a `/`, `IMPORT \`../b/mod\``; see
+ * specs/proposals/RELATIVE-IMPORTS-SPEC.md) needs no such check here. The
+ * service looks it up where its path names, counted from the importing file's
+ * folder in the zip, and the language server resolves it the same way, against
+ * the importing file's URI with `..` collapsed by its letters. Entry names keep
+ * every file's place relative to every other, so the file the language server
+ * returned for a path is where the path names it in the zip. Unlike `l4 deploy`,
+ * which names a file by its folder with links followed and refuses a path whose
+ * folder is a link, this deploy names a file by its URI, so a folder reached
+ * through a link goes up under the name the path wrote. With no workspace
+ * folder the root is the main file's folder, so a path into a sibling folder
+ * (`../b/mod`) stops the deploy as outside the root.
+ *
  * A service built before the commit that makes the bundle root the top of the
  * upload (`bundleRoot` in jl4-service's Backend/Jl4.hs) looks a bare IMPORT up
  * from the folder of the first file of the upload in alphabetical order, not at
@@ -40,10 +53,13 @@
  * call on the wrapper path, a request with a `{}` in an input, looks from the
  * folder of the function's own file instead; see jl4-service's
  * test/BundleRootSpec.hs), so a main file in a folder with its library at the
- * top is uploaded here, such a service says "ready", and every call fails; this
- * deploy does not
- * check the version of the service, and whether the service has to be released
- * first is not decided.
+ * top is uploaded here, such a service says "ready", and every call fails. A
+ * service built without path imports reads `../b/mod` as the bare name `mod`,
+ * and fails the same way. This deploy does not check the version of the service
+ * (a build made without `JL4_SERVICE_VERSION` reports `0.0.0-dev` on /health,
+ * so a number would misjudge every self-built service). Ruled 2026-11-05 (RI3,
+ * specs/as-built/import-resolution.md): the service ships first, and this
+ * deploy stays a draft until Legalese Cloud runs a build that has both.
  *
  * Lives in its own module with no `vscode` import so `node --test` can exercise
  * it (see `unit-tests/deploy-bundle.test.ts`). The zip writer that packs the
